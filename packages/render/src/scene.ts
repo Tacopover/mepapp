@@ -202,6 +202,41 @@ export class SketchScene {
     return this.calibration;
   }
 
+  /**
+   * Benchmark-only: fills the scene with `count` placeholder rectangles (a
+   * shared 1x1 white texture, tinted, no real stamp art) scattered across
+   * [0,areaWidth] x [0,areaHeight]. Exists to drive Step 3's frame-rate/
+   * object-count load test without needing 3000 real stamp images — see the
+   * Stack Study plan, which explicitly allows placeholder shapes here since
+   * this step measures redraw cost, not rendering fidelity. Never called from
+   * normal UI code.
+   */
+  debugPopulateForBenchmark(count: number, areaWidth: number, areaHeight: number): void {
+    for (let i = 0; i < count; i++) {
+      const id = `bench-${this.nextStampSeq++}`;
+      const nativeWidth = 40 + Math.random() * 40;
+      const nativeHeight = 40 + Math.random() * 40;
+      const data: PlacedStamp = {
+        id,
+        transform: {
+          position: { x: Math.random() * areaWidth, y: Math.random() * areaHeight },
+          rotationDegrees: Math.random() * 360,
+          scale: { x: 1, y: 1 },
+        },
+        nativeWidth,
+        nativeHeight,
+        ports: [],
+      };
+      const sprite = new Sprite(Texture.WHITE);
+      sprite.anchor.set(0.5);
+      sprite.tint = Math.floor(Math.random() * 0xffffff);
+      const baseScale = { x: nativeWidth, y: nativeHeight }; // Texture.WHITE is 1x1
+      applyTransformToSprite(sprite, data.transform, baseScale);
+      this.stamps.set(id, { data, sprite, baseScale });
+      this.stampsLayer.addChild(sprite);
+    }
+  }
+
   /** Programmatic rotate (e.g. a "rotate 90°" button) — same absolute-recompute path as drag rotation. */
   rotateSelectionBy(deltaDegrees: number): void {
     const snapshot = this.getSelection().map((s) => ({ id: s.id, transform: s.transform }));

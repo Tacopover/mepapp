@@ -12,6 +12,10 @@ export interface MepSketchAppProps {
   // Kept as a prop (not a direct @mepapp/pdf-engine-mupdf import) so this
   // component stays engine-agnostic — the app shell picks which PdfEngine to wire in.
   onLoadPdfPage: (file: File) => Promise<PdfPageLoadResult>;
+  // AGPLv3 section 13: a network service running a modified version of this
+  // app must offer the exact corresponding source. The app shell computes
+  // this link (it knows the build's commit SHA); this component just shows it.
+  correspondingSourceUrl?: string;
 }
 
 function ToolButton(props: { tool: SketchTool; current: SketchTool; sceneRef: RefObject<SketchScene | null>; label: string }) {
@@ -22,7 +26,7 @@ function ToolButton(props: { tool: SketchTool; current: SketchTool; sceneRef: Re
   );
 }
 
-export function MepSketchApp({ onLoadPdfPage }: MepSketchAppProps) {
+export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketchAppProps) {
   const { containerRef, sceneRef, ready, tool, selection, calibration, measurementMm, calibrationPrompt, setCalibrationPrompt } =
     useSketchScene();
   const [status, setStatus] = useState('');
@@ -137,6 +141,15 @@ export function MepSketchApp({ onLoadPdfPage }: MepSketchAppProps) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {correspondingSourceUrl && (
+        <div style={{ padding: '4px 8px', background: '#1c1c1c', color: '#888', fontSize: 11 }}>
+          MepApp is AGPLv3 licensed.{' '}
+          <a href={correspondingSourceUrl} target="_blank" rel="noreferrer" style={{ color: '#7dc4ff' }}>
+            View the source code for this exact version
+          </a>
+          .
         </div>
       )}
     </div>

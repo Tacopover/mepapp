@@ -51,6 +51,11 @@ export function useSketchScene(): UseSketchScene {
 
     scene.init().then(() => {
       if (!cancelled) setReady(true);
+      // Dev-only hook so Playwright-driven benchmarks (Step 3, frame rate) can
+      // reach the scene instance directly, without adding permanent UI surface.
+      if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+        (window as unknown as { __mepSketchScene?: SketchScene }).__mepSketchScene = scene;
+      }
     });
 
     return () => {

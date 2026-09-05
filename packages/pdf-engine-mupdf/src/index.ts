@@ -9,6 +9,7 @@ import type {
   PdfDocumentHandle,
   PdfEngine,
   RasterOptions,
+  StoredAnnotation,
 } from '@mepapp/pdf-engine';
 
 const VALID_ROTATIONS = [0, 90, 180, 270] as const;
@@ -28,6 +29,68 @@ function readRotation(page: mupdf.PDFPage): PageInfo['rotationDegrees'] {
   return (VALID_ROTATIONS as readonly number[]).includes(normalized)
     ? (normalized as PageInfo['rotationDegrees'])
     : 0;
+}
+
+function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): AnnotationSpec | null {
+  const type = annot.getType();
+  switch (type) {
+    case 'Ink': {
+      const strokes = annot.getInkList();
+      const first = strokes[0] ?? [];
+      return {
+        kind: 'freehand',
+        pageIndex,
+        geometry: { kind: 'freehand', points: first.map(([x, y]) => ({ x, y })) },
+      };
+    }
+    case 'Line': {
+      const [[fx, fy], [tx, ty]] = annot.getLine();
+      const isArrow = annot.getLineEndingStyles().end === 'ClosedArrow';
+      return {
+        kind: isArrow ? 'arrow' : 'line',
+        pageIndex,
+        geometry: { kind: isArrow ? 'arrow' : 'line', from: { x: fx, y: fy }, to: { x: tx, y: ty } },
+      };
+    }
+    case 'Square': {
+      const [x0, y0, x1, y1] = annot.getRect();
+      return { kind: 'rectangle', pageIndex, geometry: { kind: 'rectangle', rect: { x0, y0, x1, y1 } } };
+    }
+    case 'Circle': {
+      const [x0, y0, x1, y1] = annot.getRect();
+      return {
+        kind: 'circle',
+        pageIndex,
+        geometry: { kind: 'circle', center: { x: (x0 + x1) / 2, y: (y0 + y1) / 2 }, radius: (x1 - x0) / 2 },
+      };
+    }
+    case 'Highlight': {
+      const quads = annot.getQuadPoints();
+      const flat = quads[0] ?? [0, 0, 0, 0, 0, 0, 0, 0];
+      const xs = [flat[0], flat[2], flat[4], flat[6]];
+      const ys = [flat[1], flat[3], flat[5], flat[7]];
+      const rect = { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+      return { kind: 'highlight', pageIndex, geometry: { kind: 'highlight', rect } };
+    }
+    case 'FreeText': {
+      const [x0, y0, x1, y1] = annot.getRect();
+      return {
+        kind: 'textbox',
+        pageIndex,
+        geometry: { kind: 'textbox', rect: { x0, y0, x1, y1 }, text: annot.getContents() },
+      };
+    }
+    case 'Text': {
+      const [x0, y0] = annot.getRect();
+      return {
+        kind: 'stickyNote',
+        pageIndex,
+        geometry: { kind: 'stickyNote', position: { x: x0, y: y0 }, text: annot.getContents() },
+      };
+    }
+    default:
+      return null; // foreign annotation type this adapter doesn't author — not one of ours to round-trip
+  }
 }
 
 class MupdfDocumentHandle implements PdfDocumentHandle {
@@ -84,24 +147,131 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
     return createImageBitmap(new Blob([new Uint8Array(png)], { type: 'image/png' }));
   }
 
-  async addAnnotation(_spec: AnnotationSpec): Promise<string> {
-    throw new Error('addAnnotation is not implemented yet — out of scope until Step 4 (annotation round trip).');
+  async addAnnotation(spec: AnnotationSpec): Promise<string> {
+    const page = this.doc.loadPage(spec.pageIndex);
+    const id = `annot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const rgb = spec.style?.colorRGBA ? ([spec.style.colorRGBA[0], spec.style.colorRGBA[1], spec.style.colorRGBA[2]] as [number, number, number]) : undefined;
+    const geometry = spec.geometry;
+
+    let annot: mupdf.PDFAnnotation;
+    switch (geometry.kind) {
+      case 'freehand':
+        annot = page.createAnnotation('Ink');
+        annot.setInkList([geometry.points.map((p) => [p.x, p.y])]);
+        break;
+      case 'line':
+      case 'arrow':
+        annot = page.createAnnotation('Line');
+        annot.setLine([geometry.from.x, geometry.from.y], [geometry.to.x, geometry.to.y]);
+        annot.setLineEndingStyles('None', geometry.kind === 'arrow' ? 'ClosedArrow' : 'None');
+        break;
+      case 'rectangle':
+        annot = page.createAnnotation('Square');
+        annot.setRect([geometry.rect.x0, geometry.rect.y0, geometry.rect.x1, geometry.rect.y1]);
+        break;
+      case 'highlight':
+        annot = page.createAnnotation('Highlight');
+        annot.setQuadPoints([
+          [geometry.rect.x0, geometry.rect.y0, geometry.rect.x1, geometry.rect.y0, geometry.rect.x0, geometry.rect.y1, geometry.rect.x1, geometry.rect.y1],
+        ]);
+        break;
+      case 'circle':
+        annot = page.createAnnotation('Circle');
+        annot.setRect([
+          geometry.center.x - geometry.radius,
+          geometry.center.y - geometry.radius,
+          geometry.center.x + geometry.radius,
+          geometry.center.y + geometry.radius,
+        ]);
+        break;
+      case 'textbox':
+        annot = page.createAnnotation('FreeText');
+        annot.setRect([geometry.rect.x0, geometry.rect.y0, geometry.rect.x1, geometry.rect.y1]);
+        annot.setContents(geometry.text);
+        annot.setDefaultAppearance('Helv', 12, rgb ?? [0, 0, 0]);
+        break;
+      case 'stickyNote':
+        annot = page.createAnnotation('Text');
+        annot.setRect([geometry.position.x, geometry.position.y, geometry.position.x, geometry.position.y]);
+        annot.setContents(geometry.text);
+        break;
+    }
+
+    if (rgb && geometry.kind !== 'textbox') annot.setColor(rgb);
+    if (spec.style?.strokeWidthPt !== undefined) annot.setBorderWidth(spec.style.strokeWidthPt);
+    annot.setName(id);
+    annot.update();
+    return id;
   }
 
-  async listAnnotations(_pageIndex: number): Promise<AnnotationSpec[]> {
-    throw new Error('listAnnotations is not implemented yet — out of scope until Step 4 (annotation round trip).');
+  async listAnnotations(pageIndex: number): Promise<StoredAnnotation[]> {
+    const page = this.doc.loadPage(pageIndex);
+    const results: StoredAnnotation[] = [];
+    for (const annot of page.getAnnotations()) {
+      const id = annot.getName();
+      if (!id) continue; // not one of ours — skip rather than fail on foreign annotations
+      const spec = annotationToSpec(annot, pageIndex);
+      if (spec) results.push({ ...spec, id });
+    }
+    return results;
   }
 
-  async deleteAnnotation(_annotationId: string): Promise<void> {
-    throw new Error('deleteAnnotation is not implemented yet — out of scope until Step 4 (annotation round trip).');
+  async deleteAnnotation(annotationId: string): Promise<void> {
+    for (let i = 0; i < this.doc.countPages(); i++) {
+      const page = this.doc.loadPage(i);
+      for (const annot of page.getAnnotations()) {
+        if (annot.getName() === annotationId) {
+          page.deleteAnnotation(annot);
+          return;
+        }
+      }
+    }
+    throw new Error(`deleteAnnotation: no annotation found with id ${annotationId}`);
   }
 
-  async flattenOverlay(_req: FlattenRequest): Promise<void> {
-    throw new Error('flattenOverlay is not implemented yet — out of scope until Step 4 (annotation round trip).');
+  async flattenOverlay(req: FlattenRequest): Promise<void> {
+    if (req.overlaySnapshot.kind === 'vector') {
+      throw new Error('flattenOverlay does not support vector (SVG) snapshots yet — only raster is implemented.');
+    }
+    const page = this.doc.loadPage(req.pageIndex);
+    const { pngBytes, pageRect } = req.overlaySnapshot;
+    const image = new mupdf.Image(pngBytes);
+    const pageObj = page.getObject();
+
+    let resources = pageObj.get('Resources');
+    if (!resources.isDictionary()) {
+      resources = this.doc.newDictionary();
+      pageObj.put('Resources', resources);
+    }
+    let xobjects = resources.get('XObject');
+    if (!xobjects.isDictionary()) {
+      xobjects = this.doc.newDictionary();
+      resources.put('XObject', xobjects);
+    }
+    const imageRef = this.doc.addImage(image);
+    const resourceName = `MepAppOverlay${Date.now().toString(36)}`;
+    xobjects.put(resourceName, imageRef);
+
+    const width = pageRect.x1 - pageRect.x0;
+    const height = pageRect.y1 - pageRect.y0;
+    const contentStream = `q ${width} 0 0 ${height} ${pageRect.x0} ${pageRect.y0} cm /${resourceName} Do Q`;
+    const extraContents = this.doc.addStream(contentStream, null);
+
+    const existingContents = pageObj.get('Contents');
+    if (existingContents.isNull()) {
+      pageObj.put('Contents', extraContents);
+    } else if (existingContents.isArray()) {
+      existingContents.push(extraContents);
+    } else {
+      const newContents = this.doc.newArray();
+      newContents.push(existingContents);
+      newContents.push(extraContents);
+      pageObj.put('Contents', newContents);
+    }
   }
 
   async save(): Promise<Uint8Array> {
-    throw new Error('save is not implemented yet — out of scope until Step 4 (annotation round trip).');
+    return this.doc.saveToBuffer('incremental').asUint8Array();
   }
 }
 
