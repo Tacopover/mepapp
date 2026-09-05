@@ -66,6 +66,26 @@ export function applyMatrix(m: Mat2x3, p: Vec2): Vec2 {
   };
 }
 
+/** Algebraic inverse of a 2x3 affine matrix. Throws if the matrix is singular. */
+export function invertMatrix(m: Mat2x3): Mat2x3 {
+  const det = m.a * m.d - m.b * m.c;
+  if (det === 0) {
+    throw new Error('invertMatrix: matrix is singular');
+  }
+  const a = m.d / det;
+  const b = -m.b / det;
+  const c = -m.c / det;
+  const d = m.a / det;
+  return {
+    a,
+    b,
+    c,
+    d,
+    tx: (m.c * m.ty - m.d * m.tx) / det,
+    ty: (m.b * m.tx - m.a * m.ty) / det,
+  };
+}
+
 /**
  * Rotates a point about a pivot by deltaDegrees. Used for both hit-testing
  * (inverse-rotate the click point, then test against the unrotated rect) and
