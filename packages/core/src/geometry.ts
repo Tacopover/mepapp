@@ -123,6 +123,58 @@ export function pointInRotatedRect(
   return Math.abs(dx) <= halfWidth && Math.abs(dy) <= halfHeight;
 }
 
+/**
+ * Rubber-band selection test: does an axis-aligned drag rectangle intersect
+ * an element's true rotated extents? Uses the separating-axis test over the
+ * four candidate axes (the drag rect's two axes, plus the element's own two
+ * rotated axes) — a deliberate improvement over the old app's rubber-band
+ * selection, which only tested each element's center point against the drag
+ * rectangle and ignored rotation and size entirely.
+ */
+export function rectIntersectsRotatedRect(
+  rectMin: Vec2,
+  rectMax: Vec2,
+  transform: Transform2D,
+  halfWidth: number,
+  halfHeight: number,
+): boolean {
+  const localCorners: Vec2[] = [
+    { x: -halfWidth, y: -halfHeight },
+    { x: halfWidth, y: -halfHeight },
+    { x: halfWidth, y: halfHeight },
+    { x: -halfWidth, y: halfHeight },
+  ];
+  const rotatedCorners = localCorners.map((local) => {
+    const rotated = rotatePointAround(local, { x: 0, y: 0 }, transform.rotationDegrees);
+    return { x: rotated.x + transform.position.x, y: rotated.y + transform.position.y };
+  });
+  const rectCorners: Vec2[] = [
+    { x: rectMin.x, y: rectMin.y },
+    { x: rectMax.x, y: rectMin.y },
+    { x: rectMax.x, y: rectMax.y },
+    { x: rectMin.x, y: rectMax.y },
+  ];
+  const radians = (transform.rotationDegrees * Math.PI) / 180;
+  const axes: Vec2[] = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: Math.cos(radians), y: Math.sin(radians) },
+    { x: -Math.sin(radians), y: Math.cos(radians) },
+  ];
+  for (const axis of axes) {
+    const rectProjections = rectCorners.map((c) => c.x * axis.x + c.y * axis.y);
+    const rotatedProjections = rotatedCorners.map((c) => c.x * axis.x + c.y * axis.y);
+    const rectMinProj = Math.min(...rectProjections);
+    const rectMaxProj = Math.max(...rectProjections);
+    const rotatedMinProj = Math.min(...rotatedProjections);
+    const rotatedMaxProj = Math.max(...rotatedProjections);
+    if (rectMaxProj < rotatedMinProj || rotatedMaxProj < rectMinProj) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function centroid(points: Vec2[]): Vec2 {
   if (points.length === 0) {
     throw new Error('centroid requires at least one point');

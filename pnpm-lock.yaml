@@ -35,6 +35,12 @@ importers:
       '@mepapp/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      react:
+        specifier: latest
+        version: 19.2.8
+      react-dom:
+        specifier: latest
+        version: 19.2.8(react@19.2.8)
     devDependencies:
       '@types/react':
         specifier: latest
@@ -103,6 +109,13 @@ importers:
       react-dom:
         specifier: latest
         version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@types/react':
+        specifier: latest
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: latest
+        version: 19.2.7(@types/react@19.2.18)
 
 packages:
 

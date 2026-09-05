@@ -4,6 +4,7 @@ import {
   composeTransform,
   multiRotate,
   normalizeDegrees,
+  rectIntersectsRotatedRect,
   rotateBy,
   rotatePointAround,
   type Transform2D,
@@ -103,5 +104,35 @@ describe('check 4 — multi-rotate preserves relative position and own rotation'
 
   it('returns an empty array for an empty selection', () => {
     expect(multiRotate([], 90)).toEqual([]);
+  });
+});
+
+describe('check 2 — rubber-band selection tests the rotated shape, not a center point', () => {
+  const stamp: Transform2D = { position: { x: 100, y: 100 }, rotationDegrees: 0, scale: { x: 1, y: 1 } };
+
+  it('detects an unrotated stamp fully enclosed by the drag rectangle', () => {
+    expect(rectIntersectsRotatedRect({ x: 50, y: 50 }, { x: 150, y: 150 }, stamp, 20, 20)).toBe(true);
+  });
+
+  it('does not select a stamp far outside the drag rectangle', () => {
+    expect(rectIntersectsRotatedRect({ x: 50, y: 50 }, { x: 150, y: 150 }, { ...stamp, position: { x: 500, y: 500 } }, 20, 20)).toBe(
+      false,
+    );
+  });
+
+  it('rejects a drag rectangle whose corner lies in the rotated stamp AABB but misses its true rotated extent', () => {
+    // A stamp rotated 45 degrees has a diamond-shaped footprint; a small drag
+    // rectangle placed in the AABB's corner, outside the diamond, must miss —
+    // a center-point-only or AABB-only test would get this wrong.
+    const rotated: Transform2D = { position: { x: 0, y: 0 }, rotationDegrees: 45, scale: { x: 1, y: 1 } };
+    const halfWidth = 10;
+    const halfHeight = 10;
+    // AABB half-extent of a 45-degree-rotated 10x10 half-extent square is 10*sqrt(2) ~= 14.14
+    expect(rectIntersectsRotatedRect({ x: 12, y: 12 }, { x: 14, y: 14 }, rotated, halfWidth, halfHeight)).toBe(false);
+  });
+
+  it('accepts a drag rectangle that overlaps the rotated diamond', () => {
+    const rotated: Transform2D = { position: { x: 0, y: 0 }, rotationDegrees: 45, scale: { x: 1, y: 1 } };
+    expect(rectIntersectsRotatedRect({ x: 8, y: -1 }, { x: 12, y: 1 }, rotated, 10, 10)).toBe(true);
   });
 });

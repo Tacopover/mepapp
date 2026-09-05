@@ -1,2 +1,3 @@
 // React panels and dialogs. Depends on core + render.
-export {};
+export * from './App.js';
+export * from './useSketchScene.js';

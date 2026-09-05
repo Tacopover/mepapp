@@ -14,5 +14,9 @@
     "@mepapp/render": "workspace:*",
     "react": "latest",
     "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
   }
 }
