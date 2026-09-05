@@ -124,11 +124,43 @@ history of what was verified stays visible.
       `https://github.com/Tacopover/mepapp/tree/<commit-sha>`, with the SHA
       baked in at build time via `vite.config.ts`. Verified the link renders
       with the correct, real commit SHA.
-- [ ] **Clean-clone build verification is queued** — needs to run after this
-      session's work is committed and pushed (a clone only sees committed
-      history). Will confirm in the same pass as the push.
+- [x] **Clean-clone build verified.** Cloned `https://github.com/Tacopover/mepapp`
+      fresh into an empty directory, ran `corepack enable && pnpm install &&
+      pnpm build && pnpm test` — 9/9 build tasks and all 27 tests passed, all
+      genuinely fresh (0 cache hits, since it's a separate directory from this
+      session's own dev checkout). Confirmed the built bundle's
+      corresponding-source link bakes in the exact commit
+      (`f255c94...`) that was actually cloned and built.
 - [ ] Self-hosted license-gating behavior remains explicitly out of scope per
       the plan's own decision — not attempted, not needed here.
+
+## Step 7 — Vertical feature slice: STOPPED HERE, needs your design input
+
+This is where automated progress stopped. Steps 3-6 were all either pure
+verification or had a specified target to implement against. Step 7 (segment
+drawing tool, auto-generated junctions, network merge, flow solve, undo/redo,
+schema migration, export) is different: the plan intentionally doesn't pin
+down *how* several of these should work, because they're real product design
+decisions, not implementation details:
+
+- **Segment/junction/fitting domain model** — `@mepapp/core` has no
+  representation yet for a drawn run, a network, or a fitting. What data
+  shape should these be (geometry only, or with engineering properties like
+  pipe/duct size, material, flow direction)?
+- **Flow solve** — the plan names this step but doesn't specify what physical
+  quantity is being solved for (pressure drop? air/water flow balancing?) or
+  by what method. This is domain-specific engineering knowledge, not
+  something to guess at.
+- **Undo/redo model** — a command-pattern history, an immutable-snapshot
+  diff, or something else? This choice shapes how every future feature is
+  built on top of `core`, so it's worth deciding deliberately rather than
+  picking whatever is fastest to write first.
+- **Schema migration strategy** — versioned JSON with explicit migration
+  functions is the common approach, but the exact shape depends on what
+  `core`'s save format ends up being, which depends on the above.
+
+None of this was invented or guessed at. Tell me how you want these to work
+(or point me at more detail in a design doc) and this can continue.
 
 ## Notes
 
