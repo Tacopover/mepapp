@@ -13,7 +13,7 @@ async function loadPdfPage(file: File): Promise<PdfPageLoadResult> {
   const info = doc.getPageInfo(0);
   const bitmap = await doc.renderPageToRaster(0, { dpi: BACKDROP_DPI });
   const displayed = displayDimensions({ widthPt: info.widthPt, heightPt: info.heightPt }, info.rotationDegrees);
-  return { bitmap, pageWidthPt: displayed.widthPt, pageHeightPt: displayed.heightPt };
+  return { bitmap, pageWidthPt: displayed.widthPt, pageHeightPt: displayed.heightPt, handle: doc };
 }
 
 const REPO_URL = 'https://github.com/Tacopover/mepapp';

@@ -104,6 +104,9 @@ importers:
       '@mepapp/core':
         specifier: workspace:*
         version: link:../core
+      '@mepapp/pdf-engine':
+        specifier: workspace:*
+        version: link:../pdf-engine
       pixi.js:
         specifier: latest
         version: 8.20.1
@@ -113,6 +116,9 @@ importers:
       '@mepapp/core':
         specifier: workspace:*
         version: link:../core
+      '@mepapp/pdf-engine':
+        specifier: workspace:*
+        version: link:../pdf-engine
       '@mepapp/render':
         specifier: workspace:*
         version: link:../render

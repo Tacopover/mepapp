@@ -1,12 +1,16 @@
 import { useCallback, useState, type RefObject } from 'react';
 import type { SketchScene, SketchTool } from '@mepapp/render';
-import { ProjectLoadError } from '@mepapp/core';
+import { ProjectLoadError, type ReconciliationReport } from '@mepapp/core';
+import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 
 export interface PdfPageLoadResult {
   bitmap: ImageBitmap;
   pageWidthPt: number; // display-space (post-rotation) dimensions, per @mepapp/core's displayDimensions
   pageHeightPt: number;
+  // The still-open document handle, kept so the app can later sync the
+  // domain model back into this same PDF (exportToPdf) and download it.
+  handle: PdfDocumentHandle;
 }
 
 export interface MepSketchAppProps {
@@ -44,6 +48,8 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
   const [status, setStatus] = useState('');
   const [calibrationInput, setCalibrationInput] = useState('');
   const [capacityInput, setCapacityInput] = useState('');
+  const [pdfHandle, setPdfHandle] = useState<PdfDocumentHandle | null>(null);
+  const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
 
   const handleSaveProject = useCallback(() => {
     if (!sceneRef.current) return;
@@ -75,8 +81,15 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
     async (file: File) => {
       setStatus(`Loading ${file.name}...`);
       try {
-        const { bitmap, pageWidthPt, pageHeightPt } = await onLoadPdfPage(file);
+        const { bitmap, pageWidthPt, pageHeightPt, handle } = await onLoadPdfPage(file);
         sceneRef.current?.setBackdrop(bitmap, pageWidthPt, pageHeightPt);
+        setPdfHandle(handle);
+        // Loads this PDF's own embedded project JSON (if any) and compares
+        // its annotations against that domain model — see decisions log
+        // 2026-09-06's reconciliation policy: flag drift/missing, never
+        // silently resolve either way.
+        const report = sceneRef.current ? await sceneRef.current.loadFromPdf(handle) : null;
+        setReconciliation(report && (report.drifted.length > 0 || report.missingIds.length > 0) ? report : null);
         setStatus(`Loaded ${file.name} (${pageWidthPt.toFixed(1)} x ${pageHeightPt.toFixed(1)} pt)`);
       } catch (err) {
         setStatus(`Failed to load ${file.name}: ${(err as Error).message}`);
@@ -84,6 +97,25 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
     },
     [onLoadPdfPage, sceneRef],
   );
+
+  const handleSyncToPdf = useCallback(async () => {
+    if (!sceneRef.current || !pdfHandle) return;
+    await sceneRef.current.exportToPdf(pdfHandle);
+    setReconciliation(null);
+    setStatus('Synced the current drawing into the open PDF\'s annotations and embedded project data.');
+  }, [pdfHandle, sceneRef]);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!pdfHandle) return;
+    const bytes = await pdfHandle.save();
+    const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mepapp-drawing.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [pdfHandle]);
 
   const handleStampFile = useCallback(
     async (file: File) => {
@@ -174,7 +206,26 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
           Load project:{' '}
           <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && handleLoadProject(e.target.files[0])} />
         </label>
+        <button onClick={handleSyncToPdf} disabled={!pdfHandle}>
+          Sync to PDF
+        </button>
+        <button onClick={handleDownloadPdf} disabled={!pdfHandle}>
+          Download PDF
+        </button>
       </div>
+      {reconciliation && (
+        <div style={{ padding: 8, background: '#4a3200', color: '#ffd479', fontSize: 13 }}>
+          This PDF's annotations differ from its saved project data since it was last opened here.{' '}
+          {reconciliation.missingIds.length > 0 && (
+            <span>{reconciliation.missingIds.length} annotation{reconciliation.missingIds.length === 1 ? '' : 's'} missing (deleted in another viewer). </span>
+          )}
+          {reconciliation.drifted.length > 0 && (
+            <span>{reconciliation.drifted.length} annotation{reconciliation.drifted.length === 1 ? '' : 's'} moved in another viewer. </span>
+          )}
+          Click "Sync to PDF" to rewrite them from the current drawing, or edit the drawing first if you want to keep the other viewer's changes instead.{' '}
+          <button onClick={() => setReconciliation(null)}>Dismiss</button>
+        </div>
+      )}
       <div ref={containerRef} style={{ flex: 1, position: 'relative' }}>
         {!ready && <div style={{ position: 'absolute', top: 12, left: 12, color: '#888' }}>Initializing canvas…</div>}
       </div>

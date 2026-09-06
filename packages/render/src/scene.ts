@@ -17,7 +17,9 @@ import {
   measureRealDistance,
   multiRotate,
   normalizeDegrees,
+  planPdfSync,
   pointInRotatedRect,
+  reconcilePdfSync,
   rectIntersectsRotatedRect,
   resolveSegmentEndpoint,
   rotatePointAround,
@@ -32,11 +34,46 @@ import {
   type NetworkType,
   type PlacedStamp,
   type ProjectDocument,
+  type ReconciliationReport,
   type Segment,
+  type SyncedGeometry,
   type Transform2D,
   type Vec2,
 } from '@mepapp/core';
+import type { AnnotationGeometry, PdfDocumentHandle, StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
+
+// The embedded-file name the project JSON is stored under inside the PDF
+// itself (see decisions log 2026-09-06: single self-contained .pdf, no
+// sidecar file to lose or point at the wrong PDF).
+const EMBEDDED_PROJECT_FILENAME = 'mepapp-project.json';
+
+function round(n: number): number {
+  return Math.round(n * 1000) / 1000; // avoids float round-trip noise producing false-positive drift
+}
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+/** Maps an observed PDF annotation back to the generic geometry shape reconcilePdfSync compares — see core/pdfSync.ts. Returns null for annotation kinds MepApp doesn't itself author (foreign markup is left alone entirely). */
+function annotationSyncEntry(annotation: StoredAnnotation): SyncedGeometry | null {
+  const g: AnnotationGeometry = annotation.geometry;
+  if (g.kind === 'line') {
+    return { id: annotation.id, geometry: { ax: round(g.from.x), ay: round(g.from.y), bx: round(g.to.x), by: round(g.to.y) } };
+  }
+  if (g.kind === 'circle') {
+    return { id: annotation.id, geometry: { x: round(g.center.x), y: round(g.center.y) } };
+  }
+  if (g.kind === 'stamp') {
+    return { id: annotation.id, geometry: { x: round(g.position.x), y: round(g.position.y), rotationDegrees: round(g.rotationDegrees) } };
+  }
+  return null;
+}
 
 /** Undo-history state for the segment/fitting drawing tool — kept separate from the pre-existing, not-yet-undoable stamp placement state (see decisions log 2026-09-06). */
 interface DrawingState {
@@ -205,6 +242,12 @@ export class SketchScene {
   private nextSegmentSeq = 1;
   private lastFlowResult: FlowResult[] = [];
   private readonly SNAP_RADIUS_SCREEN_PX = 12;
+  // Domain ids that currently have a MepApp-written PDF annotation, per the
+  // last loadFromPdf/exportToPdf call — seeds planPdfSync's "what did we
+  // previously write" input so a save never deletes an annotation it doesn't
+  // own (see core/pdfSync.ts's SyncPlan doc comment).
+  private pdfSyncIds = new Set<string>();
+  private static readonly FITTING_MARKER_RADIUS_PT = 4;
 
   constructor(private readonly container: HTMLElement) {}
 
@@ -375,6 +418,144 @@ export class SketchScene {
 
     this.syncDrawingLayer();
     this.emitter.emit('projectLoaded');
+  }
+
+  /**
+   * Writes the current domain model into a PDF, both as the authoritative
+   * project JSON (a document-level embedded file, so a single .pdf carries
+   * the whole project) and as real, editable PDF annotation objects for
+   * segments/fittings/stamps — kept in sync with the domain model rather
+   * than recreated wholesale on every save (see core/pdfSync.ts's
+   * planPdfSync). A domain object's own id is used verbatim as its
+   * annotation's id, so it can be correlated again on the next open with no
+   * separate mapping table (decisions log 2026-09-06).
+   */
+  async exportToPdf(handle: PdfDocumentHandle): Promise<void> {
+    const domainEntries = this.domainSyncEntries();
+    const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
+    const plan = planPdfSync(domainEntries, observed, this.pdfSyncIds);
+
+    for (const id of plan.toDelete) {
+      await handle.deleteAnnotation(id);
+      this.pdfSyncIds.delete(id);
+    }
+    for (const id of plan.toUpdate) {
+      // The interface has no "update in place" — an update is a delete then
+      // recreate under the same id.
+      await handle.deleteAnnotation(id);
+      await this.writeAnnotationForId(handle, id);
+    }
+    for (const id of plan.toCreate) {
+      await this.writeAnnotationForId(handle, id);
+      this.pdfSyncIds.add(id);
+    }
+
+    await handle.setEmbeddedFile(EMBEDDED_PROJECT_FILENAME, new TextEncoder().encode(JSON.stringify(this.exportProject())));
+  }
+
+  /**
+   * Opens a PDF: loads its embedded project JSON (if any) as the domain
+   * model, then compares that domain model against what the PDF's own
+   * annotations actually show right now. MepApp's confirmed reconciliation
+   * policy (2026-09-06) is to flag drift/missing annotations and let the
+   * user choose what to do — this method never silently overwrites either
+   * side; the caller decides how to act on the returned report (e.g. an "N
+   * annotations changed since last save" review panel).
+   */
+  async loadFromPdf(handle: PdfDocumentHandle): Promise<ReconciliationReport> {
+    const embedded = await handle.getEmbeddedFile(EMBEDDED_PROJECT_FILENAME);
+    if (embedded) {
+      this.loadProjectFromJson(JSON.parse(new TextDecoder().decode(embedded)));
+    }
+
+    const domainEntries = this.domainSyncEntries();
+    const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
+    const report = reconcilePdfSync(domainEntries, observed);
+
+    this.pdfSyncIds = new Set([...report.matchedIds, ...report.drifted.map((d) => d.id)]);
+    return report;
+  }
+
+  private domainSyncEntries(): SyncedGeometry[] {
+    const state = this.drawingHistory.getState();
+    const entries: SyncedGeometry[] = [];
+    for (const segment of Object.values(state.segments)) {
+      const [a, b] = segment.geometry;
+      if (!a || !b) continue;
+      entries.push({ id: segment.id, geometry: { ax: round(a.x), ay: round(a.y), bx: round(b.x), by: round(b.y) } });
+    }
+    for (const fitting of Object.values(state.fittings)) {
+      entries.push({ id: fitting.id, geometry: { x: round(fitting.position.x), y: round(fitting.position.y) } });
+    }
+    for (const entry of this.stamps.values()) {
+      const bounds = this.stampWorldBounds(entry);
+      entries.push({
+        id: entry.data.id,
+        geometry: { x: round(bounds.minX), y: round(bounds.minY), rotationDegrees: round(entry.data.transform.rotationDegrees) },
+      });
+    }
+    return entries;
+  }
+
+  private stampWorldBounds(entry: StampEntry): { minX: number; minY: number; maxX: number; maxY: number } {
+    const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
+    const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
+    const corners = [
+      { x: -halfWidth, y: -halfHeight },
+      { x: halfWidth, y: -halfHeight },
+      { x: halfWidth, y: halfHeight },
+      { x: -halfWidth, y: halfHeight },
+    ].map((local) => {
+      const r = rotatePointAround(local, { x: 0, y: 0 }, entry.data.transform.rotationDegrees);
+      return { x: r.x + entry.data.transform.position.x, y: r.y + entry.data.transform.position.y };
+    });
+    return {
+      minX: Math.min(...corners.map((c) => c.x)),
+      minY: Math.min(...corners.map((c) => c.y)),
+      maxX: Math.max(...corners.map((c) => c.x)),
+      maxY: Math.max(...corners.map((c) => c.y)),
+    };
+  }
+
+  private async writeAnnotationForId(handle: PdfDocumentHandle, id: string): Promise<void> {
+    const state = this.drawingHistory.getState();
+    const segment = state.segments[id];
+    if (segment) {
+      const [a, b] = segment.geometry;
+      await handle.addAnnotation({ id, kind: 'line', pageIndex: segment.pageIndex, geometry: { kind: 'line', from: a, to: b } });
+      return;
+    }
+    const fitting = state.fittings[id];
+    if (fitting) {
+      await handle.addAnnotation({
+        id,
+        kind: 'circle',
+        pageIndex: fitting.pageIndex,
+        geometry: { kind: 'circle', center: fitting.position, radius: SketchScene.FITTING_MARKER_RADIUS_PT },
+      });
+      return;
+    }
+    const stampEntry = this.stamps.get(id);
+    if (stampEntry) {
+      // The extracted PNG already reflects the sprite's own rotation baked
+      // into its pixels — the adapter does not rotate pngBytes itself (see
+      // AnnotationGeometry's 'stamp' doc comment in @mepapp/pdf-engine).
+      const pngBytes = dataUrlToBytes(await this.app.renderer.extract.base64({ target: stampEntry.sprite, format: 'png' }));
+      const bounds = this.stampWorldBounds(stampEntry);
+      await handle.addAnnotation({
+        id,
+        kind: 'stamp',
+        pageIndex: 0,
+        geometry: {
+          kind: 'stamp',
+          position: { x: bounds.minX, y: bounds.minY },
+          widthPt: bounds.maxX - bounds.minX,
+          heightPt: bounds.maxY - bounds.minY,
+          rotationDegrees: stampEntry.data.transform.rotationDegrees,
+          pngBytes,
+        },
+      });
+    }
   }
 
   /**

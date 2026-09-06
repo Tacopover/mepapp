@@ -8,3 +8,4 @@ export * from './commands.js';
 export * from './schema.js';
 export * from './segmentTool.js';
 export * from './project.js';
+export * from './pdfSync.js';

@@ -88,6 +88,19 @@ function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): Annota
         geometry: { kind: 'stickyNote', position: { x: x0, y: y0 }, text: annot.getContents() },
       };
     }
+    case 'Stamp': {
+      const [x0, y0, x1, y1] = annot.getRect();
+      const rotationRaw = annot.getObject().get('MepAppRotationDegrees');
+      const rotationDegrees = rotationRaw.isNumber() ? rotationRaw.asNumber() : 0;
+      // pngBytes is not reconstructed from the appearance stream on read-back
+      // (see the AnnotationGeometry doc comment in @mepapp/pdf-engine) —
+      // geometry is all reconciliation needs.
+      return {
+        kind: 'stamp',
+        pageIndex,
+        geometry: { kind: 'stamp', position: { x: x0, y: y0 }, widthPt: x1 - x0, heightPt: y1 - y0, rotationDegrees, pngBytes: new Uint8Array(0) },
+      };
+    }
     default:
       return null; // foreign annotation type this adapter doesn't author — not one of ours to round-trip
   }
@@ -149,7 +162,10 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
 
   async addAnnotation(spec: AnnotationSpec): Promise<string> {
     const page = this.doc.loadPage(spec.pageIndex);
-    const id = `annot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    // A caller-supplied id (a domain object's own id) becomes the annotation's
+    // /NM verbatim, so it round-trips as the correlation key on reopen — see
+    // AnnotationSpec.id's doc comment in @mepapp/pdf-engine.
+    const id = spec.id ?? `annot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const rgb = spec.style?.colorRGBA ? ([spec.style.colorRGBA[0], spec.style.colorRGBA[1], spec.style.colorRGBA[2]] as [number, number, number]) : undefined;
     const geometry = spec.geometry;
 
@@ -195,9 +211,26 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
         annot.setRect([geometry.position.x, geometry.position.y, geometry.position.x, geometry.position.y]);
         annot.setContents(geometry.text);
         break;
+      case 'stamp':
+        annot = page.createAnnotation('Stamp');
+        annot.setRect([
+          geometry.position.x,
+          geometry.position.y,
+          geometry.position.x + geometry.widthPt,
+          geometry.position.y + geometry.heightPt,
+        ]);
+        // pngBytes must already be oriented as it should appear on the page —
+        // this adapter does not rotate pixels itself. rotationDegrees is
+        // stashed as our own bookkeeping key (ignored by other readers, which
+        // just see the already-oriented image) purely so reconcilePdfSync can
+        // compare it against the domain model's rotation without having to
+        // reverse-engineer it from pixel content.
+        annot.setStampImage(new mupdf.Image(geometry.pngBytes));
+        annot.getObject().put('MepAppRotationDegrees', geometry.rotationDegrees);
+        break;
     }
 
-    if (rgb && geometry.kind !== 'textbox') annot.setColor(rgb);
+    if (rgb && geometry.kind !== 'textbox' && geometry.kind !== 'stamp') annot.setColor(rgb);
     if (spec.style?.strokeWidthPt !== undefined) annot.setBorderWidth(spec.style.strokeWidthPt);
     annot.setName(id);
     annot.update();
@@ -227,6 +260,26 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
       }
     }
     throw new Error(`deleteAnnotation: no annotation found with id ${annotationId}`);
+  }
+
+  async setEmbeddedFile(name: string, bytes: Uint8Array): Promise<void> {
+    try {
+      this.doc.deleteEmbeddedFile(name);
+    } catch {
+      // No existing embedded file by this name — nothing to replace.
+    }
+    // addEmbeddedFile only creates the filespec/stream objects; the document's
+    // /Names/EmbeddedFiles tree (what getEmbeddedFiles reads) is only updated
+    // by insertEmbeddedFile — verified empirically, not documented clearly.
+    const fileSpec = this.doc.addEmbeddedFile(name, 'application/json', bytes, new Date(), new Date(), false);
+    this.doc.insertEmbeddedFile(name, fileSpec);
+  }
+
+  async getEmbeddedFile(name: string): Promise<Uint8Array | null> {
+    const fileSpec = this.doc.getEmbeddedFiles()[name];
+    if (!fileSpec) return null;
+    const contents = this.doc.getEmbeddedFileContents(fileSpec);
+    return contents ? contents.asUint8Array() : null;
   }
 
   async flattenOverlay(req: FlattenRequest): Promise<void> {

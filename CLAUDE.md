@@ -29,8 +29,8 @@ Stack: TypeScript, PixiJS v8 (interactive overlay), MuPDF.js behind a swappable 
 - `@mepapp/core` — headless domain model: geometry/calibration math, commands, undo, schema migrations. No rendering/I/O. **Only package with real test coverage** (vitest).
 - `@mepapp/pdf-engine` — abstract `PdfEngine`/`PdfDocumentHandle` interface only. No deps.
 - `@mepapp/pdf-engine-mupdf` — concrete MuPDF.js adapter. **Rule: nothing outside this package may import `mupdf` directly** — go through the `pdf-engine` interface.
-- `@mepapp/render` — PixiJS scene graph, hit-testing, interactive tools. Depends on `core` only.
-- `@mepapp/ui` — React panels/dialogs. Depends on `core` + `render`.
+- `@mepapp/render` — PixiJS scene graph, hit-testing, interactive tools. Depends on `core` and the `pdf-engine` interface (for PDF export/import sync — still never imports `mupdf` directly).
+- `@mepapp/ui` — React panels/dialogs. Depends on `core` + `render` + the `pdf-engine` interface.
 - `@mepapp/platform` — abstract interface for file access, secure storage, window chrome (the layer that differs web vs. desktop).
 - `@mepapp/platform-web` / `@mepapp/platform-tauri` — concrete implementations. `platform-tauri` is currently a stub, not wired to a real Tauri project yet.
 - `apps/web` — Vite + React app, wires everything together. **The only real running app right now.**

@@ -139,3 +139,102 @@ describe('MupdfEngine annotation round trip (Step 4)', () => {
     expect(reopened.getPageCount()).toBe(1);
   });
 });
+
+// Step 7 (PDF export/import): a domain object's own id (Segment.id etc.)
+// becomes the annotation's /NM verbatim, so a save+reopen round trip can
+// correlate a listed annotation back to the domain object that owns it with
+// no separate id-mapping table — see AnnotationSpec.id's doc comment.
+describe('MupdfEngine id correlation (Step 7)', () => {
+  it('addAnnotation uses a caller-supplied id as the annotation id, surviving save+reopen', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+
+    const returnedId = await doc.addAnnotation({
+      id: 'segment-42',
+      kind: 'line',
+      pageIndex: 0,
+      geometry: { kind: 'line', from: { x: 0, y: 0 }, to: { x: 10, y: 10 } },
+    });
+    expect(returnedId).toBe('segment-42');
+
+    const reopened = await engine.openDocument(await doc.save());
+    const listed = await reopened.listAnnotations(0);
+    expect(listed).toHaveLength(1);
+    expect(listed[0].id).toBe('segment-42');
+  });
+
+  it('addAnnotation still autogenerates an id when the caller supplies none', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+    const id = await doc.addAnnotation({
+      kind: 'rectangle',
+      pageIndex: 0,
+      geometry: { kind: 'rectangle', rect: { x0: 0, y0: 0, x1: 5, y1: 5 } },
+    });
+    expect(id.length).toBeGreaterThan(0);
+  });
+});
+
+describe('MupdfEngine stamp annotation (Step 7)', () => {
+  it('writes a placed image as a Stamp annotation and reads back its geometry after save+reopen', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+
+    // A tiny, genuinely valid PNG, produced by mupdf itself.
+    const tinyDoc = new mupdf.PDFDocument();
+    tinyDoc.insertPage(-1, tinyDoc.addPage([0, 0, 10, 10], 0, {}, ''));
+    const pngBytes = tinyDoc.loadPage(0).toPixmap([1, 0, 0, 1, 0, 0], mupdf.ColorSpace.DeviceRGB, false, true).asPNG();
+    tinyDoc.destroy();
+
+    const id = await doc.addAnnotation({
+      id: 'stamp-1',
+      kind: 'stamp',
+      pageIndex: 0,
+      geometry: { kind: 'stamp', position: { x: 20, y: 30 }, widthPt: 40, heightPt: 25, rotationDegrees: 90, pngBytes: new Uint8Array(pngBytes) },
+    });
+    expect(id).toBe('stamp-1');
+
+    const reopened = await engine.openDocument(await doc.save());
+    const listed = await reopened.listAnnotations(0);
+    expect(listed).toHaveLength(1);
+    expect(listed[0].kind).toBe('stamp');
+    if (listed[0].geometry.kind === 'stamp') {
+      expect(listed[0].geometry.position).toEqual({ x: 20, y: 30 });
+      expect(listed[0].geometry.widthPt).toBe(40);
+      expect(listed[0].geometry.heightPt).toBe(25);
+      expect(listed[0].geometry.rotationDegrees).toBe(90);
+    }
+  });
+});
+
+describe('MupdfEngine embedded project JSON (Step 7)', () => {
+  it('setEmbeddedFile then getEmbeddedFile round-trips through save+reopen', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+    const json = new TextEncoder().encode(JSON.stringify({ schemaVersion: 1, hello: 'world' }));
+
+    await doc.setEmbeddedFile('mepapp-project.json', json);
+    const reopened = await engine.openDocument(await doc.save());
+    const readBack = await reopened.getEmbeddedFile('mepapp-project.json');
+
+    expect(readBack).not.toBeNull();
+    expect(new TextDecoder().decode(readBack!)).toBe(JSON.stringify({ schemaVersion: 1, hello: 'world' }));
+  });
+
+  it('getEmbeddedFile returns null for a PDF with no embedded file by that name', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+    expect(await doc.getEmbeddedFile('mepapp-project.json')).toBeNull();
+  });
+
+  it('setEmbeddedFile replaces rather than duplicates an existing entry', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+    await doc.setEmbeddedFile('mepapp-project.json', new TextEncoder().encode('{"v":1}'));
+    await doc.setEmbeddedFile('mepapp-project.json', new TextEncoder().encode('{"v":2}'));
+
+    const reopened = await engine.openDocument(await doc.save());
+    const readBack = await reopened.getEmbeddedFile('mepapp-project.json');
+    expect(new TextDecoder().decode(readBack!)).toBe('{"v":2}');
+  });
+});

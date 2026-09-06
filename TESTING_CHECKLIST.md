@@ -188,16 +188,65 @@ Implementation proceeds now that all four are confirmed.
       running without error, and save/reload — including a synthetic
       pre-material (v0) document proving the migration step itself runs on
       real load, not just in a unit test. Zero page errors throughout.
-- [ ] **PDF export is not wired up.** "the exported PDF reflects the final
-      on-screen state" (this step's pass criteria) needs segments/fittings
-      to be written back through `@mepapp/pdf-engine`'s `addAnnotation`/
-      `flattenOverlay`, which nothing yet does for segment data (stamps
-      aren't flattened either — see Step 4's own open item). Real gap, not
-      attempted as a placeholder.
-- [ ] **Placed stamps are not round-tripped through save/load.** The save
-      format has no image bytes for a stamp's source PNG (it only exists in
-      that browser session), so a reload has nothing to rebuild a sprite
-      from. Segments/fittings/network types do round-trip correctly.
+- [x] **PDF export/import with reference management and external-edit
+      detection (2026-09-06).** Design investigated against
+      `/root/MepSketcher`'s own `ProjectDataMapper.cs`/`AnnotationRebuildResult`
+      (citations in the session transcript and Decisions-Log), confirmed with
+      you, then implemented:
+  - A domain object's own id (`Segment.id`/`Fitting.id`/`PlacedStamp.id`) is
+    used verbatim as its PDF annotation's `/NM` field
+    (`AnnotationSpec.id` in `@mepapp/pdf-engine`, `MupdfEngine.addAnnotation`)
+    — no separate id-mapping table, the same correlation MEPSketcher used via
+    pdftron's UniqueID.
+  - The project JSON is embedded **inside** the PDF itself (a document-level
+    embedded file, `PdfDocumentHandle.setEmbeddedFile`/`getEmbeddedFile`) —
+    one self-contained `.pdf`, no sidecar file to lose or mismatch.
+  - `SketchScene.exportToPdf()` diffs the domain model against the PDF's
+    current annotations (`core/pdfSync.ts`'s `planPdfSync`) and only
+    creates/updates/deletes what actually changed; segments write as `line`
+    annotations, fittings as small `circle` markers, placed stamps as real
+    `stamp` annotations rasterized from the live PixiJS sprite
+    (`renderer.extract.base64`).
+  - `SketchScene.loadFromPdf()` loads the embedded JSON, then compares it
+    against the PDF's actual annotations (`core/pdfSync.ts`'s
+    `reconcilePdfSync`) and returns a report of drifted/missing/foreign
+    annotations. Confirmed policy: flag it, never silently resolve either
+    way — the domain model is never mutated or deleted just because an
+    annotation vanished or moved (mirrors MEPSketcher's own user-gated
+    `AnnotationRebuildResult`, minus its silent gap around geometry drift,
+    which MEPSketcher never detected at all).
+  - `@mepapp/ui`'s toolbar surfaces the report as a dismissible banner (Sync
+    to PDF / Download PDF buttons alongside it).
+  - Automated coverage: `packages/pdf-engine-mupdf/src/annotations.test.ts`
+    (id correlation, stamp annotation round trip, embedded-file round trip —
+    9 tests) and `packages/core/src/pdfSync.test.ts` (10 tests, pure
+    reconcile/plan logic). **Verified live in a real browser** (Playwright
+    against the dev server, real fixture PDF + real fixture stamp PNG): drew
+    a segment, placed a stamp, synced into the PDF, downloaded it, then
+    independently reopened those exact bytes with `MupdfEngine` outside the
+    browser to confirm the annotations and embedded JSON are real — then
+    used `MupdfEngine` directly (simulating a different PDF viewer) to delete
+    the stamp annotation and move the segment's line annotation, saved, and
+    reopened that mutated file in the running app: the reconciliation banner
+    correctly reported "1 annotation missing" and "1 annotation moved," and
+    the domain model's segment count was untouched. Zero page errors.
+  - **Known gap, not attempted**: no UI action yet to accept a drifted
+    annotation's PDF-side geometry back into the domain model (only "keep
+    MepApp's version," via re-running Sync to PDF, is wired up) — pushing an
+    externally-edited position into the corresponding Segment/Fitting/
+    PlacedStamp would need a new, undoable command, tracked as a real
+    follow-up rather than a placeholder button.
+  - **Known gap, not attempted**: `flattenOverlay`-based baking (Step 4's
+    other pass condition) is unrelated to this annotation-based sync and
+    remains as previously tracked.
+- [ ] **Placed stamps are still not round-tripped through the project JSON
+      itself.** The save format has no image bytes for a stamp's source PNG,
+      so a reload with no PDF (JSON-only) has nothing to rebuild a sprite
+      from. When reopening via a PDF, the stamp's *position/rotation* is
+      still checked by reconciliation (its annotation carries a rasterized
+      copy), but the domain-side `PlacedStamp` object itself is not restored
+      by `loadProjectFromJson` — segments/fittings/network types round-trip
+      correctly either way.
 - [ ] Only straight two-point segments are supported (no multi-point
       polyline drawing tool yet) and there is no UI yet to edit a segment's
       shape/diameter/material/network-type after creation — every new
