@@ -1,0 +1,672 @@
+/*
+ * Field Blueprint skin — see the Sketch Canvas Directions artifact
+ * (skin 04, Adaptive Dock layout): cool blueprint palette, a literal
+ * sheet-border frame with zone ticks, folder-style dock tabs, a hard
+ * offset shadow on the floating toolbar, and an architect's scale bar.
+ * Tokens and component mechanics are ported directly from that artifact's
+ * skin-4 CSS block; class names here are this app's own, not the mockup's.
+ */
+
+:root {
+  --ink: #131b21;
+  --muted: #57676f;
+  --line: #c2ced4;
+  --paper: #eef2f4;
+  --surface: #ffffff;
+  --surface-2: #e7edf0;
+  --canvas-bg: #e7edf0;
+  --accent: #175a8a;
+  --accent-soft: #dbe9f2;
+  --accent-ink: #0f4267;
+
+  --hvac: #3f7cc9;
+  --plumb: #2f9e8f;
+  --elec: #c98a1d;
+  --fire: #c0432f;
+
+  --font-display: 'Big Shoulders Display', sans-serif;
+  --font-ui: 'Chivo', sans-serif;
+  --font-mono: 'Martian Mono', monospace;
+  --font-hand: 'Architects Daughter', cursive;
+}
+
+.mep-app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--paper);
+  position: relative;
+}
+
+/* ---------- Titlebar ---------- */
+
+.mep-titlebar {
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  color: var(--muted);
+}
+.mep-titlebar .mep-badge {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+}
+.mep-titlebar .mep-title {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+  opacity: 0.75;
+}
+.mep-titlebar .mep-fill {
+  flex: 1;
+}
+.mep-titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mep-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+.mep-icon-btn:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.mep-icon-btn:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: default;
+}
+.mep-file-btn {
+  position: relative;
+  overflow: hidden;
+}
+.mep-file-btn input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ---------- Action bar: file/project operations the mockup didn't design
+   chrome for (it assumes a project is already open) ---------- */
+
+.mep-actionbar {
+  min-height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  flex-wrap: wrap;
+  background: var(--surface-2);
+  border-left: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+.mep-actionbar .mep-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
+  margin: 0 2px;
+}
+.mep-actionbar .mep-fill {
+  flex: 1;
+}
+.mep-actionbar .mep-flow-result {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+/* ---------- Head: sheet chip + discipline switcher ---------- */
+
+.mep-head {
+  height: 52px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-left: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+.mep-sheet-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--surface-2);
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  max-width: 42ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-discipline {
+  display: flex;
+  gap: 8px;
+}
+.mep-discipline-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.mep-discipline-btn.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent-ink);
+  box-shadow: 2px 2px 0 rgba(15, 66, 103, 0.35);
+}
+.mep-head .mep-fill {
+  flex: 1;
+}
+.mep-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- Body: canvas + toolbar + resize + dock ---------- */
+
+.mep-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+  border-left: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
+}
+.mep-canvas-wrap {
+  flex: 1;
+  position: relative;
+  background: var(--canvas-bg);
+  overflow: hidden;
+}
+.mep-canvas-init {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Floating toolbar: hard offset shadow rather than a soft blur — the
+   Field Blueprint skin's signature stamped-ink look. */
+.mep-toolbar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 4px;
+}
+.mep-toolbar-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 32px;
+  color: var(--muted);
+  cursor: grab;
+}
+.mep-tool-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+}
+.mep-tool-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.mep-tool-btn.active {
+  background: var(--accent);
+  color: #fff;
+  transform: rotate(-1deg);
+  box-shadow: 1.5px 1.5px 0 var(--accent-ink);
+}
+.mep-tool-btn:disabled {
+  opacity: 0.35;
+}
+.mep-tool-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
+  margin: 0 4px;
+}
+
+.mep-resize-handle {
+  width: 10px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  border-left: 2px dashed var(--ink);
+}
+.mep-resize-handle .nub {
+  width: 5px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+/* ---------- Dock: docked / floating / hidden ---------- */
+
+.mep-dock {
+  flex: none;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  border-left: 2px solid var(--ink);
+}
+.mep-dock.floating {
+  position: fixed;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 4px 4px 0 var(--ink);
+  z-index: 40;
+}
+.mep-dock.hidden-mode {
+  width: auto;
+  flex: none;
+}
+.mep-dock-edge-tab {
+  writing-mode: vertical-rl;
+  padding: 10px 6px;
+  border: 1.5px solid var(--ink);
+  border-right: none;
+  background: var(--surface-2);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 11px;
+  color: var(--ink);
+}
+.mep-dock-header {
+  padding: 8px 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 2px solid var(--ink);
+}
+.mep-dock-tab {
+  padding: 7px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1.5px solid var(--ink);
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.mep-dock-tab.on {
+  color: var(--ink);
+  background: var(--surface);
+  transform: translateY(2px);
+  position: relative;
+  z-index: 2;
+}
+.mep-dock-header .mep-fill {
+  flex: 1;
+}
+.mep-dock-mode-btn {
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.mep-dock-mode-btn.on::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  background: var(--accent);
+}
+.mep-dock-legend {
+  display: flex;
+  gap: 12px;
+  padding: 7px 12px 9px;
+  font-size: 10px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+.mep-dock-legend b {
+  font-weight: 700;
+  color: var(--ink);
+}
+.mep-dock-body {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+/* Elements / networks list rows (Layers, Stamps panels) */
+.mep-elem-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--ink);
+}
+.mep-elem-row b {
+  font-size: 13px;
+  display: block;
+  font-weight: 600;
+}
+.mep-elem-row span {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.mep-elem-row.selectable {
+  cursor: pointer;
+}
+.mep-elem-row.selectable:hover {
+  background: var(--surface-2);
+}
+.mep-elem-row .swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border: 1px solid var(--ink);
+}
+.mep-field-note {
+  font-family: var(--font-hand);
+  color: var(--muted);
+  font-size: 12px;
+  transform: rotate(-3deg);
+  margin-left: 6px;
+}
+
+/* Properties panel sections */
+.mep-section {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.mep-section h4 {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 9px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 4px;
+}
+.mep-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.mep-field-row:last-child {
+  margin-bottom: 0;
+}
+.mep-field-row label {
+  font-size: 9.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.mep-field-row input {
+  width: 104px;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--ink);
+  text-align: right;
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px dotted var(--ink);
+  font-weight: 600;
+}
+.mep-field-row input:disabled {
+  color: var(--muted);
+  border-bottom-style: dotted;
+  opacity: 0.6;
+}
+.mep-seg2 {
+  display: flex;
+  width: 104px;
+  overflow: hidden;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+}
+.mep-seg2 button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 10.5px;
+  padding: 5px 0;
+  color: var(--muted);
+}
+.mep-seg2 button.on {
+  background: var(--accent);
+  color: #fff;
+}
+.mep-empty-panel {
+  padding: 20px 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Stamp palette grid */
+.mep-stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+.mep-stamp-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+}
+.mep-stamp-tile:hover {
+  border-color: var(--ink);
+}
+.mep-stamp-tile.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 2px 2px 0 var(--accent);
+}
+.mep-stamp-tile img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+/* ---------- Status bar ---------- */
+
+.mep-status {
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 14px;
+  background: var(--surface);
+  border-top: 2px solid var(--ink);
+  border-left: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+.mep-status .mep-fill {
+  flex: 1;
+}
+.mep-chip {
+  padding: 3px 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.mep-chip b {
+  color: var(--ink);
+}
+.mep-scale-bar {
+  display: flex;
+  height: 7px;
+  width: 64px;
+  border: 1.3px solid var(--ink);
+}
+.mep-scale-bar i {
+  flex: 1;
+  font-style: normal;
+}
+.mep-scale-bar i:nth-child(odd) {
+  background: var(--ink);
+}
+
+/* ---------- Sheet-border margin + zone ticks (decorative frame) ---------- */
+
+.mep-sheet-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+.mep-ticks-top {
+  position: absolute;
+  top: 2px;
+  left: 22px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+/* ---------- Reconciliation / status banners ---------- */
+
+.mep-banner {
+  padding: 8px 14px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 12.5px;
+  border-left: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+.mep-banner button {
+  margin-left: 8px;
+}
+
+/* ---------- Calibration modal ---------- */
+
+.mep-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(19, 27, 33, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.mep-modal {
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 20px;
+  min-width: 280px;
+}
+.mep-modal input {
+  width: 100%;
+  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  padding: 6px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 2px;
+}
+.mep-modal .mep-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.mep-source-footer {
+  padding: 4px 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  border-left: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+.mep-source-footer a {
+  color: var(--accent-ink);
+}

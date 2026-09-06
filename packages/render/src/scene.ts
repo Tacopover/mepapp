@@ -28,6 +28,7 @@ import {
   splitSegmentAtFitting,
   type Calibration,
   type Command,
+  type Discipline,
   type Fitting,
   type FlowResult,
   type Network,
@@ -142,9 +143,11 @@ export interface StampInfo {
   transform: Transform2D;
   nativeWidth: number;
   nativeHeight: number;
+  /** Set when this stamp was placed from the stamp palette rather than an ad hoc uploaded PNG — see PlacedStamp.definitionId. */
+  definitionId?: string;
 }
 
-export type SketchTool = 'select' | 'place-stamp' | 'calibrate' | 'measure' | 'draw-segment';
+export type SketchTool = 'select' | 'pan' | 'place-stamp' | 'calibrate' | 'measure' | 'draw-segment';
 
 export interface DrawingSummary {
   segmentCount: number;
@@ -152,6 +155,16 @@ export interface DrawingSummary {
   networkCount: number;
   canUndo: boolean;
   canRedo: boolean;
+}
+
+/** One derived network, resolved against its NetworkType for display — the Layers panel's read model. Recomputed from live topology on every call, same as DrawingSummary. */
+export interface NetworkSummary {
+  id: string;
+  networkTypeId: string;
+  networkTypeName: string;
+  discipline: Discipline;
+  segmentCount: number;
+  fittingCount: number;
 }
 
 interface SketchSceneEvents {
@@ -164,6 +177,7 @@ interface SketchSceneEvents {
   drawingChanged: [DrawingSummary];
   flowSolved: [FlowResult[]];
   projectLoaded: [];
+  zoomChanged: [zoom: number];
 }
 
 type Listener<A extends unknown[]> = (...args: A) => void;
@@ -226,7 +240,7 @@ export class SketchScene {
   private readonly stamps = new Map<string, StampEntry>();
   private selectedIds = new Set<string>();
   private tool: SketchTool = 'select';
-  private pendingStampTexture: { texture: Texture; nativeWidth: number; nativeHeight: number } | null = null;
+  private pendingStampTexture: { texture: Texture; nativeWidth: number; nativeHeight: number; definitionId?: string } | null = null;
   private calibration: Calibration | null = null;
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure two-click flows
   private drag: DragState = { kind: 'none' };
@@ -254,7 +268,7 @@ export class SketchScene {
   async init(): Promise<void> {
     await this.app.init({
       resizeTo: this.container,
-      background: '#2b2b2b',
+      background: '#e7edf0', // Field Blueprint's --canvas-bg (packages/ui/src/theme.css) — kept a literal color since render stays framework/theme-agnostic, not a CSS var consumer.
       antialias: true,
       eventFeatures: { move: true, globalMove: true, click: true, wheel: true },
     });
@@ -314,13 +328,24 @@ export class SketchScene {
     this.world.addChildAt(sprite, 0);
   }
 
-  /** Sets the stamp art the next 'place-stamp' click will place. */
-  setStampTexture(bitmap: ImageBitmap): void {
+  /** Sets the stamp art the next 'place-stamp' click will place. definitionId, when given (the stamp palette's case, vs. an ad hoc uploaded PNG), is carried onto the resulting PlacedStamp. */
+  setStampTexture(bitmap: ImageBitmap, definitionId?: string): void {
     const texture = textureFromImageBitmap(bitmap);
     this.pendingStampTexture = {
       texture,
       nativeWidth: (texture.width * 72) / STAMP_SOURCE_DPI,
       nativeHeight: (texture.height * 72) / STAMP_SOURCE_DPI,
+      definitionId,
+    };
+  }
+
+  private toStampInfo(entry: StampEntry): StampInfo {
+    return {
+      id: entry.data.id,
+      transform: entry.data.transform,
+      nativeWidth: entry.data.nativeWidth,
+      nativeHeight: entry.data.nativeHeight,
+      definitionId: entry.data.definitionId,
     };
   }
 
@@ -328,7 +353,32 @@ export class SketchScene {
     return [...this.selectedIds]
       .map((id) => this.stamps.get(id))
       .filter((e): e is StampEntry => e !== undefined)
-      .map((e) => ({ id: e.data.id, transform: e.data.transform, nativeWidth: e.data.nativeWidth, nativeHeight: e.data.nativeHeight }));
+      .map((e) => this.toStampInfo(e));
+  }
+
+  /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. */
+  listStamps(): StampInfo[] {
+    return [...this.stamps.values()].map((e) => this.toStampInfo(e));
+  }
+
+  /** Derives the current network topology (see core's computeNetworks) resolved against known network types — the Layers panel's "Networks" list. */
+  getNetworkSummaries(): NetworkSummary[] {
+    const state = this.drawingHistory.getState();
+    const segments = Object.values(state.segments);
+    const fittings = Object.values(state.fittings);
+    const networks = computeNetworks({ segments, fittings, portGroups: [] });
+    const typeById = new Map(this.networkTypes.map((t) => [t.id, t]));
+    return networks.map((network: Network) => {
+      const type = typeById.get(network.networkTypeId) ?? DEFAULT_NETWORK_TYPE;
+      return {
+        id: network.id,
+        networkTypeId: network.networkTypeId,
+        networkTypeName: type.name,
+        discipline: type.discipline,
+        segmentCount: network.segmentIds.length,
+        fittingCount: network.fittingIds.length,
+      };
+    });
   }
 
   getCalibration(): Calibration | null {
@@ -617,6 +667,22 @@ export class SketchScene {
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
+  /** Typed-position entry (Properties panel X/Y fields): single-selection only, same pattern as setSelectedRotationDegrees. */
+  setSelectedPosition(position: Vec2): void {
+    if (this.selectedIds.size !== 1) return;
+    const [id] = this.selectedIds;
+    const entry = this.stamps.get(id);
+    if (!entry) return;
+    this.setStampTransform(id, { ...entry.data.transform, position });
+    this.redrawOverlay();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** Current world scale (1 = 100%) — the status bar's zoom readout. */
+  getZoom(): number {
+    return this.world.scale.x;
+  }
+
   private setStampTransform(id: string, transform: Transform2D): void {
     const entry = this.stamps.get(id);
     if (!entry) return;
@@ -684,7 +750,7 @@ export class SketchScene {
     const screen = { x: event.global.x, y: event.global.y };
     const world = this.screenToWorld(screen);
 
-    if (event.button === 2) {
+    if (event.button === 2 || this.tool === 'pan') {
       this.drag = { kind: 'pan', startScreen: screen, startWorldPos: { x: this.world.x, y: this.world.y } };
       return;
     }
@@ -847,11 +913,12 @@ export class SketchScene {
     this.world.x = screen.x - beforeWorld.x * newZoom;
     this.world.y = screen.y - beforeWorld.y * newZoom;
     this.redrawOverlay();
+    this.emitter.emit('zoomChanged', newZoom);
   };
 
   private placeStamp(worldPosition: Vec2): void {
     if (!this.pendingStampTexture) return;
-    const { texture, nativeWidth, nativeHeight } = this.pendingStampTexture;
+    const { texture, nativeWidth, nativeHeight, definitionId } = this.pendingStampTexture;
     const id = `stamp-${this.nextStampSeq++}`;
     const data: PlacedStamp = {
       id,
@@ -859,6 +926,7 @@ export class SketchScene {
       nativeWidth,
       nativeHeight,
       ports: [],
+      definitionId,
     };
     const sprite = new Sprite(texture);
     sprite.anchor.set(0.5); // pivot = own center, matching the reference semantics

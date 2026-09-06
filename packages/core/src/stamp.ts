@@ -9,6 +9,8 @@ export interface PlacedStamp {
   nativeWidth: number; // unscaled width in world units, before transform.scale
   nativeHeight: number;
   ports: PortSpec[];
+  /** StampDefinition['id'] (stamp-library.ts) this instance was placed from, when placed via the palette rather than an ad hoc uploaded PNG. */
+  definitionId?: string;
 }
 
 /** Half-extents in world units, scale applied — the shape pointInRotatedRect and rectIntersectsRotatedRect expect. */

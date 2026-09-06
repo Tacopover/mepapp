@@ -1,8 +1,18 @@
-import { useCallback, useState, type RefObject } from 'react';
-import type { SketchScene, SketchTool } from '@mepapp/render';
-import { ProjectLoadError, type ReconciliationReport } from '@mepapp/core';
+import { useCallback, useState } from 'react';
+import { ProjectLoadError, type ReconciliationReport, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
+import { Toolbar } from './components/Toolbar.js';
+import { DisciplineSwitcher } from './components/DisciplineSwitcher.js';
+import { DockPanel, type DockTab } from './components/DockPanel.js';
+import { StampsPanel } from './components/StampsPanel.js';
+import { LayersPanel } from './components/LayersPanel.js';
+import { PropertiesPanel } from './components/PropertiesPanel.js';
+import { StatusBar } from './components/StatusBar.js';
+import { SheetChip } from './components/SheetChip.js';
+import { IconFile, IconFlow, IconRedo, IconUndo } from './icons.js';
+import type { DisciplineGroup } from './disciplineGroups.js';
+import './theme.css';
 
 export interface PdfPageLoadResult {
   bitmap: ImageBitmap;
@@ -21,23 +31,22 @@ export interface MepSketchAppProps {
   // app must offer the exact corresponding source. The app shell computes
   // this link (it knows the build's commit SHA); this component just shows it.
   correspondingSourceUrl?: string;
+  /** Resolves a stamp-library definition's iconRef to a fetchable URL. Defaults to apps/web's copy under /stamps/. */
+  resolveStampIconUrl?: (iconRef: string) => string;
 }
 
-function ToolButton(props: { tool: SketchTool; current: SketchTool; sceneRef: RefObject<SketchScene | null>; label: string }) {
-  return (
-    <button onClick={() => props.sceneRef.current?.setTool(props.tool)} style={{ fontWeight: props.tool === props.current ? 'bold' : 'normal' }}>
-      {props.label}
-    </button>
-  );
-}
+const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
 
-export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketchAppProps) {
+export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL }: MepSketchAppProps) {
   const {
     containerRef,
     sceneRef,
     ready,
     tool,
     selection,
+    allStamps,
+    networkSummaries,
+    zoom,
     calibration,
     measurementMm,
     calibrationPrompt,
@@ -45,11 +54,16 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
     drawingSummary,
     flowResult,
   } = useSketchScene();
+
   const [status, setStatus] = useState('');
   const [calibrationInput, setCalibrationInput] = useState('');
   const [capacityInput, setCapacityInput] = useState('');
   const [pdfHandle, setPdfHandle] = useState<PdfDocumentHandle | null>(null);
+  const [sheetName, setSheetName] = useState<string | null>(null);
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
+  const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
+  const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
+  const [dockTabId, setDockTabId] = useState('stamps');
 
   const handleSaveProject = useCallback(() => {
     if (!sceneRef.current) return;
@@ -84,6 +98,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
         const { bitmap, pageWidthPt, pageHeightPt, handle } = await onLoadPdfPage(file);
         sceneRef.current?.setBackdrop(bitmap, pageWidthPt, pageHeightPt);
         setPdfHandle(handle);
+        setSheetName(file.name);
         // Loads this PDF's own embedded project JSON (if any) and compares
         // its annotations against that domain model — see decisions log
         // 2026-09-06's reconciliation policy: flag drift/missing, never
@@ -102,7 +117,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
     if (!sceneRef.current || !pdfHandle) return;
     await sceneRef.current.exportToPdf(pdfHandle);
     setReconciliation(null);
-    setStatus('Synced the current drawing into the open PDF\'s annotations and embedded project data.');
+    setStatus("Synced the current drawing into the open PDF's annotations and embedded project data.");
   }, [pdfHandle, sceneRef]);
 
   const handleDownloadPdf = useCallback(async () => {
@@ -117,104 +132,114 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
     URL.revokeObjectURL(url);
   }, [pdfHandle]);
 
-  const handleStampFile = useCallback(
+  const handleCustomStampFile = useCallback(
     async (file: File) => {
       const bitmap = await createImageBitmap(file);
       sceneRef.current?.setStampTexture(bitmap);
-      setStatus(`Stamp art ready: ${file.name} — switch to "Place stamp" and click the canvas.`);
+      sceneRef.current?.setTool('place-stamp');
+      setActiveDefinitionId(null);
+      setStatus(`Stamp art ready: ${file.name} — click the canvas to place it.`);
     },
     [sceneRef],
   );
 
-  const singleSelected = selection.length === 1 ? selection[0] : null;
+  const handleStampPick = useCallback((definition: StampDefinition) => {
+    setActiveDefinitionId(definition.id);
+    setStatus(`${definition.label} ready — click the canvas to place it.`);
+  }, []);
+
+  const totalFlowCapacity = flowResult
+    ? flowResult
+        .flatMap((r) => Object.values(r.segmentCapacity))
+        .filter((c): c is number => c !== null)
+        .reduce((sum, c) => sum + c, 0)
+    : null;
+
+  const dockTabs: DockTab[] = [
+    {
+      id: 'stamps',
+      label: 'Stamps',
+      content: (
+        <StampsPanel
+          sceneRef={sceneRef}
+          disciplineGroup={disciplineGroup}
+          activeDefinitionId={activeDefinitionId}
+          onPick={handleStampPick}
+          resolveIconUrl={resolveStampIconUrl}
+        />
+      ),
+    },
+    { id: 'layers', label: 'Layers', content: <LayersPanel networks={networkSummaries} stamps={allStamps} /> },
+    {
+      id: 'properties',
+      label: 'Properties',
+      content: <PropertiesPanel sceneRef={sceneRef} selection={selection} capacityInput={capacityInput} setCapacityInput={setCapacityInput} />,
+    },
+  ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', gap: 12, padding: 8, background: '#1c1c1c', color: '#eee', alignItems: 'center', flexWrap: 'wrap' }}>
-        <label>
-          PDF:{' '}
+    <div className="mep-app">
+      <div className="mep-titlebar">
+        <span className="mep-badge">M</span>
+        <span className="mep-title">MepApp{sheetName ? ` — ${sheetName}` : ''}</span>
+        <div className="mep-fill" />
+        <span style={{ fontSize: 11, opacity: 0.7 }}>{status}</span>
+      </div>
+
+      <div className="mep-actionbar">
+        <label className="mep-icon-btn mep-file-btn">
+          <IconFile size={13} /> Open PDF
           <input type="file" accept="application/pdf" onChange={(e) => e.target.files?.[0] && handlePdfFile(e.target.files[0])} />
         </label>
-        <label>
-          Stamp:{' '}
-          <input type="file" accept="image/png" onChange={(e) => e.target.files?.[0] && handleStampFile(e.target.files[0])} />
+        <label className="mep-icon-btn mep-file-btn">
+          Custom stamp…
+          <input type="file" accept="image/png,image/svg+xml" onChange={(e) => e.target.files?.[0] && handleCustomStampFile(e.target.files[0])} />
         </label>
-        <ToolButton tool="select" current={tool} sceneRef={sceneRef} label="Select" />
-        <ToolButton tool="place-stamp" current={tool} sceneRef={sceneRef} label="Place stamp" />
-        <ToolButton tool="draw-segment" current={tool} sceneRef={sceneRef} label="Draw segment" />
-        <ToolButton tool="calibrate" current={tool} sceneRef={sceneRef} label="Calibrate" />
-        <ToolButton tool="measure" current={tool} sceneRef={sceneRef} label="Measure" />
-        <button onClick={() => sceneRef.current?.rotateSelectionBy(-90)} disabled={selection.length === 0}>
-          -90°
+        <div className="mep-divider" />
+        <button className="mep-icon-btn" onClick={() => sceneRef.current?.undoDrawing()} disabled={!drawingSummary.canUndo}>
+          <IconUndo size={13} /> Undo
         </button>
-        <button onClick={() => sceneRef.current?.rotateSelectionBy(90)} disabled={selection.length === 0}>
-          +90°
+        <button className="mep-icon-btn" onClick={() => sceneRef.current?.redoDrawing()} disabled={!drawingSummary.canRedo}>
+          <IconRedo size={13} /> Redo
         </button>
-        <label>
-          {/* Always rendered (disabled when inapplicable) so the toolbar's height
-              never changes with selection — a conditional row here would shift
-              the canvas underneath the pointer every time selection changes. */}
-          Angle:{' '}
-          <input
-            type="number"
-            disabled={!singleSelected}
-            value={singleSelected ? Math.round(singleSelected.transform.rotationDegrees * 1000) / 1000 : ''}
-            onChange={(e) => sceneRef.current?.setSelectedRotationDegrees(Number(e.target.value))}
-            style={{ width: 70 }}
-          />
-          °
-        </label>
-        <span>{selection.length} selected</span>
-        {calibration && <span>Scale: {calibration.pageUnitsPerRealUnit.toFixed(4)} pt/mm</span>}
-        {measurementMm !== null && <span>Last measurement: {measurementMm.toFixed(2)} mm</span>}
-        <span style={{ opacity: 0.7 }}>{status}</span>
-      </div>
-      <div style={{ display: 'flex', gap: 12, padding: 8, background: '#242424', color: '#eee', alignItems: 'center', flexWrap: 'wrap' }}>
-        <button onClick={() => sceneRef.current?.undoDrawing()} disabled={!drawingSummary.canUndo}>
-          Undo
-        </button>
-        <button onClick={() => sceneRef.current?.redoDrawing()} disabled={!drawingSummary.canRedo}>
-          Redo
-        </button>
-        <span>
+        <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
           {drawingSummary.segmentCount} segment{drawingSummary.segmentCount === 1 ? '' : 's'}, {drawingSummary.fittingCount} fitting
           {drawingSummary.fittingCount === 1 ? '' : 's'}, {drawingSummary.networkCount} network{drawingSummary.networkCount === 1 ? '' : 's'}
         </span>
-        <label>
-          Capacity:{' '}
-          <input
-            type="number"
-            disabled={!singleSelected}
-            value={capacityInput}
-            onChange={(e) => setCapacityInput(e.target.value)}
-            onBlur={() => singleSelected && sceneRef.current?.setTerminalCapacity(singleSelected.id, Number(capacityInput) || 0)}
-            style={{ width: 70 }}
-          />
-        </label>
-        <button onClick={() => sceneRef.current?.computeFlow()}>Solve flow</button>
-        {flowResult && (
-          <span>
-            {flowResult
-              .flatMap((r) => Object.values(r.segmentCapacity))
-              .filter((c): c is number => c !== null)
-              .reduce((sum, c) => sum + c, 0)}{' '}
-            total capacity across {flowResult.length} network{flowResult.length === 1 ? '' : 's'}
+        <div className="mep-divider" />
+        <button className="mep-icon-btn" onClick={() => sceneRef.current?.computeFlow()}>
+          <IconFlow size={13} /> Solve flow
+        </button>
+        {totalFlowCapacity !== null && (
+          <span className="mep-flow-result">
+            {totalFlowCapacity} total capacity across {flowResult?.length ?? 0} network{flowResult?.length === 1 ? '' : 's'}
           </span>
         )}
-        <button onClick={handleSaveProject}>Save project</button>
-        <label>
-          Load project:{' '}
+        <div className="mep-fill" />
+        <button className="mep-icon-btn" onClick={handleSaveProject}>
+          Save project
+        </button>
+        <label className="mep-icon-btn mep-file-btn">
+          Load project…
           <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && handleLoadProject(e.target.files[0])} />
         </label>
-        <button onClick={handleSyncToPdf} disabled={!pdfHandle}>
+        <button className="mep-icon-btn" onClick={handleSyncToPdf} disabled={!pdfHandle}>
           Sync to PDF
         </button>
-        <button onClick={handleDownloadPdf} disabled={!pdfHandle}>
+        <button className="mep-icon-btn" onClick={handleDownloadPdf} disabled={!pdfHandle}>
           Download PDF
         </button>
       </div>
+
+      <div className="mep-head">
+        <SheetChip sheetName={sheetName} />
+        <DisciplineSwitcher value={disciplineGroup} onChange={setDisciplineGroup} />
+        <div className="mep-fill" />
+        <span className="mep-hint">Drag any panel edge to resize · drag a handle to move it</span>
+      </div>
+
       {reconciliation && (
-        <div style={{ padding: 8, background: '#4a3200', color: '#ffd479', fontSize: 13 }}>
+        <div className="mep-banner">
           This PDF's annotations differ from its saved project data since it was last opened here.{' '}
           {reconciliation.missingIds.length > 0 && (
             <span>{reconciliation.missingIds.length} annotation{reconciliation.missingIds.length === 1 ? '' : 's'} missing (deleted in another viewer). </span>
@@ -226,30 +251,23 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
           <button onClick={() => setReconciliation(null)}>Dismiss</button>
         </div>
       )}
-      <div ref={containerRef} style={{ flex: 1, position: 'relative' }}>
-        {!ready && <div style={{ position: 'absolute', top: 12, left: 12, color: '#888' }}>Initializing canvas…</div>}
+
+      <div className="mep-body">
+        <div className="mep-canvas-wrap" ref={containerRef}>
+          {!ready && <div className="mep-canvas-init">Initializing canvas…</div>}
+          {ready && <Toolbar tool={tool} sceneRef={sceneRef} stampReady={activeDefinitionId !== null || tool === 'place-stamp'} />}
+        </div>
+        <DockPanel tabs={dockTabs} activeTabId={dockTabId} onTabChange={setDockTabId} />
       </div>
+
+      <StatusBar zoom={zoom} calibration={calibration} measurementMm={measurementMm} selectedCount={selection.length} />
+
       {calibrationPrompt && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <div style={{ background: '#fff', padding: 20, borderRadius: 8, minWidth: 280 }}>
+        <div className="mep-modal-backdrop">
+          <div className="mep-modal">
             <p>Known real-world distance between the two clicked points (mm):</p>
-            <input
-              autoFocus
-              type="number"
-              value={calibrationInput}
-              onChange={(e) => setCalibrationInput(e.target.value)}
-              style={{ width: '100%', marginBottom: 12 }}
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <input autoFocus type="number" value={calibrationInput} onChange={(e) => setCalibrationInput(e.target.value)} />
+            <div className="mep-modal-actions">
               <button
                 onClick={() => {
                   calibrationPrompt.resolve(null);
@@ -272,10 +290,11 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
           </div>
         </div>
       )}
+
       {correspondingSourceUrl && (
-        <div style={{ padding: '4px 8px', background: '#1c1c1c', color: '#888', fontSize: 11 }}>
+        <div className="mep-source-footer">
           MepApp is AGPLv3 licensed.{' '}
-          <a href={correspondingSourceUrl} target="_blank" rel="noreferrer" style={{ color: '#7dc4ff' }}>
+          <a href={correspondingSourceUrl} target="_blank" rel="noreferrer">
             View the source code for this exact version
           </a>
           .
