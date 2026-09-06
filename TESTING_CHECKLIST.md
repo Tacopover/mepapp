@@ -134,33 +134,39 @@ history of what was verified stays visible.
 - [ ] Self-hosted license-gating behavior remains explicitly out of scope per
       the plan's own decision — not attempted, not needed here.
 
-## Step 7 — Vertical feature slice: STOPPED HERE, needs your design input
+## Step 7 — Vertical feature slice
 
-This is where automated progress stopped. Steps 3-6 were all either pure
-verification or had a specified target to implement against. Step 7 (segment
-drawing tool, auto-generated junctions, network merge, flow solve, undo/redo,
-schema migration, export) is different: the plan intentionally doesn't pin
-down *how* several of these should work, because they're real product design
-decisions, not implementation details:
+Design questions resolved 2026-09-06, following the same method as Step 1's
+rotation semantics: investigate `/root/MepSketcher` as a behavioral
+reference, cite file:line evidence, then confirm the target design with the
+user before writing code. Full investigation reports and citations are in
+the session transcript; decisions are recorded in the Obsidian decisions log.
 
-- **Segment/junction/fitting domain model** — `@mepapp/core` has no
-  representation yet for a drawn run, a network, or a fitting. What data
-  shape should these be (geometry only, or with engineering properties like
-  pipe/duct size, material, flow direction)?
-- **Flow solve** — the plan names this step but doesn't specify what physical
-  quantity is being solved for (pressure drop? air/water flow balancing?) or
-  by what method. This is domain-specific engineering knowledge, not
-  something to guess at.
-- **Undo/redo model** — a command-pattern history, an immutable-snapshot
-  diff, or something else? This choice shapes how every future feature is
-  built on top of `core`, so it's worth deciding deliberately rather than
-  picking whatever is fastest to write first.
-- **Schema migration strategy** — versioned JSON with explicit migration
-  functions is the common approach, but the exact shape depends on what
-  `core`'s save format ends up being, which depends on the above.
+- **Segment/junction/fitting domain model** — old app stores engineering
+  data in a loosely-typed property bag and a stamped, hand-synced
+  `NetworkId` (a documented source of bugs — see
+  `SegmentLifecycleManager.cs:11-22`). New `@mepapp/core` uses typed
+  `Segment`/`Fitting`/`Network` objects; network membership is derived from
+  graph adjacency rather than stamped state. Adding `material` (segments)
+  and a fitting-kind field now, which the old app never had or abandoned.
+- **Flow solve** — confirmed the old app computes a unitless, user-entered
+  "Capacity" number summed bottom-up over the network graph
+  (`NetworkFlowProcessor.cs:11-41`), not real HVAC/plumbing physics. The new
+  app ports this same capacity-accumulation model, not a physics solver.
+- **Undo/redo model** — old app uses a command pattern (`execute`/`undo`/
+  `redo`, two-stack history, `CompositeCommand` grouping). New `core` adopts
+  the same family, plus a first-class transaction/batch API for continuous
+  gestures (drag) — an improvement over the old app, which only ever
+  hand-rolled this per tool (`MepDragHandler.cs:640-706`).
+- **Schema migration strategy** — old app centralizes version as an int
+  field in the save JSON with a resumable chain of upgrade steps, but two
+  real bugs were found: migration is opt-in per call site (not run inside
+  `LoadAsync` itself), and steps operate on fully-typed DTOs, which already
+  caused one near-miss with a deleted field. New `core` fixes both: migration
+  runs automatically inside the load boundary, on loosely-typed JSON, with
+  post-migration shape validation the old app never had.
 
-None of this was invented or guessed at. Tell me how you want these to work
-(or point me at more detail in a design doc) and this can continue.
+Implementation proceeds now that all four are confirmed.
 
 ## Notes
 
