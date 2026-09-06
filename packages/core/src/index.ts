@@ -6,3 +6,5 @@ export * from './network.js';
 export * from './flow.js';
 export * from './commands.js';
 export * from './schema.js';
+export * from './segmentTool.js';
+export * from './project.js';

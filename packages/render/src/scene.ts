@@ -10,18 +10,84 @@ import {
 import {
   calibrateFromKnownDistance,
   centroid,
+  CommandManager,
+  CompositeCommand,
+  computeNetworks,
+  loadProject,
   measureRealDistance,
   multiRotate,
   normalizeDegrees,
   pointInRotatedRect,
   rectIntersectsRotatedRect,
+  resolveSegmentEndpoint,
   rotatePointAround,
+  serializeProject,
+  solveFlow,
+  splitSegmentAtFitting,
   type Calibration,
+  type Command,
+  type Fitting,
+  type FlowResult,
+  type Network,
+  type NetworkType,
   type PlacedStamp,
+  type ProjectDocument,
+  type Segment,
   type Transform2D,
   type Vec2,
 } from '@mepapp/core';
 import { textureFromImageBitmap } from './texture.js';
+
+/** Undo-history state for the segment/fitting drawing tool — kept separate from the pre-existing, not-yet-undoable stamp placement state (see decisions log 2026-09-06). */
+interface DrawingState {
+  segments: Record<string, Segment>;
+  fittings: Record<string, Fitting>;
+}
+
+const DEFAULT_NETWORK_TYPE: NetworkType = {
+  id: 'default',
+  name: 'Unassigned',
+  discipline: 'ventilation',
+  units: '',
+  defaultCapacity: 0,
+};
+
+function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const rest = { ...record };
+  delete rest[key];
+  return rest;
+}
+
+function createFittingCommand(fitting: Fitting): Command<DrawingState> {
+  return {
+    description: `Create fitting ${fitting.id}`,
+    execute: (state) => ({ ...state, fittings: { ...state.fittings, [fitting.id]: fitting } }),
+    undo: (state) => ({ ...state, fittings: withoutKey(state.fittings, fitting.id) }),
+  };
+}
+
+function createSegmentCommand(segment: Segment): Command<DrawingState> {
+  return {
+    description: `Create segment ${segment.id}`,
+    execute: (state) => ({ ...state, segments: { ...state.segments, [segment.id]: segment } }),
+    undo: (state) => ({ ...state, segments: withoutKey(state.segments, segment.id) }),
+  };
+}
+
+function deleteSegmentCommand(segment: Segment): Command<DrawingState> {
+  return {
+    description: `Delete segment ${segment.id}`,
+    execute: (state) => ({ ...state, segments: withoutKey(state.segments, segment.id) }),
+    undo: (state) => ({ ...state, segments: { ...state.segments, [segment.id]: segment } }),
+  };
+}
+
+interface DrawEndpointResolution {
+  point: Segment['endpointA'];
+  worldPosition: Vec2;
+  /** Present when resolving this endpoint requires new state (a bare new fitting, or breaking an existing segment) — bundled into the draw's single undo step rather than applied on its own. */
+  setupCommand?: Command<DrawingState>;
+}
 
 // Stamp art in fixtures/stamps is expected to be authored at 300 DPI (see the
 // fixtures README) — this converts a stamp texture's native pixel size into
@@ -41,7 +107,15 @@ export interface StampInfo {
   nativeHeight: number;
 }
 
-export type SketchTool = 'select' | 'place-stamp' | 'calibrate' | 'measure';
+export type SketchTool = 'select' | 'place-stamp' | 'calibrate' | 'measure' | 'draw-segment';
+
+export interface DrawingSummary {
+  segmentCount: number;
+  fittingCount: number;
+  networkCount: number;
+  canUndo: boolean;
+  canRedo: boolean;
+}
 
 interface SketchSceneEvents {
   [key: string]: unknown[];
@@ -50,6 +124,9 @@ interface SketchSceneEvents {
   calibrationNeeded: [p1: Vec2, p2: Vec2, resolve: (knownRealDistanceMm: number | null) => void];
   calibrationSet: [Calibration];
   measurement: [distanceMm: number];
+  drawingChanged: [DrawingSummary];
+  flowSolved: [FlowResult[]];
+  projectLoaded: [];
 }
 
 type Listener<A extends unknown[]> = (...args: A) => void;
@@ -106,6 +183,7 @@ export class SketchScene {
   private readonly app = new Application();
   private readonly world = new Container();
   private readonly stampsLayer = new Container();
+  private readonly drawingLayer = new Graphics();
   private readonly overlay = new Graphics();
   private backdropSprite: Sprite | null = null;
   private readonly stamps = new Map<string, StampEntry>();
@@ -117,6 +195,16 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private nextStampSeq = 1;
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
+
+  // Segment/fitting drawing tool state — see decisions log 2026-09-06.
+  private readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {} });
+  private readonly networkTypes: NetworkType[] = [DEFAULT_NETWORK_TYPE];
+  private readonly terminalCapacities = new Map<string, number>();
+  private pendingSegmentStart: DrawEndpointResolution | null = null;
+  private nextFittingSeq = 1;
+  private nextSegmentSeq = 1;
+  private lastFlowResult: FlowResult[] = [];
+  private readonly SNAP_RADIUS_SCREEN_PX = 12;
 
   constructor(private readonly container: HTMLElement) {}
 
@@ -130,6 +218,7 @@ export class SketchScene {
     this.container.appendChild(this.app.canvas);
 
     this.world.addChild(this.stampsLayer);
+    this.world.addChild(this.drawingLayer);
     this.world.addChild(this.overlay);
     this.app.stage.addChild(this.world);
 
@@ -158,6 +247,7 @@ export class SketchScene {
   setTool(tool: SketchTool): void {
     this.tool = tool;
     this.pendingPoints = [];
+    this.pendingSegmentStart = null;
     this.redrawOverlay();
     this.emitter.emit('toolChanged', tool);
   }
@@ -200,6 +290,91 @@ export class SketchScene {
 
   getCalibration(): Calibration | null {
     return this.calibration;
+  }
+
+  getDrawingSummary(): DrawingSummary {
+    const state = this.drawingHistory.getState();
+    const networks = computeNetworks({
+      segments: Object.values(state.segments),
+      fittings: Object.values(state.fittings),
+      portGroups: [],
+    });
+    return {
+      segmentCount: Object.keys(state.segments).length,
+      fittingCount: Object.keys(state.fittings).length,
+      networkCount: networks.length,
+      canUndo: this.drawingHistory.canUndo,
+      canRedo: this.drawingHistory.canRedo,
+    };
+  }
+
+  undoDrawing(): void {
+    this.drawingHistory.undo();
+    this.syncDrawingLayer();
+  }
+
+  redoDrawing(): void {
+    this.drawingHistory.redo();
+    this.syncDrawingLayer();
+  }
+
+  /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
+  setTerminalCapacity(elementId: string, capacity: number): void {
+    this.terminalCapacities.set(elementId, capacity);
+  }
+
+  /**
+   * Runs the capacity-accumulation flow solve (core/flow.ts) over every
+   * derived network and returns one FlowResult per network. Networks are
+   * recomputed from current topology on every call — there is no stored
+   * NetworkId to go stale, unlike the old app (see decisions log 2026-09-06).
+   */
+  computeFlow(): FlowResult[] {
+    const state = this.drawingHistory.getState();
+    const segments = Object.values(state.segments);
+    const fittings = Object.values(state.fittings);
+    const networks = computeNetworks({ segments, fittings, portGroups: [] });
+    const capacities = Object.fromEntries(this.terminalCapacities);
+    this.lastFlowResult = networks.map((network: Network) =>
+      solveFlow({ network, segments, fittings, portGroups: [], terminalCapacities: capacities }),
+    );
+    this.emitter.emit('flowSolved', this.lastFlowResult);
+    return this.lastFlowResult;
+  }
+
+  exportProject(): ProjectDocument {
+    const state = this.drawingHistory.getState();
+    return serializeProject({
+      networkTypes: this.networkTypes,
+      segments: Object.values(state.segments),
+      fittings: Object.values(state.fittings),
+      stamps: [...this.stamps.values()].map((entry) => entry.data),
+    }) as unknown as ProjectDocument;
+  }
+
+  /**
+   * Loads a saved project, running it through core's schema migration first
+   * (see decisions log 2026-09-06). Throws core's ProjectLoadError on a
+   * malformed document — callers should catch it for a user-facing message.
+   *
+   * Restores segments/fittings/network types only. Placed stamps are not
+   * round-tripped yet: the save format has no image bytes for them (the
+   * PNG the user picked lives only in that browser session), so there is
+   * nothing to rebuild a sprite from after a reload. Tracked as a known gap,
+   * not attempted as a half-working placeholder.
+   */
+  loadProjectFromJson(raw: unknown): void {
+    const doc = loadProject(raw as Record<string, unknown>);
+
+    this.drawingHistory.clear();
+    this.drawingHistory.setLiveState({
+      segments: Object.fromEntries(doc.segments.map((s) => [s.id, s])),
+      fittings: Object.fromEntries(doc.fittings.map((f) => [f.id, f])),
+    });
+    this.networkTypes.splice(0, this.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
+
+    this.syncDrawingLayer();
+    this.emitter.emit('projectLoaded');
   }
 
   /**
@@ -336,6 +511,11 @@ export class SketchScene {
     if (this.tool === 'place-stamp') {
       if (!this.pendingStampTexture) return;
       this.placeStamp(world);
+      return;
+    }
+
+    if (this.tool === 'draw-segment') {
+      this.onDrawSegmentClick(world);
       return;
     }
 
@@ -510,6 +690,103 @@ export class SketchScene {
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
+  /**
+   * Two-click segment drawing: the first click resolves and remembers a
+   * start endpoint (without mutating anything yet — see DrawEndpointResolution),
+   * the second resolves the end endpoint and applies both endpoints' setup
+   * plus the new segment as one CompositeCommand, so "draw a run" is always
+   * exactly one undo step, matching the pass criteria's "undo the whole chain."
+   */
+  private onDrawSegmentClick(world: Vec2): void {
+    const snapRadius = this.SNAP_RADIUS_SCREEN_PX / this.world.scale.x;
+    const state = this.drawingHistory.getState();
+    const stamps = [...this.stamps.values()].map((entry) => entry.data);
+    const segments = Object.values(state.segments);
+    const fittings = Object.values(state.fittings);
+
+    const target = resolveSegmentEndpoint(world, stamps, fittings, segments, { radius: snapRadius });
+    const resolved = this.resolveDrawTarget(target);
+
+    if (!this.pendingSegmentStart) {
+      this.pendingSegmentStart = resolved;
+      this.redrawOverlay();
+      return;
+    }
+
+    const start = this.pendingSegmentStart;
+    this.pendingSegmentStart = null;
+
+    const newSegment: Segment = {
+      id: `segment-${this.nextSegmentSeq++}`,
+      pageIndex: 0,
+      networkTypeId: DEFAULT_NETWORK_TYPE.id,
+      shape: 'round',
+      diameter: 200,
+      endpointA: start.point,
+      endpointB: resolved.point,
+      geometry: [start.worldPosition, resolved.worldPosition],
+    };
+
+    const subCommands: Command<DrawingState>[] = [];
+    if (start.setupCommand) subCommands.push(start.setupCommand);
+    if (resolved.setupCommand) subCommands.push(resolved.setupCommand);
+    subCommands.push(createSegmentCommand(newSegment));
+
+    this.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
+    this.syncDrawingLayer();
+    this.redrawOverlay();
+  }
+
+  private resolveDrawTarget(target: ReturnType<typeof resolveSegmentEndpoint>): DrawEndpointResolution {
+    if (target.kind === 'existing') {
+      return { point: target.point, worldPosition: target.worldPosition };
+    }
+
+    if (target.kind === 'new-fitting') {
+      const fitting: Fitting = { id: `fitting-${this.nextFittingSeq++}`, pageIndex: 0, position: target.worldPosition, kind: 'junction' };
+      return {
+        point: { kind: 'fitting', fittingId: fitting.id },
+        worldPosition: target.worldPosition,
+        setupCommand: createFittingCommand(fitting),
+      };
+    }
+
+    // target.kind === 'break': auto-generates a junction at the click point on an existing run.
+    const newFitting: Fitting = {
+      id: `fitting-${this.nextFittingSeq++}`,
+      pageIndex: target.original.pageIndex,
+      position: target.breakPoint,
+      kind: 'junction',
+    };
+    const { segmentA, segmentB } = splitSegmentAtFitting(target.original, newFitting, target.breakPoint, {
+      segmentA: `segment-${this.nextSegmentSeq++}`,
+      segmentB: `segment-${this.nextSegmentSeq++}`,
+    });
+    const setupCommand = new CompositeCommand(`Break segment ${target.original.id} into a junction`, [
+      deleteSegmentCommand(target.original),
+      createFittingCommand(newFitting),
+      createSegmentCommand(segmentA),
+      createSegmentCommand(segmentB),
+    ]);
+    return { point: { kind: 'fitting', fittingId: newFitting.id }, worldPosition: target.breakPoint, setupCommand };
+  }
+
+  private syncDrawingLayer(): void {
+    this.drawingLayer.clear();
+    const state = this.drawingHistory.getState();
+    for (const segment of Object.values(state.segments)) {
+      const [start, ...rest] = segment.geometry;
+      if (!start || rest.length === 0) continue;
+      this.drawingLayer.moveTo(start.x, start.y);
+      for (const point of rest) this.drawingLayer.lineTo(point.x, point.y);
+      this.drawingLayer.stroke({ width: 3, color: 0xffa726 });
+    }
+    for (const fitting of Object.values(state.fittings)) {
+      this.drawingLayer.circle(fitting.position.x, fitting.position.y, 6).fill({ color: 0xffa726 });
+    }
+    this.emitter.emit('drawingChanged', this.getDrawingSummary());
+  }
+
   private redrawOverlay(): void {
     this.overlay.clear();
 
@@ -553,6 +830,11 @@ export class SketchScene {
 
     for (const p of this.pendingPoints) {
       this.overlay.circle(p.x, p.y, 4 / this.world.scale.x).fill({ color: 0xffb300 });
+    }
+
+    if (this.pendingSegmentStart) {
+      const p = this.pendingSegmentStart.worldPosition;
+      this.overlay.circle(p.x, p.y, 5 / this.world.scale.x).fill({ color: 0xffa726 });
     }
   }
 }

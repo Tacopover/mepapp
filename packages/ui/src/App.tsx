@@ -1,5 +1,6 @@
 import { useCallback, useState, type RefObject } from 'react';
 import type { SketchScene, SketchTool } from '@mepapp/render';
+import { ProjectLoadError } from '@mepapp/core';
 import { useSketchScene } from './useSketchScene.js';
 
 export interface PdfPageLoadResult {
@@ -27,10 +28,48 @@ function ToolButton(props: { tool: SketchTool; current: SketchTool; sceneRef: Re
 }
 
 export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketchAppProps) {
-  const { containerRef, sceneRef, ready, tool, selection, calibration, measurementMm, calibrationPrompt, setCalibrationPrompt } =
-    useSketchScene();
+  const {
+    containerRef,
+    sceneRef,
+    ready,
+    tool,
+    selection,
+    calibration,
+    measurementMm,
+    calibrationPrompt,
+    setCalibrationPrompt,
+    drawingSummary,
+    flowResult,
+  } = useSketchScene();
   const [status, setStatus] = useState('');
   const [calibrationInput, setCalibrationInput] = useState('');
+  const [capacityInput, setCapacityInput] = useState('');
+
+  const handleSaveProject = useCallback(() => {
+    if (!sceneRef.current) return;
+    const doc = sceneRef.current.exportProject();
+    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mepapp-project.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [sceneRef]);
+
+  const handleLoadProject = useCallback(
+    async (file: File) => {
+      try {
+        const raw = JSON.parse(await file.text());
+        sceneRef.current?.loadProjectFromJson(raw);
+        setStatus(`Loaded project from ${file.name}.`);
+      } catch (err) {
+        const message = err instanceof ProjectLoadError ? `${err.message}: ${JSON.stringify(err.issues)}` : (err as Error).message;
+        setStatus(`Failed to load ${file.name}: ${message}`);
+      }
+    },
+    [sceneRef],
+  );
 
   const handlePdfFile = useCallback(
     async (file: File) => {
@@ -70,6 +109,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
         </label>
         <ToolButton tool="select" current={tool} sceneRef={sceneRef} label="Select" />
         <ToolButton tool="place-stamp" current={tool} sceneRef={sceneRef} label="Place stamp" />
+        <ToolButton tool="draw-segment" current={tool} sceneRef={sceneRef} label="Draw segment" />
         <ToolButton tool="calibrate" current={tool} sceneRef={sceneRef} label="Calibrate" />
         <ToolButton tool="measure" current={tool} sceneRef={sceneRef} label="Measure" />
         <button onClick={() => sceneRef.current?.rotateSelectionBy(-90)} disabled={selection.length === 0}>
@@ -96,6 +136,44 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl }: MepSketc
         {calibration && <span>Scale: {calibration.pageUnitsPerRealUnit.toFixed(4)} pt/mm</span>}
         {measurementMm !== null && <span>Last measurement: {measurementMm.toFixed(2)} mm</span>}
         <span style={{ opacity: 0.7 }}>{status}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 12, padding: 8, background: '#242424', color: '#eee', alignItems: 'center', flexWrap: 'wrap' }}>
+        <button onClick={() => sceneRef.current?.undoDrawing()} disabled={!drawingSummary.canUndo}>
+          Undo
+        </button>
+        <button onClick={() => sceneRef.current?.redoDrawing()} disabled={!drawingSummary.canRedo}>
+          Redo
+        </button>
+        <span>
+          {drawingSummary.segmentCount} segment{drawingSummary.segmentCount === 1 ? '' : 's'}, {drawingSummary.fittingCount} fitting
+          {drawingSummary.fittingCount === 1 ? '' : 's'}, {drawingSummary.networkCount} network{drawingSummary.networkCount === 1 ? '' : 's'}
+        </span>
+        <label>
+          Capacity:{' '}
+          <input
+            type="number"
+            disabled={!singleSelected}
+            value={capacityInput}
+            onChange={(e) => setCapacityInput(e.target.value)}
+            onBlur={() => singleSelected && sceneRef.current?.setTerminalCapacity(singleSelected.id, Number(capacityInput) || 0)}
+            style={{ width: 70 }}
+          />
+        </label>
+        <button onClick={() => sceneRef.current?.computeFlow()}>Solve flow</button>
+        {flowResult && (
+          <span>
+            {flowResult
+              .flatMap((r) => Object.values(r.segmentCapacity))
+              .filter((c): c is number => c !== null)
+              .reduce((sum, c) => sum + c, 0)}{' '}
+            total capacity across {flowResult.length} network{flowResult.length === 1 ? '' : 's'}
+          </span>
+        )}
+        <button onClick={handleSaveProject}>Save project</button>
+        <label>
+          Load project:{' '}
+          <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && handleLoadProject(e.target.files[0])} />
+        </label>
       </div>
       <div ref={containerRef} style={{ flex: 1, position: 'relative' }}>
         {!ready && <div style={{ position: 'absolute', top: 12, left: 12, color: '#888' }}>Initializing canvas…</div>}

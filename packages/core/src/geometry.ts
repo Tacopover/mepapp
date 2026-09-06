@@ -175,6 +175,28 @@ export function rectIntersectsRotatedRect(
   return true;
 }
 
+export function distance(a: Vec2, b: Vec2): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+/**
+ * Closest point on the finite line segment [a, b] to p, plus t (0..1) — how
+ * far along [a, b] that point sits. Used by the segment-drawing tool to
+ * detect a click on the middle of an existing run (t strictly between 0 and
+ * 1) versus near one of its own endpoints.
+ */
+export function closestPointOnSegment(p: Vec2, a: Vec2, b: Vec2): { point: Vec2; t: number } {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) {
+    return { point: a, t: 0 };
+  }
+  const raw = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared;
+  const t = Math.max(0, Math.min(1, raw));
+  return { point: { x: a.x + dx * t, y: a.y + dy * t }, t };
+}
+
 export function centroid(points: Vec2[]): Vec2 {
   if (points.length === 0) {
     throw new Error('centroid requires at least one point');

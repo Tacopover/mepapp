@@ -168,6 +168,44 @@ the session transcript; decisions are recorded in the Obsidian decisions log.
 
 Implementation proceeds now that all four are confirmed.
 
+**Status:**
+- [x] Domain layer in `@mepapp/core`: `network.ts` (Segment/Fitting/Network,
+      `computeNetworks`), `flow.ts` (`solveFlow`), `commands.ts`
+      (`CommandManager`/`CompositeCommand`/`Transaction`), `schema.ts` +
+      `project.ts` (versioned save format with a real migration step).
+      67 automated tests, all passing.
+- [x] Interactive segment-drawing tool wired into `@mepapp/render`'s
+      `SketchScene` and `@mepapp/ui`'s toolbar: two-click draw with snap-to-port/
+      snap-to-fitting/break-existing-segment resolution
+      (`core/segmentTool.ts`), undo/redo via `CommandManager`, a "Solve flow"
+      button, and Save/Load project buttons.
+- [x] Verified live in a real browser (Playwright/Chromium against the dev
+      server, not just unit tests): drawing a run, snapping to an existing
+      fitting, auto-generating a junction by branching onto a segment's
+      interior, two separately-drawn networks merging into one purely from
+      derived connectivity (no explicit "merge" step exists or is needed),
+      atomic undo/redo of a whole composite draw operation, flow solve
+      running without error, and save/reload — including a synthetic
+      pre-material (v0) document proving the migration step itself runs on
+      real load, not just in a unit test. Zero page errors throughout.
+- [ ] **PDF export is not wired up.** "the exported PDF reflects the final
+      on-screen state" (this step's pass criteria) needs segments/fittings
+      to be written back through `@mepapp/pdf-engine`'s `addAnnotation`/
+      `flattenOverlay`, which nothing yet does for segment data (stamps
+      aren't flattened either — see Step 4's own open item). Real gap, not
+      attempted as a placeholder.
+- [ ] **Placed stamps are not round-tripped through save/load.** The save
+      format has no image bytes for a stamp's source PNG (it only exists in
+      that browser session), so a reload has nothing to rebuild a sprite
+      from. Segments/fittings/network types do round-trip correctly.
+- [ ] Only straight two-point segments are supported (no multi-point
+      polyline drawing tool yet) and there is no UI yet to edit a segment's
+      shape/diameter/material/network-type after creation — every new
+      segment gets the same default network type and round/200 shape.
+- [ ] Stamp placement/move/rotate still isn't covered by undo/redo (a
+      pre-existing gap from Step 1, not introduced this session) — only the
+      new segment/fitting drawing operations are undoable.
+
 ## Notes
 
 - SVG stamp support (you added `.svg` fixtures) — real feature gap, not built

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   centroid,
+  closestPointOnSegment,
   composeTransform,
+  distance,
   multiRotate,
   normalizeDegrees,
   rectIntersectsRotatedRect,
@@ -134,5 +136,31 @@ describe('check 2 — rubber-band selection tests the rotated shape, not a cente
   it('accepts a drag rectangle that overlaps the rotated diamond', () => {
     const rotated: Transform2D = { position: { x: 0, y: 0 }, rotationDegrees: 45, scale: { x: 1, y: 1 } };
     expect(rectIntersectsRotatedRect({ x: 8, y: -1 }, { x: 12, y: 1 }, rotated, 10, 10)).toBe(true);
+  });
+});
+
+describe('closestPointOnSegment', () => {
+  it('clamps to an endpoint when the projection falls outside [a, b]', () => {
+    const result = closestPointOnSegment({ x: -5, y: 3 }, { x: 0, y: 0 }, { x: 10, y: 0 });
+    expect(result.t).toBe(0);
+    expect(result.point).toEqual({ x: 0, y: 0 });
+  });
+
+  it('finds the perpendicular foot when it falls inside [a, b]', () => {
+    const result = closestPointOnSegment({ x: 5, y: 4 }, { x: 0, y: 0 }, { x: 10, y: 0 });
+    expect(result.t).toBeCloseTo(0.5, 9);
+    expect(result.point.x).toBeCloseTo(5, 9);
+    expect(result.point.y).toBeCloseTo(0, 9);
+  });
+
+  it('treats a zero-length segment as its single point', () => {
+    const result = closestPointOnSegment({ x: 3, y: 3 }, { x: 1, y: 1 }, { x: 1, y: 1 });
+    expect(result).toEqual({ point: { x: 1, y: 1 }, t: 0 });
+  });
+});
+
+describe('distance', () => {
+  it('measures a 3-4-5 triangle', () => {
+    expect(distance({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
   });
 });
