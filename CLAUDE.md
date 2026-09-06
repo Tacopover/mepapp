@@ -43,3 +43,11 @@ Stack: TypeScript, PixiJS v8 (interactive overlay), MuPDF.js behind a swappable 
 ## License constraint
 
 AGPLv3. No paid SDKs or non-free libraries — everything in the dependency tree must stay free/open. Network-use (§13) triggers source-disclosure obligations if a modified version is run as a network service — keep this in mind before adding SaaS-style backend dependencies.
+
+## Documentation Hub
+
+- Hub: `/taco/notes/Obsidian Vault/Project Docs/MepApp/` (this container's mount of `C:\Users\taco\OneDrive - MEPover\Taco\Notes\Obsidian Vault\Project Docs\MepApp\`)
+- Temp plans: `.claude/plans/` — delete when task done; save 2–3 line summary to Decisions-Log first
+- Session end: run `/session-handoff` — writes Claude memory + Obsidian Session-Summary + Decisions-Log entries
+- Cross-project patterns: check `/taco/notes/Obsidian Vault/Project Docs/_Cross-Project/` before implementing a known pattern
+- Do NOT log to hub: git history, code structure, CLAUDE.md content, or anything already in the repo
