@@ -3,14 +3,13 @@ import { ProjectLoadError, type ReconciliationReport, type StampDefinition } fro
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { Toolbar } from './components/Toolbar.js';
-import { DisciplineSwitcher } from './components/DisciplineSwitcher.js';
 import { DockPanel, type DockTab } from './components/DockPanel.js';
 import { StampsPanel } from './components/StampsPanel.js';
-import { LayersPanel } from './components/LayersPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
-import { SheetChip } from './components/SheetChip.js';
-import { IconFile, IconFlow, IconRedo, IconUndo } from './icons.js';
+import { DrawingsPanel } from './components/DrawingsPanel.js';
+import { MenuButton } from './components/MenuButton.js';
+import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
 import './theme.css';
 
@@ -53,17 +52,22 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     setCalibrationPrompt,
     drawingSummary,
     flowResult,
+    documents,
+    activeDocumentId,
+    activePdfHandle,
   } = useSketchScene();
 
   const [status, setStatus] = useState('');
   const [calibrationInput, setCalibrationInput] = useState('');
   const [capacityInput, setCapacityInput] = useState('');
-  const [pdfHandle, setPdfHandle] = useState<PdfDocumentHandle | null>(null);
-  const [sheetName, setSheetName] = useState<string | null>(null);
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
   const [dockTabId, setDockTabId] = useState('stamps');
+
+  const activeDoc = documents.find((d) => d.id === activeDocumentId) ?? null;
+  const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
+  const pdfHandle = activePdfHandle;
 
   const handleSaveProject = useCallback(() => {
     if (!sceneRef.current) return;
@@ -93,12 +97,21 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
 
   const handlePdfFile = useCallback(
     async (file: File) => {
+      // Reopening a file already open elsewhere in the document list just
+      // switches to its tab — no re-parse, no duplicate — see decisions log
+      // 2026-09-07's multi-document plan, D3.
+      const fileKey = `${file.name}:${file.size}:${file.lastModified}`;
+      const existingId = sceneRef.current?.findDocumentByFileKey(fileKey);
+      if (existingId) {
+        sceneRef.current?.activateDocument(existingId);
+        setStatus(`Switched to already-open ${file.name}.`);
+        return;
+      }
+
       setStatus(`Loading ${file.name}...`);
       try {
         const { bitmap, pageWidthPt, pageHeightPt, handle } = await onLoadPdfPage(file);
-        sceneRef.current?.setBackdrop(bitmap, pageWidthPt, pageHeightPt);
-        setPdfHandle(handle);
-        setSheetName(file.name);
+        sceneRef.current?.openDocument(bitmap, pageWidthPt, pageHeightPt, { fileKey, fileName: file.name, handle });
         // Loads this PDF's own embedded project JSON (if any) and compares
         // its annotations against that domain model — see decisions log
         // 2026-09-06's reconciliation policy: flag drift/missing, never
@@ -111,6 +124,23 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
       }
     },
     [onLoadPdfPage, sceneRef],
+  );
+
+  const handleActivateDocument = useCallback(
+    (id: string) => {
+      sceneRef.current?.activateDocument(id);
+      setReconciliation(null); // tied to the load that produced it, not something to resurrect on tab-switch-back
+    },
+    [sceneRef],
+  );
+
+  const handleCloseDocument = useCallback(
+    (id: string) => {
+      const target = documents.find((d) => d.id === id);
+      if (target?.isDirty && !window.confirm(`"${target.fileName}" has unsynced changes. Close anyway?`)) return;
+      sceneRef.current?.closeDocument(id);
+    },
+    [documents, sceneRef],
   );
 
   const handleSyncToPdf = useCallback(async () => {
@@ -163,13 +193,40 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         <StampsPanel
           sceneRef={sceneRef}
           disciplineGroup={disciplineGroup}
+          onChangeDisciplineGroup={setDisciplineGroup}
           activeDefinitionId={activeDefinitionId}
           onPick={handleStampPick}
+          onCustomStampFile={handleCustomStampFile}
           resolveIconUrl={resolveStampIconUrl}
         />
       ),
     },
-    { id: 'layers', label: 'Layers', content: <LayersPanel networks={networkSummaries} stamps={allStamps} /> },
+    {
+      id: 'drawings',
+      label: 'Drawings',
+      content: (
+        <DrawingsPanel documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
+      ),
+    },
+    {
+      id: 'networks',
+      label: 'Networks',
+      content: (
+        <div>
+          <div className="mep-section">
+            <button className="mep-icon-btn" onClick={() => sceneRef.current?.computeFlow()}>
+              <IconFlow size={13} /> Solve flow
+            </button>
+            {totalFlowCapacity !== null && (
+              <div className="mep-flow-result" style={{ marginTop: 8 }}>
+                {totalFlowCapacity} total capacity across {flowResult?.length ?? 0} network{flowResult?.length === 1 ? '' : 's'}
+              </div>
+            )}
+          </div>
+          <div className="mep-empty-panel">Network tree — coming soon.</div>
+        </div>
+      ),
+    },
     {
       id: 'properties',
       label: 'Properties',
@@ -179,63 +236,21 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
 
   return (
     <div className="mep-app">
-      <div className="mep-titlebar">
-        <span className="mep-badge">M</span>
-        <span className="mep-title">MepApp{sheetName ? ` — ${sheetName}` : ''}</span>
+      <div className="mep-header">
+        <MenuButton
+          onOpenPdf={handlePdfFile}
+          onSaveProject={handleSaveProject}
+          onLoadProject={handleLoadProject}
+          onSyncToPdf={handleSyncToPdf}
+          onDownloadPdf={handleDownloadPdf}
+          pdfLoaded={pdfHandle !== null}
+        />
+        <span className="mep-title">{sheetName ?? 'No sheet loaded'}</span>
         <div className="mep-fill" />
-        <span style={{ fontSize: 11, opacity: 0.7 }}>{status}</span>
-      </div>
-
-      <div className="mep-actionbar">
-        <label className="mep-icon-btn mep-file-btn">
-          <IconFile size={13} /> Open PDF
-          <input type="file" accept="application/pdf" onChange={(e) => e.target.files?.[0] && handlePdfFile(e.target.files[0])} />
-        </label>
-        <label className="mep-icon-btn mep-file-btn">
-          Custom stamp…
-          <input type="file" accept="image/png,image/svg+xml" onChange={(e) => e.target.files?.[0] && handleCustomStampFile(e.target.files[0])} />
-        </label>
-        <div className="mep-divider" />
-        <button className="mep-icon-btn" onClick={() => sceneRef.current?.undoDrawing()} disabled={!drawingSummary.canUndo}>
-          <IconUndo size={13} /> Undo
+        {status && <span className="mep-header-status">{status}</span>}
+        <button type="button" className="mep-login-btn" disabled>
+          Log in
         </button>
-        <button className="mep-icon-btn" onClick={() => sceneRef.current?.redoDrawing()} disabled={!drawingSummary.canRedo}>
-          <IconRedo size={13} /> Redo
-        </button>
-        <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-          {drawingSummary.segmentCount} segment{drawingSummary.segmentCount === 1 ? '' : 's'}, {drawingSummary.fittingCount} fitting
-          {drawingSummary.fittingCount === 1 ? '' : 's'}, {drawingSummary.networkCount} network{drawingSummary.networkCount === 1 ? '' : 's'}
-        </span>
-        <div className="mep-divider" />
-        <button className="mep-icon-btn" onClick={() => sceneRef.current?.computeFlow()}>
-          <IconFlow size={13} /> Solve flow
-        </button>
-        {totalFlowCapacity !== null && (
-          <span className="mep-flow-result">
-            {totalFlowCapacity} total capacity across {flowResult?.length ?? 0} network{flowResult?.length === 1 ? '' : 's'}
-          </span>
-        )}
-        <div className="mep-fill" />
-        <button className="mep-icon-btn" onClick={handleSaveProject}>
-          Save project
-        </button>
-        <label className="mep-icon-btn mep-file-btn">
-          Load project…
-          <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && handleLoadProject(e.target.files[0])} />
-        </label>
-        <button className="mep-icon-btn" onClick={handleSyncToPdf} disabled={!pdfHandle}>
-          Sync to PDF
-        </button>
-        <button className="mep-icon-btn" onClick={handleDownloadPdf} disabled={!pdfHandle}>
-          Download PDF
-        </button>
-      </div>
-
-      <div className="mep-head">
-        <SheetChip sheetName={sheetName} />
-        <DisciplineSwitcher value={disciplineGroup} onChange={setDisciplineGroup} />
-        <div className="mep-fill" />
-        <span className="mep-hint">Drag any panel edge to resize · drag a handle to move it</span>
       </div>
 
       {reconciliation && (
@@ -255,12 +270,22 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
       <div className="mep-body">
         <div className="mep-canvas-wrap" ref={containerRef}>
           {!ready && <div className="mep-canvas-init">Initializing canvas…</div>}
-          {ready && <Toolbar tool={tool} sceneRef={sceneRef} stampReady={activeDefinitionId !== null || tool === 'place-stamp'} />}
+          {ready && (
+            <Toolbar
+              tool={tool}
+              sceneRef={sceneRef}
+              stampReady={activeDefinitionId !== null || tool === 'place-stamp'}
+              canUndo={drawingSummary.canUndo}
+              canRedo={drawingSummary.canRedo}
+              onUndo={() => sceneRef.current?.undoDrawing()}
+              onRedo={() => sceneRef.current?.redoDrawing()}
+            />
+          )}
         </div>
         <DockPanel tabs={dockTabs} activeTabId={dockTabId} onTabChange={setDockTabId} />
       </div>
 
-      <StatusBar zoom={zoom} calibration={calibration} measurementMm={measurementMm} selectedCount={selection.length} />
+      <StatusBar zoom={zoom} calibration={calibration} measurementMm={measurementMm} selectedCount={selection.length} drawingSummary={drawingSummary} />
 
       {calibrationPrompt && (
         <div className="mep-modal-backdrop">

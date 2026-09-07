@@ -2,12 +2,16 @@ import type { RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import { STAMP_LIBRARY, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
+import { DisciplineSwitcher } from './DisciplineSwitcher.js';
+import { IconFile } from '../icons.js';
 
 export interface StampsPanelProps {
   sceneRef: RefObject<SketchScene | null>;
   disciplineGroup: DisciplineGroup | null;
+  onChangeDisciplineGroup: (value: DisciplineGroup | null) => void;
   activeDefinitionId: string | null;
   onPick: (definition: StampDefinition) => void;
+  onCustomStampFile: (file: File) => void;
   /** Resolves a StampDefinition's iconRef to a fetchable URL — apps/web owns where stamp art actually lives. */
   resolveIconUrl: (iconRef: string) => string;
 }
@@ -25,7 +29,15 @@ function loadBitmap(url: string): Promise<ImageBitmap> {
   return cached;
 }
 
-export function StampsPanel({ sceneRef, disciplineGroup, activeDefinitionId, onPick, resolveIconUrl }: StampsPanelProps) {
+export function StampsPanel({
+  sceneRef,
+  disciplineGroup,
+  onChangeDisciplineGroup,
+  activeDefinitionId,
+  onPick,
+  onCustomStampFile,
+  resolveIconUrl,
+}: StampsPanelProps) {
   const definitions =
     disciplineGroup === null ? STAMP_LIBRARY : STAMP_LIBRARY.filter((def) => disciplineGroupOf(def.discipline) === disciplineGroup);
 
@@ -36,23 +48,30 @@ export function StampsPanel({ sceneRef, disciplineGroup, activeDefinitionId, onP
     onPick(definition);
   }
 
-  if (definitions.length === 0) {
-    return <div className="mep-empty-panel">No stamp art available yet for this discipline.</div>;
-  }
-
   return (
-    <div className="mep-stamp-grid">
-      {definitions.map((definition) => (
-        <button
-          key={definition.id}
-          type="button"
-          className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}`}
-          onClick={() => void handlePick(definition)}
-        >
-          <img src={resolveIconUrl(definition.iconRef)} alt="" />
-          {definition.label}
-        </button>
-      ))}
+    <div>
+      <div className="mep-stamps-filter">
+        <DisciplineSwitcher value={disciplineGroup} onChange={onChangeDisciplineGroup} />
+      </div>
+      {definitions.length === 0 && <div className="mep-empty-panel">No stamp art available yet for this discipline.</div>}
+      <div className="mep-stamp-grid">
+        {definitions.map((definition) => (
+          <button
+            key={definition.id}
+            type="button"
+            className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}`}
+            onClick={() => void handlePick(definition)}
+          >
+            <img src={resolveIconUrl(definition.iconRef)} alt="" />
+            {definition.label}
+          </button>
+        ))}
+        <label className="mep-stamp-tile mep-file-btn">
+          <IconFile size={20} />
+          Custom stamp…
+          <input type="file" accept="image/png,image/svg+xml" onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0])} />
+        </label>
+      </div>
     </div>
   );
 }

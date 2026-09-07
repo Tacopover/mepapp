@@ -122,6 +122,12 @@ export const IconRedo = (props: IconProps) => (
   </Svg>
 );
 
+export const IconMenu = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </Svg>
+);
+
 export const IconFlow = (props: IconProps) => (
   <Svg {...props}>
     <path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2" />

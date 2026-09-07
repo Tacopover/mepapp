@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ReactElement, type RefObject } from 'react';
 import type { SketchScene, SketchTool } from '@mepapp/render';
-import { IconGrip, IconMeasure, IconPan, IconRuler, IconSegment, IconSelect, IconStamp } from '../icons.js';
+import { IconGrip, IconMeasure, IconPan, IconRedo, IconRuler, IconSegment, IconSelect, IconStamp, IconUndo } from '../icons.js';
 
 interface ToolDef {
   tool: SketchTool;
@@ -27,9 +27,13 @@ export interface ToolbarProps {
   tool: SketchTool;
   sceneRef: RefObject<SketchScene | null>;
   stampReady: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
-export function Toolbar({ tool, sceneRef, stampReady }: ToolbarProps) {
+export function Toolbar({ tool, sceneRef, stampReady, canUndo, canRedo, onUndo, onRedo }: ToolbarProps) {
   const [position, setPosition] = useState({ top: 16, left: 16 });
   const dragRef = useRef<{ startScreen: { x: number; y: number }; startPos: { top: number; left: number } } | null>(null);
 
@@ -73,6 +77,13 @@ export function Toolbar({ tool, sceneRef, stampReady }: ToolbarProps) {
           ))}
         </div>
       ))}
+      <div className="mep-tool-divider" />
+      <button type="button" className="mep-tool-btn" title="Undo" disabled={!canUndo} onClick={onUndo}>
+        <IconUndo size={17} />
+      </button>
+      <button type="button" className="mep-tool-btn" title="Redo" disabled={!canRedo} onClick={onRedo}>
+        <IconRedo size={17} />
+      </button>
     </div>
   );
 }

@@ -10,7 +10,6 @@ import {
 import {
   calibrateFromKnownDistance,
   centroid,
-  CommandManager,
   CompositeCommand,
   computeNetworks,
   loadProject,
@@ -32,7 +31,6 @@ import {
   type Fitting,
   type FlowResult,
   type Network,
-  type NetworkType,
   type PlacedStamp,
   type ProjectDocument,
   type ReconciliationReport,
@@ -43,6 +41,9 @@ import {
 } from '@mepapp/core';
 import type { AnnotationGeometry, PdfDocumentHandle, StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
+import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState, type StampEntry } from './document.js';
+
+export type { DocumentSummary } from './document.js';
 
 // The embedded-file name the project JSON is stored under inside the PDF
 // itself (see decisions log 2026-09-06: single self-contained .pdf, no
@@ -75,20 +76,6 @@ function annotationSyncEntry(annotation: StoredAnnotation): SyncedGeometry | nul
   }
   return null;
 }
-
-/** Undo-history state for the segment/fitting drawing tool — kept separate from the pre-existing, not-yet-undoable stamp placement state (see decisions log 2026-09-06). */
-interface DrawingState {
-  segments: Record<string, Segment>;
-  fittings: Record<string, Fitting>;
-}
-
-const DEFAULT_NETWORK_TYPE: NetworkType = {
-  id: 'default',
-  name: 'Unassigned',
-  discipline: 'ventilation',
-  units: '',
-  defaultCapacity: 0,
-};
 
 function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
   const rest = { ...record };
@@ -178,6 +165,10 @@ interface SketchSceneEvents {
   flowSolved: [FlowResult[]];
   projectLoaded: [];
   zoomChanged: [zoom: number];
+  /** A different document became active — everything (selection, stamps, networks, calibration, drawing summary, flow result, zoom) should be re-pulled via the getters, not diffed. */
+  documentActivated: [];
+  /** The open-document list, a document's name, or its dirty flag changed — the Drawings tab's cue to re-render. */
+  documentsChanged: [DocumentSummary[]];
 }
 
 type Listener<A extends unknown[]> = (...args: A) => void;
@@ -196,12 +187,6 @@ class TypedEmitter<Events extends Record<string, unknown[]>> {
   emit<K extends keyof Events>(event: K, ...args: Events[K]): void {
     this.listeners[event]?.forEach((listener) => listener(...args));
   }
-}
-
-interface StampEntry {
-  data: PlacedStamp;
-  sprite: Sprite;
-  baseScale: Vec2; // converts texture pixels -> world units at transform.scale = 1
 }
 
 type DragState =
@@ -233,37 +218,34 @@ function snapToNearest(degrees: number, step: number): number {
 export class SketchScene {
   private readonly app = new Application();
   private readonly world = new Container();
-  private readonly stampsLayer = new Container();
-  private readonly drawingLayer = new Graphics();
   private readonly overlay = new Graphics();
-  private backdropSprite: Sprite | null = null;
-  private readonly stamps = new Map<string, StampEntry>();
-  private selectedIds = new Set<string>();
+  // Every open document, kept fully resident (sprites/textures/undo history
+  // and all) — see decisions log 2026-09-07's multi-document plan, D1.
+  // SketchScene renders whichever one is active; switching just reparents
+  // that document's own layers into `world`, nothing is rebuilt or reloaded.
+  private readonly documents: SketchDocument[] = [];
+  private activeId: string;
   private tool: SketchTool = 'select';
   private pendingStampTexture: { texture: Texture; nativeWidth: number; nativeHeight: number; definitionId?: string } | null = null;
-  private calibration: Calibration | null = null;
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure two-click flows
   private drag: DragState = { kind: 'none' };
-  private nextStampSeq = 1;
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
-
-  // Segment/fitting drawing tool state — see decisions log 2026-09-06.
-  private readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {} });
-  private readonly networkTypes: NetworkType[] = [DEFAULT_NETWORK_TYPE];
-  private readonly terminalCapacities = new Map<string, number>();
   private pendingSegmentStart: DrawEndpointResolution | null = null;
-  private nextFittingSeq = 1;
-  private nextSegmentSeq = 1;
-  private lastFlowResult: FlowResult[] = [];
   private readonly SNAP_RADIUS_SCREEN_PX = 12;
-  // Domain ids that currently have a MepApp-written PDF annotation, per the
-  // last loadFromPdf/exportToPdf call — seeds planPdfSync's "what did we
-  // previously write" input so a save never deletes an annotation it doesn't
-  // own (see core/pdfSync.ts's SyncPlan doc comment).
-  private pdfSyncIds = new Set<string>();
   private static readonly FITTING_MARKER_RADIUS_PT = 4;
 
-  constructor(private readonly container: HTMLElement) {}
+  constructor(private readonly container: HTMLElement) {
+    const first = new SketchDocument();
+    this.documents.push(first);
+    this.activeId = first.id;
+  }
+
+  /** The active document — every per-document read/mutation goes through this. */
+  private get doc(): SketchDocument {
+    const found = this.documents.find((d) => d.id === this.activeId);
+    if (!found) throw new Error('SketchScene invariant violated: no active document'); // there is always >= 1, see closeDocument
+    return found;
+  }
 
   async init(): Promise<void> {
     await this.app.init({
@@ -274,8 +256,8 @@ export class SketchScene {
     });
     this.container.appendChild(this.app.canvas);
 
-    this.world.addChild(this.stampsLayer);
-    this.world.addChild(this.drawingLayer);
+    this.world.addChild(this.doc.stampsLayer);
+    this.world.addChild(this.doc.drawingLayer);
     this.world.addChild(this.overlay);
     this.app.stage.addChild(this.world);
 
@@ -290,6 +272,7 @@ export class SketchScene {
   }
 
   destroy(): void {
+    for (const document of this.documents) document.destroy();
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -310,22 +293,126 @@ export class SketchScene {
   }
 
   /**
-   * Displays a PDF page raster as the backdrop. pageWidthPt/pageHeightPt are
-   * the page's own display-space dimensions (see @mepapp/core's
-   * displayDimensions) — 1 world unit = 1 PDF point, independent of the DPI
-   * the bitmap was actually rendered at.
+   * Opens a PDF page as a new document, or into the currently active one if
+   * it's still empty (so the app's initial blank canvas doesn't linger as a
+   * permanent extra tab the moment the first PDF is opened — see decisions
+   * log 2026-09-07). Always activates the resulting document. Reopening a
+   * file already open elsewhere in the list should be checked for via
+   * findDocumentByFileKey *before* calling this (skips the re-parse
+   * entirely) — this method itself does not dedupe.
    */
-  setBackdrop(bitmap: ImageBitmap, pageWidthPt: number, pageHeightPt: number): void {
-    if (this.backdropSprite) {
-      this.world.removeChild(this.backdropSprite);
-      this.backdropSprite.destroy({ texture: true });
-    }
+  openDocument(
+    bitmap: ImageBitmap,
+    pageWidthPt: number,
+    pageHeightPt: number,
+    opts: { fileKey: string; fileName: string; handle: PdfDocumentHandle },
+  ): string {
+    const reuse = this.doc.isEmpty() ? this.doc : null;
+    const target = reuse ?? new SketchDocument();
+    if (!reuse) this.documents.push(target);
+
+    target.fileKey = opts.fileKey;
+    target.fileName = opts.fileName;
+    target.pdfHandle = opts.handle;
     const sprite = new Sprite(textureFromImageBitmap(bitmap));
     sprite.anchor.set(0);
     sprite.width = pageWidthPt;
     sprite.height = pageHeightPt;
-    this.backdropSprite = sprite;
-    this.world.addChildAt(sprite, 0);
+    target.backdropSprite = sprite;
+    target.isDirty = false;
+
+    if (target.id === this.activeId) {
+      this.world.addChildAt(sprite, 0); // already the active, reused doc — just attach the backdrop
+    } else {
+      this.doc.viewport = { x: this.world.x, y: this.world.y, scale: this.world.scale.x };
+      this.activateInternal(target);
+    }
+    this.emitter.emit('documentsChanged', this.getDocuments());
+    return target.id;
+  }
+
+  /** Public, cheap pre-check so a caller can skip re-parsing a file that's already open — see decisions log 2026-09-07, D3. */
+  findDocumentByFileKey(fileKey: string): string | null {
+    return this.documents.find((d) => d.fileKey === fileKey)?.id ?? null;
+  }
+
+  activateDocument(id: string): void {
+    if (id === this.activeId) return;
+    const target = this.documents.find((d) => d.id === id);
+    if (!target) return;
+    this.doc.viewport = { x: this.world.x, y: this.world.y, scale: this.world.scale.x };
+    this.activateInternal(target);
+  }
+
+  /** Destroys the document's PixiJS resources and removes it. Never confirms — an unsaved-changes check is the caller's job (see doc.isDirty / getDocuments()). */
+  closeDocument(id: string): void {
+    const idx = this.documents.findIndex((d) => d.id === id);
+    if (idx === -1) return;
+    const removed = this.documents[idx];
+    const wasActive = removed.id === this.activeId;
+    this.documents.splice(idx, 1);
+
+    if (this.documents.length === 0) {
+      this.documents.push(new SketchDocument()); // invariant: always >= 1 open document
+    }
+    if (wasActive) {
+      const next = this.documents[Math.min(idx, this.documents.length - 1)];
+      this.activateInternal(next);
+    }
+    removed.destroy();
+    this.emitter.emit('documentsChanged', this.getDocuments());
+  }
+
+  getDocuments(): DocumentSummary[] {
+    return this.documents.map((d) => d.toSummary());
+  }
+
+  getActiveDocumentId(): string {
+    return this.activeId;
+  }
+
+  getActivePdfHandle(): PdfDocumentHandle | null {
+    return this.doc.pdfHandle;
+  }
+
+  getFlowResult(): FlowResult[] | null {
+    return this.doc.lastFlowResult;
+  }
+
+  /** Reparents the given document's layers into `world`, restores its viewport, resets transient interaction state, and announces the switch. Assumes the outgoing document's viewport has already been saved by the caller. */
+  private activateInternal(target: SketchDocument): void {
+    this.activeId = target.id;
+    this.world.removeChildren();
+    if (target.backdropSprite) this.world.addChild(target.backdropSprite);
+    this.world.addChild(target.stampsLayer);
+    this.world.addChild(target.drawingLayer);
+    this.world.addChild(this.overlay);
+    this.world.x = target.viewport.x;
+    this.world.y = target.viewport.y;
+    this.world.scale.set(target.viewport.scale);
+
+    this.tool = 'select';
+    this.pendingStampTexture = null;
+    this.pendingPoints = [];
+    this.pendingSegmentStart = null;
+    this.drag = { kind: 'none' };
+
+    this.redrawOverlay();
+    this.emitter.emit('toolChanged', this.tool);
+    this.emitter.emit('zoomChanged', this.world.scale.x);
+    this.emitter.emit('documentActivated');
+  }
+
+  private markDirty(): void {
+    if (this.doc.isDirty) return;
+    this.doc.isDirty = true;
+    this.emitter.emit('documentsChanged', this.getDocuments());
+  }
+
+  private markClean(): void {
+    if (!this.doc.isDirty) return;
+    this.doc.isDirty = false;
+    this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
   /** Sets the stamp art the next 'place-stamp' click will place. definitionId, when given (the stamp palette's case, vs. an ad hoc uploaded PNG), is carried onto the resulting PlacedStamp. */
@@ -350,24 +437,24 @@ export class SketchScene {
   }
 
   getSelection(): StampInfo[] {
-    return [...this.selectedIds]
-      .map((id) => this.stamps.get(id))
+    return [...this.doc.selectedIds]
+      .map((id) => this.doc.stamps.get(id))
       .filter((e): e is StampEntry => e !== undefined)
       .map((e) => this.toStampInfo(e));
   }
 
   /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. */
   listStamps(): StampInfo[] {
-    return [...this.stamps.values()].map((e) => this.toStampInfo(e));
+    return [...this.doc.stamps.values()].map((e) => this.toStampInfo(e));
   }
 
   /** Derives the current network topology (see core's computeNetworks) resolved against known network types — the Layers panel's "Networks" list. */
   getNetworkSummaries(): NetworkSummary[] {
-    const state = this.drawingHistory.getState();
+    const state = this.doc.drawingHistory.getState();
     const segments = Object.values(state.segments);
     const fittings = Object.values(state.fittings);
     const networks = computeNetworks({ segments, fittings, portGroups: [] });
-    const typeById = new Map(this.networkTypes.map((t) => [t.id, t]));
+    const typeById = new Map(this.doc.networkTypes.map((t) => [t.id, t]));
     return networks.map((network: Network) => {
       const type = typeById.get(network.networkTypeId) ?? DEFAULT_NETWORK_TYPE;
       return {
@@ -382,11 +469,11 @@ export class SketchScene {
   }
 
   getCalibration(): Calibration | null {
-    return this.calibration;
+    return this.doc.calibration;
   }
 
   getDrawingSummary(): DrawingSummary {
-    const state = this.drawingHistory.getState();
+    const state = this.doc.drawingHistory.getState();
     const networks = computeNetworks({
       segments: Object.values(state.segments),
       fittings: Object.values(state.fittings),
@@ -396,24 +483,26 @@ export class SketchScene {
       segmentCount: Object.keys(state.segments).length,
       fittingCount: Object.keys(state.fittings).length,
       networkCount: networks.length,
-      canUndo: this.drawingHistory.canUndo,
-      canRedo: this.drawingHistory.canRedo,
+      canUndo: this.doc.drawingHistory.canUndo,
+      canRedo: this.doc.drawingHistory.canRedo,
     };
   }
 
   undoDrawing(): void {
-    this.drawingHistory.undo();
+    this.doc.drawingHistory.undo();
     this.syncDrawingLayer();
+    this.markDirty();
   }
 
   redoDrawing(): void {
-    this.drawingHistory.redo();
+    this.doc.drawingHistory.redo();
     this.syncDrawingLayer();
+    this.markDirty();
   }
 
   /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
   setTerminalCapacity(elementId: string, capacity: number): void {
-    this.terminalCapacities.set(elementId, capacity);
+    this.doc.terminalCapacities.set(elementId, capacity);
   }
 
   /**
@@ -423,25 +512,25 @@ export class SketchScene {
    * NetworkId to go stale, unlike the old app (see decisions log 2026-09-06).
    */
   computeFlow(): FlowResult[] {
-    const state = this.drawingHistory.getState();
+    const state = this.doc.drawingHistory.getState();
     const segments = Object.values(state.segments);
     const fittings = Object.values(state.fittings);
     const networks = computeNetworks({ segments, fittings, portGroups: [] });
-    const capacities = Object.fromEntries(this.terminalCapacities);
-    this.lastFlowResult = networks.map((network: Network) =>
+    const capacities = Object.fromEntries(this.doc.terminalCapacities);
+    this.doc.lastFlowResult = networks.map((network: Network) =>
       solveFlow({ network, segments, fittings, portGroups: [], terminalCapacities: capacities }),
     );
-    this.emitter.emit('flowSolved', this.lastFlowResult);
-    return this.lastFlowResult;
+    this.emitter.emit('flowSolved', this.doc.lastFlowResult);
+    return this.doc.lastFlowResult;
   }
 
   exportProject(): ProjectDocument {
-    const state = this.drawingHistory.getState();
+    const state = this.doc.drawingHistory.getState();
     return serializeProject({
-      networkTypes: this.networkTypes,
+      networkTypes: this.doc.networkTypes,
       segments: Object.values(state.segments),
       fittings: Object.values(state.fittings),
-      stamps: [...this.stamps.values()].map((entry) => entry.data),
+      stamps: [...this.doc.stamps.values()].map((entry) => entry.data),
     }) as unknown as ProjectDocument;
   }
 
@@ -459,14 +548,15 @@ export class SketchScene {
   loadProjectFromJson(raw: unknown): void {
     const doc = loadProject(raw as Record<string, unknown>);
 
-    this.drawingHistory.clear();
-    this.drawingHistory.setLiveState({
+    this.doc.drawingHistory.clear();
+    this.doc.drawingHistory.setLiveState({
       segments: Object.fromEntries(doc.segments.map((s) => [s.id, s])),
       fittings: Object.fromEntries(doc.fittings.map((f) => [f.id, f])),
     });
-    this.networkTypes.splice(0, this.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
+    this.doc.networkTypes.splice(0, this.doc.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
 
     this.syncDrawingLayer();
+    this.markClean();
     this.emitter.emit('projectLoaded');
   }
 
@@ -483,11 +573,11 @@ export class SketchScene {
   async exportToPdf(handle: PdfDocumentHandle): Promise<void> {
     const domainEntries = this.domainSyncEntries();
     const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
-    const plan = planPdfSync(domainEntries, observed, this.pdfSyncIds);
+    const plan = planPdfSync(domainEntries, observed, this.doc.pdfSyncIds);
 
     for (const id of plan.toDelete) {
       await handle.deleteAnnotation(id);
-      this.pdfSyncIds.delete(id);
+      this.doc.pdfSyncIds.delete(id);
     }
     for (const id of plan.toUpdate) {
       // The interface has no "update in place" — an update is a delete then
@@ -497,10 +587,11 @@ export class SketchScene {
     }
     for (const id of plan.toCreate) {
       await this.writeAnnotationForId(handle, id);
-      this.pdfSyncIds.add(id);
+      this.doc.pdfSyncIds.add(id);
     }
 
     await handle.setEmbeddedFile(EMBEDDED_PROJECT_FILENAME, new TextEncoder().encode(JSON.stringify(this.exportProject())));
+    this.markClean();
   }
 
   /**
@@ -522,12 +613,12 @@ export class SketchScene {
     const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
     const report = reconcilePdfSync(domainEntries, observed);
 
-    this.pdfSyncIds = new Set([...report.matchedIds, ...report.drifted.map((d) => d.id)]);
+    this.doc.pdfSyncIds = new Set([...report.matchedIds, ...report.drifted.map((d) => d.id)]);
     return report;
   }
 
   private domainSyncEntries(): SyncedGeometry[] {
-    const state = this.drawingHistory.getState();
+    const state = this.doc.drawingHistory.getState();
     const entries: SyncedGeometry[] = [];
     for (const segment of Object.values(state.segments)) {
       const [a, b] = segment.geometry;
@@ -537,7 +628,7 @@ export class SketchScene {
     for (const fitting of Object.values(state.fittings)) {
       entries.push({ id: fitting.id, geometry: { x: round(fitting.position.x), y: round(fitting.position.y) } });
     }
-    for (const entry of this.stamps.values()) {
+    for (const entry of this.doc.stamps.values()) {
       const bounds = this.stampWorldBounds(entry);
       entries.push({
         id: entry.data.id,
@@ -568,7 +659,7 @@ export class SketchScene {
   }
 
   private async writeAnnotationForId(handle: PdfDocumentHandle, id: string): Promise<void> {
-    const state = this.drawingHistory.getState();
+    const state = this.doc.drawingHistory.getState();
     const segment = state.segments[id];
     if (segment) {
       const [a, b] = segment.geometry;
@@ -585,7 +676,7 @@ export class SketchScene {
       });
       return;
     }
-    const stampEntry = this.stamps.get(id);
+    const stampEntry = this.doc.stamps.get(id);
     if (stampEntry) {
       // The extracted PNG already reflects the sprite's own rotation baked
       // into its pixels — the adapter does not rotate pngBytes itself (see
@@ -619,7 +710,7 @@ export class SketchScene {
    */
   debugPopulateForBenchmark(count: number, areaWidth: number, areaHeight: number): void {
     for (let i = 0; i < count; i++) {
-      const id = `bench-${this.nextStampSeq++}`;
+      const id = `bench-${this.doc.nextStampSeq++}`;
       const nativeWidth = 40 + Math.random() * 40;
       const nativeHeight = 40 + Math.random() * 40;
       const data: PlacedStamp = {
@@ -638,8 +729,8 @@ export class SketchScene {
       sprite.tint = Math.floor(Math.random() * 0xffffff);
       const baseScale = { x: nativeWidth, y: nativeHeight }; // Texture.WHITE is 1x1
       applyTransformToSprite(sprite, data.transform, baseScale);
-      this.stamps.set(id, { data, sprite, baseScale });
-      this.stampsLayer.addChild(sprite);
+      this.doc.stamps.set(id, { data, sprite, baseScale });
+      this.doc.stampsLayer.addChild(sprite);
     }
   }
 
@@ -653,28 +744,31 @@ export class SketchScene {
     );
     snapshot.forEach((s, i) => this.setStampTransform(s.id, rotated[i]));
     this.redrawOverlay();
+    this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /** Typed-degree entry: free-form, no snapping, single-selection only. */
   setSelectedRotationDegrees(degrees: number): void {
-    if (this.selectedIds.size !== 1) return;
-    const [id] = this.selectedIds;
-    const entry = this.stamps.get(id);
+    if (this.doc.selectedIds.size !== 1) return;
+    const [id] = this.doc.selectedIds;
+    const entry = this.doc.stamps.get(id);
     if (!entry) return;
     this.setStampTransform(id, { ...entry.data.transform, rotationDegrees: normalizeDegrees(degrees) });
     this.redrawOverlay();
+    this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /** Typed-position entry (Properties panel X/Y fields): single-selection only, same pattern as setSelectedRotationDegrees. */
   setSelectedPosition(position: Vec2): void {
-    if (this.selectedIds.size !== 1) return;
-    const [id] = this.selectedIds;
-    const entry = this.stamps.get(id);
+    if (this.doc.selectedIds.size !== 1) return;
+    const [id] = this.doc.selectedIds;
+    const entry = this.doc.stamps.get(id);
     if (!entry) return;
     this.setStampTransform(id, { ...entry.data.transform, position });
     this.redrawOverlay();
+    this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
@@ -684,7 +778,7 @@ export class SketchScene {
   }
 
   private setStampTransform(id: string, transform: Transform2D): void {
-    const entry = this.stamps.get(id);
+    const entry = this.doc.stamps.get(id);
     if (!entry) return;
     entry.data = { ...entry.data, transform };
     applyTransformToSprite(entry.sprite, transform, entry.baseScale);
@@ -698,7 +792,7 @@ export class SketchScene {
   }
 
   private hitTestStamp(worldPoint: Vec2): string | null {
-    const ordered = [...this.stamps.values()].reverse(); // topmost first
+    const ordered = [...this.doc.stamps.values()].reverse(); // topmost first
     for (const entry of ordered) {
       const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
       const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
@@ -710,13 +804,13 @@ export class SketchScene {
   }
 
   private getSelectionBoundsWorld(): { minX: number; minY: number; maxX: number; maxY: number } | null {
-    if (this.selectedIds.size === 0) return null;
+    if (this.doc.selectedIds.size === 0) return null;
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    for (const id of this.selectedIds) {
-      const entry = this.stamps.get(id);
+    for (const id of this.doc.selectedIds) {
+      const entry = this.doc.stamps.get(id);
       if (!entry) continue;
       const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
       const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
@@ -774,14 +868,14 @@ export class SketchScene {
         if (this.tool === 'calibrate') {
           this.emitter.emit('calibrationNeeded', p1, p2, (mm) => {
             if (mm !== null && mm > 0) {
-              this.calibration = calibrateFromKnownDistance(p1, p2, mm);
-              this.emitter.emit('calibrationSet', this.calibration);
+              this.doc.calibration = calibrateFromKnownDistance(p1, p2, mm);
+              this.emitter.emit('calibrationSet', this.doc.calibration);
               this.setTool('select');
             }
             this.redrawOverlay();
           });
-        } else if (this.calibration) {
-          this.emitter.emit('measurement', measureRealDistance(p1, p2, this.calibration));
+        } else if (this.doc.calibration) {
+          this.emitter.emit('measurement', measureRealDistance(p1, p2, this.doc.calibration));
         } else {
           console.warn('[render] measure tool used with no calibration set yet.');
         }
@@ -809,17 +903,17 @@ export class SketchScene {
     const hitId = this.hitTestStamp(world);
     if (hitId) {
       if (event.shiftKey) {
-        if (this.selectedIds.has(hitId)) {
-          this.selectedIds.delete(hitId);
+        if (this.doc.selectedIds.has(hitId)) {
+          this.doc.selectedIds.delete(hitId);
         } else {
-          this.selectedIds.add(hitId);
+          this.doc.selectedIds.add(hitId);
         }
         this.emitter.emit('selectionChanged', this.getSelection());
         this.redrawOverlay();
         return;
       }
-      if (!this.selectedIds.has(hitId)) {
-        this.selectedIds = new Set([hitId]);
+      if (!this.doc.selectedIds.has(hitId)) {
+        this.doc.selectedIds = new Set([hitId]);
         this.emitter.emit('selectionChanged', this.getSelection());
       }
       this.drag = {
@@ -832,7 +926,7 @@ export class SketchScene {
     }
 
     if (!event.shiftKey) {
-      this.selectedIds.clear();
+      this.doc.selectedIds.clear();
       this.emitter.emit('selectionChanged', this.getSelection());
     }
     this.drag = { kind: 'rubber-band', startWorld: world, currentWorld: world, additive: event.shiftKey };
@@ -854,11 +948,12 @@ export class SketchScene {
       const dx = world.x - this.drag.startPointerWorld.x;
       const dy = world.y - this.drag.startPointerWorld.y;
       for (const { id, position } of this.drag.snapshot) {
-        const entry = this.stamps.get(id);
+        const entry = this.doc.stamps.get(id);
         if (!entry) continue;
         this.setStampTransform(id, { ...entry.data.transform, position: { x: position.x + dx, y: position.y + dy } });
       }
       this.redrawOverlay();
+      this.markDirty();
       this.emitter.emit('selectionChanged', this.getSelection());
       return;
     }
@@ -873,6 +968,7 @@ export class SketchScene {
       );
       this.drag.snapshot.forEach((s, i) => this.setStampTransform(s.id, rotated[i]));
       this.redrawOverlay();
+      this.markDirty();
       this.emitter.emit('selectionChanged', this.getSelection());
       return;
     }
@@ -889,14 +985,14 @@ export class SketchScene {
       const rectMin = { x: Math.min(startWorld.x, currentWorld.x), y: Math.min(startWorld.y, currentWorld.y) };
       const rectMax = { x: Math.max(startWorld.x, currentWorld.x), y: Math.max(startWorld.y, currentWorld.y) };
       const hits = new Set<string>();
-      for (const entry of this.stamps.values()) {
+      for (const entry of this.doc.stamps.values()) {
         const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
         const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
         if (rectIntersectsRotatedRect(rectMin, rectMax, entry.data.transform, halfWidth, halfHeight)) {
           hits.add(entry.data.id);
         }
       }
-      this.selectedIds = additive ? new Set([...this.selectedIds, ...hits]) : hits;
+      this.doc.selectedIds = additive ? new Set([...this.doc.selectedIds, ...hits]) : hits;
       this.emitter.emit('selectionChanged', this.getSelection());
     }
     this.drag = { kind: 'none' };
@@ -919,7 +1015,7 @@ export class SketchScene {
   private placeStamp(worldPosition: Vec2): void {
     if (!this.pendingStampTexture) return;
     const { texture, nativeWidth, nativeHeight, definitionId } = this.pendingStampTexture;
-    const id = `stamp-${this.nextStampSeq++}`;
+    const id = `stamp-${this.doc.nextStampSeq++}`;
     const data: PlacedStamp = {
       id,
       transform: { position: worldPosition, rotationDegrees: 0, scale: { x: 1, y: 1 } },
@@ -932,9 +1028,10 @@ export class SketchScene {
     sprite.anchor.set(0.5); // pivot = own center, matching the reference semantics
     const baseScale = { x: nativeWidth / texture.width, y: nativeHeight / texture.height };
     applyTransformToSprite(sprite, data.transform, baseScale);
-    this.stamps.set(id, { data, sprite, baseScale });
-    this.stampsLayer.addChild(sprite);
-    this.selectedIds = new Set([id]);
+    this.doc.stamps.set(id, { data, sprite, baseScale });
+    this.doc.stampsLayer.addChild(sprite);
+    this.doc.selectedIds = new Set([id]);
+    this.markDirty();
     this.setTool('select');
     this.emitter.emit('selectionChanged', this.getSelection());
   }
@@ -948,8 +1045,8 @@ export class SketchScene {
    */
   private onDrawSegmentClick(world: Vec2): void {
     const snapRadius = this.SNAP_RADIUS_SCREEN_PX / this.world.scale.x;
-    const state = this.drawingHistory.getState();
-    const stamps = [...this.stamps.values()].map((entry) => entry.data);
+    const state = this.doc.drawingHistory.getState();
+    const stamps = [...this.doc.stamps.values()].map((entry) => entry.data);
     const segments = Object.values(state.segments);
     const fittings = Object.values(state.fittings);
 
@@ -966,7 +1063,7 @@ export class SketchScene {
     this.pendingSegmentStart = null;
 
     const newSegment: Segment = {
-      id: `segment-${this.nextSegmentSeq++}`,
+      id: `segment-${this.doc.nextSegmentSeq++}`,
       pageIndex: 0,
       networkTypeId: DEFAULT_NETWORK_TYPE.id,
       shape: 'round',
@@ -981,8 +1078,9 @@ export class SketchScene {
     if (resolved.setupCommand) subCommands.push(resolved.setupCommand);
     subCommands.push(createSegmentCommand(newSegment));
 
-    this.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
+    this.doc.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
     this.syncDrawingLayer();
+    this.markDirty();
     this.redrawOverlay();
   }
 
@@ -992,7 +1090,7 @@ export class SketchScene {
     }
 
     if (target.kind === 'new-fitting') {
-      const fitting: Fitting = { id: `fitting-${this.nextFittingSeq++}`, pageIndex: 0, position: target.worldPosition, kind: 'junction' };
+      const fitting: Fitting = { id: `fitting-${this.doc.nextFittingSeq++}`, pageIndex: 0, position: target.worldPosition, kind: 'junction' };
       return {
         point: { kind: 'fitting', fittingId: fitting.id },
         worldPosition: target.worldPosition,
@@ -1002,14 +1100,14 @@ export class SketchScene {
 
     // target.kind === 'break': auto-generates a junction at the click point on an existing run.
     const newFitting: Fitting = {
-      id: `fitting-${this.nextFittingSeq++}`,
+      id: `fitting-${this.doc.nextFittingSeq++}`,
       pageIndex: target.original.pageIndex,
       position: target.breakPoint,
       kind: 'junction',
     };
     const { segmentA, segmentB } = splitSegmentAtFitting(target.original, newFitting, target.breakPoint, {
-      segmentA: `segment-${this.nextSegmentSeq++}`,
-      segmentB: `segment-${this.nextSegmentSeq++}`,
+      segmentA: `segment-${this.doc.nextSegmentSeq++}`,
+      segmentB: `segment-${this.doc.nextSegmentSeq++}`,
     });
     const setupCommand = new CompositeCommand(`Break segment ${target.original.id} into a junction`, [
       deleteSegmentCommand(target.original),
@@ -1021,17 +1119,17 @@ export class SketchScene {
   }
 
   private syncDrawingLayer(): void {
-    this.drawingLayer.clear();
-    const state = this.drawingHistory.getState();
+    this.doc.drawingLayer.clear();
+    const state = this.doc.drawingHistory.getState();
     for (const segment of Object.values(state.segments)) {
       const [start, ...rest] = segment.geometry;
       if (!start || rest.length === 0) continue;
-      this.drawingLayer.moveTo(start.x, start.y);
-      for (const point of rest) this.drawingLayer.lineTo(point.x, point.y);
-      this.drawingLayer.stroke({ width: 3, color: 0xffa726 });
+      this.doc.drawingLayer.moveTo(start.x, start.y);
+      for (const point of rest) this.doc.drawingLayer.lineTo(point.x, point.y);
+      this.doc.drawingLayer.stroke({ width: 3, color: 0xffa726 });
     }
     for (const fitting of Object.values(state.fittings)) {
-      this.drawingLayer.circle(fitting.position.x, fitting.position.y, 6).fill({ color: 0xffa726 });
+      this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, 6).fill({ color: 0xffa726 });
     }
     this.emitter.emit('drawingChanged', this.getDrawingSummary());
   }
@@ -1039,8 +1137,8 @@ export class SketchScene {
   private redrawOverlay(): void {
     this.overlay.clear();
 
-    for (const id of this.selectedIds) {
-      const entry = this.stamps.get(id);
+    for (const id of this.doc.selectedIds) {
+      const entry = this.doc.stamps.get(id);
       if (!entry) continue;
       const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
       const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;

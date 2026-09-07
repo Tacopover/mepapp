@@ -40,10 +40,10 @@
   position: relative;
 }
 
-/* ---------- Titlebar ---------- */
+/* ---------- Header: single-row menu + filename + login slot ---------- */
 
-.mep-titlebar {
-  height: 36px;
+.mep-header {
+  height: 40px;
   flex: none;
   display: flex;
   align-items: center;
@@ -52,33 +52,109 @@
   background: var(--surface);
   border: 2px solid var(--ink);
   border-bottom: 2px solid var(--ink);
-  color: var(--muted);
+  position: relative;
 }
-.mep-titlebar .mep-badge {
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  background: var(--accent);
-  color: #fff;
-}
-.mep-titlebar .mep-title {
-  font-size: 12px;
-  font-family: var(--font-mono);
-  letter-spacing: 0.01em;
-  opacity: 0.75;
-}
-.mep-titlebar .mep-fill {
+.mep-header .mep-fill {
   flex: 1;
 }
-.mep-titlebar-actions {
-  display: flex;
+.mep-header .mep-title {
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-header-status {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mep-login-btn {
+  flex: none;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mep-menu {
+  position: relative;
+  flex: none;
+}
+.mep-menu-btn {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 6px 10px;
 }
+.mep-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 5px;
+  z-index: 50;
+}
+.mep-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 3px;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+}
+.mep-menu-item:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.mep-menu-item:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+}
+.mep-menu-item input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.mep-menu-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 2px;
+}
+
 .mep-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -112,51 +188,15 @@
   cursor: pointer;
 }
 
-/* ---------- Action bar: file/project operations the mockup didn't design
-   chrome for (it assumes a project is already open) ---------- */
-
-.mep-actionbar {
-  min-height: 34px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  flex-wrap: wrap;
-  background: var(--surface-2);
-  border-left: 2px solid var(--ink);
-  border-right: 2px solid var(--ink);
-  border-bottom: 2px solid var(--ink);
-}
-.mep-actionbar .mep-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--line);
-  margin: 0 2px;
-}
-.mep-actionbar .mep-fill {
-  flex: 1;
-}
-.mep-actionbar .mep-flow-result {
+.mep-flow-result {
   font-size: 11.5px;
   color: var(--muted);
   font-family: var(--font-mono);
 }
 
-/* ---------- Head: sheet chip + discipline switcher ---------- */
+/* ---------- Sheet chip + discipline switcher (used in the Drawings/Stamps
+   tabs now — see header-toolbar-consolidation.md) ---------- */
 
-.mep-head {
-  height: 52px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 16px;
-  background: var(--surface);
-  border-left: 2px solid var(--ink);
-  border-right: 2px solid var(--ink);
-  border-bottom: 2px solid var(--ink);
-}
 .mep-sheet-chip {
   display: flex;
   align-items: center;
@@ -201,13 +241,17 @@
   border-color: var(--accent-ink);
   box-shadow: 2px 2px 0 rgba(15, 66, 103, 0.35);
 }
-.mep-head .mep-fill {
-  flex: 1;
+/* Compact discipline filter row at the top of the Stamps panel */
+.mep-stamps-filter {
+  padding: 10px 10px 0;
 }
-.mep-hint {
-  font-size: 11.5px;
-  color: var(--muted);
-  white-space: nowrap;
+.mep-stamps-filter .mep-discipline {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mep-stamps-filter .mep-discipline-btn {
+  padding: 5px 9px;
+  font-size: 11px;
 }
 
 /* ---------- Body: canvas + toolbar + resize + dock ---------- */
@@ -429,6 +473,29 @@
   height: 10px;
   flex: none;
   border: 1px solid var(--ink);
+}
+.mep-elem-row.active {
+  background: var(--accent-soft);
+}
+.mep-doc-dirty-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--fire);
+}
+.mep-doc-close {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.mep-doc-close:hover {
+  color: var(--ink);
 }
 .mep-field-note {
   font-family: var(--font-hand);
