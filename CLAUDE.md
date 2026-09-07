@@ -14,6 +14,12 @@ This repo gets worked on from two different machines:
 
 Fix: `pnpm install` then `pnpm build` at repo root.
 
+## Concurrent sessions — default to a worktree
+
+More than one Claude Code session often works on this repo at the same time (this container + Windows, or two sessions here). Sessions sharing one working directory can step on each other: a `git checkout`/`reset`/`stash` in one session silently swaps the files under another session's feet, and a commit made right after can land on the wrong branch. This already happened once (Decisions-Log 2026-09-07).
+
+**Default: call `EnterWorktree` at the start of any task that will edit files**, so this session gets its own isolated checkout instead of sharing the primary one. Skip it only when the user explicitly says to work directly in the main checkout, or for a purely read-only look-around that touches no files.
+
 # Delegate to subagents
 
 Use the Agent tool for menial/mechanical sub-tasks (repo surveys, locating code, running a build/test and reporting output, applying a well-specified small edit) and for any task big enough to blow up context if done inline. Keep the main thread's context small — push exploration and grunt work to subagents, do the synthesis/decisions yourself.
