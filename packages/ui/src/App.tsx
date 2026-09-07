@@ -161,7 +161,12 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   }, [pdfHandle, sceneRef]);
 
   const handleDownloadPdf = useCallback(async () => {
-    if (!pdfHandle) return;
+    if (!sceneRef.current || !pdfHandle) return;
+    // Download must reflect what's on screen, not just whatever was last explicitly synced —
+    // otherwise a placed stamp/segment never reaches the file if the user downloads without
+    // clicking "Sync to PDF" first (see decisions log: this was shipping PDFs with no stamps).
+    await sceneRef.current.exportToPdf(pdfHandle);
+    setReconciliation(null);
     const bytes = await pdfHandle.save();
     const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -170,7 +175,8 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     a.download = 'mepapp-drawing.pdf';
     a.click();
     URL.revokeObjectURL(url);
-  }, [pdfHandle]);
+    setStatus('Downloaded mepapp-drawing.pdf with the current drawing synced in.');
+  }, [pdfHandle, sceneRef]);
 
   const handleCustomStampFile = useCallback(
     async (file: File) => {
