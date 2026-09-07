@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { ProjectLoadError, type ReconciliationReport, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { Toolbar } from './components/Toolbar.js';
-import { DockPanel, type DockTab } from './components/DockPanel.js';
+import { DockviewShell, type DockviewTabDef } from './components/DockviewShell.js';
 import { StampsPanel } from './components/StampsPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
@@ -63,7 +63,6 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
-  const [dockTabId, setDockTabId] = useState('stamps');
 
   const activeDoc = documents.find((d) => d.id === activeDocumentId) ?? null;
   const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
@@ -196,54 +195,45 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         .reduce((sum, c) => sum + c, 0)
     : null;
 
-  const dockTabs: DockTab[] = [
-    {
-      id: 'stamps',
-      label: 'Stamps',
-      content: (
-        <StampsPanel
-          sceneRef={sceneRef}
-          disciplineGroup={disciplineGroup}
-          onChangeDisciplineGroup={setDisciplineGroup}
-          activeDefinitionId={activeDefinitionId}
-          onPick={handleStampPick}
-          onCustomStampFile={handleCustomStampFile}
-          resolveIconUrl={resolveStampIconUrl}
-        />
-      ),
-    },
-    {
-      id: 'drawings',
-      label: 'Drawings',
-      content: (
-        <DrawingsPanel documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
-      ),
-    },
-    {
-      id: 'networks',
-      label: 'Networks',
-      content: (
-        <div>
-          <div className="mep-section">
-            <button className="mep-icon-btn" onClick={() => sceneRef.current?.computeFlow()}>
-              <IconFlow size={13} /> Solve flow
-            </button>
-            {totalFlowCapacity !== null && (
-              <div className="mep-flow-result" style={{ marginTop: 8 }}>
-                {totalFlowCapacity} total capacity across {flowResult?.length ?? 0} network{flowResult?.length === 1 ? '' : 's'}
-              </div>
-            )}
-          </div>
-          <div className="mep-empty-panel">Network tree — coming soon.</div>
-        </div>
-      ),
-    },
-    {
-      id: 'properties',
-      label: 'Properties',
-      content: <PropertiesPanel sceneRef={sceneRef} selection={selection} capacityInput={capacityInput} setCapacityInput={setCapacityInput} />,
-    },
+  const dockTabDefs: DockviewTabDef[] = [
+    { id: 'stamps', label: 'Stamps' },
+    { id: 'drawings', label: 'Drawings' },
+    { id: 'networks', label: 'Networks' },
+    { id: 'properties', label: 'Properties' },
   ];
+
+  const dockContent: Record<string, ReactNode> = {
+    stamps: (
+      <StampsPanel
+        sceneRef={sceneRef}
+        disciplineGroup={disciplineGroup}
+        onChangeDisciplineGroup={setDisciplineGroup}
+        activeDefinitionId={activeDefinitionId}
+        onPick={handleStampPick}
+        onCustomStampFile={handleCustomStampFile}
+        resolveIconUrl={resolveStampIconUrl}
+      />
+    ),
+    drawings: (
+      <DrawingsPanel documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
+    ),
+    networks: (
+      <div>
+        <div className="mep-section">
+          <button className="mep-icon-btn" onClick={() => sceneRef.current?.computeFlow()}>
+            <IconFlow size={13} /> Solve flow
+          </button>
+          {totalFlowCapacity !== null && (
+            <div className="mep-flow-result" style={{ marginTop: 8 }}>
+              {totalFlowCapacity} total capacity across {flowResult?.length ?? 0} network{flowResult?.length === 1 ? '' : 's'}
+            </div>
+          )}
+        </div>
+        <div className="mep-empty-panel">Network tree — coming soon.</div>
+      </div>
+    ),
+    properties: <PropertiesPanel sceneRef={sceneRef} selection={selection} capacityInput={capacityInput} setCapacityInput={setCapacityInput} />,
+  };
 
   return (
     <div className="mep-app">
@@ -293,7 +283,9 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
             />
           )}
         </div>
-        <DockPanel tabs={dockTabs} activeTabId={dockTabId} onTabChange={setDockTabId} />
+        <div className="mep-dockview-root">
+          <DockviewShell tabs={dockTabDefs} content={dockContent} />
+        </div>
       </div>
 
       <StatusBar zoom={zoom} calibration={calibration} measurementMm={measurementMm} selectedCount={selection.length} drawingSummary={drawingSummary} />

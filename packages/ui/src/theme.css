@@ -345,104 +345,65 @@
   background: var(--line);
 }
 
-/* ---------- Dock: docked / floating / hidden ---------- */
+/* ---------- Dockview root — see dockable-panel-system.md ---------- */
 
-.mep-dock {
+.mep-dockview-root {
   flex: none;
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
+  width: 420px;
+  height: 100%;
+  position: relative;
   border-left: 2px solid var(--ink);
 }
-.mep-dock.floating {
-  position: fixed;
-  border: 2px solid var(--ink);
-  border-radius: 4px;
-  box-shadow: 4px 4px 0 var(--ink);
-  z-index: 40;
+.mep-dockview-root .mep-dock-body {
+  height: 100%;
+  overflow: auto;
+  padding: 10px;
 }
-.mep-dock.hidden-mode {
-  width: auto;
-  flex: none;
+
+/* Field Blueprint's palette layered onto dockview's stock light theme —
+   see DockviewShell.tsx's `theme` (themeLight + this class). */
+.mep-dockview-theme {
+  --dv-group-view-background-color: var(--surface);
+  --dv-tabs-and-actions-container-background-color: var(--surface-2);
+  --dv-tabs-and-actions-container-height: 32px;
+  --dv-tabs-and-actions-container-font-size: 11px;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--surface);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--surface-2);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--surface-2);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--surface-2);
+  --dv-tab-divider-color: var(--line);
+  --dv-activegroup-visiblepanel-tab-color: var(--ink);
+  --dv-activegroup-hiddenpanel-tab-color: var(--muted);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--muted);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--muted);
+  --dv-separator-border: var(--line);
+  --dv-edge-dock-indicator-color: var(--accent);
+  --dv-drag-over-background-color: var(--accent-soft);
+  --dv-drag-over-border-color: var(--accent);
+  --dv-icon-hover-background-color: var(--surface-2);
+  --dv-floating-border: 2px solid var(--ink);
+  --dv-floating-box-shadow: 4px 4px 0 var(--ink);
 }
-.mep-dock-edge-tab {
-  writing-mode: vertical-rl;
-  padding: 10px 6px;
-  border: 1.5px solid var(--ink);
-  border-right: none;
-  background: var(--surface-2);
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-size: 11px;
-  color: var(--ink);
-}
-.mep-dock-header {
-  padding: 8px 10px 0;
+
+.mep-dock-header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  border-bottom: 2px solid var(--ink);
-}
-.mep-dock-tab {
-  padding: 7px 11px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  background: var(--surface-2);
-  border: 1.5px solid var(--ink);
-  border-bottom: none;
-  border-radius: 5px 5px 0 0;
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-.mep-dock-tab.on {
-  color: var(--ink);
-  background: var(--surface);
-  transform: translateY(2px);
-  position: relative;
-  z-index: 2;
-}
-.mep-dock-header .mep-fill {
-  flex: 1;
+  padding: 0 6px;
 }
 .mep-dock-mode-btn {
-  width: 26px;
-  height: 26px;
-  border: 2px solid var(--ink);
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--ink);
   border-radius: 2px;
   background: transparent;
   color: var(--muted);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
 }
-.mep-dock-mode-btn.on::after {
-  content: '';
-  position: absolute;
-  inset: 4px;
-  background: var(--accent);
-}
-.mep-dock-legend {
-  display: flex;
-  gap: 12px;
-  padding: 7px 12px 9px;
-  font-size: 10px;
-  color: var(--muted);
-  border-bottom: 1px solid var(--line);
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-}
-.mep-dock-legend b {
-  font-weight: 700;
+.mep-dock-mode-btn:hover {
+  background: var(--surface-2);
   color: var(--ink);
-}
-.mep-dock-body {
-  flex: 1;
-  overflow: auto;
-  min-height: 0;
 }
 
 /* Elements / networks list rows (Layers, Stamps panels) */
