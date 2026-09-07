@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { ProjectLoadError, type ReconciliationReport, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
@@ -12,6 +12,11 @@ import { MenuButton } from './components/MenuButton.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
 import './theme.css';
+
+const DOCK_WIDTH_STORAGE_KEY = 'mepapp.dockWidth.v1';
+const DOCK_DEFAULT_WIDTH = 420;
+const DOCK_MIN_WIDTH = 280;
+const DOCK_MAX_WIDTH = 720;
 
 export interface PdfPageLoadResult {
   bitmap: ImageBitmap;
@@ -63,6 +68,32 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
+  const [dockWidth, setDockWidth] = useState(() => {
+    const saved = Number(localStorage.getItem(DOCK_WIDTH_STORAGE_KEY));
+    return saved >= DOCK_MIN_WIDTH && saved <= DOCK_MAX_WIDTH ? saved : DOCK_DEFAULT_WIDTH;
+  });
+  const dockResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const onDockResizePointerDown = useCallback(
+    (event: React.PointerEvent) => {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dockResizeRef.current = { startX: event.clientX, startWidth: dockWidth };
+    },
+    [dockWidth],
+  );
+  const onDockResizePointerMove = useCallback((event: React.PointerEvent) => {
+    if (!dockResizeRef.current) return;
+    const dx = dockResizeRef.current.startX - event.clientX; // dock sits on the right — dragging left grows it
+    setDockWidth(Math.min(DOCK_MAX_WIDTH, Math.max(DOCK_MIN_WIDTH, dockResizeRef.current.startWidth + dx)));
+  }, []);
+  const onDockResizePointerUp = useCallback((event: React.PointerEvent) => {
+    dockResizeRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    setDockWidth((w) => {
+      localStorage.setItem(DOCK_WIDTH_STORAGE_KEY, String(w));
+      return w;
+    });
+  }, []);
 
   const activeDoc = documents.find((d) => d.id === activeDocumentId) ?? null;
   const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
@@ -161,7 +192,12 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   }, [pdfHandle, sceneRef]);
 
   const handleDownloadPdf = useCallback(async () => {
-    if (!pdfHandle) return;
+    if (!sceneRef.current || !pdfHandle) return;
+    // Download must reflect what's on screen, not just whatever was last explicitly synced —
+    // otherwise a placed stamp/segment never reaches the file if the user downloads without
+    // clicking "Sync to PDF" first (see decisions log: this was shipping PDFs with no stamps).
+    await sceneRef.current.exportToPdf(pdfHandle);
+    setReconciliation(null);
     const bytes = await pdfHandle.save();
     const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -170,7 +206,8 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     a.download = 'mepapp-drawing.pdf';
     a.click();
     URL.revokeObjectURL(url);
-  }, [pdfHandle]);
+    setStatus('Downloaded mepapp-drawing.pdf with the current drawing synced in.');
+  }, [pdfHandle, sceneRef]);
 
   const handleCustomStampFile = useCallback(
     async (file: File) => {
@@ -283,7 +320,15 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
             />
           )}
         </div>
-        <div className="mep-dockview-root">
+        <div
+          className="mep-resize-handle"
+          onPointerDown={onDockResizePointerDown}
+          onPointerMove={onDockResizePointerMove}
+          onPointerUp={onDockResizePointerUp}
+        >
+          <div className="nub" />
+        </div>
+        <div className="mep-dockview-root" style={{ width: dockWidth }}>
           <DockviewShell tabs={dockTabDefs} content={dockContent} />
         </div>
       </div>
