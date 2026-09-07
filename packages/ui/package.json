@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p . && cp src/theme.css dist/theme.css",
+    "build": "tsc -p . && node -e \"require('fs').copyFileSync('src/theme.css','dist/theme.css')\"",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
