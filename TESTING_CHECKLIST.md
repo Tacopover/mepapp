@@ -239,14 +239,27 @@ Implementation proceeds now that all four are confirmed.
   - **Known gap, not attempted**: `flattenOverlay`-based baking (Step 4's
     other pass condition) is unrelated to this annotation-based sync and
     remains as previously tracked.
-- [ ] **Placed stamps are still not round-tripped through the project JSON
-      itself.** The save format has no image bytes for a stamp's source PNG,
-      so a reload with no PDF (JSON-only) has nothing to rebuild a sprite
-      from. When reopening via a PDF, the stamp's *position/rotation* is
-      still checked by reconciliation (its annotation carries a rasterized
-      copy), but the domain-side `PlacedStamp` object itself is not restored
-      by `loadProjectFromJson` — segments/fittings/network types round-trip
-      correctly either way.
+- [x] **Placed stamps now round-trip through the project JSON, for
+      palette-placed stamps.** `loadProjectFromJson` is now async: for every
+      restored `PlacedStamp` with a `definitionId` (placed from the stamp
+      palette), it looks the definition up in `STAMP_LIBRARY`, re-fetches its
+      icon art via an injected `IconBitmapResolver` (apps/web's
+      `resolveStampIconUrl`, same layering as `StampsPanel` — `SketchScene`
+      still owns no fetch call itself), and rebuilds the sprite into the
+      *target* `SketchDocument` (captured up front, so a tab switch mid-load
+      can't spill it into whichever document happens to be active when the
+      fetch resolves). `nextStampSeq` is seeded past the highest restored
+      `stamp-N` id so a newly placed stamp can't collide with one just
+      restored. Verified live (Playwright against the dev server): placed a
+      palette stamp, saved project JSON, reloaded it, stamp reappeared at the
+      same position/rotation/scale; repeated with two documents open
+      simultaneously (two PDFs, one distinct stamp each) and confirmed each
+      restores only its own stamp, no cross-document leakage.
+  - **Known gap, not attempted**: a `PlacedStamp` with no `definitionId` (an
+    ad hoc uploaded PNG/SVG via the "Custom stamp…" tile) has no image bytes
+    saved anywhere in the project JSON, so it still cannot be rebuilt on
+    reload and is left out of the restored scene. Fixing this needs the save
+    format itself to embed image bytes — a separate, larger change.
 - [ ] Only straight two-point segments are supported (no multi-point
       polyline drawing tool yet) and there is no UI yet to edit a segment's
       shape/diameter/material/network-type after creation — every new

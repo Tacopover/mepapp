@@ -69,6 +69,17 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
   const pdfHandle = activePdfHandle;
 
+  // Fetches a stamp-library icon's actual bytes for loadProjectFromJson/loadFromPdf to rebuild a restored stamp's sprite —
+  // SketchScene has no fetch of its own, same layering as resolveStampIconUrl/StampsPanel.
+  const resolveStampIconBitmap = useCallback(
+    async (iconRef: string) => {
+      const res = await fetch(resolveStampIconUrl(iconRef));
+      const blob = await res.blob();
+      return createImageBitmap(blob);
+    },
+    [resolveStampIconUrl],
+  );
+
   const handleSaveProject = useCallback(() => {
     if (!sceneRef.current) return;
     const doc = sceneRef.current.exportProject();
@@ -85,14 +96,14 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     async (file: File) => {
       try {
         const raw = JSON.parse(await file.text());
-        sceneRef.current?.loadProjectFromJson(raw);
+        await sceneRef.current?.loadProjectFromJson(raw, resolveStampIconBitmap);
         setStatus(`Loaded project from ${file.name}.`);
       } catch (err) {
         const message = err instanceof ProjectLoadError ? `${err.message}: ${JSON.stringify(err.issues)}` : (err as Error).message;
         setStatus(`Failed to load ${file.name}: ${message}`);
       }
     },
-    [sceneRef],
+    [resolveStampIconBitmap, sceneRef],
   );
 
   const handlePdfFile = useCallback(
@@ -116,7 +127,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         // its annotations against that domain model — see decisions log
         // 2026-09-06's reconciliation policy: flag drift/missing, never
         // silently resolve either way.
-        const report = sceneRef.current ? await sceneRef.current.loadFromPdf(handle) : null;
+        const report = sceneRef.current ? await sceneRef.current.loadFromPdf(handle, resolveStampIconBitmap) : null;
         setReconciliation(report && (report.drifted.length > 0 || report.missingIds.length > 0) ? report : null);
         setStatus(`Loaded ${file.name} (${pageWidthPt.toFixed(1)} x ${pageHeightPt.toFixed(1)} pt)`);
       } catch (err) {

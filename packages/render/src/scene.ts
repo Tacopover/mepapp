@@ -12,6 +12,7 @@ import {
   centroid,
   CompositeCommand,
   computeNetworks,
+  getStampDefinition,
   loadProject,
   measureRealDistance,
   multiRotate,
@@ -135,6 +136,14 @@ export interface StampInfo {
 }
 
 export type SketchTool = 'select' | 'pan' | 'place-stamp' | 'calibrate' | 'measure' | 'draw-segment';
+
+/**
+ * Resolves a stamp-library iconRef to loaded image bytes — `loadProjectFromJson`'s
+ * way of rebuilding restored stamps' sprites without `SketchScene` itself owning a
+ * fetch call, matching the layering that `StampsPanel`'s `resolveIconUrl` prop
+ * already establishes (apps/web owns where stamp art actually lives on disk).
+ */
+export type IconBitmapResolver = (iconRef: string) => Promise<ImageBitmap>;
 
 export interface DrawingSummary {
   segmentCount: number;
@@ -539,25 +548,67 @@ export class SketchScene {
    * (see decisions log 2026-09-06). Throws core's ProjectLoadError on a
    * malformed document — callers should catch it for a user-facing message.
    *
-   * Restores segments/fittings/network types only. Placed stamps are not
-   * round-tripped yet: the save format has no image bytes for them (the
-   * PNG the user picked lives only in that browser session), so there is
-   * nothing to rebuild a sprite from after a reload. Tracked as a known gap,
-   * not attempted as a half-working placeholder.
+   * Restores segments/fittings/network types, plus every placed stamp that
+   * carries a `definitionId` (placed from the stamp palette) — its art is
+   * re-fetched via `resolveIconBitmap`, the same layering `StampsPanel` uses,
+   * so `SketchScene` never owns a fetch call itself. A stamp with no
+   * `definitionId` (an ad hoc uploaded PNG/SVG) has no image bytes saved
+   * anywhere, so it cannot be rebuilt and is left out of the restored scene —
+   * a disclosed gap, not a silent failure. Omitting `resolveIconBitmap`
+   * restores everything except stamps, same as before this method could
+   * rebuild sprites (e.g. call sites that don't yet wire the callback).
+   *
+   * Rebuilding a sprite per stamp awaits an icon fetch, so this method is
+   * async — and the active document can change mid-await if the user
+   * switches tabs. The target document is captured once up front and every
+   * mutation goes through that captured reference, never a fresh `this.doc`
+   * read, so a tab switch mid-load can't spill restored state into the wrong
+   * document. Scene-wide notifications (redraw, dirty/clean, `projectLoaded`)
+   * only fire if that document is still the active one when the load
+   * finishes; otherwise the restored state sits ready and is picked up
+   * normally via `documentActivated` the next time the user switches back.
    */
-  loadProjectFromJson(raw: unknown): void {
+  async loadProjectFromJson(raw: unknown, resolveIconBitmap?: IconBitmapResolver): Promise<void> {
     const doc = loadProject(raw as Record<string, unknown>);
+    const target = this.doc;
 
-    this.doc.drawingHistory.clear();
-    this.doc.drawingHistory.setLiveState({
+    target.drawingHistory.clear();
+    target.drawingHistory.setLiveState({
       segments: Object.fromEntries(doc.segments.map((s) => [s.id, s])),
       fittings: Object.fromEntries(doc.fittings.map((f) => [f.id, f])),
     });
-    this.doc.networkTypes.splice(0, this.doc.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
+    target.networkTypes.splice(0, target.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
 
-    this.syncDrawingLayer();
-    this.markClean();
-    this.emitter.emit('projectLoaded');
+    for (const entry of target.stamps.values()) entry.sprite.destroy({ texture: true });
+    target.stamps.clear();
+    target.stampsLayer.removeChildren();
+
+    let maxStampSeq = 0;
+    for (const stampData of doc.stamps) {
+      const numericSuffix = /^stamp-(\d+)$/.exec(stampData.id)?.[1];
+      if (numericSuffix) maxStampSeq = Math.max(maxStampSeq, Number(numericSuffix));
+
+      if (!stampData.definitionId || !resolveIconBitmap) continue; // ad hoc upload, or no resolver wired — leave it out, see doc comment above
+      const definition = getStampDefinition(stampData.definitionId);
+      if (!definition) continue; // stamp library changed since this project was saved
+
+      const bitmap = await resolveIconBitmap(definition.iconRef);
+      const texture = textureFromImageBitmap(bitmap);
+      const sprite = new Sprite(texture);
+      sprite.anchor.set(0.5); // matches placeStamp's pivot convention
+      const baseScale = { x: stampData.nativeWidth / texture.width, y: stampData.nativeHeight / texture.height };
+      applyTransformToSprite(sprite, stampData.transform, baseScale);
+      target.stamps.set(stampData.id, { data: stampData, sprite, baseScale });
+      target.stampsLayer.addChild(sprite);
+    }
+    target.nextStampSeq = Math.max(target.nextStampSeq, maxStampSeq + 1);
+    target.isDirty = false;
+
+    if (target === this.doc) {
+      this.syncDrawingLayer();
+      this.emitter.emit('documentsChanged', this.getDocuments());
+      this.emitter.emit('projectLoaded');
+    }
   }
 
   /**
@@ -603,10 +654,10 @@ export class SketchScene {
    * side; the caller decides how to act on the returned report (e.g. an "N
    * annotations changed since last save" review panel).
    */
-  async loadFromPdf(handle: PdfDocumentHandle): Promise<ReconciliationReport> {
+  async loadFromPdf(handle: PdfDocumentHandle, resolveIconBitmap?: IconBitmapResolver): Promise<ReconciliationReport> {
     const embedded = await handle.getEmbeddedFile(EMBEDDED_PROJECT_FILENAME);
     if (embedded) {
-      this.loadProjectFromJson(JSON.parse(new TextDecoder().decode(embedded)));
+      await this.loadProjectFromJson(JSON.parse(new TextDecoder().decode(embedded)), resolveIconBitmap);
     }
 
     const domainEntries = this.domainSyncEntries();
