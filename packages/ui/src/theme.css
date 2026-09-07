@@ -349,15 +349,47 @@
 
 .mep-dockview-root {
   flex: none;
-  width: 420px;
   height: 100%;
   position: relative;
-  border-left: 2px solid var(--ink);
+  min-width: 0;
+}
+.mep-dockview-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.mep-dockview-container {
+  flex: 1;
+  min-height: 0;
 }
 .mep-dockview-root .mep-dock-body {
   height: 100%;
   overflow: auto;
   padding: 10px;
+}
+
+.mep-dock-reopen-bar {
+  flex: none;
+  display: flex;
+  border-bottom: 2px solid var(--ink);
+  background: var(--surface-2);
+}
+.mep-dock-reopen-btn {
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+.mep-dock-reopen-btn:hover {
+  background: var(--surface);
+}
+
+.mep-dock-menu-dropdown {
+  left: auto;
+  right: 0;
 }
 
 /* Field Blueprint's palette layered onto dockview's stock light theme —
