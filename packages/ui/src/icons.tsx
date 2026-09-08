@@ -148,3 +148,15 @@ export const IconFlow = (props: IconProps) => (
     <path d="M4 18h4M18 6h2" />
   </Svg>
 );
+
+export const IconClose = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M5 5l14 14M19 5L5 19" />
+  </Svg>
+);
+
+export const IconPlus = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);

@@ -345,46 +345,91 @@
   background: var(--line);
 }
 
-/* ---------- Dockview root — see dockable-panel-system.md ---------- */
+/* ---------- Dock: a single fixed right-hand panel — resizable width,
+   closeable/reopenable tabs, collapse to an edge tab. Rewound from a
+   dockview-react-based multi-position layout (dockable-panel-system.md) —
+   see DockPanel.tsx's doc comment. ---------- */
 
-.mep-dockview-root {
+.mep-dock {
   flex: none;
-  height: 100%;
-  position: relative;
-  min-width: 0;
-}
-.mep-dockview-shell {
+  background: var(--surface);
   display: flex;
   flex-direction: column;
-  height: 100%;
+  border-left: 2px solid var(--ink);
 }
-.mep-dockview-container {
-  flex: 1;
-  min-height: 0;
-}
-.mep-dockview-root .mep-dock-body {
-  height: 100%;
-  overflow: auto;
-  padding: 10px;
-}
-
-.mep-dock-reopen-bar {
-  flex: none;
-  display: flex;
-  border-bottom: 2px solid var(--ink);
+.mep-dock-edge-tab {
+  writing-mode: vertical-rl;
+  padding: 10px 6px;
+  border: 1.5px solid var(--ink);
+  border-right: none;
   background: var(--surface-2);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 11px;
+  color: var(--ink);
 }
-.mep-dock-reopen-btn {
+.mep-dock-header {
+  padding: 8px 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 2px solid var(--ink);
+}
+.mep-dock-header .mep-fill {
+  flex: 1;
+}
+.mep-dock-tab {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px 0 11px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1.5px solid var(--ink);
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+}
+.mep-dock-tab.on {
+  color: var(--ink);
+  background: var(--surface);
+  transform: translateY(2px);
+  position: relative;
+  z-index: 2;
+}
+.mep-dock-tab-label {
   border: none;
   background: none;
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 6px 10px;
+  color: inherit;
+  font: inherit;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 7px 0;
 }
-.mep-dock-reopen-btn:hover {
+.mep-dock-tab-close {
+  border: none;
+  background: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  opacity: 0.55;
+}
+.mep-dock-tab-close:hover {
   background: var(--surface);
+  opacity: 1;
+}
+.mep-dock-body {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  padding: 10px;
 }
 
 .mep-dock-menu-dropdown {
@@ -392,36 +437,6 @@
   right: 0;
 }
 
-/* Field Blueprint's palette layered onto dockview's stock light theme —
-   see DockviewShell.tsx's `theme` (themeLight + this class). */
-.mep-dockview-theme {
-  --dv-group-view-background-color: var(--surface);
-  --dv-tabs-and-actions-container-background-color: var(--surface-2);
-  --dv-tabs-and-actions-container-height: 32px;
-  --dv-tabs-and-actions-container-font-size: 11px;
-  --dv-activegroup-visiblepanel-tab-background-color: var(--surface);
-  --dv-activegroup-hiddenpanel-tab-background-color: var(--surface-2);
-  --dv-inactivegroup-visiblepanel-tab-background-color: var(--surface-2);
-  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--surface-2);
-  --dv-tab-divider-color: var(--line);
-  --dv-activegroup-visiblepanel-tab-color: var(--ink);
-  --dv-activegroup-hiddenpanel-tab-color: var(--muted);
-  --dv-inactivegroup-visiblepanel-tab-color: var(--muted);
-  --dv-inactivegroup-hiddenpanel-tab-color: var(--muted);
-  --dv-separator-border: var(--line);
-  --dv-edge-dock-indicator-color: var(--accent);
-  --dv-drag-over-background-color: var(--accent-soft);
-  --dv-drag-over-border-color: var(--accent);
-  --dv-icon-hover-background-color: var(--surface-2);
-  --dv-floating-border: 2px solid var(--ink);
-  --dv-floating-box-shadow: 4px 4px 0 var(--ink);
-}
-
-.mep-dock-header-actions {
-  display: flex;
-  align-items: center;
-  padding: 0 6px;
-}
 .mep-dock-mode-btn {
   width: 22px;
   height: 22px;
@@ -432,6 +447,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: none;
 }
 .mep-dock-mode-btn:hover {
   background: var(--surface-2);

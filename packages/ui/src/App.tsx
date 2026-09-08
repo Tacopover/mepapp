@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { ProjectLoadError, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { Toolbar } from './components/Toolbar.js';
-import { DockviewShell, type DockviewTabDef } from './components/DockviewShell.js';
+import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { StampsPanel } from './components/StampsPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
@@ -12,11 +12,6 @@ import { MenuButton } from './components/MenuButton.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
 import './theme.css';
-
-const DOCK_WIDTH_STORAGE_KEY = 'mepapp.dockWidth.v1';
-const DOCK_DEFAULT_WIDTH = 420;
-const DOCK_MIN_WIDTH = 280;
-const DOCK_MAX_WIDTH = 720;
 
 export interface PdfPageLoadResult {
   bitmap: ImageBitmap;
@@ -68,32 +63,6 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
-  const [dockWidth, setDockWidth] = useState(() => {
-    const saved = Number(localStorage.getItem(DOCK_WIDTH_STORAGE_KEY));
-    return saved >= DOCK_MIN_WIDTH && saved <= DOCK_MAX_WIDTH ? saved : DOCK_DEFAULT_WIDTH;
-  });
-  const dockResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
-
-  const onDockResizePointerDown = useCallback(
-    (event: React.PointerEvent) => {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      dockResizeRef.current = { startX: event.clientX, startWidth: dockWidth };
-    },
-    [dockWidth],
-  );
-  const onDockResizePointerMove = useCallback((event: React.PointerEvent) => {
-    if (!dockResizeRef.current) return;
-    const dx = dockResizeRef.current.startX - event.clientX; // dock sits on the right — dragging left grows it
-    setDockWidth(Math.min(DOCK_MAX_WIDTH, Math.max(DOCK_MIN_WIDTH, dockResizeRef.current.startWidth + dx)));
-  }, []);
-  const onDockResizePointerUp = useCallback((event: React.PointerEvent) => {
-    dockResizeRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-    setDockWidth((w) => {
-      localStorage.setItem(DOCK_WIDTH_STORAGE_KEY, String(w));
-      return w;
-    });
-  }, []);
 
   const activeDoc = documents.find((d) => d.id === activeDocumentId) ?? null;
   const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
@@ -232,7 +201,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         .reduce((sum, c) => sum + c, 0)
     : null;
 
-  const dockTabDefs: DockviewTabDef[] = [
+  const dockTabDefs: DockTabDef[] = [
     { id: 'stamps', label: 'Stamps' },
     { id: 'drawings', label: 'Drawings' },
     { id: 'networks', label: 'Networks' },
@@ -320,17 +289,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
             />
           )}
         </div>
-        <div
-          className="mep-resize-handle"
-          onPointerDown={onDockResizePointerDown}
-          onPointerMove={onDockResizePointerMove}
-          onPointerUp={onDockResizePointerUp}
-        >
-          <div className="nub" />
-        </div>
-        <div className="mep-dockview-root" style={{ width: dockWidth }}>
-          <DockviewShell tabs={dockTabDefs} content={dockContent} />
-        </div>
+        <DockPanel tabs={dockTabDefs} content={dockContent} />
       </div>
 
       <StatusBar zoom={zoom} calibration={calibration} measurementMm={measurementMm} selectedCount={selection.length} drawingSummary={drawingSummary} />
