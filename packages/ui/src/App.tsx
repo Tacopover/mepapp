@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
-import { ProjectLoadError, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { ProjectLoadError, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
-import { Toolbar } from './components/Toolbar.js';
+import { Rail } from './components/Rail.js';
+import { QuickAccessStrip } from './components/QuickAccessStrip.js';
 import { DockviewShell, type DockviewTabDef } from './components/DockviewShell.js';
 import { StampsPanel } from './components/StampsPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
@@ -50,6 +51,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     selection,
     allStamps,
     networkSummaries,
+    networkTypes,
     zoom,
     calibration,
     measurementMm,
@@ -68,6 +70,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
+  const [activeNetworkTypeId, setActiveNetworkTypeId] = useState<string | null>(null);
   const [dockWidth, setDockWidth] = useState(() => {
     const saved = Number(localStorage.getItem(DOCK_WIDTH_STORAGE_KEY));
     return saved >= DOCK_MIN_WIDTH && saved <= DOCK_MAX_WIDTH ? saved : DOCK_DEFAULT_WIDTH;
@@ -225,6 +228,22 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     setStatus(`${definition.label} ready — click the canvas to place it.`);
   }, []);
 
+  const handleNetworkTypePick = useCallback(
+    (type: NetworkType) => {
+      sceneRef.current?.setActiveNetworkType(type);
+      setActiveNetworkTypeId(type.id);
+      setStatus(`${type.name} is now the active network type — new segments will be tagged with it.`);
+    },
+    [sceneRef],
+  );
+
+  const handleRenameNetworkType = useCallback(
+    (id: string, name: string) => {
+      sceneRef.current?.renameNetworkType(id, name);
+    },
+    [sceneRef],
+  );
+
   const totalFlowCapacity = flowResult
     ? flowResult
         .flatMap((r) => Object.values(r.segmentCapacity))
@@ -249,6 +268,10 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         onPick={handleStampPick}
         onCustomStampFile={handleCustomStampFile}
         resolveIconUrl={resolveStampIconUrl}
+        networkTypes={networkTypes}
+        activeNetworkTypeId={activeNetworkTypeId}
+        onPickNetworkType={handleNetworkTypePick}
+        onRenameNetworkType={handleRenameNetworkType}
       />
     ),
     drawings: (
@@ -286,9 +309,6 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         <span className="mep-title">{sheetName ?? 'No sheet loaded'}</span>
         <div className="mep-fill" />
         {status && <span className="mep-header-status">{status}</span>}
-        <button type="button" className="mep-login-btn" disabled>
-          Log in
-        </button>
       </div>
 
       {reconciliation && (
@@ -309,15 +329,22 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         <div className="mep-canvas-wrap" ref={containerRef}>
           {!ready && <div className="mep-canvas-init">Initializing canvas…</div>}
           {ready && (
-            <Toolbar
-              tool={tool}
-              sceneRef={sceneRef}
-              stampReady={activeDefinitionId !== null || tool === 'place-terminal' || tool === 'place-equipment'}
-              canUndo={drawingSummary.canUndo}
-              canRedo={drawingSummary.canRedo}
-              onUndo={() => sceneRef.current?.undoDrawing()}
-              onRedo={() => sceneRef.current?.redoDrawing()}
-            />
+            <>
+              <Rail
+                tool={tool}
+                sceneRef={sceneRef}
+                stampReady={activeDefinitionId !== null || tool === 'place-terminal' || tool === 'place-equipment'}
+                canUndo={drawingSummary.canUndo}
+                canRedo={drawingSummary.canRedo}
+                onUndo={() => sceneRef.current?.undoDrawing()}
+                onRedo={() => sceneRef.current?.redoDrawing()}
+              />
+              <QuickAccessStrip
+                tool={tool}
+                sceneRef={sceneRef}
+                stampReady={activeDefinitionId !== null || tool === 'place-terminal' || tool === 'place-equipment'}
+              />
+            </>
           )}
         </div>
         <div

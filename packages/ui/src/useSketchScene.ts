@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { SketchScene, type DocumentSummary, type DrawingSummary, type NetworkSummary, type SketchTool, type StampInfo } from '@mepapp/render';
-import type { Calibration, FlowResult, Vec2 } from '@mepapp/core';
+import type { Calibration, FlowResult, NetworkType, Vec2 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 export interface CalibrationPrompt {
@@ -17,6 +17,7 @@ export interface UseSketchScene {
   selection: StampInfo[];
   allStamps: StampInfo[];
   networkSummaries: NetworkSummary[];
+  networkTypes: NetworkType[];
   zoom: number;
   calibration: Calibration | null;
   measurementMm: number | null;
@@ -40,6 +41,7 @@ export function useSketchScene(): UseSketchScene {
   const [selection, setSelection] = useState<StampInfo[]>([]);
   const [allStamps, setAllStamps] = useState<StampInfo[]>([]);
   const [networkSummaries, setNetworkSummaries] = useState<NetworkSummary[]>([]);
+  const [networkTypes, setNetworkTypes] = useState<NetworkType[]>([]);
   const [zoom, setZoom] = useState(1);
   const [calibration, setCalibration] = useState<Calibration | null>(null);
   const [measurementMm, setMeasurementMm] = useState<number | null>(null);
@@ -81,7 +83,9 @@ export function useSketchScene(): UseSketchScene {
       setFlowResult(null);
       setAllStamps(scene.listStamps());
       setNetworkSummaries(scene.getNetworkSummaries());
+      setNetworkTypes(scene.getNetworkTypes());
     };
+    const onNetworkTypesChanged = (types: NetworkType[]) => setNetworkTypes(types);
     const onZoomChanged = (z: number) => setZoom(z);
     const onDocumentsChanged = (docs: DocumentSummary[]) => {
       setDocuments(docs);
@@ -111,6 +115,7 @@ export function useSketchScene(): UseSketchScene {
     scene.on('drawingChanged', onDrawingChanged);
     scene.on('flowSolved', onFlowSolved);
     scene.on('projectLoaded', onProjectLoaded);
+    scene.on('networkTypesChanged', onNetworkTypesChanged);
     scene.on('zoomChanged', onZoomChanged);
     scene.on('documentsChanged', onDocumentsChanged);
     scene.on('documentActivated', onDocumentActivated);
@@ -140,6 +145,7 @@ export function useSketchScene(): UseSketchScene {
       scene.off('drawingChanged', onDrawingChanged);
       scene.off('flowSolved', onFlowSolved);
       scene.off('projectLoaded', onProjectLoaded);
+      scene.off('networkTypesChanged', onNetworkTypesChanged);
       scene.off('zoomChanged', onZoomChanged);
       scene.off('documentsChanged', onDocumentsChanged);
       scene.off('documentActivated', onDocumentActivated);
@@ -156,6 +162,7 @@ export function useSketchScene(): UseSketchScene {
     selection,
     allStamps,
     networkSummaries,
+    networkTypes,
     zoom,
     calibration,
     measurementMm,

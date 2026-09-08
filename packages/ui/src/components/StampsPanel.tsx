@@ -1,9 +1,9 @@
-import type { RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { STAMP_LIBRARY, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampCategory, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
-import { IconFile } from '../icons.js';
+import { IconFile, IconPencil } from '../icons.js';
 
 export interface StampsPanelProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -14,6 +14,11 @@ export interface StampsPanelProps {
   onCustomStampFile: (file: File, category: StampCategory) => void;
   /** Resolves a StampDefinition's iconRef to a fetchable URL — apps/web owns where stamp art actually lives. */
   resolveIconUrl: (iconRef: string) => string;
+  /** The active document's own network types — only ones actually picked at least once get an entry here (see SketchScene.setActiveNetworkType). Everything else falls back to NETWORK_TYPE_LIBRARY's default name. */
+  networkTypes: NetworkType[];
+  activeNetworkTypeId: string | null;
+  onPickNetworkType: (type: NetworkType) => void;
+  onRenameNetworkType: (id: string, name: string) => void;
 }
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
@@ -37,15 +42,34 @@ export function StampsPanel({
   onPick,
   onCustomStampFile,
   resolveIconUrl,
+  networkTypes,
+  activeNetworkTypeId,
+  onPickNetworkType,
+  onRenameNetworkType,
 }: StampsPanelProps) {
   const definitions =
     disciplineGroup === null ? STAMP_LIBRARY : STAMP_LIBRARY.filter((def) => disciplineGroupOf(def.discipline) === disciplineGroup);
+  const networkTypeDefs =
+    disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   async function handlePick(definition: StampDefinition) {
     const bitmap = await loadBitmap(resolveIconUrl(definition.iconRef));
     sceneRef.current?.setStampTexture(bitmap, definition.id);
     sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
     onPick(definition);
+  }
+
+  function startEditing(type: NetworkType) {
+    setEditingId(type.id);
+    setEditValue(type.name);
+  }
+
+  function commitEditing() {
+    if (editingId && editValue.trim()) onRenameNetworkType(editingId, editValue.trim());
+    setEditingId(null);
   }
 
   return (
@@ -84,6 +108,53 @@ export function StampsPanel({
             onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'equipment')}
           />
         </label>
+      </div>
+
+      <div className="mep-section-label">Network Types</div>
+      {networkTypeDefs.length === 0 && <div className="mep-empty-panel">No network types for this discipline.</div>}
+      <div className="mep-networktype-grid">
+        {networkTypeDefs.map((libType) => {
+          const live = networkTypes.find((t) => t.id === libType.id);
+          const effective = live ?? libType;
+          const isAdopted = live !== undefined;
+          const isActive = activeNetworkTypeId === libType.id;
+          const isEditing = editingId === libType.id;
+          return (
+            <div
+              key={libType.id}
+              className={`mep-networktype-tile mep-discipline-${disciplineGroupOf(libType.discipline)}${isActive ? ' active' : ''}`}
+            >
+              {isEditing ? (
+                <input
+                  autoFocus
+                  className="mep-networktype-input"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={commitEditing}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitEditing();
+                    if (e.key === 'Escape') setEditingId(null);
+                  }}
+                />
+              ) : (
+                <button type="button" className="mep-networktype-pick" onClick={() => onPickNetworkType(effective)}>
+                  <span className="mep-networktype-name">{effective.name}</span>
+                  {effective.units && <span className="mep-networktype-units">{effective.units}</span>}
+                </button>
+              )}
+              {isAdopted && !isEditing && (
+                <button
+                  type="button"
+                  className="mep-networktype-edit"
+                  title="Rename"
+                  onClick={() => startEditing(effective)}
+                >
+                  <IconPencil size={12} />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
