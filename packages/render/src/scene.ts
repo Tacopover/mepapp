@@ -32,6 +32,7 @@ import {
   type Fitting,
   type FlowResult,
   type Network,
+  type NetworkType,
   type PlacedStamp,
   type ProjectDocument,
   type ReconciliationReport,
@@ -176,6 +177,8 @@ interface SketchSceneEvents {
   flowSolved: [FlowResult[]];
   projectLoaded: [];
   zoomChanged: [zoom: number];
+  /** The active network type, or a per-document network type's name, changed — the Stamps tab's Network Types section's cue to re-render. */
+  networkTypesChanged: [NetworkType[]];
   /** A different document became active — everything (selection, stamps, networks, calibration, drawing summary, flow result, zoom) should be re-pulled via the getters, not diffed. */
   documentActivated: [];
   /** The open-document list, a document's name, or its dirty flag changed — the Drawings tab's cue to re-render. */
@@ -237,6 +240,7 @@ export class SketchScene {
   private readonly documents: SketchDocument[] = [];
   private activeId: string;
   private tool: SketchTool = 'select';
+  private activeNetworkTypeId: string = DEFAULT_NETWORK_TYPE.id;
   private pendingStampTexture: { texture: Texture; nativeWidth: number; nativeHeight: number; definitionId?: string } | null = null;
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure two-click flows
   private drag: DragState = { kind: 'none' };
@@ -403,6 +407,7 @@ export class SketchScene {
     this.world.scale.set(target.viewport.scale);
 
     this.tool = 'select';
+    this.activeNetworkTypeId = DEFAULT_NETWORK_TYPE.id; // per-document context, same reset rule as `tool`
     this.pendingStampTexture = null;
     this.pendingPoints = [];
     this.pendingSegmentStart = null;
@@ -410,6 +415,7 @@ export class SketchScene {
 
     this.redrawOverlay();
     this.emitter.emit('toolChanged', this.tool);
+    this.emitter.emit('networkTypesChanged', target.networkTypes);
     this.emitter.emit('zoomChanged', this.world.scale.x);
     this.emitter.emit('documentActivated');
   }
@@ -510,6 +516,35 @@ export class SketchScene {
     this.doc.drawingHistory.redo();
     this.syncDrawingLayer();
     this.markDirty();
+  }
+
+  /** Every network type known to the active document — the effective library the Stamps tab's Network Types section renders (falls back to the static NETWORK_TYPE_LIBRARY entry for any type never yet picked). */
+  getNetworkTypes(): NetworkType[] {
+    return this.doc.networkTypes;
+  }
+
+  /**
+   * Marks `type` as what the next drawn segment gets tagged with (see
+   * onDrawSegmentClick). Adds it to the active document's own `networkTypes`
+   * list the first time it's picked — `getNetworkSummaries`/`exportProject`
+   * both read from that per-document list, not the static library, so a type
+   * has to actually be adopted by a document before it can be resolved or
+   * saved, same as how a stamp definition isn't "real" until placed.
+   */
+  setActiveNetworkType(type: NetworkType): void {
+    if (!this.doc.networkTypes.some((t) => t.id === type.id)) {
+      this.doc.networkTypes.push(type);
+    }
+    this.activeNetworkTypeId = type.id;
+    this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+  }
+
+  /** Renames a network type already adopted by the active document (see setActiveNetworkType) — the Network Type Editor pencil icon's action. No-op if `id` hasn't been picked in this document yet. */
+  renameNetworkType(id: string, name: string): void {
+    const target = this.doc.networkTypes.find((t) => t.id === id);
+    if (!target) return;
+    target.name = name;
+    this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
   /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
@@ -1124,7 +1159,7 @@ export class SketchScene {
     const newSegment: Segment = {
       id: `segment-${this.doc.nextSegmentSeq++}`,
       pageIndex: 0,
-      networkTypeId: DEFAULT_NETWORK_TYPE.id,
+      networkTypeId: this.activeNetworkTypeId,
       shape: 'round',
       diameter: 200,
       endpointA: start.point,

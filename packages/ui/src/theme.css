@@ -75,20 +75,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.mep-login-btn {
-  flex: none;
-  border: 1.5px solid var(--line);
-  border-radius: 3px;
-  background: var(--surface);
-  color: var(--muted);
-  font-family: var(--font-ui);
-  font-size: 11.5px;
-  font-weight: 600;
-  padding: 6px 12px;
-  opacity: 0.55;
-  cursor: default;
-}
-
 .mep-menu {
   position: relative;
   flex: none;
@@ -278,9 +264,11 @@
   font-size: 12px;
 }
 
-/* Floating toolbar: hard offset shadow rather than a soft blur — the
-   Field Blueprint skin's signature stamped-ink look. */
-.mep-toolbar {
+/* Floating quick-access strip (formerly the app's only toolbar — now a
+   convenience layer over the left rail, see .mep-rail below): hard offset
+   shadow rather than a soft blur, the Field Blueprint skin's signature
+   stamped-ink look. */
+.mep-quick-access {
   position: absolute;
   display: flex;
   align-items: center;
@@ -289,8 +277,9 @@
   border-radius: 4px;
   box-shadow: 3px 3px 0 var(--ink);
   padding: 4px;
+  z-index: 10;
 }
-.mep-toolbar-grip {
+.mep-quick-access-grip {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -298,6 +287,149 @@
   height: 32px;
   color: var(--muted);
   cursor: grab;
+}
+.mep-quick-access-empty {
+  font-size: 10.5px;
+  color: var(--muted);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.mep-quick-access-capacity {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+}
+.mep-quick-access-cap-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+}
+.mep-quick-access-cap-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.mep-quick-access-cap-btn:disabled {
+  opacity: 0.35;
+}
+.mep-quick-access-cap-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  width: 1.2em;
+  text-align: center;
+}
+
+/* ---------- Left rail: canvas-gesture tools, see
+   ui-atlas-layout-mapping.md §3 ---------- */
+
+.mep-rail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 44px;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 0;
+  background: var(--surface);
+  border-right: 2px solid var(--ink);
+}
+.mep-rail-row {
+  position: relative;
+}
+.mep-rail-row-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.mep-rail-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+}
+.mep-rail-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.mep-rail-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 1.5px 1.5px 0 var(--accent-ink);
+}
+.mep-rail-btn:disabled {
+  opacity: 0.35;
+}
+.mep-rail-chev {
+  width: 32px;
+  height: 12px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(90deg);
+}
+.mep-rail-chev.open {
+  color: var(--accent);
+  transform: rotate(-90deg);
+}
+.mep-rail-divider {
+  width: 24px;
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
+}
+.mep-rail-flyout {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 4px;
+  z-index: 20;
+}
+.mep-rail-flyout-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 3px;
+  text-align: left;
+  white-space: nowrap;
+}
+.mep-rail-flyout-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.mep-rail-flyout-btn:disabled {
+  color: var(--muted);
+  opacity: 0.5;
 }
 .mep-tool-btn {
   width: 32px;
@@ -605,6 +737,108 @@
   width: 36px;
   height: 36px;
   object-fit: contain;
+}
+
+.mep-section-label {
+  margin: 12px 10px 0;
+  padding-bottom: 4px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Network Types grid — Stamps tab, below the stamp grid (Rev C, see
+   ui-atlas-layout-mapping.md §4). Each tile's left border takes the
+   discipline's accent color, same tokens the discipline switcher uses. */
+.mep-networktype-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+.mep-networktype-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+}
+.mep-networktype-tile.mep-discipline-hvac {
+  border-left-color: var(--hvac);
+}
+.mep-networktype-tile.mep-discipline-plumbing {
+  border-left-color: var(--plumb);
+}
+.mep-networktype-tile.mep-discipline-electrical {
+  border-left-color: var(--elec);
+}
+.mep-networktype-tile.mep-discipline-fire {
+  border-left-color: var(--fire);
+}
+.mep-networktype-tile.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 2px 2px 0 var(--accent);
+}
+.mep-networktype-pick {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  border: none;
+  background: none;
+  padding: 8px 8px;
+  text-align: left;
+  min-width: 0;
+}
+.mep-networktype-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.mep-networktype-units {
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.mep-networktype-edit {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+}
+.mep-networktype-edit:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.mep-networktype-input {
+  flex: 1;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: none;
+  padding: 8px;
+  min-width: 0;
 }
 
 /* ---------- Status bar ---------- */
