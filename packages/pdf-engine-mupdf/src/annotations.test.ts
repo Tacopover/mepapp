@@ -97,6 +97,27 @@ describe('MupdfEngine annotation round trip (Step 4)', () => {
     }
   });
 
+  it('writes a polyline as a real PDF PolyLine annotation and reads back its vertices after save+reopen', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+
+    const id = await doc.addAnnotation({
+      kind: 'polyline',
+      pageIndex: 0,
+      geometry: { kind: 'polyline', points: [{ x: 10, y: 10 }, { x: 20, y: 30 }, { x: 40, y: 15 }, { x: 60, y: 40 }] },
+    });
+
+    const reopened = await engine.openDocument(await doc.save());
+    const listed = await reopened.listAnnotations(0);
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0].id).toBe(id);
+    expect(listed[0].kind).toBe('polyline');
+    if (listed[0].geometry.kind === 'polyline') {
+      expect(listed[0].geometry.points).toEqual([{ x: 10, y: 10 }, { x: 20, y: 30 }, { x: 40, y: 15 }, { x: 60, y: 40 }]);
+    }
+  });
+
   it('deleteAnnotation removes exactly the targeted annotation, leaving the others', async () => {
     const engine = new MupdfEngine();
     const doc = await engine.openDocument(makeBlankPdfBytes());

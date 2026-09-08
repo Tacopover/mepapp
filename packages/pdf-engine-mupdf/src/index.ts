@@ -88,6 +88,14 @@ function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): Annota
         geometry: { kind: 'stickyNote', position: { x: x0, y: y0 }, text: annot.getContents() },
       };
     }
+    case 'PolyLine': {
+      const vertices = annot.getVertices();
+      return {
+        kind: 'polyline',
+        pageIndex,
+        geometry: { kind: 'polyline', points: vertices.map(([x, y]) => ({ x, y })) },
+      };
+    }
     case 'Stamp': {
       const [x0, y0, x1, y1] = annot.getRect();
       const rotationRaw = annot.getObject().get('MepAppRotationDegrees');
@@ -216,6 +224,10 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
         annot = page.createAnnotation('Text');
         annot.setRect([geometry.position.x, geometry.position.y, geometry.position.x, geometry.position.y]);
         annot.setContents(geometry.text);
+        break;
+      case 'polyline':
+        annot = page.createAnnotation('PolyLine');
+        annot.setVertices(geometry.points.map((p) => [p.x, p.y]));
         break;
       case 'stamp':
         annot = page.createAnnotation('Stamp');

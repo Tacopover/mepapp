@@ -77,4 +77,41 @@ Part C (annotation tools)" (2026-09-08).
 
 ## Status
 
-Not started.
+**Done.** Implemented in worktree `annotation-tools-arrow-sticky-highlight-polyline`, branch `worktree-annotation-tools-arrow-sticky-highlight-polyline`.
+
+All checklist items completed as designed above, one design correction found
+during live testing:
+
+- `event.detail` (native click-count) reads as `0` on every `pointerdown` in
+  Chromium regardless of click count — click-count semantics only apply to
+  the native `click`/`mousedown` events, not `pointerdown`, which is all this
+  class's gesture model listens to. Confirmed empirically (a throwaway
+  Playwright probe logging `pointerdown.detail` during a real `dblclick`
+  showed `[0, 0]`), not assumed. Replaced with hand-rolled double-click
+  detection (`lastPolylineClickAt`/`lastPolylineClickScreen`, 400ms /
+  6-screen-px thresholds) in `onPointerDown`'s `draw-polyline` case — same
+  place, same trigger (a second click close in time and position), just not
+  reliant on a native flag that turned out not to fire the way assumed.
+
+Verification:
+- `pnpm build && pnpm turbo run typecheck` clean across all 10 workspace packages.
+- `pnpm turbo run test`: 84 core tests + 10 `pdf-engine-mupdf` tests (9
+  pre-existing + 1 new `polyline` round-trip case added to
+  `packages/pdf-engine-mupdf/src/annotations.test.ts`, matching that file's
+  existing per-kind convention) — all passing.
+- Live headless-Chromium (Playwright) smoke test against the real
+  `fixtures/pdfs/arch_simple_A4.pdf` fixture: opened the PDF, exercised every
+  new tool's golden path (Shift+two-click arrow, click-to-place sticky note
+  with committed text, drag-a-box highlight, 4-vertex polyline finished via
+  double-click), confirmed `drawingSummary.annotationCount` incremented for
+  each, confirmed the Rail UI's three previously-disabled buttons (Sticky
+  Note/Text Highlight/Polyline) and the relabeled "Line/Arrow" button are all
+  enabled and wired. Then a full save round trip: `exportToPdf` +
+  `handle.save()` to real PDF bytes, reopened in a **separate** mupdf process
+  (not just the same in-memory document) — confirmed a real `Line` annotation
+  with `ClosedArrow` ending, a `Text` annotation with the committed sticky
+  note contents, a `Highlight` with the dragged quad points, and a real
+  `PolyLine` annotation with all 4 vertices, all correctly named/correlated.
+  Zero console errors throughout. Screenshot confirms correct visual
+  rendering (arrowhead, sticky note icon+label, translucent highlight fill,
+  zigzag polyline stroke).

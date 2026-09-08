@@ -10,7 +10,7 @@ export interface RasterOptions {
 
 export type AnnotationKind =
   | 'freehand' | 'line' | 'arrow' | 'rectangle' | 'circle'
-  | 'textbox' | 'stickyNote' | 'highlight' | 'stamp';
+  | 'textbox' | 'stickyNote' | 'highlight' | 'polyline' | 'stamp';
 
 export interface PageRect {
   x0: number;
@@ -33,6 +33,7 @@ export type AnnotationGeometry =
   | { kind: 'circle'; center: { x: number; y: number }; radius: number }
   | { kind: 'textbox'; rect: PageRect; text: string }
   | { kind: 'stickyNote'; position: { x: number; y: number }; text: string }
+  | { kind: 'polyline'; points: Array<{ x: number; y: number }> }
   | { kind: 'stamp'; position: { x: number; y: number }; widthPt: number; heightPt: number; rotationDegrees: number; pngBytes: Uint8Array };
 
 export interface AnnotationSpec {
