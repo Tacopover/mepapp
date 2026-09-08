@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
+import { loadStampBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
 import { QuickAccessStrip } from './components/QuickAccessStrip.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
@@ -133,7 +134,8 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     async (iconRef: string) => {
       const res = await fetch(resolveStampIconUrl(iconRef));
       const blob = await res.blob();
-      return createImageBitmap(blob);
+      const definition = STAMP_LIBRARY.find((def) => def.iconRef === iconRef);
+      return loadStampBitmap(blob, definition && { widthPt: definition.nativeWidth, heightPt: definition.nativeHeight });
     },
     [resolveStampIconUrl],
   );
@@ -278,7 +280,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
 
   const handleCustomStampFile = useCallback(
     async (file: File, category: StampCategory) => {
-      const bitmap = await createImageBitmap(file);
+      const bitmap = await loadStampBitmap(file);
       sceneRef.current?.setStampTexture(bitmap);
       sceneRef.current?.setTool(category === 'equipment' ? 'place-equipment' : 'place-terminal');
       setActiveDefinitionId(null);
