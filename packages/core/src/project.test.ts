@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_SCHEMA_VERSION, loadProject, ProjectLoadError, serializeProject } from './project.js';
+import type { Annotation } from './annotation.js';
 import type { Fitting, NetworkType, Segment } from './network.js';
 
 const networkType: NetworkType = { id: 'supply-air', name: 'Supply Air', discipline: 'ventilation', units: 'CFM', defaultCapacity: 0 };
@@ -15,6 +16,7 @@ const segment: Segment = {
   geometry: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
 };
 const fitting: Fitting = { id: 'f1', pageIndex: 0, position: { x: 0, y: 0 }, kind: 'junction' };
+const annotation: Annotation = { id: 'a1', pageIndex: 0, geometry: { kind: 'line', from: { x: 0, y: 0 }, to: { x: 10, y: 10 } } };
 
 describe('serializeProject / loadProject round trip', () => {
   it('round-trips a document at the current schema version unchanged', () => {
@@ -24,6 +26,7 @@ describe('serializeProject / loadProject round trip', () => {
       fittings: [fitting],
       stamps: [],
       portGroups: [],
+      annotations: [annotation],
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -76,12 +79,28 @@ describe('serializeProject / loadProject round trip', () => {
     };
 
     const loaded = loadProject(legacyDoc);
-    expect(loaded.schemaVersion).toBe(3);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION); // v2 resumes through every later step, not just v2->v3
     expect(loaded.portGroups).toEqual([]);
+    expect(loaded.annotations).toEqual([]);
+  });
+
+  it('migrates a pre-annotations (v3) save, defaulting to an empty array', () => {
+    const legacyDoc = {
+      schemaVersion: 3,
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [],
+      portGroups: [],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(4);
+    expect(loaded.annotations).toEqual([]);
   });
 
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
-    const doc = { schemaVersion: CURRENT_SCHEMA_VERSION, networkTypes: [], fittings: [], stamps: [], portGroups: [] };
+    const doc = { schemaVersion: CURRENT_SCHEMA_VERSION, networkTypes: [], fittings: [], stamps: [], portGroups: [], annotations: [] };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {
       loadProject(doc);

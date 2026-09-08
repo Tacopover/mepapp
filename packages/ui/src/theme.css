@@ -1003,6 +1003,22 @@
   justify-content: flex-end;
 }
 
+/* ---------- Floating textbox-annotation input ---------- */
+
+.mep-textbox-prompt {
+  position: absolute;
+  z-index: 50;
+  min-width: 160px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 6px 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 var(--ink);
+  resize: both;
+}
+
 .mep-source-footer {
   padding: 4px 8px;
   background: var(--surface-2);

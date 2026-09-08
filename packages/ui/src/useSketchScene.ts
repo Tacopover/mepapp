@@ -9,6 +9,12 @@ export interface CalibrationPrompt {
   resolve: (knownRealDistanceMm: number | null) => void;
 }
 
+export interface TextboxPrompt {
+  /** Container-relative pixels — where the floating textarea should be positioned over the canvas. */
+  screenPosition: Vec2;
+  resolve: (text: string | null) => void;
+}
+
 export interface UseSketchScene {
   containerRef: RefObject<HTMLDivElement | null>;
   sceneRef: RefObject<SketchScene | null>;
@@ -23,6 +29,8 @@ export interface UseSketchScene {
   measurementMm: number | null;
   calibrationPrompt: CalibrationPrompt | null;
   setCalibrationPrompt: (prompt: CalibrationPrompt | null) => void;
+  textboxPrompt: TextboxPrompt | null;
+  setTextboxPrompt: (prompt: TextboxPrompt | null) => void;
   drawingSummary: DrawingSummary;
   flowResult: FlowResult[] | null;
   refreshLayers: () => void;
@@ -31,7 +39,7 @@ export interface UseSketchScene {
   activePdfHandle: PdfDocumentHandle | null;
 }
 
-const EMPTY_DRAWING_SUMMARY: DrawingSummary = { segmentCount: 0, fittingCount: 0, networkCount: 0, canUndo: false, canRedo: false };
+const EMPTY_DRAWING_SUMMARY: DrawingSummary = { segmentCount: 0, fittingCount: 0, annotationCount: 0, networkCount: 0, canUndo: false, canRedo: false };
 
 export function useSketchScene(): UseSketchScene {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -46,6 +54,7 @@ export function useSketchScene(): UseSketchScene {
   const [calibration, setCalibration] = useState<Calibration | null>(null);
   const [measurementMm, setMeasurementMm] = useState<number | null>(null);
   const [calibrationPrompt, setCalibrationPrompt] = useState<CalibrationPrompt | null>(null);
+  const [textboxPrompt, setTextboxPrompt] = useState<TextboxPrompt | null>(null);
   const [drawingSummary, setDrawingSummary] = useState<DrawingSummary>(EMPTY_DRAWING_SUMMARY);
   const [flowResult, setFlowResult] = useState<FlowResult[] | null>(null);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
@@ -74,6 +83,8 @@ export function useSketchScene(): UseSketchScene {
     const onMeasurement = (mm: number) => setMeasurementMm(mm);
     const onCalibrationNeeded = (p1: Vec2, p2: Vec2, resolve: (mm: number | null) => void) =>
       setCalibrationPrompt({ p1, p2, resolve });
+    const onTextboxRequested = (screenPosition: Vec2, resolve: (text: string | null) => void) =>
+      setTextboxPrompt({ screenPosition, resolve });
     const onDrawingChanged = (summary: DrawingSummary) => {
       setDrawingSummary(summary);
       setNetworkSummaries(scene.getNetworkSummaries());
@@ -112,6 +123,7 @@ export function useSketchScene(): UseSketchScene {
     scene.on('calibrationSet', onCalibrationSet);
     scene.on('measurement', onMeasurement);
     scene.on('calibrationNeeded', onCalibrationNeeded);
+    scene.on('textboxRequested', onTextboxRequested);
     scene.on('drawingChanged', onDrawingChanged);
     scene.on('flowSolved', onFlowSolved);
     scene.on('projectLoaded', onProjectLoaded);
@@ -142,6 +154,7 @@ export function useSketchScene(): UseSketchScene {
       scene.off('calibrationSet', onCalibrationSet);
       scene.off('measurement', onMeasurement);
       scene.off('calibrationNeeded', onCalibrationNeeded);
+      scene.off('textboxRequested', onTextboxRequested);
       scene.off('drawingChanged', onDrawingChanged);
       scene.off('flowSolved', onFlowSolved);
       scene.off('projectLoaded', onProjectLoaded);
@@ -168,6 +181,8 @@ export function useSketchScene(): UseSketchScene {
     measurementMm,
     calibrationPrompt,
     setCalibrationPrompt,
+    textboxPrompt,
+    setTextboxPrompt,
     drawingSummary,
     flowResult,
     refreshLayers,

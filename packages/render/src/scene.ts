@@ -3,6 +3,7 @@ import {
   Container,
   Graphics,
   Sprite,
+  Text,
   Texture,
   type FederatedPointerEvent,
   type FederatedWheelEvent,
@@ -26,6 +27,8 @@ import {
   serializeProject,
   solveFlow,
   splitSegmentAtFitting,
+  type Annotation,
+  type AnnotationGeometry,
   type Calibration,
   type Command,
   type Discipline,
@@ -44,7 +47,7 @@ import {
   type Transform2D,
   type Vec2,
 } from '@mepapp/core';
-import type { AnnotationGeometry, PdfDocumentHandle, StoredAnnotation } from '@mepapp/pdf-engine';
+import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState, type StampEntry } from './document.js';
 
@@ -69,17 +72,55 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
 
 /** Maps an observed PDF annotation back to the generic geometry shape reconcilePdfSync compares — see core/pdfSync.ts. Returns null for annotation kinds MepApp doesn't itself author (foreign markup is left alone entirely). */
 function annotationSyncEntry(annotation: StoredAnnotation): SyncedGeometry | null {
-  const g: AnnotationGeometry = annotation.geometry;
+  const g: PdfAnnotationGeometry = annotation.geometry;
   if (g.kind === 'line') {
     return { id: annotation.id, geometry: { ax: round(g.from.x), ay: round(g.from.y), bx: round(g.to.x), by: round(g.to.y) } };
   }
   if (g.kind === 'circle') {
+    // Radius deliberately excluded — this shape is shared with Fitting's constant-radius marker circle (see writeAnnotationForId), whose domain-side entry never carried one either.
     return { id: annotation.id, geometry: { x: round(g.center.x), y: round(g.center.y) } };
+  }
+  if (g.kind === 'rectangle') {
+    return { id: annotation.id, geometry: { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) } };
+  }
+  if (g.kind === 'textbox') {
+    // Text content isn't compared — SyncedGeometry is numeric-only (see core/pdfSync.ts), so an edit to a textbox's text in another viewer isn't flagged as drift, only a move/resize is.
+    return { id: annotation.id, geometry: { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) } };
+  }
+  if (g.kind === 'freehand') {
+    const geometry: Record<string, number> = { count: g.points.length };
+    g.points.forEach((p, i) => {
+      geometry[`x${i}`] = round(p.x);
+      geometry[`y${i}`] = round(p.y);
+    });
+    return { id: annotation.id, geometry };
   }
   if (g.kind === 'stamp') {
     return { id: annotation.id, geometry: { x: round(g.position.x), y: round(g.position.y), rotationDegrees: round(g.rotationDegrees) } };
   }
   return null;
+}
+
+/** Domain-side counterpart to annotationSyncEntry's per-kind geometry snapshot, from core's own Annotation.geometry rather than an observed PDF annotation — kept in the same shape by hand so sync comparison lines up, same split as the segment/fitting/stamp cases in domainSyncEntries below. */
+function domainAnnotationGeometry(g: AnnotationGeometry): Record<string, number> {
+  if (g.kind === 'line') {
+    return { ax: round(g.from.x), ay: round(g.from.y), bx: round(g.to.x), by: round(g.to.y) };
+  }
+  if (g.kind === 'circle') {
+    return { x: round(g.center.x), y: round(g.center.y) };
+  }
+  if (g.kind === 'rectangle') {
+    return { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) };
+  }
+  if (g.kind === 'textbox') {
+    return { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) };
+  }
+  const geometry: Record<string, number> = { count: g.points.length };
+  g.points.forEach((p, i) => {
+    geometry[`x${i}`] = round(p.x);
+    geometry[`y${i}`] = round(p.y);
+  });
+  return geometry;
 }
 
 function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
@@ -112,6 +153,15 @@ function deleteSegmentCommand(segment: Segment): Command<DrawingState> {
   };
 }
 
+/** One command per whole annotation (a freehand stroke's every point included) — never one command per point, so undoing a drawn annotation is always a single step. */
+function createAnnotationCommand(annotation: Annotation): Command<DrawingState> {
+  return {
+    description: `Create annotation ${annotation.id}`,
+    execute: (state) => ({ ...state, annotations: { ...state.annotations, [annotation.id]: annotation } }),
+    undo: (state) => ({ ...state, annotations: withoutKey(state.annotations, annotation.id) }),
+  };
+}
+
 interface DrawEndpointResolution {
   point: Segment['endpointA'];
   worldPosition: Vec2;
@@ -130,6 +180,16 @@ const ROTATE_SNAP_DEGREES = 45;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 32;
 
+// A draw-shape drag shorter than this (screen px, zoom-independent — see
+// onPointerUp's 'draw-shape' case) is treated as a stray click, not a
+// zero-size rectangle/circle nobody meant to create.
+const MIN_SHAPE_DRAG_SCREEN_PX = 3;
+// A textbox annotation has no drag-to-size gesture (it's a single click, see
+// onPointerDown's 'draw-textbox' case) — this is its placeholder rect size in
+// PDF points, matching AnnotationGeometry's 'textbox' rect shape.
+const DEFAULT_TEXTBOX_WIDTH_PT = 160;
+const DEFAULT_TEXTBOX_HEIGHT_PT = 40;
+
 export interface StampInfo {
   id: string;
   category: StampCategory;
@@ -143,7 +203,18 @@ export interface StampInfo {
   definitionId?: string;
 }
 
-export type SketchTool = 'select' | 'pan' | 'place-terminal' | 'place-equipment' | 'calibrate' | 'measure' | 'draw-segment';
+export type SketchTool =
+  | 'select'
+  | 'pan'
+  | 'place-terminal'
+  | 'place-equipment'
+  | 'calibrate'
+  | 'measure'
+  | 'draw-segment'
+  | 'draw-freehand'
+  | 'draw-line'
+  | 'draw-shape'
+  | 'draw-textbox';
 
 /**
  * Resolves a stamp-library iconRef to loaded image bytes — `loadProjectFromJson`'s
@@ -156,6 +227,7 @@ export type IconBitmapResolver = (iconRef: string) => Promise<ImageBitmap>;
 export interface DrawingSummary {
   segmentCount: number;
   fittingCount: number;
+  annotationCount: number;
   networkCount: number;
   canUndo: boolean;
   canRedo: boolean;
@@ -178,6 +250,8 @@ interface SketchSceneEvents {
   calibrationNeeded: [p1: Vec2, p2: Vec2, resolve: (knownRealDistanceMm: number | null) => void];
   calibrationSet: [Calibration];
   measurement: [distanceMm: number];
+  /** The draw-textbox tool was clicked — the UI's cue to show a floating text input at screenPosition (container-relative pixels) and call resolve with the committed text, or null to cancel. */
+  textboxRequested: [screenPosition: Vec2, resolve: (text: string | null) => void];
   drawingChanged: [DrawingSummary];
   flowSolved: [FlowResult[]];
   projectLoaded: [];
@@ -218,7 +292,9 @@ type DragState =
       startPointerAngleDeg: number;
       snapshot: Array<{ id: string; transform: Transform2D }>;
     }
-  | { kind: 'rubber-band'; startWorld: Vec2; currentWorld: Vec2; additive: boolean };
+  | { kind: 'rubber-band'; startWorld: Vec2; currentWorld: Vec2; additive: boolean }
+  | { kind: 'draw-freehand'; points: Vec2[] }
+  | { kind: 'draw-shape'; shapeKind: 'rectangle' | 'circle'; startWorld: Vec2; currentWorld: Vec2 };
 
 function applyTransformToSprite(sprite: Sprite, transform: Transform2D, baseScale: Vec2): void {
   sprite.position.set(transform.position.x, transform.position.y);
@@ -290,6 +366,7 @@ export class SketchScene {
 
     this.world.addChild(this.doc.stampsLayer);
     this.world.addChild(this.doc.drawingLayer);
+    this.world.addChild(this.doc.annotationTextLayer);
     this.world.addChild(this.overlay);
     this.app.stage.addChild(this.world);
 
@@ -427,6 +504,7 @@ export class SketchScene {
     if (target.backdropSprite) this.world.addChild(target.backdropSprite);
     this.world.addChild(target.stampsLayer);
     this.world.addChild(target.drawingLayer);
+    this.world.addChild(target.annotationTextLayer);
     this.world.addChild(this.overlay);
     this.world.x = target.viewport.x;
     this.world.y = target.viewport.y;
@@ -528,6 +606,7 @@ export class SketchScene {
     return {
       segmentCount: Object.keys(state.segments).length,
       fittingCount: Object.keys(state.fittings).length,
+      annotationCount: Object.keys(state.annotations).length,
       networkCount: networks.length,
       canUndo: this.doc.drawingHistory.canUndo,
       canRedo: this.doc.drawingHistory.canRedo,
@@ -626,6 +705,7 @@ export class SketchScene {
       fittings: Object.values(state.fittings),
       stamps: [...this.doc.stamps.values()].map((entry) => entry.data),
       portGroups: this.doc.portGroups,
+      annotations: Object.values(state.annotations),
     }) as unknown as ProjectDocument;
   }
 
@@ -662,9 +742,17 @@ export class SketchScene {
     target.drawingHistory.setLiveState({
       segments: Object.fromEntries(doc.segments.map((s) => [s.id, s])),
       fittings: Object.fromEntries(doc.fittings.map((f) => [f.id, f])),
+      annotations: Object.fromEntries(doc.annotations.map((a) => [a.id, a])),
     });
     target.networkTypes.splice(0, target.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
     target.portGroups.splice(0, target.portGroups.length, ...doc.portGroups);
+
+    let maxAnnotationSeq = 0;
+    for (const annotation of doc.annotations) {
+      const numericSuffix = /^annotation-(\d+)$/.exec(annotation.id)?.[1];
+      if (numericSuffix) maxAnnotationSeq = Math.max(maxAnnotationSeq, Number(numericSuffix));
+    }
+    target.nextAnnotationSeq = Math.max(target.nextAnnotationSeq, maxAnnotationSeq + 1);
 
     for (const entry of target.stamps.values()) entry.sprite.destroy({ texture: true });
     target.stamps.clear();
@@ -773,6 +861,9 @@ export class SketchScene {
         geometry: { x: round(bounds.minX), y: round(bounds.minY), rotationDegrees: round(entry.data.transform.rotationDegrees) },
       });
     }
+    for (const annotation of Object.values(state.annotations)) {
+      entries.push({ id: annotation.id, geometry: domainAnnotationGeometry(annotation.geometry) });
+    }
     return entries;
   }
 
@@ -857,6 +948,11 @@ export class SketchScene {
           pngBytes,
         },
       });
+      return;
+    }
+    const annotation = state.annotations[id];
+    if (annotation) {
+      await handle.addAnnotation({ id, kind: annotation.geometry.kind, pageIndex: annotation.pageIndex, geometry: annotation.geometry });
     }
   }
 
@@ -1022,6 +1118,52 @@ export class SketchScene {
       return;
     }
 
+    if (this.tool === 'draw-freehand') {
+      this.drag = { kind: 'draw-freehand', points: [world] };
+      this.redrawOverlay();
+      return;
+    }
+
+    if (this.tool === 'draw-line') {
+      this.pendingPoints.push(world);
+      if (this.pendingPoints.length === 2) {
+        const [from, to] = this.pendingPoints;
+        this.pendingPoints = [];
+        const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: 'line', from, to } };
+        this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
+        this.syncDrawingLayer();
+        this.markDirty();
+      }
+      this.redrawOverlay();
+      return;
+    }
+
+    if (this.tool === 'draw-shape') {
+      // Plain drag = rectangle (opposite corners); Shift+drag = circle (start point is the center, drag distance is the radius) — one tool covering both shapes per the atlas' "generalized shape tool", disambiguated the same way rotate-selection already uses shiftKey for a modifier (see onPointerMove's 'rotate-selection' case).
+      this.drag = { kind: 'draw-shape', shapeKind: event.shiftKey ? 'circle' : 'rectangle', startWorld: world, currentWorld: world };
+      this.redrawOverlay();
+      return;
+    }
+
+    if (this.tool === 'draw-textbox') {
+      this.emitter.emit('textboxRequested', screen, (text) => {
+        const trimmed = text?.trim();
+        if (trimmed) {
+          const annotation: Annotation = {
+            id: `annotation-${this.doc.nextAnnotationSeq++}`,
+            pageIndex: 0,
+            geometry: { kind: 'textbox', rect: { x0: world.x, y0: world.y, x1: world.x + DEFAULT_TEXTBOX_WIDTH_PT, y1: world.y + DEFAULT_TEXTBOX_HEIGHT_PT }, text: trimmed },
+          };
+          this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
+          this.syncDrawingLayer();
+          this.markDirty();
+          this.setTool('select'); // one-shot, matching placeStamp's revert-after-place convention
+        }
+        this.redrawOverlay();
+      });
+      return;
+    }
+
     if (this.tool === 'calibrate' || this.tool === 'measure') {
       this.pendingPoints.push(world);
       if (this.pendingPoints.length === 2) {
@@ -1139,6 +1281,16 @@ export class SketchScene {
       this.drag = { ...this.drag, currentWorld: world };
       this.redrawOverlay();
     }
+
+    if (this.drag.kind === 'draw-freehand') {
+      this.drag = { ...this.drag, points: [...this.drag.points, world] };
+      this.redrawOverlay();
+    }
+
+    if (this.drag.kind === 'draw-shape') {
+      this.drag = { ...this.drag, currentWorld: world };
+      this.redrawOverlay();
+    }
   };
 
   private readonly onPointerUp = (): void => {
@@ -1157,6 +1309,39 @@ export class SketchScene {
       this.doc.selectedIds = additive ? new Set([...this.doc.selectedIds, ...hits]) : hits;
       this.emitter.emit('selectionChanged', this.getSelection());
     }
+
+    if (this.drag.kind === 'draw-freehand' && this.drag.points.length >= 2) {
+      const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: 'freehand', points: this.drag.points } };
+      this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
+      this.syncDrawingLayer();
+      this.markDirty();
+    }
+
+    if (this.drag.kind === 'draw-shape') {
+      const { shapeKind, startWorld, currentWorld } = this.drag;
+      const dx = currentWorld.x - startWorld.x;
+      const dy = currentWorld.y - startWorld.y;
+      const dragScreenPx = Math.hypot(dx, dy) * this.world.scale.x;
+      if (dragScreenPx >= MIN_SHAPE_DRAG_SCREEN_PX) {
+        const geometry: AnnotationGeometry =
+          shapeKind === 'circle'
+            ? { kind: 'circle', center: startWorld, radius: Math.hypot(dx, dy) }
+            : {
+                kind: 'rectangle',
+                rect: {
+                  x0: Math.min(startWorld.x, currentWorld.x),
+                  y0: Math.min(startWorld.y, currentWorld.y),
+                  x1: Math.max(startWorld.x, currentWorld.x),
+                  y1: Math.max(startWorld.y, currentWorld.y),
+                },
+              };
+        const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry };
+        this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
+        this.syncDrawingLayer();
+        this.markDirty();
+      }
+    }
+
     this.drag = { kind: 'none' };
     this.redrawOverlay();
   };
@@ -1286,6 +1471,11 @@ export class SketchScene {
 
   private syncDrawingLayer(): void {
     this.doc.drawingLayer.clear();
+    // Textbox text is a PixiJS Text node (Graphics can't render text) — fully
+    // rebuilt here alongside drawingLayer rather than diffed, same "clear and
+    // redraw everything" approach as segments/fittings above; annotation
+    // counts are small enough that this isn't a real cost.
+    for (const child of this.doc.annotationTextLayer.removeChildren()) child.destroy();
     const state = this.doc.drawingHistory.getState();
     for (const segment of Object.values(state.segments)) {
       const [start, ...rest] = segment.geometry;
@@ -1297,7 +1487,44 @@ export class SketchScene {
     for (const fitting of Object.values(state.fittings)) {
       this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, 6).fill({ color: 0xffa726 });
     }
+    for (const annotation of Object.values(state.annotations)) {
+      this.drawAnnotation(annotation);
+    }
     this.emitter.emit('drawingChanged', this.getDrawingSummary());
+  }
+
+  /** Renders one committed annotation into drawingLayer (or, for a textbox's text, into annotationTextLayer — see syncDrawingLayer). */
+  private drawAnnotation(annotation: Annotation): void {
+    const g = annotation.geometry;
+    const layer = this.doc.drawingLayer;
+    const color = 0x42a5f5;
+    if (g.kind === 'freehand') {
+      const [first, ...rest] = g.points;
+      if (!first) return;
+      layer.moveTo(first.x, first.y);
+      for (const point of rest) layer.lineTo(point.x, point.y);
+      layer.stroke({ width: 2, color });
+      return;
+    }
+    if (g.kind === 'line') {
+      layer.moveTo(g.from.x, g.from.y);
+      layer.lineTo(g.to.x, g.to.y);
+      layer.stroke({ width: 2, color });
+      return;
+    }
+    if (g.kind === 'rectangle') {
+      layer.rect(g.rect.x0, g.rect.y0, g.rect.x1 - g.rect.x0, g.rect.y1 - g.rect.y0).stroke({ width: 2, color });
+      return;
+    }
+    if (g.kind === 'circle') {
+      layer.circle(g.center.x, g.center.y, g.radius).stroke({ width: 2, color });
+      return;
+    }
+    // textbox: a light bounding box (drawingLayer) plus the actual text (a Text node in annotationTextLayer).
+    layer.rect(g.rect.x0, g.rect.y0, g.rect.x1 - g.rect.x0, g.rect.y1 - g.rect.y0).stroke({ width: 1, color, alpha: 0.4 });
+    const text = new Text({ text: g.text, style: { fontSize: 14, fill: 0x1a1a1a } });
+    text.position.set(g.rect.x0 + 4, g.rect.y0 + 4);
+    this.doc.annotationTextLayer.addChild(text);
   }
 
   private redrawOverlay(): void {
@@ -1348,6 +1575,27 @@ export class SketchScene {
     if (this.pendingSegmentStart) {
       const p = this.pendingSegmentStart.worldPosition;
       this.overlay.circle(p.x, p.y, 5 / this.world.scale.x).fill({ color: 0xffa726 });
+    }
+
+    if (this.drag.kind === 'draw-freehand' && this.drag.points.length > 1) {
+      const [first, ...rest] = this.drag.points;
+      this.overlay.moveTo(first.x, first.y);
+      for (const p of rest) this.overlay.lineTo(p.x, p.y);
+      this.overlay.stroke({ width: 2 / this.world.scale.x, color: 0x42a5f5 });
+    }
+
+    if (this.drag.kind === 'draw-shape') {
+      const { shapeKind, startWorld, currentWorld } = this.drag;
+      if (shapeKind === 'circle') {
+        const radius = Math.hypot(currentWorld.x - startWorld.x, currentWorld.y - startWorld.y);
+        this.overlay.circle(startWorld.x, startWorld.y, radius).stroke({ width: 2 / this.world.scale.x, color: 0x42a5f5 });
+      } else {
+        const x = Math.min(startWorld.x, currentWorld.x);
+        const y = Math.min(startWorld.y, currentWorld.y);
+        const w = Math.abs(currentWorld.x - startWorld.x);
+        const h = Math.abs(currentWorld.y - startWorld.y);
+        this.overlay.rect(x, y, w, h).stroke({ width: 2 / this.world.scale.x, color: 0x42a5f5 });
+      }
     }
   }
 }

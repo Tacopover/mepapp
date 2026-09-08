@@ -4,12 +4,13 @@
 // needed so far (material became a segment field partway through
 // development; see decisions log 2026-09-06).
 
+import type { Annotation } from './annotation.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { PlacedStamp } from './stamp.js';
 import { getStampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -18,6 +19,7 @@ export interface ProjectDocument {
   fittings: Fitting[];
   stamps: PlacedStamp[];
   portGroups: PortGroup[];
+  annotations: Annotation[];
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -72,6 +74,18 @@ const migrationSteps: MigrationStep[] = [
       portGroups: Array.isArray(data.portGroups) ? data.portGroups : [],
     }),
   },
+  {
+    fromVersion: 3,
+    toVersion: 4,
+    // Version 3 predates user-drawn annotations (freehand/line/rectangle/
+    // circle/textbox) — no save before this could have any, so default to an
+    // empty array rather than trying to infer markup that was never recorded.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 4,
+      annotations: Array.isArray(data.annotations) ? data.annotations : [],
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -84,6 +98,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'fittings'),
   (data: JsonRecord) => requireArray(data, 'stamps'),
   (data: JsonRecord) => requireArray(data, 'portGroups'),
+  (data: JsonRecord) => requireArray(data, 'annotations'),
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

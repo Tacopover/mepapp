@@ -1,6 +1,7 @@
 import { Container, Graphics, type Sprite } from 'pixi.js';
 import {
   CommandManager,
+  type Annotation,
   type Calibration,
   type Fitting,
   type FlowResult,
@@ -12,10 +13,11 @@ import {
 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
-/** Undo-history state for the segment/fitting drawing tool — kept separate from the pre-existing, not-yet-undoable stamp placement state (see decisions log 2026-09-06). */
+/** Undo-history state for the segment/fitting/annotation drawing tools — kept separate from the pre-existing, not-yet-undoable stamp placement state (see decisions log 2026-09-06). */
 export interface DrawingState {
   segments: Record<string, Segment>;
   fittings: Record<string, Fitting>;
+  annotations: Record<string, Annotation>;
 }
 
 export interface StampEntry {
@@ -57,10 +59,12 @@ export class SketchDocument {
   backdropSprite: Sprite | null = null;
   readonly stampsLayer = new Container();
   readonly drawingLayer = new Graphics();
+  /** PixiJS Text nodes for placed textbox annotations — a Graphics object can't render text, so these live in their own container, fully rebuilt alongside drawingLayer on every syncDrawingLayer (see SketchScene.drawAnnotation). */
+  readonly annotationTextLayer = new Container();
   readonly stamps = new Map<string, StampEntry>();
   selectedIds = new Set<string>();
   calibration: Calibration | null = null;
-  readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {} });
+  readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {}, annotations: {} });
   readonly networkTypes: NetworkType[] = [DEFAULT_NETWORK_TYPE];
   /** Ports on the same element linked into one connectivity node — e.g. an AHU's supply + return (see core's PortGroup doc comment). Set via SketchScene.setPortGroup. */
   readonly portGroups: PortGroup[] = [];
@@ -69,6 +73,7 @@ export class SketchDocument {
   nextStampSeq = 1;
   nextFittingSeq = 1;
   nextSegmentSeq = 1;
+  nextAnnotationSeq = 1;
   lastFlowResult: FlowResult[] | null = null;
   viewport = { x: 0, y: 0, scale: 1 };
   isDirty = false;
@@ -81,7 +86,8 @@ export class SketchDocument {
       this.pdfHandle === null &&
       this.stamps.size === 0 &&
       Object.keys(state.segments).length === 0 &&
-      Object.keys(state.fittings).length === 0
+      Object.keys(state.fittings).length === 0 &&
+      Object.keys(state.annotations).length === 0
     );
   }
 
@@ -96,5 +102,6 @@ export class SketchDocument {
     this.stamps.clear();
     this.stampsLayer.destroy();
     this.drawingLayer.destroy();
+    this.annotationTextLayer.destroy({ children: true });
   }
 }

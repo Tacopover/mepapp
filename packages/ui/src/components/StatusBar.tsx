@@ -30,7 +30,8 @@ export function StatusBar({ zoom, calibration, measurementMm, selectedCount, dra
       )}
       <span className="mep-chip">
         {drawingSummary.segmentCount} segment{drawingSummary.segmentCount === 1 ? '' : 's'}, {drawingSummary.fittingCount} fitting
-        {drawingSummary.fittingCount === 1 ? '' : 's'}, {drawingSummary.networkCount} network{drawingSummary.networkCount === 1 ? '' : 's'}
+        {drawingSummary.fittingCount === 1 ? '' : 's'}, {drawingSummary.annotationCount} annotation{drawingSummary.annotationCount === 1 ? '' : 's'},{' '}
+        {drawingSummary.networkCount} network{drawingSummary.networkCount === 1 ? '' : 's'}
       </span>
       <span className="mep-scale-bar" aria-hidden="true">
         <i />

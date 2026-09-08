@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
@@ -84,6 +84,8 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     measurementMm,
     calibrationPrompt,
     setCalibrationPrompt,
+    textboxPrompt,
+    setTextboxPrompt,
     drawingSummary,
     flowResult,
     documents,
@@ -93,11 +95,25 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
 
   const [status, setStatus] = useState('');
   const [calibrationInput, setCalibrationInput] = useState('');
+  const [textboxInput, setTextboxInput] = useState('');
   const [capacityInput, setCapacityInput] = useState('');
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
   const [activeNetworkTypeId, setActiveNetworkTypeId] = useState<string | null>(null);
+  const textboxRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Deferred, not `autoFocus`: the click that opens this prompt is the same
+  // mousedown/mouseup the browser is still processing its own default focus
+  // handling for (canvas isn't focusable, so that default action lands focus
+  // back on <body>) — focusing synchronously during that same gesture loses
+  // the race and the immediate blur dismisses the prompt before it's ever
+  // seen. Waiting a macrotask lets that default action finish first.
+  useEffect(() => {
+    if (!textboxPrompt) return;
+    const id = setTimeout(() => textboxRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [textboxPrompt]);
 
   const activeDoc = documents.find((d) => d.id === activeDocumentId) ?? null;
   const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
@@ -392,6 +408,33 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
                 sceneRef={sceneRef}
                 stampReady={activeDefinitionId !== null || tool === 'place-terminal' || tool === 'place-equipment'}
               />
+              {textboxPrompt && (
+                <textarea
+                  ref={textboxRef}
+                  rows={2}
+                  className="mep-textbox-prompt"
+                  style={{ left: textboxPrompt.screenPosition.x, top: textboxPrompt.screenPosition.y }}
+                  value={textboxInput}
+                  onChange={(e) => setTextboxInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      textboxPrompt.resolve(textboxInput);
+                      setTextboxPrompt(null);
+                      setTextboxInput('');
+                    } else if (e.key === 'Escape') {
+                      textboxPrompt.resolve(null);
+                      setTextboxPrompt(null);
+                      setTextboxInput('');
+                    }
+                  }}
+                  onBlur={() => {
+                    textboxPrompt.resolve(textboxInput);
+                    setTextboxPrompt(null);
+                    setTextboxInput('');
+                  }}
+                />
+              )}
             </>
           )}
         </div>
