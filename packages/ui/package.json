@@ -13,7 +13,6 @@
     "@mepapp/core": "workspace:*",
     "@mepapp/pdf-engine": "workspace:*",
     "@mepapp/render": "workspace:*",
-    "dockview-react": "^8.2.0",
     "react": "latest",
     "react-dom": "latest"
   },
