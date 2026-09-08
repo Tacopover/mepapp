@@ -253,6 +253,7 @@ export class SketchScene {
   private pendingSegmentStart: DrawEndpointResolution | null = null;
   private readonly SNAP_RADIUS_SCREEN_PX = 12;
   private static readonly FITTING_MARKER_RADIUS_PT = 4;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(private readonly container: HTMLElement) {
     const first = new SketchDocument();
@@ -269,12 +270,23 @@ export class SketchScene {
 
   async init(): Promise<void> {
     await this.app.init({
-      resizeTo: this.container,
       background: '#e7edf0', // Field Blueprint's --canvas-bg (packages/ui/src/theme.css) — kept a literal color since render stays framework/theme-agnostic, not a CSS var consumer.
       antialias: true,
       eventFeatures: { move: true, globalMove: true, click: true, wheel: true },
     });
     this.container.appendChild(this.app.canvas);
+
+    // Pixi's own `resizeTo` option only re-measures on the browser's `window`
+    // resize event — it never notices the container itself changing size,
+    // e.g. dragging the right-dock's width handle or collapsing it. That left
+    // the canvas element frozen at its last-known size while its flex-layout
+    // container grew or shrank around it, exposing a dead strip of raw clear
+    // color (or, growing, an overflowing canvas silently clipped by the
+    // container's `overflow: hidden`). Watch the container directly instead.
+    const resize = () => this.app.renderer.resize(this.container.clientWidth, this.container.clientHeight);
+    resize();
+    this.resizeObserver = new ResizeObserver(resize);
+    this.resizeObserver.observe(this.container);
 
     this.world.addChild(this.doc.stampsLayer);
     this.world.addChild(this.doc.drawingLayer);
@@ -292,6 +304,7 @@ export class SketchScene {
   }
 
   destroy(): void {
+    this.resizeObserver?.disconnect();
     for (const document of this.documents) document.destroy();
     this.app.destroy(true, { children: true, texture: true });
   }
