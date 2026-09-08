@@ -1,6 +1,6 @@
 # Textbox rotation
 
-Status: **in progress**.
+Status: **done**. Implemented, verified. Not yet merged to `origin/master` — pending user confirmation.
 
 ## Goal
 
@@ -141,18 +141,47 @@ rectangle/highlight/circle) and stays out of scope here.
   field.
 - Resize handles for textbox (didn't exist before, still don't).
 
-## Verification (to run before calling this done)
+## A pre-existing bug found along the way (fixed here)
 
-- `pnpm build && pnpm turbo run typecheck` — must stay clean across all 10
-  workspace packages.
-- `pnpm turbo run test` — existing textbox round-trip test in
-  `pdf-engine-mupdf/src/annotations.test.ts` needs its literal updated
-  (`rotationDegrees: 0`); add a new test there for a rotated textbox
-  (nonzero angle, save+reopen, confirm `rotationDegrees` and the original
-  local `rect` both round-trip). Add/extend `core/src/annotation.test.ts`
-  coverage for `rotateAnnotationGeometry`/`annotationBoundsWorld`'s textbox
-  case now actually rotating.
-- Live headless-Chromium Playwright smoke test against a real fixture PDF:
-  place a textbox, rotate it via the drag handle (and via the rail's Rotate
-  button), confirm the text visibly tilts and hit-testing/re-select still
-  works at the rotated angle, save, reopen, confirm the angle survives.
+`SketchScene.rotateSelectionBy` (the rail's instant "Rotate 90°" action) was
+entirely stamp-only: it built its snapshot from `this.getSelection()`, which
+by design only ever returns stamps (kept stamp-only for the Properties
+panel's read model — see the prior task's notes). For an annotation-only
+selection, `rotateSelectionBy` silently no-opped. This predates this task —
+the prior task's own plan only verified the drag-rotate handle rotating
+annotations, never the rail button on an annotation-only selection — but it
+directly blocked the deliverable here, since the rail button is the natural
+way to rotate a selected textbox. Fixed by making `rotateSelectionBy` handle
+both stamps and annotations, mirroring the drag-rotate gesture's pivot
+(selection bounds centroid) and `Transaction` usage, committed in one shot.
+
+## Verification
+
+- `pnpm build && pnpm turbo run typecheck` — clean across all 10 workspace
+  packages.
+- `pnpm turbo run test` — 109 core tests (102 + 7 new) + 11
+  `pdf-engine-mupdf` tests (10 + 1 new), all passing. New coverage:
+  `rotateAnnotationGeometry`/`annotationBoundsWorld`/`rotatedRectCorners`'s
+  textbox case in `core/src/annotation.test.ts`; a rotated-textbox
+  save+reopen round trip (custom appearance stream, `MepAppRotationDegrees`
+  + `MepAppLocalRect` bookkeeping keys) in
+  `pdf-engine-mupdf/src/annotations.test.ts`.
+- Live headless-Chromium Playwright smoke test against the real fixture
+  `fixtures/pdfs/arch_simple_A4.pdf`, driving the actual running app (not a
+  unit test), zero console/page errors throughout:
+  - Placed a textbox ("ROTATE ME"), selected it, rotated it 90°/180°/270°
+    via the rail's Rotate button. Screenshots confirm the text itself
+    visibly rotates (reads vertically at 90°, upside-down at 180°, the
+    opposite vertical direction at 270°) — not just the bounding box.
+  - Rotation-aware hit-testing: after rotating to 270° (footprint now 40
+    wide × 160 tall instead of 160×40), a click inside the *original*
+    unrotated footprint but outside the rotated one correctly missed
+    (selection cleared) — a screenshot confirms this, ruling out a
+    hit-test that forgot to account for the angle. A click inside the
+    actual rotated footprint correctly re-selected it.
+- Did not re-verify PDF save/reopen through the live browser UI (that flow
+  goes through the File System Access API / a download, awkward to drive
+  headlessly) — relied on the `pdf-engine-mupdf` unit test instead, which
+  exercises the real mupdf save/reopen path directly and is a more precise
+  check of the exact thing that matters (the angle and original rect
+  surviving a real file round trip) than an E2E download flow would be.

@@ -28,6 +28,7 @@ import {
   rectIntersectsRotatedRect,
   resolveSegmentEndpoint,
   rotateAnnotationGeometry,
+  rotatedRectCorners,
   rotatePointAround,
   serializeProject,
   solveFlow,
@@ -91,8 +92,8 @@ function annotationSyncEntry(annotation: StoredAnnotation): SyncedGeometry | nul
     return { id: annotation.id, geometry: { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) } };
   }
   if (g.kind === 'textbox') {
-    // Text content isn't compared — SyncedGeometry is numeric-only (see core/pdfSync.ts), so an edit to a textbox's text in another viewer isn't flagged as drift, only a move/resize is.
-    return { id: annotation.id, geometry: { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) } };
+    // Text content isn't compared — SyncedGeometry is numeric-only (see core/pdfSync.ts), so an edit to a textbox's text in another viewer isn't flagged as drift, only a move/resize/rotate is.
+    return { id: annotation.id, geometry: { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1), rotationDegrees: round(g.rotationDegrees) } };
   }
   if (g.kind === 'stickyNote') {
     // Text content isn't compared, same reasoning as textbox above.
@@ -124,7 +125,7 @@ function domainAnnotationGeometry(g: AnnotationGeometry): Record<string, number>
     return { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) };
   }
   if (g.kind === 'textbox') {
-    return { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) };
+    return { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1), rotationDegrees: round(g.rotationDegrees) };
   }
   if (g.kind === 'stickyNote') {
     return { x: round(g.position.x), y: round(g.position.y) };
@@ -1081,14 +1082,51 @@ export class SketchScene {
   }
 
   /** Programmatic rotate (e.g. a "rotate 90°" button) — same absolute-recompute path as drag rotation. */
+  /**
+   * Instant (non-drag) rotate-by-delta for the current selection — the
+   * rail's Rotate flyout button. Was stamp-only until this covered
+   * annotations too: this.getSelection() only ever returns stamps (kept
+   * stamp-only by design, see the Properties panel's read model), so this
+   * previously silently no-opped for an annotation-only selection even
+   * though the drag-rotate handle (onPointerMove's 'rotate-selection' case)
+   * already rotated annotations correctly. Mirrors that gesture's pivot
+   * (the selection's own bounds centroid) and Transaction usage, just
+   * committed in one shot instead of per pointermove frame.
+   */
   rotateSelectionBy(deltaDegrees: number): void {
-    const snapshot = this.getSelection().map((s) => ({ id: s.id, transform: s.transform }));
-    if (snapshot.length === 0) return;
-    const rotated = multiRotate(
-      snapshot.map((s) => s.transform),
-      deltaDegrees,
-    );
-    snapshot.forEach((s, i) => this.setStampTransform(s.id, rotated[i]));
+    if (this.doc.selectedIds.size === 0) return;
+    const state = this.doc.drawingHistory.getState();
+    const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => (this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id }));
+    const pivotPoints = selectedRefs
+      .map((ref) => this.resolveSelectableBoundsWorld(ref, state))
+      .filter((b): b is NonNullable<typeof b> => b !== null)
+      .map((b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }));
+    if (pivotPoints.length === 0) return;
+    const pivot = centroid(pivotPoints);
+
+    const stampSnapshot = this.getSelection().map((s) => ({ id: s.id, transform: s.transform }));
+    if (stampSnapshot.length > 0) {
+      const rotated = multiRotate(
+        stampSnapshot.map((s) => s.transform),
+        deltaDegrees,
+      );
+      stampSnapshot.forEach((s, i) => this.setStampTransform(s.id, rotated[i]));
+    }
+
+    const annotationIds = [...this.doc.selectedIds].filter((id) => state.annotations[id]);
+    if (annotationIds.length > 0) {
+      const tx = new Transaction(this.doc.drawingHistory, 'Rotate annotation(s)');
+      tx.update((s) => {
+        const annotations = { ...s.annotations };
+        for (const id of annotationIds) {
+          annotations[id] = { ...annotations[id], geometry: rotateAnnotationGeometry(annotations[id].geometry, pivot, deltaDegrees) };
+        }
+        return { ...s, annotations };
+      });
+      tx.commit();
+      this.syncDrawingLayer();
+    }
+
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
@@ -1193,8 +1231,15 @@ export class SketchScene {
         return pointNearSegment(worldPoint, g.from, g.to, strokeThreshold);
       case 'rectangle':
       case 'highlight':
-      case 'textbox':
         return pointInAxisAlignedRect(worldPoint, g.rect);
+      case 'textbox': {
+        // Undo the rect's own rotation on the test point (around its center)
+        // instead of rotating the rect itself, so the existing
+        // axis-aligned-rect test still applies. Identity when rotationDegrees is 0.
+        const center = { x: (g.rect.x0 + g.rect.x1) / 2, y: (g.rect.y0 + g.rect.y1) / 2 };
+        const local = g.rotationDegrees === 0 ? worldPoint : rotatePointAround(worldPoint, center, -g.rotationDegrees);
+        return pointInAxisAlignedRect(local, g.rect);
+      }
       case 'circle': {
         const distanceToCenter = Math.hypot(worldPoint.x - g.center.x, worldPoint.y - g.center.y);
         return distanceToCenter <= g.radius + strokeThreshold;
@@ -1338,7 +1383,7 @@ export class SketchScene {
           const annotation: Annotation = {
             id: `annotation-${this.doc.nextAnnotationSeq++}`,
             pageIndex: 0,
-            geometry: { kind: 'textbox', rect: { x0: world.x, y0: world.y, x1: world.x + DEFAULT_TEXTBOX_WIDTH_PT, y1: world.y + DEFAULT_TEXTBOX_HEIGHT_PT }, text: trimmed },
+            geometry: { kind: 'textbox', rect: { x0: world.x, y0: world.y, x1: world.x + DEFAULT_TEXTBOX_WIDTH_PT, y1: world.y + DEFAULT_TEXTBOX_HEIGHT_PT }, text: trimmed, rotationDegrees: 0 },
           };
           this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
           this.syncDrawingLayer();
@@ -1824,7 +1869,11 @@ export class SketchScene {
     if (!annotation) return;
     const g = annotation.geometry;
     if (g.kind !== 'textbox' && g.kind !== 'stickyNote') return;
-    const anchorWorld = g.kind === 'textbox' ? { x: g.rect.x0, y: g.rect.y0 } : g.position;
+    // The bounding box's own min corner, not g.rect.x0/y0 directly — for a
+    // rotated textbox those are the local (unrotated) corner, not where the
+    // box actually appears on screen.
+    const bounds = annotationBoundsWorld(g, STICKY_NOTE_ICON_SIZE_PT);
+    const anchorWorld = { x: bounds.minX, y: bounds.minY };
     const screen = this.worldToScreen(anchorWorld);
     this.emitter.emit('textboxRequested', screen, g.text, (text) => {
       const trimmed = text?.trim();
@@ -2040,9 +2089,25 @@ export class SketchScene {
       return;
     }
     // textbox: a light bounding box (drawingLayer) plus the actual text (a Text node in annotationTextLayer).
-    layer.rect(g.rect.x0, g.rect.y0, g.rect.x1 - g.rect.x0, g.rect.y1 - g.rect.y0).stroke({ width: 1, color, alpha: 0.4 });
+    if (g.rotationDegrees === 0) {
+      layer.rect(g.rect.x0, g.rect.y0, g.rect.x1 - g.rect.x0, g.rect.y1 - g.rect.y0).stroke({ width: 1, color, alpha: 0.4 });
+    } else {
+      const [c0, ...rest] = rotatedRectCorners(g.rect, g.rotationDegrees);
+      layer.moveTo(c0.x, c0.y);
+      for (const c of rest) layer.lineTo(c.x, c.y);
+      layer.closePath();
+      layer.stroke({ width: 1, color, alpha: 0.4 });
+    }
     const text = new Text({ text: g.text, style: { fontSize: 14, fill: 0x1a1a1a } });
-    text.position.set(g.rect.x0 + 4, g.rect.y0 + 4);
+    // pivot/position/rotation (not a plain position.set) so the text rotates
+    // rigidly around the rect's own center — at rotationDegrees 0 this is
+    // exactly equivalent to the old position.set(rect.x0+4, rect.y0+4),
+    // verified algebraically: the point at local offset (0,0) still lands on
+    // (rect.x0+4, rect.y0+4) when rotation is 0.
+    const center = { x: (g.rect.x0 + g.rect.x1) / 2, y: (g.rect.y0 + g.rect.y1) / 2 };
+    text.pivot.set(center.x - (g.rect.x0 + 4), center.y - (g.rect.y0 + 4));
+    text.position.set(center.x, center.y);
+    text.rotation = (g.rotationDegrees * Math.PI) / 180;
     this.doc.annotationTextLayer.addChild(text);
   }
 
@@ -2060,7 +2125,7 @@ export class SketchScene {
         this.overlay.stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
         continue;
       }
-      // An annotation has no rotation of its own, so its selection box is always axis-aligned — a plain rect, not a rotated quad.
+      // The selection box is always the bounding AABB, a plain rect — even for a rotated textbox, whose own outline (drawn separately in drawAnnotation) is the true rotated quad.
       const bounds = this.resolveSelectableBoundsWorld({ kind: 'annotation', id }, state);
       if (!bounds) continue;
       this.overlay

@@ -53,7 +53,7 @@ describe('MupdfEngine annotation round trip (Step 4)', () => {
     ids.textbox = await doc.addAnnotation({
       kind: 'textbox',
       pageIndex: 0,
-      geometry: { kind: 'textbox', rect: { x0: 10, y0: 300, x1: 150, y1: 350 }, text: 'Step 4 round trip' },
+      geometry: { kind: 'textbox', rect: { x0: 10, y0: 300, x1: 150, y1: 350 }, text: 'Step 4 round trip', rotationDegrees: 0 },
     });
 
     // Save, then reopen as an entirely separate document instance — proves
@@ -94,6 +94,32 @@ describe('MupdfEngine annotation round trip (Step 4)', () => {
     if (byId[ids.textbox].geometry.kind === 'textbox') {
       expect(byId[ids.textbox].geometry.text).toBe('Step 4 round trip');
       expect(byId[ids.textbox].geometry.rect).toEqual({ x0: 10, y0: 300, x1: 150, y1: 350 });
+      expect(byId[ids.textbox].geometry.rotationDegrees).toBe(0);
+    }
+  });
+
+  it('writes a rotated textbox with a custom appearance stream and reads back its angle and original rect after save+reopen', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+
+    const id = await doc.addAnnotation({
+      kind: 'textbox',
+      pageIndex: 0,
+      geometry: { kind: 'textbox', rect: { x0: 20, y0: 50, x1: 120, y1: 80 }, text: 'Diagonal label', rotationDegrees: 45 },
+    });
+
+    const reopened = await engine.openDocument(await doc.save());
+    const listed = await reopened.listAnnotations(0);
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0].id).toBe(id);
+    expect(listed[0].kind).toBe('textbox');
+    if (listed[0].geometry.kind === 'textbox') {
+      expect(listed[0].geometry.text).toBe('Diagonal label');
+      expect(listed[0].geometry.rotationDegrees).toBe(45);
+      // The original local (unrotated) rect round-trips verbatim — not the
+      // rotated AABB that getRect() alone would return.
+      expect(listed[0].geometry.rect).toEqual({ x0: 20, y0: 50, x1: 120, y1: 80 });
     }
   });
 

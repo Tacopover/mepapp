@@ -8,7 +8,7 @@
 // render/scene.ts) — `stamp` isn't a user-facing draw tool, so it has no
 // domain counterpart here.
 
-import { rotatePointAround, type Vec2 } from './geometry.js';
+import { normalizeDegrees, rotatePointAround, type Vec2 } from './geometry.js';
 
 export type AnnotationKind = 'freehand' | 'line' | 'arrow' | 'rectangle' | 'circle' | 'textbox' | 'stickyNote' | 'highlight' | 'polyline';
 
@@ -25,7 +25,7 @@ export type AnnotationGeometry =
   | { kind: 'arrow'; from: Vec2; to: Vec2 }
   | { kind: 'rectangle'; rect: AnnotationRect }
   | { kind: 'circle'; center: Vec2; radius: number }
-  | { kind: 'textbox'; rect: AnnotationRect; text: string }
+  | { kind: 'textbox'; rect: AnnotationRect; text: string; rotationDegrees: number }
   | { kind: 'stickyNote'; position: Vec2; text: string }
   | { kind: 'highlight'; rect: AnnotationRect }
   | { kind: 'polyline'; points: Vec2[] };
@@ -57,17 +57,38 @@ export function translateAnnotationGeometry(g: AnnotationGeometry, dx: number, d
   }
 }
 
+/** The center of an AnnotationRect. */
+function rectCenter(rect: AnnotationRect): Vec2 {
+  return { x: (rect.x0 + rect.x1) / 2, y: (rect.y0 + rect.y1) / 2 };
+}
+
+/** The rect's 4 corners, each rotated by rotationDegrees around the rect's own center — used to draw, hit-test, and bound a rotated textbox. Identity (the plain corners) when rotationDegrees is 0. */
+export function rotatedRectCorners(rect: AnnotationRect, rotationDegrees: number): Vec2[] {
+  const center = rectCenter(rect);
+  const corners = [
+    { x: rect.x0, y: rect.y0 },
+    { x: rect.x1, y: rect.y0 },
+    { x: rect.x1, y: rect.y1 },
+    { x: rect.x0, y: rect.y1 },
+  ];
+  return rotationDegrees === 0 ? corners : corners.map((c) => rotatePointAround(c, center, rotationDegrees));
+}
+
 /**
  * Rotates an annotation's geometry by deltaDegrees around `pivot` — the same
  * group-rotate gesture multiRotate gives stamps, extended to annotations,
  * which have no rotation field of their own (see the doc comment on
  * AnnotationGeometry). Point-based kinds (freehand/polyline/line/arrow)
  * rotate every point; circle rotates its center only (a circle has no
- * orientation to advance). rectangle/highlight/textbox have no rotation
- * field in either this type or the PDF annotation kinds MepApp writes for
- * them — resolved as "reposition only": their center orbits the pivot but
- * the rect itself stays axis-aligned, same width/height. stickyNote's fixed
- * icon square is treated the same way, rotating only its anchor position.
+ * orientation to advance). rectangle/highlight have no rotation field in
+ * either this type or the PDF annotation kinds MepApp writes for them —
+ * resolved as "reposition only": their center orbits the pivot but the rect
+ * itself stays axis-aligned, same width/height. stickyNote's fixed icon
+ * square is treated the same way, rotating only its anchor position.
+ * textbox is the one kind that genuinely tilts: its rect's center orbits the
+ * pivot the same as rectangle/highlight, but its own rotationDegrees also
+ * advances by deltaDegrees, so the text itself reads at an angle — see
+ * rotatedRectCorners, and the render/PDF layers that consume it.
  */
 export function rotateAnnotationGeometry(g: AnnotationGeometry, pivot: Vec2, deltaDegrees: number): AnnotationGeometry {
   switch (g.kind) {
@@ -80,12 +101,21 @@ export function rotateAnnotationGeometry(g: AnnotationGeometry, pivot: Vec2, del
     case 'circle':
       return { ...g, center: rotatePointAround(g.center, pivot, deltaDegrees) };
     case 'rectangle':
-    case 'highlight':
+    case 'highlight': {
+      const width = g.rect.x1 - g.rect.x0;
+      const height = g.rect.y1 - g.rect.y0;
+      const center = rotatePointAround(rectCenter(g.rect), pivot, deltaDegrees);
+      return { ...g, rect: { x0: center.x - width / 2, y0: center.y - height / 2, x1: center.x + width / 2, y1: center.y + height / 2 } };
+    }
     case 'textbox': {
       const width = g.rect.x1 - g.rect.x0;
       const height = g.rect.y1 - g.rect.y0;
-      const center = rotatePointAround({ x: (g.rect.x0 + g.rect.x1) / 2, y: (g.rect.y0 + g.rect.y1) / 2 }, pivot, deltaDegrees);
-      return { ...g, rect: { x0: center.x - width / 2, y0: center.y - height / 2, x1: center.x + width / 2, y1: center.y + height / 2 } };
+      const center = rotatePointAround(rectCenter(g.rect), pivot, deltaDegrees);
+      return {
+        ...g,
+        rect: { x0: center.x - width / 2, y0: center.y - height / 2, x1: center.x + width / 2, y1: center.y + height / 2 },
+        rotationDegrees: normalizeDegrees(g.rotationDegrees + deltaDegrees),
+      };
     }
     case 'stickyNote':
       return { ...g, position: rotatePointAround(g.position, pivot, deltaDegrees) };
@@ -113,13 +143,23 @@ export function annotationBoundsWorld(g: AnnotationGeometry, stickyNoteIconSize:
       };
     case 'rectangle':
     case 'highlight':
-    case 'textbox':
       return {
         minX: Math.min(g.rect.x0, g.rect.x1),
         minY: Math.min(g.rect.y0, g.rect.y1),
         maxX: Math.max(g.rect.x0, g.rect.x1),
         maxY: Math.max(g.rect.y0, g.rect.y1),
       };
+    case 'textbox': {
+      // Rotated (or not — identity when rotationDegrees is 0), so this is
+      // always the true bounding box, not just the raw rect's corners.
+      const corners = rotatedRectCorners(g.rect, g.rotationDegrees);
+      return {
+        minX: Math.min(...corners.map((c) => c.x)),
+        minY: Math.min(...corners.map((c) => c.y)),
+        maxX: Math.max(...corners.map((c) => c.x)),
+        maxY: Math.max(...corners.map((c) => c.y)),
+      };
+    }
     case 'circle':
       return { minX: g.center.x - g.radius, minY: g.center.y - g.radius, maxX: g.center.x + g.radius, maxY: g.center.y + g.radius };
     case 'stickyNote':

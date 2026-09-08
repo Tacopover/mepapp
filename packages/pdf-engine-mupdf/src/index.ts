@@ -14,6 +14,30 @@ import type {
 
 const VALID_ROTATIONS = [0, 90, 180, 270] as const;
 
+function escapePdfLiteralString(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+// Hand-written PDF text-drawing operators for a FreeText annotation's custom
+// appearance stream — only used when the textbox is rotated (see the
+// 'textbox' case in addAnnotation below); the unrotated case still uses
+// mupdf's own setDefaultAppearance()+update() auto-appearance. Local
+// coordinates: (0,0) is the box's bottom-left, matching the appearance's own
+// BBox, not the page.
+function freeTextAppearanceContents(text: string, heightPt: number, fontSize: number, rgb: [number, number, number]): string {
+  const padding = 3;
+  const leading = fontSize * 1.2;
+  const lines = text.split('\n');
+  const startY = heightPt - padding - fontSize;
+  const ops = ['q', `${rgb[0]} ${rgb[1]} ${rgb[2]} rg`, 'BT', `/Helv ${fontSize} Tf`, `1 0 0 1 ${padding} ${startY} Tm`];
+  lines.forEach((line, i) => {
+    if (i > 0) ops.push(`0 ${-leading} Td`);
+    ops.push(`(${escapePdfLiteralString(line)}) Tj`);
+  });
+  ops.push('ET', 'Q');
+  return ops.join('\n');
+}
+
 function readMediaBox(page: mupdf.PDFPage): [number, number, number, number] {
   const box = page.getObject().getInheritable('MediaBox');
   const values = box.asJS() as number[];
@@ -73,11 +97,28 @@ function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): Annota
       return { kind: 'highlight', pageIndex, geometry: { kind: 'highlight', rect } };
     }
     case 'FreeText': {
-      const [x0, y0, x1, y1] = annot.getRect();
+      // A rotated textbox stashes its own bookkeeping keys (see addAnnotation
+      // below) because getRect() returns the rotated AABB, not the original
+      // local rect — reverse-solving the local rect from the AABB + angle is
+      // singular at exactly 45/135/225/315 degrees, which is also this app's
+      // default rotate-snap angle. An unrotated or pre-existing textbox has
+      // neither key and falls back to getRect() directly, unchanged from
+      // before this feature existed.
+      const localRectRaw = annot.getObject().get('MepAppLocalRect');
+      const rotationRaw = annot.getObject().get('MepAppRotationDegrees');
+      const rotationDegrees = rotationRaw.isNumber() ? rotationRaw.asNumber() : 0;
+      let rect: { x0: number; y0: number; x1: number; y1: number };
+      if (localRectRaw.isArray() && localRectRaw.length === 4) {
+        const [x0, y0, x1, y1] = localRectRaw.asJS() as number[];
+        rect = { x0, y0, x1, y1 };
+      } else {
+        const [x0, y0, x1, y1] = annot.getRect();
+        rect = { x0, y0, x1, y1 };
+      }
       return {
         kind: 'textbox',
         pageIndex,
-        geometry: { kind: 'textbox', rect: { x0, y0, x1, y1 }, text: annot.getContents() },
+        geometry: { kind: 'textbox', rect, text: annot.getContents(), rotationDegrees },
       };
     }
     case 'Text': {
@@ -184,6 +225,11 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
     const geometry = spec.geometry;
 
     let annot: mupdf.PDFAnnotation;
+    // Set only by the rotated-textbox case below, which writes its own
+    // custom appearance via setAppearance() directly — calling update()
+    // afterward would let mupdf regenerate (and overwrite) it from Rect/DA,
+    // the same auto-appearance path every other kind still relies on.
+    let skipUpdate = false;
     switch (geometry.kind) {
       case 'freehand':
         annot = page.createAnnotation('Ink');
@@ -216,9 +262,44 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
         break;
       case 'textbox':
         annot = page.createAnnotation('FreeText');
-        annot.setRect([geometry.rect.x0, geometry.rect.y0, geometry.rect.x1, geometry.rect.y1]);
         annot.setContents(geometry.text);
-        annot.setDefaultAppearance('Helv', 12, rgb ?? [0, 0, 0]);
+        if (geometry.rotationDegrees === 0) {
+          annot.setRect([geometry.rect.x0, geometry.rect.y0, geometry.rect.x1, geometry.rect.y1]);
+          annot.setDefaultAppearance('Helv', 12, rgb ?? [0, 0, 0]);
+        } else {
+          // No PDF annotation subtype (FreeText included) has a native
+          // rotation field — verified against mupdf's own PDFAnnotation API,
+          // which has no setRotate/getRotate. The only real mechanism is a
+          // hand-authored appearance stream: draw the text in a local,
+          // unrotated box (bbox), then bake the tilt into the appearance's
+          // own transform matrix. Rect is set to the exact AABB of that
+          // transformed bbox, so the PDF viewer's own fit-appearance-into-Rect
+          // step (spec algorithm 8.1) is an identity — no extra distortion.
+          const width = geometry.rect.x1 - geometry.rect.x0;
+          const height = geometry.rect.y1 - geometry.rect.y0;
+          const centerX = (geometry.rect.x0 + geometry.rect.x1) / 2;
+          const centerY = (geometry.rect.y0 + geometry.rect.y1) / 2;
+          const bbox: mupdf.Rect = [0, 0, width, height];
+          const transform = mupdf.Matrix.concat(
+            mupdf.Matrix.concat(mupdf.Matrix.translate(-width / 2, -height / 2), mupdf.Matrix.rotate(geometry.rotationDegrees)),
+            mupdf.Matrix.translate(centerX, centerY),
+          );
+          const fontResources = this.doc.newDictionary();
+          const fontDict = this.doc.newDictionary();
+          fontDict.put('Helv', this.doc.addSimpleFont(new mupdf.Font('Helvetica'), 'Latin'));
+          fontResources.put('Font', fontDict);
+          const contents = freeTextAppearanceContents(geometry.text, height, 12, rgb ?? [0, 0, 0]);
+          annot.setRect(mupdf.Rect.transform(bbox, transform));
+          annot.setAppearance('N', null, transform, bbox, fontResources, contents);
+          // Our own bookkeeping keys (ignored by other readers), the same
+          // pattern the 'stamp' case below already uses — getRect() only
+          // returns the rotated AABB, not the original local rect, and
+          // reverse-solving one from the other is singular at exactly
+          // 45/135/225/315 degrees. See annotationToSpec's FreeText case.
+          annot.getObject().put('MepAppRotationDegrees', geometry.rotationDegrees);
+          annot.getObject().put('MepAppLocalRect', [geometry.rect.x0, geometry.rect.y0, geometry.rect.x1, geometry.rect.y1]);
+          skipUpdate = true;
+        }
         break;
       case 'stickyNote':
         annot = page.createAnnotation('Text');
@@ -251,7 +332,7 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
     if (rgb && geometry.kind !== 'textbox' && geometry.kind !== 'stamp') annot.setColor(rgb);
     if (spec.style?.strokeWidthPt !== undefined) annot.setBorderWidth(spec.style.strokeWidthPt);
     annot.setName(id);
-    annot.update();
+    if (!skipUpdate) annot.update();
     return id;
   }
 

@@ -31,7 +31,7 @@ export type AnnotationGeometry =
   | { kind: 'line' | 'arrow'; from: { x: number; y: number }; to: { x: number; y: number } }
   | { kind: 'rectangle' | 'highlight'; rect: PageRect }
   | { kind: 'circle'; center: { x: number; y: number }; radius: number }
-  | { kind: 'textbox'; rect: PageRect; text: string }
+  | { kind: 'textbox'; rect: PageRect; text: string; rotationDegrees: number }
   | { kind: 'stickyNote'; position: { x: number; y: number }; text: string }
   | { kind: 'polyline'; points: Array<{ x: number; y: number }> }
   | { kind: 'stamp'; position: { x: number; y: number }; widthPt: number; heightPt: number; rotationDegrees: number; pngBytes: Uint8Array };
