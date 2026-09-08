@@ -4,12 +4,12 @@
 // needed so far (material became a segment field partway through
 // development; see decisions log 2026-09-06).
 
-import type { Fitting, NetworkType, Segment } from './network.js';
+import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { PlacedStamp } from './stamp.js';
 import { getStampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -17,6 +17,7 @@ export interface ProjectDocument {
   segments: Segment[];
   fittings: Fitting[];
   stamps: PlacedStamp[];
+  portGroups: PortGroup[];
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -58,6 +59,19 @@ const migrationSteps: MigrationStep[] = [
         : data.stamps,
     }),
   },
+  {
+    fromVersion: 2,
+    toVersion: 3,
+    // Version 2 predates PortGroup (linking two ports on one element into a
+    // single connectivity node, e.g. an AHU's supply + return) — no save
+    // before this could have any, so default to an empty array rather than
+    // trying to infer linkage that was never recorded.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 3,
+      portGroups: Array.isArray(data.portGroups) ? data.portGroups : [],
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -69,6 +83,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'segments'),
   (data: JsonRecord) => requireArray(data, 'fittings'),
   (data: JsonRecord) => requireArray(data, 'stamps'),
+  (data: JsonRecord) => requireArray(data, 'portGroups'),
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

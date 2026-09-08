@@ -18,7 +18,13 @@ const fitting: Fitting = { id: 'f1', pageIndex: 0, position: { x: 0, y: 0 }, kin
 
 describe('serializeProject / loadProject round trip', () => {
   it('round-trips a document at the current schema version unchanged', () => {
-    const serialized = serializeProject({ networkTypes: [networkType], segments: [segment], fittings: [fitting], stamps: [] });
+    const serialized = serializeProject({
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [],
+      portGroups: [],
+    });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
     const loaded = loadProject(serialized);
@@ -54,17 +60,31 @@ describe('serializeProject / loadProject round trip', () => {
     };
 
     const loaded = loadProject(legacyDoc);
-    expect(loaded.schemaVersion).toBe(2);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION); // v1 resumes through every later step, not just v1->v2
     expect(loaded.stamps[0].category).toBe('terminal');
     expect(loaded.stamps[1].category).toBe('equipment');
+    expect(loaded.portGroups).toEqual([]);
+  });
+
+  it('migrates a pre-portGroups (v2) save, defaulting to an empty array', () => {
+    const legacyDoc = {
+      schemaVersion: 2,
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(3);
+    expect(loaded.portGroups).toEqual([]);
   });
 
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
-    expect(() => loadProject({ schemaVersion: CURRENT_SCHEMA_VERSION, networkTypes: [], fittings: [], stamps: [] })).toThrow(
-      ProjectLoadError,
-    );
+    const doc = { schemaVersion: CURRENT_SCHEMA_VERSION, networkTypes: [], fittings: [], stamps: [], portGroups: [] };
+    expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {
-      loadProject({ schemaVersion: CURRENT_SCHEMA_VERSION, networkTypes: [], fittings: [], stamps: [] });
+      loadProject(doc);
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(ProjectLoadError);

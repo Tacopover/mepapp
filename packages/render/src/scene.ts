@@ -33,6 +33,8 @@ import {
   type FlowResult,
   type Network,
   type PlacedStamp,
+  type PortGroup,
+  type PortSpec,
   type ProjectDocument,
   type ReconciliationReport,
   type Segment,
@@ -133,6 +135,9 @@ export interface StampInfo {
   transform: Transform2D;
   nativeWidth: number;
   nativeHeight: number;
+  ports: PortSpec[];
+  /** This element's PortGroup membership (see core's PortGroup doc comment), or null if its ports aren't linked. */
+  linkedPortIds: string[] | null;
   /** Set when this stamp was placed from the stamp palette rather than an ad hoc uploaded PNG — see PlacedStamp.definitionId. */
   definitionId?: string;
 }
@@ -444,6 +449,8 @@ export class SketchScene {
       transform: entry.data.transform,
       nativeWidth: entry.data.nativeWidth,
       nativeHeight: entry.data.nativeHeight,
+      ports: entry.data.ports,
+      linkedPortIds: this.doc.portGroups.find((g) => g.elementId === entry.data.id)?.portIds ?? null,
       definitionId: entry.data.definitionId,
     };
   }
@@ -465,7 +472,7 @@ export class SketchScene {
     const state = this.doc.drawingHistory.getState();
     const segments = Object.values(state.segments);
     const fittings = Object.values(state.fittings);
-    const networks = computeNetworks({ segments, fittings, portGroups: [] });
+    const networks = computeNetworks({ segments, fittings, portGroups: this.doc.portGroups });
     const typeById = new Map(this.doc.networkTypes.map((t) => [t.id, t]));
     return networks.map((network: Network) => {
       const type = typeById.get(network.networkTypeId) ?? DEFAULT_NETWORK_TYPE;
@@ -489,7 +496,7 @@ export class SketchScene {
     const networks = computeNetworks({
       segments: Object.values(state.segments),
       fittings: Object.values(state.fittings),
-      portGroups: [],
+      portGroups: this.doc.portGroups,
     });
     return {
       segmentCount: Object.keys(state.segments).length,
@@ -518,6 +525,25 @@ export class SketchScene {
   }
 
   /**
+   * Links (or re-links) which of an element's own ports collapse into one
+   * connectivity node — e.g. an AHU's supply and return ports, so a segment
+   * drawn between them doesn't bridge supply into return (core's PortGroup
+   * doc comment). An empty portIds clears any existing group for this
+   * element. A single portId is stored as-is (a one-port "group" behaves
+   * identically to no group in nodeKeyOf) rather than silently dropped —
+   * dropping it would make checking one port in the UI immediately revert to
+   * unchecked while the user is still picking a second one.
+   */
+  setPortGroup(elementId: string, portIds: string[]): void {
+    const groups = this.doc.portGroups;
+    const existingIndex = groups.findIndex((g) => g.elementId === elementId);
+    if (existingIndex !== -1) groups.splice(existingIndex, 1);
+    if (portIds.length > 0) groups.push({ elementId, portIds });
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /**
    * Runs the capacity-accumulation flow solve (core/flow.ts) over every
    * derived network and returns one FlowResult per network. Networks are
    * recomputed from current topology on every call — there is no stored
@@ -527,10 +553,10 @@ export class SketchScene {
     const state = this.doc.drawingHistory.getState();
     const segments = Object.values(state.segments);
     const fittings = Object.values(state.fittings);
-    const networks = computeNetworks({ segments, fittings, portGroups: [] });
+    const networks = computeNetworks({ segments, fittings, portGroups: this.doc.portGroups });
     const capacities = Object.fromEntries(this.doc.terminalCapacities);
     this.doc.lastFlowResult = networks.map((network: Network) =>
-      solveFlow({ network, segments, fittings, portGroups: [], terminalCapacities: capacities }),
+      solveFlow({ network, segments, fittings, portGroups: this.doc.portGroups, terminalCapacities: capacities }),
     );
     this.emitter.emit('flowSolved', this.doc.lastFlowResult);
     return this.doc.lastFlowResult;
@@ -543,6 +569,7 @@ export class SketchScene {
       segments: Object.values(state.segments),
       fittings: Object.values(state.fittings),
       stamps: [...this.doc.stamps.values()].map((entry) => entry.data),
+      portGroups: this.doc.portGroups,
     }) as unknown as ProjectDocument;
   }
 
@@ -581,6 +608,7 @@ export class SketchScene {
       fittings: Object.fromEntries(doc.fittings.map((f) => [f.id, f])),
     });
     target.networkTypes.splice(0, target.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
+    target.portGroups.splice(0, target.portGroups.length, ...doc.portGroups);
 
     for (const entry of target.stamps.values()) entry.sprite.destroy({ texture: true });
     target.stamps.clear();
