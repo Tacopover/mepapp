@@ -4,6 +4,7 @@ import { NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampCatego
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { IconFile, IconPencil } from '../icons.js';
+import { loadStampBitmap } from '../stampBitmap.js';
 
 export interface StampsPanelProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -23,12 +24,12 @@ export interface StampsPanelProps {
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
 
-function loadBitmap(url: string): Promise<ImageBitmap> {
+function loadBitmap(url: string, definition: StampDefinition): Promise<ImageBitmap> {
   let cached = bitmapCache.get(url);
   if (!cached) {
     cached = fetch(url)
       .then((res) => res.blob())
-      .then((blob) => createImageBitmap(blob));
+      .then((blob) => loadStampBitmap(blob, { widthPt: definition.nativeWidth, heightPt: definition.nativeHeight }));
     bitmapCache.set(url, cached);
   }
   return cached;
@@ -57,7 +58,7 @@ export function StampsPanel({
   const [subTab, setSubTab] = useState<'stamps' | 'networkTypes'>('stamps');
 
   async function handlePick(definition: StampDefinition) {
-    const bitmap = await loadBitmap(resolveIconUrl(definition.iconRef));
+    const bitmap = await loadBitmap(resolveIconUrl(definition.iconRef), definition);
     sceneRef.current?.setStampTexture(bitmap, definition.id);
     sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
     onPick(definition);
