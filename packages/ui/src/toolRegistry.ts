@@ -81,12 +81,12 @@ export const RAIL_ROWS: RailRow[] = [
     id: 'annotate',
     members: [
       { id: 'draw-freehand', label: 'Freehand', Icon: IconFreehand, tool: 'draw-freehand' },
-      { id: 'draw-line', label: 'Line', Icon: IconLineArrow, tool: 'draw-line' },
+      { id: 'draw-line', label: 'Line/Arrow', Icon: IconLineArrow, tool: 'draw-line' },
       { id: 'draw-shape', label: 'Rectangle/Circle', Icon: IconShape, tool: 'draw-shape' },
       { id: 'draw-textbox', label: 'Textbox', Icon: IconTextbox, tool: 'draw-textbox' },
-      { id: 'sticky-note', label: 'Sticky Note', Icon: IconSticky, tool: null },
-      { id: 'text-highlight', label: 'Text Highlight', Icon: IconHighlight, tool: null },
-      { id: 'polyline', label: 'Polyline', Icon: IconPolyline, tool: null },
+      { id: 'sticky-note', label: 'Sticky Note', Icon: IconSticky, tool: 'draw-sticky-note' },
+      { id: 'text-highlight', label: 'Text Highlight', Icon: IconHighlight, tool: 'draw-highlight' },
+      { id: 'polyline', label: 'Polyline', Icon: IconPolyline, tool: 'draw-polyline' },
     ],
   },
   {

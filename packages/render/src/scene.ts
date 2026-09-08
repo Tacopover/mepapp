@@ -73,21 +73,25 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
 /** Maps an observed PDF annotation back to the generic geometry shape reconcilePdfSync compares — see core/pdfSync.ts. Returns null for annotation kinds MepApp doesn't itself author (foreign markup is left alone entirely). */
 function annotationSyncEntry(annotation: StoredAnnotation): SyncedGeometry | null {
   const g: PdfAnnotationGeometry = annotation.geometry;
-  if (g.kind === 'line') {
+  if (g.kind === 'line' || g.kind === 'arrow') {
     return { id: annotation.id, geometry: { ax: round(g.from.x), ay: round(g.from.y), bx: round(g.to.x), by: round(g.to.y) } };
   }
   if (g.kind === 'circle') {
     // Radius deliberately excluded — this shape is shared with Fitting's constant-radius marker circle (see writeAnnotationForId), whose domain-side entry never carried one either.
     return { id: annotation.id, geometry: { x: round(g.center.x), y: round(g.center.y) } };
   }
-  if (g.kind === 'rectangle') {
+  if (g.kind === 'rectangle' || g.kind === 'highlight') {
     return { id: annotation.id, geometry: { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) } };
   }
   if (g.kind === 'textbox') {
     // Text content isn't compared — SyncedGeometry is numeric-only (see core/pdfSync.ts), so an edit to a textbox's text in another viewer isn't flagged as drift, only a move/resize is.
     return { id: annotation.id, geometry: { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) } };
   }
-  if (g.kind === 'freehand') {
+  if (g.kind === 'stickyNote') {
+    // Text content isn't compared, same reasoning as textbox above.
+    return { id: annotation.id, geometry: { x: round(g.position.x), y: round(g.position.y) } };
+  }
+  if (g.kind === 'freehand' || g.kind === 'polyline') {
     const geometry: Record<string, number> = { count: g.points.length };
     g.points.forEach((p, i) => {
       geometry[`x${i}`] = round(p.x);
@@ -103,17 +107,20 @@ function annotationSyncEntry(annotation: StoredAnnotation): SyncedGeometry | nul
 
 /** Domain-side counterpart to annotationSyncEntry's per-kind geometry snapshot, from core's own Annotation.geometry rather than an observed PDF annotation — kept in the same shape by hand so sync comparison lines up, same split as the segment/fitting/stamp cases in domainSyncEntries below. */
 function domainAnnotationGeometry(g: AnnotationGeometry): Record<string, number> {
-  if (g.kind === 'line') {
+  if (g.kind === 'line' || g.kind === 'arrow') {
     return { ax: round(g.from.x), ay: round(g.from.y), bx: round(g.to.x), by: round(g.to.y) };
   }
   if (g.kind === 'circle') {
     return { x: round(g.center.x), y: round(g.center.y) };
   }
-  if (g.kind === 'rectangle') {
+  if (g.kind === 'rectangle' || g.kind === 'highlight') {
     return { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) };
   }
   if (g.kind === 'textbox') {
     return { x0: round(g.rect.x0), y0: round(g.rect.y0), x1: round(g.rect.x1), y1: round(g.rect.y1) };
+  }
+  if (g.kind === 'stickyNote') {
+    return { x: round(g.position.x), y: round(g.position.y) };
   }
   const geometry: Record<string, number> = { count: g.points.length };
   g.points.forEach((p, i) => {
@@ -189,6 +196,15 @@ const MIN_SHAPE_DRAG_SCREEN_PX = 3;
 // PDF points, matching AnnotationGeometry's 'textbox' rect shape.
 const DEFAULT_TEXTBOX_WIDTH_PT = 160;
 const DEFAULT_TEXTBOX_HEIGHT_PT = 40;
+// Fixed on-page footprint of a placed sticky note's icon — a sticky note has
+// no drag-to-size gesture (single click, like a textbox's placeholder rect
+// above), just a point plus its always-visible text label drawn beside it.
+const STICKY_NOTE_ICON_SIZE_PT = 16;
+// Arrowhead geometry for the 'arrow' render case — drawn as two short lines
+// back from the endpoint, not a filled triangle, matching drawAnnotation's
+// stroke-only convention for every other kind.
+const ARROWHEAD_LENGTH_PT = 10;
+const ARROWHEAD_ANGLE_RAD = Math.PI / 7;
 
 export interface StampInfo {
   id: string;
@@ -214,7 +230,10 @@ export type SketchTool =
   | 'draw-freehand'
   | 'draw-line'
   | 'draw-shape'
-  | 'draw-textbox';
+  | 'draw-textbox'
+  | 'draw-sticky-note'
+  | 'draw-highlight'
+  | 'draw-polyline';
 
 /**
  * Resolves a stamp-library iconRef to loaded image bytes — `loadProjectFromJson`'s
@@ -294,7 +313,8 @@ type DragState =
     }
   | { kind: 'rubber-band'; startWorld: Vec2; currentWorld: Vec2; additive: boolean }
   | { kind: 'draw-freehand'; points: Vec2[] }
-  | { kind: 'draw-shape'; shapeKind: 'rectangle' | 'circle'; startWorld: Vec2; currentWorld: Vec2 };
+  | { kind: 'draw-shape'; shapeKind: 'rectangle' | 'circle'; startWorld: Vec2; currentWorld: Vec2 }
+  | { kind: 'draw-highlight'; startWorld: Vec2; currentWorld: Vec2 };
 
 function applyTransformToSprite(sprite: Sprite, transform: Transform2D, baseScale: Vec2): void {
   sprite.position.set(transform.position.x, transform.position.y);
@@ -324,6 +344,19 @@ export class SketchScene {
   private activeNetworkTypeId: string = DEFAULT_NETWORK_TYPE.id;
   private pendingStampTexture: { texture: Texture; nativeWidth: number; nativeHeight: number; definitionId?: string } | null = null;
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure two-click flows
+  // draw-polyline's own scratch: an arbitrary-length click-to-add-vertex
+  // gesture doesn't fit pendingPoints' fixed two-click contract above, so it
+  // gets a dedicated pair — the committed vertices, and the live cursor
+  // position for the rubber-band segment drawn out to the pointer.
+  private pendingPolylinePoints: Vec2[] = [];
+  private pendingPolylineCursor: Vec2 | null = null;
+  // Hand-rolled double-click detection for draw-polyline's finish gesture —
+  // see onPointerDown's 'draw-polyline' case for why native detail-based
+  // detection doesn't work here.
+  private lastPolylineClickAt = 0;
+  private lastPolylineClickScreen: Vec2 | null = null;
+  private static readonly DOUBLE_CLICK_MS = 400;
+  private static readonly DOUBLE_CLICK_SCREEN_PX = 6;
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private pendingSegmentStart: DrawEndpointResolution | null = null;
@@ -398,6 +431,9 @@ export class SketchScene {
     this.tool = tool;
     this.pendingPoints = [];
     this.pendingSegmentStart = null;
+    this.pendingPolylinePoints = [];
+    this.pendingPolylineCursor = null;
+    this.lastPolylineClickScreen = null;
     this.redrawOverlay();
     this.emitter.emit('toolChanged', tool);
   }
@@ -1125,11 +1161,16 @@ export class SketchScene {
     }
 
     if (this.tool === 'draw-line') {
+      // Plain two-click = line; Shift+(either click) = arrow — same
+      // one-tool-two-kinds modifier pattern as draw-shape's rectangle/circle
+      // Shift toggle, per the arrow addition confirmed in the Decisions-Log.
+      // pdf-engine already models arrow as the same {from,to} shape as line.
+      const isArrow = event.shiftKey;
       this.pendingPoints.push(world);
       if (this.pendingPoints.length === 2) {
         const [from, to] = this.pendingPoints;
         this.pendingPoints = [];
-        const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: 'line', from, to } };
+        const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: isArrow ? 'arrow' : 'line', from, to } };
         this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
         this.syncDrawingLayer();
         this.markDirty();
@@ -1161,6 +1202,73 @@ export class SketchScene {
         }
         this.redrawOverlay();
       });
+      return;
+    }
+
+    if (this.tool === 'draw-sticky-note') {
+      // Same floating-textarea event draw-textbox uses — a point instead of a
+      // rect is the only difference, so no new UI event/App.tsx wiring is needed.
+      this.emitter.emit('textboxRequested', screen, (text) => {
+        const trimmed = text?.trim();
+        if (trimmed) {
+          const annotation: Annotation = {
+            id: `annotation-${this.doc.nextAnnotationSeq++}`,
+            pageIndex: 0,
+            geometry: { kind: 'stickyNote', position: world, text: trimmed },
+          };
+          this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
+          this.syncDrawingLayer();
+          this.markDirty();
+          this.setTool('select'); // one-shot, matching placeStamp/draw-textbox's revert-after-place convention
+        }
+        this.redrawOverlay();
+      });
+      return;
+    }
+
+    if (this.tool === 'draw-highlight') {
+      this.drag = { kind: 'draw-highlight', startWorld: world, currentWorld: world };
+      this.redrawOverlay();
+      return;
+    }
+
+    if (this.tool === 'draw-polyline') {
+      // Click adds a vertex; double-click finishes. Chromium leaves
+      // PointerEvent.detail at 0 on every 'pointerdown' regardless of click
+      // count (click-count semantics only apply to the native 'click' event,
+      // which this class's gesture model doesn't otherwise use) — confirmed
+      // empirically, not assumed. Double-clicks are detected by hand instead:
+      // two pointerdowns close together in time and screen position.
+      const now = performance.now();
+      const isDoubleClick =
+        this.lastPolylineClickScreen !== null &&
+        now - this.lastPolylineClickAt <= SketchScene.DOUBLE_CLICK_MS &&
+        Math.hypot(screen.x - this.lastPolylineClickScreen.x, screen.y - this.lastPolylineClickScreen.y) <= SketchScene.DOUBLE_CLICK_SCREEN_PX;
+      this.lastPolylineClickAt = now;
+      this.lastPolylineClickScreen = screen;
+      if (isDoubleClick) {
+        // The first click of this double-click already added its vertex
+        // below on the previous pointerdown — this one only ever closes the
+        // shape out, it never adds a second point of its own.
+        if (this.pendingPolylinePoints.length >= 2) {
+          const annotation: Annotation = {
+            id: `annotation-${this.doc.nextAnnotationSeq++}`,
+            pageIndex: 0,
+            geometry: { kind: 'polyline', points: this.pendingPolylinePoints },
+          };
+          this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
+          this.syncDrawingLayer();
+          this.markDirty();
+        }
+        this.pendingPolylinePoints = [];
+        this.pendingPolylineCursor = null;
+        this.lastPolylineClickScreen = null;
+        this.redrawOverlay();
+        return;
+      }
+      this.pendingPolylinePoints.push(world);
+      this.pendingPolylineCursor = world;
+      this.redrawOverlay();
       return;
     }
 
@@ -1287,8 +1395,13 @@ export class SketchScene {
       this.redrawOverlay();
     }
 
-    if (this.drag.kind === 'draw-shape') {
+    if (this.drag.kind === 'draw-shape' || this.drag.kind === 'draw-highlight') {
       this.drag = { ...this.drag, currentWorld: world };
+      this.redrawOverlay();
+    }
+
+    if (this.tool === 'draw-polyline' && this.pendingPolylinePoints.length > 0) {
+      this.pendingPolylineCursor = world;
       this.redrawOverlay();
     }
   };
@@ -1336,6 +1449,23 @@ export class SketchScene {
                 },
               };
         const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry };
+        this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
+        this.syncDrawingLayer();
+        this.markDirty();
+      }
+    }
+
+    if (this.drag.kind === 'draw-highlight') {
+      const { startWorld, currentWorld } = this.drag;
+      const dragScreenPx = Math.hypot(currentWorld.x - startWorld.x, currentWorld.y - startWorld.y) * this.world.scale.x;
+      if (dragScreenPx >= MIN_SHAPE_DRAG_SCREEN_PX) {
+        const rect = {
+          x0: Math.min(startWorld.x, currentWorld.x),
+          y0: Math.min(startWorld.y, currentWorld.y),
+          x1: Math.max(startWorld.x, currentWorld.x),
+          y1: Math.max(startWorld.y, currentWorld.y),
+        };
+        const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: 'highlight', rect } };
         this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
         this.syncDrawingLayer();
         this.markDirty();
@@ -1512,12 +1642,47 @@ export class SketchScene {
       layer.stroke({ width: 2, color });
       return;
     }
+    if (g.kind === 'arrow') {
+      layer.moveTo(g.from.x, g.from.y);
+      layer.lineTo(g.to.x, g.to.y);
+      layer.stroke({ width: 2, color });
+      const angle = Math.atan2(g.to.y - g.from.y, g.to.x - g.from.x);
+      for (const sign of [-1, 1]) {
+        const headAngle = angle + sign * ARROWHEAD_ANGLE_RAD;
+        layer.moveTo(g.to.x, g.to.y);
+        layer.lineTo(g.to.x - ARROWHEAD_LENGTH_PT * Math.cos(headAngle), g.to.y - ARROWHEAD_LENGTH_PT * Math.sin(headAngle));
+      }
+      layer.stroke({ width: 2, color });
+      return;
+    }
     if (g.kind === 'rectangle') {
       layer.rect(g.rect.x0, g.rect.y0, g.rect.x1 - g.rect.x0, g.rect.y1 - g.rect.y0).stroke({ width: 2, color });
       return;
     }
+    if (g.kind === 'highlight') {
+      // A translucent fill (no stroke) is what visually distinguishes a highlight from a plain rectangle — same drag-a-box gesture, different rendering/purpose.
+      layer.rect(g.rect.x0, g.rect.y0, g.rect.x1 - g.rect.x0, g.rect.y1 - g.rect.y0).fill({ color: 0xfff176, alpha: 0.35 });
+      return;
+    }
     if (g.kind === 'circle') {
       layer.circle(g.center.x, g.center.y, g.radius).stroke({ width: 2, color });
+      return;
+    }
+    if (g.kind === 'polyline') {
+      const [first, ...rest] = g.points;
+      if (!first) return;
+      layer.moveTo(first.x, first.y);
+      for (const point of rest) layer.lineTo(point.x, point.y);
+      layer.stroke({ width: 2, color });
+      return;
+    }
+    if (g.kind === 'stickyNote') {
+      // A small square icon (PDF viewers show sticky notes collapsed, opened on click) plus an always-visible text label beside it — matching textbox's "just render the text" convention rather than building an interactive popup.
+      const size = STICKY_NOTE_ICON_SIZE_PT;
+      layer.rect(g.position.x, g.position.y, size, size).fill({ color: 0xffee58 }).stroke({ width: 1, color: 0xf9a825 });
+      const text = new Text({ text: g.text, style: { fontSize: 12, fill: 0x5d4037 } });
+      text.position.set(g.position.x + size + 4, g.position.y);
+      this.doc.annotationTextLayer.addChild(text);
       return;
     }
     // textbox: a light bounding box (drawingLayer) plus the actual text (a Text node in annotationTextLayer).
@@ -1595,6 +1760,26 @@ export class SketchScene {
         const w = Math.abs(currentWorld.x - startWorld.x);
         const h = Math.abs(currentWorld.y - startWorld.y);
         this.overlay.rect(x, y, w, h).stroke({ width: 2 / this.world.scale.x, color: 0x42a5f5 });
+      }
+    }
+
+    if (this.drag.kind === 'draw-highlight') {
+      const { startWorld, currentWorld } = this.drag;
+      const x = Math.min(startWorld.x, currentWorld.x);
+      const y = Math.min(startWorld.y, currentWorld.y);
+      const w = Math.abs(currentWorld.x - startWorld.x);
+      const h = Math.abs(currentWorld.y - startWorld.y);
+      this.overlay.rect(x, y, w, h).fill({ color: 0xfff176, alpha: 0.35 }).stroke({ width: 1 / this.world.scale.x, color: 0xf9a825 });
+    }
+
+    if (this.pendingPolylinePoints.length > 0) {
+      const [first, ...rest] = this.pendingPolylinePoints;
+      this.overlay.moveTo(first.x, first.y);
+      for (const p of rest) this.overlay.lineTo(p.x, p.y);
+      if (this.pendingPolylineCursor) this.overlay.lineTo(this.pendingPolylineCursor.x, this.pendingPolylineCursor.y);
+      this.overlay.stroke({ width: 2 / this.world.scale.x, color: 0x42a5f5 });
+      for (const p of this.pendingPolylinePoints) {
+        this.overlay.circle(p.x, p.y, 4 / this.world.scale.x).fill({ color: 0xffb300 });
       }
     }
   }
