@@ -773,16 +773,27 @@ export class SketchScene {
       // through its full world transform, so the placed sprite's actual
       // pixels land outside that small viewport and nothing is captured.
       // A same-texture/rotation/scale clone left at position (0,0) — never
-      // added to any container — sidesteps that entirely. The extracted PNG
-      // still reflects rotation baked into its pixels — the adapter does not
+      // added to any container — sidesteps the translation issue, but extract
+      // treats its `target` as a render-group root, and a root's OWN local
+      // transform (rotation/scale included, not just position) is never
+      // applied to itself — only to descendants (see getLocalBounds's isRoot
+      // branch). So a rotated extractionSprite passed directly as `target`
+      // extracts un-rotated at native pixel size, which is exactly what a
+      // rotated stamp did: right image, wrong orientation and aspect ratio.
+      // Nesting it one level inside a bare Container root sidesteps that too
+      // — the rotation/scale now lives on a non-root descendant, so both the
+      // bounds calc and the actual render pick it up. The extracted PNG still
+      // reflects rotation baked into its pixels — the adapter does not
       // rotate pngBytes itself (see AnnotationGeometry's 'stamp' doc comment
       // in @mepapp/pdf-engine).
       const extractionSprite = new Sprite(stampEntry.sprite.texture);
       extractionSprite.anchor.set(0.5);
       extractionSprite.rotation = stampEntry.sprite.rotation;
       extractionSprite.scale.copyFrom(stampEntry.sprite.scale);
-      const pngBytes = dataUrlToBytes(await this.app.renderer.extract.base64({ target: extractionSprite, format: 'png' }));
-      extractionSprite.destroy(); // the shared texture is owned by stampEntry.sprite, not this — never { texture: true } here
+      const extractionRoot = new Container();
+      extractionRoot.addChild(extractionSprite);
+      const pngBytes = dataUrlToBytes(await this.app.renderer.extract.base64({ target: extractionRoot, format: 'png' }));
+      extractionRoot.destroy(); // the shared texture is owned by stampEntry.sprite, not extractionSprite — never { children: true, texture: true } here
       const bounds = this.stampWorldBounds(stampEntry);
       await handle.addAnnotation({
         id,
