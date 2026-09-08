@@ -5,6 +5,7 @@ import type { PlacedStamp } from './stamp.js';
 
 const stamp: PlacedStamp = {
   id: 'ahu',
+  category: 'equipment',
   transform: { position: { x: 100, y: 100 }, rotationDegrees: 0, scale: { x: 1, y: 1 } },
   nativeWidth: 40,
   nativeHeight: 20,

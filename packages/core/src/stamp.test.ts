@@ -4,6 +4,7 @@ import { getStampHalfExtents, getStampWorldPorts, type PlacedStamp } from './sta
 describe('PlacedStamp helpers', () => {
   const stamp: PlacedStamp = {
     id: 's1',
+    category: 'terminal',
     transform: { position: { x: 100, y: 50 }, rotationDegrees: 0, scale: { x: 2, y: 3 } },
     nativeWidth: 40,
     nativeHeight: 20,

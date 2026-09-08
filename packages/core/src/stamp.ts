@@ -2,9 +2,12 @@
 // the render layer wraps this with an actual PixiJS sprite.
 
 import { getWorldPortPosition, type PortSpec, type Transform2D, type Vec2 } from './geometry.js';
+import type { StampCategory } from './stamp-library.js';
 
 export interface PlacedStamp {
   id: string;
+  /** Terminal vs. Equipment vs. Fitting — set from whichever placement tool created this instance, not looked up lazily, so ad hoc uploaded art (no definitionId) still carries it. */
+  category: StampCategory;
   transform: Transform2D;
   nativeWidth: number; // unscaled width in world units, before transform.scale
   nativeHeight: number;

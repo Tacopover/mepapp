@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ReactElement, type RefObject } from 'react';
 import type { SketchScene, SketchTool } from '@mepapp/render';
-import { IconGrip, IconMeasure, IconPan, IconRedo, IconRuler, IconSegment, IconSelect, IconStamp, IconUndo } from '../icons.js';
+import { IconEquipment, IconGrip, IconMeasure, IconPan, IconRedo, IconRuler, IconSegment, IconSelect, IconTerminal, IconUndo } from '../icons.js';
 
 interface ToolDef {
   tool: SketchTool;
@@ -14,7 +14,8 @@ const TOOLS: ToolDef[][] = [
     { tool: 'pan', label: 'Pan', Icon: IconPan },
   ],
   [
-    { tool: 'place-stamp', label: 'Place stamp', Icon: IconStamp },
+    { tool: 'place-terminal', label: 'Place terminal', Icon: IconTerminal },
+    { tool: 'place-equipment', label: 'Place equipment', Icon: IconEquipment },
     { tool: 'draw-segment', label: 'Segment', Icon: IconSegment },
   ],
   [
@@ -69,7 +70,7 @@ export function Toolbar({ tool, sceneRef, stampReady, canUndo, canRedo, onUndo, 
               type="button"
               className={`mep-tool-btn${tool === t ? ' active' : ''}`}
               title={label}
-              disabled={t === 'place-stamp' && !stampReady}
+              disabled={(t === 'place-terminal' || t === 'place-equipment') && !stampReady}
               onClick={() => sceneRef.current?.setTool(t)}
             >
               <Icon size={17} />

@@ -31,9 +31,32 @@ describe('serializeProject / loadProject round trip', () => {
     const legacyDoc = { networkTypes: [networkType], segments: [legacySegment], fittings: [fitting], stamps: [] }; // no schemaVersion field at all
 
     const loaded = loadProject(legacyDoc);
-    expect(loaded.schemaVersion).toBe(1);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION); // v0 resumes through every later step, not just v0->v1
     expect(loaded.segments[0].material).toBeNull();
     expect(loaded.segments[0].id).toBe('s1'); // nothing else about the segment was disturbed
+  });
+
+  it('migrates a pre-category (v1) save, defaulting bare stamps to terminal and resolving known definitions', () => {
+    const bareStamp = {
+      id: 'st1',
+      transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } },
+      nativeWidth: 10,
+      nativeHeight: 10,
+      ports: [],
+    };
+    const libraryStamp = { ...bareStamp, id: 'st2', definitionId: 'fire-hose-reel' }; // stamp-library.ts: category 'equipment'
+    const legacyDoc = {
+      schemaVersion: 1,
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [bareStamp, libraryStamp],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(2);
+    expect(loaded.stamps[0].category).toBe('terminal');
+    expect(loaded.stamps[1].category).toBe('equipment');
   });
 
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {

@@ -41,6 +41,20 @@ export const IconStamp = (props: IconProps) => (
   </Svg>
 );
 
+export const IconTerminal = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="6" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const IconEquipment = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="5" y="5" width="14" height="14" rx="1.5" />
+    <path d="M9 5v14M15 5v14" />
+  </Svg>
+);
+
 export const IconSegment = (props: IconProps) => (
   <Svg {...props}>
     <line x1="4" y1="20" x2="20" y2="4" />

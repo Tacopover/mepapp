@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
-import { ProjectLoadError, type ReconciliationReport, type StampDefinition } from '@mepapp/core';
+import { ProjectLoadError, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { Toolbar } from './components/Toolbar.js';
@@ -210,10 +210,10 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   }, [pdfHandle, sceneRef]);
 
   const handleCustomStampFile = useCallback(
-    async (file: File) => {
+    async (file: File, category: StampCategory) => {
       const bitmap = await createImageBitmap(file);
       sceneRef.current?.setStampTexture(bitmap);
-      sceneRef.current?.setTool('place-stamp');
+      sceneRef.current?.setTool(category === 'equipment' ? 'place-equipment' : 'place-terminal');
       setActiveDefinitionId(null);
       setStatus(`Stamp art ready: ${file.name} — click the canvas to place it.`);
     },
@@ -312,7 +312,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
             <Toolbar
               tool={tool}
               sceneRef={sceneRef}
-              stampReady={activeDefinitionId !== null || tool === 'place-stamp'}
+              stampReady={activeDefinitionId !== null || tool === 'place-terminal' || tool === 'place-equipment'}
               canUndo={drawingSummary.canUndo}
               canRedo={drawingSummary.canRedo}
               onUndo={() => sceneRef.current?.undoDrawing()}

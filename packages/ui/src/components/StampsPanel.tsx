@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { STAMP_LIBRARY, type StampDefinition } from '@mepapp/core';
+import { STAMP_LIBRARY, type StampCategory, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { IconFile } from '../icons.js';
@@ -11,7 +11,7 @@ export interface StampsPanelProps {
   onChangeDisciplineGroup: (value: DisciplineGroup | null) => void;
   activeDefinitionId: string | null;
   onPick: (definition: StampDefinition) => void;
-  onCustomStampFile: (file: File) => void;
+  onCustomStampFile: (file: File, category: StampCategory) => void;
   /** Resolves a StampDefinition's iconRef to a fetchable URL — apps/web owns where stamp art actually lives. */
   resolveIconUrl: (iconRef: string) => string;
 }
@@ -44,7 +44,7 @@ export function StampsPanel({
   async function handlePick(definition: StampDefinition) {
     const bitmap = await loadBitmap(resolveIconUrl(definition.iconRef));
     sceneRef.current?.setStampTexture(bitmap, definition.id);
-    sceneRef.current?.setTool('place-stamp');
+    sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
     onPick(definition);
   }
 
@@ -68,8 +68,21 @@ export function StampsPanel({
         ))}
         <label className="mep-stamp-tile mep-file-btn">
           <IconFile size={20} />
-          Custom stamp…
-          <input type="file" accept="image/png,image/svg+xml" onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0])} />
+          Custom terminal…
+          <input
+            type="file"
+            accept="image/png,image/svg+xml"
+            onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'terminal')}
+          />
+        </label>
+        <label className="mep-stamp-tile mep-file-btn">
+          <IconFile size={20} />
+          Custom equipment…
+          <input
+            type="file"
+            accept="image/png,image/svg+xml"
+            onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'equipment')}
+          />
         </label>
       </div>
     </div>

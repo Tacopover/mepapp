@@ -6,9 +6,10 @@
 
 import type { Fitting, NetworkType, Segment } from './network.js';
 import type { PlacedStamp } from './stamp.js';
+import { getStampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -34,6 +35,27 @@ const migrationSteps: MigrationStep[] = [
               : segment,
           )
         : data.segments,
+    }),
+  },
+  {
+    fromVersion: 1,
+    toVersion: 2,
+    // Version 1 predates PlacedStamp.category (the Terminal/Equipment tool
+    // split) — backfill it from the stamp library when the save recorded a
+    // definitionId, else default to 'terminal' (an ad hoc uploaded PNG, whose
+    // original placement tool this version doesn't know).
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 2,
+      stamps: Array.isArray(data.stamps)
+        ? data.stamps.map((stamp) => {
+            if (!stamp || typeof stamp !== 'object' || 'category' in stamp) return stamp;
+            const record = stamp as JsonRecord;
+            const definitionId = typeof record.definitionId === 'string' ? record.definitionId : undefined;
+            const category = (definitionId && getStampDefinition(definitionId)?.category) || 'terminal';
+            return { ...record, category };
+          })
+        : data.stamps,
     }),
   },
 ];

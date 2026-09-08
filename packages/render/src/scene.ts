@@ -36,6 +36,7 @@ import {
   type ProjectDocument,
   type ReconciliationReport,
   type Segment,
+  type StampCategory,
   type SyncedGeometry,
   type Transform2D,
   type Vec2,
@@ -128,6 +129,7 @@ const MAX_ZOOM = 32;
 
 export interface StampInfo {
   id: string;
+  category: StampCategory;
   transform: Transform2D;
   nativeWidth: number;
   nativeHeight: number;
@@ -135,7 +137,7 @@ export interface StampInfo {
   definitionId?: string;
 }
 
-export type SketchTool = 'select' | 'pan' | 'place-stamp' | 'calibrate' | 'measure' | 'draw-segment';
+export type SketchTool = 'select' | 'pan' | 'place-terminal' | 'place-equipment' | 'calibrate' | 'measure' | 'draw-segment';
 
 /**
  * Resolves a stamp-library iconRef to loaded image bytes — `loadProjectFromJson`'s
@@ -424,7 +426,7 @@ export class SketchScene {
     this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
-  /** Sets the stamp art the next 'place-stamp' click will place. definitionId, when given (the stamp palette's case, vs. an ad hoc uploaded PNG), is carried onto the resulting PlacedStamp. */
+  /** Sets the stamp art the next 'place-terminal'/'place-equipment' click will place. definitionId, when given (the stamp palette's case, vs. an ad hoc uploaded PNG), is carried onto the resulting PlacedStamp. */
   setStampTexture(bitmap: ImageBitmap, definitionId?: string): void {
     const texture = textureFromImageBitmap(bitmap);
     this.pendingStampTexture = {
@@ -438,6 +440,7 @@ export class SketchScene {
   private toStampInfo(entry: StampEntry): StampInfo {
     return {
       id: entry.data.id,
+      category: entry.data.category,
       transform: entry.data.transform,
       nativeWidth: entry.data.nativeWidth,
       nativeHeight: entry.data.nativeHeight,
@@ -766,6 +769,7 @@ export class SketchScene {
       const nativeHeight = 40 + Math.random() * 40;
       const data: PlacedStamp = {
         id,
+        category: 'terminal', // arbitrary — this is placeholder art for a redraw-cost benchmark, not a real placement
         transform: {
           position: { x: Math.random() * areaWidth, y: Math.random() * areaHeight },
           rotationDegrees: Math.random() * 360,
@@ -900,9 +904,9 @@ export class SketchScene {
       return;
     }
 
-    if (this.tool === 'place-stamp') {
+    if (this.tool === 'place-terminal' || this.tool === 'place-equipment') {
       if (!this.pendingStampTexture) return;
-      this.placeStamp(world);
+      this.placeStamp(world, this.tool === 'place-terminal' ? 'terminal' : 'equipment');
       return;
     }
 
@@ -1063,16 +1067,20 @@ export class SketchScene {
     this.emitter.emit('zoomChanged', newZoom);
   };
 
-  private placeStamp(worldPosition: Vec2): void {
+  private placeStamp(worldPosition: Vec2, category: StampCategory): void {
     if (!this.pendingStampTexture) return;
     const { texture, nativeWidth, nativeHeight, definitionId } = this.pendingStampTexture;
     const id = `stamp-${this.doc.nextStampSeq++}`;
+    // Copy the definition's ports onto the placed instance (previously always []) so
+    // resolveSegmentEndpoint's existing port-snapping has something to snap to.
+    const ports = definitionId ? [...(getStampDefinition(definitionId)?.ports ?? [])] : [];
     const data: PlacedStamp = {
       id,
+      category,
       transform: { position: worldPosition, rotationDegrees: 0, scale: { x: 1, y: 1 } },
       nativeWidth,
       nativeHeight,
-      ports: [],
+      ports,
       definitionId,
     };
     const sprite = new Sprite(texture);
