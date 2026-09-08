@@ -135,7 +135,13 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
     // fixtures/pdfs) — the check below makes a wrong assumption loud instead
     // of silently producing a mis-rotated backdrop.
     const matrix: mupdf.Matrix = [zoom, 0, 0, zoom, 0, 0];
-    const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
+    // showExtras=false: this raster is only ever used as the static backdrop
+    // behind the interactive PixiJS overlay (apps/web's loadPdfPage). Every
+    // stamp/segment/fitting annotation is already drawn live on top of it
+    // from the domain model, so baking annotations into the backdrop too
+    // left a non-interactive duplicate of every one of them sitting exactly
+    // where the real, movable sprite reappeared on the next open.
+    const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, false);
     const expectedWidth =
       info.rotationDegrees === 90 || info.rotationDegrees === 270
         ? Math.round(info.heightPt * zoom)
