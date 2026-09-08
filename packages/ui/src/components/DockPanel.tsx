@@ -9,6 +9,15 @@ export interface DockTabDef {
 export interface DockPanelProps {
   tabs: DockTabDef[];
   content: Record<string, ReactNode>;
+  /**
+   * When set to a tab id, forces the dock onto that tab (reopening it first
+   * if the user had closed it), remembering whichever tab was active so it
+   * can be restored once this goes back to null/undefined. Bump
+   * `forcedTabNonce` to re-force the same tab id again, e.g. when a new
+   * element is selected while the user had manually switched to another tab.
+   */
+  forcedTabId?: string | null;
+  forcedTabNonce?: number;
 }
 
 const STATE_STORAGE_KEY = 'mepapp.dockPanel.v1';
@@ -43,7 +52,7 @@ function loadState(): PersistedState | null {
  * actual needs — see the original DockPanel.tsx this restores (deleted in
  * the dockview replacement, git history 2341a8f).
  */
-export function DockPanel({ tabs, content }: DockPanelProps) {
+export function DockPanel({ tabs, content, forcedTabId = null, forcedTabNonce = 0 }: DockPanelProps) {
   const saved = useRef(loadState()).current;
 
   const [width, setWidth] = useState(() => (saved && saved.width >= MIN_WIDTH && saved.width <= MAX_WIDTH ? saved.width : DEFAULT_WIDTH));
@@ -57,6 +66,8 @@ export function DockPanel({ tabs, content }: DockPanelProps) {
   const [reopenMenuOpen, setReopenMenuOpen] = useState(false);
   const reopenRef = useRef<HTMLDivElement | null>(null);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const preForceTabIdRef = useRef<string | null>(null);
+  const wasForcedRef = useRef(false);
 
   useEffect(() => {
     const state: PersistedState = { width, collapsed, activeTabId, closedTabIds };
@@ -71,6 +82,26 @@ export function DockPanel({ tabs, content }: DockPanelProps) {
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [reopenMenuOpen]);
+
+  useEffect(() => {
+    if (forcedTabId) {
+      if (!wasForcedRef.current) {
+        // Fresh force (was not already forced) — remember the tab to restore later.
+        preForceTabIdRef.current = activeTabId;
+        wasForcedRef.current = true;
+      }
+      setClosedTabIds((ids) => (ids.includes(forcedTabId) ? ids.filter((id) => id !== forcedTabId) : ids));
+      setActiveTabId(forcedTabId);
+    } else if (wasForcedRef.current) {
+      wasForcedRef.current = false;
+      const restore = preForceTabIdRef.current;
+      setActiveTabId((current) => (restore && tabs.some((t) => t.id === restore) ? restore : current));
+    }
+    // forcedTabNonce is a re-force signal only — bumping it re-runs this effect
+    // even when forcedTabId's value hasn't changed (e.g. re-selecting while the
+    // user had manually switched away from the forced tab).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forcedTabId, forcedTabNonce]);
 
   const onResizePointerDown = useCallback(
     (event: React.PointerEvent) => {

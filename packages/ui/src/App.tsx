@@ -359,6 +359,13 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     properties: <PropertiesPanel sceneRef={sceneRef} selection={selection} capacityInput={capacityInput} setCapacityInput={setCapacityInput} />,
   };
 
+  const [forcedTabId, setForcedTabId] = useState<string | null>(null);
+  const [forcedTabNonce, setForcedTabNonce] = useState(0);
+  useEffect(() => {
+    setForcedTabId(selection.length > 0 ? 'properties' : null);
+    setForcedTabNonce((n) => n + 1);
+  }, [selection]);
+
   return (
     <div className="mep-app">
       <div className="mep-header">
@@ -438,7 +445,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
             </>
           )}
         </div>
-        <DockPanel tabs={dockTabDefs} content={dockContent} />
+        <DockPanel tabs={dockTabDefs} content={dockContent} forcedTabId={forcedTabId} forcedTabNonce={forcedTabNonce} />
       </div>
 
       <StatusBar zoom={zoom} calibration={calibration} measurementMm={measurementMm} selectedCount={selection.length} drawingSummary={drawingSummary} />
