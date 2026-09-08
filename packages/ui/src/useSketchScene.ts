@@ -12,6 +12,8 @@ export interface CalibrationPrompt {
 export interface TextboxPrompt {
   /** Container-relative pixels — where the floating textarea should be positioned over the canvas. */
   screenPosition: Vec2;
+  /** Pre-fills the textarea — empty for a new textbox/stickyNote, the existing text when reopened to edit one already placed. */
+  initialText: string;
   resolve: (text: string | null) => void;
 }
 
@@ -21,6 +23,8 @@ export interface UseSketchScene {
   ready: boolean;
   tool: SketchTool;
   selection: StampInfo[];
+  /** Whether anything — a stamp or an annotation — is selected, for gating UI (e.g. the rail's Rotate/Delete actions) that `selection` alone can't answer since it only reports stamps. */
+  hasSelection: boolean;
   allStamps: StampInfo[];
   networkSummaries: NetworkSummary[];
   networkTypes: NetworkType[];
@@ -47,6 +51,7 @@ export function useSketchScene(): UseSketchScene {
   const [ready, setReady] = useState(false);
   const [tool, setTool] = useState<SketchTool>('select');
   const [selection, setSelection] = useState<StampInfo[]>([]);
+  const [hasSelection, setHasSelection] = useState(false);
   const [allStamps, setAllStamps] = useState<StampInfo[]>([]);
   const [networkSummaries, setNetworkSummaries] = useState<NetworkSummary[]>([]);
   const [networkTypes, setNetworkTypes] = useState<NetworkType[]>([]);
@@ -76,6 +81,7 @@ export function useSketchScene(): UseSketchScene {
 
     const onSelectionChanged = (s: StampInfo[]) => {
       setSelection(s);
+      setHasSelection(scene.hasSelection());
       setAllStamps(scene.listStamps());
     };
     const onToolChanged = (t: SketchTool) => setTool(t);
@@ -83,8 +89,8 @@ export function useSketchScene(): UseSketchScene {
     const onMeasurement = (mm: number) => setMeasurementMm(mm);
     const onCalibrationNeeded = (p1: Vec2, p2: Vec2, resolve: (mm: number | null) => void) =>
       setCalibrationPrompt({ p1, p2, resolve });
-    const onTextboxRequested = (screenPosition: Vec2, resolve: (text: string | null) => void) =>
-      setTextboxPrompt({ screenPosition, resolve });
+    const onTextboxRequested = (screenPosition: Vec2, initialText: string, resolve: (text: string | null) => void) =>
+      setTextboxPrompt({ screenPosition, initialText, resolve });
     const onDrawingChanged = (summary: DrawingSummary) => {
       setDrawingSummary(summary);
       setNetworkSummaries(scene.getNetworkSummaries());
@@ -173,6 +179,7 @@ export function useSketchScene(): UseSketchScene {
     ready,
     tool,
     selection,
+    hasSelection,
     allStamps,
     networkSummaries,
     networkTypes,

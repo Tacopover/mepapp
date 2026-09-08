@@ -9,6 +9,7 @@ import {
   type FederatedWheelEvent,
 } from 'pixi.js';
 import {
+  annotationBoundsWorld,
   calibrateFromKnownDistance,
   centroid,
   CompositeCommand,
@@ -19,14 +20,20 @@ import {
   multiRotate,
   normalizeDegrees,
   planPdfSync,
+  pointInAxisAlignedRect,
   pointInRotatedRect,
+  pointNearPolyline,
+  pointNearSegment,
   reconcilePdfSync,
   rectIntersectsRotatedRect,
   resolveSegmentEndpoint,
+  rotateAnnotationGeometry,
   rotatePointAround,
   serializeProject,
   solveFlow,
   splitSegmentAtFitting,
+  Transaction,
+  translateAnnotationGeometry,
   type Annotation,
   type AnnotationGeometry,
   type Calibration,
@@ -187,6 +194,16 @@ const ROTATE_SNAP_DEGREES = 45;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 32;
 
+// How close a click needs to be to a thin-stroke annotation (line/arrow/
+// freehand/polyline) or a circle's edge to count as a hit — a plain
+// bounding-box test would be far too generous for a 2pt-wide stroke.
+const ANNOTATION_STROKE_HIT_THRESHOLD_SCREEN_PX = 6;
+// A pointerdown-to-pointerup drag shorter than this (screen px) is a click,
+// not a drag — used to tell "reopen this textbox/stickyNote's text editor"
+// apart from "start moving it", the same distinction MIN_SHAPE_DRAG_SCREEN_PX
+// draws for draw-shape.
+const CLICK_VS_DRAG_SCREEN_PX = 3;
+
 // A draw-shape drag shorter than this (screen px, zoom-independent — see
 // onPointerUp's 'draw-shape' case) is treated as a stray click, not a
 // zero-size rectangle/circle nobody meant to create.
@@ -269,8 +286,15 @@ interface SketchSceneEvents {
   calibrationNeeded: [p1: Vec2, p2: Vec2, resolve: (knownRealDistanceMm: number | null) => void];
   calibrationSet: [Calibration];
   measurement: [distanceMm: number];
-  /** The draw-textbox tool was clicked — the UI's cue to show a floating text input at screenPosition (container-relative pixels) and call resolve with the committed text, or null to cancel. */
-  textboxRequested: [screenPosition: Vec2, resolve: (text: string | null) => void];
+  /**
+   * The draw-textbox/draw-sticky-note tool was clicked, or an existing
+   * textbox/stickyNote annotation was clicked again with the select tool to
+   * edit it — the UI's cue to show a floating text input at screenPosition
+   * (container-relative pixels), pre-filled with initialText (empty for a
+   * new annotation), and call resolve with the committed text, or null to
+   * cancel.
+   */
+  textboxRequested: [screenPosition: Vec2, initialText: string, resolve: (text: string | null) => void];
   drawingChanged: [DrawingSummary];
   flowSolved: [FlowResult[]];
   projectLoaded: [];
@@ -301,16 +325,37 @@ class TypedEmitter<Events extends Record<string, unknown[]>> {
   }
 }
 
+/** A selectable object is either a placed stamp or a drawn annotation — see hitTest. */
+type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'annotation'; id: string };
+
+/** Original per-annotation geometry captured at gesture start, so move/rotate can recompute the whole gesture's delta from a fixed origin on every pointermove rather than drifting by accumulating per-frame deltas. */
+type AnnotationSnapshot = Record<string, AnnotationGeometry>;
+
 type DragState =
   | { kind: 'none' }
   | { kind: 'pan'; startScreen: Vec2; startWorldPos: Vec2 }
-  | { kind: 'move-selection'; startPointerWorld: Vec2; snapshot: Array<{ id: string; position: Vec2 }> }
+  | {
+      kind: 'move-selection';
+      startPointerWorld: Vec2;
+      snapshot: Array<{ id: string; position: Vec2 }>;
+      annotationSnapshot: AnnotationSnapshot;
+      annotationTx: Transaction<DrawingState> | null;
+      /** Set when this gesture began on an already-sole-selected textbox/stickyNote — a click with no drag reopens its text editor instead of committing a zero-length move. */
+      reopenTextEditId: string | null;
+      /** True once onPointerMove has actually applied a delta — a plain click never sets this, since a real pointermove never fires for zero on-screen movement. Gates whether onPointerUp commits anything. */
+      moved: boolean;
+    }
   | {
       kind: 'rotate-selection';
       pivot: Vec2;
       startPointerAngleDeg: number;
       snapshot: Array<{ id: string; transform: Transform2D }>;
+      annotationSnapshot: AnnotationSnapshot;
+      annotationTx: Transaction<DrawingState> | null;
+      moved: boolean;
     }
+  | { kind: 'resize-rect'; id: string; corner: 'x0y0' | 'x1y0' | 'x1y1' | 'x0y1'; original: AnnotationGeometry; tx: Transaction<DrawingState>; moved: boolean }
+  | { kind: 'resize-circle'; id: string; center: Vec2; tx: Transaction<DrawingState>; moved: boolean }
   | { kind: 'rubber-band'; startWorld: Vec2; currentWorld: Vec2; additive: boolean }
   | { kind: 'draw-freehand'; points: Vec2[] }
   | { kind: 'draw-shape'; shapeKind: 'rectangle' | 'circle'; startWorld: Vec2; currentWorld: Vec2 }
@@ -411,9 +456,11 @@ export class SketchScene {
     this.app.stage.on('pointerupoutside', this.onPointerUp);
     this.app.stage.on('wheel', this.onWheel);
     this.app.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    window.addEventListener('keydown', this.onKeyDown);
   }
 
   destroy(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
     this.resizeObserver?.disconnect();
     for (const document of this.documents) document.destroy();
     this.app.destroy(true, { children: true, texture: true });
@@ -601,6 +648,11 @@ export class SketchScene {
       .map((id) => this.doc.stamps.get(id))
       .filter((e): e is StampEntry => e !== undefined)
       .map((e) => this.toStampInfo(e));
+  }
+
+  /** Whether anything (a stamp or an annotation) is currently selected — unlike getSelection(), which only reports stamps (the Properties panel's read model), this covers the full selection for gating UI like the rail's Rotate/Delete actions. */
+  hasSelection(): boolean {
+    return this.doc.selectedIds.size > 0;
   }
 
   /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. */
@@ -1085,44 +1137,110 @@ export class SketchScene {
     };
   }
 
-  private hitTestStamp(worldPoint: Vec2): string | null {
-    const ordered = [...this.doc.stamps.values()].reverse(); // topmost first
-    for (const entry of ordered) {
+  /** A stamp's true rotated corners, in world space — shared by hit-testing, bounds, and overlay drawing. */
+  private stampCornersWorld(entry: StampEntry): Vec2[] {
+    const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
+    const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
+    return [
+      { x: -halfWidth, y: -halfHeight },
+      { x: halfWidth, y: -halfHeight },
+      { x: halfWidth, y: halfHeight },
+      { x: -halfWidth, y: halfHeight },
+    ].map((local) => {
+      const r = rotatePointAround(local, { x: 0, y: 0 }, entry.data.transform.rotationDegrees);
+      return { x: r.x + entry.data.transform.position.x, y: r.y + entry.data.transform.position.y };
+    });
+  }
+
+  /**
+   * Finds whichever selectable object (a placed stamp or a drawn annotation)
+   * sits under worldPoint, topmost first within each layer — stamps checked
+   * before annotations, matching their draw order (annotations render above
+   * stamps in drawingLayer). A stamp's true rotated extents use
+   * pointInRotatedRect (unchanged); each annotation kind gets its own test
+   * since, unlike a stamp, most of them aren't a filled rectangle: a thin
+   * stroke (line/arrow/freehand/polyline) needs a near-the-stroke test, not
+   * a bounding-box one.
+   */
+  private hitTest(worldPoint: Vec2): SelectableRef | null {
+    const orderedStamps = [...this.doc.stamps.values()].reverse();
+    for (const entry of orderedStamps) {
       const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
       const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
       if (pointInRotatedRect(worldPoint, entry.data.transform, halfWidth, halfHeight)) {
-        return entry.data.id;
+        return { kind: 'stamp', id: entry.data.id };
+      }
+    }
+
+    const threshold = ANNOTATION_STROKE_HIT_THRESHOLD_SCREEN_PX / this.world.scale.x;
+    const state = this.doc.drawingHistory.getState();
+    const orderedAnnotations = Object.values(state.annotations).reverse();
+    for (const annotation of orderedAnnotations) {
+      if (this.annotationHit(worldPoint, annotation.geometry, threshold)) {
+        return { kind: 'annotation', id: annotation.id };
       }
     }
     return null;
   }
 
+  private annotationHit(worldPoint: Vec2, g: AnnotationGeometry, strokeThreshold: number): boolean {
+    switch (g.kind) {
+      case 'freehand':
+      case 'polyline':
+        return pointNearPolyline(worldPoint, g.points, strokeThreshold);
+      case 'line':
+      case 'arrow':
+        return pointNearSegment(worldPoint, g.from, g.to, strokeThreshold);
+      case 'rectangle':
+      case 'highlight':
+      case 'textbox':
+        return pointInAxisAlignedRect(worldPoint, g.rect);
+      case 'circle': {
+        const distanceToCenter = Math.hypot(worldPoint.x - g.center.x, worldPoint.y - g.center.y);
+        return distanceToCenter <= g.radius + strokeThreshold;
+      }
+      case 'stickyNote':
+        return pointInAxisAlignedRect(worldPoint, {
+          x0: g.position.x,
+          y0: g.position.y,
+          x1: g.position.x + STICKY_NOTE_ICON_SIZE_PT,
+          y1: g.position.y + STICKY_NOTE_ICON_SIZE_PT,
+        });
+    }
+  }
+
+  private resolveSelectableBoundsWorld(ref: SelectableRef, state: DrawingState): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    if (ref.kind === 'stamp') {
+      const entry = this.doc.stamps.get(ref.id);
+      if (!entry) return null;
+      const corners = this.stampCornersWorld(entry);
+      return {
+        minX: Math.min(...corners.map((c) => c.x)),
+        minY: Math.min(...corners.map((c) => c.y)),
+        maxX: Math.max(...corners.map((c) => c.x)),
+        maxY: Math.max(...corners.map((c) => c.y)),
+      };
+    }
+    const annotation = state.annotations[ref.id];
+    if (!annotation) return null;
+    return annotationBoundsWorld(annotation.geometry, STICKY_NOTE_ICON_SIZE_PT);
+  }
+
   private getSelectionBoundsWorld(): { minX: number; minY: number; maxX: number; maxY: number } | null {
     if (this.doc.selectedIds.size === 0) return null;
+    const state = this.doc.drawingHistory.getState();
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
     for (const id of this.doc.selectedIds) {
-      const entry = this.doc.stamps.get(id);
-      if (!entry) continue;
-      const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
-      const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
-      const corners = [
-        { x: -halfWidth, y: -halfHeight },
-        { x: halfWidth, y: -halfHeight },
-        { x: halfWidth, y: halfHeight },
-        { x: -halfWidth, y: halfHeight },
-      ].map((local) => {
-        const r = rotatePointAround(local, { x: 0, y: 0 }, entry.data.transform.rotationDegrees);
-        return { x: r.x + entry.data.transform.position.x, y: r.y + entry.data.transform.position.y };
-      });
-      for (const c of corners) {
-        minX = Math.min(minX, c.x);
-        minY = Math.min(minY, c.y);
-        maxX = Math.max(maxX, c.x);
-        maxY = Math.max(maxY, c.y);
-      }
+      const ref: SelectableRef = this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id };
+      const bounds = this.resolveSelectableBoundsWorld(ref, state);
+      if (!bounds) continue;
+      minX = Math.min(minX, bounds.minX);
+      minY = Math.min(minY, bounds.minY);
+      maxX = Math.max(maxX, bounds.maxX);
+      maxY = Math.max(maxY, bounds.maxY);
     }
     return minX === Infinity ? null : { minX, minY, maxX, maxY };
   }
@@ -1132,6 +1250,33 @@ export class SketchScene {
     if (!bounds) return null;
     const gap = HANDLE_OFFSET_WORLD_AT_ZOOM_1 / this.world.scale.x;
     return { x: (bounds.minX + bounds.maxX) / 2, y: bounds.minY - gap };
+  }
+
+  /**
+   * Resize handles for a single selected rectangle/highlight annotation (one
+   * per corner) or circle annotation (one on its radius) — resizing is
+   * single-selection only, same scoping as setSelectedRotationDegrees/
+   * setSelectedPosition above. Returns an empty array for any other
+   * selection shape (none, multiple, or a non-resizable kind).
+   */
+  private getResizeHandlesWorld(): Array<{ id: string; corner: 'x0y0' | 'x1y0' | 'x1y1' | 'x0y1'; position: Vec2 } | { id: string; role: 'radius'; position: Vec2 }> {
+    if (this.doc.selectedIds.size !== 1) return [];
+    const [id] = this.doc.selectedIds;
+    const annotation = this.doc.drawingHistory.getState().annotations[id];
+    if (!annotation) return [];
+    const g = annotation.geometry;
+    if (g.kind === 'rectangle' || g.kind === 'highlight') {
+      return [
+        { id, corner: 'x0y0', position: { x: g.rect.x0, y: g.rect.y0 } },
+        { id, corner: 'x1y0', position: { x: g.rect.x1, y: g.rect.y0 } },
+        { id, corner: 'x1y1', position: { x: g.rect.x1, y: g.rect.y1 } },
+        { id, corner: 'x0y1', position: { x: g.rect.x0, y: g.rect.y1 } },
+      ];
+    }
+    if (g.kind === 'circle') {
+      return [{ id, role: 'radius', position: { x: g.center.x + g.radius, y: g.center.y } }];
+    }
+    return [];
   }
 
   private readonly onPointerDown = (event: FederatedPointerEvent): void => {
@@ -1187,7 +1332,7 @@ export class SketchScene {
     }
 
     if (this.tool === 'draw-textbox') {
-      this.emitter.emit('textboxRequested', screen, (text) => {
+      this.emitter.emit('textboxRequested', screen, '', (text) => {
         const trimmed = text?.trim();
         if (trimmed) {
           const annotation: Annotation = {
@@ -1208,7 +1353,7 @@ export class SketchScene {
     if (this.tool === 'draw-sticky-note') {
       // Same floating-textarea event draw-textbox uses — a point instead of a
       // rect is the only difference, so no new UI event/App.tsx wiring is needed.
-      this.emitter.emit('textboxRequested', screen, (text) => {
+      this.emitter.emit('textboxRequested', screen, '', (text) => {
         const trimmed = text?.trim();
         if (trimmed) {
           const annotation: Annotation = {
@@ -1297,41 +1442,84 @@ export class SketchScene {
     }
 
     // tool === 'select'
-    const handle = this.getRotationHandleWorld();
-    if (handle) {
-      const handleRadiusWorld = HANDLE_HIT_RADIUS_SCREEN_PX / this.world.scale.x;
-      if (Math.hypot(world.x - handle.x, world.y - handle.y) <= handleRadiusWorld) {
-        const centroidPoint = centroid(this.getSelection().map((s) => s.transform.position));
-        this.drag = {
-          kind: 'rotate-selection',
-          pivot: centroidPoint,
-          startPointerAngleDeg: angleDegrees(centroidPoint, world),
-          snapshot: this.getSelection().map((s) => ({ id: s.id, transform: s.transform })),
-        };
+    const handleRadiusWorld = HANDLE_HIT_RADIUS_SCREEN_PX / this.world.scale.x;
+
+    for (const resizeHandle of this.getResizeHandlesWorld()) {
+      if (Math.hypot(world.x - resizeHandle.position.x, world.y - resizeHandle.position.y) > handleRadiusWorld) continue;
+      const annotation = this.doc.drawingHistory.getState().annotations[resizeHandle.id];
+      if (!annotation) break;
+      const tx = new Transaction(this.doc.drawingHistory, `Resize annotation ${resizeHandle.id}`);
+      if ('corner' in resizeHandle) {
+        this.drag = { kind: 'resize-rect', id: resizeHandle.id, corner: resizeHandle.corner, original: annotation.geometry, tx, moved: false };
+        return;
+      }
+      if (annotation.geometry.kind === 'circle') {
+        this.drag = { kind: 'resize-circle', id: resizeHandle.id, center: annotation.geometry.center, tx, moved: false };
         return;
       }
     }
 
-    const hitId = this.hitTestStamp(world);
-    if (hitId) {
+    const handle = this.getRotationHandleWorld();
+    if (handle && Math.hypot(world.x - handle.x, world.y - handle.y) <= handleRadiusWorld) {
+      const state = this.doc.drawingHistory.getState();
+      const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => (this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id }));
+      const pivotPoints = selectedRefs
+        .map((ref) => this.resolveSelectableBoundsWorld(ref, state))
+        .filter((b): b is NonNullable<typeof b> => b !== null)
+        .map((b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }));
+      if (pivotPoints.length === 0) return;
+      const centroidPoint = centroid(pivotPoints);
+      const annotationSnapshot: AnnotationSnapshot = {};
+      for (const id of this.doc.selectedIds) {
+        const annotation = state.annotations[id];
+        if (annotation) annotationSnapshot[id] = annotation.geometry;
+      }
+      this.drag = {
+        kind: 'rotate-selection',
+        pivot: centroidPoint,
+        startPointerAngleDeg: angleDegrees(centroidPoint, world),
+        snapshot: this.getSelection().map((s) => ({ id: s.id, transform: s.transform })),
+        annotationSnapshot,
+        annotationTx: Object.keys(annotationSnapshot).length > 0 ? new Transaction(this.doc.drawingHistory, 'Rotate annotation(s)') : null,
+        moved: false,
+      };
+      return;
+    }
+
+    const hit = this.hitTest(world);
+    if (hit) {
+      // A click (not drag) on an already-sole-selected textbox/stickyNote reopens its text editor — checked before selectedIds is mutated below, see onPointerUp's move-selection case.
+      const alreadySoleSelected = this.doc.selectedIds.size === 1 && this.doc.selectedIds.has(hit.id);
       if (event.shiftKey) {
-        if (this.doc.selectedIds.has(hitId)) {
-          this.doc.selectedIds.delete(hitId);
+        if (this.doc.selectedIds.has(hit.id)) {
+          this.doc.selectedIds.delete(hit.id);
         } else {
-          this.doc.selectedIds.add(hitId);
+          this.doc.selectedIds.add(hit.id);
         }
         this.emitter.emit('selectionChanged', this.getSelection());
         this.redrawOverlay();
         return;
       }
-      if (!this.doc.selectedIds.has(hitId)) {
-        this.doc.selectedIds = new Set([hitId]);
+      if (!this.doc.selectedIds.has(hit.id)) {
+        this.doc.selectedIds = new Set([hit.id]);
         this.emitter.emit('selectionChanged', this.getSelection());
       }
+      const state = this.doc.drawingHistory.getState();
+      const annotationSnapshot: AnnotationSnapshot = {};
+      for (const id of this.doc.selectedIds) {
+        const annotation = state.annotations[id];
+        if (annotation) annotationSnapshot[id] = annotation.geometry;
+      }
+      const hitAnnotationKind = hit.kind === 'annotation' ? state.annotations[hit.id]?.geometry.kind : null;
+      const isTextEditable = hitAnnotationKind === 'textbox' || hitAnnotationKind === 'stickyNote';
       this.drag = {
         kind: 'move-selection',
         startPointerWorld: world,
         snapshot: this.getSelection().map((s) => ({ id: s.id, position: s.transform.position })),
+        annotationSnapshot,
+        annotationTx: Object.keys(annotationSnapshot).length > 0 ? new Transaction(this.doc.drawingHistory, 'Move annotation(s)') : null,
+        reopenTextEditId: alreadySoleSelected && isTextEditable ? hit.id : null,
+        moved: false,
       };
       this.redrawOverlay();
       return;
@@ -1357,12 +1545,25 @@ export class SketchScene {
     const world = this.screenToWorld(screen);
 
     if (this.drag.kind === 'move-selection') {
+      this.drag.moved = true;
       const dx = world.x - this.drag.startPointerWorld.x;
       const dy = world.y - this.drag.startPointerWorld.y;
       for (const { id, position } of this.drag.snapshot) {
         const entry = this.doc.stamps.get(id);
         if (!entry) continue;
         this.setStampTransform(id, { ...entry.data.transform, position: { x: position.x + dx, y: position.y + dy } });
+      }
+      if (this.drag.annotationTx) {
+        const originals = this.drag.annotationSnapshot;
+        this.drag.annotationTx.update((state) => {
+          const annotations = { ...state.annotations };
+          for (const [id, original] of Object.entries(originals)) {
+            if (!annotations[id]) continue;
+            annotations[id] = { ...annotations[id], geometry: translateAnnotationGeometry(original, dx, dy) };
+          }
+          return { ...state, annotations };
+        });
+        this.syncDrawingLayer();
       }
       this.redrawOverlay();
       this.markDirty();
@@ -1371,6 +1572,7 @@ export class SketchScene {
     }
 
     if (this.drag.kind === 'rotate-selection') {
+      this.drag.moved = true;
       const currentAngle = angleDegrees(this.drag.pivot, world);
       const rawDelta = currentAngle - this.drag.startPointerAngleDeg;
       const delta = event.shiftKey ? rawDelta : snapToNearest(rawDelta, ROTATE_SNAP_DEGREES);
@@ -1379,9 +1581,61 @@ export class SketchScene {
         delta,
       );
       this.drag.snapshot.forEach((s, i) => this.setStampTransform(s.id, rotated[i]));
+      if (this.drag.annotationTx) {
+        const originals = this.drag.annotationSnapshot;
+        const pivot = this.drag.pivot;
+        this.drag.annotationTx.update((state) => {
+          const annotations = { ...state.annotations };
+          for (const [id, original] of Object.entries(originals)) {
+            if (!annotations[id]) continue;
+            annotations[id] = { ...annotations[id], geometry: rotateAnnotationGeometry(original, pivot, delta) };
+          }
+          return { ...state, annotations };
+        });
+        this.syncDrawingLayer();
+      }
       this.redrawOverlay();
       this.markDirty();
       this.emitter.emit('selectionChanged', this.getSelection());
+      return;
+    }
+
+    if (this.drag.kind === 'resize-rect') {
+      this.drag.moved = true;
+      const { id, corner, original, tx } = this.drag;
+      if (original.kind !== 'rectangle' && original.kind !== 'highlight') return; // always true by construction — see onPointerDown's resize-handle branch
+      const fixed =
+        corner === 'x0y0'
+          ? { x: original.rect.x1, y: original.rect.y1 }
+          : corner === 'x1y0'
+            ? { x: original.rect.x0, y: original.rect.y1 }
+            : corner === 'x1y1'
+              ? { x: original.rect.x0, y: original.rect.y0 }
+              : { x: original.rect.x1, y: original.rect.y0 };
+      const rect = { x0: Math.min(fixed.x, world.x), y0: Math.min(fixed.y, world.y), x1: Math.max(fixed.x, world.x), y1: Math.max(fixed.y, world.y) };
+      tx.update((state) => {
+        const annotation = state.annotations[id];
+        if (!annotation || (annotation.geometry.kind !== 'rectangle' && annotation.geometry.kind !== 'highlight')) return state;
+        return { ...state, annotations: { ...state.annotations, [id]: { ...annotation, geometry: { ...annotation.geometry, rect } } } };
+      });
+      this.syncDrawingLayer();
+      this.redrawOverlay();
+      this.markDirty();
+      return;
+    }
+
+    if (this.drag.kind === 'resize-circle') {
+      this.drag.moved = true;
+      const { id, center, tx } = this.drag;
+      const radius = Math.max(0, Math.hypot(world.x - center.x, world.y - center.y));
+      tx.update((state) => {
+        const annotation = state.annotations[id];
+        if (!annotation || annotation.geometry.kind !== 'circle') return state;
+        return { ...state, annotations: { ...state.annotations, [id]: { ...annotation, geometry: { ...annotation.geometry, radius } } } };
+      });
+      this.syncDrawingLayer();
+      this.redrawOverlay();
+      this.markDirty();
       return;
     }
 
@@ -1419,8 +1673,32 @@ export class SketchScene {
           hits.add(entry.data.id);
         }
       }
+      const state = this.doc.drawingHistory.getState();
+      for (const annotation of Object.values(state.annotations)) {
+        const bounds = annotationBoundsWorld(annotation.geometry, STICKY_NOTE_ICON_SIZE_PT);
+        // Plain AABB overlap — annotations carry no rotation, so this needs none of rectIntersectsRotatedRect's separating-axis machinery.
+        if (bounds.minX <= rectMax.x && bounds.maxX >= rectMin.x && bounds.minY <= rectMax.y && bounds.maxY >= rectMin.y) {
+          hits.add(annotation.id);
+        }
+      }
       this.doc.selectedIds = additive ? new Set([...this.doc.selectedIds, ...hits]) : hits;
       this.emitter.emit('selectionChanged', this.getSelection());
+    }
+
+    if (this.drag.kind === 'move-selection') {
+      if (this.drag.moved) {
+        this.drag.annotationTx?.commit();
+      } else if (this.drag.reopenTextEditId) {
+        this.openTextEditor(this.drag.reopenTextEditId);
+      }
+    }
+
+    if (this.drag.kind === 'rotate-selection' && this.drag.moved) {
+      this.drag.annotationTx?.commit();
+    }
+
+    if ((this.drag.kind === 'resize-rect' || this.drag.kind === 'resize-circle') && this.drag.moved) {
+      this.drag.tx.commit();
     }
 
     if (this.drag.kind === 'draw-freehand' && this.drag.points.length >= 2) {
@@ -1488,6 +1766,82 @@ export class SketchScene {
     this.redrawOverlay();
     this.emitter.emit('zoomChanged', newZoom);
   };
+
+  /** Delete/Backspace deletes the current selection — the rail's Delete flyout action's keyboard-shortcut counterpart (atlas §4). Ignored while focus is in a text input/textarea so it doesn't fight typing in, e.g., the Properties panel or the textbox-annotation floating textarea. */
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+    if (this.doc.selectedIds.size === 0) return;
+    event.preventDefault();
+    this.deleteSelection();
+  };
+
+  /** Deletes every currently selected stamp and annotation. Annotation deletion goes through doc.drawingHistory (undoable, matching how annotation creation already works); stamp deletion is a direct mutation with no undo step, matching the existing precedent that moving/rotating a stamp isn't undoable either. No PDF-sync call is needed here — the next exportToPdf's planPdfSync diff already detects a domain annotation that disappeared and calls handle.deleteAnnotation for it. */
+  deleteSelection(): void {
+    const ids = [...this.doc.selectedIds];
+    if (ids.length === 0) return;
+    const state = this.doc.drawingHistory.getState();
+    const annotationIds = ids.filter((id) => state.annotations[id]);
+    if (annotationIds.length > 0) {
+      const tx = new Transaction(this.doc.drawingHistory, `Delete ${annotationIds.length} annotation(s)`);
+      tx.update((s) => {
+        const annotations = { ...s.annotations };
+        for (const id of annotationIds) delete annotations[id];
+        return { ...s, annotations };
+      });
+      tx.commit();
+    }
+    for (const id of ids) {
+      const entry = this.doc.stamps.get(id);
+      if (!entry) continue;
+      this.doc.stampsLayer.removeChild(entry.sprite);
+      entry.sprite.destroy({ texture: false }); // the texture may be shared with other placed instances of the same stamp — never destroy it here, only the sprite
+      this.doc.stamps.delete(id);
+    }
+    this.doc.selectedIds.clear();
+    this.syncDrawingLayer();
+    this.markDirty();
+    this.redrawOverlay();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  private worldToScreen(world: Vec2): Vec2 {
+    return { x: world.x * this.world.scale.x + this.world.x, y: world.y * this.world.scale.y + this.world.y };
+  }
+
+  /**
+   * Reopens the floating textarea for an already-placed textbox/stickyNote
+   * annotation — clicking an already-sole-selected one with the select tool
+   * (see onPointerDown's move-selection case) triggers this instead of a
+   * zero-length move. Reuses the same textboxRequested event the create-flow
+   * uses, prefilled with the current text. Committing an edit replaces only
+   * the geometry's text field via one Transaction, keeping the annotation's
+   * id and its position/rect untouched.
+   */
+  private openTextEditor(id: string): void {
+    const annotation = this.doc.drawingHistory.getState().annotations[id];
+    if (!annotation) return;
+    const g = annotation.geometry;
+    if (g.kind !== 'textbox' && g.kind !== 'stickyNote') return;
+    const anchorWorld = g.kind === 'textbox' ? { x: g.rect.x0, y: g.rect.y0 } : g.position;
+    const screen = this.worldToScreen(anchorWorld);
+    this.emitter.emit('textboxRequested', screen, g.text, (text) => {
+      const trimmed = text?.trim();
+      if (trimmed) {
+        const tx = new Transaction(this.doc.drawingHistory, `Edit annotation ${id}`);
+        tx.update((state) => {
+          const current = state.annotations[id];
+          if (!current || (current.geometry.kind !== 'textbox' && current.geometry.kind !== 'stickyNote')) return state;
+          return { ...state, annotations: { ...state.annotations, [id]: { ...current, geometry: { ...current.geometry, text: trimmed } } } };
+        });
+        tx.commit();
+        this.syncDrawingLayer();
+        this.markDirty();
+      }
+      this.redrawOverlay();
+    });
+  }
 
   private placeStamp(worldPosition: Vec2, category: StampCategory): void {
     if (!this.pendingStampTexture) return;
@@ -1695,30 +2049,34 @@ export class SketchScene {
   private redrawOverlay(): void {
     this.overlay.clear();
 
+    const state = this.doc.drawingHistory.getState();
     for (const id of this.doc.selectedIds) {
       const entry = this.doc.stamps.get(id);
-      if (!entry) continue;
-      const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
-      const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
-      const corners = [
-        { x: -halfWidth, y: -halfHeight },
-        { x: halfWidth, y: -halfHeight },
-        { x: halfWidth, y: halfHeight },
-        { x: -halfWidth, y: halfHeight },
-      ].map((local) => {
-        const r = rotatePointAround(local, { x: 0, y: 0 }, entry.data.transform.rotationDegrees);
-        return { x: r.x + entry.data.transform.position.x, y: r.y + entry.data.transform.position.y };
-      });
-      this.overlay.moveTo(corners[0].x, corners[0].y);
-      for (const c of corners.slice(1)) this.overlay.lineTo(c.x, c.y);
-      this.overlay.closePath();
-      this.overlay.stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
+      if (entry) {
+        const corners = this.stampCornersWorld(entry);
+        this.overlay.moveTo(corners[0].x, corners[0].y);
+        for (const c of corners.slice(1)) this.overlay.lineTo(c.x, c.y);
+        this.overlay.closePath();
+        this.overlay.stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
+        continue;
+      }
+      // An annotation has no rotation of its own, so its selection box is always axis-aligned — a plain rect, not a rotated quad.
+      const bounds = this.resolveSelectableBoundsWorld({ kind: 'annotation', id }, state);
+      if (!bounds) continue;
+      this.overlay
+        .rect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
+        .stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
     }
 
     const handle = this.getRotationHandleWorld();
     if (handle) {
       this.overlay.circle(handle.x, handle.y, HANDLE_HIT_RADIUS_SCREEN_PX / this.world.scale.x);
       this.overlay.fill({ color: 0x00e5ff, alpha: 0.85 });
+    }
+
+    for (const resizeHandle of this.getResizeHandlesWorld()) {
+      this.overlay.circle(resizeHandle.position.x, resizeHandle.position.y, HANDLE_HIT_RADIUS_SCREEN_PX / this.world.scale.x);
+      this.overlay.fill({ color: 0xffee58, alpha: 0.9 });
     }
 
     if (this.drag.kind === 'rubber-band') {

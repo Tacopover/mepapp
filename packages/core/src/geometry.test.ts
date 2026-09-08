@@ -6,6 +6,9 @@ import {
   distance,
   multiRotate,
   normalizeDegrees,
+  pointInAxisAlignedRect,
+  pointNearPolyline,
+  pointNearSegment,
   rectIntersectsRotatedRect,
   rotateBy,
   rotatePointAround,
@@ -162,5 +165,48 @@ describe('closestPointOnSegment', () => {
 describe('distance', () => {
   it('measures a 3-4-5 triangle', () => {
     expect(distance({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
+  });
+});
+
+describe('pointNearSegment', () => {
+  it('hits a point close to the middle of the segment', () => {
+    expect(pointNearSegment({ x: 5, y: 2 }, { x: 0, y: 0 }, { x: 10, y: 0 }, 3)).toBe(true);
+  });
+
+  it('misses a point further than the threshold from the segment', () => {
+    expect(pointNearSegment({ x: 5, y: 5 }, { x: 0, y: 0 }, { x: 10, y: 0 }, 3)).toBe(false);
+  });
+});
+
+describe('pointNearPolyline', () => {
+  it('hits a point near any interior segment, not just the first', () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+    ];
+    expect(pointNearPolyline({ x: 10, y: 5 }, points, 1)).toBe(true);
+  });
+
+  it('misses a point far from every segment', () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    expect(pointNearPolyline({ x: 5, y: 20 }, points, 1)).toBe(false);
+  });
+});
+
+describe('pointInAxisAlignedRect', () => {
+  it('accepts a point inside the rect', () => {
+    expect(pointInAxisAlignedRect({ x: 5, y: 5 }, { x0: 0, y0: 0, x1: 10, y1: 10 })).toBe(true);
+  });
+
+  it('rejects a point outside the rect', () => {
+    expect(pointInAxisAlignedRect({ x: 15, y: 5 }, { x0: 0, y0: 0, x1: 10, y1: 10 })).toBe(false);
+  });
+
+  it('normalizes reversed corners', () => {
+    expect(pointInAxisAlignedRect({ x: 5, y: 5 }, { x0: 10, y0: 10, x1: 0, y1: 0 })).toBe(true);
   });
 });

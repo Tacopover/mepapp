@@ -8,7 +8,7 @@
 // render/scene.ts) — `stamp` isn't a user-facing draw tool, so it has no
 // domain counterpart here.
 
-import type { Vec2 } from './geometry.js';
+import { rotatePointAround, type Vec2 } from './geometry.js';
 
 export type AnnotationKind = 'freehand' | 'line' | 'arrow' | 'rectangle' | 'circle' | 'textbox' | 'stickyNote' | 'highlight' | 'polyline';
 
@@ -35,4 +35,94 @@ export interface Annotation {
   pageIndex: number;
   /** geometry.kind is the annotation's kind — no redundant top-level field to keep in sync. */
   geometry: AnnotationGeometry;
+}
+
+/** Shifts an annotation's geometry by (dx, dy) — every point/rect corner/center/position field moves uniformly, kind by kind. Used by the render layer's drag-to-move gesture. */
+export function translateAnnotationGeometry(g: AnnotationGeometry, dx: number, dy: number): AnnotationGeometry {
+  switch (g.kind) {
+    case 'freehand':
+    case 'polyline':
+      return { ...g, points: g.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) };
+    case 'line':
+    case 'arrow':
+      return { ...g, from: { x: g.from.x + dx, y: g.from.y + dy }, to: { x: g.to.x + dx, y: g.to.y + dy } };
+    case 'rectangle':
+    case 'highlight':
+    case 'textbox':
+      return { ...g, rect: { x0: g.rect.x0 + dx, y0: g.rect.y0 + dy, x1: g.rect.x1 + dx, y1: g.rect.y1 + dy } };
+    case 'circle':
+      return { ...g, center: { x: g.center.x + dx, y: g.center.y + dy } };
+    case 'stickyNote':
+      return { ...g, position: { x: g.position.x + dx, y: g.position.y + dy } };
+  }
+}
+
+/**
+ * Rotates an annotation's geometry by deltaDegrees around `pivot` — the same
+ * group-rotate gesture multiRotate gives stamps, extended to annotations,
+ * which have no rotation field of their own (see the doc comment on
+ * AnnotationGeometry). Point-based kinds (freehand/polyline/line/arrow)
+ * rotate every point; circle rotates its center only (a circle has no
+ * orientation to advance). rectangle/highlight/textbox have no rotation
+ * field in either this type or the PDF annotation kinds MepApp writes for
+ * them — resolved as "reposition only": their center orbits the pivot but
+ * the rect itself stays axis-aligned, same width/height. stickyNote's fixed
+ * icon square is treated the same way, rotating only its anchor position.
+ */
+export function rotateAnnotationGeometry(g: AnnotationGeometry, pivot: Vec2, deltaDegrees: number): AnnotationGeometry {
+  switch (g.kind) {
+    case 'freehand':
+    case 'polyline':
+      return { ...g, points: g.points.map((p) => rotatePointAround(p, pivot, deltaDegrees)) };
+    case 'line':
+    case 'arrow':
+      return { ...g, from: rotatePointAround(g.from, pivot, deltaDegrees), to: rotatePointAround(g.to, pivot, deltaDegrees) };
+    case 'circle':
+      return { ...g, center: rotatePointAround(g.center, pivot, deltaDegrees) };
+    case 'rectangle':
+    case 'highlight':
+    case 'textbox': {
+      const width = g.rect.x1 - g.rect.x0;
+      const height = g.rect.y1 - g.rect.y0;
+      const center = rotatePointAround({ x: (g.rect.x0 + g.rect.x1) / 2, y: (g.rect.y0 + g.rect.y1) / 2 }, pivot, deltaDegrees);
+      return { ...g, rect: { x0: center.x - width / 2, y0: center.y - height / 2, x1: center.x + width / 2, y1: center.y + height / 2 } };
+    }
+    case 'stickyNote':
+      return { ...g, position: rotatePointAround(g.position, pivot, deltaDegrees) };
+  }
+}
+
+/** Axis-aligned world-space bounds of one annotation's geometry — used for selection-box overlay, rubber-band hit-testing, and as the fallback anchor for the group rotation handle. Annotations have no rotation of their own, so this is always axis-aligned, unlike a stamp's rotated bounding box. */
+export function annotationBoundsWorld(g: AnnotationGeometry, stickyNoteIconSize: number): { minX: number; minY: number; maxX: number; maxY: number } {
+  switch (g.kind) {
+    case 'freehand':
+    case 'polyline':
+      return {
+        minX: Math.min(...g.points.map((p) => p.x)),
+        minY: Math.min(...g.points.map((p) => p.y)),
+        maxX: Math.max(...g.points.map((p) => p.x)),
+        maxY: Math.max(...g.points.map((p) => p.y)),
+      };
+    case 'line':
+    case 'arrow':
+      return {
+        minX: Math.min(g.from.x, g.to.x),
+        minY: Math.min(g.from.y, g.to.y),
+        maxX: Math.max(g.from.x, g.to.x),
+        maxY: Math.max(g.from.y, g.to.y),
+      };
+    case 'rectangle':
+    case 'highlight':
+    case 'textbox':
+      return {
+        minX: Math.min(g.rect.x0, g.rect.x1),
+        minY: Math.min(g.rect.y0, g.rect.y1),
+        maxX: Math.max(g.rect.x0, g.rect.x1),
+        maxY: Math.max(g.rect.y0, g.rect.y1),
+      };
+    case 'circle':
+      return { minX: g.center.x - g.radius, minY: g.center.y - g.radius, maxX: g.center.x + g.radius, maxY: g.center.y + g.radius };
+    case 'stickyNote':
+      return { minX: g.position.x, minY: g.position.y, maxX: g.position.x + stickyNoteIconSize, maxY: g.position.y + stickyNoteIconSize };
+  }
 }

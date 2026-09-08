@@ -7,6 +7,7 @@ export interface RailProps {
   tool: SketchTool;
   sceneRef: RefObject<SketchScene | null>;
   stampReady: boolean;
+  hasSelection: boolean;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -24,7 +25,7 @@ function needsStamp(t: SketchTool | null): boolean {
  * listing the rest. Members with `tool: null` (toolRegistry.ts) are reserved
  * slots for tools nobody has built yet — they render disabled.
  */
-export function Rail({ tool, sceneRef, stampReady, canUndo, canRedo, onUndo, onRedo }: RailProps) {
+export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRedo, onUndo, onRedo }: RailProps) {
   const [lastPickedByRow, setLastPickedByRow] = useState<Record<string, string>>({});
   const [openRow, setOpenRow] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -76,12 +77,17 @@ export function Rail({ tool, sceneRef, stampReady, canUndo, canRedo, onUndo, onR
                     key={m.id}
                     type="button"
                     className="mep-rail-flyout-btn"
-                    title={m.tool === null ? `${m.label} — coming soon` : m.label}
-                    disabled={m.tool === null || (needsStamp(m.tool) && !stampReady)}
+                    title={m.tool === null && !m.action ? `${m.label} — coming soon` : m.label}
+                    disabled={(m.tool === null && !m.action) || (needsStamp(m.tool) && !stampReady) || (m.action !== undefined && !hasSelection)}
                     onClick={() => {
-                      if (!m.tool) return;
-                      sceneRef.current?.setTool(m.tool);
-                      setLastPickedByRow((prev) => ({ ...prev, [row.id]: m.id }));
+                      if (m.tool) {
+                        sceneRef.current?.setTool(m.tool);
+                        setLastPickedByRow((prev) => ({ ...prev, [row.id]: m.id }));
+                        setOpenRow(null);
+                        return;
+                      }
+                      if (m.action === 'rotate-90') sceneRef.current?.rotateSelectionBy(90);
+                      if (m.action === 'delete-selection') sceneRef.current?.deleteSelection();
                       setOpenRow(null);
                     }}
                   >

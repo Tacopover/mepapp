@@ -77,6 +77,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     ready,
     tool,
     selection,
+    hasSelection,
     allStamps,
     networkSummaries,
     networkTypes,
@@ -112,6 +113,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   // seen. Waiting a macrotask lets that default action finish first.
   useEffect(() => {
     if (!textboxPrompt) return;
+    setTextboxInput(textboxPrompt.initialText);
     const id = setTimeout(() => textboxRef.current?.focus(), 0);
     return () => clearTimeout(id);
   }, [textboxPrompt]);
@@ -407,6 +409,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
                 tool={tool}
                 sceneRef={sceneRef}
                 stampReady={activeDefinitionId !== null || tool === 'place-terminal' || tool === 'place-equipment'}
+                hasSelection={hasSelection}
                 canUndo={drawingSummary.canUndo}
                 canRedo={drawingSummary.canRedo}
                 onUndo={() => sceneRef.current?.undoDrawing()}

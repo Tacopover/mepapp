@@ -197,6 +197,29 @@ export function closestPointOnSegment(p: Vec2, a: Vec2, b: Vec2): { point: Vec2;
   return { point: { x: a.x + dx * t, y: a.y + dy * t }, t };
 }
 
+/** Is p within `threshold` of the finite segment [a, b]? Used to hit-test a thin stroke (a line/arrow/freehand/polyline annotation), where a plain bounding-box test would be too generous. */
+export function pointNearSegment(p: Vec2, a: Vec2, b: Vec2, threshold: number): boolean {
+  return distance(p, closestPointOnSegment(p, a, b).point) <= threshold;
+}
+
+/** Is p within `threshold` of any segment of the open polyline through `points`? Same threshold semantics as pointNearSegment. */
+export function pointNearPolyline(p: Vec2, points: Vec2[], threshold: number): boolean {
+  for (let i = 0; i < points.length - 1; i++) {
+    if (pointNearSegment(p, points[i], points[i + 1], threshold)) return true;
+  }
+  return false;
+}
+
+/** Plain point-in-axis-aligned-rectangle test, min/max normalized so it works regardless of corner order. */
+export function pointInAxisAlignedRect(p: Vec2, rect: { x0: number; y0: number; x1: number; y1: number }): boolean {
+  return (
+    p.x >= Math.min(rect.x0, rect.x1) &&
+    p.x <= Math.max(rect.x0, rect.x1) &&
+    p.y >= Math.min(rect.y0, rect.y1) &&
+    p.y <= Math.max(rect.y0, rect.y1)
+  );
+}
+
 export function centroid(points: Vec2[]): Vec2 {
   if (points.length === 0) {
     throw new Error('centroid requires at least one point');

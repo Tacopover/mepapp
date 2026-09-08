@@ -29,13 +29,18 @@ import {
   type IconProps,
 } from './icons.js';
 
+/** A flyout member with no SketchTool of its own — it runs immediately against the current selection instead of switching tools (atlas §4: "Rail flyout + keyboard shortcuts", not a persistent mode). */
+export type ToolAction = 'rotate-90' | 'delete-selection';
+
 export interface ToolEntry {
   /** Stable id, unique across every row — a real SketchTool's own id when `tool` is set, otherwise a UI-only placeholder id. */
   id: string;
   label: string;
   Icon: (props: IconProps) => ReactElement;
-  /** The SketchTool this activates, or null for a reserved-but-not-yet-built slot (renders disabled, "Coming soon"). */
+  /** The SketchTool this activates, or null for a reserved-but-not-yet-built slot (renders disabled, "Coming soon") or an `action` entry. */
   tool: SketchTool | null;
+  /** An instant action to run on click when `tool` is null — see ToolAction. Requires a non-empty selection. */
+  action?: ToolAction;
 }
 
 export interface RailRow {
@@ -51,10 +56,11 @@ export const RAIL_ROWS: RailRow[] = [
     id: 'select-edit',
     members: [
       { id: 'select', label: 'Select', Icon: IconSelect, tool: 'select' },
+      // No distinct action of its own — Select's drag-to-move (generalized to cover annotations, not just stamps) already handles continuous move.
       { id: 'move', label: 'Move', Icon: IconMove, tool: null },
       { id: 'copy', label: 'Copy', Icon: IconCopy, tool: null },
-      { id: 'rotate', label: 'Rotate', Icon: IconRotate, tool: null },
-      { id: 'delete', label: 'Delete', Icon: IconTrash, tool: null },
+      { id: 'rotate', label: 'Rotate 90°', Icon: IconRotate, tool: null, action: 'rotate-90' },
+      { id: 'delete', label: 'Delete', Icon: IconTrash, tool: null, action: 'delete-selection' },
     ],
   },
   {
