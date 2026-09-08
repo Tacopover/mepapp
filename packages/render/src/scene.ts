@@ -767,10 +767,22 @@ export class SketchScene {
     }
     const stampEntry = this.doc.stamps.get(id);
     if (stampEntry) {
-      // The extracted PNG already reflects the sprite's own rotation baked
-      // into its pixels — the adapter does not rotate pngBytes itself (see
-      // AnnotationGeometry's 'stamp' doc comment in @mepapp/pdf-engine).
-      const pngBytes = dataUrlToBytes(await this.app.renderer.extract.base64({ target: stampEntry.sprite, format: 'png' }));
+      // Extracting the live sprite directly comes back fully blank whenever
+      // it's placed away from world origin: PixiJS's extract sizes the output
+      // to the target's local (untranslated) bounds but still renders it
+      // through its full world transform, so the placed sprite's actual
+      // pixels land outside that small viewport and nothing is captured.
+      // A same-texture/rotation/scale clone left at position (0,0) — never
+      // added to any container — sidesteps that entirely. The extracted PNG
+      // still reflects rotation baked into its pixels — the adapter does not
+      // rotate pngBytes itself (see AnnotationGeometry's 'stamp' doc comment
+      // in @mepapp/pdf-engine).
+      const extractionSprite = new Sprite(stampEntry.sprite.texture);
+      extractionSprite.anchor.set(0.5);
+      extractionSprite.rotation = stampEntry.sprite.rotation;
+      extractionSprite.scale.copyFrom(stampEntry.sprite.scale);
+      const pngBytes = dataUrlToBytes(await this.app.renderer.extract.base64({ target: extractionSprite, format: 'png' }));
+      extractionSprite.destroy(); // the shared texture is owned by stampEntry.sprite, not this — never { texture: true } here
       const bounds = this.stampWorldBounds(stampEntry);
       await handle.addAnnotation({
         id,
