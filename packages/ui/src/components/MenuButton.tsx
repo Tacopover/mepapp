@@ -2,15 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { IconFile, IconMenu } from '../icons.js';
 
 export interface MenuButtonProps {
-  onOpenPdf: (file: File) => void;
-  onSaveProject: () => void;
-  onLoadProject: (file: File) => void;
-  onSyncToPdf: () => void;
-  onDownloadPdf: () => void;
+  onOpenPdf: () => void;
+  onSave: () => void;
+  onSaveAs: () => void;
   pdfLoaded: boolean;
 }
 
-export function MenuButton({ onOpenPdf, onSaveProject, onLoadProject, onSyncToPdf, onDownloadPdf, pdfLoaded }: MenuButtonProps) {
+export function MenuButton({ onOpenPdf, onSave, onSaveAs, pdfLoaded }: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -30,63 +28,38 @@ export function MenuButton({ onOpenPdf, onSaveProject, onLoadProject, onSyncToPd
       </button>
       {open && (
         <div className="mep-menu-dropdown">
-          <label className="mep-menu-item">
-            <IconFile size={13} /> Open PDF…
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onOpenPdf(file);
-                setOpen(false);
-              }}
-            />
-          </label>
-          <div className="mep-menu-divider" />
           <button
             type="button"
             className="mep-menu-item"
             onClick={() => {
-              onSaveProject();
+              onOpenPdf();
               setOpen(false);
             }}
           >
-            Save project
+            <IconFile size={13} /> Open…
           </button>
-          <label className="mep-menu-item">
-            Load project…
-            <input
-              type="file"
-              accept="application/json"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onLoadProject(file);
-                setOpen(false);
-              }}
-            />
-          </label>
           <div className="mep-menu-divider" />
           <button
             type="button"
             className="mep-menu-item"
             disabled={!pdfLoaded}
             onClick={() => {
-              onSyncToPdf();
+              onSave();
               setOpen(false);
             }}
           >
-            Sync to PDF
+            Save
           </button>
           <button
             type="button"
             className="mep-menu-item"
             disabled={!pdfLoaded}
             onClick={() => {
-              onDownloadPdf();
+              onSaveAs();
               setOpen(false);
             }}
           >
-            Download PDF
+            Save As…
           </button>
         </div>
       )}

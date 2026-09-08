@@ -356,6 +356,14 @@ export class SketchScene {
     return this.documents.find((d) => d.fileKey === fileKey)?.id ?? null;
   }
 
+  /** Updates a document's displayed file name (e.g. after a "Save As" picks a new location) — doesn't touch fileKey, so it stays matched against its original source file for the re-open dedupe check above. */
+  renameDocument(id: string, fileName: string): void {
+    const target = this.documents.find((d) => d.id === id);
+    if (!target) return;
+    target.fileName = fileName;
+    this.emitter.emit('documentsChanged', this.getDocuments());
+  }
+
   activateDocument(id: string): void {
     if (id === this.activeId) return;
     const target = this.documents.find((d) => d.id === id);

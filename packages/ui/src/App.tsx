@@ -1,5 +1,5 @@
-import { useCallback, useState, type ReactNode } from 'react';
-import { ProjectLoadError, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { useCallback, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { Rail } from './components/Rail.js';
@@ -37,6 +37,38 @@ export interface MepSketchAppProps {
 
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
 
+// The File System Access API (showOpenFilePicker/showSaveFilePicker) is what
+// lets "Save" write straight back to the file the user opened, with no
+// download prompt — it's Chromium-only today (not in Firefox/Safari), so
+// every call site below feature-detects it and falls back to the old
+// download-a-copy behavior where it's missing. That fallback is never a
+// regression: it's exactly what this app already did before Save/Save As existed.
+function supportsFileSystemAccess(): boolean {
+  return typeof window !== 'undefined' && typeof window.showOpenFilePicker === 'function';
+}
+
+const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
+
+async function writeToFileHandle(fileHandle: FileSystemFileHandle, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
+  const writable = await fileHandle.createWritable();
+  await writable.write(bytes);
+  await writable.close();
+}
+
+function downloadPdfBytes(bytes: Uint8Array<ArrayBuffer>, fileName: string): void {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+
 export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL }: MepSketchAppProps) {
   const {
     containerRef,
@@ -71,6 +103,14 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
   const pdfHandle = activePdfHandle;
 
+  // A document's FileSystemFileHandle, when "Open"/"Save As" got one from the
+  // File System Access API — keyed by document id so "Save" knows which real
+  // file to write back to. Not scene state: @mepapp/render stays platform-
+  // agnostic (see its IconBitmapResolver layering), and this is a browser-only
+  // concern. A plain ref, not state: it's write-target bookkeeping, never rendered.
+  const fileHandlesRef = useRef(new Map<string, FileSystemFileHandle>());
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // Fetches a stamp-library icon's actual bytes for loadProjectFromJson/loadFromPdf to rebuild a restored stamp's sprite —
   // SketchScene has no fetch of its own, same layering as resolveStampIconUrl/StampsPanel.
   const resolveStampIconBitmap = useCallback(
@@ -82,34 +122,8 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     [resolveStampIconUrl],
   );
 
-  const handleSaveProject = useCallback(() => {
-    if (!sceneRef.current) return;
-    const doc = sceneRef.current.exportProject();
-    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mepapp-project.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [sceneRef]);
-
-  const handleLoadProject = useCallback(
-    async (file: File) => {
-      try {
-        const raw = JSON.parse(await file.text());
-        await sceneRef.current?.loadProjectFromJson(raw, resolveStampIconBitmap);
-        setStatus(`Loaded project from ${file.name}.`);
-      } catch (err) {
-        const message = err instanceof ProjectLoadError ? `${err.message}: ${JSON.stringify(err.issues)}` : (err as Error).message;
-        setStatus(`Failed to load ${file.name}: ${message}`);
-      }
-    },
-    [resolveStampIconBitmap, sceneRef],
-  );
-
-  const handlePdfFile = useCallback(
-    async (file: File) => {
+  const openPdfFile = useCallback(
+    async (file: File, fileHandle: FileSystemFileHandle | null) => {
       // Reopening a file already open elsewhere in the document list just
       // switches to its tab — no re-parse, no duplicate — see decisions log
       // 2026-09-07's multi-document plan, D3.
@@ -117,6 +131,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
       const existingId = sceneRef.current?.findDocumentByFileKey(fileKey);
       if (existingId) {
         sceneRef.current?.activateDocument(existingId);
+        if (fileHandle) fileHandlesRef.current.set(existingId, fileHandle);
         setStatus(`Switched to already-open ${file.name}.`);
         return;
       }
@@ -124,11 +139,13 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
       setStatus(`Loading ${file.name}...`);
       try {
         const { bitmap, pageWidthPt, pageHeightPt, handle } = await onLoadPdfPage(file);
-        sceneRef.current?.openDocument(bitmap, pageWidthPt, pageHeightPt, { fileKey, fileName: file.name, handle });
-        // Loads this PDF's own embedded project JSON (if any) and compares
+        const docId = sceneRef.current?.openDocument(bitmap, pageWidthPt, pageHeightPt, { fileKey, fileName: file.name, handle });
+        if (docId && fileHandle) fileHandlesRef.current.set(docId, fileHandle);
+        // Loads this PDF's own embedded project data (if any) and compares
         // its annotations against that domain model — see decisions log
         // 2026-09-06's reconciliation policy: flag drift/missing, never
-        // silently resolve either way.
+        // silently resolve either way. The user never sees this as a separate
+        // "project file" — Open/Save hide it entirely, it's just "the PDF."
         const report = sceneRef.current ? await sceneRef.current.loadFromPdf(handle, resolveStampIconBitmap) : null;
         setReconciliation(report && (report.drifted.length > 0 || report.missingIds.length > 0) ? report : null);
         setStatus(`Loaded ${file.name} (${pageWidthPt.toFixed(1)} x ${pageHeightPt.toFixed(1)} pt)`);
@@ -136,8 +153,33 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         setStatus(`Failed to load ${file.name}: ${(err as Error).message}`);
       }
     },
-    [onLoadPdfPage, sceneRef],
+    [onLoadPdfPage, resolveStampIconBitmap, sceneRef],
   );
+
+  // The hidden <input type="file"> below is the fallback path for browsers
+  // without the File System Access API — its onChange calls this directly.
+  const handleFileInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = ''; // so picking the same file twice in a row still fires onChange
+      if (file) void openPdfFile(file, null);
+    },
+    [openPdfFile],
+  );
+
+  const handleOpenPdf = useCallback(async () => {
+    if (!supportsFileSystemAccess()) {
+      fileInputRef.current?.click();
+      return;
+    }
+    try {
+      const [fileHandle] = await window.showOpenFilePicker!({ types: PDF_PICKER_TYPES });
+      const file = await fileHandle.getFile();
+      await openPdfFile(file, fileHandle);
+    } catch (err) {
+      if (!isAbortError(err)) setStatus(`Failed to open PDF: ${(err as Error).message}`);
+    }
+  }, [openPdfFile]);
 
   const handleActivateDocument = useCallback(
     (id: string) => {
@@ -150,36 +192,73 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const handleCloseDocument = useCallback(
     (id: string) => {
       const target = documents.find((d) => d.id === id);
-      if (target?.isDirty && !window.confirm(`"${target.fileName}" has unsynced changes. Close anyway?`)) return;
+      if (target?.isDirty && !window.confirm(`"${target.fileName}" has unsaved changes. Close anyway?`)) return;
       sceneRef.current?.closeDocument(id);
     },
     [documents, sceneRef],
   );
 
-  const handleSyncToPdf = useCallback(async () => {
-    if (!sceneRef.current || !pdfHandle) return;
+  // Shared by Save and Save As: writes the current drawing into the open
+  // PDF's annotations and embedded project data, then returns the resulting
+  // file bytes. Always runs first — otherwise a placed stamp/segment never
+  // reaches the file if the user saves without an explicit sync step first
+  // (see decisions log: this was shipping PDFs with no stamps).
+  const syncAndGetPdfBytes = useCallback(async (): Promise<Uint8Array<ArrayBuffer> | null> => {
+    if (!sceneRef.current || !pdfHandle) return null;
     await sceneRef.current.exportToPdf(pdfHandle);
     setReconciliation(null);
-    setStatus("Synced the current drawing into the open PDF's annotations and embedded project data.");
+    return new Uint8Array(await pdfHandle.save());
   }, [pdfHandle, sceneRef]);
 
-  const handleDownloadPdf = useCallback(async () => {
-    if (!sceneRef.current || !pdfHandle) return;
-    // Download must reflect what's on screen, not just whatever was last explicitly synced —
-    // otherwise a placed stamp/segment never reaches the file if the user downloads without
-    // clicking "Sync to PDF" first (see decisions log: this was shipping PDFs with no stamps).
-    await sceneRef.current.exportToPdf(pdfHandle);
-    setReconciliation(null);
-    const bytes = await pdfHandle.save();
-    const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mepapp-drawing.pdf';
-    a.click();
-    URL.revokeObjectURL(url);
-    setStatus('Downloaded mepapp-drawing.pdf with the current drawing synced in.');
-  }, [pdfHandle, sceneRef]);
+  // Prompts for a new file location (or downloads a copy, on browsers without
+  // the File System Access API) and remembers it as the active document's
+  // save target from here on.
+  const saveAsNewFile = useCallback(
+    async (bytes: Uint8Array<ArrayBuffer>) => {
+      const suggestedName = activeDoc?.fileName ?? 'mepapp-drawing.pdf';
+      if (!supportsFileSystemAccess()) {
+        downloadPdfBytes(bytes, suggestedName);
+        setStatus(`Downloaded ${suggestedName}.`);
+        return;
+      }
+      try {
+        const fileHandle = await window.showSaveFilePicker!({ suggestedName, types: PDF_PICKER_TYPES });
+        await writeToFileHandle(fileHandle, bytes);
+        if (activeDocumentId) {
+          fileHandlesRef.current.set(activeDocumentId, fileHandle);
+          sceneRef.current?.renameDocument(activeDocumentId, fileHandle.name);
+        }
+        setStatus(`Saved as ${fileHandle.name}.`);
+      } catch (err) {
+        if (!isAbortError(err)) setStatus(`Failed to save: ${(err as Error).message}`);
+      }
+    },
+    [activeDoc, activeDocumentId, sceneRef],
+  );
+
+  const handleSave = useCallback(async () => {
+    const bytes = await syncAndGetPdfBytes();
+    if (!bytes) return;
+    const fileHandle = activeDocumentId ? fileHandlesRef.current.get(activeDocumentId) : undefined;
+    if (fileHandle) {
+      try {
+        await writeToFileHandle(fileHandle, bytes);
+        setStatus(`Saved ${activeDoc?.fileName ?? 'the drawing'}.`);
+      } catch (err) {
+        setStatus(`Failed to save: ${(err as Error).message}`);
+      }
+      return;
+    }
+    // Never saved to a real file yet (opened via the legacy file-picker
+    // fallback, or this is a brand new document) — first save behaves like Save As.
+    await saveAsNewFile(bytes);
+  }, [activeDoc, activeDocumentId, saveAsNewFile, syncAndGetPdfBytes]);
+
+  const handleSaveAs = useCallback(async () => {
+    const bytes = await syncAndGetPdfBytes();
+    if (!bytes) return;
+    await saveAsNewFile(bytes);
+  }, [saveAsNewFile, syncAndGetPdfBytes]);
 
   const handleCustomStampFile = useCallback(
     async (file: File, category: StampCategory) => {
@@ -267,14 +346,14 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   return (
     <div className="mep-app">
       <div className="mep-header">
-        <MenuButton
-          onOpenPdf={handlePdfFile}
-          onSaveProject={handleSaveProject}
-          onLoadProject={handleLoadProject}
-          onSyncToPdf={handleSyncToPdf}
-          onDownloadPdf={handleDownloadPdf}
-          pdfLoaded={pdfHandle !== null}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileInputChange}
+          style={{ display: 'none' }}
         />
+        <MenuButton onOpenPdf={handleOpenPdf} onSave={handleSave} onSaveAs={handleSaveAs} pdfLoaded={pdfHandle !== null} />
         <span className="mep-title">{sheetName ?? 'No sheet loaded'}</span>
         <div className="mep-fill" />
         {status && <span className="mep-header-status">{status}</span>}
@@ -289,7 +368,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
           {reconciliation.drifted.length > 0 && (
             <span>{reconciliation.drifted.length} annotation{reconciliation.drifted.length === 1 ? '' : 's'} moved in another viewer. </span>
           )}
-          Click "Sync to PDF" to rewrite them from the current drawing, or edit the drawing first if you want to keep the other viewer's changes instead.{' '}
+          Click "Save" to rewrite them from the current drawing, or edit the drawing first if you want to keep the other viewer's changes instead.{' '}
           <button onClick={() => setReconciliation(null)}>Dismiss</button>
         </div>
       )}
