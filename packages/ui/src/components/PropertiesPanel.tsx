@@ -65,6 +65,32 @@ export function PropertiesPanel({ sceneRef, selection, capacityInput, setCapacit
           />
         </div>
       </div>
+      {stamp.category === 'equipment' && stamp.ports.length >= 2 && (
+        <div className="mep-section">
+          <h4>Linked ports</h4>
+          <p className="mep-hint">
+            Checked ports on this element act as one connectivity node — e.g. a unit's supply and return, so a segment
+            between them never bridges the two networks.
+          </p>
+          {stamp.ports.map((port) => {
+            const checked = stamp.linkedPortIds?.includes(port.id) ?? false;
+            return (
+              <label key={port.id} className="mep-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => {
+                    const current = stamp.linkedPortIds ?? [];
+                    const next = e.target.checked ? [...current, port.id] : current.filter((id) => id !== port.id);
+                    sceneRef.current?.setPortGroup(stamp.id, next);
+                  }}
+                />
+                {port.name}
+              </label>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

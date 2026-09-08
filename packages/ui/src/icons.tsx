@@ -149,6 +149,12 @@ export const IconFlow = (props: IconProps) => (
   </Svg>
 );
 
+export const IconClose = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M5 5l14 14M19 5L5 19" />
+  </Svg>
+);
+
 // ---------- Left rail: Select & Edit flyout (Move/Copy/Rotate/Delete are
 // placeholders — no owning spec yet, see toolRegistry.ts) ----------
 

@@ -1,5 +1,15 @@
 import { Container, Graphics, type Sprite } from 'pixi.js';
-import { CommandManager, type Calibration, type FlowResult, type NetworkType, type PlacedStamp, type Segment, type Fitting, type Vec2 } from '@mepapp/core';
+import {
+  CommandManager,
+  type Calibration,
+  type Fitting,
+  type FlowResult,
+  type NetworkType,
+  type PlacedStamp,
+  type PortGroup,
+  type Segment,
+  type Vec2,
+} from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 /** Undo-history state for the segment/fitting drawing tool — kept separate from the pre-existing, not-yet-undoable stamp placement state (see decisions log 2026-09-06). */
@@ -52,6 +62,8 @@ export class SketchDocument {
   calibration: Calibration | null = null;
   readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {} });
   readonly networkTypes: NetworkType[] = [DEFAULT_NETWORK_TYPE];
+  /** Ports on the same element linked into one connectivity node — e.g. an AHU's supply + return (see core's PortGroup doc comment). Set via SketchScene.setPortGroup. */
+  readonly portGroups: PortGroup[] = [];
   readonly terminalCapacities = new Map<string, number>();
   pdfSyncIds = new Set<string>();
   nextStampSeq = 1;
