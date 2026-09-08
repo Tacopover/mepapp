@@ -53,7 +53,7 @@ AGPLv3. No paid SDKs or non-free libraries — everything in the dependency tree
 ## Documentation Hub
 
 - Hub: `/taco/notes/Obsidian Vault/Project Docs/MepApp/` (this container's mount of `C:\Users\taco\OneDrive - MEPover\Taco\Notes\Obsidian Vault\Project Docs\MepApp\`)
-- Temp plans: `.claude/plans/` — delete when task done; save 2–3 line summary to Decisions-Log first
-- Session end: run `/session-handoff` — writes Claude memory + Obsidian Session-Summary + Decisions-Log entries
+- Plans: `.claude/plans/` — **commit these to git** (a fresh `EnterWorktree` checkout only pulls tracked files; an uncommitted plan is one worktree away from silently vanishing — this happened once, 2026-09-08, and was only recoverable because the deleting session had read the file into its own transcript first). When a part/task in a plan finishes, mark it done inline in the file (status + commit hash + verification summary, same style as prior done-entries) — don't delete on partial completion. For a multi-part plan, the file stays until every part is done. `/session-handoff` checks each plan's completion status and deletes only fully-done ones (after confirming a summary made it to Decisions-Log) — don't delete a plan file by hand mid-session.
+- Session end: run `/session-handoff` — writes Claude memory + Obsidian Session-Summary + Decisions-Log entries, and sweeps `.claude/plans/` for fully-completed plans to delete
 - Cross-project patterns: check `/taco/notes/Obsidian Vault/Project Docs/_Cross-Project/` before implementing a known pattern
 - Do NOT log to hub: git history, code structure, CLAUDE.md content, or anything already in the repo
