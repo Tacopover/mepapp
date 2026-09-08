@@ -54,6 +54,7 @@ export function StampsPanel({
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [subTab, setSubTab] = useState<'stamps' | 'networkTypes'>('stamps');
 
   async function handlePick(definition: StampDefinition) {
     const bitmap = await loadBitmap(resolveIconUrl(definition.iconRef));
@@ -74,88 +75,114 @@ export function StampsPanel({
 
   return (
     <div>
+      <div className="mep-stamps-subtabs" role="tablist" aria-label="Stamps panel section">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={subTab === 'stamps'}
+          className={`mep-stamps-subtab-btn${subTab === 'stamps' ? ' on' : ''}`}
+          onClick={() => setSubTab('stamps')}
+        >
+          Stamps
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={subTab === 'networkTypes'}
+          className={`mep-stamps-subtab-btn${subTab === 'networkTypes' ? ' on' : ''}`}
+          onClick={() => setSubTab('networkTypes')}
+        >
+          Network Types
+        </button>
+      </div>
       <div className="mep-stamps-filter">
         <DisciplineSwitcher value={disciplineGroup} onChange={onChangeDisciplineGroup} />
       </div>
-      {definitions.length === 0 && <div className="mep-empty-panel">No stamp art available yet for this discipline.</div>}
-      <div className="mep-stamp-grid">
-        {definitions.map((definition) => (
-          <button
-            key={definition.id}
-            type="button"
-            className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}`}
-            onClick={() => void handlePick(definition)}
-          >
-            <img src={resolveIconUrl(definition.iconRef)} alt="" />
-            {definition.label}
-          </button>
-        ))}
-        <label className="mep-stamp-tile mep-file-btn">
-          <IconFile size={20} />
-          Custom terminal…
-          <input
-            type="file"
-            accept="image/png,image/svg+xml"
-            onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'terminal')}
-          />
-        </label>
-        <label className="mep-stamp-tile mep-file-btn">
-          <IconFile size={20} />
-          Custom equipment…
-          <input
-            type="file"
-            accept="image/png,image/svg+xml"
-            onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'equipment')}
-          />
-        </label>
-      </div>
 
-      <div className="mep-section-label">Network Types</div>
-      {networkTypeDefs.length === 0 && <div className="mep-empty-panel">No network types for this discipline.</div>}
-      <div className="mep-networktype-grid">
-        {networkTypeDefs.map((libType) => {
-          const live = networkTypes.find((t) => t.id === libType.id);
-          const effective = live ?? libType;
-          const isAdopted = live !== undefined;
-          const isActive = activeNetworkTypeId === libType.id;
-          const isEditing = editingId === libType.id;
-          return (
-            <div
-              key={libType.id}
-              className={`mep-networktype-tile mep-discipline-${disciplineGroupOf(libType.discipline)}${isActive ? ' active' : ''}`}
-            >
-              {isEditing ? (
-                <input
-                  autoFocus
-                  className="mep-networktype-input"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={commitEditing}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitEditing();
-                    if (e.key === 'Escape') setEditingId(null);
-                  }}
-                />
-              ) : (
-                <button type="button" className="mep-networktype-pick" onClick={() => onPickNetworkType(effective)}>
-                  <span className="mep-networktype-name">{effective.name}</span>
-                  {effective.units && <span className="mep-networktype-units">{effective.units}</span>}
-                </button>
-              )}
-              {isAdopted && !isEditing && (
-                <button
-                  type="button"
-                  className="mep-networktype-edit"
-                  title="Rename"
-                  onClick={() => startEditing(effective)}
+      {subTab === 'stamps' ? (
+        <>
+          {definitions.length === 0 && <div className="mep-empty-panel">No stamp art available yet for this discipline.</div>}
+          <div className="mep-stamp-grid">
+            {definitions.map((definition) => (
+              <button
+                key={definition.id}
+                type="button"
+                className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}`}
+                onClick={() => void handlePick(definition)}
+              >
+                <img src={resolveIconUrl(definition.iconRef)} alt="" />
+                {definition.label}
+              </button>
+            ))}
+            <label className="mep-stamp-tile mep-file-btn">
+              <IconFile size={20} />
+              Custom terminal…
+              <input
+                type="file"
+                accept="image/png,image/svg+xml"
+                onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'terminal')}
+              />
+            </label>
+            <label className="mep-stamp-tile mep-file-btn">
+              <IconFile size={20} />
+              Custom equipment…
+              <input
+                type="file"
+                accept="image/png,image/svg+xml"
+                onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'equipment')}
+              />
+            </label>
+          </div>
+        </>
+      ) : (
+        <>
+          {networkTypeDefs.length === 0 && <div className="mep-empty-panel">No network types for this discipline.</div>}
+          <div className="mep-networktype-grid">
+            {networkTypeDefs.map((libType) => {
+              const live = networkTypes.find((t) => t.id === libType.id);
+              const effective = live ?? libType;
+              const isAdopted = live !== undefined;
+              const isActive = activeNetworkTypeId === libType.id;
+              const isEditing = editingId === libType.id;
+              return (
+                <div
+                  key={libType.id}
+                  className={`mep-networktype-tile mep-discipline-${disciplineGroupOf(libType.discipline)}${isActive ? ' active' : ''}`}
                 >
-                  <IconPencil size={12} />
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                  {isEditing ? (
+                    <input
+                      autoFocus
+                      className="mep-networktype-input"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={commitEditing}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitEditing();
+                        if (e.key === 'Escape') setEditingId(null);
+                      }}
+                    />
+                  ) : (
+                    <button type="button" className="mep-networktype-pick" onClick={() => onPickNetworkType(effective)}>
+                      <span className="mep-networktype-name">{effective.name}</span>
+                      {effective.units && <span className="mep-networktype-units">{effective.units}</span>}
+                    </button>
+                  )}
+                  {isAdopted && !isEditing && (
+                    <button
+                      type="button"
+                      className="mep-networktype-edit"
+                      title="Rename"
+                      onClick={() => startEditing(effective)}
+                    >
+                      <IconPencil size={12} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
