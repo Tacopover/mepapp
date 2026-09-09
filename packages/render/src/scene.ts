@@ -2052,6 +2052,31 @@ export class SketchScene {
     this.applyZoomAtScreenPoint(this.world.scale.x * factor, { x: event.global.x, y: event.global.y });
   };
 
+  /** Shared by the wheel handler and the status bar's zoom buttons — zooms so screenPoint's world position stays fixed under it. */
+  private applyZoomAtScreenPoint(newZoomRaw: number, screenPoint: Vec2): void {
+    const beforeWorld = this.screenToWorld(screenPoint);
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoomRaw));
+    this.world.scale.set(newZoom);
+    this.world.x = screenPoint.x - beforeWorld.x * newZoom;
+    this.world.y = screenPoint.y - beforeWorld.y * newZoom;
+    this.redrawOverlay();
+    this.emitter.emit('zoomChanged', newZoom);
+  }
+
+  private screenCenter(): Vec2 {
+    return { x: this.app.screen.width / 2, y: this.app.screen.height / 2 };
+  }
+
+  /** Status bar's zoom +/- buttons — same math as the wheel handler, centered on the canvas's own center rather than a cursor position. */
+  zoomBy(factor: number): void {
+    this.applyZoomAtScreenPoint(this.world.scale.x * factor, this.screenCenter());
+  }
+
+  /** Status bar's zoom chip reset-to-100% action. */
+  resetZoom(): void {
+    this.applyZoomAtScreenPoint(1, this.screenCenter());
+  }
+
   /**
    * Delete/Backspace deletes the current selection (rail Delete flyout's
    * keyboard-shortcut counterpart), Ctrl/Cmd+C copies it, Ctrl/Cmd+V pastes
@@ -2122,9 +2147,11 @@ export class SketchScene {
     if (this.doc.selectedIds.size === 0) return;
     const state = this.doc.drawingHistory.getState();
     const stamps = [...this.doc.selectedIds]
-      .map((id) => this.doc.stamps.get(id))
-      .filter((e): e is StampEntry => e !== undefined)
-      .map((entry) => ({ data: entry.data, texture: entry.sprite.texture, baseScale: entry.baseScale }));
+      .filter((id) => state.stamps[id] && this.doc.stamps.has(id))
+      .map((id) => {
+        const entry = this.doc.stamps.get(id)!;
+        return { data: state.stamps[id], texture: entry.sprite.texture, baseScale: entry.baseScale };
+      });
     const annotations = [...this.doc.selectedIds].filter((id) => state.annotations[id]).map((id) => state.annotations[id]);
     if (stamps.length === 0 && annotations.length === 0) return;
     this.clipboard = { stamps, annotations };
@@ -2141,6 +2168,7 @@ export class SketchScene {
     if (!this.clipboard) return;
     const OFFSET = 20; // world units — enough to read as a separate copy without straying far from the originals
     const newSelection = new Set<string>();
+    const pastedStamps: PlacedStamp[] = [];
 
     for (const { data, texture, baseScale } of this.clipboard.stamps) {
       const id = `stamp-${this.doc.nextStampSeq++}`;
@@ -2152,22 +2180,25 @@ export class SketchScene {
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5);
       applyTransformToSprite(sprite, pasted.transform, baseScale);
-      this.doc.stamps.set(id, { data: pasted, sprite, baseScale });
+      this.doc.stamps.set(id, { sprite, baseScale });
       this.doc.stampsLayer.addChild(sprite);
+      pastedStamps.push(pasted);
       newSelection.add(id);
     }
 
-    if (this.clipboard.annotations.length > 0) {
-      const pastedAnnotations = this.clipboard.annotations;
-      const tx = new Transaction(this.doc.drawingHistory, `Paste ${pastedAnnotations.length} annotation(s)`);
+    const pastedAnnotations = this.clipboard.annotations;
+    if (pastedStamps.length > 0 || pastedAnnotations.length > 0) {
+      const tx = new Transaction(this.doc.drawingHistory, `Paste ${pastedStamps.length + pastedAnnotations.length} item(s)`);
       tx.update((s) => {
+        const stamps = { ...s.stamps };
+        for (const stamp of pastedStamps) stamps[stamp.id] = stamp;
         const annotations = { ...s.annotations };
         for (const annotation of pastedAnnotations) {
           const id = `annotation-${this.doc.nextAnnotationSeq++}`;
           annotations[id] = { ...annotation, id, geometry: translateAnnotationGeometry(annotation.geometry, OFFSET, OFFSET) };
           newSelection.add(id);
         }
-        return { ...s, annotations };
+        return { ...s, stamps, annotations };
       });
       tx.commit();
       this.syncDrawingLayer();
