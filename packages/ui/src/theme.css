@@ -1024,6 +1024,37 @@
 .mep-chip b {
   color: var(--ink);
 }
+.mep-zoom-chip,
+.mep-page-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mep-zoom-chip button,
+.mep-page-chip button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.mep-zoom-chip button:hover,
+.mep-page-chip button:hover {
+  color: var(--ink);
+}
+.mep-zoom-chip button:disabled,
+.mep-page-chip button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mep-zoom-reset {
+  cursor: pointer;
+}
+.mep-zoom-reset:hover {
+  text-decoration: underline;
+}
 .mep-scale-bar {
   display: flex;
   height: 7px;

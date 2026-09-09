@@ -57,6 +57,8 @@ export class SketchDocument {
   fileName = 'Untitled';
   pdfHandle: PdfDocumentHandle | null = null;
   backdropSprite: Sprite | null = null;
+  /** Which page of pdfHandle the backdrop currently shows (status bar page navigation) — view-only: placed elements aren't page-scoped yet (they still all record pageIndex: 0), see atlas §6 D4. */
+  pageIndex = 0;
   readonly stampsLayer = new Container();
   readonly drawingLayer = new Graphics();
   /** PixiJS Text nodes for placed textbox annotations — a Graphics object can't render text, so these live in their own container, fully rebuilt alongside drawingLayer on every syncDrawingLayer (see SketchScene.drawAnnotation). */

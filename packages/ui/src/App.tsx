@@ -36,6 +36,8 @@ export interface MepSketchAppProps {
   // Kept as a prop (not a direct @mepapp/pdf-engine-mupdf import) so this
   // component stays engine-agnostic — the app shell picks which PdfEngine to wire in.
   onLoadPdfPage: (file: File) => Promise<PdfPageLoadResult>;
+  /** Renders a different page of an already-open handle — status bar page navigation, reusing the open PDF instead of re-parsing the file. */
+  onLoadPdfPageAt: (handle: PdfDocumentHandle, pageIndex: number) => Promise<PdfPageLoadResult>;
   // AGPLv3 section 13: a network service running a modified version of this
   // app must offer the exact corresponding source. The app shell computes
   // this link (it knows the build's commit SHA); this component just shows it.
@@ -97,7 +99,12 @@ function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'AbortError';
 }
 
-export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL }: MepSketchAppProps) {
+export function MepSketchApp({
+  onLoadPdfPage,
+  onLoadPdfPageAt,
+  correspondingSourceUrl,
+  resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL,
+}: MepSketchAppProps) {
   const {
     containerRef,
     sceneRef,
@@ -109,6 +116,8 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     networkSummaries,
     networkTypes,
     zoom,
+    pageIndex,
+    pageCount,
     calibration,
     measurementMm,
     calibrationPrompt,
@@ -174,6 +183,16 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
     setBuildings(next);
     saveBuildings(next);
   }, []);
+
+  /** Status bar's page nav — reuses the already-open PDF handle, no re-parse. View-only: see SketchScene.setBackdropPage. */
+  const handleChangePage = useCallback(
+    async (nextPageIndex: number) => {
+      if (!activePdfHandle) return;
+      const { bitmap, pageWidthPt, pageHeightPt } = await onLoadPdfPageAt(activePdfHandle, nextPageIndex);
+      sceneRef.current?.setBackdropPage(bitmap, pageWidthPt, pageHeightPt, nextPageIndex);
+    },
+    [activePdfHandle, onLoadPdfPageAt, sceneRef],
+  );
 
   // Deferred, not `autoFocus`: the click that opens this prompt is the same
   // mousedown/mouseup the browser is still processing its own default focus
@@ -546,7 +565,18 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         <DockPanel tabs={dockTabDefs} content={dockContent} forcedTabId={forcedTabId} forcedTabNonce={forcedTabNonce} />
       </div>
 
-      <StatusBar zoom={zoom} calibration={calibration} measurementMm={measurementMm} selectedCount={selection.length} drawingSummary={drawingSummary} />
+      <StatusBar
+        zoom={zoom}
+        onZoomBy={(factor) => sceneRef.current?.zoomBy(factor)}
+        onResetZoom={() => sceneRef.current?.resetZoom()}
+        pageIndex={pageIndex}
+        pageCount={pageCount}
+        onChangePage={(next) => void handleChangePage(next)}
+        calibration={calibration}
+        measurementMm={measurementMm}
+        selectedCount={selection.length}
+        drawingSummary={drawingSummary}
+      />
 
       {calibrationPrompt && (
         <Dialog

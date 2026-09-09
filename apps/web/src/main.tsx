@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { MepSketchApp, type PdfPageLoadResult } from '@mepapp/ui';
 import { displayDimensions } from '@mepapp/core';
 import { MupdfEngine } from '@mepapp/pdf-engine-mupdf';
+import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 const BACKDROP_DPI = 150;
 
@@ -10,10 +11,15 @@ const engine = new MupdfEngine();
 async function loadPdfPage(file: File): Promise<PdfPageLoadResult> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const doc = await engine.openDocument(bytes);
-  const info = doc.getPageInfo(0);
-  const bitmap = await doc.renderPageToRaster(0, { dpi: BACKDROP_DPI });
+  return loadPdfPageAt(doc, 0);
+}
+
+/** Renders a different page of an already-open handle — the status bar's page navigation, reusing the same open PDF rather than re-parsing the file. */
+async function loadPdfPageAt(handle: PdfDocumentHandle, pageIndex: number): Promise<PdfPageLoadResult> {
+  const info = handle.getPageInfo(pageIndex);
+  const bitmap = await handle.renderPageToRaster(pageIndex, { dpi: BACKDROP_DPI });
   const displayed = displayDimensions({ widthPt: info.widthPt, heightPt: info.heightPt }, info.rotationDegrees);
-  return { bitmap, pageWidthPt: displayed.widthPt, pageHeightPt: displayed.heightPt, handle: doc };
+  return { bitmap, pageWidthPt: displayed.widthPt, pageHeightPt: displayed.heightPt, handle };
 }
 
 const REPO_URL = 'https://github.com/Tacopover/mepapp';
@@ -21,7 +27,9 @@ const correspondingSourceUrl = `${REPO_URL}/tree/${__MEPAPP_COMMIT_SHA__}`;
 
 const container = document.getElementById('root');
 if (container) {
-  createRoot(container).render(<MepSketchApp onLoadPdfPage={loadPdfPage} correspondingSourceUrl={correspondingSourceUrl} />);
+  createRoot(container).render(
+    <MepSketchApp onLoadPdfPage={loadPdfPage} onLoadPdfPageAt={loadPdfPageAt} correspondingSourceUrl={correspondingSourceUrl} />,
+  );
 }
 
 // Step 5 (offline caching, browser case) — see public/sw.js for the caching

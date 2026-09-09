@@ -29,6 +29,8 @@ export interface UseSketchScene {
   networkSummaries: NetworkSummary[];
   networkTypes: NetworkType[];
   zoom: number;
+  pageIndex: number;
+  pageCount: number;
   calibration: Calibration | null;
   measurementMm: number | null;
   calibrationPrompt: CalibrationPrompt | null;
@@ -56,6 +58,8 @@ export function useSketchScene(): UseSketchScene {
   const [networkSummaries, setNetworkSummaries] = useState<NetworkSummary[]>([]);
   const [networkTypes, setNetworkTypes] = useState<NetworkType[]>([]);
   const [zoom, setZoom] = useState(1);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
   const [calibration, setCalibration] = useState<Calibration | null>(null);
   const [measurementMm, setMeasurementMm] = useState<number | null>(null);
   const [calibrationPrompt, setCalibrationPrompt] = useState<CalibrationPrompt | null>(null);
@@ -112,6 +116,7 @@ export function useSketchScene(): UseSketchScene {
       setNetworkSummaries(scene.getNetworkSummaries());
     };
     const onZoomChanged = (z: number) => setZoom(z);
+    const onPageChanged = (p: number) => setPageIndex(p);
     const onDocumentsChanged = (docs: DocumentSummary[]) => {
       setDocuments(docs);
       setActiveDocumentId(scene.getActiveDocumentId());
@@ -130,6 +135,8 @@ export function useSketchScene(): UseSketchScene {
       setMeasurementMm(null); // a transient reading, not resident per-document state
       setActiveDocumentId(scene.getActiveDocumentId());
       setActivePdfHandle(scene.getActivePdfHandle());
+      setPageIndex(scene.getPageIndex());
+      setPageCount(scene.getPageCount());
     };
 
     scene.on('selectionChanged', onSelectionChanged);
@@ -143,6 +150,7 @@ export function useSketchScene(): UseSketchScene {
     scene.on('projectLoaded', onProjectLoaded);
     scene.on('networkTypesChanged', onNetworkTypesChanged);
     scene.on('zoomChanged', onZoomChanged);
+    scene.on('pageChanged', onPageChanged);
     scene.on('documentsChanged', onDocumentsChanged);
     scene.on('documentActivated', onDocumentActivated);
 
@@ -150,6 +158,8 @@ export function useSketchScene(): UseSketchScene {
       if (!cancelled) {
         setReady(true);
         setZoom(scene.getZoom());
+        setPageIndex(scene.getPageIndex());
+        setPageCount(scene.getPageCount());
         setDocuments(scene.getDocuments());
         setActiveDocumentId(scene.getActiveDocumentId());
         setActivePdfHandle(scene.getActivePdfHandle());
@@ -174,6 +184,7 @@ export function useSketchScene(): UseSketchScene {
       scene.off('projectLoaded', onProjectLoaded);
       scene.off('networkTypesChanged', onNetworkTypesChanged);
       scene.off('zoomChanged', onZoomChanged);
+      scene.off('pageChanged', onPageChanged);
       scene.off('documentsChanged', onDocumentsChanged);
       scene.off('documentActivated', onDocumentActivated);
       scene.destroy();
@@ -192,6 +203,8 @@ export function useSketchScene(): UseSketchScene {
     networkSummaries,
     networkTypes,
     zoom,
+    pageIndex,
+    pageCount,
     calibration,
     measurementMm,
     calibrationPrompt,

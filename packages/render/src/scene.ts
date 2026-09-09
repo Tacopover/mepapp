@@ -312,6 +312,8 @@ interface SketchSceneEvents {
   flowSolved: [FlowResult[]];
   projectLoaded: [];
   zoomChanged: [zoom: number];
+  /** The active document's backdrop switched to a different PDF page — status bar page navigation. */
+  pageChanged: [pageIndex: number];
   /** The active network type, or a per-document network type's name, changed — the Stamps tab's Network Types section's cue to re-render. */
   networkTypesChanged: [NetworkType[]];
   /** A different document became active — everything (selection, stamps, networks, calibration, drawing summary, flow result, zoom) should be re-pulled via the getters, not diffed. */
@@ -535,6 +537,41 @@ export class SketchScene {
     }
     this.emitter.emit('documentsChanged', this.getDocuments());
     return target.id;
+  }
+
+  /**
+   * Swaps the active document's backdrop to a different already-rendered
+   * page of the same open PDF (status bar's page navigation, atlas §6) —
+   * every placed stamp/segment/fitting/annotation is left untouched. They
+   * aren't page-scoped today (each still records pageIndex: 0 regardless of
+   * which page is shown, see D4) — this is a view-only page flip, not full
+   * multi-page domain support.
+   */
+  setBackdropPage(bitmap: ImageBitmap, pageWidthPt: number, pageHeightPt: number, pageIndex: number): void {
+    const old = this.doc.backdropSprite;
+    if (old) {
+      this.world.removeChild(old);
+      old.destroy({ texture: true });
+    }
+    const sprite = new Sprite(textureFromImageBitmap(bitmap));
+    sprite.anchor.set(0);
+    sprite.width = pageWidthPt;
+    sprite.height = pageHeightPt;
+    this.doc.backdropSprite = sprite;
+    this.world.addChildAt(sprite, 0);
+    this.doc.pageIndex = pageIndex;
+    this.redrawOverlay();
+    this.emitter.emit('pageChanged', pageIndex);
+  }
+
+  /** The active document's currently-shown page (0-based) — status bar's "Page X of N". */
+  getPageIndex(): number {
+    return this.doc.pageIndex;
+  }
+
+  /** Total pages in the active document's PDF, or 1 if none is open. */
+  getPageCount(): number {
+    return this.doc.pdfHandle?.getPageCount() ?? 1;
   }
 
   /** Public, cheap pre-check so a caller can skip re-parsing a file that's already open — see decisions log 2026-09-07, D3. */
@@ -1406,7 +1443,8 @@ export class SketchScene {
     const screen = { x: event.global.x, y: event.global.y };
     const world = this.screenToWorld(screen);
 
-    if (event.button === 2 || this.tool === 'pan') {
+    if (event.button === 1 || event.button === 2 || this.tool === 'pan') {
+      if (event.button === 1) event.preventDefault(); // stop the browser's native middle-click autoscroll mode
       this.drag = { kind: 'pan', startScreen: screen, startWorldPos: { x: this.world.x, y: this.world.y } };
       return;
     }
@@ -1879,16 +1917,34 @@ export class SketchScene {
 
   private readonly onWheel = (event: FederatedWheelEvent): void => {
     event.preventDefault();
-    const screen = { x: event.global.x, y: event.global.y };
-    const beforeWorld = this.screenToWorld(screen);
     const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, this.world.scale.x * factor));
+    this.applyZoomAtScreenPoint(this.world.scale.x * factor, { x: event.global.x, y: event.global.y });
+  };
+
+  /** Shared by the wheel handler and the status bar's zoom buttons — zooms so screenPoint's world position stays fixed under it. */
+  private applyZoomAtScreenPoint(newZoomRaw: number, screenPoint: Vec2): void {
+    const beforeWorld = this.screenToWorld(screenPoint);
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoomRaw));
     this.world.scale.set(newZoom);
-    this.world.x = screen.x - beforeWorld.x * newZoom;
-    this.world.y = screen.y - beforeWorld.y * newZoom;
+    this.world.x = screenPoint.x - beforeWorld.x * newZoom;
+    this.world.y = screenPoint.y - beforeWorld.y * newZoom;
     this.redrawOverlay();
     this.emitter.emit('zoomChanged', newZoom);
-  };
+  }
+
+  private screenCenter(): Vec2 {
+    return { x: this.app.screen.width / 2, y: this.app.screen.height / 2 };
+  }
+
+  /** Status bar's zoom +/- buttons — same math as the wheel handler, centered on the canvas's own center rather than a cursor position. */
+  zoomBy(factor: number): void {
+    this.applyZoomAtScreenPoint(this.world.scale.x * factor, this.screenCenter());
+  }
+
+  /** Status bar's zoom chip reset-to-100% action. */
+  resetZoom(): void {
+    this.applyZoomAtScreenPoint(1, this.screenCenter());
+  }
 
   /**
    * Delete/Backspace deletes the current selection (rail Delete flyout's
