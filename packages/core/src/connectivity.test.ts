@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { recomputeAttachedSegments, resolveConnectionPointWorld, type ConnectivityGraphState } from './connectivity.js';
 import type { Fitting, Segment } from './network.js';
-import type { PlacedStamp } from './stamp.js';
+import { SYNTHETIC_CENTER_PORT_ID, type PlacedStamp } from './stamp.js';
 
 const stamp: PlacedStamp = {
   id: 'ahu',
@@ -68,6 +68,12 @@ describe('resolveConnectionPointWorld', () => {
   it('returns null for a dangling port reference', () => {
     expect(resolveConnectionPointWorld({ kind: 'port', elementId: 'ahu', portId: 'missing' }, baseState())).toBeNull();
   });
+
+  it('resolves the synthetic center port on a port-less stamp (Phase 5 bridge)', () => {
+    const portless: PlacedStamp = { ...stamp, id: 'grille', ports: [] };
+    const state = baseState({ stamps: { ...baseState().stamps, [portless.id]: portless } });
+    expect(resolveConnectionPointWorld({ kind: 'port', elementId: 'grille', portId: SYNTHETIC_CENTER_PORT_ID }, state)).toEqual(portless.transform.position);
+  });
 });
 
 describe('recomputeAttachedSegments', () => {
@@ -111,5 +117,30 @@ describe('recomputeAttachedSegments', () => {
     const state = baseState({ stamps: {} }); // ahu's port no longer resolvable
     const updates = recomputeAttachedSegments(state, [{ kind: 'fitting', fittingId: 'f1' }]);
     expect(updates.s1).toBeUndefined();
+  });
+
+  it('rewrites the endpoint nearest a moved stamp, driven by its port (Phase 3 cascade)', () => {
+    const moved = { ...stamp, transform: { ...stamp.transform, position: { x: 400, y: 250 } } };
+    const state = baseState({ stamps: { [moved.id]: moved } });
+
+    const updates = recomputeAttachedSegments(state, [{ kind: 'port', elementId: 'ahu', portId: 'p1' }]);
+
+    expect(Object.keys(updates)).toEqual(['s1']);
+    // p1 is at fractionX=1, so its world position is the new center plus the unscaled half-width offset (20).
+    expect(updates.s1.geometry).toEqual([
+      { x: 420, y: 250 },
+      { x: 300, y: 100 }, // endpointB (fitting) unchanged
+    ]);
+  });
+
+  it('cascades through a port-less stamp\'s synthetic center port (Phase 5 bridge)', () => {
+    const portless: PlacedStamp = { ...stamp, id: 'grille', ports: [] };
+    const segmentToPortless: Segment = { ...segmentToFitting, id: 's3', endpointA: { kind: 'port', elementId: 'grille', portId: SYNTHETIC_CENTER_PORT_ID } };
+    const moved = { ...portless, transform: { ...portless.transform, position: { x: 700, y: 700 } } };
+    const state = baseState({ segments: { [segmentToPortless.id]: segmentToPortless }, stamps: { [moved.id]: moved } });
+
+    const updates = recomputeAttachedSegments(state, [{ kind: 'port', elementId: 'grille', portId: SYNTHETIC_CENTER_PORT_ID }]);
+
+    expect(updates.s3.geometry).toEqual([{ x: 700, y: 700 }, { x: 300, y: 100 }]);
   });
 });

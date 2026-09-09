@@ -9,7 +9,7 @@
 
 import { getWorldPortPosition, type Vec2 } from './geometry.js';
 import { nodeKeyOf, type ConnectionPoint, type Fitting, type PortGroup, type Segment } from './network.js';
-import { type PlacedStamp } from './stamp.js';
+import { getStampPorts, type PlacedStamp } from './stamp.js';
 
 export interface ConnectivityGraphState {
   segments: Record<string, Segment>;
@@ -27,7 +27,7 @@ export function resolveConnectionPointWorld(
     return state.fittings[point.fittingId]?.position ?? null;
   }
   const stamp = state.stamps[point.elementId];
-  const port = stamp?.ports.find((p) => p.id === point.portId);
+  const port = stamp && getStampPorts(stamp).find((p) => p.id === point.portId);
   if (!stamp || !port) return null;
   return getWorldPortPosition(port, stamp.transform, stamp.nativeWidth, stamp.nativeHeight);
 }

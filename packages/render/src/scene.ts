@@ -17,6 +17,7 @@ import {
   computeNetworks,
   distance,
   getStampDefinition,
+  getStampPorts,
   loadProject,
   measureRealDistance,
   multiRotate,
@@ -1234,15 +1235,17 @@ export class SketchScene {
       const tx = new Transaction(this.doc.drawingHistory, 'Rotate selection');
       tx.update((s) => {
         const stamps = { ...s.stamps };
+        const rotatedIds: string[] = [];
         stampSnapshot.forEach((item, i) => {
           if (!stamps[item.id]) return;
           stamps[item.id] = { ...stamps[item.id], transform: rotated[i] };
+          rotatedIds.push(item.id);
         });
         const annotations = { ...s.annotations };
         for (const id of annotationIds) {
           annotations[id] = { ...annotations[id], geometry: rotateAnnotationGeometry(annotations[id].geometry, pivot, deltaDegrees) };
         }
-        return { ...s, stamps, annotations };
+        return this.applyConnectivityCascade({ ...s, stamps, annotations }, this.stampPortConnectionPoints(rotatedIds, stamps));
       });
       tx.commit();
       this.syncDrawingLayer();
@@ -1288,10 +1291,40 @@ export class SketchScene {
     tx.update((state) => {
       const data = state.stamps[id];
       if (!data) return state;
-      return { ...state, stamps: { ...state.stamps, [id]: { ...data, transform } } };
+      const stamps = { ...state.stamps, [id]: { ...data, transform } };
+      return this.applyConnectivityCascade({ ...state, stamps }, this.stampPortConnectionPoints([id], stamps));
     });
     tx.commit();
     this.syncDrawingLayer();
+  }
+
+  /** Every connection point a stamp's own ports offer, for the given ids — the render layer's equivalent of "which nodes did this mutation touch," fed straight into recomputeAttachedSegments below. A stamp with no ports yet (pre-Phase 5) simply contributes nothing. */
+  private stampPortConnectionPoints(ids: Iterable<string>, stamps: Record<string, PlacedStamp>): ConnectionPoint[] {
+    const points: ConnectionPoint[] = [];
+    for (const id of ids) {
+      const data = stamps[id];
+      if (!data) continue;
+      for (const port of getStampPorts(data)) points.push({ kind: 'port', elementId: id, portId: port.id });
+    }
+    return points;
+  }
+
+  /**
+   * Shared by every stamp/fitting mutation path that can move a connected
+   * node — recomputes attached segment geometry from state's own live
+   * fittings/stamps and merges the result in, or returns state unchanged if
+   * nothing moved. The one call every such mutation path goes through,
+   * mirroring the old app's single shared re-seat routine (connectivity
+   * spec §2.1) instead of a second parallel recompute per node kind —
+   * fittings (Phase 1) and now stamps (Phase 3/4) both funnel through here.
+   */
+  private applyConnectivityCascade(state: DrawingState, changed: ConnectionPoint[]): DrawingState {
+    if (changed.length === 0) return state;
+    const segmentUpdates = recomputeAttachedSegments(
+      { segments: state.segments, fittings: state.fittings, stamps: state.stamps, portGroups: this.doc.portGroups },
+      changed,
+    );
+    return { ...state, segments: { ...state.segments, ...segmentUpdates } };
   }
 
   private screenToWorld(screen: Vec2): Vec2 {
@@ -1757,9 +1790,11 @@ export class SketchScene {
         const fittingOriginals = this.drag.fittingSnapshot;
         this.drag.drawingTx.update((state) => {
           const stamps = { ...state.stamps };
+          const movedStampIds: string[] = [];
           for (const { id, position } of stampOriginals) {
             if (!stamps[id]) continue;
             stamps[id] = { ...stamps[id], transform: { ...stamps[id].transform, position: { x: position.x + dx, y: position.y + dy } } };
+            movedStampIds.push(id);
           }
           const annotations = { ...state.annotations };
           for (const [id, original] of Object.entries(annotationOriginals)) {
@@ -1767,15 +1802,13 @@ export class SketchScene {
             annotations[id] = { ...annotations[id], geometry: translateAnnotationGeometry(original, dx, dy) };
           }
           const fittings = { ...state.fittings };
-          const changed: ConnectionPoint[] = [];
+          const changed = this.stampPortConnectionPoints(movedStampIds, stamps);
           for (const [id, original] of Object.entries(fittingOriginals)) {
             if (!fittings[id]) continue;
             fittings[id] = { ...fittings[id], position: { x: original.x + dx, y: original.y + dy } };
             changed.push({ kind: 'fitting', fittingId: id });
           }
-          if (changed.length === 0) return { ...state, stamps, annotations, fittings };
-          const segmentUpdates = recomputeAttachedSegments({ segments: state.segments, fittings, stamps, portGroups: this.doc.portGroups }, changed);
-          return { ...state, stamps, annotations, fittings, segments: { ...state.segments, ...segmentUpdates } };
+          return this.applyConnectivityCascade({ ...state, stamps, annotations, fittings }, changed);
         });
         this.syncDrawingLayer();
       }
@@ -1800,16 +1833,18 @@ export class SketchScene {
         const pivot = this.drag.pivot;
         this.drag.drawingTx.update((state) => {
           const stamps = { ...state.stamps };
+          const rotatedIds: string[] = [];
           stampSnapshot.forEach((s, i) => {
             if (!stamps[s.id]) return;
             stamps[s.id] = { ...stamps[s.id], transform: rotated[i] };
+            rotatedIds.push(s.id);
           });
           const annotations = { ...state.annotations };
           for (const [id, original] of Object.entries(originals)) {
             if (!annotations[id]) continue;
             annotations[id] = { ...annotations[id], geometry: rotateAnnotationGeometry(original, pivot, delta) };
           }
-          return { ...state, stamps, annotations };
+          return this.applyConnectivityCascade({ ...state, stamps, annotations }, this.stampPortConnectionPoints(rotatedIds, stamps));
         });
         this.syncDrawingLayer();
       }

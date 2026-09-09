@@ -474,3 +474,67 @@ unblocked, since stamp position lives in `DrawingState`), Phase 4
 (stamp rotate cascade), Phase 5 (synthetic center port), Phase 6
 (chained drawing), Phase 7 (deferred). This plan file stays until every
 phase is done.
+
+## 10. Phase 3 + 4 + 5 status
+
+**Done** — 2026-09-09, on `worktree-segments-ports-custom-elements-spec`
+(pushed to origin, not yet merged to master).
+
+Shipped, in one pass since all three were small and tightly coupled
+once Phase 0 landed:
+
+- **Phase 3/4** — `packages/render/src/scene.ts` gained two shared
+  private helpers: `stampPortConnectionPoints(ids, stamps)` (every
+  connection point a set of stamps' own ports offer — the render
+  layer's "which nodes did this touch" list) and
+  `applyConnectivityCascade(state, changed)` (calls core's
+  `recomputeAttachedSegments` and merges the result, or returns `state`
+  unchanged if `changed` is empty). Every stamp-transform mutation path
+  now funnels through these two — `move-selection`'s drag, `rotate-
+  selection`'s drag, the instant `rotateSelectionBy` rail action, and
+  `applyStampTransform` (the typed Properties-panel X/Y/rotation
+  setters) — mirroring Phase 1's fitting cascade and closing the same
+  "forgotten call site" risk §2.1 flags, now for every node kind, not
+  just fittings. Phase 4 needed no separate geometry work, exactly as
+  the spec predicted: `getWorldPortPosition` already derives a port's
+  position live from the stamp's current transform, so once a rotation
+  is written into `state.stamps` before the cascade call, the recompute
+  picks up the new port position automatically.
+- **Phase 5** — new `packages/core/src/stamp.ts` export
+  `getStampPorts(stamp)`: returns `stamp.ports` unchanged when
+  non-empty, or a single synthetic `{ id: '__center__', fractionX: 0.5,
+  fractionY: 0.5 }` port when empty. `SYNTHETIC_CENTER_PORT_ID` is
+  exported alongside it. Every connection-resolution call site now goes
+  through this instead of reading `stamp.ports` directly:
+  `getStampWorldPorts` (stamp.ts, which `resolveSegmentEndpoint` in
+  segmentTool.ts already calls, so the two-click draw tool picked up
+  the bridge with no changes of its own), `resolveConnectionPointWorld`
+  (connectivity.ts), and `stampPortConnectionPoints` (scene.ts, above).
+  UI that lists a stamp's own *authored* ports (`PropertiesPanel`'s
+  port-group checkbox list, `StampInfo.ports`) deliberately still reads
+  `stamp.ports` raw — a synthetic port isn't a real one a user can
+  choose to group. No `ConnectionPoint` schema change, as the spec
+  anticipated: the synthetic port is a normal `{ kind: 'port',
+  elementId, portId: '__center__' }`, so it keeps working unchanged if
+  a real port is later authored at the same position.
+
+Verified: `pnpm build` clean across all 9 workspace packages;
+`pnpm vitest run` in `packages/core` — 125/125 passing (7 new: two in
+`stamp.test.ts` for `getStampPorts`'s two branches, two in
+`connectivity.test.ts` for a stamp-driven cascade and the synthetic-
+port cascade, one in `segmentTool.test.ts` for snapping to a port-less
+stamp); `tsc --noEmit` clean in `packages/render`. Exercised live via a
+scripted Playwright session: placed a "Supply Grille" (one real,
+authored port) and drew a segment to its port, then dragged the stamp
+(segment endpoint followed — confirmed structurally via the fitting
+count staying at 1, i.e. the click genuinely snapped to the port rather
+than creating a second bare fitting) and rotated it 90° (segment
+endpoint moved to the rotated port position), undoing each; placed a
+"Fire Hose Reel" (zero authored ports) and drew a segment directly onto
+its body — snapped to the synthetic center port — then dragged it and
+confirmed the segment's endpoint tracked the stamp's center exactly,
+undoing correctly in one step. No console/page errors in any of it.
+
+Not done: Phase 6 (chained click-click-click segment drawing) and
+Phase 7 (explicitly deferred). This plan file stays until Phase 6 is
+either done or explicitly dropped alongside Phase 7.

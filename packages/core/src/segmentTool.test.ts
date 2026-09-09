@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveSegmentEndpoint, splitSegmentAtFitting } from './segmentTool.js';
 import type { Fitting, Segment } from './network.js';
-import type { PlacedStamp } from './stamp.js';
+import { SYNTHETIC_CENTER_PORT_ID, type PlacedStamp } from './stamp.js';
 
 const stamp: PlacedStamp = {
   id: 'ahu',
@@ -11,6 +11,8 @@ const stamp: PlacedStamp = {
   nativeHeight: 20,
   ports: [{ id: 'p1', name: 'out', fractionX: 1, fractionY: 0.5 }],
 };
+
+const portlessStamp: PlacedStamp = { ...stamp, id: 'grille', ports: [] };
 
 const existingFitting: Fitting = { id: 'f1', pageIndex: 0, position: { x: 300, y: 100 }, kind: 'junction' };
 
@@ -72,6 +74,16 @@ describe('resolveSegmentEndpoint', () => {
   it('creates a brand new bare fitting when nothing is nearby', () => {
     const target = resolveSegmentEndpoint({ x: 900, y: 900 }, [stamp], [existingFitting], [existingSegment], { radius: 10 });
     expect(target).toEqual({ kind: 'new-fitting', worldPosition: { x: 900, y: 900 } });
+  });
+
+  it('snaps to a port-less stamp\'s synthetic center port (Phase 5 bridge)', () => {
+    // portlessStamp's center is its own transform.position, (100, 100).
+    const target = resolveSegmentEndpoint({ x: 100, y: 100 }, [portlessStamp], [], [], { radius: 10 });
+    expect(target).toEqual({
+      kind: 'existing',
+      point: { kind: 'port', elementId: 'grille', portId: SYNTHETIC_CENTER_PORT_ID },
+      worldPosition: { x: 100, y: 100 },
+    });
   });
 });
 
