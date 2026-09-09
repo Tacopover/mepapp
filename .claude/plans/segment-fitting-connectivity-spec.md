@@ -334,3 +334,56 @@ not confirmed either way whether an equivalent exists today.
   (Phase 7).
 
 None of these block starting Phase 1.
+
+## 8. Phase 1 + 2 status
+
+**Done** — 2026-09-09, commit `c3008ba` on `worktree-segments-ports-custom-elements-spec` (pushed to origin, not yet merged to master).
+
+Shipped: new pure `packages/core/src/connectivity.ts`
+(`resolveConnectionPointWorld`, `recomputeAttachedSegments` — 9 vitest
+cases, all passing) plus its `index.ts` export. `packages/render/src/scene.ts`:
+`SelectableRef` gained a `'fitting'` variant; `hitTest` and
+`resolveSelectableBoundsWorld` both handle it (new
+`FITTING_MARKER_RADIUS_WORLD`/`FITTING_HIT_RADIUS_SCREEN_PX` constants,
+the latter matching §5 Phase 1's "generous screen-px click target"); a
+new `selectableRefForId` helper replaces three duplicated
+stamp-or-annotation ternaries now that there are three kinds, not two;
+`stampsRecord()` adapts `doc.stamps` for `recomputeAttachedSegments`'s
+`ConnectivityGraphState` input. The existing `move-selection` drag
+state (already generic over a mixed selection, single or multi) gained
+a `fittingSnapshot` alongside `annotationSnapshot`, and its
+`annotationTx` was generalized to `drawingTx`: on every pointermove it
+now also writes moved fittings' positions and calls
+`recomputeAttachedSegments` once per gesture with every moved fitting's
+connection point, merging the returned segment updates into the same
+transaction — so a fitting drag/multi-drag, its segment cascade, and
+the undo entry are genuinely one atomic step, and Phase 2's
+"recompute once per gesture, not once per node" is satisfied by
+construction (the loop already collects every changed point before the
+single `recomputeAttachedSegments` call). Fittings never rotate (per
+§2.1's old-app source read), so `rotate-selection` was left untouched.
+
+Verified: `pnpm build` clean across all 9 workspace packages;
+`pnpm vitest run` in `packages/core` — 118/118 passing (109 pre-existing
++ 9 new); `tsc --noEmit` clean in `packages/render`. Exercised live via
+a scripted Playwright session against `pnpm dev` (no project run-skill
+existed for this repo yet): drew a 3-fitting/2-segment chain, dragged
+the shared middle fitting — both segments followed, endpoints away from
+the drag stayed fixed; undid the drag — position and segment geometry
+correctly reverted in one step; multi-selected both end fittings and
+dragged them together — both segments recomputed correctly from a
+single gesture. No console/page errors in any of it.
+
+**Found, not fixed (pre-existing, out of scope for this spec):**
+`SketchScene.undoDrawing()`/`redoDrawing()` never call
+`redrawOverlay()`, so a selection's highlight box/rotation-handle
+overlay visibly stays at its pre-undo position for one frame until the
+next redraw-triggering interaction — cosmetic only (the underlying
+`DrawingState` and canvas geometry both revert correctly), pre-dates
+this change, and would affect an undone annotation/stamp move too, not
+just fittings. Worth a one-line follow-up (`this.redrawOverlay();` in
+both methods) whenever someone's next in `scene.ts`.
+
+Not done: Phase 0 (stamp state unification — prerequisite for Phase
+3/4's stamp-drag cascade), Phase 3-7. This plan file stays until every
+phase is done — see CLAUDE.md's plan-file convention.
