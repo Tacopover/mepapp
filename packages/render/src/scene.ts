@@ -15,7 +15,9 @@ import {
   coerceDefaultValue,
   CompositeCommand,
   computeNetworks,
+  distance,
   getStampDefinition,
+  getStampPorts,
   loadProject,
   measureRealDistance,
   multiRotate,
@@ -26,6 +28,7 @@ import {
   pointNearPolyline,
   pointNearSegment,
   reconcilePdfSync,
+  recomputeAttachedSegments,
   rectIntersectsRotatedRect,
   resolveSegmentEndpoint,
   rotateAnnotationGeometry,
@@ -40,6 +43,7 @@ import {
   type AnnotationGeometry,
   type Calibration,
   type Command,
+  type ConnectionPoint,
   type CustomPropertyDefinition,
   type CustomPropertyValues,
   type Discipline,
@@ -60,7 +64,7 @@ import {
 } from '@mepapp/core';
 import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
-import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState, type StampEntry } from './document.js';
+import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 
 export type { DocumentSummary } from './document.js';
 
@@ -171,6 +175,14 @@ function deleteSegmentCommand(segment: Segment): Command<DrawingState> {
   };
 }
 
+function createStampCommand(stamp: PlacedStamp): Command<DrawingState> {
+  return {
+    description: `Place stamp ${stamp.id}`,
+    execute: (state) => ({ ...state, stamps: { ...state.stamps, [stamp.id]: stamp } }),
+    undo: (state) => ({ ...state, stamps: withoutKey(state.stamps, stamp.id) }),
+  };
+}
+
 /** One command per whole annotation (a freehand stroke's every point included) — never one command per point, so undoing a drawn annotation is always a single step. */
 function createAnnotationCommand(annotation: Annotation): Command<DrawingState> {
   return {
@@ -194,6 +206,10 @@ const STAMP_SOURCE_DPI = 300;
 
 const HANDLE_OFFSET_WORLD_AT_ZOOM_1 = 32;
 const HANDLE_HIT_RADIUS_SCREEN_PX = 10;
+/** Drawn radius of a fitting's marker circle (syncDrawingLayer) — also its bounding box for selection/pivot purposes. */
+const FITTING_MARKER_RADIUS_WORLD = 6;
+/** Extra click-target slack around a fitting's drawn radius, in screen px at zoom 1 — same generous-target idea as HANDLE_HIT_RADIUS_SCREEN_PX. */
+const FITTING_HIT_RADIUS_SCREEN_PX = 8;
 const ROTATE_SNAP_DEGREES = 45;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 32;
@@ -340,8 +356,8 @@ class TypedEmitter<Events extends Record<string, unknown[]>> {
   }
 }
 
-/** A selectable object is either a placed stamp or a drawn annotation — see hitTest. */
-type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'annotation'; id: string };
+/** A selectable object is a placed stamp, a fitting, or a drawn annotation — see hitTest. */
+type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'fitting'; id: string } | { kind: 'annotation'; id: string };
 
 /** Original per-annotation geometry captured at gesture start, so move/rotate can recompute the whole gesture's delta from a fixed origin on every pointermove rather than drifting by accumulating per-frame deltas. */
 type AnnotationSnapshot = Record<string, AnnotationGeometry>;
@@ -352,9 +368,13 @@ type DragState =
   | {
       kind: 'move-selection';
       startPointerWorld: Vec2;
+      /** Selected stamps' positions at gesture start (from getSelection(), so stamp-only) — the stamp counterpart to annotationSnapshot/fittingSnapshot below. */
       snapshot: Array<{ id: string; position: Vec2 }>;
       annotationSnapshot: AnnotationSnapshot;
-      annotationTx: Transaction<DrawingState> | null;
+      /** Fitting positions at gesture start, keyed by fitting id — the fitting counterpart to annotationSnapshot above. */
+      fittingSnapshot: Record<string, Vec2>;
+      /** Undoable transaction covering snapshot's/annotationSnapshot's/fittingSnapshot's moves, plus the cascaded recompute of any segment attached to a moved fitting — null when none of the three is present in the selection. */
+      drawingTx: Transaction<DrawingState> | null;
       /** Set when this gesture began on an already-sole-selected textbox/stickyNote — a click with no drag reopens its text editor instead of committing a zero-length move. */
       reopenTextEditId: string | null;
       /** True once onPointerMove has actually applied a delta — a plain click never sets this, since a real pointermove never fires for zero on-screen movement. Gates whether onPointerUp commits anything. */
@@ -364,9 +384,11 @@ type DragState =
       kind: 'rotate-selection';
       pivot: Vec2;
       startPointerAngleDeg: number;
+      /** Selected stamps' transforms at gesture start (from getSelection(), so stamp-only). */
       snapshot: Array<{ id: string; transform: Transform2D }>;
       annotationSnapshot: AnnotationSnapshot;
-      annotationTx: Transaction<DrawingState> | null;
+      /** Undoable transaction covering both snapshot's stamp rotations and annotationSnapshot's — null when neither is present in the selection. */
+      drawingTx: Transaction<DrawingState> | null;
       moved: boolean;
     }
   | { kind: 'resize-rect'; id: string; corner: 'x0y0' | 'x1y0' | 'x1y1' | 'x0y1'; original: AnnotationGeometry; tx: Transaction<DrawingState>; moved: boolean }
@@ -680,25 +702,26 @@ export class SketchScene {
     };
   }
 
-  private toStampInfo(entry: StampEntry): StampInfo {
+  private toStampInfo(data: PlacedStamp): StampInfo {
     return {
-      id: entry.data.id,
-      category: entry.data.category,
-      transform: entry.data.transform,
-      nativeWidth: entry.data.nativeWidth,
-      nativeHeight: entry.data.nativeHeight,
-      ports: entry.data.ports,
-      linkedPortIds: this.doc.portGroups.find((g) => g.elementId === entry.data.id)?.portIds ?? null,
-      definitionId: entry.data.definitionId,
-      properties: entry.data.properties,
+      id: data.id,
+      category: data.category,
+      transform: data.transform,
+      nativeWidth: data.nativeWidth,
+      nativeHeight: data.nativeHeight,
+      ports: data.ports,
+      linkedPortIds: this.doc.portGroups.find((g) => g.elementId === data.id)?.portIds ?? null,
+      definitionId: data.definitionId,
+      properties: data.properties,
     };
   }
 
   getSelection(): StampInfo[] {
+    const state = this.doc.drawingHistory.getState();
     return [...this.doc.selectedIds]
-      .map((id) => this.doc.stamps.get(id))
-      .filter((e): e is StampEntry => e !== undefined)
-      .map((e) => this.toStampInfo(e));
+      .map((id) => state.stamps[id])
+      .filter((d): d is PlacedStamp => d !== undefined)
+      .map((d) => this.toStampInfo(d));
   }
 
   /** Whether anything (a stamp or an annotation) is currently selected — unlike getSelection(), which only reports stamps (the Properties panel's read model), this covers the full selection for gating UI like the rail's Rotate/Delete actions. */
@@ -708,7 +731,7 @@ export class SketchScene {
 
   /** Programmatically selects one placed stamp by id and syncs the canvas highlight — the Networks tree's click-to-select-on-canvas action (every other selection path so far originated from a canvas hit-test). No-op if `id` isn't a placed stamp. */
   selectStampById(id: string): void {
-    if (!this.doc.stamps.has(id)) return;
+    if (!this.doc.drawingHistory.getState().stamps[id]) return;
     this.doc.selectedIds = new Set([id]);
     this.emitter.emit('selectionChanged', this.getSelection());
     this.redrawOverlay();
@@ -716,7 +739,7 @@ export class SketchScene {
 
   /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. */
   listStamps(): StampInfo[] {
-    return [...this.doc.stamps.values()].map((e) => this.toStampInfo(e));
+    return Object.values(this.doc.drawingHistory.getState().stamps).map((d) => this.toStampInfo(d));
   }
 
   /** Derives the current network topology (see core's computeNetworks) resolved against known network types — the Layers panel's "Networks" list. */
@@ -773,13 +796,17 @@ export class SketchScene {
   undoDrawing(): void {
     this.doc.drawingHistory.undo();
     this.syncDrawingLayer();
+    this.redrawOverlay();
     this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   redoDrawing(): void {
     this.doc.drawingHistory.redo();
     this.syncDrawingLayer();
+    this.redrawOverlay();
     this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /** Every network type known to the active document — the effective library the Stamps tab's Network Types section renders (falls back to the static NETWORK_TYPE_LIBRARY entry for any type never yet picked). */
@@ -847,9 +874,14 @@ export class SketchScene {
 
   /** One custom-property value on a placed Terminal/Equipment (Global Properties dialog, Properties panel). */
   setStampProperty(elementId: string, name: string, value: string | number): void {
-    const entry = this.doc.stamps.get(elementId);
-    if (!entry) return;
-    entry.data.properties = { ...entry.data.properties, [name]: value };
+    if (!this.doc.drawingHistory.getState().stamps[elementId]) return;
+    const tx = new Transaction(this.doc.drawingHistory, `Set ${elementId} property ${name}`);
+    tx.update((state) => {
+      const data = state.stamps[elementId];
+      if (!data) return state;
+      return { ...state, stamps: { ...state.stamps, [elementId]: { ...data, properties: { ...data.properties, [name]: value } } } };
+    });
+    tx.commit();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
@@ -871,13 +903,19 @@ export class SketchScene {
     const removedNames = previous.filter((d) => !nextNames.has(d.name)).map((d) => d.name);
     const addedDefs = next.filter((d) => !previousNames.has(d.name));
     if (removedNames.length === 0 && addedDefs.length === 0) return;
-    for (const entry of this.doc.stamps.values()) {
-      if (entry.data.category !== category) continue;
-      const properties = { ...entry.data.properties };
-      for (const name of removedNames) delete properties[name];
-      for (const def of addedDefs) properties[def.name] = coerceDefaultValue(def);
-      entry.data.properties = properties;
-    }
+    const tx = new Transaction(this.doc.drawingHistory, `Update ${category} properties`);
+    tx.update((state) => {
+      const stamps = { ...state.stamps };
+      for (const [id, data] of Object.entries(stamps)) {
+        if (data.category !== category) continue;
+        const properties = { ...data.properties };
+        for (const name of removedNames) delete properties[name];
+        for (const def of addedDefs) properties[def.name] = coerceDefaultValue(def);
+        stamps[id] = { ...data, properties };
+      }
+      return { ...state, stamps };
+    });
+    tx.commit();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
@@ -907,7 +945,7 @@ export class SketchScene {
       networkTypes: this.doc.networkTypes,
       segments: Object.values(state.segments),
       fittings: Object.values(state.fittings),
-      stamps: [...this.doc.stamps.values()].map((entry) => entry.data),
+      stamps: Object.values(state.stamps),
       portGroups: this.doc.portGroups,
       annotations: Object.values(state.annotations),
     }) as unknown as ProjectDocument;
@@ -946,6 +984,7 @@ export class SketchScene {
     target.drawingHistory.setLiveState({
       segments: Object.fromEntries(doc.segments.map((s) => [s.id, s])),
       fittings: Object.fromEntries(doc.fittings.map((f) => [f.id, f])),
+      stamps: Object.fromEntries(doc.stamps.map((s) => [s.id, s])),
       annotations: Object.fromEntries(doc.annotations.map((a) => [a.id, a])),
     });
     target.networkTypes.splice(0, target.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
@@ -977,7 +1016,7 @@ export class SketchScene {
       sprite.anchor.set(0.5); // matches placeStamp's pivot convention
       const baseScale = { x: stampData.nativeWidth / texture.width, y: stampData.nativeHeight / texture.height };
       applyTransformToSprite(sprite, stampData.transform, baseScale);
-      target.stamps.set(stampData.id, { data: stampData, sprite, baseScale });
+      target.stamps.set(stampData.id, { sprite, baseScale });
       target.stampsLayer.addChild(sprite);
     }
     target.nextStampSeq = Math.max(target.nextStampSeq, maxStampSeq + 1);
@@ -1058,11 +1097,11 @@ export class SketchScene {
     for (const fitting of Object.values(state.fittings)) {
       entries.push({ id: fitting.id, geometry: { x: round(fitting.position.x), y: round(fitting.position.y) } });
     }
-    for (const entry of this.doc.stamps.values()) {
-      const bounds = this.stampWorldBounds(entry);
+    for (const data of Object.values(state.stamps)) {
+      const bounds = this.stampWorldBounds(data);
       entries.push({
-        id: entry.data.id,
-        geometry: { x: round(bounds.minX), y: round(bounds.minY), rotationDegrees: round(entry.data.transform.rotationDegrees) },
+        id: data.id,
+        geometry: { x: round(bounds.minX), y: round(bounds.minY), rotationDegrees: round(data.transform.rotationDegrees) },
       });
     }
     for (const annotation of Object.values(state.annotations)) {
@@ -1071,17 +1110,17 @@ export class SketchScene {
     return entries;
   }
 
-  private stampWorldBounds(entry: StampEntry): { minX: number; minY: number; maxX: number; maxY: number } {
-    const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
-    const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
+  private stampWorldBounds(data: PlacedStamp): { minX: number; minY: number; maxX: number; maxY: number } {
+    const halfWidth = (data.nativeWidth / 2) * data.transform.scale.x;
+    const halfHeight = (data.nativeHeight / 2) * data.transform.scale.y;
     const corners = [
       { x: -halfWidth, y: -halfHeight },
       { x: halfWidth, y: -halfHeight },
       { x: halfWidth, y: halfHeight },
       { x: -halfWidth, y: halfHeight },
     ].map((local) => {
-      const r = rotatePointAround(local, { x: 0, y: 0 }, entry.data.transform.rotationDegrees);
-      return { x: r.x + entry.data.transform.position.x, y: r.y + entry.data.transform.position.y };
+      const r = rotatePointAround(local, { x: 0, y: 0 }, data.transform.rotationDegrees);
+      return { x: r.x + data.transform.position.x, y: r.y + data.transform.position.y };
     });
     return {
       minX: Math.min(...corners.map((c) => c.x)),
@@ -1110,7 +1149,8 @@ export class SketchScene {
       return;
     }
     const stampEntry = this.doc.stamps.get(id);
-    if (stampEntry) {
+    const stampData = state.stamps[id];
+    if (stampEntry && stampData) {
       // Extracting the live sprite directly comes back fully blank whenever
       // it's placed away from world origin: PixiJS's extract sizes the output
       // to the target's local (untranslated) bounds but still renders it
@@ -1138,7 +1178,7 @@ export class SketchScene {
       extractionRoot.addChild(extractionSprite);
       const pngBytes = dataUrlToBytes(await this.app.renderer.extract.base64({ target: extractionRoot, format: 'png' }));
       extractionRoot.destroy(); // the shared texture is owned by stampEntry.sprite, not extractionSprite — never { children: true, texture: true } here
-      const bounds = this.stampWorldBounds(stampEntry);
+      const bounds = this.stampWorldBounds(stampData);
       await handle.addAnnotation({
         id,
         kind: 'stamp',
@@ -1148,7 +1188,7 @@ export class SketchScene {
           position: { x: bounds.minX, y: bounds.minY },
           widthPt: bounds.maxX - bounds.minX,
           heightPt: bounds.maxY - bounds.minY,
-          rotationDegrees: stampEntry.data.transform.rotationDegrees,
+          rotationDegrees: stampData.transform.rotationDegrees,
           pngBytes,
         },
       });
@@ -1170,6 +1210,8 @@ export class SketchScene {
    * normal UI code.
    */
   debugPopulateForBenchmark(count: number, areaWidth: number, areaHeight: number): void {
+    // Bypasses the undo history entirely (a direct setLiveState merge, not N execute() calls) — this is placeholder load for a redraw-cost benchmark, not a real placement, and was never undoable before stamps moved into DrawingState either.
+    const newStamps: Record<string, PlacedStamp> = {};
     for (let i = 0; i < count; i++) {
       const id = `bench-${this.doc.nextStampSeq++}`;
       const nativeWidth = 40 + Math.random() * 40;
@@ -1186,14 +1228,17 @@ export class SketchScene {
         nativeHeight,
         ports: [],
       };
+      newStamps[id] = data;
       const sprite = new Sprite(Texture.WHITE);
       sprite.anchor.set(0.5);
       sprite.tint = Math.floor(Math.random() * 0xffffff);
       const baseScale = { x: nativeWidth, y: nativeHeight }; // Texture.WHITE is 1x1
       applyTransformToSprite(sprite, data.transform, baseScale);
-      this.doc.stamps.set(id, { data, sprite, baseScale });
+      this.doc.stamps.set(id, { sprite, baseScale });
       this.doc.stampsLayer.addChild(sprite);
     }
+    const state = this.doc.drawingHistory.getState();
+    this.doc.drawingHistory.setLiveState({ ...state, stamps: { ...state.stamps, ...newStamps } });
   }
 
   /** Programmatic rotate (e.g. a "rotate 90°" button) — same absolute-recompute path as drag rotation. */
@@ -1211,7 +1256,7 @@ export class SketchScene {
   rotateSelectionBy(deltaDegrees: number): void {
     if (this.doc.selectedIds.size === 0) return;
     const state = this.doc.drawingHistory.getState();
-    const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => (this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id }));
+    const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => this.selectableRefForId(id, state));
     const pivotPoints = selectedRefs
       .map((ref) => this.resolveSelectableBoundsWorld(ref, state))
       .filter((b): b is NonNullable<typeof b> => b !== null)
@@ -1220,23 +1265,24 @@ export class SketchScene {
     const pivot = centroid(pivotPoints);
 
     const stampSnapshot = this.getSelection().map((s) => ({ id: s.id, transform: s.transform }));
-    if (stampSnapshot.length > 0) {
-      const rotated = multiRotate(
-        stampSnapshot.map((s) => s.transform),
-        deltaDegrees,
-      );
-      stampSnapshot.forEach((s, i) => this.setStampTransform(s.id, rotated[i]));
-    }
-
+    const rotated = stampSnapshot.length > 0 ? multiRotate(stampSnapshot.map((s) => s.transform), deltaDegrees) : [];
     const annotationIds = [...this.doc.selectedIds].filter((id) => state.annotations[id]);
-    if (annotationIds.length > 0) {
-      const tx = new Transaction(this.doc.drawingHistory, 'Rotate annotation(s)');
+
+    if (stampSnapshot.length > 0 || annotationIds.length > 0) {
+      const tx = new Transaction(this.doc.drawingHistory, 'Rotate selection');
       tx.update((s) => {
+        const stamps = { ...s.stamps };
+        const rotatedIds: string[] = [];
+        stampSnapshot.forEach((item, i) => {
+          if (!stamps[item.id]) return;
+          stamps[item.id] = { ...stamps[item.id], transform: rotated[i] };
+          rotatedIds.push(item.id);
+        });
         const annotations = { ...s.annotations };
         for (const id of annotationIds) {
           annotations[id] = { ...annotations[id], geometry: rotateAnnotationGeometry(annotations[id].geometry, pivot, deltaDegrees) };
         }
-        return { ...s, annotations };
+        return this.applyConnectivityCascade({ ...s, stamps, annotations }, this.stampPortConnectionPoints(rotatedIds, stamps));
       });
       tx.commit();
       this.syncDrawingLayer();
@@ -1251,9 +1297,9 @@ export class SketchScene {
   setSelectedRotationDegrees(degrees: number): void {
     if (this.doc.selectedIds.size !== 1) return;
     const [id] = this.doc.selectedIds;
-    const entry = this.doc.stamps.get(id);
-    if (!entry) return;
-    this.setStampTransform(id, { ...entry.data.transform, rotationDegrees: normalizeDegrees(degrees) });
+    const current = this.doc.drawingHistory.getState().stamps[id]?.transform;
+    if (!current) return;
+    this.applyStampTransform(id, { ...current, rotationDegrees: normalizeDegrees(degrees) }, `Rotate stamp ${id}`);
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
@@ -1263,9 +1309,9 @@ export class SketchScene {
   setSelectedPosition(position: Vec2): void {
     if (this.doc.selectedIds.size !== 1) return;
     const [id] = this.doc.selectedIds;
-    const entry = this.doc.stamps.get(id);
-    if (!entry) return;
-    this.setStampTransform(id, { ...entry.data.transform, position });
+    const current = this.doc.drawingHistory.getState().stamps[id]?.transform;
+    if (!current) return;
+    this.applyStampTransform(id, { ...current, position }, `Move stamp ${id}`);
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
@@ -1276,11 +1322,46 @@ export class SketchScene {
     return this.world.scale.x;
   }
 
-  private setStampTransform(id: string, transform: Transform2D): void {
-    const entry = this.doc.stamps.get(id);
-    if (!entry) return;
-    entry.data = { ...entry.data, transform };
-    applyTransformToSprite(entry.sprite, transform, entry.baseScale);
+  /** One-shot (non-drag) committed transform change for a single stamp — setSelectedRotationDegrees/setSelectedPosition's shared plumbing. Live drag preview (onPointerMove's move-selection/rotate-selection cases) folds its own per-frame stamp updates into its own Transaction instead, since those cover many items across many frames rather than one committed step. */
+  private applyStampTransform(id: string, transform: Transform2D, description: string): void {
+    const tx = new Transaction(this.doc.drawingHistory, description);
+    tx.update((state) => {
+      const data = state.stamps[id];
+      if (!data) return state;
+      const stamps = { ...state.stamps, [id]: { ...data, transform } };
+      return this.applyConnectivityCascade({ ...state, stamps }, this.stampPortConnectionPoints([id], stamps));
+    });
+    tx.commit();
+    this.syncDrawingLayer();
+  }
+
+  /** Every connection point a stamp's own ports offer, for the given ids — the render layer's equivalent of "which nodes did this mutation touch," fed straight into recomputeAttachedSegments below. A stamp with no ports yet (pre-Phase 5) simply contributes nothing. */
+  private stampPortConnectionPoints(ids: Iterable<string>, stamps: Record<string, PlacedStamp>): ConnectionPoint[] {
+    const points: ConnectionPoint[] = [];
+    for (const id of ids) {
+      const data = stamps[id];
+      if (!data) continue;
+      for (const port of getStampPorts(data)) points.push({ kind: 'port', elementId: id, portId: port.id });
+    }
+    return points;
+  }
+
+  /**
+   * Shared by every stamp/fitting mutation path that can move a connected
+   * node — recomputes attached segment geometry from state's own live
+   * fittings/stamps and merges the result in, or returns state unchanged if
+   * nothing moved. The one call every such mutation path goes through,
+   * mirroring the old app's single shared re-seat routine (connectivity
+   * spec §2.1) instead of a second parallel recompute per node kind —
+   * fittings (Phase 1) and now stamps (Phase 3/4) both funnel through here.
+   */
+  private applyConnectivityCascade(state: DrawingState, changed: ConnectionPoint[]): DrawingState {
+    if (changed.length === 0) return state;
+    const segmentUpdates = recomputeAttachedSegments(
+      { segments: state.segments, fittings: state.fittings, stamps: state.stamps, portGroups: this.doc.portGroups },
+      changed,
+    );
+    return { ...state, segments: { ...state.segments, ...segmentUpdates } };
   }
 
   private screenToWorld(screen: Vec2): Vec2 {
@@ -1291,17 +1372,17 @@ export class SketchScene {
   }
 
   /** A stamp's true rotated corners, in world space — shared by hit-testing, bounds, and overlay drawing. */
-  private stampCornersWorld(entry: StampEntry): Vec2[] {
-    const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
-    const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
+  private stampCornersWorld(data: PlacedStamp): Vec2[] {
+    const halfWidth = (data.nativeWidth / 2) * data.transform.scale.x;
+    const halfHeight = (data.nativeHeight / 2) * data.transform.scale.y;
     return [
       { x: -halfWidth, y: -halfHeight },
       { x: halfWidth, y: -halfHeight },
       { x: halfWidth, y: halfHeight },
       { x: -halfWidth, y: halfHeight },
     ].map((local) => {
-      const r = rotatePointAround(local, { x: 0, y: 0 }, entry.data.transform.rotationDegrees);
-      return { x: r.x + entry.data.transform.position.x, y: r.y + entry.data.transform.position.y };
+      const r = rotatePointAround(local, { x: 0, y: 0 }, data.transform.rotationDegrees);
+      return { x: r.x + data.transform.position.x, y: r.y + data.transform.position.y };
     });
   }
 
@@ -1316,17 +1397,25 @@ export class SketchScene {
    * a bounding-box one.
    */
   private hitTest(worldPoint: Vec2): SelectableRef | null {
-    const orderedStamps = [...this.doc.stamps.values()].reverse();
-    for (const entry of orderedStamps) {
-      const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
-      const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
-      if (pointInRotatedRect(worldPoint, entry.data.transform, halfWidth, halfHeight)) {
-        return { kind: 'stamp', id: entry.data.id };
+    const state = this.doc.drawingHistory.getState();
+    const orderedStamps = Object.values(state.stamps).reverse();
+    for (const data of orderedStamps) {
+      const halfWidth = (data.nativeWidth / 2) * data.transform.scale.x;
+      const halfHeight = (data.nativeHeight / 2) * data.transform.scale.y;
+      if (pointInRotatedRect(worldPoint, data.transform, halfWidth, halfHeight)) {
+        return { kind: 'stamp', id: data.id };
+      }
+    }
+
+    const fittingHitRadius = FITTING_MARKER_RADIUS_WORLD + FITTING_HIT_RADIUS_SCREEN_PX / this.world.scale.x;
+    const orderedFittings = Object.values(state.fittings).reverse();
+    for (const fitting of orderedFittings) {
+      if (distance(worldPoint, fitting.position) <= fittingHitRadius) {
+        return { kind: 'fitting', id: fitting.id };
       }
     }
 
     const threshold = ANNOTATION_STROKE_HIT_THRESHOLD_SCREEN_PX / this.world.scale.x;
-    const state = this.doc.drawingHistory.getState();
     const orderedAnnotations = Object.values(state.annotations).reverse();
     for (const annotation of orderedAnnotations) {
       if (this.annotationHit(worldPoint, annotation.geometry, threshold)) {
@@ -1371,9 +1460,9 @@ export class SketchScene {
 
   private resolveSelectableBoundsWorld(ref: SelectableRef, state: DrawingState): { minX: number; minY: number; maxX: number; maxY: number } | null {
     if (ref.kind === 'stamp') {
-      const entry = this.doc.stamps.get(ref.id);
-      if (!entry) return null;
-      const corners = this.stampCornersWorld(entry);
+      const data = state.stamps[ref.id];
+      if (!data) return null;
+      const corners = this.stampCornersWorld(data);
       return {
         minX: Math.min(...corners.map((c) => c.x)),
         minY: Math.min(...corners.map((c) => c.y)),
@@ -1381,9 +1470,26 @@ export class SketchScene {
         maxY: Math.max(...corners.map((c) => c.y)),
       };
     }
+    if (ref.kind === 'fitting') {
+      const fitting = state.fittings[ref.id];
+      if (!fitting) return null;
+      return {
+        minX: fitting.position.x - FITTING_MARKER_RADIUS_WORLD,
+        minY: fitting.position.y - FITTING_MARKER_RADIUS_WORLD,
+        maxX: fitting.position.x + FITTING_MARKER_RADIUS_WORLD,
+        maxY: fitting.position.y + FITTING_MARKER_RADIUS_WORLD,
+      };
+    }
     const annotation = state.annotations[ref.id];
     if (!annotation) return null;
     return annotationBoundsWorld(annotation.geometry, STICKY_NOTE_ICON_SIZE_PT);
+  }
+
+  /** Which selectable kind an id belongs to — stamps and fittings are checked directly (both are keyed collections with no ambiguity), anything else is assumed to be an annotation. */
+  private selectableRefForId(id: string, state: DrawingState): SelectableRef {
+    if (state.stamps[id]) return { kind: 'stamp', id };
+    if (state.fittings[id]) return { kind: 'fitting', id };
+    return { kind: 'annotation', id };
   }
 
   private getSelectionBoundsWorld(): { minX: number; minY: number; maxX: number; maxY: number } | null {
@@ -1394,7 +1500,7 @@ export class SketchScene {
     let maxX = -Infinity;
     let maxY = -Infinity;
     for (const id of this.doc.selectedIds) {
-      const ref: SelectableRef = this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id };
+      const ref = this.selectableRefForId(id, state);
       const bounds = this.resolveSelectableBoundsWorld(ref, state);
       if (!bounds) continue;
       minX = Math.min(minX, bounds.minX);
@@ -1623,7 +1729,7 @@ export class SketchScene {
     const handle = this.getRotationHandleWorld();
     if (handle && Math.hypot(world.x - handle.x, world.y - handle.y) <= handleRadiusWorld) {
       const state = this.doc.drawingHistory.getState();
-      const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => (this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id }));
+      const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => this.selectableRefForId(id, state));
       const pivotPoints = selectedRefs
         .map((ref) => this.resolveSelectableBoundsWorld(ref, state))
         .filter((b): b is NonNullable<typeof b> => b !== null)
@@ -1635,13 +1741,14 @@ export class SketchScene {
         const annotation = state.annotations[id];
         if (annotation) annotationSnapshot[id] = annotation.geometry;
       }
+      const stampSnapshot = this.getSelection().map((s) => ({ id: s.id, transform: s.transform }));
       this.drag = {
         kind: 'rotate-selection',
         pivot: centroidPoint,
         startPointerAngleDeg: angleDegrees(centroidPoint, world),
-        snapshot: this.getSelection().map((s) => ({ id: s.id, transform: s.transform })),
+        snapshot: stampSnapshot,
         annotationSnapshot,
-        annotationTx: Object.keys(annotationSnapshot).length > 0 ? new Transaction(this.doc.drawingHistory, 'Rotate annotation(s)') : null,
+        drawingTx: stampSnapshot.length > 0 || Object.keys(annotationSnapshot).length > 0 ? new Transaction(this.doc.drawingHistory, 'Rotate selection') : null,
         moved: false,
       };
       return;
@@ -1667,18 +1774,24 @@ export class SketchScene {
       }
       const state = this.doc.drawingHistory.getState();
       const annotationSnapshot: AnnotationSnapshot = {};
+      const fittingSnapshot: Record<string, Vec2> = {};
       for (const id of this.doc.selectedIds) {
         const annotation = state.annotations[id];
         if (annotation) annotationSnapshot[id] = annotation.geometry;
+        const fitting = state.fittings[id];
+        if (fitting) fittingSnapshot[id] = fitting.position;
       }
       const hitAnnotationKind = hit.kind === 'annotation' ? state.annotations[hit.id]?.geometry.kind : null;
       const isTextEditable = hitAnnotationKind === 'textbox' || hitAnnotationKind === 'stickyNote';
+      const stampSnapshot = this.getSelection().map((s) => ({ id: s.id, position: s.transform.position }));
+      const hasDrawingChanges = stampSnapshot.length > 0 || Object.keys(annotationSnapshot).length > 0 || Object.keys(fittingSnapshot).length > 0;
       this.drag = {
         kind: 'move-selection',
         startPointerWorld: world,
-        snapshot: this.getSelection().map((s) => ({ id: s.id, position: s.transform.position })),
+        snapshot: stampSnapshot,
         annotationSnapshot,
-        annotationTx: Object.keys(annotationSnapshot).length > 0 ? new Transaction(this.doc.drawingHistory, 'Move annotation(s)') : null,
+        fittingSnapshot,
+        drawingTx: hasDrawingChanges ? new Transaction(this.doc.drawingHistory, 'Move selection') : null,
         reopenTextEditId: alreadySoleSelected && isTextEditable ? hit.id : null,
         moved: false,
       };
@@ -1709,20 +1822,31 @@ export class SketchScene {
       this.drag.moved = true;
       const dx = world.x - this.drag.startPointerWorld.x;
       const dy = world.y - this.drag.startPointerWorld.y;
-      for (const { id, position } of this.drag.snapshot) {
-        const entry = this.doc.stamps.get(id);
-        if (!entry) continue;
-        this.setStampTransform(id, { ...entry.data.transform, position: { x: position.x + dx, y: position.y + dy } });
-      }
-      if (this.drag.annotationTx) {
-        const originals = this.drag.annotationSnapshot;
-        this.drag.annotationTx.update((state) => {
+      if (this.drag.drawingTx) {
+        const stampOriginals = this.drag.snapshot;
+        const annotationOriginals = this.drag.annotationSnapshot;
+        const fittingOriginals = this.drag.fittingSnapshot;
+        this.drag.drawingTx.update((state) => {
+          const stamps = { ...state.stamps };
+          const movedStampIds: string[] = [];
+          for (const { id, position } of stampOriginals) {
+            if (!stamps[id]) continue;
+            stamps[id] = { ...stamps[id], transform: { ...stamps[id].transform, position: { x: position.x + dx, y: position.y + dy } } };
+            movedStampIds.push(id);
+          }
           const annotations = { ...state.annotations };
-          for (const [id, original] of Object.entries(originals)) {
+          for (const [id, original] of Object.entries(annotationOriginals)) {
             if (!annotations[id]) continue;
             annotations[id] = { ...annotations[id], geometry: translateAnnotationGeometry(original, dx, dy) };
           }
-          return { ...state, annotations };
+          const fittings = { ...state.fittings };
+          const changed = this.stampPortConnectionPoints(movedStampIds, stamps);
+          for (const [id, original] of Object.entries(fittingOriginals)) {
+            if (!fittings[id]) continue;
+            fittings[id] = { ...fittings[id], position: { x: original.x + dx, y: original.y + dy } };
+            changed.push({ kind: 'fitting', fittingId: id });
+          }
+          return this.applyConnectivityCascade({ ...state, stamps, annotations, fittings }, changed);
         });
         this.syncDrawingLayer();
       }
@@ -1741,17 +1865,24 @@ export class SketchScene {
         this.drag.snapshot.map((s) => s.transform),
         delta,
       );
-      this.drag.snapshot.forEach((s, i) => this.setStampTransform(s.id, rotated[i]));
-      if (this.drag.annotationTx) {
+      if (this.drag.drawingTx) {
+        const stampSnapshot = this.drag.snapshot;
         const originals = this.drag.annotationSnapshot;
         const pivot = this.drag.pivot;
-        this.drag.annotationTx.update((state) => {
+        this.drag.drawingTx.update((state) => {
+          const stamps = { ...state.stamps };
+          const rotatedIds: string[] = [];
+          stampSnapshot.forEach((s, i) => {
+            if (!stamps[s.id]) return;
+            stamps[s.id] = { ...stamps[s.id], transform: rotated[i] };
+            rotatedIds.push(s.id);
+          });
           const annotations = { ...state.annotations };
           for (const [id, original] of Object.entries(originals)) {
             if (!annotations[id]) continue;
             annotations[id] = { ...annotations[id], geometry: rotateAnnotationGeometry(original, pivot, delta) };
           }
-          return { ...state, annotations };
+          return this.applyConnectivityCascade({ ...state, stamps, annotations }, this.stampPortConnectionPoints(rotatedIds, stamps));
         });
         this.syncDrawingLayer();
       }
@@ -1827,14 +1958,14 @@ export class SketchScene {
       const rectMin = { x: Math.min(startWorld.x, currentWorld.x), y: Math.min(startWorld.y, currentWorld.y) };
       const rectMax = { x: Math.max(startWorld.x, currentWorld.x), y: Math.max(startWorld.y, currentWorld.y) };
       const hits = new Set<string>();
-      for (const entry of this.doc.stamps.values()) {
-        const halfWidth = (entry.data.nativeWidth / 2) * entry.data.transform.scale.x;
-        const halfHeight = (entry.data.nativeHeight / 2) * entry.data.transform.scale.y;
-        if (rectIntersectsRotatedRect(rectMin, rectMax, entry.data.transform, halfWidth, halfHeight)) {
-          hits.add(entry.data.id);
+      const state = this.doc.drawingHistory.getState();
+      for (const data of Object.values(state.stamps)) {
+        const halfWidth = (data.nativeWidth / 2) * data.transform.scale.x;
+        const halfHeight = (data.nativeHeight / 2) * data.transform.scale.y;
+        if (rectIntersectsRotatedRect(rectMin, rectMax, data.transform, halfWidth, halfHeight)) {
+          hits.add(data.id);
         }
       }
-      const state = this.doc.drawingHistory.getState();
       for (const annotation of Object.values(state.annotations)) {
         const bounds = annotationBoundsWorld(annotation.geometry, STICKY_NOTE_ICON_SIZE_PT);
         // Plain AABB overlap — annotations carry no rotation, so this needs none of rectIntersectsRotatedRect's separating-axis machinery.
@@ -1848,14 +1979,14 @@ export class SketchScene {
 
     if (this.drag.kind === 'move-selection') {
       if (this.drag.moved) {
-        this.drag.annotationTx?.commit();
+        this.drag.drawingTx?.commit();
       } else if (this.drag.reopenTextEditId) {
         this.openTextEditor(this.drag.reopenTextEditId);
       }
     }
 
     if (this.drag.kind === 'rotate-selection' && this.drag.moved) {
-      this.drag.annotationTx?.commit();
+      this.drag.drawingTx?.commit();
     }
 
     if ((this.drag.kind === 'resize-rect' || this.drag.kind === 'resize-circle') && this.drag.moved) {
@@ -1921,43 +2052,30 @@ export class SketchScene {
     this.applyZoomAtScreenPoint(this.world.scale.x * factor, { x: event.global.x, y: event.global.y });
   };
 
-  /** Shared by the wheel handler and the status bar's zoom buttons — zooms so screenPoint's world position stays fixed under it. */
-  private applyZoomAtScreenPoint(newZoomRaw: number, screenPoint: Vec2): void {
-    const beforeWorld = this.screenToWorld(screenPoint);
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoomRaw));
-    this.world.scale.set(newZoom);
-    this.world.x = screenPoint.x - beforeWorld.x * newZoom;
-    this.world.y = screenPoint.y - beforeWorld.y * newZoom;
-    this.redrawOverlay();
-    this.emitter.emit('zoomChanged', newZoom);
-  }
-
-  private screenCenter(): Vec2 {
-    return { x: this.app.screen.width / 2, y: this.app.screen.height / 2 };
-  }
-
-  /** Status bar's zoom +/- buttons — same math as the wheel handler, centered on the canvas's own center rather than a cursor position. */
-  zoomBy(factor: number): void {
-    this.applyZoomAtScreenPoint(this.world.scale.x * factor, this.screenCenter());
-  }
-
-  /** Status bar's zoom chip reset-to-100% action. */
-  resetZoom(): void {
-    this.applyZoomAtScreenPoint(1, this.screenCenter());
-  }
-
   /**
    * Delete/Backspace deletes the current selection (rail Delete flyout's
    * keyboard-shortcut counterpart), Ctrl/Cmd+C copies it, Ctrl/Cmd+V pastes
    * the clipboard — atlas §4's Select & Edit row ("+ keyboard shortcuts
    * Ctrl+C/V, Delete for all three"; Copy has a rail button too, but Paste
-   * is keyboard-only by design, no rail slot). Ignored while focus is in a
-   * text input/textarea so none of this fights typing in, e.g., the
-   * Properties panel or the textbox-annotation floating textarea.
+   * is keyboard-only by design, no rail slot). Escape cancels an
+   * in-progress segment-draw chain (Phase 6) instead — the Segment tool
+   * stays active rather than reverting to Select, since MepApp's
+   * rail-based tool model has no equivalent of the old app's
+   * auto-revert-to-pan convention (§5 Phase 6). All of this is ignored
+   * while focus is in a text input/textarea so it doesn't fight typing in,
+   * e.g., the Properties panel or the textbox-annotation floating textarea.
    */
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+
+    if (event.key === 'Escape') {
+      if (!this.pendingSegmentStart) return;
+      this.pendingSegmentStart = null;
+      this.redrawOverlay();
+      return;
+    }
+
     const meta = event.ctrlKey || event.metaKey;
     if ((event.key === 'Delete' || event.key === 'Backspace') && this.doc.selectedIds.size > 0) {
       event.preventDefault();
@@ -1971,27 +2089,23 @@ export class SketchScene {
     }
   };
 
-  /** Deletes every currently selected stamp and annotation. Annotation deletion goes through doc.drawingHistory (undoable, matching how annotation creation already works); stamp deletion is a direct mutation with no undo step, matching the existing precedent that moving/rotating a stamp isn't undoable either. No PDF-sync call is needed here — the next exportToPdf's planPdfSync diff already detects a domain annotation that disappeared and calls handle.deleteAnnotation for it. */
+  /** Deletes every currently selected stamp and annotation, as one undo step. A deleted stamp's sprite is only detached (see syncStampSprites), never destroyed — an undo has to be able to re-attach the same sprite without re-fetching its art, since a re-fetch is async and, for an ad hoc uploaded stamp with no saved bytes, not even possible. No PDF-sync call is needed here — the next exportToPdf's planPdfSync diff already detects a domain object that disappeared and calls handle.deleteAnnotation for it. */
   deleteSelection(): void {
     const ids = [...this.doc.selectedIds];
     if (ids.length === 0) return;
     const state = this.doc.drawingHistory.getState();
     const annotationIds = ids.filter((id) => state.annotations[id]);
-    if (annotationIds.length > 0) {
-      const tx = new Transaction(this.doc.drawingHistory, `Delete ${annotationIds.length} annotation(s)`);
+    const stampIds = ids.filter((id) => state.stamps[id]);
+    if (annotationIds.length > 0 || stampIds.length > 0) {
+      const tx = new Transaction(this.doc.drawingHistory, `Delete ${ids.length} item(s)`);
       tx.update((s) => {
         const annotations = { ...s.annotations };
         for (const id of annotationIds) delete annotations[id];
-        return { ...s, annotations };
+        const stamps = { ...s.stamps };
+        for (const id of stampIds) delete stamps[id];
+        return { ...s, annotations, stamps };
       });
       tx.commit();
-    }
-    for (const id of ids) {
-      const entry = this.doc.stamps.get(id);
-      if (!entry) continue;
-      this.doc.stampsLayer.removeChild(entry.sprite);
-      entry.sprite.destroy({ texture: false }); // the texture may be shared with other placed instances of the same stamp — never destroy it here, only the sprite
-      this.doc.stamps.delete(id);
     }
     this.doc.selectedIds.clear();
     this.syncDrawingLayer();
@@ -2127,25 +2241,33 @@ export class SketchScene {
     sprite.anchor.set(0.5); // pivot = own center, matching the reference semantics
     const baseScale = { x: nativeWidth / texture.width, y: nativeHeight / texture.height };
     applyTransformToSprite(sprite, data.transform, baseScale);
-    this.doc.stamps.set(id, { data, sprite, baseScale });
+    this.doc.stamps.set(id, { sprite, baseScale });
     this.doc.stampsLayer.addChild(sprite);
+    this.doc.drawingHistory.execute(createStampCommand(data));
     this.doc.selectedIds = new Set([id]);
+    this.syncDrawingLayer();
     this.markDirty();
     this.setTool('select');
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /**
-   * Two-click segment drawing: the first click resolves and remembers a
+   * Click-to-draw segment tool: the first click resolves and remembers a
    * start endpoint (without mutating anything yet — see DrawEndpointResolution),
-   * the second resolves the end endpoint and applies both endpoints' setup
-   * plus the new segment as one CompositeCommand, so "draw a run" is always
-   * exactly one undo step, matching the pass criteria's "undo the whole chain."
+   * the next click resolves the end endpoint and applies both endpoints'
+   * setup plus the new segment as one CompositeCommand, so each individual
+   * segment is always exactly one undo step. After committing, the run
+   * chains on automatically (§2.2, Phase 6): connecting to a fitting or an
+   * Equipment's port re-arms pendingSegmentStart from the endpoint just
+   * placed, so the very next click continues the run; connecting to a
+   * Terminal's port ends the chain (an end-use device, not a pass-through
+   * node) — mirrors the old app's MepSegmentCreate. Escape (onKeyDown)
+   * cancels an in-progress chain early.
    */
   private onDrawSegmentClick(world: Vec2): void {
     const snapRadius = this.snapRadiusScreenPx / this.world.scale.x;
     const state = this.doc.drawingHistory.getState();
-    const stamps = [...this.doc.stamps.values()].map((entry) => entry.data);
+    const stamps = Object.values(state.stamps);
     const segments = Object.values(state.segments);
     const fittings = Object.values(state.fittings);
 
@@ -2180,7 +2302,15 @@ export class SketchScene {
     this.doc.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
     this.syncDrawingLayer();
     this.markDirty();
+    this.pendingSegmentStart = this.chainContinuationFrom(resolved, state.stamps);
     this.redrawOverlay();
+  }
+
+  /** Whether a just-placed segment endpoint continues the chain (§2.2/Phase 6): a bare fitting always continues; a stamp's port continues only for Equipment (a pass-through node), not Terminal (an end-use device that should end the run). */
+  private chainContinuationFrom(resolved: DrawEndpointResolution, stamps: Record<string, PlacedStamp>): DrawEndpointResolution | null {
+    if (resolved.point.kind === 'fitting') return resolved;
+    const stamp = stamps[resolved.point.elementId];
+    return stamp?.category === 'equipment' ? resolved : null;
   }
 
   private resolveDrawTarget(target: ReturnType<typeof resolveSegmentEndpoint>): DrawEndpointResolution {
@@ -2225,6 +2355,7 @@ export class SketchScene {
     // counts are small enough that this isn't a real cost.
     for (const child of this.doc.annotationTextLayer.removeChildren()) child.destroy();
     const state = this.doc.drawingHistory.getState();
+    this.syncStampSprites(state);
     for (const segment of Object.values(state.segments)) {
       const [start, ...rest] = segment.geometry;
       if (!start || rest.length === 0) continue;
@@ -2233,12 +2364,25 @@ export class SketchScene {
       this.doc.drawingLayer.stroke({ width: 3, color: 0xffa726 });
     }
     for (const fitting of Object.values(state.fittings)) {
-      this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, 6).fill({ color: 0xffa726 });
+      this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD).fill({ color: 0xffa726 });
     }
     for (const annotation of Object.values(state.annotations)) {
       this.drawAnnotation(annotation);
     }
     this.emitter.emit('drawingChanged', this.getDrawingSummary());
+  }
+
+  /** Keeps each cached stamp sprite's transform and stampsLayer membership matching DrawingState.stamps — the render-only mirror of the source-of-truth data, the sprite counterpart to the segment/fitting Graphics redrawn just above. A sprite is detached (not destroyed) when its stamp isn't in state — deleteSelection relies on this to let an undo re-attach the same sprite instead of needing to re-fetch its texture, which is async and, for an ad hoc uploaded stamp with no saved bytes, sometimes impossible. */
+  private syncStampSprites(state: DrawingState): void {
+    for (const [id, entry] of this.doc.stamps) {
+      const data = state.stamps[id];
+      if (!data) {
+        if (entry.sprite.parent) this.doc.stampsLayer.removeChild(entry.sprite);
+        continue;
+      }
+      applyTransformToSprite(entry.sprite, data.transform, entry.baseScale);
+      if (!entry.sprite.parent) this.doc.stampsLayer.addChild(entry.sprite);
+    }
   }
 
   /** Renders one committed annotation into drawingLayer (or, for a textbox's text, into annotationTextLayer — see syncDrawingLayer). */
@@ -2331,9 +2475,9 @@ export class SketchScene {
 
     const state = this.doc.drawingHistory.getState();
     for (const id of this.doc.selectedIds) {
-      const entry = this.doc.stamps.get(id);
-      if (entry) {
-        const corners = this.stampCornersWorld(entry);
+      const stampData = state.stamps[id];
+      if (stampData) {
+        const corners = this.stampCornersWorld(stampData);
         this.overlay.moveTo(corners[0].x, corners[0].y);
         for (const c of corners.slice(1)) this.overlay.lineTo(c.x, c.y);
         this.overlay.closePath();
@@ -2341,7 +2485,7 @@ export class SketchScene {
         continue;
       }
       // The selection box is always the bounding AABB, a plain rect — even for a rotated textbox, whose own outline (drawn separately in drawAnnotation) is the true rotated quad.
-      const bounds = this.resolveSelectableBoundsWorld({ kind: 'annotation', id }, state);
+      const bounds = this.resolveSelectableBoundsWorld(this.selectableRefForId(id, state), state);
       if (!bounds) continue;
       this.overlay
         .rect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)

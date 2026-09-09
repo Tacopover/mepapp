@@ -27,8 +27,33 @@ export function getStampHalfExtents(stamp: PlacedStamp): { halfWidth: number; ha
   };
 }
 
+/** Reserved port id for the synthetic center connection point below — a plain string, never confused with a real authored port id since those come from stamp-library.ts's own definitions. */
+export const SYNTHETIC_CENTER_PORT_ID = '__center__';
+
+const SYNTHETIC_CENTER_PORT: PortSpec = { id: SYNTHETIC_CENTER_PORT_ID, name: 'Center', fractionX: 0.5, fractionY: 0.5 };
+
+/**
+ * A stamp's connectable ports — its own authored ports (stamp-library.ts),
+ * or, when it has none, a single synthetic point at its center. This is the
+ * bridge that lets a segment connect to any stamp today, not just the
+ * handful of built-ins with real ports authored yet (connectivity spec,
+ * §5 Phase 5). No ConnectionPoint schema change: the synthetic port is still
+ * `{ kind: 'port', elementId, portId: SYNTHETIC_CENTER_PORT_ID }`, so a
+ * segment connected to it keeps working unchanged if a real port is later
+ * authored at the same position. Every connection-resolution call site
+ * (getStampWorldPorts below, connectivity.ts's resolveConnectionPointWorld,
+ * scene.ts's stampPortConnectionPoints) goes through this instead of reading
+ * `stamp.ports` directly, so the bridge can't be forgotten at a new call
+ * site — UI that lists a stamp's own *authored* ports (e.g. the port-group
+ * picker) still reads `stamp.ports` directly, since a synthetic port isn't a
+ * real one a user can choose to group.
+ */
+export function getStampPorts(stamp: PlacedStamp): PortSpec[] {
+  return stamp.ports.length > 0 ? stamp.ports : [SYNTHETIC_CENTER_PORT];
+}
+
 export function getStampWorldPorts(stamp: PlacedStamp): Array<PortSpec & { world: Vec2 }> {
-  return stamp.ports.map((port) => ({
+  return getStampPorts(stamp).map((port) => ({
     ...port,
     world: getWorldPortPosition(port, stamp.transform, stamp.nativeWidth, stamp.nativeHeight),
   }));
