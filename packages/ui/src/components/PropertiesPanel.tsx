@@ -1,14 +1,17 @@
 import type { RefObject } from 'react';
 import type { SketchScene, StampInfo } from '@mepapp/render';
+import { coerceDefaultValue, type CustomPropertyDefinition } from '@mepapp/core';
 
 export interface PropertiesPanelProps {
   sceneRef: RefObject<SketchScene | null>;
   selection: StampInfo[];
   capacityInput: string;
   setCapacityInput: (value: string) => void;
+  /** Global Properties definitions (Terminal/Equipment only) — see GlobalPropertiesDialog. */
+  customPropertyDefs: { terminal: CustomPropertyDefinition[]; equipment: CustomPropertyDefinition[] };
 }
 
-export function PropertiesPanel({ sceneRef, selection, capacityInput, setCapacityInput }: PropertiesPanelProps) {
+export function PropertiesPanel({ sceneRef, selection, capacityInput, setCapacityInput, customPropertyDefs }: PropertiesPanelProps) {
   if (selection.length === 0) {
     return <div className="mep-empty-panel">Select an element to see its properties.</div>;
   }
@@ -65,6 +68,27 @@ export function PropertiesPanel({ sceneRef, selection, capacityInput, setCapacit
           />
         </div>
       </div>
+      {(stamp.category === 'terminal' || stamp.category === 'equipment') && customPropertyDefs[stamp.category].length > 0 && (
+        <div className="mep-section">
+          <h4>Custom Properties</h4>
+          {customPropertyDefs[stamp.category].map((def) => (
+            <div className="mep-field-row" key={def.name}>
+              <label>{def.name}</label>
+              <input
+                type={def.kind === 'numeric' ? 'number' : 'text'}
+                value={stamp.properties?.[def.name] ?? coerceDefaultValue(def)}
+                onChange={(e) =>
+                  sceneRef.current?.setStampProperty(
+                    stamp.id,
+                    def.name,
+                    def.kind === 'numeric' ? Number(e.target.value) : e.target.value,
+                  )
+                }
+              />
+            </div>
+          ))}
+        </div>
+      )}
       {stamp.category === 'equipment' && stamp.ports.length >= 2 && (
         <div className="mep-section">
           <h4>Linked ports</h4>

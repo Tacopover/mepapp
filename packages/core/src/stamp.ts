@@ -3,6 +3,7 @@
 
 import { getWorldPortPosition, type PortSpec, type Transform2D, type Vec2 } from './geometry.js';
 import type { StampCategory } from './stamp-library.js';
+import type { CustomPropertyValues } from './custom-properties.js';
 
 export interface PlacedStamp {
   id: string;
@@ -14,6 +15,8 @@ export interface PlacedStamp {
   ports: PortSpec[];
   /** StampDefinition['id'] (stamp-library.ts) this instance was placed from, when placed via the palette rather than an ad hoc uploaded PNG. */
   definitionId?: string;
+  /** Values for the Global Properties dialog's per-installation custom fields (Terminal/Equipment only for now) — see custom-properties.ts. */
+  properties?: CustomPropertyValues;
 }
 
 /** Half-extents in world units, scale applied — the shape pointInRotatedRect and rectIntersectsRotatedRect expect. */

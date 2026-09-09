@@ -6,10 +6,20 @@ export interface MenuButtonProps {
   onSave: () => void;
   onSaveAs: () => void;
   onOpenSettings: () => void;
+  onOpenGlobalProperties: () => void;
+  onOpenManageBuildings: () => void;
   pdfLoaded: boolean;
 }
 
-export function MenuButton({ onOpenPdf, onSave, onSaveAs, onOpenSettings, pdfLoaded }: MenuButtonProps) {
+export function MenuButton({
+  onOpenPdf,
+  onSave,
+  onSaveAs,
+  onOpenSettings,
+  onOpenGlobalProperties,
+  onOpenManageBuildings,
+  pdfLoaded,
+}: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -72,6 +82,26 @@ export function MenuButton({ onOpenPdf, onSave, onSaveAs, onOpenSettings, pdfLoa
             }}
           >
             Settings…
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            onClick={() => {
+              onOpenGlobalProperties();
+              setOpen(false);
+            }}
+          >
+            Global Properties…
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            onClick={() => {
+              onOpenManageBuildings();
+              setOpen(false);
+            }}
+          >
+            Manage Buildings…
           </button>
         </div>
       )}

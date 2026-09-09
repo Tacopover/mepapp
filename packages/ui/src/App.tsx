@@ -15,6 +15,9 @@ import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { Dialog } from './components/Dialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX } from './components/SettingsDialog.js';
+import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
+import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
+import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
@@ -57,6 +60,22 @@ const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.
 
 const SNAP_RADIUS_STORAGE_KEY = 'mepapp.settings.snapRadiusPx.v1';
 const ONBOARDING_STORAGE_KEY = 'mepapp.onboarding.seen.v1';
+const CUSTOM_PROPERTIES_STORAGE_KEY = 'mepapp.customProperties.v1';
+const EMPTY_CUSTOM_PROPERTY_DEFS: GlobalPropertyDefs = { terminal: [], equipment: [] };
+
+function loadCustomPropertyDefs(): GlobalPropertyDefs {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PROPERTIES_STORAGE_KEY);
+    if (!raw) return EMPTY_CUSTOM_PROPERTY_DEFS;
+    const parsed = JSON.parse(raw) as Partial<GlobalPropertyDefs>;
+    return {
+      terminal: Array.isArray(parsed.terminal) ? parsed.terminal : [],
+      equipment: Array.isArray(parsed.equipment) ? parsed.equipment : [],
+    };
+  } catch {
+    return EMPTY_CUSTOM_PROPERTY_DEFS;
+  }
+}
 
 async function writeToFileHandle(fileHandle: FileSystemFileHandle, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
   const writable = await fileHandle.createWritable();
@@ -112,6 +131,10 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
   const [activeNetworkTypeId, setActiveNetworkTypeId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [globalPropertiesOpen, setGlobalPropertiesOpen] = useState(false);
+  const [customPropertyDefs, setCustomPropertyDefs] = useState<GlobalPropertyDefs>(loadCustomPropertyDefs);
+  const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
+  const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
     const saved = Number(localStorage.getItem(SNAP_RADIUS_STORAGE_KEY));
@@ -134,6 +157,22 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const handleDismissOnboarding = useCallback(() => {
     localStorage.setItem(ONBOARDING_STORAGE_KEY, '1');
     setOnboardingSeen(true);
+  }, []);
+
+  const handleSaveCustomPropertyDefs = useCallback(
+    (next: GlobalPropertyDefs) => {
+      sceneRef.current?.applyCustomPropertyCascade('terminal', customPropertyDefs.terminal, next.terminal);
+      sceneRef.current?.applyCustomPropertyCascade('equipment', customPropertyDefs.equipment, next.equipment);
+      setCustomPropertyDefs(next);
+      localStorage.setItem(CUSTOM_PROPERTIES_STORAGE_KEY, JSON.stringify(next));
+      setGlobalPropertiesOpen(false);
+    },
+    [sceneRef, customPropertyDefs],
+  );
+
+  const handleChangeBuildings = useCallback((next: Building[]) => {
+    setBuildings(next);
+    saveBuildings(next);
   }, []);
 
   // Deferred, not `autoFocus`: the click that opens this prompt is the same
@@ -397,7 +436,15 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
         />
       </div>
     ),
-    properties: <PropertiesPanel sceneRef={sceneRef} selection={selection} capacityInput={capacityInput} setCapacityInput={setCapacityInput} />,
+    properties: (
+      <PropertiesPanel
+        sceneRef={sceneRef}
+        selection={selection}
+        capacityInput={capacityInput}
+        setCapacityInput={setCapacityInput}
+        customPropertyDefs={customPropertyDefs}
+      />
+    ),
   };
 
   const [forcedTabId, setForcedTabId] = useState<string | null>(null);
@@ -423,6 +470,8 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
           onSave={handleSave}
           onSaveAs={handleSaveAs}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenGlobalProperties={() => setGlobalPropertiesOpen(true)}
+          onOpenManageBuildings={() => setManageBuildingsOpen(true)}
           pdfLoaded={pdfHandle !== null}
         />
         <span className="mep-title">{sheetName ?? 'No sheet loaded'}</span>
@@ -537,6 +586,23 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
 
       {settingsOpen && (
         <SettingsDialog snapRadiusPx={snapRadiusPx} onChangeSnapRadiusPx={handleChangeSnapRadiusPx} onClose={() => setSettingsOpen(false)} />
+      )}
+
+      {globalPropertiesOpen && (
+        <GlobalPropertiesDialog
+          definitions={customPropertyDefs}
+          onSave={handleSaveCustomPropertyDefs}
+          onClose={() => setGlobalPropertiesOpen(false)}
+        />
+      )}
+
+      {manageBuildingsOpen && (
+        <ManageBuildingsDialog
+          buildings={buildings}
+          onChange={handleChangeBuildings}
+          currentDocumentFileName={sheetName}
+          onClose={() => setManageBuildingsOpen(false)}
+        />
       )}
 
       {correspondingSourceUrl && (

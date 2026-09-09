@@ -1100,6 +1100,95 @@
   border-bottom: 1.5px dotted var(--ink);
   border-radius: 0;
 }
+.mep-subtabs {
+  display: flex;
+  overflow: hidden;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  margin-bottom: 10px;
+}
+.mep-subtabs button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 7px 0;
+  font-size: 11px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.mep-subtabs button.on {
+  background: var(--accent);
+  color: #fff;
+}
+.mep-property-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.mep-modal .mep-property-row input {
+  width: auto;
+  flex: 1;
+  margin-bottom: 0;
+  min-width: 0;
+}
+.mep-property-row .mep-seg2 {
+  flex: 0 0 auto;
+}
+.mep-property-row-remove {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.mep-property-row-remove:hover {
+  color: var(--ink);
+}
+.mep-field-error {
+  color: #b3261e;
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+.mep-buildings-layout {
+  display: flex;
+  gap: 0;
+  min-width: 460px;
+  max-height: 360px;
+  border: 1.5px solid var(--line);
+}
+.mep-buildings-tree {
+  width: 180px;
+  flex: none;
+  overflow-y: auto;
+  border-right: 1.5px solid var(--line);
+  padding-bottom: 8px;
+}
+.mep-buildings-tree > button {
+  margin: 8px 10px 0;
+}
+.mep-buildings-tree .mep-elem-row {
+  padding: 7px 10px;
+  border-bottom: none;
+  font-size: 12px;
+}
+.mep-buildings-tree .mep-elem-row.mep-level-row {
+  padding-left: 24px;
+}
+.mep-buildings-detail {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+.mep-buildings-detail .mep-section {
+  border-bottom: none;
+}
+.mep-buildings-detail button {
+  margin: 0 6px 8px 0;
+}
 .mep-modal .mep-modal-actions {
   display: flex;
   gap: 8px;

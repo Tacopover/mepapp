@@ -12,6 +12,7 @@ import {
   annotationBoundsWorld,
   calibrateFromKnownDistance,
   centroid,
+  coerceDefaultValue,
   CompositeCommand,
   computeNetworks,
   getStampDefinition,
@@ -39,6 +40,8 @@ import {
   type AnnotationGeometry,
   type Calibration,
   type Command,
+  type CustomPropertyDefinition,
+  type CustomPropertyValues,
   type Discipline,
   type Fitting,
   type FlowResult,
@@ -240,6 +243,8 @@ export interface StampInfo {
   linkedPortIds: string[] | null;
   /** Set when this stamp was placed from the stamp palette rather than an ad hoc uploaded PNG — see PlacedStamp.definitionId. */
   definitionId?: string;
+  /** Global Properties custom field values (Terminal/Equipment only) — see PlacedStamp.properties. */
+  properties?: CustomPropertyValues;
 }
 
 export type SketchTool =
@@ -648,6 +653,7 @@ export class SketchScene {
       ports: entry.data.ports,
       linkedPortIds: this.doc.portGroups.find((g) => g.elementId === entry.data.id)?.portIds ?? null,
       definitionId: entry.data.definitionId,
+      properties: entry.data.properties,
     };
   }
 
@@ -798,6 +804,43 @@ export class SketchScene {
     const existingIndex = groups.findIndex((g) => g.elementId === elementId);
     if (existingIndex !== -1) groups.splice(existingIndex, 1);
     if (portIds.length > 0) groups.push({ elementId, portIds });
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** One custom-property value on a placed Terminal/Equipment (Global Properties dialog, Properties panel). */
+  setStampProperty(elementId: string, name: string, value: string | number): void {
+    const entry = this.doc.stamps.get(elementId);
+    if (!entry) return;
+    entry.data.properties = { ...entry.data.properties, [name]: value };
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /**
+   * Applies a Global Properties definitions change to every already-placed
+   * stamp of the given category: a newly added definition gets its default
+   * value, a removed one is dropped. A rename is treated as remove+add (the
+   * value resets to the new definition's default) rather than carried over —
+   * simplest first-pass behavior, no separate rename affordance in the dialog.
+   */
+  applyCustomPropertyCascade(
+    category: StampCategory,
+    previous: CustomPropertyDefinition[],
+    next: CustomPropertyDefinition[],
+  ): void {
+    const previousNames = new Set(previous.map((d) => d.name));
+    const nextNames = new Set(next.map((d) => d.name));
+    const removedNames = previous.filter((d) => !nextNames.has(d.name)).map((d) => d.name);
+    const addedDefs = next.filter((d) => !previousNames.has(d.name));
+    if (removedNames.length === 0 && addedDefs.length === 0) return;
+    for (const entry of this.doc.stamps.values()) {
+      if (entry.data.category !== category) continue;
+      const properties = { ...entry.data.properties };
+      for (const name of removedNames) delete properties[name];
+      for (const def of addedDefs) properties[def.name] = coerceDefaultValue(def);
+      entry.data.properties = properties;
+    }
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
