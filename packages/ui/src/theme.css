@@ -892,6 +892,87 @@
   min-width: 0;
 }
 
+/* ---------- Networks tree ---------- */
+.mep-net-tree {
+  padding: 6px 0;
+}
+.mep-net-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 5px 10px;
+  color: var(--ink);
+  border-radius: 2px;
+}
+.mep-net-tree-row-discipline {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mep-net-tree-row-network {
+  padding-left: 20px;
+}
+.mep-net-tree-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 0;
+}
+.mep-net-tree-row-element {
+  padding-left: 40px;
+  font-size: 11.5px;
+}
+.mep-net-tree-row-element.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.mep-net-tree-row-element:hover {
+  background: var(--surface-2);
+}
+.mep-net-tree-label {
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-net-tree-count {
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.mep-net-tree-children {
+  display: flex;
+  flex-direction: column;
+}
+.mep-net-tree-empty {
+  padding: 4px 10px 4px 40px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.mep-net-tree-rename-input {
+  flex: 1;
+  font-size: 11.5px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: none;
+  border-bottom: 1.5px dotted var(--ink);
+  padding: 2px 0;
+  min-width: 0;
+}
+
 /* ---------- Status bar ---------- */
 
 .mep-status {

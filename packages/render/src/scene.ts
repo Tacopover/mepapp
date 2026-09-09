@@ -278,6 +278,8 @@ export interface NetworkSummary {
   discipline: Discipline;
   segmentCount: number;
   fittingCount: number;
+  /** Placed stamps (Terminal/Equipment) connected into this network via a segment port endpoint — the Networks tree's element list under this network. */
+  elementIds: string[];
 }
 
 interface SketchSceneEvents {
@@ -656,6 +658,14 @@ export class SketchScene {
     return this.doc.selectedIds.size > 0;
   }
 
+  /** Programmatically selects one placed stamp by id and syncs the canvas highlight — the Networks tree's click-to-select-on-canvas action (every other selection path so far originated from a canvas hit-test). No-op if `id` isn't a placed stamp. */
+  selectStampById(id: string): void {
+    if (!this.doc.stamps.has(id)) return;
+    this.doc.selectedIds = new Set([id]);
+    this.emitter.emit('selectionChanged', this.getSelection());
+    this.redrawOverlay();
+  }
+
   /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. */
   listStamps(): StampInfo[] {
     return [...this.doc.stamps.values()].map((e) => this.toStampInfo(e));
@@ -668,8 +678,17 @@ export class SketchScene {
     const fittings = Object.values(state.fittings);
     const networks = computeNetworks({ segments, fittings, portGroups: this.doc.portGroups });
     const typeById = new Map(this.doc.networkTypes.map((t) => [t.id, t]));
+    const segmentById = new Map(segments.map((s) => [s.id, s]));
     return networks.map((network: Network) => {
       const type = typeById.get(network.networkTypeId) ?? DEFAULT_NETWORK_TYPE;
+      const elementIds = new Set<string>();
+      for (const segmentId of network.segmentIds) {
+        const segment = segmentById.get(segmentId);
+        if (!segment) continue;
+        for (const point of [segment.endpointA, segment.endpointB]) {
+          if (point.kind === 'port') elementIds.add(point.elementId);
+        }
+      }
       return {
         id: network.id,
         networkTypeId: network.networkTypeId,
@@ -677,6 +696,7 @@ export class SketchScene {
         discipline: type.discipline,
         segmentCount: network.segmentIds.length,
         fittingCount: network.fittingIds.length,
+        elementIds: [...elementIds],
       };
     });
   }

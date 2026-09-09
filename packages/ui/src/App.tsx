@@ -10,6 +10,7 @@ import { StampsPanel } from './components/StampsPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
+import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
@@ -357,7 +358,13 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
             </div>
           )}
         </div>
-        <div className="mep-empty-panel">Network tree — coming soon.</div>
+        <NetworkTreePanel
+          sceneRef={sceneRef}
+          networkSummaries={networkSummaries}
+          allStamps={allStamps}
+          selection={selection}
+          onRenameNetworkType={handleRenameNetworkType}
+        />
       </div>
     ),
     properties: <PropertiesPanel sceneRef={sceneRef} selection={selection} capacityInput={capacityInput} setCapacityInput={setCapacityInput} />,

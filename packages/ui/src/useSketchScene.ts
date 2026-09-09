@@ -102,7 +102,15 @@ export function useSketchScene(): UseSketchScene {
       setNetworkSummaries(scene.getNetworkSummaries());
       setNetworkTypes(scene.getNetworkTypes());
     };
-    const onNetworkTypesChanged = (types: NetworkType[]) => setNetworkTypes(types);
+    // getNetworkSummaries() copies each resolved NetworkType's name into
+    // networkTypeName at call time, so a rename (which mutates the type
+    // in place, see SketchScene.renameNetworkType) needs this re-derived
+    // too, not just networkTypes itself — otherwise the Networks tree's
+    // "live rebuild" requirement misses renames.
+    const onNetworkTypesChanged = (types: NetworkType[]) => {
+      setNetworkTypes(types);
+      setNetworkSummaries(scene.getNetworkSummaries());
+    };
     const onZoomChanged = (z: number) => setZoom(z);
     const onDocumentsChanged = (docs: DocumentSummary[]) => {
       setDocuments(docs);
