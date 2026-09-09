@@ -1,10 +1,13 @@
-# Chained segment drawing + ports + custom element editor — spec
+# Ports + custom element editor — spec
 
-Three atlas items that are one coupled feature: a user cannot draw a
-connected run of segments to real equipment until equipment can carry
-ports, and equipment cannot carry ports until there is a dialog to place
-them. This document scopes all three together and gives a build order that
-lets the first slice ship without waiting on the last.
+Priority 2 of two split specs — see
+[[segment-fitting-connectivity-spec]] (priority 1, built first) for
+chained segment drawing and drag/undo propagation between segments,
+fittings, and elements. That spec doesn't wait on this one: it bridges
+with a synthetic center connection point on any port-less stamp, so
+segments can already connect to (and drag with) any Terminal/Equipment
+before real ports exist. This document scopes the part that bridge stands
+in for: real, user-authored ports, and the dialog to place them.
 
 ## 1. Source investigated
 
@@ -14,10 +17,6 @@ lets the first slice ship without waiting on the last.
   `MepSketcherTools/Schematics/MepElementConfigLibrary.cs`;
   `MepSketcherTools/Utilities/ConnectionValidator.cs`, `PortGroupResolver.cs`,
   `HighLighter.cs`.
-- Chained segment drawing: `MepSketcherTools/Tools/MepSegmentCreate.cs`,
-  `StartEndPointCreate.cs`, `ToolManager.cs`;
-  `MepSketcherTools/Commands/CreateHiddenSegmentCommand.cs`,
-  `DeleteSegmentWithCleanupCommand.cs`, `DeleteFittingWithMergeCommand.cs`.
 - Custom element dialog: `MEPSketcher2/Views/SymbolCreator/ElementCreatorWindow.xaml[.cs]`,
   `MEPSketcher2/ViewModels/SymbolCreator/ElementCreatorViewModel.cs`,
   `MEPSketcher2/Views/SymbolCreator/DrawingCanvas.xaml.cs` (+ partials).
@@ -48,51 +47,7 @@ port has no cardinality limit and no type/discipline/direction field —
 compatibility is enforced at the *network* level (`ConnectionValidator`),
 never per-port.
 
-### 2.2 Chained segment drawing
-
-Tool: `MepSegmentCreate` (subclass of `StartEndPointCreate`). Click 1 sets
-the start point (creating a free `Fitting` there if nothing was hit,
-snapping to a port if a ported element was hit). Every subsequent click
-places one segment from the current start to the new point, **then sets
-the new endpoint as the next start** (`_startNode = endNode`,
-`MepSegmentCreate.cs:1067`) — that reassignment is the entire chaining
-mechanism.
-
-**Chain ends** when: the endpoint just connected to is a **Terminal**
-(`CompleteConnectionToTerminal()` → `EndCurrentTool`), the user presses
-**Escape** (global handler, `ToolManager.cs:1409`), or right-click →
-Cancel. Connecting to **Equipment** or a **Fitting** does *not* end the
-chain — the loop continues from there.
-
-**Snap resolution per click**, in priority order: (1) a nearby port on a
-hovered Terminal/Equipment; (2) if the click is anywhere on a ported
-element's body but *not* within the normal snap radius of a specific port,
-it still **force-snaps to the nearest port** — `HasUserDefinedPorts`
-elements never accept an unconnected click, per `HighLighter.TrySnapToPort`
-with an effectively unlimited threshold in that case; (3) an existing
-fitting; (4) a point on an existing segment's interior, which breaks that
-segment and inserts a new fitting at the break; (5) otherwise, empty space
-→ new free-floating `Fitting`.
-
-Angle snapping (`AngularSnapService`, default 90°, user-selectable
-15/30/45/60/90/120° via a separate toolbar control) layers alignment and
-intersection snapping on top, with Shift disabling it for one move, plus a
-type-a-distance numeric entry. This is real but orthogonal machinery — the
-atlas already lists a "Snap Angle selector" as its own rail flyout item,
-separate from the segment tool itself.
-
-Deletion cleanup: deleting a segment removes any endpoint fitting left with
-zero remaining segments (`DeleteSegmentWithCleanupCommand`); deleting a
-fitting that has exactly two segments merges them into one continuous
-segment carrying the correct port references through
-(`DeleteFittingWithMergeCommand`).
-
-"Hidden segment" (`CreateHiddenSegmentCommand`, `Segment.IsHidden`) is a
-segment with no drawn PDF geometry — dashed overlay only, for logical
-connections like a plenum return path. A separate creation path, not part
-of the interactive chain tool.
-
-### 2.3 Custom element dialog
+### 2.2 Custom element dialog
 
 `ElementCreatorWindow` (modeless, multiple instances allowed) has three
 modes: **Shapes** (a real vector drawing tool — line/rect/circle/arc/
@@ -127,20 +82,9 @@ for editing `linkedPortIds` in `PropertiesPanel.tsx:75-88`. `ConnectionPoint`
 `HighLighter.TrySnapToPort`: port, then fitting, then segment-interior
 break, then new fitting.
 
-What's actually missing:
+What's actually missing (chain-drawing and force-snap gaps are scoped in
+[[segment-fitting-connectivity-spec]] instead, not repeated here):
 
-- **Segment drawing is strictly two-click**, not a chain. `scene.ts:2008`
-  (`onDrawSegmentClick`) unconditionally does
-  `this.pendingSegmentStart = null` after building one segment
-  (`scene.ts:2025`) — there is no re-arming from the just-placed endpoint,
-  no chain-termination rule, and the doc comment at `scene.ts:2001` calls
-  this out explicitly as "Two-click segment drawing."
-- **No force-snap-to-nearest-port when clicking a ported stamp's body.**
-  `resolveSegmentEndpoint` only checks literal distance to each port
-  (`segmentTool.ts:38-44`) — it has no concept of "inside this stamp's
-  bounds but far from any specific port," so a click on a ported element's
-  body but away from its one port would currently fall through to
-  fitting/new-fitting logic instead of snapping, unlike the old app.
 - **No custom element authoring path.** The existing "Custom terminal…" /
   "Custom equipment…" upload (`StampsPanel.tsx:118-135`,
   `App.tsx:283-292` `handleCustomStampFile`) loads a bitmap straight into
@@ -170,45 +114,7 @@ What's actually missing:
 
 ## 5. Implementation scope
 
-### 5.1 Chained segment drawing (`packages/render/src/scene.ts`)
-
-Replace the unconditional reset at `scene.ts:2025` with a rule mirroring
-§2.2:
-
-- After committing a segment, inspect `resolved.point` (the endpoint just
-  connected to).
-- `{ kind: 'fitting' }` → **continue**: `this.pendingSegmentStart =
-  resolved`.
-- `{ kind: 'port', elementId }` → look up that stamp's `category`
-  (`stamp.ts`'s `StampCategory`). `'terminal'` → **end chain**
-  (`this.pendingSegmentStart = null`). `'equipment'` → **continue**.
-- Escape cancels an in-progress chain: clear `pendingSegmentStart`, drop
-  any preview overlay, leave the Segment tool active (don't force a tool
-  switch — MepApp's rail-based tool model doesn't have the old app's
-  auto-revert-to-pan convention, and there's no reason to invent one here).
-  **Verify first**: MepApp's current global-key-handling location (not
-  confirmed by this research) before wiring this in.
-- Force-snap fix: before falling through to fitting/break/new-fitting
-  logic, `resolveSegmentEndpoint` needs a new check — if the click lands
-  inside a ported stamp's hit-bounds (reuse whatever `pointInRotatedRect`-
-  style check the render layer already uses for stamp hit-testing) and
-  that stamp has `ports.length > 0`, snap to its nearest port regardless of
-  the normal snap radius. Add this as a new branch before the existing
-  port-distance loop in `segmentTool.ts:38-44`, using the built-in stamps
-  (Supply Grille, Luminaire, Switch already have one port each) as test
-  material — this does **not** need to wait on the custom element dialog.
-
-Explicitly **out of scope for this phase** (flagged, not forgotten):
-angle/alignment/intersection snapping (own atlas rail item), hidden
-segments, fitting-merge-on-delete parity, right-click cancel (Escape
-covers the "cancel" case; right-click is a nice-to-have, not required).
-
-**Verify before starting**: whether deleting a segment today already
-cleans up an orphaned endpoint fitting (zero remaining segments) — not
-confirmed either way by this research; check `commands.ts`/wherever
-segment deletion lives.
-
-### 5.2 Shared Dialog component
+### 5.1 Shared Dialog component
 
 Smallest possible build: modal shell (backdrop, title, close button,
 content slot), reused for the Element Editor below and for every other
@@ -216,7 +122,7 @@ dialog already listed in `ui-atlas-layout-mapping.md` §5 (Settings,
 Network Type Editor, etc.) — build against the simplest target first per
 that doc's D2 resolution, which this spec doesn't need to re-litigate.
 
-### 5.3 Element Editor dialog — Ports mode (unblocks custom ported elements)
+### 5.2 Element Editor dialog — Ports mode (unblocks custom ported elements)
 
 New component in `packages/ui`, opened either as "Create custom element"
 (new action — natural home is the Stamps dock tab, next to the existing
@@ -239,8 +145,10 @@ that fractional position (mirrors `DrawingCanvas.HandlePortMouseDown`'s
 to rename. Port linking: a link-mode toggle, click two ports to group them
 — stored as a **definition-level** group list (new field, see §6) since
 there's no `elementId` yet at authoring time; converted to a real
-`PortGroup` (with the new instance's `elementId`) at placement, alongside
-the existing ports-copy step at `scene.ts:1899-1921`.
+`PortGroup` (with the new instance's `elementId`) at placement, the same
+way [[segment-fitting-connectivity-spec]]'s synthetic center port gets
+replaced by a real one — alongside the existing ports-copy step at
+`scene.ts:1899-1921`.
 
 **Verify before starting**: how (if at all) an uploaded raster image is
 currently persisted. The current upload flow only sets a runtime texture
@@ -250,9 +158,9 @@ table), which is new work either way, but the exact mechanism should be
 confirmed against `project.ts`'s save/load path before designing the
 field.
 
-### 5.4 Element Editor dialog — Shapes mode (vector artwork authoring)
+### 5.3 Element Editor dialog — Shapes mode (vector artwork authoring)
 
-Added on top of §5.3's dialog shell once that ships and is validated: a
+Added on top of §5.2's dialog shell once that ships and is validated: a
 drawing canvas with a tool palette (Select/Line/Rect/Circle/Arc/Text),
 stroke color/width and fill controls, and undo/redo for shape edits (reuse
 the existing `Command`/history pattern rather than inventing a second
@@ -262,7 +170,7 @@ list into an actual PixiJS display object / palette thumbnail — likely a
 PixiJS `Graphics` built from the shape list, or an offscreen-canvas render
 to texture. This is the largest single piece of new work in this whole
 spec — a small vector editor in its own right — and should stay a distinct
-phase rather than be built inline with §5.3.
+phase rather than be built inline with §5.2.
 
 ## 6. Data model / schema changes (`@mepapp/core`)
 
@@ -273,43 +181,43 @@ phase rather than be built inline with §5.3.
   accept an optional custom-list argument, or have the palette query both
   and concatenate).
 - `StampDefinition` needs a `source: 'library' | 'custom'` marker (gates
-  the read-only distinction in §5.3) and an artwork field: `artwork: {
+  the read-only distinction in §5.2) and an artwork field: `artwork: {
   kind: 'raster'; assetRef: string } | { kind: 'vector'; shapes:
   SymbolShape[] }` replacing/extending today's `iconRef` for custom
   entries — `iconRef` stays as-is for the fixture-backed built-ins.
 - New `definitionPortGroups?: string[][]` field on `StampDefinition` (or
   equivalent) — groups of port ids at authoring time, converted to a real
-  instance-level `PortGroup` at placement (§5.3).
+  instance-level `PortGroup` at placement (§5.2).
 - New `SymbolShape` type (line/rect/circle/arc/text primitives + style) for
-  §5.4 — design this once §5.4 actually starts, not speculatively now.
+  §5.3 — design this once §5.3 actually starts, not speculatively now.
 - Bump `CURRENT_SCHEMA_VERSION` (currently `4`, `project.ts:13`) and add
   one `MigrationStep` (`project.ts:25`) per the existing pattern,
   initializing `customStampDefinitions: []` on older documents.
 
 ## 7. Recommended build order
 
-1. **Chained segment drawing** (§5.1) — independent, no schema change, no
-   new dialog. Testable today against the four built-in stamps. Smallest,
-   ships first.
-2. **Shared Dialog component** (§5.2) — small, unblocks everything below.
-3. **Element Editor, Ports mode** (§5.3) — real custom ported elements
+1. **Shared Dialog component** (§5.1) — small, unblocks everything below.
+2. **Element Editor, Ports mode** (§5.2) — real custom ported elements
    become possible; needs the schema bump (§6, minus `SymbolShape`) and
    the raster-persistence question resolved first.
-4. **Element Editor, Shapes mode** (§5.4) — vector authoring, its own
+3. **Element Editor, Shapes mode** (§5.3) — vector authoring, its own
    multi-session effort.
-5. **Deferred / future, not scoped further here**: angle/alignment
-   snapping during chain draw, hidden segments, fitting-merge-on-delete,
-   and whether MepApp needs an old-app-style `ConnectionValidator`
-   (NetworkType-level compatibility check on connect) — not confirmed
-   either way whether this exists today; worth a follow-up check but
-   doesn't block phases 1–4.
+4. **Deferred / future, not scoped further here**: whether MepApp needs
+   an old-app-style `ConnectionValidator` (NetworkType-level compatibility
+   check on connect) — not confirmed either way whether this exists today;
+   worth a follow-up check but doesn't block steps 1–3.
+
+This spec has no hard dependency on
+[[segment-fitting-connectivity-spec]] finishing first — the two can be
+built in either order or in parallel — but building connectivity first
+(as agreed) means real ports, once they land here, immediately get full
+drag/rotate cascade behavior for free, instead of that wiring being new
+work at this spec's completion.
 
 ## 8. Open verification items for whoever picks this up
 
-- Global key-handling location for Escape-to-cancel (§5.1).
-- Whether segment deletion already cleans up orphaned fittings (§5.1).
-- How/whether uploaded raster images persist today, if at all (§5.3).
+- How/whether uploaded raster images persist today, if at all (§5.2).
 - Whether a NetworkType-level connection-compatibility check exists in
-  MepApp today (§7 item 5).
+  MepApp today (§7 item 4).
 
-None of these block starting phase 1.
+Neither blocks starting step 1.
