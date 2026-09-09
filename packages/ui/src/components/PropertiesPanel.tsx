@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import type { SketchScene, StampInfo } from '@mepapp/render';
 import { coerceDefaultValue, type CustomPropertyDefinition } from '@mepapp/core';
+import { IconRotate } from '../icons.js';
 
 export interface PropertiesPanelProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -49,11 +50,19 @@ export function PropertiesPanel({ sceneRef, selection, capacityInput, setCapacit
         </div>
         <div className="mep-field-row">
           <label>Rotation</label>
-          <input
-            type="number"
-            value={Math.round(stamp.transform.rotationDegrees * 1000) / 1000}
-            onChange={(e) => sceneRef.current?.setSelectedRotationDegrees(Number(e.target.value))}
-          />
+          <div className="mep-rotate-nudge">
+            <button type="button" onClick={() => sceneRef.current?.rotateSelectionBy(-90)} title="Rotate -90°">
+              <IconRotate size={13} />
+            </button>
+            <input
+              type="number"
+              value={Math.round(stamp.transform.rotationDegrees * 1000) / 1000}
+              onChange={(e) => sceneRef.current?.setSelectedRotationDegrees(Number(e.target.value))}
+            />
+            <button type="button" className="flip" onClick={() => sceneRef.current?.rotateSelectionBy(90)} title="Rotate +90°">
+              <IconRotate size={13} />
+            </button>
+          </div>
         </div>
       </div>
       <div className="mep-section">

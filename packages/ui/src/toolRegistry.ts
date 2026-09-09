@@ -30,7 +30,7 @@ import {
 } from './icons.js';
 
 /** A flyout member with no SketchTool of its own — it runs immediately against the current selection instead of switching tools (atlas §4: "Rail flyout + keyboard shortcuts", not a persistent mode). */
-export type ToolAction = 'rotate-90' | 'delete-selection';
+export type ToolAction = 'rotate-90' | 'delete-selection' | 'copy-selection';
 
 export interface ToolEntry {
   /** Stable id, unique across every row — a real SketchTool's own id when `tool` is set, otherwise a UI-only placeholder id. */
@@ -58,7 +58,7 @@ export const RAIL_ROWS: RailRow[] = [
       { id: 'select', label: 'Select', Icon: IconSelect, tool: 'select' },
       // No distinct action of its own — Select's drag-to-move (generalized to cover annotations, not just stamps) already handles continuous move.
       { id: 'move', label: 'Move', Icon: IconMove, tool: null },
-      { id: 'copy', label: 'Copy', Icon: IconCopy, tool: null },
+      { id: 'copy', label: 'Copy', Icon: IconCopy, tool: null, action: 'copy-selection' },
       { id: 'rotate', label: 'Rotate 90°', Icon: IconRotate, tool: null, action: 'rotate-90' },
       { id: 'delete', label: 'Delete', Icon: IconTrash, tool: null, action: 'delete-selection' },
     ],

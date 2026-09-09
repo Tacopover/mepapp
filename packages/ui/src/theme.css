@@ -695,6 +695,28 @@
   border-bottom-style: dotted;
   opacity: 0.6;
 }
+.mep-rotate-nudge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mep-rotate-nudge input {
+  width: 64px;
+}
+.mep-rotate-nudge button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  display: flex;
+  padding: 2px;
+  cursor: pointer;
+}
+.mep-rotate-nudge button:hover {
+  color: var(--ink);
+}
+.mep-rotate-nudge button.flip {
+  transform: scaleX(-1);
+}
 .mep-seg2 {
   display: flex;
   width: 104px;

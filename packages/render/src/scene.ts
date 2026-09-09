@@ -1890,14 +1890,29 @@ export class SketchScene {
     this.emitter.emit('zoomChanged', newZoom);
   };
 
-  /** Delete/Backspace deletes the current selection — the rail's Delete flyout action's keyboard-shortcut counterpart (atlas §4). Ignored while focus is in a text input/textarea so it doesn't fight typing in, e.g., the Properties panel or the textbox-annotation floating textarea. */
+  /**
+   * Delete/Backspace deletes the current selection (rail Delete flyout's
+   * keyboard-shortcut counterpart), Ctrl/Cmd+C copies it, Ctrl/Cmd+V pastes
+   * the clipboard — atlas §4's Select & Edit row ("+ keyboard shortcuts
+   * Ctrl+C/V, Delete for all three"; Copy has a rail button too, but Paste
+   * is keyboard-only by design, no rail slot). Ignored while focus is in a
+   * text input/textarea so none of this fights typing in, e.g., the
+   * Properties panel or the textbox-annotation floating textarea.
+   */
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== 'Delete' && event.key !== 'Backspace') return;
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
-    if (this.doc.selectedIds.size === 0) return;
-    event.preventDefault();
-    this.deleteSelection();
+    const meta = event.ctrlKey || event.metaKey;
+    if ((event.key === 'Delete' || event.key === 'Backspace') && this.doc.selectedIds.size > 0) {
+      event.preventDefault();
+      this.deleteSelection();
+    } else if (meta && event.key.toLowerCase() === 'c' && this.doc.selectedIds.size > 0) {
+      event.preventDefault();
+      this.copySelection();
+    } else if (meta && event.key.toLowerCase() === 'v' && this.clipboard !== null) {
+      event.preventDefault();
+      this.pasteClipboard();
+    }
   };
 
   /** Deletes every currently selected stamp and annotation. Annotation deletion goes through doc.drawingHistory (undoable, matching how annotation creation already works); stamp deletion is a direct mutation with no undo step, matching the existing precedent that moving/rotating a stamp isn't undoable either. No PDF-sync call is needed here — the next exportToPdf's planPdfSync diff already detects a domain annotation that disappeared and calls handle.deleteAnnotation for it. */
@@ -1924,6 +1939,72 @@ export class SketchScene {
     }
     this.doc.selectedIds.clear();
     this.syncDrawingLayer();
+    this.markDirty();
+    this.redrawOverlay();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** Snapshot for pasteClipboard — each stamp's already-loaded texture is kept by reference (cheap, and shared safely: deleteSelection already never destroys a texture, only its sprite). */
+  private clipboard: { stamps: Array<{ data: PlacedStamp; texture: Texture; baseScale: Vec2 }>; annotations: Annotation[] } | null = null;
+
+  /** Copies the current selection (stamps + annotations) — the rail's Copy flyout action / Ctrl+C. */
+  copySelection(): void {
+    if (this.doc.selectedIds.size === 0) return;
+    const state = this.doc.drawingHistory.getState();
+    const stamps = [...this.doc.selectedIds]
+      .map((id) => this.doc.stamps.get(id))
+      .filter((e): e is StampEntry => e !== undefined)
+      .map((entry) => ({ data: entry.data, texture: entry.sprite.texture, baseScale: entry.baseScale }));
+    const annotations = [...this.doc.selectedIds].filter((id) => state.annotations[id]).map((id) => state.annotations[id]);
+    if (stamps.length === 0 && annotations.length === 0) return;
+    this.clipboard = { stamps, annotations };
+  }
+
+  /**
+   * Pastes the last Copy'd selection, offset from the originals so the
+   * copies are visibly distinct — Ctrl+V (no rail button, keyboard-only by
+   * design, atlas §4). Reuses each copied stamp's already-loaded texture
+   * directly and builds its sprite synchronously, unlike loadProjectFromJson's
+   * restore path, which has to re-fetch icon bytes because nothing is loaded yet.
+   */
+  pasteClipboard(): void {
+    if (!this.clipboard) return;
+    const OFFSET = 20; // world units — enough to read as a separate copy without straying far from the originals
+    const newSelection = new Set<string>();
+
+    for (const { data, texture, baseScale } of this.clipboard.stamps) {
+      const id = `stamp-${this.doc.nextStampSeq++}`;
+      const pasted: PlacedStamp = {
+        ...data,
+        id,
+        transform: { ...data.transform, position: { x: data.transform.position.x + OFFSET, y: data.transform.position.y + OFFSET } },
+      };
+      const sprite = new Sprite(texture);
+      sprite.anchor.set(0.5);
+      applyTransformToSprite(sprite, pasted.transform, baseScale);
+      this.doc.stamps.set(id, { data: pasted, sprite, baseScale });
+      this.doc.stampsLayer.addChild(sprite);
+      newSelection.add(id);
+    }
+
+    if (this.clipboard.annotations.length > 0) {
+      const pastedAnnotations = this.clipboard.annotations;
+      const tx = new Transaction(this.doc.drawingHistory, `Paste ${pastedAnnotations.length} annotation(s)`);
+      tx.update((s) => {
+        const annotations = { ...s.annotations };
+        for (const annotation of pastedAnnotations) {
+          const id = `annotation-${this.doc.nextAnnotationSeq++}`;
+          annotations[id] = { ...annotation, id, geometry: translateAnnotationGeometry(annotation.geometry, OFFSET, OFFSET) };
+          newSelection.add(id);
+        }
+        return { ...s, annotations };
+      });
+      tx.commit();
+      this.syncDrawingLayer();
+    }
+
+    if (newSelection.size === 0) return;
+    this.doc.selectedIds = newSelection;
     this.markDirty();
     this.redrawOverlay();
     this.emitter.emit('selectionChanged', this.getSelection());

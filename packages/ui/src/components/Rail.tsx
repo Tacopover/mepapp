@@ -88,6 +88,7 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
                       }
                       if (m.action === 'rotate-90') sceneRef.current?.rotateSelectionBy(90);
                       if (m.action === 'delete-selection') sceneRef.current?.deleteSelection();
+                      if (m.action === 'copy-selection') sceneRef.current?.copySelection();
                       setOpenRow(null);
                     }}
                   >
