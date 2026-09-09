@@ -15,6 +15,7 @@ import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { Dialog } from './components/Dialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX } from './components/SettingsDialog.js';
+import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
 import './theme.css';
@@ -55,6 +56,7 @@ function supportsFileSystemAccess(): boolean {
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
 
 const SNAP_RADIUS_STORAGE_KEY = 'mepapp.settings.snapRadiusPx.v1';
+const ONBOARDING_STORAGE_KEY = 'mepapp.onboarding.seen.v1';
 
 async function writeToFileHandle(fileHandle: FileSystemFileHandle, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
   const writable = await fileHandle.createWritable();
@@ -110,6 +112,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
   const [activeNetworkTypeId, setActiveNetworkTypeId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
     const saved = Number(localStorage.getItem(SNAP_RADIUS_STORAGE_KEY));
     return saved >= MIN_SNAP_RADIUS_PX && saved <= MAX_SNAP_RADIUS_PX ? saved : DEFAULT_SNAP_RADIUS_SCREEN_PX;
@@ -126,6 +129,11 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const handleChangeSnapRadiusPx = useCallback((px: number) => {
     setSnapRadiusPx(px);
     localStorage.setItem(SNAP_RADIUS_STORAGE_KEY, String(px));
+  }, []);
+
+  const handleDismissOnboarding = useCallback(() => {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, '1');
+    setOnboardingSeen(true);
   }, []);
 
   // Deferred, not `autoFocus`: the click that opens this prompt is the same
@@ -401,6 +409,7 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
 
   return (
     <div className="mep-app">
+      {!onboardingSeen && <WelcomeScreen onDismiss={handleDismissOnboarding} />}
       <div className="mep-header">
         <input
           ref={fileInputRef}
