@@ -15,6 +15,7 @@ import {
   coerceDefaultValue,
   CompositeCommand,
   computeNetworks,
+  distance,
   getStampDefinition,
   loadProject,
   measureRealDistance,
@@ -26,6 +27,7 @@ import {
   pointNearPolyline,
   pointNearSegment,
   reconcilePdfSync,
+  recomputeAttachedSegments,
   rectIntersectsRotatedRect,
   resolveSegmentEndpoint,
   rotateAnnotationGeometry,
@@ -40,6 +42,7 @@ import {
   type AnnotationGeometry,
   type Calibration,
   type Command,
+  type ConnectionPoint,
   type CustomPropertyDefinition,
   type CustomPropertyValues,
   type Discipline,
@@ -194,6 +197,10 @@ const STAMP_SOURCE_DPI = 300;
 
 const HANDLE_OFFSET_WORLD_AT_ZOOM_1 = 32;
 const HANDLE_HIT_RADIUS_SCREEN_PX = 10;
+/** Drawn radius of a fitting's marker circle (syncDrawingLayer) — also its bounding box for selection/pivot purposes. */
+const FITTING_MARKER_RADIUS_WORLD = 6;
+/** Extra click-target slack around a fitting's drawn radius, in screen px at zoom 1 — same generous-target idea as HANDLE_HIT_RADIUS_SCREEN_PX. */
+const FITTING_HIT_RADIUS_SCREEN_PX = 8;
 const ROTATE_SNAP_DEGREES = 45;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 32;
@@ -338,8 +345,8 @@ class TypedEmitter<Events extends Record<string, unknown[]>> {
   }
 }
 
-/** A selectable object is either a placed stamp or a drawn annotation — see hitTest. */
-type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'annotation'; id: string };
+/** A selectable object is a placed stamp, a fitting, or a drawn annotation — see hitTest. */
+type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'fitting'; id: string } | { kind: 'annotation'; id: string };
 
 /** Original per-annotation geometry captured at gesture start, so move/rotate can recompute the whole gesture's delta from a fixed origin on every pointermove rather than drifting by accumulating per-frame deltas. */
 type AnnotationSnapshot = Record<string, AnnotationGeometry>;
@@ -352,7 +359,10 @@ type DragState =
       startPointerWorld: Vec2;
       snapshot: Array<{ id: string; position: Vec2 }>;
       annotationSnapshot: AnnotationSnapshot;
-      annotationTx: Transaction<DrawingState> | null;
+      /** Fitting positions at gesture start, keyed by fitting id — the fitting counterpart to annotationSnapshot above. */
+      fittingSnapshot: Record<string, Vec2>;
+      /** Undoable transaction covering both annotationSnapshot's and fittingSnapshot's moves, plus the cascaded recompute of any segment attached to a moved fitting — null when neither is present in the selection. */
+      drawingTx: Transaction<DrawingState> | null;
       /** Set when this gesture began on an already-sole-selected textbox/stickyNote — a click with no drag reopens its text editor instead of committing a zero-length move. */
       reopenTextEditId: string | null;
       /** True once onPointerMove has actually applied a delta — a plain click never sets this, since a real pointermove never fires for zero on-screen movement. Gates whether onPointerUp commits anything. */
@@ -1174,7 +1184,7 @@ export class SketchScene {
   rotateSelectionBy(deltaDegrees: number): void {
     if (this.doc.selectedIds.size === 0) return;
     const state = this.doc.drawingHistory.getState();
-    const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => (this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id }));
+    const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => this.selectableRefForId(id, state));
     const pivotPoints = selectedRefs
       .map((ref) => this.resolveSelectableBoundsWorld(ref, state))
       .filter((b): b is NonNullable<typeof b> => b !== null)
@@ -1288,8 +1298,16 @@ export class SketchScene {
       }
     }
 
-    const threshold = ANNOTATION_STROKE_HIT_THRESHOLD_SCREEN_PX / this.world.scale.x;
     const state = this.doc.drawingHistory.getState();
+    const fittingHitRadius = FITTING_MARKER_RADIUS_WORLD + FITTING_HIT_RADIUS_SCREEN_PX / this.world.scale.x;
+    const orderedFittings = Object.values(state.fittings).reverse();
+    for (const fitting of orderedFittings) {
+      if (distance(worldPoint, fitting.position) <= fittingHitRadius) {
+        return { kind: 'fitting', id: fitting.id };
+      }
+    }
+
+    const threshold = ANNOTATION_STROKE_HIT_THRESHOLD_SCREEN_PX / this.world.scale.x;
     const orderedAnnotations = Object.values(state.annotations).reverse();
     for (const annotation of orderedAnnotations) {
       if (this.annotationHit(worldPoint, annotation.geometry, threshold)) {
@@ -1344,9 +1362,33 @@ export class SketchScene {
         maxY: Math.max(...corners.map((c) => c.y)),
       };
     }
+    if (ref.kind === 'fitting') {
+      const fitting = state.fittings[ref.id];
+      if (!fitting) return null;
+      return {
+        minX: fitting.position.x - FITTING_MARKER_RADIUS_WORLD,
+        minY: fitting.position.y - FITTING_MARKER_RADIUS_WORLD,
+        maxX: fitting.position.x + FITTING_MARKER_RADIUS_WORLD,
+        maxY: fitting.position.y + FITTING_MARKER_RADIUS_WORLD,
+      };
+    }
     const annotation = state.annotations[ref.id];
     if (!annotation) return null;
     return annotationBoundsWorld(annotation.geometry, STICKY_NOTE_ICON_SIZE_PT);
+  }
+
+  /** Which selectable kind an id belongs to — stamps and fittings are checked directly (both are keyed collections with no ambiguity), anything else is assumed to be an annotation. */
+  private selectableRefForId(id: string, state: DrawingState): SelectableRef {
+    if (this.doc.stamps.has(id)) return { kind: 'stamp', id };
+    if (state.fittings[id]) return { kind: 'fitting', id };
+    return { kind: 'annotation', id };
+  }
+
+  /** Live placed-stamp data keyed by id, for connectivity recompute call sites that need to resolve a port's world position — see core's ConnectivityGraphState. Not itself the undoable state (see document.ts's DrawingState doc comment); just a read-only view of doc.stamps for this purpose. */
+  private stampsRecord(): Record<string, PlacedStamp> {
+    const record: Record<string, PlacedStamp> = {};
+    for (const [id, entry] of this.doc.stamps) record[id] = entry.data;
+    return record;
   }
 
   private getSelectionBoundsWorld(): { minX: number; minY: number; maxX: number; maxY: number } | null {
@@ -1357,7 +1399,7 @@ export class SketchScene {
     let maxX = -Infinity;
     let maxY = -Infinity;
     for (const id of this.doc.selectedIds) {
-      const ref: SelectableRef = this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id };
+      const ref = this.selectableRefForId(id, state);
       const bounds = this.resolveSelectableBoundsWorld(ref, state);
       if (!bounds) continue;
       minX = Math.min(minX, bounds.minX);
@@ -1585,7 +1627,7 @@ export class SketchScene {
     const handle = this.getRotationHandleWorld();
     if (handle && Math.hypot(world.x - handle.x, world.y - handle.y) <= handleRadiusWorld) {
       const state = this.doc.drawingHistory.getState();
-      const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => (this.doc.stamps.has(id) ? { kind: 'stamp', id } : { kind: 'annotation', id }));
+      const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => this.selectableRefForId(id, state));
       const pivotPoints = selectedRefs
         .map((ref) => this.resolveSelectableBoundsWorld(ref, state))
         .filter((b): b is NonNullable<typeof b> => b !== null)
@@ -1629,18 +1671,23 @@ export class SketchScene {
       }
       const state = this.doc.drawingHistory.getState();
       const annotationSnapshot: AnnotationSnapshot = {};
+      const fittingSnapshot: Record<string, Vec2> = {};
       for (const id of this.doc.selectedIds) {
         const annotation = state.annotations[id];
         if (annotation) annotationSnapshot[id] = annotation.geometry;
+        const fitting = state.fittings[id];
+        if (fitting) fittingSnapshot[id] = fitting.position;
       }
       const hitAnnotationKind = hit.kind === 'annotation' ? state.annotations[hit.id]?.geometry.kind : null;
       const isTextEditable = hitAnnotationKind === 'textbox' || hitAnnotationKind === 'stickyNote';
+      const hasDrawingChanges = Object.keys(annotationSnapshot).length > 0 || Object.keys(fittingSnapshot).length > 0;
       this.drag = {
         kind: 'move-selection',
         startPointerWorld: world,
         snapshot: this.getSelection().map((s) => ({ id: s.id, position: s.transform.position })),
         annotationSnapshot,
-        annotationTx: Object.keys(annotationSnapshot).length > 0 ? new Transaction(this.doc.drawingHistory, 'Move annotation(s)') : null,
+        fittingSnapshot,
+        drawingTx: hasDrawingChanges ? new Transaction(this.doc.drawingHistory, 'Move selection') : null,
         reopenTextEditId: alreadySoleSelected && isTextEditable ? hit.id : null,
         moved: false,
       };
@@ -1676,15 +1723,28 @@ export class SketchScene {
         if (!entry) continue;
         this.setStampTransform(id, { ...entry.data.transform, position: { x: position.x + dx, y: position.y + dy } });
       }
-      if (this.drag.annotationTx) {
-        const originals = this.drag.annotationSnapshot;
-        this.drag.annotationTx.update((state) => {
+      if (this.drag.drawingTx) {
+        const annotationOriginals = this.drag.annotationSnapshot;
+        const fittingOriginals = this.drag.fittingSnapshot;
+        this.drag.drawingTx.update((state) => {
           const annotations = { ...state.annotations };
-          for (const [id, original] of Object.entries(originals)) {
+          for (const [id, original] of Object.entries(annotationOriginals)) {
             if (!annotations[id]) continue;
             annotations[id] = { ...annotations[id], geometry: translateAnnotationGeometry(original, dx, dy) };
           }
-          return { ...state, annotations };
+          const fittings = { ...state.fittings };
+          const changed: ConnectionPoint[] = [];
+          for (const [id, original] of Object.entries(fittingOriginals)) {
+            if (!fittings[id]) continue;
+            fittings[id] = { ...fittings[id], position: { x: original.x + dx, y: original.y + dy } };
+            changed.push({ kind: 'fitting', fittingId: id });
+          }
+          if (changed.length === 0) return { ...state, annotations, fittings };
+          const segmentUpdates = recomputeAttachedSegments(
+            { segments: state.segments, fittings, stamps: this.stampsRecord(), portGroups: this.doc.portGroups },
+            changed,
+          );
+          return { ...state, annotations, fittings, segments: { ...state.segments, ...segmentUpdates } };
         });
         this.syncDrawingLayer();
       }
@@ -1810,7 +1870,7 @@ export class SketchScene {
 
     if (this.drag.kind === 'move-selection') {
       if (this.drag.moved) {
-        this.drag.annotationTx?.commit();
+        this.drag.drawingTx?.commit();
       } else if (this.drag.reopenTextEditId) {
         this.openTextEditor(this.drag.reopenTextEditId);
       }
@@ -2096,7 +2156,7 @@ export class SketchScene {
       this.doc.drawingLayer.stroke({ width: 3, color: 0xffa726 });
     }
     for (const fitting of Object.values(state.fittings)) {
-      this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, 6).fill({ color: 0xffa726 });
+      this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD).fill({ color: 0xffa726 });
     }
     for (const annotation of Object.values(state.annotations)) {
       this.drawAnnotation(annotation);
@@ -2204,7 +2264,7 @@ export class SketchScene {
         continue;
       }
       // The selection box is always the bounding AABB, a plain rect — even for a rotated textbox, whose own outline (drawn separately in drawAnnotation) is the true rotated quad.
-      const bounds = this.resolveSelectableBoundsWorld({ kind: 'annotation', id }, state);
+      const bounds = this.resolveSelectableBoundsWorld(this.selectableRefForId(id, state), state);
       if (!bounds) continue;
       this.overlay
         .rect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)

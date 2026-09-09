@@ -6,6 +6,7 @@ export * from './stamp.js';
 export * from './stamp-library.js';
 export * from './custom-properties.js';
 export * from './network.js';
+export * from './connectivity.js';
 export * from './network-type-library.js';
 export * from './flow.js';
 export * from './commands.js';
