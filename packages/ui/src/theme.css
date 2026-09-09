@@ -1051,7 +1051,7 @@
   margin-left: 8px;
 }
 
-/* ---------- Calibration modal ---------- */
+/* ---------- Shared Dialog (calibration, Settings, ...) ---------- */
 
 .mep-modal-backdrop {
   position: fixed;
@@ -1070,6 +1070,16 @@
   padding: 20px;
   min-width: 280px;
 }
+.mep-modal-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-family: var(--font-display);
+}
+.mep-settings-hint {
+  margin: 10px 14px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
 .mep-modal input {
   width: 100%;
   margin-bottom: 12px;
@@ -1077,6 +1087,18 @@
   padding: 6px 8px;
   border: 1.5px solid var(--line);
   border-radius: 2px;
+}
+/* A .mep-field-row (PropertiesPanel's compact label+input row) used inside a
+   Dialog body — e.g. Settings — needs to win over the plain full-width
+   .mep-modal input above; same specificity, so this overrides on selector
+   weight rather than source order. */
+.mep-modal .mep-field-row input {
+  width: 104px;
+  margin-bottom: 0;
+  padding: 0;
+  border: none;
+  border-bottom: 1.5px dotted var(--ink);
+  border-radius: 0;
 }
 .mep-modal .mep-modal-actions {
   display: flex;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { DEFAULT_SNAP_RADIUS_SCREEN_PX } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { loadStampBitmap } from './stampBitmap.js';
@@ -12,6 +13,8 @@ import { StatusBar } from './components/StatusBar.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
+import { Dialog } from './components/Dialog.js';
+import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX } from './components/SettingsDialog.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
 import './theme.css';
@@ -50,6 +53,8 @@ function supportsFileSystemAccess(): boolean {
 }
 
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
+
+const SNAP_RADIUS_STORAGE_KEY = 'mepapp.settings.snapRadiusPx.v1';
 
 async function writeToFileHandle(fileHandle: FileSystemFileHandle, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
   const writable = await fileHandle.createWritable();
@@ -104,7 +109,24 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
   const [activeNetworkTypeId, setActiveNetworkTypeId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
+    const saved = Number(localStorage.getItem(SNAP_RADIUS_STORAGE_KEY));
+    return saved >= MIN_SNAP_RADIUS_PX && saved <= MAX_SNAP_RADIUS_PX ? saved : DEFAULT_SNAP_RADIUS_SCREEN_PX;
+  });
   const textboxRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Applies the persisted/user-set snap radius to the scene once it exists
+  // (SketchScene itself always starts at its own hardcoded default) and again
+  // whenever Settings changes it.
+  useEffect(() => {
+    if (ready) sceneRef.current?.setSnapRadius(snapRadiusPx);
+  }, [ready, snapRadiusPx, sceneRef]);
+
+  const handleChangeSnapRadiusPx = useCallback((px: number) => {
+    setSnapRadiusPx(px);
+    localStorage.setItem(SNAP_RADIUS_STORAGE_KEY, String(px));
+  }, []);
 
   // Deferred, not `autoFocus`: the click that opens this prompt is the same
   // mousedown/mouseup the browser is still processing its own default focus
@@ -387,7 +409,13 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
           onChange={handleFileInputChange}
           style={{ display: 'none' }}
         />
-        <MenuButton onOpenPdf={handleOpenPdf} onSave={handleSave} onSaveAs={handleSaveAs} pdfLoaded={pdfHandle !== null} />
+        <MenuButton
+          onOpenPdf={handleOpenPdf}
+          onSave={handleSave}
+          onSaveAs={handleSaveAs}
+          onOpenSettings={() => setSettingsOpen(true)}
+          pdfLoaded={pdfHandle !== null}
+        />
         <span className="mep-title">{sheetName ?? 'No sheet loaded'}</span>
         <div className="mep-fill" />
         {status && <span className="mep-header-status">{status}</span>}
@@ -463,11 +491,15 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
       <StatusBar zoom={zoom} calibration={calibration} measurementMm={measurementMm} selectedCount={selection.length} drawingSummary={drawingSummary} />
 
       {calibrationPrompt && (
-        <div className="mep-modal-backdrop">
-          <div className="mep-modal">
-            <p>Known real-world distance between the two clicked points (mm):</p>
-            <input autoFocus type="number" value={calibrationInput} onChange={(e) => setCalibrationInput(e.target.value)} />
-            <div className="mep-modal-actions">
+        <Dialog
+          title="Calibration"
+          onClose={() => {
+            calibrationPrompt.resolve(null);
+            setCalibrationPrompt(null);
+            setCalibrationInput('');
+          }}
+          actions={
+            <>
               <button
                 onClick={() => {
                   calibrationPrompt.resolve(null);
@@ -486,9 +518,16 @@ export function MepSketchApp({ onLoadPdfPage, correspondingSourceUrl, resolveSta
               >
                 Set calibration
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p>Known real-world distance between the two clicked points (mm):</p>
+          <input autoFocus type="number" value={calibrationInput} onChange={(e) => setCalibrationInput(e.target.value)} />
+        </Dialog>
+      )}
+
+      {settingsOpen && (
+        <SettingsDialog snapRadiusPx={snapRadiusPx} onChangeSnapRadiusPx={handleChangeSnapRadiusPx} onClose={() => setSettingsOpen(false)} />
       )}
 
       {correspondingSourceUrl && (

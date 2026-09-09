@@ -5,10 +5,11 @@ export interface MenuButtonProps {
   onOpenPdf: () => void;
   onSave: () => void;
   onSaveAs: () => void;
+  onOpenSettings: () => void;
   pdfLoaded: boolean;
 }
 
-export function MenuButton({ onOpenPdf, onSave, onSaveAs, pdfLoaded }: MenuButtonProps) {
+export function MenuButton({ onOpenPdf, onSave, onSaveAs, onOpenSettings, pdfLoaded }: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -60,6 +61,17 @@ export function MenuButton({ onOpenPdf, onSave, onSaveAs, pdfLoaded }: MenuButto
             }}
           >
             Save As…
+          </button>
+          <div className="mep-menu-divider" />
+          <button
+            type="button"
+            className="mep-menu-item"
+            onClick={() => {
+              onOpenSettings();
+              setOpen(false);
+            }}
+          >
+            Settings…
           </button>
         </div>
       )}

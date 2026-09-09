@@ -195,6 +195,11 @@ const ROTATE_SNAP_DEGREES = 45;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 32;
 
+// How close (screen px, zoom-independent — see onDrawSegmentClick) a click
+// needs to be to an existing stamp/segment endpoint to snap onto it instead
+// of starting a new one. User-adjustable via setSnapRadius (Settings dialog).
+export const DEFAULT_SNAP_RADIUS_SCREEN_PX = 12;
+
 // How close a click needs to be to a thin-stroke annotation (line/arrow/
 // freehand/polyline) or a circle's edge to count as a hit — a plain
 // bounding-box test would be far too generous for a 2pt-wide stroke.
@@ -408,7 +413,7 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private pendingSegmentStart: DrawEndpointResolution | null = null;
-  private readonly SNAP_RADIUS_SCREEN_PX = 12;
+  private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
   private static readonly FITTING_MARKER_RADIUS_PT = 4;
   private resizeObserver: ResizeObserver | null = null;
 
@@ -761,6 +766,16 @@ export class SketchScene {
     if (!target) return;
     target.name = name;
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+  }
+
+  /** Current segment-endpoint snap radius, screen px at zoom 1 — see onDrawSegmentClick. */
+  getSnapRadius(): number {
+    return this.snapRadiusScreenPx;
+  }
+
+  /** Sets the segment-endpoint snap radius (Settings dialog) — screen px, applied zoom-independently at draw time. */
+  setSnapRadius(px: number): void {
+    this.snapRadiusScreenPx = px;
   }
 
   /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
@@ -1948,7 +1963,7 @@ export class SketchScene {
    * exactly one undo step, matching the pass criteria's "undo the whole chain."
    */
   private onDrawSegmentClick(world: Vec2): void {
-    const snapRadius = this.SNAP_RADIUS_SCREEN_PX / this.world.scale.x;
+    const snapRadius = this.snapRadiusScreenPx / this.world.scale.x;
     const state = this.doc.drawingHistory.getState();
     const stamps = [...this.doc.stamps.values()].map((entry) => entry.data);
     const segments = Object.values(state.segments);
