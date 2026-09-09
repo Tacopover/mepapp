@@ -538,3 +538,74 @@ undoing correctly in one step. No console/page errors in any of it.
 Not done: Phase 6 (chained click-click-click segment drawing) and
 Phase 7 (explicitly deferred). This plan file stays until Phase 6 is
 either done or explicitly dropped alongside Phase 7.
+
+## 11. Phase 6 status — spec complete
+
+**Done** — 2026-09-09, on `worktree-segments-ports-custom-elements-spec`
+(pushed to origin, not yet merged to master). This was the last
+non-deferred phase — see the closing note below.
+
+Shipped, all three sub-items from §5 Phase 6:
+
+- **Chaining**: `packages/render/src/scene.ts`'s `onDrawSegmentClick`
+  no longer unconditionally clears `pendingSegmentStart` after
+  committing a segment. A new `chainContinuationFrom(resolved, stamps)`
+  helper re-arms it from the endpoint just placed when that endpoint is
+  a bare fitting, or a port on a stamp whose `category === 'equipment'`
+  (a pass-through node); a port on a `'terminal'` stamp (an end-use
+  device) or a dangling reference ends the chain (returns `null`) —
+  matches §2.2's rule and the old app's `MepSegmentCreate`.
+- **Escape cancels an in-progress chain**: verified first (§7's open
+  item) that `SketchScene.onKeyDown` — bound once via
+  `window.addEventListener('keydown', ...)` in `init()` — is the only
+  existing global key-handling location (everything else found by grep
+  was scoped to one React input's own `onKeyDown`, e.g. rename-editing
+  fields, dialogs). Added an `Escape` branch there, ignored while focus
+  is in a text input same as the existing Delete/Backspace branch;
+  clears `pendingSegmentStart` and redraws the overlay. The Segment
+  tool itself stays active (no tool-switch), since MepApp's rail has no
+  equivalent of the old app's auto-revert-to-pan.
+- **Force-snap fix**: `packages/core/src/segmentTool.ts`'s
+  `resolveSegmentEndpoint` gained a new branch, checked before the
+  existing radius-based port loop: a click anywhere inside a stamp's
+  own rotated body (`pointInRotatedRect` + `getStampHalfExtents`) now
+  force-snaps to that stamp's nearest port, regardless of the normal
+  snap radius — matching the old app's `HighLighter.TrySnapToPort`.
+  Scoped to `stamp.ports.length > 0` (real authored ports only), exactly
+  as the spec specified — a port-less stamp's Phase 5 synthetic center
+  point still only snaps within the normal radius, not its whole body,
+  since force-snapping an entire large stamp's silhouette to one
+  synthetic point would be a much bigger target than the spec asked for.
+
+**Verify before starting** (§7's open items): the Escape-handling
+location question above is answered. The other two open items —
+whether segment deletion already cleans up an orphaned endpoint fitting,
+and whether a NetworkType-level connection-compatibility check exists —
+were never resolved and are carried into §5 Phase 7, which stays
+explicitly deferred (not part of this spec's completion).
+
+Verified: `pnpm build` clean across all 9 workspace packages;
+`pnpm vitest run` in `packages/core` — 127/127 passing (4 new: one
+confirming a click anywhere on a real-ported stamp's body force-snaps
+to its nearest port past the normal radius, one confirming a port-less
+stamp's whole body does *not* force-snap this way — only its synthetic
+center's normal radius applies); `tsc --noEmit` clean in
+`packages/render`. Exercised live via a scripted Playwright session:
+drew a chain into a placed Terminal's port and confirmed the chain
+correctly ended there (the very next click started a brand-new,
+unconnected segment — verified via segment/fitting/network counts and
+visual gaps in the screenshots); drew a chain through two bare
+fittings, pressed Escape mid-chain, and confirmed the next click again
+started a fresh, unconnected segment rather than continuing. No
+console/page errors in any of it.
+
+**Spec complete.** Every phase in §5 except Phase 7 (explicitly
+deferred: angle/alignment snapping, hidden segments,
+`DeleteFittingWithMergeCommand` parity, and the two unresolved §7
+verification items above) is now shipped and verified: Phase 0
+(commit `335454a`), Phase 1+2 (commit `c3008ba`/`259eb79`), Phase 3+4+5
+(commit `a8c4dcb`), Phase 6 (this commit). Per CLAUDE.md's plan-file
+convention, this file is a candidate for deletion by `/session-handoff`
+once its summary lands in the Decisions-Log — Phase 7's deferred items
+belong in a future spec of their own if the team picks them up later,
+not as a reason to keep this file open indefinitely.

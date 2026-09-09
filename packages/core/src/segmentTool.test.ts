@@ -76,6 +76,22 @@ describe('resolveSegmentEndpoint', () => {
     expect(target).toEqual({ kind: 'new-fitting', worldPosition: { x: 900, y: 900 } });
   });
 
+  it('force-snaps to the nearest port for a click anywhere on a ported stamp\'s body, past the normal radius (Phase 6)', () => {
+    // (85, 95) is inside the AHU's body (spans x:[80,120], y:[90,110]) but ~35 units from its one port at (120,100) - well past radius 10.
+    const target = resolveSegmentEndpoint({ x: 85, y: 95 }, [stamp], [], [], { radius: 10 });
+    expect(target).toEqual({
+      kind: 'existing',
+      point: { kind: 'port', elementId: 'ahu', portId: 'p1' },
+      worldPosition: { x: 120, y: 100 },
+    });
+  });
+
+  it('does not force-snap a port-less stamp\'s whole body — only the normal synthetic-center radius applies', () => {
+    // (85, 95) is inside portlessStamp's body but outside the default radius from its synthetic center (100, 100).
+    const target = resolveSegmentEndpoint({ x: 85, y: 95 }, [portlessStamp], [], [], { radius: 10 });
+    expect(target.kind).toBe('new-fitting');
+  });
+
   it('snaps to a port-less stamp\'s synthetic center port (Phase 5 bridge)', () => {
     // portlessStamp's center is its own transform.position, (100, 100).
     const target = resolveSegmentEndpoint({ x: 100, y: 100 }, [portlessStamp], [], [], { radius: 10 });

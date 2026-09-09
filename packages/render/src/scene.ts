@@ -2021,11 +2021,28 @@ export class SketchScene {
     this.emitter.emit('zoomChanged', newZoom);
   };
 
-  /** Delete/Backspace deletes the current selection — the rail's Delete flyout action's keyboard-shortcut counterpart (atlas §4). Ignored while focus is in a text input/textarea so it doesn't fight typing in, e.g., the Properties panel or the textbox-annotation floating textarea. */
+  /**
+   * Delete/Backspace deletes the current selection — the rail's Delete
+   * flyout action's keyboard-shortcut counterpart (atlas §4). Escape
+   * cancels an in-progress segment-draw chain (Phase 6) instead — the
+   * Segment tool stays active rather than reverting to Select, since
+   * MepApp's rail-based tool model has no equivalent of the old app's
+   * auto-revert-to-pan convention (§5 Phase 6). Both are ignored while
+   * focus is in a text input/textarea so they don't fight typing in, e.g.,
+   * the Properties panel or the textbox-annotation floating textarea.
+   */
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== 'Delete' && event.key !== 'Backspace') return;
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+
+    if (event.key === 'Escape') {
+      if (!this.pendingSegmentStart) return;
+      this.pendingSegmentStart = null;
+      this.redrawOverlay();
+      return;
+    }
+
+    if (event.key !== 'Delete' && event.key !== 'Backspace') return;
     if (this.doc.selectedIds.size === 0) return;
     event.preventDefault();
     this.deleteSelection();
@@ -2128,11 +2145,17 @@ export class SketchScene {
   }
 
   /**
-   * Two-click segment drawing: the first click resolves and remembers a
+   * Click-to-draw segment tool: the first click resolves and remembers a
    * start endpoint (without mutating anything yet — see DrawEndpointResolution),
-   * the second resolves the end endpoint and applies both endpoints' setup
-   * plus the new segment as one CompositeCommand, so "draw a run" is always
-   * exactly one undo step, matching the pass criteria's "undo the whole chain."
+   * the next click resolves the end endpoint and applies both endpoints'
+   * setup plus the new segment as one CompositeCommand, so each individual
+   * segment is always exactly one undo step. After committing, the run
+   * chains on automatically (§2.2, Phase 6): connecting to a fitting or an
+   * Equipment's port re-arms pendingSegmentStart from the endpoint just
+   * placed, so the very next click continues the run; connecting to a
+   * Terminal's port ends the chain (an end-use device, not a pass-through
+   * node) — mirrors the old app's MepSegmentCreate. Escape (onKeyDown)
+   * cancels an in-progress chain early.
    */
   private onDrawSegmentClick(world: Vec2): void {
     const snapRadius = this.snapRadiusScreenPx / this.world.scale.x;
@@ -2172,7 +2195,15 @@ export class SketchScene {
     this.doc.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
     this.syncDrawingLayer();
     this.markDirty();
+    this.pendingSegmentStart = this.chainContinuationFrom(resolved, state.stamps);
     this.redrawOverlay();
+  }
+
+  /** Whether a just-placed segment endpoint continues the chain (§2.2/Phase 6): a bare fitting always continues; a stamp's port continues only for Equipment (a pass-through node), not Terminal (an end-use device that should end the run). */
+  private chainContinuationFrom(resolved: DrawEndpointResolution, stamps: Record<string, PlacedStamp>): DrawEndpointResolution | null {
+    if (resolved.point.kind === 'fitting') return resolved;
+    const stamp = stamps[resolved.point.elementId];
+    return stamp?.category === 'equipment' ? resolved : null;
   }
 
   private resolveDrawTarget(target: ReturnType<typeof resolveSegmentEndpoint>): DrawEndpointResolution {

@@ -11,8 +11,8 @@
 // junction" Step 7 asks for, matching the old app's SegmentBreaker), and
 // only creates a brand new bare fitting if nothing nearby was hit.
 
-import { closestPointOnSegment, distance, type Vec2 } from './geometry.js';
-import { getStampWorldPorts, type PlacedStamp } from './stamp.js';
+import { closestPointOnSegment, distance, pointInRotatedRect, type Vec2 } from './geometry.js';
+import { getStampHalfExtents, getStampWorldPorts, type PlacedStamp } from './stamp.js';
 import type { ConnectionPoint, Fitting, Segment } from './network.js';
 
 export type SegmentEndpointTarget =
@@ -34,6 +34,23 @@ export function resolveSegmentEndpoint(
   options: SnapOptions,
 ): SegmentEndpointTarget {
   const minT = options.minInteriorFraction ?? 0.02;
+
+  // A click anywhere on a ported stamp's own body force-snaps to its
+  // nearest port, regardless of the normal snap radius — matches the old
+  // app's HighLighter.TrySnapToPort (§2.2): a user aiming at a Terminal or
+  // Equipment's icon expects to connect to it, not to have to hit a small
+  // port marker precisely. Restricted to stamps with real authored ports
+  // (not the Phase 5 synthetic-center bridge) — a port-less stamp's whole
+  // body force-snapping to its center would be a much bigger snap target
+  // than the spec asked for.
+  for (const stamp of stamps) {
+    if (stamp.ports.length === 0) continue;
+    const { halfWidth, halfHeight } = getStampHalfExtents(stamp);
+    if (!pointInRotatedRect(worldPoint, stamp.transform, halfWidth, halfHeight)) continue;
+    const ports = getStampWorldPorts(stamp);
+    const nearest = ports.reduce((best, port) => (distance(worldPoint, port.world) < distance(worldPoint, best.world) ? port : best));
+    return { kind: 'existing', point: { kind: 'port', elementId: stamp.id, portId: nearest.id }, worldPosition: nearest.world };
+  }
 
   for (const stamp of stamps) {
     for (const port of getStampWorldPorts(stamp)) {
