@@ -61,3 +61,32 @@ An empty Networks tab containing only the "Solve Flow" button + its result (both
 - **D1 — rename UX.** Inline double-click-to-edit (old app's pattern) vs. a name field in the Properties panel when a network is the "selection." Old app's pattern is proven; only reason to deviate is if MepApp's selection model doesn't cleanly support "a network is selected" as a concept yet (today, selection is stamps only).
 - **D2 — does Phase 2 happen at all soon?** Confirm whether Electrical Circuits parity is a near-term goal before investing in `Circuit`/`Panel` domain modeling — it's a meaningfully sized addition to `@mepapp/core`, not a small one.
 - **D3 — tree component.** A plain recursive React component is enough for this tree's size and behavior; no tree UI library is needed.
+
+## 7. Phase 1 status
+
+**Done** — 2026-09-09, commit `9513318` on `master`.
+
+Shipped: `SketchScene.getNetworkSummaries()` now returns `elementIds` per
+network; new `SketchScene.selectStampById()`; `NetworkTreePanel.tsx`
+(Discipline → Network → Element tree, all 6 disciplines always shown,
+bidirectional canvas↔tree selection sync with ancestor auto-expand +
+highlight, inline double-click network rename per D1, plain recursive
+component per D3) wired into the Networks dock tab in `App.tsx`. Also
+fixed a live-rebuild gap found during verification: `useSketchScene.ts`'s
+`networkTypesChanged` handler wasn't refreshing `networkSummaries`, so a
+rename never reached the tree (`networkTypeName` is copied at
+`getNetworkSummaries()` call time, not looked up live).
+
+Verified: `pnpm build` + `pnpm turbo run typecheck` clean across all 10
+packages; `pnpm turbo run test` — 109 core + 11 pdf-engine-mupdf tests,
+unchanged (UI-only change, no new core tests). Live headless-Chromium
+Playwright walkthrough against `fixtures/pdfs/arch_simple_A4.pdf`: placed
+a Supply Grille (ventilation) and a Luminaire (electricalCircuits), drew
+one segment per stamp connecting it into a network, confirmed all 6
+disciplines render (including the 4 empty ones), confirmed
+discipline→network→element grouping, confirmed tree-click→canvas-select
+and canvas-select→tree-highlight-and-expand both work, confirmed inline
+rename commits and persists on the domain model.
+
+Phase 2 (§4's Circuit/Panel branch) is still open — not started, still
+blocked on the domain modeling `@mepapp/core` gap described in §3.
