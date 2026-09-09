@@ -387,3 +387,90 @@ both methods) whenever someone's next in `scene.ts`.
 Not done: Phase 0 (stamp state unification — prerequisite for Phase
 3/4's stamp-drag cascade), Phase 3-7. This plan file stays until every
 phase is done — see CLAUDE.md's plan-file convention.
+
+## 9. Phase 0 status
+
+**Done** — 2026-09-09, on `worktree-segments-ports-custom-elements-spec`
+(pushed to origin, not yet merged to master).
+
+Shipped: `packages/render/src/document.ts`'s `DrawingState` gained
+`stamps: Record<string, PlacedStamp>`; `StampEntry` dropped its `data`
+field down to `{ sprite, baseScale }` — the PixiJS-only render cache
+the spec called for, with `PlacedStamp` data now read from
+`DrawingState.stamps[id]` everywhere. `packages/render/src/scene.ts`:
+every direct stamp mutation site named in §5 Phase 0 — `setStampTransform`
+(replaced by a `Transaction`-backed `applyStampTransform` helper used by
+`setSelectedRotationDegrees`/`setSelectedPosition`), `placeStamp`, stamp
+deletion, plus `setStampProperty`/`applyCustomPropertyCascade` (mutated
+`entry.data` before, so needed the same treatment once `data` moved) —
+now go through `createStampCommand`/`Transaction<DrawingState>`, so a
+stamp move/rotate/property-change/place/delete is undoable for the
+first time. `rotateSelectionBy` and the drag-rotate handle
+(`rotate-selection`) were unified to cover stamps and annotations in
+one `Transaction` (previously stamps rotated with no undo at all, in a
+separate code path from annotations); `move-selection`'s drag now
+folds stamp position updates into the same `drawingTx` already used for
+fittings/annotations, alongside Phase 1's fitting cascade. Every
+geometry helper that only needed `PlacedStamp` fields (`stampCornersWorld`,
+`stampWorldBounds`, `hitTest`'s stamp loop, `resolveSelectableBoundsWorld`,
+`domainSyncEntries`, the rubber-band hit test) was migrated to take
+`PlacedStamp` directly and read `state.stamps` instead of the old
+`entry.data`; `stampsRecord()` (a Phase 1 addition) became dead code
+once stamps lived in `DrawingState` and was deleted rather than kept as
+a trivial passthrough.
+
+Key design decision — sprite lifecycle across delete/undo: a deleted
+stamp's sprite is detached from `stampsLayer`, never destroyed (new
+`syncStampSprites`, called from `syncDrawingLayer`, reconciles sprite
+attachment/transform against `DrawingState.stamps` every time). An
+undo has to be able to re-attach the exact same sprite instead of
+re-fetching its texture, since that fetch is async (`resolveIconBitmap`)
+and, for an ad hoc uploaded stamp with no saved bytes, not even
+possible. Traded off: a deleted-then-never-restored stamp's sprite
+stays resident in `doc.stamps` for the rest of the session (bounded by
+`CommandManager`'s 50-entry history in principle, but nothing actually
+evicts the sprite once its command falls off the stack) — a small,
+accepted memory-retention cost, not a correctness issue.
+
+**Verify before starting** (§7's open item): confirmed `packages/core/src/project.ts`
+already persists `stamps: PlacedStamp[]` as a top-level `ProjectDocument`
+field, parallel to `segments`/`fittings`/`annotations`, since schema
+version 2 (2026-09-06's Terminal/Equipment category migration) — Phase 0
+was purely a runtime-state migration in `packages/render`, not a save-schema
+change. `exportProject`/`loadProjectFromJson` were updated to read/write
+`DrawingState.stamps` instead of `doc.stamps`'s `.data`, with no
+`ProjectDocument`/migration changes needed.
+
+**Found and fixed** (widened, not just documented, from Phase 1's
+note): `SketchScene.undoDrawing()`/`redoDrawing()` never called
+`redrawOverlay()` or re-emitted `selectionChanged`. Phase 1 only
+observed this as a cosmetic one-frame-stale selection box. Phase 0
+exposed a real-data-correctness version of the same bug: after
+undoing a stamp move/rotate, the Properties panel kept showing the
+pre-undo X/Y/rotation values (confirmed via Playwright screenshot,
+`p0-03-move-undone` before the fix) because nothing told the panel to
+re-read the reverted state. Fixed by adding `this.redrawOverlay()` and
+`this.emitter.emit('selectionChanged', this.getSelection())` to both
+methods.
+
+Verified: `pnpm build` clean across all 9 workspace packages;
+`pnpm vitest run` in `packages/core` — 118/118 passing, unchanged (no
+core-package schema touched); `tsc --noEmit` clean in `packages/render`.
+Exercised live via a scripted Playwright session against `pnpm dev`:
+placed a stamp (undoable — Undo button enables immediately), dragged it
+(position updates, Properties panel and overlay box both track live),
+undid the move (position and Properties panel both correctly revert),
+redid it, rotated it 90° via the rail's flyout action (now one
+`Transaction`, undoable), undid the rotation, deleted it (disappears,
+selection clears), undid the delete (sprite correctly reappears at its
+prior position — confirms the detach-not-destroy design), and re-ran
+Phase 1's fitting-drag-cascade regression test (draw a 3-fitting chain,
+drag the shared middle fitting, undo) to confirm the shared drag state
+machine still works correctly after this refactor. No console/page
+errors in any of it.
+
+Not done: Phase 3 (stamp drag cascades to connected segments — now
+unblocked, since stamp position lives in `DrawingState`), Phase 4
+(stamp rotate cascade), Phase 5 (synthetic center port), Phase 6
+(chained drawing), Phase 7 (deferred). This plan file stays until every
+phase is done.

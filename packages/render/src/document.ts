@@ -13,15 +13,16 @@ import {
 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
-/** Undo-history state for the segment/fitting/annotation drawing tools — kept separate from the pre-existing, not-yet-undoable stamp placement state (see decisions log 2026-09-06). */
+/** Undo-history state for the segment/fitting/stamp/annotation drawing tools — stamp placement used to be a separate, not-yet-undoable state container (see decisions log 2026-09-06); unified in here so a stamp move and its cascaded segment update can be one atomic undo step (connectivity spec, Phase 0). */
 export interface DrawingState {
   segments: Record<string, Segment>;
   fittings: Record<string, Fitting>;
+  stamps: Record<string, PlacedStamp>;
   annotations: Record<string, Annotation>;
 }
 
+/** The PixiJS-side render cache for one placed stamp — its actual data (position/transform/ports/etc.) lives in DrawingState.stamps instead, so this holds only what can't be derived from that: the sprite object and its base texture-to-world scale. A sprite is kept alive (detached, not destroyed) if its stamp is deleted, so an undo can re-attach it without re-fetching art — see SketchScene.syncStampSprites. */
 export interface StampEntry {
-  data: PlacedStamp;
   sprite: Sprite;
   baseScale: Vec2; // converts texture pixels -> world units at transform.scale = 1
 }
@@ -64,7 +65,7 @@ export class SketchDocument {
   readonly stamps = new Map<string, StampEntry>();
   selectedIds = new Set<string>();
   calibration: Calibration | null = null;
-  readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {}, annotations: {} });
+  readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {}, stamps: {}, annotations: {} });
   readonly networkTypes: NetworkType[] = [DEFAULT_NETWORK_TYPE];
   /** Ports on the same element linked into one connectivity node — e.g. an AHU's supply + return (see core's PortGroup doc comment). Set via SketchScene.setPortGroup. */
   readonly portGroups: PortGroup[] = [];
@@ -84,7 +85,7 @@ export class SketchDocument {
     return (
       this.backdropSprite === null &&
       this.pdfHandle === null &&
-      this.stamps.size === 0 &&
+      Object.keys(state.stamps).length === 0 &&
       Object.keys(state.segments).length === 0 &&
       Object.keys(state.fittings).length === 0 &&
       Object.keys(state.annotations).length === 0
