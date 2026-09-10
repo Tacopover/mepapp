@@ -359,8 +359,8 @@ class TypedEmitter<Events extends Record<string, unknown[]>> {
   }
 }
 
-/** A selectable object is a placed stamp, a fitting, or a drawn annotation — see hitTest. */
-type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'fitting'; id: string } | { kind: 'annotation'; id: string };
+/** A selectable object is a placed stamp, a fitting, a drawn segment, or a drawn annotation — see hitTest. */
+type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'fitting'; id: string } | { kind: 'segment'; id: string } | { kind: 'annotation'; id: string };
 
 /** Original per-annotation geometry captured at gesture start, so move/rotate can recompute the whole gesture's delta from a fixed origin on every pointermove rather than drifting by accumulating per-frame deltas. */
 type AnnotationSnapshot = Record<string, AnnotationGeometry>;
@@ -1442,6 +1442,13 @@ export class SketchScene {
     }
 
     const threshold = ANNOTATION_STROKE_HIT_THRESHOLD_SCREEN_PX / this.world.scale.x;
+    const orderedSegments = Object.values(state.segments).reverse();
+    for (const segment of orderedSegments) {
+      if (pointNearPolyline(worldPoint, segment.geometry, threshold)) {
+        return { kind: 'segment', id: segment.id };
+      }
+    }
+
     const orderedAnnotations = Object.values(state.annotations).reverse();
     for (const annotation of orderedAnnotations) {
       if (this.annotationHit(worldPoint, annotation.geometry, threshold)) {
@@ -1506,15 +1513,26 @@ export class SketchScene {
         maxY: fitting.position.y + FITTING_MARKER_RADIUS_WORLD,
       };
     }
+    if (ref.kind === 'segment') {
+      const segment = state.segments[ref.id];
+      if (!segment) return null;
+      return {
+        minX: Math.min(...segment.geometry.map((p) => p.x)),
+        minY: Math.min(...segment.geometry.map((p) => p.y)),
+        maxX: Math.max(...segment.geometry.map((p) => p.x)),
+        maxY: Math.max(...segment.geometry.map((p) => p.y)),
+      };
+    }
     const annotation = state.annotations[ref.id];
     if (!annotation) return null;
     return annotationBoundsWorld(annotation.geometry, STICKY_NOTE_ICON_SIZE_PT);
   }
 
-  /** Which selectable kind an id belongs to — stamps and fittings are checked directly (both are keyed collections with no ambiguity), anything else is assumed to be an annotation. */
+  /** Which selectable kind an id belongs to — stamps/fittings/segments are checked directly (all keyed collections with no ambiguity), anything else is assumed to be an annotation. */
   private selectableRefForId(id: string, state: DrawingState): SelectableRef {
     if (state.stamps[id]) return { kind: 'stamp', id };
     if (state.fittings[id]) return { kind: 'fitting', id };
+    if (state.segments[id]) return { kind: 'segment', id };
     return { kind: 'annotation', id };
   }
 
@@ -1999,6 +2017,12 @@ export class SketchScene {
           hits.add(annotation.id);
         }
       }
+      for (const segment of Object.values(state.segments)) {
+        const bounds = this.resolveSelectableBoundsWorld({ kind: 'segment', id: segment.id }, state);
+        if (bounds && bounds.minX <= rectMax.x && bounds.maxX >= rectMin.x && bounds.minY <= rectMax.y && bounds.maxY >= rectMin.y) {
+          hits.add(segment.id);
+        }
+      }
       this.doc.selectedIds = additive ? new Set([...this.doc.selectedIds, ...hits]) : hits;
       this.emitter.emit('selectionChanged', this.getSelection());
     }
@@ -2147,14 +2171,17 @@ export class SketchScene {
     const state = this.doc.drawingHistory.getState();
     const annotationIds = ids.filter((id) => state.annotations[id]);
     const stampIds = ids.filter((id) => state.stamps[id]);
-    if (annotationIds.length > 0 || stampIds.length > 0) {
+    const segmentIds = ids.filter((id) => state.segments[id]);
+    if (annotationIds.length > 0 || stampIds.length > 0 || segmentIds.length > 0) {
       const tx = new Transaction(this.doc.drawingHistory, `Delete ${ids.length} item(s)`);
       tx.update((s) => {
         const annotations = { ...s.annotations };
         for (const id of annotationIds) delete annotations[id];
         const stamps = { ...s.stamps };
         for (const id of stampIds) delete stamps[id];
-        return { ...s, annotations, stamps };
+        const segments = { ...s.segments };
+        for (const id of segmentIds) delete segments[id];
+        return { ...s, annotations, stamps, segments };
       });
       tx.commit();
     }
