@@ -271,5 +271,86 @@ reopened via "Edit ports…" and confirmed full pre-fill (name,
 discipline, category, artwork, ports, groups) round-tripped correctly.
 Zero console errors throughout.
 
-§5.3 (Shapes mode) not started — see §7 item 3, its own multi-session
-effort.
+## 10. §5.3 status (Shapes mode)
+
+**Done** — 2026-09-10, commit `41cb4f9`, branch
+`worktree-ports-custom-element-editor` (not yet merged to master).
+
+Shipped: a vector drawing canvas inside the same Element Editor dialog,
+toggled via an "Import image" / "Draw shapes" mode switch. Tools:
+Select (click to select/move, Delete to remove), Port (click to place a
+port, same as the always-on Ports-mode behavior), Line, Rect, Circle,
+Arc (drag to set radius, then Start°/End° number inputs on the selected
+arc for the sweep — a deliberate simplification over a drag-handle
+sweep gesture), and Text (click to place, inline rename same pattern as
+port renaming). Stroke color/width and optional fill are editable per
+selected shape or as defaults for the next shape drawn. Local undo/redo
+via a `CommandManager<SymbolShape[]>` scoped to just this dialog's
+canvas, wired to Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z / Ctrl+Y and on-canvas
+buttons — reuses `@mepapp/core`'s existing Command/CommandManager
+primitive per §5.3's own instruction, rather than inventing a second
+undo system.
+
+New `SymbolShape` union in `@mepapp/core` (`symbol-shapes.ts`) — line,
+rect, circle, arc, text, each with a `style: { stroke, strokeWidth,
+fill }`. Coordinates are fractional over the definition's own bounding
+box (0..1), the same convention `PortSpec.fractionX/fractionY` already
+uses, so a shape stays correctly placed regardless of the definition's
+final `nativeWidth`/`nativeHeight`. `StampDefinition.shapes?:
+SymbolShape[]` is the editable source — reopening "Edit ports…" on a
+Shapes-authored element re-populates the canvas from it. No schema
+version bump: the field is optional and needs no migration for older
+saves.
+
+One deliberate deviation, consistent with §5.2's already-recorded one:
+rather than the spec's `artwork: { kind: 'vector'; shapes: SymbolShape[]
+}` union member, the canvas is rasterized to a `data:` URL at save time
+and stored in the existing `iconRef` field (same as the raster-import
+path) — `shapes` is carried alongside purely as the editable source.
+This means every render/placement call site in `@mepapp/render` and
+`App.tsx` needed zero changes; they keep treating artwork as "an image"
+with no vector-aware branch. The rasterizer (`packages/ui/src/
+symbolShapeCanvas.ts`) is a plain `<canvas>` 2D-context draw routine,
+shared by both the live editing canvas and the final save-time
+rasterize step, matching this section's own suggestion ("a PixiJS
+Graphics built from the shape list, or an offscreen-canvas render to
+texture") — the offscreen-canvas option, not a PixiJS-side renderer, to
+avoid touching `@mepapp/render` at all.
+
+One real bug found and fixed during live verification: placing a text
+shape opened its rename input with `autoFocus` from inside the same
+`pointerdown` that created the shape — this raced the browser's own
+post-mousedown focus handling (mousedown targets the canvas, which
+isn't focusable, so the browser blurs whatever the app just focused),
+silently discarding the rename before it was visible. Fixed by
+deferring the focus call via `setTimeout(..., 0)`, the same fix already
+present in `App.tsx` for the floating textbox-annotation prompt —
+found by grepping for that exact pattern once the race was diagnosed,
+not reinvented.
+
+Two explicit scope trims, not built: shape **resize** (select tool
+supports move + delete only, no resize handles) and a **shapes list**
+for keyboard-only access (ports already have one via the existing Ports
+section; shapes do not). Worth picking up if this dialog sees real use
+and resize/keyboard access turns out to matter.
+
+Verified: `pnpm build` clean across all 9 workspace packages (turbo,
+root). `pnpm vitest run` in `packages/core` — 129/129 passing (no new
+tests needed — `symbol-shapes.ts` is a pure type with no runtime logic,
+and `packages/ui` has no test harness of its own, consistent with the
+rest of that package). `tsc --noEmit` clean via `pnpm --filter
+@mepapp/ui build`. Live Playwright walkthrough against the real dev
+server: drew a rect, circle, line, and text label; selected and dragged
+the rect; changed stroke color; exercised undo/redo; placed a port via
+the Port tool; saved (name "Shape Test Valve", Plumbing, Equipment);
+confirmed the new tile appeared in the Stamps grid; placed an instance
+on the sheet (rasterized artwork + port render correctly); reopened via
+"Edit ports…" and confirmed full pre-fill (name, discipline, category,
+Draw-shapes mode active, W/H, all four shapes, the port) round-tripped
+correctly. Zero console errors throughout.
+
+This closes every part of ports-custom-element-editor-spec.md (§5.1
+skipped as already-shipped, §5.2 and §5.3 both done this session). Per
+this repo's CLAUDE.md, `/session-handoff` is the point at which this
+plan file gets deleted, after confirming a summary lands in
+Decisions-Log — not done by hand mid-session.
