@@ -34,6 +34,10 @@ export const DEFAULT_NETWORK_TYPE: NetworkType = {
   discipline: 'ventilation',
   units: '',
   defaultCapacity: 0,
+  // Matches the segment stroke that was hardcoded before per-network-type visuals existed, so untyped/pre-migration segments don't change appearance.
+  color: '#ffa726',
+  lineWidthPt: 3,
+  linePattern: 'solid',
 };
 
 /** Summary of one open document — the Drawings tab's read model. */

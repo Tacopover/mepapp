@@ -17,6 +17,8 @@ export type Discipline =
   | 'electricalPathways'
   | 'electricalCircuits';
 
+export type LinePattern = 'solid' | 'dashed' | 'dotted';
+
 export interface NetworkType {
   id: string;
   name: string;
@@ -24,6 +26,10 @@ export interface NetworkType {
   /** Display-only label (e.g. "CFM", "GPM"). Never consulted by flow solve — see flow.ts. */
   units: string;
   defaultCapacity: number;
+  /** Hex color (e.g. '#2196f3') a drawn segment of this type is stroked with — see render's syncDrawingLayer. */
+  color: string;
+  lineWidthPt: number;
+  linePattern: LinePattern;
 }
 
 export type SegmentShape = 'round' | 'rectangular';

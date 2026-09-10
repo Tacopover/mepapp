@@ -49,6 +49,7 @@ import {
   type Discipline,
   type Fitting,
   type FlowResult,
+  type LinePattern,
   type Network,
   type NetworkType,
   type PlacedStamp,
@@ -78,6 +79,19 @@ function round(n: number): number {
   return Math.round(n * 1000) / 1000; // avoids float round-trip noise producing false-positive drift
 }
 
+/** '#2196f3' -> 0x2196f3, the numeric color format PixiJS's Graphics.stroke()/fill() take. */
+function hexColorToPixi(hex: string): number {
+  return parseInt(hex.replace('#', ''), 16);
+}
+
+// Dash/gap lengths (world units = PDF points) for a non-solid NetworkType.linePattern —
+// PixiJS v8's Graphics.stroke() has no native dash option, so syncDrawingLayer's
+// strokeDashedPolyline walks a segment in these increments, issuing one stroke() call per dash.
+const DASH_PATTERN_WORLD: Record<Exclude<LinePattern, 'solid'>, { dash: number; gap: number }> = {
+  dashed: { dash: 8, gap: 5 },
+  dotted: { dash: 1.5, gap: 4 },
+};
+
 function dataUrlToBytes(dataUrl: string): Uint8Array {
   const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
   const binary = atob(base64);
@@ -93,7 +107,7 @@ function annotationSyncEntry(annotation: StoredAnnotation): SyncedGeometry | nul
     return { id: annotation.id, geometry: { ax: round(g.from.x), ay: round(g.from.y), bx: round(g.to.x), by: round(g.to.y) } };
   }
   if (g.kind === 'circle') {
-    // Radius deliberately excluded — this shape is shared with Fitting's constant-radius marker circle (see writeAnnotationForId), whose domain-side entry never carried one either.
+    // Radius deliberately excluded from the sync comparison — an annotation's radius edit isn't flagged as drift, only a move is.
     return { id: annotation.id, geometry: { x: round(g.center.x), y: round(g.center.y) } };
   }
   if (g.kind === 'rectangle' || g.kind === 'highlight') {
@@ -445,8 +459,9 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private pendingSegmentStart: DrawEndpointResolution | null = null;
+  /** Id of the most recently committed segment in the chain currently being drawn (draw-segment tool, chain still continuing) — governs fitting visibility (computeVisibleFittingIds) alongside the current selection. Cleared whenever the chain stops being "in progress": natural end, Escape-finish, or switching tools. */
+  private activeChainAnchorId: string | null = null;
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
-  private static readonly FITTING_MARKER_RADIUS_PT = 4;
   private resizeObserver: ResizeObserver | null = null;
 
   constructor(private readonly container: HTMLElement) {
@@ -518,10 +533,12 @@ export class SketchScene {
     this.tool = tool;
     this.pendingPoints = [];
     this.pendingSegmentStart = null;
+    this.activeChainAnchorId = null;
     this.pendingPolylinePoints = [];
     this.pendingPolylineCursor = null;
     this.lastPolylineClickScreen = null;
     this.redrawOverlay();
+    this.syncDrawingLayer();
     this.emitter.emit('toolChanged', tool);
   }
 
@@ -1112,6 +1129,7 @@ export class SketchScene {
     return report;
   }
 
+  /** Fittings are deliberately excluded — they're editing-view-only (visible for the chain being drawn or selected, see computeVisibleFittingIds) and never written into the exported PDF. */
   private domainSyncEntries(): SyncedGeometry[] {
     const state = this.doc.drawingHistory.getState();
     const entries: SyncedGeometry[] = [];
@@ -1119,9 +1137,6 @@ export class SketchScene {
       const [a, b] = segment.geometry;
       if (!a || !b) continue;
       entries.push({ id: segment.id, geometry: { ax: round(a.x), ay: round(a.y), bx: round(b.x), by: round(b.y) } });
-    }
-    for (const fitting of Object.values(state.fittings)) {
-      entries.push({ id: fitting.id, geometry: { x: round(fitting.position.x), y: round(fitting.position.y) } });
     }
     for (const data of Object.values(state.stamps)) {
       const bounds = this.stampWorldBounds(data);
@@ -1162,16 +1177,6 @@ export class SketchScene {
     if (segment) {
       const [a, b] = segment.geometry;
       await handle.addAnnotation({ id, kind: 'line', pageIndex: segment.pageIndex, geometry: { kind: 'line', from: a, to: b } });
-      return;
-    }
-    const fitting = state.fittings[id];
-    if (fitting) {
-      await handle.addAnnotation({
-        id,
-        kind: 'circle',
-        pageIndex: fitting.pageIndex,
-        geometry: { kind: 'circle', center: fitting.position, radius: SketchScene.FITTING_MARKER_RADIUS_PT },
-      });
       return;
     }
     const stampEntry = this.doc.stamps.get(id);
@@ -2394,9 +2399,10 @@ export class SketchScene {
     subCommands.push(createSegmentCommand(newSegment));
 
     this.doc.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
+    this.pendingSegmentStart = this.chainContinuationFrom(resolved, state.stamps);
+    this.activeChainAnchorId = this.pendingSegmentStart ? newSegment.id : null;
     this.syncDrawingLayer();
     this.markDirty();
-    this.pendingSegmentStart = this.chainContinuationFrom(resolved, state.stamps);
     this.redrawOverlay();
   }
 
@@ -2453,17 +2459,87 @@ export class SketchScene {
     for (const segment of Object.values(state.segments)) {
       const [start, ...rest] = segment.geometry;
       if (!start || rest.length === 0) continue;
-      this.doc.drawingLayer.moveTo(start.x, start.y);
-      for (const point of rest) this.doc.drawingLayer.lineTo(point.x, point.y);
-      this.doc.drawingLayer.stroke({ width: 3, color: 0xffa726 });
+      const visuals = this.resolveNetworkTypeVisuals(segment.networkTypeId);
+      if (visuals.linePattern === 'solid') {
+        this.doc.drawingLayer.moveTo(start.x, start.y);
+        for (const point of rest) this.doc.drawingLayer.lineTo(point.x, point.y);
+        this.doc.drawingLayer.stroke({ width: visuals.lineWidthPt, color: visuals.color });
+      } else {
+        this.strokeDashedPolyline(segment.geometry, visuals.lineWidthPt, visuals.color, DASH_PATTERN_WORLD[visuals.linePattern]);
+      }
     }
+    const visibleFittingIds = this.computeVisibleFittingIds(state);
     for (const fitting of Object.values(state.fittings)) {
+      if (!visibleFittingIds.has(fitting.id)) continue;
       this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD).fill({ color: 0xffa726 });
     }
     for (const annotation of Object.values(state.annotations)) {
       this.drawAnnotation(annotation);
     }
     this.emitter.emit('drawingChanged', this.getDrawingSummary());
+  }
+
+  /** A segment's stroke color/width/pattern, resolved from its networkTypeId against the active document's adopted network types — falls back field-by-field to DEFAULT_NETWORK_TYPE, which also covers a project saved before these fields existed. */
+  private resolveNetworkTypeVisuals(networkTypeId: string): { color: number; lineWidthPt: number; linePattern: LinePattern } {
+    const type = this.doc.networkTypes.find((t) => t.id === networkTypeId);
+    return {
+      color: hexColorToPixi(type?.color ?? DEFAULT_NETWORK_TYPE.color),
+      lineWidthPt: type?.lineWidthPt ?? DEFAULT_NETWORK_TYPE.lineWidthPt,
+      linePattern: type?.linePattern ?? DEFAULT_NETWORK_TYPE.linePattern,
+    };
+  }
+
+  /** Draws a dashed/dotted polyline as a series of short stroke() calls (moveTo/lineTo per dash) — see DASH_PATTERN_WORLD's doc comment for why this is manual. */
+  private strokeDashedPolyline(points: Vec2[], width: number, color: number, pattern: { dash: number; gap: number }): void {
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i];
+      const b = points[i + 1];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const length = Math.hypot(dx, dy);
+      if (length === 0) continue;
+      const ux = dx / length;
+      const uy = dy / length;
+      let covered = 0;
+      let drawing = true;
+      while (covered < length) {
+        const step = Math.min(drawing ? pattern.dash : pattern.gap, length - covered);
+        if (drawing) {
+          this.doc.drawingLayer
+            .moveTo(a.x + ux * covered, a.y + uy * covered)
+            .lineTo(a.x + ux * (covered + step), a.y + uy * (covered + step))
+            .stroke({ width, color });
+        }
+        covered += step;
+        drawing = !drawing;
+      }
+    }
+  }
+
+  /**
+   * Which fittings should render right now (Fix 4): the user asked for
+   * fitting markers to be editing-view-only, visible only for the chain of
+   * segments currently being drawn (activeChainAnchorId, draw-segment tool
+   * only) or the chain currently selected (selectedIds) — never
+   * unconditionally, and never written into the exported PDF (see
+   * domainSyncEntries). Reuses computeNetworks' connected-component grouping
+   * as the "chain" concept: a fitting is visible if it's in the same network
+   * as an anchor/selected segment or fitting.
+   */
+  private computeVisibleFittingIds(state: DrawingState): Set<string> {
+    const visible = new Set<string>();
+    const anchorIds = new Set<string>(this.doc.selectedIds);
+    if (this.tool === 'draw-segment' && this.activeChainAnchorId) anchorIds.add(this.activeChainAnchorId);
+    if (anchorIds.size === 0) return visible;
+
+    const segments = Object.values(state.segments);
+    const fittings = Object.values(state.fittings);
+    const networks = computeNetworks({ segments, fittings, portGroups: this.doc.portGroups });
+    for (const network of networks) {
+      const isRelevant = network.segmentIds.some((id) => anchorIds.has(id)) || network.fittingIds.some((id) => anchorIds.has(id));
+      if (isRelevant) for (const fittingId of network.fittingIds) visible.add(fittingId);
+    }
+    return visible;
   }
 
   /** Keeps each cached stamp sprite's transform and stampsLayer membership matching DrawingState.stamps — the render-only mirror of the source-of-truth data, the sprite counterpart to the segment/fitting Graphics redrawn just above. A sprite is detached (not destroyed) when its stamp isn't in state — deleteSelection relies on this to let an undo re-attach the same sprite instead of needing to re-fetch its texture, which is async and, for an ad hoc uploaded stamp with no saved bytes, sometimes impossible. */
