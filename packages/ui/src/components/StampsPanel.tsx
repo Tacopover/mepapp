@@ -23,6 +23,8 @@ export interface StampsPanelProps {
   activeNetworkTypeId: string | null;
   onPickNetworkType: (type: NetworkType) => void;
   onRenameNetworkType: (id: string, name: string) => void;
+  /** Opens the Network Type Editor dialog (visuals: color/thickness/pattern) for an adopted type — see App.tsx's networkTypeEditorTarget. */
+  onEditNetworkTypeVisuals: (type: NetworkType) => void;
 }
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
@@ -57,6 +59,7 @@ export function StampsPanel({
   activeNetworkTypeId,
   onPickNetworkType,
   onRenameNetworkType,
+  onEditNetworkTypeVisuals,
 }: StampsPanelProps) {
   const allDefinitions = [...STAMP_LIBRARY, ...customStampDefinitions];
   const definitions =
@@ -184,14 +187,23 @@ export function StampsPanel({
                     </button>
                   )}
                   {isAdopted && !isEditing && (
-                    <button
-                      type="button"
-                      className="mep-networktype-edit"
-                      title="Rename"
-                      onClick={() => startEditing(effective)}
-                    >
-                      <IconPencil size={12} />
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="mep-networktype-visuals"
+                        title="Edit visuals"
+                        style={{ backgroundColor: effective.color }}
+                        onClick={() => onEditNetworkTypeVisuals(effective)}
+                      />
+                      <button
+                        type="button"
+                        className="mep-networktype-edit"
+                        title="Rename"
+                        onClick={() => startEditing(effective)}
+                      >
+                        <IconPencil size={12} />
+                      </button>
+                    </>
                   )}
                 </div>
               );

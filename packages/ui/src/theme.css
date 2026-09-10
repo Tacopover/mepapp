@@ -902,6 +902,19 @@
   background: var(--surface-2);
   color: var(--ink);
 }
+.mep-networktype-visuals {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+  padding: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.mep-networktype-visuals:hover {
+  border-color: var(--ink);
+}
 .mep-networktype-input {
   flex: 1;
   font-size: 11px;

@@ -18,6 +18,7 @@ import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX } from './compon
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
+import { NetworkTypeEditorDialog, type NetworkTypeVisualsPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
@@ -147,6 +148,7 @@ export function MepSketchApp({
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
   /** Element Editor dialog target — 'create' for a brand-new custom element, or the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel). */
   const [elementEditorTarget, setElementEditorTarget] = useState<{ mode: 'create' } | { mode: 'edit'; definitionId: string } | null>(null);
+  const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
   const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
@@ -422,6 +424,14 @@ export function MepSketchApp({
     [sceneRef],
   );
 
+  const handleSaveNetworkTypeVisuals = useCallback(
+    (id: string, patch: NetworkTypeVisualsPatch) => {
+      sceneRef.current?.updateNetworkTypeVisuals(id, patch);
+      setNetworkTypeEditorTarget(null);
+    },
+    [sceneRef],
+  );
+
   const totalFlowCapacity = flowResult
     ? flowResult
         .flatMap((r) => Object.values(r.segmentCapacity))
@@ -452,6 +462,7 @@ export function MepSketchApp({
         activeNetworkTypeId={activeNetworkTypeId}
         onPickNetworkType={handleNetworkTypePick}
         onRenameNetworkType={handleRenameNetworkType}
+        onEditNetworkTypeVisuals={setNetworkTypeEditorTarget}
       />
     ),
     drawings: (
@@ -665,6 +676,14 @@ export function MepSketchApp({
           definition={elementEditorTarget.mode === 'edit' ? customStampDefinitions.find((d) => d.id === elementEditorTarget.definitionId) : undefined}
           onSave={handleSaveElementDefinition}
           onClose={() => setElementEditorTarget(null)}
+        />
+      )}
+
+      {networkTypeEditorTarget && (
+        <NetworkTypeEditorDialog
+          networkType={networkTypeEditorTarget}
+          onSave={handleSaveNetworkTypeVisuals}
+          onClose={() => setNetworkTypeEditorTarget(null)}
         />
       )}
 

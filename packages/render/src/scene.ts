@@ -858,6 +858,16 @@ export class SketchScene {
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
+  /** Updates a network type's visuals (color/thickness/pattern) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType; no-op if `id` hasn't been picked in this document yet. Re-syncs the drawing layer so already-drawn segments of this type update immediately. */
+  updateNetworkTypeVisuals(id: string, patch: Partial<Pick<NetworkType, 'color' | 'lineWidthPt' | 'linePattern'>>): void {
+    const target = this.doc.networkTypes.find((t) => t.id === id);
+    if (!target) return;
+    Object.assign(target, patch);
+    this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+    this.syncDrawingLayer();
+    this.markDirty();
+  }
+
   /** The active document's user-authored elements (Element Editor dialog) — the Stamps tab's palette reads this alongside the fixture-backed STAMP_LIBRARY. */
   getCustomStampDefinitions(): StampDefinition[] {
     return [...this.doc.customStampDefinitions];
