@@ -2147,22 +2147,37 @@ export class SketchScene {
    * keyboard-shortcut counterpart), Ctrl/Cmd+C copies it, Ctrl/Cmd+V pastes
    * the clipboard — atlas §4's Select & Edit row ("+ keyboard shortcuts
    * Ctrl+C/V, Delete for all three"; Copy has a rail button too, but Paste
-   * is keyboard-only by design, no rail slot). Escape cancels an
-   * in-progress segment-draw chain (Phase 6) instead — the Segment tool
-   * stays active rather than reverting to Select, since MepApp's
-   * rail-based tool model has no equivalent of the old app's
-   * auto-revert-to-pan convention (§5 Phase 6). All of this is ignored
-   * while focus is in a text input/textarea so it doesn't fight typing in,
-   * e.g., the Properties panel or the textbox-annotation floating textarea.
+   * is keyboard-only by design, no rail slot). Escape is two-stage for the
+   * Segment and stamp-placement tools: for draw-segment, the first Escape
+   * finishes the chain up through the last placed endpoint (the Segment
+   * tool stays active, so a further click starts a new chain) and a second
+   * Escape (nothing left pending) switches to Select; for
+   * place-terminal/place-equipment, Escape switches to Select directly,
+   * since that tool otherwise stays active across repeated placements (see
+   * placeStamp). All of this is ignored while focus is in a text
+   * input/textarea so it doesn't fight typing in, e.g., the Properties
+   * panel or the textbox-annotation floating textarea.
    */
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
 
     if (event.key === 'Escape') {
-      if (!this.pendingSegmentStart) return;
-      this.pendingSegmentStart = null;
-      this.redrawOverlay();
+      if (this.tool === 'draw-segment') {
+        if (this.pendingSegmentStart) {
+          this.pendingSegmentStart = null;
+          this.activeChainAnchorId = null;
+          this.syncDrawingLayer();
+          this.redrawOverlay();
+          return;
+        }
+        this.setTool('select');
+        return;
+      }
+      if (this.tool === 'place-terminal' || this.tool === 'place-equipment') {
+        this.setTool('select');
+        return;
+      }
       return;
     }
 
@@ -2356,7 +2371,9 @@ export class SketchScene {
     this.doc.selectedIds = new Set([id]);
     this.syncDrawingLayer();
     this.markDirty();
-    this.setTool('select');
+    // Deliberately does NOT revert to Select (unlike draw-textbox/draw-sticky-note) —
+    // stamp placement stays active so the user can place the same stamp repeatedly;
+    // Escape (onKeyDown) is the only way out of place-terminal/place-equipment.
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
