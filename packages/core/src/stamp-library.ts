@@ -60,7 +60,10 @@ export const STAMP_LIBRARY: StampDefinition[] = [
     discipline: 'electricalCircuits',
     category: 'terminal',
     nativeWidth: 60,
-    nativeHeight: 30,
+    // Matches D5_Luminaire_rectangular.svg's own aspect ratio (viewBox 676x190,
+    // ≈3.558:1) — previously 30 (2:1), which didn't match the art and caused
+    // rasterizeSvg's now-fixed non-uniform stretch to squash the circle glyph.
+    nativeHeight: 16.87,
     ports: [{ id: 'feed', name: 'Feed', fractionX: 0, fractionY: 0.5 }],
     iconRef: 'D5_Luminaire_rectangular.svg',
     source: 'library',

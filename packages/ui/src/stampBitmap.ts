@@ -28,8 +28,19 @@ function rasterizeSvg(blob: Blob, px?: { width: number; height: number }): Promi
     const url = URL.createObjectURL(blob);
     const img = new Image();
     img.onload = () => {
-      const width = Math.max(1, Math.round(px?.width ?? img.naturalWidth));
-      const height = Math.max(1, Math.round(px?.height ?? img.naturalHeight));
+      // "Contain" scaling: rasterize at the SVG's OWN intrinsic aspect ratio
+      // rather than stretching independently on each axis to exactly fill
+      // px's target box. A StampDefinition's nativeWidth/nativeHeight is
+      // sometimes a poor match for the art's real aspect ratio (see
+      // fixtures/stamps/D5_Luminaire_rectangular.svg, whose 676x190 viewBox
+      // doesn't match its 60x30 definition) — stretching to fill would bake
+      // a non-uniform, aspect-distorting scale into the rasterized pixels
+      // before scene.ts ever recomputes a placed size from them.
+      const naturalWidth = img.naturalWidth || 1;
+      const naturalHeight = img.naturalHeight || 1;
+      const scale = px ? Math.min(px.width / naturalWidth, px.height / naturalHeight) : 1;
+      const width = Math.max(1, Math.round(naturalWidth * scale));
+      const height = Math.max(1, Math.round(naturalHeight * scale));
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
