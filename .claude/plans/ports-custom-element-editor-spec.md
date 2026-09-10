@@ -221,3 +221,55 @@ work at this spec's completion.
   MepApp today (§7 item 4).
 
 Neither blocks starting step 1.
+
+## 9. §5.1 + §5.2 status
+
+**Done** — 2026-09-10, commit `c9385ce`, branch
+`worktree-ports-custom-element-editor` (not yet merged to master).
+
+Shipped: §5.1 turned out to already exist (`Dialog.tsx`, in production
+use by `SettingsDialog`/`GlobalPropertiesDialog`/`ManageBuildingsDialog`)
+— the §3 investigation was stale, so this step was skipped as redundant
+rather than rebuilt. §5.2 shipped in full: schema bumped v4→v5 with
+`customStampDefinitions: StampDefinition[]` on `ProjectDocument`;
+`StampDefinition` gained `source: 'library' | 'custom'` and
+`definitionPortGroups?: string[][]`; new `ElementEditorDialog.tsx`
+(name/discipline/category fields, raster import, click-to-add/drag-to-
+reposition/double-click-to-rename ports, link-mode for grouping ports);
+wired into `StampsPanel` ("Create custom element…") and
+`PropertiesPanel` ("Edit ports…", gated to `source: 'custom'`);
+`SketchDocument`/`SketchScene` carry `customStampDefinitions` per open
+document, and `placeStamp` instantiates a definition's authoring-time
+port groups into real `PortGroup` entries at placement.
+
+One deliberate deviation from §6: instead of the spec'd
+`artwork: { kind: 'raster' | 'vector'; ... }` field, custom artwork is
+stored as a `data:` URL directly in the existing `iconRef` field,
+distinguished from library entries via `source`. Avoids introducing a
+schema branch for the not-yet-built `SymbolShape` vector variant (§5.3)
+and needs no change to the `IconBitmapResolver` signature — only a
+`data:`-prefix check at the two call sites that build a fetchable URL
+from an `iconRef`. Revisit when §5.3 starts vector authoring.
+
+Two real bugs found and fixed during live verification (not present at
+initial implementation, both are shared-component/UX correctness fixes):
+a port dot's click handler let clicks bubble to the preview's add-port
+handler, spawning duplicate ports; and the shared `Dialog` component had
+no scroll handling, so a tall dialog's action buttons could be pushed
+off-screen — `.mep-modal-body` now scrolls independently of the
+title/actions, fixed for every dialog in the app.
+
+Verified: `pnpm build` clean across all 9 workspace packages (turbo,
+root). `pnpm vitest run` in `packages/core` — 129/129 passing across 14
+test files (5 new tests for the schema/library changes). `tsc --noEmit`
+clean in `@mepapp/render` and `@mepapp/ui`. Live Playwright walkthrough
+against the real dev server (`apps/web`, fixture PDF + fixture stamp
+art): created a custom Fire Hose Reel element with two linked ports,
+placed it on the sheet, confirmed the Properties panel's existing
+"Linked ports" checkboxes reflected the auto-created `PortGroup`,
+reopened via "Edit ports…" and confirmed full pre-fill (name,
+discipline, category, artwork, ports, groups) round-tripped correctly.
+Zero console errors throughout.
+
+§5.3 (Shapes mode) not started — see §7 item 3, its own multi-session
+effort.
