@@ -16,6 +16,7 @@ import {
   CompositeCommand,
   computeNetworks,
   distance,
+  getNetworkTypeFromLibrary,
   getStampDefinition,
   getStampPorts,
   loadProject,
@@ -276,6 +277,18 @@ export interface StampInfo {
   definitionId?: string;
   /** Global Properties custom field values (Terminal/Equipment only) — see PlacedStamp.properties. */
   properties?: CustomPropertyValues;
+}
+
+/** The Properties panel's read model for a single selected segment — see getSelectedSegmentInfo. */
+export interface SegmentInfo {
+  id: string;
+  networkTypeId: string;
+  shape: Segment['shape'];
+  diameter?: number;
+  width?: number;
+  height?: number;
+  material?: string;
+  lengthPt: number;
 }
 
 export type SketchTool =
@@ -747,6 +760,68 @@ export class SketchScene {
   /** Whether anything (a stamp or an annotation) is currently selected — unlike getSelection(), which only reports stamps (the Properties panel's read model), this covers the full selection for gating UI like the rail's Rotate/Delete actions. */
   hasSelection(): boolean {
     return this.doc.selectedIds.size > 0;
+  }
+
+  /** The Properties panel's read model for a segment selection — null unless exactly one segment (and nothing else) is selected, mirroring getSelection()'s stamps-only counterpart. */
+  getSelectedSegmentInfo(): SegmentInfo | null {
+    if (this.doc.selectedIds.size !== 1) return null;
+    const [id] = this.doc.selectedIds;
+    const segment = this.doc.drawingHistory.getState().segments[id];
+    if (!segment) return null;
+    let lengthPt = 0;
+    for (let i = 1; i < segment.geometry.length; i++) lengthPt += distance(segment.geometry[i - 1], segment.geometry[i]);
+    return {
+      id: segment.id,
+      networkTypeId: segment.networkTypeId,
+      shape: segment.shape,
+      diameter: segment.diameter,
+      width: segment.width,
+      height: segment.height,
+      material: segment.material,
+      lengthPt,
+    };
+  }
+
+  /**
+   * Retags every segment in the given segment's whole connected network (see
+   * core's computeNetworks) with a new network type — segments are physically
+   * connected, so changing one segment's type in isolation would leave the
+   * rest of the run visually/logically split. The Properties panel's Network
+   * Type dropdown for a selected segment.
+   */
+  setNetworkTypeForSegmentNetwork(segmentId: string, networkTypeId: string): void {
+    const state = this.doc.drawingHistory.getState();
+    if (!state.segments[segmentId]) return;
+    // The dropdown offers every library type, not just ones already adopted
+    // by this document (see setActiveNetworkType) — adopt it now so its own
+    // color/thickness/pattern resolve correctly instead of falling back to
+    // DEFAULT_NETWORK_TYPE (see resolveNetworkTypeVisuals).
+    if (!this.doc.networkTypes.some((t) => t.id === networkTypeId)) {
+      const type = getNetworkTypeFromLibrary(networkTypeId);
+      if (type) {
+        this.doc.networkTypes.push(type);
+        this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+      }
+    }
+    const networks = computeNetworks({
+      segments: Object.values(state.segments),
+      fittings: Object.values(state.fittings),
+      portGroups: this.doc.portGroups,
+    });
+    const network = networks.find((n) => n.segmentIds.includes(segmentId));
+    const targetIds = network ? network.segmentIds : [segmentId];
+    const tx = new Transaction(this.doc.drawingHistory, 'Change network type');
+    tx.update((s) => {
+      const segments = { ...s.segments };
+      for (const id of targetIds) {
+        if (segments[id]) segments[id] = { ...segments[id], networkTypeId };
+      }
+      return { ...s, segments };
+    });
+    tx.commit();
+    this.syncDrawingLayer();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /** Programmatically selects one placed stamp by id and syncs the canvas highlight — the Networks tree's click-to-select-on-canvas action (every other selection path so far originated from a canvas hit-test). No-op if `id` isn't a placed stamp. */

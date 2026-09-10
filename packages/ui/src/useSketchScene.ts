@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { SketchScene, type DocumentSummary, type DrawingSummary, type NetworkSummary, type SketchTool, type StampInfo } from '@mepapp/render';
+import {
+  SketchScene,
+  type DocumentSummary,
+  type DrawingSummary,
+  type NetworkSummary,
+  type SegmentInfo,
+  type SketchTool,
+  type StampInfo,
+} from '@mepapp/render';
 import type { Calibration, FlowResult, NetworkType, StampDefinition, Vec2 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
@@ -23,6 +31,8 @@ export interface UseSketchScene {
   ready: boolean;
   tool: SketchTool;
   selection: StampInfo[];
+  /** The lone selected segment's read model, or null — see SketchScene.getSelectedSegmentInfo. */
+  selectedSegment: SegmentInfo | null;
   /** Whether anything — a stamp or an annotation — is selected, for gating UI (e.g. the rail's Rotate/Delete actions) that `selection` alone can't answer since it only reports stamps. */
   hasSelection: boolean;
   allStamps: StampInfo[];
@@ -54,6 +64,7 @@ export function useSketchScene(): UseSketchScene {
   const [ready, setReady] = useState(false);
   const [tool, setTool] = useState<SketchTool>('select');
   const [selection, setSelection] = useState<StampInfo[]>([]);
+  const [selectedSegment, setSelectedSegment] = useState<SegmentInfo | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [allStamps, setAllStamps] = useState<StampInfo[]>([]);
   const [networkSummaries, setNetworkSummaries] = useState<NetworkSummary[]>([]);
@@ -87,6 +98,7 @@ export function useSketchScene(): UseSketchScene {
 
     const onSelectionChanged = (s: StampInfo[]) => {
       setSelection(s);
+      setSelectedSegment(scene.getSelectedSegmentInfo());
       setHasSelection(scene.hasSelection());
       setAllStamps(scene.listStamps());
     };
@@ -100,6 +112,7 @@ export function useSketchScene(): UseSketchScene {
     const onDrawingChanged = (summary: DrawingSummary) => {
       setDrawingSummary(summary);
       setNetworkSummaries(scene.getNetworkSummaries());
+      setSelectedSegment(scene.getSelectedSegmentInfo());
     };
     const onFlowSolved = (result: FlowResult[]) => setFlowResult(result);
     const onProjectLoaded = () => {
@@ -131,6 +144,7 @@ export function useSketchScene(): UseSketchScene {
     // covering every per-document read model (see decisions log 2026-09-07).
     const onDocumentActivated = () => {
       setSelection(scene.getSelection());
+      setSelectedSegment(scene.getSelectedSegmentInfo());
       setAllStamps(scene.listStamps());
       setNetworkSummaries(scene.getNetworkSummaries());
       setCalibration(scene.getCalibration());
@@ -206,6 +220,7 @@ export function useSketchScene(): UseSketchScene {
     ready,
     tool,
     selection,
+    selectedSegment,
     hasSelection,
     allStamps,
     networkSummaries,

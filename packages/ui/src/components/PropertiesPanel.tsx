@@ -1,11 +1,22 @@
 import type { RefObject } from 'react';
-import type { SketchScene, StampInfo } from '@mepapp/render';
-import { coerceDefaultValue, getStampDefinition, type CustomPropertyDefinition, type StampDefinition } from '@mepapp/core';
+import type { SegmentInfo, SketchScene, StampInfo } from '@mepapp/render';
+import {
+  coerceDefaultValue,
+  getStampDefinition,
+  NETWORK_TYPE_LIBRARY,
+  type CustomPropertyDefinition,
+  type NetworkType,
+  type StampDefinition,
+} from '@mepapp/core';
 import { IconRotate } from '../icons.js';
 
 export interface PropertiesPanelProps {
   sceneRef: RefObject<SketchScene | null>;
   selection: StampInfo[];
+  /** The lone selected segment's read model — see SketchScene.getSelectedSegmentInfo. Only non-null when exactly one segment (and nothing else) is selected. */
+  selectedSegment: SegmentInfo | null;
+  /** The active document's adopted network types — the selected segment's "Network Type" dropdown. */
+  networkTypes: NetworkType[];
   capacityInput: string;
   setCapacityInput: (value: string) => void;
   /** Global Properties definitions (Terminal/Equipment only) — see GlobalPropertiesDialog. */
@@ -18,12 +29,53 @@ export interface PropertiesPanelProps {
 export function PropertiesPanel({
   sceneRef,
   selection,
+  selectedSegment,
+  networkTypes,
   capacityInput,
   setCapacityInput,
   customPropertyDefs,
   customStampDefinitions,
   onEditPorts,
 }: PropertiesPanelProps) {
+  if (selection.length === 0 && selectedSegment) {
+    // Every library type, resolved against this document's own adopted
+    // overrides (name/color/etc), plus any duplicated types that only exist
+    // in this document — same effective-list logic as StampsPanel's tiles.
+    const availableNetworkTypes = [
+      ...NETWORK_TYPE_LIBRARY.map((lib) => networkTypes.find((t) => t.id === lib.id) ?? lib),
+      ...networkTypes.filter((t) => !NETWORK_TYPE_LIBRARY.some((lib) => lib.id === t.id)),
+    ];
+    return (
+      <div>
+        <div className="mep-elem-row">
+          <div style={{ flex: 1 }}>
+            <b>Segment · {selectedSegment.id}</b>
+            <span>{Math.round(selectedSegment.lengthPt)} pt</span>
+          </div>
+        </div>
+        <div className="mep-section">
+          <h4>Network</h4>
+          <div className="mep-field-row">
+            <label>Network Type</label>
+            <select
+              value={selectedSegment.networkTypeId}
+              onChange={(e) => sceneRef.current?.setNetworkTypeForSegmentNetwork(selectedSegment.id, e.target.value)}
+            >
+              {!availableNetworkTypes.some((t) => t.id === selectedSegment.networkTypeId) && (
+                <option value={selectedSegment.networkTypeId}>Unknown type</option>
+              )}
+              {availableNetworkTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mep-hint">Changing the network type retags every segment connected to this one in the same run.</p>
+        </div>
+      </div>
+    );
+  }
   if (selection.length === 0) {
     return <div className="mep-empty-panel">Select an element to see its properties.</div>;
   }

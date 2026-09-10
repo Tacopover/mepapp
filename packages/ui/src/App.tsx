@@ -113,6 +113,7 @@ export function MepSketchApp({
     ready,
     tool,
     selection,
+    selectedSegment,
     hasSelection,
     allStamps,
     networkSummaries,
@@ -493,6 +494,8 @@ export function MepSketchApp({
       <PropertiesPanel
         sceneRef={sceneRef}
         selection={selection}
+        selectedSegment={selectedSegment}
+        networkTypes={networkTypes}
         capacityInput={capacityInput}
         setCapacityInput={setCapacityInput}
         customPropertyDefs={customPropertyDefs}
@@ -505,9 +508,9 @@ export function MepSketchApp({
   const [forcedTabId, setForcedTabId] = useState<string | null>(null);
   const [forcedTabNonce, setForcedTabNonce] = useState(0);
   useEffect(() => {
-    setForcedTabId(selection.length > 0 ? 'properties' : null);
+    setForcedTabId(selection.length > 0 || selectedSegment ? 'properties' : null);
     setForcedTabNonce((n) => n + 1);
-  }, [selection]);
+  }, [selection, selectedSegment]);
 
   return (
     <div className="mep-app">
