@@ -85,12 +85,16 @@ function hexColorToPixi(hex: string): number {
   return parseInt(hex.replace('#', ''), 16);
 }
 
-// Dash/gap lengths (world units = PDF points) for a non-solid NetworkType.linePattern —
-// PixiJS v8's Graphics.stroke() has no native dash option, so syncDrawingLayer's
-// strokeDashedPolyline walks a segment in these increments, issuing one stroke() call per dash.
-const DASH_PATTERN_WORLD: Record<Exclude<LinePattern, 'solid'>, { dash: number; gap: number }> = {
-  dashed: { dash: 8, gap: 5 },
-  dotted: { dash: 1.5, gap: 4 },
+// Repeating [dash, gap, dash, gap, ...] lengths (world units = PDF points) for a
+// non-solid NetworkType.linePattern — PixiJS v8's Graphics.stroke() has no native
+// dash option, so syncDrawingLayer's strokeDashedPolyline walks a segment cycling
+// through this sequence, issuing one stroke() call per "on" entry.
+const DASH_PATTERN_WORLD: Record<Exclude<LinePattern, 'solid'>, number[]> = {
+  dashed: [8, 5],
+  dotted: [1.5, 4],
+  dashDot: [8, 4, 1.5, 4],
+  longDash: [14, 6],
+  dashDotDot: [8, 4, 1.5, 4, 1.5, 4],
 };
 
 function dataUrlToBytes(dataUrl: string): Uint8Array {
@@ -925,7 +929,7 @@ export class SketchScene {
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
-  /** Renames a network type already adopted by the active document (see setActiveNetworkType) — the Network Type Editor pencil icon's action. No-op if `id` hasn't been picked in this document yet. */
+  /** Renames a network type already adopted by the active document (see setActiveNetworkType) — the Networks tree's double-click-to-rename action. No-op if `id` hasn't been picked in this document yet. */
   renameNetworkType(id: string, name: string): void {
     const target = this.doc.networkTypes.find((t) => t.id === id);
     if (!target) return;
@@ -933,14 +937,24 @@ export class SketchScene {
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
-  /** Updates a network type's visuals (color/thickness/pattern) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType; no-op if `id` hasn't been picked in this document yet. Re-syncs the drawing layer so already-drawn segments of this type update immediately. */
-  updateNetworkTypeVisuals(id: string, patch: Partial<Pick<NetworkType, 'color' | 'lineWidthPt' | 'linePattern'>>): void {
+  /** Updates a network type's name and/or visuals (color/thickness/pattern) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType; no-op if `id` hasn't been picked in this document yet. Re-syncs the drawing layer so already-drawn segments of this type update immediately. */
+  updateNetworkType(id: string, patch: Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern'>>): void {
     const target = this.doc.networkTypes.find((t) => t.id === id);
     if (!target) return;
     Object.assign(target, patch);
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
     this.syncDrawingLayer();
     this.markDirty();
+  }
+
+  /** Clones an adopted network type into a brand-new one named "<name>_copy" — the Network Type Editor dialog's Duplicate action. Existing segments keep referencing the original type; nothing re-tags automatically. Returns the new type, or null if `id` hasn't been adopted yet. */
+  duplicateNetworkType(id: string): NetworkType | null {
+    const source = this.doc.networkTypes.find((t) => t.id === id);
+    if (!source) return null;
+    const copy: NetworkType = { ...source, id: crypto.randomUUID(), name: `${source.name}_copy` };
+    this.doc.networkTypes.push(copy);
+    this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+    return copy;
   }
 
   /** The active document's user-authored elements (Element Editor dialog) — the Stamps tab's palette reads this alongside the fixture-backed STAMP_LIBRARY. */
@@ -2610,8 +2624,8 @@ export class SketchScene {
     };
   }
 
-  /** Draws a dashed/dotted polyline as a series of short stroke() calls (moveTo/lineTo per dash) — see DASH_PATTERN_WORLD's doc comment for why this is manual. */
-  private strokeDashedPolyline(points: Vec2[], width: number, color: number, pattern: { dash: number; gap: number }): void {
+  /** Draws a dashed/dotted polyline as a series of short stroke() calls (moveTo/lineTo per "on" entry) — see DASH_PATTERN_WORLD's doc comment for why this is manual. `pattern` cycles [dash, gap, dash, gap, ...]; even indices draw, odd indices skip. */
+  private strokeDashedPolyline(points: Vec2[], width: number, color: number, pattern: number[]): void {
     for (let i = 0; i < points.length - 1; i++) {
       const a = points[i];
       const b = points[i + 1];
@@ -2622,17 +2636,17 @@ export class SketchScene {
       const ux = dx / length;
       const uy = dy / length;
       let covered = 0;
-      let drawing = true;
+      let patternIndex = 0;
       while (covered < length) {
-        const step = Math.min(drawing ? pattern.dash : pattern.gap, length - covered);
-        if (drawing) {
+        const step = Math.min(pattern[patternIndex % pattern.length], length - covered);
+        if (patternIndex % 2 === 0) {
           this.doc.drawingLayer
             .moveTo(a.x + ux * covered, a.y + uy * covered)
             .lineTo(a.x + ux * (covered + step), a.y + uy * (covered + step))
             .stroke({ width, color });
         }
         covered += step;
-        drawing = !drawing;
+        patternIndex++;
       }
     }
   }

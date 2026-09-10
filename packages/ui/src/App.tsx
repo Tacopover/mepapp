@@ -18,7 +18,7 @@ import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX } from './compon
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
-import { NetworkTypeEditorDialog, type NetworkTypeVisualsPatch } from './components/NetworkTypeEditorDialog.js';
+import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
@@ -425,10 +425,18 @@ export function MepSketchApp({
     [sceneRef],
   );
 
-  const handleSaveNetworkTypeVisuals = useCallback(
-    (id: string, patch: NetworkTypeVisualsPatch) => {
-      sceneRef.current?.updateNetworkTypeVisuals(id, patch);
+  const handleSaveNetworkType = useCallback(
+    (id: string, patch: NetworkTypeEditPatch) => {
+      sceneRef.current?.updateNetworkType(id, patch);
       setNetworkTypeEditorTarget(null);
+    },
+    [sceneRef],
+  );
+
+  const handleDuplicateNetworkType = useCallback(
+    (id: string) => {
+      const copy = sceneRef.current?.duplicateNetworkType(id);
+      if (copy) setNetworkTypeEditorTarget(copy);
     },
     [sceneRef],
   );
@@ -462,8 +470,7 @@ export function MepSketchApp({
         networkTypes={networkTypes}
         activeNetworkTypeId={activeNetworkTypeId}
         onPickNetworkType={handleNetworkTypePick}
-        onRenameNetworkType={handleRenameNetworkType}
-        onEditNetworkTypeVisuals={setNetworkTypeEditorTarget}
+        onEditNetworkType={setNetworkTypeEditorTarget}
       />
     ),
     drawings: (
@@ -684,8 +691,10 @@ export function MepSketchApp({
 
       {networkTypeEditorTarget && (
         <NetworkTypeEditorDialog
+          key={networkTypeEditorTarget.id}
           networkType={networkTypeEditorTarget}
-          onSave={handleSaveNetworkTypeVisuals}
+          onSave={handleSaveNetworkType}
+          onDuplicate={handleDuplicateNetworkType}
           onClose={() => setNetworkTypeEditorTarget(null)}
         />
       )}

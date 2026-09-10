@@ -885,23 +885,6 @@
   font-family: var(--font-mono);
   color: var(--muted);
 }
-.mep-networktype-edit {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  margin-right: 4px;
-  border: none;
-  background: none;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 2px;
-}
-.mep-networktype-edit:hover {
-  background: var(--surface-2);
-  color: var(--ink);
-}
 .mep-networktype-visuals {
   flex: none;
   width: 14px;
@@ -914,17 +897,6 @@
 }
 .mep-networktype-visuals:hover {
   border-color: var(--ink);
-}
-.mep-networktype-input {
-  flex: 1;
-  font-size: 11px;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  color: var(--ink);
-  background: var(--surface);
-  border: none;
-  padding: 8px;
-  min-width: 0;
 }
 
 /* ---------- Networks tree ---------- */

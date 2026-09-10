@@ -17,7 +17,7 @@ export type Discipline =
   | 'electricalPathways'
   | 'electricalCircuits';
 
-export type LinePattern = 'solid' | 'dashed' | 'dotted';
+export type LinePattern = 'solid' | 'dashed' | 'dotted' | 'dashDot' | 'longDash' | 'dashDotDot';
 
 export interface NetworkType {
   id: string;

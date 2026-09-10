@@ -22,9 +22,8 @@ export interface StampsPanelProps {
   networkTypes: NetworkType[];
   activeNetworkTypeId: string | null;
   onPickNetworkType: (type: NetworkType) => void;
-  onRenameNetworkType: (id: string, name: string) => void;
-  /** Opens the Network Type Editor dialog (visuals: color/thickness/pattern) for an adopted type — see App.tsx's networkTypeEditorTarget. */
-  onEditNetworkTypeVisuals: (type: NetworkType) => void;
+  /** Opens the Network Type Editor dialog (name, color/thickness/pattern) for an adopted type — see App.tsx's networkTypeEditorTarget. */
+  onEditNetworkType: (type: NetworkType) => void;
 }
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
@@ -58,17 +57,20 @@ export function StampsPanel({
   networkTypes,
   activeNetworkTypeId,
   onPickNetworkType,
-  onRenameNetworkType,
-  onEditNetworkTypeVisuals,
+  onEditNetworkType,
 }: StampsPanelProps) {
   const allDefinitions = [...STAMP_LIBRARY, ...customStampDefinitions];
   const definitions =
     disciplineGroup === null ? allDefinitions : allDefinitions.filter((def) => disciplineGroupOf(def.discipline) === disciplineGroup);
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
+  // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id
+  // that's never in the static library — without this they'd be adopted into
+  // the document but have no tile to pick/edit them from.
+  const customNetworkTypes = networkTypes.filter((t) => !NETWORK_TYPE_LIBRARY.some((lib) => lib.id === t.id));
+  const visibleCustomNetworkTypes =
+    disciplineGroup === null ? customNetworkTypes : customNetworkTypes.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
   const [subTab, setSubTab] = useState<'stamps' | 'networkTypes'>('stamps');
 
   async function handlePick(definition: StampDefinition) {
@@ -76,16 +78,6 @@ export function StampsPanel({
     sceneRef.current?.setStampTexture(bitmap, definition.id);
     sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
     onPick(definition);
-  }
-
-  function startEditing(type: NetworkType) {
-    setEditingId(type.id);
-    setEditValue(type.name);
-  }
-
-  function commitEditing() {
-    if (editingId && editValue.trim()) onRenameNetworkType(editingId, editValue.trim());
-    setEditingId(null);
   }
 
   return (
@@ -155,55 +147,32 @@ export function StampsPanel({
         </>
       ) : (
         <>
-          {networkTypeDefs.length === 0 && <div className="mep-empty-panel">No network types for this discipline.</div>}
+          {networkTypeDefs.length === 0 && visibleCustomNetworkTypes.length === 0 && (
+            <div className="mep-empty-panel">No network types for this discipline.</div>
+          )}
           <div className="mep-networktype-grid">
-            {networkTypeDefs.map((libType) => {
+            {[...networkTypeDefs, ...visibleCustomNetworkTypes].map((libType) => {
               const live = networkTypes.find((t) => t.id === libType.id);
               const effective = live ?? libType;
               const isAdopted = live !== undefined;
               const isActive = activeNetworkTypeId === libType.id;
-              const isEditing = editingId === libType.id;
               return (
                 <div
                   key={libType.id}
                   className={`mep-networktype-tile mep-discipline-${disciplineGroupOf(libType.discipline)}${isActive ? ' active' : ''}`}
                 >
-                  {isEditing ? (
-                    <input
-                      autoFocus
-                      className="mep-networktype-input"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onBlur={commitEditing}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') commitEditing();
-                        if (e.key === 'Escape') setEditingId(null);
-                      }}
+                  <button type="button" className="mep-networktype-pick" onClick={() => onPickNetworkType(effective)}>
+                    <span className="mep-networktype-name">{effective.name}</span>
+                    {effective.units && <span className="mep-networktype-units">{effective.units}</span>}
+                  </button>
+                  {isAdopted && (
+                    <button
+                      type="button"
+                      className="mep-networktype-visuals"
+                      title="Edit"
+                      style={{ backgroundColor: effective.color }}
+                      onClick={() => onEditNetworkType(effective)}
                     />
-                  ) : (
-                    <button type="button" className="mep-networktype-pick" onClick={() => onPickNetworkType(effective)}>
-                      <span className="mep-networktype-name">{effective.name}</span>
-                      {effective.units && <span className="mep-networktype-units">{effective.units}</span>}
-                    </button>
-                  )}
-                  {isAdopted && !isEditing && (
-                    <>
-                      <button
-                        type="button"
-                        className="mep-networktype-visuals"
-                        title="Edit visuals"
-                        style={{ backgroundColor: effective.color }}
-                        onClick={() => onEditNetworkTypeVisuals(effective)}
-                      />
-                      <button
-                        type="button"
-                        className="mep-networktype-edit"
-                        title="Rename"
-                        onClick={() => startEditing(effective)}
-                      >
-                        <IconPencil size={12} />
-                      </button>
-                    </>
                   )}
                 </div>
               );
