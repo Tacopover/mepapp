@@ -4,6 +4,7 @@ export * from './calibration.js';
 export * from './annotation.js';
 export * from './stamp.js';
 export * from './stamp-library.js';
+export * from './symbol-shapes.js';
 export * from './custom-properties.js';
 export * from './network.js';
 export * from './connectivity.js';

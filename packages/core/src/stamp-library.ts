@@ -8,6 +8,7 @@
 
 import type { PortSpec } from './geometry.js';
 import type { Discipline } from './network.js';
+import type { SymbolShape } from './symbol-shapes.js';
 
 export type StampCategory = 'terminal' | 'equipment' | 'fitting';
 
@@ -26,6 +27,8 @@ export interface StampDefinition {
   source: 'library' | 'custom';
   /** Groups of this definition's own port ids that should collapse into one connectivity node once placed (e.g. a unit's supply + return) — authored in the Element Editor dialog's link mode, converted into real instance-level PortGroup entries at placement time (see SketchScene.placeStamp). Only meaningful for 'custom' definitions; library entries never set it. */
   definitionPortGroups?: string[][];
+  /** Editable vector source for a 'custom' definition authored via the Element Editor dialog's Shapes mode (ports-custom-element-editor-spec.md §5.3) — reopening the dialog re-populates the drawing canvas from this list. `iconRef` still holds the rasterized `data:` URL produced from these shapes at save time, so every render/placement call site keeps treating artwork as "an image" and needs no vector-aware branch. Undefined for a raster-imported or library definition. */
+  shapes?: SymbolShape[];
 }
 
 export const STAMP_LIBRARY: StampDefinition[] = [
