@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { SketchScene, type DocumentSummary, type DrawingSummary, type NetworkSummary, type SketchTool, type StampInfo } from '@mepapp/render';
-import type { Calibration, FlowResult, NetworkType, Vec2 } from '@mepapp/core';
+import type { Calibration, FlowResult, NetworkType, StampDefinition, Vec2 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 export interface CalibrationPrompt {
@@ -28,6 +28,7 @@ export interface UseSketchScene {
   allStamps: StampInfo[];
   networkSummaries: NetworkSummary[];
   networkTypes: NetworkType[];
+  customStampDefinitions: StampDefinition[];
   zoom: number;
   pageIndex: number;
   pageCount: number;
@@ -57,6 +58,7 @@ export function useSketchScene(): UseSketchScene {
   const [allStamps, setAllStamps] = useState<StampInfo[]>([]);
   const [networkSummaries, setNetworkSummaries] = useState<NetworkSummary[]>([]);
   const [networkTypes, setNetworkTypes] = useState<NetworkType[]>([]);
+  const [customStampDefinitions, setCustomStampDefinitions] = useState<StampDefinition[]>([]);
   const [zoom, setZoom] = useState(1);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
@@ -105,6 +107,7 @@ export function useSketchScene(): UseSketchScene {
       setAllStamps(scene.listStamps());
       setNetworkSummaries(scene.getNetworkSummaries());
       setNetworkTypes(scene.getNetworkTypes());
+      setCustomStampDefinitions(scene.getCustomStampDefinitions());
     };
     // getNetworkSummaries() copies each resolved NetworkType's name into
     // networkTypeName at call time, so a rename (which mutates the type
@@ -115,6 +118,7 @@ export function useSketchScene(): UseSketchScene {
       setNetworkTypes(types);
       setNetworkSummaries(scene.getNetworkSummaries());
     };
+    const onCustomStampDefinitionsChanged = (defs: StampDefinition[]) => setCustomStampDefinitions(defs);
     const onZoomChanged = (z: number) => setZoom(z);
     const onPageChanged = (p: number) => setPageIndex(p);
     const onDocumentsChanged = (docs: DocumentSummary[]) => {
@@ -137,6 +141,7 @@ export function useSketchScene(): UseSketchScene {
       setActivePdfHandle(scene.getActivePdfHandle());
       setPageIndex(scene.getPageIndex());
       setPageCount(scene.getPageCount());
+      setCustomStampDefinitions(scene.getCustomStampDefinitions());
     };
 
     scene.on('selectionChanged', onSelectionChanged);
@@ -149,6 +154,7 @@ export function useSketchScene(): UseSketchScene {
     scene.on('flowSolved', onFlowSolved);
     scene.on('projectLoaded', onProjectLoaded);
     scene.on('networkTypesChanged', onNetworkTypesChanged);
+    scene.on('customStampDefinitionsChanged', onCustomStampDefinitionsChanged);
     scene.on('zoomChanged', onZoomChanged);
     scene.on('pageChanged', onPageChanged);
     scene.on('documentsChanged', onDocumentsChanged);
@@ -163,6 +169,7 @@ export function useSketchScene(): UseSketchScene {
         setDocuments(scene.getDocuments());
         setActiveDocumentId(scene.getActiveDocumentId());
         setActivePdfHandle(scene.getActivePdfHandle());
+        setCustomStampDefinitions(scene.getCustomStampDefinitions());
       }
       // Dev-only hook so Playwright-driven benchmarks (Step 3, frame rate) can
       // reach the scene instance directly, without adding permanent UI surface.
@@ -183,6 +190,7 @@ export function useSketchScene(): UseSketchScene {
       scene.off('flowSolved', onFlowSolved);
       scene.off('projectLoaded', onProjectLoaded);
       scene.off('networkTypesChanged', onNetworkTypesChanged);
+      scene.off('customStampDefinitionsChanged', onCustomStampDefinitionsChanged);
       scene.off('zoomChanged', onZoomChanged);
       scene.off('pageChanged', onPageChanged);
       scene.off('documentsChanged', onDocumentsChanged);
@@ -202,6 +210,7 @@ export function useSketchScene(): UseSketchScene {
     allStamps,
     networkSummaries,
     networkTypes,
+    customStampDefinitions,
     zoom,
     pageIndex,
     pageCount,

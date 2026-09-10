@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import type { SketchScene, StampInfo } from '@mepapp/render';
-import { coerceDefaultValue, type CustomPropertyDefinition } from '@mepapp/core';
+import { coerceDefaultValue, getStampDefinition, type CustomPropertyDefinition, type StampDefinition } from '@mepapp/core';
 import { IconRotate } from '../icons.js';
 
 export interface PropertiesPanelProps {
@@ -10,9 +10,20 @@ export interface PropertiesPanelProps {
   setCapacityInput: (value: string) => void;
   /** Global Properties definitions (Terminal/Equipment only) — see GlobalPropertiesDialog. */
   customPropertyDefs: { terminal: CustomPropertyDefinition[]; equipment: CustomPropertyDefinition[] };
+  /** The active document's user-authored elements — looked up against the selected stamp's definitionId to gate the "Edit ports…" action to custom (source: 'custom') elements only; the four hardcoded STAMP_LIBRARY entries stay read-only. */
+  customStampDefinitions: StampDefinition[];
+  onEditPorts: (definitionId: string) => void;
 }
 
-export function PropertiesPanel({ sceneRef, selection, capacityInput, setCapacityInput, customPropertyDefs }: PropertiesPanelProps) {
+export function PropertiesPanel({
+  sceneRef,
+  selection,
+  capacityInput,
+  setCapacityInput,
+  customPropertyDefs,
+  customStampDefinitions,
+  onEditPorts,
+}: PropertiesPanelProps) {
   if (selection.length === 0) {
     return <div className="mep-empty-panel">Select an element to see its properties.</div>;
   }
@@ -21,14 +32,20 @@ export function PropertiesPanel({ sceneRef, selection, capacityInput, setCapacit
   }
 
   const stamp = selection[0];
+  const definition = stamp.definitionId ? getStampDefinition(stamp.definitionId, customStampDefinitions) : undefined;
 
   return (
     <div>
       <div className="mep-elem-row">
-        <div>
+        <div style={{ flex: 1 }}>
           <b>Stamp · {stamp.id}</b>
           <span>{Math.round(stamp.nativeWidth)} × {Math.round(stamp.nativeHeight)} pt</span>
         </div>
+        {definition?.source === 'custom' && (
+          <button type="button" onClick={() => onEditPorts(definition.id)}>
+            Edit ports…
+          </button>
+        )}
       </div>
       <div className="mep-section">
         <h4>Transform</h4>

@@ -27,6 +27,7 @@ describe('serializeProject / loadProject round trip', () => {
       stamps: [],
       portGroups: [],
       annotations: [annotation],
+      customStampDefinitions: [],
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -95,12 +96,37 @@ describe('serializeProject / loadProject round trip', () => {
     };
 
     const loaded = loadProject(legacyDoc);
-    expect(loaded.schemaVersion).toBe(4);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION); // v3 resumes through every later step, not just v3->v4
     expect(loaded.annotations).toEqual([]);
+    expect(loaded.customStampDefinitions).toEqual([]);
+  });
+
+  it('migrates a pre-customStampDefinitions (v4) save, defaulting to an empty array', () => {
+    const legacyDoc = {
+      schemaVersion: 4,
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.customStampDefinitions).toEqual([]);
   });
 
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
-    const doc = { schemaVersion: CURRENT_SCHEMA_VERSION, networkTypes: [], fittings: [], stamps: [], portGroups: [], annotations: [] };
+    const doc = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      networkTypes: [],
+      fittings: [],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [],
+    };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {
       loadProject(doc);

@@ -1122,11 +1122,19 @@
   box-shadow: 4px 4px 0 var(--ink);
   padding: 20px;
   min-width: 280px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
 }
 .mep-modal-title {
   margin: 0 0 12px;
   font-size: 13px;
   font-family: var(--font-display);
+  flex: none;
+}
+.mep-modal-body {
+  overflow-y: auto;
+  min-height: 0; /* lets this flex child actually shrink and scroll instead of forcing .mep-modal to grow past max-height */
 }
 .mep-settings-hint {
   margin: 10px 14px 0;
@@ -1246,6 +1254,100 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  flex: none;
+  padding-top: 12px;
+}
+.mep-modal select {
+  width: 100%;
+  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  padding: 6px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* ---------- Element Editor dialog (ports-custom-element-editor-spec.md §5.2) ---------- */
+
+.mep-element-editor-preview {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  margin: 8px auto;
+  border: 1.5px dashed var(--line);
+  border-radius: 3px;
+  cursor: crosshair;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.mep-element-editor-preview img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.mep-element-editor-port {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px var(--ink);
+  cursor: grab;
+}
+.mep-element-editor-port.selected {
+  background: #b3261e;
+}
+.mep-element-editor-port-label {
+  position: absolute;
+  transform: translate(8px, -8px);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--ink);
+  background: var(--surface);
+  padding: 1px 3px;
+  border-radius: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.mep-element-editor-port-rename {
+  position: absolute;
+  transform: translate(-50%, -140%);
+  width: 90px;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  padding: 2px 4px;
+}
+.mep-port-list-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.mep-port-list-row input {
+  flex: 1;
+  min-width: 0;
+}
+.mep-port-group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 2px 8px;
+  margin: 0 6px 6px 0;
+}
+.mep-section button.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 /* ---------- Floating textbox-annotation input ---------- */

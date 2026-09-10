@@ -13,7 +13,10 @@ export interface StampsPanelProps {
   activeDefinitionId: string | null;
   onPick: (definition: StampDefinition) => void;
   onCustomStampFile: (file: File, category: StampCategory) => void;
-  /** Resolves a StampDefinition's iconRef to a fetchable URL — apps/web owns where stamp art actually lives. */
+  /** The active document's user-authored elements (Element Editor dialog) — shown in the grid alongside STAMP_LIBRARY. */
+  customStampDefinitions: StampDefinition[];
+  onCreateCustomElement: () => void;
+  /** Resolves a StampDefinition's iconRef to a fetchable URL — apps/web owns where stamp art actually lives. A custom definition's iconRef is already a self-contained `data:` URL (see stamp-library.ts's StampDefinition doc comment) and is used as-is, never passed through this. */
   resolveIconUrl: (iconRef: string) => string;
   /** The active document's own network types — only ones actually picked at least once get an entry here (see SketchScene.setActiveNetworkType). Everything else falls back to NETWORK_TYPE_LIBRARY's default name. */
   networkTypes: NetworkType[];
@@ -23,6 +26,11 @@ export interface StampsPanelProps {
 }
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
+
+/** A custom definition's iconRef is already a self-contained `data:` URL — resolve library entries through resolveIconUrl, but use a custom one verbatim. */
+function iconUrlFor(definition: StampDefinition, resolveIconUrl: (iconRef: string) => string): string {
+  return definition.iconRef.startsWith('data:') ? definition.iconRef : resolveIconUrl(definition.iconRef);
+}
 
 function loadBitmap(url: string, definition: StampDefinition): Promise<ImageBitmap> {
   let cached = bitmapCache.get(url);
@@ -42,14 +50,17 @@ export function StampsPanel({
   activeDefinitionId,
   onPick,
   onCustomStampFile,
+  customStampDefinitions,
+  onCreateCustomElement,
   resolveIconUrl,
   networkTypes,
   activeNetworkTypeId,
   onPickNetworkType,
   onRenameNetworkType,
 }: StampsPanelProps) {
+  const allDefinitions = [...STAMP_LIBRARY, ...customStampDefinitions];
   const definitions =
-    disciplineGroup === null ? STAMP_LIBRARY : STAMP_LIBRARY.filter((def) => disciplineGroupOf(def.discipline) === disciplineGroup);
+    disciplineGroup === null ? allDefinitions : allDefinitions.filter((def) => disciplineGroupOf(def.discipline) === disciplineGroup);
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
 
@@ -58,7 +69,7 @@ export function StampsPanel({
   const [subTab, setSubTab] = useState<'stamps' | 'networkTypes'>('stamps');
 
   async function handlePick(definition: StampDefinition) {
-    const bitmap = await loadBitmap(resolveIconUrl(definition.iconRef), definition);
+    const bitmap = await loadBitmap(iconUrlFor(definition, resolveIconUrl), definition);
     sceneRef.current?.setStampTexture(bitmap, definition.id);
     sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
     onPick(definition);
@@ -111,7 +122,7 @@ export function StampsPanel({
                 className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}`}
                 onClick={() => void handlePick(definition)}
               >
-                <img src={resolveIconUrl(definition.iconRef)} alt="" />
+                <img src={iconUrlFor(definition, resolveIconUrl)} alt="" />
                 {definition.label}
               </button>
             ))}
@@ -133,6 +144,10 @@ export function StampsPanel({
                 onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'equipment')}
               />
             </label>
+            <button type="button" className="mep-stamp-tile" onClick={onCreateCustomElement}>
+              <IconPencil size={20} />
+              Create custom element…
+            </button>
           </div>
         </>
       ) : (

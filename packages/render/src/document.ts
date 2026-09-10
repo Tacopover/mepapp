@@ -9,6 +9,7 @@ import {
   type PlacedStamp,
   type PortGroup,
   type Segment,
+  type StampDefinition,
   type Vec2,
 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
@@ -71,6 +72,8 @@ export class SketchDocument {
   readonly networkTypes: NetworkType[] = [DEFAULT_NETWORK_TYPE];
   /** Ports on the same element linked into one connectivity node — e.g. an AHU's supply + return (see core's PortGroup doc comment). Set via SketchScene.setPortGroup. */
   readonly portGroups: PortGroup[] = [];
+  /** User-authored elements (Element Editor dialog) — embedded per-document, same as networkTypes/portGroups, so they travel with this PDF's own project data. Set via SketchScene.addCustomStampDefinition/updateCustomStampDefinition. */
+  readonly customStampDefinitions: StampDefinition[] = [];
   readonly terminalCapacities = new Map<string, number>();
   pdfSyncIds = new Set<string>();
   nextStampSeq = 1;

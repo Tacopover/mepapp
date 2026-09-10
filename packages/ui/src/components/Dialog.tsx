@@ -27,7 +27,8 @@ export function Dialog({ title, onClose, children, actions }: DialogProps) {
     <div className="mep-modal-backdrop" onClick={onClose}>
       <div className="mep-modal" onClick={(event) => event.stopPropagation()}>
         <h3 className="mep-modal-title">{title}</h3>
-        {children}
+        {/* Scrolls independently of the title/actions so a tall dialog (many rows, e.g. the Element Editor's port list) never pushes its action buttons below the viewport. */}
+        <div className="mep-modal-body">{children}</div>
         {actions && <div className="mep-modal-actions">{actions}</div>}
       </div>
     </div>

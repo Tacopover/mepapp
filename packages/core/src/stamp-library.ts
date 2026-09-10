@@ -20,7 +20,12 @@ export interface StampDefinition {
   nativeWidth: number;
   nativeHeight: number;
   ports: PortSpec[];
+  /** For a 'library' definition, a fixture-relative asset key (apps/web resolves it under /stamps/). For a 'custom' definition (Element Editor dialog, ports-custom-element-editor-spec.md §5.2), a self-contained `data:` URL — the project embeds the art directly rather than pointing at a shared filesystem path, so it stays fetchable/renderable through the exact same resolver call sites with no source-aware branching beyond "is this already a data: URL". */
   iconRef: string;
+  /** 'library' = one of the fixture-backed STAMP_LIBRARY entries below (read-only in the Element Editor dialog). 'custom' = authored via the Element Editor dialog and stored on the project document's customStampDefinitions. */
+  source: 'library' | 'custom';
+  /** Groups of this definition's own port ids that should collapse into one connectivity node once placed (e.g. a unit's supply + return) — authored in the Element Editor dialog's link mode, converted into real instance-level PortGroup entries at placement time (see SketchScene.placeStamp). Only meaningful for 'custom' definitions; library entries never set it. */
+  definitionPortGroups?: string[][];
 }
 
 export const STAMP_LIBRARY: StampDefinition[] = [
@@ -33,6 +38,7 @@ export const STAMP_LIBRARY: StampDefinition[] = [
     nativeHeight: 60,
     ports: [{ id: 'supply', name: 'Supply', fractionX: 0.5, fractionY: 1 }],
     iconRef: 'D3_Ventilation_grille_rh_supply.svg',
+    source: 'library',
   },
   {
     id: 'fire-hose-reel',
@@ -43,6 +49,7 @@ export const STAMP_LIBRARY: StampDefinition[] = [
     nativeHeight: 48,
     ports: [],
     iconRef: 'D4_Fire_hose_reel.png',
+    source: 'library',
   },
   {
     id: 'luminaire-rectangular',
@@ -53,6 +60,7 @@ export const STAMP_LIBRARY: StampDefinition[] = [
     nativeHeight: 30,
     ports: [{ id: 'feed', name: 'Feed', fractionX: 0, fractionY: 0.5 }],
     iconRef: 'D5_Luminaire_rectangular.svg',
+    source: 'library',
   },
   {
     id: 'switch',
@@ -63,13 +71,15 @@ export const STAMP_LIBRARY: StampDefinition[] = [
     nativeHeight: 24,
     ports: [{ id: 'feed', name: 'Feed', fractionX: 0.5, fractionY: 1 }],
     iconRef: 'D5_Switch.png',
+    source: 'library',
   },
 ];
 
-export function getStampDefinition(id: string): StampDefinition | undefined {
-  return STAMP_LIBRARY.find((def) => def.id === id);
+export function getStampDefinition(id: string, customDefinitions: StampDefinition[] = []): StampDefinition | undefined {
+  return STAMP_LIBRARY.find((def) => def.id === id) ?? customDefinitions.find((def) => def.id === id);
 }
 
-export function stampDefinitionsForDiscipline(discipline: Discipline | null): StampDefinition[] {
-  return discipline === null ? STAMP_LIBRARY : STAMP_LIBRARY.filter((def) => def.discipline === discipline);
+export function stampDefinitionsForDiscipline(discipline: Discipline | null, customDefinitions: StampDefinition[] = []): StampDefinition[] {
+  const all = [...STAMP_LIBRARY, ...customDefinitions];
+  return discipline === null ? all : all.filter((def) => def.discipline === discipline);
 }

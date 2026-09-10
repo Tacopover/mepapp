@@ -58,6 +58,7 @@ import {
   type ReconciliationReport,
   type Segment,
   type StampCategory,
+  type StampDefinition,
   type SyncedGeometry,
   type Transform2D,
   type Vec2,
@@ -336,6 +337,8 @@ interface SketchSceneEvents {
   documentActivated: [];
   /** The open-document list, a document's name, or its dirty flag changed — the Drawings tab's cue to re-render. */
   documentsChanged: [DocumentSummary[]];
+  /** The active document's customStampDefinitions list changed (a new one authored, or an existing one edited) — the Stamps tab's cue to re-render its palette. */
+  customStampDefinitionsChanged: [StampDefinition[]];
 }
 
 type Listener<A extends unknown[]> = (...args: A) => void;
@@ -838,6 +841,27 @@ export class SketchScene {
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
+  /** The active document's user-authored elements (Element Editor dialog) — the Stamps tab's palette reads this alongside the fixture-backed STAMP_LIBRARY. */
+  getCustomStampDefinitions(): StampDefinition[] {
+    return [...this.doc.customStampDefinitions];
+  }
+
+  /** Adds a newly-authored element (Element Editor dialog's "Create custom element" flow) to the active document. */
+  addCustomStampDefinition(definition: StampDefinition): void {
+    this.doc.customStampDefinitions.push(definition);
+    this.markDirty();
+    this.emitter.emit('customStampDefinitionsChanged', this.doc.customStampDefinitions);
+  }
+
+  /** Applies an edit (rename, re-authored ports/artwork) to an existing custom element — "Edit ports…" from a placed instance's Properties panel. No-op if `id` isn't a custom definition in this document. */
+  updateCustomStampDefinition(id: string, patch: Partial<StampDefinition>): void {
+    const index = this.doc.customStampDefinitions.findIndex((def) => def.id === id);
+    if (index === -1) return;
+    this.doc.customStampDefinitions[index] = { ...this.doc.customStampDefinitions[index], ...patch };
+    this.markDirty();
+    this.emitter.emit('customStampDefinitionsChanged', this.doc.customStampDefinitions);
+  }
+
   /** Current segment-endpoint snap radius, screen px at zoom 1 — see onDrawSegmentClick. */
   getSnapRadius(): number {
     return this.snapRadiusScreenPx;
@@ -948,6 +972,7 @@ export class SketchScene {
       stamps: Object.values(state.stamps),
       portGroups: this.doc.portGroups,
       annotations: Object.values(state.annotations),
+      customStampDefinitions: this.doc.customStampDefinitions,
     }) as unknown as ProjectDocument;
   }
 
@@ -989,6 +1014,7 @@ export class SketchScene {
     });
     target.networkTypes.splice(0, target.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
     target.portGroups.splice(0, target.portGroups.length, ...doc.portGroups);
+    target.customStampDefinitions.splice(0, target.customStampDefinitions.length, ...doc.customStampDefinitions);
 
     let maxAnnotationSeq = 0;
     for (const annotation of doc.annotations) {
@@ -1007,7 +1033,7 @@ export class SketchScene {
       if (numericSuffix) maxStampSeq = Math.max(maxStampSeq, Number(numericSuffix));
 
       if (!stampData.definitionId || !resolveIconBitmap) continue; // ad hoc upload, or no resolver wired — leave it out, see doc comment above
-      const definition = getStampDefinition(stampData.definitionId);
+      const definition = getStampDefinition(stampData.definitionId, target.customStampDefinitions);
       if (!definition) continue; // stamp library changed since this project was saved
 
       const bitmap = await resolveIconBitmap(definition.iconRef);
@@ -2258,7 +2284,8 @@ export class SketchScene {
     const id = `stamp-${this.doc.nextStampSeq++}`;
     // Copy the definition's ports onto the placed instance (previously always []) so
     // resolveSegmentEndpoint's existing port-snapping has something to snap to.
-    const ports = definitionId ? [...(getStampDefinition(definitionId)?.ports ?? [])] : [];
+    const definition = definitionId ? getStampDefinition(definitionId, this.doc.customStampDefinitions) : undefined;
+    const ports = definition ? [...definition.ports] : [];
     const data: PlacedStamp = {
       id,
       category,
@@ -2275,6 +2302,15 @@ export class SketchScene {
     this.doc.stamps.set(id, { sprite, baseScale });
     this.doc.stampsLayer.addChild(sprite);
     this.doc.drawingHistory.execute(createStampCommand(data));
+    // Instantiates the definition's authoring-time port groups (Element Editor
+    // dialog link mode) into real instance-level PortGroup entries, same idea
+    // as the connectivity spec's synthetic-center-port replacement — pushed
+    // directly (not via setPortGroup, which assumes one group per element)
+    // since a definition can carry several independent groups (e.g. an AHU's
+    // supply pair and return pair as two separate connectivity nodes).
+    for (const group of definition?.definitionPortGroups ?? []) {
+      this.doc.portGroups.push({ elementId: id, portIds: group });
+    }
     this.doc.selectedIds = new Set([id]);
     this.syncDrawingLayer();
     this.markDirty();

@@ -7,10 +7,10 @@
 import type { Annotation } from './annotation.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { PlacedStamp } from './stamp.js';
-import { getStampDefinition } from './stamp-library.js';
+import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -20,6 +20,8 @@ export interface ProjectDocument {
   stamps: PlacedStamp[];
   portGroups: PortGroup[];
   annotations: Annotation[];
+  /** User-authored elements (Element Editor dialog, ports-custom-element-editor-spec.md §5.2) — embedded in the project document itself rather than a shared app-wide library, so the definitions travel with the file. Kept separate from the fixture-backed STAMP_LIBRARY; stamp-library.ts's lookups accept this list as an optional second argument. */
+  customStampDefinitions: StampDefinition[];
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -86,6 +88,19 @@ const migrationSteps: MigrationStep[] = [
       annotations: Array.isArray(data.annotations) ? data.annotations : [],
     }),
   },
+  {
+    fromVersion: 4,
+    toVersion: 5,
+    // Version 4 predates the Element Editor dialog's user-authored elements
+    // (ports-custom-element-editor-spec.md §5.2) — no save before this could
+    // have any, so default to an empty array rather than trying to infer
+    // definitions that were never recorded.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 5,
+      customStampDefinitions: Array.isArray(data.customStampDefinitions) ? data.customStampDefinitions : [],
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -99,6 +114,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'stamps'),
   (data: JsonRecord) => requireArray(data, 'portGroups'),
   (data: JsonRecord) => requireArray(data, 'annotations'),
+  (data: JsonRecord) => requireArray(data, 'customStampDefinitions'),
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

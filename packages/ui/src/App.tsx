@@ -17,6 +17,7 @@ import { Dialog } from './components/Dialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
+import { ElementEditorDialog } from './components/ElementEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
@@ -115,6 +116,7 @@ export function MepSketchApp({
     allStamps,
     networkSummaries,
     networkTypes,
+    customStampDefinitions,
     zoom,
     pageIndex,
     pageCount,
@@ -143,6 +145,8 @@ export function MepSketchApp({
   const [globalPropertiesOpen, setGlobalPropertiesOpen] = useState(false);
   const [customPropertyDefs, setCustomPropertyDefs] = useState<GlobalPropertyDefs>(loadCustomPropertyDefs);
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
+  /** Element Editor dialog target — 'create' for a brand-new custom element, or the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel). */
+  const [elementEditorTarget, setElementEditorTarget] = useState<{ mode: 'create' } | { mode: 'edit'; definitionId: string } | null>(null);
   const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
@@ -223,7 +227,10 @@ export function MepSketchApp({
   // SketchScene has no fetch of its own, same layering as resolveStampIconUrl/StampsPanel.
   const resolveStampIconBitmap = useCallback(
     async (iconRef: string) => {
-      const res = await fetch(resolveStampIconUrl(iconRef));
+      // A custom (Element Editor-authored) definition's iconRef is already a
+      // self-contained `data:` URL — fetch() handles those directly, so skip
+      // resolveStampIconUrl's fixture-relative `/stamps/` prefixing for it.
+      const res = await fetch(iconRef.startsWith('data:') ? iconRef : resolveStampIconUrl(iconRef));
       const blob = await res.blob();
       const definition = STAMP_LIBRARY.find((def) => def.iconRef === iconRef);
       return loadStampBitmap(blob, definition && { widthPt: definition.nativeWidth, heightPt: definition.nativeHeight });
@@ -385,6 +392,20 @@ export function MepSketchApp({
     setStatus(`${definition.label} ready — click the canvas to place it.`);
   }, []);
 
+  const handleSaveElementDefinition = useCallback(
+    (definition: StampDefinition) => {
+      if (elementEditorTarget?.mode === 'edit') {
+        sceneRef.current?.updateCustomStampDefinition(definition.id, definition);
+        setStatus(`${definition.label} updated.`);
+      } else {
+        sceneRef.current?.addCustomStampDefinition(definition);
+        setStatus(`${definition.label} created — pick it from the Stamps tab to place it.`);
+      }
+      setElementEditorTarget(null);
+    },
+    [elementEditorTarget, sceneRef],
+  );
+
   const handleNetworkTypePick = useCallback(
     (type: NetworkType) => {
       sceneRef.current?.setActiveNetworkType(type);
@@ -424,6 +445,8 @@ export function MepSketchApp({
         activeDefinitionId={activeDefinitionId}
         onPick={handleStampPick}
         onCustomStampFile={handleCustomStampFile}
+        customStampDefinitions={customStampDefinitions}
+        onCreateCustomElement={() => setElementEditorTarget({ mode: 'create' })}
         resolveIconUrl={resolveStampIconUrl}
         networkTypes={networkTypes}
         activeNetworkTypeId={activeNetworkTypeId}
@@ -462,6 +485,8 @@ export function MepSketchApp({
         capacityInput={capacityInput}
         setCapacityInput={setCapacityInput}
         customPropertyDefs={customPropertyDefs}
+        customStampDefinitions={customStampDefinitions}
+        onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
       />
     ),
   };
@@ -632,6 +657,14 @@ export function MepSketchApp({
           onChange={handleChangeBuildings}
           currentDocumentFileName={sheetName}
           onClose={() => setManageBuildingsOpen(false)}
+        />
+      )}
+
+      {elementEditorTarget && (
+        <ElementEditorDialog
+          definition={elementEditorTarget.mode === 'edit' ? customStampDefinitions.find((d) => d.id === elementEditorTarget.definitionId) : undefined}
+          onSave={handleSaveElementDefinition}
+          onClose={() => setElementEditorTarget(null)}
         />
       )}
 
