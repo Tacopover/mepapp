@@ -1570,7 +1570,11 @@ export class SketchScene {
     return minX === Infinity ? null : { minX, minY, maxX, maxY };
   }
 
+  /** Only stamps and annotations are rotatable (see onPointerMove's 'rotate-selection' case) — a segment- or fitting-only selection has no handle, even though it still has selection bounds for the plain overlay outline. */
   private getRotationHandleWorld(): Vec2 | null {
+    const state = this.doc.drawingHistory.getState();
+    const isRotatable = [...this.doc.selectedIds].some((id) => state.stamps[id] || state.annotations[id]);
+    if (!isRotatable) return null;
     const bounds = this.getSelectionBoundsWorld();
     if (!bounds) return null;
     const gap = HANDLE_OFFSET_WORLD_AT_ZOOM_1 / this.world.scale.x;
@@ -1839,6 +1843,21 @@ export class SketchScene {
         if (annotation) annotationSnapshot[id] = annotation.geometry;
         const fitting = state.fittings[id];
         if (fitting) fittingSnapshot[id] = fitting.position;
+        // A selected segment has no position of its own to drag — instead, drag
+        // both its endpoint fittings by the same delta and let the existing
+        // fitting-move + applyConnectivityCascade path (below) recompute the
+        // segment's own geometry and re-seat any neighboring segment sharing
+        // one of those fittings, exactly like dragging those fittings directly.
+        // A 'port' endpoint (attached to a placed stamp) is left alone — that
+        // end stays pinned to the equipment, matching the old app's behavior.
+        const segment = state.segments[id];
+        if (segment) {
+          for (const endpoint of [segment.endpointA, segment.endpointB]) {
+            if (endpoint.kind !== 'fitting') continue;
+            const endpointFitting = state.fittings[endpoint.fittingId];
+            if (endpointFitting) fittingSnapshot[endpoint.fittingId] = endpointFitting.position;
+          }
+        }
       }
       const hitAnnotationKind = hit.kind === 'annotation' ? state.annotations[hit.id]?.geometry.kind : null;
       const isTextEditable = hitAnnotationKind === 'textbox' || hitAnnotationKind === 'stickyNote';
