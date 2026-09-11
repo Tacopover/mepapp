@@ -14,11 +14,14 @@ export interface SymbolShapeStyle {
   fill: string | null;
 }
 
+/** Radians, about the shape's own bounds center. Optional/absent means 0 — same defaultable convention as `shapes?` itself, no schema version bump needed. */
+type Rotatable = { rotation?: number };
+
 export type SymbolShape =
-  | { id: string; kind: 'line'; x1: number; y1: number; x2: number; y2: number; style: SymbolShapeStyle }
-  | { id: string; kind: 'rect'; x: number; y: number; width: number; height: number; style: SymbolShapeStyle }
-  | { id: string; kind: 'circle'; cx: number; cy: number; radius: number; style: SymbolShapeStyle }
-  | {
+  | ({ id: string; kind: 'line'; x1: number; y1: number; x2: number; y2: number; style: SymbolShapeStyle } & Rotatable)
+  | ({ id: string; kind: 'rect'; x: number; y: number; width: number; height: number; style: SymbolShapeStyle } & Rotatable)
+  | ({ id: string; kind: 'circle'; cx: number; cy: number; radius: number; style: SymbolShapeStyle } & Rotatable)
+  | ({
       id: string;
       kind: 'arc';
       cx: number;
@@ -28,9 +31,9 @@ export type SymbolShape =
       startAngle: number;
       endAngle: number;
       style: SymbolShapeStyle;
-    }
-  | { id: string; kind: 'text'; x: number; y: number; text: string; fontSize: number; style: SymbolShapeStyle }
+    } & Rotatable)
+  | ({ id: string; kind: 'text'; x: number; y: number; text: string; fontSize: number; style: SymbolShapeStyle } & Rotatable)
   /** Same two-point shape as 'line', rendered with an arrowhead at (x2,y2). */
-  | { id: string; kind: 'arrow'; x1: number; y1: number; x2: number; y2: number; style: SymbolShapeStyle }
-  | { id: string; kind: 'ellipse'; cx: number; cy: number; radiusX: number; radiusY: number; style: SymbolShapeStyle }
-  | { id: string; kind: 'polygon'; points: { x: number; y: number }[]; style: SymbolShapeStyle };
+  | ({ id: string; kind: 'arrow'; x1: number; y1: number; x2: number; y2: number; style: SymbolShapeStyle } & Rotatable)
+  | ({ id: string; kind: 'ellipse'; cx: number; cy: number; radiusX: number; radiusY: number; style: SymbolShapeStyle } & Rotatable)
+  | ({ id: string; kind: 'polygon'; points: { x: number; y: number }[]; style: SymbolShapeStyle } & Rotatable);

@@ -7,8 +7,56 @@
 
 import type { SymbolShape, SymbolShapeStyle } from '@mepapp/core';
 
+/** A shape's own rotation pivot — the center of its unrotated local bounds. Rotating a shape's defining geometry around this point (rather than transforming the raw coordinates) is what `rotation` means throughout this file. */
+function shapeCenter(shape: SymbolShape): { x: number; y: number } {
+  switch (shape.kind) {
+    case 'line':
+    case 'arrow':
+      return { x: (shape.x1 + shape.x2) / 2, y: (shape.y1 + shape.y2) / 2 };
+    case 'rect':
+      return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
+    case 'circle':
+    case 'arc':
+    case 'ellipse':
+      return { x: shape.cx, y: shape.cy };
+    case 'text': {
+      const width = shape.text.length * shape.fontSize * 0.6;
+      return { x: shape.x + width / 2, y: shape.y + shape.fontSize / 2 };
+    }
+    case 'polygon': {
+      const xs = shape.points.map((p) => p.x);
+      const ys = shape.points.map((p) => p.y);
+      return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+    }
+  }
+}
+
+function rotatePoint(x: number, y: number, cx: number, cy: number, rotation: number): { x: number; y: number } {
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const dx = x - cx;
+  const dy = y - cy;
+  return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+}
+
+function aabbOfPoints(points: { x: number; y: number }[]): { x: number; y: number; width: number; height: number } {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
+}
+
 export function drawSymbolShapes(ctx: CanvasRenderingContext2D, shapes: SymbolShape[], widthPx: number, heightPx: number): void {
   for (const shape of shapes) {
+    ctx.save();
+    const rotation = shape.rotation ?? 0;
+    if (rotation !== 0) {
+      const center = shapeCenter(shape);
+      ctx.translate(center.x * widthPx, center.y * heightPx);
+      ctx.rotate(rotation);
+      ctx.translate(-center.x * widthPx, -center.y * heightPx);
+    }
     ctx.lineWidth = Math.max(1, shape.style.strokeWidth * Math.min(widthPx, heightPx));
     ctx.strokeStyle = shape.style.stroke;
     ctx.fillStyle = shape.style.fill ?? 'transparent';
@@ -79,6 +127,7 @@ export function drawSymbolShapes(ctx: CanvasRenderingContext2D, shapes: SymbolSh
         ctx.stroke();
         break;
     }
+    ctx.restore();
   }
 }
 
@@ -97,8 +146,16 @@ export function hitTestSymbolShape(shapes: SymbolShape[], fractionX: number, fra
   const tolerancePx = 6;
   for (let i = shapes.length - 1; i >= 0; i--) {
     const shape = shapes[i];
-    const x = fractionX * widthPx;
-    const y = fractionY * heightPx;
+    let x = fractionX * widthPx;
+    let y = fractionY * heightPx;
+    const rotation = shape.rotation ?? 0;
+    if (rotation !== 0) {
+      // Rotate the test point into the shape's local (unrotated) space instead of rotating the shape's geometry.
+      const center = shapeCenter(shape);
+      const local = rotatePoint(x, y, center.x * widthPx, center.y * heightPx, -rotation);
+      x = local.x;
+      y = local.y;
+    }
     if (shape.kind === 'line') {
       if (distanceToSegment(x, y, shape.x1 * widthPx, shape.y1 * heightPx, shape.x2 * widthPx, shape.y2 * heightPx) <= tolerancePx) return shape;
     } else if (shape.kind === 'rect') {
@@ -163,37 +220,69 @@ function pointInPolygon(x: number, y: number, points: { x: number; y: number }[]
   return inside;
 }
 
+/** Returns the *rotated* bounding box (an axis-aligned box tight around the shape as actually drawn) — used for the selection highlight and marquee test. */
 export function symbolShapeBounds(shape: SymbolShape): { x: number; y: number; width: number; height: number } {
+  const rotation = shape.rotation ?? 0;
   switch (shape.kind) {
     case 'line':
-      return {
-        x: Math.min(shape.x1, shape.x2),
-        y: Math.min(shape.y1, shape.y2),
-        width: Math.abs(shape.x2 - shape.x1),
-        height: Math.abs(shape.y2 - shape.y1),
-      };
-    case 'rect':
-      return { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+    case 'arrow': {
+      if (rotation === 0) {
+        return {
+          x: Math.min(shape.x1, shape.x2),
+          y: Math.min(shape.y1, shape.y2),
+          width: Math.abs(shape.x2 - shape.x1),
+          height: Math.abs(shape.y2 - shape.y1),
+        };
+      }
+      const center = shapeCenter(shape);
+      return aabbOfPoints([rotatePoint(shape.x1, shape.y1, center.x, center.y, rotation), rotatePoint(shape.x2, shape.y2, center.x, center.y, rotation)]);
+    }
+    case 'rect': {
+      if (rotation === 0) return { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+      const center = shapeCenter(shape);
+      const corners = [
+        { x: shape.x, y: shape.y },
+        { x: shape.x + shape.width, y: shape.y },
+        { x: shape.x + shape.width, y: shape.y + shape.height },
+        { x: shape.x, y: shape.y + shape.height },
+      ].map((p) => rotatePoint(p.x, p.y, center.x, center.y, rotation));
+      return aabbOfPoints(corners);
+    }
     case 'circle':
     case 'arc':
+      // Rotation about its own center never changes a circle's (or this circle-based arc) bounding box.
       return { x: shape.cx - shape.radius, y: shape.cy - shape.radius, width: shape.radius * 2, height: shape.radius * 2 };
-    case 'text':
-      return { x: shape.x, y: shape.y, width: shape.text.length * shape.fontSize * 0.6, height: shape.fontSize };
-    case 'arrow':
-      return {
-        x: Math.min(shape.x1, shape.x2),
-        y: Math.min(shape.y1, shape.y2),
-        width: Math.abs(shape.x2 - shape.x1),
-        height: Math.abs(shape.y2 - shape.y1),
-      };
-    case 'ellipse':
-      return { x: shape.cx - shape.radiusX, y: shape.cy - shape.radiusY, width: shape.radiusX * 2, height: shape.radiusY * 2 };
+    case 'text': {
+      const width = shape.text.length * shape.fontSize * 0.6;
+      const height = shape.fontSize;
+      if (rotation === 0) return { x: shape.x, y: shape.y, width, height };
+      const center = shapeCenter(shape);
+      const corners = [
+        { x: shape.x, y: shape.y },
+        { x: shape.x + width, y: shape.y },
+        { x: shape.x + width, y: shape.y + height },
+        { x: shape.x, y: shape.y + height },
+      ].map((p) => rotatePoint(p.x, p.y, center.x, center.y, rotation));
+      return aabbOfPoints(corners);
+    }
+    case 'ellipse': {
+      if (rotation === 0) return { x: shape.cx - shape.radiusX, y: shape.cy - shape.radiusY, width: shape.radiusX * 2, height: shape.radiusY * 2 };
+      // Closed-form half-extents of an ellipse rotated in place — rotating its corner points
+      // (as the other kinds do) would only bound the ellipse's own axis-aligned bbox, not the ellipse itself.
+      const halfWidth = Math.hypot(shape.radiusX * Math.cos(rotation), shape.radiusY * Math.sin(rotation));
+      const halfHeight = Math.hypot(shape.radiusX * Math.sin(rotation), shape.radiusY * Math.cos(rotation));
+      return { x: shape.cx - halfWidth, y: shape.cy - halfHeight, width: halfWidth * 2, height: halfHeight * 2 };
+    }
     case 'polygon': {
-      const xs = shape.points.map((p) => p.x);
-      const ys = shape.points.map((p) => p.y);
-      const minX = Math.min(...xs);
-      const minY = Math.min(...ys);
-      return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
+      if (rotation === 0) {
+        const xs = shape.points.map((p) => p.x);
+        const ys = shape.points.map((p) => p.y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
+      }
+      const center = shapeCenter(shape);
+      return aabbOfPoints(shape.points.map((p) => rotatePoint(p.x, p.y, center.x, center.y, rotation)));
     }
   }
 }
@@ -205,18 +294,18 @@ export function createDraftShape(tool: ShapeDrawTool, id: string, start: { fract
   const { fractionX: x, fractionY: y } = start;
   switch (tool) {
     case 'line':
-      return { id, kind: 'line', x1: x, y1: y, x2: x, y2: y, style };
+      return { id, kind: 'line', x1: x, y1: y, x2: x, y2: y, style, rotation: 0 };
     case 'rect':
-      return { id, kind: 'rect', x, y, width: 0, height: 0, style };
+      return { id, kind: 'rect', x, y, width: 0, height: 0, style, rotation: 0 };
     case 'circle':
-      return { id, kind: 'circle', cx: x, cy: y, radius: 0, style };
+      return { id, kind: 'circle', cx: x, cy: y, radius: 0, style, rotation: 0 };
     case 'arc':
       // Default 270° sweep — fine-tuned afterward via the selected shape's angle inputs, same as the old app's arc tool needed a second adjustment step.
-      return { id, kind: 'arc', cx: x, cy: y, radius: 0, startAngle: 0, endAngle: (Math.PI * 3) / 2, style };
+      return { id, kind: 'arc', cx: x, cy: y, radius: 0, startAngle: 0, endAngle: (Math.PI * 3) / 2, style, rotation: 0 };
     case 'arrow':
-      return { id, kind: 'arrow', x1: x, y1: y, x2: x, y2: y, style };
+      return { id, kind: 'arrow', x1: x, y1: y, x2: x, y2: y, style, rotation: 0 };
     case 'ellipse':
-      return { id, kind: 'ellipse', cx: x, cy: y, radiusX: 0, radiusY: 0, style };
+      return { id, kind: 'ellipse', cx: x, cy: y, radiusX: 0, radiusY: 0, style, rotation: 0 };
   }
 }
 
@@ -273,29 +362,39 @@ export function isDraftLargeEnough(draft: SymbolShape): boolean {
   }
 }
 
-/** Single-shape pivot is its own bounds center; multi-selection pivot is the combined bounding-box center — shared rule for mirror, scale, and (group) rotate. */
-export function selectionPivot(shapes: SymbolShape[]): { x: number; y: number } {
+/** Combined bounding box of a whole selection — single shape or multi. */
+export function selectionBounds(shapes: SymbolShape[]): { x: number; y: number; width: number; height: number } {
   const bounds = shapes.map(symbolShapeBounds);
   const minX = Math.min(...bounds.map((b) => b.x));
   const minY = Math.min(...bounds.map((b) => b.y));
   const maxX = Math.max(...bounds.map((b) => b.x + b.width));
   const maxY = Math.max(...bounds.map((b) => b.y + b.height));
-  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/** Single-shape pivot is its own bounds center; multi-selection pivot is the combined bounding-box center — shared rule for mirror, scale, and (group) rotate. */
+export function selectionPivot(shapes: SymbolShape[]): { x: number; y: number } {
+  const b = selectionBounds(shapes);
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 
 export function mirrorShape(shape: SymbolShape, axis: 'horizontal' | 'vertical', pivotX: number, pivotY: number): SymbolShape {
   const mx = (x: number) => (axis === 'horizontal' ? 2 * pivotX - x : x);
   const my = (y: number) => (axis === 'vertical' ? 2 * pivotY - y : y);
+  // A reflection always reverses handedness, so a shape's own `rotation` (applied on top of
+  // its raw coordinates, see shapeCenter/drawSymbolShapes) flips sign regardless of axis —
+  // the axis itself is already accounted for by mx/my above.
+  const rotation = shape.rotation ? -shape.rotation : shape.rotation;
   switch (shape.kind) {
     case 'line':
     case 'arrow':
-      return { ...shape, x1: mx(shape.x1), y1: my(shape.y1), x2: mx(shape.x2), y2: my(shape.y2) };
+      return { ...shape, x1: mx(shape.x1), y1: my(shape.y1), x2: mx(shape.x2), y2: my(shape.y2), rotation };
     case 'rect': {
       const x1 = mx(shape.x);
       const y1 = my(shape.y);
       const x2 = mx(shape.x + shape.width);
       const y2 = my(shape.y + shape.height);
-      return { ...shape, x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+      return { ...shape, x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1), rotation };
     }
     case 'circle':
       return { ...shape, cx: mx(shape.cx), cy: my(shape.cy) };
@@ -303,7 +402,7 @@ export function mirrorShape(shape: SymbolShape, axis: 'horizontal' | 'vertical',
       // Reflecting reverses the sweep's orientation — mirror each bound angle, then
       // swap start/end so the arc still traces the same wedge of the (now-mirrored) circle.
       const mirrorAngle = (theta: number) => (axis === 'horizontal' ? Math.PI - theta : -theta);
-      return { ...shape, cx: mx(shape.cx), cy: my(shape.cy), startAngle: mirrorAngle(shape.endAngle), endAngle: mirrorAngle(shape.startAngle) };
+      return { ...shape, cx: mx(shape.cx), cy: my(shape.cy), startAngle: mirrorAngle(shape.endAngle), endAngle: mirrorAngle(shape.startAngle), rotation };
     }
     case 'text': {
       // Text stays upright/readable — only its anchor position mirrors, not the glyphs.
@@ -312,12 +411,12 @@ export function mirrorShape(shape: SymbolShape, axis: 'horizontal' | 'vertical',
       const y1 = my(shape.y);
       const x2 = mx(shape.x + approxWidth);
       const y2 = my(shape.y + shape.fontSize);
-      return { ...shape, x: Math.min(x1, x2), y: Math.min(y1, y2) };
+      return { ...shape, x: Math.min(x1, x2), y: Math.min(y1, y2), rotation };
     }
     case 'ellipse':
-      return { ...shape, cx: mx(shape.cx), cy: my(shape.cy) };
+      return { ...shape, cx: mx(shape.cx), cy: my(shape.cy), rotation };
     case 'polygon':
-      return { ...shape, points: shape.points.map((p) => ({ x: mx(p.x), y: my(p.y) })) };
+      return { ...shape, points: shape.points.map((p) => ({ x: mx(p.x), y: my(p.y) })), rotation };
   }
 }
 
@@ -360,6 +459,20 @@ export function translateShape(shape: SymbolShape, dx: number, dy: number): Symb
     case 'polygon':
       return { ...shape, points: shape.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) };
   }
+}
+
+/**
+ * Revolves a shape's own center around an external pivot by `deltaRotation` and adds the same
+ * delta to its `rotation` field. Single-shape rotate and group rotate are the same operation:
+ * when `pivotX/pivotY` is the shape's own center (single-select — see `selectionPivot`), the
+ * revolve step is a no-op and only `rotation` changes; for a group pivot, every selected shape
+ * both revolves around the shared point and spins in place by the same amount.
+ */
+export function rotateShapeAround(shape: SymbolShape, deltaRotation: number, pivotX: number, pivotY: number): SymbolShape {
+  const center = shapeCenter(shape);
+  const newCenter = rotatePoint(center.x, center.y, pivotX, pivotY, deltaRotation);
+  const moved = translateShape(shape, newCenter.x - center.x, newCenter.y - center.y);
+  return { ...moved, rotation: (shape.rotation ?? 0) + deltaRotation };
 }
 
 /**

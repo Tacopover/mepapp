@@ -10,7 +10,9 @@ import {
   isDraftLargeEnough,
   mirrorShape,
   rasterizeSymbolShapes,
+  rotateShapeAround,
   scaleShape,
+  selectionBounds,
   selectionPivot,
   symbolShapeBounds,
   translateShape,
@@ -23,6 +25,10 @@ const STAMP_SOURCE_DPI = 300;
 
 /** Drawing-buffer resolution for the Shapes-mode canvas — always square regardless of the definition's own nativeWidth:nativeHeight aspect, same simplification the ports overlay already relies on (fractions are relative to the full preview box, not the artwork's own aspect). */
 const SHAPE_CANVAS_PX = 520;
+
+/** Rotate handle geometry, in the same SHAPE_CANVAS_PX pixel space — a stem above the selection's top edge ending in a small draggable circle. */
+const ROTATE_HANDLE_OFFSET_PX = 28;
+const ROTATE_HANDLE_RADIUS_PX = 6;
 
 const DISCIPLINE_OPTIONS: Discipline[] = [
   'heatingAndCooling',
@@ -63,6 +69,13 @@ const DEFAULT_STYLE: SymbolShapeStyle = { stroke: '#1a1a1a', strokeWidth: 0.01, 
 
 function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
+}
+
+/** Rotate handle sits centered above the selection's top edge, offset by a fixed pixel distance — fraction-space position, in the SHAPE_CANVAS_PX pixel convention. */
+function rotateHandlePosition(selected: SymbolShape[]): { x: number; y: number } | null {
+  if (selected.length === 0) return null;
+  const b = selectionBounds(selected);
+  return { x: b.x + b.width / 2, y: b.y - ROTATE_HANDLE_OFFSET_PX / SHAPE_CANVAS_PX };
 }
 
 function readAsDataUrl(file: File): Promise<string> {
@@ -249,6 +262,28 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
       ctx.strokeRect(minX, minY, w, h);
       ctx.restore();
     }
+    if (tool === 'select' && !marquee) {
+      const selectedForHandle = toDraw.filter((s) => selectedShapeIds.has(s.id));
+      const handle = rotateHandlePosition(selectedForHandle);
+      if (handle) {
+        const b = selectionBounds(selectedForHandle);
+        const handleX = handle.x * canvas.width;
+        const handleY = handle.y * canvas.height;
+        const stemTopY = b.y * canvas.height;
+        ctx.save();
+        ctx.strokeStyle = '#2f6fed';
+        ctx.fillStyle = '#2f6fed';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(handleX, stemTopY);
+        ctx.lineTo(handleX, handleY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(handleX, handleY, ROTATE_HANDLE_RADIUS_PX, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
 
     // Click-accumulate previews for Polygon and Arc (3-pt): placed vertices plus a
     // rubber-band line to the current pointer position.
@@ -373,6 +408,44 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     }
 
     if (tool === 'select') {
+      // Rotate-handle hit test takes priority over shape hit-testing.
+      const selectedForRotate = shapes.filter((s) => selectedShapeIds.has(s.id));
+      const handle = rotateHandlePosition(selectedForRotate);
+      if (handle) {
+        const handlePxX = handle.x * SHAPE_CANVAS_PX;
+        const handlePxY = handle.y * SHAPE_CANVAS_PX;
+        const clickPxX = start.fractionX * SHAPE_CANVAS_PX;
+        const clickPxY = start.fractionY * SHAPE_CANVAS_PX;
+        if (Math.hypot(clickPxX - handlePxX, clickPxY - handlePxY) <= ROTATE_HANDLE_RADIUS_PX + 3) {
+          const pivot = selectionPivot(selectedForRotate);
+          const pivotPxX = pivot.x * SHAPE_CANVAS_PX;
+          const pivotPxY = pivot.y * SHAPE_CANVAS_PX;
+          const startAngle = Math.atan2(clickPxY - pivotPxY, clickPxX - pivotPxX);
+          const move = (ev: PointerEvent) => {
+            const current = fractionFromEvent(ev.clientX, ev.clientY);
+            const currentPxX = current.fractionX * SHAPE_CANVAS_PX;
+            const currentPxY = current.fractionY * SHAPE_CANVAS_PX;
+            const currentAngle = Math.atan2(currentPxY - pivotPxY, currentPxX - pivotPxX);
+            const delta = currentAngle - startAngle;
+            setDraftShapes(selectedForRotate.map((s) => rotateShapeAround(s, delta, pivot.x, pivot.y)));
+          };
+          const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            setDraftShapes((current) => {
+              if (current) {
+                const currentById = new Map(current.map((s) => [s.id, s]));
+                commitShapes(shapes.map((s) => currentById.get(s.id) ?? s));
+              }
+              return null;
+            });
+          };
+          window.addEventListener('pointermove', move);
+          window.addEventListener('pointerup', up);
+          return;
+        }
+      }
+
       const hit = hitTestSymbolShape(shapes, start.fractionX, start.fractionY, SHAPE_CANVAS_PX, SHAPE_CANVAS_PX);
       if (hit) {
         if (event.shiftKey) {
