@@ -8,7 +8,10 @@ import {
   drawSymbolShapes,
   hitTestSymbolShape,
   isDraftLargeEnough,
+  mirrorShape,
   rasterizeSymbolShapes,
+  scaleShape,
+  selectionPivot,
   symbolShapeBounds,
   translateShape,
   updateDraftShape,
@@ -119,6 +122,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
   const [pendingPoint, setPendingPoint] = useState<{ fractionX: number; fractionY: number } | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
+  const [scalePercentInput, setScalePercentInput] = useState('100');
   const shapesCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const textRenameRef = useRef<HTMLInputElement | null>(null);
 
@@ -165,6 +169,19 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     if (selectedShapeIds.size === 0) return;
     commitShapes(shapes.filter((s) => !selectedShapeIds.has(s.id)));
     setSelectedShapeIds(new Set());
+  }
+
+  function mirrorSelection(axis: 'horizontal' | 'vertical') {
+    if (selectedShapes.length === 0) return;
+    const pivot = selectionPivot(selectedShapes);
+    commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? mirrorShape(s, axis, pivot.x, pivot.y) : s)));
+  }
+
+  function applyScalePercent() {
+    const factor = Number(scalePercentInput) / 100;
+    if (selectedShapes.length === 0 || !Number.isFinite(factor) || factor <= 0) return;
+    const pivot = selectionPivot(selectedShapes);
+    commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? scaleShape(s, factor, pivot.x, pivot.y) : s)));
   }
 
   function finishPolygon() {
@@ -658,6 +675,29 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
               <button type="button" onClick={redoShapes} disabled={!shapesManager.canRedo} title="Redo">
                 ⤻
               </button>
+            </div>
+            <div className="mep-shape-toolbar">
+              <button type="button" onClick={() => mirrorSelection('horizontal')} disabled={selectedShapes.length === 0} title="Mirror horizontally">
+                Mirror ↔
+              </button>
+              <button type="button" onClick={() => mirrorSelection('vertical')} disabled={selectedShapes.length === 0} title="Mirror vertically">
+                Mirror ↕
+              </button>
+              <label>
+                Scale %{' '}
+                <input
+                  type="number"
+                  min={1}
+                  style={{ width: 56 }}
+                  value={scalePercentInput}
+                  disabled={selectedShapes.length === 0}
+                  onChange={(e) => setScalePercentInput(e.target.value)}
+                  onBlur={applyScalePercent}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applyScalePercent();
+                  }}
+                />
+              </label>
             </div>
             <div className="mep-shape-style-row">
               <label>

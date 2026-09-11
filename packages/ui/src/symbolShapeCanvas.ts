@@ -273,6 +273,76 @@ export function isDraftLargeEnough(draft: SymbolShape): boolean {
   }
 }
 
+/** Single-shape pivot is its own bounds center; multi-selection pivot is the combined bounding-box center — shared rule for mirror, scale, and (group) rotate. */
+export function selectionPivot(shapes: SymbolShape[]): { x: number; y: number } {
+  const bounds = shapes.map(symbolShapeBounds);
+  const minX = Math.min(...bounds.map((b) => b.x));
+  const minY = Math.min(...bounds.map((b) => b.y));
+  const maxX = Math.max(...bounds.map((b) => b.x + b.width));
+  const maxY = Math.max(...bounds.map((b) => b.y + b.height));
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
+
+export function mirrorShape(shape: SymbolShape, axis: 'horizontal' | 'vertical', pivotX: number, pivotY: number): SymbolShape {
+  const mx = (x: number) => (axis === 'horizontal' ? 2 * pivotX - x : x);
+  const my = (y: number) => (axis === 'vertical' ? 2 * pivotY - y : y);
+  switch (shape.kind) {
+    case 'line':
+    case 'arrow':
+      return { ...shape, x1: mx(shape.x1), y1: my(shape.y1), x2: mx(shape.x2), y2: my(shape.y2) };
+    case 'rect': {
+      const x1 = mx(shape.x);
+      const y1 = my(shape.y);
+      const x2 = mx(shape.x + shape.width);
+      const y2 = my(shape.y + shape.height);
+      return { ...shape, x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+    }
+    case 'circle':
+      return { ...shape, cx: mx(shape.cx), cy: my(shape.cy) };
+    case 'arc': {
+      // Reflecting reverses the sweep's orientation — mirror each bound angle, then
+      // swap start/end so the arc still traces the same wedge of the (now-mirrored) circle.
+      const mirrorAngle = (theta: number) => (axis === 'horizontal' ? Math.PI - theta : -theta);
+      return { ...shape, cx: mx(shape.cx), cy: my(shape.cy), startAngle: mirrorAngle(shape.endAngle), endAngle: mirrorAngle(shape.startAngle) };
+    }
+    case 'text': {
+      // Text stays upright/readable — only its anchor position mirrors, not the glyphs.
+      const approxWidth = shape.text.length * shape.fontSize * 0.6;
+      const x1 = mx(shape.x);
+      const y1 = my(shape.y);
+      const x2 = mx(shape.x + approxWidth);
+      const y2 = my(shape.y + shape.fontSize);
+      return { ...shape, x: Math.min(x1, x2), y: Math.min(y1, y2) };
+    }
+    case 'ellipse':
+      return { ...shape, cx: mx(shape.cx), cy: my(shape.cy) };
+    case 'polygon':
+      return { ...shape, points: shape.points.map((p) => ({ x: mx(p.x), y: my(p.y) })) };
+  }
+}
+
+export function scaleShape(shape: SymbolShape, factor: number, pivotX: number, pivotY: number): SymbolShape {
+  const sx = (x: number) => pivotX + (x - pivotX) * factor;
+  const sy = (y: number) => pivotY + (y - pivotY) * factor;
+  switch (shape.kind) {
+    case 'line':
+    case 'arrow':
+      return { ...shape, x1: sx(shape.x1), y1: sy(shape.y1), x2: sx(shape.x2), y2: sy(shape.y2) };
+    case 'rect':
+      return { ...shape, x: sx(shape.x), y: sy(shape.y), width: shape.width * factor, height: shape.height * factor };
+    case 'circle':
+      return { ...shape, cx: sx(shape.cx), cy: sy(shape.cy), radius: shape.radius * factor };
+    case 'arc':
+      return { ...shape, cx: sx(shape.cx), cy: sy(shape.cy), radius: shape.radius * factor };
+    case 'text':
+      return { ...shape, x: sx(shape.x), y: sy(shape.y), fontSize: shape.fontSize * factor };
+    case 'ellipse':
+      return { ...shape, cx: sx(shape.cx), cy: sy(shape.cy), radiusX: shape.radiusX * factor, radiusY: shape.radiusY * factor };
+    case 'polygon':
+      return { ...shape, points: shape.points.map((p) => ({ x: sx(p.x), y: sy(p.y) })) };
+  }
+}
+
 export function translateShape(shape: SymbolShape, dx: number, dy: number): SymbolShape {
   switch (shape.kind) {
     case 'line':
