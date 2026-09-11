@@ -3,6 +3,7 @@ import { CommandManager, type Discipline, type PortSpec, type StampCategory, typ
 import { Dialog } from './Dialog.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import {
+  arcFromThreePoints,
   createDraftShape,
   drawSymbolShapes,
   hitTestSymbolShape,
@@ -39,15 +40,19 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = {
 };
 
 type ArtworkMode = 'import' | 'shapes';
-type ShapeTool = 'select' | 'port' | ShapeDrawTool | 'text';
+type ShapeTool = 'select' | 'port' | ShapeDrawTool | 'text' | 'polygon' | 'arcThreePoint';
 
 const SHAPE_TOOLS: { tool: ShapeTool; label: string }[] = [
   { tool: 'select', label: 'Select' },
   { tool: 'port', label: 'Port' },
   { tool: 'line', label: 'Line' },
+  { tool: 'arrow', label: 'Arrow' },
   { tool: 'rect', label: 'Rect' },
   { tool: 'circle', label: 'Circle' },
+  { tool: 'ellipse', label: 'Ellipse' },
   { tool: 'arc', label: 'Arc' },
+  { tool: 'arcThreePoint', label: 'Arc (3-pt)' },
+  { tool: 'polygon', label: 'Polygon' },
   { tool: 'text', label: 'Text' },
 ];
 
@@ -108,6 +113,9 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
   const [defaultStyle, setDefaultStyle] = useState<SymbolShapeStyle>(DEFAULT_STYLE);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [draftShape, setDraftShape] = useState<SymbolShape | null>(null);
+  const [polygonDraft, setPolygonDraft] = useState<{ fractionX: number; fractionY: number }[] | null>(null);
+  const [arcThreePointDraft, setArcThreePointDraft] = useState<{ fractionX: number; fractionY: number }[] | null>(null);
+  const [pendingPoint, setPendingPoint] = useState<{ fractionX: number; fractionY: number } | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
   const shapesCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -157,6 +165,33 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     setSelectedShapeId(null);
   }
 
+  function finishPolygon() {
+    if (!polygonDraft || polygonDraft.length < 3) return;
+    const shape: SymbolShape = {
+      id: crypto.randomUUID(),
+      kind: 'polygon',
+      points: polygonDraft.map((p) => ({ x: p.fractionX, y: p.fractionY })),
+      style: defaultStyle,
+    };
+    commitShapes([...shapes, shape]);
+    setSelectedShapeId(shape.id);
+    setTool('select');
+    setPolygonDraft(null);
+    setPendingPoint(null);
+  }
+
+  function cancelActiveDraft() {
+    setPolygonDraft(null);
+    setArcThreePointDraft(null);
+    setPendingPoint(null);
+  }
+
+  // Switching tools abandons any in-progress Polygon/Arc(3-pt) click-accumulation.
+  useEffect(() => {
+    cancelActiveDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool]);
+
   // Redraw the Shapes-mode canvas whenever its state changes.
   useEffect(() => {
     if (mode !== 'shapes') return;
@@ -176,7 +211,29 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
       ctx.strokeRect(b.x * canvas.width - 3, b.y * canvas.height - 3, b.width * canvas.width + 6, b.height * canvas.height + 6);
       ctx.restore();
     }
-  }, [mode, shapes, draftShape, selectedShapeId]);
+
+    // Click-accumulate previews for Polygon and Arc (3-pt): placed vertices plus a
+    // rubber-band line to the current pointer position.
+    const activeDraftPoints = tool === 'polygon' ? polygonDraft : tool === 'arcThreePoint' ? arcThreePointDraft : null;
+    if (activeDraftPoints && activeDraftPoints.length > 0) {
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = '#2f6fed';
+      ctx.fillStyle = '#2f6fed';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(activeDraftPoints[0].fractionX * canvas.width, activeDraftPoints[0].fractionY * canvas.height);
+      for (const p of activeDraftPoints.slice(1)) ctx.lineTo(p.fractionX * canvas.width, p.fractionY * canvas.height);
+      if (pendingPoint) ctx.lineTo(pendingPoint.fractionX * canvas.width, pendingPoint.fractionY * canvas.height);
+      ctx.stroke();
+      for (const p of activeDraftPoints) {
+        ctx.beginPath();
+        ctx.arc(p.fractionX * canvas.width, p.fractionY * canvas.height, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }, [mode, shapes, draftShape, selectedShapeId, tool, polygonDraft, arcThreePointDraft, pendingPoint]);
 
   // Delete/Backspace removes the selected shape; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes — only while Shapes mode is active and no text field has focus.
   useEffect(() => {
@@ -194,12 +251,23 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
       } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
         event.preventDefault();
         redoShapes();
+      } else if (event.key === 'Escape' && (polygonDraft || arcThreePointDraft)) {
+        // Cancel the in-progress draft only — stop the event reaching Dialog's own
+        // Escape-closes-the-whole-dialog listener (also on document, registered
+        // during Dialog's child-mounts-first effect, so capture phase is the only
+        // way to run before it).
+        event.preventDefault();
+        event.stopPropagation();
+        cancelActiveDraft();
+      } else if (event.key === 'Enter' && polygonDraft && polygonDraft.length >= 3) {
+        event.preventDefault();
+        finishPolygon();
       }
     }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, selectedShapeId, shapes]);
+  }, [mode, selectedShapeId, shapes, polygonDraft, arcThreePointDraft]);
 
   async function handleArtworkFile(file: File) {
     const [dataUrl, bitmap] = await Promise.all([readAsDataUrl(file), loadStampBitmap(file)]);
@@ -239,6 +307,30 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
       setEditingTextId(shape.id);
       setEditingTextValue('Label');
       setTool('select');
+      return;
+    }
+
+    if (tool === 'polygon') {
+      if (event.detail && event.detail >= 2) return; // 2nd click of a dblclick — onDoubleClick finishes instead
+      setPolygonDraft(polygonDraft ? [...polygonDraft, start] : [start]);
+      return;
+    }
+
+    if (tool === 'arcThreePoint') {
+      if (event.detail && event.detail >= 2) return;
+      const nextPoints = arcThreePointDraft ? [...arcThreePointDraft, start] : [start];
+      if (nextPoints.length < 3) {
+        setArcThreePointDraft(nextPoints);
+        return;
+      }
+      const arc = arcFromThreePoints(nextPoints[0], nextPoints[1], nextPoints[2], defaultStyle);
+      setArcThreePointDraft(null);
+      setPendingPoint(null);
+      if (arc) {
+        commitShapes([...shapes, arc]);
+        setSelectedShapeId(arc.id);
+        setTool('select');
+      }
       return;
     }
 
@@ -284,6 +376,16 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+  }
+
+  function handleShapesCanvasPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if ((tool === 'polygon' && polygonDraft) || (tool === 'arcThreePoint' && arcThreePointDraft)) {
+      setPendingPoint(fractionFromEvent(event.clientX, event.clientY));
+    }
+  }
+
+  function handleShapesCanvasDoubleClick() {
+    if (tool === 'polygon') finishPolygon();
   }
 
   function commitTextEdit() {
@@ -538,7 +640,11 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
                 </div>
               </>
             )}
-            <p className="mep-hint">Drag to draw. Select tool: click a shape to select/move it, Delete to remove. Port tool: click to place a port.</p>
+            <p className="mep-hint">
+              Drag to draw. Select tool: click a shape to select/move it, Delete to remove. Port tool: click to place a port. Arc
+              (3-pt): click start, end, then a point the arc passes through. Polygon: click each vertex, double-click or Enter to
+              finish, Escape to cancel.
+            </p>
           </>
         )}
 
@@ -551,6 +657,8 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
               width={SHAPE_CANVAS_PX}
               height={SHAPE_CANVAS_PX}
               onPointerDown={handleShapesCanvasPointerDown}
+              onPointerMove={handleShapesCanvasPointerMove}
+              onDoubleClick={handleShapesCanvasDoubleClick}
             />
           )}
           {ports.map((port) => (

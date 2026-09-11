@@ -29,4 +29,8 @@ export type SymbolShape =
       endAngle: number;
       style: SymbolShapeStyle;
     }
-  | { id: string; kind: 'text'; x: number; y: number; text: string; fontSize: number; style: SymbolShapeStyle };
+  | { id: string; kind: 'text'; x: number; y: number; text: string; fontSize: number; style: SymbolShapeStyle }
+  /** Same two-point shape as 'line', rendered with an arrowhead at (x2,y2). */
+  | { id: string; kind: 'arrow'; x1: number; y1: number; x2: number; y2: number; style: SymbolShapeStyle }
+  | { id: string; kind: 'ellipse'; cx: number; cy: number; radiusX: number; radiusY: number; style: SymbolShapeStyle }
+  | { id: string; kind: 'polygon'; points: { x: number; y: number }[]; style: SymbolShapeStyle };
