@@ -182,12 +182,59 @@ reasoning as `shapes?` itself (`ports-custom-element-editor-spec.md` §10).
 
 ## 8. Open items for whoever picks this up
 
-- Confirm the multi-select modifier key (Shift vs. Ctrl) against whatever
-  convention placed-stamp selection already uses elsewhere in the app, for
-  consistency.
+- ~~Confirm the multi-select modifier key (Shift vs. Ctrl)~~ — resolved,
+  see §9: Shift, matching `scene.ts`'s placed-stamp/annotation selection.
 - Confirm whether Shapes-mode `text` shapes should rotate with the
   selection or stay upright (§5.4).
 - Old app's actual `ScaleSelection` trigger UI (button/shortcut/field)
   wasn't found in the three files read for this plan — the numeric-field
   recommendation in §5.5 has no old-app precedent to match exactly, it's a
   reasonable default, not a port.
+
+## 9. Status
+
+**Part 1 done** — 2026-09-11, commit `7d9d0e3`, branch
+`worktree-element-editor-plans` (not yet merged to master). Parts 2
+(mirror/scale) and 3 (rotate) from §7's build order are not started —
+this file stays until all three are done.
+
+Shipped exactly §5.1–5.3's scope: `selectedShapeId: string | null` →
+`selectedShapeIds: Set<string>` throughout `ElementEditorDialog.tsx`,
+one dashed outline per selected id, `deleteSelectedShapes` batches the
+whole selection into one `commitShapes` call (one undo step), and
+`updateActiveStyle` loops over every selected id instead of disabling
+for multi-select (as recommended, not the disable alternative).
+
+Modifier key (§8's open item): **Shift**, confirmed against
+`scene.ts`'s `onPointerDown` (`event.shiftKey` toggles membership in
+`selectedIds`, and gates additive-vs-replacing rubber-band) — used the
+same convention here for consistency, no reason found to diverge.
+
+Marquee: bounds-midpoint-inside test per §5.2's explicit recommendation
+(not `scene.ts`'s own full-overlap `rectIntersectsRotatedRect` test,
+which is a different rule solving a different problem — rotated stamp
+bounds vs. these axis-aligned fractional shape bounds).
+
+Group move: clicking a shape already in the current multi-selection
+(no Shift) keeps the whole group selected and drags all of it —
+clicking a shape outside the current selection replaces it with just
+that shape, same rule `scene.ts`'s own hit-test branch already uses.
+
+One implementation note beyond the plan text: the dialog's old
+`draftShape: SymbolShape | null` (doing double duty for both the
+in-progress drag-to-create preview and the single-shape select-drag
+preview) became `draftShapes: SymbolShape[] | null` to carry a whole
+dragged group; the redraw effect merges it into the committed `shapes`
+list by id (replacing dragged originals, appending any not-yet-committed
+new shape), rather than the old single-id swap.
+
+Verified with a scratch Playwright driver against `apps/web`'s dev
+server (not committed, per the existing Playwright-verification-
+gotchas pattern): drew two rects, Shift-clicked both (outline on each,
+confirmed via a cropped/zoomed screenshot — the 1px dashed line doesn't
+read at full-page screenshot scale), dragged the group by one shape's
+edge (both moved by the same delta, both stayed selected), clicked
+empty canvas to deselect, marquee-selected both back, deleted both in
+one keypress, then Undo restored both in one step — confirming the
+batched-commit requirement from §5.1/§5.3. No console errors during the
+run.
