@@ -129,3 +129,61 @@ existing `arc` shape via a different construction path.
   weren't investigated on the old-app side — recommend the simplest rule
   (3+ points, no self-intersection check) unless real usage shows it's
   needed.
+
+## 9. Status
+
+**Done** — 2026-09-11, commit `318d550`, branch
+`worktree-element-editor-plans` (not yet merged to master).
+
+Shipped all four tools from §7's build order: Ellipse, Arrow, Arc
+(3-pt), Polygon. `SymbolShape` (`@mepapp/core`) gained the three
+variants from §6 exactly as scoped — `arrow`, `ellipse`, `polygon` — no
+schema version bump. `symbolShapeCanvas.ts` got the draw/hit-test/
+bounds/translate cases from §5's checklist, plus a new exported
+`arcFromThreePoints()` (circumcenter formula, then derives startAngle/
+endAngle so the sweep passes through the third point) — used only by
+Arc (3-pt), which still produces the existing `arc` `SymbolShape`, per
+§4's note.
+
+One addition beyond §5's scope: Polygon and Arc (3-pt) needed a visible
+click-accumulate preview (placed-vertex dots + a rubber-band line to
+the cursor) for the tool to be usable at all — without it there's no
+feedback between clicks. Implemented as two new dialog-local point-array
+states (`polygonDraft`, `arcThreePointDraft`) plus a `pendingPoint`
+tracked on canvas `pointermove`, drawn directly in the existing
+draw-canvas `useEffect` (not through `drawSymbolShapes`, since these
+aren't committed `SymbolShape`s yet).
+
+One real bug hit and fixed along the way: `Dialog.tsx` already closes
+the whole dialog on Escape via its own `document`-level keydown
+listener. Adding "Escape cancels the in-progress draft" on top of that
+needed the new listener registered with `{ capture: true }` and to call
+`event.stopPropagation()`, so it intercepts Escape before Dialog's
+bubble-phase listener sees it — otherwise both fired (draft canceled
+*and* dialog closed). Caught via manual testing, not by the build.
+
+Arrowhead proportions (open item above): fixed triangle, length =
+`max(6px, strokeWidth×3)`, half-angle ≈ 25.7° (`π/7` rad) — eyeballed
+against the fixture stamp art per the open item's own suggestion, no
+old-app WPF values to port from.
+
+Verified with a scratch Playwright driver against `apps/web`'s dev
+server (not committed — one-off, per the existing "Playwright
+verification gotchas" pattern): dismissed the onboarding screen, opened
+Create Custom Element → Draw shapes, drove all four new tools
+(Ellipse/Arrow drag, Arc-3-pt three clicks, Polygon four clicks +
+double-click), confirmed each rendered correctly via screenshot, tool
+auto-reset to Select after each commit, zero console errors, Escape
+mid-Polygon-draft cancels just the draft (dialog stays open, other
+shapes intact), and the resulting polygon is properly selectable/
+hit-testable/deletable (edge-hit-tested since unfilled, matching Rect's
+existing fill-vs-stroke hit-test convention). `packages/core`'s 129
+existing vitest tests still pass unchanged. Full `pnpm build` (all 9
+workspace tasks) is clean.
+
+Not covered by this pass, left as-is: no automated test coverage was
+added (`@mepapp/ui` has no test suite to extend, consistent with the
+rest of this dialog), and the Arc (3-pt) preview doesn't render a
+provisional arc between the 2nd and 3rd click — only vertex dots and
+straight connecting lines, same simplification already accepted for
+Polygon's own rubber-band.
