@@ -111,8 +111,9 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
   const [shapes, setShapes] = useState<SymbolShape[]>(shapesManager.getState());
   const [tool, setTool] = useState<ShapeTool>('select');
   const [defaultStyle, setDefaultStyle] = useState<SymbolShapeStyle>(DEFAULT_STYLE);
-  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
-  const [draftShape, setDraftShape] = useState<SymbolShape | null>(null);
+  const [selectedShapeIds, setSelectedShapeIds] = useState<Set<string>>(new Set());
+  const [draftShapes, setDraftShapes] = useState<SymbolShape[] | null>(null);
+  const [marquee, setMarquee] = useState<{ start: { fractionX: number; fractionY: number }; current: { fractionX: number; fractionY: number }; additive: boolean } | null>(null);
   const [polygonDraft, setPolygonDraft] = useState<{ fractionX: number; fractionY: number }[] | null>(null);
   const [arcThreePointDraft, setArcThreePointDraft] = useState<{ fractionX: number; fractionY: number }[] | null>(null);
   const [pendingPoint, setPendingPoint] = useState<{ fractionX: number; fractionY: number } | null>(null);
@@ -133,8 +134,9 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     return () => clearTimeout(id);
   }, [editingTextId]);
 
-  const selectedShape = selectedShapeId ? shapes.find((s) => s.id === selectedShapeId) : undefined;
-  const activeStyle = selectedShape?.style ?? defaultStyle;
+  const selectedShapes = shapes.filter((s) => selectedShapeIds.has(s.id));
+  const singleSelectedShape = selectedShapes.length === 1 ? selectedShapes[0] : undefined;
+  const activeStyle = selectedShapes[0]?.style ?? defaultStyle;
 
   function commitShapes(next: SymbolShape[]) {
     shapesManager.execute({ description: 'Edit shape', execute: () => next, undo: () => shapes });
@@ -143,26 +145,26 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
 
   function undoShapes() {
     setShapes(shapesManager.undo());
-    setSelectedShapeId(null);
+    setSelectedShapeIds(new Set());
   }
 
   function redoShapes() {
     setShapes(shapesManager.redo());
-    setSelectedShapeId(null);
+    setSelectedShapeIds(new Set());
   }
 
   function updateActiveStyle(patch: Partial<SymbolShapeStyle>) {
-    if (selectedShapeId) {
-      commitShapes(shapes.map((s) => (s.id === selectedShapeId ? { ...s, style: { ...s.style, ...patch } } : s)));
+    if (selectedShapeIds.size > 0) {
+      commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? { ...s, style: { ...s.style, ...patch } } : s)));
     } else {
       setDefaultStyle((prev) => ({ ...prev, ...patch }));
     }
   }
 
-  function deleteSelectedShape() {
-    if (!selectedShapeId) return;
-    commitShapes(shapes.filter((s) => s.id !== selectedShapeId));
-    setSelectedShapeId(null);
+  function deleteSelectedShapes() {
+    if (selectedShapeIds.size === 0) return;
+    commitShapes(shapes.filter((s) => !selectedShapeIds.has(s.id)));
+    setSelectedShapeIds(new Set());
   }
 
   function finishPolygon() {
@@ -174,7 +176,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
       style: defaultStyle,
     };
     commitShapes([...shapes, shape]);
-    setSelectedShapeId(shape.id);
+    setSelectedShapeIds(new Set([shape.id]));
     setTool('select');
     setPolygonDraft(null);
     setPendingPoint(null);
@@ -199,16 +201,35 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const toDraw = draftShape ? [...shapes.filter((s) => s.id !== draftShape.id), draftShape] : shapes;
+    // draftShapes either replaces in-place shapes being dragged (select tool) or
+    // holds one not-yet-committed new shape being drawn (drag-to-create tools) —
+    // handle both by replacing matching ids and appending any that aren't found.
+    const draftById = draftShapes ? new Map(draftShapes.map((s) => [s.id, s])) : null;
+    const toDraw = draftById
+      ? [...shapes.map((s) => draftById.get(s.id) ?? s), ...draftShapes!.filter((s) => !shapes.some((orig) => orig.id === s.id))]
+      : shapes;
     drawSymbolShapes(ctx, toDraw, canvas.width, canvas.height);
-    const highlighted = selectedShapeId ? toDraw.find((s) => s.id === selectedShapeId) : undefined;
-    if (highlighted) {
-      const b = symbolShapeBounds(highlighted);
+    for (const shape of toDraw) {
+      if (!selectedShapeIds.has(shape.id)) continue;
+      const b = symbolShapeBounds(shape);
       ctx.save();
       ctx.setLineDash([4, 3]);
       ctx.strokeStyle = '#2f6fed';
       ctx.lineWidth = 1;
       ctx.strokeRect(b.x * canvas.width - 3, b.y * canvas.height - 3, b.width * canvas.width + 6, b.height * canvas.height + 6);
+      ctx.restore();
+    }
+    if (marquee) {
+      const minX = Math.min(marquee.start.fractionX, marquee.current.fractionX) * canvas.width;
+      const minY = Math.min(marquee.start.fractionY, marquee.current.fractionY) * canvas.height;
+      const w = Math.abs(marquee.current.fractionX - marquee.start.fractionX) * canvas.width;
+      const h = Math.abs(marquee.current.fractionY - marquee.start.fractionY) * canvas.height;
+      ctx.save();
+      ctx.fillStyle = 'rgba(47, 111, 237, 0.12)';
+      ctx.fillRect(minX, minY, w, h);
+      ctx.strokeStyle = '#2f6fed';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(minX, minY, w, h);
       ctx.restore();
     }
 
@@ -233,7 +254,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
       }
       ctx.restore();
     }
-  }, [mode, shapes, draftShape, selectedShapeId, tool, polygonDraft, arcThreePointDraft, pendingPoint]);
+  }, [mode, shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint]);
 
   // Delete/Backspace removes the selected shape; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes — only while Shapes mode is active and no text field has focus.
   useEffect(() => {
@@ -241,9 +262,9 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedShapeId) {
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedShapeIds.size > 0) {
         event.preventDefault();
-        deleteSelectedShape();
+        deleteSelectedShapes();
       } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         if (event.shiftKey) redoShapes();
@@ -267,7 +288,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     document.addEventListener('keydown', onKeyDown, { capture: true });
     return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, selectedShapeId, shapes, polygonDraft, arcThreePointDraft]);
+  }, [mode, selectedShapeIds, shapes, polygonDraft, arcThreePointDraft]);
 
   async function handleArtworkFile(file: File) {
     const [dataUrl, bitmap] = await Promise.all([readAsDataUrl(file), loadStampBitmap(file)]);
@@ -303,7 +324,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     if (tool === 'text') {
       const shape: SymbolShape = { id: crypto.randomUUID(), kind: 'text', x: start.fractionX, y: start.fractionY, text: 'Label', fontSize: 0.08, style: defaultStyle };
       commitShapes([...shapes, shape]);
-      setSelectedShapeId(shape.id);
+      setSelectedShapeIds(new Set([shape.id]));
       setEditingTextId(shape.id);
       setEditingTextValue('Label');
       setTool('select');
@@ -328,7 +349,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
       setPendingPoint(null);
       if (arc) {
         commitShapes([...shapes, arc]);
-        setSelectedShapeId(arc.id);
+        setSelectedShapeIds(new Set([arc.id]));
         setTool('select');
       }
       return;
@@ -336,17 +357,71 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
 
     if (tool === 'select') {
       const hit = hitTestSymbolShape(shapes, start.fractionX, start.fractionY, SHAPE_CANVAS_PX, SHAPE_CANVAS_PX);
-      setSelectedShapeId(hit?.id ?? null);
-      if (!hit) return;
+      if (hit) {
+        if (event.shiftKey) {
+          setSelectedShapeIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(hit.id)) next.delete(hit.id);
+            else next.add(hit.id);
+            return next;
+          });
+          return; // shift-click only toggles membership, no drag — matches scene.ts's shift-click convention
+        }
+        // Clicking a shape already in a multi-selection keeps the whole group selected
+        // (so it can be group-dragged); clicking outside it replaces the selection.
+        const dragIds = selectedShapeIds.has(hit.id) ? selectedShapeIds : new Set([hit.id]);
+        setSelectedShapeIds(dragIds);
+        const dragShapes = shapes.filter((s) => dragIds.has(s.id));
+        const move = (ev: PointerEvent) => {
+          const current = fractionFromEvent(ev.clientX, ev.clientY);
+          const dx = current.fractionX - start.fractionX;
+          const dy = current.fractionY - start.fractionY;
+          setDraftShapes(dragShapes.map((s) => translateShape(s, dx, dy)));
+        };
+        const up = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          setDraftShapes((current) => {
+            if (current) {
+              const currentById = new Map(current.map((s) => [s.id, s]));
+              commitShapes(shapes.map((s) => currentById.get(s.id) ?? s));
+            }
+            return null;
+          });
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        return;
+      }
+
+      // Empty canvas: marquee-select. Non-additive click clears the current selection immediately.
+      if (!event.shiftKey) setSelectedShapeIds(new Set());
+      setMarquee({ start, current: start, additive: event.shiftKey });
       const move = (ev: PointerEvent) => {
         const current = fractionFromEvent(ev.clientX, ev.clientY);
-        setDraftShape(translateShape(hit, current.fractionX - start.fractionX, current.fractionY - start.fractionY));
+        setMarquee((prev) => (prev ? { ...prev, current } : prev));
       };
       const up = () => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
-        setDraftShape((current) => {
-          if (current) commitShapes(shapes.map((s) => (s.id === current.id ? current : s)));
+        setMarquee((prev) => {
+          if (prev) {
+            const minX = Math.min(prev.start.fractionX, prev.current.fractionX);
+            const maxX = Math.max(prev.start.fractionX, prev.current.fractionX);
+            const minY = Math.min(prev.start.fractionY, prev.current.fractionY);
+            const maxY = Math.max(prev.start.fractionY, prev.current.fractionY);
+            // A shape counts as inside if its bounds midpoint falls inside the marquee
+            // rectangle — same rule as the old app's rubber-band select, not full overlap.
+            const hitIds = shapes
+              .filter((s) => {
+                const b = symbolShapeBounds(s);
+                const midX = b.x + b.width / 2;
+                const midY = b.y + b.height / 2;
+                return midX >= minX && midX <= maxX && midY >= minY && midY <= maxY;
+              })
+              .map((s) => s.id);
+            setSelectedShapeIds((prevIds) => (prev.additive ? new Set([...prevIds, ...hitIds]) : new Set(hitIds)));
+          }
           return null;
         });
       };
@@ -358,21 +433,21 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     // Drag-to-create: line, rect, circle, arc.
     const id = crypto.randomUUID();
     let draft = createDraftShape(tool, id, start, defaultStyle);
-    setDraftShape(draft);
+    setDraftShapes([draft]);
     const move = (ev: PointerEvent) => {
       const current = fractionFromEvent(ev.clientX, ev.clientY);
       draft = updateDraftShape(draft, start, current);
-      setDraftShape(draft);
+      setDraftShapes([draft]);
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       if (isDraftLargeEnough(draft)) {
         commitShapes([...shapes, draft]);
-        setSelectedShapeId(draft.id);
+        setSelectedShapeIds(new Set([draft.id]));
         setTool('select');
       }
-      setDraftShape(null);
+      setDraftShapes(null);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -606,22 +681,22 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
               {activeStyle.fill !== null && (
                 <input type="color" value={activeStyle.fill} onChange={(e) => updateActiveStyle({ fill: e.target.value })} />
               )}
-              {selectedShape && (
-                <button type="button" className="mep-property-row-remove" onClick={deleteSelectedShape} title="Delete shape">
+              {selectedShapes.length > 0 && (
+                <button type="button" className="mep-property-row-remove" onClick={deleteSelectedShapes} title="Delete shape">
                   ✕
                 </button>
               )}
             </div>
-            {selectedShape?.kind === 'arc' && (
+            {singleSelectedShape?.kind === 'arc' && (
               <>
                 <div className="mep-field-row">
                   <label>Start°</label>
                   <input
                     type="number"
-                    value={Math.round((selectedShape.startAngle * 180) / Math.PI)}
+                    value={Math.round((singleSelectedShape.startAngle * 180) / Math.PI)}
                     onChange={(e) =>
                       commitShapes(
-                        shapes.map((s) => (s.id === selectedShape.id && s.kind === 'arc' ? { ...s, startAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
+                        shapes.map((s) => (s.id === singleSelectedShape.id && s.kind === 'arc' ? { ...s, startAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
                       )
                     }
                   />
@@ -630,10 +705,10 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
                   <label>End°</label>
                   <input
                     type="number"
-                    value={Math.round((selectedShape.endAngle * 180) / Math.PI)}
+                    value={Math.round((singleSelectedShape.endAngle * 180) / Math.PI)}
                     onChange={(e) =>
                       commitShapes(
-                        shapes.map((s) => (s.id === selectedShape.id && s.kind === 'arc' ? { ...s, endAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
+                        shapes.map((s) => (s.id === singleSelectedShape.id && s.kind === 'arc' ? { ...s, endAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
                       )
                     }
                   />
@@ -641,7 +716,8 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
               </>
             )}
             <p className="mep-hint">
-              Drag to draw. Select tool: click a shape to select/move it, Delete to remove. Port tool: click to place a port. Arc
+              Drag to draw. Select tool: click a shape to select/move it, Delete to remove. Shift-click or drag a marquee to
+              multi-select and move/delete as a group. Port tool: click to place a port. Arc
               (3-pt): click start, end, then a point the arc passes through. Polygon: click each vertex, double-click or Enter to
               finish, Escape to cancel.
             </p>
