@@ -184,21 +184,23 @@ reasoning as `shapes?` itself (`ports-custom-element-editor-spec.md` §10).
 
 - ~~Confirm the multi-select modifier key (Shift vs. Ctrl)~~ — resolved,
   see §9: Shift, matching `scene.ts`'s placed-stamp/annotation selection.
-- Confirm whether Shapes-mode `text` shapes should rotate with the
-  selection or stay upright (§5.4).
+- ~~Confirm whether Shapes-mode `text` shapes should rotate with the
+  selection or stay upright~~ — resolved, see §9 part 3: rotates with
+  the rest of the selection, the plan's own stated default, and nothing
+  in the implementation special-cases `'text'` so this was automatic.
 - Old app's actual `ScaleSelection` trigger UI (button/shortcut/field)
   wasn't found in the three files read for this plan — the numeric-field
   recommendation in §5.5 has no old-app precedent to match exactly, it's a
-  reasonable default, not a port.
+  reasonable default, not a port. Shipped as specified in part 2 (§9).
 
 ## 9. Status
 
-**Part 1 done** — 2026-09-11, commit `7d9d0e3`, branch
-`worktree-element-editor-plans` (not yet merged to master). Parts 2
-(mirror/scale) and 3 (rotate) from §7's build order are not started —
-this file stays until all three are done.
+**All three parts done** — 2026-09-11, branch
+`worktree-element-editor-plans` (not yet merged to master).
 
-Shipped exactly §5.1–5.3's scope: `selectedShapeId: string | null` →
+### Part 1 — multi-select, marquee, group move/delete
+
+Commit `7d9d0e3`. Shipped exactly §5.1–5.3's scope: `selectedShapeId: string | null` →
 `selectedShapeIds: Set<string>` throughout `ElementEditorDialog.tsx`,
 one dashed outline per selected id, `deleteSelectedShapes` batches the
 whole selection into one `commitShapes` call (one undo step), and
@@ -238,3 +240,75 @@ empty canvas to deselect, marquee-selected both back, deleted both in
 one keypress, then Undo restored both in one step — confirming the
 batched-commit requirement from §5.1/§5.3. No console errors during the
 run.
+
+### Part 2 — mirror + scale selection
+
+Commit `ae6303f`. Shipped §5.5 as specified: two toolbar buttons
+("Mirror ↔" horizontal, "Mirror ↕" vertical) and a "Scale %" numeric
+field (Enter/blur applies), all operating on the current selection,
+disabled when nothing is selected. `symbolShapeCanvas.ts` gained
+`mirrorShape`/`scaleShape` (per-kind geometry transforms) and
+`selectionPivot` (own bounds center for a single shape, combined
+bounding-box center for multi — same rule for both actions, exported
+early because part 3's group-rotate pivot needed the identical rule).
+Style/geometry only — stroke width is not scaled (a visual-thickness
+convention independent of shape size, not stated in the plan either
+way; picked as the less-surprising default).
+
+Verified with a scratch Playwright driver: single-shape mirror
+(asymmetric arrow, both axes — head flips to the correct side each
+time), multi-selection mirror (rect top-left + circle bottom-right,
+mirrored horizontally around their combined bbox center — positions
+swap left/right as a rigid pair), and scale (a rect at 200% doubles in
+size around its own center, position unchanged). No console errors.
+
+### Part 3 — single + group rotate
+
+Commit `9c2a6c1`. Shipped §5.4/§6 as specified: `@mepapp/core`'s
+`SymbolShape` gained an optional `rotation` (radians, on every
+variant, no schema bump), and `symbolShapeCanvas.ts`'s
+draw/hit-test/bounds functions were updated per §6's checklist exactly
+(`createDraftShape` sets `rotation: 0`; `translateShape` and
+`rasterizeSymbolShapes` needed no change, as predicted).
+
+One deviation from §6's literal wording, judged an improvement: rather
+than separate single-shape and group-rotate code paths (mirroring the
+old app's `_rotHandle` vs. `_groupRotPivot` split), a single
+`rotateShapeAround(shape, deltaRotation, pivotX, pivotY)` handles both
+— it revolves the shape's own center around the given pivot *and* adds
+the delta to `rotation`. For single-select the pivot (via
+`selectionPivot`) equals the shape's own center, so the revolve is a
+no-op and only `rotation` changes; for group-select the shared pivot
+makes every shape both revolve and spin together. One rotate handle
+(stem + circle) renders above the selection's combined bounds
+(`selectionBounds`, factored out of `selectionPivot`), hit-tested ahead
+of normal shape hit-testing in the `'select'` tool.
+
+`mirrorShape` (part 2) needed a retroactive fix once `rotation` existed:
+a reflection reverses handedness, so mirroring now also negates a
+shape's `rotation` field (same sign flip for either axis, since the
+axis itself is already handled by the position mirror) — visually
+confirmed coherent (not garbled) on a rotated-then-mirrored arrow.
+
+§5.4's open question (text rotate-with-group vs. stay upright) resolved
+itself: nothing in `drawSymbolShapes`/`hitTestSymbolShape`/
+`symbolShapeBounds` special-cases `'text'`, so it rotates with
+everything else — the plan's own stated default, now moot.
+
+Verified with a scratch Playwright driver: single-shape rotate (wide
+rect → 90° → tall rect, same center, handle re-renders correctly) with
+Undo restoring the original; group rotate (rect + "AB" text, 90°
+around their combined center) — both shapes revolved position *and*
+the text's own glyphs visibly rotated 90° together with the rect. No
+console errors in any run.
+
+### Cross-cutting
+
+All three parts type-check (`tsc --noEmit`) clean in `core` and `ui`,
+the full `pnpm build` (turbo, all 9 workspace tasks) succeeds, and
+`@mepapp/core`'s existing 129-test vitest suite still passes unchanged
+(the `rotation` field is additive/optional, no existing test touches
+`SymbolShape` construction). Not yet merged to `master` — this branch
+(`worktree-element-editor-plans`) also carries the drawing-tools-spec
+work from earlier in the day (see git log), so a merge should bundle
+both or be split, whichever the person merging prefers.
