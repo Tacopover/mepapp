@@ -17,6 +17,8 @@ export interface PlacedStamp {
   definitionId?: string;
   /** Values for the Global Properties dialog's per-installation custom fields (Terminal/Equipment only for now) — see custom-properties.ts. */
   properties?: CustomPropertyValues;
+  /** Per-instance tint, hex (e.g. '#2196f3'). Absent means no tint — render at the stamp art's own native colors. */
+  color?: string;
 }
 
 /** Half-extents in world units, scale applied — the shape pointInRotatedRect and rectIntersectsRotatedRect expect. */

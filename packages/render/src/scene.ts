@@ -22,6 +22,7 @@ import {
   loadProject,
   measureRealDistance,
   multiRotate,
+  NETWORK_TYPE_LIBRARY,
   normalizeDegrees,
   planPdfSync,
   pointInAxisAlignedRect,
@@ -223,6 +224,8 @@ interface DrawEndpointResolution {
 // fixtures README) — this converts a stamp texture's native pixel size into
 // world units (1 world unit = 1 PDF point) for its initial, unscaled size.
 const STAMP_SOURCE_DPI = 300;
+/** Opacity of the stamp-placement ghost/preview sprite that follows the pointer before a click commits it. */
+const STAMP_GHOST_ALPHA = 0.5;
 
 const HANDLE_OFFSET_WORLD_AT_ZOOM_1 = 32;
 const HANDLE_HIT_RADIUS_SCREEN_PX = 10;
@@ -281,6 +284,8 @@ export interface StampInfo {
   definitionId?: string;
   /** Global Properties custom field values (Terminal/Equipment only) — see PlacedStamp.properties. */
   properties?: CustomPropertyValues;
+  /** Per-instance tint — see PlacedStamp.color. */
+  color?: string;
 }
 
 /** The Properties panel's read model for a single selected segment — see getSelectedSegmentInfo. */
@@ -438,6 +443,11 @@ function applyTransformToSprite(sprite: Sprite, transform: Transform2D, baseScal
   sprite.scale.set(baseScale.x * transform.scale.x, baseScale.y * transform.scale.y);
 }
 
+/** Converts texture pixels -> world units at transform.scale = 1, shared by placeStamp and the stamp ghost preview so the two never drift apart. */
+function computeStampBaseScale(nativeWidth: number, nativeHeight: number, texture: Texture): Vec2 {
+  return { x: nativeWidth / texture.width, y: nativeHeight / texture.height };
+}
+
 function angleDegrees(from: Vec2, to: Vec2): number {
   return (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
 }
@@ -450,6 +460,11 @@ export class SketchScene {
   private readonly app = new Application();
   private readonly world = new Container();
   private readonly overlay = new Graphics();
+  /** Scene-level (not per-document) — holds the translucent stamp-placement preview sprite, kept out of `overlay` (a Graphics node cleared every redrawOverlay()) so the ghost's own lifecycle isn't tangled with vector-overlay redraws. Reparented on every activateInternal alongside `overlay`. */
+  private readonly stampGhostLayer = new Container();
+  private stampGhostSprite: Sprite | null = null;
+  /** The stamp-placement preview's current rotation (Space advances this by 45°) — persists across repeated placements of the same stamp until Escape, a tool switch, or a different stamp pick resets it to 0. Also becomes the next placed stamp's initial rotationDegrees (see placeStamp). */
+  private stampGhostRotationDegrees = 0;
   // Every open document, kept fully resident (sprites/textures/undo history
   // and all) — see decisions log 2026-09-07's multi-document plan, D1.
   // SketchScene renders whichever one is active; switching just reparents
@@ -457,8 +472,14 @@ export class SketchScene {
   private readonly documents: SketchDocument[] = [];
   private activeId: string;
   private tool: SketchTool = 'select';
-  private activeNetworkTypeId: string = DEFAULT_NETWORK_TYPE.id;
-  private pendingStampTexture: { texture: Texture; nativeWidth: number; nativeHeight: number; definitionId?: string } | null = null;
+  private activeNetworkTypeId: string = NETWORK_TYPE_LIBRARY[0].id;
+  private pendingStampTexture: {
+    texture: Texture;
+    nativeWidth: number;
+    nativeHeight: number;
+    definitionId?: string;
+    appearanceDefault?: { color?: string; scale?: number };
+  } | null = null;
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure two-click flows
   // draw-polyline's own scratch: an arbitrary-length click-to-add-vertex
   // gesture doesn't fit pendingPoints' fixed two-click contract above, so it
@@ -476,6 +497,8 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private pendingSegmentStart: DrawEndpointResolution | null = null;
+  /** Live cursor position while a segment's start point is pending — draws the rubber-band preview line to where the segment would land if clicked now. Mirrors pendingPolylineCursor's pattern. */
+  private pendingSegmentCursor: Vec2 | null = null;
   /** Id of the most recently committed segment in the chain currently being drawn (draw-segment tool, chain still continuing) — governs fitting visibility (computeVisibleFittingIds) alongside the current selection. Cleared whenever the chain stops being "in progress": natural end, Escape-finish, or switching tools. */
   private activeChainAnchorId: string | null = null;
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
@@ -517,6 +540,7 @@ export class SketchScene {
     this.world.addChild(this.doc.stampsLayer);
     this.world.addChild(this.doc.drawingLayer);
     this.world.addChild(this.doc.annotationTextLayer);
+    this.world.addChild(this.stampGhostLayer);
     this.world.addChild(this.overlay);
     this.app.stage.addChild(this.world);
 
@@ -534,6 +558,7 @@ export class SketchScene {
   destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown);
     this.resizeObserver?.disconnect();
+    this.stampGhostSprite?.destroy();
     for (const document of this.documents) document.destroy();
     this.app.destroy(true, { children: true, texture: true });
   }
@@ -550,10 +575,15 @@ export class SketchScene {
     this.tool = tool;
     this.pendingPoints = [];
     this.pendingSegmentStart = null;
+    this.pendingSegmentCursor = null;
     this.activeChainAnchorId = null;
     this.pendingPolylinePoints = [];
     this.pendingPolylineCursor = null;
     this.lastPolylineClickScreen = null;
+    if (tool !== 'place-terminal' && tool !== 'place-equipment') {
+      this.stampGhostRotationDegrees = 0;
+      if (this.stampGhostSprite) this.stampGhostSprite.visible = false;
+    }
     this.redrawOverlay();
     this.syncDrawingLayer();
     this.emitter.emit('toolChanged', tool);
@@ -697,16 +727,21 @@ export class SketchScene {
     this.world.addChild(target.stampsLayer);
     this.world.addChild(target.drawingLayer);
     this.world.addChild(target.annotationTextLayer);
+    this.world.addChild(this.stampGhostLayer);
     this.world.addChild(this.overlay);
     this.world.x = target.viewport.x;
     this.world.y = target.viewport.y;
     this.world.scale.set(target.viewport.scale);
 
     this.tool = 'select';
-    this.activeNetworkTypeId = DEFAULT_NETWORK_TYPE.id; // per-document context, same reset rule as `tool`
+    this.activeNetworkTypeId = NETWORK_TYPE_LIBRARY[0].id; // per-document context, same reset rule as `tool`
     this.pendingStampTexture = null;
+    this.stampGhostSprite?.destroy();
+    this.stampGhostSprite = null;
+    this.stampGhostRotationDegrees = 0;
     this.pendingPoints = [];
     this.pendingSegmentStart = null;
+    this.pendingSegmentCursor = null;
     this.drag = { kind: 'none' };
 
     this.redrawOverlay();
@@ -728,15 +763,36 @@ export class SketchScene {
     this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
-  /** Sets the stamp art the next 'place-terminal'/'place-equipment' click will place. definitionId, when given (the stamp palette's case, vs. an ad hoc uploaded PNG), is carried onto the resulting PlacedStamp. */
-  setStampTexture(bitmap: ImageBitmap, definitionId?: string): void {
+  /** Sets the stamp art the next 'place-terminal'/'place-equipment' click will place. definitionId, when given (the stamp palette's case, vs. an ad hoc uploaded PNG), is carried onto the resulting PlacedStamp. appearanceDefault, when given, seeds the next placement's color/scale (the per-stamp-definition "remembered appearance", looked up by the UI layer — see @mepapp/ui's stampAppearanceDefaults.ts). */
+  setStampTexture(bitmap: ImageBitmap, definitionId?: string, appearanceDefault?: { color?: string; scale?: number }): void {
     const texture = textureFromImageBitmap(bitmap);
     this.pendingStampTexture = {
       texture,
       nativeWidth: (texture.width * 72) / STAMP_SOURCE_DPI,
       nativeHeight: (texture.height * 72) / STAMP_SOURCE_DPI,
       definitionId,
+      appearanceDefault,
     };
+    this.stampGhostRotationDegrees = 0; // a new stamp pick (even re-picking the same one) resets the preview's rotation
+    this.rebuildStampGhost();
+  }
+
+  /** (Re)builds the translucent stamp-placement preview sprite from `pendingStampTexture`, reusing placeStamp's own base-scale math (via computeStampBaseScale) so the ghost previews exactly what will be placed. Hidden until the next onPointerMove positions it over the canvas. */
+  private rebuildStampGhost(): void {
+    this.stampGhostSprite?.destroy(); // never {texture: true} — the texture is owned by pendingStampTexture/the eventual placed sprite, not the ghost
+    this.stampGhostSprite = null;
+    if (!this.pendingStampTexture) return;
+    const { texture, nativeWidth, nativeHeight } = this.pendingStampTexture;
+    const sprite = new Sprite(texture);
+    sprite.anchor.set(0.5);
+    sprite.alpha = STAMP_GHOST_ALPHA;
+    sprite.eventMode = 'none'; // never intercepts hit-testing/pointer events
+    sprite.visible = false; // shown on the next onPointerMove while a stamp-placement tool is active
+    const baseScale = computeStampBaseScale(nativeWidth, nativeHeight, texture);
+    sprite.scale.set(baseScale.x, baseScale.y);
+    sprite.rotation = (this.stampGhostRotationDegrees * Math.PI) / 180;
+    this.stampGhostLayer.addChild(sprite);
+    this.stampGhostSprite = sprite;
   }
 
   private toStampInfo(data: PlacedStamp): StampInfo {
@@ -750,6 +806,7 @@ export class SketchScene {
       linkedPortIds: this.doc.portGroups.find((g) => g.elementId === data.id)?.portIds ?? null,
       definitionId: data.definitionId,
       properties: data.properties,
+      color: data.color,
     };
   }
 
@@ -1156,8 +1213,9 @@ export class SketchScene {
       const texture = textureFromImageBitmap(bitmap);
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5); // matches placeStamp's pivot convention
-      const baseScale = { x: stampData.nativeWidth / texture.width, y: stampData.nativeHeight / texture.height };
+      const baseScale = computeStampBaseScale(stampData.nativeWidth, stampData.nativeHeight, texture);
       applyTransformToSprite(sprite, stampData.transform, baseScale);
+      if (stampData.color) sprite.tint = hexColorToPixi(stampData.color);
       target.stamps.set(stampData.id, { sprite, baseScale });
       target.stampsLayer.addChild(sprite);
     }
@@ -1445,6 +1503,57 @@ export class SketchScene {
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /**
+   * Shared plumbing for a selection-wide stamp field edit (Properties panel,
+   * single or multi-select) — patches every currently-selected stamp with
+   * `mutate`, as one undo step. No-ops if the selection has no stamps.
+   */
+  private applyToSelectedStamps(mutate: (data: PlacedStamp) => PlacedStamp, description: string): void {
+    const state = this.doc.drawingHistory.getState();
+    const stampIds = [...this.doc.selectedIds].filter((id) => state.stamps[id]);
+    if (stampIds.length === 0) return;
+    const tx = new Transaction(this.doc.drawingHistory, description);
+    tx.update((s) => {
+      const stamps = { ...s.stamps };
+      for (const id of stampIds) stamps[id] = mutate(stamps[id]);
+      return this.applyConnectivityCascade({ ...s, stamps }, this.stampPortConnectionPoints(stampIds, stamps));
+    });
+    tx.commit();
+    this.syncDrawingLayer();
+    this.redrawOverlay();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** Absolute rotation set across the whole selection (Properties panel's typed Rotation field) — distinct from rotateSelectionBy's delta/orbit-around-centroid behavior used by the ±90° nudge buttons. */
+  setRotationForSelection(degrees: number): void {
+    const normalized = normalizeDegrees(degrees);
+    this.applyToSelectedStamps((d) => ({ ...d, transform: { ...d.transform, rotationDegrees: normalized } }), 'Set rotation');
+  }
+
+  /** Per-instance tint across the whole selection — see PlacedStamp.color. */
+  setColorForSelection(color: string): void {
+    this.applyToSelectedStamps((d) => ({ ...d, color }), 'Set color');
+  }
+
+  /** Uniform scale factor (1 = 100%) across the whole selection — see PlacedStamp/Transform2D.scale. */
+  setScaleForSelection(factor: number): void {
+    this.applyToSelectedStamps((d) => ({ ...d, transform: { ...d.transform, scale: { x: factor, y: factor } } }), 'Set scale');
+  }
+
+  /** Same custom-property write as setStampProperty, generalized across the whole selection. */
+  setStampPropertyForSelection(name: string, value: string | number): void {
+    this.applyToSelectedStamps((d) => ({ ...d, properties: { ...d.properties, [name]: value } }), 'Set property');
+  }
+
+  /** Same (non-undoable — see setTerminalCapacity) capacity write, generalized across the whole selection. */
+  setCapacityForSelection(capacity: number): void {
+    const state = this.doc.drawingHistory.getState();
+    for (const id of this.doc.selectedIds) {
+      if (state.stamps[id]) this.doc.terminalCapacities.set(id, capacity);
+    }
   }
 
   /** Current world scale (1 = 100%) — the status bar's zoom readout. */
@@ -1917,6 +2026,7 @@ export class SketchScene {
           this.doc.selectedIds.add(hit.id);
         }
         this.emitter.emit('selectionChanged', this.getSelection());
+        this.syncDrawingLayer();
         this.redrawOverlay();
         return;
       }
@@ -1962,6 +2072,7 @@ export class SketchScene {
         reopenTextEditId: alreadySoleSelected && isTextEditable ? hit.id : null,
         moved: false,
       };
+      this.syncDrawingLayer();
       this.redrawOverlay();
       return;
     }
@@ -1969,6 +2080,7 @@ export class SketchScene {
     if (!event.shiftKey) {
       this.doc.selectedIds.clear();
       this.emitter.emit('selectionChanged', this.getSelection());
+      this.syncDrawingLayer();
     }
     this.drag = { kind: 'rubber-band', startWorld: world, currentWorld: world, additive: event.shiftKey };
     this.redrawOverlay();
@@ -1984,6 +2096,17 @@ export class SketchScene {
     }
 
     const world = this.screenToWorld(screen);
+
+    if (this.stampGhostSprite) {
+      const showGhost = this.tool === 'place-terminal' || this.tool === 'place-equipment';
+      this.stampGhostSprite.visible = showGhost;
+      if (showGhost) this.stampGhostSprite.position.set(world.x, world.y);
+    }
+
+    if (this.tool === 'draw-segment' && this.pendingSegmentStart) {
+      this.pendingSegmentCursor = world;
+      this.redrawOverlay();
+    }
 
     if (this.drag.kind === 'move-selection') {
       this.drag.moved = true;
@@ -2148,6 +2271,7 @@ export class SketchScene {
       }
       this.doc.selectedIds = additive ? new Set([...this.doc.selectedIds, ...hits]) : hits;
       this.emitter.emit('selectionChanged', this.getSelection());
+      this.syncDrawingLayer();
     }
 
     if (this.drag.kind === 'move-selection') {
@@ -2274,6 +2398,7 @@ export class SketchScene {
       if (this.tool === 'draw-segment') {
         if (this.pendingSegmentStart) {
           this.pendingSegmentStart = null;
+          this.pendingSegmentCursor = null;
           this.activeChainAnchorId = null;
           this.syncDrawingLayer();
           this.redrawOverlay();
@@ -2286,6 +2411,13 @@ export class SketchScene {
         this.setTool('select');
         return;
       }
+      return;
+    }
+
+    if (event.code === 'Space' && (this.tool === 'place-terminal' || this.tool === 'place-equipment') && this.stampGhostSprite) {
+      event.preventDefault(); // Space otherwise scrolls the page
+      this.stampGhostRotationDegrees = normalizeDegrees(this.stampGhostRotationDegrees + 45);
+      this.stampGhostSprite.rotation = (this.stampGhostRotationDegrees * Math.PI) / 180;
       return;
     }
 
@@ -2371,6 +2503,7 @@ export class SketchScene {
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5);
       applyTransformToSprite(sprite, pasted.transform, baseScale);
+      if (pasted.color) sprite.tint = hexColorToPixi(pasted.color);
       this.doc.stamps.set(id, { sprite, baseScale });
       this.doc.stampsLayer.addChild(sprite);
       pastedStamps.push(pasted);
@@ -2445,25 +2578,28 @@ export class SketchScene {
 
   private placeStamp(worldPosition: Vec2, category: StampCategory): void {
     if (!this.pendingStampTexture) return;
-    const { texture, nativeWidth, nativeHeight, definitionId } = this.pendingStampTexture;
+    const { texture, nativeWidth, nativeHeight, definitionId, appearanceDefault } = this.pendingStampTexture;
     const id = `stamp-${this.doc.nextStampSeq++}`;
     // Copy the definition's ports onto the placed instance (previously always []) so
     // resolveSegmentEndpoint's existing port-snapping has something to snap to.
     const definition = definitionId ? getStampDefinition(definitionId, this.doc.customStampDefinitions) : undefined;
     const ports = definition ? [...definition.ports] : [];
+    const scaleFactor = appearanceDefault?.scale ?? 1;
     const data: PlacedStamp = {
       id,
       category,
-      transform: { position: worldPosition, rotationDegrees: 0, scale: { x: 1, y: 1 } },
+      transform: { position: worldPosition, rotationDegrees: this.stampGhostRotationDegrees, scale: { x: scaleFactor, y: scaleFactor } },
       nativeWidth,
       nativeHeight,
       ports,
       definitionId,
+      color: appearanceDefault?.color,
     };
     const sprite = new Sprite(texture);
     sprite.anchor.set(0.5); // pivot = own center, matching the reference semantics
-    const baseScale = { x: nativeWidth / texture.width, y: nativeHeight / texture.height };
+    const baseScale = computeStampBaseScale(nativeWidth, nativeHeight, texture);
     applyTransformToSprite(sprite, data.transform, baseScale);
+    if (data.color) sprite.tint = hexColorToPixi(data.color);
     this.doc.stamps.set(id, { sprite, baseScale });
     this.doc.stampsLayer.addChild(sprite);
     this.doc.drawingHistory.execute(createStampCommand(data));
@@ -2535,6 +2671,7 @@ export class SketchScene {
 
     this.doc.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
     this.pendingSegmentStart = this.chainContinuationFrom(resolved, state.stamps);
+    this.pendingSegmentCursor = null;
     this.activeChainAnchorId = this.pendingSegmentStart ? newSegment.id : null;
     this.syncDrawingLayer();
     this.markDirty();
@@ -2686,6 +2823,7 @@ export class SketchScene {
         continue;
       }
       applyTransformToSprite(entry.sprite, data.transform, entry.baseScale);
+      entry.sprite.tint = data.color ? hexColorToPixi(data.color) : 0xffffff;
       if (!entry.sprite.parent) this.doc.stampsLayer.addChild(entry.sprite);
     }
   }
@@ -2827,6 +2965,13 @@ export class SketchScene {
     if (this.pendingSegmentStart) {
       const p = this.pendingSegmentStart.worldPosition;
       this.overlay.circle(p.x, p.y, 5 / this.world.scale.x).fill({ color: 0xffa726 });
+      if (this.pendingSegmentCursor) {
+        const visuals = this.resolveNetworkTypeVisuals(this.activeNetworkTypeId);
+        this.overlay
+          .moveTo(p.x, p.y)
+          .lineTo(this.pendingSegmentCursor.x, this.pendingSegmentCursor.y)
+          .stroke({ width: 2 / this.world.scale.x, color: visuals.color });
+      }
     }
 
     if (this.drag.kind === 'draw-freehand' && this.drag.points.length > 1) {

@@ -1,16 +1,11 @@
 // Single source of truth for the left rail's rows and every tool's
-// icon/label — shared by Rail.tsx (which groups tools by row) and
-// QuickAccessStrip.tsx (which needs icon/label for whatever's in the MRU
-// list, regardless of which row it came from). See
+// icon/label — shared by Rail.tsx, which groups tools by row. See
 // .claude/plans/ui-atlas-layout-mapping.md §3 for the design this encodes.
 import type { ReactElement } from 'react';
 import type { SketchTool } from '@mepapp/render';
 import {
   IconSelect,
   IconMove,
-  IconCopy,
-  IconRotate,
-  IconTrash,
   IconPan,
   IconTerminal,
   IconEquipment,
@@ -29,18 +24,13 @@ import {
   type IconProps,
 } from './icons.js';
 
-/** A flyout member with no SketchTool of its own — it runs immediately against the current selection instead of switching tools (atlas §4: "Rail flyout + keyboard shortcuts", not a persistent mode). */
-export type ToolAction = 'rotate-90' | 'delete-selection' | 'copy-selection';
-
 export interface ToolEntry {
   /** Stable id, unique across every row — a real SketchTool's own id when `tool` is set, otherwise a UI-only placeholder id. */
   id: string;
   label: string;
   Icon: (props: IconProps) => ReactElement;
-  /** The SketchTool this activates, or null for a reserved-but-not-yet-built slot (renders disabled, "Coming soon") or an `action` entry. */
+  /** The SketchTool this activates, or null for a reserved-but-not-yet-built slot (renders disabled, "Coming soon"). */
   tool: SketchTool | null;
-  /** An instant action to run on click when `tool` is null — see ToolAction. Requires a non-empty selection. */
-  action?: ToolAction;
 }
 
 export interface RailRow {
@@ -58,9 +48,6 @@ export const RAIL_ROWS: RailRow[] = [
       { id: 'select', label: 'Select', Icon: IconSelect, tool: 'select' },
       // No distinct action of its own — Select's drag-to-move (generalized to cover annotations, not just stamps) already handles continuous move.
       { id: 'move', label: 'Move', Icon: IconMove, tool: null },
-      { id: 'copy', label: 'Copy', Icon: IconCopy, tool: null, action: 'copy-selection' },
-      { id: 'rotate', label: 'Rotate 90°', Icon: IconRotate, tool: null, action: 'rotate-90' },
-      { id: 'delete', label: 'Delete', Icon: IconTrash, tool: null, action: 'delete-selection' },
     ],
   },
   {
@@ -103,10 +90,3 @@ export const RAIL_ROWS: RailRow[] = [
     ],
   },
 ];
-
-/** Flat SketchTool -> icon/label lookup, for the quick-access strip (its MRU list holds real SketchTool ids only — placeholders never activate, so they never appear there). */
-export const TOOL_META: Partial<Record<SketchTool, { label: string; Icon: (props: IconProps) => ReactElement }>> = Object.fromEntries(
-  RAIL_ROWS.flatMap((row) => row.members)
-    .filter((m): m is ToolEntry & { tool: SketchTool } => m.tool !== null)
-    .map((m) => [m.tool, { label: m.label, Icon: m.Icon }]),
-);

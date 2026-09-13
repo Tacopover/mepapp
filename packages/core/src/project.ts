@@ -10,7 +10,7 @@ import type { PlacedStamp } from './stamp.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -99,6 +99,18 @@ const migrationSteps: MigrationStep[] = [
       ...data,
       schemaVersion: 5,
       customStampDefinitions: Array.isArray(data.customStampDefinitions) ? data.customStampDefinitions : [],
+    }),
+  },
+  {
+    fromVersion: 5,
+    toVersion: 6,
+    // Version 5 predates PlacedStamp.color (per-instance tint) — it's
+    // optional and every reader already treats "absent" as "no tint", the
+    // same way definitionId? never needed a migration step, so this step
+    // only advances the version number.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 6,
     }),
   },
 ];

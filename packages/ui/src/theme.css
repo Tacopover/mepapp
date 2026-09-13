@@ -264,68 +264,6 @@
   font-size: 12px;
 }
 
-/* Floating quick-access strip (formerly the app's only toolbar — now a
-   convenience layer over the left rail, see .mep-rail below): hard offset
-   shadow rather than a soft blur, the Field Blueprint skin's signature
-   stamped-ink look. */
-.mep-quick-access {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  background: var(--surface);
-  border: 2px solid var(--ink);
-  border-radius: 4px;
-  box-shadow: 3px 3px 0 var(--ink);
-  padding: 4px;
-  z-index: 10;
-}
-.mep-quick-access-grip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 32px;
-  color: var(--muted);
-  cursor: grab;
-}
-.mep-quick-access-empty {
-  font-size: 10.5px;
-  color: var(--muted);
-  padding: 0 8px;
-  white-space: nowrap;
-}
-.mep-quick-access-capacity {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 2px;
-}
-.mep-quick-access-cap-btn {
-  width: 18px;
-  height: 18px;
-  border: none;
-  background: none;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 2px;
-}
-.mep-quick-access-cap-btn:hover:not(:disabled) {
-  background: var(--surface-2);
-  color: var(--ink);
-}
-.mep-quick-access-cap-btn:disabled {
-  opacity: 0.35;
-}
-.mep-quick-access-cap-label {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--muted);
-  width: 1.2em;
-  text-align: center;
-}
-
 /* ---------- Left rail: canvas-gesture tools, see
    ui-atlas-layout-mapping.md §3 ---------- */
 
@@ -431,36 +369,6 @@
   color: var(--muted);
   opacity: 0.5;
 }
-.mep-tool-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: none;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 2px;
-}
-.mep-tool-btn:hover:not(:disabled) {
-  background: var(--surface-2);
-}
-.mep-tool-btn.active {
-  background: var(--accent);
-  color: #fff;
-  transform: rotate(-1deg);
-  box-shadow: 1.5px 1.5px 0 var(--accent-ink);
-}
-.mep-tool-btn:disabled {
-  opacity: 0.35;
-}
-.mep-tool-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--line);
-  margin: 0 4px;
-}
-
 .mep-resize-handle {
   width: 10px;
   flex: none;

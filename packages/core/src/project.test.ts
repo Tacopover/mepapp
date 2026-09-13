@@ -117,6 +117,31 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.customStampDefinitions).toEqual([]);
   });
 
+  it('migrates a pre-color (v5) save, leaving stamps without a color field untouched', () => {
+    const bareStamp = {
+      id: 'st1',
+      category: 'terminal',
+      transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } },
+      nativeWidth: 10,
+      nativeHeight: 10,
+      ports: [],
+    };
+    const legacyDoc = {
+      schemaVersion: 5,
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [bareStamp],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.stamps[0].color).toBeUndefined();
+  });
+
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
     const doc = {
       schemaVersion: CURRENT_SCHEMA_VERSION,

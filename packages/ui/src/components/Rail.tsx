@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { SketchScene, SketchTool } from '@mepapp/render';
 import { RAIL_ROWS } from '../toolRegistry.js';
-import { IconChevRight, IconRedo, IconUndo } from '../icons.js';
+import { IconChevRight, IconCopy, IconRedo, IconSelect, IconTrash, IconUndo } from '../icons.js';
 
 export interface RailProps {
   tool: SketchTool;
@@ -77,18 +77,12 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
                     key={m.id}
                     type="button"
                     className="mep-rail-flyout-btn"
-                    title={m.tool === null && !m.action ? `${m.label} — coming soon` : m.label}
-                    disabled={(m.tool === null && !m.action) || (needsStamp(m.tool) && !stampReady) || (m.action !== undefined && !hasSelection)}
+                    title={m.tool === null ? `${m.label} — coming soon` : m.label}
+                    disabled={m.tool === null || (needsStamp(m.tool) && !stampReady)}
                     onClick={() => {
-                      if (m.tool) {
-                        sceneRef.current?.setTool(m.tool);
-                        setLastPickedByRow((prev) => ({ ...prev, [row.id]: m.id }));
-                        setOpenRow(null);
-                        return;
-                      }
-                      if (m.action === 'rotate-90') sceneRef.current?.rotateSelectionBy(90);
-                      if (m.action === 'delete-selection') sceneRef.current?.deleteSelection();
-                      if (m.action === 'copy-selection') sceneRef.current?.copySelection();
+                      if (!m.tool) return;
+                      sceneRef.current?.setTool(m.tool);
+                      setLastPickedByRow((prev) => ({ ...prev, [row.id]: m.id }));
                       setOpenRow(null);
                     }}
                   >
@@ -108,6 +102,17 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
       </button>
       <button type="button" className="mep-rail-btn" title="Redo" disabled={!canRedo} onClick={onRedo}>
         <IconRedo size={18} />
+      </button>
+
+      <div className="mep-rail-divider" />
+      <button type="button" className={`mep-rail-btn${tool === 'select' ? ' active' : ''}`} title="Select" onClick={() => sceneRef.current?.setTool('select')}>
+        <IconSelect size={18} />
+      </button>
+      <button type="button" className="mep-rail-btn" title="Copy" disabled={!hasSelection} onClick={() => sceneRef.current?.copySelection()}>
+        <IconCopy size={18} />
+      </button>
+      <button type="button" className="mep-rail-btn" title="Delete" disabled={!hasSelection} onClick={() => sceneRef.current?.deleteSelection()}>
+        <IconTrash size={18} />
       </button>
     </div>
   );

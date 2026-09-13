@@ -5,7 +5,6 @@ import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { loadStampBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
-import { QuickAccessStrip } from './components/QuickAccessStrip.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { StampsPanel } from './components/StampsPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
@@ -572,11 +571,6 @@ export function MepSketchApp({
                 canRedo={drawingSummary.canRedo}
                 onUndo={() => sceneRef.current?.undoDrawing()}
                 onRedo={() => sceneRef.current?.redoDrawing()}
-              />
-              <QuickAccessStrip
-                tool={tool}
-                sceneRef={sceneRef}
-                stampReady={activeDefinitionId !== null || tool === 'place-terminal' || tool === 'place-equipment'}
               />
               {textboxPrompt && (
                 <textarea

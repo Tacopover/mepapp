@@ -5,6 +5,7 @@ import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js'
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { IconFile, IconPencil } from '../icons.js';
 import { loadStampBitmap } from '../stampBitmap.js';
+import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 
 export interface StampsPanelProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -27,6 +28,9 @@ export interface StampsPanelProps {
 }
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
+
+/** Matches @mepapp/render document.ts's DEFAULT_NETWORK_TYPE.id — an internal fallback for old/corrupt data, never a pickable tile. */
+const UNASSIGNED_NETWORK_TYPE_ID = 'default';
 
 /** A custom definition's iconRef is already a self-contained `data:` URL — resolve library entries through resolveIconUrl, but use a custom one verbatim. */
 function iconUrlFor(definition: StampDefinition, resolveIconUrl: (iconRef: string) => string): string {
@@ -67,7 +71,9 @@ export function StampsPanel({
   // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id
   // that's never in the static library — without this they'd be adopted into
   // the document but have no tile to pick/edit them from.
-  const customNetworkTypes = networkTypes.filter((t) => !NETWORK_TYPE_LIBRARY.some((lib) => lib.id === t.id));
+  const customNetworkTypes = networkTypes.filter(
+    (t) => t.id !== UNASSIGNED_NETWORK_TYPE_ID && !NETWORK_TYPE_LIBRARY.some((lib) => lib.id === t.id),
+  );
   const visibleCustomNetworkTypes =
     disciplineGroup === null ? customNetworkTypes : customNetworkTypes.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
 
@@ -75,7 +81,7 @@ export function StampsPanel({
 
   async function handlePick(definition: StampDefinition) {
     const bitmap = await loadBitmap(iconUrlFor(definition, resolveIconUrl), definition);
-    sceneRef.current?.setStampTexture(bitmap, definition.id);
+    sceneRef.current?.setStampTexture(bitmap, definition.id, getStampAppearanceDefault(definition.id));
     sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
     onPick(definition);
   }

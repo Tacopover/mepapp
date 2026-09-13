@@ -1,6 +1,7 @@
 import { Container, Graphics, type Sprite } from 'pixi.js';
 import {
   CommandManager,
+  NETWORK_TYPE_LIBRARY,
   type Annotation,
   type Calibration,
   type Fitting,
@@ -73,7 +74,7 @@ export class SketchDocument {
   selectedIds = new Set<string>();
   calibration: Calibration | null = null;
   readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {}, stamps: {}, annotations: {} });
-  readonly networkTypes: NetworkType[] = [DEFAULT_NETWORK_TYPE];
+  readonly networkTypes: NetworkType[] = [{ ...NETWORK_TYPE_LIBRARY[0] }];
   /** Ports on the same element linked into one connectivity node — e.g. an AHU's supply + return (see core's PortGroup doc comment). Set via SketchScene.setPortGroup. */
   readonly portGroups: PortGroup[] = [];
   /** User-authored elements (Element Editor dialog) — embedded per-document, same as networkTypes/portGroups, so they travel with this PDF's own project data. Set via SketchScene.addCustomStampDefinition/updateCustomStampDefinition. */
