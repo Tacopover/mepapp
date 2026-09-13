@@ -279,3 +279,43 @@ Files: `packages/render/src/scene.ts`,
   8. Place a stamp, set a custom color and scale in the Properties panel;
      place another stamp of the *same* definition — it starts with that
      color/scale already applied.
+
+## Progress
+
+### Parts 1-6 (+ Part 4's data model/migration/rendering, minus the
+Properties-panel write-back of remembered appearance)
+
+**Done** — 2026-09-13, commit `b009504` on `worktree-drawing-tool-ux-improvements`.
+
+Shipped: default network type is now `NETWORK_TYPE_LIBRARY[0]` (Supply Air)
+for new documents/segments, with `DEFAULT_NETWORK_TYPE`/`'default'` kept only
+as an internal fallback and excluded from the Stamps tab's picker; fitting
+visibility now recomputes on every plain click-select/shift-click/rubber-band/
+deselect, not only during a drag; `QuickAccessStrip` removed, replaced by
+fixed Select/Copy/Delete buttons in `Rail.tsx` below Undo/Redo, with
+Copy/Delete/Rotate-90° dropped from the rail's top flyout and the now-dead
+`ToolAction`/`TOOL_META`/quick-access CSS removed; `PlacedStamp.color`
+(optional per-instance tint) added to core's model with a `5→6` schema
+migration step (version-bump only, no backfill needed); `scene.ts` applies
+the tint (`sprite.tint`) on placement, sync, copy/paste, and project-load
+restore, and exposes `setColorForSelection`/`setScaleForSelection`/
+`setRotationForSelection`/`setStampPropertyForSelection`/
+`setCapacityForSelection` (all selection-wide, built on a new shared
+`applyToSelectedStamps` one-undo-step helper) for Part 8's multi-select UI;
+new `packages/ui/src/stampAppearanceDefaults.ts` (localStorage, keyed by
+`definitionId`) is read at pick-time in `StampsPanel.handlePick` and threaded
+through an extended `setStampTexture(bitmap, definitionId?, appearanceDefault?)`
+— the write-back after a Properties-panel edit is still pending, landing with
+Part 8's UI; stamp placement now shows a translucent ghost sprite that
+follows the cursor and rotates 45°/Space-press (persisting across placements,
+resetting on Escape/tool-switch/re-pick), and the segment tool draws a
+rubber-band preview line (in the active network type's color) from the
+pending start point to the cursor.
+
+Verified: `pnpm build` clean across all 9 workspace tasks; `pnpm --filter
+@mepapp/core test` — 130 tests passing, including a new migration test for
+the `5→6` schema step. Not yet manually verified in the running app — that
+pass is deferred to the end, once Parts 7-8 also land, per this plan's
+Verification section.
+
+Parts 7-8 are still open — not started.
