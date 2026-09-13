@@ -318,4 +318,60 @@ the `5→6` schema step. Not yet manually verified in the running app — that
 pass is deferred to the end, once Parts 7-8 also land, per this plan's
 Verification section.
 
-Parts 7-8 are still open — not started.
+### Parts 7-8
+
+**Done** — 2026-09-13, commit `3b49197` on `worktree-drawing-tool-ux-improvements`.
+
+Shipped: `StampsPanel.tsx`'s network-type swatch button renders
+unconditionally (no more `isAdopted &&` guard); `scene.ts`'s
+`updateNetworkType` now adopts a never-picked library type into the
+document before applying its patch, so the editor dialog works even
+for a type nobody has drawn a segment with yet; `NetworkTypeEditorDialog.tsx`
+gained a Discipline `<select>` (all 6 core `Discipline` values, own
+label map) wired through a widened `NetworkTypeEditPatch`; no extra
+wiring needed for the discipline filter buttons to pick up a change,
+since they already read the live (mutated) `networkTypes` entry.
+`PropertiesPanel.tsx`'s `selection.length > 1` branch is now a real
+multi-select UI: a `commonValue()` helper drives "same value vs
+Varies" for Rotation, Color, Scale %, Capacity, and Custom Properties
+(intersected across mixed terminal/equipment categories); each edit
+calls one of `scene.ts`'s new `set*ForSelection` methods, all built on
+a shared `applyToSelectedStamps` helper that writes every selected
+stamp inside one `Transaction` (one undo step for the whole batch).
+Position (X/Y) stays single-selection-only per the decision. Added
+`PlacedStamp`/`StampInfo.capacity` (read from `terminalCapacities`) so
+multi-select capacity has something to diff against — capacity itself
+stays non-undoable, a pre-existing gap called out in Context, not
+fixed here. Also added the single-selection Appearance section
+(Color, Scale %) to `PropertiesPanel.tsx`, completing Part 4's
+per-stamp-definition remembered-appearance write-back
+(`rememberAppearance()`, called from both the single- and multi-select
+color/scale handlers).
+
+Verified: `pnpm exec turbo run build --force` clean across all 9
+workspace tasks (forced, not cache-served); `pnpm --filter @mepapp/core
+test` — 130 tests passing. Live headless-Chromium Playwright
+walkthrough against `fixtures/pdfs/arch_simple_A4.pdf` covering every
+item in this plan's Verification section: stamp ghost preview visibly
+rotates 45° per Space-press and the placed stamp's rotation matches;
+a second placement (same definition) starts at the same persisted
+angle; the segment tool's rubber-band line follows the cursor in the
+active network type's color; a fresh document's first segment is
+tagged "Supply Air", never "Unassigned", and the picker never shows an
+"Unassigned" tile; clicking a segment (no drag) shows its fitting
+markers immediately; every Network Types tile shows a color swatch
+whether adopted or not, and clicking one (including a never-adopted
+type) opens a working Discipline dropdown; the rail shows fixed
+Select/Copy/Delete below Undo/Redo with no floating Quick Access strip;
+and a genuine two-stamp color mismatch (`#ff0000`/`#0000ff`) showed
+"Color (Varies)", a multi-set to green landed on both stamps, and one
+Undo — confirmed directly at the `CommandManager` level via temporary
+debug logging (removed after use) — cleanly restored each stamp's own
+prior color in a single step. One color/scale scenario surfaced a
+pre-existing, unrelated app behavior worth noting: clicking an already
+multi-selected element does not collapse the selection to that one
+element (by design, so the group can still be dragged as a whole) —
+not a bug, but something to know when testing selection state by
+clicking a member of an existing multi-selection.
+
+All 8 parts (9 requested features) are now complete.
