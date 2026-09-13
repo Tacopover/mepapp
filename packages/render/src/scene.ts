@@ -286,6 +286,8 @@ export interface StampInfo {
   properties?: CustomPropertyValues;
   /** Per-instance tint — see PlacedStamp.color. */
   color?: string;
+  /** User-entered capacity (Flow section) — see setTerminalCapacity/terminalCapacities. Not part of PlacedStamp itself. */
+  capacity: number;
 }
 
 /** The Properties panel's read model for a single selected segment — see getSelectedSegmentInfo. */
@@ -807,6 +809,7 @@ export class SketchScene {
       definitionId: data.definitionId,
       properties: data.properties,
       color: data.color,
+      capacity: this.doc.terminalCapacities.get(data.id) ?? 0,
     };
   }
 
@@ -994,10 +997,15 @@ export class SketchScene {
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
-  /** Updates a network type's name and/or visuals (color/thickness/pattern) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType; no-op if `id` hasn't been picked in this document yet. Re-syncs the drawing layer so already-drawn segments of this type update immediately. */
-  updateNetworkType(id: string, patch: Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern'>>): void {
-    const target = this.doc.networkTypes.find((t) => t.id === id);
-    if (!target) return;
+  /** Updates a network type's name and/or visuals (color/thickness/pattern/discipline) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType. If `id` hasn't been picked in this document yet (editing a library type's swatch before ever placing a segment of it), adopts it first — same "adopt on first touch" pattern as setActiveNetworkType — so the edit actually persists instead of being silently dropped. No-op only if `id` isn't a known library type either. Re-syncs the drawing layer so already-drawn segments of this type update immediately. */
+  updateNetworkType(id: string, patch: Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline'>>): void {
+    let target = this.doc.networkTypes.find((t) => t.id === id);
+    if (!target) {
+      const libraryType = getNetworkTypeFromLibrary(id);
+      if (!libraryType) return;
+      target = { ...libraryType };
+      this.doc.networkTypes.push(target);
+    }
     Object.assign(target, patch);
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
     this.syncDrawingLayer();

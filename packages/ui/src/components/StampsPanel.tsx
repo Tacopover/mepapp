@@ -160,7 +160,6 @@ export function StampsPanel({
             {[...networkTypeDefs, ...visibleCustomNetworkTypes].map((libType) => {
               const live = networkTypes.find((t) => t.id === libType.id);
               const effective = live ?? libType;
-              const isAdopted = live !== undefined;
               const isActive = activeNetworkTypeId === libType.id;
               return (
                 <div
@@ -171,15 +170,13 @@ export function StampsPanel({
                     <span className="mep-networktype-name">{effective.name}</span>
                     {effective.units && <span className="mep-networktype-units">{effective.units}</span>}
                   </button>
-                  {isAdopted && (
-                    <button
-                      type="button"
-                      className="mep-networktype-visuals"
-                      title="Edit"
-                      style={{ backgroundColor: effective.color }}
-                      onClick={() => onEditNetworkType(effective)}
-                    />
-                  )}
+                  <button
+                    type="button"
+                    className="mep-networktype-visuals"
+                    title="Edit"
+                    style={{ backgroundColor: effective.color }}
+                    onClick={() => onEditNetworkType(effective)}
+                  />
                 </div>
               );
             })}

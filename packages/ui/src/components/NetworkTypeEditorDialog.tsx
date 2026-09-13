@@ -1,8 +1,18 @@
 import { useState } from 'react';
-import type { LinePattern, NetworkType } from '@mepapp/core';
+import type { Discipline, LinePattern, NetworkType } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 
-export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern'>>;
+export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline'>>;
+
+/** All 6 core Discipline values, human-labeled — finer-grained than disciplineGroups.ts's 4-way UI grouping (which this dialog's dropdown drives, via disciplineGroupOf), so it needs its own label map. */
+const DISCIPLINES: Array<{ value: Discipline; label: string }> = [
+  { value: 'heatingAndCooling', label: 'Heating & Cooling' },
+  { value: 'ventilation', label: 'Ventilation' },
+  { value: 'plumbing', label: 'Plumbing' },
+  { value: 'fireProtection', label: 'Fire Protection' },
+  { value: 'electricalPathways', label: 'Electrical Pathways' },
+  { value: 'electricalCircuits', label: 'Electrical Circuits' },
+];
 
 export interface NetworkTypeEditorDialogProps {
   networkType: NetworkType;
@@ -27,9 +37,10 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
   const [color, setColor] = useState(networkType.color);
   const [lineWidthPt, setLineWidthPt] = useState(networkType.lineWidthPt);
   const [linePattern, setLinePattern] = useState<LinePattern>(networkType.linePattern);
+  const [discipline, setDiscipline] = useState<Discipline>(networkType.discipline);
 
   function handleSave() {
-    onSave(networkType.id, { name: name.trim() || networkType.name, color, lineWidthPt, linePattern });
+    onSave(networkType.id, { name: name.trim() || networkType.name, color, lineWidthPt, linePattern, discipline });
   }
 
   return (
@@ -50,6 +61,16 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
         <div className="mep-field-row">
           <label>Name</label>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="mep-field-row">
+          <label>Discipline</label>
+          <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)}>
+            {DISCIPLINES.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="mep-field-row">
           <label>Color</label>
