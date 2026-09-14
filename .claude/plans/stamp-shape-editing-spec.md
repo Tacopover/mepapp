@@ -33,7 +33,7 @@ Verified: `pnpm --filter @mepapp/ui build` clean, `pnpm --filter @mepapp/core te
 
 ## Part B — Migrate `.mepshapes.json` into real vector `shapes` (DONE)
 
-**Status: DONE** (worktree `stamp-shape-vector-migration`).
+**Status: DONE** (commit `5561ae9`, worktree `stamp-shape-vector-migration`).
 
 ### Why this is lower-risk than it sounds
 
