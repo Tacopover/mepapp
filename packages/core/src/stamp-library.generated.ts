@@ -16,7 +16,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '4a377d60-42b4-4043-a025-66d1e729c128',
+        id: '53f9eb1b-12ef-4f6b-86f6-b5fd2dc656f6',
         kind: 'rect',
         x: 0.022408326541718752,
         y: 0.043923171885270854,
@@ -29,11 +29,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '891cb1cd-968d-4a57-b1f3-b37b41d52f75',
+        id: '84806fce-df82-4642-b6d9-d7daf21c89a9',
         kind: 'circle',
         cx: 0.05219361370363307,
         cy: 0.3772404726404053,
-        radius: 0.013352025279478815,
+        radius: 0.03209722155419809,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0196078431372549,
@@ -41,11 +41,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '82b77de7-8909-40b6-9e9e-b253c2d959d3',
+        id: '7d9f629b-ff7a-4efd-a1fb-3d6c55b0edc8',
         kind: 'circle',
         cx: 0.17852431442485586,
         cy: 0.4957532906866753,
-        radius: 0.020796762011305585,
+        radius: 0.049993784756589506,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0196078431372549,
@@ -53,11 +53,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7fd292d5-7d63-431b-8441-fd4717f2abe7',
+        id: '27b773d4-5d53-41d4-915e-803ba2f44288',
         kind: 'circle',
         cx: 0.05219361370363307,
         cy: 0.6142661087329453,
-        radius: 0.013352025279478815,
+        radius: 0.03209722155419809,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0196078431372549,
@@ -65,7 +65,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4a87e806-0785-491c-9e73-b88cabfd7a6c',
+        id: 'a22b830d-fffc-4946-910b-115300cd3312',
         kind: 'line',
         x1: 0.1298232990680713,
         y1: 0.12352013260744112,
@@ -78,7 +78,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fb468b8a-0c42-44dd-9da1-40d47fc24aa4',
+        id: '8084e75b-6ccd-44e5-8650-f5ddb7dcc46f',
         kind: 'line',
         x1: 0.14052239632172384,
         y1: 0.8636368300386387,
@@ -91,11 +91,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '112b3835-f9b3-4eb1-91a0-6da67bd9d8ee',
+        id: '5cc08d59-e92e-477a-8cf0-8f42b3c8b1b8',
         kind: 'arc',
         cx: 0.7188142727100666,
         cy: 0.492625449119124,
-        radius: 0.20547140234996447,
+        radius: 0.4939371358452087,
         startAngle: -0.7976698547029721,
         endAngle: 0.813044719172075,
         style: {
@@ -105,13 +105,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e00167ad-7f13-42d6-a0f7-9eacc4845898',
+        id: '6fab5a79-524c-4277-8734-2fdb496d605e',
         kind: 'arc',
         cx: 0.35058856457325593,
         cy: 0.49464960512567846,
-        radius: 0.27177425198831673,
-        startAngle: -2.6823261972693087,
-        endAngle: -3.5689620729402463,
+        radius: 0.6533239861523066,
+        startAngle: -3.5689620729402463,
+        endAngle: -2.6823261972693087,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0196078431372549,
@@ -119,13 +119,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '97f327de-dbc9-4f7a-b33f-4c7296e0786c',
+        id: '78db802b-7408-42e0-81ea-846f76aa940d',
         kind: 'arc',
         cx: 0.4938570057776968,
         cy: 0.03729896138806658,
-        radius: 0.06964018557425278,
-        startAngle: 2.4681245922401884,
-        endAngle: 0.6734680613496049,
+        radius: 0.16740954414516454,
+        startAngle: 0.6734680613496049,
+        endAngle: 2.4681245922401884,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0196078431372549,
@@ -133,11 +133,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '84c46276-7cd4-4379-ab91-68112864a070',
+        id: '3284595e-9b9e-49b9-9206-3ba89aa494f7',
         kind: 'arc',
         cx: 0.4953781450955649,
         cy: 0.9988566634067149,
-        radius: 0.07658573278145077,
+        radius: 0.18410609488246793,
         startAngle: -2.296733318074326,
         endAngle: -0.8448593355154633,
         style: {
@@ -147,13 +147,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '10e7c2de-80f3-42ab-9b53-f62b261487df',
+        id: '90b95841-6ea8-4f9e-8204-69ce33c9ca10',
         kind: 'arc',
         cx: 0.15684422366205328,
         cy: 0.22950127400257822,
-        radius: 0.05099319872229229,
-        startAngle: -2.0524600043497614,
-        endAngle: -2.9797552223513715,
+        radius: 0.12258365026182422,
+        startAngle: -2.9797552223513715,
+        endAngle: -2.0524600043497614,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0196078431372549,
@@ -161,11 +161,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '036231c3-f003-4a19-9c49-31bfc8a4f35f',
+        id: '86f5eece-6eb3-4bc6-b388-179927b4dc85',
         kind: 'arc',
         cx: 0.15873638853245245,
         cy: 0.7363304421260969,
-        radius: 0.05587223314330185,
+        radius: 0.13431246634056485,
         startAngle: 1.8603182710817991,
         endAngle: 2.9283254107481227,
         style: {
@@ -196,7 +196,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '10dbe441-fe71-4a5e-8171-0ad2868e9db7',
+        id: 'b218f065-d628-4099-8dda-5dc63f33f65d',
         kind: 'circle',
         cx: 0.5421245421245421,
         cy: 0.4067796610169492,
@@ -208,7 +208,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '99a15f7d-13f5-49d1-9ffd-7bd71807d3ff',
+        id: '755252ff-7a06-4112-ac3e-424e813e34f3',
         kind: 'circle',
         cx: 0.3956043956043956,
         cy: 0.36610169491525424,
@@ -220,7 +220,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6ca062c0-fc9a-4984-b6a2-5abbdb17e59d',
+        id: 'b5aa4f9b-8702-47d4-9c4f-446500a5345b',
         kind: 'circle',
         cx: 0.3956043956043956,
         cy: 0.36610169491525424,
@@ -232,7 +232,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c0a86096-63ad-46e6-972f-074ffe9700f0',
+        id: '9b66db54-c6a5-41ea-8baf-d76617efe560',
         kind: 'circle',
         cx: 0.3956043956043956,
         cy: 0.36610169491525424,
@@ -244,7 +244,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '110bbb14-15cc-40a3-9ffc-21f64f42655a',
+        id: '4ccbfb80-7bd7-4f04-a456-5b2de1a9d79a',
         kind: 'line',
         x1: 0.3956043956043956,
         y1: 0.29152542372881357,
@@ -257,7 +257,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '68a0645a-a7bc-44e8-99dd-9398eef3fbb5',
+        id: 'b242c1f5-b75a-40cd-85b7-555e3f540e30',
         kind: 'line',
         x1: 0.3956043956043956,
         y1: 0.4406779661016949,
@@ -270,7 +270,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '55824be8-cdba-425f-8b66-6f1e02c0dc8c',
+        id: '9d69c4be-aa96-49ff-8ed1-2fc94f863b6d',
         kind: 'line',
         x1: 0.315018315018315,
         y1: 0.36610169491525424,
@@ -283,7 +283,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a417f182-8c6d-4722-8c9c-a7e7b56f2211',
+        id: '2cf2c4de-8d61-4572-b351-cb22683773e2',
         kind: 'line',
         x1: 0.47619047619047616,
         y1: 0.36610169491525424,
@@ -296,7 +296,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '178d8a60-4643-47f6-a25a-2d896503e216',
+        id: 'ff60e81e-c31c-4747-bd35-d8b83cbf9514',
         kind: 'circle',
         cx: 0.652014652014652,
         cy: 0.36610169491525424,
@@ -308,7 +308,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dce14c81-e696-4593-9ba8-d5a8aae66320',
+        id: '62d1c356-ab68-4d83-96f7-28535ce64b4f',
         kind: 'circle',
         cx: 0.652014652014652,
         cy: 0.36610169491525424,
@@ -320,7 +320,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'db85e496-e173-43fb-b97b-b1e10a836cf9',
+        id: '75acf4a5-106f-4bc0-9591-27180bcb6576',
         kind: 'circle',
         cx: 0.652014652014652,
         cy: 0.36610169491525424,
@@ -332,7 +332,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0a6a0031-8fa5-4eb8-9779-196e0f3ec22a',
+        id: 'b672b903-4cd7-4a8e-8279-f5760f84121a',
         kind: 'line',
         x1: 0.652014652014652,
         y1: 0.29152542372881357,
@@ -345,7 +345,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c754c394-1a79-4ec2-b738-de4662c1e0e1',
+        id: '70335c2d-1e5c-4d3e-851b-463c8dd064b5',
         kind: 'line',
         x1: 0.652014652014652,
         y1: 0.4406779661016949,
@@ -358,7 +358,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ddcd1965-6ffe-4539-8b5d-241d5c24e0f9',
+        id: '0d9e6cf8-3096-4311-b0f4-60e8e188abc0',
         kind: 'line',
         x1: 0.5714285714285714,
         y1: 0.36610169491525424,
@@ -371,7 +371,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5293c821-c3fd-4ed9-8d2e-290b9ded0f9f',
+        id: 'e73fcb60-2c7e-486a-95b5-371fd894860e',
         kind: 'line',
         x1: 0.7326007326007326,
         y1: 0.36610169491525424,
@@ -384,7 +384,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e95a74d6-0505-417d-b681-ca368099fa74',
+        id: '12b376ce-b322-40aa-89a2-d953ee532f79',
         kind: 'line',
         x1: 0.5212392363797874,
         y1: 0.5410712963299612,
@@ -397,7 +397,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '012af5d6-832b-41dc-8269-920c0486ba34',
+        id: '9abef6bf-71d7-4946-8fc6-c5507941bac0',
         kind: 'line',
         x1: 0.5238095238095238,
         y1: 0.7627118644067796,
@@ -410,7 +410,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0ba2e3c0-cbe7-4931-8184-eba4c4d67d69',
+        id: '949fe66a-3669-4879-b793-9a57b21eb7d7',
         kind: 'line',
         x1: 0.525456516807207,
         y1: 0.788298744865918,
@@ -423,7 +423,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '27f2eba6-2b7a-4b6c-98e1-a3ecaf111c76',
+        id: '0201a9e8-d206-44af-91cb-cb9056337b8b',
         kind: 'line',
         x1: 0.397849386935308,
         y1: 0.45309045952962135,
@@ -436,7 +436,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8d77a7eb-3e8d-4e3b-96df-358be7c0b651',
+        id: '92549e9b-10d7-4da1-822a-876bc2b4afe5',
         kind: 'line',
         x1: 0.52326202079691,
         y1: 0.5429432290278406,
@@ -449,7 +449,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4bc0fad6-53ee-4f22-8cb2-739f80cbba5f',
+        id: 'b9dc1c44-9b9a-4cc6-8889-d21cc5156c50',
         kind: 'line',
         x1: 0.02925699688105189,
         y1: 0.4575802157427557,
@@ -462,13 +462,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '266eaad7-f674-430c-bdbb-c8a7ff953dcc',
+        id: '86f0b38e-1276-4e8f-a5b6-aef67fc6d903',
         kind: 'arc',
         cx: 0.08178579531017059,
         cy: 0.5033583431798246,
         radius: 0.06257895277660146,
-        startAngle: 0.7717003900245824,
-        endAngle: -2.3424967168194777,
+        startAngle: -2.3424967168194777,
+        endAngle: 0.7717003900245824,
         style: {
           stroke: '#000000',
           strokeWidth: 0.018315018315018316,
@@ -476,7 +476,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc9a142b-d102-4d04-821f-6a8fe75976d8',
+        id: '89f8e4b0-549c-42e0-88c9-35bbe43d1a61',
         kind: 'line',
         x1: 0.057541493589021116,
         y1: 0.45399858855703673,
@@ -489,7 +489,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4d0de021-5e64-4e59-92e4-0d0513b95d22',
+        id: 'dacb8426-3504-4959-84eb-6a8ca7d644fb',
         kind: 'line',
         x1: 0.08157046537428489,
         y1: 0.44857330875109463,
@@ -516,7 +516,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '9c77aa13-7f0a-45a9-9f1b-79459124a51d',
+        id: 'eccd02d5-04fc-4d18-8a9f-f5c349fdaa2a',
         kind: 'rect',
         x: 0.0615884343253181,
         y: 0.06513405172054577,
@@ -529,7 +529,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c6f62516-26d1-494a-bf63-484564086f0c',
+        id: 'b41dd0fe-c386-45f1-9da7-a769b19a9fa0',
         kind: 'circle',
         cx: 0.49370701101902364,
         cy: 0.500583377086615,
@@ -541,7 +541,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2f7519d6-ec39-427a-8a07-16af256b0eed',
+        id: '936150e7-fc3a-4cdf-a1f8-a6c2cd63af0c',
         kind: 'circle',
         cx: 0.48951168503170606,
         cy: 0.5047503562767208,
@@ -553,7 +553,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '58957c7c-95f3-4e9e-a861-2283929db7aa',
+        id: '73d796fa-394b-4011-b2ac-205168a73f6a',
         kind: 'circle',
         cx: 0.49370701101902364,
         cy: 0.17347551066329978,
@@ -565,7 +565,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8c242c15-a027-4d88-822a-f9ab94965530',
+        id: 'ca8e097f-d8a0-459d-b424-74b8d8da0ebe',
         kind: 'circle',
         cx: 0.7307429293024639,
         cy: 0.269316032035736,
@@ -577,7 +577,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2905e702-a892-41d6-bcc3-fd0a1bb1be7a',
+        id: 'fb13c3f0-e38a-469d-9e9c-7d60925480e0',
         kind: 'circle',
         cx: 0.825137764017108,
         cy: 0.5026668666816678,
@@ -589,7 +589,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '65a8f0ff-1a88-4a53-8d1d-fd18ca495e0f',
+        id: 'fc500c25-6c88-45cb-b69f-b2a49589f07e',
         kind: 'circle',
         cx: 0.7286452663088051,
         cy: 0.7297672325424408,
@@ -601,7 +601,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4fcd5b7f-f5e8-478d-88aa-c63d76c06cdc',
+        id: '192b0f95-493d-4881-8a5c-cfc0f29ab1b4',
         kind: 'circle',
         cx: 0.48951168503170606,
         cy: 0.8318582227000358,
@@ -613,7 +613,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '77120ad4-5797-457a-8d4c-ddad0b4fa737',
+        id: '4f670752-a749-4458-a364-ea267676315e',
         kind: 'circle',
         cx: 0.258768755729242,
         cy: 0.7381011909226526,
@@ -625,7 +625,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5bd0a09d-ea95-4a1f-8699-26005d9be507',
+        id: '6307c6a0-0917-41bf-b66a-1140bb35470d',
         kind: 'circle',
         cx: 0.1538856060463037,
         cy: 0.4984998874915618,
@@ -637,7 +637,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '16d3dde5-9261-449d-b06c-633d1de928b7',
+        id: '1e4d60c8-36d4-49fe-8e40-a4ae7679391f',
         kind: 'circle',
         cx: 0.2608664187229008,
         cy: 0.26514905284563023,
@@ -649,7 +649,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4ab710c5-ed31-4c7f-8e81-65fc3df6294d',
+        id: '018b7d9c-28aa-46f6-9c3b-3deff48dc707',
         kind: 'circle',
         cx: 0.1832528879575265,
         cy: 0.36724004300322527,
@@ -661,7 +661,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f31e6b02-faf6-46eb-91d7-b4ae29248448',
+        id: '3a892add-fb72-49e0-bc5e-aba5b240485d',
         kind: 'circle',
         cx: 0.3657495684058389,
         cy: 0.19847738580393537,
@@ -673,7 +673,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8f31ddb7-1634-45fc-954a-1fce26a1d4ab',
+        id: '7ebd88d7-f18a-46d0-b565-80c1fe0f0b87',
         kind: 'circle',
         cx: 0.6174691276448906,
         cy: 0.2088948337792001,
@@ -685,7 +685,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c5e69998-1007-4ff2-a541-cd6129c9155d',
+        id: '111a0d15-51ec-4334-989f-7103939e3b1f',
         kind: 'circle',
         cx: 0.8041611340805206,
         cy: 0.3859914493587019,
@@ -697,7 +697,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f0d346ac-6462-49e2-b14f-7439c607fc01',
+        id: '085053c5-4cb4-4e77-99c2-5ca3dd11389e',
         kind: 'circle',
         cx: 0.8020634710868622,
         cy: 0.6255927527897926,
@@ -709,7 +709,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fd0b2e6b-666e-4fdf-a880-0cd1b51fa7bc',
+        id: 'f53339b8-d1cf-4d73-acec-c08151f2ed70',
         kind: 'circle',
         cx: 0.6174691276448906,
         cy: 0.8047728579643474,
@@ -721,7 +721,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '59c12394-854b-4cb4-b416-fe654696fc83',
+        id: 'ceaf105a-7ec9-44ac-8ed8-3ccf53688367',
         kind: 'circle',
         cx: 0.35945657942486275,
         cy: 0.8068563475594002,
@@ -733,7 +733,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6c5c7c28-97f1-4e89-a5d2-120bd39b102b',
+        id: '00d7423d-9a48-41c7-a65d-0304426bbaba',
         kind: 'circle',
         cx: 0.18535055095118527,
         cy: 0.6255927527897926,
@@ -766,7 +766,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '3ff43bb8-31f3-4bb6-8842-efe07226009c',
+        id: 'd659b52e-9963-42ac-b6b5-148b732c49a8',
         kind: 'rect',
         x: 0.03719784962749755,
         y: 0.04286262736212647,
@@ -779,7 +779,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '22d1e447-a7a5-4540-8233-49dc5b4ab70b',
+        id: '2990b3b0-b61d-49e5-a64e-427dc9a0f085',
         kind: 'line',
         x1: 0.0492967867650612,
         y1: 0.12485496078714615,
@@ -792,7 +792,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '30e34828-af82-4226-a401-8a0dc4482977',
+        id: '9e389daf-ebcd-4292-81f8-60ac9bfc7e5d',
         kind: 'line',
         x1: 0.0993749215689433,
         y1: 0.12485496078714615,
@@ -805,7 +805,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5c1e55f5-e6e1-4b1f-9901-89b672c3a1e2',
+        id: '1d2e78f9-47a2-4365-961a-e49e5848385c',
         kind: 'line',
         x1: 0.8941334683638869,
         y1: 0.12485496078714615,
@@ -818,7 +818,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd50c0dcf-5e6b-4795-bc49-89b4ab78b53d',
+        id: '7eafbdba-cbd4-442d-9688-9e61443bc1ca',
         kind: 'line',
         x1: 0.9367926202338607,
         y1: 0.12602179613121156,
@@ -831,7 +831,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0ba4d3fc-0543-4160-91f3-219263fd7b78',
+        id: 'ae907a32-edfb-4a17-ad6d-a7dea85c9a2f',
         kind: 'line',
         x1: 0.22271551284517135,
         y1: 0.13535647888373484,
@@ -844,7 +844,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5e2bc820-4a63-43ea-a192-550d61e8ad39',
+        id: 'fa7a809d-e8c2-4ab0-835d-8a5828fb850f',
         kind: 'line',
         x1: 0.22271551284517135,
         y1: 0.17852938661415516,
@@ -857,7 +857,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bddccb47-df12-4829-a1ca-10b57dbb2fad',
+        id: '58937cbb-241a-492a-b173-f48b32943a40',
         kind: 'line',
         x1: 0.7670833856207045,
         y1: 0.12252129009901527,
@@ -870,7 +870,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '089f6723-8fbe-4d80-95d7-662fc063123f',
+        id: '6bab8c30-f652-41d9-a3be-93f0b6a574cf',
         kind: 'line',
         x1: 0.25331881744754375,
         y1: 0.17969622195822058,
@@ -883,7 +883,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '28950c1e-a665-461e-af23-fe8f415a798f',
+        id: 'ab81d18b-ecee-4da6-8139-b52d280950e2',
         kind: 'line',
         x1: 0.28675572167254276,
         y1: 0.17969622195822058,
@@ -896,7 +896,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a33a3558-e282-4080-b74f-ae9b30af2b21',
+        id: '9bcff3cd-293f-474e-b105-f97a0bacf45c',
         kind: 'line',
         x1: 0.36183729422571204,
         y1: 0.17969622195822058,
@@ -909,7 +909,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd087d64c-fe8f-48ed-95d1-4c38eb345148',
+        id: '20caa515-bdb5-4e2b-9240-8a3da77ce9b7',
         kind: 'line',
         x1: 0.39335519106247924,
         y1: 0.17969622195822058,
@@ -922,7 +922,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '098d6536-9f19-4d86-9cbd-1c67ecd6cbfd',
+        id: 'aa89947d-8424-43ad-91eb-32699bcfacb3',
         kind: 'line',
         x1: 0.4805270623882951,
         y1: 0.17969622195822058,
@@ -935,7 +935,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1407696c-6be2-4054-804a-41a7950e3813',
+        id: '5b0ee375-71ed-4566-bf00-4a1e56e946be',
         kind: 'line',
         x1: 0.5111301423322778,
         y1: 0.17969622195822058,
@@ -948,7 +948,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd068c8cb-d823-4424-8dbb-c8243adb4c46',
+        id: '6cb8c083-5515-4819-9fcc-babd4ca81b8e',
         kind: 'line',
         x1: 0.5964781068750172,
         y1: 0.17969622195822058,
@@ -961,7 +961,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6373f7ac-1f23-4185-8be3-ef16c4b3f045',
+        id: 'c9130e2a-9e0d-4736-80c6-71c0770ef364',
         kind: 'line',
         x1: 0.6261792245859297,
         y1: 0.17969622195822058,
@@ -974,7 +974,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4930c320-e7b1-4614-bcb1-37c973e847c1',
+        id: '837d7347-ac98-4915-a76c-1a3fee3098c3',
         kind: 'line',
         x1: 0.7056230079762081,
         y1: 0.17969622195822058,
@@ -987,7 +987,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ead03347-22a8-408f-a0ed-49ffa2610bd5',
+        id: '99dfb615-e352-492b-9dce-05a322f7efbb',
         kind: 'line',
         x1: 0.735913713420678,
         y1: 0.17969622195822058,
@@ -1000,11 +1000,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7fcfec52-c4f3-4ca0-96ba-a5362cd15d8b',
+        id: '9b53744a-e6a8-4503-ad62-34d6e1808c58',
         kind: 'circle',
         cx: 0.4953631356663071,
         cy: 0.29637975636476205,
-        radius: 0.05196599044224482,
+        radius: 0.06538443867850523,
         style: {
           stroke: '#000000',
           strokeWidth: 0.023474178403755867,
@@ -1012,7 +1012,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1a33755b-cadc-41d1-a473-67a25a4fb9ef',
+        id: 'a8d56041-e38c-47cb-9b62-f8ea99e06675',
         kind: 'line',
         x1: 0.1995311911767075,
         y1: 0.89496628787032,
@@ -1025,7 +1025,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ab4e2512-9945-4279-931d-149a0d382b52',
+        id: '19dc2939-15cd-46b4-9221-f2f071c6b7d1',
         kind: 'line',
         x1: 0.2551735631810209,
         y1: 0.8051199663772829,
@@ -1038,7 +1038,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '47002e6f-8b33-4c7f-9859-d879b9ae69e5',
+        id: '094ec720-b01d-4d11-a649-4340a4b444f9',
         kind: 'line',
         x1: 0.20973229271083157,
         y1: 0.8377913560111143,
@@ -1051,7 +1051,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '320e8e16-73f4-44c6-bcdf-89e1f81ff8ec',
+        id: '5d88960b-471f-47ee-8304-31d006433eb0',
         kind: 'line',
         x1: 0.7086588950161753,
         y1: 0.8377913560111143,
@@ -1064,11 +1064,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'faea9905-5b14-49fa-8430-063134c036f5',
+        id: '3dc3f9d4-cbf0-429e-be22-233aab6e8319',
         kind: 'arc',
         cx: 0.21394157298215286,
         cy: 0.7421108577977504,
-        radius: 0.07512292651158152,
+        radius: 0.0945208652821777,
         startAngle: 1.558451274950672,
         endAngle: 3.0890095919788494,
         style: {
@@ -1078,11 +1078,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f5b6c8ce-5973-4ff4-b7cb-9f402972b959',
+        id: '21c2e38e-00f4-440a-8d48-25c937185980',
         kind: 'arc',
         cx: 0.20272425260169932,
         cy: 0.7502092999159892,
-        radius: 0.11502788521275634,
+        radius: 0.14472992130055726,
         startAngle: 1.5466074971360597,
         endAngle: 3.0691390575012045,
         style: {
@@ -1092,11 +1092,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '73547c76-e913-4487-a196-c2ad2cd45048',
+        id: '707efbda-5590-42ab-a3cd-423ca2965eba',
         kind: 'arc',
         cx: 0.7728975172233193,
         cy: 0.7383867797987448,
-        radius: 0.07975945805999152,
+        radius: 0.10035462328674989,
         startAngle: 0.011627382956383114,
         endAngle: 1.4735431285433311,
         style: {
@@ -1106,11 +1106,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a0ba9b05-6425-494a-8c84-0e571212d44b',
+        id: 'c0d23b82-786a-4e86-9670-bdd9088e572f',
         kind: 'arc',
         cx: 0.7790397861207566,
         cy: 0.7451836437811568,
-        radius: 0.11922423299203337,
+        radius: 0.1500098330603988,
         startAngle: 0.09347678115858976,
         endAngle: 1.5777406596099126,
         style: {
@@ -1134,7 +1134,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'd64a3aa0-7b90-4f2d-abe0-7f6a1ded9e20',
+        id: '3bc70875-e838-4dac-a61b-8790b5cd912b',
         kind: 'circle',
         cx: 0.49019607843137253,
         cy: 0.49019607843137253,
@@ -1160,7 +1160,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'd760334f-53ee-4f52-8223-fca06ee45b7c',
+        id: '10cffdb7-6f2a-4cb3-9203-264dbb511e03',
         kind: 'rect',
         x: 0.051541923628043634,
         y: 0.044943840136669265,
@@ -1173,7 +1173,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6473eee6-b473-42de-b0d2-e29c816ee1b2',
+        id: 'ebc85cc9-25c4-46da-bec8-0fbf5c89dec4',
         kind: 'circle',
         cx: 0.28183120608931844,
         cy: 0.49185550934872235,
@@ -1185,7 +1185,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6945db08-a9b1-40ba-a714-71a7e0275efc',
+        id: 'a26ac558-bbcc-4bff-b53d-979aedd09b8c',
         kind: 'line',
         x1: 0.2697107175387251,
         y1: 0.4607960111023248,
@@ -1198,7 +1198,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '956b1322-b8b3-42a2-b94a-ef5e055ea5d0',
+        id: '06072400-4cea-40d0-8700-1a05d45a4f0c',
         kind: 'line',
         x1: 0.31299817664798724,
         y1: 0.4763257602255237,
@@ -1211,7 +1211,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cce244ba-9fdb-4d14-8a7a-63ec8c5be8c2',
+        id: 'aad1b2bb-a5c3-405c-ba3c-f05fcc25163d',
         kind: 'line',
         x1: 0.3147296750123578,
         y1: 0.5177384245540536,
@@ -1224,7 +1224,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2ea841c1-cf10-4162-9687-3881d9746553',
+        id: 'e1152d60-c200-4b5a-8dba-86f1d20ada1b',
         kind: 'line',
         x1: 0.26624772080998393,
         y1: 0.5246405352754754,
@@ -1237,7 +1237,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2d76e71a-bf92-4279-97c7-216a5fb453cc',
+        id: '60063626-f8e8-41e7-bfe9-08636673e878',
         kind: 'line',
         x1: 0.1548064369958867,
         y1: 0.10533730894910874,
@@ -1250,7 +1250,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f0bf1fb9-6c8c-4ee8-9312-bcad70037098',
+        id: '03882e2c-2f5f-4fb3-8e34-0629abc97acb',
         kind: 'line',
         x1: 0.8826611385258779,
         y1: 0.15882866704012683,
@@ -1263,7 +1263,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0f15cf90-5c5e-4745-9f6a-ec122ed49c2a',
+        id: '1bf7188c-408b-4ed5-bd3d-1a699feecfa0',
         kind: 'line',
         x1: 0.11170675230166431,
         y1: 0.15882866704012694,
@@ -1276,7 +1276,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '89440a33-974d-4398-a9a1-7bb59126dcf2',
+        id: '408dc34a-e3a0-40da-a9cf-4449534b095a',
         kind: 'line',
         x1: 0.16235781894775472,
         y1: 0.8843151177009898,
@@ -1289,13 +1289,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f5ee51e0-0690-46eb-a1fc-7f80b1f4898a',
+        id: '82636ea4-2311-48d1-944d-8e6ed34639dd',
         kind: 'arc',
         cx: 0.1698216664683124,
         cy: 0.1619455029761107,
         radius: 0.05854681224580743,
-        startAngle: -1.743607056980492,
-        endAngle: -3.1194397050608793,
+        startAngle: -3.1194397050608793,
+        endAngle: -1.743607056980492,
         style: {
           stroke: '#000000',
           strokeWidth: 0.01730103806228374,
@@ -1303,7 +1303,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f91e093c-25fc-4134-8305-470769258195',
+        id: '376c15eb-63a8-4d1b-8944-09cf2f62fa7c',
         kind: 'arc',
         cx: 0.8219526895819883,
         cy: 0.16513433588154205,
@@ -1317,7 +1317,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '74fd5327-e17c-46a8-802d-b5b859be4821',
+        id: 'f9db048d-3f19-45dd-b8c3-418e731c7850',
         kind: 'arc',
         cx: 0.8324280453309215,
         cy: 0.8322633381109655,
@@ -1331,7 +1331,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8c979620-85cb-4803-bdab-8f0095f9609e',
+        id: 'b4259a83-79bb-4d83-aa25-adb634fa3972',
         kind: 'arc',
         cx: 0.16733248821359967,
         cy: 0.8288671812398622,
@@ -1366,7 +1366,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '68e124d5-e194-4b8c-96c0-a11ea6a25e4d',
+        id: 'f019108a-ef3b-4084-bedc-c9d399ce274e',
         kind: 'line',
         x1: 0.026595884600898092,
         y1: 0.06067808102094245,
@@ -1379,7 +1379,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eba9a16d-0bc5-4077-90a6-06211918b171',
+        id: 'd69b902c-55c1-42ad-be14-9eb49c556c3a',
         kind: 'line',
         x1: 0.04599407299715391,
         y1: 0.8284899454980189,
@@ -1392,7 +1392,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '732232a5-611b-4c7d-9b6b-8a041879c335',
+        id: 'd863a557-65cf-413c-9f89-41ac885977f8',
         kind: 'line',
         x1: 0.9432283382312653,
         y1: 0.8317752693337331,
@@ -1405,7 +1405,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dadfd002-26b8-4793-8b61-69c65c0259b7',
+        id: '47562af3-4c77-4121-bcf3-ffb3aa35b4f4',
         kind: 'line',
         x1: 0.10122921545150602,
         y1: 0.9148933266667948,
@@ -1418,11 +1418,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '43348705-558b-43ab-a092-dbf77eccd121',
+        id: '4a381d22-b43d-4ce9-9a22-2f28985600b4',
         kind: 'arc',
         cx: 0.10935571048453739,
         cy: 0.8235987021294259,
-        radius: 0.06252446612723264,
+        radius: 0.09113735740579673,
         startAngle: 1.6221277500347226,
         endAngle: 3.1423478514729393,
         style: {
@@ -1432,11 +1432,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ab9ce187-8d4e-4ecc-b9a4-790aee35241a',
+        id: '60714e06-fe7d-4b45-ac36-3680a129384c',
         kind: 'arc',
         cx: 0.8862459130268086,
         cy: 0.8318160367636925,
-        radius: 0.057835930567302886,
+        radius: 0.08430322082691608,
         startAngle: -0.02777063659341955,
         endAngle: 1.6506263125071332,
         style: {
@@ -1446,7 +1446,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eda01265-d120-435b-8029-c9921dbcbdb0',
+        id: '3a41fa17-6c27-4bff-99fd-2b5d8308ee24',
         kind: 'rect',
         x: 0.09178485545847428,
         y: 0.23804034535958757,
@@ -1486,7 +1486,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'ea7521c2-1c1b-4b2b-abc2-c5cb5a7eb09d',
+        id: '705e397b-32bf-4074-853f-54c47fa1647b',
         kind: 'rect',
         x: 0.15290798890181034,
         y: 0.087115454002839,
@@ -1499,7 +1499,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0bbaa1f8-ef9e-4396-9c02-cb00103e9ef1',
+        id: '29bf7049-61f6-4e70-9f67-0590261e070e',
         kind: 'line',
         x1: 0.1853596809963566,
         y1: 0.2736293096339838,
@@ -1512,7 +1512,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0e1ae90e-5df6-4caf-96cc-d10e545a62a5',
+        id: '6eeaaff4-1cf4-424b-aeda-72fa080f2f21',
         kind: 'line',
         x1: 0.1853596809963566,
         y1: 0.4283634146493009,
@@ -1525,7 +1525,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '692b0229-4e75-44df-ab2c-86bca6d2198c',
+        id: 'fa7e5037-5fc0-4489-95f1-ec18ac2affa7',
         kind: 'line',
         x1: 0.1853596809963566,
         y1: 0.5731056731986517,
@@ -1538,7 +1538,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd3ab53ef-7db0-48bb-b3c2-de4d2333c0ce',
+        id: 'cbe11b75-2322-439b-8d25-38b9745e54b1',
         kind: 'line',
         x1: 0.1853596809963566,
         y1: 0.7175479566485714,
@@ -1551,11 +1551,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '461dc178-9ff5-420c-9ac6-936fa5116d64',
+        id: 'e836c3da-321e-4a5c-9b53-e8a04d6d6cdd',
         kind: 'circle',
         cx: 0.49941087412746477,
         cy: 0.5004704854015921,
-        radius: 0.3844425216175068,
+        radius: 0.45783609392630353,
         style: {
           stroke: '#000000',
           strokeWidth: 0.030303030303030304,
@@ -1563,7 +1563,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '15a7178b-4233-46cf-9a90-a59adfb94760',
+        id: 'e62e2deb-1bbc-4fb3-b64f-5d3484aa4fca',
         kind: 'rect',
         x: 0.04849819694544435,
         y: 0.41141432010023465,
@@ -1576,7 +1576,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '92a424ac-7cdd-4455-ba8c-3e47d61ff4d8',
+        id: '64428bea-5355-4200-bad3-1be3bda739ea',
         kind: 'rect',
         x: 0.8442751281578185,
         y: 0.41141432010023465,
@@ -1589,11 +1589,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd68a8970-e30b-43ca-ac3d-350fc9938fe8',
+        id: '7bcd044f-e7ed-47cc-b1ec-6241ebeff62d',
         kind: 'circle',
         cx: 0.4957671705963636,
         cy: 0.49879018039590617,
-        radius: 0.31388332000331326,
+        radius: 0.3738064992766731,
         style: {
           stroke: '#000000',
           strokeWidth: 0.024242424242424242,
@@ -1601,7 +1601,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f932c086-0b43-49cd-bff6-598676d49b84',
+        id: '0789e912-4d3e-410a-a45a-a9f1e5ac3ad6',
         kind: 'rect',
         x: 0.17601313453995487,
         y: 0.11463158199008382,
@@ -1635,7 +1635,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '4c292387-85b7-418a-993b-c3da33c9c699',
+        id: '1c4b7870-0f19-456f-aca5-3383ca1557a5',
         kind: 'line',
         x1: 0.5,
         y1: 0.04926108374384237,
@@ -1648,7 +1648,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9f33f734-3c75-4124-b151-8fb5f6d284c5',
+        id: '88740fa0-ce95-4cb6-a4ce-2e5da730cbce',
         kind: 'line',
         x1: 0.15463917525773196,
         y1: 0.19704433497536947,
@@ -1661,7 +1661,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5bd522ba-a2eb-499a-b58b-c98740245d0c',
+        id: '50acf7aa-78f3-4d96-81a3-fb1253ad43af',
         kind: 'circle',
         cx: 0.5,
         cy: 0.8817733990147784,
@@ -1694,11 +1694,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '3c2dfdcf-2b45-4560-b2f6-6daea8e57863',
+        id: 'af64251f-4505-497c-85c1-c814fbcc6b13',
         kind: 'arc',
         cx: 0.4999999999999999,
         cy: 0.265715942697509,
-        radius: 0.4309644845915312,
+        radius: 0.4642503594177063,
         startAngle: -0.015442787729809544,
         endAngle: 3.141592653589794,
         style: {
@@ -1708,7 +1708,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f68bd366-6d1c-4008-87c4-c5ec8cfb73c3',
+        id: '3560e71b-fca2-4553-81a9-2ea6a79fffb7',
         kind: 'line',
         x1: 0.4983362428668965,
         y1: 0.06677522696482463,
@@ -1721,7 +1721,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'aa3558a6-1e50-43d1-8ac1-93572bd351a1',
+        id: '84b22da0-1283-46e3-8535-503603e9a343',
         kind: 'line',
         x1: 0.30866792969309403,
         y1: 0.2675082013978034,
@@ -1734,11 +1734,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '90b3cc28-5078-46be-8008-85c2b7fb5323',
+        id: 'b6841893-0b28-4ac4-b2c1-41461e9a598d',
         kind: 'circle',
         cx: 0.4999999999999999,
         cy: 0.8382713965238671,
-        radius: 0.10121540303381767,
+        radius: 0.10903285286163285,
         style: {
           stroke: '#000000',
           strokeWidth: 0.04878048780487805,
@@ -1773,7 +1773,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '2eed0d4c-aca1-41cd-8a1f-306b54a4374c',
+        id: '9b2b78b4-fcbb-4667-9a19-8bb0d890b51c',
         kind: 'line',
         x1: 0.08426966292134831,
         y1: 0.32019704433497537,
@@ -1786,7 +1786,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7493e5f9-7e1c-4274-8a44-510891de7fc1',
+        id: '5aadbf2b-d38b-4489-bb55-62b19ca6afb2',
         kind: 'line',
         x1: 0.3146067415730338,
         y1: 0.12789535871534244,
@@ -1799,7 +1799,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd9b9a2ab-e572-497c-a07f-3bd4152e3c46',
+        id: '2380f758-0caa-4e81-b60d-fed4c671cc3d',
         kind: 'line',
         x1: 0.6853932584269663,
         y1: 0.12964954267503248,
@@ -1812,7 +1812,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '21b9fb58-9058-44e1-b9c3-8da584743e52',
+        id: '7b5c638f-51be-499a-ba37-395e10eea29c',
         kind: 'circle',
         cx: 0.3146067415730337,
         cy: 0.8866995073891626,
@@ -1824,7 +1824,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5140c887-b5b9-4023-a0f1-54501106bacb',
+        id: '12bed214-6d86-457f-a912-e69177fcf6a8',
         kind: 'circle',
         cx: 0.6853932584269663,
         cy: 0.8866995073891626,
@@ -1836,7 +1836,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '36834c7c-ba6d-4a11-96ed-bf8cf87945e2',
+        id: 'e80f5837-5a0f-4b6c-8e12-b2d82cf69db8',
         kind: 'line',
         x1: 0.6095505617977528,
         y1: 0.8201970443349754,
@@ -1849,7 +1849,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '666b47f5-ae3f-4daa-a98e-0cd1b1999983',
+        id: '87d9f6ed-1eba-4a03-a7bc-bd26c1387ec8',
         kind: 'line',
         x1: 0.7612359550561798,
         y1: 0.8201970443349754,
@@ -1883,7 +1883,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'e2f12dce-931d-42a8-8ccd-45abbd86655a',
+        id: 'd506289a-1458-4cbb-a1ce-9249b8d4cb4f',
         kind: 'line',
         x1: 0.49740932642487046,
         y1: 0.04926108374384237,
@@ -1896,7 +1896,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '049e196e-59df-44d5-9367-7e6495120273',
+        id: 'b3496e64-0801-45dc-bb05-8c328e902305',
         kind: 'line',
         x1: 0.15544041450777202,
         y1: 0.19704433497536947,
@@ -1909,7 +1909,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd7dd5424-9b8f-4bca-90cb-1f3cf51a8ddd',
+        id: 'c0d40c96-2bfc-406f-a47a-51cdd124867b',
         kind: 'circle',
         cx: 0.49740932642487046,
         cy: 0.8817733990147784,
@@ -1921,7 +1921,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6e4aeb6c-3edb-466d-bc23-ca751ba1ea8c',
+        id: '732458b2-7a9d-4c09-a378-60daebc8c889',
         kind: 'line',
         x1: 0.35751295336787564,
         y1: 0.8152709359605911,
@@ -1934,7 +1934,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5fd1f3bd-ba64-46f4-a928-23d395765887',
+        id: 'bf3fda82-5de1-4abe-af93-aad9a7a75d8c',
         kind: 'line',
         x1: 0.6373056994818653,
         y1: 0.8152709359605911,
@@ -1974,7 +1974,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '384a73ec-39fc-40a5-88d7-221ce900ad9e',
+        id: '0b8600eb-2979-43d7-a2bd-2f5445fe2517',
         kind: 'rect',
         x: 0.13344409457037984,
         y: 0.16555435239000243,
@@ -1987,7 +1987,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'afb49416-f29b-4320-9a23-e0d65fb9ba0b',
+        id: 'a9b2c792-ca97-4c45-a807-6bc6dcbd428f',
         kind: 'rect',
         x: 0.03845618552217259,
         y: 0.5290822302269562,
@@ -2000,7 +2000,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5fe594aa-dc49-4839-ad3b-96c7d1a884e3',
+        id: 'd13d83ee-fb57-4e9c-90e4-d63d7e1d48ec',
         kind: 'rect',
         x: 0.2734903707311981,
         y: 0.6451017657068352,
@@ -2013,7 +2013,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b88412a7-3e03-40da-9d96-f5da76d54335',
+        id: '9095e795-9498-4deb-9fd0-e7169a192d33',
         kind: 'rect',
         x: 0.27470528733985156,
         y: 0.8563106285714479,
@@ -2040,7 +2040,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '98036775-ec4d-4280-9273-da7dde75abfd',
+        id: 'f24a764d-ce2a-493a-b828-cc98df2d5687',
         kind: 'circle',
         cx: 0.4867507997956368,
         cy: 0.3603952911322606,
@@ -2052,7 +2052,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8c01f4d5-924b-4c8f-9a8e-6e20ac713615',
+        id: '85dfba46-9731-45bb-af10-afdc52c9d439',
         kind: 'ellipse',
         cx: 0.4947003199182548,
         cy: 0.60690258956488,
@@ -2065,7 +2065,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '88716771-9707-4350-aaad-82edf78dbb43',
+        id: '8ae71e3f-b96a-4bdd-a2a1-829bab8f12b2',
         kind: 'line',
         x1: 0.06520591195095664,
         y1: 0.04649750823604766,
@@ -2078,7 +2078,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2e597283-2ecc-4a1f-9ce6-b18a25dcf4eb',
+        id: '76a91866-6d2b-4abe-9bb4-812d526bcada',
         kind: 'line',
         x1: 0.09457447374648568,
         y1: 0.04649750823604752,
@@ -2091,7 +2091,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'aeaced50-e813-4287-8031-0742c6cbee62',
+        id: 'e05ace0b-fd61-4461-a654-847de8de3783',
         kind: 'line',
         x1: 0.8921763260491511,
         y1: 0.04472407443437408,
@@ -2104,7 +2104,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '190f921c-88bf-4ed4-b568-9113622276c0',
+        id: '74c26a18-7ae7-4b8f-b6f4-88b7299a2a29',
         kind: 'arc',
         cx: 0.46073553286988317,
         cy: 0.6667614694805485,
@@ -2118,7 +2118,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0dac8c73-3674-4ea6-85bf-dcdb2f9491c4',
+        id: '1ba74189-7f73-409d-8571-d1136dda17fb',
         kind: 'line',
         x1: 0.9197236141495235,
         y1: 0.5453382253620821,
@@ -2131,7 +2131,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c73b341f-0196-4436-9619-32fac4e71d16',
+        id: '0c1d9144-d78c-4a82-b5cd-73c44bac618f',
         kind: 'arc',
         cx: 0.5121855242817603,
         cy: 0.6640430386420754,
@@ -2145,7 +2145,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '746b2def-d10e-4199-81cf-7a17ffcac5ac',
+        id: 'bb757ba3-7d71-492b-a463-6501d7891e28',
         kind: 'line',
         x1: 0.061807308943563635,
         y1: 0.5558660697104711,
@@ -2185,7 +2185,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '5674980b-52da-401b-9454-b56543165105',
+        id: '3129304a-085c-4d5a-b85f-669b01433819',
         kind: 'line',
         x1: 0.04693016919082727,
         y1: 0.060137557569723755,
@@ -2198,7 +2198,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f2437e52-f2e2-4ee4-995e-422aee2b3fb4',
+        id: 'c1a3f5f0-0544-4049-8731-e8364c3e9841',
         kind: 'line',
         x1: 0.10042969121579537,
         y1: 0.32075787299093256,
@@ -2211,7 +2211,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b7f89e54-63e5-4ddf-b8fe-902b36b56381',
+        id: '7ee53738-725a-4564-8d0b-d8ab181e3372',
         kind: 'line',
         x1: 0.22470138894287564,
         y1: 0.35444901816059143,
@@ -2224,7 +2224,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bca728f1-cc1a-4842-8a5f-d2bab5e85e06',
+        id: '504a07ad-f15f-43a2-8e42-1c34099a6d8f',
         kind: 'line',
         x1: 0.4961720394307777,
         y1: 0.6393814380664197,
@@ -2237,7 +2237,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '67ca7430-6183-4ed3-9ec1-7131b77bad99',
+        id: '021a2abf-5b95-4058-ac4f-ab446360a91d',
         kind: 'line',
         x1: 0.06744045567789528,
         y1: 0.060137557569723624,
@@ -2250,7 +2250,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '886e4354-84ec-4865-99ed-32d6daef7ec4',
+        id: '8d205e71-02b5-4180-ac2d-62cc17a4ef64',
         kind: 'line',
         x1: 0.9191702844449704,
         y1: 0.060137557569723624,
@@ -2263,7 +2263,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3bbd28e5-eb83-4895-b5c7-8629a2242635',
+        id: '1a82b911-6980-4fa5-9c5b-64d1d3cffca0',
         kind: 'line',
         x1: 0.9191702844449704,
         y1: 0.060137557569723624,
@@ -2276,7 +2276,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd9f31bb1-c88c-45d2-86ca-6a7ef72a9b31',
+        id: '2e644ac0-0eb3-41c8-92ba-12c595d6bf01',
         kind: 'line',
         x1: 0.06744045567789528,
         y1: 0.060137557569723624,
@@ -2289,11 +2289,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0e709fe4-1cd8-4b53-8676-66790e287345',
+        id: '69611c24-9d29-407f-a782-af824fda5fca',
         kind: 'arc',
         cx: 0.4961720394307777,
         cy: 0.6157235012971074,
-        radius: 0.2866628788773783,
+        radius: 0.30258859437056596,
         startAngle: 0.5954098754787324,
         endAngle: 2.437830832321414,
         style: {
@@ -2303,11 +2303,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1ffe9eee-59c6-42df-b022-030b79a91e41',
+        id: '5b1b13ce-2b73-4388-ab8b-e40b6876a002',
         kind: 'arc',
         cx: 0.4904747304277454,
         cy: 0.3732859985797036,
-        radius: 0.2565179899886859,
+        radius: 0.2707689894325018,
         startAngle: 0,
         endAngle: 3.141592653589793,
         style: {
@@ -2317,7 +2317,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dd25a38f-ab25-4639-a45b-8ab94337696c',
+        id: 'f71de134-3f79-484f-88b4-f52c02e71480',
         kind: 'line',
         x1: 0.11030600297864449,
         y1: 0.4833468618171427,
@@ -2330,7 +2330,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9bcf0597-d719-47e8-9174-56e67ade7159',
+        id: 'fe87e8bb-1f3c-48ee-b01c-9dd38d374a96',
         kind: 'line',
         x1: 0.8817684197680726,
         y1: 0.4953979990829373,
@@ -2343,11 +2343,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '32a76f27-cc23-4c9b-9788-2697c53d5562',
+        id: 'd33546b0-3419-4608-8fd0-0b861961e3ba',
         kind: 'circle',
         cx: 0.08431951628754086,
         cy: 0.3412349169140719,
-        radius: 0.031512416916155896,
+        radius: 0.03326310674483122,
         style: {
           stroke: '#000000',
           strokeWidth: 0.030864197530864196,
@@ -2355,11 +2355,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dae26294-4670-4c77-8585-7e693c8d721e',
+        id: 'c92bf29b-ea7c-41ad-9952-9d0d8e34ef82',
         kind: 'circle',
         cx: 0.901925612535192,
         cy: 0.3412349169140719,
-        radius: 0.031512416916155896,
+        radius: 0.03326310674483122,
         style: {
           stroke: '#000000',
           strokeWidth: 0.030864197530864196,
@@ -2388,11 +2388,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'e57e4761-4522-47ab-8650-8f4768b6f66b',
+        id: 'a2601478-2aef-4f45-896c-5c4686d449b5',
         kind: 'circle',
         cx: 0.5000000000000001,
         cy: 0.4946419353834565,
-        radius: 0.4488025337814621,
+        radius: 0.45229516050349683,
         style: {
           stroke: '#000000',
           strokeWidth: 0.04669260700389105,
@@ -2400,7 +2400,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '48b07b76-ac31-45e4-b6c3-996c9224b84a',
+        id: 'ad04db7e-546a-4b70-944c-88e9b7c7eb1c',
         kind: 'text',
         x: 0.19603411567479925,
         y: 0.24967062497396506,
@@ -2434,7 +2434,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '821172e8-7b1b-4f34-a6c5-3f8f788a9d0e',
+        id: '7c795d8d-6dd3-4548-9e78-ce6732489fce',
         kind: 'circle',
         cx: 0.3353819438903533,
         cy: 0.3352069921724834,
@@ -2446,7 +2446,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '28851fb3-b1b7-41ba-ab27-09ee34c75520',
+        id: '98edb93c-d15d-4ab2-a51f-bcadb262e60a',
         kind: 'circle',
         cx: 0.3353819438903533,
         cy: 0.33520699217248334,
@@ -2479,7 +2479,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'f76996b2-cc7f-4e94-93b8-877a39436cf5',
+        id: '07a44539-e71c-47c8-b33a-0223e0428998',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -2491,7 +2491,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ae8cb3ca-03d7-4cb9-8ae3-b5f8698033da',
+        id: '0d2b61eb-45a4-4c1a-bf90-0e9f8026de9d',
         kind: 'line',
         x1: 0.21646078031070598,
         y1: 0.22048261321410012,
@@ -2504,7 +2504,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e43f730b-53e3-4c2f-a2fd-3bfa3c932735',
+        id: '6d97b8e5-8da9-4c69-8f92-2a0098cbcfad',
         kind: 'line',
         x1: 0.7878502322938682,
         y1: 0.21623274972448445,
@@ -2517,7 +2517,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cd884581-f1e3-4708-850f-df2e73446153',
+        id: '8bfe2657-cbe3-4904-8cdd-114638c6c0c6',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -2550,7 +2550,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '26301a74-8e94-4351-b536-c0745bcee9d0',
+        id: '246f223f-1525-46ee-91f9-832ccb9edd95',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -2562,7 +2562,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a65ad467-7d26-4f14-9416-00a0a4516e76',
+        id: '2b7511ce-a4bc-4c78-a755-a79c8966a4d7',
         kind: 'line',
         x1: 0.21335581029170023,
         y1: 0.21335581029170023,
@@ -2575,7 +2575,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c2a390b3-2ffd-4ac1-aa5e-6e1e9f60c959',
+        id: 'ce2c43db-2a96-4df7-a044-d8918b755d52',
         kind: 'line',
         x1: 0.7791961082753402,
         y1: 0.2208038917246597,
@@ -2588,7 +2588,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd3fdbeac-2c47-44d7-ae47-2679dd232500',
+        id: '89a289a6-b6cc-4a96-819b-a89418d5c370',
         kind: 'arc',
         cx: 0.5018242661051415,
         cy: 0.4981757338948585,
@@ -2602,7 +2602,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4a332ad2-c266-4e1f-8efa-5d7a295fe66a',
+        id: '7bf5b224-4972-4272-b737-672662b8d6cd',
         kind: 'polygon',
         points: [
           {
@@ -2639,7 +2639,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '416f2e20-59f3-4f7e-ac1a-471ccff2cf4c',
+        id: '91913ad5-570b-445c-9701-bfcaff8de76f',
         kind: 'rect',
         x: 0.09803570472691368,
         y: 0.04935905907228756,
@@ -2652,7 +2652,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '334ebfcb-519a-4492-9b12-8cc0b12d2b69',
+        id: 'e8ad41fd-bb8f-4c3f-8fd3-246be35cab4d',
         kind: 'line',
         x1: 0.10195094136918396,
         y1: 0.8319713612327665,
@@ -2665,7 +2665,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '12ed861f-88c5-42e4-9abe-c60c808b94d5',
+        id: '5af730dd-b3a3-4c09-b117-20cf72191878',
         kind: 'line',
         x1: 0.10195094136918396,
         y1: 0.7340633692123164,
@@ -2678,7 +2678,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '84fb1948-86fe-4b1d-ae72-af98d28f2963',
+        id: 'f37069a5-0a09-455d-bc6d-912df3477c27',
         kind: 'line',
         x1: 0.10195094136918396,
         y1: 0.4445697915483052,
@@ -2691,7 +2691,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f16f4390-44bc-4ced-a43a-5cc7f0c542c6',
+        id: '99631494-22c6-4bf8-a1cf-03a4bc5e27fd',
         kind: 'line',
         x1: 0.10195094136918396,
         y1: 0.5424777835687553,
@@ -2704,7 +2704,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2441c29a-8528-4cad-89f2-d1c33e381881',
+        id: '0674c531-ded6-49b6-beb1-760edadc0c4f',
         kind: 'line',
         x1: 0.10195094136918396,
         y1: 0.14901543554009644,
@@ -2717,7 +2717,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a35590e1-b439-4cfb-a236-7c6d54c093eb',
+        id: 'cdbaba6b-931a-4ec9-8929-cb097b61f4ca',
         kind: 'line',
         x1: 0.10195094136918396,
         y1: 0.24692342756054653,
@@ -2751,7 +2751,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '94ca2ac8-543c-4cba-b0b2-9b76d8fb4445',
+        id: '81178306-277f-40cf-a897-f51f7821520f',
         kind: 'line',
         x1: 0.24078221558624702,
         y1: 0.048128717467102795,
@@ -2764,7 +2764,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '61a72b03-828b-42bd-9ee7-fd0cb6099d1b',
+        id: 'a80e195c-3767-4635-abc9-002e0bfb8878',
         kind: 'line',
         x1: 0.24226346006861127,
         y1: 0.8568882048380123,
@@ -2777,7 +2777,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3fdf8ff3-cd52-48c1-bdbc-86264ae70df9',
+        id: 'b2307bbb-ba24-4400-aa54-185f0e145408',
         kind: 'line',
         x1: 0.24522594903333986,
         y1: 0.11644858283861795,
@@ -2790,7 +2790,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8fad89a3-f9e2-477f-a4cb-60fb072fc79f',
+        id: 'a0da6d7f-c64e-4085-85ef-0cfcd1944e0d',
         kind: 'line',
         x1: 0.3607721617938382,
         y1: 0.048128717467102795,
@@ -2803,7 +2803,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '88e95b06-741e-4cdf-81e9-650ba27c2154',
+        id: 'a0ff3482-9ee8-47e1-9de8-2e2c1c7070d6',
         kind: 'line',
         x1: 0.03933296598470171,
         y1: 0.4949775666537697,
@@ -2816,7 +2816,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '60f95af2-d765-4f56-9bea-4be6a1352294',
+        id: '6771c64f-381a-438a-9b4c-5b43ccd73c0a',
         kind: 'line',
         x1: 0.40668159761104894,
         y1: 0.4931310838058909,
@@ -2829,7 +2829,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c3c756d0-7028-4d87-8449-ba78563c41d7',
+        id: 'd49f4fc4-7f78-45ae-99fb-3e9bf9031ff0',
         kind: 'line',
         x1: 0.25559466040989,
         y1: 0.39711397571619383,
@@ -2842,7 +2842,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e0b32131-513a-4088-8656-3146d67a7fc4',
+        id: '5e032743-8093-4d2d-82c4-3598d761a2d0',
         kind: 'line',
         x1: 0.25559466040989,
         y1: 0.39711397571619383,
@@ -2855,7 +2855,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c54b1667-e75b-47a8-9ab9-19daa3f5ef90',
+        id: '6657c3ae-d686-447f-95d2-80da926c2b39',
         kind: 'polygon',
         points: [
           {
@@ -2899,7 +2899,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '2aef6dbe-f233-4f7c-aaa7-888f42acf63c',
+        id: 'f6f5ff01-4caa-4a4c-9017-481731fe54dc',
         kind: 'line',
         x1: 0.4965034965034967,
         y1: 0.14476110467289702,
@@ -2912,7 +2912,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '70deacf3-e8a9-41cb-8353-6cb8ff38f210',
+        id: '544e22ed-a4ad-4e2f-8e47-1af551694a45',
         kind: 'line',
         x1: 0.2097902097902098,
         y1: 0.6696428571428571,
@@ -2925,7 +2925,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '84b01275-d541-471e-aabf-31fbca47c13d',
+        id: '8cd14125-0c1d-4096-9c59-a1b7ff888746',
         kind: 'line',
         x1: 0.4965034965034965,
         y1: 0.5729166666666666,
@@ -2938,7 +2938,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ff736ace-c37d-4e14-a30b-d67b3fc5d6d8',
+        id: '6e0826dd-e134-46f7-8594-32482b09cd54',
         kind: 'line',
         x1: 0.7692307692307693,
         y1: 0.6101190476190477,
@@ -2951,7 +2951,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7f38e0c1-678f-49b7-8c27-defb2fedcb45',
+        id: '55173764-c0c2-43fc-acee-38f0b2e839c0',
         kind: 'polygon',
         points: [
           {
@@ -2995,7 +2995,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '74eeabc3-bec9-48e3-80d9-909e1dbfc62f',
+        id: '56001226-e0f7-4bb6-b584-528ad05ae361',
         kind: 'line',
         x1: 0.4965034965034968,
         y1: 0.1132890457916257,
@@ -3008,7 +3008,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '961e87a6-6541-48de-8837-9c37bbc57f16',
+        id: '34683ae0-30cc-4d05-a4bd-805c17843f36',
         kind: 'polygon',
         points: [
           {
@@ -3076,7 +3076,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'd8d649d0-22a7-4b0b-8777-886bb8b63eb3',
+        id: 'f931bd52-b958-4f57-972f-7ad6add8d033',
         kind: 'rect',
         x: 0.14677160476138684,
         y: 0.34813920569394957,
@@ -3089,7 +3089,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3e1c5e04-259c-49ab-9f8a-fa1df9e8f60a',
+        id: '9aab5bf3-a391-420c-a358-5c584bdafe1e',
         kind: 'line',
         x1: 0.15160429181287713,
         y1: 0.42424242424242414,
@@ -3102,7 +3102,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e721dadb-41cb-4153-bce0-989188a64a4a',
+        id: 'fe3d66bc-c177-453b-9e01-fe2e3fb9e644',
         kind: 'line',
         x1: 0.1491863349340724,
         y1: 0.5743801652892563,
@@ -3115,11 +3115,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0dd2e60b-5edc-4120-9bdb-59e1c94ef11d',
+        id: 'bc60f381-ec90-46a5-a1cf-93cb6bfcb8d2',
         kind: 'circle',
         cx: 0.5201282221415902,
         cy: 0.4986225895316804,
-        radius: 0.037333333333333336,
+        radius: 0.03856749311294766,
         style: {
           stroke: '#000000',
           strokeWidth: 0.013774104683195593,
@@ -3127,11 +3127,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'acd3a5ee-7539-4f4e-bd02-a71e8af210db',
+        id: 'c14b7aa2-9e25-4b24-8033-4a5f31f9ffea',
         kind: 'circle',
         cx: 0.8711237373165647,
         cy: 0.49084829841100097,
-        radius: 0.006666666666666667,
+        radius: 0.006887052341597796,
         style: {
           stroke: '#000000',
           strokeWidth: 0.013774104683195593,
@@ -3139,11 +3139,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b025fe8d-b379-4bcc-8e91-4b39dfebdd4f',
+        id: '2fe28cfd-19a7-4b98-92de-d8e2af1ba48d',
         kind: 'circle',
         cx: 0.8711237373165647,
         cy: 0.5142642763724334,
-        radius: 0.006666666666666667,
+        radius: 0.006887052341597796,
         style: {
           stroke: '#000000',
           strokeWidth: 0.013774104683195593,
@@ -3151,11 +3151,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '016027bc-777e-46f9-89fa-942d28ab2f88',
+        id: '3e81b70d-54ce-4546-854b-f5099e8c9985',
         kind: 'circle',
         cx: 0.8711237373165647,
         cy: 0.537680254333866,
-        radius: 0.006666666666666667,
+        radius: 0.006887052341597796,
         style: {
           stroke: '#000000',
           strokeWidth: 0.013774104683195593,
@@ -3163,7 +3163,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'db7a6fe8-b0b3-4d15-a994-e47b1e700488',
+        id: 'ac62a2c8-e420-44fe-aea1-5a58ad7c26b9',
         kind: 'line',
         x1: 0.5214614531149471,
         y1: 0.11019283746556474,
@@ -3176,7 +3176,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2fc01020-acc7-4ec1-bfed-485f566c3371',
+        id: '97e6103d-73a8-4143-819f-816ef9e238ab',
         kind: 'line',
         x1: 0.5214614531149471,
         y1: 0.6473829201101928,
@@ -3189,11 +3189,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2582ac7f-900e-44de-a942-1f47fd44dfaf',
+        id: '4b2f02fb-8cfe-4b4c-aa15-e0dd3407c8ad',
         kind: 'circle',
         cx: 0.8711237373165647,
         cy: 0.466647877235349,
-        radius: 0.006666666666666667,
+        radius: 0.006887052341597796,
         style: {
           stroke: '#000000',
           strokeWidth: 0.013774104683195593,
@@ -3201,7 +3201,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ed718e9f-9060-4a6b-b1cb-4e81699cf675',
+        id: 'c4ad70b3-3d05-4971-8329-6788549d33d3',
         kind: 'polygon',
         points: [
           {
@@ -3224,7 +3224,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8b4be902-0741-4e80-a464-891e753e4c09',
+        id: '2b4f67d9-2948-4438-88b4-1c4c516a7ff0',
         kind: 'polygon',
         points: [
           {
@@ -3268,7 +3268,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'cfffcb76-00d8-408c-9509-e4d379d90c2c',
+        id: 'e94c5b85-8f19-4580-973f-088643f3b5f4',
         kind: 'rect',
         x: 0.009433962264150943,
         y: 0.05154639175257732,
@@ -3281,11 +3281,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '47f85d5e-877b-49ac-878f-067c353da949',
+        id: '167380b2-9166-4050-8fbc-dc5eaf91f4bc',
         kind: 'circle',
         cx: 0.5,
         cy: 0.3711340206185567,
-        radius: 0.007547169811320755,
+        radius: 0.041237113402061855,
         style: {
           stroke: '#000000',
           strokeWidth: 0.020618556701030927,
@@ -3293,7 +3293,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b5fd12d6-6d7d-4fd0-8d8d-ffbeb17b5a13',
+        id: '43001b24-6988-411a-a873-a6bac3d9d98a',
         kind: 'rect',
         x: 0.41509433962264153,
         y: 0.6907216494845361,
@@ -3327,7 +3327,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'baeee242-4fb9-4f8d-b06f-69520c35ead7',
+        id: '335a976f-21fa-44dc-91f8-34bda18f0931',
         kind: 'rect',
         x: 0.044180877086652644,
         y: 0.173481735436799,
@@ -3340,7 +3340,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a8f4514d-65f4-497a-83d6-2363cbfe59da',
+        id: 'ff884347-03c8-4d4c-98f4-48130490205d',
         kind: 'rect',
         x: 0.028735632183908046,
         y: 0.04950495049504951,
@@ -3380,7 +3380,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'ad3c1302-d8de-4701-96d3-a7f8eab80d31',
+        id: '1f176889-fe53-4ea4-9a5e-8ef5ec0b2c0b',
         kind: 'rect',
         x: 0.009433962264150943,
         y: 0.014302059496567507,
@@ -3393,7 +3393,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'db5c3cce-56ef-4b4e-a5a5-c45cc15c4b33',
+        id: '92a3e92e-d47d-4e52-b5eb-ca10cf483900',
         kind: 'line',
         x1: 0.01847065619994894,
         y1: 0.01805534491935246,
@@ -3406,7 +3406,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5fada469-c9ba-4cef-8b76-365fc8b91f86',
+        id: '942d22dd-adf3-4f59-859b-c4d163b4475b',
         kind: 'circle',
         cx: 0.1320754716981132,
         cy: 0.05434782608695652,
@@ -3418,7 +3418,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4dc2d74f-9796-43bc-90f6-f6f4c5692a8b',
+        id: '6bff4691-ae6a-4a2b-8e2c-cc3ac48ef8d0',
         kind: 'circle',
         cx: 0.8679245283018868,
         cy: 0.05434782608695652,
@@ -3430,7 +3430,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eeb8dc5d-a0cc-49a2-9e9b-a4fbb39f4743',
+        id: '1023a2fe-0408-4df5-9285-24dbade3a66a',
         kind: 'circle',
         cx: 0.1320754716981132,
         cy: 0.959954233409611,
@@ -3442,7 +3442,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a9a58e79-b57a-4e89-918d-054821ed0ba9',
+        id: '72b02e70-f41d-4cb9-886d-825289cfe62b',
         kind: 'circle',
         cx: 0.8679245283018868,
         cy: 0.959954233409611,
@@ -3454,7 +3454,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3ac0b697-90c0-463b-b145-7d6f3737cb6b',
+        id: '09bd3392-fb52-4b4d-bb55-a6f9f482a3a4',
         kind: 'rect',
         x: 0.4679245283018868,
         y: 0.0029972637443246757,
@@ -3467,7 +3467,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '96b09870-6134-4d65-933a-7b041efec338',
+        id: 'dd54479a-0a6f-4d39-823b-86353f804d05',
         kind: 'rect',
         x: 0.5216494872508559,
         y: 0.0029972637443246757,
@@ -3507,7 +3507,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '4d2a6189-909d-48df-96dc-dc7bf5bcbe1d',
+        id: '3110b942-13b5-4775-944b-69002181f6cf',
         kind: 'rect',
         x: 0.007748102712268956,
         y: 0.06229953654900722,
@@ -3520,7 +3520,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9a7f5582-6c59-4738-a780-b777accb3e23',
+        id: '7f804ccf-1547-4716-b1ea-6ef6384f8852',
         kind: 'rect',
         x: 0.007748102712268956,
         y: 0.7654762367431152,
@@ -3533,7 +3533,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '32bced64-cb0a-4cf1-83f2-843238660474',
+        id: 'e5b3fee4-1ad3-4f4e-92e0-7eb02ee137b6',
         kind: 'rect',
         x: 0.03848280538215022,
         y: 0.4170435667632573,
@@ -3546,7 +3546,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3b0aabff-f5c8-458c-b620-4ee01477e68c',
+        id: '925af35e-7a11-4a44-9770-0989858e5f2c',
         kind: 'line',
         x1: 0.013877792656439156,
         y1: 0.19863985095246564,
@@ -3559,7 +3559,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dd14ac94-9282-45ef-b7e0-329ff104f7bd',
+        id: '424f6e80-f7a3-4d1b-813b-7efe16baf93f',
         kind: 'line',
         x1: 0.014965135204775168,
         y1: 0.7794195814509258,
@@ -3572,7 +3572,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'df925f43-aa3b-4d46-9981-65fcc2f0352b',
+        id: '73bd1418-2a3e-4ede-a249-9d70dbff555d',
         kind: 'line',
         x1: 0.01569003023699921,
         y1: 0.5777599528056274,
@@ -3585,7 +3585,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b6e37ec6-f442-431e-8acd-028c7f9bba0b',
+        id: '08291a01-e41e-41ac-a32c-409fa2714c9b',
         kind: 'line',
         x1: 0.007353737366422987,
         y1: 0.5777599528056274,
@@ -3598,7 +3598,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '01ef67cb-e20a-4f80-aa6a-161a4e5fcd07',
+        id: 'e3ef6ddf-1be7-4cf9-ada0-d9bcb54ad35b',
         kind: 'line',
         x1: 0.008078632398647019,
         y1: 0.40836586474357656,
@@ -3611,11 +3611,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '67b5e0d1-dc92-4013-a9bd-ebc4f81d3a89',
+        id: '9650d400-24bf-4203-845f-3ffec1818eb1',
         kind: 'circle',
         cx: 0.024751218139799438,
         cy: 0.4890297162016959,
-        radius: 0.005799160257792136,
+        radius: 0.06453108116649547,
         style: {
           stroke: '#000000',
           strokeWidth: 0.10638297872340426,
@@ -3623,7 +3623,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '50b0c63a-55cc-4403-bccd-86220e4b73d0',
+        id: 'ea9834c2-fac9-4be2-bced-be439752b522',
         kind: 'line',
         x1: 0.9623108679887707,
         y1: 0.20670623609827757,
@@ -3636,7 +3636,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '884585bb-5979-4304-b69a-dddf8a217ce1',
+        id: '8a3da034-9f6b-4b63-a3ea-b07c21e85213',
         kind: 'line',
         x1: 0.9855075090199393,
         y1: 0.20670623609827757,
@@ -3649,7 +3649,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2c390c3d-14f3-4b35-ab78-bf66fa8d0d5a',
+        id: 'b9c38add-8fdc-4a50-ad93-1a2c9168a071',
         kind: 'line',
         x1: 0.9920315643099555,
         y1: 0.41239905731648235,
@@ -3662,7 +3662,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9c1a3b2c-9d5b-4209-816f-6403fd20b1be',
+        id: '7d7dab60-6138-496b-a770-93da11cebdbb',
         kind: 'line',
         x1: 0.03760044958790735,
         y1: 0.20670623609827637,
@@ -3689,7 +3689,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'aae23a12-7bf8-45c4-a53d-0cfa8bc2d041',
+        id: '41d3dd77-34cd-4019-be64-cfabc677c62d',
         kind: 'rect',
         x: 0.006996954159529875,
         y: 0.3823718588344621,
@@ -3702,7 +3702,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e868f851-287c-4593-a0ae-992f6135ef73',
+        id: '52edffd1-a5bb-4e8d-8d5c-779d0039dbf8',
         kind: 'rect',
         x: 0.006996954159529875,
         y: 0.8351020630690248,
@@ -3715,7 +3715,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bdc93b5d-4597-4b3b-9574-5e9ae6ae5eca',
+        id: '1745af3a-4d05-4f3f-99da-a0975813b557',
         kind: 'rect',
         x: 0.03779053557015804,
         y: 0.6107687002052806,
@@ -3728,7 +3728,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '360606ee-6130-421f-afa6-b5eda0563023',
+        id: '523baba7-60c3-4c4b-abb1-7e915d6c74a1',
         kind: 'line',
         x1: 0.013138386804742547,
         y1: 0.4701526092038121,
@@ -3741,7 +3741,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc1de67f-5d76-4005-b63b-30f4ccf095d9',
+        id: '59dfe5d6-33e3-4733-9069-493d1206dbd1',
         kind: 'line',
         x1: 0.014227812384780353,
         y1: 0.8440792850041905,
@@ -3754,7 +3754,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7fd8161b-eafe-4f54-ae06-2d09ff2d89d9',
+        id: '5ae4de67-a1ab-43e1-a2fb-86bd6ae0971b',
         kind: 'line',
         x1: 0.01495409610480559,
         y1: 0.7142436336846149,
@@ -3767,7 +3767,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd88142b1-a29b-498f-906e-7422900206ae',
+        id: '7f903514-b85c-43e5-8bce-ee6bc19f26d0',
         kind: 'line',
         x1: 0.00660183332451562,
         y1: 0.7142436336846149,
@@ -3780,7 +3780,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6125af1d-293f-4c23-a6d8-a9b07fb964a0',
+        id: 'd7d2263d-0c20-4a12-94bf-14f80db3b437',
         kind: 'line',
         x1: 0.007328117044540845,
         y1: 0.6051816865761711,
@@ -3793,11 +3793,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '90a8b15d-177b-4040-b800-8680252645c9',
+        id: '99d6a5af-eecc-4b4d-8d99-968ec400558a',
         kind: 'circle',
         cx: 0.02403264260512076,
         cy: 0.6571159471040013,
-        radius: 0.0058102697602017,
+        radius: 0.04154740842226421,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0684931506849315,
@@ -3805,7 +3805,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8e7453ce-d2c9-440b-9179-4fbd568f7789',
+        id: 'cf49ec1d-b27d-4da0-9e29-b75305474310',
         kind: 'line',
         x1: 0.9633883837373277,
         y1: 0.4753460352565951,
@@ -3818,7 +3818,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '944a12a9-df4b-45b1-9c5b-702063763cbc',
+        id: 'c0bcef39-6aa8-49cd-8312-b7144d9cdfe7',
         kind: 'line',
         x1: 0.9866294627781345,
         y1: 0.4753460352565951,
@@ -3831,7 +3831,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2c95ac81-ea0f-48e5-92dd-a58b2982fee0',
+        id: '89d2abcd-878a-4e2c-90d3-5cd68a913e26',
         kind: 'line',
         x1: 0.9931660162583615,
         y1: 0.6077783996025625,
@@ -3844,7 +3844,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '42dfc8b7-4b3d-4eff-9885-ba157a748e97',
+        id: 'd53ad7ab-126b-43bd-9e93-11628210c4a0',
         kind: 'line',
         x1: 0.03690648943914459,
         y1: 0.4753460352565943,
@@ -3857,7 +3857,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4d30a202-7e99-40c7-b862-34c6e915150c',
+        id: '1bd2f6c3-1f6d-4571-9fc0-7a9b939598db',
         kind: 'line',
         x1: 0.03690648943914459,
         y1: 0.13833293922425544,
@@ -3870,7 +3870,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '86596694-c9f7-4879-bb43-a4263eb93aec',
+        id: '96b914bf-07cf-4674-9bfe-a400985dbc23',
         kind: 'rect',
         x: 0.006996954159529875,
         y: 0.07330533967324239,
@@ -3883,7 +3883,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cb36c497-8e84-4871-a39c-48e1edf2c17d',
+        id: '20609f66-15e2-4d08-9cbe-e2d654cf99c5',
         kind: 'line',
         x1: 0.016247370665866637,
         y1: 0.15080799299101985,
@@ -3896,7 +3896,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3eb1c319-0b3e-4b49-bab6-1b9e5abf1b31',
+        id: 'cb24a896-f1d9-4560-b3ba-46d53f7f00e8',
         kind: 'line',
         x1: 0.038987904105631334,
         y1: 0.2942890776794199,
@@ -3909,7 +3909,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '610adcb6-4264-4a50-90d2-d7974e69052f',
+        id: 'da9abd19-2e28-4318-9e57-bd02cee38246',
         kind: 'line',
         x1: 0.9576472907821697,
         y1: 0.14090748210955284,
@@ -3922,7 +3922,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '769cac04-48e0-4a5a-a7c0-650a4ba014ca',
+        id: '1750572f-4f52-4d49-bc29-8debe3bc01d9',
         kind: 'line',
         x1: 0.9666767038703189,
         y1: 0.157646941989866,
@@ -3935,7 +3935,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7546ed52-826b-47f0-a933-d99910c2cba8',
+        id: '117159f4-0bee-4f38-80a9-4a134b8470e3',
         kind: 'line',
         x1: 0.9833978392187435,
         y1: 0.14569018493249952,
@@ -3969,7 +3969,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'c6d06748-c480-43ea-80c5-70f22ec6ee89',
+        id: 'beb64266-d44a-43e3-951b-3976381f2e59',
         kind: 'rect',
         x: 0.0117096018735363,
         y: 0.011723329425556858,
@@ -3982,7 +3982,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd7350d47-989a-4278-ba56-ab5dbf77ef7e',
+        id: 'abafbf5e-592c-465c-be39-1ec9f4136e54',
         kind: 'line',
         x1: 0.0117096018735363,
         y1: 0.011723329425556858,
@@ -3995,7 +3995,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e52d38bf-246e-4438-a59d-835607118fe4',
+        id: 'ba2d629c-a353-417f-8d4b-39d233e10802',
         kind: 'line',
         x1: 0.9882903981264637,
         y1: 0.011723329425556858,
@@ -4008,7 +4008,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9d1bda36-04ab-41fc-9c72-1a38827cb1db',
+        id: 'a3001f70-9183-43c9-96d7-3b0d986284a3',
         kind: 'line',
         x1: 0.0117096018735363,
         y1: 0.9882766705744431,
@@ -4021,7 +4021,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8a32859d-54e5-4916-9f8f-13143b09acd7',
+        id: '430fcc1b-dd55-43f1-bc7b-9870d5fe1c57',
         kind: 'line',
         x1: 0.9882903981264637,
         y1: 0.9882766705744431,
@@ -4034,7 +4034,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c650b23f-07b2-457c-b5a2-dbb462440954',
+        id: 'a86a5f65-7818-437b-be94-3425c2ecaae5',
         kind: 'rect',
         x: 0.11124121779859485,
         y: 0.11137162954279015,
@@ -4047,7 +4047,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3ec7cef5-218f-414b-b3f5-83050ebfc814',
+        id: '4d0f2385-5e1b-4bb0-8be6-b12859a871ef',
         kind: 'rect',
         x: 0.13466042154566746,
         y: 0.13481828839390386,
@@ -4081,7 +4081,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '43001186-855c-4286-9a49-bc90f1356b3d',
+        id: 'c3c32606-53ca-4882-b3b8-a37bbc517291',
         kind: 'line',
         x1: 0.19321616152609142,
         y1: 0.06240650940536432,
@@ -4094,7 +4094,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '60e59b96-f4bc-4b31-b373-6396ce87db87',
+        id: '008b3d50-f4be-4d55-a4bf-401cba111b59',
         kind: 'line',
         x1: 0.2539786134468277,
         y1: 0.1798416328290948,
@@ -4107,7 +4107,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '870db58e-b5f9-47dd-97a6-d17856732fa3',
+        id: '3114e338-a1a8-4099-9a03-0bc4b03774ac',
         kind: 'line',
         x1: 0.33577422180166466,
         y1: 0.2972767562528252,
@@ -4120,7 +4120,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f9b409c6-fb19-4026-b938-f9f7f3f6a8d6',
+        id: '7eb540d1-3113-441f-9e33-4329167caac3',
         kind: 'line',
         x1: 0.3041719677080605,
         y1: 0.7056705436816193,
@@ -4133,7 +4133,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a5171289-4212-43ce-9287-dd503866fe65',
+        id: 'b0b9b21b-d493-4a1b-b733-126c24c58622',
         kind: 'line',
         x1: 0.2468813492541549,
         y1: 0.8231056671053494,
@@ -4146,7 +4146,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f0c41301-bdca-4e11-bb14-c2ff44dabde8',
+        id: 'e4b1068e-811b-44e7-95e5-7bde97e6485a',
         kind: 'line',
         x1: 0.17685703985512402,
         y1: 0.94054079052908,
@@ -4159,7 +4159,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cbd49d0e-8e98-4b77-95eb-5afc820e2e38',
+        id: '23d50894-a693-4730-9b39-da8f4a9f15cf',
         kind: 'line',
         x1: 0.1306494349164649,
         y1: 0.13702144297725966,
@@ -4172,7 +4172,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3c24d840-9e45-4d9c-b50c-350d30787ba4',
+        id: '0db1f7a0-80b2-4cdf-aed6-570032ef5c89',
         kind: 'line',
         x1: 0.20855357232925448,
         y1: 0.2538776490964441,
@@ -4185,7 +4185,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '55bf37c2-8839-4846-b3dd-e2b68cd4b6ec',
+        id: 'ff1f71ab-65d6-4f0e-b8e1-4702abccc808',
         kind: 'line',
         x1: 0.2849198930235443,
         y1: 0.36842713013787887,
@@ -4198,7 +4198,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8729f0fb-f5ed-45af-a528-6684f4fc71c3',
+        id: 'b2e0b925-f6ba-4ad4-8bc6-812db8824af4',
         kind: 'line',
         x1: 0.6242420882912334,
         y1: 0.3621039622681252,
@@ -4211,7 +4211,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0ff9b6fd-152a-4f07-8afd-bb1821668185',
+        id: '78fbeefe-42d9-49bc-9d48-50f8e2f39dd5',
         kind: 'line',
         x1: 0.6996637161413678,
         y1: 0.2514109118832968,
@@ -4224,7 +4224,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9e00dc00-8a33-4dcf-bea1-104876386272',
+        id: '3dcbf98a-c5f5-4ef8-af90-3e6ea9d575f3',
         kind: 'line',
         x1: 0.7784374163403972,
         y1: 0.13325036158475304,
@@ -4237,13 +4237,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eda2d406-d6aa-4ab9-906a-60b7c38d093e',
+        id: '89ce5e4e-7c47-4d69-9abd-0f885fa6df3f',
         kind: 'arc',
         cx: 0.1904341721507294,
         cy: 0.15485139638090697,
-        radius: 0.06034237651432395,
-        startAngle: -1.4957447838585505,
-        endAngle: -3.020741347240585,
+        radius: 0.09051356477148592,
+        startAngle: -3.020741347240585,
+        endAngle: -1.4957447838585505,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4251,13 +4251,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5b346415-4dbf-4dbf-8765-78a0aa8e1c29',
+        id: 'd032fd57-0459-472c-9198-4846c73a5025',
         kind: 'arc',
         cx: 0.25306655918108134,
         cy: 0.2467036527277836,
-        radius: 0.044421848946716636,
-        startAngle: -1.5489806655563725,
-        endAngle: -3.3038022569720606,
+        radius: 0.06663277342007495,
+        startAngle: -3.3038022569720606,
+        endAngle: -1.5489806655563725,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4265,13 +4265,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9c44e84a-dbe7-43bb-87f5-0268363614b3',
+        id: 'ba116b3d-ce88-4dde-a748-adf3c953d32e',
         kind: 'arc',
         cx: 0.33123485111114254,
         cy: 0.36573428741854414,
-        radius: 0.046008134388225805,
-        startAngle: -1.4808561320276816,
-        endAngle: -3.1932233581045915,
+        radius: 0.0690122015823387,
+        startAngle: -3.1932233581045915,
+        endAngle: -1.4808561320276816,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4279,11 +4279,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '212645e8-0591-49bb-b0a9-d417c0d53221',
+        id: '38c7c864-cd7f-41f3-ae30-e31c5d06b3c9',
         kind: 'arc',
         cx: 0.5735259961989626,
         cy: 0.37070786149874696,
-        radius: 0.04997082266111761,
+        radius: 0.07495623399167642,
         startAngle: -1.514252889850087,
         endAngle: -0.05654343694484812,
         style: {
@@ -4293,11 +4293,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '00e244b9-4b40-499d-bad0-fe26fcec0ee6',
+        id: '31aa23c4-2d5e-4186-a82e-64db9d26cd3e',
         kind: 'arc',
         cx: 0.6522324012205184,
         cy: 0.25032350846299267,
-        radius: 0.04764103608563567,
+        radius: 0.0714615541284535,
         startAngle: -1.6224124601507695,
         endAngle: 0.0288034345416793,
         style: {
@@ -4307,11 +4307,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4120a472-9402-4515-95b4-1ac8ca47a25d',
+        id: '5b1a1a2f-667e-4df2-8a44-0f6b83b24cd5',
         kind: 'arc',
         cx: 0.7261629451273699,
         cy: 0.14145858549399293,
-        radius: 0.0530491186758408,
+        radius: 0.0795736780137612,
         startAngle: -1.6338098436546102,
         endAngle: -0.10387081268293363,
         style: {
@@ -4321,13 +4321,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ac06b5bf-7892-4fcc-87bb-6e595d1475e2',
+        id: 'cfc804ec-6b6c-4bc3-a9fa-24eb8e9fd2ea',
         kind: 'arc',
         cx: 0.3083762987840575,
         cy: 0.6717941473756811,
-        radius: 0.02312762649498139,
-        startAngle: -3.083247820965835,
-        endAngle: -4.723498502998792,
+        radius: 0.03469143974247208,
+        startAngle: -4.723498502998792,
+        endAngle: -3.083247820965835,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4335,13 +4335,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '623f78c7-aefc-4bf4-bbd0-7c30b93433e6',
+        id: 'e2d3ced1-8149-44d5-b55a-5a0fe903ebf0',
         kind: 'arc',
         cx: 0.24579169915786875,
         cy: 0.7660532966839061,
-        radius: 0.036621822244031044,
-        startAngle: -3.085321148182955,
-        endAngle: -4.834986870796612,
+        radius: 0.054932733366046566,
+        startAngle: -4.834986870796612,
+        endAngle: -3.085321148182955,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4349,13 +4349,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c94b4312-5fce-46aa-89a1-c5f85d56da3c',
+        id: '438f8f6b-c344-4710-8bd8-4a2d245c0ac2',
         kind: 'arc',
         cx: 0.17576424059982493,
         cy: 0.8727416804238668,
-        radius: 0.04523253824483537,
-        startAngle: -3.1385557117455645,
-        endAngle: -4.803019275916662,
+        radius: 0.06784880736725306,
+        startAngle: -4.803019275916662,
+        endAngle: -3.1385557117455645,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4363,11 +4363,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd220532d-83d2-4051-af55-444db603154d',
+        id: '73177053-050d-41d6-90d0-71e8c230b023',
         kind: 'arc',
         cx: 0.5827431487763808,
         cy: 0.7585961564099695,
-        radius: 0.042874342149225544,
+        radius: 0.06431151322383832,
         startAngle: -0.08055093109472153,
         endAngle: 1.5488729230827185,
         style: {
@@ -4377,13 +4377,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '45d09e83-8e8f-4c5c-83d8-b543f8db9089',
+        id: '3025d3ed-082d-461c-9c04-cf0e8a862d5b',
         kind: 'arc',
         cx: 0.6523428822060635,
         cy: 0.8695822428028761,
-        radius: 0.048001076408693846,
-        startAngle: 1.711051041454564,
-        endAngle: -0.06885648930102271,
+        radius: 0.07200161461304078,
+        startAngle: -0.06885648930102271,
+        endAngle: 1.711051041454564,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4391,7 +4391,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '03efa3b3-f640-41a6-89db-a66bbf2a15be',
+        id: 'a4dbc4f3-acad-455c-8a0f-d92218d17b69',
         kind: 'line',
         x1: 0.3798388036599819,
         y1: 0.588174184735156,
@@ -4404,7 +4404,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6394fbbb-e6d8-4795-9b7f-5c503f606aa3',
+        id: '21a9b5b3-3a2e-44a2-bdc0-85135b15987f',
         kind: 'line',
         x1: 0.3827867409812193,
         y1: 0.41698325315186796,
@@ -4417,7 +4417,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c4366f4e-eba5-4166-9b34-541990102e7f',
+        id: 'e7de2b94-3d1d-491e-a554-8e0fcb2ca130',
         kind: 'line',
         x1: 0.5467523848935565,
         y1: 0.6711282946466914,
@@ -4430,7 +4430,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1caba198-0a03-484a-b92d-f9ad7548b8af',
+        id: '3a6390ad-8639-4f17-87e2-c5bff32dfca0',
         kind: 'line',
         x1: 0.3627168692677339,
         y1: 0.5594450662392818,
@@ -4443,7 +4443,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dd654a4c-32b3-4455-8451-a79c96311d2a',
+        id: '6abfe4d8-6e3b-41b3-97c0-f5ba8200a735',
         kind: 'line',
         x1: 0.46926374673531546,
         y1: 0.5711405131038706,
@@ -4456,11 +4456,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6b2cbcce-4fc5-4b34-aeba-a417205b36d6',
+        id: '09e18f2d-d2bd-4aa7-ae11-61c577e6dfff',
         kind: 'arc',
         cx: 0.5242172763962554,
         cy: 0.6706828109750537,
-        radius: 0.022608357061174974,
+        radius: 0.033912535591762466,
         startAngle: -0.08051881567998265,
         endAngle: 1.5612859109258952,
         style: {
@@ -4470,13 +4470,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1ba44dea-f9f0-4b50-a9cb-d68e7c87dc4e',
+        id: 'd6e3406d-9596-49cc-bcce-bb4bfff1b36d',
         kind: 'arc',
         cx: 0.5254104596083371,
         cy: 0.44982961329827603,
-        radius: 0.021784581056458852,
-        startAngle: 0.04445454163699649,
-        endAngle: -1.5383656883899035,
+        radius: 0.03267687158468828,
+        startAngle: -1.5383656883899035,
+        endAngle: 0.04445454163699649,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4484,13 +4484,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4153c983-b7b9-488d-88a5-83fc4e5c755d',
+        id: 'a48cd002-3d3a-4723-926f-e2de15df58ee',
         kind: 'arc',
         cx: 0.3820170740628555,
         cy: 0.4442595610577736,
-        radius: 0.01934477456584566,
-        startAngle: -1.523519311401169,
-        endAngle: -3.2094874952760217,
+        radius: 0.029017161848768493,
+        startAngle: -3.2094874952760217,
+        endAngle: -1.523519311401169,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4498,13 +4498,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '02a0ca63-e723-43ad-9b4a-9de0c81a076b',
+        id: 'd1f2ae14-7a58-4e5c-a7a7-7c5c397cb8e4',
         kind: 'arc',
         cx: 0.3828075613944326,
         cy: 0.557802443133938,
-        radius: 0.02051351570809987,
-        startAngle: -3.128757533048272,
-        endAngle: -4.594973774257277,
+        radius: 0.030770273562149803,
+        startAngle: -4.594973774257277,
+        endAngle: -3.128757533048272,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4512,13 +4512,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3a9a225f-8240-4e86-b459-e619d4997690',
+        id: '40034ad9-c494-44e3-9305-23f581250aca',
         kind: 'arc',
         cx: 0.45694558007157626,
         cy: 0.5648299988483183,
-        radius: 0.0140505127617914,
-        startAngle: 1.6533152812280973,
-        endAngle: -0.08251895443304845,
+        radius: 0.0210757691426871,
+        startAngle: -0.08251895443304845,
+        endAngle: 1.6533152812280973,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4526,13 +4526,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1b591cfe-c733-4d7f-be2a-b7f828cb6f9f',
+        id: '6b1101a4-a750-4c31-99dc-6bed41020e6f',
         kind: 'arc',
         cx: 0.4493753099425859,
         cy: 0.5282437592479468,
-        radius: 0.020797068199179782,
-        startAngle: -0.4132754350465856,
-        endAngle: -2.706095910747986,
+        radius: 0.03119560229876967,
+        startAngle: -2.706095910747986,
+        endAngle: -0.4132754350465856,
         style: {
           stroke: '#FF0000',
           strokeWidth: 0.008,
@@ -4540,11 +4540,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '682f178a-10de-4475-8602-c8e97b1d5973',
+        id: '9e2125b0-6793-4620-85e0-591619775d2d',
         kind: 'arc',
         cx: 0.41554882946549365,
         cy: 0.5403500648869964,
-        radius: 0.0143326145398303,
+        radius: 0.021498921809745452,
         startAngle: 0.45650600688045445,
         endAngle: 2.7495804115798297,
         style: {
@@ -4554,7 +4554,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '44f6215f-7078-48b3-abac-5d40adfaa922',
+        id: '1928a1fd-f384-4321-ad56-52c78c2fe6e8',
         kind: 'line',
         x1: 0.43013230923777096,
         y1: 0.554022408600607,
@@ -4567,7 +4567,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '455f3e47-8d39-4bba-bb17-511aecaf677a',
+        id: '758cbbe8-70c2-48c3-8cdf-d6130b32591f',
         kind: 'line',
         x1: 0.4162699679147046,
         y1: 0.45806948633804095,
@@ -4580,7 +4580,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a532b543-0c2f-486e-90ad-ab34b7be20eb',
+        id: 'fde3a9dc-4300-4da9-a07c-069ee45874ce',
         kind: 'line',
         x1: 0.3353031709531006,
         y1: 0.35696249448717604,
@@ -4593,7 +4593,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '911b9486-edb6-4e97-a595-f3302babbeff',
+        id: '46de61a4-ed8c-48e8-930e-f1162f668ef4',
         kind: 'line',
         x1: 0.28961670429910585,
         y1: 0.2418760257123057,
@@ -4606,7 +4606,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cccdd6e2-fd97-45d8-bae8-d85d3ab463f5',
+        id: 'ce39287c-5306-4e3c-bdbc-bfebcf11f986',
         kind: 'line',
         x1: 0.21061423259118434,
         y1: 0.12599892576714364,
@@ -4619,7 +4619,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1f3a8af8-fc07-4f34-9063-f072519e163a',
+        id: '4e0278cb-47c0-44c3-ac42-1f2b33ebcd3f',
         kind: 'line',
         x1: 0.3456661243327241,
         y1: 0.6488451145233397,
@@ -4632,7 +4632,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e14091a3-0943-4100-b236-d29740ca930c',
+        id: '1af6faec-bdff-4fd5-8015-01692293d130',
         kind: 'line',
         x1: 0.29263884739892665,
         y1: 0.7650452360354699,
@@ -4645,7 +4645,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c53c8d84-a3b4-46e7-ad99-4e18d9807aa5',
+        id: '5d00f6ca-3d92-49f7-af84-27c4491af059',
         kind: 'line',
         x1: 0.21391276744416277,
         y1: 0.8812081284968631,
@@ -4658,7 +4658,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd31e8f10-b9f5-4cc7-b432-050ea7dfa48a',
+        id: '912847bf-c456-4672-81e4-246dd127b7f4',
         kind: 'line',
         x1: 0.16724235063153128,
         y1: 0.8089501271576347,
@@ -4671,7 +4671,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '78dc08eb-0d80-4d21-a84c-3a0b5a94aca5',
+        id: 'a82af197-0849-4edd-884b-fbac8f967580',
         kind: 'line',
         x1: 0.24400943104974765,
         y1: 0.6866338545095461,
@@ -4684,7 +4684,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '29ae3045-c1fe-45f4-85be-60ecdb136484',
+        id: 'bb7b6bf6-4da2-4329-beb1-4bc399eb86b5',
         kind: 'line',
         x1: 0.3230319877201761,
         y1: 0.6124437328716504,
@@ -4697,7 +4697,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2c444238-bb32-4c4f-b5a6-f8ae5ad98b16',
+        id: 'f6095c67-6a04-4232-bd4d-4e525b6f7270',
         kind: 'line',
         x1: 0.40238727674761304,
         y1: 0.5507675004850056,
@@ -4710,7 +4710,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '437db249-c3c5-452e-80eb-15e0612885e0',
+        id: '1eda1d55-b7e2-41e7-9e78-0e40e68ea0f6',
         kind: 'line',
         x1: 0.5083720529320335,
         y1: 0.6124437328716504,
@@ -4723,7 +4723,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ecc329d1-ba45-4210-89ea-041a6bf2b3ac',
+        id: '56e937fb-a887-446a-93b4-dec557415f24',
         kind: 'line',
         x1: 0.5858492079914458,
         y1: 0.6942274015463614,
@@ -4736,7 +4736,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '00cc8703-115a-47e4-81a8-3603138f4262',
+        id: '29907e51-0f88-46b0-aab2-35a4d7a23e66',
         kind: 'line',
         x1: 0.6638253086252585,
         y1: 0.8145548437058265,
@@ -4749,7 +4749,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7ef47855-5b81-4ec6-93c3-0c91d190c564',
+        id: 'afda26d0-56d6-4177-86f5-359b6de38576',
         kind: 'line',
         x1: 0.7416991066344724,
         y1: 0.5164440915615129,
@@ -4762,7 +4762,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '76b68b68-cc2b-4512-802e-13d83dbeee2f',
+        id: '4845ef0b-2b7f-4475-ab8a-227540528c60',
         kind: 'line',
         x1: 0.7877258543525062,
         y1: 0.5779715833685979,
@@ -4775,7 +4775,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '64833f83-23cc-4ad1-9a05-c7fca2684932',
+        id: '4e4e7b35-1ddf-4e48-b6b8-1b03c2a670ec',
         kind: 'line',
         x1: 0.8166982919384491,
         y1: 0.5176989938311461,
@@ -4788,11 +4788,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8b32161e-b857-4e6c-85f0-389e6b70e420',
+        id: '482b4a1a-ab94-43d8-9314-1bfce77ba9ed',
         kind: 'arc',
         cx: 0.8255260093365947,
         cy: 0.44869830448622544,
-        radius: 0.045966511036560374,
+        radius: 0.06894976655484056,
         startAngle: 1.5355094017784165,
         endAngle: 3.2146109506496754,
         style: {
@@ -4802,11 +4802,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eead7cdf-dda0-4778-8922-6da00fc734a2',
+        id: '8d0bf660-b916-4cc6-81d2-b62d0fd1caf2',
         kind: 'arc',
         cx: 0.7918932433361388,
         cy: 0.5009659203227419,
-        radius: 0.05075534671530696,
+        radius: 0.07613302007296044,
         startAngle: 1.6005780997128558,
         endAngle: 2.9927464405213,
         style: {
@@ -4816,13 +4816,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '20e08b4c-86ba-4ccf-8c11-d83f214f3d6b',
+        id: 'cac3f188-127e-4e47-a93a-a26d18d79c84',
         kind: 'arc',
         cx: 0.691627492149295,
         cy: 0.20243760176047806,
-        radius: 0.05060073465861712,
-        startAngle: -0.08361859452247553,
-        endAngle: -1.5002494415643086,
+        radius: 0.07590110198792568,
+        startAngle: -1.5002494415643086,
+        endAngle: -0.08361859452247553,
         style: {
           stroke: '#0000FF',
           strokeWidth: 0.008,
@@ -4830,13 +4830,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd3a7c34a-1eb2-4c5d-99bd-9d3855d76d0b',
+        id: '3f3d5239-365f-4883-85b8-92f7bb541b8a',
         kind: 'arc',
         cx: 0.6239152945201134,
         cy: 0.3021139521517192,
-        radius: 0.040973094685814684,
-        startAngle: 0.2258052831462657,
-        endAngle: -1.6806028235252617,
+        radius: 0.06145964202872203,
+        startAngle: -1.6806028235252617,
+        endAngle: 0.2258052831462657,
         style: {
           stroke: '#0000FF',
           strokeWidth: 0.008,
@@ -4844,13 +4844,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '592e1242-2daa-4331-ad9b-202a6307a93f',
+        id: '47360bd7-5f38-4439-927c-a2f37a7a5c1b',
         kind: 'arc',
         cx: 0.5674306674505954,
         cy: 0.38479699676128587,
-        radius: 0.019391242909494125,
-        startAngle: 0.3071771942062928,
-        endAngle: -1.7482854658947753,
+        radius: 0.02908686436424119,
+        startAngle: -1.7482854658947753,
+        endAngle: 0.3071771942062928,
         style: {
           stroke: '#0000FF',
           strokeWidth: 0.008,
@@ -4858,13 +4858,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e8108280-2390-42ed-9933-fd4d123be946',
+        id: '65e6fedd-a2ba-4a62-a263-221fe8a939aa',
         kind: 'arc',
         cx: 0.3450675997504233,
         cy: 0.38913594535116736,
-        radius: 0.02243468293415877,
-        startAngle: -1.8800056526678997,
-        endAngle: -3.329358169031595,
+        radius: 0.03365202440123815,
+        startAngle: -3.329358169031595,
+        endAngle: -1.8800056526678997,
         style: {
           stroke: '#0000FF',
           strokeWidth: 0.008,
@@ -4872,13 +4872,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '057909de-23c5-4cde-a919-9b3ce1476ea4',
+        id: 'bcf44f03-c0e7-4dbd-80a4-1ac016229831',
         kind: 'arc',
         cx: 0.3522707066581367,
         cy: 0.6077454707303293,
-        radius: 0.028651717426111865,
-        startAngle: -3.107367534368031,
-        endAngle: -4.540450882560958,
+        radius: 0.04297757613916779,
+        startAngle: -4.540450882560958,
+        endAngle: -3.107367534368031,
         style: {
           stroke: '#0000FF',
           strokeWidth: 0.008,
@@ -4886,13 +4886,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9ed14b9a-9dfa-403d-b706-77004aa3b4b5',
+        id: 'f681c985-95aa-4072-962e-1ab3af6ef366',
         kind: 'arc',
         cx: 0.41635962465503323,
         cy: 0.4776668629368752,
-        radius: 0.014233272107425369,
-        startAngle: -1.4150693402285734,
-        endAngle: -3.1798079947247846,
+        radius: 0.02134990816113805,
+        startAngle: -3.1798079947247846,
+        endAngle: -1.4150693402285734,
         style: {
           stroke: '#0000FF',
           strokeWidth: 0.008,
@@ -4900,11 +4900,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ffc4e7c3-866c-46ef-b333-b474cf539dbe',
+        id: '84ff470b-da3e-4040-baae-fc3130c888a1',
         kind: 'arc',
         cx: 0.49638681330746476,
         cy: 0.4757430026137323,
-        radius: 0.013080659408637833,
+        radius: 0.01962098911295675,
         startAngle: -1.9461563545378158,
         endAngle: 0.1872375584867617,
         style: {
@@ -4914,11 +4914,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eb4a04cd-9fd7-4033-aa4f-3f5353d99cd7',
+        id: '0ae40ae1-7b49-47b1-a148-920dc0dbf3d9',
         kind: 'arc',
         cx: 0.49187220745033344,
         cy: 0.6211956479270448,
-        radius: 0.017563635003781976,
+        radius: 0.026345452505672964,
         startAngle: -0.40401689586945877,
         endAngle: 1.6910191134559385,
         style: {
@@ -4928,13 +4928,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd217516f-a6a6-4c42-9e48-0e87fea7ab86',
+        id: '72913eda-687d-466c-ad12-3332ac1c96cf',
         kind: 'arc',
         cx: 0.28666547153851435,
         cy: 0.30456255620267736,
-        radius: 0.04253403277358003,
-        startAngle: -1.487210805016795,
-        endAngle: -3.42207049379316,
+        radius: 0.06380104916037005,
+        startAngle: -3.42207049379316,
+        endAngle: -1.487210805016795,
         style: {
           stroke: '#0000FF',
           strokeWidth: 0.008,
@@ -4942,13 +4942,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eee625ec-f458-4a14-96fc-ec4b25a30dad',
+        id: 'a296bd8a-a641-4594-a386-aa73df09f689',
         kind: 'arc',
         cx: 0.2936666712402639,
         cy: 0.6893899244374703,
-        radius: 0.04988521003779763,
-        startAngle: -3.0676636896347205,
-        endAngle: -4.739814698718829,
+        radius: 0.07482781505669645,
+        startAngle: -4.739814698718829,
+        endAngle: -3.0676636896347205,
         style: {
           stroke: '#0000FF',
           strokeWidth: 0.008,
@@ -4956,11 +4956,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'edb93062-1039-4fe4-b687-91d366d45c4e',
+        id: '38f8e412-8585-4f8b-8163-2468146fa9ef',
         kind: 'arc',
         cx: 0.5352454075812766,
         cy: 0.6919461443040303,
-        radius: 0.050090426453378085,
+        radius: 0.07513563968006713,
         startAngle: -0.03469506131519934,
         endAngle: 1.5068061236041514,
         style: {
@@ -4970,11 +4970,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a114dd7e-b667-4072-bb2b-13891f8a6bcf',
+        id: '7228379c-907a-43ed-82ed-3e0d4b304ec2',
         kind: 'arc',
         cx: 0.6207017999189702,
         cy: 0.8176337221465354,
-        radius: 0.04289182118860683,
+        radius: 0.06433773178291025,
         startAngle: -0.1359033445270535,
         endAngle: 1.6015335481000448,
         style: {
@@ -4984,11 +4984,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5d0a4953-a5b7-4ed2-9518-2457482edfc7',
+        id: '0ac4a766-e835-4005-a791-9e0be8299581',
         kind: 'arc',
         cx: 0.2118328045910477,
         cy: 0.8131803368645752,
-        radius: 0.04468094900208552,
+        radius: 0.06702142350312827,
         startAngle: 1.5200433471658759,
         endAngle: 3.2052486800047113,
         style: {
@@ -4998,11 +4998,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cdc20d76-aec5-4902-8c2f-551e5a43a523',
+        id: 'db2c5178-10c8-47bc-9c76-0ab572ceae63',
         kind: 'arc',
         cx: 0.20645256091205524,
         cy: 0.18558374341380157,
-        radius: 0.03916523133212292,
+        radius: 0.05874784699818439,
         startAngle: 2.9717466885635506,
         endAngle: 4.908900031999226,
         style: {
@@ -5033,7 +5033,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '6efc459d-6515-48dc-bd09-874b4f681f59',
+        id: '3d165ede-6c24-4fef-b9fb-5dad88772588',
         kind: 'rect',
         x: 0.03546099290780142,
         y: 0.03571428571428571,
@@ -5046,7 +5046,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '162940b7-7cb4-4ae9-a0b6-ef33cdb08cfa',
+        id: '85da5325-644d-4a56-89ab-218ccf82d0b8',
         kind: 'line',
         x1: 0.11861115471020242,
         y1: 0.12725252483724261,
@@ -5059,7 +5059,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b49fe4f1-32bd-42e0-95c9-8ea3a2dd8717',
+        id: 'd984b07b-c020-4b6d-bd9f-dcce4a03170d',
         kind: 'line',
         x1: 0.8973135505374832,
         y1: 0.10341992410153462,
@@ -5072,7 +5072,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b61eee26-ea2b-4e25-bba1-b6738df3eebc',
+        id: '804f1073-465a-42fe-9a02-19a8c078c626',
         kind: 'line',
         x1: 0.12539686281465948,
         y1: 0.873707445308093,
@@ -5085,7 +5085,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3f326987-61dd-46c2-a8af-5677d7bd3382',
+        id: '10365d6d-47de-4421-8862-a796907275e3',
         kind: 'line',
         x1: 0.8822519028523036,
         y1: 0.8814108450155343,
@@ -5098,7 +5098,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '32e8b64a-8f9e-42c8-86d7-7cc8e81f4960',
+        id: '006c9e65-af6f-4ee0-9e28-7443537a39f1',
         kind: 'rect',
         x: 0.2127659574468085,
         y: 0.21428571428571427,
@@ -5111,11 +5111,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eaee8016-71d1-43fd-9804-0951d6e4683e',
+        id: '0db3fccf-b98e-4d0d-9433-7a02c68d5af5',
         kind: 'circle',
         cx: 0.49645390070921985,
         cy: 0.5,
-        radius: 0.19166691442484973,
+        radius: 0.19303596381359864,
         style: {
           stroke: '#000000',
           strokeWidth: 0.07142857142857142,
@@ -5144,7 +5144,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '48221088-e084-4250-be55-402a4d0097cd',
+        id: '498af6d8-87e1-404a-b61b-b66f9c90341a',
         kind: 'rect',
         x: 0.4028978291844441,
         y: 0.40329183477123953,
@@ -5157,7 +5157,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '476ea6e5-0b69-4774-8daa-0f6e9cb8f261',
+        id: '637184b0-32da-4ac6-86b5-de5a98b6bd31',
         kind: 'line',
         x1: 0.42799614355351756,
         y1: 0.4284242501109231,
@@ -5170,7 +5170,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3b922713-6ac4-46fc-a16e-2bf37d8aeb35',
+        id: '3474d9c7-f0ae-4e51-8dd2-ff17f4876087',
         kind: 'line',
         x1: 0.5785839072810202,
         y1: 0.42709531363377135,
@@ -5183,7 +5183,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '94ea861f-b0fe-43e1-9623-76090f130152',
+        id: '61f799c7-d9a9-43b0-b100-ba15e85b699a',
         kind: 'line',
         x1: 0.4279309802309564,
         y1: 0.5765942365086314,
@@ -5196,7 +5196,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6ae46e32-8664-4839-b26d-256a22e2956b',
+        id: 'b6b11b5a-d084-41a4-9d0c-777995593ac5',
         kind: 'line',
         x1: 0.577602018196468,
         y1: 0.5768746979531167,
@@ -5209,7 +5209,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f05cb891-4bcb-40b6-a85a-3f673cf54965',
+        id: '3f186b27-8854-41ca-8217-d8e1841fe63d',
         kind: 'rect',
         x: 0.43681913176246306,
         y: 0.4372592260755873,
@@ -5222,7 +5222,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f5ac4a5f-58b4-4d75-85b4-347a94f16d98',
+        id: '5605a039-c35b-4dd6-a212-43c7ee2e0817',
         kind: 'line',
         x1: 0.5019480327122595,
         y1: 0.40329183477123953,
@@ -5235,7 +5235,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f0ee5004-c489-446c-bba1-e3f4c95c0091',
+        id: 'cc4cd3ba-6ee6-4ddd-9dc4-2bc5cfc4b03d',
         kind: 'line',
         x1: 0.5019480327122595,
         y1: 0.6016613999886309,
@@ -5248,7 +5248,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '88039ee8-11f2-4669-a9a6-90abe62f8c2d',
+        id: '6b3e31d2-d7be-4c8e-aafe-eeb2c08fdace',
         kind: 'line',
         x1: 0.4028978291844441,
         y1: 0.5024766173799352,
@@ -5261,7 +5261,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9913015c-838b-4164-b0ec-f430c3cf16d2',
+        id: '18680a3d-1c04-48e2-b57d-790a52a697a3',
         kind: 'line',
         x1: 0.6023550883431957,
         y1: 0.5024766173799352,
@@ -5274,7 +5274,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8e0866ea-1308-4176-8267-84dbe3f200f5',
+        id: '60e06026-b9e7-42a5-88b2-cebcc2f4184d',
         kind: 'polygon',
         points: [
           {
@@ -5297,7 +5297,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '82992e06-4902-4d8b-8054-c9a09526dc0c',
+        id: 'ddd927a5-e60e-4ab2-a6ac-f8c72eb57c65',
         kind: 'polygon',
         points: [
           {
@@ -5320,7 +5320,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '28301e0d-c4f0-47e8-9500-e76fe31c3f9f',
+        id: '05f8241d-0380-4896-9eaf-2d5cf2d8ede4',
         kind: 'polygon',
         points: [
           {
@@ -5343,7 +5343,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0d9a7e1e-471c-4c68-a7fb-1e832fda70ee',
+        id: 'a0e85d58-5c87-4cc2-bc07-72d7e0d4915e',
         kind: 'polygon',
         points: [
           {
@@ -5366,11 +5366,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5cfb837e-333d-460e-a681-64b9943dab82',
+        id: 'db6c7633-d86f-43b2-a325-be370c1f511c',
         kind: 'circle',
         cx: 0.50262645876382,
         cy: 0.5024766173799352,
-        radius: 0.03829347717420584,
+        radius: 0.03834550635514905,
         style: {
           stroke: '#000000',
           strokeWidth: 0.010869565217391304,
@@ -5399,7 +5399,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '6ca757db-cbc9-4c6f-8bf5-22a9110b40d5',
+        id: '175daf0c-fbb6-42f6-9714-acf9ccb9040b',
         kind: 'rect',
         x: 0.40027137042062416,
         y: 0.4008152173913043,
@@ -5412,7 +5412,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1a55da77-9dd1-40a5-919d-51c67a5029e3',
+        id: '977a9ee1-b4ef-4388-b55d-f23482e4b15e',
         kind: 'line',
         x1: 0.42319256924414095,
         y1: 0.4237675591480053,
@@ -5425,7 +5425,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '008d4ee6-adc8-45f7-9d5d-0cb1c0776df1',
+        id: '65e4d50d-e343-46f1-a29f-2f45b960122f',
         kind: 'line',
         x1: 0.577257878806289,
         y1: 0.4233164990757676,
@@ -5438,7 +5438,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '93db2cd9-ec8b-46c8-abbc-baa13081ffd4',
+        id: '49b8ba16-4c1b-4fa0-9bc3-cb6fe88fefc1',
         kind: 'line',
         x1: 0.4246258989152926,
         y1: 0.5747971637220506,
@@ -5451,7 +5451,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '04a190f3-ac1b-41ba-b9bc-ab59b1a454a7',
+        id: 'cd6d4841-6334-4b01-8448-3be9225ab08b',
         kind: 'line',
         x1: 0.5771119544061395,
         y1: 0.5765373782572347,
@@ -5464,7 +5464,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '23079c77-65fc-4852-b761-f94236b103c6',
+        id: '86f05368-b3cc-4a2d-bc1b-2f775e6c527a',
         kind: 'rect',
         x: 0.43419267299864317,
         y: 0.43478260869565216,
@@ -5477,11 +5477,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e8fefd23-9c92-414b-aeaa-6cacdb2ee24c',
+        id: 'eb65828c-d27d-482c-8998-ec0560fe51a2',
         kind: 'circle',
         cx: 0.4993215739484396,
         cy: 0.5,
-        radius: 0.005427408412483039,
+        radius: 0.005434782608695652,
         style: {
           stroke: '#000000',
           strokeWidth: 0.002717391304347826,
@@ -5489,7 +5489,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0cbc2592-6395-4fa1-98b5-1fa0ba163004',
+        id: 'e046ab21-4e0a-4a57-aedc-ab3943296014',
         kind: 'line',
         x1: 0.4993215739484396,
         y1: 0.4008152173913043,
@@ -5502,7 +5502,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e9b8b366-3bd7-4db0-a332-4e3cd3d8cc80',
+        id: 'e15ebac0-f97e-4dc3-bed1-b497d33617f8',
         kind: 'line',
         x1: 0.4993215739484396,
         y1: 0.5991847826086957,
@@ -5515,7 +5515,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1bfb0601-f0d0-4fa1-81b6-90188893ff3c',
+        id: '88fa9ae3-ac5b-4805-adbf-eb369b5be991',
         kind: 'line',
         x1: 0.40027137042062416,
         y1: 0.5,
@@ -5528,7 +5528,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cdeb8c57-e787-41d6-b70d-27d42f615123',
+        id: '440bcea4-2e6a-4c33-b590-b6175150ffc9',
         kind: 'line',
         x1: 0.5997286295793759,
         y1: 0.5,
@@ -5541,7 +5541,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6db4a060-9803-4f3e-a02f-d17cadc32517',
+        id: '826181d1-4fcc-460a-a897-7c60861cb460',
         kind: 'polygon',
         points: [
           {
@@ -5564,7 +5564,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9bb64212-7132-4895-aa5d-72948c8a4042',
+        id: '180f86ca-5aea-45da-a13d-71f6fc4cf177',
         kind: 'polygon',
         points: [
           {
@@ -5587,7 +5587,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2f30d020-4a49-4bdd-972e-571fe1cb71d9',
+        id: 'f7175c02-9909-40f5-abc3-93947495a181',
         kind: 'polygon',
         points: [
           {
@@ -5610,7 +5610,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '055b9eb1-6545-49d4-9abd-281526cfbc02',
+        id: '230ad3cb-f870-446f-86be-0d8d5fbe1ef1',
         kind: 'polygon',
         points: [
           {
@@ -5633,7 +5633,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9eb1837b-3aab-404b-aed0-b880b52f242c',
+        id: '617618ab-e4da-4a3a-a243-4bd2582f383f',
         kind: 'rect',
         x: 0.4678830671449502,
         y: 0.5628322943683643,
@@ -5667,7 +5667,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '3969c032-416d-45a5-9371-8dfb4bb05f6a',
+        id: '208b4158-e2a2-4ed7-92f6-ba99a5a5629b',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -5679,7 +5679,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3ec74b55-f1fa-4bce-bc1e-d61f48d2d1f8',
+        id: '5d3b303a-d8f7-4b14-a1dc-79461fb54dfb',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -5691,7 +5691,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a82ee198-c414-4e40-abc4-2aff898e77ae',
+        id: 'be6f1b55-ecfc-469f-a042-05771992095f',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -5703,7 +5703,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bb6808dc-cdb0-4e32-8237-02663d4aad98',
+        id: 'a8bea70c-29f5-4137-9f0b-e60e5ada9ac3',
         kind: 'line',
         x1: 0.5,
         y1: 0.4116847826086957,
@@ -5716,7 +5716,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8daa36b5-6f42-47fd-a0d5-969ddc6e0408',
+        id: '6b355cd3-bf99-410e-83ee-2b0d674a7f6c',
         kind: 'line',
         x1: 0.5,
         y1: 0.5883152173913043,
@@ -5729,7 +5729,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a24a685b-7186-4184-9241-a73d99071fd5',
+        id: 'ed72f970-0ced-4e73-ac9b-ab18a8431e53',
         kind: 'line',
         x1: 0.4116847826086957,
         y1: 0.5,
@@ -5742,7 +5742,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd9617759-09c8-4a20-8aa1-94f4ce2f8fd5',
+        id: 'cdf4a938-3e40-498f-ba6c-28f04f90c801',
         kind: 'line',
         x1: 0.5883152173913043,
         y1: 0.5,
@@ -5755,7 +5755,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1e1d3eca-29f2-4db4-90c8-1e24782bb210',
+        id: '1f11cf59-5da3-4bc4-83ac-9321466f31e7',
         kind: 'polygon',
         points: [
           {
@@ -5778,7 +5778,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9620d442-5bbc-4dd3-911e-12245652ce79',
+        id: 'ea581427-cb22-442b-b46e-2ca57aa28aa3',
         kind: 'polygon',
         points: [
           {
@@ -5801,7 +5801,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a2c6a213-110a-4a40-9e2f-e736335b09a0',
+        id: '1d044cf0-b908-4f78-95cc-0e867dcdea8f',
         kind: 'polygon',
         points: [
           {
@@ -5824,7 +5824,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4679b501-3a59-4607-8a90-63a18898d635',
+        id: '41a4411e-bc98-4844-a948-de7284577d63',
         kind: 'polygon',
         points: [
           {
@@ -5868,7 +5868,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '83deeddd-39eb-4b63-a78d-5f31ba0af5c3',
+        id: 'd5f1d0e4-3a5e-4128-ba9e-26559cb2622e',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -5880,7 +5880,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '41a39832-62de-4eac-b7c0-1c365ae70881',
+        id: '5b86e3c5-a780-4bf0-9e90-554ea5ea267d',
         kind: 'rect',
         x: 0.11956521739130435,
         y: 0.12991579822338703,
@@ -5893,7 +5893,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fa44ceea-4d9d-45d8-a704-30bd173912d3',
+        id: '8db5e028-d908-4a2a-b35b-8b39105e4bf5',
         kind: 'circle',
         cx: 0.5,
         cy: 0.4782608695652174,
@@ -5905,7 +5905,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c487f9ad-f58a-42a1-bc2d-0c9c7c446fd8',
+        id: '349b7bda-2ac6-462a-a727-61c7d7c1e410',
         kind: 'rect',
         x: 0.3602870043628557,
         y: 0.8362426095000606,
@@ -5939,7 +5939,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'ac1b8b34-1a56-42c5-94ba-6c015789e3e5',
+        id: 'ee9a0aac-0fca-4af9-8c1b-c52f4f648461',
         kind: 'rect',
         x: 0.02982243518285932,
         y: 0.07979117099907893,
@@ -5952,7 +5952,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b319a0de-c719-499f-93fd-3497b125cb17',
+        id: '7518df08-ed3c-49e4-9a4a-dd41e5db7777',
         kind: 'rect',
         x: 0.011816838995568686,
         y: 0.04526748971193416,
@@ -5986,7 +5986,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '67a26d52-8ea7-49ee-980c-680735fdf521',
+        id: '7a094cd1-19ef-48db-983e-e2f95b2b1890',
         kind: 'rect',
         x: 0.07666939220496051,
         y: 0.5827373874786875,
@@ -5999,7 +5999,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cfd711d8-bc0f-4a97-99ea-73d2719c8a56',
+        id: '96259ee1-5a95-4d8f-9d4e-235f26d0f786',
         kind: 'rect',
         x: 0.12073589533932953,
         y: 0.6680340168963308,
@@ -6033,7 +6033,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '26817adb-2226-419b-b219-80b8254487d5',
+        id: 'db4aaa37-82f5-4e5b-ab57-c0f4887261d3',
         kind: 'rect',
         x: 0.03592814371257485,
         y: 0.05795659077995987,
@@ -6046,7 +6046,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8fd394bb-3cf4-4bbf-83df-e90ce641295d',
+        id: '2e718bb6-4f94-428c-b763-5aeb96a0ec6d',
         kind: 'line',
         x1: 0.3153692614770459,
         y1: 0.20089530326990399,
@@ -6059,7 +6059,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '73e81e72-db52-4cf0-aea8-8001556184a2',
+        id: 'f06d82fd-1248-469f-a53f-2f9deed469a9',
         kind: 'line',
         x1: 0.6846307385229541,
         y1: 0.20089530326990399,
@@ -6072,7 +6072,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'abd86baf-aaeb-48c6-895e-86d9ba476649',
+        id: 'd2f61081-d4fa-4027-9e51-959c06635cc5',
         kind: 'line',
         x1: 0.3037447825435771,
         y1: 0.3625332343043867,
@@ -6085,7 +6085,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2a5e12dd-3041-419c-92fa-e1fba7d7b80f',
+        id: '4a74eb95-d61b-4609-bf5b-38dc5aa743ba',
         kind: 'line',
         x1: 0.499001996007984,
         y1: 0.3625332343043867,
@@ -6098,11 +6098,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '467cd43b-c075-4e34-a71b-6f250f66f7ce',
+        id: '1c28096e-aa0b-4c9e-913d-31ea1eaef736',
         kind: 'circle',
         cx: 0.499001996007984,
         cy: 0.7528525055933923,
-        radius: 0.12811506353816723,
+        radius: 0.13833113541513314,
         style: {
           stroke: '#000000',
           strokeWidth: 0.02586206896551724,
@@ -6131,7 +6131,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '591920d8-b713-42b2-886e-6b262406cad0',
+        id: '2c8f0110-6956-4e27-917b-b89bd76f1b91',
         kind: 'line',
         x1: 0.10483503060343514,
         y1: 0.059395692620499936,
@@ -6144,7 +6144,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4cfba0b7-decf-49f5-b601-4f87c9e05046',
+        id: '7229a013-8787-47be-910a-0bb5bca5716d',
         kind: 'line',
         x1: 0.07951388301357491,
         y1: 0.27368140690621423,
@@ -6157,7 +6157,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1a25365f-e72b-4fb9-b531-52e9394eaf55',
+        id: '4729032e-cd3e-4c78-81c4-c5bc33243d84',
         kind: 'line',
         x1: 0.9091828566903917,
         y1: 0.059395692620499936,
@@ -6170,7 +6170,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e79356de-d130-4202-82c4-5111782cdf29',
+        id: '3bd12dbd-f933-4b5d-88ad-3f2c9e86a98c',
         kind: 'line',
         x1: 0.5048350306034352,
         y1: 0.27368140690621423,
@@ -6183,7 +6183,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5e5ad80b-cb69-4c5a-b36b-a0d07597d6de',
+        id: '5ec4537b-de4e-4664-82d0-9a8b5aec203c',
         kind: 'circle',
         cx: 0.5048350306034352,
         cy: 0.7911332408436389,
@@ -6216,7 +6216,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'ffb73ff3-bf09-4bef-bd62-96fba50146a0',
+        id: '7a1971a7-2ec6-4c1e-bf25-aa6541decc4c',
         kind: 'circle',
         cx: 0.5002226794332192,
         cy: 0.6486583263884207,
@@ -6228,7 +6228,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '475879a9-c70e-4c14-a19c-2bb8cd19672c',
+        id: '439b4577-ba06-41e1-b24a-6538db4f8b9f',
         kind: 'line',
         x1: 0.22938934609988582,
         y1: 0.5430245235715192,
@@ -6241,7 +6241,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '13fb8ea9-d553-4bc1-8540-baa72d57636a',
+        id: '739f1555-ce97-456f-8472-8fe7de9affed',
         kind: 'line',
         x1: 0.7710560127665524,
         y1: 0.5430245235715192,
@@ -6254,7 +6254,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5e399857-3740-484a-80f7-f8752ecaaa81',
+        id: '3c32b070-3424-4751-8f87-cd269b8fccca',
         kind: 'circle',
         cx: 0.503686167859893,
         cy: 0.8421750100198502,
@@ -6266,7 +6266,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd29cb6ff-0a70-4ea6-83a5-45c2cda3d6d0',
+        id: '6cfbde24-cbee-4367-b502-d58fe59ca173',
         kind: 'line',
         x1: 0.5002226794332192,
         y1: 0.48668649540250514,
@@ -6279,7 +6279,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '58bec2b3-b5f8-4fc1-80b8-d7cdb192d7cd',
+        id: '6ed94b33-b58e-49b3-a263-913e8c1b3f76',
         kind: 'line',
         x1: 0.5002226794332192,
         y1: 0.48668649540250514,
@@ -6292,7 +6292,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bdb782fc-26df-42a9-99a8-1f6ac94f0bad',
+        id: '9a18a6d9-cb78-481e-b0fe-d816c9220a16',
         kind: 'line',
         x1: 0.625,
         y1: 0.45774647887323944,
@@ -6305,7 +6305,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e0b37650-7e42-4b1d-8571-ec58f911e974',
+        id: '17380e2b-c1fc-4794-98e9-6959809e8545',
         kind: 'line',
         x1: 0.375,
         y1: 0.3873239436619718,
@@ -6318,7 +6318,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9572b8b5-0607-4138-820e-7462ee704e2c',
+        id: 'ca4c9475-6810-41fb-839e-465a4b6aafb5',
         kind: 'line',
         x1: 0.625,
         y1: 0.31690140845070425,
@@ -6331,7 +6331,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '32e95abc-642f-4071-baf8-a986f14bc592',
+        id: '5ce12fb4-bd1b-44ab-a32b-3ec52a98f6ea',
         kind: 'line',
         x1: 0.375,
         y1: 0.24647887323943662,
@@ -6344,7 +6344,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2b36d794-dab3-4edc-8337-de28040713fe',
+        id: 'dfec2330-e5f3-419a-b256-7affb2a87271',
         kind: 'line',
         x1: 0.625,
         y1: 0.176056338028169,
@@ -6357,7 +6357,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3d5b3fe4-c0bb-47f8-873f-3b13f6a3e341',
+        id: '05720e19-e215-4045-ad88-1454ff593a2b',
         kind: 'line',
         x1: 0.375,
         y1: 0.1056338028169014,
@@ -6370,7 +6370,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e9109c31-8365-4c53-bdc6-f4dc52563a54',
+        id: 'b29d54fc-f03f-444f-9989-6e30ac2d0103',
         kind: 'line',
         x1: 0.4701355251512863,
         y1: 0.6371081280102197,
@@ -6383,7 +6383,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '31007092-c683-4002-a9c9-4ea1659b081a',
+        id: 'e8f14322-d8d9-4a09-81f3-3b2222a2754f',
         kind: 'line',
         x1: 0.44358460586587556,
         y1: 0.6276179428320353,
@@ -6396,7 +6396,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fb0a05a2-0b2e-45b3-a99c-41f169998b36',
+        id: 'f2496c8a-9622-4cf6-8b67-3be2f87a2bd2',
         kind: 'line',
         x1: 0.41887964556419116,
         y1: 0.6164593157895066,
@@ -6409,7 +6409,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '75090b2f-cc4d-4c5b-8b6b-7809554441cd',
+        id: '0c92a685-be4f-4b2a-8766-87d32aad4801',
         kind: 'line',
         x1: 0.39587847562814016,
         y1: 0.6056606444580274,
@@ -6422,7 +6422,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f7c30667-ea37-43cf-9813-50f85f1fa5a2',
+        id: 'ee86b7e5-2133-40a3-a1dd-200534b3b4fa',
         kind: 'line',
         x1: 0.36776593459518886,
         y1: 0.5966617516817945,
@@ -6435,7 +6435,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '824c9fc5-4fda-4175-ae99-b8cedfcd1b09',
+        id: 'a3da19f5-1c2f-4bba-ba14-a291114c5000',
         kind: 'line',
         x1: 0.3362458128309707,
         y1: 0.5887427260387096,
@@ -6448,7 +6448,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dcefaeb5-3955-448c-9cd2-75764183d2ac',
+        id: 'aa5a1fd9-8da9-4bbd-b01d-edd050b2fb94',
         kind: 'line',
         x1: 0.31068895734646956,
         y1: 0.5783040104182795,
@@ -6461,7 +6461,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '585b091a-f45f-45e1-87da-a72872e3765a',
+        id: '3d72ad14-9f1b-4147-960e-965000a9294c',
         kind: 'line',
         x1: 0.28378317477869697,
         y1: 0.5695981511001443,
@@ -6474,7 +6474,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4c4b80cb-6e49-447a-a1f5-7239cecf3b6b',
+        id: 'ca97e2c1-ac2e-4b55-9b1b-5f57cc00f7e5',
         kind: 'line',
         x1: 0.2578003717027874,
         y1: 0.5598793469018131,
@@ -6487,7 +6487,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '196a7a11-70f4-4b80-b7e0-85747fdbbff9',
+        id: '6f9903fb-8785-480c-bb87-c3b955d3af60',
         kind: 'line',
         x1: 0.8517524621900912,
         y1: 0.6946772630437594,
@@ -6500,7 +6500,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5e3f4a7a-2487-4881-abfb-b2a1fab18703',
+        id: '54ec3fd2-acdc-439e-80a0-e3f731c7b57c',
         kind: 'line',
         x1: 0.860844473342958,
         y1: 0.671277848937149,
@@ -6513,7 +6513,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '512ad3a8-1a27-471d-94e3-b1b1c0a62e3b',
+        id: '18202aca-ba2c-4eed-bbb9-b83494266a5b',
         kind: 'line',
         x1: 0.8666302986220553,
         y1: 0.6482276798172045,
@@ -6526,7 +6526,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6f25ad84-393a-4d8e-a55f-687090bbf3a8',
+        id: 'aa96d201-b03e-4b0d-9ec6-2eca991354a9',
         kind: 'line',
         x1: 0.864150659216728,
         y1: 0.6286699605639183,
@@ -6539,7 +6539,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3b2e8931-bde4-45c2-aebf-3a549351738d',
+        id: 'c32c789f-b6e0-4578-bf7e-2bdb28840209',
         kind: 'line',
         x1: 0.8575985187731174,
         y1: 0.6122433728843129,
@@ -6552,7 +6552,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '988c80d2-13fc-40e7-ac2a-aa4738cb0234',
+        id: 'd222f918-6f5b-47da-b908-a14bfc28ad6d',
         kind: 'line',
         x1: 0.8451400904425513,
         y1: 0.5968886667773281,
@@ -6565,7 +6565,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a1d95815-7e60-4c80-8419-4cc3599a44dc',
+        id: '779f9d57-3db5-43de-8468-a2b1908a89cf',
         kind: 'line',
         x1: 0.8267932968991057,
         y1: 0.5826383347277951,
@@ -6578,7 +6578,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '98486b99-3fa7-419c-b6a5-3ad0fef426e9',
+        id: 'd9ea5ec0-b249-4042-a0a5-2c6097fb695d',
         kind: 'line',
         x1: 0.8145578711101806,
         y1: 0.568949067844062,
@@ -6591,7 +6591,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6e39b6f8-c4cd-46da-a02e-6752af5ba48a',
+        id: '5281fa1b-7dcc-48de-9dc3-fbe50650ca15',
         kind: 'line',
         x1: 0.7947207558675617,
         y1: 0.5556777583507606,
@@ -6604,7 +6604,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '49f782d9-f45f-4171-9ffa-b5378ecc4c15',
+        id: 'c26c1f99-829b-4900-aad2-0daa9440367d',
         kind: 'rect',
         x: 0.10197672720190903,
         y: 0.4865456921871068,
@@ -6638,7 +6638,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '92a78841-5ecb-4bc3-bc93-e0856d71e733',
+        id: '9384538c-3a95-42b8-b442-afa9c6e01c4a',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -6650,7 +6650,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd1d51273-a782-4422-b0fd-4888f783a208',
+        id: '205dca8b-ce2b-4be9-b559-4f44f3947971',
         kind: 'rect',
         x: 0.20611133464461123,
         y: 0.19942107526397826,
@@ -6684,7 +6684,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'bc071656-e531-4021-8994-5a07fc65e9f5',
+        id: '0f57a100-05ba-4a8b-a6e3-5e7d8e1c7704',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -6696,7 +6696,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd769dc21-5c2c-4d50-a654-8ddafa47cf08',
+        id: '71a056ac-f6d4-48ec-9354-a8a322c94bb9',
         kind: 'line',
         x1: 0.0994467686675311,
         y1: 0.39285714285714274,
@@ -6709,7 +6709,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8b3b0486-4f6a-4aba-9b79-96f3d088eeeb',
+        id: '3d71f21e-0b3a-42e8-987e-bd1fc5459bfb',
         kind: 'line',
         x1: 0.10657115793646445,
         y1: 0.6071428571428571,
@@ -6743,7 +6743,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '2172853f-66f3-49ea-a4de-6f4860195226',
+        id: '6c1c0ae2-b2bf-4cb0-88d1-cce083c0a963',
         kind: 'circle',
         cx: 0.5,
         cy: 0.4968152866242038,
@@ -6755,7 +6755,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '187491db-e02e-41b4-9e25-c1509e3386f2',
+        id: 'af71cfdd-4874-43b5-b456-cef694cc326d',
         kind: 'circle',
         cx: 0.5,
         cy: 0.4968152866242038,
@@ -6788,7 +6788,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '7e8d6bbc-9525-484c-a922-18a8ad2ca77f',
+        id: 'e9cf5cab-288e-4ce9-9b04-9f120ffd4959',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -6800,7 +6800,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '41011710-7651-471e-be32-79868b6fcbf3',
+        id: '523f2e04-6404-4668-af46-d50275efd926',
         kind: 'line',
         x1: 0.2212818557372859,
         y1: 0.7787181442627142,
@@ -6813,7 +6813,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c1aa816d-f38d-46f9-b566-bc929da411bf',
+        id: '461105c1-0cc9-4963-b79d-560ddddf7cd3',
         kind: 'arc',
         cx: 0.5,
         cy: 0.5,
@@ -6848,7 +6848,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '0edea340-f9bf-4576-8905-3d55a1ac239a',
+        id: '3a7e66c4-380e-467e-8063-10276401c48a',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.43080159500978094,
@@ -6861,7 +6861,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd59b47ad-9c2d-47ea-b514-508f610f0b1d',
+        id: 'c5f85955-bf59-4c06-b119-92111f55b22f',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.5346234330223854,
@@ -6874,7 +6874,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bee14971-8b5a-4625-afc0-b66203a3fc74',
+        id: 'ec4fa9ec-d9c4-4c84-b646-2359f6781464',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.6358057327804316,
@@ -6887,7 +6887,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '07ff10a1-eaf6-45b7-9864-2c926bc30e84',
+        id: '3c4af61d-6309-4020-9547-938b00220e53',
         kind: 'circle',
         cx: 0.27507789859804865,
         cy: 0.3331386795911448,
@@ -6899,7 +6899,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7e416d08-ffc6-4864-84c8-f060128d07f4',
+        id: '9d269f41-04ad-4164-bdfe-4ae1e0cd1229',
         kind: 'circle',
         cx: 0.6397243357193939,
         cy: 0.19236330601473234,
@@ -6911,7 +6911,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5b8943bb-83f0-44a1-9507-b7d3ca16bb7a',
+        id: '6ee3048e-314c-4da4-a0d9-1ded32930ff3',
         kind: 'line',
         x1: 0.07379169297939851,
         y1: 0.0316399294785617,
@@ -6924,7 +6924,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7f3597c4-945f-4ddf-8c26-bbac918b38fe',
+        id: '839157bd-04a5-4e4f-a591-601e284d8e68',
         kind: 'line',
         x1: 0.6398124240722121,
         y1: 0.9898262522958872,
@@ -6937,7 +6937,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8520d24b-e805-45e3-93fe-6c5c8c838378',
+        id: 'e4b8076c-7595-416c-9e1d-4630bb4e97b7',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.7395466125684409,
@@ -6950,7 +6950,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '832b3eb0-dd7e-451f-94ee-9aff703fedd3',
+        id: '0d842da6-61fd-45c7-a9df-c2f1d49f1ad2',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.8413484104912538,
@@ -6977,7 +6977,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'fec3c255-9c0a-44b6-8413-31c02a32ba73',
+        id: 'eab6dd40-00b6-424c-8843-f7891751024a',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.5441684841450897,
@@ -6990,7 +6990,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '03a4da77-44e3-49ac-aec5-6929d8b278d7',
+        id: 'ce778c4b-5667-46b7-b5e0-6cd5a80e1d13',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.6249607508167163,
@@ -7003,7 +7003,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8ea42f39-a77a-4322-88b4-1abe735d0b3b',
+        id: '8c7b99c6-e1a4-4872-ad2d-2a2a8afc153b',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.7036989768102506,
@@ -7016,7 +7016,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd5862956-f87b-49cf-b8fa-b923504346fa',
+        id: '97014f81-0965-4da9-b659-09089794301f',
         kind: 'circle',
         cx: 0.27507789859804865,
         cy: 0.4681689790556782,
@@ -7028,7 +7028,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a83e90c2-a2d7-4ff9-b013-dc8f9feee354',
+        id: '689d849e-74d5-4eaf-8548-e8dd3c6ca553',
         kind: 'line',
         x1: 0.07379169297939851,
         y1: 0.23354813351352272,
@@ -7041,7 +7041,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c96041f0-4834-4482-9510-06a3076a4011',
+        id: '4ef265a8-66ee-4fbb-aa66-fddcf9e4a30a',
         kind: 'line',
         x1: 0.6398124240722121,
         y1: 0.9791913083604595,
@@ -7054,7 +7054,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a68350ff-bef1-470f-8c2a-8da6a1ef06a4',
+        id: 'a0c409d6-7ed6-44e5-8245-aa063d751ebb',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.784428243263465,
@@ -7067,7 +7067,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bb329dfc-0c33-44a4-93b0-656c2d2e6189',
+        id: '5d93a039-100b-4f41-b4c1-950514bc1d27',
         kind: 'rect',
         x: 0.47219761514661,
         y: 0.04332900494235601,
@@ -7101,7 +7101,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '4231b4cd-5127-4745-9046-e9f15dc9629d',
+        id: '9d201db9-55bd-40c0-9dc6-a7bab9684c2e',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.43080159500978094,
@@ -7114,7 +7114,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0fbf8e23-418b-44bf-9908-fc5993d8d1bc',
+        id: 'c53b296a-497e-4867-ae55-f3e48b280526',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.5346234330223854,
@@ -7127,7 +7127,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '79af22e0-63a3-4b14-b854-b0da5b4519bf',
+        id: 'f34ae9ac-eca0-45c0-8214-975195e9132a',
         kind: 'line',
         x1: 0.9242848730991355,
         y1: 0.6358057327804316,
@@ -7140,7 +7140,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cbfa6a96-0bbf-4080-9d93-9524e0b1c291',
+        id: '8c1713a3-c0f5-4671-baf3-6f5c287878b7',
         kind: 'circle',
         cx: 0.27507789859804865,
         cy: 0.3331386795911448,
@@ -7152,7 +7152,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '86bc7a69-3167-436e-b14d-79bad1af3adf',
+        id: 'd9ff65a2-4089-4274-9a13-0cfa130e7268',
         kind: 'circle',
         cx: 0.6397243357193939,
         cy: 0.19236330601473234,
@@ -7164,7 +7164,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '36229947-f1eb-4e0c-b4f5-49fd5fbad4f3',
+        id: 'a60dfbfa-acd6-447b-91ff-c2ca8e8344b7',
         kind: 'line',
         x1: 0.07379169297939851,
         y1: 0.0316399294785617,
@@ -7177,7 +7177,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '527807a4-c630-4031-80dd-3821cde6709b',
+        id: 'fbfb0a54-4264-43f6-a927-f1d082cf2bfd',
         kind: 'line',
         x1: 0.6377280124548304,
         y1: 0.9625294092719202,
@@ -7211,7 +7211,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '9fa8a078-0f1f-49c4-8141-5d1cdc1fbf2f',
+        id: '6cb9e1c6-2cf9-42b3-b85d-0601cbf9e906',
         kind: 'circle',
         cx: 0.5,
         cy: 0.12923076923076923,
@@ -7223,7 +7223,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3852c71a-c008-4123-844c-9b49d5a6792d',
+        id: '343e9f40-98ff-46cd-ae6f-d9ad9417e42d',
         kind: 'line',
         x1: 0.5,
         y1: 0.2276923076923077,
@@ -7236,7 +7236,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a85a95fc-02be-4353-8217-b8f0a98f4032',
+        id: 'd0ffc4d9-48ac-4fce-ba93-b3aa3676f622',
         kind: 'line',
         x1: 0.15151515151515152,
         y1: 0.6,
@@ -7249,7 +7249,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ea6eb737-746b-436f-a8e8-7f898b06a72c',
+        id: 'a5ea4eb3-079d-4f87-a944-a2c33b7c49d8',
         kind: 'line',
         x1: 0.26262626262626265,
         y1: 0.7015384615384616,
@@ -7262,7 +7262,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd5bd5939-3ef3-4d76-99e8-f7627e4f725b',
+        id: '908fb6e8-980f-4c15-8a8f-db8762f59d4f',
         kind: 'line',
         x1: 0.37373737373737376,
         y1: 0.803076923076923,
@@ -7296,7 +7296,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '6ce6cb67-5515-438a-9944-334b47e8d7c2',
+        id: 'c109e0f1-ff52-41ac-8fa7-bfed7ce261ec',
         kind: 'circle',
         cx: 0.5303030303030303,
         cy: 0.1489971346704871,
@@ -7308,7 +7308,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '943533e3-4f9e-4168-8bd2-e7b81ec4059b',
+        id: '78e94c9a-5204-44a5-8346-d6622401c938',
         kind: 'line',
         x1: 0.3085386077876202,
         y1: 0.014586373472632632,
@@ -7321,7 +7321,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6c3db783-9780-4ee6-8b2a-bcd3bec8d2a9',
+        id: '3553ad44-38e6-41cf-8bd0-e7579b6134cc',
         kind: 'line',
         x1: 0.5303030303030303,
         y1: 0.25787965616045844,
@@ -7334,7 +7334,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '38f117a7-9281-48f2-b5dc-7cd53fcb909b',
+        id: '2ce047b6-6c92-4bc2-a300-32d56d3089b2',
         kind: 'line',
         x1: 0.15151515151515152,
         y1: 0.6017191977077364,
@@ -7347,7 +7347,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f42828f3-dedb-4710-b0e1-063efe93f457',
+        id: '8576324e-aab5-49cc-b853-41178b1fdc80',
         kind: 'line',
         x1: 0.26262626262626265,
         y1: 0.6962750716332379,
@@ -7360,7 +7360,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'acb2a559-42c1-4b58-bc17-a935e5865f4f',
+        id: '38cf79ce-b17b-4170-960e-4e959c91ecd2',
         kind: 'line',
         x1: 0.37373737373737376,
         y1: 0.7908309455587392,
@@ -7394,7 +7394,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '18b5f73c-78d6-456f-8f26-1b5a67aef008',
+        id: '945eb807-53c9-4b30-9380-3b31a3dfe4d6',
         kind: 'circle',
         cx: 0.46537396121883656,
         cy: 0.3925925925925926,
@@ -7406,7 +7406,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b06a98c4-fba3-4f9d-9aae-c1b49101d6da',
+        id: '5085d5d0-6c3c-47c4-84ea-325088fd7074',
         kind: 'line',
         x1: 0.46537396121883656,
         y1: 0.44,
@@ -7419,7 +7419,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cd1960b8-c6fb-4ba5-b7db-1fa9a4425b1e',
+        id: 'b7ac5894-34ac-4f8a-86de-219f25d98c92',
         kind: 'line',
         x1: 0.22714681440443213,
         y1: 0.5777777777777777,
@@ -7432,7 +7432,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cbd898c1-b832-4f82-bb31-a286656a4285',
+        id: 'f2c9419a-9258-47bf-ad1a-09e5a6a6cc43',
         kind: 'line',
         x1: 0.2880886426592798,
         y1: 0.6370370370370371,
@@ -7445,7 +7445,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '88b31d01-3a36-4686-b2c7-bddefdf3884d',
+        id: '2f1d3d34-75f6-40af-a694-06707286f738',
         kind: 'line',
         x1: 0.3545706371191136,
         y1: 0.6962962962962963,
@@ -7458,7 +7458,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '890fed46-600a-43cf-a240-81a46ac2ac0a',
+        id: '4b16fa48-5cd7-4f4b-8ea7-531f0d8e0a04',
         kind: 'line',
         x1: 0.46537396121883656,
         y1: 0.6962962962962963,
@@ -7471,7 +7471,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '14dfc378-cea1-44cd-9a76-0b4b63e9a52b',
+        id: '361a1e8e-d379-48cd-a6cc-4be58ec46971',
         kind: 'polygon',
         points: [
           {
@@ -7494,7 +7494,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f5c83b0a-ae36-40db-8065-6cf8f74ebbb7',
+        id: 'bd2dd746-4b88-43ec-9189-6eab2d347811',
         kind: 'arrow',
         x1: 0.8556023485616129,
         y1: 0.09639893502380396,
@@ -7528,7 +7528,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '9f1a8f7c-9ec7-496a-a6c2-e7a9cbab3dd1',
+        id: 'f9d6dc4b-3ecf-411e-a84b-40e1d456bf94',
         kind: 'rect',
         x: 0.04466205488282342,
         y: 0.07231861662722436,
@@ -7541,11 +7541,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9ff04c21-4e35-4014-b595-72555f34a959',
+        id: 'c4650e35-b5bc-4de9-8e95-32d4eb20b4e2',
         kind: 'circle',
         cx: 0.3090208779664409,
         cy: 0.234410101061039,
-        radius: 0.035940598839973366,
+        radius: 0.06649802428541328,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -7553,7 +7553,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7afdda7a-2970-4ea7-befe-87a92f477064',
+        id: 'f581e6cd-30db-4eb7-899d-d23fd2bfdbb6',
         kind: 'line',
         x1: 0.30516070480545915,
         y1: 0.3102029313483118,
@@ -7566,7 +7566,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd9e1f3cf-6b88-4cb8-bf7b-dcba00976284',
+        id: '17609b6f-e397-4445-90f0-49cefbb070b7',
         kind: 'line',
         x1: 0.16890489315995588,
         y1: 0.4044322300674442,
@@ -7579,7 +7579,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1d6a2c9e-74b7-46c9-9206-76a4f331e800',
+        id: '63e9d7e1-65d9-458b-8159-793cca517c0f',
         kind: 'line',
         x1: 0.1916684689045386,
         y1: 0.43115569134798165,
@@ -7592,7 +7592,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '29abd178-3da5-4ae2-826f-f2f55d43e4f3',
+        id: '9d6cf80b-3ba3-4426-b5fe-90cfcd22149e',
         kind: 'line',
         x1: 0.25099999912579257,
         y1: 0.3576956058645958,
@@ -7605,7 +7605,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '19e87d35-97ab-46cf-bdf9-cd6a63b992e2',
+        id: '9147bd18-5613-4e0d-9926-08692eb7f95d',
         kind: 'line',
         x1: 0.22129456484075338,
         y1: 0.4782189496974024,
@@ -7618,7 +7618,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dd265dce-6f5f-4fa3-bd69-ea2ffd4826a0',
+        id: '62c6639f-6e32-4d80-bca5-ff277a4e5d7a',
         kind: 'line',
         x1: 0.21651033922298538,
         y1: 0.6120506952762518,
@@ -7631,7 +7631,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e5de1bb0-10fa-45e4-8b57-95056ce2ab37',
+        id: 'a1074657-af19-4e04-98a7-eac7f4a79f0c',
         kind: 'line',
         x1: 0.13752578400492907,
         y1: 0.6147470389802622,
@@ -7644,7 +7644,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '92ccfba5-9987-4920-a939-60bf091d9cfd',
+        id: 'fa59362b-1c29-47d8-b88d-403d7c1af9d9',
         kind: 'line',
         x1: 0.09673097056590681,
         y1: 0.6767629441725034,
@@ -7657,7 +7657,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e93f3329-efe9-46f2-bac4-7cf7f37b6b08',
+        id: '3db558d9-dd35-42ab-ba80-6c6a4f11a04d',
         kind: 'line',
         x1: 0.24950224716120878,
         y1: 0.6562994263724071,
@@ -7670,7 +7670,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f57ee7c3-69ac-40b5-95d4-fc11637332c0',
+        id: 'e0d61c3a-6270-4b24-9332-79a1689461c6',
         kind: 'line',
         x1: 0.3224869141466142,
         y1: 0.7604484620981574,
@@ -7683,7 +7683,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a097ddcd-506e-4891-b1d7-a09d7546d507',
+        id: '2e5ff5b3-9af3-4e11-abe4-8ec7e5be096c',
         kind: 'line',
         x1: 0.3324070109217505,
         y1: 0.7743864304122935,
@@ -7696,7 +7696,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '614fd9f6-c269-4ae1-8682-2f797b687169',
+        id: 'dfcb1b0a-df1c-467b-be17-89879b46afc4',
         kind: 'line',
         x1: 0.29208677430507113,
         y1: 0.48691011362924985,
@@ -7709,7 +7709,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'efaebed7-200c-4a25-8839-7b5a1f923202',
+        id: 'c16a107c-2aca-416d-b159-e0d265ee49c8',
         kind: 'line',
         x1: 0.31600028779172423,
         y1: 0.40166994471709666,
@@ -7722,7 +7722,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f08f87db-bd24-410b-a0be-6172ce5443af',
+        id: '10f34ce0-11f2-4fda-bf58-7f7c70899c0f',
         kind: 'line',
         x1: 0.34594990748103854,
         y1: 0.4695781726724168,
@@ -7735,7 +7735,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1d2b2702-bf1f-46d0-8cd5-ebaca3d9ca99',
+        id: '84355921-90cc-4acc-9c15-a1371dbb15e4',
         kind: 'line',
         x1: 0.40815688136392464,
         y1: 0.4674979807478404,
@@ -7748,7 +7748,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '70bff6b3-f97c-4306-a415-88927192234a',
+        id: 'bee38b1b-1e85-4101-80af-5372a1f85a9b',
         kind: 'line',
         x1: 0.4084058599690139,
         y1: 0.4127958099617294,
@@ -7761,7 +7761,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9d380fa3-211e-4839-8197-2296f0df41a3',
+        id: '4b1efb2a-f309-462c-bb4b-0a32d786b7ac',
         kind: 'line',
         x1: 0.3099226095673639,
         y1: 0.3116713601295159,
@@ -7774,7 +7774,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b04c4122-14be-49a7-82b8-1de107734112',
+        id: 'dae2cb8d-c272-4141-8f5a-54626df35e51',
         kind: 'line',
         x1: 0.4016893177919044,
         y1: 0.14855651040170176,
@@ -7787,7 +7787,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b0e56cd8-1c0d-48b1-9b13-9dac4a3f7b55',
+        id: '9cf6ed2e-f334-47b6-8489-54396bb2bcb6',
         kind: 'line',
         x1: 0.14362001691416823,
         y1: 0.6099990200440895,
@@ -7800,7 +7800,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ff6541cb-bf78-4500-8b33-8662f4e1b757',
+        id: '26467f83-e2a9-4ff8-ae50-811b45910db6',
         kind: 'line',
         x1: 0.4031926341076973,
         y1: 0.13781968505774236,
@@ -7813,7 +7813,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4597375c-3301-4a59-aadd-052f905bbbf6',
+        id: '207fffb1-d9a7-4f8d-87af-b34ffce3f57d',
         kind: 'line',
         x1: 0.40219042323050225,
         y1: 0.4628622035625767,
@@ -7826,7 +7826,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8e68c808-209f-4efc-906c-1463d3e1a90e',
+        id: 'a0c75417-14f0-4541-afd7-953e73b42bb5',
         kind: 'line',
         x1: 0.40286847826474786,
         y1: 0.791674987988664,
@@ -7839,7 +7839,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e652b8b9-1c52-4522-b888-78c836e4002a',
+        id: '3bf11baa-4b84-4a14-8d41-27aef61a5312',
         kind: 'line',
         x1: 0.37845160155493585,
         y1: 0.8439230881912481,
@@ -7852,7 +7852,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c8fad2d4-3a88-4561-ba55-8801697d2d34',
+        id: 'e51802da-86dc-4846-805e-d20826621fea',
         kind: 'line',
         x1: 0.35759203919532057,
         y1: 0.7938566945904009,
@@ -7865,7 +7865,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bab4f14e-2897-41f7-ab68-b28a582f9340',
+        id: '31708163-441a-4aee-ab9b-7bc742975ac7',
         kind: 'line',
         x1: 0.36259805440818904,
         y1: 0.7910752282792426,
@@ -7878,7 +7878,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '17a4ce7d-d7f0-4c8e-a096-ffe6131cea48',
+        id: 'a248fdf0-d2b4-4987-a3a3-14f1e54af646',
         kind: 'line',
         x1: 0.32133429617579623,
         y1: 0.7895505368104693,
@@ -7891,7 +7891,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2a44bf07-65bc-4e75-8d9d-6f3c7ea618e3',
+        id: 'f85bdb8b-b50d-42b8-9dde-db2d9e34b28d',
         kind: 'line',
         x1: 0.29241518376837944,
         y1: 0.8467045545024062,
@@ -7904,7 +7904,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9aa41a82-0f15-4c47-93e9-93a5681dfa76',
+        id: '7364d814-16b9-4059-b2a8-4d72c71f9bd0',
         kind: 'line',
         x1: 0.11656032322990098,
         y1: 0.8513403316876699,
@@ -7917,7 +7917,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6a43f08b-40ec-4c70-b0cd-c134c3b60d4f',
+        id: 'ca6bcde8-5e2a-4193-9468-7ae87e7fdafa',
         kind: 'line',
         x1: 0.14412099206859968,
         y1: 0.8105454924573497,
@@ -7930,7 +7930,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8a63a7af-dbbc-43e5-a6dd-075a6c56fb9b',
+        id: '88e8363e-e115-4c73-8d81-5f0b56a9e5f5',
         kind: 'line',
         x1: 0.1431189114755707,
         y1: 0.6955782182628115,
@@ -7943,7 +7943,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3b9982ea-0eef-4292-bd3f-faed7c267813',
+        id: '466e48a4-2f60-4600-91cc-7eb26668b823',
         kind: 'line',
         x1: 0.7618334518098523,
         y1: 0.7603626622570478,
@@ -7956,7 +7956,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7d003a56-ed7c-4ac3-8cdf-8571b6f718b1',
+        id: '04e82f0e-1968-4b22-9948-9e64d0f0de0e',
         kind: 'line',
         x1: 0.6353250203797453,
         y1: 0.5285659496382049,
@@ -7969,7 +7969,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6eb333df-5d80-4890-92ff-c2947aa90228',
+        id: 'd494d902-138a-41ee-ac39-3989dd5c59eb',
         kind: 'line',
         x1: 0.6372680998108893,
         y1: 0.3357525770680091,
@@ -7982,7 +7982,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '30405cba-1238-4a0b-8780-ff4ff02d73a1',
+        id: 'ceab8e50-673e-4638-9f09-0b148649fcf1',
         kind: 'line',
         x1: 0.7178040100145757,
         y1: 0.4937495624788,
@@ -7995,7 +7995,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '470cb04e-c5e8-4a06-887e-56b59bdf51d2',
+        id: 'deeab3b4-36b7-42fb-b91c-7f6f22c59e14',
         kind: 'line',
         x1: 0.7179058962033679,
         y1: 0.20722686051017578,
@@ -8008,7 +8008,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'acdf4470-635c-4deb-8cea-253d4bcb8daf',
+        id: '40c0e912-7b16-4a54-b41c-e45beb3ba044',
         kind: 'line',
         x1: 0.7978900342213262,
         y1: 0.19669724772682676,
@@ -8021,7 +8021,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cacb618e-668f-4cd3-97db-8e9288d1a2b5',
+        id: '6b2e31cb-1b53-434b-82ce-3308c16017a8',
         kind: 'line',
         x1: 0.7970954120165974,
         y1: 0.48584904325792627,
@@ -8034,7 +8034,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '292dda12-b389-4f60-8bcc-b8d99a8c2ba7',
+        id: '57aafb9a-f6c3-4a68-b488-b9fb6b57623c',
         kind: 'line',
         x1: 0.8791814889883254,
         y1: 0.33068181222290766,
@@ -8047,7 +8047,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '570423bd-4a64-4c57-8e2c-06eae232a87e',
+        id: 'bb965971-9d95-4e88-a9ab-8eaba109d120',
         kind: 'line',
         x1: 0.8812138074513035,
         y1: 0.525230305718346,
@@ -8060,11 +8060,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '591d496c-9c50-4a9f-9a2e-1a715b91d783',
+        id: '89805b63-3625-4165-8f07-60aa59a640df',
         kind: 'arc',
         cx: 0.13521411562893687,
         cy: 0.6720292383861675,
-        radius: 0.03247486092440789,
+        radius: 0.06008564576322165,
         startAngle: 3.062728288581139,
         endAngle: 4.903875495642343,
         style: {
@@ -8074,13 +8074,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '860cab35-3ecb-47cd-8fef-fe6ca4041fdc',
+        id: '36ffa9c2-c05b-4f0f-9813-efd7d389d3e0',
         kind: 'arc',
         cx: 0.23759748525644675,
         cy: 0.6511599256381927,
-        radius: 0.012501574604780515,
-        startAngle: 1.586668009786683,
-        endAngle: 0.12891077168398754,
+        radius: 0.023130666669637957,
+        startAngle: 0.12891077168398754,
+        endAngle: 1.586668009786683,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -8088,11 +8088,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '39f638a8-c7ac-4867-bb25-cdc5bb5cf6e1',
+        id: 'b2156748-8774-4703-b620-ff069475d41c',
         kind: 'arc',
         cx: 0.33459008874978874,
         cy: 0.7453970670908153,
-        radius: 0.014092889569110954,
+        radius: 0.026074949863553305,
         startAngle: 1.5426347598070007,
         endAngle: 2.7010623129732787,
         style: {
@@ -8102,11 +8102,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e335f860-c46c-4d2b-9116-a345c56facc1',
+        id: '73c99992-7e43-4ebf-af81-4da620579ff5',
         kind: 'arc',
         cx: 0.3035734032181575,
         cy: 0.3325964702616745,
-        radius: 0.012103174603174558,
+        radius: 0.02239353891336262,
         startAngle: 4.71238898038469,
         endAngle: 5.29750141856912,
         style: {
@@ -8116,13 +8116,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b5b485c0-3ba8-4a39-b801-0e35064852e2',
+        id: 'c7e5f33b-52d4-46a9-9183-d306d9c55356',
         kind: 'arc',
         cx: 0.18016053239660212,
         cy: 0.41793983231714465,
-        radius: 0.013216430542365742,
-        startAngle: 3.7670776938290222,
-        endAngle: 0.5232783221319769,
+        radius: 0.0244533076114256,
+        startAngle: 0.5232783221319769,
+        endAngle: 3.7670776938290222,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -8151,7 +8151,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '4f140d7c-51b0-4195-a7a9-fe8384680e29',
+        id: 'f283a1cc-68c6-496e-bceb-f632e50aacaf',
         kind: 'rect',
         x: 0.04466205488282342,
         y: 0.07231861662722436,
@@ -8164,11 +8164,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0fcd76ad-681d-4323-ad71-4fc4ce65bff9',
+        id: '9bc0bce5-95b7-4b68-a4bc-cd6ad4bcc2cc',
         kind: 'circle',
         cx: 0.703333809220972,
         cy: 0.23441010106103885,
-        radius: 0.035940598839973366,
+        radius: 0.06649802428541328,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -8176,7 +8176,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6d3a8b04-b44e-4f79-bedb-40b10652b18e',
+        id: '8c71f506-26b7-40e0-b591-0278c6f4c204',
         kind: 'line',
         x1: 0.7071939823819537,
         y1: 0.3102029313483117,
@@ -8189,7 +8189,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '15ed941c-294f-45e6-b125-fe526f118446',
+        id: 'cf064b2d-88b4-4706-81fd-95d4c255d26f',
         kind: 'line',
         x1: 0.843449794027457,
         y1: 0.4044322300674441,
@@ -8202,7 +8202,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a0946f1e-b86c-4e37-89c8-bbb1f1ded0dc',
+        id: '9ea47af6-c1c5-4924-90a2-ac299bacdb7c',
         kind: 'line',
         x1: 0.8206862182828742,
         y1: 0.43115569134798154,
@@ -8215,7 +8215,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '54c76491-5284-48e6-90c4-0c076b9bf890',
+        id: '04e9f17a-748e-4004-bf0c-f9b3d041b5e5',
         kind: 'line',
         x1: 0.7613546880616203,
         y1: 0.3576956058645957,
@@ -8228,7 +8228,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a2768dfe-75b7-4c11-9f51-b0ee3101b2d2',
+        id: 'ab5db1ca-98b8-4645-b1a2-3ad9066a4cd9',
         kind: 'line',
         x1: 0.7910601223466595,
         y1: 0.47821894969740225,
@@ -8241,7 +8241,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '26d4a6bd-92a7-4e2c-9fa7-e71ad4e84237',
+        id: 'aea801c9-1fbf-4135-a7c2-d23b1d4382b7',
         kind: 'line',
         x1: 0.7958443479644275,
         y1: 0.6120506952762517,
@@ -8254,7 +8254,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '90e36a6f-a56e-4f81-9716-81c7d0d8fb80',
+        id: 'bb2b877d-d5cc-442e-afe7-b1b02634c526',
         kind: 'line',
         x1: 0.8748289031824839,
         y1: 0.6147470389802621,
@@ -8267,7 +8267,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e63406e5-b237-4210-b947-c3e42e9ef6f0',
+        id: 'e10cce8c-f29b-4b59-8bec-d7c1cd9c9035',
         kind: 'line',
         x1: 0.9156237166215061,
         y1: 0.6767629441725033,
@@ -8280,7 +8280,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0a2d4a09-ab52-484b-966f-d6ce811490b5',
+        id: '62c83e9b-6394-4e4f-9720-0f1882c6ecea',
         kind: 'line',
         x1: 0.7628524400262041,
         y1: 0.656299426372407,
@@ -8293,7 +8293,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '00c89965-1379-4ad6-8cf1-0a83202a6086',
+        id: '4afb58ad-a58d-4272-a5a8-74ec097e6fa1',
         kind: 'line',
         x1: 0.6898677730407987,
         y1: 0.7604484620981573,
@@ -8306,7 +8306,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bb77b99b-e593-42c0-bbcc-77fc8d87cac0',
+        id: 'bb3eeec4-1f35-4fc1-9a77-08619fab611f',
         kind: 'line',
         x1: 0.6799476762656623,
         y1: 0.7743864304122934,
@@ -8319,7 +8319,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '763688ca-034f-4a07-85f7-eb98a63625ad',
+        id: '13f04281-911f-475e-88cc-84c3f0bc77ed',
         kind: 'line',
         x1: 0.7202679128823417,
         y1: 0.4869101136292497,
@@ -8332,7 +8332,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5e9b3324-eb1e-408c-b868-8799f611b45f',
+        id: 'b86597f5-4b5f-4476-912f-3ac46465f1ae',
         kind: 'line',
         x1: 0.6963543993956887,
         y1: 0.4016699447170965,
@@ -8345,7 +8345,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ca19b5e1-fd19-4eff-ac5a-5f725661a988',
+        id: '23621294-67b8-44ce-80ab-89009edaf0f4',
         kind: 'line',
         x1: 0.6664047797063744,
         y1: 0.46957817267241664,
@@ -8358,7 +8358,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b776e500-e54f-44ca-ab9d-a7db40540874',
+        id: 'c3f82c4e-a4d2-45d6-9d32-6077241a69fc',
         kind: 'line',
         x1: 0.6041978058234881,
         y1: 0.46749798074784027,
@@ -8371,7 +8371,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a4fb67ee-df05-4b16-b036-d378cdc84e51',
+        id: '97fbe3b0-463c-4352-bd59-92fdd5dcd793',
         kind: 'line',
         x1: 0.6039488272183989,
         y1: 0.4127958099617292,
@@ -8384,7 +8384,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ae764f57-9ed2-4d30-97e0-e150163aefe5',
+        id: '7b8d88e0-1789-401f-b828-985a8ca45377',
         kind: 'line',
         x1: 0.702432077620049,
         y1: 0.3116713601295158,
@@ -8397,7 +8397,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '58b0c4d0-9146-4aa1-a843-3b86e7af96f7',
+        id: 'd213452f-a350-497b-9487-37b89db873ff',
         kind: 'line',
         x1: 0.6106653693955084,
         y1: 0.14855651040170165,
@@ -8410,7 +8410,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a332eda6-7edd-4ae8-81a8-afb86c58b9dc',
+        id: 'fc89adca-f244-4112-9807-6aa74695f7d4',
         kind: 'line',
         x1: 0.8687346702732446,
         y1: 0.6099990200440893,
@@ -8423,7 +8423,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '678221d7-e4a1-47fe-9aa9-b4c6249a6cb8',
+        id: '93503832-c016-49d7-8147-53ad926f9076',
         kind: 'line',
         x1: 0.6091620530797156,
         y1: 0.13781968505774225,
@@ -8436,7 +8436,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8a9a2f0c-8388-4faf-a6ed-813cb32773c6',
+        id: '162eeb42-cc4e-457d-a997-bc20c926fc9e',
         kind: 'line',
         x1: 0.6101642639569106,
         y1: 0.46286220356257657,
@@ -8449,7 +8449,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8e9d4593-4b58-4fac-a112-02cbbd388a03',
+        id: '0deba8e4-87db-4c72-821c-7dfbf0f8869d',
         kind: 'line',
         x1: 0.609486208922665,
         y1: 0.7916749879886639,
@@ -8462,7 +8462,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bd045825-5efd-4965-ac50-d1ccb1787062',
+        id: '149b900e-5e1e-4555-96b7-03d24b5fa303',
         kind: 'line',
         x1: 0.633903085632477,
         y1: 0.8439230881912478,
@@ -8475,7 +8475,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8a7674a1-ac58-4eb5-a171-7417b2f9cc68',
+        id: '049a63d5-2f74-483e-b34c-eb9133e272a6',
         kind: 'line',
         x1: 0.6547626479920923,
         y1: 0.7938566945904008,
@@ -8488,7 +8488,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '264510ca-703a-4f9f-a341-0832a8185315',
+        id: '130f8a27-f5e7-43fb-a872-6acebdfaa700',
         kind: 'line',
         x1: 0.6497566327792238,
         y1: 0.7910752282792425,
@@ -8501,7 +8501,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a5617042-a08a-481b-afd7-96230a3892df',
+        id: 'b3f9e611-a390-4b3a-b489-8bd96053b55c',
         kind: 'line',
         x1: 0.6910203910116166,
         y1: 0.7895505368104692,
@@ -8514,7 +8514,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f04df47b-2e1c-4898-a80c-80aaf76f8743',
+        id: '1571974d-7a9f-4a80-9747-6502b90bec34',
         kind: 'line',
         x1: 0.7199395034190335,
         y1: 0.8467045545024061,
@@ -8527,7 +8527,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7564d7df-c6c7-4e73-8800-e0885fa89565',
+        id: '8244591f-9621-4326-8408-12c03d12fa5c',
         kind: 'line',
         x1: 0.8957943639575119,
         y1: 0.8513403316876698,
@@ -8540,7 +8540,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '297146e3-4eb3-4187-af23-5076513e5a75',
+        id: '3adf8593-b2fb-4e5f-bc15-107ca4dc50f4',
         kind: 'line',
         x1: 0.8682336951188132,
         y1: 0.8105454924573496,
@@ -8553,7 +8553,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'abfc4aad-da51-4184-bf0f-96dec18b593c',
+        id: '535ff03e-ed7c-4896-b92d-1a65bbe1f27f',
         kind: 'line',
         x1: 0.8692357757118422,
         y1: 0.6955782182628114,
@@ -8566,7 +8566,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f6b46972-7479-47b2-b814-11265ab7be5b',
+        id: '781adb09-6c23-4ca9-901a-2f4671bc8f58',
         kind: 'line',
         x1: 0.09009591072657032,
         y1: 0.48691861995675745,
@@ -8579,7 +8579,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9fa9642c-9acd-4642-817e-6a5513f4bd81',
+        id: 'd6f4ac25-a34d-47f2-879b-44ba0a2375b7',
         kind: 'line',
         x1: 0.2153765149277069,
         y1: 0.2528501565177929,
@@ -8592,7 +8592,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '60029047-34a9-43b7-99f4-75c8ba4e6a25',
+        id: '7c09a25c-286c-4ab6-9a34-75be8408fd93',
         kind: 'line',
         x1: 0.3195875520073127,
         y1: 0.2564452814564737,
@@ -8605,7 +8605,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '50cf9c8f-c13e-4a93-b8c5-86dc3d3b382f',
+        id: '54edec1d-b2d1-4c8f-ac91-09f470ed95c7',
         kind: 'line',
         x1: 0.2341939432257662,
         y1: 0.405454454520563,
@@ -8618,7 +8618,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7623279c-4aca-4f7e-a65c-7a8983f20a58',
+        id: 'bd5cfa77-0515-4cfb-be55-e6fcdd9068a9',
         kind: 'line',
         x1: 0.3890526416707131,
         y1: 0.40564296641172043,
@@ -8631,7 +8631,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '17354a1b-7d3d-427f-8537-ba37d079e1eb',
+        id: 'b57e0b98-bd26-4ce6-ac7e-57b1397280f1',
         kind: 'line',
         x1: 0.39474364667504697,
         y1: 0.5536312393964892,
@@ -8644,7 +8644,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0515d1a3-f591-490d-899f-de3149deab96',
+        id: '83796cf1-27f5-4e83-8048-a63457d76904',
         kind: 'line',
         x1: 0.23846398575704794,
         y1: 0.5521610132908236,
@@ -8657,7 +8657,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c88b6c09-abb2-4ac6-a829-e4b614595ba4',
+        id: '8071f4a2-a782-4736-b439-acb9e4cab499',
         kind: 'line',
         x1: 0.32232817967359373,
         y1: 0.7040383363222145,
@@ -8670,7 +8670,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f84a98eb-95c4-4efc-8a68-fa481c9cd389',
+        id: '59327349-813e-419a-aacd-5d1d5632708c',
         kind: 'line',
         x1: 0.21717935104629732,
         y1: 0.7077985731259625,
@@ -8683,13 +8683,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1033f0ff-a76b-4580-9ca4-67effe51ed0e',
+        id: '2199846a-8b7f-4075-8840-8a6da1b2ffd8',
         kind: 'arc',
         cx: 0.877140571558476,
         cy: 0.6720292383861672,
-        radius: 0.03247486092440789,
-        startAngle: 0.07886436500865414,
-        endAngle: -1.7622828420525503,
+        radius: 0.06008564576322165,
+        startAngle: -1.7622828420525503,
+        endAngle: 0.07886436500865414,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -8697,11 +8697,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5e666971-0a71-4944-b709-9a3e197d9767',
+        id: '25575ecb-1986-41f6-bce8-1eedd2b601d9',
         kind: 'arc',
         cx: 0.7747572019309661,
         cy: 0.6511599256381926,
-        radius: 0.012501574604780515,
+        radius: 0.023130666669637957,
         startAngle: 1.5549246438031101,
         endAngle: 3.0126818819058054,
         style: {
@@ -8711,13 +8711,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c4b0ed2d-9d38-40f2-aed0-d523b33c5ee1',
+        id: '20f074bc-00bc-40d6-bf3f-ed28ab53a172',
         kind: 'arc',
         cx: 0.6777645984376242,
         cy: 0.7453970670908152,
-        radius: 0.014092889569110954,
-        startAngle: 1.5989578937827926,
-        endAngle: 0.4405303406165145,
+        radius: 0.026074949863553305,
+        startAngle: 0.4405303406165145,
+        endAngle: 1.5989578937827926,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -8725,13 +8725,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c25f4f35-a1a2-47c8-abab-ca8b2f3461f7',
+        id: '6c078504-9b92-4ded-9408-cf524c4e306c',
         kind: 'arc',
         cx: 0.7087812839692553,
         cy: 0.3325964702616744,
-        radius: 0.012103174603174558,
-        startAngle: -1.5707963267948966,
-        endAngle: -2.1559087649793267,
+        radius: 0.02239353891336262,
+        startAngle: -2.1559087649793267,
+        endAngle: -1.5707963267948966,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -8739,11 +8739,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2df94ff2-bd83-473f-99a2-d997d1c113b7',
+        id: 'fcd9da1b-baf0-4d1f-91da-106b55407f40',
         kind: 'arc',
         cx: 0.8321941547908107,
         cy: 0.41793983231714454,
-        radius: 0.013216430542365742,
+        radius: 0.0244533076114256,
         startAngle: -0.625485040239229,
         endAngle: 2.6183143314578166,
         style: {
@@ -8767,7 +8767,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '11840db2-f19d-4661-b5b2-40677bf297f1',
+        id: '3077261b-ae45-4ce8-b033-f92463b26da9',
         kind: 'rect',
         x: 0.04466205488282342,
         y: 0.07231861662722436,
@@ -8780,11 +8780,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd3afea1c-a8c5-46d3-b461-8f39c946ad41',
+        id: 'b607d26b-352c-45a0-a46f-09fcd36e1d4c',
         kind: 'circle',
         cx: 0.3090208779664409,
         cy: 0.234410101061039,
-        radius: 0.035940598839973366,
+        radius: 0.06649802428541328,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -8792,7 +8792,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '563396f0-1039-43a0-9831-8cdf13e0c961',
+        id: '85df2ac1-039c-4b02-8600-34a41984db8c',
         kind: 'line',
         x1: 0.30516070480545915,
         y1: 0.3102029313483118,
@@ -8805,7 +8805,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6a3a4fea-852a-4224-83ad-dbd177491b39',
+        id: '2f04f8ec-5e00-48cd-a9a7-37b034117303',
         kind: 'line',
         x1: 0.16890489315995588,
         y1: 0.4044322300674442,
@@ -8818,7 +8818,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '01640ec0-bc5a-40a4-afd0-f2a0917c909e',
+        id: '9ad0fe5c-a4bf-4438-9d3a-a81469b13c07',
         kind: 'line',
         x1: 0.1916684689045386,
         y1: 0.43115569134798165,
@@ -8831,7 +8831,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c5e17b04-8412-4456-8192-96576ef7df72',
+        id: '4cc89b03-7d9e-4cf3-9fb4-010ebb49841b',
         kind: 'line',
         x1: 0.25099999912579257,
         y1: 0.3576956058645958,
@@ -8844,7 +8844,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ff3dfa2d-cec3-4821-b4b4-fb7236e7e1cc',
+        id: 'beda7bb2-ab77-4f71-af0d-85e5a29c75f8',
         kind: 'line',
         x1: 0.22129456484075338,
         y1: 0.4782189496974025,
@@ -8857,7 +8857,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '393c88ad-970a-4422-999f-394b12ea024f',
+        id: '6696ed6c-6e69-42b9-9ec2-6682d96c82ba',
         kind: 'line',
         x1: 0.21651033922298538,
         y1: 0.6120506952762518,
@@ -8870,7 +8870,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7d7cda1c-de0c-4c92-9f27-78b601a4b9a7',
+        id: '90fe2b22-9bd7-4219-acae-4bc093edf1c0',
         kind: 'line',
         x1: 0.13752578400492907,
         y1: 0.6147470389802622,
@@ -8883,7 +8883,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1325244a-2d62-479d-bc5c-8d504f497a57',
+        id: '2af39384-c018-4740-a773-d6856931f065',
         kind: 'line',
         x1: 0.09673097056590681,
         y1: 0.6767629441725034,
@@ -8896,7 +8896,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd177a613-6396-4395-a13f-3c5dae84ffbb',
+        id: '7b8530ec-7426-4685-acd6-7022aae07877',
         kind: 'line',
         x1: 0.24950224716120875,
         y1: 0.6562994263724071,
@@ -8909,7 +8909,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2662e8ac-a556-4d05-8be5-2aad29f2264b',
+        id: '38658927-9e87-4a1e-8b31-096d64f4204c',
         kind: 'line',
         x1: 0.3224869141466142,
         y1: 0.7604484620981574,
@@ -8922,7 +8922,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '621f240c-0d05-4ec5-82d3-7d691fc6632e',
+        id: '91508de2-d96f-4915-8df1-14864aa2ff9b',
         kind: 'line',
         x1: 0.3324070109217505,
         y1: 0.7743864304122935,
@@ -8935,7 +8935,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e0b481e8-327c-4c7b-a750-80ab9c50024a',
+        id: '3894a7e0-54d2-486b-b49b-e38d9920187e',
         kind: 'line',
         x1: 0.29208677430507113,
         y1: 0.48691011362924985,
@@ -8948,7 +8948,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8ceb661f-a7d7-413c-a71a-bef22007e81c',
+        id: '8d929216-4a2a-439e-b299-9571e5ee55dc',
         kind: 'line',
         x1: 0.31600028779172423,
         y1: 0.40166994471709666,
@@ -8961,7 +8961,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5711f820-3834-49b3-aafd-e5e3cd66756e',
+        id: '9f5998f4-22b1-4f21-ab8e-be1b60a29edd',
         kind: 'line',
         x1: 0.34594990748103854,
         y1: 0.46957817267241675,
@@ -8974,7 +8974,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '90377f19-6972-4f1a-9a47-f3e14f70c1ba',
+        id: '52da2dcd-48c3-4f93-87a0-d761fbb5d5bc',
         kind: 'line',
         x1: 0.40815688136392464,
         y1: 0.4674979807478404,
@@ -8987,7 +8987,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2ddb1a3e-d442-4977-ad5c-710e77eae4c4',
+        id: 'bd692ef6-0515-4fa3-b660-65c0d3c9deae',
         kind: 'line',
         x1: 0.4084058599690139,
         y1: 0.4127958099617294,
@@ -9000,7 +9000,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9c35aa52-060c-4c2e-a031-59c75210c54d',
+        id: '3e8dd79c-8c2f-4a10-b174-1406789b2b18',
         kind: 'line',
         x1: 0.3099226095673639,
         y1: 0.3116713601295159,
@@ -9013,7 +9013,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c850c8ed-270c-4857-9f56-c50fcaa11dc2',
+        id: '27103216-2efe-406f-beb0-855eacc46447',
         kind: 'line',
         x1: 0.4016893177919044,
         y1: 0.14855651040170176,
@@ -9026,7 +9026,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '455a0185-bde4-4729-afeb-3ea624e1e8ac',
+        id: '6a3b6c25-12df-4994-94e0-49193437629e',
         kind: 'line',
         x1: 0.14362001691416823,
         y1: 0.6099990200440895,
@@ -9039,7 +9039,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd885cc4d-06fc-4b42-9134-1184fd1a8be4',
+        id: 'd0772a31-8357-43b4-9cee-ef2e845d4258',
         kind: 'line',
         x1: 0.4031926341076973,
         y1: 0.1378196850577424,
@@ -9052,7 +9052,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '413a6d23-6993-46ea-b084-66e38d65523b',
+        id: '995dcfaa-7b9e-482d-bd48-9be816d4ecfc',
         kind: 'line',
         x1: 0.40219042323050225,
         y1: 0.46286220356257674,
@@ -9065,7 +9065,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '235086a1-a2f2-472a-87d0-3bf8bbac0ee8',
+        id: '83a2c575-ce6c-4a40-b630-c7d13ddc2eff',
         kind: 'line',
         x1: 0.40286847826474786,
         y1: 0.791674987988664,
@@ -9078,7 +9078,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e068ae84-8be8-4d10-b6b3-1dda9c45fe58',
+        id: '07541470-40fd-451b-9468-10bc84e86eed',
         kind: 'line',
         x1: 0.37845160155493596,
         y1: 0.8439230881912481,
@@ -9091,7 +9091,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b910d2d9-17a1-4ec3-a94a-2e3b72c0392d',
+        id: 'e2955ddc-29a7-4232-9f21-abbbdb0be35a',
         kind: 'line',
         x1: 0.35759203919532057,
         y1: 0.7938566945904009,
@@ -9104,7 +9104,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '637eb386-bceb-4b14-9244-7d794b48ac11',
+        id: 'f593a872-bed3-4d74-9eea-ab6995d6d00c',
         kind: 'line',
         x1: 0.36259805440818904,
         y1: 0.7910752282792426,
@@ -9117,7 +9117,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '70c0fe5f-c8ba-4e9b-9dd4-6a9eaf5da4e5',
+        id: 'a987e129-00b6-48f1-91e2-45224a236833',
         kind: 'line',
         x1: 0.32133429617579623,
         y1: 0.7895505368104692,
@@ -9130,7 +9130,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'edbcbc0c-6229-4dea-a5b2-40afff3a2087',
+        id: '240a7ad3-38db-49a1-ae7e-ea71a548d3c8',
         kind: 'line',
         x1: 0.29241518376837944,
         y1: 0.8467045545024062,
@@ -9143,7 +9143,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5920d674-918f-45a4-bc85-ccd246b0406b',
+        id: '404f83b5-a6d6-4bf8-a096-e20455c5ecb8',
         kind: 'line',
         x1: 0.116560323229901,
         y1: 0.8513403316876699,
@@ -9156,7 +9156,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4022c9e1-f31a-49ce-a023-59fe59905914',
+        id: '6bf2b646-b98f-4eef-9273-07fa108b6864',
         kind: 'line',
         x1: 0.14412099206859968,
         y1: 0.8105454924573497,
@@ -9169,7 +9169,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '50e7ce4b-7506-4217-b70d-a311f85afc5e',
+        id: '9cc7d7df-4a79-4764-9e27-e8f299e94bac',
         kind: 'line',
         x1: 0.1431189114755707,
         y1: 0.6955782182628115,
@@ -9182,7 +9182,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e4b14f49-8606-4dec-91dd-f34203800f29',
+        id: '3d38ce6a-3af1-43d0-a757-4b05bcd8031c',
         kind: 'line',
         x1: 0.9096234461007235,
         y1: 0.4701412900271171,
@@ -9195,7 +9195,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1e091c42-9660-4dc6-8d09-8299055b145b',
+        id: '4c411ac0-f071-4794-acdb-f11bb0ebfb9b',
         kind: 'line',
         x1: 0.7843428418995869,
         y1: 0.7042097534660817,
@@ -9208,7 +9208,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '48825644-7357-4322-9243-baedb0a4415f',
+        id: '69a52125-272d-4b7d-bd14-90625254bfe4',
         kind: 'line',
         x1: 0.6801318048199811,
         y1: 0.7006146285274011,
@@ -9221,7 +9221,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0460c69e-f0a2-4a90-b193-cbb0694c8a40',
+        id: '6186a162-f1a4-410e-ad3d-87fc5506b774',
         kind: 'line',
         x1: 0.7655254136015276,
         y1: 0.5516054554633115,
@@ -9234,7 +9234,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6a2637d7-15a2-487c-b89e-9e6109281ba2',
+        id: '64a0f0b3-74ca-45f8-9f18-d3c8dab2431c',
         kind: 'line',
         x1: 0.6106667151565807,
         y1: 0.5514169435721542,
@@ -9247,7 +9247,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '05c34b8f-6b4d-438f-84e4-1b975356da21',
+        id: '435e2ea2-f44f-4455-9dcc-9187a5e41812',
         kind: 'line',
         x1: 0.6049757101522468,
         y1: 0.40342867058738563,
@@ -9260,7 +9260,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4b49d788-9eb8-4889-b934-b798029b5e2d',
+        id: 'c6a97765-e389-4958-b755-0945721265ec',
         kind: 'line',
         x1: 0.7612553710702459,
         y1: 0.4048988966930511,
@@ -9273,7 +9273,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9b81bcc9-a474-41dc-8fab-e238616d44de',
+        id: '391d961d-ddb6-430a-a087-cebf8b939068',
         kind: 'line',
         x1: 0.6773911771537,
         y1: 0.2530215736616604,
@@ -9286,7 +9286,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bf84a9b0-ff17-4f16-8da0-40fa5303848f',
+        id: '86a6b159-ceb8-4f1a-a16a-1a3a9a8054bb',
         kind: 'line',
         x1: 0.7825400057809965,
         y1: 0.2492613368579124,
@@ -9299,11 +9299,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5820377c-f05f-4805-915c-1345d2f9c3f2',
+        id: 'bdbbfa59-8864-41b6-a517-8044f4f16b7e',
         kind: 'arc',
         cx: 0.13521411562893687,
         cy: 0.6720292383861675,
-        radius: 0.03247486092440789,
+        radius: 0.06008564576322165,
         startAngle: 3.062728288581139,
         endAngle: 4.903875495642343,
         style: {
@@ -9313,13 +9313,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '74832ba0-c45e-4c5b-a12d-36c83a9754c6',
+        id: '36fc33a9-33b6-4481-9254-11b2ad47e691',
         kind: 'arc',
         cx: 0.23759748525644675,
         cy: 0.6511599256381927,
-        radius: 0.012501574604780515,
-        startAngle: 1.586668009786683,
-        endAngle: 0.12891077168398754,
+        radius: 0.023130666669637957,
+        startAngle: 0.12891077168398754,
+        endAngle: 1.586668009786683,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -9327,11 +9327,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '69f62018-03d5-4875-87ba-ec836943bc8c',
+        id: 'd6ed271f-bccc-4176-bc54-c0e32426d27e',
         kind: 'arc',
         cx: 0.33459008874978874,
         cy: 0.7453970670908153,
-        radius: 0.014092889569110954,
+        radius: 0.026074949863553305,
         startAngle: 1.5426347598070007,
         endAngle: 2.7010623129732787,
         style: {
@@ -9341,11 +9341,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cb160f53-aa94-4638-9691-3e7803d358cd',
+        id: 'ab94377f-2c07-4e22-9404-cf41edc474fb',
         kind: 'arc',
         cx: 0.3035734032181575,
         cy: 0.3325964702616745,
-        radius: 0.012103174603174558,
+        radius: 0.02239353891336262,
         startAngle: 4.71238898038469,
         endAngle: 5.29750141856912,
         style: {
@@ -9355,13 +9355,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c9c59a04-ef0b-4630-9b68-89d17f2a964e',
+        id: 'c773dc2d-bf82-400c-98a5-e06b8374f05f',
         kind: 'arc',
         cx: 0.18016053239660212,
         cy: 0.41793983231714465,
-        radius: 0.013216430542365742,
-        startAngle: 3.7670776938290222,
-        endAngle: 0.5232783221319769,
+        radius: 0.0244533076114256,
+        startAngle: 0.5232783221319769,
+        endAngle: 3.7670776938290222,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -9390,7 +9390,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '099fe5d7-5b57-4456-aa0f-255a8ed1e159',
+        id: 'bb2162c5-fc20-4e37-93f9-28b06f0f1cea',
         kind: 'rect',
         x: 0.04466205488282342,
         y: 0.07231861662722436,
@@ -9403,11 +9403,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e4721675-a58e-4503-b81b-939f66ce6d38',
+        id: '3883b7b9-0816-44e0-a917-2b692af2a60b',
         kind: 'circle',
         cx: 0.703333809220972,
         cy: 0.23441010106103885,
-        radius: 0.035940598839973366,
+        radius: 0.06649802428541328,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -9415,7 +9415,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0115f6f4-844a-4898-8698-7864531fe1e3',
+        id: '27fe6f84-c583-49e4-a521-3f7d78e8e338',
         kind: 'line',
         x1: 0.7071939823819537,
         y1: 0.3102029313483117,
@@ -9428,7 +9428,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a4fa86f8-c2e7-4eec-8d63-4e5a89b933d6',
+        id: '92ede21e-272b-4824-a5c8-63c2118c9ddb',
         kind: 'line',
         x1: 0.843449794027457,
         y1: 0.4044322300674441,
@@ -9441,7 +9441,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6c13894b-5ca0-4149-a474-cde3ccc1d563',
+        id: '705636f1-378a-41d6-81ce-5f3d24eff4cd',
         kind: 'line',
         x1: 0.8206862182828742,
         y1: 0.43115569134798154,
@@ -9454,7 +9454,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'db7400f4-728b-42df-b013-07971bd87e0a',
+        id: 'd90cdce0-6b6f-4b65-a462-9f794b47bce2',
         kind: 'line',
         x1: 0.7613546880616203,
         y1: 0.3576956058645957,
@@ -9467,7 +9467,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e2482016-2efb-4d25-b80c-4f74801c9729',
+        id: '3ee80685-472e-4621-aa77-66a0a749211f',
         kind: 'line',
         x1: 0.7910601223466595,
         y1: 0.47821894969740225,
@@ -9480,7 +9480,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b932eaa9-e815-4790-ad81-384a3c3c5e17',
+        id: 'cab61626-7054-4d9c-a07d-6456fcaa65ca',
         kind: 'line',
         x1: 0.7958443479644275,
         y1: 0.6120506952762517,
@@ -9493,7 +9493,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8492ac54-d2e9-4db1-a12b-6e69f0c96c54',
+        id: '6c8524ed-66bd-4410-b7f6-7f78f5ac2193',
         kind: 'line',
         x1: 0.8748289031824839,
         y1: 0.6147470389802621,
@@ -9506,7 +9506,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5b5f35b8-15c3-4f45-9c11-532b1f78b341',
+        id: 'e780a8f8-41cc-4764-a0d2-b7cb64952a6c',
         kind: 'line',
         x1: 0.9156237166215061,
         y1: 0.6767629441725033,
@@ -9519,7 +9519,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9569199f-7360-482d-a40d-cccd6c683d74',
+        id: '78270ef9-ac32-44e5-8758-5d2128fa1f2e',
         kind: 'line',
         x1: 0.7628524400262041,
         y1: 0.656299426372407,
@@ -9532,7 +9532,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '71be6880-ac1d-4a5b-9677-ef22ddb8f686',
+        id: '579d6ca1-61a7-48f3-b77d-a6a2f2d2f716',
         kind: 'line',
         x1: 0.6898677730407987,
         y1: 0.7604484620981573,
@@ -9545,7 +9545,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2d1912f3-c4b9-47c8-b3bf-72462b07e778',
+        id: 'b651452b-b468-4501-970d-3ab7b30423a6',
         kind: 'line',
         x1: 0.6799476762656623,
         y1: 0.7743864304122934,
@@ -9558,7 +9558,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '16bd1bed-2249-4de6-b246-a01c242f2b5b',
+        id: '8c4bd896-7236-4865-bb1b-f49926064976',
         kind: 'line',
         x1: 0.7202679128823417,
         y1: 0.4869101136292497,
@@ -9571,7 +9571,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd95d0629-be53-490b-9cdc-22c107717e48',
+        id: 'aa519395-2f44-42fd-86e0-3aa301350eb5',
         kind: 'line',
         x1: 0.6963543993956887,
         y1: 0.4016699447170965,
@@ -9584,7 +9584,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9cc83c72-e8d3-466b-b2fd-7b034485ec86',
+        id: 'ece411a9-ba7c-460b-a725-d0530f8191d2',
         kind: 'line',
         x1: 0.6664047797063744,
         y1: 0.46957817267241664,
@@ -9597,7 +9597,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b392d0c6-9328-4b45-8dc4-155516ca771d',
+        id: 'c90f681d-434d-442d-b181-b48f1319c947',
         kind: 'line',
         x1: 0.6041978058234881,
         y1: 0.46749798074784027,
@@ -9610,7 +9610,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0f29a7ab-4f93-4c2a-a9ec-dfc03ae1920c',
+        id: 'b3912572-9b3e-4df9-870f-37d1e2fad3c3',
         kind: 'line',
         x1: 0.6039488272183989,
         y1: 0.4127958099617292,
@@ -9623,7 +9623,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0427752f-bfd5-4a62-aab4-31c6bd713a13',
+        id: '7357c217-79b2-4a5a-952e-0e0d9271ff39',
         kind: 'line',
         x1: 0.702432077620049,
         y1: 0.3116713601295158,
@@ -9636,7 +9636,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '780abafb-59d5-450e-84f6-59f42d73922c',
+        id: '7f9f2041-a8fe-4720-8197-d6abe62c723f',
         kind: 'line',
         x1: 0.6106653693955084,
         y1: 0.14855651040170165,
@@ -9649,7 +9649,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c4bc3844-a3c0-4fc3-95fc-2c7693b925f4',
+        id: 'a1da49ef-36e9-46ac-9a55-b64b1c488e8c',
         kind: 'line',
         x1: 0.8687346702732446,
         y1: 0.6099990200440893,
@@ -9662,7 +9662,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '92e9c950-2450-4a0c-8c79-404393ea1525',
+        id: 'b6c3a000-ff55-4d03-b442-6416963ea431',
         kind: 'line',
         x1: 0.6091620530797156,
         y1: 0.13781968505774225,
@@ -9675,7 +9675,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2273fd98-80f9-4233-aeb2-1053edd3af58',
+        id: '98a275b0-a821-4d03-bf90-12f95e5b5520',
         kind: 'line',
         x1: 0.6101642639569106,
         y1: 0.46286220356257657,
@@ -9688,7 +9688,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e6e98577-7155-421f-bf61-0121eea78fb8',
+        id: '72756e87-084c-40b7-8372-1e9eaa4e7b7a',
         kind: 'line',
         x1: 0.609486208922665,
         y1: 0.7916749879886639,
@@ -9701,7 +9701,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '27b4981f-9cee-4431-b3c8-03510039bea5',
+        id: '0edb3c56-e49e-480d-beb1-3dd73a916416',
         kind: 'line',
         x1: 0.633903085632477,
         y1: 0.8439230881912478,
@@ -9714,7 +9714,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1a37cc78-b374-4aa2-bb31-f1c6b241e8d5',
+        id: '53ba4fda-1884-41b0-bc6a-e5c5b463aca9',
         kind: 'line',
         x1: 0.6547626479920923,
         y1: 0.7938566945904008,
@@ -9727,7 +9727,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8bcb17c9-3fb1-48b6-b604-784f060a3ea0',
+        id: '1ddfe6bb-9fbc-488a-8ab6-def217af5f65',
         kind: 'line',
         x1: 0.6497566327792238,
         y1: 0.7910752282792425,
@@ -9740,7 +9740,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c621e1cf-ee48-459c-a78d-48989279ff4e',
+        id: '869cc0ed-0eda-4472-a73c-b6fddc2e8502',
         kind: 'line',
         x1: 0.6910203910116166,
         y1: 0.7895505368104692,
@@ -9753,7 +9753,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '215fba73-8e71-4a5b-898c-90f24342f273',
+        id: 'b286a2f4-7a6b-4005-9929-f77d6d911255',
         kind: 'line',
         x1: 0.7199395034190335,
         y1: 0.8467045545024061,
@@ -9766,7 +9766,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0e94372e-c251-4e6d-84c9-476351b1b1b0',
+        id: 'e6441687-a4e7-4a11-8e8b-f2d6add517f5',
         kind: 'line',
         x1: 0.8957943639575119,
         y1: 0.8513403316876698,
@@ -9779,7 +9779,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1280801d-9565-4dbc-ae9a-e378d1ef0e27',
+        id: '1d76870f-49d6-4c8e-935b-a1c755cb9b23',
         kind: 'line',
         x1: 0.8682336951188132,
         y1: 0.8105454924573496,
@@ -9792,7 +9792,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0eb0f3f6-b6b6-44a2-a516-2f6dad93102a',
+        id: '22645a22-189d-4cdd-907a-5056d3193507',
         kind: 'line',
         x1: 0.8692357757118422,
         y1: 0.6955782182628114,
@@ -9805,7 +9805,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e78f8386-96fe-4541-adf2-8a48e812681a',
+        id: '23778a56-d350-4329-97cc-d479789cbcc4',
         kind: 'line',
         x1: 0.13791647154621242,
         y1: 0.7233405391003516,
@@ -9818,7 +9818,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8a124df2-c624-4da0-a8ac-262a410c8595',
+        id: '89f0622d-192d-4278-82da-a458f6c44e1e',
         kind: 'line',
         x1: 0.13704826658648198,
         y1: 0.393924113991211,
@@ -9831,7 +9831,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b19b580f-75cb-4f0a-8fd0-7a7f0b4f4a62',
+        id: '3846854d-025a-4105-9194-6b8d042f9bc6',
         kind: 'line',
         x1: 0.2121105622221001,
         y1: 0.26012660796673137,
@@ -9844,7 +9844,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '647b6c26-2b73-426a-9109-d3625bc5c73d',
+        id: '5016f9b3-176f-4e1b-9939-9f015500875a',
         kind: 'line',
         x1: 0.20867565061673496,
         y1: 0.47721274449035106,
@@ -9857,7 +9857,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '40b6df07-aaf9-4c44-ba87-823117d6ba79',
+        id: '41f07134-afa9-4352-940a-eeb5e76534af',
         kind: 'line',
         x1: 0.31824933082788376,
         y1: 0.2747438970010165,
@@ -9870,7 +9870,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '08f5e21a-fac9-466c-a160-30c74b5a26ec',
+        id: 'abc97ce1-36cc-425d-b9f6-bc0de99c27b5',
         kind: 'line',
         x1: 0.37883080543807396,
         y1: 0.3719418477622577,
@@ -9883,7 +9883,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '62f56033-d58f-4aec-8bb3-55ea5e6f3aa5',
+        id: '28f549da-2106-4df1-b9e3-3e69b9530843',
         kind: 'line',
         x1: 0.26776251469197737,
         y1: 0.5753634363253706,
@@ -9896,7 +9896,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '53aaf2ea-770d-42d4-a53f-aaee009450dd',
+        id: 'a3d1278d-f5b2-4e42-9410-6208877b8159',
         kind: 'line',
         x1: 0.38510707657682025,
         y1: 0.5730371200665256,
@@ -9909,7 +9909,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fb4964c1-55d2-4158-9cd7-2ae5623515e5',
+        id: '30116ecd-960a-4e29-b491-5da573ea53d0',
         kind: 'line',
         x1: 0.3121926929873392,
         y1: 0.7132625680295743,
@@ -9922,13 +9922,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '59ef75ae-e18f-4854-b9ac-92581ad2bf1a',
+        id: '158ccc43-d40c-488f-9803-0a6cd73e6ae8',
         kind: 'arc',
         cx: 0.877140571558476,
         cy: 0.6720292383861672,
-        radius: 0.03247486092440789,
-        startAngle: 0.07886436500865414,
-        endAngle: -1.7622828420525503,
+        radius: 0.06008564576322165,
+        startAngle: -1.7622828420525503,
+        endAngle: 0.07886436500865414,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -9936,11 +9936,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2bea6e29-4d6a-45bf-b88e-e3ed56b8056b',
+        id: 'e1aceb2c-b8ab-435d-bd46-721eb2f12ec8',
         kind: 'arc',
         cx: 0.7747572019309661,
         cy: 0.6511599256381926,
-        radius: 0.012501574604780515,
+        radius: 0.023130666669637957,
         startAngle: 1.5549246438031101,
         endAngle: 3.0126818819058054,
         style: {
@@ -9950,13 +9950,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2c0a718b-a057-450c-80c3-1c7e238153b3',
+        id: '3fa148b5-803d-4286-8ed7-f6e352963d55',
         kind: 'arc',
         cx: 0.6777645984376242,
         cy: 0.7453970670908152,
-        radius: 0.014092889569110954,
-        startAngle: 1.5989578937827926,
-        endAngle: 0.4405303406165145,
+        radius: 0.026074949863553305,
+        startAngle: 0.4405303406165145,
+        endAngle: 1.5989578937827926,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -9964,13 +9964,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cea4b6e2-2f29-4fda-8011-d9871409ead5',
+        id: '88ee1204-41e8-410f-b15d-262b7f44f620',
         kind: 'arc',
         cx: 0.7087812839692553,
         cy: 0.3325964702616744,
-        radius: 0.012103174603174558,
-        startAngle: -1.5707963267948966,
-        endAngle: -2.1559087649793267,
+        radius: 0.02239353891336262,
+        startAngle: -2.1559087649793267,
+        endAngle: -1.5707963267948966,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -9978,11 +9978,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c38b5237-eac6-4fab-bd94-79997577423f',
+        id: 'fd72dc76-b179-4fc1-bc4b-52af3ae344f3',
         kind: 'arc',
         cx: 0.8321941547908107,
         cy: 0.41793983231714454,
-        radius: 0.013216430542365742,
+        radius: 0.0244533076114256,
         startAngle: -0.625485040239229,
         endAngle: 2.6183143314578166,
         style: {
@@ -10006,7 +10006,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'ec81e2e9-8e83-4e37-94fb-2463420d39b3',
+        id: 'cf83ff53-945b-4975-b4d6-b278b90dab63',
         kind: 'rect',
         x: 0.04466205488282342,
         y: 0.07231861662722436,
@@ -10019,11 +10019,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a0983c08-0c66-4d79-95cc-b2c5cf2c04ee',
+        id: 'ac55b357-37fb-4fd8-bbd9-d21538a464b6',
         kind: 'circle',
         cx: 0.3090208779664409,
         cy: 0.234410101061039,
-        radius: 0.035940598839973366,
+        radius: 0.06649802428541328,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -10031,7 +10031,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9e4e3902-ccbc-4cb5-b031-389918d670fb',
+        id: '5bfd17f8-1924-4dad-b596-91ef6349ec73',
         kind: 'line',
         x1: 0.30516070480545915,
         y1: 0.3102029313483118,
@@ -10044,7 +10044,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '78f8c9ba-21f1-49b7-8b21-89028ef9fa66',
+        id: '4e541c88-9f91-4cee-985c-6eef2e7e39c5',
         kind: 'line',
         x1: 0.16890489315995588,
         y1: 0.4044322300674442,
@@ -10057,7 +10057,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6f26884c-c463-475b-a0f7-5a47ba8fe38e',
+        id: 'f628d60a-5e37-4b07-ba71-5b63a324c249',
         kind: 'line',
         x1: 0.1916684689045386,
         y1: 0.43115569134798165,
@@ -10070,7 +10070,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6076409e-7fcb-4ec3-9ed7-d753c6a73f8c',
+        id: '1a3f46e3-eec3-4279-b20e-7b16f02355df',
         kind: 'line',
         x1: 0.25099999912579257,
         y1: 0.3576956058645958,
@@ -10083,7 +10083,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '953ddfe6-9c50-4656-b7e2-8b0a1fc202a7',
+        id: 'b66cc791-5b25-4d89-9d2d-9d534cc17c4a',
         kind: 'line',
         x1: 0.22129456484075338,
         y1: 0.4782189496974025,
@@ -10096,7 +10096,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a4b8e714-7aff-4792-bf3b-16b2b5460f44',
+        id: '30596ec8-7c72-4792-9cbe-60a7916b77d2',
         kind: 'line',
         x1: 0.21651033922298538,
         y1: 0.6120506952762518,
@@ -10109,7 +10109,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bfd9ad6d-0f8b-4258-b04a-890c8d3f56f3',
+        id: 'dcc2dd7c-dfc1-46c8-b125-5edc8f11557f',
         kind: 'line',
         x1: 0.13752578400492907,
         y1: 0.6147470389802622,
@@ -10122,7 +10122,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'de4bb070-e0af-4f88-b696-183295f763d9',
+        id: '3d8a25f6-1644-479d-87af-2d05b96c3240',
         kind: 'line',
         x1: 0.09673097056590681,
         y1: 0.6767629441725034,
@@ -10135,7 +10135,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ad04494e-4d5f-4104-b0ac-5272be19bd6a',
+        id: '926c418d-61d1-45e1-8e6b-d708a5a3adaa',
         kind: 'line',
         x1: 0.24950224716120875,
         y1: 0.6562994263724071,
@@ -10148,7 +10148,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dbd6c722-e15e-4568-aa3d-0f6406d0ee3a',
+        id: 'c413cee6-e596-4308-8856-33467a1bdce5',
         kind: 'line',
         x1: 0.3224869141466142,
         y1: 0.7604484620981574,
@@ -10161,7 +10161,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4e28ecd9-0243-4ca7-be4d-2d6c84ba4332',
+        id: 'adc6849e-83b3-4a9f-abc2-3cb180bf1d3c',
         kind: 'line',
         x1: 0.3324070109217505,
         y1: 0.7743864304122935,
@@ -10174,7 +10174,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '24462343-f644-4702-a44b-0d2ab3475f67',
+        id: 'dc18061d-5c45-45f0-9d80-722868a1d279',
         kind: 'line',
         x1: 0.29208677430507113,
         y1: 0.48691011362924985,
@@ -10187,7 +10187,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c89a50db-f8f7-49ea-9526-ae37c9c36505',
+        id: 'afd8eba1-967c-4f50-b2bb-ffe69a5aa218',
         kind: 'line',
         x1: 0.31600028779172423,
         y1: 0.40166994471709666,
@@ -10200,7 +10200,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9be67123-12f4-4f22-8aba-3a8fd1eb74d9',
+        id: '7f01d360-1690-4590-8e78-dc5f1a64b710',
         kind: 'line',
         x1: 0.34594990748103854,
         y1: 0.46957817267241675,
@@ -10213,7 +10213,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd82e5154-a273-4c75-93b1-5f906de1c1f5',
+        id: '3b4d1dcd-24d9-490e-a731-df0c8fa7366d',
         kind: 'line',
         x1: 0.40815688136392464,
         y1: 0.4674979807478404,
@@ -10226,7 +10226,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ac5a4693-2b4d-4c03-9794-6b32d56b0346',
+        id: '3eda26e3-05be-4572-a6b6-5abe8e4a5121',
         kind: 'line',
         x1: 0.4084058599690139,
         y1: 0.4127958099617294,
@@ -10239,7 +10239,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c2844282-b236-42a0-8066-aa4cdf4c1a4d',
+        id: '4f094025-68ee-47fd-8f16-722819e3b048',
         kind: 'line',
         x1: 0.3099226095673639,
         y1: 0.3116713601295159,
@@ -10252,7 +10252,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0f86de08-cc4b-43bb-a891-6a07ba8726e0',
+        id: '8c84a36d-2f5a-4a49-91da-97047efe1f05',
         kind: 'line',
         x1: 0.4016893177919044,
         y1: 0.14855651040170176,
@@ -10265,7 +10265,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bf64fd9a-e687-434c-a153-85531ce41b1f',
+        id: '0464fa50-0361-4183-96be-c1dc9c2101e6',
         kind: 'line',
         x1: 0.14362001691416823,
         y1: 0.6099990200440895,
@@ -10278,7 +10278,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '52a9fa15-2701-4067-82ac-d5ed8f22d6cb',
+        id: '29b1bbf0-9d1f-4559-96d4-0e9dc24d8482',
         kind: 'line',
         x1: 0.4031926341076973,
         y1: 0.1378196850577424,
@@ -10291,7 +10291,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3008dbea-26b2-48f9-bcf6-02b79913bc2a',
+        id: '6bb2338a-7c3d-46af-90cf-668741bc7ca2',
         kind: 'line',
         x1: 0.40219042323050225,
         y1: 0.46286220356257674,
@@ -10304,7 +10304,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f31e273a-8b96-4b55-bdf1-c91d1d60b6a7',
+        id: '377e4d69-9efa-4070-b446-302ab13239c0',
         kind: 'line',
         x1: 0.40286847826474786,
         y1: 0.791674987988664,
@@ -10317,7 +10317,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b4cf5777-e282-48c2-a9ee-f25006c57ea7',
+        id: '56b03588-8bdb-40e4-bf47-4aa219f0779c',
         kind: 'line',
         x1: 0.37845160155493596,
         y1: 0.8439230881912481,
@@ -10330,7 +10330,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5896ac17-0e97-41a7-98f0-42e147b7c7b9',
+        id: 'cec29235-db81-47b1-b6eb-ab711df4e957',
         kind: 'line',
         x1: 0.35759203919532057,
         y1: 0.7938566945904009,
@@ -10343,7 +10343,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3a54b8c0-5c93-4084-8268-3a3174ac1c43',
+        id: '973c93bc-3d63-4fe8-8e36-52ed23320c8a',
         kind: 'line',
         x1: 0.36259805440818904,
         y1: 0.7910752282792426,
@@ -10356,7 +10356,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '60841ff5-5d8a-4bcf-b6f4-6ffc7e4c6f7f',
+        id: 'a0d7be28-a4b9-423d-8189-0d49b4fcf07d',
         kind: 'line',
         x1: 0.32133429617579623,
         y1: 0.7895505368104692,
@@ -10369,7 +10369,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '97c67134-def6-4fed-81b0-4b200ebcee7a',
+        id: '4dded204-95f7-41e5-bde6-785c75f6e060',
         kind: 'line',
         x1: 0.29241518376837944,
         y1: 0.8467045545024062,
@@ -10382,7 +10382,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '14a52245-383d-4fa0-a005-0774831d9dc4',
+        id: 'e31c5233-a2aa-426b-9960-0f69aa9b332e',
         kind: 'line',
         x1: 0.116560323229901,
         y1: 0.8513403316876699,
@@ -10395,7 +10395,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3a4bba46-9bb8-42d6-98b6-e8e779bd1a1f',
+        id: '3715dfec-aabc-4fec-b8d2-db4564bd27ae',
         kind: 'line',
         x1: 0.14412099206859968,
         y1: 0.8105454924573497,
@@ -10408,7 +10408,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4188be7c-6a7d-4442-8dd9-b74d6e7143d7',
+        id: '5ea24a07-7afe-4985-9f24-34ac473d9db2',
         kind: 'line',
         x1: 0.1431189114755707,
         y1: 0.6955782182628115,
@@ -10421,7 +10421,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '107a36df-1d00-4476-8a17-378d3147bf53',
+        id: '11b61b0e-b6df-48c5-9ff0-4a54c31f9b0c',
         kind: 'line',
         x1: 0.8682147509341854,
         y1: 0.6718840915775338,
@@ -10434,7 +10434,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '684934c9-9af2-42b4-973b-e3e8fbb76a97',
+        id: 'b5e51753-9610-4fb5-98a7-93d5483fb94c',
         kind: 'line',
         x1: 0.690173016410912,
         y1: 0.6734904619876078,
@@ -10447,7 +10447,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd54c350e-85c1-4847-bd93-c025d29a4893',
+        id: 'a21fce7c-e668-484a-99f0-1c7592b8d4a9',
         kind: 'line',
         x1: 0.6178586500595861,
         y1: 0.5346086815164202,
@@ -10460,7 +10460,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c7f85a7f-ee48-45b0-858d-acc85b8938f4',
+        id: '99670d93-5505-4d61-bad2-684dbdd12904',
         kind: 'line',
         x1: 0.7351885381330663,
         y1: 0.540964024574805,
@@ -10473,7 +10473,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9f572bb2-1b15-45d4-8f3e-1f6db2613a32',
+        id: '2d12384a-4d1a-47c0-abfb-7d51308f3f35',
         kind: 'line',
         x1: 0.6257589467519258,
         y1: 0.33822858101232695,
@@ -10486,7 +10486,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '56c06469-95b7-4d74-b3bb-76cd8704e08e',
+        id: '06e83f24-0ce5-4a15-9966-885712b02081',
         kind: 'line',
         x1: 0.6782921249014537,
         y1: 0.22613950904633645,
@@ -10499,7 +10499,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4531c342-6e9e-4d68-a68f-09424c6c9cca',
+        id: '89cc4371-3a29-4b16-ab37-3e85b1c4cab5',
         kind: 'line',
         x1: 0.7882366501486601,
         y1: 0.4316403113078366,
@@ -10512,7 +10512,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '83449ac4-f43f-42cd-bb1d-ea1267f2da14',
+        id: '19099ded-971f-4dcb-824c-8eb642ce3742',
         kind: 'line',
         x1: 0.7869793315992366,
         y1: 0.21452702500107898,
@@ -10525,7 +10525,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b3bcc4bb-6a9b-4cee-b93d-f279a33cab75',
+        id: '63582989-f926-43c3-9ab1-faf6309477d5',
         kind: 'line',
         x1: 0.8627678475221224,
         y1: 0.34943469507853286,
@@ -10538,11 +10538,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0aaf87c5-8f02-44fa-9e05-93ff6c4cc393',
+        id: '41ccfbdf-bcff-4452-bc9c-c24803dc3b77',
         kind: 'arc',
         cx: 0.13521411562893687,
         cy: 0.6720292383861675,
-        radius: 0.03247486092440789,
+        radius: 0.06008564576322165,
         startAngle: 3.062728288581139,
         endAngle: 4.903875495642343,
         style: {
@@ -10552,13 +10552,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '61588c42-9180-4396-960d-144a88cd2ee5',
+        id: 'dcb0271a-275f-4ba9-badb-fe8249f4ed53',
         kind: 'arc',
         cx: 0.23759748525644675,
         cy: 0.6511599256381927,
-        radius: 0.012501574604780515,
-        startAngle: 1.586668009786683,
-        endAngle: 0.12891077168398754,
+        radius: 0.023130666669637957,
+        startAngle: 0.12891077168398754,
+        endAngle: 1.586668009786683,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -10566,11 +10566,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9e3de83d-9fa5-4c1c-848d-d411edb32b07',
+        id: '53b64b89-58f3-4ba3-ae16-d72266357249',
         kind: 'arc',
         cx: 0.33459008874978874,
         cy: 0.7453970670908153,
-        radius: 0.014092889569110954,
+        radius: 0.026074949863553305,
         startAngle: 1.5426347598070007,
         endAngle: 2.7010623129732787,
         style: {
@@ -10580,11 +10580,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5a173cb1-1c7d-44ab-bec3-c6f973194c30',
+        id: 'eaee4eda-2b04-401b-b63a-d6c67964f64e',
         kind: 'arc',
         cx: 0.3035734032181575,
         cy: 0.3325964702616745,
-        radius: 0.012103174603174558,
+        radius: 0.02239353891336262,
         startAngle: 4.71238898038469,
         endAngle: 5.29750141856912,
         style: {
@@ -10594,13 +10594,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '386d1513-5c88-49c5-ba2f-0b900b1d3795',
+        id: '7e7121d0-013b-4a4a-9f4f-2832c96d0a04',
         kind: 'arc',
         cx: 0.18016053239660212,
         cy: 0.41793983231714465,
-        radius: 0.013216430542365742,
-        startAngle: 3.7670776938290222,
-        endAngle: 0.5232783221319769,
+        radius: 0.0244533076114256,
+        startAngle: 0.5232783221319769,
+        endAngle: 3.7670776938290222,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -10622,7 +10622,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '1a85c37c-a58a-4a4c-9bbf-185b0b58d64d',
+        id: '076494e5-49f8-4a3e-aafe-c27736091da5',
         kind: 'rect',
         x: 0.04466205488282342,
         y: 0.07231861662722436,
@@ -10635,11 +10635,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8abe8283-7a0a-4c2c-940f-0f8d65bc2543',
+        id: 'd216aac3-a098-4289-af66-cfdfd7d1b69d',
         kind: 'circle',
         cx: 0.703333809220972,
         cy: 0.23441010106103885,
-        radius: 0.035940598839973366,
+        radius: 0.06649802428541328,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -10647,7 +10647,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '584348d9-109a-4b93-b081-fef14c5a341c',
+        id: '7b991e38-e11f-429d-abc3-d039202a7a96',
         kind: 'line',
         x1: 0.7071939823819537,
         y1: 0.3102029313483117,
@@ -10660,7 +10660,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9807315c-efb9-4d8e-baed-7dc97dc4722e',
+        id: 'a2440b6e-1af2-4977-9b1c-4d065ece3e08',
         kind: 'line',
         x1: 0.843449794027457,
         y1: 0.4044322300674441,
@@ -10673,7 +10673,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0edd4c29-aa52-41a9-b0e6-a43c6d227220',
+        id: 'b7f065bc-e052-46e3-9db3-d4cd0b57b0ef',
         kind: 'line',
         x1: 0.8206862182828742,
         y1: 0.43115569134798154,
@@ -10686,7 +10686,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '35a04691-4c64-4b49-8073-43f2ca55aaaf',
+        id: '7a02fd36-dd1a-4bdf-a1d7-c58c73479ffb',
         kind: 'line',
         x1: 0.7613546880616203,
         y1: 0.3576956058645957,
@@ -10699,7 +10699,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e6fe3791-a246-4b71-ba8b-efa4daa151a9',
+        id: 'f3705b37-14aa-4efe-98f2-dc88d84cfd48',
         kind: 'line',
         x1: 0.7910601223466595,
         y1: 0.47821894969740225,
@@ -10712,7 +10712,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6b116f1f-9176-4fec-8902-65f9bd7dfd23',
+        id: '82e1a5b4-791b-454b-91a3-2687ae8dc534',
         kind: 'line',
         x1: 0.7958443479644275,
         y1: 0.6120506952762517,
@@ -10725,7 +10725,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bf9ae773-9222-4687-9071-463fbb9e966d',
+        id: '44c365c5-755f-4b0a-92f1-663de71296a6',
         kind: 'line',
         x1: 0.8748289031824839,
         y1: 0.6147470389802621,
@@ -10738,7 +10738,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a8bc8fd5-a608-453b-af27-d9391ff9a57f',
+        id: 'eb6fb34c-33bc-4ed2-9c93-312d00eb684b',
         kind: 'line',
         x1: 0.9156237166215061,
         y1: 0.6767629441725033,
@@ -10751,7 +10751,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1a374091-5535-41b2-ab4c-d21931482d5a',
+        id: '187c9839-1cbc-4ce3-8878-e32bcb0e30f2',
         kind: 'line',
         x1: 0.7628524400262041,
         y1: 0.656299426372407,
@@ -10764,7 +10764,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6bd3200f-8d52-47a1-b281-130cd352d7b6',
+        id: 'dc9c6324-0313-4817-88eb-1dc6d1060ebd',
         kind: 'line',
         x1: 0.6898677730407987,
         y1: 0.7604484620981573,
@@ -10777,7 +10777,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3eb0085e-dc59-481b-8fc9-d53f4e38ff29',
+        id: '481b9177-774d-4c83-92e9-a14bb414cd5c',
         kind: 'line',
         x1: 0.6799476762656623,
         y1: 0.7743864304122934,
@@ -10790,7 +10790,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8652f1f3-04d0-47a3-bd75-467ce29ef929',
+        id: 'ba23fa08-4e48-4188-a370-80f7ca3b2b66',
         kind: 'line',
         x1: 0.7202679128823417,
         y1: 0.4869101136292497,
@@ -10803,7 +10803,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '415b9713-a3a6-45db-98f1-6444a4cad523',
+        id: '719ebf1d-5fdb-48e4-b7d2-1e106fade05e',
         kind: 'line',
         x1: 0.6963543993956887,
         y1: 0.4016699447170965,
@@ -10816,7 +10816,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7ae0bd02-4f05-44ec-aac2-23ca1fdf8966',
+        id: 'ca713476-7f62-487c-85ac-4958e3f80df6',
         kind: 'line',
         x1: 0.6664047797063744,
         y1: 0.46957817267241664,
@@ -10829,7 +10829,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ac85ddec-1ff4-4922-8d12-0cadfec8828d',
+        id: '7c8febe2-80a3-48c7-a00a-c5a3dccfa617',
         kind: 'line',
         x1: 0.6041978058234881,
         y1: 0.46749798074784027,
@@ -10842,7 +10842,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '132dca04-77a4-4f0f-b15e-2c572615f19a',
+        id: '1f5ff2fb-619c-4400-ba2c-b1d813b632f8',
         kind: 'line',
         x1: 0.6039488272183989,
         y1: 0.4127958099617292,
@@ -10855,7 +10855,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '71389784-e7b5-4ab3-945e-dd4bca240463',
+        id: '55d2c306-0868-41ab-8e4a-1de72d37db5e',
         kind: 'line',
         x1: 0.702432077620049,
         y1: 0.3116713601295158,
@@ -10868,7 +10868,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1b1b1bf0-0c48-4b62-9595-ccb22ee63c39',
+        id: 'f4f0a973-bced-42ea-951a-5641a7ab2f40',
         kind: 'line',
         x1: 0.6106653693955084,
         y1: 0.14855651040170165,
@@ -10881,7 +10881,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3f585215-808a-4cd2-8f2c-62802ac853aa',
+        id: '7380d50b-6b27-4670-a9c7-4679c400d76a',
         kind: 'line',
         x1: 0.8687346702732446,
         y1: 0.6099990200440893,
@@ -10894,7 +10894,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bb265a1f-f99c-40ef-b88e-dbcbe0c7e774',
+        id: '7692cdad-d45e-4be7-9f85-03bf43194e0c',
         kind: 'line',
         x1: 0.6091620530797156,
         y1: 0.13781968505774225,
@@ -10907,7 +10907,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '46c5f3fb-2b5e-49d7-969d-884f6a241b02',
+        id: '28ff8233-e923-44cc-96cc-f2d844e2612c',
         kind: 'line',
         x1: 0.6101642639569106,
         y1: 0.46286220356257657,
@@ -10920,7 +10920,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3bf2d9a9-1251-46e6-85d3-2b6a5024e16f',
+        id: 'a7720786-8512-4678-b6af-f92ab5dd54d4',
         kind: 'line',
         x1: 0.609486208922665,
         y1: 0.7916749879886639,
@@ -10933,7 +10933,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3746c848-10fa-4e40-b99f-9dd16c2d2db1',
+        id: '04afe2b8-31fe-461c-b9c8-f02c809b715f',
         kind: 'line',
         x1: 0.633903085632477,
         y1: 0.8439230881912478,
@@ -10946,7 +10946,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e0cd1719-64cd-49f0-a7f7-af31c69b3004',
+        id: 'b33fa046-7ab6-4536-af17-90f7736df9b6',
         kind: 'line',
         x1: 0.6547626479920923,
         y1: 0.7938566945904008,
@@ -10959,7 +10959,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd3dbb7ff-cdce-4ca3-88b0-ea096f3895f5',
+        id: '063bda3b-f1d8-4223-8ef7-8fe5470f1257',
         kind: 'line',
         x1: 0.6497566327792238,
         y1: 0.7910752282792425,
@@ -10972,7 +10972,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fd4363e9-1038-4fee-8edc-b1d126764437',
+        id: '3862efed-227c-4e8c-81f7-b20437dec271',
         kind: 'line',
         x1: 0.6910203910116166,
         y1: 0.7895505368104692,
@@ -10985,7 +10985,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '09c951a5-7b73-4061-b46e-61d6befcacfa',
+        id: '3820a934-4adf-438b-9bcc-f7ec4da51ffc',
         kind: 'line',
         x1: 0.7199395034190335,
         y1: 0.8467045545024061,
@@ -10998,7 +10998,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3ac88690-b69f-4572-a69f-0c1fb5c44be1',
+        id: 'b9d5779e-e9cc-43bb-b5e5-a197bdda5a1f',
         kind: 'line',
         x1: 0.8957943639575119,
         y1: 0.8513403316876698,
@@ -11011,7 +11011,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd3883183-2212-4553-a65d-038bc74324b4',
+        id: 'bfa7b579-392f-4afb-b2b2-b7ba7aec6a8b',
         kind: 'line',
         x1: 0.8682336951188132,
         y1: 0.8105454924573496,
@@ -11024,7 +11024,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd52536bd-9dfb-4628-a043-7e711b294847',
+        id: '776c9039-cfb8-43e4-8d55-b21c9bd0a12b',
         kind: 'line',
         x1: 0.8692357757118422,
         y1: 0.6955782182628114,
@@ -11037,7 +11037,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '819256fa-ffaf-4cdb-b528-5878fc0db77b',
+        id: '76ffb9b5-976a-44ca-8759-ace171fdace4',
         kind: 'line',
         x1: 0.13375337205135757,
         y1: 0.25988719188622145,
@@ -11050,7 +11050,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'db2b0d64-7e5c-4b7a-90e5-42409f478a25',
+        id: '8ddd1548-61fc-4b6a-9f36-004772c42099',
         kind: 'line',
         x1: 0.31179510657463116,
         y1: 0.25828082147614745,
@@ -11063,7 +11063,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cff8e3b3-1e93-434c-8752-5f1283c6846c',
+        id: '534b549b-8b9f-40e7-af17-b6a7092c2214',
         kind: 'line',
         x1: 0.38410947292595704,
         y1: 0.39716260194733516,
@@ -11076,7 +11076,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fe76f0d6-9d77-4e2d-9835-a2e83d6c8f96',
+        id: '8bea8c9e-e26d-4a3b-96b3-231e69568d4a',
         kind: 'line',
         x1: 0.26677958485247694,
         y1: 0.39080725888895035,
@@ -11089,7 +11089,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd7b75917-2a5b-4d74-8dcc-22913e81027a',
+        id: '748f7453-ecbb-4077-aba4-6628582372b6',
         kind: 'line',
         x1: 0.37620917623361727,
         y1: 0.5935427024514284,
@@ -11102,7 +11102,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4783c1a5-00e9-4db7-bf8e-5fdc79bbc159',
+        id: 'c616f47b-4b1c-474d-9ecb-92915a7b5220',
         kind: 'line',
         x1: 0.3236759980840893,
         y1: 0.705631774417419,
@@ -11115,7 +11115,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bc6e31bf-fb7a-4b0e-8444-a281277f95e9',
+        id: '0d24c8fe-2097-4ba4-95e3-b75fb3411e01',
         kind: 'line',
         x1: 0.21373147283688299,
         y1: 0.5001309721559187,
@@ -11128,7 +11128,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a768c6ae-eb89-42a3-b6eb-12834fb1cd54',
+        id: '6f3d9e2c-d2de-4524-b84b-81358bd63851',
         kind: 'line',
         x1: 0.21498879138630636,
         y1: 0.7172442584626765,
@@ -11141,7 +11141,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fd04c229-b1c7-4189-8bdd-1cf66f35d995',
+        id: 'f38bf227-f097-4b9a-a98a-42b91ed2ea2c',
         kind: 'line',
         x1: 0.13920027546342048,
         y1: 0.5823365883852226,
@@ -11154,13 +11154,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd57954a7-e2db-4b6d-95b8-c54a64a062e8',
+        id: '7613e61a-a4b2-4a80-9826-527e38609674',
         kind: 'arc',
         cx: 0.877140571558476,
         cy: 0.6720292383861672,
-        radius: 0.03247486092440789,
-        startAngle: 0.07886436500865414,
-        endAngle: -1.7622828420525503,
+        radius: 0.06008564576322165,
+        startAngle: -1.7622828420525503,
+        endAngle: 0.07886436500865414,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -11168,11 +11168,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '265baf28-58c8-4126-a84e-951389e38333',
+        id: '9ca75b03-087b-4cae-a4d9-b8ecb4740e32',
         kind: 'arc',
         cx: 0.7747572019309661,
         cy: 0.6511599256381926,
-        radius: 0.012501574604780515,
+        radius: 0.023130666669637957,
         startAngle: 1.5549246438031101,
         endAngle: 3.0126818819058054,
         style: {
@@ -11182,13 +11182,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8bfd5dfb-eafc-4e7e-a2d7-de97925f5710',
+        id: '6da05925-a0cb-46f9-8b34-4c75a5a36e44',
         kind: 'arc',
         cx: 0.6777645984376242,
         cy: 0.7453970670908152,
-        radius: 0.014092889569110954,
-        startAngle: 1.5989578937827926,
-        endAngle: 0.4405303406165145,
+        radius: 0.026074949863553305,
+        startAngle: 0.4405303406165145,
+        endAngle: 1.5989578937827926,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -11196,13 +11196,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dae7c860-1878-40e1-9e59-b8ccad0453c9',
+        id: 'bdcee580-0fd9-47ed-af3b-3dc4fd380ede',
         kind: 'arc',
         cx: 0.7087812839692553,
         cy: 0.3325964702616744,
-        radius: 0.012103174603174558,
-        startAngle: -1.5707963267948966,
-        endAngle: -2.1559087649793267,
+        radius: 0.02239353891336262,
+        startAngle: -2.1559087649793267,
+        endAngle: -1.5707963267948966,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -11210,11 +11210,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '01a5d615-b34a-4183-9bf5-7cc6c8e3da01',
+        id: '2cdde1eb-0938-4de6-8ab2-f8281acf0fa4',
         kind: 'arc',
         cx: 0.8321941547908107,
         cy: 0.41793983231714454,
-        radius: 0.013216430542365742,
+        radius: 0.0244533076114256,
         startAngle: -0.625485040239229,
         endAngle: 2.6183143314578166,
         style: {
@@ -11238,7 +11238,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '3996383c-10c8-4cc5-a247-24e9ef79cd86',
+        id: '251f468c-4cc4-47b6-b182-2aa313b40cf1',
         kind: 'rect',
         x: 0.04466205488282342,
         y: 0.07231861662722436,
@@ -11251,11 +11251,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '359567ee-4e69-4cd8-8bbc-0f48ee9f8932',
+        id: '3a77e60e-c9f4-4d27-be70-c0440269e9ff',
         kind: 'circle',
         cx: 0.3090208779664409,
         cy: 0.234410101061039,
-        radius: 0.035940598839973366,
+        radius: 0.06649802428541328,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -11263,7 +11263,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6994069a-d34d-4e74-a551-18517191ca36',
+        id: 'b5771147-5772-4028-947a-942712573d99',
         kind: 'line',
         x1: 0.30516070480545915,
         y1: 0.3102029313483118,
@@ -11276,7 +11276,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f72734fe-a26d-4e32-b3bc-2244946f3134',
+        id: '418508b6-5b7f-49a9-8e80-15fe970acd28',
         kind: 'line',
         x1: 0.16890489315995588,
         y1: 0.4044322300674442,
@@ -11289,7 +11289,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1b3726e1-38c9-4e88-9af7-0616ba666ea8',
+        id: '9b59111b-ae3e-44b7-a6e4-3bf24c9c0e95',
         kind: 'line',
         x1: 0.1916684689045386,
         y1: 0.43115569134798165,
@@ -11302,7 +11302,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bbe1949d-8de2-46ef-b587-d24373cde69e',
+        id: '6d7ff843-727f-4dc2-86c6-55a817ae40b3',
         kind: 'line',
         x1: 0.25099999912579257,
         y1: 0.3576956058645958,
@@ -11315,7 +11315,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c1bd468a-c98b-4fc8-9bc2-6294d3c1e833',
+        id: 'edc70771-a124-417b-98d3-62c7216a7def',
         kind: 'line',
         x1: 0.22129456484075338,
         y1: 0.4782189496974025,
@@ -11328,7 +11328,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '92d6707d-fa51-4e35-b930-b9331865cfc1',
+        id: '95a7f53f-338a-4f4b-98a0-936cba4bd535',
         kind: 'line',
         x1: 0.21651033922298538,
         y1: 0.6120506952762518,
@@ -11341,7 +11341,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '87d5741f-9e9d-45fe-a259-15837f605546',
+        id: '3f83c604-3bc2-48a7-930d-dfdcb4c6b4cd',
         kind: 'line',
         x1: 0.13752578400492907,
         y1: 0.6147470389802622,
@@ -11354,7 +11354,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b0a9ce6b-849c-4df3-ad9b-a72466a6bb55',
+        id: '5176ec85-2fe1-4ccf-82f7-9e7b26b70ee6',
         kind: 'line',
         x1: 0.09673097056590681,
         y1: 0.6767629441725034,
@@ -11367,7 +11367,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0f9e0acd-c293-4f46-be63-10bf117391de',
+        id: 'f81cca4d-0d61-42d6-955a-1189e1be725c',
         kind: 'line',
         x1: 0.24950224716120875,
         y1: 0.6562994263724071,
@@ -11380,7 +11380,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bb33977b-8352-484b-9333-261989f1b4c2',
+        id: 'f062737f-21f1-44cf-a4c3-4c7fab58d376',
         kind: 'line',
         x1: 0.3224869141466142,
         y1: 0.7604484620981574,
@@ -11393,7 +11393,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '61d60c9e-2ff9-46bf-b045-f284b5a0555f',
+        id: '9b01bd0b-179a-4b9c-9e00-79d8a1c4730a',
         kind: 'line',
         x1: 0.3324070109217505,
         y1: 0.7743864304122935,
@@ -11406,7 +11406,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '29b444e6-4d00-4108-9055-36b3c3be3b27',
+        id: '20a00550-d113-43c8-b9d0-7a988ce9192c',
         kind: 'line',
         x1: 0.29208677430507113,
         y1: 0.48691011362924985,
@@ -11419,7 +11419,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f3a215d9-b6fb-4721-94ef-cd8c595a680a',
+        id: 'bd410cdf-296b-4d5a-988d-81448ad1a279',
         kind: 'line',
         x1: 0.31600028779172423,
         y1: 0.40166994471709666,
@@ -11432,7 +11432,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'da5e5073-07bb-4153-ba3e-bd70ce9c2399',
+        id: '00e66b60-678b-47bc-9100-2f3c7c8e6995',
         kind: 'line',
         x1: 0.34594990748103854,
         y1: 0.46957817267241675,
@@ -11445,7 +11445,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f0c99285-5f3f-4598-9da5-7c7f543891e6',
+        id: '46360498-a881-4923-9f23-cf1b1f195502',
         kind: 'line',
         x1: 0.40815688136392464,
         y1: 0.4674979807478404,
@@ -11458,7 +11458,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd0cd0a2a-d890-48a9-8f9c-5f3b3229852d',
+        id: '5c7e28a3-2e98-4c86-8d15-b7c3f0f6a265',
         kind: 'line',
         x1: 0.4084058599690139,
         y1: 0.4127958099617294,
@@ -11471,7 +11471,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '45ca90e6-7218-45b8-81b6-2b084dabb24a',
+        id: 'f0984581-9a3c-4ac0-85c1-8b162060a2b9',
         kind: 'line',
         x1: 0.3099226095673639,
         y1: 0.3116713601295159,
@@ -11484,7 +11484,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4c127cb9-5cb5-4ec5-9f6c-fd34afada3b8',
+        id: '1ffcaf6b-2f28-478e-99e3-bfef07b85a56',
         kind: 'line',
         x1: 0.4016893177919044,
         y1: 0.14855651040170176,
@@ -11497,7 +11497,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'efe911af-f298-4820-9d92-5d83f2822fab',
+        id: 'c5830fc3-e8e0-45b2-92cb-276eff5d7e02',
         kind: 'line',
         x1: 0.14362001691416823,
         y1: 0.6099990200440895,
@@ -11510,7 +11510,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6d0a5c02-c01d-418f-aa6e-2faf359f5c94',
+        id: '00dead7a-0f64-4f7b-9727-5a69168f3740',
         kind: 'line',
         x1: 0.4031926341076973,
         y1: 0.1378196850577424,
@@ -11523,7 +11523,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9fbc25e8-a6fe-4abe-b466-cfbbd495c64f',
+        id: 'adc26786-b1e0-49b1-b24f-d68c158319b4',
         kind: 'line',
         x1: 0.40219042323050225,
         y1: 0.46286220356257674,
@@ -11536,7 +11536,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6566c8f9-c9e1-4808-af1f-299b1ae026b8',
+        id: '413117dc-0391-47e3-bc02-bf8db7cd7dfd',
         kind: 'line',
         x1: 0.40286847826474786,
         y1: 0.791674987988664,
@@ -11549,7 +11549,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a767bb0e-d282-467b-8f1e-98c0868e9f3a',
+        id: '64da1351-4b27-4294-82ab-f5a549f1ae61',
         kind: 'line',
         x1: 0.37845160155493596,
         y1: 0.8439230881912481,
@@ -11562,7 +11562,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b4050bad-6451-4bf9-aef2-d261ed6df0f0',
+        id: 'ffed9a7a-1960-4b0d-a015-38ac9256ae68',
         kind: 'line',
         x1: 0.35759203919532057,
         y1: 0.7938566945904009,
@@ -11575,7 +11575,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '579d7664-f0a9-48f8-9d7f-afe2bee379c6',
+        id: '448c857f-6b6f-4ebe-bf36-8784553ba86f',
         kind: 'line',
         x1: 0.36259805440818904,
         y1: 0.7910752282792426,
@@ -11588,7 +11588,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b2ac2869-1009-4c51-897e-1a26eb7ad3b4',
+        id: '9b4917f6-30d5-454d-813b-d800959afd5e',
         kind: 'line',
         x1: 0.32133429617579623,
         y1: 0.7895505368104692,
@@ -11601,7 +11601,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9a40a8bd-eeca-421a-a1a6-2e854b937056',
+        id: 'deefd267-f831-42b8-b484-3864276f1d84',
         kind: 'line',
         x1: 0.29241518376837944,
         y1: 0.8467045545024062,
@@ -11614,7 +11614,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2be415cc-cfc6-4010-9d01-528b6cc42814',
+        id: '2da26b3c-7f3a-4c35-8d36-5b6c4500a543',
         kind: 'line',
         x1: 0.116560323229901,
         y1: 0.8513403316876699,
@@ -11627,7 +11627,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b49114ad-ab8c-4070-831d-9aaa1445bd8e',
+        id: '67f2f386-5c82-4333-8a05-4b9c1e2a4726',
         kind: 'line',
         x1: 0.14412099206859968,
         y1: 0.8105454924573497,
@@ -11640,7 +11640,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3e1b6b1e-ed49-42cd-b9a0-d923e9c04095',
+        id: '2597a94c-8d67-4d1b-88f4-3d866d94ec9e',
         kind: 'line',
         x1: 0.1431189114755707,
         y1: 0.6955782182628115,
@@ -11653,7 +11653,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '37450e67-634a-4b7d-9ae8-60bb907e8deb',
+        id: 'bd11a949-e4fe-4c92-a5e6-1289cf4b117a',
         kind: 'line',
         x1: 0.8618028852810813,
         y1: 0.27331245464288806,
@@ -11666,7 +11666,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4fc96a01-cb38-4a61-9117-7a772b7d4fee',
+        id: '0f2aea41-c5d7-4bd5-b6d7-ac4fb67d4576',
         kind: 'line',
         x1: 0.8626710902408118,
         y1: 0.6027288797520286,
@@ -11679,7 +11679,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '36270f54-cb19-49fa-a8b0-7695546f5b1f',
+        id: '93a7fe66-ac2e-4f69-9c68-6e2251e99543',
         kind: 'line',
         x1: 0.7876087946051937,
         y1: 0.7365263857765083,
@@ -11692,7 +11692,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e27f1581-10bb-4883-89c0-a0e5eb63fc6e',
+        id: 'a0b522a5-b226-4d0f-877e-ee2d33cbf3e4',
         kind: 'line',
         x1: 0.7910437062105589,
         y1: 0.5194402492528886,
@@ -11705,7 +11705,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '99972186-4565-4211-b71d-0c46d4ace26f',
+        id: '98151ff7-daf1-4e6c-91e3-42f4012a8f88',
         kind: 'line',
         x1: 0.6814700259994101,
         y1: 0.7219090967422234,
@@ -11718,7 +11718,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e4c2790d-4e5e-40fb-9d23-b289cf214d9f',
+        id: 'a13c4f57-40d5-4b1f-903c-147886726081',
         kind: 'line',
         x1: 0.6208885513892198,
         y1: 0.6247111459809822,
@@ -11731,7 +11731,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0783d26f-a971-411e-b65d-0f5120a41bc9',
+        id: '31c5ec0d-7ea5-477f-a294-c419f28df340',
         kind: 'line',
         x1: 0.7319568421353163,
         y1: 0.42128955741786916,
@@ -11744,7 +11744,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '85511af0-a0c0-448f-9218-122b20de179e',
+        id: '9d0ee5b4-8dbb-4f4f-a796-b860e9c1a938',
         kind: 'line',
         x1: 0.6146122802504737,
         y1: 0.4236158736767144,
@@ -11757,7 +11757,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd0eaaa33-39e6-4f29-8250-f0aaa674b113',
+        id: 'f5bdcef2-03d5-43bb-bb0b-a86c76f64d72',
         kind: 'line',
         x1: 0.6875266638399546,
         y1: 0.28339042571366563,
@@ -11770,11 +11770,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f57c3830-60f0-4103-8e4b-a6feaa2241ad',
+        id: '851aea95-8972-4a2a-84b6-6fd7a13d28c6',
         kind: 'arc',
         cx: 0.13521411562893687,
         cy: 0.6720292383861675,
-        radius: 0.03247486092440789,
+        radius: 0.06008564576322165,
         startAngle: 3.062728288581139,
         endAngle: 4.903875495642343,
         style: {
@@ -11784,13 +11784,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e98a3603-fc95-4ad4-ad19-6a687cbc4fd6',
+        id: '2f753d4d-73a0-4c7b-9138-32a534f8ffd9',
         kind: 'arc',
         cx: 0.23759748525644675,
         cy: 0.6511599256381927,
-        radius: 0.012501574604780515,
-        startAngle: 1.586668009786683,
-        endAngle: 0.12891077168398754,
+        radius: 0.023130666669637957,
+        startAngle: 0.12891077168398754,
+        endAngle: 1.586668009786683,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -11798,11 +11798,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '358111c4-895d-46b6-a713-f7c440f69887',
+        id: '5bb8a100-1278-4e28-92a5-246e75ab0af3',
         kind: 'arc',
         cx: 0.33459008874978874,
         cy: 0.7453970670908153,
-        radius: 0.014092889569110954,
+        radius: 0.026074949863553305,
         startAngle: 1.5426347598070007,
         endAngle: 2.7010623129732787,
         style: {
@@ -11812,11 +11812,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cb42bb22-97de-4cfc-b426-a0573a5d27b5',
+        id: 'cf345f2a-b7d0-42eb-b0e5-fbe8f69db9a4',
         kind: 'arc',
         cx: 0.3035734032181575,
         cy: 0.3325964702616745,
-        radius: 0.012103174603174558,
+        radius: 0.02239353891336262,
         startAngle: 4.71238898038469,
         endAngle: 5.29750141856912,
         style: {
@@ -11826,13 +11826,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f9e717d5-f6c0-4dcb-815c-5549c57c5e92',
+        id: '71211fea-01ec-488d-b117-547f255caa61',
         kind: 'arc',
         cx: 0.18016053239660212,
         cy: 0.41793983231714465,
-        radius: 0.013216430542365742,
-        startAngle: 3.7670776938290222,
-        endAngle: 0.5232783221319769,
+        radius: 0.0244533076114256,
+        startAngle: 0.5232783221319769,
+        endAngle: 3.7670776938290222,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -11854,7 +11854,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '9aeedb19-e36b-41bc-8d31-1d6666b0f54e',
+        id: 'a32e027f-4af2-40f1-a863-82f4ecc92345',
         kind: 'rect',
         x: 0.04466205488282342,
         y: 0.07231861662722436,
@@ -11867,11 +11867,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '31ee8657-a1e3-4f0c-beca-8f31ec01d7c9',
+        id: '0daef49b-1dcb-4b9c-8bca-294b5166219a',
         kind: 'circle',
         cx: 0.3090208779664409,
         cy: 0.234410101061039,
-        radius: 0.035940598839973366,
+        radius: 0.06649802428541328,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -11879,7 +11879,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3d897829-5bbb-4a74-ba0c-96cabc129020',
+        id: '8a5014bb-026a-49f4-a0e9-92211cdab0db',
         kind: 'line',
         x1: 0.30516070480545915,
         y1: 0.3102029313483118,
@@ -11892,7 +11892,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '536d504e-a50c-4cd1-a3c5-eea81939af7c',
+        id: '3a30dab9-ac7b-4451-a2a8-3ea47f787d42',
         kind: 'line',
         x1: 0.16890489315995588,
         y1: 0.4044322300674442,
@@ -11905,7 +11905,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '10fa77e2-ff7f-445d-be8f-67459814dc32',
+        id: 'e433a901-7c13-49d2-a5b6-57fbfc957167',
         kind: 'line',
         x1: 0.1916684689045386,
         y1: 0.43115569134798165,
@@ -11918,7 +11918,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a3015302-3abe-464d-8f72-8591d3190cdd',
+        id: '2bef8bb5-a2fd-4f91-a080-14ca32c909d9',
         kind: 'line',
         x1: 0.25099999912579257,
         y1: 0.3576956058645958,
@@ -11931,7 +11931,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd5d10b09-b01a-4007-a268-cebf07d6fafa',
+        id: 'f07e3dff-4df1-4a77-83bf-c36c69586edf',
         kind: 'line',
         x1: 0.22129456484075338,
         y1: 0.4782189496974025,
@@ -11944,7 +11944,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c7b0877d-aabb-4bc7-aef2-79a33fc29dd2',
+        id: 'c1e23e7f-cae1-47e2-afb5-27dca17e85f9',
         kind: 'line',
         x1: 0.21651033922298538,
         y1: 0.6120506952762518,
@@ -11957,7 +11957,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9acce935-0e88-47d3-b09a-6a388fcf4c7c',
+        id: '96c83c8b-c8f9-4852-93c9-db96f7cded80',
         kind: 'line',
         x1: 0.13752578400492907,
         y1: 0.6147470389802622,
@@ -11970,7 +11970,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1bf3c3f3-cee9-44ab-8f1c-9a7173201d24',
+        id: 'c76bc6ab-0bfb-4a86-a823-0cc916b9d0c5',
         kind: 'line',
         x1: 0.09673097056590681,
         y1: 0.6767629441725034,
@@ -11983,7 +11983,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a1020fb9-2b65-4e24-9ca9-8eb604177a39',
+        id: '6a6779b4-f1e7-41a3-b846-0fa77659cf65',
         kind: 'line',
         x1: 0.24950224716120875,
         y1: 0.6562994263724071,
@@ -11996,7 +11996,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '02836725-e842-4fae-9841-e365d4b3db2a',
+        id: '6f774405-fadb-4104-992e-fa5c2e881f04',
         kind: 'line',
         x1: 0.3224869141466142,
         y1: 0.7604484620981574,
@@ -12009,7 +12009,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2570eea8-7b60-4361-b9b2-af7defcce3fb',
+        id: 'ed449c02-1852-4a27-ad1e-3f787e211bde',
         kind: 'line',
         x1: 0.3324070109217505,
         y1: 0.7743864304122935,
@@ -12022,7 +12022,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1c8fe4bf-1881-4fb6-8292-bb4696aa8fba',
+        id: '8297481e-d108-4763-8e6b-c734ed4b742a',
         kind: 'line',
         x1: 0.29208677430507113,
         y1: 0.48691011362924985,
@@ -12035,7 +12035,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '545bb8a1-0cee-4507-8743-d16fdeb67222',
+        id: '721198e0-fa44-42d8-b746-dbca2f7e4671',
         kind: 'line',
         x1: 0.31600028779172423,
         y1: 0.40166994471709666,
@@ -12048,7 +12048,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd1b224b5-ea38-48c9-878b-3ebb515505aa',
+        id: '54bb868c-96ad-48f9-b0a8-157f30b39287',
         kind: 'line',
         x1: 0.34594990748103854,
         y1: 0.46957817267241675,
@@ -12061,7 +12061,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '90801f42-137c-4eb6-8b18-fc01f5255394',
+        id: '625e85c6-698f-4a4e-9460-3337d0bec334',
         kind: 'line',
         x1: 0.40815688136392464,
         y1: 0.4674979807478404,
@@ -12074,7 +12074,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd337f624-b158-4902-9ec7-5cd8be828bd1',
+        id: '1aeb9dfd-c619-4a8a-92fc-801266965855',
         kind: 'line',
         x1: 0.4084058599690139,
         y1: 0.4127958099617294,
@@ -12087,7 +12087,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2fa50f05-8fef-4d92-9bdb-ecb3051e113d',
+        id: 'ca2440d0-4a4c-473f-b671-284f13016bf5',
         kind: 'line',
         x1: 0.3099226095673639,
         y1: 0.3116713601295159,
@@ -12100,7 +12100,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '83f5312d-11bf-4700-a35c-5184b5abe061',
+        id: '8d610d5c-dd73-46bb-9e23-68e9c6c4bebb',
         kind: 'line',
         x1: 0.4016893177919044,
         y1: 0.14855651040170176,
@@ -12113,7 +12113,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '521d5ec9-d697-4814-9c22-2e9ccbb55cc8',
+        id: '9feae66a-49d5-46db-9634-679479912d64',
         kind: 'line',
         x1: 0.14362001691416823,
         y1: 0.6099990200440895,
@@ -12126,7 +12126,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd6d20475-13d8-4941-b28e-ad3bd1a7ede5',
+        id: 'a2c2c2bd-7a76-417e-a03e-05434f2f7922',
         kind: 'line',
         x1: 0.4031926341076973,
         y1: 0.1378196850577424,
@@ -12139,7 +12139,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a975a95f-5f85-4f3d-bb1f-70f1e6a0969a',
+        id: '00c01680-c2e9-4f16-827b-ae5036dff9cd',
         kind: 'line',
         x1: 0.40219042323050225,
         y1: 0.46286220356257674,
@@ -12152,7 +12152,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8c3ea7c0-b336-4f4e-bf96-a720d8bc69d4',
+        id: 'c9120c0e-e3ca-412d-8255-978b46f71845',
         kind: 'line',
         x1: 0.40286847826474786,
         y1: 0.791674987988664,
@@ -12165,7 +12165,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eac8c32b-71d2-458d-bc97-5f546b375d84',
+        id: 'cced13ef-9988-4013-ba98-32a894f7eda2',
         kind: 'line',
         x1: 0.37845160155493596,
         y1: 0.8439230881912481,
@@ -12178,7 +12178,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '12dbf915-a9d2-408c-9bd6-7985935a6857',
+        id: '5bb54980-7923-48e4-8646-1e547425b1d5',
         kind: 'line',
         x1: 0.35759203919532057,
         y1: 0.7938566945904009,
@@ -12191,7 +12191,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b1ff4ac1-d211-4c07-86ed-3b724d8aa991',
+        id: '792b1d89-10cd-4cf7-a01b-b2bf7e105708',
         kind: 'line',
         x1: 0.36259805440818904,
         y1: 0.7910752282792426,
@@ -12204,7 +12204,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c5af76c9-71e6-4477-b0f0-875eaa1a737f',
+        id: 'df66a7c4-f0d6-4eb3-8868-6e2e640dbe03',
         kind: 'line',
         x1: 0.32133429617579623,
         y1: 0.7895505368104692,
@@ -12217,7 +12217,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '95203e90-6a42-4b75-a977-72a37dd7ce01',
+        id: '24293855-4a52-4f57-9ac5-91668a3e7c91',
         kind: 'line',
         x1: 0.29241518376837944,
         y1: 0.8467045545024062,
@@ -12230,7 +12230,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3b1a45a0-4dca-46a9-98fe-ec1aedc27536',
+        id: '67e9b5f8-d754-4391-b57f-2fde68a13765',
         kind: 'line',
         x1: 0.116560323229901,
         y1: 0.8513403316876699,
@@ -12243,7 +12243,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ebcea74e-588d-4a84-b97e-6b1ae745d09f',
+        id: 'aa5c669c-f6cc-491e-be3b-510def0229ad',
         kind: 'line',
         x1: 0.14412099206859968,
         y1: 0.8105454924573497,
@@ -12256,7 +12256,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc3fd406-5115-4769-977f-309a729999a3',
+        id: '08ecd406-09e4-466e-9d88-cc460d0b7527',
         kind: 'line',
         x1: 0.1431189114755707,
         y1: 0.6955782182628115,
@@ -12269,7 +12269,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a1feca53-1e1f-489c-b7d2-98179defea54',
+        id: '5f2a7e91-e576-4257-a34d-58b43c11c813',
         kind: 'line',
         x1: 0.752765704443118,
         y1: 0.19669724772682676,
@@ -12282,7 +12282,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '16b9b491-10f6-4584-baf2-61502be4375b',
+        id: '900ba764-5114-4f1d-9808-1e33b0c9753e',
         kind: 'line',
         x1: 0.8792741358732251,
         y1: 0.42849396034566967,
@@ -12295,7 +12295,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a1996ac7-7b40-4162-bf4e-08b4d7c5db66',
+        id: 'e2ffa1a3-1415-44c6-8517-ae2b9f922e6e',
         kind: 'line',
         x1: 0.877331056442081,
         y1: 0.6213073329158655,
@@ -12308,7 +12308,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '058e1bd8-27e1-4ff9-8e26-5b8f20588bec',
+        id: 'b570442e-e50c-4294-b955-6d9bffbe7545',
         kind: 'line',
         x1: 0.7967951462383945,
         y1: 0.4633103475050746,
@@ -12321,7 +12321,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '41cc9abf-436f-4bf7-858c-891f19b09bb8',
+        id: '9d87f3da-4465-492b-9875-3ebd1df69e97',
         kind: 'line',
         x1: 0.7966932600496024,
         y1: 0.7498330494736989,
@@ -12334,7 +12334,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '198e922f-3231-48fa-bfea-5385fef88b97',
+        id: '7da8ac52-3371-47db-8a8b-bc4ac3b9a050',
         kind: 'line',
         x1: 0.716709122031644,
         y1: 0.7603626622570478,
@@ -12347,7 +12347,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e38fd103-f0b0-4467-8234-34fea5a4bbf2',
+        id: '95e9b1ac-2f1e-43b5-8b0f-deeaa7e7525f',
         kind: 'line',
         x1: 0.7175037442363729,
         y1: 0.47121086672594836,
@@ -12360,7 +12360,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '62a99d7b-97af-4c7f-85df-bf3706302e55',
+        id: '9bc1972c-c929-4bb2-99ac-b5b38e7ffff9',
         kind: 'line',
         x1: 0.635417667264645,
         y1: 0.626378097760967,
@@ -12373,7 +12373,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '02c1cb0d-0317-412f-9c1c-9cc7c7ea8c8b',
+        id: '72d2365f-4121-4218-bf03-cbe13fd8059e',
         kind: 'line',
         x1: 0.633385348801667,
         y1: 0.4318296042655287,
@@ -12386,11 +12386,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '57d84937-2a97-4e97-9aad-f86236f0d25d',
+        id: '291f6b6e-a738-4c72-ab23-fd8642d571dd',
         kind: 'arc',
         cx: 0.13521411562893687,
         cy: 0.6720292383861675,
-        radius: 0.03247486092440789,
+        radius: 0.06008564576322165,
         startAngle: 3.062728288581139,
         endAngle: 4.903875495642343,
         style: {
@@ -12400,13 +12400,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4853c3b6-47db-4e62-a645-6a9026216599',
+        id: 'c71cf309-47f4-4664-976b-8d5638c3a8ee',
         kind: 'arc',
         cx: 0.23759748525644675,
         cy: 0.6511599256381927,
-        radius: 0.012501574604780515,
-        startAngle: 1.586668009786683,
-        endAngle: 0.12891077168398754,
+        radius: 0.023130666669637957,
+        startAngle: 0.12891077168398754,
+        endAngle: 1.586668009786683,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -12414,11 +12414,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd283629a-3cdf-4c29-b3a0-f78a7fa5cbf4',
+        id: '96641898-ee27-4e40-a1e5-e5cf433fb4d3',
         kind: 'arc',
         cx: 0.33459008874978874,
         cy: 0.7453970670908153,
-        radius: 0.014092889569110954,
+        radius: 0.026074949863553305,
         startAngle: 1.5426347598070007,
         endAngle: 2.7010623129732787,
         style: {
@@ -12428,11 +12428,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a4c81f07-0b24-4ae3-93c8-758bca56fa2b',
+        id: 'fd859a45-c0a9-4ebf-975f-a81eb13b2a95',
         kind: 'arc',
         cx: 0.3035734032181575,
         cy: 0.3325964702616745,
-        radius: 0.012103174603174558,
+        radius: 0.02239353891336262,
         startAngle: 4.71238898038469,
         endAngle: 5.29750141856912,
         style: {
@@ -12442,13 +12442,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4df56de6-d144-4c1c-9c2e-b9111599efa4',
+        id: '989c8bd8-9595-4b39-b150-3b717fba3164',
         kind: 'arc',
         cx: 0.18016053239660212,
         cy: 0.41793983231714465,
-        radius: 0.013216430542365742,
-        startAngle: 3.7670776938290222,
-        endAngle: 0.5232783221319769,
+        radius: 0.0244533076114256,
+        startAngle: 0.5232783221319769,
+        endAngle: 3.7670776938290222,
         style: {
           stroke: '#000000',
           strokeWidth: 0.022026431718061675,
@@ -12470,7 +12470,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'fd709279-9217-4ed8-ba00-3dfe31400b95',
+        id: '8d9de051-1352-492c-a768-5dd7b5104c79',
         kind: 'line',
         x1: 0.5344090333170342,
         y1: 0.9340355462610685,
@@ -12483,7 +12483,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ed83747b-6ac9-4c40-9d28-30d918c3ca7c',
+        id: '780535c6-bf68-47e7-9a0a-230dbe526fb5',
         kind: 'line',
         x1: 0.687529231577836,
         y1: 0.8927447062806277,
@@ -12496,7 +12496,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7868f581-99fb-426d-879c-304666b0f111',
+        id: 'ffdcd6f6-7bac-48ce-900a-c643293e21f2',
         kind: 'line',
         x1: 0.7993585898581967,
         y1: 0.8015607679904871,
@@ -12509,7 +12509,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f6cb5952-2091-4261-ac01-3a620a4a676e',
+        id: 'ba6cf892-8e76-4caa-95b9-f3ed22213be5',
         kind: 'line',
         x1: 0.8871016248166339,
         y1: 0.6880109580442746,
@@ -12522,7 +12522,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '42a34878-2fda-403c-95ae-920af2777550',
+        id: 'dc0bc3a3-85af-4d17-86d3-e3e1e5bdf18b',
         kind: 'line',
         x1: 0.9301129164629267,
         y1: 0.5228475981225107,
@@ -12535,7 +12535,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0f042e3b-008f-4a11-bd34-35df0e8631cf',
+        id: 'f5ff89d1-91e0-465c-99bb-64c7c7ad0b83',
         kind: 'line',
         x1: 0.8440903331703415,
         y1: 0.2406935249228309,
@@ -12548,7 +12548,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '86b83ba4-134f-4285-8a6d-c22488fb19e1',
+        id: '08149618-5598-4ad2-a8dd-a1d6f5decb01',
         kind: 'line',
         x1: 0.24258355796280012,
         y1: 0.8417824641456325,
@@ -12561,7 +12561,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2deba8d8-f8ab-4082-b7d0-fec216c0e311',
+        id: '5f47006a-7d66-4d0e-8c3e-72a58e792047',
         kind: 'line',
         x1: 0.14730740850040025,
         y1: 0.24757533158623776,
@@ -12574,7 +12574,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eabd7bbd-b9bf-4c71-8079-205e2bdd9285',
+        id: 'b43b6c2c-20a5-4af9-9c0b-80a2747b8d28',
         kind: 'line',
         x1: 0.06128482520781496,
         y1: 0.5280089531200658,
@@ -12587,7 +12587,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '71e331e2-3b4e-4989-be44-b8f53d4ab278',
+        id: 'ca858e4a-7d24-4603-8fff-e56b15db3c5e',
         kind: 'line',
         x1: 0.06300527687366665,
         y1: 0.5280089531200658,
@@ -12600,7 +12600,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c48c95c9-6bca-4b5a-a894-74d7e7a9b51c',
+        id: 'd5026565-89c8-4c8a-a536-a633a4220aa4',
         kind: 'line',
         x1: 0.1060165685199594,
         y1: 0.6862905063784228,
@@ -12613,7 +12613,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd786ef0b-9322-41b6-9f62-b4062109cc69',
+        id: 'b3c2311c-440b-467f-8716-e7b0aca69990',
         kind: 'line',
         x1: 0.1920391518125447,
         y1: 0.8015607679904871,
@@ -12626,7 +12626,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b51a020b-45a7-4ef5-918a-adcab17783bd',
+        id: '8f4c1255-a8ac-40bd-ae51-1cad9f7fbfab',
         kind: 'line',
         x1: 0.3124707684221641,
         y1: 0.8893038029489241,
@@ -12639,7 +12639,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b2ec4560-7f59-4bf0-9c36-b76eb3544037',
+        id: '5eb9ef2f-0142-476f-92be-bb21fb89a3a4',
         kind: 'line',
         x1: 0.46559096668296585,
         y1: 0.9305946429293652,
@@ -12652,7 +12652,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '235522ea-f981-435f-8d86-31bc4c57717b',
+        id: 'dd595702-71a5-4531-a62c-8a8bb2b600b6',
         kind: 'line',
         x1: 0.7563472982119044,
         y1: 0.8497334146343349,
@@ -12686,7 +12686,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'd85f8460-c35f-4b9f-8b7b-3ce20607a35c',
+        id: 'e6f73f46-e087-4507-8ac1-b37a5e7a0252',
         kind: 'rect',
         x: 0.1896551724137931,
         y: 0.18900343642611683,
@@ -12699,7 +12699,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '517fd5a9-c225-481a-b0fd-4918df5cb3e9',
+        id: '41907e4c-463b-419b-8d89-2e74aa50fbde',
         kind: 'line',
         x1: 0.25274465470178176,
         y1: 0.25187611636947316,
@@ -12712,7 +12712,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bf597254-13af-48a7-9f5f-a3d3782fe6b8',
+        id: 'd0abf7eb-b184-4d6d-a0d8-bb20899c9ced',
         kind: 'line',
         x1: 0.7497115993954225,
         y1: 0.24942830300799843,
@@ -12725,7 +12725,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f5c0185c-5c27-4771-acda-08f35d6f9bab',
+        id: 'cd290a61-9624-4a48-afc2-d053c6036f5e',
         kind: 'line',
         x1: 0.3157351233308835,
         y1: 0.03436426116838488,
@@ -12738,7 +12738,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '096d31b6-bf01-4530-9cc6-f1654d99e067',
+        id: '40b1454c-1544-4754-88a2-362bcbdc44c8',
         kind: 'line',
         x1: 0.685894386994718,
         y1: 0.03436426116838488,
@@ -12751,7 +12751,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd912427b-2eec-494a-8a56-7885c1b4f9c6',
+        id: '8f085cb4-59ae-4df4-a62d-2adc47b6778e',
         kind: 'line',
         x1: 0.3157351233308835,
         y1: 0.8075601374570447,
@@ -12764,7 +12764,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7c03fc31-93cb-4e43-b541-e177b02eb199',
+        id: 'fc404ede-d540-427c-bb3e-7e87d760ce21',
         kind: 'line',
         x1: 0.685894386994718,
         y1: 0.8075601374570447,
@@ -12777,7 +12777,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fe1f02a8-506d-47fb-bf6c-1e5ea82f3357',
+        id: 'c74141a8-d464-4497-b1b9-92ab43b7faef',
         kind: 'line',
         x1: 0.034482758620689655,
         y1: 0.3089778980289958,
@@ -12790,7 +12790,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '744d9e7b-6f92-490e-a4ae-cd3eca174a03',
+        id: '6e3ab52a-c1f2-4999-9b8b-09ca5b826f40',
         kind: 'line',
         x1: 0.034482758620689655,
         y1: 0.6785812361750817,
@@ -12803,7 +12803,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '38871909-b2e6-458c-9d4a-3821df6d51f7',
+        id: '0db17808-2e30-4aa3-9bf7-3a0f346d6827',
         kind: 'line',
         x1: 0.8103448275862069,
         y1: 0.3089778980289958,
@@ -12816,7 +12816,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e710075c-de2e-49ce-9676-03249d110d93',
+        id: '79fe443d-81ae-4f00-8056-795d0dc5e642',
         kind: 'line',
         x1: 0.8103448275862069,
         y1: 0.6785812361750817,
@@ -12850,7 +12850,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '6bcbfe8e-b775-4b2b-aa23-e99b3674c483',
+        id: '98693241-7205-4e4e-90e6-52a4cd9f14e9',
         kind: 'circle',
         cx: 0.5,
         cy: 0.49878345498783455,
@@ -12862,7 +12862,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e91819e5-7a1d-4374-9864-13170a4dd0ac',
+        id: 'a760a37c-273c-4a4f-9f29-f6dbc433e13d',
         kind: 'circle',
         cx: 0.5,
         cy: 0.36009732360097324,
@@ -12874,7 +12874,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '76041d78-7e23-4fc3-975e-71f3aecd9139',
+        id: '2df2738a-66f7-4885-b26e-5e32e8e02ff3',
         kind: 'polygon',
         points: [
           {
@@ -12926,7 +12926,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'cddf7125-a7ce-4658-83e9-e1d9181ed223',
+        id: '08ecf7d4-5c93-4099-8480-f30dc9e556f0',
         kind: 'rect',
         x: 0.02006077982409871,
         y: 0.07892373951432871,
@@ -12939,7 +12939,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '826a0efe-5fc2-44ed-94fa-131a0c13e008',
+        id: '58a45792-4a0a-4b0d-a108-233124e7679d',
         kind: 'text',
         x: 0.12045073637050296,
         y: 0.07934744397566708,
@@ -12973,11 +12973,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '2a0f1f3c-f5f7-4d15-aad5-9812206598f0',
+        id: 'a23ebc49-d4b3-420f-9c89-b88e15623ab9',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
-        radius: 0.13119533527696792,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -12985,7 +12985,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '20b2f31f-5c56-4953-8697-a165331fdf9a',
+        id: '9b2128a3-b3fa-4b90-8bcb-6c920cbf6e1c',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.40772414920761957,
@@ -12998,7 +12998,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dedf4b0b-11f5-49ea-821f-8b78a9960c28',
+        id: 'cbd2cebd-b579-464a-af38-df7359688ce8',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.47128347124151787,
@@ -13011,7 +13011,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '69e4428a-a692-4b2e-9150-db7e67c03412',
+        id: 'aa31d910-bf7d-4785-a676-b7354a497e9a',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.5348427932754162,
@@ -13024,7 +13024,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5dd3dfc2-d6bb-4ca6-86eb-37deddbf1e03',
+        id: '3a570420-871e-4fd0-8c2c-bb66725f1e70',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.5984021153093144,
@@ -13037,7 +13037,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2de95299-ffe4-418f-b416-48709afc4f23',
+        id: '5e62285f-ec48-4d6a-b2db-453983234b7b',
         kind: 'line',
         x1: 0.6227969481201805,
         y1: 0.40818196542559754,
@@ -13050,7 +13050,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c07f4027-dfea-46a6-9f00-c26a9ac92d91',
+        id: '3bdcc743-a8a9-48d3-9c1a-79ebccaf8f80',
         kind: 'line',
         x1: 0.6267069490859404,
         y1: 0.47182882860383374,
@@ -13063,7 +13063,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e75012cb-5160-4efc-b718-4208d955f6b1',
+        id: 'e51b04d3-8133-4235-bd5c-6fc620370a00',
         kind: 'line',
         x1: 0.6267069490859404,
         y1: 0.5354756917820698,
@@ -13076,7 +13076,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'efbbe488-59b5-48a6-b567-6fe4e98a293c',
+        id: '39e9608b-570d-4f51-b927-3475b74f036f',
         kind: 'line',
         x1: 0.6212329477338764,
         y1: 0.598364854208184,
@@ -13089,7 +13089,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '25b91413-94a9-4ee9-8b16-25c8cbd221e6',
+        id: '54a2a901-f67e-4bbb-8eda-d7053bb334ea',
         kind: 'line',
         x1: 0.9845174070506325,
         y1: 0.21252369471420718,
@@ -13102,7 +13102,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cf30eca4-b310-483e-9fca-d5703cde09fa',
+        id: '23c5d033-e2ab-4d3f-b076-d204eba44efe',
         kind: 'line',
         x1: 0.014742802131884355,
         y1: 0.21252369471420718,
@@ -13115,11 +13115,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '940cc982-60d7-40f2-a412-0c8bea1f8b32',
+        id: '0e3462e8-e024-4280-b9d5-79f0526bdf61',
         kind: 'arc',
         cx: 0.5,
         cy: 0.5,
-        radius: 0.12253675541504484,
+        radius: 0.35618734836746085,
         startAngle: -0.8391717190429038,
         endAngle: 0.835637029142797,
         style: {
@@ -13129,11 +13129,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc91a1c9-7df9-4e8c-8a7a-7b2bd6dac2e0',
+        id: '0e806295-c940-45dc-8dd6-48fa25ad52a0',
         kind: 'arc',
         cx: 0.5,
         cy: 0.5,
-        radius: 0.12253675541504484,
+        radius: 0.35618734836746085,
         startAngle: 2.304433932866914,
         endAngle: 3.979242681052615,
         style: {
@@ -13143,7 +13143,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3ddf2d3e-28f2-4e17-aa38-840889bfd194',
+        id: '599936b1-49c9-4e6a-a967-56da48948062',
         kind: 'polygon',
         points: [
           {
@@ -13188,11 +13188,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '34898884-03ff-4b42-82b1-2c709a75aa4e',
+        id: '6850ccc4-a52d-4761-bbbe-20c748c5b9a2',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
-        radius: 0.13119533527696792,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -13200,7 +13200,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '17711ece-bbdd-49dd-aeef-0446732131b9',
+        id: '23d96018-102b-49fa-b406-988648cc8344',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.40772414920761957,
@@ -13213,7 +13213,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc448c91-3409-4035-a94a-f52348b67031',
+        id: '74a213b8-f777-4f1f-9547-6198dad942e7',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.47128347124151787,
@@ -13226,7 +13226,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '058780d0-cda8-4205-8d2b-fe23d5a92b99',
+        id: '8bed58d3-0a1e-4e63-9cd2-87e6168bef7b',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.5348427932754162,
@@ -13239,7 +13239,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '258c7336-9242-441b-ad92-9316d11a5ef4',
+        id: 'b149921c-9f47-415c-a48e-7872a093de9d',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.5984021153093144,
@@ -13252,7 +13252,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc8b8311-6c02-462c-8eda-09538c1c747a',
+        id: 'b9f595a4-c5c0-49e2-bfb7-82cb48ccddd9',
         kind: 'line',
         x1: 0.6227969481201805,
         y1: 0.40818196542559754,
@@ -13265,7 +13265,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7fcf4cff-71b1-4514-b644-95c8704d07fb',
+        id: '6c92a25c-8560-4e80-b130-899f993a664a',
         kind: 'line',
         x1: 0.6267069490859404,
         y1: 0.47182882860383374,
@@ -13278,7 +13278,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8a5ec9ce-540c-4a68-91cf-1c4aaf82c70e',
+        id: '2a2819b1-a335-4119-a40c-fc244b33a8c5',
         kind: 'line',
         x1: 0.6267069490859404,
         y1: 0.5354756917820698,
@@ -13291,7 +13291,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9598903f-40bd-4d23-8932-05f6af52c137',
+        id: 'cd7fffc4-a851-4952-9201-e51b10a500b9',
         kind: 'line',
         x1: 0.6212329477338764,
         y1: 0.598364854208184,
@@ -13304,7 +13304,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3c1dd695-f130-4c0e-9515-7e8b54339af6',
+        id: 'fcadf61f-c2c0-49a2-91f4-7a4e8f9d4c74',
         kind: 'line',
         x1: 0.9845174070506325,
         y1: 0.21252369471420718,
@@ -13317,7 +13317,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8b8867c6-8695-4b06-a31f-bce087cc6496',
+        id: 'ec509ae2-349e-43e9-a32e-be515fad96e6',
         kind: 'line',
         x1: 0.014742802131884355,
         y1: 0.21252369471420718,
@@ -13330,11 +13330,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd633271b-71a9-4643-a463-b0a35885d4c8',
+        id: '1f76dac5-c2ad-4eb3-8637-edc0a1a79468',
         kind: 'arc',
         cx: 0.5,
         cy: 0.5,
-        radius: 0.12253675541504484,
+        radius: 0.35618734836746085,
         startAngle: 0.7355835372937952,
         endAngle: 2.410392285479496,
         style: {
@@ -13365,11 +13365,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'b1bf754c-2ad5-4e8d-bbbc-e3460f226ad4',
+        id: 'd82ddc17-b19f-4ae5-97c9-850a4fc537c7',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
-        radius: 0.13119533527696792,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -13377,7 +13377,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f785a55c-cfc3-4f1d-a85c-863a0c2613bc',
+        id: '3b85986c-bbaf-4947-9770-1fc6c80ab8c8',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.40772414920761957,
@@ -13390,7 +13390,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e8c11de0-1d92-4c83-b147-6eebfeddaed9',
+        id: '9b5e1afe-1f32-4f73-8d23-9cdba290be78',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.47128347124151787,
@@ -13403,7 +13403,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd1ef40a5-ff4c-4211-98ad-47cf91828a79',
+        id: 'd68faa1a-2259-4dfe-a077-005fb782b6fc',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.5348427932754162,
@@ -13416,7 +13416,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9b20333e-2b98-4882-a8eb-32365abcbf63',
+        id: 'df096779-15c3-41ef-ad80-118398e3f2de',
         kind: 'line',
         x1: 0.014577259475218658,
         y1: 0.5984021153093144,
@@ -13429,7 +13429,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '67a55e25-1769-4d3e-9728-0094d48044e9',
+        id: 'fc0a3a69-8d5f-4ecd-8aa6-5c353a678ba0',
         kind: 'line',
         x1: 0.6227969481201805,
         y1: 0.40818196542559754,
@@ -13442,7 +13442,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd7e76901-bdc6-4164-a83a-38850415348f',
+        id: '89c13b40-f276-4b66-887f-95a391cca1c3',
         kind: 'line',
         x1: 0.6267069490859404,
         y1: 0.47182882860383374,
@@ -13455,7 +13455,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fcca9eca-ab20-4afb-bdb5-a510ddf8a65a',
+        id: 'fd7b6a74-1f08-4b63-8f5c-77b7e6fdf06a',
         kind: 'line',
         x1: 0.6267069490859404,
         y1: 0.5354756917820698,
@@ -13468,7 +13468,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '44069ace-f1e4-4c33-a596-67c99cf12a0c',
+        id: '910e0546-a582-404f-8b77-4583c2ced78e',
         kind: 'line',
         x1: 0.6212329477338764,
         y1: 0.598364854208184,
@@ -13481,7 +13481,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '14cea784-30a1-4f37-9a83-ef30d52b5a69',
+        id: '92d38a88-d09a-46ed-b136-461f6fa2006e',
         kind: 'line',
         x1: 0.9845174070506325,
         y1: 0.21252369471420718,
@@ -13494,7 +13494,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4458e901-7537-44a1-b919-efed04fbb17d',
+        id: 'a6c02e39-3dc3-4272-85ad-1ef322868d35',
         kind: 'line',
         x1: 0.014742802131884357,
         y1: 0.21252369471420718,
@@ -13528,11 +13528,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'ab11af55-72af-4802-b1c4-2eb4f760e19f',
+        id: '883c50e1-b750-44f9-8c38-bc787d162dd6',
         kind: 'circle',
         cx: 0.484930664641697,
         cy: 0.5,
-        radius: 0.32142857142857145,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -13540,7 +13540,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5eac8e8f-b480-457f-b036-25188db081d1',
+        id: '28c40e54-a42a-422b-aa9b-2e8265b6828c',
         kind: 'line',
         x1: 0.12346764797164848,
         y1: 0.4083862251336112,
@@ -13553,7 +13553,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '71aa1dd0-fa60-4763-ae79-1ee093bf203d',
+        id: '8f0073a9-af76-47d8-b12f-dfeca9c1c00e',
         kind: 'line',
         x1: 0.1134931395735138,
         y1: 0.4710376736961721,
@@ -13566,7 +13566,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2ca5dd7b-1993-465a-84dc-69dd7146d1ca',
+        id: 'ad694d49-b8e3-423d-bb33-513841daa262',
         kind: 'line',
         x1: 0.11994723324289508,
         y1: 0.5343852494649838,
@@ -13579,7 +13579,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '75b0a47f-2b92-4651-9f2a-b7fbdcaf47e4',
+        id: '9d9ef6e3-3bb6-403b-b7ee-ef8b8b2a67e1',
         kind: 'line',
         x1: 0.11994723324289508,
         y1: 0.5991250796462967,
@@ -13592,7 +13592,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1743d949-1bb3-4fd5-852b-45b3ee4689fb',
+        id: '7e52d0ed-118b-44d2-9f0e-1cde98fcd3bf',
         kind: 'line',
         x1: 0.7857831875361392,
         y1: 0.40818196542559754,
@@ -13605,7 +13605,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e52980e1-adf6-41bc-9a77-8d50ea02dffb',
+        id: '18728934-bf4f-4852-b45b-6933cb7108f0',
         kind: 'line',
         x1: 0.7953626899022511,
         y1: 0.47182882860383374,
@@ -13618,7 +13618,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '19ac4ead-9d1a-4b49-9847-6e474498e826',
+        id: 'e4814f52-dbcd-44fd-b3f5-f49753ce0676',
         kind: 'line',
         x1: 0.7953626899022511,
         y1: 0.5354756917820698,
@@ -13631,7 +13631,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '93dd486c-8f6d-49ef-b4f8-5ad0140d6bf6',
+        id: '8ddf74c5-028e-4e02-82d2-e938284e73b3',
         kind: 'line',
         x1: 0.7819513865896942,
         y1: 0.598364854208184,
@@ -13644,7 +13644,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '738cd581-ca25-49a0-ad3b-43b45600bacf',
+        id: 'eedf912e-0c57-4a70-8615-ff209c678013',
         kind: 'line',
         x1: 0.8502890729273337,
         y1: 0.21252369471420718,
@@ -13657,7 +13657,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8d425002-daea-4ad4-9633-1766b14c9fc1',
+        id: 'ce5d8d07-1d1a-47e7-8597-3655d86fe17a',
         kind: 'line',
         x1: 0.11708682500717903,
         y1: 0.21252369471420718,
@@ -13670,7 +13670,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3d22a1c5-6902-4eaf-b60e-066c5bfbf6fe',
+        id: 'f672e803-b459-43a6-9a2e-fa732dd75df4',
         kind: 'line',
         x1: 0.18850209321312558,
         y1: 0.8898305084745762,
@@ -13704,11 +13704,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'b56c6122-adcb-4b63-a8df-30d994254d57',
+        id: 'd28ab4da-6183-425a-8832-f54329319613',
         kind: 'circle',
         cx: 0.5021099240884535,
         cy: 0.5,
-        radius: 0.18,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -13716,7 +13716,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f92d55e8-a6ad-48bc-9f33-dce28067a05d',
+        id: '48965070-2751-4fcc-850f-d15508507dcc',
         kind: 'line',
         x1: 0.04164712422047356,
         y1: 0.40750448580720344,
@@ -13729,7 +13729,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '96f13eb9-710a-4305-a62f-9a6cf94b5661',
+        id: 'f65cc921-23c9-4c5d-8090-df8b53208651',
         kind: 'line',
         x1: 0.03707274422267389,
         y1: 0.46952997730279206,
@@ -13742,7 +13742,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eceb82b4-6648-4518-b45c-7491242feb51',
+        id: 'ce3cdc2d-c4ed-4b00-87bd-ad720fe4893c',
         kind: 'line',
         x1: 0.04073224822091365,
         y1: 0.533493765407618,
@@ -13755,7 +13755,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '055b7b2e-c019-42ab-8ec2-c32838261ecf',
+        id: 'b6a757fc-7fab-4d22-b89d-56ed7dce2fcd',
         kind: 'line',
         x1: 0.04530662821871326,
         y1: 0.5974575535124439,
@@ -13768,7 +13768,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '21939fc0-78ed-4f9a-8e4d-3448577aa7c3',
+        id: '84ee2612-fec2-4787-a118-f275c1b289de',
         kind: 'line',
         x1: 0.670587336909341,
         y1: 0.40818196542559754,
@@ -13781,7 +13781,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a857ed76-5328-4bb8-8884-847dfecff209',
+        id: 'cda599ad-b9eb-4717-99ef-1b4c68bf8c7f',
         kind: 'line',
         x1: 0.6759518582343638,
         y1: 0.47182882860383374,
@@ -13794,7 +13794,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7ae1aeab-7ead-4452-bcf8-839674ce3090',
+        id: 'ad35822a-3ba0-46f0-96b4-91cd2f2ee51f',
         kind: 'line',
         x1: 0.6759518582343638,
         y1: 0.5354756917820698,
@@ -13807,7 +13807,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '00ae2ea9-1ac0-4241-8dfa-83f27ecb8da5',
+        id: '8f075ffe-8073-4fa4-9e27-f5121dc45890',
         kind: 'line',
         x1: 0.6684415283793319,
         y1: 0.598364854208184,
@@ -13820,7 +13820,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6cdb5567-e048-4950-81b8-902ae88e64aa',
+        id: '64a5ec1e-2388-4cfe-b2a5-19292703b7f2',
         kind: 'line',
         x1: 0.9693313877742458,
         y1: 0.21252369471420718,
@@ -13833,7 +13833,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8ec093f4-7d9b-4d88-8165-1c198c591f9b',
+        id: '4bf0111b-2bf3-4070-b806-e406ccd08839',
         kind: 'line',
         x1: 0.03798762022223383,
         y1: 0.21252369471420718,
@@ -13846,7 +13846,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ab21e09d-4a70-43df-a913-13328c74c98a',
+        id: '30d33049-366b-4df3-b6c6-16f75a03037b',
         kind: 'line',
         x1: 0.3361099240884534,
         y1: 0.8898305084745762,
@@ -13880,11 +13880,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '0e9ffed3-3040-4389-820a-056a1511dc5b',
+        id: '1f6637db-c203-4f6b-8d95-f0dd8f4d5621',
         kind: 'circle',
         cx: 0.4485396467493419,
         cy: 0.5,
-        radius: 0.36,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -13892,7 +13892,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9b7e30ca-60a8-42b8-a65b-50e6a74868b5',
+        id: '090b4606-32e8-4752-88d4-78a20ad0a5ae',
         kind: 'line',
         x1: 0.7854944723911171,
         y1: 0.40818196542559754,
@@ -13905,7 +13905,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2136ff4a-7989-423e-8203-6b3c0a310eb1',
+        id: '9bf7545c-7cbe-49aa-b438-8fc5ba78db25',
         kind: 'line',
         x1: 0.7962235150411626,
         y1: 0.47182882860383374,
@@ -13918,7 +13918,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '545a1386-3938-42a3-b2ae-47b5e88da1ad',
+        id: '7e25f3f4-1313-4435-98af-e1af77e75f26',
         kind: 'line',
         x1: 0.7962235150411626,
         y1: 0.5354756917820698,
@@ -13931,7 +13931,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3ead0e09-14ea-437e-9ec6-9a6b6f0955da',
+        id: '0e4b5f69-9db1-4588-a1a8-41f9517880d6',
         kind: 'line',
         x1: 0.7812028553310988,
         y1: 0.598364854208184,
@@ -13944,7 +13944,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '031da922-bcbb-466b-a3fc-2f497f3336ba',
+        id: '75728201-2ac9-4743-85c3-655dda6de5c8',
         kind: 'line',
         x1: 0.8959180951642877,
         y1: 0.21252369471420718,
@@ -13957,11 +13957,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '59754ef3-b110-4d9d-aae7-290a90dac614',
+        id: '4b424c30-29f7-47eb-be2a-a517e6dbd559',
         kind: 'arc',
         cx: 0.44853964674934194,
         cy: 0.5,
-        radius: 0.33107127396019836,
+        radius: 0.3507110952968203,
         startAngle: -0.8160159156289736,
         endAngle: 0.8208559654622037,
         style: {
@@ -13971,11 +13971,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4b7a8fc5-1bdd-4969-92e5-c587b3d5b696',
+        id: '3c870ede-250e-4a11-8790-e6f5e1fffebc',
         kind: 'arc',
         cx: 0.44853964674934194,
         cy: 0.5,
-        radius: 0.33107127396019836,
+        radius: 0.3507110952968203,
         startAngle: 2.325979534867388,
         endAngle: 3.962851415958565,
         style: {
@@ -13985,7 +13985,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1d78c67c-7e3a-4a22-baee-b3c0228b6ca6',
+        id: '0878c3ed-80c0-43aa-800a-0ebc94a4b284',
         kind: 'polygon',
         points: [
           {
@@ -14037,11 +14037,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'a656572a-274f-4562-8252-e9488e8dff3d',
+        id: '661901f7-14ec-4f34-aeb0-44defaef09fe',
         kind: 'circle',
         cx: 0.4485396467493419,
         cy: 0.5,
-        radius: 0.36,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -14049,7 +14049,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fee151d3-1e67-4133-b99e-0073e90b0631',
+        id: 'd1e6c404-428a-4a4b-a4a6-a190e4928df3',
         kind: 'line',
         x1: 0.7854944723911171,
         y1: 0.40818196542559754,
@@ -14062,7 +14062,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a858cf16-6e3e-46d8-accd-5359854de4ad',
+        id: '8c612dbe-6bce-4fb1-9f06-a1923fec3b8f',
         kind: 'line',
         x1: 0.7962235150411626,
         y1: 0.47182882860383374,
@@ -14075,7 +14075,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3545eab9-96db-45e9-9139-9217e7eafd34',
+        id: 'b5969304-d437-4765-8e46-4fc1fdd8fea1',
         kind: 'line',
         x1: 0.7962235150411626,
         y1: 0.5354756917820698,
@@ -14088,7 +14088,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '140d73ab-ad70-474b-8f6e-081eeb79c043',
+        id: '1aafd7e6-fc0d-4960-bf64-4c257c1a9958',
         kind: 'line',
         x1: 0.7812028553310988,
         y1: 0.598364854208184,
@@ -14101,7 +14101,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '262c1615-ef3f-4202-ab6a-37ebeccd43d6',
+        id: '07c03126-dfd1-4676-a9f2-0cb90743d685',
         kind: 'line',
         x1: 0.8959180951642877,
         y1: 0.21252369471420718,
@@ -14114,11 +14114,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e810feba-50de-4559-90d9-65b1c8c6b1bb',
+        id: '587038ee-c3a6-40b8-b547-0cfc9c468fd1',
         kind: 'arc',
         cx: 0.4485396467493419,
         cy: 0.5,
-        radius: 0.3310712739601984,
+        radius: 0.3507110952968204,
         startAngle: -0.8160159156289736,
         endAngle: 0.8208559654622037,
         style: {
@@ -14128,11 +14128,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'df419d3c-742c-44b3-9745-facda37af692',
+        id: '6190bf78-ea80-4121-9db1-fecc701e837a',
         kind: 'arc',
         cx: 0.4485396467493419,
         cy: 0.5,
-        radius: 0.3310712739601984,
+        radius: 0.3507110952968204,
         startAngle: 2.325979534867388,
         endAngle: 3.962851415958565,
         style: {
@@ -14142,7 +14142,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '87b45932-e529-4ab0-988e-0d928eb5213b',
+        id: '57d72d2d-16af-4c54-aa05-8fee77f36771',
         kind: 'polygon',
         points: [
           {
@@ -14173,7 +14173,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a49cba75-d3a4-4f6d-9b69-f0a70a101422',
+        id: '0236b798-0515-4e78-b83f-cf340eed998d',
         kind: 'line',
         x1: 0.8,
         y1: 0.8898305084745762,
@@ -14207,11 +14207,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '06728f0a-8e12-4c5c-8f01-7208a77c98d8',
+        id: '08c1d546-da84-464b-86b7-9d8ff1f3e394',
         kind: 'circle',
         cx: 0.4485396467493419,
         cy: 0.5,
-        radius: 0.36,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -14219,7 +14219,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '998ac7ec-fc1d-4fd5-a79c-5ddd10b38637',
+        id: '8738c48d-1ff8-4f9e-b12c-d0a508748dff',
         kind: 'line',
         x1: 0.7854944723911171,
         y1: 0.40818196542559754,
@@ -14232,7 +14232,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '705f3b27-f7cf-4ba0-8575-749430dfc724',
+        id: '948b711f-1722-46df-b53e-86548bafac2d',
         kind: 'line',
         x1: 0.7962235150411626,
         y1: 0.47182882860383374,
@@ -14245,7 +14245,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '88aacfa6-44d6-445d-abfe-00a42bd282f1',
+        id: 'd9a8f7cd-ceed-4417-8ad9-b6d32c4edced',
         kind: 'line',
         x1: 0.7962235150411626,
         y1: 0.5354756917820698,
@@ -14258,7 +14258,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ede8ffdd-14fe-4534-af7c-9b33b679a590',
+        id: '7a94be6a-9d61-4ab1-a539-fbab8c275fcc',
         kind: 'line',
         x1: 0.7812028553310988,
         y1: 0.598364854208184,
@@ -14271,7 +14271,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7bf15cd5-2de8-4aef-be54-74f0f8eb3319',
+        id: '8c9cce66-8523-4ba8-a4eb-66d4929cfe14',
         kind: 'line',
         x1: 0.8959180951642877,
         y1: 0.21252369471420718,
@@ -14284,11 +14284,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2a1b1dfb-90b4-4784-9b88-0195021f14c6',
+        id: '4266c8ce-93f1-4c5f-9d5b-ca0f4dd04eb4',
         kind: 'arc',
         cx: 0.4485396467493419,
         cy: 0.5,
-        radius: 0.3310712739601984,
+        radius: 0.3507110952968204,
         startAngle: 0.7530344141883909,
         endAngle: 2.389906295279568,
         style: {
@@ -14298,7 +14298,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '067e3099-1d6f-42be-84dd-ede795c86eca',
+        id: 'e9aa5bfe-c962-4b53-9d76-180b30e90328',
         kind: 'line',
         x1: 0.8,
         y1: 0.8898305084745762,
@@ -14332,7 +14332,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'abbd76be-7959-4f07-8cbb-b3e20ad53ac5',
+        id: '3376255e-b01f-4fd9-bb61-7feacebebd14',
         kind: 'circle',
         cx: 0.5,
         cy: 0.44176706827309237,
@@ -14344,7 +14344,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd57d7b6f-8237-4603-9251-9f74f24eb66e',
+        id: 'e883c406-2c1a-4d92-871d-f2dbd5eaa386',
         kind: 'rect',
         x: 0.09745762711864407,
         y: 0.7831325301204819,
@@ -14378,11 +14378,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'ef67b7cb-4716-4f4d-8685-8d9692797af3',
+        id: 'b1bc5871-72d4-4fc5-8b2b-6cf9e64b085f',
         kind: 'circle',
         cx: 0.4485396467493419,
         cy: 0.5,
-        radius: 0.36,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -14390,7 +14390,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b0a3505a-2551-4262-bf65-a47ccc0f7aa7',
+        id: 'a10948bf-44a2-4919-bc69-7735051779fc',
         kind: 'line',
         x1: 0.7854944723911171,
         y1: 0.40818196542559754,
@@ -14403,7 +14403,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '59ceff10-9220-4b55-9993-9a4a833ec7ee',
+        id: 'ac57f0cd-a02f-4ee8-8cbe-e75e86770cb0',
         kind: 'line',
         x1: 0.7962235150411626,
         y1: 0.47182882860383374,
@@ -14416,7 +14416,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c192420e-1393-49c6-8d6d-5ef637667b66',
+        id: '3c8acf3f-8db2-421f-afa8-15c70e596ded',
         kind: 'line',
         x1: 0.7962235150411626,
         y1: 0.5354756917820698,
@@ -14429,7 +14429,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dab44845-7f96-4816-b7ff-d4b2a7c9cda4',
+        id: '06d5fc4d-7531-4ccb-b8d1-ea7a8c099b25',
         kind: 'line',
         x1: 0.7812028553310988,
         y1: 0.598364854208184,
@@ -14442,7 +14442,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2d47f178-9de0-4e7b-8faa-b9130c4d559e',
+        id: 'c2a2cecb-f7be-4cee-b2dc-fd45b9d47218',
         kind: 'line',
         x1: 0.8959180951642877,
         y1: 0.21252369471420718,
@@ -14455,11 +14455,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9bab1792-1292-449a-9eb0-c0c5a95491fe',
+        id: '3870c7c4-8c92-4844-b409-674300811542',
         kind: 'arc',
         cx: 0.4485396467493419,
         cy: 0.5,
-        radius: 0.3310712739601984,
+        radius: 0.3507110952968204,
         startAngle: 0.7530344141883909,
         endAngle: 2.389906295279568,
         style: {
@@ -14490,11 +14490,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '42bf2645-63da-4da8-b990-e6b06ab90f8e',
+        id: '8782bc13-1bb6-4deb-b0a5-bd8edaf72259',
         kind: 'circle',
         cx: 0.44853964674934194,
         cy: 0.5,
-        radius: 0.36,
+        radius: 0.3813559322033898,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0423728813559322,
@@ -14502,7 +14502,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b58e50d7-798c-4fb6-9d89-45b189d696e7',
+        id: 'c5adac60-5274-47bd-8a33-8102ad0f99eb',
         kind: 'line',
         x1: 0.7854944723911171,
         y1: 0.40818196542559754,
@@ -14515,7 +14515,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7db1f0b0-3eef-4e06-9c01-3865498c6d21',
+        id: 'ff3d8585-cfbd-4bdb-b712-6f6e3c65a2ef',
         kind: 'line',
         x1: 0.7962235150411625,
         y1: 0.47182882860383374,
@@ -14528,7 +14528,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '466b4bf4-117f-4c6a-9061-5512342db011',
+        id: '3346493f-1b8f-4467-bb77-65bc66fc6274',
         kind: 'line',
         x1: 0.7962235150411625,
         y1: 0.5354756917820698,
@@ -14541,7 +14541,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2cde339b-620b-48ad-b23d-0fb2a2641ba1',
+        id: 'dd1aee47-e80a-45ad-8f67-54c6334a5de3',
         kind: 'line',
         x1: 0.7812028553310988,
         y1: 0.598364854208184,
@@ -14554,7 +14554,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '03b8b314-22e8-4557-9114-d11f76d83db8',
+        id: '533ccc87-7236-44c0-88ff-eb8e48ff2e6a',
         kind: 'line',
         x1: 0.8959180951642877,
         y1: 0.21252369471420718,
@@ -14588,7 +14588,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '9a294071-df9e-442b-baf6-1975aa537579',
+        id: '6863bd58-8bea-4678-9481-b6ceb69f6b4d',
         kind: 'circle',
         cx: 0.5097041440333431,
         cy: 0.5,
@@ -14600,7 +14600,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '31472a5c-d3ca-449e-b9a0-d84fa846fabf',
+        id: '6f10e017-6c3f-4baa-a210-a35ec1486720',
         kind: 'arc',
         cx: 0.5097041440333431,
         cy: 0.5,
@@ -14614,7 +14614,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8b371cbb-5180-4d0c-bde9-744645dd2e7d',
+        id: '0a18fda4-dda9-48db-b852-199457aabf74',
         kind: 'arc',
         cx: 0.5097041440333431,
         cy: 0.5,
@@ -14628,7 +14628,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5b10c4d5-3013-4114-a5da-aae39896625d',
+        id: '8fdb3737-fc87-4836-a2ce-c763c887feb5',
         kind: 'polygon',
         points: [
           {
@@ -14680,7 +14680,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'f76b5015-aa58-49b2-a9d2-add8741511aa',
+        id: '0d311a04-7f52-412a-aeb1-7aefc5844f8c',
         kind: 'circle',
         cx: 0.5097041440333431,
         cy: 0.5,
@@ -14692,7 +14692,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd5778fb1-fec9-47db-a94d-2142215f1472',
+        id: '259286df-6792-43fd-8b09-89e160a05971',
         kind: 'arc',
         cx: 0.5097041440333431,
         cy: 0.5,
@@ -14727,7 +14727,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'd4c90645-f431-4878-be13-49f4b4193923',
+        id: 'f0e03da8-d21a-48d0-a481-7ace2d7c7c77',
         kind: 'circle',
         cx: 0.5097041440333431,
         cy: 0.5,
@@ -14760,7 +14760,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'cc4453c0-baac-4977-a810-83bfe7bb98cb',
+        id: 'e83d13d4-0e2e-4a96-8b0a-6adaaf732a2d',
         kind: 'rect',
         x: 0.023526350999777047,
         y: 0.05666435597438415,
@@ -14773,7 +14773,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3a6374ba-6f16-4e0a-94fb-a4b80a20223b',
+        id: '5c31fdab-69f2-4452-90fe-85ebd7a91f2a',
         kind: 'text',
         x: 0.1953444145979377,
         y: 0.28704934392001824,
@@ -14807,11 +14807,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '0bb68dac-37db-4e11-8813-5445614048a9',
+        id: 'f06bd424-ba7b-4699-9db6-a5947a94f6d5',
         kind: 'arc',
         cx: 0.47979483757467134,
         cy: 0.9278350515463918,
-        radius: 0.2057142857142857,
+        radius: 0.7422680412371134,
         startAngle: 3.141592653589793,
         endAngle: 6.283185307179586,
         style: {
@@ -14821,7 +14821,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5816ee1c-7306-4d8c-999b-bcdc7f8477dd',
+        id: '2d25fd61-1110-46b1-b406-06ec6efe85bd',
         kind: 'line',
         x1: 0.27408055186038555,
         y1: 0.9278350515463918,
@@ -14834,7 +14834,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '82948c3d-2d4b-4b44-a12d-1e7be8c0b7c2',
+        id: '2b7ac6ad-be85-4e19-b5b9-afa8605ee71a',
         kind: 'line',
         x1: 0.3940805518603856,
         y1: 0.30927835051546393,
@@ -14847,7 +14847,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3a7b2cfa-b2ff-4b52-9933-dfae0031376e',
+        id: 'a039ec56-4f58-4d57-aa51-205927a63c48',
         kind: 'line',
         x1: 0.5655091232889571,
         y1: 0.30927835051546393,
@@ -14860,7 +14860,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '19f06ed3-8611-4865-b865-9992ad668a0e',
+        id: 'cbd14170-9168-474d-a038-1180fde8b699',
         kind: 'line',
         x1: 0.27408055186038555,
         y1: 0.9278350515463918,
@@ -14873,7 +14873,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '462e5c05-a2eb-4771-8408-507ec6e68753',
+        id: 'cc2d6cbe-c05c-4adf-b869-5a841c76a94f',
         kind: 'rect',
         x: 0.19408055186038556,
         y: 0.8762886597938144,
@@ -14886,7 +14886,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b55d6685-ff07-415e-990c-678250a1fa32',
+        id: 'd803b1c1-94be-41fb-9985-2fcb7c4f6c99',
         kind: 'polygon',
         points: [
           {
@@ -14909,7 +14909,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eb9c927e-246e-47c2-8658-8bab537f489c',
+        id: 'f73a4303-5474-4b57-bdb3-20e4b39c7b01',
         kind: 'polygon',
         points: [
           {
@@ -14953,7 +14953,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '4b319345-61ee-495e-b8a1-1f1930862d30',
+        id: '8d03a6fc-5ee5-41f5-ac32-f2b744515089',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -14965,7 +14965,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ee614071-cf33-4f6c-aaae-55ad1604c5f0',
+        id: '6da87c46-7f5b-4bee-a80e-69a103ed6a4a',
         kind: 'polygon',
         points: [
           {
@@ -14988,7 +14988,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f4f4836e-2654-4dba-8709-8a1c661898e2',
+        id: 'ab757947-fab6-4be7-809e-947ef7519f5c',
         kind: 'polygon',
         points: [
           {
@@ -15011,7 +15011,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0e377b9a-428e-4a60-b4e8-fa4bb33aba54',
+        id: 'd2eb2c1a-b084-4476-ab4b-edcc3f7204cb',
         kind: 'polygon',
         points: [
           {
@@ -15034,7 +15034,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '87f39c54-e321-4678-a2e3-09f97133456b',
+        id: 'bafc92be-e26d-473b-a9d3-f0b2d0c82130',
         kind: 'polygon',
         points: [
           {
@@ -15078,7 +15078,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'f346f0a2-ccff-4059-aa1a-f60399e6b8fa',
+        id: '5d367f06-f093-4e01-863c-713c4d41b974',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -15090,7 +15090,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '968b7569-e63a-4405-8ce4-bbb89049af6b',
+        id: 'cd6c20aa-15ad-4fd0-9f2e-e25be8b5118c',
         kind: 'line',
         x1: 0.22853391205118675,
         y1: 0.22853391205118675,
@@ -15103,7 +15103,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '56df6d88-7ba6-4df7-aa6c-275acee81cc2',
+        id: '319a063d-a6ab-4a24-a3aa-83630f2a2f2d',
         kind: 'line',
         x1: 0.770077504805261,
         y1: 0.22992249519473898,
@@ -15137,7 +15137,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '909dc314-235b-499e-b7ef-1c83556030fe',
+        id: '2a295798-6baf-4368-bbcc-0a19696656e9',
         kind: 'rect',
         x: 0.021431089195542766,
         y: 0.08536355743481723,
@@ -15150,7 +15150,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6e0a4980-cafa-488f-933e-f7fcb1de6be4',
+        id: '08b9553e-756a-4a9d-9eab-7f90c990bd93',
         kind: 'rect',
         x: 0.05634687006226375,
         y: 0.13345691951019076,
@@ -15163,7 +15163,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b708f8ef-86a1-4004-9721-acdc0d5fd1f4',
+        id: 'c24b9866-83db-4eff-a4a7-14be2d75c1f4',
         kind: 'polygon',
         points: [
           {
@@ -15186,7 +15186,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ce691b78-d680-4ee9-a291-cc7598e7ba3f',
+        id: 'a56a69a8-ceb9-44eb-a89f-26240f8bbb6e',
         kind: 'line',
         x1: 0.14628145714321225,
         y1: 0.12768571606114598,
@@ -15199,7 +15199,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e69d4845-ec90-4cdc-a384-629e7e3f1a4c',
+        id: '7b1005a5-5e1f-4c15-8185-0e5999809ad1',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.2007876264157138,
@@ -15212,7 +15212,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e339d10f-939e-49de-994d-eedfb621dfb5',
+        id: 'ba7121c4-d99b-4dbd-9851-d6dc6122d3c7',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.2700420678042516,
@@ -15225,7 +15225,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0ef41947-4e36-4615-9ab1-e85d482b60d2',
+        id: 'ae1eed30-601d-4037-be72-49f4726468e0',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.3452727652750271,
@@ -15238,7 +15238,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f3826df3-de5f-4907-a2cc-8a996eb72ff5',
+        id: 'd386b140-f5e7-462c-b68a-bd637c08346a',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.4086934005974908,
@@ -15251,7 +15251,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ea960b46-e26e-49bf-8fdf-826a030c7ebd',
+        id: 'f4b893c1-ba4f-41ad-ad6e-d8ea2bb2d95b',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.4818175159668166,
@@ -15264,7 +15264,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e8b517d1-e84a-4703-81a7-eca4a705c9c4',
+        id: 'e997702e-4e7f-46f0-9775-db9e3fffd2c5',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.5493235096536463,
@@ -15277,7 +15277,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dc4f08eb-614d-47bd-8b8d-31969af97df6',
+        id: 'd45421f1-cfcb-40b2-88ab-58dc6d549ea3',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.6183488087241101,
@@ -15290,7 +15290,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc3c4b12-ec7c-4ed1-b9e8-05cc858afb26',
+        id: '5c80f9a6-42a1-4ad5-a444-becfb9b38b03',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.6975620264935274,
@@ -15303,7 +15303,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'da7564a6-4771-4c8a-8f52-0d6cdaace82f',
+        id: 'a6c3cea8-e587-41f6-8370-cccd513320ea',
         kind: 'line',
         x1: 0.06057908592489679,
         y1: 0.7591480390525184,
@@ -15316,7 +15316,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd4f42cac-ec51-4228-a6fe-00d303cb024e',
+        id: 'a8c234a8-0e83-46e2-bcff-3b36008cafbb',
         kind: 'line',
         x1: 0.23309992684783298,
         y1: 0.12768571606114598,
@@ -15329,7 +15329,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3c324964-fb0b-4d8b-818f-0b39e1b4c128',
+        id: 'ee849203-293f-4c73-b39f-65d40d133822',
         kind: 'line',
         x1: 0.3261506313051094,
         y1: 0.12768571606114598,
@@ -15342,7 +15342,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '49b919db-5612-4c5d-ad20-131a8ef9a9ba',
+        id: '567fa8f8-190a-477c-9926-558d5ed3f9ac',
         kind: 'line',
         x1: 0.4118719709410183,
         y1: 0.12768571606114598,
@@ -15355,7 +15355,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '603444ed-4873-4395-90ec-162f1c4146b3',
+        id: '9b281a97-14f6-4f57-bf86-f98cfcefad1b',
         kind: 'line',
         x1: 0.8541203509408877,
         y1: 0.12768571606114598,
@@ -15368,7 +15368,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f978105f-08fb-4f48-ad90-7df0f9c543e1',
+        id: '5d8d3da1-f7e9-4ea3-b0e7-98848c439ad7',
         kind: 'line',
         x1: 0.7663010810189278,
         y1: 0.12768571606114598,
@@ -15381,7 +15381,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5edf9d23-b3f5-4fbd-a713-8016a9fc4515',
+        id: 'e10dd18f-8f99-4d86-999b-7e81ff4591f8',
         kind: 'line',
         x1: 0.6784868088266864,
         y1: 0.12768571606114598,
@@ -15394,7 +15394,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f39ac888-18da-4bf9-9c91-d3a5bf8d392a',
+        id: 'd4cf3cc7-d7ac-4517-989f-9cfed202847e',
         kind: 'line',
         x1: 0.5917234332797082,
         y1: 0.12768571606114598,
@@ -15407,7 +15407,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b13e6eb2-2e13-4021-9779-46a4a9290514',
+        id: '2c7eb5af-460f-4f04-a061-894a0d9072ad',
         kind: 'line',
         x1: 0.5016893197197435,
         y1: 0.12768571606114598,
@@ -15434,7 +15434,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'ada017ca-783f-471f-8796-57d6e24a2c44',
+        id: '777a8b03-dd45-4fb8-aabd-68dfae1f65b0',
         kind: 'circle',
         cx: 0.5019259292613638,
         cy: 0.5222502073717019,
@@ -15446,7 +15446,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c54be429-3354-4305-8b10-52c98fee221b',
+        id: '079a0dbb-6c0b-4cb2-a815-fbee45ba4011',
         kind: 'line',
         x1: 0.5636737888533124,
         y1: 0.433015508805356,
@@ -15459,7 +15459,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '65da0970-355c-4333-987f-1fcb3f9a84b5',
+        id: '4132c416-fd1f-488b-8a03-0f1e2b5786b9',
         kind: 'line',
         x1: 0.940033738614122,
         y1: 0.1592511093486632,
@@ -15472,7 +15472,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c89d49f0-bfb4-4fc3-9fd9-8f54c99a38e8',
+        id: '3ee5462d-7f4b-4053-856c-d6c939e16a17',
         kind: 'line',
         x1: 0.19935874592684724,
         y1: 0.9538666307699041,
@@ -15485,7 +15485,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8ccec5d5-3c59-4045-8f5d-d8f27bd7e8ce',
+        id: '55fe9cac-f096-4f0c-8f15-392b6b0d8984',
         kind: 'line',
         x1: 0.21559907101673123,
         y1: 0.9547139664362811,
@@ -15519,7 +15519,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'f118e62e-6e1f-4af1-8a32-7b23deb4ebdf',
+        id: '88b33a3f-af36-42ca-9e60-09236ac407df',
         kind: 'circle',
         cx: 0.29187180754391084,
         cy: 0.776915822413233,
@@ -15531,7 +15531,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e60f6003-fab3-4485-ad6c-98db0c27ff24',
+        id: '006e56a7-c51c-4f29-857c-bb2de0bfa46c',
         kind: 'line',
         x1: 0.3760734342602043,
         y1: 0.6310932662194481,
@@ -15544,7 +15544,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd71a4f56-3e2a-4cf9-9183-5483ba1ba46c',
+        id: '45910461-e6a1-4a87-848e-714e1b90564f',
         kind: 'line',
         x1: 0.8892915475703992,
         y1: 0.1837221744243647,
@@ -15557,7 +15557,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '997089e2-bdb8-45da-9fcb-4770d981cb4b',
+        id: '6756b239-c10e-41bc-888d-fd0759dc3f37',
         kind: 'polygon',
         points: [
           {
@@ -15594,7 +15594,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'a4333238-0533-441f-bc8b-d935c8945369',
+        id: '0d54d331-d1d9-4d4b-bbe9-268a87bd17aa',
         kind: 'circle',
         cx: 0.27779032204230997,
         cy: 0.7578418353480469,
@@ -15606,7 +15606,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '26222c16-4778-41bc-8470-4edc440863cb',
+        id: '04b88bd7-f3ae-41e7-bf53-41d002333960',
         kind: 'line',
         x1: 0.36967701786366197,
         y1: 0.6120192791542621,
@@ -15619,7 +15619,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '05f0b270-6abc-4d05-a227-387556a15081',
+        id: 'f705406e-d867-4947-81a9-8a981befc22e',
         kind: 'line',
         x1: 0.9297364669124858,
         y1: 0.16464818735917883,
@@ -15632,7 +15632,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '43576e13-c343-4d7f-ad24-8378f3d16f60',
+        id: '5887ec4c-f12c-4050-978a-167e5f36c9b9',
         kind: 'line',
         x1: 0.8604415242031483,
         y1: 0.2704703762067564,
@@ -15659,7 +15659,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'f07ac10a-49cf-4593-9591-3761204ba0a9',
+        id: '731d2b73-e860-43f1-901d-8aa7f2f1929b',
         kind: 'circle',
         cx: 0.36467820390557987,
         cy: 0.7528083305515585,
@@ -15671,7 +15671,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e7dd4978-f7ba-4eff-8188-e6183ef6590d',
+        id: 'b92c3466-bd15-4e95-810c-7a666dbd5ee8',
         kind: 'line',
         x1: 0.44887983062187337,
         y1: 0.6069857743577736,
@@ -15684,7 +15684,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3c7f7c22-5038-435c-b9a3-f0d1c0d32e4e',
+        id: '51a5391f-22fa-4063-9c4b-cfe9dfe391ad',
         kind: 'line',
         x1: 0.9620979439320683,
         y1: 0.15961468256269024,
@@ -15697,7 +15697,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0a469ce2-2281-4fd5-b0e3-4b12c20416b0',
+        id: '1a9444c5-13a3-4366-8445-f738d4681947',
         kind: 'line',
         x1: 0.5001280197333982,
         y1: 0.30616991848180697,
@@ -15710,7 +15710,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '64c9af64-f5e5-405a-a31a-3dcd0f267d30',
+        id: '0c9eac9f-44a4-420c-ae3a-2660e180cb81',
         kind: 'line',
         x1: 0.2729221260001328,
         y1: 0.17045708997015033,
@@ -15723,7 +15723,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9358f68a-e5a5-4b0d-9841-f1e497070ed5',
+        id: 'f4e7594a-7365-4f05-8b1d-13f1b620619f',
         kind: 'line',
         x1: 0.06327146842870025,
         y1: 0.16904341467315392,
@@ -15757,11 +15757,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '7929c062-cc52-4a89-9d99-4c060f44c789',
+        id: 'ed4d8971-f5f5-4848-b32c-4384a0aeb80d',
         kind: 'circle',
         cx: 0.5,
         cy: 0.4968944099378882,
-        radius: 0.41975308641975306,
+        radius: 0.422360248447205,
         style: {
           stroke: '#000000',
           strokeWidth: 0.07453416149068323,
@@ -15769,11 +15769,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c2d37ec5-cad2-4f7e-93c8-ac6cfab2e841',
+        id: '70e2f03c-4dc0-4027-8011-8d6a6c0d717b',
         kind: 'circle',
         cx: 0.5,
         cy: 0.4968944099378882,
-        radius: 0.13580246913580246,
+        radius: 0.13664596273291926,
         style: {
           stroke: '#000000',
           strokeWidth: 0.018633540372670808,
@@ -15795,7 +15795,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'a9a88abb-c305-4d3d-b48a-17033a4e7f31',
+        id: '95922c93-950d-4f0f-85da-7a7f806c915c',
         kind: 'circle',
         cx: 0.27190634675475367,
         cy: 0.7578652709617008,
@@ -15807,7 +15807,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '00ed0b9b-c20c-421d-b453-d0e7726b39e8',
+        id: '709dcba9-bd01-4576-8d5a-56585a44a7bb',
         kind: 'line',
         x1: 0.3637930425761057,
         y1: 0.6120427147679159,
@@ -15820,7 +15820,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '147c7ad6-d90d-4d0c-bc97-f9de6bf0babf',
+        id: '06cf93e6-e85f-43a2-baed-2724d17362cb',
         kind: 'line',
         x1: 0.9238524916249294,
         y1: 0.16467162297283255,
@@ -15833,7 +15833,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '39e48ade-34fc-4bc6-b70d-5771d71edbd6',
+        id: 'd2e8456f-f676-4420-8a8e-e94b0e56bcfe',
         kind: 'line',
         x1: 0.13091461573412835,
         y1: 0.6353063383221519,
@@ -15846,7 +15846,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e5bc624f-53d2-4813-abcd-4f68188591f5',
+        id: '21e0efd7-0713-44c3-aea4-e9e81f701a3a',
         kind: 'line',
         x1: 0.4123576512278364,
         y1: 0.6342224755410466,
@@ -15859,7 +15859,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c92b3157-6954-408f-9c26-0e8ba25303bf',
+        id: '80ccc45d-58c9-4cd5-961c-35e5e0763717',
         kind: 'polygon',
         points: [
           {
@@ -15882,7 +15882,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a1bcf587-8928-4898-9483-f5ee9e339940',
+        id: 'bb064693-b7f8-4825-8969-0ab8439f5cda',
         kind: 'line',
         x1: 0.732067064354461,
         y1: 0.4162490736735414,
@@ -15909,7 +15909,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '79141f69-3d18-41fd-abc9-c2cb99b1706b',
+        id: '7685e9a1-19c5-4df4-9249-149510e4723c',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -15921,7 +15921,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5705b9de-b742-455e-b62c-2f13ca94dc13',
+        id: 'c9f7bf3e-4574-41c6-96d7-eb57910a787a',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
@@ -15954,7 +15954,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '5f32f7d3-8507-4df2-8ba0-01b70d27f9ee',
+        id: 'b039a1b3-024f-4c21-a3fa-909057811161',
         kind: 'circle',
         cx: 0.5019259292613638,
         cy: 0.5222502073717019,
@@ -15966,7 +15966,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '33451837-f755-445d-9ade-6f00e44dd2fe',
+        id: 'e51cb800-f83a-4de9-8eeb-a967515a3c63',
         kind: 'line',
         x1: 0.5636737888533124,
         y1: 0.433015508805356,
@@ -15979,7 +15979,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '43fafaed-4b93-4c33-82dc-863cf6ff85f2',
+        id: 'fa17ba22-1c64-4fe7-aecb-6dc5363fec65',
         kind: 'line',
         x1: 0.940033738614122,
         y1: 0.1592511093486632,
@@ -15992,7 +15992,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4caa49ca-e4ac-4632-86c8-135440370b6f',
+        id: '51458911-98d0-4a9e-8296-ccdaec41422b',
         kind: 'line',
         x1: 0.5019259292613638,
         y1: 0.4162513808030253,
@@ -16005,7 +16005,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a22558f0-c6e0-4e2e-a86c-00a04cb4387a',
+        id: '91b6631e-bc2d-4f4a-ba02-3e55918f2613',
         kind: 'line',
         x1: 0.3333528500974439,
         y1: 0.1889484044278779,
@@ -16018,7 +16018,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3caee250-49d3-4b57-bb5f-868f523c74e0',
+        id: 'a8179060-2084-4c6f-9a17-9b6b1ba2049e',
         kind: 'arc',
         cx: 0.50310758950017,
         cy: 0.053217002986465735,
@@ -16032,7 +16032,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bed9921f-6761-4384-8d6c-c76f2b0ca1ee',
+        id: 'b9e59173-acb1-400b-bb13-28d6c850fdd9',
         kind: 'line',
         x1: 0.19935874592684724,
         y1: 0.9538666307699041,
@@ -16045,7 +16045,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '14905b4d-36ec-4ea4-9bfb-5ced7a6f8adc',
+        id: '2115b17e-5055-4a7c-9778-59af4981c890',
         kind: 'line',
         x1: 0.21559907101673123,
         y1: 0.9547139664362811,
@@ -16072,7 +16072,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '7a1ec65d-4326-4a3f-a72e-5efd64d705cf',
+        id: '96f12fa6-ea26-418c-b07f-27dce45b2b62',
         kind: 'circle',
         cx: 0.30627884071790934,
         cy: 0.769702384966949,
@@ -16084,7 +16084,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6a2f4ca6-3dd5-4e4f-ae08-6d1db65f6e1f',
+        id: 'ca8e1c3b-2e68-4538-9b85-3b653e1759e3',
         kind: 'line',
         x1: 0.3943223667520565,
         y1: 0.6342620172400356,
@@ -16097,7 +16097,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '00cf0d28-19ef-41f3-8b30-e24106cf0d63',
+        id: 'dc543100-ceff-48b4-b3e4-e0b36cb1df4a',
         kind: 'line',
         x1: 0.930957276106823,
         y1: 0.2187425889384533,
@@ -16110,7 +16110,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4b0849e6-1d07-46f5-a085-f87e851921b3',
+        id: 'adb0fccc-1b30-4a13-a50a-afdf3a6f2ee9',
         kind: 'line',
         x1: 0.30627884071790934,
         y1: 0.600521888278643,
@@ -16123,7 +16123,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e772e3d6-3b89-4805-a3a9-4125ce14858d',
+        id: '653bf7dc-fbdf-4700-930c-add239b63c3d',
         kind: 'line',
         x1: 0.06591798639673074,
         y1: 0.26381712418813513,
@@ -16136,7 +16136,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b9618f61-1103-48cd-a0f6-6a098771879a',
+        id: '4dd2b7c9-d3ec-4a76-8f5e-94593e1e3264',
         kind: 'arc',
         cx: 0.3079637174842679,
         cy: 0.05780409093239953,
@@ -16164,7 +16164,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '17399497-e196-467c-8e8b-f9c5e2a372bb',
+        id: '521a0355-21ac-43f4-86f8-0d022960f96c',
         kind: 'circle',
         cx: 0.49559961042041034,
         cy: 0.8016233253011552,
@@ -16176,7 +16176,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9b94692d-5b69-4935-8293-2f7fd0e04c57',
+        id: '4dd1ad1a-f737-4513-9f7c-bd4fcf2e9b6c',
         kind: 'line',
         x1: 0.5563750627746904,
         y1: 0.6934810161858678,
@@ -16189,7 +16189,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f8827163-6e5c-4b0d-a65e-d0d16b5b1326',
+        id: '9349c62b-0b6d-4033-9b07-1b436648fd45',
         kind: 'line',
         x1: 0.92680808419281,
         y1: 0.3617096897125114,
@@ -16202,7 +16202,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f17f6222-8faa-43ea-b496-6acd8ba7dad1',
+        id: '8bdfa1e9-cf4f-4d45-9525-a5c167061995',
         kind: 'line',
         x1: 0.43154374890688973,
         y1: 0.6903605599088514,
@@ -16215,7 +16215,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a52a4cb5-5e5e-4827-971b-6e57358d4edd',
+        id: '7013646c-6e07-45b9-8563-89d24915e3d7',
         kind: 'line',
         x1: 0.06402071209200177,
         y1: 0.36336771244364335,
@@ -16228,7 +16228,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0ab47460-11a6-4027-a349-35c6b5553a8b',
+        id: 'b876cd79-5551-45e8-94f2-872027d7f5e2',
         kind: 'line',
         x1: 0.06070528024479278,
         y1: 0.24259860973018887,
@@ -16241,7 +16241,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3b1fcbed-42a9-43e0-a0eb-a53d170aa4c0',
+        id: '1479e3a0-8ea1-4e21-a573-a8470ce11999',
         kind: 'line',
         x1: 0.23973859999408484,
         y1: 0.2507586842378548,
@@ -16254,7 +16254,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b57f068e-a3af-4d69-85d2-4238ac901481',
+        id: '69835275-e669-45b3-a460-3b74d46cc907',
         kind: 'line',
         x1: 0.7552882522351015,
         y1: 0.054916896053874675,
@@ -16267,7 +16267,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c147136c-b6e5-4f26-9756-4844761b3b1e',
+        id: 'cf350620-8705-4737-ad44-0b8d0ad3f9a9',
         kind: 'line',
         x1: 0.9405233573248337,
         y1: 0.05298012552555138,
@@ -16301,7 +16301,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '452c587f-a88d-462a-b68b-4257c5a4a75b',
+        id: '1d511c87-6683-40ce-852f-e848ba7f9be6',
         kind: 'circle',
         cx: 0.2785230318265809,
         cy: 0.7581689439410445,
@@ -16313,7 +16313,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b49cac61-88b9-4cdd-b3aa-7f465f2c7da1',
+        id: '3db8e130-deaa-423f-bf5e-15163f2a9898',
         kind: 'line',
         x1: 0.3707758101014044,
         y1: 0.6123463877472597,
@@ -16326,7 +16326,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '93d0f685-9e4e-4846-92f6-15ac6e83b014',
+        id: '984945bf-f334-401f-8fb6-0ff0f3bb1617',
         kind: 'line',
         x1: 0.9330665716962395,
         y1: 0.16497529595217636,
@@ -16360,7 +16360,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '0b48a4d2-112b-4cac-9dbd-56739e78dc90',
+        id: 'a46f1144-7074-40f0-aaa1-d69262a6659f',
         kind: 'line',
         x1: 0.9305024281405924,
         y1: 0.5736673544845629,
@@ -16373,7 +16373,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f733505f-da0e-48ea-9f7e-e0e7e41cda7d',
+        id: '7295ddc5-d382-4003-adf0-b1fa93ae2aec',
         kind: 'line',
         x1: 0.9305024281405924,
         y1: 0.677489192497167,
@@ -16386,7 +16386,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'caefa609-4a11-4a50-bb06-61c811d7bac9',
+        id: 'bf6caa7f-03d9-47a8-99b8-59e9e9abac92',
         kind: 'line',
         x1: 0.9305024281405924,
         y1: 0.7786714922552135,
@@ -16399,7 +16399,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '56e8d545-6723-4d21-adaa-54875aa84f70',
+        id: 'b75c26d7-044a-4351-ad4f-db2b96233736',
         kind: 'circle',
         cx: 0.28129545363950553,
         cy: 0.47600443906592654,
@@ -16411,7 +16411,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fa45b863-3052-45d0-883e-354973806b4f',
+        id: 'bad1b567-e85c-4940-ae3c-bd91ceccedb0',
         kind: 'line',
         x1: 0.08000924802085538,
         y1: 0.1745056889533435,
@@ -16424,7 +16424,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '09559577-b4d0-4778-9fe8-0cd5a26da0df',
+        id: 'eee5ad5d-0614-4432-a196-15c836ea4292',
         kind: 'line',
         x1: 0.6427023866767183,
         y1: 0.8989929119001119,
@@ -16437,7 +16437,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '798e2f53-7504-40bd-bf6a-926bd0757cd5',
+        id: 'ef6ca5f1-e9ce-4577-8d72-638799278842',
         kind: 'arc',
         cx: 0.640527463085302,
         cy: 0.18544561675941892,
@@ -16451,7 +16451,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '744e91de-ea4a-452a-94a4-db93d587e625',
+        id: 'c6b0578e-940c-40a9-a607-8d44b416e0af',
         kind: 'line',
         x1: 0.34556015657432226,
         y1: 0.34670940324832994,
@@ -16478,7 +16478,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'ffeff4ab-17ff-423a-bdfa-eddaa7a75662',
+        id: '33c20e9d-39d7-4791-83d0-fff4de143343',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.475,
@@ -16491,7 +16491,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e44f9e7b-fc33-4b65-8409-7eb6e04caba6',
+        id: '7c18d78c-63da-4eaf-b8de-1d78f08692ff',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.8014028581189456,
@@ -16504,7 +16504,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'befad617-3bf5-49fc-9efc-4391a6aa8d09',
+        id: 'ba021bdd-7494-401b-9de4-27ccfc289fd0',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.6877963670740219,
@@ -16517,7 +16517,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ea507ad3-2234-470d-a940-9c6d58fb44d6',
+        id: 'ef914c6f-8a4f-4a7e-b5f3-69dd09c01f59',
         kind: 'line',
         x1: 0.6306407930901069,
         y1: 0.2068511360724353,
@@ -16530,7 +16530,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1e5d38c9-4d1e-4239-a73c-dce1346bcb5f',
+        id: 'd0dfe132-54d6-43a3-800f-0a3ffb2e8b8c',
         kind: 'line',
         x1: 0.07183321256834219,
         y1: 0.03367818540337897,
@@ -16543,7 +16543,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b654e27d-3de1-4a66-a695-c09b679fda05',
+        id: '58140544-bccf-40b5-8a3a-08db379f2491',
         kind: 'circle',
         cx: 0.2673006590045338,
         cy: 0.36135685823681535,
@@ -16555,7 +16555,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1d3ad006-614d-4761-9817-c58db058c423',
+        id: '965b6e8c-3e0d-4913-91f1-4bf0c0a2443a',
         kind: 'line',
         x1: 0.31645884160115667,
         y1: 0.2110306059587812,
@@ -16568,7 +16568,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f444b33a-6221-4d02-981d-11cc51e12bb5',
+        id: 'd9953a4a-e604-4bcd-b04f-25b2f828107e',
         kind: 'arc',
         cx: 0.6251974267113524,
         cy: 0.04444830016229609,
@@ -16582,7 +16582,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8daa404b-187d-496a-9453-715cb0672ffe',
+        id: '0822ceb3-42b9-44ba-887d-f93aff9efcf9',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.5795891187083495,
@@ -16595,7 +16595,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bd6dfe57-93ec-4b8e-967d-8f6fd4626df3',
+        id: '1d3798e5-3b4a-425a-8921-45f9c1ec3537',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.9073663441439253,
@@ -16622,7 +16622,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '61b46370-457f-48c3-9d23-400466c75347',
+        id: '2c360c6b-a291-4453-b467-cb2a41065204',
         kind: 'line',
         x1: 0.07548264989329587,
         y1: 0.47569846150282863,
@@ -16635,7 +16635,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c78d0be5-b6fc-44c6-a31f-1007ddd1835b',
+        id: '6f566533-d1cf-4f62-9311-b963290d4e25',
         kind: 'line',
         x1: 0.5072379430344937,
         y1: 0.24380769846922323,
@@ -16648,7 +16648,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3c288126-9ae4-47fa-b860-3494426dfd3d',
+        id: 'ebb3af2c-6337-4703-b64d-fee37c6ca1f6',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.24562879277864894,
@@ -16662,7 +16662,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7464b42f-c20d-4d8d-8a55-f3b6b80a341c',
+        id: '313d706a-b70f-46d5-a5f9-c77ff62baee6',
         kind: 'circle',
         cx: 0.26859721788355645,
         cy: 0.709031794836162,
@@ -16674,7 +16674,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '879ad1ff-d9da-4ab2-a769-f074d7ae27ce',
+        id: '79562a6c-5529-418a-922c-f8a607a02ac9',
         kind: 'rect',
         x: 0.6578947368421053,
         y: 0.5756984615028287,
@@ -16687,7 +16687,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '748eafd2-a36d-473a-958a-552b186894c6',
+        id: 'bcf11835-f6e9-4f9f-bcc3-c902c3f239b0',
         kind: 'line',
         x1: 0.5031142288406643,
         y1: 0.47569846150282863,
@@ -16700,7 +16700,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '12c13cbd-7720-4346-a93e-f5398bbbf3da',
+        id: 'e1103144-469e-4cfb-81b1-6b9639a489ef',
         kind: 'line',
         x1: 0.5031142288406643,
         y1: 0.47569846150282863,
@@ -16713,7 +16713,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6173573f-491a-413b-9fc7-de6609f589e9',
+        id: '7651d0fc-0dca-4f8a-b186-cfb513cad85d',
         kind: 'line',
         x1: 0.2698733445829209,
         y1: 0.7312302188155635,
@@ -16726,7 +16726,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bd31dd54-fc57-4b54-b140-a77b529e5568',
+        id: 'f6be2822-b875-4396-9de1-33a5173185a6',
         kind: 'line',
         x1: 0.2592193327580561,
         y1: 0.7987056270397069,
@@ -16739,7 +16739,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '94d366f0-09df-4a1b-9a73-affc58155b16',
+        id: '4bb24f44-4aa9-43f7-aad2-2d3e34b36acc',
         kind: 'line',
         x1: 0.7237342483221603,
         y1: 0.6329860244412104,
@@ -16752,7 +16752,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3d60d5db-17b5-4b86-8dd9-82e68b813549',
+        id: '9f48f25c-3abb-476e-bee5-60cabf5fbc16',
         kind: 'line',
         x1: 0.7290612542345926,
         y1: 0.7047798587916992,
@@ -16765,7 +16765,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e5c65234-829a-416f-a7c4-697cd819116c',
+        id: '88a38fef-10cd-44f3-84b7-afa0aa2cfa03',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.027428936765462358,
@@ -16800,7 +16800,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'c66b016b-5967-4e9f-8145-e5cb4d22406a',
+        id: '63807bc7-2f64-42b2-af06-ee30c05270bb',
         kind: 'line',
         x1: 0.07548264989329587,
         y1: 0.5754282292068076,
@@ -16813,7 +16813,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cf672325-e427-4eb3-9b5e-97a0393f6f61',
+        id: 'bafc99d6-963e-4d99-b2c8-7fb3e2f85390',
         kind: 'line',
         x1: 0.502891731576698,
         y1: 0.3332287539909318,
@@ -16826,7 +16826,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd6800b89-aef7-41aa-8455-c02b82cfe50a',
+        id: 'd2ad8ac7-f130-43e3-b68c-f5439b3e3108',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.04481265054182081,
@@ -16840,7 +16840,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f77ebe71-5149-49ad-90d2-668b8db04680',
+        id: 'dcbdfdbf-c727-4bef-aa09-e3b7c113d751',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.2886870168672937,
@@ -16875,7 +16875,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '9e4cdeb3-4606-4756-86f3-0858d84d52f8',
+        id: '1e5b9746-c090-4c3a-b67c-3254c0f29eae',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.475,
@@ -16888,7 +16888,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ce2d757f-eaf8-4103-83ea-d85b428cf966',
+        id: '4bd73172-e7f3-4f34-84fa-c1732d3e5f50',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.8014028581189456,
@@ -16901,7 +16901,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b5e35b67-5a2e-4ebf-a86d-12b85d98681f',
+        id: '356bd0af-5b1a-4628-bea9-9139ffa7512a',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.6877963670740219,
@@ -16914,7 +16914,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '295933c4-8594-4b20-9f5d-25a1e5af16fa',
+        id: 'b3d1c431-1ca8-416a-94a9-031e3f3c7c97',
         kind: 'line',
         x1: 0.6306407930901069,
         y1: 0.2068511360724353,
@@ -16927,7 +16927,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3c6b3d87-aa7b-475d-8c69-13b316abc9a4',
+        id: '45238ee5-38a8-4aa6-8934-76c99722a8f3',
         kind: 'line',
         x1: 0.07183321256834219,
         y1: 0.03367818540337897,
@@ -16940,7 +16940,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fb030778-6d5b-467f-b29b-de8bfa1fcf4b',
+        id: '823b1cbc-a7e3-4755-935b-c30448ddb5d2',
         kind: 'circle',
         cx: 0.2673006590045338,
         cy: 0.5770314661174775,
@@ -16952,7 +16952,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3ae5710a-3af5-4d6b-9b7a-2ad9f4863c9a',
+        id: 'a83a2f7c-585e-4988-9e5c-8678d29f4774',
         kind: 'line',
         x1: 0.31645884160115667,
         y1: 0.2110306059587812,
@@ -16965,7 +16965,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '08335f90-b9a4-49ba-8dd5-4caf4eb2b88d',
+        id: 'd7e709c6-cd5b-4f01-a791-92a264134650',
         kind: 'arc',
         cx: 0.6251974267113524,
         cy: 0.04444830016229609,
@@ -16979,7 +16979,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '970f761f-9a84-449d-a70c-c936b4fb8d11',
+        id: 'a1ef3f73-9666-4d09-a3d6-ee08038184c8',
         kind: 'line',
         x1: 0.9502262443438914,
         y1: 0.5795891187083495,
@@ -17013,7 +17013,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '8f8e95e1-884c-416c-944b-b699ca8797cf',
+        id: 'da94561f-93ea-46dc-b3c9-d8e282721ebb',
         kind: 'line',
         x1: 0.07548264989329587,
         y1: 0.7262904327290525,
@@ -17026,7 +17026,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7f625b05-6c3f-4fbc-9f9f-0f034a17c669',
+        id: 'e836c1b7-a4db-4def-a9cc-94e7dc89d45f',
         kind: 'line',
         x1: 0.49999999999999983,
         y1: 0.217811096415067,
@@ -17039,7 +17039,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd0acdfd3-23fe-434c-97f1-0a49539c5b6d',
+        id: '516e7fef-0f77-4165-b2f8-b0d420f28e2f',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.3651770528042696,
@@ -17053,7 +17053,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0a556c32-dd45-473e-8d0f-f2a0cd23bb54',
+        id: '344553bd-3310-4631-9070-4a35937c3c5e',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.5311471076646609,
@@ -17067,7 +17067,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '93ef28ef-e794-47c3-be2e-32359326a616',
+        id: '374af82f-24d1-4d1e-a151-a0e58ba69d89',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.20005220429542925,
@@ -17081,7 +17081,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f5f7e5f8-0738-419d-acca-f3279bca56c8',
+        id: '293aaaa1-7231-4341-88e3-968fa80b6688',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.034927355786588954,
@@ -17116,7 +17116,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '9f9d82a5-bbd6-4e12-bb7b-3dbd1be0a4c4',
+        id: '5b5b12df-7593-4b52-be19-dfb0bf01660a',
         kind: 'line',
         x1: 0.07548264989329587,
         y1: 0.6741273618889446,
@@ -17129,7 +17129,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6a453dba-909e-4e32-9d3f-bcd021e39f0a',
+        id: 'b374fa68-0db8-4837-8fa5-5e7d8647726f',
         kind: 'line',
         x1: 0.5,
         y1: 0.28076238612447185,
@@ -17142,7 +17142,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7b7ceeaf-4e27-4edc-8cd6-5f413ae11b80',
+        id: '9e5b6cac-425d-4f4f-808b-3346a0f45faf',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.26787480947356385,
@@ -17156,7 +17156,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '94436db6-3cfc-4ed5-96a0-aa4713eec4c9',
+        id: '6ff9fad9-7ece-4d75-9230-0ffa6f27e659',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.454591121191504,
@@ -17170,7 +17170,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '741ae41d-c732-4656-8cfc-024c15b82f2f',
+        id: '18c4d709-052a-49c0-b526-cd92818ad5e4',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.08210935490111848,
@@ -17205,7 +17205,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'b666ccc5-23a4-403a-b636-a65a038ebde9',
+        id: '7025c0a9-f8ee-400a-b8c5-ad9b33082405',
         kind: 'line',
         x1: 0.07548264989329587,
         y1: 0.32653061224489793,
@@ -17218,7 +17218,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5b4dc2a3-9c01-471e-84ff-90ae100b8272',
+        id: '9cb97f41-4ce3-4ea9-b634-ef707000be78',
         kind: 'line',
         x1: 0.502891731576698,
         y1: 0.3332287539909318,
@@ -17231,7 +17231,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b05d3cee-7ab2-48d3-9412-c125c28436e6',
+        id: '5553eaeb-a74c-4884-92c3-ec174b7a0f35',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.04481265054182081,
@@ -17245,7 +17245,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b5c16980-cc7f-47bf-bed4-81d5ec1ecf1f',
+        id: 'b769c0bc-0a05-4981-b966-f43cfc7ca42c',
         kind: 'circle',
         cx: 0.26859721788355645,
         cy: 0.6122448979591837,
@@ -17257,7 +17257,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fd950d95-b537-4114-b8ce-1e64d639b93d',
+        id: '8769b19a-1e81-413f-b318-62b2914f57a9',
         kind: 'rect',
         x: 0.6578947368421053,
         y: 0.4489795918367347,
@@ -17270,7 +17270,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7ef0d83f-91bd-4ce0-8dca-b54957a797ca',
+        id: '26211d41-2c49-418d-90f3-685c900630d8',
         kind: 'line',
         x1: 0.5031142288406643,
         y1: 0.32653061224489793,
@@ -17283,7 +17283,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '88c04c5a-1237-4751-b4a9-a69b9b05b0f1',
+        id: '7f2d88fd-ec68-415d-97a5-1cba89f83f58',
         kind: 'line',
         x1: 0.5031142288406643,
         y1: 0.32653061224489793,
@@ -17296,7 +17296,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '310f9b94-35b4-4eb4-97c2-425c3539ad21',
+        id: '1615ae26-7b86-4555-ae05-d99e9aed9e08',
         kind: 'line',
         x1: 0.2698733445829209,
         y1: 0.6394266416074305,
@@ -17309,7 +17309,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7c6eef04-4360-4935-83f7-41d9e52a05e6',
+        id: '5e848acf-51ef-4174-8b80-b3f1fb9a13b3',
         kind: 'line',
         x1: 0.2592193327580561,
         y1: 0.7220495904533204,
@@ -17322,7 +17322,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '14fe55ad-55cb-4a7a-9161-e8a1d0ef2d05',
+        id: '61eced53-6605-42de-9bcf-25ab9ab5cd96',
         kind: 'line',
         x1: 0.7237342483221604,
         y1: 0.5191276280878144,
@@ -17335,7 +17335,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a804352e-ac60-402c-899a-95991ac8bc22',
+        id: '3dca5437-db05-4f8e-af30-e2a0f22577b9',
         kind: 'line',
         x1: 0.7290612542345927,
         y1: 0.6070384456598416,
@@ -17369,7 +17369,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '8b4bbb75-283b-4e8c-a057-876e156e1d35',
+        id: 'e7145905-62f7-44d8-af12-eb9149d86318',
         kind: 'line',
         x1: 0.07548264989329585,
         y1: 0.32653061224489793,
@@ -17382,7 +17382,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9828aba9-42d5-4aa0-aae7-cd6eab358f1e',
+        id: '3595a554-409d-4c33-a6f7-72b43f1eb82a',
         kind: 'line',
         x1: 0.502891731576698,
         y1: 0.3332287539909318,
@@ -17395,7 +17395,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a7323577-f543-4016-a711-8548925d129d',
+        id: '8be6c52c-2d3f-4c46-9b3c-3be3f675145a',
         kind: 'arc',
         cx: 0.5043495889651809,
         cy: 0.04481265054182081,
@@ -17430,7 +17430,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'd0fee41b-29d3-4f9a-89ca-b0c97f7088f6',
+        id: 'c475a3f2-9a4c-40df-b933-27ba8609ad74',
         kind: 'circle',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17442,7 +17442,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4ad64ec8-6571-434a-a658-9d8a5206b498',
+        id: '673b36e4-8b98-48e4-8d85-91a0c3b7bb96',
         kind: 'arc',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17456,7 +17456,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2d6868d7-8d8a-43c8-9059-d3fb5ab5724b',
+        id: 'a28a8945-3075-4f31-b348-0b0b6ff5ea22',
         kind: 'arc',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17470,7 +17470,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bcb486a1-dd2d-4936-88b5-3626796c9e84',
+        id: '2c2a5afb-b07f-4648-b292-b97bc7e71faf',
         kind: 'arc',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17484,7 +17484,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e4aa8bee-cc0f-4b4e-b8d6-5d3c69688f61',
+        id: '0404330c-2100-4774-b40e-1e0d616f07fd',
         kind: 'arc',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17498,7 +17498,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '715e7400-f62d-4697-9cda-3cbefa22a5b4',
+        id: '8916cd49-13b6-4151-8d57-d473e7725413',
         kind: 'circle',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17510,7 +17510,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6636c93d-ce3f-4dd1-b0a6-2f4ec21ff2bc',
+        id: 'cb68000a-5528-4f83-a539-b970d4ccb0b0',
         kind: 'arc',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17524,7 +17524,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd237d969-8a58-4b01-af8b-d91e17158686',
+        id: '7b02c624-2a80-470f-88d6-b55f16114ef0',
         kind: 'arc',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17538,7 +17538,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd4579cef-040b-463a-ac9f-3ec34b482a03',
+        id: 'a67de309-226b-4bba-be18-863cb216366d',
         kind: 'arc',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17552,7 +17552,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c223a396-3867-45a7-8afb-9da370b0b7c2',
+        id: '7ef48cf7-fba0-4292-ad8f-c33f0106e9ef',
         kind: 'arc',
         cx: 0.4948272632173463,
         cy: 0.49531005198372763,
@@ -17580,7 +17580,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'a5373a93-6394-4ad0-93ad-aaae65150240',
+        id: '5737bf0a-0e5c-485c-bfb5-908713053343',
         kind: 'rect',
         x: 0.05078486816740043,
         y: 0.04627797749448992,
@@ -17593,7 +17593,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9886309a-26ed-4847-a2ec-4840a75c0119',
+        id: '6b6a5813-5964-4663-a9a3-61175f148b96',
         kind: 'line',
         x1: 0.05078486816740043,
         y1: 0.04627797749448992,
@@ -17606,7 +17606,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '85d1f90d-b1da-4221-a1f0-15fb57c57e8d',
+        id: '288efb43-b1ce-4671-8f1e-550a5a26135b',
         kind: 'rect',
         x: 0.15392778880374106,
         y: 0.3427243405386948,
@@ -17619,7 +17619,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '49566976-50e2-4171-ba3e-991d572c148f',
+        id: '5970bb0d-dc28-4593-b0a6-508ecb800913',
         kind: 'line',
         x1: 0.38149708989027054,
         y1: 0.36197410437273425,
@@ -17632,7 +17632,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '52423a56-6992-482d-8e25-f5278daf8485',
+        id: 'f98ecbd7-298b-417f-859b-5d3f62d018ef',
         kind: 'line',
         x1: 0.37494833302447106,
         y1: 0.610296057831841,
@@ -17645,7 +17645,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '77c4db8d-c01c-47be-97c5-eb86576d3973',
+        id: '7c21aab0-eb0e-4563-82a3-dee1bbc82445',
         kind: 'line',
         x1: 0.6520028531097801,
         y1: 0.48858804452860216,
@@ -17658,7 +17658,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e516d3bf-4f5f-4ddc-89c9-3d48aadbb708',
+        id: '85854809-e46d-44ca-b6a1-1acf546d9fc6',
         kind: 'polygon',
         points: [
           {
@@ -17681,7 +17681,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'af666e11-767c-4931-be76-4adbc1bb7bc8',
+        id: '69403fdc-2f00-441a-98fe-7cca9e479b03',
         kind: 'polygon',
         points: [
           {
@@ -17718,7 +17718,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '1e3fc735-8669-472d-8753-4809f63e1407',
+        id: '7c073139-bf83-4f1d-b832-44ab994db88c',
         kind: 'rect',
         x: 0.2542086187865057,
         y: 0.5389516254365961,
@@ -17731,7 +17731,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4bc3c000-29c8-448c-a167-183dbc16a3ea',
+        id: '9ea19d5d-e99d-4f82-80ec-9aa4cd7067d7',
         kind: 'line',
         x1: 0.04771103056181802,
         y1: 0.08842193288675396,
@@ -17744,7 +17744,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '878f5bb0-92c0-43df-bb25-dab0b86782a4',
+        id: '09f83932-99c8-4fcc-a432-681967e96df0',
         kind: 'line',
         x1: 0.9333690142448453,
         y1: 0.09246255793204418,
@@ -17757,7 +17757,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '746327ba-e599-4b33-9372-56ab895ec25f',
+        id: '90f4017e-be8a-4a0a-8802-6890855e2ba3',
         kind: 'line',
         x1: 0.06533734690666258,
         y1: 0.0954930267160117,
@@ -17784,7 +17784,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '02d4f701-235f-4f10-8a85-d49db5006de6',
+        id: 'a1e0e555-d929-489b-840d-b3a41dff4d5b',
         kind: 'rect',
         x: 0.05128985005383218,
         y: 0.032633795988297395,
@@ -17797,7 +17797,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5f5aa26d-ec5a-43ee-a37c-36987386fb0e',
+        id: '1415b4c2-694d-4cb9-9d7c-54466a2a69a5',
         kind: 'circle',
         cx: 0.4322998721133852,
         cy: 0.2711144043226119,
@@ -17809,7 +17809,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '43fb7763-3fbe-421e-876a-c50e4cfb4923',
+        id: '0b290694-e977-477e-aab4-78eafe679e71',
         kind: 'rect',
         x: 0.22762506687478218,
         y: 0.14049432008970933,
@@ -17822,7 +17822,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7bbed3b5-1f70-4c0b-99de-58262632471b',
+        id: 'ead7c9f6-6c54-406a-9d96-3c0c9af3f1df',
         kind: 'line',
         x1: 0.6117839320918521,
         y1: 0.15632705757248536,
@@ -17835,7 +17835,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '60edf2d4-a375-4037-8eb3-70a263431ba0',
+        id: 'c1563af5-cd7d-4579-b600-ba5d3a3e6155',
         kind: 'line',
         x1: 0.25439023371367664,
         y1: 0.15731660366515893,
@@ -17848,7 +17848,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f8715c9a-3bec-4b18-93e2-e9a9747f776a',
+        id: '465837cd-c1d0-4d53-ba3b-d57aff056213',
         kind: 'line',
         x1: 0.06860848742017545,
         y1: 0.5006890978228649,
@@ -17861,7 +17861,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5943d9c0-3b3b-4266-a025-fb1753590af2',
+        id: 'cc83681e-1c96-49b7-8d77-5afd34e748d8',
         kind: 'rect',
         x: 0.16779704688195987,
         y: 0.6530791960945846,
@@ -17874,7 +17874,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a39d3282-9a53-434a-9916-6fa9de5cf8da',
+        id: '4051f456-e851-40d7-a17d-7762af3bfc1f',
         kind: 'line',
         x1: 0.3866416463293892,
         y1: 0.6629746570213197,
@@ -17887,7 +17887,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '23282a6e-c51d-4321-aaa9-dbba6ccf8d9f',
+        id: '3d411980-74f4-4292-a09c-a9f22838c1fc',
         kind: 'line',
         x1: 0.3803439600143552,
         y1: 0.7906261029762018,
@@ -17900,7 +17900,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bf8dfeb9-10e4-478e-8826-47ac02ec84ca',
+        id: '4be8c198-4cf3-4626-b9be-dfe4aaeae79f',
         kind: 'line',
         x1: 0.6467765815660422,
         y1: 0.7280613411175089,
@@ -17913,7 +17913,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '10d9a3ff-6062-41e6-b0ed-3947ca6a607b',
+        id: '709015bf-4a6a-4668-9185-6b875fab45d1',
         kind: 'polygon',
         points: [
           {
@@ -17936,7 +17936,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a6d7817c-c011-4e04-b611-2215b9325492',
+        id: 'c85b00e0-b8ec-456f-9c54-380dc597aedb',
         kind: 'polygon',
         points: [
           {
@@ -17973,7 +17973,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'bf86a30a-18de-4e4e-8968-ffa47e95c4d8',
+        id: '2f255ad8-3007-4f6f-bf2b-46c7334d09ca',
         kind: 'rect',
         x: 0.043339270785441496,
         y: 0.06701515844976877,
@@ -17986,7 +17986,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6faf1cab-b941-436b-910d-7dccb73a7deb',
+        id: '24a6aee2-ce15-4473-872d-ae256d4c94a8',
         kind: 'polygon',
         points: [
           {
@@ -18030,7 +18030,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'ea89a65d-324f-4f6d-a2a5-d54b1b8673d6',
+        id: 'e78129bb-8a88-4a04-a57a-b1a58325c5d2',
         kind: 'line',
         x1: 0.6962153001912466,
         y1: 0.9008509920986328,
@@ -18043,7 +18043,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '71b78b0e-1c55-46c9-9314-39d76b3f34c9',
+        id: '393dc7ba-e2a9-4fe2-82e8-33fbbe737bfc',
         kind: 'line',
         x1: 0.7379111472961711,
         y1: 0.6063389718894645,
@@ -18056,7 +18056,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0b9c75e4-32fa-477c-b48c-ec7add542065',
+        id: '11cc182f-8798-4630-bc38-91061b14b976',
         kind: 'line',
         x1: 0.6994675380246791,
         y1: 0.8932859779445343,
@@ -18069,7 +18069,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b79fc1ef-5a30-4756-a323-b75028476489',
+        id: '41bb2a05-30a2-45f8-892a-04e1587a961c',
         kind: 'line',
         x1: 0.27643157262381046,
         y1: 0.6665816873475682,
@@ -18082,7 +18082,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3ba258ec-ba13-42f7-8287-d2093860228f',
+        id: '59ac9025-dbba-4911-b0d5-b22aef34102f',
         kind: 'line',
         x1: 0.30846331849078856,
         y1: 0.5858937962313424,
@@ -18095,7 +18095,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '04b4c289-32b6-4dac-b6df-28c530b4b1e0',
+        id: '5d1d4e1a-4b27-4571-adb3-61cb0df1d4f2',
         kind: 'line',
         x1: 0.25505915592678774,
         y1: 0.5641026723375785,
@@ -18108,7 +18108,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '480d6f20-7a3a-4d09-86db-8102bdc5c5ec',
+        id: '292dd6db-1066-4ce8-a418-912d471908ca',
         kind: 'line',
         x1: 0.27097753660729346,
         y1: 0.46562172221709364,
@@ -18121,7 +18121,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1b9f667f-386c-4c2b-83a3-c97f10ae0bbf',
+        id: 'cb91846f-274c-4a78-8a54-2087fea287e2',
         kind: 'line',
         x1: 0.9115439481900695,
         y1: 0.9172818912947229,
@@ -18134,13 +18134,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f055738b-c50d-4af5-9853-090bd2de1c03',
+        id: 'cf45cbc9-166e-45f4-bbcb-54f722d132ff',
         kind: 'arc',
         cx: 0.49725527582151097,
         cy: 0.9172818912947233,
-        radius: 0.409536351033004,
-        startAngle: 0,
-        endAngle: -3.141592653589793,
+        radius: 0.819072702066008,
+        startAngle: -3.141592653589793,
+        endAngle: 0,
         style: {
           stroke: '#000000',
           strokeWidth: 0.02,
@@ -18169,7 +18169,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '25fe39cc-21ae-4460-ac09-1d22e1fe017e',
+        id: '0458f55e-17f0-4130-8f06-30d55b6ea04f',
         kind: 'line',
         x1: 0.2686728015267202,
         y1: 0.9425130393869293,
@@ -18182,7 +18182,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ea3d3c1d-c759-4fb1-b627-102884d177ce',
+        id: '5932391a-d2df-4ed9-b605-80d1e0f7474d',
         kind: 'line',
         x1: 0.7803763741900677,
         y1: 0.9425130393869293,
@@ -18195,7 +18195,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ebfd3eb5-d07b-4a97-a703-64f1515f3ba5',
+        id: '4ec5bf43-c3b8-432f-98b3-7423da224b50',
         kind: 'line',
         x1: 0.28526070684206495,
         y1: 0.9425130393869293,
@@ -18208,7 +18208,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'af35da83-69c2-4539-bdca-5e7d65e25c18',
+        id: '6e1752d9-1dde-45fd-ac98-7be26a223366',
         kind: 'line',
         x1: 0.285260706842065,
         y1: 0.2125812753264237,
@@ -18221,7 +18221,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7deb742e-e094-4f0e-9adf-50bd25ddc27c',
+        id: '71c02039-16a0-405b-a6ed-799916dea6f1',
         kind: 'line',
         x1: 0.4427929895995294,
         y1: 0.24674545720812943,
@@ -18234,7 +18234,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '61d74071-b9ab-46ad-944f-58fc8d7a1c0d',
+        id: 'a5509030-bda0-486d-8d85-4977c5f1b037',
         kind: 'line',
         x1: 0.42539623696187123,
         y1: 0.16045739635089537,
@@ -18247,7 +18247,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a0c58f68-852e-4557-80b3-f508c3e927d1',
+        id: 'b4e6eb25-0597-4a05-a4b2-7418e8020559',
         kind: 'line',
         x1: 0.6040760461456924,
         y1: 0.16045739635089537,
@@ -18260,7 +18260,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '06b2df4f-ea37-4311-8c87-d029b4ffd444',
+        id: '0b100679-ff1c-412c-ae61-e8b2679fe29f',
         kind: 'arc',
         cx: 0.5181095748048326,
         cy: 0.26583929309338505,
@@ -18274,7 +18274,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '32744834-bf81-441c-99bb-c45fa090e1d1',
+        id: 'df1d6fe0-1fa3-492a-a680-b5af6126a994',
         kind: 'polygon',
         points: [
           {
@@ -18297,7 +18297,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8292ef77-f4e9-4a02-99cc-ebe35d71bc4a',
+        id: '3f51c981-18e4-47b3-b99d-9ee261f76648',
         kind: 'polygon',
         points: [
           {
@@ -18341,7 +18341,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '03f69c2c-6369-4184-be9a-037d1ee62e5c',
+        id: 'dbdedd67-6191-4192-8d3a-f2abbbd8ed77',
         kind: 'line',
         x1: 0.11494515655591371,
         y1: 0.9712902639874738,
@@ -18354,7 +18354,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f50d67d8-b7ef-4418-ba46-202ccb6ada2e',
+        id: '88567516-cd68-4521-a346-88165266afb1',
         kind: 'line',
         x1: 0.8796286438832064,
         y1: 0.9712902639874738,
@@ -18367,7 +18367,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '84d2c36f-4baf-4ad4-8f67-e3e84fe3afda',
+        id: 'f9da19e7-5af6-4060-abeb-a782ef06a705',
         kind: 'line',
         x1: 0.13695514286120244,
         y1: 0.9712902639874738,
@@ -18380,7 +18380,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '129e73d3-acea-4ba9-be57-c17721b439c0',
+        id: '5cf3bf4a-76b5-4bb1-a4e6-3af503d22b9c',
         kind: 'line',
         x1: 0.13695514286120258,
         y1: 0.09537214711486695,
@@ -18393,7 +18393,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0e6ac306-31ab-4e08-8a3f-4fa00b588bfb',
+        id: '057a0db2-e18e-4c67-92a1-aa87d2fe2603',
         kind: 'line',
         x1: 0.373253566997399,
         y1: 0.13636916537291383,
@@ -18406,7 +18406,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1423bd32-f1b5-451e-a0ac-59c750851d5a',
+        id: '0527b9b0-9ac6-4756-b72b-7cc512e1bd7c',
         kind: 'line',
         x1: 0.3467543183679379,
         y1: 0.03282349234423279,
@@ -18419,7 +18419,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '16a3ee0a-8944-4694-b80f-3b52ffd23a3f',
+        id: '5bd60fd3-f5cb-4050-80be-85d03384781c',
         kind: 'line',
         x1: 0.6151781518166439,
         y1: 0.03282349234423282,
@@ -18453,7 +18453,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '7e41f6ff-93f0-4b23-a7a3-2ceaa42efdd1',
+        id: '7a7fe6df-868d-4544-a4b4-84e78fca79ed',
         kind: 'rect',
         x: 0.08760807025084769,
         y: 0.05326896124293062,
@@ -18466,7 +18466,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b94522a9-9a59-49dd-b510-175f4ac2ad36',
+        id: '9e0924a2-4483-4f16-816b-322c4c72a67e',
         kind: 'rect',
         x: 0.1919191919191919,
         y: 0.11320754716981132,
@@ -18500,7 +18500,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'b6a2e1be-3dea-43bc-bc80-a77e75311d80',
+        id: 'ff855864-b7f6-47cf-9880-20e5dc141ba3',
         kind: 'rect',
         x: 0.04950495049504951,
         y: 0.03773584905660377,
@@ -18513,7 +18513,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4373db11-f874-4e47-b911-8899e8bcbfa0',
+        id: '10fa1a3c-2d72-4301-95eb-b21cd46d4d4d',
         kind: 'circle',
         cx: 0.2871287128712871,
         cy: 0.25660377358490566,
@@ -18525,7 +18525,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ec1593ce-9bcf-40cf-ada7-5a3fcde0f248',
+        id: '703456c1-4ba1-4889-a529-e2e7cb1476f2',
         kind: 'circle',
         cx: 0.7128712871287128,
         cy: 0.25660377358490566,
@@ -18537,7 +18537,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0d186656-099c-4514-aaf6-0495a8a641e8',
+        id: '3bcb8eb2-2264-432f-b388-6f917db00694',
         kind: 'circle',
         cx: 0.2871287128712871,
         cy: 0.5018867924528302,
@@ -18549,7 +18549,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0c78c29c-f9d9-4142-b286-ede6a7fcdb6d',
+        id: 'a578eff2-a0d2-4028-b372-3add03086231',
         kind: 'circle',
         cx: 0.7128712871287128,
         cy: 0.5018867924528302,
@@ -18561,7 +18561,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f39528a0-314c-4460-a14e-37afb6351d0b',
+        id: '2fdb0250-5055-40b1-a328-6d4dd92e05f8',
         kind: 'circle',
         cx: 0.2871287128712871,
         cy: 0.7471698113207547,
@@ -18573,7 +18573,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd08aa7a1-0c80-482e-b326-263e71586d72',
+        id: '43dd59e7-3d3b-4bc6-ba93-2da011fbde34',
         kind: 'circle',
         cx: 0.7128712871287128,
         cy: 0.7471698113207547,
@@ -18599,7 +18599,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'cb7f0c7c-35af-4d9a-a35e-cd6134f7b9f0',
+        id: 'efdba2ac-c509-4e9a-981c-d197839c9161',
         kind: 'polygon',
         points: [
           {
@@ -18622,7 +18622,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b7a16345-9fe3-45b6-952d-a274b315abca',
+        id: '97f41cbb-0df6-4f00-baac-07f9b1ce444d',
         kind: 'line',
         x1: 0.5041379010414713,
         y1: 0.3722920224034425,
@@ -18635,7 +18635,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '91ce8cf2-7fbc-4ab5-b905-c2a797a02b47',
+        id: 'f3c318fd-0db7-4592-9f05-ce7f8e189b9d',
         kind: 'line',
         x1: 0.2177910224781142,
         y1: 0.5070852702985942,
@@ -18648,7 +18648,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7823b0ca-c18e-43e4-a163-ef1ab17107c5',
+        id: '2d3c3d7a-17ab-410f-be4d-55a2df443cbd',
         kind: 'line',
         x1: 0.2177910224781142,
         y1: 0.6518774814147904,
@@ -18675,7 +18675,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'f551bc5a-af3e-410d-8316-f65830047579',
+        id: '393c34ec-94ed-42d4-a4fd-fe5319a98f3d',
         kind: 'polygon',
         points: [
           {
@@ -18698,7 +18698,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b1fc139e-ce6d-4992-aef1-d81a725780a0',
+        id: '40584123-4646-4497-9291-616764d47b35',
         kind: 'line',
         x1: 0.5007083915105769,
         y1: 0.35644559463466474,
@@ -18711,7 +18711,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2055344a-040e-4aa0-a9b5-6ff52540272d',
+        id: '65ffa63f-9a0a-4294-befa-f3edb1d3f8dc',
         kind: 'line',
         x1: 0.21630945089663042,
         y1: 0.4875957817758934,
@@ -18724,7 +18724,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b87610b7-24cf-4b8b-9f65-d089bcefebb0',
+        id: '5e07d17a-ff9d-4d80-b064-7a11c824fb28',
         kind: 'line',
         x1: 0.21630945089663042,
         y1: 0.7362228478121778,
@@ -18737,7 +18737,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4e2168df-ded5-4d47-84a4-082863917590',
+        id: 'ef3a749f-46ff-4be3-9e27-407ad2f68af0',
         kind: 'line',
         x1: 0.21630945089663042,
         y1: 0.6526230576746965,
@@ -18750,7 +18750,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f7c12e08-88b1-4ea3-8a35-912ad8a0bb9a',
+        id: 'b765ca20-2d4a-42da-afa8-4126b9e2d449',
         kind: 'line',
         x1: 0.21630945089663042,
         y1: 0.5709942548456015,
@@ -18777,7 +18777,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'e55ae71a-cd4a-4a72-b4d7-9d33dc0bff6f',
+        id: '03b3716c-cf20-4875-b959-9495c1c4c3e7',
         kind: 'polygon',
         points: [
           {
@@ -18800,7 +18800,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ec2a5193-1c0e-40cc-a018-8e455ef08ea1',
+        id: '79ba86e0-7b0b-4fb5-a5fc-1da7ea673f32',
         kind: 'line',
         x1: 0.497325226703073,
         y1: 0.357504624997214,
@@ -18813,7 +18813,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '34d48343-cc93-4296-86f4-3a1f381af498',
+        id: '5137ea6f-cb8a-47f7-af3e-8387738a39ff',
         kind: 'line',
         x1: 0.21484790055273428,
         y1: 0.4890993890440062,
@@ -18826,7 +18826,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '03818516-733b-4d6e-b60a-80e3d39c5156',
+        id: 'a4bebce8-3fb6-4a69-95b1-def895073f23',
         kind: 'line',
         x1: 0.21484790055273428,
         y1: 0.6304558527777843,
@@ -18839,7 +18839,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f39ae910-42ec-4230-86d2-a1642421f365',
+        id: 'e38c9ad6-1f86-4c2b-ae4a-1719c89f0680',
         kind: 'line',
         x1: 0.21484790055273428,
         y1: 0.7851937789858592,
@@ -18866,7 +18866,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '28402b34-e0ad-4f53-9e9c-8badc1a6b070',
+        id: 'c6a5ca2f-bbc7-44d1-a081-fc1fa5ad445e',
         kind: 'polygon',
         points: [
           {
@@ -18889,7 +18889,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0d40b7e6-5190-4fbe-afdc-a157afea2539',
+        id: '2c82f714-acc7-4f3b-b8a5-556535166aac',
         kind: 'line',
         x1: 0.5000000000000002,
         y1: 0.3605062696141456,
@@ -18902,7 +18902,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'df515958-774c-47d4-a28c-81a7cdc7a982',
+        id: '6420d502-0e24-49de-9865-68a8aa6e8f55',
         kind: 'line',
         x1: 0.21560105938605373,
         y1: 0.4952995175092973,
@@ -18936,7 +18936,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '6b8e84f4-2d8c-45d6-879e-62dd809856f3',
+        id: 'e1ac94f6-6d88-4352-b2e0-834883d3e7bd',
         kind: 'rect',
         x: 0.03472389228245123,
         y: 0.05221222858181156,
@@ -18949,7 +18949,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1f119ebd-39d6-4ef7-ac67-2033e9410e35',
+        id: '1972389a-bfc6-4e7e-930c-67120f686df7',
         kind: 'rect',
         x: 0.13619942389602338,
         y: 0.18568101290914046,
@@ -18962,7 +18962,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0134bd86-f40c-4103-9b30-f14d2e670a73',
+        id: 'ed5a91da-3fc8-4feb-82e3-9c7eee7c24af',
         kind: 'rect',
         x: 0.5917649054376937,
         y: 0.18568101290914046,
@@ -18975,7 +18975,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '412caa2e-6915-4d1b-ae05-bbb15da8ee57',
+        id: '1dd1adb5-8441-4b9d-83d1-a4c40807ef47',
         kind: 'line',
         x1: 0.7310187634606854,
         y1: 0.21487730948074366,
@@ -18988,7 +18988,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c2009da3-f59a-4290-9603-16199021e27c',
+        id: 'a865a5df-cf8e-4f20-a4ae-cbd85d1e91eb',
         kind: 'line',
         x1: 0.6090322201379872,
         y1: 0.49849847617631743,
@@ -19028,7 +19028,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'd87f8a51-5685-4c2f-bc12-9704989407b5',
+        id: 'cd9b1462-8c4d-41b8-9e21-6e782888fc68',
         kind: 'rect',
         x: 0.29150994098290123,
         y: 0.2958556749603703,
@@ -19041,7 +19041,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5a1b0e77-20dc-4788-b5f6-dd5da7779909',
+        id: 'b4747161-11e6-4473-9c46-509ff1015fb3',
         kind: 'line',
         x1: 0.29150994098290123,
         y1: 0.6094612951625872,
@@ -19054,7 +19054,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6a47e917-71fa-409c-bcac-1518aa99e9c2',
+        id: '7de5b316-eb21-4178-9933-36ef3b71598b',
         kind: 'line',
         x1: 0.7197264504959685,
         y1: 0.6094612951625872,
@@ -19067,7 +19067,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1638bec2-dbcd-4f6f-bbc5-f430a82ab610',
+        id: '68180a94-cf5c-46ff-a3d1-371229a6194a',
         kind: 'line',
         x1: 0.2772961413773048,
         y1: 0.1405197373217013,
@@ -19094,7 +19094,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'b8752a90-043e-4fbd-854d-4d85ef7d793d',
+        id: '48c5efcc-0231-45d8-ba83-4640c509550d',
         kind: 'line',
         x1: 0.038714063625331425,
         y1: 0.05039966594525945,
@@ -19107,7 +19107,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '525b0ec8-5523-4822-b5b9-b702b42751d2',
+        id: '6020257e-a46a-4b42-8159-11427e16caa0',
         kind: 'line',
         x1: 0.038714063625331405,
         y1: 0.8921928487137943,
@@ -19120,7 +19120,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '07523d19-94b6-4071-8136-fb03fc280b53',
+        id: '263167de-76f6-446a-b2c8-69052541773b',
         kind: 'line',
         x1: 0.9495302183849672,
         y1: 0.878967829768636,
@@ -19133,7 +19133,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '43d8d98b-616e-477c-a7a8-568bdca24126',
+        id: 'aa7c3253-5cf1-4790-b3a5-0fc44ad15ce7',
         kind: 'line',
         x1: 0.6907849372416429,
         y1: 0.09964337024358925,
@@ -19160,7 +19160,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '5b50753a-5e82-4ef7-a72f-3db2e9e23775',
+        id: '02fb2224-b5e7-486d-aaa5-0ee621da49bc',
         kind: 'circle',
         cx: 0.497780364136089,
         cy: 0.4928886332651362,
@@ -19172,7 +19172,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '13aa4457-f396-4e69-b231-7c311849b28b',
+        id: 'f23c3cf9-ebdc-4bba-822a-f4cb3740a30c',
         kind: 'circle',
         cx: 0.497780364136089,
         cy: 0.4928886332651362,
@@ -19198,7 +19198,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'b3a6bc57-caee-4be7-95b3-d3c20e3bb25c',
+        id: '9422da7a-40cb-4351-be0f-1c64dfd46fa5',
         kind: 'rect',
         x: 0.25670919270327,
         y: 0.5408067618336244,
@@ -19211,7 +19211,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5e5a926c-7eb1-4cea-9b2d-9c0282cdf249',
+        id: 'ec4dfe7a-a111-41d2-99a4-d518007437eb',
         kind: 'line',
         x1: 0.038622770932406014,
         y1: 0.08002034862356497,
@@ -19224,7 +19224,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9968e88b-e38d-4835-9d9e-d93df0011980',
+        id: '42cee858-f306-402c-a5c9-4be674330e96',
         kind: 'line',
         x1: 0.9397673715698696,
         y1: 0.08771511564547474,
@@ -19237,7 +19237,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '631c6154-9143-4328-8e52-fe991b2b0454',
+        id: 'a32f96b2-434e-4e9c-bb79-41a2ad9d7db8',
         kind: 'line',
         x1: 0.059676885433839456,
         y1: 0.0946172353224463,
@@ -19271,7 +19271,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'bdea4200-8ab2-4cfb-950e-97b327e2b9ea',
+        id: 'c1dcde8a-13a8-4f77-9bd3-dd8d15499947',
         kind: 'rect',
         x: 0.023357598323955037,
         y: 0.07082021534004827,
@@ -19284,11 +19284,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '554b56c5-2bdc-4a95-b49d-9279c018cf76',
+        id: '67a2053d-6de6-439b-825b-166b8c323a7b',
         kind: 'circle',
         cx: 0.2572463768115942,
         cy: 0.5,
-        radius: 0.17391304347826086,
+        radius: 0.3582089552238806,
         style: {
           stroke: '#000000',
           strokeWidth: 0.07462686567164178,
@@ -19296,7 +19296,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f8d298ec-290e-4211-ad3b-c223f3d24a75',
+        id: '681ffc79-5360-4735-92db-faa332e9d527',
         kind: 'line',
         x1: 0.14419450182146043,
         y1: 0.26714688434867967,
@@ -19309,7 +19309,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7e4c9244-ee2a-4c26-b896-1ec02e69a895',
+        id: '75294cb4-2c92-4834-a184-0cf3b67fa596',
         kind: 'line',
         x1: 0.3680726294804545,
         y1: 0.27173100196563116,
@@ -19322,11 +19322,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '021aaf94-33f6-47ee-a74e-000e1206256c',
+        id: 'ca69ee37-6503-4944-af6d-ab86f08edc60',
         kind: 'circle',
         cx: 0.7427536231884058,
         cy: 0.5,
-        radius: 0.17391304347826086,
+        radius: 0.3582089552238806,
         style: {
           stroke: '#000000',
           strokeWidth: 0.07462686567164178,
@@ -19334,7 +19334,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eadf8469-e81e-4dbc-b4d9-4f024adf308c',
+        id: 'a06fb7d8-b9d0-4526-812a-927d0941e096',
         kind: 'line',
         x1: 0.6312498794445753,
         y1: 0.27033557258733415,
@@ -19347,7 +19347,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc8950a5-0818-4f0e-85dd-598bcc8b22d0',
+        id: '983cdb40-9e24-4162-9d68-2839aceed702',
         kind: 'line',
         x1: 0.8543047342220479,
         y1: 0.27023801010981185,
@@ -19374,7 +19374,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'd84958dc-dada-425a-8967-c125c784d918',
+        id: '7323cf84-96bd-422b-a904-d58b7fdb354a',
         kind: 'rect',
         x: 0.04933366630973292,
         y: 0.018530757626489404,
@@ -19387,7 +19387,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '437edfb4-589b-4363-b546-0f59dfbaf420',
+        id: 'fcec3503-bcc4-46dd-a0c5-a276be60bae2',
         kind: 'line',
         x1: 0.07533364709955614,
         y1: 0.6570361960299942,
@@ -19400,7 +19400,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fcda4c8d-51a8-4712-a82b-92b8ddfc4159',
+        id: '0ac86113-0297-4355-9d8c-904008566d7a',
         kind: 'ellipse',
         cx: 0.23132870799404948,
         cy: 0.8182311103583841,
@@ -19413,7 +19413,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '05f07c0a-d0f7-4b8a-b6ab-e8bcff7f01bd',
+        id: 'dc6c5487-3230-4bd4-b329-cb0219a9f0d6',
         kind: 'line',
         x1: 0.32468490011675843,
         y1: 0.8181016812143501,
@@ -19426,7 +19426,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e25831b4-5aa6-4788-956f-0e18f36f5781',
+        id: 'af592208-0006-480d-859a-8236af8f6015',
         kind: 'line',
         x1: 0.6676927042361438,
         y1: 0.7426075285819272,
@@ -19439,7 +19439,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '733d1f4f-6c89-45dd-a41c-4ccd61fcedfd',
+        id: '7a6ad3c9-f107-4e2b-963c-d39745c28a5d',
         kind: 'line',
         x1: 0.8449134030311596,
         y1: 0.7452564462181527,
@@ -19452,7 +19452,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f21a0aad-5fea-45eb-8f09-27eec1d66bce',
+        id: '0cc54dcb-8e93-4967-b214-9271487832a0',
         kind: 'line',
         x1: 0.7553502541777645,
         y1: 0.7777056872619134,
@@ -19479,7 +19479,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '35d7ebd8-fbfa-401c-b466-5a08b80ab6c9',
+        id: '3a63dcbc-37ed-4990-99f1-c32fb12e457e',
         kind: 'rect',
         x: 0.060096602590341094,
         y: 0.06062752048376657,
@@ -19492,7 +19492,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8ae995da-6aec-4fc2-80ad-828e1bec15c7',
+        id: '4673aa86-fe85-443d-8e31-629abf1701e2',
         kind: 'line',
         x1: 0.4962077293326752,
         y1: 0.8039125712793972,
@@ -19505,7 +19505,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2787e13e-ee81-4b63-beac-2697c07f5153',
+        id: '74d55b29-4369-400b-ba26-9cb5a002f16b',
         kind: 'arc',
         cx: 0.49241545866535086,
         cy: 0.24265651251534967,
@@ -19533,13 +19533,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'b538f6b6-884a-4cb2-a6d5-83211f999262',
+        id: 'b34fefa2-5761-46df-9558-7aa5b4fc040c',
         kind: 'arc',
         cx: 0.4955519730906391,
         cy: 0.915428015264085,
         radius: 0.5390790245365102,
-        startAngle: -0.6831170349919463,
-        endAngle: -2.473303234759209,
+        startAngle: -2.473303234759209,
+        endAngle: -0.6831170349919463,
         style: {
           stroke: '#000000',
           strokeWidth: 0.05333333333333334,
@@ -19547,7 +19547,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6d182442-9edf-46bb-a318-060399462bc2',
+        id: '08f56b82-08dd-48ae-a90c-a76e2ba70979',
         kind: 'line',
         x1: 0.22199831816496068,
         y1: 0.5256009378145016,
@@ -19560,7 +19560,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '068fe460-f023-470d-8c2c-3c8c3d449b21',
+        id: 'fd22cbf1-01de-4610-9060-7c8e3dd70aa5',
         kind: 'line',
         x1: 0.7777787790689553,
         y1: 0.5245670599114239,
@@ -19573,7 +19573,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'efb60684-8702-425e-9096-3c38bf10d3b9',
+        id: '1cf58ab1-4896-4def-8ff8-71fa0c8ec9a7',
         kind: 'polygon',
         points: [
           {
@@ -19596,7 +19596,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd054c8a0-b06d-4a11-ae5c-82272a5ac183',
+        id: '4cf60f01-3707-4f0a-8c1f-5812a1bdb233',
         kind: 'polygon',
         points: [
           {
@@ -19619,7 +19619,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fd81a178-f3c1-433a-86ec-1ff22a33fc03',
+        id: '7895b857-3c2d-4115-a843-c0e63992ea89',
         kind: 'polygon',
         points: [
           {
@@ -19656,7 +19656,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '47c9c5e6-8833-4b43-b96f-7c1e9f8000c8',
+        id: '91fe9c6a-ec90-428f-b45a-8b0601f01dff',
         kind: 'rect',
         x: 0.05630433192301645,
         y: 0.05304297914911728,
@@ -19669,7 +19669,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '68482043-fb07-4a65-ab03-0f3c25b7349e',
+        id: '978c689d-33a2-40b7-8710-1159cad04e46',
         kind: 'line',
         x1: 0.3625301883094818,
         y1: 0.15448621950005173,
@@ -19682,7 +19682,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '33d9e360-6826-4a53-93ec-8996ff22ef25',
+        id: '95adda1c-dec6-4e63-9be4-660a68efdf82',
         kind: 'line',
         x1: 0.32365941396940395,
         y1: 0.46450434655384143,
@@ -19695,7 +19695,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b200a61f-6897-4f77-b1db-5cf10793fcb7',
+        id: '93cd86de-3e81-42f8-861e-befdc9a669aa',
         kind: 'line',
         x1: 0.4497524136579485,
         y1: 0.5943896169097106,
@@ -19708,13 +19708,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '750a3fde-5974-4bcb-994d-97b099641a88',
+        id: 'afb68630-22dc-4e60-99dd-e62290120ecb',
         kind: 'arc',
         cx: 0.37002328764083353,
         cy: 0.4119249674460683,
         radius: 0.06868094288137215,
-        startAngle: -2.6658974347348003,
-        endAngle: -4.206940639511032,
+        startAngle: -4.206940639511032,
+        endAngle: -2.6658974347348003,
         style: {
           stroke: '#000000',
           strokeWidth: 0.06030150753768844,
@@ -19722,7 +19722,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '638a5b56-2d29-485f-b134-629216968cc6',
+        id: '5a8e7dd8-1c6a-4317-b9e7-66ad0217b4fe',
         kind: 'arc',
         cx: 0.361763026164477,
         cy: 0.5908972994337933,
@@ -19736,7 +19736,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ac3ce4a8-ad09-4051-ae50-750ff2477da3',
+        id: '65f37998-007e-4f91-96b9-fe981d5ee07b',
         kind: 'line',
         x1: 0.5907871443307131,
         y1: 0.15448621950005173,
@@ -19749,7 +19749,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '49549e43-a338-438f-9cdf-8fb340c1810a',
+        id: 'dfed52cf-4040-409c-9bba-879c3aece6f2',
         kind: 'line',
         x1: 0.5519163699906352,
         y1: 0.46450434655384143,
@@ -19762,7 +19762,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ec677fa2-93d3-43fc-baac-85a21905e93b',
+        id: '57d583d8-9d1e-4d63-8a89-c0bd96ac4ca5',
         kind: 'line',
         x1: 0.6780093696791799,
         y1: 0.5943896169097106,
@@ -19775,13 +19775,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '173f05fb-afea-4725-92c6-9fc98acc0583',
+        id: '8998a36c-b1d4-4e66-af79-c1e7ab8fedca',
         kind: 'arc',
         cx: 0.5982802436620648,
         cy: 0.4119249674460683,
         radius: 0.06868094288137215,
-        startAngle: -2.6658974347348003,
-        endAngle: -4.206940639511032,
+        startAngle: -4.206940639511032,
+        endAngle: -2.6658974347348003,
         style: {
           stroke: '#000000',
           strokeWidth: 0.06030150753768844,
@@ -19789,7 +19789,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9df9a0de-cc82-4914-b324-9913534b0b09',
+        id: '088ecca2-5b50-4a6a-96d4-df846f2f9ea8',
         kind: 'arc',
         cx: 0.5900199821857083,
         cy: 0.5908972994337933,
@@ -19824,7 +19824,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'b1e81316-c8e7-4ef6-a7b1-5f490e977cd2',
+        id: 'fe305c87-094b-4921-9d24-ade76168fa8e',
         kind: 'rect',
         x: 0.05632472047499099,
         y: 0.027961642608972753,
@@ -19837,7 +19837,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '045e556f-1fa5-4183-bcc3-69619202d22e',
+        id: '4a7c60d6-b1e7-4e1a-a8a7-248780709ca5',
         kind: 'circle',
         cx: 0.49370673362375844,
         cy: 0.8405242071120917,
@@ -19849,13 +19849,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c013562a-b9a4-4bdc-af59-d4addfb6e88a',
+        id: '3863f3b8-1586-40c3-9d51-521681c956ff',
         kind: 'arc',
         cx: 0.49370673362375844,
         cy: 0.20289965951407088,
         radius: 0.1826131972682174,
-        startAngle: -0.034469100999508166,
-        endAngle: -3.0633215130685154,
+        startAngle: -3.0633215130685154,
+        endAngle: -0.034469100999508166,
         style: {
           stroke: '#000000',
           strokeWidth: 0.05025125628140704,
@@ -19863,13 +19863,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4ac3a4cf-4d21-41ee-b068-c29ef7497ee4',
+        id: '2da20a20-6529-475d-8de3-0413be30a632',
         kind: 'arc',
         cx: 0.49999999999999967,
         cy: 0.6737608638941479,
         radius: 0.0796663892089577,
-        startAngle: 2.9829373914033903,
-        endAngle: 0.15865526218640208,
+        startAngle: 0.15865526218640208,
+        endAngle: 2.9829373914033903,
         style: {
           stroke: '#000000',
           strokeWidth: 0.05025125628140704,
@@ -19877,7 +19877,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '91ed4262-5afd-4f21-8d65-48ab35456870',
+        id: '7d5c18b0-b3b2-4006-a083-3d08a5dd7ad7',
         kind: 'polygon',
         points: [
           {
@@ -19918,7 +19918,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '5e0c8b15-51d2-4543-8f4f-11b0a63cfb7b',
+        id: '4936d010-6e41-4afe-b49a-a18057e09d4d',
         kind: 'rect',
         x: 0.047169294744598425,
         y: 0.049620133858940665,
@@ -19931,7 +19931,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b6dbb5e8-93e1-4208-acd0-501c7e9dc26b',
+        id: '7e8fa106-4239-4019-b462-bd904eaa2211',
         kind: 'line',
         x1: 0.48835417359806577,
         y1: 0.15106337420987512,
@@ -19944,7 +19944,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '25582258-92d1-4464-a6b3-0bb62a43b9e0',
+        id: '55b67361-c141-41a6-9825-11cde860abd3',
         kind: 'line',
         x1: 0.4494833992579879,
         y1: 0.4610815012636648,
@@ -19957,7 +19957,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9cf07dcf-c11d-4576-a6ae-3fd80bc297b3',
+        id: 'd23ac303-2e5f-420b-8380-ba23d067c3c8',
         kind: 'line',
         x1: 0.5755763989465325,
         y1: 0.590966771619534,
@@ -19970,13 +19970,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '89a78efa-9114-4fc2-814c-bf6d48afe4a7',
+        id: '1d79c078-06b2-4743-9076-f28bdb883035',
         kind: 'arc',
         cx: 0.4958472729294175,
         cy: 0.4085021221558917,
         radius: 0.06868094288137215,
-        startAngle: -2.6658974347348003,
-        endAngle: -4.206940639511032,
+        startAngle: -4.206940639511032,
+        endAngle: -2.6658974347348003,
         style: {
           stroke: '#000000',
           strokeWidth: 0.06030150753768844,
@@ -19984,7 +19984,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '120e0ed4-5146-474d-8619-a7e12347bdd4',
+        id: 'b32b082d-d2f2-4ee1-85e8-38101edce635',
         kind: 'arc',
         cx: 0.48758701145306094,
         cy: 0.5874744541436168,
@@ -20019,7 +20019,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'f9552d5f-c960-4e76-aba5-516ee80a653a',
+        id: 'a33f3754-b2a4-4ec6-9334-a083ed842853',
         kind: 'circle',
         cx: 0.4999999999999999,
         cy: 0.496135820089363,
@@ -20031,7 +20031,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f361feb8-bd5d-4028-a029-47775a47290f',
+        id: 'c401121c-a551-40f2-a741-3b98a8733b80',
         kind: 'arc',
         cx: 0.5119088727844643,
         cy: 0.48395140205693427,
@@ -20045,7 +20045,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '63b8c844-7f04-4cf6-a31c-4c491f0c8052',
+        id: 'e4b40764-94a6-45e5-b74c-2101e8026216',
         kind: 'polygon',
         points: [
           {
@@ -20068,7 +20068,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '863edbe1-082c-408b-983b-01465eaef3c0',
+        id: '78df7d41-3055-4456-a8dd-5e8867ab8e36',
         kind: 'polygon',
         points: [
           {
@@ -20091,7 +20091,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3a1eb2b8-bb97-4cd9-9091-09ec020b40ed',
+        id: '61feb146-bb5f-483e-b4ff-ea75b2541907',
         kind: 'arc',
         cx: 0.48625943151940904,
         cy: 0.496135820089363,
@@ -20119,7 +20119,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '7ab34276-cde8-4a63-b3df-11ad0d27672d',
+        id: 'e3ef5606-fcf0-4f83-9b40-cfaa5253b076',
         kind: 'line',
         x1: 0.041182838877048246,
         y1: 0.5916779875508797,
@@ -20132,13 +20132,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f74c41ca-4f7a-4f0d-af0d-7f268d227a5a',
+        id: '2db5b6a5-26f4-415b-a50c-e8c02069588d',
         kind: 'arc',
         cx: 0.49616622026243923,
         cy: 0.5916779875508799,
-        radius: 0.4304597422706226,
-        startAngle: 0,
-        endAngle: -3.0998515956718675,
+        radius: 0.532639580082336,
+        startAngle: -3.0998515956718675,
+        endAngle: 0,
         style: {
           stroke: '#000000',
           strokeWidth: 0.06060606060606061,
@@ -20146,7 +20146,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e8f05449-c2ac-4d4b-b967-0107d80f467c',
+        id: 'f7f14f28-66c8-41a6-9e04-770509380fd1',
         kind: 'line',
         x1: 0.27287829944448383,
         y1: 0.5992735126172327,
@@ -20159,7 +20159,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'af6bb765-4b9f-4509-8461-c3233000fda8',
+        id: 'd54081d8-b22f-45b9-bcc2-f61c842f5ea2',
         kind: 'line',
         x1: 0.29690776650149897,
         y1: 0.909000780497663,
@@ -20172,7 +20172,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1584d0e5-69f3-4561-a0a1-63ffb2e6d2f9',
+        id: '5832ad1f-0c8a-4faf-b4cd-f90fd530d1ee',
         kind: 'line',
         x1: 0.7163794579616745,
         y1: 0.6068690376835857,
@@ -20185,7 +20185,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '48eba5ff-255c-490d-8985-8b998aaab58a',
+        id: '7aa30a78-e338-45b8-99e4-12c058e62526',
         kind: 'line',
         x1: 0.6921819745917248,
         y1: 0.9145405450513244,
@@ -20212,11 +20212,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '85ef164e-c135-483a-927c-123184048324',
+        id: 'a62fbb59-3d40-401b-be7b-1fe60da3e5b3',
         kind: 'circle',
         cx: 0.5923241179847384,
         cy: 0.4986769128052789,
-        radius: 0.355103362736675,
+        radius: 0.40287511557120526,
         style: {
           stroke: '#000000',
           strokeWidth: 0.053811659192825115,
@@ -20224,7 +20224,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fc2f057b-604a-45e0-b4ba-91cf1aacc09d',
+        id: '1aba7809-31b4-4336-993d-709847128ac2',
         kind: 'line',
         x1: 0.3607039623388163,
         y1: 0.22670898944594153,
@@ -20237,7 +20237,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '690035eb-5e3f-46d9-b281-18523af3c3c7',
+        id: '499f44be-2194-45e7-889c-314b60d94503',
         kind: 'line',
         x1: 0.8288034377351204,
         y1: 0.2248713683421623,
@@ -20250,11 +20250,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7f27a980-a63f-4cda-b9b3-0151f656613b',
+        id: '6a90445d-b393-4e95-9ff0-35c8a5394958',
         kind: 'arc',
         cx: 0.5939438393528914,
         cy: 0.49132642839016166,
-        radius: 0.5303122110498362,
+        radius: 0.6016546609668545,
         startAngle: 2.336758493005522,
         endAngle: 3.8057881349117206,
         style: {
@@ -20264,7 +20264,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '778593be-f798-417d-9caa-301e49248e92',
+        id: 'e7feb218-47ec-4eeb-be93-dc9e99626e3d',
         kind: 'polygon',
         points: [
           {
@@ -20301,11 +20301,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '2bb5c8dc-5469-405b-8e90-d2302a1701aa',
+        id: 'a073c1fb-cafd-4918-95f7-c18706b5854e',
         kind: 'circle',
         cx: 0.3700459276855294,
         cy: 0.4891696555604244,
-        radius: 0.33844864583862677,
+        radius: 0.4585979151113393,
         style: {
           stroke: '#000000',
           strokeWidth: 0.06,
@@ -20313,7 +20313,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fcbd87ee-0ce6-4090-84d5-169a1a1c6b9a',
+        id: '42317449-5115-4c1a-8849-a35aa3e4ace3',
         kind: 'line',
         x1: 0.14227696223113467,
         y1: 0.18243612422978514,
@@ -20326,7 +20326,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '933698fc-c206-4adb-882a-cc89ccc3a2b6',
+        id: '69cd3cd3-140f-4296-81a3-568d8bc3c140',
         kind: 'line',
         x1: 0.5908281150585012,
         y1: 0.18622295794991645,
@@ -20339,7 +20339,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'aa6e2a7f-13b0-4fff-961f-dbc3b205ecc9',
+        id: 'a2a0209c-2750-4084-a212-1e379a934c7d',
         kind: 'line',
         x1: 0.9415643747459432,
         y1: 0.06504427890571325,
@@ -20352,7 +20352,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3fccf6c3-c4d1-4ae0-a03b-932eb78102a8',
+        id: '8fa343c2-95bd-47e7-acdf-dd9fb33f6c48',
         kind: 'line',
         x1: 0.7852614883002332,
         y1: 0.44562106777891386,
@@ -20365,7 +20365,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f87a62d4-714c-4e62-be1a-9271526d4afc',
+        id: '2df32a13-95c1-4326-9d7e-4ef51564b722',
         kind: 'line',
         x1: 0.9462168153144139,
         y1: 0.42742988173029645,
@@ -20378,7 +20378,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5a51d74d-57ba-443f-9090-aaa4ef74f298',
+        id: '58f27ed5-e9e9-443f-921f-f9bfb8a58572',
         kind: 'polygon',
         points: [
           {
@@ -20415,13 +20415,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'd5d5f0eb-73d9-4601-897f-c0106ea6a06f',
+        id: 'd74bc01c-b474-4d9c-beb4-c88ac316d977',
         kind: 'arc',
         cx: 0.49555197309063914,
         cy: 0.9180608463965105,
         radius: 0.5390790245365102,
-        startAngle: -0.6831170349919463,
-        endAngle: -2.473303234759209,
+        startAngle: -2.473303234759209,
+        endAngle: -0.6831170349919463,
         style: {
           stroke: '#000000',
           strokeWidth: 0.05333333333333334,
@@ -20429,7 +20429,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '414cc55d-aac9-429c-9edf-b7ad7c68ae40',
+        id: 'f72b12d8-aff7-45f6-8523-3759e1499c79',
         kind: 'line',
         x1: 0.22199831816496068,
         y1: 0.5591510888825837,
@@ -20442,7 +20442,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '87510be7-09bc-41e3-b619-a3bfb7ad2d36',
+        id: 'fd800757-8e67-4ae1-8778-a1bd90c66c64',
         kind: 'line',
         x1: 0.7777787790689553,
         y1: 0.5581992081925089,
@@ -20455,7 +20455,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '61d793ac-5d99-44bd-a46f-b94d3cc58ec0',
+        id: '9bb7a440-b030-4fbe-b54e-34fc90efc152',
         kind: 'polygon',
         points: [
           {
@@ -20492,7 +20492,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'a3f5a7c2-1364-4bf3-98ef-d4ea16a46ca3',
+        id: '54c67f83-8808-409b-a653-59e2aadb76d8',
         kind: 'circle',
         cx: 0.5009155309845914,
         cy: 0.4926003728324879,
@@ -20504,7 +20504,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '37ad3dcc-4e43-40d1-96ec-967923fdfae2',
+        id: 'bec1a960-b0a1-4d66-8120-6866d82ff34f',
         kind: 'polygon',
         points: [
           {
@@ -20531,7 +20531,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3679a6b7-3599-42e9-8338-1c63401e4318',
+        id: '22cee4b3-d5a7-4d10-a120-bf9fcfd17f33',
         kind: 'polygon',
         points: [
           {
@@ -20558,7 +20558,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'eeecbcac-5565-4192-afb1-e8a595c82ffa',
+        id: '6249b9b4-3b58-47b7-b261-5576df95a47b',
         kind: 'polygon',
         points: [
           {
@@ -20585,7 +20585,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a33fc53f-3d56-4ce7-9e75-3c4419ac377b',
+        id: '8d5ec8be-8c30-483a-a3f2-7b579ae33654',
         kind: 'polygon',
         points: [
           {
@@ -20612,7 +20612,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9b164e7b-3129-4ae4-90df-67ceeb8ef1ac',
+        id: '16a9c1bc-bf7c-4586-ae28-09383137159e',
         kind: 'polygon',
         points: [
           {
@@ -20639,7 +20639,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '16c0b639-7a64-4d64-bfd3-6bb2f57fbb43',
+        id: '21450c0c-c312-4623-97ed-91f5e3a84dbc',
         kind: 'polygon',
         points: [
           {
@@ -20666,7 +20666,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '38e1f796-26e4-4c68-b67f-998e41aff04c',
+        id: '86e4c755-96a6-4a91-8f51-e4cde0f21f41',
         kind: 'polygon',
         points: [
           {
@@ -20693,7 +20693,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3284279a-0cf8-4b34-bb14-f0395b104600',
+        id: 'db8249c5-826d-412e-bb59-b15a649e9015',
         kind: 'polygon',
         points: [
           {
@@ -20741,7 +20741,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '25d17bbd-8958-427c-97ee-b42e155778a4',
+        id: '4bf1c393-4f53-408a-96bd-cccc143f9e50',
         kind: 'line',
         x1: 0.49748743718592964,
         y1: 0.20100502512562815,
@@ -20754,7 +20754,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '06379248-a0a6-484c-a712-4977a20e475b',
+        id: '781c6610-e862-4680-bffa-32210d34f3b6',
         kind: 'circle',
         cx: 0.49748743718592964,
         cy: 0.7286432160804021,
@@ -20766,7 +20766,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '64c65fd2-26eb-4a6d-b2ae-d699c4f060b5',
+        id: 'fcc37ca1-fc55-4837-8744-496e6e2dcd43',
         kind: 'rect',
         x: 0.05030822551671998,
         y: 0.053042979149117285,
@@ -20793,7 +20793,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '177c3f42-692a-47ba-a225-1abcb8b5a144',
+        id: '3d07c29a-e382-4b7e-bcda-74a4305458f4',
         kind: 'rect',
         x: 0.04771921406284481,
         y: 0.04445786128894557,
@@ -20806,7 +20806,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6c018795-4000-4a60-a1b3-a1611bd96b0c',
+        id: '7c5a7176-d595-43b1-879b-284487391280',
         kind: 'line',
         x1: 0.3415211673668019,
         y1: 0.18742703831143043,
@@ -20819,7 +20819,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '23e54066-8723-4ce8-872a-df4e7dba664f',
+        id: 'b28793c4-8653-4bf5-af9d-977b7adbbba1',
         kind: 'line',
         x1: 0.31454007166411896,
         y1: 0.4514481535997018,
@@ -20832,7 +20832,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7c7ad5a2-7d35-4935-8079-294af2adf6fa',
+        id: '179bd8d3-9a2a-478b-b37f-d682b32ca09f',
         kind: 'line',
         x1: 0.4406330713526635,
         y1: 0.581333423955571,
@@ -20845,13 +20845,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '68fdcde3-1f0d-4942-a36e-d23d94c17622',
+        id: '8d75301d-a696-4101-bb5c-17610eaf7e10',
         kind: 'arc',
         cx: 0.3609039453355485,
         cy: 0.3988687744919287,
         radius: 0.06868094288137215,
-        startAngle: -2.6658974347348003,
-        endAngle: -4.206940639511032,
+        startAngle: -4.206940639511032,
+        endAngle: -2.6658974347348003,
         style: {
           stroke: '#000000',
           strokeWidth: 0.06030150753768844,
@@ -20859,7 +20859,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fcad2006-759c-497e-8abc-39f658b63754',
+        id: '1dc1264e-606b-446e-9c58-0edfae338eaa',
         kind: 'arc',
         cx: 0.3526436838591919,
         cy: 0.5778411064796538,
@@ -20873,7 +20873,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f1e2a4cb-58d5-4433-b0f2-d7fdb7bbf94d',
+        id: '960257d4-1a35-44db-adf6-aa668132b1c5',
         kind: 'line',
         x1: 0.6213526613543885,
         y1: 0.20852607650942787,
@@ -20886,7 +20886,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8d16644c-1489-4e85-96b6-9ecae9c5b55a',
+        id: '63482db5-3d86-49ee-8d5c-bfd236bbd5bf',
         kind: 'circle',
         cx: 0.6194565260207263,
         cy: 0.6958328572606448,
@@ -20919,7 +20919,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '34043423-71de-4ea9-968b-90382627e52c',
+        id: 'dab7d9d8-5b01-4996-8e3a-0dfd37b1aec7',
         kind: 'circle',
         cx: 0.5,
         cy: 0.1371841155234657,
@@ -20931,7 +20931,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ad1e70fc-caf5-46fe-a94d-88a2dcf33979',
+        id: '23876271-0646-43a6-8fd5-18eec2fd7f1d',
         kind: 'line',
         x1: 0.5000000000000002,
         y1: 0.22158453751553825,
@@ -20965,7 +20965,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'f1772c6d-55b5-4268-a1f3-f71808db72ec',
+        id: '0037dfab-a07e-489e-9541-0cf513e8022d',
         kind: 'circle',
         cx: 0.5,
         cy: 0.1371841155234657,
@@ -20977,7 +20977,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '17964c2b-49a1-458e-9261-cf6f970fff98',
+        id: '1b4b7112-2d22-4892-92ae-d5a7a26315af',
         kind: 'line',
         x1: 0.5000000000000002,
         y1: 0.22508621537453993,
@@ -21011,7 +21011,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'de39d2cf-f3d3-4f7d-b25d-d6390231b9da',
+        id: 'e9e79316-25ce-48e5-b4de-8fea2ede3515',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5748364392856795,
@@ -21023,7 +21023,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f463b5bc-1fff-420a-bb64-2b7ac71cf4c3',
+        id: '7953aa7a-3a1b-4a4e-9a03-428aaab47430',
         kind: 'circle',
         cx: 0.38095238095238093,
         cy: 0.7905507325476172,
@@ -21035,7 +21035,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1c284088-f5fb-45a4-9c76-fb0d03f8e54e',
+        id: 'a37fbd25-7c1e-4e7a-a212-a5766affe117',
         kind: 'circle',
         cx: 0.6190476190476191,
         cy: 0.7905507325476172,
@@ -21047,7 +21047,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '00288651-15ee-490c-93a7-eb6de578f981',
+        id: '29c99bd3-3d49-4512-9daf-f9b070e20174',
         kind: 'polygon',
         points: [
           {
@@ -21070,7 +21070,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bb133aae-3700-4f80-a36e-5ac9056bcbd3',
+        id: 'a47ae9c2-53fa-424e-9827-a1d3e2496e14',
         kind: 'text',
         x: 0.23214285714285715,
         y: 0.22119587161519974,
@@ -21083,7 +21083,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fa733687-f67d-40d8-b0a7-c4db2efab9ff',
+        id: 'c93c8ab9-b775-494f-8380-327e46268ed8',
         kind: 'text',
         x: 0.2602537627181099,
         y: 0.4869613746433817,
@@ -21117,7 +21117,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: 'cdf12b8b-c035-4aa0-bec9-8bac96c0ace0',
+        id: '15cef7db-2bc6-4ac0-b94c-17a58291e65a',
         kind: 'circle',
         cx: 0.49653172023641506,
         cy: 0.49184328038378056,
@@ -21129,7 +21129,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4ea91d0b-0448-49c3-bb3b-e25ac611f78b',
+        id: '9ebee593-d5d0-4cdb-851e-bd6cffc38e6d',
         kind: 'text',
         x: 0.2820775776146816,
         y: 0.3223575058195437,
@@ -21163,7 +21163,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '779426da-0f2b-4acc-9e98-e4c0183df5d7',
+        id: 'de440b01-c7c2-497a-adad-a4258f4285df',
         kind: 'rect',
         x: 0.053691275167785234,
         y: 0.04519774011299435,
@@ -21176,7 +21176,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '23d9401f-9bdb-4b5a-a7b9-2b6c7adfc0c3',
+        id: 'b14dbb1f-ffe4-4f99-b7d9-58bf4c5d8117',
         kind: 'rect',
         x: 0.5,
         y: 0.04519774011299435,
@@ -21210,13 +21210,13 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '639eae08-10fb-4768-91e7-4dcf82e7a35b',
+        id: '648f1fa0-32ce-46fa-89a2-0938d04a1c69',
         kind: 'arc',
         cx: 0.5,
         cy: 0.5,
-        radius: 0.36249957235371066,
-        startAngle: -3.137092683964424,
-        endAngle: -6.275657959019178,
+        radius: 0.3665726012565613,
+        startAngle: -6.275657959019178,
+        endAngle: -3.137092683964424,
         style: {
           stroke: '#000000',
           strokeWidth: 0.028089887640449437,
@@ -21224,11 +21224,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '587e1fa1-1bfe-40dc-acb4-9c0ca6c59099',
+        id: 'f462994f-6597-43aa-acb7-7500c271fa43',
         kind: 'circle',
         cx: 0.5,
         cy: 0.5,
-        radius: 0.3955594710728962,
+        radius: 0.40000395951191753,
         style: {
           stroke: '#000000',
           strokeWidth: 0.06741573033707865,
@@ -21287,7 +21287,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '212838b5-afd2-4eda-bb23-7335c2b028d0',
+        id: '7623788a-1a11-468f-bd3f-61a53b14ac2f',
         kind: 'rect',
         x: 0.1,
         y: 0.12857142857142856,
@@ -21300,7 +21300,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '585f27ac-6015-4bfd-9a86-ad7e3d37f759',
+        id: 'b6a4d9ec-9a0d-4bc7-baec-ec68c532452d',
         kind: 'rect',
         x: 0.38666666666666666,
         y: 0.05714285714285714,
@@ -21313,7 +21313,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5f78382e-52c2-417e-819b-15aaccbefd5a',
+        id: '0bea19c4-941a-43e2-9250-5443e58b7970',
         kind: 'rect',
         x: 0.4666572460214438,
         y: 0.1288931835506475,
@@ -21347,7 +21347,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '0fb25f87-5e31-4b19-9348-4e1bf4210a3b',
+        id: 'a7f9ace8-82c1-4ab4-b760-627fdf1405db',
         kind: 'circle',
         cx: 0.5,
         cy: 0.49765258215962443,
@@ -21359,7 +21359,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '790075d9-07f9-4920-9b01-b73ea1cc0a3a',
+        id: '4afa9b52-11f0-4a52-b5f1-7c180c4b0a3b',
         kind: 'text',
         x: 0.31292469247612065,
         y: 0.14604691391864094,
@@ -21398,7 +21398,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '6697530a-ef41-4fe0-aae6-71c72f9d6732',
+        id: '998597f8-2abd-40c5-9ef5-d4292b642210',
         kind: 'rect',
         x: 0.0499584696423312,
         y: 0.016818862156927662,
@@ -21411,7 +21411,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd798231a-b88b-4d30-8adc-a760a1259930',
+        id: '3e3997bf-23e3-4adb-8f28-027976f7e7f8',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.13554130259613092,
@@ -21423,7 +21423,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '49794dc1-218e-49d4-a5c3-e68b7291c358',
+        id: '08d93b95-0f2e-4eb6-8127-8692281cea43',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.13554130259613092,
@@ -21435,7 +21435,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7d25a07e-4324-4de5-926d-ec9de8979587',
+        id: 'bb251e9c-6c08-45ba-b5bf-3685fa85c009',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.13554130259613092,
@@ -21447,7 +21447,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1be0b80f-693a-422e-8fb2-4ef71973f620',
+        id: 'dd20040a-02cc-477c-bd2f-f470106f5596',
         kind: 'circle',
         cx: 0.2888694055112171,
         cy: 0.13516078195369757,
@@ -21459,7 +21459,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8b94e5ff-daad-4ab7-99de-57228770516a',
+        id: 'a5c10089-b373-4133-a74f-44eb8a08e5b3',
         kind: 'line',
         x1: 0.1699695444043762,
         y1: 0.09330351128602977,
@@ -21472,7 +21472,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6b7351f8-1e07-4574-b1e8-436653f0ff63',
+        id: 'ef0b0874-faf8-4da1-b5ea-03963ada3bad',
         kind: 'line',
         x1: 0.39887955737642494,
         y1: 0.09520611449819646,
@@ -21485,7 +21485,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '193b72e7-c24b-48c6-9837-237b2a0d9432',
+        id: '079c18a7-74d4-47fa-ab40-ed9b5c9002fb',
         kind: 'rect',
         x: 0.519158499721524,
         y: 0.016818862156927662,
@@ -21498,7 +21498,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8e095648-4185-4c72-9e52-4f586f5dd0d3',
+        id: 'b7ae9c44-b5bb-40bb-804f-76a5e783f38e',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.13554130259613092,
@@ -21510,7 +21510,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd11786d3-7e63-4478-9fe5-329fb6c40f34',
+        id: '9f25f2e5-ae19-4785-8f0a-4c7078631d7d',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.13554130259613092,
@@ -21522,7 +21522,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3470bbd7-4a91-4cfd-8b5f-f0b39b3fb8bc',
+        id: 'fa1454de-2767-427a-a6de-4991f7d7ac12',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.13554130259613092,
@@ -21534,7 +21534,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '93f07584-ed8f-4b5e-a714-10f992ad4268',
+        id: 'ee96e5a3-0c7d-4dbf-bd2e-b8533f498c94',
         kind: 'circle',
         cx: 0.7580694355904098,
         cy: 0.13516078195369757,
@@ -21546,7 +21546,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd0c4dc0e-3b0d-4bb6-a539-061aa75d7e5f',
+        id: 'e3dd6a92-f3aa-48fe-ad1c-6bb2341617d1',
         kind: 'line',
         x1: 0.639169574483569,
         y1: 0.09330351128602977,
@@ -21559,7 +21559,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '01c03033-448b-41a6-b09d-852bb7014b3b',
+        id: '491501a3-b7b7-4f7d-8748-2fff439916d4',
         kind: 'line',
         x1: 0.8680795874556178,
         y1: 0.09520611449819646,
@@ -21572,7 +21572,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e4336c2d-bede-439b-9eff-0c2895b0c0fe',
+        id: '4e57a896-cd45-4e5b-bcfe-f997706bd2b0',
         kind: 'rect',
         x: 0.0499584696423312,
         y: 0.25350270175046746,
@@ -21585,7 +21585,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6c2fc56b-b1b6-4cbb-8582-c0d017a44398',
+        id: 'a5874522-ef4c-448e-8d8b-882e43b5b5ee',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.37222514218967073,
@@ -21597,7 +21597,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ba6b4fbc-e6a2-4154-8d01-bcd00cbe8f83',
+        id: '0ed3b4e9-e878-4c6d-ad0b-383390ee38a0',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.37222514218967073,
@@ -21609,7 +21609,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f8c3f15f-e965-4582-b831-120b3d676adc',
+        id: '235ae14d-b877-4035-af6d-c4eba14536ca',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.37222514218967073,
@@ -21621,7 +21621,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ca149d9b-317d-4ecf-a879-710c1f2d5c1b',
+        id: 'c4c19510-decc-4eb3-b9e9-f6cfb9dabe51',
         kind: 'circle',
         cx: 0.2888694055112171,
         cy: 0.37184462154723735,
@@ -21633,7 +21633,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '76b6ca36-6e3f-4508-b278-a88b304c6319',
+        id: '8910c04a-ed29-4c59-a118-c04e16ec0f9a',
         kind: 'line',
         x1: 0.1699695444043762,
         y1: 0.3299873508795696,
@@ -21646,7 +21646,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b94b7c3a-5e39-404c-90f2-9c740476636d',
+        id: 'ce196a67-6f06-42a1-b45d-1fe945f3287e',
         kind: 'line',
         x1: 0.39887955737642494,
         y1: 0.3318899540917363,
@@ -21659,7 +21659,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3279b45a-882c-4b8a-a6b2-70d2f72c6737',
+        id: 'e4de9649-2d9e-4e5d-8fd2-1ef47c150c71',
         kind: 'rect',
         x: 0.519158499721524,
         y: 0.25350270175046746,
@@ -21672,7 +21672,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '00591551-4892-470e-ab3a-b5616460c6fd',
+        id: 'c47f4375-048d-48c6-b8af-bc59f1a39057',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.37222514218967073,
@@ -21684,7 +21684,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ea13c23a-e813-459e-8ceb-2670ed464c3d',
+        id: 'da330aca-1551-4d45-8992-bb0e9036a285',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.37222514218967073,
@@ -21696,7 +21696,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7c6f35f6-989a-4f04-a4b9-6a1e61e88f7d',
+        id: '76e96c1d-3c30-4d2d-8137-9f1a29af1739',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.37222514218967073,
@@ -21708,7 +21708,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4f5c009e-9e1f-462b-aa2e-9559edd5c446',
+        id: 'dff47e01-0945-40d1-8b55-202b3e046306',
         kind: 'circle',
         cx: 0.7580694355904098,
         cy: 0.37184462154723735,
@@ -21720,7 +21720,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '98a49f63-190e-4b9e-a407-655a2c8d45b5',
+        id: 'b685b16b-b8c8-488b-9486-799453d74898',
         kind: 'line',
         x1: 0.639169574483569,
         y1: 0.3299873508795696,
@@ -21733,7 +21733,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '99f40f4c-6c2a-44b0-a446-feaa0b76a900',
+        id: '1a2df22d-1189-47c0-90da-454e5d45d627',
         kind: 'line',
         x1: 0.8680795874556178,
         y1: 0.3318899540917363,
@@ -21746,7 +21746,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '55e41c61-7464-4cb6-a6f9-0655bd9de569',
+        id: 'c7117d0e-2ff7-4089-b17f-00867ab75d26',
         kind: 'rect',
         x: 0.0499584696423312,
         y: 0.49018654134400724,
@@ -21759,7 +21759,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5de10bd6-c5bd-4f4e-a7b7-1f4d6cb62d8c',
+        id: '9abe2323-921f-48f5-8d7c-0490cf348f48',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.6089089817832105,
@@ -21771,7 +21771,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7283937e-b4ea-40ab-9cd9-a864215429d3',
+        id: '7a9b9c93-41aa-4240-be30-42a3b4d1efdf',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.6089089817832105,
@@ -21783,7 +21783,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bdc956fa-e6d3-4d7a-b215-e41364e60ff0',
+        id: '3d45a6c6-96fc-4c4a-bdaf-a75f441cc440',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.6089089817832105,
@@ -21795,7 +21795,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '79a596fc-4955-4c9c-92c3-90573d047b33',
+        id: 'c8b0bbd2-ae80-4333-9cc7-971f998aac3d',
         kind: 'circle',
         cx: 0.2888694055112171,
         cy: 0.6085284611407772,
@@ -21807,7 +21807,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '92452e50-d2d3-4dd4-9493-fe31f70888ca',
+        id: '178b9df2-d925-4590-a58b-fd8dcb8f5875',
         kind: 'line',
         x1: 0.1699695444043762,
         y1: 0.5666711904731094,
@@ -21820,7 +21820,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3db5e02b-4d37-4bd5-8d89-23328e5ee082',
+        id: '1514f45c-dc41-410b-8954-369b982bd539',
         kind: 'line',
         x1: 0.39887955737642494,
         y1: 0.568573793685276,
@@ -21833,7 +21833,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c7363fec-7b5a-4b2e-9881-1945a850f109',
+        id: '1b5c9f75-236a-4377-a08c-e14f9d984719',
         kind: 'rect',
         x: 0.519158499721524,
         y: 0.49018654134400724,
@@ -21846,7 +21846,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '17a63087-98a2-4a7f-9322-18ce2bb157f4',
+        id: 'd978b3eb-1b57-4f9d-af92-7c5461f297e5',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.6089089817832105,
@@ -21858,7 +21858,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '623834a7-8900-4b9c-8275-e24abf20173b',
+        id: '525b1913-400f-475a-93d0-d87d905d5685',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.6089089817832105,
@@ -21870,7 +21870,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '097f2c8f-0ba9-48bf-9546-2bd62ca76ddf',
+        id: '1b5e3ca6-3f06-4b0d-abe9-49b31d8b0dfb',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.6089089817832105,
@@ -21882,7 +21882,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '234fc668-22e9-4d1b-bdac-d6de901a9407',
+        id: 'bd440a2b-c720-439c-8382-6566663b08d7',
         kind: 'circle',
         cx: 0.7580694355904098,
         cy: 0.6085284611407772,
@@ -21894,7 +21894,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '88cd6889-2afa-43ad-a18c-47fe107c75b2',
+        id: '819e9129-a254-4954-bf26-b931ccbf833e',
         kind: 'line',
         x1: 0.639169574483569,
         y1: 0.5666711904731094,
@@ -21907,7 +21907,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8a20d349-31bf-4b89-a43b-df557351e050',
+        id: 'a3774786-aa6c-484e-9bb6-5483d8991565',
         kind: 'line',
         x1: 0.8680795874556178,
         y1: 0.568573793685276,
@@ -21920,7 +21920,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0c40dbd9-b04d-4181-850c-749155bd8e08',
+        id: 'fae313f6-9348-43ca-8d5a-7c2c1f557c05',
         kind: 'rect',
         x: 0.0499584696423312,
         y: 0.7268703809375471,
@@ -21933,7 +21933,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '109e5288-ff35-4463-856c-9e00ed5ac94f',
+        id: '4bf436e3-e7e8-42f8-9541-430cc8ef3e4d',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.8455928213767504,
@@ -21945,7 +21945,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b9bc189e-d05c-4b62-9bcb-2b362cb2edd0',
+        id: '5b0e787b-a9f3-43f9-9338-72b8c7135510',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.8455928213767504,
@@ -21957,7 +21957,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd57459ed-e2cd-4b80-b086-dba5b0ce96de',
+        id: '5bacaeb4-0ff4-4ca4-8831-db2153e1841a',
         kind: 'circle',
         cx: 0.28553576454560475,
         cy: 0.8455928213767504,
@@ -21969,7 +21969,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd842644f-da8e-4b6a-8401-3ad1ac96acfe',
+        id: '66d02dad-8d12-40dd-be82-da7c9637a976',
         kind: 'circle',
         cx: 0.2888694055112171,
         cy: 0.8452123007343171,
@@ -21981,7 +21981,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f7c54116-21cd-4ed8-9327-cb2ae0140df1',
+        id: '1bed3042-38b8-4de0-9263-5b7947f43512',
         kind: 'line',
         x1: 0.1699695444043762,
         y1: 0.8033550300666492,
@@ -21994,7 +21994,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0cc56d17-58ac-48ad-88c4-d58f28e75ef6',
+        id: '29478187-373b-4486-9b84-4de7920a26ca',
         kind: 'line',
         x1: 0.39887955737642494,
         y1: 0.8052576332788159,
@@ -22007,7 +22007,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '710c316b-8185-4726-a276-de138d9ca78d',
+        id: '01aeb5a6-d989-4f1a-8ffd-25d6555b3793',
         kind: 'rect',
         x: 0.519158499721524,
         y: 0.7268703809375471,
@@ -22020,7 +22020,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '41716af3-8063-47f3-8099-e098d723f0a9',
+        id: '8d8a8aaf-e11f-4f45-ad2a-beb3813e5467',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.8455928213767504,
@@ -22032,7 +22032,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'faed0166-cc91-44fb-8b50-f8f3912a349c',
+        id: 'c2dd7cf7-3222-4830-97e1-0087b8286386',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.8455928213767504,
@@ -22044,7 +22044,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a793cd55-4759-4fc3-8c09-c4681d032ebd',
+        id: 'd5508409-174d-4856-98b1-0cb20995554e',
         kind: 'circle',
         cx: 0.7547357946247975,
         cy: 0.8455928213767504,
@@ -22056,7 +22056,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f8ea0f2a-8ab1-47da-82a8-b2769a85c0ae',
+        id: 'd013f31a-f647-44e5-a61e-318d7a82fd4a',
         kind: 'circle',
         cx: 0.7580694355904098,
         cy: 0.8452123007343171,
@@ -22068,7 +22068,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9cffe1f9-26d7-4f70-aee8-a86bd871df0d',
+        id: '10d46ba2-8fec-4362-95b6-c8ee67821277',
         kind: 'line',
         x1: 0.639169574483569,
         y1: 0.8033550300666492,
@@ -22081,7 +22081,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7af5d087-a69e-498f-b0b9-30dbe67852e3',
+        id: '9556555e-4a99-4e14-a12d-0476bfa75a14',
         kind: 'line',
         x1: 0.8680795874556178,
         y1: 0.8052576332788159,
@@ -22094,7 +22094,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bf0d6c8d-56c0-4b19-8ec6-8c04907ada7e',
+        id: 'f6a27acc-1437-4164-99ea-4ac9ae8f7db2',
         kind: 'rect',
         x: 0.05063801745475862,
         y: 0.9592814611767916,
@@ -22107,7 +22107,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1465ca87-96fe-4dd1-8abd-2f0f90b89310',
+        id: 'fb0e0e88-60f6-4f18-82bd-f4b203f17b43',
         kind: 'rect',
         x: 0.16808805430348306,
         y: 0.9890824608323053,
@@ -22120,7 +22120,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bd128154-63aa-48cf-9264-d2266802be8d',
+        id: 'cdc43737-b980-4579-bc26-45c0440ccaa8',
         kind: 'rect',
         x: 0.7362349193006259,
         y: 0.9883556071821709,
@@ -22147,7 +22147,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '0bc51b09-cb7d-4b9c-97a0-0ca891a73fa1',
+        id: 'bff32acf-2972-4451-8b4d-b58330cad6e3',
         kind: 'rect',
         x: 0.04385625476204961,
         y: 0.12030422958413618,
@@ -22160,7 +22160,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0a54cb58-ca0a-44cb-a7d5-d45afd2d96a6',
+        id: 'e7bb4b3f-4aa6-458c-a43f-a780bc4cf4e5',
         kind: 'rect',
         x: 0.20774023508706171,
         y: 0.03407003993692741,
@@ -22173,7 +22173,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ff00337c-c50f-48d8-b758-79371a5510cd',
+        id: 'b8450cde-3ae7-4e99-ae71-697988cb47df',
         kind: 'rect',
         x: 0.20774023508706171,
         y: 0.8616129923087855,
@@ -22186,7 +22186,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '50002c28-ec38-4c4a-bb40-f646e042c777',
+        id: '68d9a001-4c5d-4d24-bd40-8c2f11c385b2',
         kind: 'line',
         x1: 0.14505602188192154,
         y1: 0.49398571805537456,
@@ -22199,7 +22199,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8d0211fa-d8e9-4d28-9deb-3f925eb25563',
+        id: '53eb6450-919d-4675-923b-bef63e5d1659',
         kind: 'line',
         x1: 0.8277679606500243,
         y1: 0.4011156727865094,
@@ -22212,7 +22212,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'cb10c448-feee-4db7-8a0e-783c0cb71ca1',
+        id: '2ed4ab1c-1c8f-4e1d-9c6d-33755287006c',
         kind: 'line',
         x1: 0.16950063967789233,
         y1: 0.5876222314393352,
@@ -22225,7 +22225,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e6936f7c-14f7-4304-9048-75962b366079',
+        id: '656fe741-8e16-45f1-bd08-e4e28d402c95',
         kind: 'line',
         x1: 0.16950063967789233,
         y1: 0.5713753754310744,
@@ -22252,7 +22252,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '6d6d74c7-0c12-4276-86a7-48d29c4a6c83',
+        id: 'c9d6bb8e-55a4-4209-860a-ffbe6865e937',
         kind: 'line',
         x1: 0.045916269999423574,
         y1: 0.40515740113007775,
@@ -22265,7 +22265,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '45d6965e-76ac-45a5-851e-84695a05f62c',
+        id: '87097366-ffa8-4f60-afa3-e1499b3c10cf',
         kind: 'line',
         x1: 0.11777463804665285,
         y1: 0.031175109622435932,
@@ -22278,7 +22278,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6742a482-2b06-4ec5-833f-4eab77a7aeac',
+        id: '20dc5167-f721-4ce1-8bf4-81b11c31c33a',
         kind: 'line',
         x1: 0.12236134239009298,
         y1: 0.030203727047091393,
@@ -22291,7 +22291,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ef2ec847-f3f7-4bd0-9d92-0d6ef124a38a',
+        id: 'ae6d009f-8d12-4130-be76-2a8a69dba71f',
         kind: 'line',
         x1: 0.8791675590577204,
         y1: 0.031175109622435932,
@@ -22304,7 +22304,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fef6d8f8-be77-448d-8866-feeec6c956a8',
+        id: 'd3e1b1c2-d08d-4131-98ea-a404dad327aa',
         kind: 'line',
         x1: 0.9494970256571362,
         y1: 0.39811590220398624,
@@ -22317,7 +22317,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '43194540-d3ff-4af4-84e0-d59c8f3a022f',
+        id: '7ab57705-9ee5-46e0-9774-325dffe59d4d',
         kind: 'line',
         x1: 0.05205401518182227,
         y1: 0.40160749643124827,
@@ -22330,7 +22330,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '64d337ef-2424-4acf-9ad6-902fedc381b7',
+        id: 'f998eed1-b238-4cff-b3e1-93c296cd1e1b',
         kind: 'arc',
         cx: 0.5000000000000001,
         cy: 0.6985149388841242,
@@ -22344,7 +22344,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '99b1f430-3bbb-47a3-9413-da53c664be41',
+        id: '609fcccf-dd03-449d-b6ee-af5b30ca795c',
         kind: 'line',
         x1: 0.4969421971043731,
         y1: 0.46255595497812463,
@@ -22357,7 +22357,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '93fc2052-7ba7-498e-807c-5dd6fe082342',
+        id: '0d7b8178-25cc-48c5-9d55-e9fe2358cf60',
         kind: 'line',
         x1: 0.22785554228921676,
         y1: 0.6334323063360412,
@@ -22370,7 +22370,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '63b7b9bb-2520-4158-8e9d-33d6f68cee5a',
+        id: '3cee4af8-a82c-4702-b2ae-42b7168a219b',
         kind: 'line',
         x1: 0.3033710095062326,
         y1: 0.5081239541165974,
@@ -22383,7 +22383,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '71900101-6414-43c6-9d69-ef964076fb0e',
+        id: 'cac5c984-ae4c-4ae5-920f-9fd91266beef',
         kind: 'line',
         x1: 0.6865259766332332,
         y1: 0.5112530183179967,
@@ -22396,7 +22396,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2252d3b1-79a7-4b7d-b578-7aa72d033a7e',
+        id: '5e112489-aaf0-4369-9801-2e99e36edb67',
         kind: 'circle',
         cx: 0.4969421971043731,
         cy: 0.6324609237606966,
@@ -22408,7 +22408,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '963895d9-25a5-4398-944d-0d0ca2cfd1c9',
+        id: 'ee2d203f-0c94-4c17-9072-42b2822e8041',
         kind: 'circle',
         cx: 0.49934319704192415,
         cy: 0.6334323063360412,
@@ -22420,7 +22420,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '20937ef0-bb19-40d4-aa3c-366f783445e0',
+        id: 'e5a624a1-eab0-4f5f-8af0-0e8a34fe9ee3',
         kind: 'circle',
         cx: 0.49934319704192415,
         cy: 0.6334323063360412,
@@ -22432,7 +22432,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '09619393-60d9-41fb-a1c2-f719efdaed85',
+        id: '759080cb-0cd3-4ab9-8018-b247aaa77053',
         kind: 'line',
         x1: 0.05176654148703686,
         y1: 0.6705876458882996,
@@ -22445,7 +22445,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '78be2f25-f8d8-496c-bc88-0f8303b7e686',
+        id: '81c1ee50-2088-4ac9-8c19-daa3f84cd0a2',
         kind: 'line',
         x1: 0.9485451603499495,
         y1: 0.6705876458882997,
@@ -22491,7 +22491,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '59093f8d-396b-426c-9ec9-7450dd5b9cd4',
+        id: 'ea76db78-8827-4595-98ba-cb219897f39e',
         kind: 'rect',
         x: 0.11108119427990194,
         y: 0.3068883710657644,
@@ -22504,7 +22504,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '45fcd4f7-8a94-4eef-9d09-392e3681fe9f',
+        id: 'e94a75a6-a884-4c2a-8fa6-2c31b5e3869b',
         kind: 'rect',
         x: 0.08150043466762595,
         y: 0.47154155243288964,
@@ -22517,7 +22517,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5661ffc4-9f4f-4d7a-ac40-969f67b03685',
+        id: '5695cb72-60f4-4c08-a1a3-6e4aefc2df81',
         kind: 'rect',
         x: 0.8871440190229818,
         y: 0.37227855551157324,
@@ -22530,7 +22530,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '042b5e2b-718f-41df-b761-39a1c38a5bd5',
+        id: 'fac01a7f-d6b9-446c-91e9-ff09905a6464',
         kind: 'rect',
         x: 0.8871440190229818,
         y: 0.5714749033224288,
@@ -22557,7 +22557,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '77be7114-1969-4181-bb5d-bfc47f4da3bf',
+        id: '97f10bec-ab29-4e8d-b602-e4d4a6842d5a',
         kind: 'circle',
         cx: 0.4336930496597364,
         cy: 0.5571019854694975,
@@ -22569,7 +22569,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ca1d02d1-812c-43ff-b821-439f8e54a260',
+        id: '689ee938-a600-4e1d-8863-1c3a126b145e',
         kind: 'circle',
         cx: 0.4336930496597364,
         cy: 0.5571019854694975,
@@ -22581,7 +22581,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'e9fc70a9-c096-4e81-b0d9-9a83bd34a58f',
+        id: '98ef944b-c81b-40d2-ad3d-922c10baedec',
         kind: 'arrow',
         x1: 0.053403187414106955,
         y1: 0.9432424609804443,
@@ -22594,7 +22594,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a0f63b2a-ef71-4d0a-8617-16abff1512fa',
+        id: 'f7f77380-9b0a-49f2-b8a3-c7f4f2014b8c',
         kind: 'polygon',
         points: [
           {
@@ -22631,11 +22631,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'c7023f79-6d27-47e4-add2-151163777646',
+        id: '86c02da0-f35b-4c9e-bb63-669d5930ebca',
         kind: 'circle',
         cx: 0.5407331033180521,
         cy: 0.4661334725033814,
-        radius: 0.04180107590177633,
+        radius: 0.04379953371381344,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0199203187250996,
@@ -22643,11 +22643,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '84f863a2-d945-44d7-ae56-cbdc60b4cd5f',
+        id: '6e5b5223-406b-4cba-9d0e-71986cf07b18',
         kind: 'circle',
         cx: 0.5407331033180521,
         cy: 0.4661334725033814,
-        radius: 0.1163659286150046,
+        radius: 0.12192923994321199,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0199203187250996,
@@ -22655,11 +22655,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '545e378c-eb9c-444d-9a0a-02e9a909aef8',
+        id: '0cc43d08-291b-4baf-aa82-23b1dd25cf54',
         kind: 'circle',
         cx: 0.5407331033180521,
         cy: 0.4661334725033814,
-        radius: 0.08665363414393056,
+        radius: 0.0907964373699352,
         style: {
           stroke: '#000000',
           strokeWidth: 0.0199203187250996,
@@ -22667,7 +22667,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1939f911-623f-4fad-8d3f-6bf1ef74ca2a',
+        id: 'dd735d96-2c3b-477a-8dae-e5bd0d79abc3',
         kind: 'line',
         x1: 0.45723024151604524,
         y1: 0.3903755802466097,
@@ -22680,7 +22680,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '3464994b-3cef-4f25-8b29-a52e752438bf',
+        id: 'aa40352d-0d1a-4e9d-9d90-a7fd888aeff7',
         kind: 'line',
         x1: 0.16106333807709333,
         y1: 0.20371036392871195,
@@ -22693,7 +22693,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7ccb27c1-95b3-4607-87c8-9834eb1fa182',
+        id: 'd6dae3f0-a357-428b-8211-fdaf3d8738b1',
         kind: 'line',
         x1: 0.04786255316962129,
         y1: 0.40851479388555506,
@@ -22706,7 +22706,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'd085b619-76b7-472d-979a-18bb203b3e64',
+        id: '6701e990-7a55-4db0-a39f-10fbdc4620f7',
         kind: 'line',
         x1: 0.5103358135235591,
         y1: 0.35529140779081164,
@@ -22719,7 +22719,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '145174a2-2f0e-4963-9809-71ae025cfd86',
+        id: 'ff199356-06c1-44c9-b63d-c1c92aa553ff',
         kind: 'line',
         x1: 0.5012786346191814,
         y1: 0.3325649558623383,
@@ -22732,7 +22732,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6e46d04e-5fdf-4493-be22-2b8e165c1c11',
+        id: '86021e50-9c56-4b63-bb83-f21c3da8180a',
         kind: 'line',
         x1: 0.574656410262516,
         y1: 0.3537240662785031,
@@ -22745,7 +22745,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '03fbfa4c-74b6-482a-9744-fb05ec35b7eb',
+        id: '624b2abd-13d3-45ff-a56b-ba8ea3157848',
         kind: 'line',
         x1: 0.7388779717433263,
         y1: 0.9474285228000343,
@@ -22758,7 +22758,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c4a89cfc-9049-4581-ad1c-e65119af7021',
+        id: 'd18009fe-4e3e-4e56-bb28-071f0b6f6523',
         kind: 'line',
         x1: 0.513004478047368,
         y1: 0.9471090617405719,
@@ -22771,7 +22771,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '2564e76d-b9f1-4f46-a0e7-84a88e1f5f1e',
+        id: '32710d36-585e-4210-8ad9-94af2d9bb903',
         kind: 'line',
         x1: 0.5192018691145401,
         y1: 0.5850260139705702,
@@ -22784,7 +22784,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5a0d401f-ab99-4b53-a5eb-42ce29dd68c8',
+        id: 'bf84bcc9-2c31-455a-94e1-3e3ab48b39d2',
         kind: 'line',
         x1: 0.9529341594401523,
         y1: 0.25546535911080476,
@@ -22797,7 +22797,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '54c98888-65fe-4d95-94aa-5ad6d3e6f8e6',
+        id: 'aaa241ec-c949-4c32-abec-001db70fa403',
         kind: 'line',
         x1: 0.6505698649340285,
         y1: 0.430883190562909,
@@ -22810,7 +22810,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '1eaba12b-f39c-48a6-9453-5fea308ef976',
+        id: 'f7a79f86-ebab-47ce-9c8d-c5a6a47587f2',
         kind: 'line',
         x1: 0.8402614506516659,
         y1: 0.05034146809449903,
@@ -22837,7 +22837,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '912e401e-f17b-45b9-bc14-de041e0a2472',
+        id: '50ffd720-1806-406e-9c84-12e7f51a346c',
         kind: 'rect',
         x: 0.3766962706203482,
         y: 0.5134209534526005,
@@ -22850,7 +22850,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '4917a973-c24e-44e2-8e06-5cf64a7b41bb',
+        id: '948fa1f7-a77e-4e54-9b93-a5d3c252ee95',
         kind: 'rect',
         x: 0.0351116149064479,
         y: 0.11531653421764924,
@@ -22863,11 +22863,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '538d98c8-1a12-4d4b-bbb9-6d5334c660b9',
+        id: 'a6beed0b-62ae-4bcd-8a0a-a9ceacd3e72d',
         kind: 'circle',
         cx: 0.18674187671115494,
         cy: 0.2902412032754309,
-        radius: 0.1383904391685417,
+        radius: 0.16699112993004034,
         style: {
           stroke: '#000000',
           strokeWidth: 0.03333333333333333,
@@ -22875,11 +22875,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'ef830f05-476b-40bc-b1a7-33a3f3c4c944',
+        id: '1a33087e-bb65-4b27-be39-a1e3cb396c67',
         kind: 'circle',
         cx: 0.8099255900623679,
         cy: 0.2902412032754309,
-        radius: 0.1383904391685417,
+        radius: 0.16699112993004034,
         style: {
           stroke: '#000000',
           strokeWidth: 0.03333333333333333,
@@ -22887,11 +22887,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a95f8e04-9597-4ba5-a370-523f345349dd',
+        id: 'c385b9eb-88be-4641-a45c-83a7c7a5c759',
         kind: 'circle',
         cx: 0.18674187671115494,
         cy: 0.7185805581120583,
-        radius: 0.1383904391685417,
+        radius: 0.16699112993004034,
         style: {
           stroke: '#000000',
           strokeWidth: 0.03333333333333333,
@@ -22899,11 +22899,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '43821de6-c529-4c48-b6e4-6fc7248b7a7a',
+        id: '9ad0be64-bcdb-4844-b688-a073b8d75f76',
         kind: 'circle',
         cx: 0.8100057795529264,
         cy: 0.7185805581120583,
-        radius: 0.1383904391685417,
+        radius: 0.16699112993004034,
         style: {
           stroke: '#000000',
           strokeWidth: 0.03333333333333333,
@@ -22911,7 +22911,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '0a306bcd-dd37-43da-976c-20dc29280fc6',
+        id: 'c474571f-ca9c-4e11-b1db-caca758129df',
         kind: 'line',
         x1: 0.0485934134178319,
         y1: 0.1338819540668799,
@@ -22924,7 +22924,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'dd7c216f-c54b-4527-b55e-18cc9f5b53c0',
+        id: '65155483-0a93-4f95-9f40-019555d3294b',
         kind: 'line',
         x1: 0.9514065865821678,
         y1: 0.1338819540668799,
@@ -22937,11 +22937,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '870b950b-8a67-41b8-ae75-6e6b805c239a',
+        id: 'aa0b6f18-7c6d-40a9-aca9-08d222ee32fe',
         kind: 'arc',
         cx: 0.4860839548287098,
         cy: 3.173919085587228,
-        radius: 2.6039044033407643,
+        radius: 3.1420446466978555,
         startAngle: -1.7396102877902766,
         endAngle: -1.3911901617039415,
         style: {
@@ -22965,7 +22965,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '0197f7bb-c16a-4243-9fb5-ef52f10066d7',
+        id: '1f008c65-07e4-4ef8-88b7-e71c5825052e',
         kind: 'rect',
         x: 0.015336579859478047,
         y: 0.036470807414844236,
@@ -22978,7 +22978,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'a1c2628a-6fb9-4a7b-a3d7-d9ef8498184a',
+        id: '4298b9c3-febd-4acd-a794-5a4dce2ffff2',
         kind: 'line',
         x1: 0.18263156752219614,
         y1: 0.6487854104350167,
@@ -22991,7 +22991,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '60d1da44-92a3-4e8a-954d-0a2d346185f9',
+        id: 'aa746d85-6d70-4f54-965d-79c403301c30',
         kind: 'line',
         x1: 0.5110709918306211,
         y1: 0.335590010039641,
@@ -23004,7 +23004,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '247d5932-5bc4-4495-bd3d-c3fbb3b4a87c',
+        id: '9d712e90-4ce5-4599-8dd7-89cc6266b089',
         kind: 'line',
         x1: 0.4708338218645981,
         y1: 0.6797244865649283,
@@ -23017,7 +23017,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8a6101ab-2520-4492-9ae7-9d26b99fe7d4',
+        id: '78f82b4b-d025-4862-b2ed-5cf9d165128d',
         kind: 'line',
         x1: 0.7337209386464444,
         y1: 0.3039185650558389,
@@ -23030,7 +23030,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6be8b7d7-fb09-4efd-9332-7e3c21b70a8f',
+        id: '91d6b219-85c6-47c0-8728-b041bfb4a01e',
         kind: 'line',
         x1: 0.7649318989156331,
         y1: 0.4954167165896321,
@@ -23064,7 +23064,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '6e5700ae-e5b8-40e0-a6af-7fb1ee6bf5c6',
+        id: '2ec88183-bd05-4279-9eb7-bc6ac7ce0f2e',
         kind: 'rect',
         x: 0.02006077982409871,
         y: 0.07892373951432871,
@@ -23077,7 +23077,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7fc8fa98-73a3-4fdc-b6f7-51cd8538dc18',
+        id: 'ce28a138-546d-40c3-8195-dfafca52a172',
         kind: 'text',
         x: 0.12045073637050296,
         y: 0.07934744397566708,
@@ -23104,7 +23104,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'c026b0c7-9c19-4c4a-9efe-df8ac2a669d7',
+        id: '1edb0336-3f63-4ce4-9ed1-7f39d722cb48',
         kind: 'rect',
         x: 0.016004966536446483,
         y: 0.03798560869780241,
@@ -23117,7 +23117,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '9b3ee5ea-8218-4690-bf6e-798f53ac1966',
+        id: 'a342d289-6cfd-4052-9a1b-ad37fb65ac3b',
         kind: 'polygon',
         points: [
           {
@@ -23158,7 +23158,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '333a5f7c-3b2a-48cd-93e9-103145e19122',
+        id: 'fb91b425-188a-490c-b9b4-eaa15b5e678f',
         kind: 'rect',
         x: 0.016004966536446483,
         y: 0.03798560869780241,
@@ -23171,7 +23171,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'fa84cc42-db8e-4394-9687-956c7d9bc640',
+        id: '2700daea-dc89-4d09-b3e2-73904edbd188',
         kind: 'line',
         x1: 0.03352904731298597,
         y1: 0.08127161900288794,
@@ -23184,7 +23184,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'b3d85fc4-b782-46d0-b0fe-b77aafb4bffd',
+        id: '9fe5b1c6-91f8-4c51-9915-959b9a1305f3',
         kind: 'line',
         x1: 0.9685168779180976,
         y1: 0.06670411340181923,
@@ -23211,7 +23211,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '7ae5a5de-874a-444e-92e5-469403448f1c',
+        id: '7450c063-a702-4283-91b6-165327c702e0',
         kind: 'rect',
         x: 0.016004966536446483,
         y: 0.03798560869780241,
@@ -23224,7 +23224,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '99deed1d-c084-4fc8-affc-4824819ae20b',
+        id: 'fba33f85-2b87-4700-af80-c131fa99d3c1',
         kind: 'polygon',
         points: [
           {
@@ -23272,7 +23272,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '24bf75c3-3db4-4217-99b7-6cb6872d54d9',
+        id: '6f5a6714-950c-4372-bb99-24b8ae2db900',
         kind: 'rect',
         x: 0.016004966536446483,
         y: 0.03798560869780241,
@@ -23299,7 +23299,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '756faa2d-b3d6-4220-ab3a-33711c5a5345',
+        id: '10e442e6-2bad-4d21-b589-049e9e713c8f',
         kind: 'rect',
         x: 0.016004966536446483,
         y: 0.03798560869780241,
@@ -23312,7 +23312,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'f2da4ceb-b706-425f-98a9-8f3758f8f50b',
+        id: 'b2889e40-d6d3-4c93-b9fd-9d4e257944e8',
         kind: 'polygon',
         points: [
           {
@@ -23349,7 +23349,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'a634fda5-02f5-43aa-9ff7-d53789a52615',
+        id: '91119604-e21d-4124-921e-c4437a004f83',
         kind: 'circle',
         cx: 0.5087943311393898,
         cy: 0.5047798082456615,
@@ -23361,7 +23361,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c6304319-5c5d-4a2a-8bb3-b20235dabf21',
+        id: 'b7671cec-63ea-460b-93fa-35456717516a',
         kind: 'polygon',
         points: [
           {
@@ -23384,7 +23384,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '20660178-e548-4096-8139-1b8432923b65',
+        id: '9fe841f7-d24c-4541-b83c-896e0272e0bd',
         kind: 'circle',
         cx: 0.5087943311393898,
         cy: 0.5047798082456615,
@@ -23410,7 +23410,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: 'a634fda5-02f5-43aa-9ff7-d53789a52615',
+        id: '91119604-e21d-4124-921e-c4437a004f83',
         kind: 'circle',
         cx: 0.5087943311393898,
         cy: 0.5047798082456615,
@@ -23422,7 +23422,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'c6304319-5c5d-4a2a-8bb3-b20235dabf21',
+        id: 'b7671cec-63ea-460b-93fa-35456717516a',
         kind: 'polygon',
         points: [
           {
@@ -23445,7 +23445,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '20660178-e548-4096-8139-1b8432923b65',
+        id: '9fe841f7-d24c-4541-b83c-896e0272e0bd',
         kind: 'circle',
         cx: 0.5087943311393898,
         cy: 0.5047798082456615,
@@ -23471,7 +23471,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '6aaaad9b-0d1b-461c-b66d-d763c9bf78c0',
+        id: '7dff33ac-45e2-412b-8955-38bfce4490c4',
         kind: 'circle',
         cx: 0.46738955814112104,
         cy: 0.5315146598796858,
@@ -23483,7 +23483,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '05fcb001-ab62-476b-bb88-9092f453cf57',
+        id: '56d2b338-7941-4995-8561-01f2555320b8',
         kind: 'polygon',
         points: [
           {
@@ -23506,7 +23506,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bf7dae83-2025-4599-beda-b09bba6d0be8',
+        id: '70b931f5-3bff-4fd0-944b-bc06164f5f2a',
         kind: 'arrow',
         x1: 0.09380663690424569,
         y1: 0.8957166818180944,
@@ -23533,7 +23533,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '6aaaad9b-0d1b-461c-b66d-d763c9bf78c0',
+        id: '7dff33ac-45e2-412b-8955-38bfce4490c4',
         kind: 'circle',
         cx: 0.46738955814112104,
         cy: 0.5315146598796858,
@@ -23545,7 +23545,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '05fcb001-ab62-476b-bb88-9092f453cf57',
+        id: '56d2b338-7941-4995-8561-01f2555320b8',
         kind: 'polygon',
         points: [
           {
@@ -23568,7 +23568,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: 'bf7dae83-2025-4599-beda-b09bba6d0be8',
+        id: '70b931f5-3bff-4fd0-944b-bc06164f5f2a',
         kind: 'arrow',
         x1: 0.09380663690424569,
         y1: 0.8957166818180944,
@@ -23602,11 +23602,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '69542565-25ab-45a9-9bb2-3bb018cd580c',
+        id: 'bb79e6a3-eae7-42c3-a7e3-1643c1a5fe69',
         kind: 'circle',
         cx: 0.5021806794401642,
         cy: 0.5006153604795214,
-        radius: 0.459601149365335,
+        radius: 0.4631917833447517,
         style: {
           stroke: '#000000',
           strokeWidth: 0.078125,
@@ -23614,7 +23614,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7aae1473-07a2-4b34-b243-c1690b1859b6',
+        id: '83fedd46-a4b8-41ae-8560-d66bedb23021',
         kind: 'polygon',
         points: [
           {
@@ -23658,11 +23658,11 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ],
     shapes: [
       {
-        id: '69542565-25ab-45a9-9bb2-3bb018cd580c',
+        id: 'bb79e6a3-eae7-42c3-a7e3-1643c1a5fe69',
         kind: 'circle',
         cx: 0.5021806794401642,
         cy: 0.5006153604795214,
-        radius: 0.459601149365335,
+        radius: 0.4631917833447517,
         style: {
           stroke: '#000000',
           strokeWidth: 0.078125,
@@ -23670,7 +23670,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '7aae1473-07a2-4b34-b243-c1690b1859b6',
+        id: '83fedd46-a4b8-41ae-8560-d66bedb23021',
         kind: 'polygon',
         points: [
           {
@@ -23707,7 +23707,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     ports: [],
     shapes: [
       {
-        id: '01c4d3e4-89ee-4b80-8e10-8935b1d93336',
+        id: 'c359611e-4bd3-465a-8b61-28d37323023a',
         kind: 'rect',
         x: 0.1819218452681517,
         y: 0.044553555925975166,
@@ -23720,7 +23720,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '33255ad7-ca53-4193-aee8-1df681514516',
+        id: '5b55f356-ecb7-4045-a82e-78fdb50a9286',
         kind: 'line',
         x1: 0.18708966398058174,
         y1: 0.05680661398909572,
@@ -23733,7 +23733,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '8c3b8aeb-52ce-4ebd-986f-a54aa1d22a31',
+        id: 'f4631e57-a509-43b6-a3f6-f7da2da58672',
         kind: 'line',
         x1: 0.810230059411088,
         y1: 0.06113007472197923,
@@ -23746,7 +23746,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '5dedfec1-25ad-4f91-92ac-0614d6fd0b4f',
+        id: 'f1b3b657-8417-4d9f-859a-c8ff9f3b3cdf',
         kind: 'polygon',
         points: [
           {
@@ -23769,7 +23769,7 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
         }
       },
       {
-        id: '6ab563d4-87ed-4202-a2a0-50b66f29d9ba',
+        id: 'e5a69450-0962-4931-94e4-660dadb54488',
         kind: 'polygon',
         points: [
           {

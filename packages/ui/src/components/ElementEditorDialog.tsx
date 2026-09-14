@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { CommandManager, type Discipline, type PortSpec, type StampCategory, type StampDefinition, type SymbolShape, type SymbolShapeStyle } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { loadStampBitmap } from '../stampBitmap.js';
+import { stampLabelFor } from './StampsPanel.js';
+import type { StampLabelLanguage } from './LanguageToggle.js';
 import {
   arcFromThreePoints,
   createDraftShape,
@@ -23,12 +25,20 @@ import {
 /** Same 300 DPI convention as stampBitmap.ts/scene.ts's STAMP_SOURCE_DPI — stamp art's pixel size at 300 DPI is expected to match its nominal size in PDF points. */
 const STAMP_SOURCE_DPI = 300;
 
-/** Drawing-buffer resolution for the Shapes-mode canvas — always square regardless of the definition's own nativeWidth:nativeHeight aspect, same simplification the ports overlay already relies on (fractions are relative to the full preview box, not the artwork's own aspect). */
-const SHAPE_CANVAS_PX = 520;
+/** Cap on the Shapes-mode canvas's longer side, in drawing-buffer px — the shorter side is derived from the definition's own nativeWidth:nativeHeight aspect (see shapeCanvasSize) so a wide/tall stamp doesn't get squished into a square, matching how it actually looks placed on the PDF. */
+const SHAPE_CANVAS_MAX_PX = 520;
 
-/** Rotate handle geometry, in the same SHAPE_CANVAS_PX pixel space — a stem above the selection's top edge ending in a small draggable circle. */
+/** Rotate handle geometry, in the same drawing-buffer pixel space as shapeCanvasSize's output — a stem above the selection's top edge ending in a small draggable circle. */
 const ROTATE_HANDLE_OFFSET_PX = 28;
 const ROTATE_HANDLE_RADIUS_PX = 6;
+
+/** Longer side fixed at SHAPE_CANVAS_MAX_PX, shorter side scaled down to match the artwork's own aspect ratio — same "contain within a box" sizing the placed-on-PDF render and the final rasterize-to-iconRef step already use via nativeWidth/nativeHeight. */
+function shapeCanvasSize(nativeWidth: number, nativeHeight: number): { widthPx: number; heightPx: number } {
+  const w = nativeWidth > 0 ? nativeWidth : 1;
+  const h = nativeHeight > 0 ? nativeHeight : 1;
+  const scale = SHAPE_CANVAS_MAX_PX / Math.max(w, h);
+  return { widthPx: Math.max(1, Math.round(w * scale)), heightPx: Math.max(1, Math.round(h * scale)) };
+}
 
 const DISCIPLINE_OPTIONS: Discipline[] = [
   'heatingAndCooling',
@@ -71,11 +81,11 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
-/** Rotate handle sits centered above the selection's top edge, offset by a fixed pixel distance — fraction-space position, in the SHAPE_CANVAS_PX pixel convention. */
-function rotateHandlePosition(selected: SymbolShape[]): { x: number; y: number } | null {
+/** Rotate handle sits centered above the selection's top edge, offset by a fixed pixel distance — heightPx is the canvas's own drawing-buffer height (see shapeCanvasSize) since this is a vertical offset. */
+function rotateHandlePosition(selected: SymbolShape[], heightPx: number): { x: number; y: number } | null {
   if (selected.length === 0) return null;
   const b = selectionBounds(selected);
-  return { x: b.x + b.width / 2, y: b.y - ROTATE_HANDLE_OFFSET_PX / SHAPE_CANVAS_PX };
+  return { x: b.x + b.width / 2, y: b.y - ROTATE_HANDLE_OFFSET_PX / heightPx };
 }
 
 function readAsDataUrl(file: File): Promise<string> {
@@ -90,6 +100,8 @@ function readAsDataUrl(file: File): Promise<string> {
 export interface ElementEditorDialogProps {
   /** The definition being edited ("Edit ports…" from a placed custom instance's Properties panel), or undefined for "Create custom element". Editing changes the definition going forward — it does not retroactively touch instances already placed from it, same as a library definition's own fields were never live-linked to its placed instances. */
   definition?: StampDefinition;
+  /** The Stamps tab's picker-label language (see LanguageToggle) — only used to seed the Name field from definition.labelNl when opening a library stamp for editing; the saved definition always keeps a single label going forward (see StampsPanel's stampLabelFor doc comment). */
+  labelLanguage?: StampLabelLanguage;
   onSave: (definition: StampDefinition) => void;
   onClose: () => void;
 }
@@ -104,8 +116,8 @@ export interface ElementEditorDialogProps {
  * for grouping ports that are internally wired together (converted to a real
  * instance-level PortGroup at placement, see SketchScene.placeStamp).
  */
-export function ElementEditorDialog({ definition, onSave, onClose }: ElementEditorDialogProps) {
-  const [name, setName] = useState(definition?.label ?? '');
+export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose }: ElementEditorDialogProps) {
+  const [name, setName] = useState(definition ? stampLabelFor(definition, labelLanguage ?? 'en') : '');
   const [discipline, setDiscipline] = useState<Discipline>(definition?.discipline ?? 'ventilation');
   const [category, setCategory] = useState<StampCategory>(definition?.category === 'equipment' ? 'equipment' : 'terminal');
   const [mode, setMode] = useState<ArtworkMode>(definition?.shapes && definition.shapes.length > 0 ? 'shapes' : 'import');
@@ -120,6 +132,10 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
   const [editPortName, setEditPortName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+
+  // Recomputed as the user edits nativeWidth/nativeHeight so the preview box
+  // and canvas stay in sync with the definition's true aspect ratio.
+  const { widthPx: canvasWidthPx, heightPx: canvasHeightPx } = useMemo(() => shapeCanvasSize(nativeWidth, nativeHeight), [nativeWidth, nativeHeight]);
 
   // Shapes mode (§5.3) — local undo/redo history, same Command/CommandManager
   // primitive the rest of the app uses, scoped to just this dialog's canvas.
@@ -264,7 +280,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     }
     if (tool === 'select' && !marquee) {
       const selectedForHandle = toDraw.filter((s) => selectedShapeIds.has(s.id));
-      const handle = rotateHandlePosition(selectedForHandle);
+      const handle = rotateHandlePosition(selectedForHandle, canvas.height);
       if (handle) {
         const b = selectionBounds(selectedForHandle);
         const handleX = handle.x * canvas.width;
@@ -306,7 +322,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
       }
       ctx.restore();
     }
-  }, [mode, shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint]);
+  }, [mode, shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint, canvasWidthPx, canvasHeightPx]);
 
   // Delete/Backspace removes the selected shape; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes — only while Shapes mode is active and no text field has focus.
   useEffect(() => {
@@ -410,21 +426,21 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
     if (tool === 'select') {
       // Rotate-handle hit test takes priority over shape hit-testing.
       const selectedForRotate = shapes.filter((s) => selectedShapeIds.has(s.id));
-      const handle = rotateHandlePosition(selectedForRotate);
+      const handle = rotateHandlePosition(selectedForRotate, canvasHeightPx);
       if (handle) {
-        const handlePxX = handle.x * SHAPE_CANVAS_PX;
-        const handlePxY = handle.y * SHAPE_CANVAS_PX;
-        const clickPxX = start.fractionX * SHAPE_CANVAS_PX;
-        const clickPxY = start.fractionY * SHAPE_CANVAS_PX;
+        const handlePxX = handle.x * canvasWidthPx;
+        const handlePxY = handle.y * canvasHeightPx;
+        const clickPxX = start.fractionX * canvasWidthPx;
+        const clickPxY = start.fractionY * canvasHeightPx;
         if (Math.hypot(clickPxX - handlePxX, clickPxY - handlePxY) <= ROTATE_HANDLE_RADIUS_PX + 3) {
           const pivot = selectionPivot(selectedForRotate);
-          const pivotPxX = pivot.x * SHAPE_CANVAS_PX;
-          const pivotPxY = pivot.y * SHAPE_CANVAS_PX;
+          const pivotPxX = pivot.x * canvasWidthPx;
+          const pivotPxY = pivot.y * canvasHeightPx;
           const startAngle = Math.atan2(clickPxY - pivotPxY, clickPxX - pivotPxX);
           const move = (ev: PointerEvent) => {
             const current = fractionFromEvent(ev.clientX, ev.clientY);
-            const currentPxX = current.fractionX * SHAPE_CANVAS_PX;
-            const currentPxY = current.fractionY * SHAPE_CANVAS_PX;
+            const currentPxX = current.fractionX * canvasWidthPx;
+            const currentPxY = current.fractionY * canvasHeightPx;
             const currentAngle = Math.atan2(currentPxY - pivotPxY, currentPxX - pivotPxX);
             const delta = currentAngle - startAngle;
             setDraftShapes(selectedForRotate.map((s) => rotateShapeAround(s, delta, pivot.x, pivot.y)));
@@ -446,7 +462,7 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
         }
       }
 
-      const hit = hitTestSymbolShape(shapes, start.fractionX, start.fractionY, SHAPE_CANVAS_PX, SHAPE_CANVAS_PX);
+      const hit = hitTestSymbolShape(shapes, start.fractionX, start.fractionY, canvasWidthPx, canvasHeightPx);
       if (hit) {
         if (event.shiftKey) {
           setSelectedShapeIds((prev) => {
@@ -837,14 +853,19 @@ export function ElementEditorDialog({ definition, onSave, onClose }: ElementEdit
           </>
         )}
 
-        <div className="mep-element-editor-preview" ref={previewRef} onClick={handlePreviewClick}>
+        <div
+          className="mep-element-editor-preview"
+          ref={previewRef}
+          onClick={handlePreviewClick}
+          style={mode === 'shapes' ? { width: canvasWidthPx / 2, height: canvasHeightPx / 2 } : undefined}
+        >
           {mode === 'import' ? (
             artworkDataUrl && <img src={artworkDataUrl} alt="" />
           ) : (
             <canvas
               ref={shapesCanvasRef}
-              width={SHAPE_CANVAS_PX}
-              height={SHAPE_CANVAS_PX}
+              width={canvasWidthPx}
+              height={canvasHeightPx}
               onPointerDown={handleShapesCanvasPointerDown}
               onPointerMove={handleShapesCanvasPointerMove}
               onDoubleClick={handleShapesCanvasDoubleClick}

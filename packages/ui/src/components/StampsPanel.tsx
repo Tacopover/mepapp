@@ -5,7 +5,7 @@ import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js'
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
 import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
-import { IconCopy, IconFile, IconPencil } from '../icons.js';
+import { IconFile, IconPencil } from '../icons.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 
@@ -44,7 +44,7 @@ function iconUrlFor(definition: StampDefinition, resolveIconUrl: (iconRef: strin
 }
 
 /** definition.labelNl when NL is active and a translation exists (fixture-generated entries only) — a custom stamp's fixed label always shows as-is regardless of the toggle. */
-function stampLabelFor(definition: StampDefinition, language: StampLabelLanguage): string {
+export function stampLabelFor(definition: StampDefinition, language: StampLabelLanguage): string {
   return language === 'nl' && definition.labelNl ? definition.labelNl : definition.label;
 }
 
@@ -166,13 +166,13 @@ export function StampsPanel({
                   <button
                     type="button"
                     className="mep-stamp-tile-duplicate"
-                    title="Duplicate as custom stamp…"
+                    title="Edit stamp…"
                     onClick={(e) => {
                       e.stopPropagation();
                       onDuplicateStampDefinition(definition);
                     }}
                   >
-                    <IconCopy size={12} />
+                    <IconPencil size={12} />
                   </button>
                 )}
               </div>

@@ -746,6 +746,7 @@ export function MepSketchApp({
                 ? elementEditorTarget.seed
                 : undefined
           }
+          labelLanguage={labelLanguage}
           onSave={handleSaveElementDefinition}
           onClose={() => setElementEditorTarget(null)}
         />

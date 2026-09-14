@@ -154,10 +154,12 @@ function styleOf(shape, vbw, vbh) {
 // ViewBoxWidth/ViewBoxHeight; SymbolShape coordinates are fractional 0..1,
 // normalized independently per axis (see packages/ui/src/symbolShapeCanvas.ts's
 // `x * widthPx` / `y * heightPx`) — so x-ish fields divide by vbw, y-ish by vbh.
-// radius/fontSize are single scalars with no independent X/Y in SymbolShape;
-// matching how the renderer applies them (radius against widthPx, fontSize
-// against heightPx), radius divides by vbw and fontSize by vbh. See plan's
-// "Known fidelity risk" note for circle/arc on a non-square viewBox.
+// radius is a single scalar with no independent X/Y in SymbolShape — a circle
+// can't be expressed as separate width/height fractions without becoming an
+// ellipse on a non-square viewBox, so it divides by Math.min(vbw, vbh),
+// matching strokeWidth above and how the renderer/hit-test apply it
+// (radius * Math.min(widthPx, heightPx) for both axes). fontSize divides by
+// vbh, matching the renderer's single-axis (heightPx) use for text size.
 function convertShape(shape, vbw, vbh) {
   const id = randomUUID();
   const style = styleOf(shape, vbw, vbh);
@@ -167,18 +169,27 @@ function convertShape(shape, vbw, vbh) {
     case 'rect':
       return { id, kind: 'rect', x: shape.x / vbw, y: shape.y / vbh, width: shape.w / vbw, height: shape.h / vbh, style };
     case 'circle':
-      return { id, kind: 'circle', cx: shape.cx / vbw, cy: shape.cy / vbh, radius: shape.r / vbw, style };
-    case 'arc':
+      return { id, kind: 'circle', cx: shape.cx / vbw, cy: shape.cy / vbh, radius: shape.r / Math.min(vbw, vbh), style };
+    case 'arc': {
+      // ctx.ellipse always sweeps forward (increasing angle) from startAngle to
+      // endAngle — a negative sweepAngle in the fixture means the intended arc
+      // runs the other way, so swap start/end to keep endAngle > startAngle,
+      // otherwise the canvas draws the major (wrong) arc instead.
+      const rawStart = shape.startAngle;
+      const rawEnd = shape.startAngle + shape.sweepAngle;
+      const lo = Math.min(rawStart, rawEnd);
+      const hi = Math.max(rawStart, rawEnd);
       return {
         id,
         kind: 'arc',
         cx: shape.cx / vbw,
         cy: shape.cy / vbh,
-        radius: shape.r / vbw,
-        startAngle: (shape.startAngle * Math.PI) / 180,
-        endAngle: ((shape.startAngle + shape.sweepAngle) * Math.PI) / 180,
+        radius: shape.r / Math.min(vbw, vbh),
+        startAngle: (lo * Math.PI) / 180,
+        endAngle: (hi * Math.PI) / 180,
         style,
       };
+    }
     case 'text':
       return { id, kind: 'text', x: shape.x / vbw, y: shape.y / vbh, text: shape.content, fontSize: shape.fontSize / vbh, style };
     case 'arrow':

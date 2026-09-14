@@ -73,17 +73,25 @@ export function drawSymbolShapes(ctx: CanvasRenderingContext2D, shapes: SymbolSh
         if (shape.style.fill) ctx.fill();
         ctx.stroke();
         break;
-      case 'circle':
+      case 'circle': {
+        // A single radius fraction can't be scaled independently per axis without
+        // becoming an ellipse on a non-square canvas — scale by the shorter
+        // dimension (same convention strokeWidth and hitTestSymbolShape already use)
+        // so it stays a true circle regardless of the artwork's aspect ratio.
+        const r = shape.radius * Math.min(widthPx, heightPx);
         ctx.beginPath();
-        ctx.ellipse(shape.cx * widthPx, shape.cy * heightPx, shape.radius * widthPx, shape.radius * heightPx, 0, 0, Math.PI * 2);
+        ctx.ellipse(shape.cx * widthPx, shape.cy * heightPx, r, r, 0, 0, Math.PI * 2);
         if (shape.style.fill) ctx.fill();
         ctx.stroke();
         break;
-      case 'arc':
+      }
+      case 'arc': {
+        const r = shape.radius * Math.min(widthPx, heightPx);
         ctx.beginPath();
-        ctx.ellipse(shape.cx * widthPx, shape.cy * heightPx, shape.radius * widthPx, shape.radius * heightPx, 0, shape.startAngle, shape.endAngle);
+        ctx.ellipse(shape.cx * widthPx, shape.cy * heightPx, r, r, 0, shape.startAngle, shape.endAngle);
         ctx.stroke();
         break;
+      }
       case 'text':
         ctx.font = `${shape.fontSize * heightPx}px sans-serif`;
         ctx.fillStyle = shape.style.stroke;
