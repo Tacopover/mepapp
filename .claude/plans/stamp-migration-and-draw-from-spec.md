@@ -14,6 +14,15 @@ Two independent, unrelated parts of this repo (Part A touches core/UI stamp data
 
 ## Part A — Migrate fixture stamps into Stamps tab, NL/EN label toggle
 
+**Status: DONE** (commits `1cbabac`, `6bdd373`, worktree `stamp-migration-and-draw-from`). User hand-filled `scripts/stamp-discipline-map.csv`'s discipline column directly on disk (this session and the user share the same container filesystem). Two things came up during implementation that the design section above didn't anticipate:
+
+- **A 6th Discipline value, `'other'`**, added everywhere Discipline is enumerated (core union, Stamps-tab filter, Network Type editor dropdown, custom Element Editor dropdown) — the user's filled-in CSV had items (CO2/compressed-air connection points, sprinkler heads, nitrogen/oxygen connections) that don't fit the original 5.
+- **Multi-discipline items** (the 3 Pump SVGs, both hvac and plumbing per the user) generate one `StampDefinition` per discipline, ids suffixed by the CSV's own group token (`pump-hvac`/`pump-plumbing`) — CSV format is `discipline1;discipline2` in one cell.
+- **3 of the 4 original hand-typed entries turned out to share fixture art with the new generated set** (not just the `switch` collision the design section flagged) — `ventilation-grille-rh-supply` and `luminaire-rectangular` are also now superseded, same id, generated data. The 4th, `fire-hose-reel`, was deliberately kept hand-typed and *excluded* from generation: `project.ts`'s v1→v2 schema migration reads this exact definitionId's `category` to backfill old saves, and the new fixture data disagrees (terminal vs. the hand-typed equipment) — see `generate-stamp-library.mjs`'s `EXCLUDED_FILENAMES` comment. Flagged to the user as a follow-up if they want to reconcile the category disagreement later.
+
+Verified: `pnpm build` (all workspaces) clean; `pnpm --filter @mepapp/core test` 134/134 passing (rewrote `stamp-library.test.ts`'s stale "no plumbing entries" assertion, added id-uniqueness/labelNl/multi-discipline coverage; `project.test.ts`'s migration tests — including the one keyed on `fire-hose-reel`'s category — passed unmodified, confirming the exclusion worked). End-to-end in a real Chromium browser via Playwright: 166 generated entries load, Terminal/Equipment category toggle and discipline filter (now including "Other") both filter the grid correctly, EN/NL toggle swaps a fixture-generated stamp's label (Pump → Pomp) while leaving the hand-typed `fire-hose-reel` tile in English (no `labelNl`), confirming custom/hand-typed entries stay language-agnostic as required.
+
+
 ### A1. Discipline mapping (blocking — user supplies)
 
 The old `D<n>_`/numeric filename prefixes do NOT map reliably onto core's 5 `Discipline` values (`heatingAndCooling | ventilation | plumbing | fireProtection | electrical` — `packages/core/src/network.ts:12-17`): confirmed conflicts (`D3_` mixes ventilation grilles with heating radiators, `D5_` mixes electrical panels with pumps, `D6_`-`D8_` items — camera, intercom, data cabinet, thermostat — don't fit any of the 5 at all).
