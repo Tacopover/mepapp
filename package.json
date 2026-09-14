@@ -4,6 +4,7 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "build": "turbo run build",
+    "gen:stamps": "node scripts/generate-stamp-library.mjs",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck"

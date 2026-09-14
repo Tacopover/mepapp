@@ -3,6 +3,8 @@ import type { SketchScene } from '@mepapp/render';
 import { NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampCategory, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
+import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
+import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
 import { IconFile, IconPencil } from '../icons.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
@@ -11,6 +13,8 @@ export interface StampsPanelProps {
   sceneRef: RefObject<SketchScene | null>;
   disciplineGroup: DisciplineGroup | null;
   onChangeDisciplineGroup: (value: DisciplineGroup | null) => void;
+  labelLanguage: StampLabelLanguage;
+  onChangeLabelLanguage: (value: StampLabelLanguage) => void;
   activeDefinitionId: string | null;
   onPick: (definition: StampDefinition) => void;
   onCustomStampFile: (file: File, category: StampCategory) => void;
@@ -37,6 +41,11 @@ function iconUrlFor(definition: StampDefinition, resolveIconUrl: (iconRef: strin
   return definition.iconRef.startsWith('data:') ? definition.iconRef : resolveIconUrl(definition.iconRef);
 }
 
+/** definition.labelNl when NL is active and a translation exists (fixture-generated entries only) — a custom stamp's fixed label always shows as-is regardless of the toggle. */
+function stampLabelFor(definition: StampDefinition, language: StampLabelLanguage): string {
+  return language === 'nl' && definition.labelNl ? definition.labelNl : definition.label;
+}
+
 function loadBitmap(url: string, definition: StampDefinition): Promise<ImageBitmap> {
   let cached = bitmapCache.get(url);
   if (!cached) {
@@ -52,6 +61,8 @@ export function StampsPanel({
   sceneRef,
   disciplineGroup,
   onChangeDisciplineGroup,
+  labelLanguage,
+  onChangeLabelLanguage,
   activeDefinitionId,
   onPick,
   onCustomStampFile,
@@ -63,9 +74,12 @@ export function StampsPanel({
   onPickNetworkType,
   onEditNetworkType,
 }: StampsPanelProps) {
+  const [categoryFilter, setCategoryFilter] = useState<StampCategoryFilter>('all');
+
   const allDefinitions = [...STAMP_LIBRARY, ...customStampDefinitions];
-  const definitions =
-    disciplineGroup === null ? allDefinitions : allDefinitions.filter((def) => disciplineGroupOf(def.discipline) === disciplineGroup);
+  const definitions = allDefinitions
+    .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)
+    .filter((def) => categoryFilter === 'all' || def.category === categoryFilter);
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
   // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id
@@ -110,6 +124,12 @@ export function StampsPanel({
       </div>
       <div className="mep-stamps-filter">
         <DisciplineSwitcher value={disciplineGroup} onChange={onChangeDisciplineGroup} />
+        {subTab === 'stamps' && (
+          <div className="mep-stamps-filter-row2">
+            <CategorySwitcher value={categoryFilter} onChange={setCategoryFilter} />
+            <LanguageToggle value={labelLanguage} onChange={onChangeLabelLanguage} />
+          </div>
+        )}
       </div>
 
       {subTab === 'stamps' ? (
@@ -124,7 +144,7 @@ export function StampsPanel({
                 onClick={() => void handlePick(definition)}
               >
                 <img src={iconUrlFor(definition, resolveIconUrl)} alt="" />
-                {definition.label}
+                {stampLabelFor(definition, labelLanguage)}
               </button>
             ))}
             <label className="mep-stamp-tile mep-file-btn">

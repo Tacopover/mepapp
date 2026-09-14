@@ -8,6 +8,7 @@ import { Rail } from './components/Rail.js';
 import { DrawFromMenu } from './components/DrawFromMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { StampsPanel } from './components/StampsPanel.js';
+import type { StampLabelLanguage } from './components/LanguageToggle.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
@@ -63,6 +64,7 @@ function supportsFileSystemAccess(): boolean {
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
 
 const SNAP_RADIUS_STORAGE_KEY = 'mepapp.settings.snapRadiusPx.v1';
+const LABEL_LANGUAGE_STORAGE_KEY = 'mepapp.settings.labelLanguage.v1';
 const ONBOARDING_STORAGE_KEY = 'mepapp.onboarding.seen.v1';
 const CUSTOM_PROPERTIES_STORAGE_KEY = 'mepapp.customProperties.v1';
 const EMPTY_CUSTOM_PROPERTY_DEFS: GlobalPropertyDefs = { terminal: [], equipment: [] };
@@ -143,6 +145,9 @@ export function MepSketchApp({
   const [capacityInput, setCapacityInput] = useState('');
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
+  const [labelLanguage, setLabelLanguage] = useState<StampLabelLanguage>(() =>
+    localStorage.getItem(LABEL_LANGUAGE_STORAGE_KEY) === 'nl' ? 'nl' : 'en',
+  );
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
   const [activeNetworkTypeId, setActiveNetworkTypeId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -170,6 +175,11 @@ export function MepSketchApp({
   const handleChangeSnapRadiusPx = useCallback((px: number) => {
     setSnapRadiusPx(px);
     localStorage.setItem(SNAP_RADIUS_STORAGE_KEY, String(px));
+  }, []);
+
+  const handleChangeLabelLanguage = useCallback((language: StampLabelLanguage) => {
+    setLabelLanguage(language);
+    localStorage.setItem(LABEL_LANGUAGE_STORAGE_KEY, language);
   }, []);
 
   const handleDismissOnboarding = useCallback(() => {
@@ -463,6 +473,8 @@ export function MepSketchApp({
         sceneRef={sceneRef}
         disciplineGroup={disciplineGroup}
         onChangeDisciplineGroup={setDisciplineGroup}
+        labelLanguage={labelLanguage}
+        onChangeLabelLanguage={handleChangeLabelLanguage}
         activeDefinitionId={activeDefinitionId}
         onPick={handleStampPick}
         onCustomStampFile={handleCustomStampFile}

@@ -240,6 +240,12 @@
   padding: 5px 9px;
   font-size: 11px;
 }
+.mep-stamps-filter-row2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+}
 
 /* ---------- Body: canvas + toolbar + resize + dock ---------- */
 

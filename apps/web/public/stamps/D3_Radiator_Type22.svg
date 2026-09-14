@@ -1,0 +1,15 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="1.346 1.4281 520.2443 43.251" width="520.2443" height="43.251">
+  <rect x="4.0523" y="2.9281" width="516.0381" height="7.2017" stroke="#000000" stroke-width="3" fill="none"/>
+  <rect x="4.0523" y="35.9774" width="516.0381" height="7.2017" stroke="#000000" stroke-width="3" fill="none"/>
+  <rect x="20.1265" y="19.601" width="485.3957" height="8.0428" stroke="#000000" stroke-width="3" fill="none"/>
+  <line x1="7.2581" y1="9.3361" x2="7.2581" y2="19.0055" stroke="#000000" stroke-width="5"/>
+  <line x1="7.8268" y1="36.6327" x2="7.8268" y2="27.1471" stroke="#000000" stroke-width="5"/>
+  <line x1="8.2059" y1="27.1547" x2="3.846" y2="27.1547" stroke="#000000" stroke-width="5"/>
+  <line x1="3.846" y1="27.1547" x2="3.846" y2="19.1842" stroke="#000000" stroke-width="5"/>
+  <line x1="4.2251" y1="19.1932" x2="8.7746" y2="19.1932" stroke="#000000" stroke-width="5"/>
+  <circle cx="12.9449" cy="22.9844" r="3.033" stroke="#000000" stroke-width="5" fill="none"/>
+  <line x1="503.2886" y1="9.7152" x2="503.2886" y2="37.0178" stroke="#000000" stroke-width="8"/>
+  <line x1="515.4204" y1="9.7152" x2="515.4204" y2="35.8752" stroke="#000000" stroke-width="5"/>
+  <line x1="518.8325" y1="19.3828" x2="518.8325" y2="26.9675" stroke="#000000" stroke-width="5"/>
+  <line x1="19.665" y1="9.7152" x2="19.665" y2="37.0178" stroke="#000000" stroke-width="5"/>
+</svg>

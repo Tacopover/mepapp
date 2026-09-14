@@ -1,0 +1,14 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="105.0787 75 571.8291 580.5148" width="571.8291" height="580.5148">
+  <rect x="110.0787" y="252.7491" width="561.8291" height="217.2509" stroke="#000000" stroke-width="10" fill="none"/>
+  <line x1="113.7032" y1="308" x2="669.6543" y2="308" stroke="#000000" stroke-width="10"/>
+  <line x1="111.8898" y1="417" x2="669.1915" y2="417" stroke="#000000" stroke-width="10"/>
+  <circle cx="390.0962" cy="362" r="28" stroke="#000000" stroke-width="10" fill="none"/>
+  <circle cx="653.3428" cy="356.3559" r="5" stroke="#000000" stroke-width="10" fill="#000000"/>
+  <circle cx="653.3428" cy="373.3559" r="5" stroke="#000000" stroke-width="10" fill="#000000"/>
+  <circle cx="653.3428" cy="390.3559" r="5" stroke="#000000" stroke-width="10" fill="#000000"/>
+  <line x1="391.0961" y1="80" x2="391.0961" y2="255" stroke="#000000" stroke-width="10"/>
+  <line x1="391.0961" y1="470" x2="391.0961" y2="648" stroke="#000000" stroke-width="10"/>
+  <circle cx="653.3428" cy="338.7864" r="5" stroke="#000000" stroke-width="10" fill="#000000"/>
+  <polygon points="391.0961,80 416.0961,140 366.0961,140" stroke="#000000" stroke-width="10" fill="#000000"/>
+  <polygon points="391.0961,650.5148 366.0961,590.5148 416.0961,590.5148" stroke="#000000" stroke-width="10" fill="#000000"/>
+</svg>

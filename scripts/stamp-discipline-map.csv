@@ -1,165 +1,165 @@
 filename,category,englishLabel,discipline
-D2_Bath.svg,terminal,Bath,
-D2_Eye_wash.svg,terminal,Eye wash,
-D2_Floor_drain.svg,terminal,Floor drain,
-D2_Pour_out_sink.svg,terminal,Pour out sink,
-D2_Sewage_connection.svg,terminal,Sewage connection,
-D2_Shower_tray.svg,terminal,Shower tray,
-D2_Sink.svg,terminal,Sink,
-D2_Storage_pit.svg,terminal,Storage pit,
-D2_Tap_point_cold_water.svg,terminal,Tap point cold water,
-D2_Tap_point_facade_tap.svg,terminal,Tap point facade tap,
-D2_Tap_point_hot_cold_water.svg,terminal,Tap point hot cold water,
-D2_Tap_point_hot_water.svg,terminal,Tap point hot water,
-D2_Toilet_built_in_reservoir.svg,terminal,Toilet built in reservoir,
-D2_Toilet.svg,terminal,Toilet,
-D2_Urinal.svg,terminal,Urinal,
-D2_Water_meter.svg,terminal,Water meter,
-D3_Air_socket.svg,terminal,Air socket,
-D3_CO2_connection_point.svg,terminal,CO2 connection point,
-D3_Compressed_air_connection_point.svg,terminal,Compressed air connection point,
-D3_Damper.svg,terminal,Damper,
-D3_Door_slot.svg,terminal,Door slot,
-D3_Flow_arrow_return.svg,terminal,Flow arrow return,
-D3_Flow_arrow_supply.svg,terminal,Flow arrow supply,
-D3_Induction_unit_supply.svg,terminal,Induction unit supply,
-D3_Linear_grille.svg,terminal,Linear grille,
-D3_Nozzle.svg,terminal,Nozzle,
-D3_Radiation_panel.svg,terminal,Radiation panel,
-D3_Radiator_Type22.svg,terminal,Radiator Type22,
-D3_Radiator_Type33.svg,terminal,Radiator Type33,
-D3_Roof_cap.svg,terminal,Roof cap,
-D3_Underfloor_heating.svg,terminal,Underfloor heating,
-D3_Ventilation_grille_rectangular.svg,terminal,Ventilation grille rectangular,
-D3_Ventilation_grille_rh_supply_2.svg,terminal,Ventilation grille rh supply 2,
-D3_Ventilation_grille_rh_supply.svg,terminal,Ventilation grille rh supply,
-D3_Ventilation_grille_round_supply.svg,terminal,Ventilation grille round supply,
-D3_Ventilation_grille_round.svg,terminal,Ventilation grille round,
-D3_Wall_grille_plenum.svg,terminal,Wall grille plenum,
-D3_Wall_grille.svg,terminal,Wall grille,
-D4_Dry_riser_facade_cabinet.svg,terminal,Dry riser facade cabinet,
-D4_Dry_riser_fire_hydrant.svg,terminal,Dry riser fire hydrant,
-D4_Fire_hose_reel_cabinet.svg,terminal,Fire hose reel cabinet,
-D4_Fire_hose_reel.svg,terminal,Fire hose reel,
-D4_Nitrogen_connection_point.svg,terminal,Nitrogen connection point,
-D4_Oxygen_connection_point.svg,terminal,Oxygen connection point,
-D4_Sprinkler_head.svg,terminal,Sprinkler head,
-D4_Vacuum_connection_point.svg,terminal,Vacuum connection point,
-D5_Connection_point_400V_3FPE.svg,terminal,Connection point 400V 3FPE,
-D5_Connection_point_Sun_Screen.svg,terminal,Connection point Sun Screen,
-D5_Connection_point.svg,terminal,Connection point,
-D5_Earthing_central_earthing_connection.svg,terminal,Earthing central earthing connection,
-D5_Earthing_equipotential_bonding.svg,terminal,Earthing equipotential bonding,
-D5_Earthing_rod.svg,terminal,Earthing rod,
-D5_Escape_route_down.svg,terminal,Escape route down,
-D5_Escape_route_left.svg,terminal,Escape route left,
-D5_Escape_route_right.svg,terminal,Escape route right,
-D5_Escape_route_stair_down_left.svg,terminal,Escape route stair down left,
-D5_Escape_route_stair_down_right.svg,terminal,Escape route stair down right,
-D5_Escape_route_stair_left.svg,terminal,Escape route stair left,
-D5_Escape_route_stair_right.svg,terminal,Escape route stair right,
-D5_Escape_route_up.svg,terminal,Escape route up,
-D5_Grounding_mat.svg,terminal,Grounding mat,
-D5_Junction_box.svg,terminal,Junction box,
-D5_Key_locker.svg,terminal,Key locker,
-D5_Kilowatt_meter.svg,terminal,Kilowatt meter,
-D5_Luminaire_rectangular_emergency.svg,terminal,Luminaire rectangular emergency,
-D5_Luminaire_rectangular_waterproof.svg,terminal,Luminaire rectangular waterproof,
-D5_Luminaire_rectangular.svg,terminal,Luminaire rectangular,
-D5_Luminaire_rh_wall.svg,terminal,Luminaire rh wall,
-D5_Luminaire_rh2_wall.svg,terminal,Luminaire rh2 wall,
-D5_Luminaire_round_emergency.svg,terminal,Luminaire round emergency,
-D5_Luminaire_round_wall_emergency.svg,terminal,Luminaire round wall emergency,
-D5_Luminaire_round_wall_waterproof.svg,terminal,Luminaire round wall waterproof,
-D5_Luminaire_round_wall.svg,terminal,Luminaire round wall,
-D5_Luminaire_round_waterproof.svg,terminal,Luminaire round waterproof,
-D5_Luminaire_round.svg,terminal,Luminaire round,
-D5_Luminaire_spot_emergency.svg,terminal,Luminaire spot emergency,
-D5_Luminaire_spot_waterproof.svg,terminal,Luminaire spot waterproof,
-D5_Luminaire_spot.svg,terminal,Luminaire spot,
-D5_LUTO.svg,terminal,LUTO,
-D5_Motion_sensor_wall.svg,terminal,Motion sensor wall,
-D5_Motion_sensor.svg,terminal,Motion sensor,
-D5_Signal_lamp.svg,terminal,Signal lamp,
-D5_Solar_panel.svg,terminal,Solar panel,
-D5_Switch_changeover.svg,terminal,Switch changeover,
-D5_Switch_dimmer.svg,terminal,Switch dimmer,
-D5_Switch_double.svg,terminal,Switch double,
-D5_Switch_elbow.svg,terminal,Switch elbow,
-D5_Switch_emergency.svg,terminal,Switch emergency,
-D5_Switch_pull_cord.svg,terminal,Switch pull cord,
-D5_Switch_pulse.svg,terminal,Switch pulse,
-D5_Switch_socket_combo_changeover.svg,terminal,Switch socket combo changeover,
-D5_Switch_socket_combo.svg,terminal,Switch socket combo,
-D5_Switch_up_down.svg,terminal,Switch up down,
-D5_Switch.svg,terminal,Switch,
-D5_Wall_socket_230V.svg,terminal,Wall socket 230V,
-D5_Wall_socket_400V_3FPE.svg,terminal,Wall socket 400V 3FPE,
-D5_Wall_socket_double_USB.svg,terminal,Wall socket double USB,
-D5_Wall_socket_double.svg,terminal,Wall socket double,
-D5_Wall_socket_perilex.svg,terminal,Wall socket perilex,
-D5_Wall_socket_quadruple.svg,terminal,Wall socket quadruple,
-D5_Wall_socket_triple.svg,terminal,Wall socket triple,
-D5_Wall_socket_USB.svg,terminal,Wall socket USB,
-D5_Wall_socket.svg,terminal,Wall socket,
-D5_Wireless_charger.svg,terminal,Wireless charger,
-D6_Intercom.svg,terminal,Intercom,
-D6_Speaker.svg,terminal,Speaker,
-D6_Video_intercom.svg,terminal,Video intercom,
-D7_Burglar_alarm_central.svg,terminal,Burglar alarm central,
-D7_Camera_dome.svg,terminal,Camera dome,
-D7_Camera_movable.svg,terminal,Camera movable,
-D7_Camera.svg,terminal,Camera,
-D7_Card_reader.svg,terminal,Card reader,
-D7_Code_control_panel.svg,terminal,Code control panel,
-D7_Data_point_double.svg,terminal,Data point double,
-D7_Data_point_quadruple.svg,terminal,Data point quadruple,
-D7_Data_point_triple.svg,terminal,Data point triple,
-D7_Data_point.svg,terminal,Data point,
-D7_Display_screen.svg,terminal,Display screen,
-D7_Door_holder_magnet.svg,terminal,Door holder magnet,
-D7_Door_signaling.svg,terminal,Door signaling,
-D7_Doorbell.svg,terminal,Doorbell,
-D7_Evacuation_speaker.svg,terminal,Evacuation speaker,
-D7_Interlock_lights.svg,terminal,Interlock lights,
-D7_Key_safe.svg,terminal,Key safe,
-D7_Manual_fire_alarm.svg,terminal,Manual fire alarm,
-D7_Motion_detector_90_degrees.svg,terminal,Motion detector 90 degrees,
-D7_Multi_detector.svg,terminal,Multi detector,
-D7_Optical_detector_alternative.svg,terminal,Optical detector alternative,
-D7_Optical_detector.svg,terminal,Optical detector,
-D7_Remote_indicator.svg,terminal,Remote indicator,
-D7_Security_alarm.svg,terminal,Security alarm,
-D7_Security_Beacon_light.svg,terminal,Security Beacon light,
-D7_Security_Flash_light.svg,terminal,Security Flash light,
-D7_Security_sensor_long_beam.svg,terminal,Security sensor long beam,
-D7_Security_sensor_PIR_360.svg,terminal,Security sensor PIR 360,
-D7_Thermal_detector.svg,terminal,Thermal detector,
-D7_Thermo_optical_detector.svg,terminal,Thermo optical detector,
-D7_Wired_connection_point.svg,terminal,Wired connection point,
-D7_Wireless_connection_point.svg,terminal,Wireless connection point,
-D8_CO_LPG_detector.svg,terminal,CO LPG detector,
-D8_Temperature_sensor.svg,terminal,Temperature sensor,
-D8_Thermostat_1.svg,terminal,Thermostat 1,
-D8_Thermostat_2.svg,terminal,Thermostat 2,
-D3_Air_handling_unit.svg,equipment,Air handling unit,
-D3_Boiler.svg,equipment,Boiler,
-D3_Drycooler_section.svg,equipment,Drycooler section,
-D3_Drycooler.svg,equipment,Drycooler,
-D3_Fan_axial.svg,equipment,Fan axial,
-D3_Fan_booster.svg,equipment,Fan booster,
-D3_Fan_coil_unit.svg,equipment,Fan coil unit,
-D3_Fan_exhaust.svg,equipment,Fan exhaust,
-D3_Fan.svg,equipment,Fan,
-D3_HRV_unit.svg,equipment,HRV unit,
-D5_Distribution_panel.svg,equipment,Distribution panel,
-D5_Energy_meter.svg,equipment,Energy meter,
-D5_Panel_cross_2.svg,equipment,Panel cross 2,
-D5_Panel_cross_empty.svg,equipment,Panel cross empty,
-D5_Panel_cross.svg,equipment,Panel cross,
-D5_Panel_empty.svg,equipment,Panel empty,
-D5_Panel_half.svg,equipment,Panel half,
-D5_Pump_dual_speed.svg,equipment,Pump dual speed,
-D5_Pump_speed_controlled.svg,equipment,Pump speed controlled,
-D5_Pump.svg,equipment,Pump,
-D6_Data_cabinet.svg,equipment,Data cabinet,
+D2_Bath.svg,terminal,Bath,plumbing
+D2_Eye_wash.svg,terminal,Eye wash,plumbing
+D2_Floor_drain.svg,terminal,Floor drain,plumbing
+D2_Pour_out_sink.svg,terminal,Pour out sink,plumbing
+D2_Sewage_connection.svg,terminal,Sewage connection,plumbing
+D2_Shower_tray.svg,terminal,Shower tray,plumbing
+D2_Sink.svg,terminal,Sink,plumbing
+D2_Storage_pit.svg,terminal,Storage pit,plumbing
+D2_Tap_point_cold_water.svg,terminal,Tap point cold water,plumbing
+D2_Tap_point_facade_tap.svg,terminal,Tap point facade tap,plumbing
+D2_Tap_point_hot_cold_water.svg,terminal,Tap point hot cold water,plumbing
+D2_Tap_point_hot_water.svg,terminal,Tap point hot water,plumbing
+D2_Toilet_built_in_reservoir.svg,terminal,Toilet built in reservoir,plumbing
+D2_Toilet.svg,terminal,Toilet,plumbing
+D2_Urinal.svg,terminal,Urinal,plumbing
+D2_Water_meter.svg,terminal,Water meter,plumbing
+D3_Air_socket.svg,terminal,Air socket,hvac
+D3_CO2_connection_point.svg,terminal,CO2 connection point,other
+D3_Compressed_air_connection_point.svg,terminal,Compressed air connection point,other
+D3_Damper.svg,terminal,Damper,hvac
+D3_Door_slot.svg,terminal,Door slot,hvac
+D3_Flow_arrow_return.svg,terminal,Flow arrow return,hvac
+D3_Flow_arrow_supply.svg,terminal,Flow arrow supply,hvac
+D3_Induction_unit_supply.svg,terminal,Induction unit supply,hvac
+D3_Linear_grille.svg,terminal,Linear grille,hvac
+D3_Nozzle.svg,terminal,Nozzle,hvac
+D3_Radiation_panel.svg,terminal,Radiation panel,hvac
+D3_Radiator_Type22.svg,terminal,Radiator Type22,hvac
+D3_Radiator_Type33.svg,terminal,Radiator Type33,hvac
+D3_Roof_cap.svg,terminal,Roof cap,hvac
+D3_Underfloor_heating.svg,terminal,Underfloor heating,hvac
+D3_Ventilation_grille_rectangular.svg,terminal,Ventilation grille rectangular,hvac
+D3_Ventilation_grille_rh_supply_2.svg,terminal,Ventilation grille rh supply 2,hvac
+D3_Ventilation_grille_rh_supply.svg,terminal,Ventilation grille rh supply,hvac
+D3_Ventilation_grille_round_supply.svg,terminal,Ventilation grille round supply,hvac
+D3_Ventilation_grille_round.svg,terminal,Ventilation grille round,hvac
+D3_Wall_grille_plenum.svg,terminal,Wall grille plenum,hvac
+D3_Wall_grille.svg,terminal,Wall grille,hvac
+D4_Dry_riser_facade_cabinet.svg,terminal,Dry riser facade cabinet,fire protection
+D4_Dry_riser_fire_hydrant.svg,terminal,Dry riser fire hydrant,fire protection
+D4_Fire_hose_reel_cabinet.svg,terminal,Fire hose reel cabinet,fire protection
+D4_Fire_hose_reel.svg,terminal,Fire hose reel,fire protection
+D4_Nitrogen_connection_point.svg,terminal,Nitrogen connection point,other
+D4_Oxygen_connection_point.svg,terminal,Oxygen connection point,other
+D4_Sprinkler_head.svg,terminal,Sprinkler head,other
+D4_Vacuum_connection_point.svg,terminal,Vacuum connection point,other
+D5_Connection_point_400V_3FPE.svg,terminal,Connection point 400V 3FPE,electrical
+D5_Connection_point_Sun_Screen.svg,terminal,Connection point Sun Screen,electrical
+D5_Connection_point.svg,terminal,Connection point,electrical
+D5_Earthing_central_earthing_connection.svg,terminal,Earthing central earthing connection,electrical
+D5_Earthing_equipotential_bonding.svg,terminal,Earthing equipotential bonding,electrical
+D5_Earthing_rod.svg,terminal,Earthing rod,electrical
+D5_Escape_route_down.svg,terminal,Escape route down,electrical
+D5_Escape_route_left.svg,terminal,Escape route left,electrical
+D5_Escape_route_right.svg,terminal,Escape route right,electrical
+D5_Escape_route_stair_down_left.svg,terminal,Escape route stair down left,electrical
+D5_Escape_route_stair_down_right.svg,terminal,Escape route stair down right,electrical
+D5_Escape_route_stair_left.svg,terminal,Escape route stair left,electrical
+D5_Escape_route_stair_right.svg,terminal,Escape route stair right,electrical
+D5_Escape_route_up.svg,terminal,Escape route up,electrical
+D5_Grounding_mat.svg,terminal,Grounding mat,electrical
+D5_Junction_box.svg,terminal,Junction box,electrical
+D5_Key_locker.svg,terminal,Key locker,electrical
+D5_Kilowatt_meter.svg,terminal,Kilowatt meter,electrical
+D5_Luminaire_rectangular_emergency.svg,terminal,Luminaire rectangular emergency,electrical
+D5_Luminaire_rectangular_waterproof.svg,terminal,Luminaire rectangular waterproof,electrical
+D5_Luminaire_rectangular.svg,terminal,Luminaire rectangular,electrical
+D5_Luminaire_rh_wall.svg,terminal,Luminaire rh wall,electrical
+D5_Luminaire_rh2_wall.svg,terminal,Luminaire rh2 wall,electrical
+D5_Luminaire_round_emergency.svg,terminal,Luminaire round emergency,electrical
+D5_Luminaire_round_wall_emergency.svg,terminal,Luminaire round wall emergency,electrical
+D5_Luminaire_round_wall_waterproof.svg,terminal,Luminaire round wall waterproof,electrical
+D5_Luminaire_round_wall.svg,terminal,Luminaire round wall,electrical
+D5_Luminaire_round_waterproof.svg,terminal,Luminaire round waterproof,electrical
+D5_Luminaire_round.svg,terminal,Luminaire round,electrical
+D5_Luminaire_spot_emergency.svg,terminal,Luminaire spot emergency,electrical
+D5_Luminaire_spot_waterproof.svg,terminal,Luminaire spot waterproof,electrical
+D5_Luminaire_spot.svg,terminal,Luminaire spot,electrical
+D5_LUTO.svg,terminal,LUTO,electrical
+D5_Motion_sensor_wall.svg,terminal,Motion sensor wall,electrical
+D5_Motion_sensor.svg,terminal,Motion sensor,electrical
+D5_Signal_lamp.svg,terminal,Signal lamp,electrical
+D5_Solar_panel.svg,terminal,Solar panel,electrical
+D5_Switch_changeover.svg,terminal,Switch changeover,electrical
+D5_Switch_dimmer.svg,terminal,Switch dimmer,electrical
+D5_Switch_double.svg,terminal,Switch double,electrical
+D5_Switch_elbow.svg,terminal,Switch elbow,electrical
+D5_Switch_emergency.svg,terminal,Switch emergency,electrical
+D5_Switch_pull_cord.svg,terminal,Switch pull cord,electrical
+D5_Switch_pulse.svg,terminal,Switch pulse,electrical
+D5_Switch_socket_combo_changeover.svg,terminal,Switch socket combo changeover,electrical
+D5_Switch_socket_combo.svg,terminal,Switch socket combo,electrical
+D5_Switch_up_down.svg,terminal,Switch up down,electrical
+D5_Switch.svg,terminal,Switch,electrical
+D5_Wall_socket_230V.svg,terminal,Wall socket 230V,electrical
+D5_Wall_socket_400V_3FPE.svg,terminal,Wall socket 400V 3FPE,electrical
+D5_Wall_socket_double_USB.svg,terminal,Wall socket double USB,electrical
+D5_Wall_socket_double.svg,terminal,Wall socket double,electrical
+D5_Wall_socket_perilex.svg,terminal,Wall socket perilex,electrical
+D5_Wall_socket_quadruple.svg,terminal,Wall socket quadruple,electrical
+D5_Wall_socket_triple.svg,terminal,Wall socket triple,electrical
+D5_Wall_socket_USB.svg,terminal,Wall socket USB,electrical
+D5_Wall_socket.svg,terminal,Wall socket,electrical
+D5_Wireless_charger.svg,terminal,Wireless charger,electrical
+D6_Intercom.svg,terminal,Intercom,electrical
+D6_Speaker.svg,terminal,Speaker,electrical
+D6_Video_intercom.svg,terminal,Video intercom,electrical
+D7_Burglar_alarm_central.svg,terminal,Burglar alarm central,electrical
+D7_Camera_dome.svg,terminal,Camera dome,electrical
+D7_Camera_movable.svg,terminal,Camera movable,electrical
+D7_Camera.svg,terminal,Camera,electrical
+D7_Card_reader.svg,terminal,Card reader,electrical
+D7_Code_control_panel.svg,terminal,Code control panel,electrical
+D7_Data_point_double.svg,terminal,Data point double,electrical
+D7_Data_point_quadruple.svg,terminal,Data point quadruple,electrical
+D7_Data_point_triple.svg,terminal,Data point triple,electrical
+D7_Data_point.svg,terminal,Data point,electrical
+D7_Display_screen.svg,terminal,Display screen,electrical
+D7_Door_holder_magnet.svg,terminal,Door holder magnet,electrical
+D7_Door_signaling.svg,terminal,Door signaling,electrical
+D7_Doorbell.svg,terminal,Doorbell,electrical
+D7_Evacuation_speaker.svg,terminal,Evacuation speaker,electrical
+D7_Interlock_lights.svg,terminal,Interlock lights,electrical
+D7_Key_safe.svg,terminal,Key safe,electrical
+D7_Manual_fire_alarm.svg,terminal,Manual fire alarm,electrical
+D7_Motion_detector_90_degrees.svg,terminal,Motion detector 90 degrees,electrical
+D7_Multi_detector.svg,terminal,Multi detector,electrical
+D7_Optical_detector_alternative.svg,terminal,Optical detector alternative,electrical
+D7_Optical_detector.svg,terminal,Optical detector,electrical
+D7_Remote_indicator.svg,terminal,Remote indicator,electrical
+D7_Security_alarm.svg,terminal,Security alarm,electrical
+D7_Security_Beacon_light.svg,terminal,Security Beacon light,electrical
+D7_Security_Flash_light.svg,terminal,Security Flash light,electrical
+D7_Security_sensor_long_beam.svg,terminal,Security sensor long beam,electrical
+D7_Security_sensor_PIR_360.svg,terminal,Security sensor PIR 360,electrical
+D7_Thermal_detector.svg,terminal,Thermal detector,electrical
+D7_Thermo_optical_detector.svg,terminal,Thermo optical detector,electrical
+D7_Wired_connection_point.svg,terminal,Wired connection point,electrical
+D7_Wireless_connection_point.svg,terminal,Wireless connection point,electrical
+D8_CO_LPG_detector.svg,terminal,CO LPG detector,electrical
+D8_Temperature_sensor.svg,terminal,Temperature sensor,hvac
+D8_Thermostat_1.svg,terminal,Thermostat 1,hvac
+D8_Thermostat_2.svg,terminal,Thermostat 2,hvac
+D3_Air_handling_unit.svg,equipment,Air handling unit,hvac
+D3_Boiler.svg,equipment,Boiler,plumbing
+D3_Drycooler_section.svg,equipment,Drycooler section,hvac
+D3_Drycooler.svg,equipment,Drycooler,hvac
+D3_Fan_axial.svg,equipment,Fan axial,hvac
+D3_Fan_booster.svg,equipment,Fan booster,hvac
+D3_Fan_coil_unit.svg,equipment,Fan coil unit,hvac
+D3_Fan_exhaust.svg,equipment,Fan exhaust,hvac
+D3_Fan.svg,equipment,Fan,hvac
+D3_HRV_unit.svg,equipment,HRV unit,hvac
+D5_Distribution_panel.svg,equipment,Distribution panel,electrical
+D5_Energy_meter.svg,equipment,Energy meter,electrical
+D5_Panel_cross_2.svg,equipment,Panel cross 2,electrical
+D5_Panel_cross_empty.svg,equipment,Panel cross empty,electrical
+D5_Panel_cross.svg,equipment,Panel cross,electrical
+D5_Panel_empty.svg,equipment,Panel empty,electrical
+D5_Panel_half.svg,equipment,Panel half,electrical
+D5_Pump_dual_speed.svg,equipment,Pump dual speed,hvac;plumbing
+D5_Pump_speed_controlled.svg,equipment,Pump speed controlled,hvac;plumbing
+D5_Pump.svg,equipment,Pump,hvac;plumbing
+D6_Data_cabinet.svg,equipment,Data cabinet,electrical

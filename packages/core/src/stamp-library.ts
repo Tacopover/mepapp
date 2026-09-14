@@ -9,12 +9,15 @@
 import type { PortSpec } from './geometry.js';
 import type { Discipline } from './network.js';
 import type { SymbolShape } from './symbol-shapes.js';
+import { GENERATED_STAMP_LIBRARY } from './stamp-library.generated.js';
 
 export type StampCategory = 'terminal' | 'equipment' | 'fitting';
 
 export interface StampDefinition {
   id: string;
   label: string;
+  /** Dutch translation of `label`, for the Stamps tab's language toggle — only set on fixture-generated entries with a name-mapping.csv translation (scripts/generate-stamp-library.mjs). Never set on a 'custom' definition: a user-authored stamp's label stays fixed regardless of the toggle. */
+  labelNl?: string;
   discipline: Discipline;
   category: StampCategory;
   /** Nominal size in world units (1 unit = 1 PDF point) for palette layout — actual placed size is recomputed from the loaded art's real pixel dimensions, same 300 DPI convention as scene.ts's STAMP_SOURCE_DPI. */
@@ -33,17 +36,6 @@ export interface StampDefinition {
 
 export const STAMP_LIBRARY: StampDefinition[] = [
   {
-    id: 'ventilation-grille-rh-supply',
-    label: 'Supply Grille',
-    discipline: 'ventilation',
-    category: 'terminal',
-    nativeWidth: 60,
-    nativeHeight: 60,
-    ports: [{ id: 'supply', name: 'Supply', fractionX: 0.5, fractionY: 1 }],
-    iconRef: 'D3_Ventilation_grille_rh_supply.svg',
-    source: 'library',
-  },
-  {
     id: 'fire-hose-reel',
     label: 'Fire Hose Reel',
     discipline: 'fireProtection',
@@ -54,31 +46,13 @@ export const STAMP_LIBRARY: StampDefinition[] = [
     iconRef: 'D4_Fire_hose_reel.png',
     source: 'library',
   },
-  {
-    id: 'luminaire-rectangular',
-    label: 'Luminaire',
-    discipline: 'electrical',
-    category: 'terminal',
-    nativeWidth: 60,
-    // Matches D5_Luminaire_rectangular.svg's own aspect ratio (viewBox 676x190,
-    // ≈3.558:1) — previously 30 (2:1), which didn't match the art and caused
-    // rasterizeSvg's now-fixed non-uniform stretch to squash the circle glyph.
-    nativeHeight: 16.87,
-    ports: [{ id: 'feed', name: 'Feed', fractionX: 0, fractionY: 0.5 }],
-    iconRef: 'D5_Luminaire_rectangular.svg',
-    source: 'library',
-  },
-  {
-    id: 'switch',
-    label: 'Switch',
-    discipline: 'electrical',
-    category: 'terminal',
-    nativeWidth: 24,
-    nativeHeight: 24,
-    ports: [{ id: 'feed', name: 'Feed', fractionX: 0.5, fractionY: 1 }],
-    iconRef: 'D5_Switch.png',
-    source: 'library',
-  },
+  // The other 3 original hand-typed entries (ventilation-grille-rh-supply,
+  // luminaire-rectangular, switch) are now generated below under the same
+  // ids, from the same fixture art plus authored port data — see
+  // generate-stamp-library.mjs's EXCLUDED_FILENAMES comment for why
+  // fire-hose-reel above is the one exception (its category is read by
+  // project.ts's v1->v2 migration step keyed on this exact definitionId).
+  ...GENERATED_STAMP_LIBRARY,
 ];
 
 export function getStampDefinition(id: string, customDefinitions: StampDefinition[] = []): StampDefinition | undefined {
