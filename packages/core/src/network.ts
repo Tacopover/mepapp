@@ -14,8 +14,7 @@ export type Discipline =
   | 'ventilation'
   | 'plumbing'
   | 'fireProtection'
-  | 'electricalPathways'
-  | 'electricalCircuits';
+  | 'electrical';
 
 export type LinePattern = 'solid' | 'dashed' | 'dotted' | 'dashDot' | 'longDash' | 'dashDotDot';
 

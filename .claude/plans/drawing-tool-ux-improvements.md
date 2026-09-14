@@ -375,3 +375,85 @@ not a bug, but something to know when testing selection state by
 clicking a member of an existing multi-selection.
 
 All 8 parts (9 requested features) are now complete.
+
+### Follow-up fixes (post-merge user review, 2026-09-14)
+
+**Done** — 2026-09-14, on `worktree-drawing-tool-ux-improvements` (branch
+already fast-forward-merged to `origin/master` once at `1aef9fd`; these are
+additional commits on top, to be merged the same way when requested).
+
+After the merge above, the user reviewed the running app and reported four
+issues:
+
+1. **Merge the two electrical disciplines.** `Discipline` (core/network.ts)
+   had `electricalPathways`/`electricalCircuits` as separate values even
+   though `disciplineGroupOf` already folded both into one `'electrical'` UI
+   group. Collapsed the union to a single `'electrical'` value; updated
+   `network-type-library.ts` (4 entries), `stamp-library.ts` (2 entries),
+   `disciplineGroups.ts`, `NetworkTypeEditorDialog.tsx`, `ElementEditorDialog.tsx`,
+   and `NetworkTreePanel.tsx`'s label/order maps. Added schema migration
+   6→7 (`project.ts`) remapping any saved `NetworkType`/`customStampDefinitions`
+   entry still carrying either old string to `'electrical'`, with a new
+   `project.test.ts` case covering it.
+
+2. **Stamp color changes didn't update the canvas.** Root cause, confirmed
+   by placing a real fixture stamp and forcing a color edit through
+   Playwright: PixiJS `Sprite.tint` is multiplicative
+   (`result = pixel * tint / 255`), and the fixture stamps (real CAD symbols,
+   per the fixtures policy) are drawn in pure black (`#000000`) — black
+   times any tint is still black, so the on-canvas art never visibly
+   changed even though the Properties panel's own value updated correctly.
+   The old MEPSketcher hit the identical wall (see
+   `MepSketcherTools/Utilities/ImageColorizer.cs`) and fixed it by replacing
+   each non-transparent pixel with the target color, blended by the
+   source pixel's luminance — not tinting. Ported that approach as
+   `packages/render/src/colorize.ts`: `getColorizedTexture(baseTexture, colorHex)`
+   rasterizes the base texture to a canvas, recolors it pixel-by-pixel with
+   the same luminance-blend formula, and caches the result per
+   (texture, color) pair so `syncStampSprites` (called on every drawing-layer
+   sync, including every mousemove frame of an unrelated drag) doesn't
+   rebuild it repeatedly. `StampEntry` gained a `baseTexture` field (the
+   pristine, never-recolored texture); `placeStamp`/`syncStampSprites`/
+   `pasteClipboard`/`loadProjectFromJson`'s restore path all switched from
+   `sprite.tint = hexColorToPixi(...)` to `applyStampColor(sprite, baseTexture, color)`.
+   Texture teardown (`SketchDocument.destroy`, `loadProjectFromJson`'s
+   reset-before-reload) moved to a new `destroyStampEntries()` helper that
+   dedupes shared base textures (consecutive placements of one stamp
+   definition share a texture object), releases cached colorized variants,
+   and never destroys the shared `Texture.WHITE` singleton
+   (`debugPopulateForBenchmark`'s placeholder art) — fixing a latent
+   would-be-shared-texture-destroy bug as a side effect of doing the new
+   lifecycle correctly, not a separate task.
+
+3. **More elaborate color picker.** Added `packages/ui/src/components/ColorPicker.tsx`:
+   a swatch button that opens a popover with a fixed 20-color basic
+   palette, a "Last Used" row (up to 8, persisted in `localStorage` under
+   `mepapp.colorPicker.lastUsed.v1`), and a native `<input type="color">`
+   for anything else. Wired into both stamp Color fields in
+   `PropertiesPanel.tsx` (single- and multi-select, the latter showing a
+   "?" placeholder swatch for "Varies") and `NetworkTypeEditorDialog.tsx`'s
+   Color field. `ElementEditorDialog.tsx`'s Shapes-mode stroke/fill color
+   inputs were left as plain native color inputs — out of scope, not
+   mentioned by the user.
+
+4. **Stamp placement ghost preview ignored the remembered scale.**
+   `rebuildStampGhost()` only ever applied `computeStampBaseScale(...)`
+   (the art's native 1:1 size), never `pendingStampTexture.appearanceDefault?.scale`
+   — so after changing a stamp's scale, the next same-definition
+   placement started at the right (remembered) scale, but its ghost
+   preview still showed the original size while aiming. Fixed by
+   multiplying the ghost's scale by `appearanceDefault?.scale ?? 1`,
+   matching `placeStamp`'s own scale-factor logic. Ghost color intentionally
+   left untinted — the user's remark was specifically about size, not color.
+
+Verified: `pnpm --filter @mepapp/core test` — 131 tests passing (one new
+migration test added). `pnpm exec turbo run build --force` clean across all
+9 workspace tasks. Live headless-Chromium Playwright walkthrough: (a) forced
+a stamp's Properties-panel color to red via the panel's own React state
+(not just DOM manipulation, to rule out a test artifact) and confirmed the
+placed stamp visibly turns red on a deselected canvas screenshot, where it
+previously stayed black; (b) opened the new color-picker popover, picked a
+basic-palette swatch, confirmed the canvas art updated and the swatch then
+appeared under "Last Used" on reopen; (c) set a stamp's scale to 250%,
+re-picked the same stamp tile, and confirmed the ghost preview rendered
+visibly larger than the already-placed 100%-scale stamp.

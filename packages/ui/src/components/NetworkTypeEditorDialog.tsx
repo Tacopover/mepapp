@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import type { Discipline, LinePattern, NetworkType } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
+import { ColorPicker } from './ColorPicker.js';
 
 export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline'>>;
 
-/** All 6 core Discipline values, human-labeled — finer-grained than disciplineGroups.ts's 4-way UI grouping (which this dialog's dropdown drives, via disciplineGroupOf), so it needs its own label map. */
+/** All 5 core Discipline values, human-labeled — finer-grained than disciplineGroups.ts's 4-way UI grouping (which this dialog's dropdown drives, via disciplineGroupOf), so it needs its own label map. */
 const DISCIPLINES: Array<{ value: Discipline; label: string }> = [
   { value: 'heatingAndCooling', label: 'Heating & Cooling' },
   { value: 'ventilation', label: 'Ventilation' },
   { value: 'plumbing', label: 'Plumbing' },
   { value: 'fireProtection', label: 'Fire Protection' },
-  { value: 'electricalPathways', label: 'Electrical Pathways' },
-  { value: 'electricalCircuits', label: 'Electrical Circuits' },
+  { value: 'electrical', label: 'Electrical' },
 ];
 
 export interface NetworkTypeEditorDialogProps {
@@ -74,7 +74,7 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
         </div>
         <div className="mep-field-row">
           <label>Color</label>
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+          <ColorPicker value={color} onChange={setColor} />
         </div>
         <div className="mep-field-row">
           <label>Thickness (pt)</label>

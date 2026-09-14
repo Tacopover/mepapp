@@ -625,6 +625,90 @@
 .mep-rotate-nudge button.flip {
   transform: scaleX(-1);
 }
+.mep-color-picker {
+  position: relative;
+}
+.mep-color-picker-swatch {
+  width: 28px;
+  height: 20px;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mep-color-picker-varies {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.mep-color-picker-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 10px;
+  z-index: 60;
+}
+.mep-color-picker-label {
+  font-size: 9.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 5px;
+}
+.mep-color-picker-label:not(:first-child) {
+  margin-top: 8px;
+}
+.mep-color-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+.mep-color-picker-swatch-sm {
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+}
+.mep-color-picker-swatch-sm:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.mep-color-picker-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.mep-color-picker-custom label {
+  font-size: 9.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.mep-color-picker-custom input[type='color'] {
+  width: 36px;
+  height: 20px;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+}
 .mep-seg2 {
   display: flex;
   width: 104px;

@@ -10,6 +10,7 @@ import {
 } from '@mepapp/core';
 import { IconRotate } from '../icons.js';
 import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
+import { ColorPicker } from './ColorPicker.js';
 
 const VARIES = 'Varies';
 
@@ -141,12 +142,11 @@ export function PropertiesPanel({
           <h4>Appearance</h4>
           <div className="mep-field-row">
             <label>Color{color === undefined ? ` (${VARIES})` : ''}</label>
-            <input
-              type="color"
-              value={color ?? '#000000'}
-              onChange={(e) => {
-                sceneRef.current?.setColorForSelection(e.target.value);
-                rememberAppearance(selection, { color: e.target.value });
+            <ColorPicker
+              value={color}
+              onChange={(value) => {
+                sceneRef.current?.setColorForSelection(value);
+                rememberAppearance(selection, { color: value });
               }}
             />
           </div>
@@ -257,12 +257,11 @@ export function PropertiesPanel({
         <h4>Appearance</h4>
         <div className="mep-field-row">
           <label>Color</label>
-          <input
-            type="color"
+          <ColorPicker
             value={stamp.color ?? '#000000'}
-            onChange={(e) => {
-              sceneRef.current?.setColorForSelection(e.target.value);
-              rememberAppearance([stamp], { color: e.target.value });
+            onChange={(value) => {
+              sceneRef.current?.setColorForSelection(value);
+              rememberAppearance([stamp], { color: value });
             }}
           />
         </div>

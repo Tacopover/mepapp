@@ -1,4 +1,5 @@
-import { Container, Graphics, type Sprite } from 'pixi.js';
+import { Container, Graphics, type Sprite, type Texture } from 'pixi.js';
+import { destroyStampEntries } from './colorize.js';
 import {
   CommandManager,
   NETWORK_TYPE_LIBRARY,
@@ -27,6 +28,8 @@ export interface DrawingState {
 export interface StampEntry {
   sprite: Sprite;
   baseScale: Vec2; // converts texture pixels -> world units at transform.scale = 1
+  /** The pristine (uncolored) texture — a colored stamp's sprite.texture is a colorized variant of this, never this itself (see colorize.ts). */
+  baseTexture: Texture;
 }
 
 export const DEFAULT_NETWORK_TYPE: NetworkType = {
@@ -109,7 +112,7 @@ export class SketchDocument {
   /** Tears down this document's own PixiJS resources — used on close, not on a mere tab switch. */
   destroy(): void {
     this.backdropSprite?.destroy({ texture: true });
-    for (const entry of this.stamps.values()) entry.sprite.destroy({ texture: true });
+    destroyStampEntries(this.stamps.values());
     this.stamps.clear();
     this.stampsLayer.destroy();
     this.drawingLayer.destroy();

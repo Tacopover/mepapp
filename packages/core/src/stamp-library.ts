@@ -57,7 +57,7 @@ export const STAMP_LIBRARY: StampDefinition[] = [
   {
     id: 'luminaire-rectangular',
     label: 'Luminaire',
-    discipline: 'electricalCircuits',
+    discipline: 'electrical',
     category: 'terminal',
     nativeWidth: 60,
     // Matches D5_Luminaire_rectangular.svg's own aspect ratio (viewBox 676x190,
@@ -71,7 +71,7 @@ export const STAMP_LIBRARY: StampDefinition[] = [
   {
     id: 'switch',
     label: 'Switch',
-    discipline: 'electricalCircuits',
+    discipline: 'electrical',
     category: 'terminal',
     nativeWidth: 24,
     nativeHeight: 24,

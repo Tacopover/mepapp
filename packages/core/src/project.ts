@@ -10,7 +10,7 @@ import type { PlacedStamp } from './stamp.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -112,6 +112,30 @@ const migrationSteps: MigrationStep[] = [
       ...data,
       schemaVersion: 6,
     }),
+  },
+  {
+    fromVersion: 6,
+    toVersion: 7,
+    // Version 6 predates merging the 'electricalPathways'/'electricalCircuits'
+    // disciplines into one 'electrical' discipline — remap any saved
+    // NetworkType or customStampDefinitions entry that still carries either
+    // old value, everything else is left untouched.
+    migrate: (data) => {
+      const remapDiscipline = (record: JsonRecord): JsonRecord =>
+        record.discipline === 'electricalPathways' || record.discipline === 'electricalCircuits'
+          ? { ...record, discipline: 'electrical' }
+          : record;
+      return {
+        ...data,
+        schemaVersion: 7,
+        networkTypes: Array.isArray(data.networkTypes)
+          ? data.networkTypes.map((t) => (t && typeof t === 'object' ? remapDiscipline(t as JsonRecord) : t))
+          : data.networkTypes,
+        customStampDefinitions: Array.isArray(data.customStampDefinitions)
+          ? data.customStampDefinitions.map((d) => (d && typeof d === 'object' ? remapDiscipline(d as JsonRecord) : d))
+          : data.customStampDefinitions,
+      };
+    },
   },
 ];
 
