@@ -5,6 +5,7 @@ import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { loadStampBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
+import { DrawFromMenu } from './components/DrawFromMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { StampsPanel } from './components/StampsPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
@@ -127,6 +128,8 @@ export function MepSketchApp({
     setCalibrationPrompt,
     textboxPrompt,
     setTextboxPrompt,
+    drawFromMenuRequest,
+    setDrawFromMenuRequest,
     drawingSummary,
     flowResult,
     documents,
@@ -598,6 +601,9 @@ export function MepSketchApp({
                     setTextboxInput('');
                   }}
                 />
+              )}
+              {drawFromMenuRequest && (
+                <DrawFromMenu request={drawFromMenuRequest} sceneRef={sceneRef} onDismiss={() => setDrawFromMenuRequest(null)} />
               )}
             </>
           )}

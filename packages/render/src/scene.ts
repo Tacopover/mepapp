@@ -39,6 +39,7 @@ import {
   serializeProject,
   solveFlow,
   splitSegmentAtFitting,
+  SYNTHETIC_CENTER_PORT_ID,
   Transaction,
   translateAnnotationGeometry,
   type Annotation,
@@ -378,6 +379,15 @@ interface SketchSceneEvents {
   documentsChanged: [DocumentSummary[]];
   /** The active document's customStampDefinitions list changed (a new one authored, or an existing one edited) — the Stamps tab's cue to re-render its palette. */
   customStampDefinitionsChanged: [StampDefinition[]];
+  /**
+   * A right-click landed on an existing port or fitting (the same targets
+   * onDrawSegmentClick's resolveSegmentEndpoint would snap to) — the UI's
+   * cue to show a "Draw from" context menu at screenPosition
+   * (container-relative pixels, matching textboxRequested's convention).
+   * Clicking the menu item should call armSegmentStartFromTarget(point,
+   * worldPosition).
+   */
+  drawFromMenuRequested: [screenPosition: Vec2, label: string, point: ConnectionPoint, worldPosition: Vec2];
 }
 
 type Listener<A extends unknown[]> = (...args: A) => void;
@@ -554,7 +564,23 @@ export class SketchScene {
     this.app.stage.on('pointerup', this.onPointerUp);
     this.app.stage.on('pointerupoutside', this.onPointerUp);
     this.app.stage.on('wheel', this.onWheel);
-    this.app.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    this.app.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const screen = { x: 0, y: 0 };
+      this.app.renderer.events.mapPositionToPoint(screen, e.clientX, e.clientY);
+      const world = this.screenToWorld(screen);
+      const snapRadius = this.snapRadiusScreenPx / this.world.scale.x;
+      const state = this.doc.drawingHistory.getState();
+      const target = resolveSegmentEndpoint(
+        world,
+        Object.values(state.stamps),
+        Object.values(state.fittings),
+        Object.values(state.segments),
+        { radius: snapRadius },
+      );
+      if (target.kind !== 'existing') return;
+      this.emitter.emit('drawFromMenuRequested', screen, this.drawFromMenuLabel(target.point, state), target.point, target.worldPosition);
+    });
     window.addEventListener('keydown', this.onKeyDown);
   }
 
@@ -2727,6 +2753,41 @@ export class SketchScene {
       createSegmentCommand(segmentB),
     ]);
     return { point: { kind: 'fitting', fittingId: newFitting.id }, worldPosition: target.breakPoint, setupCommand };
+  }
+
+  /** Right-click "Draw from" menu's item text — names the specific port when the target is a real authored one (matching the old app's "Draw From Port" header), otherwise the generic "Draw from" (bare fitting, or a stamp's synthetic center point). */
+  private drawFromMenuLabel(point: ConnectionPoint, state: DrawingState): string {
+    if (point.kind === 'fitting' || point.portId === SYNTHETIC_CENTER_PORT_ID) return 'Draw from';
+    const stamp = state.stamps[point.elementId];
+    const port = stamp && getStampPorts(stamp).find((p) => p.id === point.portId);
+    return port ? `Draw from Port: ${port.name}` : 'Draw from';
+  }
+
+  /**
+   * Arms pendingSegmentStart from an already-existing port/fitting (the
+   * right-click "Draw from" menu's action) without creating anything new —
+   * unlike resolveDrawTarget's 'new-fitting'/'break' cases, this always
+   * targets an element that's already there, so there's no setupCommand to
+   * bundle. Switches into draw-segment with the start already pending, so
+   * the very next canvas click finishes the segment through
+   * onDrawSegmentClick's existing second-click path. Deliberately doesn't
+   * go through setTool() (which resets pendingSegmentStart as its first
+   * line) — only replicates the other gesture resets it performs.
+   */
+  armSegmentStartFromTarget(point: ConnectionPoint, worldPosition: Vec2): void {
+    this.tool = 'draw-segment';
+    this.pendingPoints = [];
+    this.pendingPolylinePoints = [];
+    this.pendingPolylineCursor = null;
+    this.lastPolylineClickScreen = null;
+    this.activeChainAnchorId = null;
+    this.stampGhostRotationDegrees = 0;
+    if (this.stampGhostSprite) this.stampGhostSprite.visible = false;
+    this.pendingSegmentStart = { point, worldPosition };
+    this.pendingSegmentCursor = null;
+    this.emitter.emit('toolChanged', this.tool);
+    this.syncDrawingLayer();
+    this.redrawOverlay();
   }
 
   private syncDrawingLayer(): void {
