@@ -154,8 +154,10 @@ export function MepSketchApp({
   const [globalPropertiesOpen, setGlobalPropertiesOpen] = useState(false);
   const [customPropertyDefs, setCustomPropertyDefs] = useState<GlobalPropertyDefs>(loadCustomPropertyDefs);
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
-  /** Element Editor dialog target — 'create' for a brand-new custom element, or the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel). */
-  const [elementEditorTarget, setElementEditorTarget] = useState<{ mode: 'create' } | { mode: 'edit'; definitionId: string } | null>(null);
+  /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp copied into a new custom one via the Stamps tab's duplicate button (see handleDuplicateStampDefinition — `seed` always carries a fresh id and a self-contained iconRef, never the library entry's own id). */
+  const [elementEditorTarget, setElementEditorTarget] = useState<
+    { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | null
+  >(null);
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
   const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
@@ -407,6 +409,42 @@ export function MepSketchApp({
     setStatus(`${definition.label} ready — click the canvas to place it.`);
   }, []);
 
+  // Opens the Element Editor pre-filled from a read-only library stamp so the
+  // user can reposition ports / rename / recategorize and save as their own
+  // custom stamp. Its iconRef is a fixture-relative asset key (see
+  // StampDefinition's doc comment), not the self-contained `data:` URL the
+  // dialog's Import mode expects, so it's fetched and re-embedded here — same
+  // fetch-then-blob approach as resolveStampIconBitmap above. Ports are
+  // shallow-cloned so the dialog's editable state never shares array/object
+  // references with the library's own (module-level, shared) definition.
+  const handleDuplicateStampDefinition = useCallback(
+    async (definition: StampDefinition) => {
+      try {
+        const res = await fetch(definition.iconRef.startsWith('data:') ? definition.iconRef : resolveStampIconUrl(definition.iconRef));
+        const blob = await res.blob();
+        const iconRef = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error ?? new Error('Failed to read stamp art'));
+          reader.readAsDataURL(blob);
+        });
+        setElementEditorTarget({
+          mode: 'duplicate',
+          seed: {
+            ...definition,
+            id: crypto.randomUUID(),
+            iconRef,
+            source: 'custom',
+            ports: definition.ports.map((port) => ({ ...port })),
+          },
+        });
+      } catch (err) {
+        setStatus(`Could not duplicate ${definition.label}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [resolveStampIconUrl],
+  );
+
   const handleSaveElementDefinition = useCallback(
     (definition: StampDefinition) => {
       if (elementEditorTarget?.mode === 'edit') {
@@ -480,6 +518,7 @@ export function MepSketchApp({
         onCustomStampFile={handleCustomStampFile}
         customStampDefinitions={customStampDefinitions}
         onCreateCustomElement={() => setElementEditorTarget({ mode: 'create' })}
+        onDuplicateStampDefinition={(definition) => void handleDuplicateStampDefinition(definition)}
         resolveIconUrl={resolveStampIconUrl}
         networkTypes={networkTypes}
         activeNetworkTypeId={activeNetworkTypeId}
@@ -695,7 +734,13 @@ export function MepSketchApp({
 
       {elementEditorTarget && (
         <ElementEditorDialog
-          definition={elementEditorTarget.mode === 'edit' ? customStampDefinitions.find((d) => d.id === elementEditorTarget.definitionId) : undefined}
+          definition={
+            elementEditorTarget.mode === 'edit'
+              ? customStampDefinitions.find((d) => d.id === elementEditorTarget.definitionId)
+              : elementEditorTarget.mode === 'duplicate'
+                ? elementEditorTarget.seed
+                : undefined
+          }
           onSave={handleSaveElementDefinition}
           onClose={() => setElementEditorTarget(null)}
         />

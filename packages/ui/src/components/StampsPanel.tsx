@@ -5,7 +5,7 @@ import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js'
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
 import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
-import { IconFile, IconPencil } from '../icons.js';
+import { IconCopy, IconFile, IconPencil } from '../icons.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 
@@ -21,6 +21,8 @@ export interface StampsPanelProps {
   /** The active document's user-authored elements (Element Editor dialog) — shown in the grid alongside STAMP_LIBRARY. */
   customStampDefinitions: StampDefinition[];
   onCreateCustomElement: () => void;
+  /** Opens the Element Editor pre-filled from a library stamp (source: 'library') so the user can save it as their own editable custom stamp — see App.tsx's handleDuplicateStampDefinition. Never offered for an already-custom definition; those get "Edit ports…" from a placed instance's Properties panel instead. */
+  onDuplicateStampDefinition: (definition: StampDefinition) => void;
   /** Resolves a StampDefinition's iconRef to a fetchable URL — apps/web owns where stamp art actually lives. A custom definition's iconRef is already a self-contained `data:` URL (see stamp-library.ts's StampDefinition doc comment) and is used as-is, never passed through this. */
   resolveIconUrl: (iconRef: string) => string;
   /** The active document's own network types — only ones actually picked at least once get an entry here (see SketchScene.setActiveNetworkType). Everything else falls back to NETWORK_TYPE_LIBRARY's default name. */
@@ -68,6 +70,7 @@ export function StampsPanel({
   onCustomStampFile,
   customStampDefinitions,
   onCreateCustomElement,
+  onDuplicateStampDefinition,
   resolveIconUrl,
   networkTypes,
   activeNetworkTypeId,
@@ -137,15 +140,29 @@ export function StampsPanel({
           {definitions.length === 0 && <div className="mep-empty-panel">No stamp art available yet for this discipline.</div>}
           <div className="mep-stamp-grid">
             {definitions.map((definition) => (
-              <button
-                key={definition.id}
-                type="button"
-                className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}`}
-                onClick={() => void handlePick(definition)}
-              >
-                <img src={iconUrlFor(definition, resolveIconUrl)} alt="" />
-                {stampLabelFor(definition, labelLanguage)}
-              </button>
+              <div key={definition.id} className="mep-stamp-tile-wrap">
+                <button
+                  type="button"
+                  className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}`}
+                  onClick={() => void handlePick(definition)}
+                >
+                  <img src={iconUrlFor(definition, resolveIconUrl)} alt="" />
+                  {stampLabelFor(definition, labelLanguage)}
+                </button>
+                {definition.source === 'library' && (
+                  <button
+                    type="button"
+                    className="mep-stamp-tile-duplicate"
+                    title="Duplicate as custom stamp…"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDuplicateStampDefinition(definition);
+                    }}
+                  >
+                    <IconCopy size={12} />
+                  </button>
+                )}
+              </div>
             ))}
             <label className="mep-stamp-tile mep-file-btn">
               <IconFile size={20} />
