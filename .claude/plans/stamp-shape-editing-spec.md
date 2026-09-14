@@ -31,7 +31,9 @@ Verified: `pnpm --filter @mepapp/ui build` clean, `pnpm --filter @mepapp/core te
 
 ---
 
-## Part B — Migrate `.mepshapes.json` into real vector `shapes` (not started)
+## Part B — Migrate `.mepshapes.json` into real vector `shapes` (DONE)
+
+**Status: DONE** (worktree `stamp-shape-vector-migration`).
 
 ### Why this is lower-risk than it sounds
 
@@ -73,3 +75,14 @@ Universal field notes across every shape:
 - `pnpm --filter @mepapp/core test` — should still pass unmodified (no core schema change, `shapes?` was already optional on `StampDefinition`).
 - Spot-check by duplicating a handful of library stamps covering each shape `kind` (at least one `arc`, one `polygon`, one non-square-viewBox asset) via the Part A duplicate button, confirm the Shapes-mode canvas renders a recognizable match to the original SVG, and that editing/saving round-trips correctly.
 - Not realistic to manually visually diff all 163 converted icons in one session — a representative sample (~10-15, covering every shape `kind` and at least a couple of non-square viewBoxes) is the intended QA bar; flag anything visibly wrong rather than guessing at a fix.
+
+### Result
+
+Implemented as planned above, with one additional bug found and fixed beyond the spec: **`SymbolShapeStyle.strokeWidth` also needed normalizing.** The mepshapes source gives `strokeWidth` as raw pixels (5–18, against a ~250–1500px viewBox), but `SymbolShapeStyle.strokeWidth` is a *fraction* — confirmed by `ElementEditorDialog.tsx`'s own `DEFAULT_STYLE.strokeWidth: 0.01` and the renderer's `ctx.lineWidth = strokeWidth * Math.min(widthPx, heightPx)`. Copying the raw value unnormalized produced a `lineWidth` in the thousands of pixels — every stroke covered the entire 520×520 preview canvas, rendering solid black. Fixed by dividing by `Math.min(vbw, vbh)`, the same width/height-independent convention already used for `radius`/`fontSize`. Caught only because the plan's own verification step (visual spot-check) was followed rather than trusting the build/tests alone — `pnpm build` and `pnpm --filter @mepapp/core test` were green throughout, since neither exercises canvas rendering.
+
+Verified:
+- `pnpm --filter @mepapp/core test`: 134/134 passing (unchanged from before Part B — no core schema change).
+- `pnpm build`: clean across all 9 workspace tasks.
+- Regenerated-vs-previous diff of `stamp-library.generated.ts` checked programmatically: all 166 entries' non-`shapes` fields byte-identical to the pre-Part-B file (0 mismatches); 165/166 entries gained a `shapes` array (the 166th, `drycooler-section`, correctly has no `shapes` key — its `.mepshapes.json` doesn't exist, confirmed the one real gap among the 164 fixture SVGs).
+- Visual spot-check via a scratch Playwright driver against the running `apps/web` dev server, covering every `SymbolShape` kind plus a non-square-viewBox asset (Air Handling Unit, 1500×700): rect, line, circle, arc, ellipse, text, arrow, and polygon shapes all rendered as clean, correctly-proportioned, recognizable line art matching their real-world symbols (AHU twin boxes, camera bracket, key-and-keyhole, LPG/CO detector text+circles, earthing-rod arrow, boiler "B"-in-circle, fan blades). (Needed forcing the preview's dark-theme background to white for the screenshots — the art's `#000000` stroke is otherwise invisible against `--surface-2`; that's a pre-existing dark-theme quirk of the dialog, not something this migration should try to fix.)
+- Full edit → save round-trip: duplicated "Key Safe" from the library, dragged one of its converted shapes on the Shapes-mode canvas, saved — status message "Key Safe created — pick it from the Stamps tab to place it.", grid showed 2 tiles named "Key Safe" (original library + new custom).

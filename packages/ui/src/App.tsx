@@ -436,6 +436,11 @@ export function MepSketchApp({
             iconRef,
             source: 'custom',
             ports: definition.ports.map((port) => ({ ...port })),
+            shapes: definition.shapes?.map((shape) => ({
+              ...shape,
+              style: { ...shape.style },
+              ...(shape.kind === 'polygon' ? { points: shape.points.map((point) => ({ ...point })) } : {}),
+            })),
           },
         });
       } catch (err) {

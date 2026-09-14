@@ -14,6 +14,7 @@
 import { readFileSync, readdirSync, writeFileSync, copyFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STAMPS_DIR = join(ROOT, 'fixtures', 'stamps');
@@ -135,6 +136,75 @@ function loadNameMapping(folderPath) {
   return map;
 }
 
+// 'none' (string) and absent (line/arc never carry a fill) both mean
+// SymbolShapeStyle.fill's null ("unfilled").
+function normalizedFill(fill) {
+  return fill == null || fill === 'none' ? null : fill;
+}
+
+// SymbolShapeStyle.strokeWidth is a fraction, not a raw pixel value — the
+// renderer does `strokeWidth * Math.min(widthPx, heightPx)` (matching the
+// dialog's own DEFAULT_STYLE.strokeWidth: 0.01), the same width-vs-height-
+// independent convention `radius`/`fontSize` already follow above.
+function styleOf(shape, vbw, vbh) {
+  return { stroke: shape.stroke, strokeWidth: shape.strokeWidth / Math.min(vbw, vbh), fill: normalizedFill(shape.fill) };
+}
+
+// mepshapes coordinates are absolute pixels against the file's own
+// ViewBoxWidth/ViewBoxHeight; SymbolShape coordinates are fractional 0..1,
+// normalized independently per axis (see packages/ui/src/symbolShapeCanvas.ts's
+// `x * widthPx` / `y * heightPx`) — so x-ish fields divide by vbw, y-ish by vbh.
+// radius/fontSize are single scalars with no independent X/Y in SymbolShape;
+// matching how the renderer applies them (radius against widthPx, fontSize
+// against heightPx), radius divides by vbw and fontSize by vbh. See plan's
+// "Known fidelity risk" note for circle/arc on a non-square viewBox.
+function convertShape(shape, vbw, vbh) {
+  const id = randomUUID();
+  const style = styleOf(shape, vbw, vbh);
+  switch (shape.type) {
+    case 'line':
+      return { id, kind: 'line', x1: shape.x1 / vbw, y1: shape.y1 / vbh, x2: shape.x2 / vbw, y2: shape.y2 / vbh, style };
+    case 'rect':
+      return { id, kind: 'rect', x: shape.x / vbw, y: shape.y / vbh, width: shape.w / vbw, height: shape.h / vbh, style };
+    case 'circle':
+      return { id, kind: 'circle', cx: shape.cx / vbw, cy: shape.cy / vbh, radius: shape.r / vbw, style };
+    case 'arc':
+      return {
+        id,
+        kind: 'arc',
+        cx: shape.cx / vbw,
+        cy: shape.cy / vbh,
+        radius: shape.r / vbw,
+        startAngle: (shape.startAngle * Math.PI) / 180,
+        endAngle: ((shape.startAngle + shape.sweepAngle) * Math.PI) / 180,
+        style,
+      };
+    case 'text':
+      return { id, kind: 'text', x: shape.x / vbw, y: shape.y / vbh, text: shape.content, fontSize: shape.fontSize / vbh, style };
+    case 'arrow':
+      return { id, kind: 'arrow', x1: shape.x1 / vbw, y1: shape.y1 / vbh, x2: shape.x2 / vbw, y2: shape.y2 / vbh, style };
+    case 'ellipse':
+      return { id, kind: 'ellipse', cx: shape.cx / vbw, cy: shape.cy / vbh, radiusX: shape.rx / vbw, radiusY: shape.ry / vbh, style };
+    case 'polygon': {
+      const points = [];
+      for (let i = 0; i < shape.points.length; i += 2) {
+        points.push({ x: shape.points[i] / vbw, y: shape.points[i + 1] / vbh });
+      }
+      return { id, kind: 'polygon', points, style };
+    }
+    default:
+      throw new Error(`Unknown mepshapes shape type "${shape.type}"`);
+  }
+}
+
+/** Returns undefined (not []) when the fixture has no .mepshapes.json — matches StampDefinition.shapes's already-optional convention (unlike `ports`, which is always an array). */
+function loadShapes(folderPath, base) {
+  const mepshapesPath = join(folderPath, `${base}.mepshapes.json`);
+  const data = readJsonIfExists(mepshapesPath);
+  if (!data) return undefined;
+  return data.Shapes.map((shape) => convertShape(shape, data.ViewBoxWidth, data.ViewBoxHeight));
+}
+
 function main() {
   const disciplineMap = loadDisciplineMap();
   const entries = [];
@@ -159,6 +229,7 @@ function main() {
 
       const config = readJsonIfExists(mepconfigPath);
       const ports = config ? config.ports.map(({ id, name, fractionX, fractionY }) => ({ id, name, fractionX, fractionY })) : [];
+      const shapes = loadShapes(folderPath, base);
 
       const label = humanizeLabel(base);
       const dutchBase = nameMapping.get(base);
@@ -171,7 +242,7 @@ function main() {
         const id = multi ? `${baseSlug}-${token.toLowerCase()}` : baseSlug;
         if (seenIds.has(id)) throw new Error(`Id collision: "${id}" generated for both ${seenIds.get(id)} and ${filename}`);
         seenIds.set(id, filename);
-        entries.push({ id, label, labelNl, discipline: value, category, nativeWidth, nativeHeight, ports, iconRef: filename });
+        entries.push({ id, label, labelNl, discipline: value, category, nativeWidth, nativeHeight, ports, shapes, iconRef: filename });
       }
 
       svgFilesToCopy.push(svgPath);
