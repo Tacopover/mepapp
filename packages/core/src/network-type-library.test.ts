@@ -14,8 +14,7 @@ describe('NETWORK_TYPE_LIBRARY', () => {
       'ventilation',
       'plumbing',
       'fireProtection',
-      'electricalPathways',
-      'electricalCircuits',
+      'electrical',
     ];
     for (const discipline of disciplines) {
       expect(NETWORK_TYPE_LIBRARY.some((t) => t.discipline === discipline)).toBe(true);

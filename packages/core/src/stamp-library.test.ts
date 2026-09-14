@@ -29,9 +29,9 @@ describe('stamp library', () => {
   });
 
   it('filters by discipline', () => {
-    const electrical = stampDefinitionsForDiscipline('electricalCircuits');
+    const electrical = stampDefinitionsForDiscipline('electrical');
     expect(electrical.length).toBeGreaterThan(0);
-    expect(electrical.every((def) => def.discipline === 'electricalCircuits')).toBe(true);
+    expect(electrical.every((def) => def.discipline === 'electrical')).toBe(true);
     expect(stampDefinitionsForDiscipline('plumbing')).toEqual([]); // no library entries for this discipline, and no custom list given
   });
 

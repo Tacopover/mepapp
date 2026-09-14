@@ -142,6 +142,29 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.stamps[0].color).toBeUndefined();
   });
 
+  it('migrates a pre-electrical-merge (v6) save, remapping the old electricalPathways/electricalCircuits disciplines to electrical', () => {
+    const legacyDoc = {
+      schemaVersion: 6,
+      networkTypes: [
+        { ...networkType, id: 'conduit', discipline: 'electricalPathways' },
+        { ...networkType, id: 'branch-circuit', discipline: 'electricalCircuits' },
+      ],
+      segments: [],
+      fittings: [],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [
+        { id: 'switch', label: 'Switch', discipline: 'electricalCircuits', category: 'terminal', nativeWidth: 10, nativeHeight: 10, ports: [], iconRef: 'x', source: 'custom' },
+      ],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.networkTypes.map((t) => t.discipline)).toEqual(['electrical', 'electrical']);
+    expect(loaded.customStampDefinitions[0].discipline).toBe('electrical');
+  });
+
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
     const doc = {
       schemaVersion: CURRENT_SCHEMA_VERSION,

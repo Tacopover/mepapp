@@ -68,6 +68,7 @@ import {
 } from '@mepapp/core';
 import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
+import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 
 export type { DocumentSummary } from './document.js';
@@ -784,14 +785,15 @@ export class SketchScene {
     this.stampGhostSprite?.destroy(); // never {texture: true} — the texture is owned by pendingStampTexture/the eventual placed sprite, not the ghost
     this.stampGhostSprite = null;
     if (!this.pendingStampTexture) return;
-    const { texture, nativeWidth, nativeHeight } = this.pendingStampTexture;
+    const { texture, nativeWidth, nativeHeight, appearanceDefault } = this.pendingStampTexture;
     const sprite = new Sprite(texture);
     sprite.anchor.set(0.5);
     sprite.alpha = STAMP_GHOST_ALPHA;
     sprite.eventMode = 'none'; // never intercepts hit-testing/pointer events
     sprite.visible = false; // shown on the next onPointerMove while a stamp-placement tool is active
     const baseScale = computeStampBaseScale(nativeWidth, nativeHeight, texture);
-    sprite.scale.set(baseScale.x, baseScale.y);
+    const scaleFactor = appearanceDefault?.scale ?? 1;
+    sprite.scale.set(baseScale.x * scaleFactor, baseScale.y * scaleFactor);
     sprite.rotation = (this.stampGhostRotationDegrees * Math.PI) / 180;
     this.stampGhostLayer.addChild(sprite);
     this.stampGhostSprite = sprite;
@@ -1204,7 +1206,7 @@ export class SketchScene {
     }
     target.nextAnnotationSeq = Math.max(target.nextAnnotationSeq, maxAnnotationSeq + 1);
 
-    for (const entry of target.stamps.values()) entry.sprite.destroy({ texture: true });
+    destroyStampEntries(target.stamps.values());
     target.stamps.clear();
     target.stampsLayer.removeChildren();
 
@@ -1223,8 +1225,8 @@ export class SketchScene {
       sprite.anchor.set(0.5); // matches placeStamp's pivot convention
       const baseScale = computeStampBaseScale(stampData.nativeWidth, stampData.nativeHeight, texture);
       applyTransformToSprite(sprite, stampData.transform, baseScale);
-      if (stampData.color) sprite.tint = hexColorToPixi(stampData.color);
-      target.stamps.set(stampData.id, { sprite, baseScale });
+      applyStampColor(sprite, texture, stampData.color);
+      target.stamps.set(stampData.id, { sprite, baseScale, baseTexture: texture });
       target.stampsLayer.addChild(sprite);
     }
     target.nextStampSeq = Math.max(target.nextStampSeq, maxStampSeq + 1);
@@ -1430,7 +1432,7 @@ export class SketchScene {
       sprite.tint = Math.floor(Math.random() * 0xffffff);
       const baseScale = { x: nativeWidth, y: nativeHeight }; // Texture.WHITE is 1x1
       applyTransformToSprite(sprite, data.transform, baseScale);
-      this.doc.stamps.set(id, { sprite, baseScale });
+      this.doc.stamps.set(id, { sprite, baseScale, baseTexture: Texture.WHITE });
       this.doc.stampsLayer.addChild(sprite);
     }
     const state = this.doc.drawingHistory.getState();
@@ -2470,8 +2472,8 @@ export class SketchScene {
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
-  /** Snapshot for pasteClipboard — each stamp's already-loaded texture is kept by reference (cheap, and shared safely: deleteSelection already never destroys a texture, only its sprite). */
-  private clipboard: { stamps: Array<{ data: PlacedStamp; texture: Texture; baseScale: Vec2 }>; annotations: Annotation[] } | null = null;
+  /** Snapshot for pasteClipboard — each stamp's already-loaded base texture is kept by reference (cheap, and shared safely: deleteSelection already never destroys a texture, only its sprite). Always the pristine base texture, never a colorized variant (see colorize.ts) — pasteClipboard re-derives the right variant from `pasted.color` itself. */
+  private clipboard: { stamps: Array<{ data: PlacedStamp; baseTexture: Texture; baseScale: Vec2 }>; annotations: Annotation[] } | null = null;
 
   /** Copies the current selection (stamps + annotations) — the rail's Copy flyout action / Ctrl+C. */
   copySelection(): void {
@@ -2481,7 +2483,7 @@ export class SketchScene {
       .filter((id) => state.stamps[id] && this.doc.stamps.has(id))
       .map((id) => {
         const entry = this.doc.stamps.get(id)!;
-        return { data: state.stamps[id], texture: entry.sprite.texture, baseScale: entry.baseScale };
+        return { data: state.stamps[id], baseTexture: entry.baseTexture, baseScale: entry.baseScale };
       });
     const annotations = [...this.doc.selectedIds].filter((id) => state.annotations[id]).map((id) => state.annotations[id]);
     if (stamps.length === 0 && annotations.length === 0) return;
@@ -2501,18 +2503,18 @@ export class SketchScene {
     const newSelection = new Set<string>();
     const pastedStamps: PlacedStamp[] = [];
 
-    for (const { data, texture, baseScale } of this.clipboard.stamps) {
+    for (const { data, baseTexture, baseScale } of this.clipboard.stamps) {
       const id = `stamp-${this.doc.nextStampSeq++}`;
       const pasted: PlacedStamp = {
         ...data,
         id,
         transform: { ...data.transform, position: { x: data.transform.position.x + OFFSET, y: data.transform.position.y + OFFSET } },
       };
-      const sprite = new Sprite(texture);
+      const sprite = new Sprite(baseTexture);
       sprite.anchor.set(0.5);
       applyTransformToSprite(sprite, pasted.transform, baseScale);
-      if (pasted.color) sprite.tint = hexColorToPixi(pasted.color);
-      this.doc.stamps.set(id, { sprite, baseScale });
+      applyStampColor(sprite, baseTexture, pasted.color);
+      this.doc.stamps.set(id, { sprite, baseScale, baseTexture });
       this.doc.stampsLayer.addChild(sprite);
       pastedStamps.push(pasted);
       newSelection.add(id);
@@ -2607,8 +2609,8 @@ export class SketchScene {
     sprite.anchor.set(0.5); // pivot = own center, matching the reference semantics
     const baseScale = computeStampBaseScale(nativeWidth, nativeHeight, texture);
     applyTransformToSprite(sprite, data.transform, baseScale);
-    if (data.color) sprite.tint = hexColorToPixi(data.color);
-    this.doc.stamps.set(id, { sprite, baseScale });
+    applyStampColor(sprite, texture, data.color);
+    this.doc.stamps.set(id, { sprite, baseScale, baseTexture: texture });
     this.doc.stampsLayer.addChild(sprite);
     this.doc.drawingHistory.execute(createStampCommand(data));
     // Instantiates the definition's authoring-time port groups (Element Editor
@@ -2831,7 +2833,7 @@ export class SketchScene {
         continue;
       }
       applyTransformToSprite(entry.sprite, data.transform, entry.baseScale);
-      entry.sprite.tint = data.color ? hexColorToPixi(data.color) : 0xffffff;
+      applyStampColor(entry.sprite, entry.baseTexture, data.color);
       if (!entry.sprite.parent) this.doc.stampsLayer.addChild(entry.sprite);
     }
   }

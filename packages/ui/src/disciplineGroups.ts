@@ -23,8 +23,7 @@ export function disciplineGroupOf(discipline: Discipline): DisciplineGroup {
       return 'hvac';
     case 'plumbing':
       return 'plumbing';
-    case 'electricalPathways':
-    case 'electricalCircuits':
+    case 'electrical':
       return 'electrical';
     case 'fireProtection':
       return 'fire';
