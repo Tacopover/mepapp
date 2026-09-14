@@ -243,8 +243,32 @@
 .mep-stamps-filter-row2 {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   margin-top: 6px;
+}
+/* Switch buttons (Terminal/Equipment, EN/NL) — deliberately distinct from
+   .mep-discipline-btn (a filter) since these toggle a single value rather
+   than select among several. */
+.mep-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1.5px dashed var(--muted);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+.mep-toggle-btn:hover {
+  border-color: var(--ink);
+  border-style: solid;
 }
 
 /* ---------- Body: canvas + toolbar + resize + dock ---------- */

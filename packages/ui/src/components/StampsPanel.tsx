@@ -74,12 +74,12 @@ export function StampsPanel({
   onPickNetworkType,
   onEditNetworkType,
 }: StampsPanelProps) {
-  const [categoryFilter, setCategoryFilter] = useState<StampCategoryFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<StampCategoryFilter>('terminal');
 
   const allDefinitions = [...STAMP_LIBRARY, ...customStampDefinitions];
   const definitions = allDefinitions
     .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)
-    .filter((def) => categoryFilter === 'all' || def.category === categoryFilter);
+    .filter((def) => def.category === categoryFilter);
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
   // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id

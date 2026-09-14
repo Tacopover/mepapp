@@ -461,7 +461,7 @@ export function MepSketchApp({
     : null;
 
   const dockTabDefs: DockTabDef[] = [
-    { id: 'stamps', label: 'Stamps' },
+    { id: 'stamps', label: 'MEP' },
     { id: 'drawings', label: 'Drawings' },
     { id: 'networks', label: 'Networks' },
     { id: 'properties', label: 'Properties' },
