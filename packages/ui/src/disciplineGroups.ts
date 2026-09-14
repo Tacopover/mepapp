@@ -5,15 +5,16 @@
 // one onto the other rather than inventing a second, weaker discipline type.
 import type { Discipline } from '@mepapp/core';
 
-export type DisciplineGroup = 'hvac' | 'plumbing' | 'electrical' | 'fire';
+export type DisciplineGroup = 'hvac' | 'plumbing' | 'electrical' | 'fire' | 'other';
 
-export const DISCIPLINE_GROUPS: DisciplineGroup[] = ['hvac', 'plumbing', 'electrical', 'fire'];
+export const DISCIPLINE_GROUPS: DisciplineGroup[] = ['hvac', 'plumbing', 'electrical', 'fire', 'other'];
 
 export const DISCIPLINE_GROUP_LABEL: Record<DisciplineGroup, string> = {
   hvac: 'HVAC',
   plumbing: 'Plumbing',
   electrical: 'Electrical',
   fire: 'Fire',
+  other: 'Other',
 };
 
 export function disciplineGroupOf(discipline: Discipline): DisciplineGroup {
@@ -27,5 +28,7 @@ export function disciplineGroupOf(discipline: Discipline): DisciplineGroup {
       return 'electrical';
     case 'fireProtection':
       return 'fire';
+    case 'other':
+      return 'other';
   }
 }

@@ -36,6 +36,7 @@ const DISCIPLINE_OPTIONS: Discipline[] = [
   'plumbing',
   'fireProtection',
   'electrical',
+  'other',
 ];
 
 const DISCIPLINE_LABEL: Record<Discipline, string> = {
@@ -44,6 +45,7 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = {
   plumbing: 'Plumbing',
   fireProtection: 'Fire Protection',
   electrical: 'Electrical',
+  other: 'Other',
 };
 
 type ArtworkMode = 'import' | 'shapes';

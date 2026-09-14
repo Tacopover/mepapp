@@ -5,13 +5,14 @@ import { ColorPicker } from './ColorPicker.js';
 
 export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline'>>;
 
-/** All 5 core Discipline values, human-labeled — finer-grained than disciplineGroups.ts's 4-way UI grouping (which this dialog's dropdown drives, via disciplineGroupOf), so it needs its own label map. */
+/** All 6 core Discipline values, human-labeled — finer-grained than disciplineGroups.ts's 5-way UI grouping (which this dialog's dropdown drives, via disciplineGroupOf), so it needs its own label map. */
 const DISCIPLINES: Array<{ value: Discipline; label: string }> = [
   { value: 'heatingAndCooling', label: 'Heating & Cooling' },
   { value: 'ventilation', label: 'Ventilation' },
   { value: 'plumbing', label: 'Plumbing' },
   { value: 'fireProtection', label: 'Fire Protection' },
   { value: 'electrical', label: 'Electrical' },
+  { value: 'other', label: 'Other' },
 ];
 
 export interface NetworkTypeEditorDialogProps {

@@ -23,6 +23,7 @@
   --plumb: #2f9e8f;
   --elec: #c98a1d;
   --fire: #c0432f;
+  --other: #7c5cbf;
 
   --font-display: 'Big Shoulders Display', sans-serif;
   --font-ui: 'Chivo', sans-serif;
@@ -845,6 +846,9 @@
 }
 .mep-networktype-tile.mep-discipline-fire {
   border-left-color: var(--fire);
+}
+.mep-networktype-tile.mep-discipline-other {
+  border-left-color: var(--other);
 }
 .mep-networktype-tile.active {
   border-color: var(--accent);

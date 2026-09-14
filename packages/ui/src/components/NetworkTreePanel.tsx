@@ -11,9 +11,9 @@ export interface NetworkTreePanelProps {
   onRenameNetworkType: (id: string, name: string) => void;
 }
 
-// Same five values as core's Discipline union (network.ts) — order and labels
+// Same six values as core's Discipline union (network.ts) — order and labels
 // match the old app's panel (networks-panel-spec.md §2) and this repo's
-// five-value discipline model, not the four-way DisciplineGroup the palette
+// six-value discipline model, not the five-way DisciplineGroup the palette
 // filter uses (see disciplineGroups.ts's note on why those stay separate).
 const DISCIPLINE_ORDER: Discipline[] = [
   'ventilation',
@@ -21,6 +21,7 @@ const DISCIPLINE_ORDER: Discipline[] = [
   'heatingAndCooling',
   'electrical',
   'fireProtection',
+  'other',
 ];
 
 const DISCIPLINE_LABEL: Record<Discipline, string> = {
@@ -29,6 +30,7 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = {
   heatingAndCooling: 'Heating/Cooling',
   electrical: 'Electrical',
   fireProtection: 'Fire Protection',
+  other: 'Other',
 };
 
 function elementLabel(stamp: StampInfo): string {
