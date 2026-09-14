@@ -78,11 +78,14 @@ export function StampsPanel({
   onEditNetworkType,
 }: StampsPanelProps) {
   const [categoryFilter, setCategoryFilter] = useState<StampCategoryFilter>('terminal');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const allDefinitions = [...STAMP_LIBRARY, ...customStampDefinitions];
+  const trimmedQuery = searchQuery.trim().toLowerCase();
   const definitions = allDefinitions
     .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)
-    .filter((def) => def.category === categoryFilter);
+    .filter((def) => def.category === categoryFilter)
+    .filter((def) => trimmedQuery === '' || stampLabelFor(def, labelLanguage).toLowerCase().includes(trimmedQuery));
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
   // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id
@@ -131,13 +134,23 @@ export function StampsPanel({
           <div className="mep-stamps-filter-row2">
             <CategorySwitcher value={categoryFilter} onChange={setCategoryFilter} />
             <LanguageToggle value={labelLanguage} onChange={onChangeLabelLanguage} />
+            <input
+              type="search"
+              className="mep-stamp-search"
+              placeholder="Search…"
+              aria-label="Search stamps"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         )}
       </div>
 
       {subTab === 'stamps' ? (
         <>
-          {definitions.length === 0 && <div className="mep-empty-panel">No stamp art available yet for this discipline.</div>}
+          {definitions.length === 0 && (
+            <div className="mep-empty-panel">{trimmedQuery === '' ? 'No stamp art available yet for this discipline.' : `No stamps match "${searchQuery.trim()}".`}</div>
+          )}
           <div className="mep-stamp-grid">
             {definitions.map((definition) => (
               <div key={definition.id} className="mep-stamp-tile-wrap">
