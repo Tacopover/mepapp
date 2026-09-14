@@ -1,0 +1,9 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="1.4467 4.4899 273.5533 125.2672" width="273.5533" height="125.2672">
+  <rect x="6.4467" y="9.4899" width="263.5533" height="115.2672" stroke="#000000" stroke-width="10" fill="none"/>
+  <circle cx="71" cy="67" r="48" stroke="#000000" stroke-width="10" fill="none"/>
+  <line x1="39.7977" y1="35.7977" x2="101.0339" y2="97.0339" stroke="#000000" stroke-width="10"/>
+  <line x1="101.588" y1="36.412" x2="40.5704" y2="97.4296" stroke="#000000" stroke-width="10"/>
+  <circle cx="205" cy="67" r="48" stroke="#000000" stroke-width="10" fill="none"/>
+  <line x1="174.225" y1="36.225" x2="235.2449" y2="97.2449" stroke="#000000" stroke-width="10"/>
+  <line x1="235.7881" y1="36.2119" x2="175.0013" y2="96.9987" stroke="#000000" stroke-width="10"/>
+</svg>

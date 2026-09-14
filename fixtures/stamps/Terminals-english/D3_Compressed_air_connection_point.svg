@@ -1,0 +1,7 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="5 5 130 130" width="130" height="130">
+  <circle cx="70" cy="70" r="60" stroke="#000000" stroke-width="10" fill="none"/>
+  <line x1="29.8698" y1="29.8698" x2="109.9123" y2="109.9123" stroke="#000000" stroke-width="10"/>
+  <line x1="109.0875" y1="30.9125" x2="31.4233" y2="108.5767" stroke="#000000" stroke-width="10"/>
+  <path d="M 109.0875 30.9125 A 54.9168 54.9168 0 0 1 108.8382 108.8243 Z" stroke="#000000" stroke-width="5" fill="#000000"/>
+  <polygon points="70,70 109.0875,30.9125 108.8382,108.8243" stroke="#000000" stroke-width="1" fill="#000000"/>
+</svg>

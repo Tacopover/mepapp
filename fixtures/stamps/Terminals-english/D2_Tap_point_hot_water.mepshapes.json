@@ -1,0 +1,14 @@
+{
+  "Version": 1,
+  "ViewBoxWidth": 193,
+  "ViewBoxHeight": 406,
+  "Shapes": [
+    {"type":"line","x1":96,"y1":20,"x2":96,"y2":330,"stroke":"#000000","strokeWidth":8},
+    {"type":"line","x1":30,"y1":80,"x2":162,"y2":80,"stroke":"#000000","strokeWidth":8},
+    {"type":"circle","cx":96,"cy":358,"r":38,"stroke":"#000000","strokeWidth":8,"fill":"none"},
+    {"type":"line","x1":69,"y1":331,"x2":123,"y2":385,"stroke":"#000000","strokeWidth":7},
+    {"type":"line","x1":123,"y1":331,"x2":69,"y2":385,"stroke":"#000000","strokeWidth":7}
+  ],
+  "Ports": [],
+  "LabelData": []
+}

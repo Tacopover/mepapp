@@ -1,0 +1,22 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0.9462 3.8513 520.2443 65.8129" width="520.2443" height="65.8129">
+  <rect x="3.6524" y="27.9131" width="516.0381" height="7.2017" stroke="#000000" stroke-width="3" fill="none"/>
+  <rect x="3.6524" y="60.9625" width="516.0381" height="7.2017" stroke="#000000" stroke-width="3" fill="none"/>
+  <rect x="19.7267" y="44.5861" width="485.3957" height="8.0428" stroke="#000000" stroke-width="3" fill="none"/>
+  <line x1="6.8582" y1="34.3211" x2="6.8582" y2="43.9906" stroke="#000000" stroke-width="5"/>
+  <line x1="7.4269" y1="61.6178" x2="7.4269" y2="52.1322" stroke="#000000" stroke-width="5"/>
+  <line x1="7.806" y1="52.1398" x2="3.4462" y2="52.1398" stroke="#000000" stroke-width="5"/>
+  <line x1="3.4462" y1="52.1398" x2="3.4462" y2="44.1692" stroke="#000000" stroke-width="5"/>
+  <line x1="3.8253" y1="44.1783" x2="8.3747" y2="44.1783" stroke="#000000" stroke-width="5"/>
+  <circle cx="12.545" cy="47.9695" r="3.033" stroke="#000000" stroke-width="5" fill="none"/>
+  <line x1="502.8887" y1="34.7003" x2="502.8887" y2="62.0028" stroke="#000000" stroke-width="8"/>
+  <line x1="515.0206" y1="34.7003" x2="515.0206" y2="60.8602" stroke="#000000" stroke-width="5"/>
+  <line x1="518.4327" y1="44.3678" x2="518.4327" y2="51.9526" stroke="#000000" stroke-width="5"/>
+  <line x1="19.2652" y1="34.7003" x2="19.2652" y2="62.0028" stroke="#000000" stroke-width="5"/>
+  <line x1="19.2652" y1="10.0983" x2="19.2652" y2="28.2897" stroke="#000000" stroke-width="5"/>
+  <rect x="3.6524" y="5.3513" width="516.0381" height="7.2017" stroke="#000000" stroke-width="3" fill="none"/>
+  <line x1="8.4811" y1="11.009" x2="8.4811" y2="28.2992" stroke="#000000" stroke-width="5"/>
+  <line x1="20.3517" y1="21.4831" x2="499.7181" y2="21.4831" stroke="#000000" stroke-width="3"/>
+  <line x1="499.8919" y1="10.2862" x2="499.8919" y2="22.6818" stroke="#000000" stroke-width="3"/>
+  <line x1="504.6052" y1="11.5082" x2="504.6052" y2="28.6595" stroke="#000000" stroke-width="5"/>
+  <line x1="513.3337" y1="10.6354" x2="513.3337" y2="28.7981" stroke="#000000" stroke-width="5"/>
+</svg>

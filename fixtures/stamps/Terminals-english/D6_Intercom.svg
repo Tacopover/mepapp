@@ -1,0 +1,10 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="10.2862 6.8472 286.7011 242.8255" width="286.7011" height="242.8255">
+  <rect x="15.2862" y="11.8472" width="231.6153" height="232.8255" stroke="#000000" stroke-width="10" fill="none"/>
+  <line x1="15.2862" y1="11.8472" x2="246.9015" y2="11.8472" stroke="#000000" stroke-width="10"/>
+  <rect x="46.3323" y="87.7374" width="73.4263" height="73.9191" stroke="#000000" stroke-width="10" fill="none"/>
+  <line x1="114.8306" y1="92.6654" x2="237.5363" y2="15.7895" stroke="#000000" stroke-width="10"/>
+  <line x1="112.8594" y1="156.2358" x2="239.5075" y2="235.5756" stroke="#000000" stroke-width="10"/>
+  <line x1="196.2529" y1="125.0785" x2="253.9434" y2="125.0785" stroke="#000000" stroke-width="10"/>
+  <polygon points="158.6893,125.1898 199.5912,101.0429 200.5768,149.8295" stroke="#000000" stroke-width="10" fill="#000000"/>
+  <polygon points="291.9873,125.5183 251.0854,149.6652 250.0999,100.8786" stroke="#000000" stroke-width="10" fill="#000000"/>
+</svg>

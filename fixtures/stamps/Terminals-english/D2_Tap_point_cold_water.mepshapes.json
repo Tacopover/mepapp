@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "ViewBoxWidth": 194,
+  "ViewBoxHeight": 406,
+  "Shapes": [
+    {"type":"line","x1":97,"y1":20,"x2":97,"y2":330,"stroke":"#000000","strokeWidth":8},
+    {"type":"line","x1":30,"y1":80,"x2":164,"y2":80,"stroke":"#000000","strokeWidth":8},
+    {"type":"circle","cx":97,"cy":358,"r":38,"stroke":"#000000","strokeWidth":8,"fill":"none"}
+  ],
+  "Ports": [],
+  "LabelData": []
+}

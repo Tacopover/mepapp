@@ -1,0 +1,26 @@
+﻿{
+  "ports": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "Center",
+      "fractionX": 0.5,
+      "fractionY": 0.5
+    }
+  ],
+  "labels": [
+    {
+      "id": "f5cfbe1a-19c6-4f59-9166-35b7c893a19c",
+      "propertyKey": "Capacity",
+      "fractionX": 0.493341092408266,
+      "fractionY": 0.103306678401785,
+      "fontSize": 9,
+      "textColor": "#FF282828",
+      "backgroundColor": "#C8FFFFDC",
+      "showBackground": false,
+      "showBorder": false,
+      "borderColor": "#B4505050"
+    }
+  ],
+  "connections": [
+  ]
+}
