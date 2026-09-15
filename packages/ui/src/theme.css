@@ -1456,6 +1456,16 @@
   font-size: 10.5px;
   color: var(--muted);
 }
+/* ColorPicker's popover opens downward by default (fine in a side dock with room
+   below) — the bottom bar sits right above the modal's own action buttons with no
+   room below and inside a scrolling .mep-modal-body, so a downward popover here
+   gets clipped. Flip it to open upward instead, into the canvas area above. */
+.mep-ee-bar .mep-color-picker-popover {
+  top: auto;
+  bottom: calc(100% + 6px);
+  right: auto;
+  left: 0;
+}
 
 .mep-element-editor-preview {
   position: relative;
@@ -1495,14 +1505,6 @@
   display: flex;
   align-items: center;
   gap: 4px;
-}
-.mep-shape-style-row input[type='color'] {
-  width: 24px;
-  height: 20px;
-  padding: 0;
-  border: 1.5px solid var(--line);
-  border-radius: 2px;
-  background: none;
 }
 .mep-element-editor-port {
   position: absolute;

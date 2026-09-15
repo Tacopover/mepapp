@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { CommandManager, type Discipline, type PortSpec, type StampCategory, type StampDefinition, type SymbolShape, type SymbolShapeStyle } from '@mepapp/core';
+import { ColorPicker } from './ColorPicker.js';
 import { Dialog } from './Dialog.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { stampLabelFor } from './StampsPanel.js';
@@ -956,7 +957,7 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
           <div className="mep-ee-bar">
             <div className="mep-ee-bar-cluster mep-shape-style-row">
               <label>
-                Stroke <input type="color" value={activeStyle.stroke} onChange={(e) => updateActiveStyle({ stroke: e.target.value })} />
+                Stroke <ColorPicker value={activeStyle.stroke} onChange={(color) => updateActiveStyle({ stroke: color })} />
               </label>
               <label>
                 Width{' '}
@@ -973,9 +974,7 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
               <label>
                 <input type="checkbox" checked={activeStyle.fill !== null} onChange={(e) => updateActiveStyle({ fill: e.target.checked ? activeStyle.stroke : null })} /> Fill
               </label>
-              {activeStyle.fill !== null && (
-                <input type="color" value={activeStyle.fill} onChange={(e) => updateActiveStyle({ fill: e.target.value })} />
-              )}
+              {activeStyle.fill !== null && <ColorPicker value={activeStyle.fill} onChange={(color) => updateActiveStyle({ fill: color })} />}
             </div>
             <div className="mep-ee-bar-divider" />
             <div className="mep-ee-bar-cluster">

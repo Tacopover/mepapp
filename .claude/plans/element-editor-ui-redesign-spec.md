@@ -450,8 +450,18 @@ polygon/arc-3pt-draft-cancel handler already uses
    handle, the dashed selection box, and populates the one-row bottom bar's
    Style (stroke/width/fill) and Modify (mirror h/v, scale, delete) clusters
    with icon buttons from `.mep-rail-btn`/`icons.tsx`.
-2. `<ColorPicker>` swap-in — small, fully independent of everything else,
-   good early win.
+2. **Done** (commit `<pending>`). `<ColorPicker>` swap-in — small, fully
+   independent of everything else, good early win.
+   Verification: `pnpm build` clean. Exercised in browser — opening the
+   Stroke swatch's popover in the new bottom bar revealed a real clipping
+   bug not anticipated by the spec text: `ColorPicker`'s popover opens
+   downward by default (fine in a side dock), but the bar sits directly
+   above the modal's own action buttons inside a scrolling
+   `.mep-modal-body`, so the popover was cut off. Fixed with a scoped CSS
+   override (`.mep-ee-bar .mep-color-picker-popover`) flipping it to open
+   upward into the canvas area — `ColorPicker.tsx` itself stays untouched,
+   per §5. Confirmed the basic-colors grid, last-used row, and custom input
+   all render fully visible after the fix.
 3. Zoom & pan (rewrite `fractionFromEvent` + wheel/pan handlers), folded
    into the one-row bottom bar per §2.1/§3.
 4. Shape handles (depends on zoom/pan's coordinate rewrite being settled) —
