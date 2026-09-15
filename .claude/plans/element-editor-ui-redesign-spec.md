@@ -570,7 +570,7 @@ polygon/arc-3pt-draft-cancel handler already uses
    remount) and the previously-selected shape was still selected —
    satisfying "one persistent, shared canvas that's never re-created per
    tab" from §2.
-8. **Done** (commit `<pending>`). Unsaved-changes warning — fully
+8. **Done** (commit `9c98e46`). Unsaved-changes warning — fully
    independent of 2-7, built last.
    `isDirty` is a JSON snapshot diff (name/discipline/category/mode/
    artworkDataUrl/nativeWidth/nativeHeight/ports/groups/shapes) captured
