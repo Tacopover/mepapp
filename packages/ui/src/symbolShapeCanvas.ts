@@ -149,9 +149,8 @@ export function rasterizeSymbolShapes(shapes: SymbolShape[], widthPx: number, he
   return canvas.toDataURL('image/png');
 }
 
-/** Hit-tests topmost-first (later shapes drawn on top), same convention as z-order in `shapes`. */
-export function hitTestSymbolShape(shapes: SymbolShape[], fractionX: number, fractionY: number, widthPx: number, heightPx: number): SymbolShape | null {
-  const tolerancePx = 6;
+/** Hit-tests topmost-first (later shapes drawn on top), same convention as z-order in `shapes`. `tolerancePx` is in the same pixel space as widthPx/heightPx — a caller drawing in a zoomed/panned world-px space should pass a zoom-adjusted value (tolerancePx / view.scale) to keep the click tolerance constant on screen. */
+export function hitTestSymbolShape(shapes: SymbolShape[], fractionX: number, fractionY: number, widthPx: number, heightPx: number, tolerancePx = 6): SymbolShape | null {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const shape = shapes[i];
     let x = fractionX * widthPx;
@@ -229,7 +228,7 @@ function pointInPolygon(x: number, y: number, points: { x: number; y: number }[]
 }
 
 /** Returns the *rotated* bounding box (an axis-aligned box tight around the shape as actually drawn) — used for the selection highlight and marquee test. */
-export function symbolShapeBounds(shape: SymbolShape): { x: number; y: number; width: number; height: number } {
+export function symbolShapeBounds(shape: SymbolShape, widthPx: number, heightPx: number): { x: number; y: number; width: number; height: number } {
   const rotation = shape.rotation ?? 0;
   switch (shape.kind) {
     case 'line':
@@ -257,9 +256,17 @@ export function symbolShapeBounds(shape: SymbolShape): { x: number; y: number; w
       return aabbOfPoints(corners);
     }
     case 'circle':
-    case 'arc':
-      // Rotation about its own center never changes a circle's (or this circle-based arc) bounding box.
-      return { x: shape.cx - shape.radius, y: shape.cy - shape.radius, width: shape.radius * 2, height: shape.radius * 2 };
+    case 'arc': {
+      // Rotation about its own center never changes a circle's (or this circle-based arc) bounding
+      // box. A single radius fraction maps to different pixel extents per axis on a non-square
+      // canvas though — same reason drawSymbolShapes/hitTestSymbolShape scale radius by
+      // Math.min(widthPx, heightPx) rather than per-axis — so the half-extents need the same
+      // per-axis correction to stay pixel-accurate (element-editor-ui-redesign-spec.md §4.3).
+      const minDim = Math.min(widthPx, heightPx);
+      const halfWidth = (shape.radius * minDim) / widthPx;
+      const halfHeight = (shape.radius * minDim) / heightPx;
+      return { x: shape.cx - halfWidth, y: shape.cy - halfHeight, width: halfWidth * 2, height: halfHeight * 2 };
+    }
     case 'text': {
       const width = shape.text.length * shape.fontSize * 0.6;
       const height = shape.fontSize;
@@ -292,6 +299,118 @@ export function symbolShapeBounds(shape: SymbolShape): { x: number; y: number; w
       const center = shapeCenter(shape);
       return aabbOfPoints(shape.points.map((p) => rotatePoint(p.x, p.y, center.x, center.y, rotation)));
     }
+  }
+}
+
+export interface ShapeHandle {
+  id: string;
+  /** Fraction-space position, already rotated into on-screen placement — draw/hit-test it exactly like any other fractional point (× widthPx/heightPx). */
+  x: number;
+  y: number;
+}
+
+/**
+ * Per-kind resize/reshape handle positions (element-editor-ui-redesign-spec.md §4), in the same
+ * fraction space + rotation convention `hitTestSymbolShape` already uses: computed in the shape's
+ * local (unrotated) space, then rotated by `shape.rotation` for on-screen placement. `text` has no
+ * handles — drag-to-move already covers repositioning it, and there's no natural resize handle for
+ * a text anchor.
+ */
+export function shapeHandles(shape: SymbolShape, widthPx: number, heightPx: number): ShapeHandle[] {
+  const rotation = shape.rotation ?? 0;
+  const center = shapeCenter(shape);
+  const toScreen = (x: number, y: number): { x: number; y: number } => (rotation === 0 ? { x, y } : rotatePoint(x, y, center.x, center.y, rotation));
+  const minDim = Math.min(widthPx, heightPx);
+
+  switch (shape.kind) {
+    case 'line':
+    case 'arrow':
+      return [
+        { id: 'p1', ...toScreen(shape.x1, shape.y1) },
+        { id: 'p2', ...toScreen(shape.x2, shape.y2) },
+      ];
+    case 'rect':
+      return [
+        { id: 'tl', ...toScreen(shape.x, shape.y) },
+        { id: 'tr', ...toScreen(shape.x + shape.width, shape.y) },
+        { id: 'br', ...toScreen(shape.x + shape.width, shape.y + shape.height) },
+        { id: 'bl', ...toScreen(shape.x, shape.y + shape.height) },
+      ];
+    case 'circle':
+      // Per-axis-corrected radius offset (same reason as symbolShapeBounds's circle/arc fix, §4.3)
+      // so the handle lands exactly on the visible circle regardless of a non-square canvas.
+      return [{ id: 'radius', ...toScreen(shape.cx + (shape.radius * minDim) / widthPx, shape.cy) }];
+    case 'arc': {
+      // Placed at the sweep's midpoint angle so it always sits on the visible arc, not just anywhere on the full circle.
+      const mid = (shape.startAngle + shape.endAngle) / 2;
+      const localX = shape.cx + (shape.radius * minDim * Math.cos(mid)) / widthPx;
+      const localY = shape.cy + (shape.radius * minDim * Math.sin(mid)) / heightPx;
+      return [{ id: 'radius', ...toScreen(localX, localY) }];
+    }
+    case 'ellipse':
+      return [
+        { id: 'x', ...toScreen(shape.cx + shape.radiusX, shape.cy) },
+        { id: 'y', ...toScreen(shape.cx, shape.cy + shape.radiusY) },
+      ];
+    case 'polygon':
+      return shape.points.map((p, i) => ({ id: String(i), ...toScreen(p.x, p.y) }));
+    case 'text':
+      return [];
+  }
+}
+
+/**
+ * Applies a handle drag, always deriving the new shape from `originalShape` — the shape as it was
+ * at drag-start, captured once by the caller and passed unchanged on every pointermove — never
+ * from an already-mutated draft. This is the fix for the corner-drag bug caught during mockup
+ * review (§4.1): recomputing a rect resize's "fixed opposite corner" from the shape's own current
+ * (already-mutated) x/y/width/height let the anchor silently jump once the dragged corner crossed
+ * the fixed one. Deriving everything fresh from the untouched original shape every call makes that
+ * class of bug structurally impossible — the fixed reference point (opposite corner, circle/arc
+ * center, or the line/arrow's other endpoint) never moves during the drag.
+ */
+export function applyHandleDrag(originalShape: SymbolShape, handleId: string, current: { x: number; y: number }, widthPx: number, heightPx: number): SymbolShape {
+  const rotation = originalShape.rotation ?? 0;
+  const center = shapeCenter(originalShape);
+  // Inverse-rotate the pointer into the shape's local (unrotated) space before computing the update — same convention hitTestSymbolShape uses.
+  const local = rotation === 0 ? current : rotatePoint(current.x, current.y, center.x, center.y, -rotation);
+  const minDim = Math.min(widthPx, heightPx);
+
+  switch (originalShape.kind) {
+    case 'line':
+    case 'arrow':
+      return handleId === 'p1' ? { ...originalShape, x1: local.x, y1: local.y } : { ...originalShape, x2: local.x, y2: local.y };
+    case 'rect': {
+      const opposite =
+        handleId === 'tl'
+          ? { x: originalShape.x + originalShape.width, y: originalShape.y + originalShape.height }
+          : handleId === 'tr'
+            ? { x: originalShape.x, y: originalShape.y + originalShape.height }
+            : handleId === 'br'
+              ? { x: originalShape.x, y: originalShape.y }
+              : { x: originalShape.x + originalShape.width, y: originalShape.y }; // 'bl'
+      return {
+        ...originalShape,
+        x: Math.min(opposite.x, local.x),
+        y: Math.min(opposite.y, local.y),
+        width: Math.abs(local.x - opposite.x),
+        height: Math.abs(local.y - opposite.y),
+      };
+    }
+    case 'circle':
+    case 'arc': {
+      const dxPx = (local.x - originalShape.cx) * widthPx;
+      const dyPx = (local.y - originalShape.cy) * heightPx;
+      return { ...originalShape, radius: Math.hypot(dxPx, dyPx) / minDim };
+    }
+    case 'ellipse':
+      return handleId === 'x' ? { ...originalShape, radiusX: Math.abs(local.x - originalShape.cx) } : { ...originalShape, radiusY: Math.abs(local.y - originalShape.cy) };
+    case 'polygon': {
+      const index = Number(handleId);
+      return { ...originalShape, points: originalShape.points.map((p, i) => (i === index ? { x: local.x, y: local.y } : p)) };
+    }
+    case 'text':
+      return originalShape;
   }
 }
 
@@ -371,8 +490,8 @@ export function isDraftLargeEnough(draft: SymbolShape): boolean {
 }
 
 /** Combined bounding box of a whole selection — single shape or multi. */
-export function selectionBounds(shapes: SymbolShape[]): { x: number; y: number; width: number; height: number } {
-  const bounds = shapes.map(symbolShapeBounds);
+export function selectionBounds(shapes: SymbolShape[], widthPx: number, heightPx: number): { x: number; y: number; width: number; height: number } {
+  const bounds = shapes.map((s) => symbolShapeBounds(s, widthPx, heightPx));
   const minX = Math.min(...bounds.map((b) => b.x));
   const minY = Math.min(...bounds.map((b) => b.y));
   const maxX = Math.max(...bounds.map((b) => b.x + b.width));
@@ -381,8 +500,8 @@ export function selectionBounds(shapes: SymbolShape[]): { x: number; y: number; 
 }
 
 /** Single-shape pivot is its own bounds center; multi-selection pivot is the combined bounding-box center — shared rule for mirror, scale, and (group) rotate. */
-export function selectionPivot(shapes: SymbolShape[]): { x: number; y: number } {
-  const b = selectionBounds(shapes);
+export function selectionPivot(shapes: SymbolShape[], widthPx: number, heightPx: number): { x: number; y: number } {
+  const b = selectionBounds(shapes, widthPx, heightPx);
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 

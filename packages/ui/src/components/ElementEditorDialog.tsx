@@ -28,6 +28,7 @@ import {
   type IconProps,
 } from '../icons.js';
 import {
+  applyHandleDrag,
   arcFromThreePoints,
   createDraftShape,
   drawSymbolShapes,
@@ -39,10 +40,12 @@ import {
   scaleShape,
   selectionBounds,
   selectionPivot,
+  shapeHandles,
   symbolShapeBounds,
   translateShape,
   updateDraftShape,
   type ShapeDrawTool,
+  type ShapeHandle,
 } from '../symbolShapeCanvas.js';
 
 /** Same 300 DPI convention as stampBitmap.ts/scene.ts's STAMP_SOURCE_DPI — stamp art's pixel size at 300 DPI is expected to match its nominal size in PDF points. */
@@ -51,9 +54,11 @@ const STAMP_SOURCE_DPI = 300;
 /** Cap on the Shapes-mode canvas's longer side, in drawing-buffer px — the shorter side is derived from the definition's own nativeWidth:nativeHeight aspect (see shapeCanvasSize) so a wide/tall stamp doesn't get squished into a square, matching how it actually looks placed on the PDF. */
 const SHAPE_CANVAS_MAX_PX = 520;
 
-/** Rotate handle geometry, in the same drawing-buffer pixel space as shapeCanvasSize's output — a stem above the selection's top edge ending in a small draggable circle. */
+/** Rotate/geometry handle geometry — all in screen px (constant on-screen size regardless of zoom, same "screen px, zoom-independent" convention as scene.ts's own handle constants), converted to world px via `/ view.scale` wherever they're drawn or hit-tested against world-space coordinates. */
 const ROTATE_HANDLE_OFFSET_PX = 28;
 const ROTATE_HANDLE_RADIUS_PX = 6;
+const GEOMETRY_HANDLE_RADIUS_PX = 5;
+const GEOMETRY_HANDLE_HIT_RADIUS_PX = 8;
 
 /** Zoom/pan range — mirrors packages/render/src/scene.ts's own MIN_ZOOM/MAX_ZOOM convention, tightened since symbol artwork is small and a full PDF page's 0.05–32 range doesn't apply (element-editor-ui-redesign-spec.md §3). */
 const MIN_ZOOM = 0.25;
@@ -137,11 +142,11 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
-/** Rotate handle sits centered above the selection's top edge, offset by a fixed pixel distance — heightPx is the canvas's own drawing-buffer height (see shapeCanvasSize) since this is a vertical offset. */
-function rotateHandlePosition(selected: SymbolShape[], heightPx: number): { x: number; y: number } | null {
+/** Rotate handle sits centered above the selection's top edge, offset by a fixed screen-px distance (divided by `scale` to convert to the world-px space bounds/coordinates live in, so it stays a constant size on screen regardless of zoom). */
+function rotateHandlePosition(selected: SymbolShape[], widthPx: number, heightPx: number, scale: number): { x: number; y: number } | null {
   if (selected.length === 0) return null;
-  const b = selectionBounds(selected);
-  return { x: b.x + b.width / 2, y: b.y - ROTATE_HANDLE_OFFSET_PX / heightPx };
+  const b = selectionBounds(selected, widthPx, heightPx);
+  return { x: b.x + b.width / 2, y: b.y - ROTATE_HANDLE_OFFSET_PX / scale / heightPx };
 }
 
 function readAsDataUrl(file: File): Promise<string> {
@@ -348,14 +353,14 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
 
   function mirrorSelection(axis: 'horizontal' | 'vertical') {
     if (selectedShapes.length === 0) return;
-    const pivot = selectionPivot(selectedShapes);
+    const pivot = selectionPivot(selectedShapes, canvasWidthPx, canvasHeightPx);
     commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? mirrorShape(s, axis, pivot.x, pivot.y) : s)));
   }
 
   function applyScalePercent() {
     const factor = Number(scalePercentInput) / 100;
     if (selectedShapes.length === 0 || !Number.isFinite(factor) || factor <= 0) return;
-    const pivot = selectionPivot(selectedShapes);
+    const pivot = selectionPivot(selectedShapes, canvasWidthPx, canvasHeightPx);
     commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? scaleShape(s, factor, pivot.x, pivot.y) : s)));
   }
 
@@ -405,6 +410,11 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     ctx.save();
     ctx.translate(view.panX, view.panY);
     ctx.scale(view.scale, view.scale);
+    // Selection/handle/marquee "chrome" is drawn in this same zoomed world-space transform, so a
+    // literal screen-px size (line width, dash length, handle radius) would visibly grow/shrink
+    // with zoom — divide by view.scale first so it renders at a constant size on screen instead,
+    // same convention scene.ts uses for its own handle/selection-outline drawing.
+    const chromeScale = 1 / view.scale;
     // draftShapes either replaces in-place shapes being dragged (select tool) or
     // holds one not-yet-committed new shape being drawn (drag-to-create tools) —
     // handle both by replacing matching ids and appending any that aren't found.
@@ -415,12 +425,13 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     drawSymbolShapes(ctx, toDraw, canvasWidthPx, canvasHeightPx);
     for (const shape of toDraw) {
       if (!selectedShapeIds.has(shape.id)) continue;
-      const b = symbolShapeBounds(shape);
+      const b = symbolShapeBounds(shape, canvasWidthPx, canvasHeightPx);
+      const pad = 3 * chromeScale;
       ctx.save();
-      ctx.setLineDash([4, 3]);
+      ctx.setLineDash([4 * chromeScale, 3 * chromeScale]);
       ctx.strokeStyle = '#2f6fed';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(b.x * canvasWidthPx - 3, b.y * canvasHeightPx - 3, b.width * canvasWidthPx + 6, b.height * canvasHeightPx + 6);
+      ctx.lineWidth = chromeScale;
+      ctx.strokeRect(b.x * canvasWidthPx - pad, b.y * canvasHeightPx - pad, b.width * canvasWidthPx + pad * 2, b.height * canvasHeightPx + pad * 2);
       ctx.restore();
     }
     if (marquee) {
@@ -432,30 +443,45 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
       ctx.fillStyle = 'rgba(47, 111, 237, 0.12)';
       ctx.fillRect(minX, minY, w, h);
       ctx.strokeStyle = '#2f6fed';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = chromeScale;
       ctx.strokeRect(minX, minY, w, h);
       ctx.restore();
     }
     if (tool === 'select' && !marquee) {
       const selectedForHandle = toDraw.filter((s) => selectedShapeIds.has(s.id));
-      const handle = rotateHandlePosition(selectedForHandle, canvasHeightPx);
+      const handle = rotateHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx, view.scale);
       if (handle) {
-        const b = selectionBounds(selectedForHandle);
+        const b = selectionBounds(selectedForHandle, canvasWidthPx, canvasHeightPx);
         const handleX = handle.x * canvasWidthPx;
         const handleY = handle.y * canvasHeightPx;
         const stemTopY = b.y * canvasHeightPx;
         ctx.save();
         ctx.strokeStyle = '#2f6fed';
         ctx.fillStyle = '#2f6fed';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = chromeScale;
         ctx.beginPath();
         ctx.moveTo(handleX, stemTopY);
         ctx.lineTo(handleX, handleY);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(handleX, handleY, ROTATE_HANDLE_RADIUS_PX, 0, Math.PI * 2);
+        ctx.arc(handleX, handleY, ROTATE_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+      }
+      // Geometry (resize/reshape) handles — only when exactly one shape is selected, per the
+      // hit-test order in handleShapesCanvasPointerDown: rotate handle → geometry handle → body drag.
+      if (selectedForHandle.length === 1) {
+        for (const geomHandle of shapeHandles(selectedForHandle[0], canvasWidthPx, canvasHeightPx)) {
+          ctx.save();
+          ctx.strokeStyle = '#2f6fed';
+          ctx.fillStyle = '#fff';
+          ctx.lineWidth = chromeScale;
+          ctx.beginPath();
+          ctx.arc(geomHandle.x * canvasWidthPx, geomHandle.y * canvasHeightPx, GEOMETRY_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
       }
     }
 
@@ -464,10 +490,10 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     const activeDraftPoints = tool === 'polygon' ? polygonDraft : tool === 'arcThreePoint' ? arcThreePointDraft : null;
     if (activeDraftPoints && activeDraftPoints.length > 0) {
       ctx.save();
-      ctx.setLineDash([4, 3]);
+      ctx.setLineDash([4 * chromeScale, 3 * chromeScale]);
       ctx.strokeStyle = '#2f6fed';
       ctx.fillStyle = '#2f6fed';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = chromeScale;
       ctx.beginPath();
       ctx.moveTo(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx);
       for (const p of activeDraftPoints.slice(1)) ctx.lineTo(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx);
@@ -475,7 +501,7 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
       ctx.stroke();
       for (const p of activeDraftPoints) {
         ctx.beginPath();
-        ctx.arc(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx, 3, 0, Math.PI * 2);
+        ctx.arc(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx, 3 * chromeScale, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
@@ -590,16 +616,17 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     }
 
     if (tool === 'select') {
-      // Rotate-handle hit test takes priority over shape hit-testing.
+      const canvasEl = event.currentTarget;
+      // Hit-test order (§4): rotate handle → geometry handle (single selection only) → shape-body drag → marquee.
       const selectedForRotate = shapes.filter((s) => selectedShapeIds.has(s.id));
-      const handle = rotateHandlePosition(selectedForRotate, canvasHeightPx);
+      const handle = rotateHandlePosition(selectedForRotate, canvasWidthPx, canvasHeightPx, view.scale);
       if (handle) {
         const handlePxX = handle.x * canvasWidthPx;
         const handlePxY = handle.y * canvasHeightPx;
         const clickPxX = start.fractionX * canvasWidthPx;
         const clickPxY = start.fractionY * canvasHeightPx;
-        if (Math.hypot(clickPxX - handlePxX, clickPxY - handlePxY) <= ROTATE_HANDLE_RADIUS_PX + 3) {
-          const pivot = selectionPivot(selectedForRotate);
+        if (Math.hypot(clickPxX - handlePxX, clickPxY - handlePxY) <= (ROTATE_HANDLE_RADIUS_PX + 3) / view.scale) {
+          const pivot = selectionPivot(selectedForRotate, canvasWidthPx, canvasHeightPx);
           const pivotPxX = pivot.x * canvasWidthPx;
           const pivotPxY = pivot.y * canvasHeightPx;
           const startAngle = Math.atan2(clickPxY - pivotPxY, clickPxX - pivotPxX);
@@ -628,7 +655,40 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
         }
       }
 
-      const hit = hitTestSymbolShape(shapes, start.fractionX, start.fractionY, canvasWidthPx, canvasHeightPx);
+      // Geometry (resize/reshape) handle hit test — only when exactly one shape is selected.
+      // originalShape is captured once here and passed unchanged to every applyHandleDrag call
+      // in `move`, never re-derived from the mutating draft — the §4.1 fix.
+      if (selectedForRotate.length === 1) {
+        const originalShape = selectedForRotate[0];
+        const hitRadius = GEOMETRY_HANDLE_HIT_RADIUS_PX / view.scale;
+        const hitHandle = shapeHandles(originalShape, canvasWidthPx, canvasHeightPx).find(
+          (h) => Math.hypot(h.x * canvasWidthPx - start.fractionX * canvasWidthPx, h.y * canvasHeightPx - start.fractionY * canvasHeightPx) <= hitRadius,
+        );
+        if (hitHandle) {
+          canvasEl.setPointerCapture(event.pointerId);
+          const move = (ev: PointerEvent) => {
+            const current = fractionFromEvent(ev.clientX, ev.clientY);
+            setDraftShapes([applyHandleDrag(originalShape, hitHandle.id, { x: current.fractionX, y: current.fractionY }, canvasWidthPx, canvasHeightPx)]);
+          };
+          const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            canvasEl.releasePointerCapture(event.pointerId);
+            setDraftShapes((current) => {
+              if (current) {
+                const currentById = new Map(current.map((s) => [s.id, s]));
+                commitShapes(shapes.map((s) => currentById.get(s.id) ?? s));
+              }
+              return null;
+            });
+          };
+          window.addEventListener('pointermove', move);
+          window.addEventListener('pointerup', up);
+          return;
+        }
+      }
+
+      const hit = hitTestSymbolShape(shapes, start.fractionX, start.fractionY, canvasWidthPx, canvasHeightPx, 6 / view.scale);
       if (hit) {
         if (event.shiftKey) {
           setSelectedShapeIds((prev) => {
@@ -686,7 +746,7 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
             // rectangle — same rule as the old app's rubber-band select, not full overlap.
             const hitIds = shapes
               .filter((s) => {
-                const b = symbolShapeBounds(s);
+                const b = symbolShapeBounds(s, canvasWidthPx, canvasHeightPx);
                 const midX = b.x + b.width / 2;
                 const midY = b.y + b.height / 2;
                 return midX >= minX && midX <= maxX && midY >= minY && midY <= maxY;

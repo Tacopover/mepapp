@@ -492,9 +492,35 @@ polygon/arc-3pt-draft-cancel handler already uses
    unblurred lines throughout. Also verified in Import mode with a real
    fixture PNG (`fixtures/stamps/D5_Switch.png`): placing a port and then
    zooming in kept the port dot correctly anchored to the artwork.
-4. Shape handles (depends on zoom/pan's coordinate rewrite being settled) —
-   build with the anchor-capture-once discipline from §4.1 from the start,
-   not as a retrofit.
+4. **Done** (commit `<pending>`). Shape handles (depends on zoom/pan's
+   coordinate rewrite being settled) — built with the anchor-capture-once
+   discipline from §4.1 from the start, not as a retrofit.
+   New `shapeHandles`/`applyHandleDrag` in `symbolShapeCanvas.ts`, per-kind
+   as speced. `applyHandleDrag` takes the ORIGINAL shape (captured once at
+   pointerdown, passed unchanged on every pointermove) rather than a
+   mutable captured anchor variable — structurally the same fix as §4.1
+   asks for, since every fixed reference point is re-derived from that same
+   untouched original shape on every call. `hitTestSymbolShape` gained an
+   optional `tolerancePx` parameter (default 6, unchanged for non-dialog
+   callers) so the dialog can pass a zoom-adjusted `6 / view.scale`.
+   Also fixed §4.3's named bug: `symbolShapeBounds`'s circle/arc case now
+   takes `widthPx`/`heightPx` and corrects the half-extents per axis
+   (`radius * Math.min(w,h) / w` and `/ h`) instead of using `radius,
+   radius` uniformly — required threading `widthPx`/`heightPx` through
+   `selectionBounds`/`selectionPivot` too, updating all 8 call sites.
+   Also resolved step 3's noted interim imprecision in the same pass (per
+   the plan's own build-order rationale for grouping this work): rotate
+   handle offset/radius and the new geometry handles are now divided by
+   `view.scale` wherever drawn or hit-tested in the zoomed world-space
+   transform, so they stay a constant size on screen regardless of zoom —
+   same "screen px, zoom-independent" convention as scene.ts's own handle
+   constants. Selection dashed-outline/marquee/polygon-draft chrome got the
+   same treatment (`chromeScale = 1 / view.scale`) for consistency.
+   Verification: `pnpm build` clean. Exercised in browser — a single-
+   selected rect shows 4 corner handles (white-filled circles) alongside
+   the existing rotate handle; dragging a corner handle past its opposite
+   corner tracked the cursor exactly with no anchor jump (the exact bug
+   class §4.1 describes), confirmed both mid-drag and after release.
 5. Grid + angle + object snap (§6) — small, same pointer-code area as
    step 4, do last of the pointer work so it doesn't get rebased across
    handle changes.
