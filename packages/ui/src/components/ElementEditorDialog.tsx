@@ -312,6 +312,41 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
   // primitive the rest of the app uses, scoped to just this dialog's canvas.
   const [shapesManager] = useState(() => new CommandManager<SymbolShape[]>(definition?.shapes ?? []));
   const [shapes, setShapes] = useState<SymbolShape[]>(shapesManager.getState());
+
+  // Unsaved-changes warning (§7) — isDirty is a snapshot diff, not a scattered `dirty = true` flag
+  // touched by every setter: one JSON comparison correctly treats "moved a shape back to where it
+  // started" as still dirty (matching normal unsaved-changes UX), and there's exactly one place to
+  // keep in sync with new saveable fields. initialSnapshotRef captures the value ONCE at mount —
+  // its useRef initializer expression re-evaluates every render (a JS-argument-evaluation quirk),
+  // but useRef only keeps the very first result, which is exactly the mount-time snapshot we want.
+  function computeSnapshot(): string {
+    return JSON.stringify({ name, discipline, category, mode, artworkDataUrl, nativeWidth, nativeHeight, ports, groups, shapes });
+  }
+  const initialSnapshotRef = useRef(computeSnapshot());
+  const isDirty = computeSnapshot() !== initialSnapshotRef.current;
+  const [pendingClose, setPendingClose] = useState(false);
+
+  function requestClose() {
+    if (isDirty) setPendingClose(true);
+    else onClose();
+  }
+
+  // Escape closes just the confirm block, not the whole dialog — a capture-phase listener with
+  // stopPropagation, same pattern the polygon/arc-3pt draft-cancel handler below already uses,
+  // since Dialog's own Escape-closes-everything listener is also on document (see
+  // project-dialog-escape-listener-conflict).
+  useEffect(() => {
+    if (!pendingClose) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingClose(false);
+    }
+    document.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [pendingClose]);
+
   const [tool, setTool] = useState<ShapeTool>('select');
   const [defaultStyle, setDefaultStyle] = useState<SymbolShapeStyle>(DEFAULT_STYLE);
   const [selectedShapeIds, setSelectedShapeIds] = useState<Set<string>>(new Set());
@@ -1016,16 +1051,31 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
   return (
     <Dialog
       title={definition ? 'Edit Element' : 'Create Custom Element'}
-      onClose={onClose}
+      onClose={requestClose}
       className="mep-modal--wide"
       actions={
         <>
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={requestClose}>Cancel</button>
           <button onClick={handleSave}>{definition ? 'Save' : 'Create'}</button>
         </>
       }
     >
       <div className="mep-ee-body">
+        {pendingClose && (
+          <div className="mep-ee-confirm-close">
+            <div className="mep-ee-confirm-close-box">
+              <p>Discard unsaved changes?</p>
+              <div className="mep-ee-confirm-close-actions">
+                <button type="button" onClick={() => setPendingClose(false)}>
+                  Keep editing
+                </button>
+                <button type="button" onClick={onClose}>
+                  Discard
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mep-ee-header">
           <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
           <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)}>

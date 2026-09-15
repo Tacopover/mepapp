@@ -1342,11 +1342,41 @@
   min-height: 0;
 }
 .mep-ee-body {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+}
+/* Unsaved-changes confirm (§7) — an inline overlay within the dialog body, not a second nested
+   Dialog (its own Escape-closes-everything listener would conflict, see
+   project-dialog-escape-listener-conflict). */
+.mep-ee-confirm-close {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(19, 27, 33, 0.4);
+}
+.mep-ee-confirm-close-box {
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 16px 20px;
+  text-align: center;
+}
+.mep-ee-confirm-close-box p {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+}
+.mep-ee-confirm-close-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
 }
 .mep-ee-header {
   display: flex;

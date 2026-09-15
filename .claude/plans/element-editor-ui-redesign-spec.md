@@ -570,5 +570,23 @@ polygon/arc-3pt-draft-cancel handler already uses
    remount) and the previously-selected shape was still selected —
    satisfying "one persistent, shared canvas that's never re-created per
    tab" from §2.
-8. Unsaved-changes warning — fully independent of 2-7, can be built first
-   or last.
+8. **Done** (commit `<pending>`). Unsaved-changes warning — fully
+   independent of 2-7, built last.
+   `isDirty` is a JSON snapshot diff (name/discipline/category/mode/
+   artworkDataUrl/nativeWidth/nativeHeight/ports/groups/shapes) captured
+   once at mount via `useRef`, compared against a freshly-computed snapshot
+   each render — not a scattered `dirty = true` flag. `requestClose()`
+   replaces the direct `onClose` prop on `<Dialog>`'s `onClose` and the
+   Cancel button; Escape and backdrop-click both already route through
+   `Dialog`'s own `onClose` prop, so wiring that one prop covers all three
+   triggers named in §7. The confirm block is an inline overlay inside
+   `.mep-ee-body` (not a nested `<Dialog>`, avoiding
+   `project-dialog-escape-listener-conflict`), with its own capture-phase
+   Escape handler (same pattern as the existing polygon/arc-3pt draft-
+   cancel handler) that closes only the confirm block, `stopPropagation`-ing
+   before `Dialog`'s own bubble-phase Escape listener sees it.
+   Verification: `pnpm build` clean. Exercised in browser — closing with no
+   changes made closes immediately with no prompt; typing a name then
+   clicking Cancel shows "Discard unsaved changes?"; Escape at that point
+   closes only the prompt (dialog stays open, confirmed via DOM query);
+   clicking Cancel again then Discard closes the whole dialog.
