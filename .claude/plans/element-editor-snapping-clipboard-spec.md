@@ -1,5 +1,14 @@
 # Element Editor — snapping & clipboard
 
+**2026-09-15 amendment:** §5.1's grid snap is now tracked and being built as
+part of [[element-editor-ui-redesign-spec]] §6 instead of here — that
+session's canvas-first redesign rewrites the exact same pointer-handling
+code (`fractionFromEvent`, `handleShapesCanvasPointerDown`,
+`handlePortPointerDown`) for zoom/pan and shape handles, so grid snap is
+built once against the final shape of that code rather than twice. §5.2's
+copy/paste has no such overlap and remains unbuilt here, independently
+pickable at any time.
+
 Priority 3 of three plans from a 2026-09-10 investigation comparing the new
 `ElementEditorDialog`'s Shapes-mode canvas against the old MEPSketcher app's
 `ElementCreatorWindow`/`DrawingCanvas`. Covers investigation findings #5
