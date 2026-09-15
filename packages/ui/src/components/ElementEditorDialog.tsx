@@ -47,6 +47,7 @@ import {
   isDraftLargeEnough,
   mirrorShape,
   rasterizeSymbolShapes,
+  rescaleShapeForCanvasResize,
   rotateShapeAround,
   scaleShape,
   selectionBounds,
@@ -392,6 +393,29 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     setShapes(next);
   }
 
+  // Canvas resize, not image resize: editing nativeWidth/nativeHeight changes the fraction-space
+  // box's own aspect ratio (via shapeCanvasSize), so without this, every shape/port's fraction
+  // coordinates would be silently reinterpreted against the new aspect and visibly shift. Rescale
+  // their raw coordinates by the old/new *native* (physical, real-world-unit) size ratio — per axis —
+  // so each one's ABSOLUTE physical position/size stays fixed and only the surrounding canvas
+  // boundary changes, matching an image editor's "canvas size" (keep content in place) rather than
+  // "image size" (stretch content). This must use nativeWidth/nativeHeight directly, not the derived
+  // canvasWidthPx/heightPx: shapeCanvasSize's own scale factor is SHAPE_CANVAS_MAX_PX/Math.max(w,h),
+  // so canvasWidthPx/heightPx don't scale linearly per axis with nativeWidth/nativeHeight whenever
+  // the aspect ratio changes — only the native sizes themselves do.
+  const nativeSizeRef = useRef({ width: nativeWidth, height: nativeHeight });
+  useEffect(() => {
+    const prev = nativeSizeRef.current;
+    if (prev.width === nativeWidth && prev.height === nativeHeight) return;
+    const sx = prev.width / nativeWidth;
+    const sy = prev.height / nativeHeight;
+    const sMin = Math.min(prev.width, prev.height) / Math.min(nativeWidth, nativeHeight);
+    commitShapes(shapes.map((s) => rescaleShapeForCanvasResize(s, sx, sy, sMin)));
+    setPorts((prevPorts) => prevPorts.map((p) => ({ ...p, fractionX: p.fractionX * sx, fractionY: p.fractionY * sy })));
+    nativeSizeRef.current = { width: nativeWidth, height: nativeHeight };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nativeWidth, nativeHeight]);
+
   function undoShapes() {
     setShapes(shapesManager.undo());
     setSelectedShapeIds(new Set());
@@ -453,12 +477,12 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     commitShapes([...shapes.filter((s) => selectedShapeIds.has(s.id)), ...shapes.filter((s) => !selectedShapeIds.has(s.id))]);
   }
 
-  function finishPolygon() {
-    if (!polygonDraft || polygonDraft.length < 3) return;
+  function finishPolygon(points = polygonDraft) {
+    if (!points || points.length < 3) return;
     const shape: SymbolShape = {
       id: crypto.randomUUID(),
       kind: 'polygon',
-      points: polygonDraft.map((p) => ({ x: p.fractionX, y: p.fractionY })),
+      points: points.map((p) => ({ x: p.fractionX, y: p.fractionY })),
       style: defaultStyle,
     };
     commitShapes([...shapes, shape]);
@@ -695,19 +719,20 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     }
 
     if (tool === 'polygon') {
-      if (event.detail && event.detail >= 2) return; // 2nd click of a dblclick — onDoubleClick finishes instead
       setPolygonDraft(polygonDraft ? [...polygonDraft, start] : [start]);
       return;
     }
 
     if (tool === 'arcThreePoint') {
-      if (event.detail && event.detail >= 2) return;
       const nextPoints = arcThreePointDraft ? [...arcThreePointDraft, start] : [start];
       if (nextPoints.length < 3) {
         setArcThreePointDraft(nextPoints);
         return;
       }
-      const arc = arcFromThreePoints(nextPoints[0], nextPoints[1], nextPoints[2], defaultStyle);
+      // Click order is start, a point the arc passes through, end — the conventional CAD "3-point
+      // arc" sequence — so the 2nd and 3rd clicks are reordered for arcFromThreePoints's own
+      // (start, end, through) parameter order.
+      const arc = arcFromThreePoints(nextPoints[0], nextPoints[2], nextPoints[1], defaultStyle);
       setArcThreePointDraft(null);
       setPendingPoint(null);
       if (arc) {
@@ -926,8 +951,23 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     }
   }
 
-  function handleShapesCanvasDoubleClick() {
-    if (tool === 'polygon') finishPolygon();
+  function handleShapesCanvasDoubleClick(event: MouseEvent<HTMLCanvasElement>) {
+    if (tool === 'polygon') {
+      // The dblclick's own two constituent pointerdowns each already appended a point (there's no
+      // reliable native signal at pointerdown time to know a dblclick is coming) — drop the last one,
+      // a near-duplicate of the true final vertex, before finishing.
+      finishPolygon(polygonDraft && polygonDraft.length > 1 ? polygonDraft.slice(0, -1) : polygonDraft);
+      return;
+    }
+    if (tool === 'select') {
+      const { fractionX, fractionY } = fractionFromEvent(event.clientX, event.clientY);
+      const hit = hitTestSymbolShape(shapes, fractionX, fractionY, canvasWidthPx, canvasHeightPx, 6 / view.scale);
+      if (hit && hit.kind === 'text') {
+        setSelectedShapeIds(new Set([hit.id]));
+        setEditingTextId(hit.id);
+        setEditingTextValue(hit.text);
+      }
+    }
   }
 
   function commitTextEdit() {
@@ -1195,7 +1235,11 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
                   <input
                     autoFocus
                     className="mep-element-editor-port-rename"
-                    style={{ left: `${editingPort.fractionX * 100}%`, top: `${editingPort.fractionY * 100}%` }}
+                    style={{
+                      left: `${editingPort.fractionX * 100}%`,
+                      top: `${editingPort.fractionY * 100}%`,
+                      transform: `scale(${1 / view.scale}) translate(-50%, -140%)`,
+                    }}
                     value={editPortName}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => setEditPortName(e.target.value)}
@@ -1210,7 +1254,11 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
                   <input
                     ref={textRenameRef}
                     className="mep-element-editor-port-rename"
-                    style={{ left: `${editingTextShape.x * 100}%`, top: `${editingTextShape.y * 100}%` }}
+                    style={{
+                      left: `${editingTextShape.x * 100}%`,
+                      top: `${editingTextShape.y * 100}%`,
+                      transform: `scale(${1 / view.scale}) translate(-50%, -140%)`,
+                    }}
                     value={editingTextValue}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => setEditingTextValue(e.target.value)}
