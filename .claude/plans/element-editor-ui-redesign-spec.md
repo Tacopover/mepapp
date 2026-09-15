@@ -431,7 +431,7 @@ polygon/arc-3pt-draft-cancel handler already uses
 
 ## 10. Build order
 
-1. **Done** (commit `<pending>`, see below). Layout restructure + wide modal
+1. **Done** (commit `7558fd6`, see below). Layout restructure + wide modal
    + icon-only rail (no drag/zoom behavior change yet) — get the
    canvas-dominant shell in place first, with explicit `grid-column`s from
    day one (§2.1), so every later step is built/tested against the final
