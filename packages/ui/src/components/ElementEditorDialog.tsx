@@ -181,6 +181,8 @@ function readAsDataUrl(file: File): Promise<string> {
 export interface ElementEditorDialogProps {
   /** The definition being edited ("Edit ports…" from a placed custom instance's Properties panel), or undefined for "Create custom element". Editing changes the definition going forward — it does not retroactively touch instances already placed from it, same as a library definition's own fields were never live-linked to its placed instances. */
   definition?: StampDefinition;
+  /** The active document's current custom elements — used only to detect a Name collision at save time (see handleSave's overwrite-confirmation prompt), never rendered directly. */
+  existingCustomDefinitions: StampDefinition[];
   /** The Stamps tab's picker-label language (see LanguageToggle) — only used to seed the Name field from definition.labelNl when opening a library stamp for editing; the saved definition always keeps a single label going forward (see StampsPanel's stampLabelFor doc comment). */
   labelLanguage?: StampLabelLanguage;
   onSave: (definition: StampDefinition) => void;
@@ -197,11 +199,17 @@ export interface ElementEditorDialogProps {
  * for grouping ports that are internally wired together (converted to a real
  * instance-level PortGroup at placement, see SketchScene.placeStamp).
  */
-export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose }: ElementEditorDialogProps) {
+export function ElementEditorDialog({ definition, existingCustomDefinitions, labelLanguage, onSave, onClose }: ElementEditorDialogProps) {
   const [name, setName] = useState(definition ? stampLabelFor(definition, labelLanguage ?? 'en') : '');
   const [discipline, setDiscipline] = useState<Discipline>(definition?.discipline ?? 'ventilation');
   const [category, setCategory] = useState<StampCategory>(definition?.category === 'equipment' ? 'equipment' : 'terminal');
-  const [mode, setMode] = useState<ArtworkMode>(definition?.shapes && definition.shapes.length > 0 ? 'shapes' : 'import');
+  // A brand-new "Create custom element" (no definition at all) defaults to Shapes mode so it opens
+  // on a ready-to-draw empty canvas, same as editing an existing shapes-based stamp does — Import
+  // mode would otherwise show nothing until the user picks a file. Editing/duplicating a
+  // raster-based definition still defaults to Import so its existing artwork shows immediately.
+  const [mode, setMode] = useState<ArtworkMode>(
+    definition?.shapes && definition.shapes.length > 0 ? 'shapes' : definition ? 'import' : 'shapes',
+  );
   const [artworkDataUrl, setArtworkDataUrl] = useState<string | null>(mode === 'import' ? (definition?.iconRef ?? null) : null);
   const [nativeWidth, setNativeWidth] = useState(definition?.nativeWidth ?? 48);
   const [nativeHeight, setNativeHeight] = useState(definition?.nativeHeight ?? 48);
@@ -1005,20 +1013,26 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     return ports.find((p) => p.id === id)?.name ?? id;
   }
 
-  function handleSave() {
+  /** Built definition awaiting the user's confirm/cancel on the Name-collision prompt below — its
+      id still matches this dialog's own definition/seed; confirmOverwrite swaps in the colliding
+      definition's id so App.tsx's save handler updates that one in place instead of adding a new
+      entry (see handleSaveElementDefinition's `isOverwrite` check, keyed on id membership). */
+  const [pendingOverwrite, setPendingOverwrite] = useState<{ built: StampDefinition; existingId: string; existingLabel: string } | null>(null);
+
+  function buildDefinition(): StampDefinition | null {
     if (!name.trim()) {
       setError('Name is required.');
-      return;
+      return null;
     }
     if (!nativeWidth || !nativeHeight) {
       setError('Width and height are required.');
-      return;
+      return null;
     }
     let iconRef: string;
     if (mode === 'shapes') {
       if (shapes.length === 0) {
         setError('Draw at least one shape, or switch to Import image.');
-        return;
+        return null;
       }
       const widthPx = (nativeWidth / 72) * STAMP_SOURCE_DPI;
       const heightPx = (nativeHeight / 72) * STAMP_SOURCE_DPI;
@@ -1026,11 +1040,11 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     } else {
       if (!artworkDataUrl) {
         setError('Artwork is required.');
-        return;
+        return null;
       }
       iconRef = artworkDataUrl;
     }
-    onSave({
+    return {
       id: definition?.id ?? crypto.randomUUID(),
       label: name.trim(),
       discipline,
@@ -1042,7 +1056,30 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
       source: 'custom',
       definitionPortGroups: groups.length > 0 ? groups : undefined,
       shapes: mode === 'shapes' ? shapes : undefined,
-    });
+    };
+  }
+
+  function handleSave() {
+    setError(null);
+    const built = buildDefinition();
+    if (!built) return;
+    // A different existing custom element already has this Name — saving straight through would
+    // silently add a second element sharing it (the original bug report). Ask before overwriting
+    // rather than doing it automatically, since the collision could equally mean "I meant to
+    // rename this as a new element" (self-match, `id === built.id`, is a normal in-place edit and
+    // never prompts).
+    const collision = existingCustomDefinitions.find((d) => d.id !== built.id && d.label.trim().toLowerCase() === built.label.toLowerCase());
+    if (collision) {
+      setPendingOverwrite({ built, existingId: collision.id, existingLabel: collision.label });
+      return;
+    }
+    onSave(built);
+  }
+
+  function confirmOverwrite() {
+    if (!pendingOverwrite) return;
+    onSave({ ...pendingOverwrite.built, id: pendingOverwrite.existingId });
+    setPendingOverwrite(null);
   }
 
   const editingPort = editingPortId ? ports.find((p) => p.id === editingPortId) : undefined;
@@ -1071,6 +1108,21 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
                 </button>
                 <button type="button" onClick={onClose}>
                   Discard
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {pendingOverwrite && (
+          <div className="mep-ee-confirm-close">
+            <div className="mep-ee-confirm-close-box">
+              <p>A custom element named &ldquo;{pendingOverwrite.existingLabel}&rdquo; already exists. Overwrite it?</p>
+              <div className="mep-ee-confirm-close-actions">
+                <button type="button" onClick={() => setPendingOverwrite(null)}>
+                  Cancel
+                </button>
+                <button type="button" onClick={confirmOverwrite}>
+                  Overwrite
                 </button>
               </div>
             </div>

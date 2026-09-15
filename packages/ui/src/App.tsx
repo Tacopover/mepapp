@@ -452,7 +452,12 @@ export function MepSketchApp({
 
   const handleSaveElementDefinition = useCallback(
     (definition: StampDefinition) => {
-      if (elementEditorTarget?.mode === 'edit') {
+      // Whether this is an in-place update vs. a brand-new entry is decided by id membership, not
+      // by elementEditorTarget.mode — the dialog's own overwrite-confirmation prompt (Name
+      // collision) reassigns a create/duplicate save's id to an existing custom definition's id to
+      // fold it in, so that must update rather than add too.
+      const isOverwrite = customStampDefinitions.some((d) => d.id === definition.id);
+      if (isOverwrite) {
         sceneRef.current?.updateCustomStampDefinition(definition.id, definition);
         setStatus(`${definition.label} updated.`);
       } else {
@@ -461,7 +466,7 @@ export function MepSketchApp({
       }
       setElementEditorTarget(null);
     },
-    [elementEditorTarget, sceneRef],
+    [customStampDefinitions, sceneRef],
   );
 
   const handleNetworkTypePick = useCallback(
@@ -746,6 +751,7 @@ export function MepSketchApp({
                 ? elementEditorTarget.seed
                 : undefined
           }
+          existingCustomDefinitions={customStampDefinitions}
           labelLanguage={labelLanguage}
           onSave={handleSaveElementDefinition}
           onClose={() => setElementEditorTarget(null)}
