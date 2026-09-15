@@ -31,6 +31,15 @@ function shapeCenter(shape: SymbolShape): { x: number; y: number } {
   }
 }
 
+/** The representative of `raw`'s angle class (mod 2π) that's within π of `reference` — keeps a dragged angle continuous with its own prior value instead of jumping by a spurious multiple of 2π. */
+function unwrapAngle(raw: number, reference: number): number {
+  const twoPi = Math.PI * 2;
+  let angle = raw;
+  while (angle - reference > Math.PI) angle -= twoPi;
+  while (reference - angle > Math.PI) angle += twoPi;
+  return angle;
+}
+
 function rotatePoint(x: number, y: number, cx: number, cy: number, rotation: number): { x: number; y: number } {
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
@@ -341,11 +350,21 @@ export function shapeHandles(shape: SymbolShape, widthPx: number, heightPx: numb
       // so the handle lands exactly on the visible circle regardless of a non-square canvas.
       return [{ id: 'radius', ...toScreen(shape.cx + (shape.radius * minDim) / widthPx, shape.cy) }];
     case 'arc': {
-      // Placed at the sweep's midpoint angle so it always sits on the visible arc, not just anywhere on the full circle.
+      // Three handles: the two sweep endpoints (draggable to reshape start/end independently) plus
+      // a radius handle at the sweep's midpoint angle, so it always sits on the visible arc.
+      const pointAt = (angle: number): { x: number; y: number } => ({
+        x: shape.cx + (shape.radius * minDim * Math.cos(angle)) / widthPx,
+        y: shape.cy + (shape.radius * minDim * Math.sin(angle)) / heightPx,
+      });
       const mid = (shape.startAngle + shape.endAngle) / 2;
-      const localX = shape.cx + (shape.radius * minDim * Math.cos(mid)) / widthPx;
-      const localY = shape.cy + (shape.radius * minDim * Math.sin(mid)) / heightPx;
-      return [{ id: 'radius', ...toScreen(localX, localY) }];
+      const start = pointAt(shape.startAngle);
+      const end = pointAt(shape.endAngle);
+      const midPoint = pointAt(mid);
+      return [
+        { id: 'start', ...toScreen(start.x, start.y) },
+        { id: 'end', ...toScreen(end.x, end.y) },
+        { id: 'radius', ...toScreen(midPoint.x, midPoint.y) },
+      ];
     }
     case 'ellipse':
       return [
@@ -397,10 +416,24 @@ export function applyHandleDrag(originalShape: SymbolShape, handleId: string, cu
         height: Math.abs(local.y - opposite.y),
       };
     }
-    case 'circle':
+    case 'circle': {
+      const dxPx = (local.x - originalShape.cx) * widthPx;
+      const dyPx = (local.y - originalShape.cy) * heightPx;
+      return { ...originalShape, radius: Math.hypot(dxPx, dyPx) / minDim };
+    }
     case 'arc': {
       const dxPx = (local.x - originalShape.cx) * widthPx;
       const dyPx = (local.y - originalShape.cy) * heightPx;
+      if (handleId === 'start' || handleId === 'end') {
+        // Unwrap the dragged angle relative to its OWN prior value (not the other endpoint) so a
+        // small drag never jumps by a spurious ±2π — ctx.ellipse itself accepts any real start/end
+        // and always sweeps in the increasing direction, wrapping through 2π as needed, so the two
+        // angles never need to be kept in a particular start<end order here.
+        const raw = Math.atan2(dyPx, dxPx);
+        const reference = handleId === 'start' ? originalShape.startAngle : originalShape.endAngle;
+        const angle = unwrapAngle(raw, reference);
+        return handleId === 'start' ? { ...originalShape, startAngle: angle } : { ...originalShape, endAngle: angle };
+      }
       return { ...originalShape, radius: Math.hypot(dxPx, dyPx) / minDim };
     }
     case 'ellipse':
@@ -566,6 +599,36 @@ export function scaleShape(shape: SymbolShape, factor: number, pivotX: number, p
       return { ...shape, cx: sx(shape.cx), cy: sy(shape.cy), radiusX: shape.radiusX * factor, radiusY: shape.radiusY * factor };
     case 'polygon':
       return { ...shape, points: shape.points.map((p) => ({ x: sx(p.x), y: sy(p.y) })) };
+  }
+}
+
+/**
+ * Rescales a shape's raw (pre-rotation) coordinates by independent x/y factors — used when editing
+ * nativeWidth/nativeHeight changes the fraction-space box's own aspect ratio (via shapeCanvasSize).
+ * Since every draw/hit-test call multiplies x-fields by widthPx and y-fields by heightPx (see
+ * drawSymbolShapes), passing sx = oldWidthPx/newWidthPx and sy = oldHeightPx/newHeightPx here keeps
+ * each shape's ABSOLUTE pixel footprint unchanged across the resize — a "canvas resize" (existing
+ * content stays put, the box around it changes) rather than an "image resize" (content stretches to
+ * fill the new box). `sMin` is the same correction for circle/arc radius, which scales by
+ * Math.min(widthPx, heightPx) instead (see symbolShapeBounds's own aspect-correction comment);
+ * text's fontSize uses `sy` since drawSymbolShapes scales it by heightPx alone.
+ */
+export function rescaleShapeForCanvasResize(shape: SymbolShape, sx: number, sy: number, sMin: number): SymbolShape {
+  switch (shape.kind) {
+    case 'line':
+    case 'arrow':
+      return { ...shape, x1: shape.x1 * sx, y1: shape.y1 * sy, x2: shape.x2 * sx, y2: shape.y2 * sy };
+    case 'rect':
+      return { ...shape, x: shape.x * sx, y: shape.y * sy, width: shape.width * sx, height: shape.height * sy };
+    case 'circle':
+    case 'arc':
+      return { ...shape, cx: shape.cx * sx, cy: shape.cy * sy, radius: shape.radius * sMin };
+    case 'text':
+      return { ...shape, x: shape.x * sx, y: shape.y * sy, fontSize: shape.fontSize * sy };
+    case 'ellipse':
+      return { ...shape, cx: shape.cx * sx, cy: shape.cy * sy, radiusX: shape.radiusX * sx, radiusY: shape.radiusY * sy };
+    case 'polygon':
+      return { ...shape, points: shape.points.map((p) => ({ x: p.x * sx, y: p.y * sy })) };
   }
 }
 
