@@ -1463,6 +1463,9 @@
   font-family: var(--font-mono);
   color: var(--muted);
 }
+.mep-ee-angle-input {
+  width: 40px;
+}
 /* ColorPicker's popover opens downward by default (fine in a side dock with room
    below) — the bottom bar sits right above the modal's own action buttons with no
    room below and inside a scrolling .mep-modal-body, so a downward popover here

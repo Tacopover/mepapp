@@ -655,3 +655,74 @@ function distanceToSegment(px: number, py: number, x1: number, y1: number, x2: n
   const nearY = y1 + t * dy;
   return Math.hypot(px - nearX, py - nearY);
 }
+
+// ---------- Grid, angle, and object snap (element-editor-ui-redesign-spec.md §6) ----------
+
+/** Rounds a fraction-space value to the nearest multiple of `spacing` (e.g. 0.02, ~2% of the artwork box). */
+export function gridSnap(value: number, spacing: number): number {
+  return Math.round(value / spacing) * spacing;
+}
+
+/** Constrains a directional two-point drag (line/arrow endpoint) to the nearest multiple of `incrementDegrees`, measured from the drag's fixed point — standard CAD ortho/polar-tracking. Preserves `to`'s distance from `from`, only its angle changes. */
+export function angleSnap(from: { x: number; y: number }, to: { x: number; y: number }, incrementDegrees: number): { x: number; y: number } {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance === 0) return to;
+  const incrementRad = (incrementDegrees * Math.PI) / 180;
+  const snappedAngle = Math.round(Math.atan2(dy, dx) / incrementRad) * incrementRad;
+  return { x: from.x + distance * Math.cos(snappedAngle), y: from.y + distance * Math.sin(snappedAngle) };
+}
+
+export interface SnapPoint {
+  x: number;
+  y: number;
+}
+
+/** Per-shape-kind candidate snap points (fraction space), excluding the shape currently being dragged. */
+export function collectSnapPoints(shapes: SymbolShape[], excludeId: string): SnapPoint[] {
+  const points: SnapPoint[] = [];
+  for (const shape of shapes) {
+    if (shape.id === excludeId) continue;
+    switch (shape.kind) {
+      case 'line':
+      case 'arrow':
+        points.push({ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }, { x: (shape.x1 + shape.x2) / 2, y: (shape.y1 + shape.y2) / 2 });
+        break;
+      case 'rect':
+        points.push(
+          { x: shape.x, y: shape.y },
+          { x: shape.x + shape.width, y: shape.y },
+          { x: shape.x + shape.width, y: shape.y + shape.height },
+          { x: shape.x, y: shape.y + shape.height },
+          { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 },
+        );
+        break;
+      case 'circle':
+      case 'arc':
+      case 'ellipse':
+        points.push({ x: shape.cx, y: shape.cy });
+        break;
+      case 'polygon':
+        for (const p of shape.points) points.push({ x: p.x, y: p.y });
+        break;
+      case 'text':
+        break;
+    }
+  }
+  return points;
+}
+
+/** Closest candidate within `thresholdPx` (same pixel space as widthPx/heightPx — pass a zoom-adjusted threshold for a constant on-screen catch radius), or null if none are in range. */
+export function findNearestSnapPoint(point: { x: number; y: number }, candidates: SnapPoint[], widthPx: number, heightPx: number, thresholdPx: number): SnapPoint | null {
+  let nearest: SnapPoint | null = null;
+  let nearestDistPx = thresholdPx;
+  for (const candidate of candidates) {
+    const distPx = Math.hypot((point.x - candidate.x) * widthPx, (point.y - candidate.y) * heightPx);
+    if (distPx <= nearestDistPx) {
+      nearestDistPx = distPx;
+      nearest = candidate;
+    }
+  }
+  return nearest;
+}

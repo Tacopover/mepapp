@@ -521,9 +521,27 @@ polygon/arc-3pt-draft-cancel handler already uses
    the existing rotate handle; dragging a corner handle past its opposite
    corner tracked the cursor exactly with no anchor jump (the exact bug
    class §4.1 describes), confirmed both mid-drag and after release.
-5. Grid + angle + object snap (§6) — small, same pointer-code area as
-   step 4, do last of the pointer work so it doesn't get rebased across
-   handle changes.
+5. **Done** (commit `<pending>`). Grid + angle + object snap (§6) — small,
+   same pointer-code area as step 4, done last of the pointer work.
+   New `gridSnap`, `angleSnap`, `collectSnapPoints`, `findNearestSnapPoint`
+   in `symbolShapeCanvas.ts`, exactly as speced. Wired into: drag-to-create
+   (grid always, angle only for line/arrow), select-tool group move (grid
+   only), port place/drag (grid only), and geometry-handle drag (angle for
+   line/arrow endpoints, then object-snap with priority over grid — an
+   exact match wins, grid only applies when none is in range, per §6.3).
+   Three independent toggle buttons plus an editable angle-degrees input in
+   the bottom bar's new Snap cluster, using `IconGridSnap`/`IconObjectSnap`/
+   the existing `IconSnapAngle`. A snap-indicator ring (distinct orange,
+   `#e8590c`) draws at the live object-snap match point during a
+   handle-drag, cleared on release.
+   Verification: `pnpm build` clean. Exercised in browser — enabled object
+   snap, drew two rects, dragged the second's corner handle to within a few
+   px of the first's corner: the indicator ring appeared exactly on that
+   corner and the dragged corner locked onto it precisely (confirmed a
+   first attempt landing ~12px away, just outside the 10-screen-px catch
+   radius, correctly did NOT snap — the threshold is working, not just
+   always-on). Enabled angle snap and drew a line at a freehand ~43°
+   angle — it rendered at exactly 45°, matching the default increment.
 6. Modify command group (§4.2) — mostly independent, can slot in anytime
    after step 1's shell and step 4's handles (Rotate 90° reuses
    `rotateShapeAround`, already exists).

@@ -10,9 +10,11 @@ import {
   IconArcTool,
   IconCircleTool,
   IconEllipseTool,
+  IconGridSnap,
   IconLineArrow,
   IconMinus,
   IconMirror,
+  IconObjectSnap,
   IconPlus,
   IconPolygonTool,
   IconPort,
@@ -21,6 +23,7 @@ import {
   IconScale,
   IconSegment,
   IconSelect,
+  IconSnapAngle,
   IconTextbox,
   IconTrash,
   IconUndo,
@@ -28,10 +31,14 @@ import {
   type IconProps,
 } from '../icons.js';
 import {
+  angleSnap,
   applyHandleDrag,
   arcFromThreePoints,
+  collectSnapPoints,
   createDraftShape,
   drawSymbolShapes,
+  findNearestSnapPoint,
+  gridSnap,
   hitTestSymbolShape,
   isDraftLargeEnough,
   mirrorShape,
@@ -45,7 +52,6 @@ import {
   translateShape,
   updateDraftShape,
   type ShapeDrawTool,
-  type ShapeHandle,
 } from '../symbolShapeCanvas.js';
 
 /** Same 300 DPI convention as stampBitmap.ts/scene.ts's STAMP_SOURCE_DPI — stamp art's pixel size at 300 DPI is expected to match its nominal size in PDF points. */
@@ -64,6 +70,13 @@ const GEOMETRY_HANDLE_HIT_RADIUS_PX = 8;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 1.1;
+
+/** Grid/angle/object snap (§6) — a fractional spacing of 0.02 (~2% of the artwork box) and a 10-screen-px object-snap catch radius are reasonable starting guesses, untested against real fixture-scale symbols (§8 open item). */
+const GRID_SPACING_FRACTION = 0.02;
+const OBJECT_SNAP_THRESHOLD_PX = 10;
+const DEFAULT_ANGLE_SNAP_DEGREES = 45;
+const SNAP_INDICATOR_COLOR = '#e8590c';
+const SNAP_INDICATOR_RADIUS_PX = 5;
 
 /** Screen-px pan offset plus a uniform scale — same shape as scene.ts's own world transform, just plain state instead of a PixiJS Container. Maps a "world" point (artwork px, the same fixed space shapeCanvasSize computes) to a screen point (CSS px within the viewport) via screen = pan + world * scale. */
 interface View {
@@ -306,6 +319,16 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
   const shapesCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const textRenameRef = useRef<HTMLInputElement | null>(null);
 
+  // Grid/angle/object snap (§6) — three independently toggleable modes, since a user may want any
+  // one without the others. snapIndicator (fraction space) shows what point is currently
+  // snapped-to during a handle-drag, matching the old app's SnapIndicator concept.
+  const [gridSnapEnabled, setGridSnapEnabled] = useState(false);
+  const [angleSnapEnabled, setAngleSnapEnabled] = useState(false);
+  const [angleSnapDegreesInput, setAngleSnapDegreesInput] = useState(String(DEFAULT_ANGLE_SNAP_DEGREES));
+  const [objectSnapEnabled, setObjectSnapEnabled] = useState(false);
+  const [snapIndicator, setSnapIndicator] = useState<{ x: number; y: number } | null>(null);
+  const angleSnapDegrees = Number(angleSnapDegreesInput) || DEFAULT_ANGLE_SNAP_DEGREES;
+
   // Text placement opens the rename input from inside the same pointerdown
   // that created the shape — autoFocus there loses a race against the
   // browser's own post-mousedown focus handling (mousedown targets the
@@ -485,6 +508,18 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
       }
     }
 
+    // Object-snap indicator (§6.3) — a distinct accent color so it doesn't get lost against the
+    // selection-blue #2f6fed, shown at whatever point a handle-drag is currently snapped to.
+    if (snapIndicator) {
+      ctx.save();
+      ctx.strokeStyle = SNAP_INDICATOR_COLOR;
+      ctx.lineWidth = 1.5 * chromeScale;
+      ctx.beginPath();
+      ctx.arc(snapIndicator.x * canvasWidthPx, snapIndicator.y * canvasHeightPx, SNAP_INDICATOR_RADIUS_PX * chromeScale, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Click-accumulate previews for Polygon and Arc (3-pt): placed vertices plus a
     // rubber-band line to the current pointer position.
     const activeDraftPoints = tool === 'polygon' ? polygonDraft : tool === 'arcThreePoint' ? arcThreePointDraft : null;
@@ -564,7 +599,9 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
 
   function addPortAt(fractionX: number, fractionY: number) {
     const id = crypto.randomUUID();
-    setPorts((prev) => [...prev, { id, name: `Port ${prev.length + 1}`, fractionX, fractionY }]);
+    const x = gridSnapEnabled ? gridSnap(fractionX, GRID_SPACING_FRACTION) : fractionX;
+    const y = gridSnapEnabled ? gridSnap(fractionY, GRID_SPACING_FRACTION) : fractionY;
+    setPorts((prev) => [...prev, { id, name: `Port ${prev.length + 1}`, fractionX: x, fractionY: y }]);
   }
 
   function handlePreviewClick(event: MouseEvent<HTMLDivElement>) {
@@ -668,12 +705,33 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
           canvasEl.setPointerCapture(event.pointerId);
           const move = (ev: PointerEvent) => {
             const current = fractionFromEvent(ev.clientX, ev.clientY);
-            setDraftShapes([applyHandleDrag(originalShape, hitHandle.id, { x: current.fractionX, y: current.fractionY }, canvasWidthPx, canvasHeightPx)]);
+            let point = { x: current.fractionX, y: current.fractionY };
+            // Angle snap only for a line/arrow endpoint handle — a "fixed point + moving point" drag.
+            if (angleSnapEnabled && (originalShape.kind === 'line' || originalShape.kind === 'arrow')) {
+              const fixed = hitHandle.id === 'p1' ? { x: originalShape.x2, y: originalShape.y2 } : { x: originalShape.x1, y: originalShape.y1 };
+              point = angleSnap(fixed, point, angleSnapDegrees);
+            }
+            // Object/endpoint snap takes priority over grid snap — an exact geometric match beats a rounded-to-grid guess (§6.3).
+            let indicator: { x: number; y: number } | null = null;
+            if (objectSnapEnabled) {
+              const candidates = collectSnapPoints(shapes, originalShape.id);
+              const snapped = findNearestSnapPoint(point, candidates, canvasWidthPx, canvasHeightPx, OBJECT_SNAP_THRESHOLD_PX / view.scale);
+              if (snapped) {
+                point = snapped;
+                indicator = snapped;
+              }
+            }
+            if (!indicator && gridSnapEnabled) {
+              point = { x: gridSnap(point.x, GRID_SPACING_FRACTION), y: gridSnap(point.y, GRID_SPACING_FRACTION) };
+            }
+            setSnapIndicator(indicator);
+            setDraftShapes([applyHandleDrag(originalShape, hitHandle.id, point, canvasWidthPx, canvasHeightPx)]);
           };
           const up = () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
             canvasEl.releasePointerCapture(event.pointerId);
+            setSnapIndicator(null);
             setDraftShapes((current) => {
               if (current) {
                 const currentById = new Map(current.map((s) => [s.id, s]));
@@ -705,7 +763,10 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
         setSelectedShapeIds(dragIds);
         const dragShapes = shapes.filter((s) => dragIds.has(s.id));
         const move = (ev: PointerEvent) => {
-          const current = fractionFromEvent(ev.clientX, ev.clientY);
+          let current = fractionFromEvent(ev.clientX, ev.clientY);
+          if (gridSnapEnabled) {
+            current = { fractionX: gridSnap(current.fractionX, GRID_SPACING_FRACTION), fractionY: gridSnap(current.fractionY, GRID_SPACING_FRACTION) };
+          }
           const dx = current.fractionX - start.fractionX;
           const dy = current.fractionY - start.fractionY;
           setDraftShapes(dragShapes.map((s) => translateShape(s, dx, dy)));
@@ -767,7 +828,15 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     let draft = createDraftShape(tool, id, start, defaultStyle);
     setDraftShapes([draft]);
     const move = (ev: PointerEvent) => {
-      const current = fractionFromEvent(ev.clientX, ev.clientY);
+      let current = fractionFromEvent(ev.clientX, ev.clientY);
+      let point = { x: current.fractionX, y: current.fractionY };
+      if (angleSnapEnabled && (tool === 'line' || tool === 'arrow')) {
+        point = angleSnap({ x: start.fractionX, y: start.fractionY }, point, angleSnapDegrees);
+      }
+      if (gridSnapEnabled) {
+        point = { x: gridSnap(point.x, GRID_SPACING_FRACTION), y: gridSnap(point.y, GRID_SPACING_FRACTION) };
+      }
+      current = { fractionX: point.x, fractionY: point.y };
       draft = updateDraftShape(draft, start, current);
       setDraftShapes([draft]);
     };
@@ -829,7 +898,9 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
       return;
     }
     const move = (ev: PointerEvent) => {
-      const { fractionX, fractionY } = fractionFromEvent(ev.clientX, ev.clientY);
+      const current = fractionFromEvent(ev.clientX, ev.clientY);
+      const fractionX = gridSnapEnabled ? gridSnap(current.fractionX, GRID_SPACING_FRACTION) : current.fractionX;
+      const fractionY = gridSnapEnabled ? gridSnap(current.fractionY, GRID_SPACING_FRACTION) : current.fractionY;
       setPorts((prev) => prev.map((p) => (p.id === portId ? { ...p, fractionX, fractionY } : p)));
     };
     const up = () => {
@@ -1202,6 +1273,28 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
               <button type="button" className="mep-rail-btn" onClick={() => fitView()} title="Fit">
                 <IconZoomFit size={18} />
               </button>
+            </div>
+            <div className="mep-ee-bar-divider" />
+            <div className="mep-ee-bar-cluster">
+              <button type="button" className={`mep-rail-btn${gridSnapEnabled ? ' active' : ''}`} onClick={() => setGridSnapEnabled((v) => !v)} title="Grid snap">
+                <IconGridSnap size={16} />
+              </button>
+              <button type="button" className={`mep-rail-btn${objectSnapEnabled ? ' active' : ''}`} onClick={() => setObjectSnapEnabled((v) => !v)} title="Object snap">
+                <IconObjectSnap size={16} />
+              </button>
+              <button type="button" className={`mep-rail-btn${angleSnapEnabled ? ' active' : ''}`} onClick={() => setAngleSnapEnabled((v) => !v)} title="Angle snap">
+                <IconSnapAngle size={16} />
+              </button>
+              <input
+                type="number"
+                min={1}
+                max={180}
+                className="mep-ee-angle-input"
+                value={angleSnapDegreesInput}
+                disabled={!angleSnapEnabled}
+                onChange={(e) => setAngleSnapDegreesInput(e.target.value)}
+                title="Angle snap increment (degrees)"
+              />
             </div>
             {singleSelectedShape?.kind === 'arc' && (
               <>
