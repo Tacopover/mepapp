@@ -1,9 +1,28 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { CommandManager, type Discipline, type PortSpec, type StampCategory, type StampDefinition, type SymbolShape, type SymbolShapeStyle } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { stampLabelFor } from './StampsPanel.js';
 import type { StampLabelLanguage } from './LanguageToggle.js';
+import {
+  IconArcThreePointTool,
+  IconArcTool,
+  IconCircleTool,
+  IconEllipseTool,
+  IconLineArrow,
+  IconMirror,
+  IconPolygonTool,
+  IconPort,
+  IconRectTool,
+  IconRedo,
+  IconScale,
+  IconSegment,
+  IconSelect,
+  IconTextbox,
+  IconTrash,
+  IconUndo,
+  type IconProps,
+} from '../icons.js';
 import {
   arcFromThreePoints,
   createDraftShape,
@@ -75,6 +94,23 @@ const SHAPE_TOOLS: { tool: ShapeTool; label: string }[] = [
   { tool: 'text', label: 'Text' },
 ];
 
+/** Icon-only rail (element-editor-ui-redesign-spec.md §2) — reuses the main canvas's own icon set (Rail.tsx / icons.tsx) where a tool already has one. */
+const SHAPE_TOOL_ICONS: Record<ShapeTool, ComponentType<IconProps>> = {
+  select: IconSelect,
+  port: IconPort,
+  line: IconSegment,
+  arrow: IconLineArrow,
+  rect: IconRectTool,
+  circle: IconCircleTool,
+  ellipse: IconEllipseTool,
+  arc: IconArcTool,
+  arcThreePoint: IconArcThreePointTool,
+  polygon: IconPolygonTool,
+  text: IconTextbox,
+};
+
+type ElementEditorTab = 'shapes' | 'ports' | 'labels';
+
 const DEFAULT_STYLE: SymbolShapeStyle = { stroke: '#1a1a1a', strokeWidth: 0.01, fill: null };
 
 function clamp01(n: number): number {
@@ -132,6 +168,13 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
   const [editPortName, setEditPortName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+
+  // Shapes/Ports/Labels tab bar (§2) — Shapes is only ever offered while artwork mode is 'shapes'
+  // (no vector geometry to edit in 'import' mode), so switching mode away from it falls back to Ports.
+  const [activeTab, setActiveTab] = useState<ElementEditorTab>(mode === 'shapes' ? 'shapes' : 'ports');
+  useEffect(() => {
+    if (mode !== 'shapes' && activeTab === 'shapes') setActiveTab('ports');
+  }, [mode, activeTab]);
 
   // Recomputed as the user edits nativeWidth/nativeHeight so the preview box
   // and canvas stay in sync with the definition's true aspect ratio.
@@ -689,6 +732,7 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     <Dialog
       title={definition ? 'Edit Element' : 'Create Custom Element'}
       onClose={onClose}
+      className="mep-modal--wide"
       actions={
         <>
           <button onClick={onClose}>Cancel</button>
@@ -696,51 +740,48 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
         </>
       }
     >
-      <div className="mep-section">
-        <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-        <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)}>
-          {DISCIPLINE_OPTIONS.map((d) => (
-            <option key={d} value={d}>
-              {DISCIPLINE_LABEL[d]}
-            </option>
-          ))}
-        </select>
-        <div className="mep-seg2" style={{ width: '100%', marginBottom: 12 }}>
-          {(['terminal', 'equipment'] as StampCategory[]).map((c) => (
-            <button key={c} type="button" className={category === c ? 'on' : ''} onClick={() => setCategory(c)}>
-              {c === 'terminal' ? 'Terminal' : 'Equipment'}
+      <div className="mep-ee-body">
+        <div className="mep-ee-header">
+          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)}>
+            {DISCIPLINE_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                {DISCIPLINE_LABEL[d]}
+              </option>
+            ))}
+          </select>
+          <div className="mep-seg2">
+            {(['terminal', 'equipment'] as StampCategory[]).map((c) => (
+              <button key={c} type="button" className={category === c ? 'on' : ''} onClick={() => setCategory(c)}>
+                {c === 'terminal' ? 'Terminal' : 'Equipment'}
+              </button>
+            ))}
+          </div>
+          <div className="mep-seg2">
+            <button type="button" className={mode === 'import' ? 'on' : ''} onClick={() => setMode('import')}>
+              Import
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mep-section">
-        <h4>Artwork</h4>
-        <div className="mep-seg2" style={{ width: '100%', marginBottom: 8 }}>
-          <button type="button" className={mode === 'import' ? 'on' : ''} onClick={() => setMode('import')}>
-            Import image
-          </button>
-          <button type="button" className={mode === 'shapes' ? 'on' : ''} onClick={() => setMode('shapes')}>
-            Draw shapes
-          </button>
-        </div>
-
-        {mode === 'shapes' && (
-          <>
-            <div className="mep-field-row">
-              <label>W (pt)</label>
-              <input type="number" min={1} value={nativeWidth} onChange={(e) => setNativeWidth(Number(e.target.value))} />
-            </div>
-            <div className="mep-field-row">
-              <label>H (pt)</label>
-              <input type="number" min={1} value={nativeHeight} onChange={(e) => setNativeHeight(Number(e.target.value))} />
-            </div>
-          </>
-        )}
-
-        {mode === 'import' ? (
-          <>
-            <label className="mep-stamp-tile mep-file-btn" style={{ width: '100%' }}>
+            <button
+              type="button"
+              className={mode === 'shapes' ? 'on' : ''}
+              onClick={() => {
+                setMode('shapes');
+                setActiveTab('shapes');
+              }}
+            >
+              Draw
+            </button>
+          </div>
+          <div className="mep-ee-header-wh">
+            <label>
+              W <input type="number" min={1} value={nativeWidth} onChange={(e) => setNativeWidth(Number(e.target.value))} />
+            </label>
+            <label>
+              H <input type="number" min={1} value={nativeHeight} onChange={(e) => setNativeHeight(Number(e.target.value))} />
+            </label>
+          </div>
+          {mode === 'import' && (
+            <label className="mep-stamp-tile mep-file-btn mep-ee-header-import">
               {artworkDataUrl ? 'Replace image…' : 'Import image…'}
               <input
                 type="file"
@@ -748,47 +789,172 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
                 onChange={(e) => e.target.files?.[0] && void handleArtworkFile(e.target.files[0])}
               />
             </label>
-            <p className="mep-hint">Click the preview to add a port. Drag a port to move it. Double-click a port to rename it.</p>
-          </>
-        ) : (
-          <>
-            <div className="mep-shape-toolbar">
-              {SHAPE_TOOLS.map(({ tool: t, label }) => (
-                <button key={t} type="button" className={tool === t ? 'on' : ''} onClick={() => setTool(t)}>
-                  {label}
-                </button>
-              ))}
-              <button type="button" onClick={undoShapes} disabled={!shapesManager.canUndo} title="Undo">
-                ⤺
+          )}
+        </div>
+
+        <div className="mep-subtabs">
+          {mode === 'shapes' && (
+            <button type="button" className={activeTab === 'shapes' ? 'on' : ''} onClick={() => setActiveTab('shapes')}>
+              Shapes
+            </button>
+          )}
+          <button type="button" className={activeTab === 'ports' ? 'on' : ''} onClick={() => setActiveTab('ports')}>
+            Ports
+          </button>
+          <button type="button" className={activeTab === 'labels' ? 'on' : ''} disabled title="Coming soon">
+            Labels
+          </button>
+        </div>
+
+        <div className="mep-ee-grid">
+          {mode === 'shapes' && activeTab === 'shapes' && (
+            <div className="mep-ee-rail" style={{ gridColumn: '1 / 2' }}>
+              {SHAPE_TOOLS.map(({ tool: t, label }) => {
+                const Icon = SHAPE_TOOL_ICONS[t];
+                return (
+                  <button key={t} type="button" className={`mep-rail-btn${tool === t ? ' active' : ''}`} title={label} onClick={() => setTool(t)}>
+                    <Icon size={18} />
+                  </button>
+                );
+              })}
+              <div className="mep-rail-divider" />
+              <button type="button" className="mep-rail-btn" title="Undo" disabled={!shapesManager.canUndo} onClick={undoShapes}>
+                <IconUndo size={18} />
               </button>
-              <button type="button" onClick={redoShapes} disabled={!shapesManager.canRedo} title="Redo">
-                ⤻
+              <button type="button" className="mep-rail-btn" title="Redo" disabled={!shapesManager.canRedo} onClick={redoShapes}>
+                <IconRedo size={18} />
               </button>
             </div>
-            <div className="mep-shape-toolbar">
-              <button type="button" onClick={() => mirrorSelection('horizontal')} disabled={selectedShapes.length === 0} title="Mirror horizontally">
-                Mirror ↔
-              </button>
-              <button type="button" onClick={() => mirrorSelection('vertical')} disabled={selectedShapes.length === 0} title="Mirror vertically">
-                Mirror ↕
-              </button>
-              <label>
-                Scale %{' '}
+          )}
+
+          <div className="mep-ee-canvas-col" style={{ gridColumn: '2 / 3' }}>
+            <div
+              className="mep-element-editor-preview"
+              ref={previewRef}
+              onClick={handlePreviewClick}
+              style={mode === 'shapes' ? { width: canvasWidthPx / 2, height: canvasHeightPx / 2 } : undefined}
+            >
+              {mode === 'import' ? (
+                artworkDataUrl && <img src={artworkDataUrl} alt="" />
+              ) : (
+                <canvas
+                  ref={shapesCanvasRef}
+                  width={canvasWidthPx}
+                  height={canvasHeightPx}
+                  onPointerDown={handleShapesCanvasPointerDown}
+                  onPointerMove={handleShapesCanvasPointerMove}
+                  onDoubleClick={handleShapesCanvasDoubleClick}
+                />
+              )}
+              {ports.map((port) => (
+                <div
+                  key={port.id}
+                  className={`mep-element-editor-port${linkMode && linkFirstPortId === port.id ? ' selected' : ''}`}
+                  style={{ left: `${port.fractionX * 100}%`, top: `${port.fractionY * 100}%` }}
+                  onPointerDown={(e) => handlePortPointerDown(e, port.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => handlePortDoubleClick(e, port)}
+                  title={port.name}
+                >
+                  <span className="mep-element-editor-port-label">{port.name}</span>
+                </div>
+              ))}
+              {editingPort && (
                 <input
-                  type="number"
-                  min={1}
-                  style={{ width: 56 }}
-                  value={scalePercentInput}
-                  disabled={selectedShapes.length === 0}
-                  onChange={(e) => setScalePercentInput(e.target.value)}
-                  onBlur={applyScalePercent}
+                  autoFocus
+                  className="mep-element-editor-port-rename"
+                  style={{ left: `${editingPort.fractionX * 100}%`, top: `${editingPort.fractionY * 100}%` }}
+                  value={editPortName}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setEditPortName(e.target.value)}
+                  onBlur={commitPortRename}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') applyScalePercent();
+                    if (e.key === 'Enter') commitPortRename();
+                    if (e.key === 'Escape') setEditingPortId(null);
                   }}
                 />
-              </label>
+              )}
+              {editingTextShape && editingTextShape.kind === 'text' && (
+                <input
+                  ref={textRenameRef}
+                  className="mep-element-editor-port-rename"
+                  style={{ left: `${editingTextShape.x * 100}%`, top: `${editingTextShape.y * 100}%` }}
+                  value={editingTextValue}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setEditingTextValue(e.target.value)}
+                  onBlur={commitTextEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitTextEdit();
+                    if (e.key === 'Escape') setEditingTextId(null);
+                  }}
+                />
+              )}
             </div>
-            <div className="mep-shape-style-row">
+          </div>
+
+          <div className="mep-ee-sidebar" style={{ gridColumn: '3 / 4' }}>
+            {activeTab === 'ports' && (
+              <>
+                <p className="mep-hint">
+                  {mode === 'import'
+                    ? 'Click the preview to add a port.'
+                    : 'Use the Port tool on the Shapes tab to add a port.'}{' '}
+                  Drag a port to move it. Double-click a port to rename it.
+                </p>
+                {ports.length > 0 && (
+                  <div className="mep-section">
+                    <h4>Ports</h4>
+                    {ports.map((port) => (
+                      <div className="mep-port-list-row" key={port.id}>
+                        <input value={port.name} onChange={(e) => setPorts((prev) => prev.map((p) => (p.id === port.id ? { ...p, name: e.target.value } : p)))} />
+                        <button type="button" className="mep-property-row-remove" onClick={() => removePort(port.id)} title="Remove port">
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {ports.length >= 2 && (
+                  <div className="mep-section">
+                    <h4>Linked Ports</h4>
+                    <p className="mep-hint">
+                      Linked ports collapse into one connectivity node once placed — e.g. a unit's supply and return,
+                      so a segment between them never bridges the two networks.
+                    </p>
+                    <button
+                      type="button"
+                      className={linkMode ? 'on' : ''}
+                      onClick={() => {
+                        setLinkMode(!linkMode);
+                        setLinkFirstPortId(null);
+                      }}
+                    >
+                      {linkMode ? 'Done linking' : 'Link ports…'}
+                    </button>
+                    {linkMode && <p className="mep-hint">Click two ports above to link them.</p>}
+                    {groups.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        {groups.map((group, i) => (
+                          <span className="mep-port-group-chip" key={i}>
+                            {group.map(portName).join(' + ')}
+                            <button type="button" className="mep-property-row-remove" onClick={() => ungroup(i)} title="Ungroup">
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            {activeTab === 'labels' && <p className="mep-hint">Labels — coming soon.</p>}
+          </div>
+        </div>
+
+        {mode === 'shapes' && activeTab === 'shapes' && (
+          <div className="mep-ee-bar">
+            <div className="mep-ee-bar-cluster mep-shape-style-row">
               <label>
                 Stroke <input type="color" value={activeStyle.stroke} onChange={(e) => updateActiveStyle({ stroke: e.target.value })} />
               </label>
@@ -810,154 +976,79 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
               {activeStyle.fill !== null && (
                 <input type="color" value={activeStyle.fill} onChange={(e) => updateActiveStyle({ fill: e.target.value })} />
               )}
-              {selectedShapes.length > 0 && (
-                <button type="button" className="mep-property-row-remove" onClick={deleteSelectedShapes} title="Delete shape">
-                  ✕
-                </button>
-              )}
+            </div>
+            <div className="mep-ee-bar-divider" />
+            <div className="mep-ee-bar-cluster">
+              <button type="button" className="mep-rail-btn" onClick={() => mirrorSelection('horizontal')} disabled={selectedShapes.length === 0} title="Mirror horizontally">
+                <IconMirror size={18} />
+              </button>
+              <button
+                type="button"
+                className="mep-rail-btn"
+                onClick={() => mirrorSelection('vertical')}
+                disabled={selectedShapes.length === 0}
+                title="Mirror vertically"
+              >
+                <IconMirror size={18} style={{ transform: 'rotate(90deg)' }} />
+              </button>
+              <label className="mep-ee-scale-field">
+                <IconScale size={16} />
+                <input
+                  type="number"
+                  min={1}
+                  style={{ width: 48 }}
+                  value={scalePercentInput}
+                  disabled={selectedShapes.length === 0}
+                  onChange={(e) => setScalePercentInput(e.target.value)}
+                  onBlur={applyScalePercent}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applyScalePercent();
+                  }}
+                />
+                %
+              </label>
+              <button type="button" className="mep-rail-btn" onClick={deleteSelectedShapes} disabled={selectedShapes.length === 0} title="Delete">
+                <IconTrash size={18} />
+              </button>
             </div>
             {singleSelectedShape?.kind === 'arc' && (
               <>
-                <div className="mep-field-row">
-                  <label>Start°</label>
-                  <input
-                    type="number"
-                    value={Math.round((singleSelectedShape.startAngle * 180) / Math.PI)}
-                    onChange={(e) =>
-                      commitShapes(
-                        shapes.map((s) => (s.id === singleSelectedShape.id && s.kind === 'arc' ? { ...s, startAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
-                      )
-                    }
-                  />
-                </div>
-                <div className="mep-field-row">
-                  <label>End°</label>
-                  <input
-                    type="number"
-                    value={Math.round((singleSelectedShape.endAngle * 180) / Math.PI)}
-                    onChange={(e) =>
-                      commitShapes(
-                        shapes.map((s) => (s.id === singleSelectedShape.id && s.kind === 'arc' ? { ...s, endAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
-                      )
-                    }
-                  />
+                <div className="mep-ee-bar-divider" />
+                <div className="mep-ee-bar-cluster">
+                  <label>
+                    Start°
+                    <input
+                      type="number"
+                      style={{ width: 52 }}
+                      value={Math.round((singleSelectedShape.startAngle * 180) / Math.PI)}
+                      onChange={(e) =>
+                        commitShapes(
+                          shapes.map((s) => (s.id === singleSelectedShape.id && s.kind === 'arc' ? { ...s, startAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
+                        )
+                      }
+                    />
+                  </label>
+                  <label>
+                    End°
+                    <input
+                      type="number"
+                      style={{ width: 52 }}
+                      value={Math.round((singleSelectedShape.endAngle * 180) / Math.PI)}
+                      onChange={(e) =>
+                        commitShapes(
+                          shapes.map((s) => (s.id === singleSelectedShape.id && s.kind === 'arc' ? { ...s, endAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
+                        )
+                      }
+                    />
+                  </label>
                 </div>
               </>
             )}
-            <p className="mep-hint">
-              Drag to draw. Select tool: click a shape to select/move it, Delete to remove. Shift-click or drag a marquee to
-              multi-select and move/delete as a group. Port tool: click to place a port. Arc
-              (3-pt): click start, end, then a point the arc passes through. Polygon: click each vertex, double-click or Enter to
-              finish, Escape to cancel.
-            </p>
-          </>
+          </div>
         )}
 
-        <div
-          className="mep-element-editor-preview"
-          ref={previewRef}
-          onClick={handlePreviewClick}
-          style={mode === 'shapes' ? { width: canvasWidthPx / 2, height: canvasHeightPx / 2 } : undefined}
-        >
-          {mode === 'import' ? (
-            artworkDataUrl && <img src={artworkDataUrl} alt="" />
-          ) : (
-            <canvas
-              ref={shapesCanvasRef}
-              width={canvasWidthPx}
-              height={canvasHeightPx}
-              onPointerDown={handleShapesCanvasPointerDown}
-              onPointerMove={handleShapesCanvasPointerMove}
-              onDoubleClick={handleShapesCanvasDoubleClick}
-            />
-          )}
-          {ports.map((port) => (
-            <div
-              key={port.id}
-              className={`mep-element-editor-port${linkMode && linkFirstPortId === port.id ? ' selected' : ''}`}
-              style={{ left: `${port.fractionX * 100}%`, top: `${port.fractionY * 100}%` }}
-              onPointerDown={(e) => handlePortPointerDown(e, port.id)}
-              onClick={(e) => e.stopPropagation()}
-              onDoubleClick={(e) => handlePortDoubleClick(e, port)}
-              title={port.name}
-            >
-              <span className="mep-element-editor-port-label">{port.name}</span>
-            </div>
-          ))}
-          {editingPort && (
-            <input
-              autoFocus
-              className="mep-element-editor-port-rename"
-              style={{ left: `${editingPort.fractionX * 100}%`, top: `${editingPort.fractionY * 100}%` }}
-              value={editPortName}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setEditPortName(e.target.value)}
-              onBlur={commitPortRename}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitPortRename();
-                if (e.key === 'Escape') setEditingPortId(null);
-              }}
-            />
-          )}
-          {editingTextShape && editingTextShape.kind === 'text' && (
-            <input
-              ref={textRenameRef}
-              className="mep-element-editor-port-rename"
-              style={{ left: `${editingTextShape.x * 100}%`, top: `${editingTextShape.y * 100}%` }}
-              value={editingTextValue}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setEditingTextValue(e.target.value)}
-              onBlur={commitTextEdit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitTextEdit();
-                if (e.key === 'Escape') setEditingTextId(null);
-              }}
-            />
-          )}
-        </div>
+        {error && <p className="mep-field-error">{error}</p>}
       </div>
-
-      {ports.length > 0 && (
-        <div className="mep-section">
-          <h4>Ports</h4>
-          {ports.map((port) => (
-            <div className="mep-port-list-row" key={port.id}>
-              <input value={port.name} onChange={(e) => setPorts((prev) => prev.map((p) => (p.id === port.id ? { ...p, name: e.target.value } : p)))} />
-              <button type="button" className="mep-property-row-remove" onClick={() => removePort(port.id)} title="Remove port">
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {ports.length >= 2 && (
-        <div className="mep-section">
-          <h4>Linked Ports</h4>
-          <p className="mep-hint">
-            Linked ports collapse into one connectivity node once placed — e.g. a unit's supply and return, so a
-            segment between them never bridges the two networks.
-          </p>
-          <button type="button" className={linkMode ? 'on' : ''} onClick={() => { setLinkMode(!linkMode); setLinkFirstPortId(null); }}>
-            {linkMode ? 'Done linking' : 'Link ports…'}
-          </button>
-          {linkMode && <p className="mep-hint">Click two ports above to link them.</p>}
-          {groups.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              {groups.map((group, i) => (
-                <span className="mep-port-group-chip" key={i}>
-                  {group.map(portName).join(' + ')}
-                  <button type="button" className="mep-property-row-remove" onClick={() => ungroup(i)} title="Ungroup">
-                    ✕
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {error && <p className="mep-field-error">{error}</p>}
     </Dialog>
   );
 }

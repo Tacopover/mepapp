@@ -1327,13 +1327,142 @@
   color: var(--ink);
 }
 
-/* ---------- Element Editor dialog (ports-custom-element-editor-spec.md §5.2) ---------- */
+/* ---------- Element Editor dialog (ports-custom-element-editor-spec.md §5.2,
+   canvas-first redesign in element-editor-ui-redesign-spec.md §2) ---------- */
+
+.mep-modal--wide {
+  width: min(1040px, 95vw);
+  max-width: min(1040px, 95vw);
+  height: min(720px, 90vh);
+  max-height: min(720px, 90vh);
+}
+.mep-modal--wide .mep-modal-body {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+.mep-ee-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.mep-ee-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1.5px solid var(--line);
+  flex: none;
+}
+.mep-ee-header input,
+.mep-ee-header select {
+  width: auto;
+  margin-bottom: 0;
+}
+.mep-ee-header-wh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.mep-ee-header-wh label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mep-ee-header-wh input {
+  width: 52px;
+}
+.mep-ee-header-import {
+  font-size: 11px;
+  padding: 6px 10px;
+}
+.mep-ee-body > .mep-subtabs {
+  flex: none;
+}
+/* Explicit grid-columns on every child (rail/canvas/sidebar) — a bug caught during
+   mockup review: hiding the rail with display:none while relying on source-order
+   auto-placement shifted the canvas and sidebar into the wrong tracks (§2.1). */
+.mep-ee-grid {
+  display: grid;
+  grid-template-columns: 44px 1fr 220px;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mep-ee-rail {
+  grid-column: 1 / 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 0;
+  background: var(--surface);
+  border-right: 2px solid var(--ink);
+  overflow-y: auto;
+}
+.mep-ee-canvas-col {
+  grid-column: 2 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.mep-ee-sidebar {
+  grid-column: 3 / 4;
+  min-width: 0;
+  padding: 10px;
+  overflow-y: auto;
+  border-left: 1.5px solid var(--line);
+}
+.mep-ee-sidebar .mep-section {
+  border-bottom: none;
+  padding: 0 0 10px;
+}
+.mep-ee-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1.5px solid var(--line);
+  flex: none;
+}
+.mep-ee-bar-cluster {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mep-ee-bar-divider {
+  align-self: stretch;
+  width: 1.5px;
+  margin: 2px 0;
+  background: var(--line);
+}
+.mep-ee-scale-field {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
 
 .mep-element-editor-preview {
   position: relative;
-  width: 260px;
-  height: 260px;
-  margin: 8px auto;
+  width: 420px;
+  height: 420px;
+  max-width: 100%;
+  max-height: 100%;
   border: 1.5px dashed var(--line);
   border-radius: 3px;
   cursor: crosshair;
@@ -1354,16 +1483,6 @@
   width: 100%;
   height: 100%;
   cursor: crosshair;
-}
-.mep-shape-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-.mep-shape-toolbar button {
-  font-size: 10.5px;
-  padding: 4px 8px;
 }
 .mep-shape-style-row {
   display: flex;

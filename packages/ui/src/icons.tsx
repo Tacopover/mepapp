@@ -286,3 +286,109 @@ export const IconPolyline = (props: IconProps) => (
     <circle cx="20" cy="4" r="1.4" fill="currentColor" stroke="none" />
   </Svg>
 );
+
+// ---------- Element Editor dialog: Shapes-mode tool rail + selection-
+// properties bar (element-editor-ui-redesign-spec.md §4) ----------
+
+export const IconPort = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+  </Svg>
+);
+
+export const IconRectTool = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="4" y="6" width="16" height="12" rx="1" />
+  </Svg>
+);
+
+export const IconCircleTool = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="8" />
+  </Svg>
+);
+
+export const IconEllipseTool = (props: IconProps) => (
+  <Svg {...props}>
+    <ellipse cx="12" cy="12" rx="9" ry="6" />
+  </Svg>
+);
+
+export const IconArcTool = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 17a8.5 8.5 0 0 1 16-6.5" />
+  </Svg>
+);
+
+export const IconArcThreePointTool = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 17a9 9 0 0 1 16-6" />
+    <circle cx="4" cy="17" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="20" cy="11" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="10.5" cy="9.2" r="1.4" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const IconPolygonTool = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M12 3l8 6-3 9H7l-3-9z" />
+  </Svg>
+);
+
+/** Horizontal mirror; vertical mirror reuses this rotated 90° in CSS — no second icon needed. */
+export const IconMirror = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M12 3v18" strokeDasharray="3 3" />
+    <path d="M10 7L5 12l5 5" />
+    <path d="M14 7l5 5-5 5" />
+  </Svg>
+);
+
+export const IconScale = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 20l6-6M4 20v-5M4 20h5" />
+    <path d="M20 4l-6 6M20 4v5M20 4h-5" />
+  </Svg>
+);
+
+export const IconGridSnap = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="7" cy="7" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="7" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="7" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="7" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="7" cy="17" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="17" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="17" r="1.3" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const IconObjectSnap = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="7" />
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+  </Svg>
+);
+
+export const IconBringToFront = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="4" y="4" width="12" height="12" rx="1.5" opacity={0.35} />
+    <rect x="8" y="8" width="12" height="12" rx="1.5" />
+  </Svg>
+);
+
+export const IconSendToBack = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="8" y="8" width="12" height="12" rx="1.5" opacity={0.35} />
+    <rect x="4" y="4" width="12" height="12" rx="1.5" />
+  </Svg>
+);
+
+export const IconZoomFit = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+  </Svg>
+);

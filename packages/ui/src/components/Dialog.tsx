@@ -7,6 +7,8 @@ export interface DialogProps {
   children: ReactNode;
   /** Rendered in the footer's button row, e.g. <button onClick={onClose}>Cancel</button>. */
   actions?: ReactNode;
+  /** Extra class appended to .mep-modal, e.g. 'mep-modal--wide' for a dialog that needs more than the default width/height. */
+  className?: string;
 }
 
 /**
@@ -14,7 +16,7 @@ export interface DialogProps {
  * and Escape both dismiss via onClose. Reuses the mep-modal / mep-modal-actions
  * classes the calibration prompt already established rather than a new look.
  */
-export function Dialog({ title, onClose, children, actions }: DialogProps) {
+export function Dialog({ title, onClose, children, actions, className }: DialogProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -25,7 +27,7 @@ export function Dialog({ title, onClose, children, actions }: DialogProps) {
 
   return (
     <div className="mep-modal-backdrop" onClick={onClose}>
-      <div className="mep-modal" onClick={(event) => event.stopPropagation()}>
+      <div className={`mep-modal${className ? ` ${className}` : ''}`} onClick={(event) => event.stopPropagation()}>
         <h3 className="mep-modal-title">{title}</h3>
         {/* Scrolls independently of the title/actions so a tall dialog (many rows, e.g. the Element Editor's port list) never pushes its action buttons below the viewport. */}
         <div className="mep-modal-body">{children}</div>

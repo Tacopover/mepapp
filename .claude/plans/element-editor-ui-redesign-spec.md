@@ -431,10 +431,25 @@ polygon/arc-3pt-draft-cancel handler already uses
 
 ## 10. Build order
 
-1. Layout restructure + wide modal + icon-only rail (no drag/zoom behavior
-   change yet) — get the canvas-dominant shell in place first, with
-   explicit `grid-column`s from day one (§2.1), so every later step is
-   built/tested against the final layout, not the old cramped one.
+1. **Done** (commit `<pending>`, see below). Layout restructure + wide modal
+   + icon-only rail (no drag/zoom behavior change yet) — get the
+   canvas-dominant shell in place first, with explicit `grid-column`s from
+   day one (§2.1), so every later step is built/tested against the final
+   layout, not the old cramped one.
+   Verification: `pnpm --filter @mepapp/ui build` and root `pnpm build` both
+   clean. Exercised in a real browser (Vite dev server + Playwright,
+   headless chromium) — Create Custom Element dialog opens at the new wide
+   size; header row (Name/Discipline/Category/Import-Draw/W/H/Import button)
+   renders in one line; Shapes tab is absent in Import mode and appears the
+   moment Draw is picked (with an added auto-jump to the Shapes tab on that
+   click, not in the original spec text, needed so switching artwork mode
+   immediately shows the relevant controls — matches the pre-redesign
+   dialog's own immediacy); switching to Ports/Labels tabs correctly hides
+   the rail without the canvas or sidebar shifting track (§2.1's fix
+   verified working); drawing a Rect and selecting it shows the rotate
+   handle, the dashed selection box, and populates the one-row bottom bar's
+   Style (stroke/width/fill) and Modify (mirror h/v, scale, delete) clusters
+   with icon buttons from `.mep-rail-btn`/`icons.tsx`.
 2. `<ColorPicker>` swap-in — small, fully independent of everything else,
    good early win.
 3. Zoom & pan (rewrite `fractionFromEvent` + wheel/pan handlers), folded
