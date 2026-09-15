@@ -492,7 +492,7 @@ polygon/arc-3pt-draft-cancel handler already uses
    unblurred lines throughout. Also verified in Import mode with a real
    fixture PNG (`fixtures/stamps/D5_Switch.png`): placing a port and then
    zooming in kept the port dot correctly anchored to the artwork.
-4. **Done** (commit `<pending>`). Shape handles (depends on zoom/pan's
+4. **Done** (commit `69cbd0b`). Shape handles (depends on zoom/pan's
    coordinate rewrite being settled) — built with the anchor-capture-once
    discipline from §4.1 from the start, not as a retrofit.
    New `shapeHandles`/`applyHandleDrag` in `symbolShapeCanvas.ts`, per-kind
