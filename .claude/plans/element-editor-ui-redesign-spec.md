@@ -521,7 +521,7 @@ polygon/arc-3pt-draft-cancel handler already uses
    the existing rotate handle; dragging a corner handle past its opposite
    corner tracked the cursor exactly with no anchor jump (the exact bug
    class §4.1 describes), confirmed both mid-drag and after release.
-5. **Done** (commit `<pending>`). Grid + angle + object snap (§6) — small,
+5. **Done** (commit `a26872c`). Grid + angle + object snap (§6) — small,
    same pointer-code area as step 4, done last of the pointer work.
    New `gridSnap`, `angleSnap`, `collectSnapPoints`, `findNearestSnapPoint`
    in `symbolShapeCanvas.ts`, exactly as speced. Wired into: drag-to-create
