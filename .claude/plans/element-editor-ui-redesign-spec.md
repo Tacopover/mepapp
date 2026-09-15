@@ -462,7 +462,7 @@ polygon/arc-3pt-draft-cancel handler already uses
    upward into the canvas area — `ColorPicker.tsx` itself stays untouched,
    per §5. Confirmed the basic-colors grid, last-used row, and custom input
    all render fully visible after the fix.
-3. **Done** (commit `<pending>`). Zoom & pan (rewrite `fractionFromEvent` +
+3. **Done** (commit `558070a`). Zoom & pan (rewrite `fractionFromEvent` +
    wheel/pan handlers), folded into the one-row bottom bar per §2.1/§3.
    Implementation split the preview area into a fixed-size viewport
    (`.mep-element-editor-preview`, the coordinate reference, independent of
