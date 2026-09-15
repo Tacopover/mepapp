@@ -542,7 +542,7 @@ polygon/arc-3pt-draft-cancel handler already uses
    radius, correctly did NOT snap — the threshold is working, not just
    always-on). Enabled angle snap and drew a line at a freehand ~43°
    angle — it rendered at exactly 45°, matching the default increment.
-6. **Done** (commit `<pending>`). Modify command group (§4.2) — mostly
+6. **Done** (commit `ef1987b`). Modify command group (§4.2) — mostly
    independent, slotted in after step 1's shell and step 4's handles
    (Rotate 90° reuses `rotateShapeAround`, already existed).
    `duplicateSelection` clones with the fixed `+0.03/+0.03` fractional
