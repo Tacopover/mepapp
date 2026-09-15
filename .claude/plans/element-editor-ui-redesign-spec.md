@@ -450,7 +450,7 @@ polygon/arc-3pt-draft-cancel handler already uses
    handle, the dashed selection box, and populates the one-row bottom bar's
    Style (stroke/width/fill) and Modify (mirror h/v, scale, delete) clusters
    with icon buttons from `.mep-rail-btn`/`icons.tsx`.
-2. **Done** (commit `<pending>`). `<ColorPicker>` swap-in — small, fully
+2. **Done** (commit `75ff95d`). `<ColorPicker>` swap-in — small, fully
    independent of everything else, good early win.
    Verification: `pnpm build` clean. Exercised in browser — opening the
    Stroke swatch's popover in the new bottom bar revealed a real clipping
