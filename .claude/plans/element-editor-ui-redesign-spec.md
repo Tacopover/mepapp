@@ -557,7 +557,18 @@ polygon/arc-3pt-draft-cancel handler already uses
    produced a second rect offset down-right and auto-selected it; Rotate
    90° on the duplicate visibly swapped its width/height orientation in
    place around its own pivot.
-7. Tabs (Shapes/Ports/Labels) — mostly independent, can slot in anytime
-   after step 1's shell exists.
+7. **Done** (already built as part of step 1's commit `7558fd6` — the tab
+   bar, per-tab rail visibility, and shared-canvas structure were
+   inherent to building the shell correctly the first time; no separate
+   code change was needed here). Tabs (Shapes/Ports/Labels).
+   Verification (done now, explicitly, rather than assumed from step 1):
+   confirmed in browser that the Labels button is genuinely `disabled`
+   (not just styled to look disabled) so `activeTab` can never reach
+   `'labels'` via the UI — matching "structurally reserved, no content"
+   from §2; tagged the Shapes-mode `<canvas>` DOM node, round-tripped
+   Shapes → Ports → Shapes, and confirmed the same DOM node survived (no
+   remount) and the previously-selected shape was still selected —
+   satisfying "one persistent, shared canvas that's never re-created per
+   tab" from §2.
 8. Unsaved-changes warning — fully independent of 2-7, can be built first
    or last.
