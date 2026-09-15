@@ -11,7 +11,9 @@ import {
   IconCircleTool,
   IconEllipseTool,
   IconLineArrow,
+  IconMinus,
   IconMirror,
+  IconPlus,
   IconPolygonTool,
   IconPort,
   IconRectTool,
@@ -22,6 +24,7 @@ import {
   IconTextbox,
   IconTrash,
   IconUndo,
+  IconZoomFit,
   type IconProps,
 } from '../icons.js';
 import {
@@ -51,6 +54,22 @@ const SHAPE_CANVAS_MAX_PX = 520;
 /** Rotate handle geometry, in the same drawing-buffer pixel space as shapeCanvasSize's output — a stem above the selection's top edge ending in a small draggable circle. */
 const ROTATE_HANDLE_OFFSET_PX = 28;
 const ROTATE_HANDLE_RADIUS_PX = 6;
+
+/** Zoom/pan range — mirrors packages/render/src/scene.ts's own MIN_ZOOM/MAX_ZOOM convention, tightened since symbol artwork is small and a full PDF page's 0.05–32 range doesn't apply (element-editor-ui-redesign-spec.md §3). */
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 8;
+const ZOOM_STEP = 1.1;
+
+/** Screen-px pan offset plus a uniform scale — same shape as scene.ts's own world transform, just plain state instead of a PixiJS Container. Maps a "world" point (artwork px, the same fixed space shapeCanvasSize computes) to a screen point (CSS px within the viewport) via screen = pan + world * scale. */
+interface View {
+  scale: number;
+  panX: number;
+  panY: number;
+}
+
+function clampZoom(scale: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
+}
 
 /** Longer side fixed at SHAPE_CANVAS_MAX_PX, shorter side scaled down to match the artwork's own aspect ratio — same "contain within a box" sizing the placed-on-PDF render and the final rasterize-to-iconRef step already use via nativeWidth/nativeHeight. */
 function shapeCanvasSize(nativeWidth: number, nativeHeight: number): { widthPx: number; heightPx: number } {
@@ -168,7 +187,8 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
   const [editingPortId, setEditingPortId] = useState<string | null>(null);
   const [editPortName, setEditPortName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const previewRef = useRef<HTMLDivElement | null>(null);
+  /** The fixed-size viewport DOM element (§2/§3) — the coordinate-space reference for fractionFromEvent, wheel-zoom, and pan-drag; distinct from the artwork's own "world" pixel box (canvasWidthPx × canvasHeightPx), which is drawn inside it at the current view.scale/pan. */
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   // Shapes/Ports/Labels tab bar (§2) — Shapes is only ever offered while artwork mode is 'shapes'
   // (no vector geometry to edit in 'import' mode), so switching mode away from it falls back to Ports.
@@ -180,6 +200,88 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
   // Recomputed as the user edits nativeWidth/nativeHeight so the preview box
   // and canvas stay in sync with the definition's true aspect ratio.
   const { widthPx: canvasWidthPx, heightPx: canvasHeightPx } = useMemo(() => shapeCanvasSize(nativeWidth, nativeHeight), [nativeWidth, nativeHeight]);
+
+  // Zoom & pan (§3) — the viewport's own CSS size is independent of the artwork's aspect
+  // ratio (unlike the pre-redesign canvas, which was sized to match it exactly), so it's
+  // tracked separately via ResizeObserver and used both for Fit and for the Shapes-mode
+  // canvas's device-pixel backing buffer (see the draw effect below).
+  const [view, setView] = useState<View>({ scale: 1, panX: 0, panY: 0 });
+  const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 });
+  const hasFitRef = useRef(false);
+
+  function fitView(size: { width: number; height: number } = viewportSize) {
+    const scale = clampZoom(Math.min(size.width / canvasWidthPx, size.height / canvasHeightPx));
+    setView({ scale, panX: (size.width - canvasWidthPx * scale) / 2, panY: (size.height - canvasHeightPx * scale) / 2 });
+  }
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const size = { width: entry.contentRect.width, height: entry.contentRect.height };
+      setViewportSize(size);
+      if (!hasFitRef.current && size.width > 4 && size.height > 4) {
+        hasFitRef.current = true;
+        fitView(size);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-fit whenever the artwork's own world size changes (W/H edits, artwork import
+  // changing aspect) — but only after the initial mount fit above has already happened,
+  // so this doesn't race it with a stale (pre-measurement) viewportSize.
+  useEffect(() => {
+    if (hasFitRef.current) fitView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasWidthPx, canvasHeightPx]);
+
+  // Wheel-to-zoom, pivoted on the cursor so the artwork point under it stays fixed — a plain
+  // addEventListener (not React's onWheel) so preventDefault reliably stops the page scrolling.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    function onWheel(event: WheelEvent) {
+      event.preventDefault();
+      const rect = el!.getBoundingClientRect();
+      const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      zoomAtScreenPoint(factor, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+    }
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Shared by the wheel handler and the bottom bar's zoom buttons — zooms so screenPoint's world position stays fixed under it, same convention as scene.ts's own applyZoomAtScreenPoint. */
+  function zoomAtScreenPoint(factor: number, screenPoint: { x: number; y: number }) {
+    setView((prev) => {
+      const newScale = clampZoom(prev.scale * factor);
+      const worldX = (screenPoint.x - prev.panX) / prev.scale;
+      const worldY = (screenPoint.y - prev.panY) / prev.scale;
+      return { scale: newScale, panX: screenPoint.x - worldX * newScale, panY: screenPoint.y - worldY * newScale };
+    });
+  }
+
+  /** Pan on middle- or right-mouse-button drag — same raw screen-space delta as scene.ts's own pan branch, no scale division. */
+  function handleViewportPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 1 && event.button !== 2) return;
+    event.preventDefault();
+    const startScreen = { x: event.clientX, y: event.clientY };
+    const startView = view;
+    const move = (ev: PointerEvent) => {
+      setView({ ...startView, panX: startView.panX + (ev.clientX - startScreen.x), panY: startView.panY + (ev.clientY - startScreen.y) });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
 
   // Shapes mode (§5.3) — local undo/redo history, same Command/CommandManager
   // primitive the rest of the app uses, scoped to just this dialog's canvas.
@@ -284,13 +386,25 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
 
-  // Redraw the Shapes-mode canvas whenever its state changes.
+  // Redraw the Shapes-mode canvas whenever its state changes. The canvas's own backing buffer
+  // is sized to the viewport's CSS size × devicePixelRatio (not the artwork's world size) —
+  // view.scale/pan are baked into the draw transform below instead of a CSS transform on the
+  // canvas element, so lines stay crisp at high zoom instead of a scaled bitmap blurring (§3).
   useEffect(() => {
     if (mode !== 'shapes') return;
     const canvas = shapesCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const dpr = window.devicePixelRatio || 1;
+    const bufferWidth = Math.max(1, Math.round(viewportSize.width * dpr));
+    const bufferHeight = Math.max(1, Math.round(viewportSize.height * dpr));
+    if (canvas.width !== bufferWidth) canvas.width = bufferWidth;
+    if (canvas.height !== bufferHeight) canvas.height = bufferHeight;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, viewportSize.width, viewportSize.height);
+    ctx.save();
+    ctx.translate(view.panX, view.panY);
+    ctx.scale(view.scale, view.scale);
     // draftShapes either replaces in-place shapes being dragged (select tool) or
     // holds one not-yet-committed new shape being drawn (drag-to-create tools) —
     // handle both by replacing matching ids and appending any that aren't found.
@@ -298,7 +412,7 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     const toDraw = draftById
       ? [...shapes.map((s) => draftById.get(s.id) ?? s), ...draftShapes!.filter((s) => !shapes.some((orig) => orig.id === s.id))]
       : shapes;
-    drawSymbolShapes(ctx, toDraw, canvas.width, canvas.height);
+    drawSymbolShapes(ctx, toDraw, canvasWidthPx, canvasHeightPx);
     for (const shape of toDraw) {
       if (!selectedShapeIds.has(shape.id)) continue;
       const b = symbolShapeBounds(shape);
@@ -306,14 +420,14 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
       ctx.setLineDash([4, 3]);
       ctx.strokeStyle = '#2f6fed';
       ctx.lineWidth = 1;
-      ctx.strokeRect(b.x * canvas.width - 3, b.y * canvas.height - 3, b.width * canvas.width + 6, b.height * canvas.height + 6);
+      ctx.strokeRect(b.x * canvasWidthPx - 3, b.y * canvasHeightPx - 3, b.width * canvasWidthPx + 6, b.height * canvasHeightPx + 6);
       ctx.restore();
     }
     if (marquee) {
-      const minX = Math.min(marquee.start.fractionX, marquee.current.fractionX) * canvas.width;
-      const minY = Math.min(marquee.start.fractionY, marquee.current.fractionY) * canvas.height;
-      const w = Math.abs(marquee.current.fractionX - marquee.start.fractionX) * canvas.width;
-      const h = Math.abs(marquee.current.fractionY - marquee.start.fractionY) * canvas.height;
+      const minX = Math.min(marquee.start.fractionX, marquee.current.fractionX) * canvasWidthPx;
+      const minY = Math.min(marquee.start.fractionY, marquee.current.fractionY) * canvasHeightPx;
+      const w = Math.abs(marquee.current.fractionX - marquee.start.fractionX) * canvasWidthPx;
+      const h = Math.abs(marquee.current.fractionY - marquee.start.fractionY) * canvasHeightPx;
       ctx.save();
       ctx.fillStyle = 'rgba(47, 111, 237, 0.12)';
       ctx.fillRect(minX, minY, w, h);
@@ -324,12 +438,12 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     }
     if (tool === 'select' && !marquee) {
       const selectedForHandle = toDraw.filter((s) => selectedShapeIds.has(s.id));
-      const handle = rotateHandlePosition(selectedForHandle, canvas.height);
+      const handle = rotateHandlePosition(selectedForHandle, canvasHeightPx);
       if (handle) {
         const b = selectionBounds(selectedForHandle);
-        const handleX = handle.x * canvas.width;
-        const handleY = handle.y * canvas.height;
-        const stemTopY = b.y * canvas.height;
+        const handleX = handle.x * canvasWidthPx;
+        const handleY = handle.y * canvasHeightPx;
+        const stemTopY = b.y * canvasHeightPx;
         ctx.save();
         ctx.strokeStyle = '#2f6fed';
         ctx.fillStyle = '#2f6fed';
@@ -355,18 +469,19 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
       ctx.fillStyle = '#2f6fed';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(activeDraftPoints[0].fractionX * canvas.width, activeDraftPoints[0].fractionY * canvas.height);
-      for (const p of activeDraftPoints.slice(1)) ctx.lineTo(p.fractionX * canvas.width, p.fractionY * canvas.height);
-      if (pendingPoint) ctx.lineTo(pendingPoint.fractionX * canvas.width, pendingPoint.fractionY * canvas.height);
+      ctx.moveTo(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx);
+      for (const p of activeDraftPoints.slice(1)) ctx.lineTo(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx);
+      if (pendingPoint) ctx.lineTo(pendingPoint.fractionX * canvasWidthPx, pendingPoint.fractionY * canvasHeightPx);
       ctx.stroke();
       for (const p of activeDraftPoints) {
         ctx.beginPath();
-        ctx.arc(p.fractionX * canvas.width, p.fractionY * canvas.height, 3, 0, Math.PI * 2);
+        ctx.arc(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx, 3, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
     }
-  }, [mode, shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint, canvasWidthPx, canvasHeightPx]);
+    ctx.restore();
+  }, [mode, shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint, canvasWidthPx, canvasHeightPx, viewportSize, view]);
 
   // Delete/Backspace removes the selected shape; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes — only while Shapes mode is active and no text field has focus.
   useEffect(() => {
@@ -409,9 +524,16 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     setNativeHeight((bitmap.height * 72) / STAMP_SOURCE_DPI);
   }
 
+  /** Screen px (viewport-relative) → world px (the artwork's own fixed canvasWidthPx/heightPx
+      box) → fraction, inverting the current view transform. Every caller keeps working purely
+      in 0–1 fraction space, unchanged by zoom/pan — only this screen→fraction conversion does. */
   function fractionFromEvent(clientX: number, clientY: number): { fractionX: number; fractionY: number } {
-    const rect = previewRef.current!.getBoundingClientRect();
-    return { fractionX: clamp01((clientX - rect.left) / rect.width), fractionY: clamp01((clientY - rect.top) / rect.height) };
+    const rect = viewportRef.current!.getBoundingClientRect();
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
+    const worldX = (screenX - view.panX) / view.scale;
+    const worldY = (screenY - view.panY) / view.scale;
+    return { fractionX: clamp01(worldX / canvasWidthPx), fractionY: clamp01(worldY / canvasHeightPx) };
   }
 
   function addPortAt(fractionX: number, fractionY: number) {
@@ -831,65 +953,63 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
           <div className="mep-ee-canvas-col" style={{ gridColumn: '2 / 3' }}>
             <div
               className="mep-element-editor-preview"
-              ref={previewRef}
+              ref={viewportRef}
               onClick={handlePreviewClick}
-              style={mode === 'shapes' ? { width: canvasWidthPx / 2, height: canvasHeightPx / 2 } : undefined}
+              onPointerDown={handleViewportPointerDown}
+              onContextMenu={(e) => e.preventDefault()}
             >
-              {mode === 'import' ? (
-                artworkDataUrl && <img src={artworkDataUrl} alt="" />
-              ) : (
-                <canvas
-                  ref={shapesCanvasRef}
-                  width={canvasWidthPx}
-                  height={canvasHeightPx}
-                  onPointerDown={handleShapesCanvasPointerDown}
-                  onPointerMove={handleShapesCanvasPointerMove}
-                  onDoubleClick={handleShapesCanvasDoubleClick}
-                />
+              {mode === 'shapes' && (
+                <canvas ref={shapesCanvasRef} onPointerDown={handleShapesCanvasPointerDown} onPointerMove={handleShapesCanvasPointerMove} onDoubleClick={handleShapesCanvasDoubleClick} />
               )}
-              {ports.map((port) => (
-                <div
-                  key={port.id}
-                  className={`mep-element-editor-port${linkMode && linkFirstPortId === port.id ? ' selected' : ''}`}
-                  style={{ left: `${port.fractionX * 100}%`, top: `${port.fractionY * 100}%` }}
-                  onPointerDown={(e) => handlePortPointerDown(e, port.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => handlePortDoubleClick(e, port)}
-                  title={port.name}
-                >
-                  <span className="mep-element-editor-port-label">{port.name}</span>
-                </div>
-              ))}
-              {editingPort && (
-                <input
-                  autoFocus
-                  className="mep-element-editor-port-rename"
-                  style={{ left: `${editingPort.fractionX * 100}%`, top: `${editingPort.fractionY * 100}%` }}
-                  value={editPortName}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setEditPortName(e.target.value)}
-                  onBlur={commitPortRename}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitPortRename();
-                    if (e.key === 'Escape') setEditingPortId(null);
-                  }}
-                />
-              )}
-              {editingTextShape && editingTextShape.kind === 'text' && (
-                <input
-                  ref={textRenameRef}
-                  className="mep-element-editor-port-rename"
-                  style={{ left: `${editingTextShape.x * 100}%`, top: `${editingTextShape.y * 100}%` }}
-                  value={editingTextValue}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setEditingTextValue(e.target.value)}
-                  onBlur={commitTextEdit}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitTextEdit();
-                    if (e.key === 'Escape') setEditingTextId(null);
-                  }}
-                />
-              )}
+              <div
+                className="mep-ee-artwork"
+                style={{ width: canvasWidthPx, height: canvasHeightPx, transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.scale})` }}
+              >
+                {mode === 'import' && artworkDataUrl && <img src={artworkDataUrl} alt="" />}
+                {ports.map((port) => (
+                  <div
+                    key={port.id}
+                    className={`mep-element-editor-port${linkMode && linkFirstPortId === port.id ? ' selected' : ''}`}
+                    style={{ left: `${port.fractionX * 100}%`, top: `${port.fractionY * 100}%` }}
+                    onPointerDown={(e) => handlePortPointerDown(e, port.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => handlePortDoubleClick(e, port)}
+                    title={port.name}
+                  >
+                    <span className="mep-element-editor-port-label">{port.name}</span>
+                  </div>
+                ))}
+                {editingPort && (
+                  <input
+                    autoFocus
+                    className="mep-element-editor-port-rename"
+                    style={{ left: `${editingPort.fractionX * 100}%`, top: `${editingPort.fractionY * 100}%` }}
+                    value={editPortName}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setEditPortName(e.target.value)}
+                    onBlur={commitPortRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitPortRename();
+                      if (e.key === 'Escape') setEditingPortId(null);
+                    }}
+                  />
+                )}
+                {editingTextShape && editingTextShape.kind === 'text' && (
+                  <input
+                    ref={textRenameRef}
+                    className="mep-element-editor-port-rename"
+                    style={{ left: `${editingTextShape.x * 100}%`, top: `${editingTextShape.y * 100}%` }}
+                    value={editingTextValue}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setEditingTextValue(e.target.value)}
+                    onBlur={commitTextEdit}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitTextEdit();
+                      if (e.key === 'Escape') setEditingTextId(null);
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -1008,6 +1128,19 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
               </label>
               <button type="button" className="mep-rail-btn" onClick={deleteSelectedShapes} disabled={selectedShapes.length === 0} title="Delete">
                 <IconTrash size={18} />
+              </button>
+            </div>
+            <div className="mep-ee-bar-divider" />
+            <div className="mep-ee-bar-cluster">
+              <button type="button" className="mep-rail-btn" onClick={() => zoomAtScreenPoint(1 / ZOOM_STEP, { x: viewportSize.width / 2, y: viewportSize.height / 2 })} title="Zoom out">
+                <IconMinus size={16} />
+              </button>
+              <span className="mep-ee-zoom-readout">{Math.round(view.scale * 100)}%</span>
+              <button type="button" className="mep-rail-btn" onClick={() => zoomAtScreenPoint(ZOOM_STEP, { x: viewportSize.width / 2, y: viewportSize.height / 2 })} title="Zoom in">
+                <IconPlus size={16} />
+              </button>
+              <button type="button" className="mep-rail-btn" onClick={() => fitView()} title="Fit">
+                <IconZoomFit size={18} />
               </button>
             </div>
             {singleSelectedShape?.kind === 'arc' && (

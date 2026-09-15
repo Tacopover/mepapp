@@ -462,8 +462,36 @@ polygon/arc-3pt-draft-cancel handler already uses
    upward into the canvas area — `ColorPicker.tsx` itself stays untouched,
    per §5. Confirmed the basic-colors grid, last-used row, and custom input
    all render fully visible after the fix.
-3. Zoom & pan (rewrite `fractionFromEvent` + wheel/pan handlers), folded
-   into the one-row bottom bar per §2.1/§3.
+3. **Done** (commit `<pending>`). Zoom & pan (rewrite `fractionFromEvent` +
+   wheel/pan handlers), folded into the one-row bottom bar per §2.1/§3.
+   Implementation split the preview area into a fixed-size viewport
+   (`.mep-element-editor-preview`, the coordinate reference, independent of
+   artwork aspect) and an inner `.mep-ee-artwork` layer sized to the
+   artwork's own world box (`canvasWidthPx`/`canvasHeightPx`) carrying a CSS
+   `translate()/scale()` for pan/zoom — used for the import-mode `<img>`
+   and, in both modes, the ports overlay (so port dot positions stay
+   correctly anchored to the artwork through pan/zoom). The Shapes-mode
+   `<canvas>` does NOT use a CSS transform (would blur its rasterized
+   lines at high zoom) — instead its backing buffer is sized to the
+   viewport's CSS size × devicePixelRatio, with pan/scale baked into the
+   2D context transform before each draw, per §3's explicit "no blur"
+   requirement. `zoomAtScreenPoint` is shared between the wheel handler and
+   the new Zoom cluster's −/%/+/Fit buttons (mirrors scene.ts's own
+   `applyZoomAtScreenPoint` convention). A known interim imprecision, not a
+   regression: the rotate handle's fixed-pixel offset/radius (and
+   `hitTestSymbolShape`'s fixed tolerancePx) are still "world px", so they
+   visually grow/shrink with zoom instead of staying constant on screen —
+   deferred to step 4, which reworks this exact hit-test/handle code
+   together (per the plan's own build-order rationale) rather than fixing
+   it twice.
+   Verification: `pnpm build` clean. Exercised in browser — wheel-zoomed to
+   173% pivoted on the cursor, right-drag-panned (no browser context menu
+   popped), and Fit correctly returned to the initial centered/contained
+   view (81% for the default 48×48pt artwork in the 420×420 viewport, which
+   is the mathematically correct contain-scale, not 100%) — all with crisp,
+   unblurred lines throughout. Also verified in Import mode with a real
+   fixture PNG (`fixtures/stamps/D5_Switch.png`): placing a port and then
+   zooming in kept the port dot correctly anchored to the artwork.
 4. Shape handles (depends on zoom/pan's coordinate rewrite being settled) —
    build with the anchor-capture-once discipline from §4.1 from the start,
    not as a retrofit.

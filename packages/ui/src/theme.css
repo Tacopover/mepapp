@@ -1456,6 +1456,13 @@
   font-size: 10.5px;
   color: var(--muted);
 }
+.mep-ee-zoom-readout {
+  min-width: 34px;
+  text-align: center;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
 /* ColorPicker's popover opens downward by default (fine in a side dock with room
    below) — the bottom bar sits right above the modal's own action buttons with no
    room below and inside a scrolling .mep-modal-body, so a downward popover here
@@ -1494,6 +1501,18 @@
   height: 100%;
   cursor: crosshair;
 }
+/* The artwork's own fixed-size ("world") box, panned/scaled as one unit by the view
+   transform (§3) — sized to canvasWidthPx/heightPx via inline style. pointer-events:none
+   so an empty area of this (usually viewport-covering) box doesn't swallow clicks meant
+   for the Shapes-mode canvas beneath it; ports/rename-input opt back into pointer-events
+   individually since they're real interactive elements. */
+.mep-ee-artwork {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
 .mep-shape-style-row {
   display: flex;
   align-items: center;
@@ -1516,6 +1535,7 @@
   border: 1.5px solid #fff;
   box-shadow: 0 0 0 1px var(--ink);
   cursor: grab;
+  pointer-events: auto;
 }
 .mep-element-editor-port.selected {
   background: #b3261e;
@@ -1539,6 +1559,7 @@
   font-size: 10.5px;
   font-family: var(--font-mono);
   padding: 2px 4px;
+  pointer-events: auto;
 }
 .mep-port-list-row {
   display: flex;
