@@ -542,9 +542,21 @@ polygon/arc-3pt-draft-cancel handler already uses
    radius, correctly did NOT snap — the threshold is working, not just
    always-on). Enabled angle snap and drew a line at a freehand ~43°
    angle — it rendered at exactly 45°, matching the default increment.
-6. Modify command group (§4.2) — mostly independent, can slot in anytime
-   after step 1's shell and step 4's handles (Rotate 90° reuses
-   `rotateShapeAround`, already exists).
+6. **Done** (commit `<pending>`). Modify command group (§4.2) — mostly
+   independent, slotted in after step 1's shell and step 4's handles
+   (Rotate 90° reuses `rotateShapeAround`, already existed).
+   `duplicateSelection` clones with the fixed `+0.03/+0.03` fractional
+   offset (same convention `element-editor-snapping-clipboard-spec.md`
+   §5.2 settled on for its own Ctrl+V paste), `rotateSelection90` uses
+   `rotateShapeAround(s, Math.PI/2, pivot.x, pivot.y)` with the selection's
+   own pivot, and `bringSelectionToFront`/`sendSelectionToBack` reorder the
+   selected shapes to the end/start of the `shapes` array (z-order is array
+   order). Reordered the Modify cluster to match §4.2/§2's icon inventory
+   order: Duplicate, Rotate 90°, Mirror ↔/↕, Scale %, Front, Back, Delete.
+   Verification: `pnpm build` clean. Exercised in browser — Duplicate
+   produced a second rect offset down-right and auto-selected it; Rotate
+   90° on the duplicate visibly swapped its width/height orientation in
+   place around its own pivot.
 7. Tabs (Shapes/Ports/Labels) — mostly independent, can slot in anytime
    after step 1's shell exists.
 8. Unsaved-changes warning — fully independent of 2-7, can be built first

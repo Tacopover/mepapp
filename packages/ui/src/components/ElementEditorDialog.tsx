@@ -8,7 +8,9 @@ import type { StampLabelLanguage } from './LanguageToggle.js';
 import {
   IconArcThreePointTool,
   IconArcTool,
+  IconBringToFront,
   IconCircleTool,
+  IconCopy,
   IconEllipseTool,
   IconGridSnap,
   IconLineArrow,
@@ -20,9 +22,11 @@ import {
   IconPort,
   IconRectTool,
   IconRedo,
+  IconRotate,
   IconScale,
   IconSegment,
   IconSelect,
+  IconSendToBack,
   IconSnapAngle,
   IconTextbox,
   IconTrash,
@@ -77,6 +81,9 @@ const OBJECT_SNAP_THRESHOLD_PX = 10;
 const DEFAULT_ANGLE_SNAP_DEGREES = 45;
 const SNAP_INDICATOR_COLOR = '#e8590c';
 const SNAP_INDICATOR_RADIUS_PX = 5;
+
+/** Duplicate's fixed fractional offset (§4.2) — same convention element-editor-snapping-clipboard-spec.md §5.2 already settled on for its own Ctrl+V paste. */
+const DUPLICATE_OFFSET_FRACTION = 0.03;
 
 /** Screen-px pan offset plus a uniform scale — same shape as scene.ts's own world transform, just plain state instead of a PixiJS Container. Maps a "world" point (artwork px, the same fixed space shapeCanvasSize computes) to a screen point (CSS px within the viewport) via screen = pan + world * scale. */
 interface View {
@@ -385,6 +392,30 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
     if (selectedShapes.length === 0 || !Number.isFinite(factor) || factor <= 0) return;
     const pivot = selectionPivot(selectedShapes, canvasWidthPx, canvasHeightPx);
     commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? scaleShape(s, factor, pivot.x, pivot.y) : s)));
+  }
+
+  function duplicateSelection() {
+    if (selectedShapes.length === 0) return;
+    const clones = selectedShapes.map((s) => ({ ...translateShape(s, DUPLICATE_OFFSET_FRACTION, DUPLICATE_OFFSET_FRACTION), id: crypto.randomUUID() }));
+    commitShapes([...shapes, ...clones]);
+    setSelectedShapeIds(new Set(clones.map((c) => c.id)));
+  }
+
+  function rotateSelection90() {
+    if (selectedShapes.length === 0) return;
+    const pivot = selectionPivot(selectedShapes, canvasWidthPx, canvasHeightPx);
+    commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? rotateShapeAround(s, Math.PI / 2, pivot.x, pivot.y) : s)));
+  }
+
+  /** z-order is array order (drawSymbolShapes' own paint-order convention) — bring-to-front/send-to-back reorder the selection to the end/start, keeping the selected shapes' own relative order among themselves. */
+  function bringSelectionToFront() {
+    if (selectedShapeIds.size === 0) return;
+    commitShapes([...shapes.filter((s) => !selectedShapeIds.has(s.id)), ...shapes.filter((s) => selectedShapeIds.has(s.id))]);
+  }
+
+  function sendSelectionToBack() {
+    if (selectedShapeIds.size === 0) return;
+    commitShapes([...shapes.filter((s) => selectedShapeIds.has(s.id)), ...shapes.filter((s) => !selectedShapeIds.has(s.id))]);
   }
 
   function finishPolygon() {
@@ -1229,6 +1260,12 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
             </div>
             <div className="mep-ee-bar-divider" />
             <div className="mep-ee-bar-cluster">
+              <button type="button" className="mep-rail-btn" onClick={duplicateSelection} disabled={selectedShapes.length === 0} title="Duplicate">
+                <IconCopy size={18} />
+              </button>
+              <button type="button" className="mep-rail-btn" onClick={rotateSelection90} disabled={selectedShapes.length === 0} title="Rotate 90°">
+                <IconRotate size={18} />
+              </button>
               <button type="button" className="mep-rail-btn" onClick={() => mirrorSelection('horizontal')} disabled={selectedShapes.length === 0} title="Mirror horizontally">
                 <IconMirror size={18} />
               </button>
@@ -1257,6 +1294,12 @@ export function ElementEditorDialog({ definition, labelLanguage, onSave, onClose
                 />
                 %
               </label>
+              <button type="button" className="mep-rail-btn" onClick={bringSelectionToFront} disabled={selectedShapes.length === 0} title="Bring to front">
+                <IconBringToFront size={18} />
+              </button>
+              <button type="button" className="mep-rail-btn" onClick={sendSelectionToBack} disabled={selectedShapes.length === 0} title="Send to back">
+                <IconSendToBack size={18} />
+              </button>
               <button type="button" className="mep-rail-btn" onClick={deleteSelectedShapes} disabled={selectedShapes.length === 0} title="Delete">
                 <IconTrash size={18} />
               </button>
