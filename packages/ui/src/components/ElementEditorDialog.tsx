@@ -46,6 +46,7 @@ import {
   hitTestSymbolShape,
   isDraftLargeEnough,
   mirrorShape,
+  normalizeAngle,
   rasterizeSymbolShapes,
   rescaleShapeForCanvasResize,
   rotateShapeAround,
@@ -70,6 +71,7 @@ const ROTATE_HANDLE_OFFSET_PX = 28;
 const ROTATE_HANDLE_RADIUS_PX = 6;
 const GEOMETRY_HANDLE_RADIUS_PX = 5;
 const GEOMETRY_HANDLE_HIT_RADIUS_PX = 8;
+const POLYGON_CLOSE_HIT_RADIUS_PX = 10;
 
 /** Zoom/pan range — mirrors packages/render/src/scene.ts's own MIN_ZOOM/MAX_ZOOM convention, tightened since symbol artwork is small and a full PDF page's 0.05–32 range doesn't apply (element-editor-ui-redesign-spec.md §3). */
 const MIN_ZOOM = 0.25;
@@ -411,13 +413,22 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // canvasWidthPx/heightPx: shapeCanvasSize's own scale factor is SHAPE_CANVAS_MAX_PX/Math.max(w,h),
   // so canvasWidthPx/heightPx don't scale linearly per axis with nativeWidth/nativeHeight whenever
   // the aspect ratio changes — only the native sizes themselves do.
+  //
+  // sMin (for radius/strokeWidth, which are fractions of Math.min(canvasWidthPx, canvasHeightPx) —
+  // see drawSymbolShapes) is the one exception to "derive from native sizes directly": that min is
+  // itself driven by shapeCanvasSize's cap on the *longer* native side, so its old/new ratio isn't
+  // Math.min(oldNative)/Math.min(newNative) — going from 48×48 to 48×96 halves the rendered min
+  // dimension (520→260) even though the native min side (48) never changes. Computing it from the
+  // actual pixel boxes sidesteps re-deriving that relationship by hand.
   const nativeSizeRef = useRef({ width: nativeWidth, height: nativeHeight });
   useEffect(() => {
     const prev = nativeSizeRef.current;
     if (prev.width === nativeWidth && prev.height === nativeHeight) return;
     const sx = prev.width / nativeWidth;
     const sy = prev.height / nativeHeight;
-    const sMin = Math.min(prev.width, prev.height) / Math.min(nativeWidth, nativeHeight);
+    const prevCanvas = shapeCanvasSize(prev.width, prev.height);
+    const nextCanvas = shapeCanvasSize(nativeWidth, nativeHeight);
+    const sMin = Math.min(prevCanvas.widthPx, prevCanvas.heightPx) / Math.min(nextCanvas.widthPx, nextCanvas.heightPx);
     commitShapes(shapes.map((s) => rescaleShapeForCanvasResize(s, sx, sy, sMin)));
     setPorts((prevPorts) => prevPorts.map((p) => ({ ...p, fractionX: p.fractionX * sx, fractionY: p.fractionY * sy })));
     nativeSizeRef.current = { width: nativeWidth, height: nativeHeight };
@@ -536,6 +547,15 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     // with zoom — divide by view.scale first so it renders at a constant size on screen instead,
     // same convention scene.ts uses for its own handle/selection-outline drawing.
     const chromeScale = 1 / view.scale;
+    // Canvas/stamp bounds — the fixed nativeWidth×nativeHeight box shapes/ports are defined
+    // against, drawn first (behind shapes/selection chrome) so the user can see the element's
+    // actual extent while placing geometry.
+    ctx.save();
+    ctx.setLineDash([6 * chromeScale, 4 * chromeScale]);
+    ctx.strokeStyle = '#57676f';
+    ctx.lineWidth = chromeScale;
+    ctx.strokeRect(0, 0, canvasWidthPx, canvasHeightPx);
+    ctx.restore();
     // draftShapes either replaces in-place shapes being dragged (select tool) or
     // holds one not-yet-committed new shape being drawn (drag-to-create tools) —
     // handle both by replacing matching ids and appending any that aren't found.
@@ -619,7 +639,8 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     }
 
     // Click-accumulate previews for Polygon and Arc (3-pt): placed vertices plus a
-    // rubber-band line to the current pointer position.
+    // rubber-band line (or, for Arc 3-pt once start+end are placed, a live preview of the actual
+    // arc bulging toward the pointer) to the current pointer position.
     const activeDraftPoints = tool === 'polygon' ? polygonDraft : tool === 'arcThreePoint' ? arcThreePointDraft : null;
     if (activeDraftPoints && activeDraftPoints.length > 0) {
       ctx.save();
@@ -627,20 +648,47 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       ctx.strokeStyle = '#2f6fed';
       ctx.fillStyle = '#2f6fed';
       ctx.lineWidth = chromeScale;
-      ctx.beginPath();
-      ctx.moveTo(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx);
-      for (const p of activeDraftPoints.slice(1)) ctx.lineTo(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx);
-      if (pendingPoint) ctx.lineTo(pendingPoint.fractionX * canvasWidthPx, pendingPoint.fractionY * canvasHeightPx);
-      ctx.stroke();
+      const previewArc =
+        tool === 'arcThreePoint' && activeDraftPoints.length === 2 && pendingPoint
+          ? arcFromThreePoints(activeDraftPoints[0], activeDraftPoints[1], pendingPoint, defaultStyle)
+          : null;
+      if (previewArc && previewArc.kind === 'arc') {
+        const r = previewArc.radius * Math.min(canvasWidthPx, canvasHeightPx);
+        ctx.beginPath();
+        ctx.ellipse(previewArc.cx * canvasWidthPx, previewArc.cy * canvasHeightPx, r, r, 0, previewArc.startAngle, previewArc.endAngle);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx);
+        for (const p of activeDraftPoints.slice(1)) ctx.lineTo(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx);
+        if (pendingPoint) ctx.lineTo(pendingPoint.fractionX * canvasWidthPx, pendingPoint.fractionY * canvasHeightPx);
+        ctx.stroke();
+      }
       for (const p of activeDraftPoints) {
         ctx.beginPath();
         ctx.arc(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx, 3 * chromeScale, 0, Math.PI * 2);
         ctx.fill();
       }
+      // Highlight the polygon's start vertex when the pointer is within closing range, hinting
+      // that clicking there finishes the shape instead of adding another vertex.
+      if (tool === 'polygon' && activeDraftPoints.length >= 3 && pendingPoint) {
+        const closePx = Math.hypot(
+          (pendingPoint.fractionX - activeDraftPoints[0].fractionX) * canvasWidthPx,
+          (pendingPoint.fractionY - activeDraftPoints[0].fractionY) * canvasHeightPx,
+        );
+        if (closePx <= POLYGON_CLOSE_HIT_RADIUS_PX / view.scale) {
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.arc(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx, GEOMETRY_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
       ctx.restore();
     }
     ctx.restore();
-  }, [mode, shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint, canvasWidthPx, canvasHeightPx, viewportSize, view]);
+  }, [mode, shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint, canvasWidthPx, canvasHeightPx, viewportSize, view, defaultStyle]);
 
   // Delete/Backspace removes the selected shape; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes — only while Shapes mode is active and no text field has focus.
   useEffect(() => {
@@ -727,6 +775,17 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     }
 
     if (tool === 'polygon') {
+      // Clicking back near the first vertex closes the polygon instead of requiring a double-click
+      // — the intuitive "close the loop" gesture. Needs at least 3 vertices placed already so this
+      // click isn't just re-clicking the first point of a still-open 1- or 2-point draft.
+      if (polygonDraft && polygonDraft.length >= 3) {
+        const first = polygonDraft[0];
+        const closePx = Math.hypot((start.fractionX - first.fractionX) * canvasWidthPx, (start.fractionY - first.fractionY) * canvasHeightPx);
+        if (closePx <= POLYGON_CLOSE_HIT_RADIUS_PX / view.scale) {
+          finishPolygon(polygonDraft);
+          return;
+        }
+      }
       setPolygonDraft(polygonDraft ? [...polygonDraft, start] : [start]);
       return;
     }
@@ -737,10 +796,9 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
         setArcThreePointDraft(nextPoints);
         return;
       }
-      // Click order is start, a point the arc passes through, end — the conventional CAD "3-point
-      // arc" sequence — so the 2nd and 3rd clicks are reordered for arcFromThreePoints's own
-      // (start, end, through) parameter order.
-      const arc = arcFromThreePoints(nextPoints[0], nextPoints[2], nextPoints[1], defaultStyle);
+      // Click order is start, end, then a point the arc bulges toward (sets the radius) —
+      // arcFromThreePoints's own (start, end, through) parameter order, so no reordering needed.
+      const arc = arcFromThreePoints(nextPoints[0], nextPoints[1], nextPoints[2], defaultStyle);
       setArcThreePointDraft(null);
       setPendingPoint(null);
       if (arc) {
@@ -802,6 +860,10 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
         );
         if (hitHandle) {
           canvasEl.setPointerCapture(event.pointerId);
+          // Arc start/end handles need their sweep clamped continuously frame-to-frame (see
+          // applyHandleDrag's sweepReference doc comment) rather than against the drag-start
+          // snapshot alone — chained forward here as each move's own result feeds the next.
+          let sweepReference = originalShape.kind === 'arc' ? normalizeAngle(originalShape.endAngle - originalShape.startAngle) : undefined;
           const move = (ev: PointerEvent) => {
             const current = fractionFromEvent(ev.clientX, ev.clientY);
             let point = { x: current.fractionX, y: current.fractionY };
@@ -824,7 +886,9 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
               point = { x: gridSnap(point.x, GRID_SPACING_FRACTION), y: gridSnap(point.y, GRID_SPACING_FRACTION) };
             }
             setSnapIndicator(indicator);
-            setDraftShapes([applyHandleDrag(originalShape, hitHandle.id, point, canvasWidthPx, canvasHeightPx)]);
+            const draftShape = applyHandleDrag(originalShape, hitHandle.id, point, canvasWidthPx, canvasHeightPx, sweepReference);
+            if (sweepReference !== undefined && draftShape.kind === 'arc') sweepReference = normalizeAngle(draftShape.endAngle - draftShape.startAngle);
+            setDraftShapes([draftShape]);
           };
           const up = () => {
             window.removeEventListener('pointermove', move);
