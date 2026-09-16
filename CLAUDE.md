@@ -20,6 +20,14 @@ More than one Claude Code session often works on this repo at the same time (thi
 
 **Default: call `EnterWorktree` at the start of any task that will edit files**, so this session gets its own isolated checkout instead of sharing the primary one. Skip it only when the user explicitly says to work directly in the main checkout, or for a purely read-only look-around that touches no files.
 
+## `master` is live — branch first, test on Windows, then merge
+
+`master` auto-deploys to `https://app.mepsketcher.com` on every push (`.github/workflows/deploy-web.yml`, added 2026-09-16). A push to `master` is not just a commit — it publishes to the live site.
+
+**Default: push code changes to a branch, never straight to `master`.** `EnterWorktree` already puts the work on its own `worktree-*` branch — push that branch to `origin` instead of merging it into `master`. Let the user pull the branch down on the Windows machine and test it there first; the user merges to `master` (or asks you to) once it checks out.
+
+Exceptions where pushing straight to `master` is fine: changes that don't touch `apps/web` or its dependencies (docs, `CLAUDE.md`, `.claude/plans/` housekeeping), or when the user explicitly says to push straight to `master`.
+
 # Delegate to subagents
 
 Use the Agent tool for menial/mechanical sub-tasks (repo surveys, locating code, running a build/test and reporting output, applying a well-specified small edit) and for any task big enough to blow up context if done inline. Keep the main thread's context small — push exploration and grunt work to subagents, do the synthesis/decisions yourself.
