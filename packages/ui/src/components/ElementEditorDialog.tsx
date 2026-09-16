@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { CommandManager, type Discipline, type PortSpec, type StampCategory, type StampDefinition, type SymbolShape, type SymbolShapeStyle } from '@mepapp/core';
+import { CommandManager, STAMP_LIBRARY, type Discipline, type PortSpec, type StampCategory, type StampDefinition, type SymbolShape, type SymbolShapeStyle } from '@mepapp/core';
 import { ColorPicker } from './ColorPicker.js';
 import { Dialog } from './Dialog.js';
 import { loadStampBitmap } from '../stampBitmap.js';
@@ -1120,10 +1120,14 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   }
 
   /** Built definition awaiting the user's confirm/cancel on the Name-collision prompt below — its
-      id still matches this dialog's own definition/seed; confirmOverwrite swaps in the colliding
-      definition's id so App.tsx's save handler updates that one in place instead of adding a new
-      entry (see handleSaveElementDefinition's `isOverwrite` check, keyed on id membership). */
-  const [pendingOverwrite, setPendingOverwrite] = useState<{ built: StampDefinition; existingId: string; existingLabel: string } | null>(null);
+      id still matches this dialog's own definition/seed. For a colliding *custom* element,
+      confirmOverwrite swaps in that element's id so App.tsx's save handler updates it in place
+      instead of adding a new entry (see handleSaveElementDefinition's `isOverwrite` check, keyed
+      on id membership). For a colliding *library* element (existingId null — nothing on the
+      document side to reuse yet), confirmOverwrite saves the built definition under its own fresh
+      id, adding a new custom entry that then shadows the library one in StampsPanel's grid (see
+      that component's shadowedLibraryIds). */
+  const [pendingOverwrite, setPendingOverwrite] = useState<{ built: StampDefinition; existingId: string | null; existingLabel: string; isLibrary: boolean } | null>(null);
 
   function buildDefinition(): StampDefinition | null {
     if (!name.trim()) {
@@ -1169,14 +1173,26 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     setError(null);
     const built = buildDefinition();
     if (!built) return;
-    // A different existing custom element already has this Name — saving straight through would
-    // silently add a second element sharing it (the original bug report). Ask before overwriting
-    // rather than doing it automatically, since the collision could equally mean "I meant to
-    // rename this as a new element" (self-match, `id === built.id`, is a normal in-place edit and
-    // never prompts).
-    const collision = existingCustomDefinitions.find((d) => d.id !== built.id && d.label.trim().toLowerCase() === built.label.toLowerCase());
+    const builtLabel = built.label.toLowerCase();
+    const labelMatches = (label: string, labelNl?: string) => label.trim().toLowerCase() === builtLabel || labelNl?.trim().toLowerCase() === builtLabel;
+    // A different existing custom element already has this Name (its English name or, for a
+    // fixture-generated one carrying a translation, its Dutch name) — saving straight through
+    // would silently add a second element sharing it (the original bug report). Ask before
+    // overwriting rather than doing it automatically, since the collision could equally mean "I
+    // meant to rename this as a new element" (self-match, `id === built.id`, is a normal in-place
+    // edit and never prompts).
+    const collision = existingCustomDefinitions.find((d) => d.id !== built.id && labelMatches(d.label, d.labelNl));
     if (collision) {
-      setPendingOverwrite({ built, existingId: collision.id, existingLabel: collision.label });
+      setPendingOverwrite({ built, existingId: collision.id, existingLabel: collision.label, isLibrary: false });
+      return;
+    }
+    // The Name field can also match a read-only STAMP_LIBRARY entry's English or Dutch name (e.g.
+    // duplicating it without renaming). There's no document-side element to overwrite yet, only a
+    // hardcoded library entry — confirming here adds a new custom entry under its own id, which
+    // then shadows the library tile with the same name in StampsPanel's grid.
+    const libraryCollision = STAMP_LIBRARY.find((d) => labelMatches(d.label, d.labelNl));
+    if (libraryCollision) {
+      setPendingOverwrite({ built, existingId: null, existingLabel: libraryCollision.label, isLibrary: true });
       return;
     }
     onSave(built);
@@ -1184,7 +1200,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
 
   function confirmOverwrite() {
     if (!pendingOverwrite) return;
-    onSave({ ...pendingOverwrite.built, id: pendingOverwrite.existingId });
+    onSave(pendingOverwrite.existingId ? { ...pendingOverwrite.built, id: pendingOverwrite.existingId } : pendingOverwrite.built);
     setPendingOverwrite(null);
   }
 
@@ -1195,6 +1211,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     <Dialog
       title={definition ? 'Edit Element' : 'Create Custom Element'}
       onClose={requestClose}
+      closeOnBackdropClick={false}
       className="mep-modal--wide"
       actions={
         <>
@@ -1222,7 +1239,11 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
         {pendingOverwrite && (
           <div className="mep-ee-confirm-close">
             <div className="mep-ee-confirm-close-box">
-              <p>A custom element named &ldquo;{pendingOverwrite.existingLabel}&rdquo; already exists. Overwrite it?</p>
+              <p>
+                {pendingOverwrite.isLibrary
+                  ? <>An element named &ldquo;{pendingOverwrite.existingLabel}&rdquo; already exists in the stamp library. Save your own version — it will take that element&rsquo;s place in the Stamps tab?</>
+                  : <>A custom element named &ldquo;{pendingOverwrite.existingLabel}&rdquo; already exists. Overwrite it?</>}
+              </p>
               <div className="mep-ee-confirm-close-actions">
                 <button type="button" onClick={() => setPendingOverwrite(null)}>
                   Cancel
