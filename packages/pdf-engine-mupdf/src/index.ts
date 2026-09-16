@@ -55,7 +55,89 @@ function readRotation(page: mupdf.PDFPage): PageInfo['rotationDegrees'] {
     : 0;
 }
 
-function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): AnnotationSpec | null {
+interface NativePageSize {
+  widthPt: number;
+  heightPt: number;
+}
+
+// @mepapp/render's "world" space is the auto-rotated page as the user sees
+// and clicks on it — identity vs. the PDF's own content-stream space at
+// rotationDegrees 0 (every fixture tested before Test_doc.pdf), but the two
+// differ by exactly the page's own /Rotate for 90/180/270, since a PDF
+// annotation's /Rect is always defined in the page's native, unrotated
+// content-stream space (ISO 32000 §12.5.2), never the rotated display space.
+// Derived empirically against PDFPage.getTransform() (mupdf.js exposes no
+// direct content<->display API) — see the round-trip investigation, issue 3.
+// Both are exact for 90/180/270 (no approximation): a page rotation is always
+// a multiple of 90°, so rotating an axis-aligned world-space rect by it stays
+// exactly axis-aligned in content space, and vice versa.
+function worldPointToContent(p: { x: number; y: number }, native: NativePageSize, rotation: PageInfo['rotationDegrees']): { x: number; y: number } {
+  switch (rotation) {
+    case 0:
+      return { x: p.x, y: p.y };
+    case 90:
+      return { x: native.widthPt - p.y, y: p.x };
+    case 180:
+      return { x: native.widthPt - p.x, y: native.heightPt - p.y };
+    case 270:
+      return { x: p.y, y: native.heightPt - p.x };
+  }
+}
+
+function contentPointToWorld(p: { x: number; y: number }, native: NativePageSize, rotation: PageInfo['rotationDegrees']): { x: number; y: number } {
+  switch (rotation) {
+    case 0:
+      return { x: p.x, y: p.y };
+    case 90:
+      return { x: p.y, y: native.widthPt - p.x };
+    case 180:
+      return { x: native.widthPt - p.x, y: native.heightPt - p.y };
+    case 270:
+      return { x: native.heightPt - p.y, y: p.x };
+  }
+}
+
+/** Maps a world-space axis-aligned rect to its (still axis-aligned, per worldPointToContent's doc comment) content-space bounding rect. */
+function worldRectToContent(
+  rect: { x0: number; y0: number; x1: number; y1: number },
+  native: NativePageSize,
+  rotation: PageInfo['rotationDegrees'],
+): [number, number, number, number] {
+  const corners = [
+    { x: rect.x0, y: rect.y0 },
+    { x: rect.x1, y: rect.y0 },
+    { x: rect.x1, y: rect.y1 },
+    { x: rect.x0, y: rect.y1 },
+  ].map((p) => worldPointToContent(p, native, rotation));
+  const xs = corners.map((c) => c.x);
+  const ys = corners.map((c) => c.y);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
+/** The inverse of worldRectToContent — used when reading a stamp annotation's stored (content-space) Rect back into @mepapp/render's world space. */
+function contentRectToWorld(
+  rect: [number, number, number, number],
+  native: NativePageSize,
+  rotation: PageInfo['rotationDegrees'],
+): [number, number, number, number] {
+  const [x0, y0, x1, y1] = rect;
+  const corners = [
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ].map((p) => contentPointToWorld(p, native, rotation));
+  const xs = corners.map((c) => c.x);
+  const ys = corners.map((c) => c.y);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
+function annotationToSpec(
+  annot: mupdf.PDFAnnotation,
+  pageIndex: number,
+  native: NativePageSize,
+  rotation: PageInfo['rotationDegrees'],
+): AnnotationSpec | null {
   const type = annot.getType();
   switch (type) {
     case 'Ink': {
@@ -138,16 +220,22 @@ function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): Annota
       };
     }
     case 'Stamp': {
-      const [x0, y0, x1, y1] = annot.getRect();
+      // The stored Rect and MepAppRotationDegrees are in the page's native
+      // content-stream space (see worldPointToContent's doc comment) —
+      // convert both back to world space/rotation before handing them to
+      // @mepapp/render, the same way addAnnotation's 'stamp' case converts
+      // the other direction on write.
+      const [wx0, wy0, wx1, wy1] = contentRectToWorld(annot.getRect(), native, rotation);
       const rotationRaw = annot.getObject().get('MepAppRotationDegrees');
-      const rotationDegrees = rotationRaw.isNumber() ? rotationRaw.asNumber() : 0;
+      const storedRotation = rotationRaw.isNumber() ? rotationRaw.asNumber() : 0;
+      const rotationDegrees = ((storedRotation - rotation) % 360 + 360) % 360;
       // pngBytes is not reconstructed from the appearance stream on read-back
       // (see the AnnotationGeometry doc comment in @mepapp/pdf-engine) —
       // geometry is all reconciliation needs.
       return {
         kind: 'stamp',
         pageIndex,
-        geometry: { kind: 'stamp', position: { x: x0, y: y0 }, widthPt: x1 - x0, heightPt: y1 - y0, rotationDegrees, pngBytes: new Uint8Array(0) },
+        geometry: { kind: 'stamp', position: { x: wx0, y: wy0 }, widthPt: wx1 - wx0, heightPt: wy1 - wy0, rotationDegrees, pngBytes: new Uint8Array(0) },
       };
     }
     default:
@@ -156,7 +244,7 @@ function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): Annota
 }
 
 class MupdfDocumentHandle implements PdfDocumentHandle {
-  constructor(private readonly doc: mupdf.PDFDocument) {}
+  constructor(private doc: mupdf.PDFDocument) {}
 
   getPageCount(): number {
     return this.doc.countPages();
@@ -310,23 +398,41 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
         annot = page.createAnnotation('PolyLine');
         annot.setVertices(geometry.points.map((p) => [p.x, p.y]));
         break;
-      case 'stamp':
+      case 'stamp': {
         annot = page.createAnnotation('Stamp');
-        annot.setRect([
-          geometry.position.x,
-          geometry.position.y,
-          geometry.position.x + geometry.widthPt,
-          geometry.position.y + geometry.heightPt,
-        ]);
+        // The Rect this adapter writes is always in the page's native,
+        // unrotated content-stream space (see worldPointToContent's doc
+        // comment) — the geometry handed in here is in @mepapp/render's
+        // world space, so it needs converting first for a rotated page.
+        const stampRotation = readRotation(page);
+        const [smx0, smy0, smx1, smy1] = readMediaBox(page);
+        const stampNative: NativePageSize = { widthPt: smx1 - smx0, heightPt: smy1 - smy0 };
+        annot.setRect(
+          worldRectToContent(
+            {
+              x0: geometry.position.x,
+              y0: geometry.position.y,
+              x1: geometry.position.x + geometry.widthPt,
+              y1: geometry.position.y + geometry.heightPt,
+            },
+            stampNative,
+            stampRotation,
+          ),
+        );
         // pngBytes must already be oriented as it should appear on the page —
-        // this adapter does not rotate pixels itself. rotationDegrees is
-        // stashed as our own bookkeeping key (ignored by other readers, which
-        // just see the already-oriented image) purely so reconcilePdfSync can
-        // compare it against the domain model's rotation without having to
-        // reverse-engineer it from pixel content.
+        // this adapter does not rotate pixels itself (the caller adds the
+        // page's own rotation on top of the stamp's world-space rotation
+        // before extracting, see @mepapp/render's writeAnnotationForId).
+        // rotationDegrees is stashed as our own bookkeeping key (ignored by
+        // other readers, which just see the already-oriented image), composed
+        // with the page rotation the same way, so annotationToSpec's read
+        // path can undo both and compare like-for-like against the domain
+        // model's world-space rotation without reverse-engineering it from
+        // pixel content.
         annot.setStampImage(new mupdf.Image(geometry.pngBytes));
-        annot.getObject().put('MepAppRotationDegrees', geometry.rotationDegrees);
+        annot.getObject().put('MepAppRotationDegrees', (geometry.rotationDegrees + stampRotation) % 360);
         break;
+      }
     }
 
     if (rgb && geometry.kind !== 'textbox' && geometry.kind !== 'stamp') annot.setColor(rgb);
@@ -338,11 +444,14 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
 
   async listAnnotations(pageIndex: number): Promise<StoredAnnotation[]> {
     const page = this.doc.loadPage(pageIndex);
+    const [mx0, my0, mx1, my1] = readMediaBox(page);
+    const native: NativePageSize = { widthPt: mx1 - mx0, heightPt: my1 - my0 };
+    const rotation = readRotation(page);
     const results: StoredAnnotation[] = [];
     for (const annot of page.getAnnotations()) {
       const id = annot.getName();
       if (!id) continue; // not one of ours — skip rather than fail on foreign annotations
-      const spec = annotationToSpec(annot, pageIndex);
+      const spec = annotationToSpec(annot, pageIndex, native, rotation);
       if (spec) results.push({ ...spec, id });
     }
     return results;
@@ -423,7 +532,29 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
   }
 
   async save(): Promise<Uint8Array> {
-    return this.doc.saveToBuffer('incremental').asUint8Array();
+    // Buffer.asUint8Array() (see mupdf.js) returns HEAPU8.subarray(...) — a
+    // live view into the WASM module's own linear memory, not an owned copy.
+    // Any later WASM allocation that grows that memory (including the
+    // PDFDocument construction two lines down, for a large enough file)
+    // replaces its backing ArrayBuffer and detaches every existing view into
+    // the old one. Copying out into two independent, plain Uint8Arrays right
+    // away — before any further mupdf call gets a chance to grow the heap —
+    // is the only way to keep both the reopened doc and the caller's bytes
+    // valid afterward.
+    const liveBytes = this.doc.saveToBuffer('incremental').asUint8Array();
+    const bytesForCaller = new Uint8Array(liveBytes);
+    const bytesForReopen = new Uint8Array(liveBytes);
+    // mupdf.PDFDocument.canBeSavedIncrementally() still reports true here, but
+    // calling saveToBuffer('incremental') a second time on this same instance
+    // (the normal case: the user saves, keeps editing, then saves again in
+    // one open session) writes a /Prev that doesn't match the real on-disk
+    // offset, corrupting the xref chain for any reader stricter than MuPDF's
+    // own auto-repair-on-open — see the round-trip investigation, issue 4,
+    // reproduced against this exact PDFDocument instance. Reopening from the
+    // bytes we just handed the caller resets that bookkeeping so the next
+    // save starts from a consistent, self-describing baseline.
+    this.doc = new mupdf.PDFDocument(bytesForReopen);
+    return bytesForCaller;
   }
 }
 
