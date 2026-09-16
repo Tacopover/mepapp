@@ -425,12 +425,11 @@ export function MepSketchApp({
             // Keeps the library original's exact name rather than auto-appending "Copy" — most of
             // the time the user is just re-authoring this stamp in place and saving under the same
             // name, and ElementEditorDialog's own Name-collision check (against both
-            // customStampDefinitions and STAMP_LIBRARY) blocks a straight-through save if they don't
-            // rename it, asking for a different name instead. labelNl is still dropped: a 'custom'
-            // definition's label is meant to stay fixed regardless of the language toggle (see
-            // StampsPanel's stampLabelFor doc comment), so carrying the library original's Dutch
-            // translation forward here would defeat that.
-            labelNl: undefined,
+            // customStampDefinitions and STAMP_LIBRARY) prompts to overwrite instead of silently
+            // duplicating. labelNl is kept (not stripped) so the dialog's Name field seeds from the
+            // library original's Dutch name when the Stamps tab's language toggle is set to NL —
+            // buildDefinition() never copies labelNl into the saved definition, so this never leaks
+            // into the resulting custom stamp; it only affects what the Name field starts as.
             iconRef,
             source: 'custom',
             ports: definition.ports.map((port) => ({ ...port })),

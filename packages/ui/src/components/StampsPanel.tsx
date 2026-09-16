@@ -84,7 +84,19 @@ export function StampsPanel({
   const [categoryFilter, setCategoryFilter] = useState<StampCategoryFilter>('terminal');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const allDefinitions = [...STAMP_LIBRARY, ...customStampDefinitions];
+  // A custom element saved under the same English or Dutch name as a library one (see
+  // ElementEditorDialog's overwrite-confirmation prompt) shadows it here — STAMP_LIBRARY itself is
+  // read-only and can't actually be edited, so "overwriting" a preloaded element in practice means
+  // the user's own custom version takes that library tile's place in the grid.
+  const shadowedLibraryIds = new Set(
+    STAMP_LIBRARY.filter((lib) =>
+      customStampDefinitions.some((c) => {
+        const label = c.label.trim().toLowerCase();
+        return label === lib.label.toLowerCase() || (!!lib.labelNl && label === lib.labelNl.toLowerCase());
+      }),
+    ).map((lib) => lib.id),
+  );
+  const allDefinitions = [...STAMP_LIBRARY.filter((lib) => !shadowedLibraryIds.has(lib.id)), ...customStampDefinitions];
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const definitions = allDefinitions
     .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)
