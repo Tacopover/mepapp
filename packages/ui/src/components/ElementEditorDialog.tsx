@@ -414,21 +414,23 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // so canvasWidthPx/heightPx don't scale linearly per axis with nativeWidth/nativeHeight whenever
   // the aspect ratio changes — only the native sizes themselves do.
   //
-  // sMin (for radius/strokeWidth, which are fractions of Math.min(canvasWidthPx, canvasHeightPx) —
-  // see drawSymbolShapes) is the one exception to "derive from native sizes directly": that min is
-  // itself driven by shapeCanvasSize's cap on the *longer* native side, so its old/new ratio isn't
-  // Math.min(oldNative)/Math.min(newNative) — going from 48×48 to 48×96 halves the rendered min
-  // dimension (520→260) even though the native min side (48) never changes. Computing it from the
-  // actual pixel boxes sidesteps re-deriving that relationship by hand.
+  // sMin (for radius/strokeWidth) needs the same native-unit basis, not the derived canvas pixel
+  // box, even though drawSymbolShapes itself scales radius by Math.min(canvasWidthPx, canvasHeightPx):
+  // that pixel min equals k * Math.min(nativeWidth, nativeHeight) for the single uniform scale
+  // k = SHAPE_CANVAS_MAX_PX / Math.max(nativeWidth, nativeHeight), so the *physical* (native-unit)
+  // radius a fraction represents is `radius * Math.min(nativeWidth, nativeHeight)` — k cancels out.
+  // Using the pixel box's own min instead (as a prior version of this fix did) folds k's own change
+  // into sMin too, which is wrong whenever only the *longer* native side moves: e.g. Bath is
+  // 48×19.08 (width already the longer side) — widening it to 96×19.08 doesn't change
+  // Math.min(nativeWidth, nativeHeight) (still 19.08) so sMin should be 1, but the pixel box's own
+  // min shrinks (k halves), which would wrongly double every circle/arc's radius on that edit alone.
   const nativeSizeRef = useRef({ width: nativeWidth, height: nativeHeight });
   useEffect(() => {
     const prev = nativeSizeRef.current;
     if (prev.width === nativeWidth && prev.height === nativeHeight) return;
     const sx = prev.width / nativeWidth;
     const sy = prev.height / nativeHeight;
-    const prevCanvas = shapeCanvasSize(prev.width, prev.height);
-    const nextCanvas = shapeCanvasSize(nativeWidth, nativeHeight);
-    const sMin = Math.min(prevCanvas.widthPx, prevCanvas.heightPx) / Math.min(nextCanvas.widthPx, nextCanvas.heightPx);
+    const sMin = Math.min(prev.width, prev.height) / Math.min(nativeWidth, nativeHeight);
     commitShapes(shapes.map((s) => rescaleShapeForCanvasResize(s, sx, sy, sMin)));
     setPorts((prevPorts) => prevPorts.map((p) => ({ ...p, fractionX: p.fractionX * sx, fractionY: p.fractionY * sy })));
     nativeSizeRef.current = { width: nativeWidth, height: nativeHeight };
@@ -650,7 +652,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       ctx.lineWidth = chromeScale;
       const previewArc =
         tool === 'arcThreePoint' && activeDraftPoints.length === 2 && pendingPoint
-          ? arcFromThreePoints(activeDraftPoints[0], activeDraftPoints[1], pendingPoint, defaultStyle)
+          ? arcFromThreePoints(activeDraftPoints[0], activeDraftPoints[1], pendingPoint, defaultStyle, canvasWidthPx, canvasHeightPx)
           : null;
       if (previewArc && previewArc.kind === 'arc') {
         const r = previewArc.radius * Math.min(canvasWidthPx, canvasHeightPx);
@@ -798,7 +800,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       }
       // Click order is start, end, then a point the arc bulges toward (sets the radius) —
       // arcFromThreePoints's own (start, end, through) parameter order, so no reordering needed.
-      const arc = arcFromThreePoints(nextPoints[0], nextPoints[1], nextPoints[2], defaultStyle);
+      const arc = arcFromThreePoints(nextPoints[0], nextPoints[1], nextPoints[2], defaultStyle, canvasWidthPx, canvasHeightPx);
       setArcThreePointDraft(null);
       setPendingPoint(null);
       if (arc) {

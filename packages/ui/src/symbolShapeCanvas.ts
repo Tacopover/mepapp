@@ -708,33 +708,44 @@ export function rotateShapeAround(shape: SymbolShape, deltaRotation: number, piv
  * startAngle/endAngle so the sweep from start to end (in the direction drawSymbolShapes'
  * `ctx.ellipse` sweeps, i.e. increasing angle) passes through the third point.
  * Returns null for (near-)collinear points, which have no well-defined circumcircle.
+ *
+ * The circumcenter math runs in *pixel* space (fraction × widthPx/heightPx), not fraction space:
+ * fraction-space x and y aren't on a common scale whenever the canvas isn't square (widthPx !=
+ * heightPx, the common case — see symbolShapeBounds/shapeHandles's own per-axis corrections for
+ * the same issue), so a "circle" fit to the raw fractions is a different curve than the true
+ * circle through the three clicked points once rendered. drawSymbolShapes always draws a true
+ * circle (uniform pixel radius, see its Math.min(widthPx, heightPx) convention), so computing the
+ * circumcircle anywhere other than that same pixel space produces an arc that doesn't actually
+ * pass through the points that were clicked.
  */
 export function arcFromThreePoints(
   start: { fractionX: number; fractionY: number },
   end: { fractionX: number; fractionY: number },
   through: { fractionX: number; fractionY: number },
   style: SymbolShapeStyle,
+  widthPx: number,
+  heightPx: number,
 ): SymbolShape | null {
-  const MIN_RADIUS = 0.01;
-  const d =
-    2 *
-    (start.fractionX * (end.fractionY - through.fractionY) +
-      end.fractionX * (through.fractionY - start.fractionY) +
-      through.fractionX * (start.fractionY - end.fractionY));
+  const MIN_RADIUS_PX = 0.01 * Math.min(widthPx, heightPx);
+  const p1 = { x: start.fractionX * widthPx, y: start.fractionY * heightPx };
+  const p2 = { x: end.fractionX * widthPx, y: end.fractionY * heightPx };
+  const p3 = { x: through.fractionX * widthPx, y: through.fractionY * heightPx };
+
+  const d = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
   if (Math.abs(d) < 1e-9) return null;
 
-  const sq1 = start.fractionX ** 2 + start.fractionY ** 2;
-  const sq2 = end.fractionX ** 2 + end.fractionY ** 2;
-  const sq3 = through.fractionX ** 2 + through.fractionY ** 2;
-  const cx = (sq1 * (end.fractionY - through.fractionY) + sq2 * (through.fractionY - start.fractionY) + sq3 * (start.fractionY - end.fractionY)) / d;
-  const cy = (sq1 * (through.fractionX - end.fractionX) + sq2 * (start.fractionX - through.fractionX) + sq3 * (end.fractionX - start.fractionX)) / d;
-  const radius = Math.hypot(start.fractionX - cx, start.fractionY - cy);
-  if (radius < MIN_RADIUS) return null;
+  const sq1 = p1.x ** 2 + p1.y ** 2;
+  const sq2 = p2.x ** 2 + p2.y ** 2;
+  const sq3 = p3.x ** 2 + p3.y ** 2;
+  const cxPx = (sq1 * (p2.y - p3.y) + sq2 * (p3.y - p1.y) + sq3 * (p1.y - p2.y)) / d;
+  const cyPx = (sq1 * (p3.x - p2.x) + sq2 * (p1.x - p3.x) + sq3 * (p2.x - p1.x)) / d;
+  const radiusPx = Math.hypot(p1.x - cxPx, p1.y - cyPx);
+  if (radiusPx < MIN_RADIUS_PX) return null;
 
   const twoPi = Math.PI * 2;
-  const aStart = normalizeAngle(Math.atan2(start.fractionY - cy, start.fractionX - cx));
-  const aEnd = normalizeAngle(Math.atan2(end.fractionY - cy, end.fractionX - cx));
-  const aThrough = normalizeAngle(Math.atan2(through.fractionY - cy, through.fractionX - cx));
+  const aStart = normalizeAngle(Math.atan2(p1.y - cyPx, p1.x - cxPx));
+  const aEnd = normalizeAngle(Math.atan2(p2.y - cyPx, p2.x - cxPx));
+  const aThrough = normalizeAngle(Math.atan2(p3.y - cyPx, p3.x - cxPx));
   const forwardSweep = normalizeAngle(aEnd - aStart);
   const throughOffset = normalizeAngle(aThrough - aStart);
 
@@ -742,7 +753,16 @@ export function arcFromThreePoints(
   const startAngle = onForwardSweep ? aStart : aEnd;
   const endAngle = onForwardSweep ? aStart + forwardSweep : aEnd + (twoPi - forwardSweep);
 
-  return { id: crypto.randomUUID(), kind: 'arc', cx, cy, radius, startAngle, endAngle, style };
+  return {
+    id: crypto.randomUUID(),
+    kind: 'arc',
+    cx: cxPx / widthPx,
+    cy: cyPx / heightPx,
+    radius: radiusPx / Math.min(widthPx, heightPx),
+    startAngle,
+    endAngle,
+    style,
+  };
 }
 
 function distanceToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
