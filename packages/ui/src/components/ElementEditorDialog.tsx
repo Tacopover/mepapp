@@ -409,6 +409,16 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   const singleSelectedShape = selectedShapes.length === 1 ? selectedShapes[0] : undefined;
   const activeStyle = selectedShapes[0]?.style ?? defaultStyle;
 
+  // Keeps the Scale % field honest: without this it just holds whatever was last typed/dragged,
+  // so selecting a fresh (never-scaled) shape after scaling another one to e.g. 150% would still
+  // show "150" and silently re-apply that on the next Enter/blur. Synced to the single selected
+  // shape's own cumulative scale (100 for 0/multi selection, where there's no one "current" value
+  // — see applyScalePercent's own doc comment); re-fires when that shape's scale actually changes
+  // (field/handle apply) too, so the field settles back to matching reality after either one.
+  useEffect(() => {
+    setScalePercentInput(singleSelectedShape ? String(Math.round((singleSelectedShape.scale ?? 1) * 100)) : '100');
+  }, [singleSelectedShape?.id, singleSelectedShape?.scale]);
+
   // 'image' shapes' art (imageCacheRef, keyed by dataUrl) — the draw effect below needs a
   // pre-decoded <img> to drawImage() with (see drawSymbolShapes' own doc comment), so any new
   // dataUrl showing up in `shapes` gets loaded here; imagesLoadedTick bumps once a load lands,
@@ -494,11 +504,24 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? mirrorShape(s, axis, pivot.x, pivot.y) : s)));
   }
 
+  /** For a single selected shape, the field shows/targets that shape's own absolute cumulative
+      `scale` (see scaleShape's doc comment) — typing 140 sets it to exactly 140% of its size at
+      creation, regardless of what it's currently at, by deriving the one-off factor needed to get
+      there from here. For a multi-shape selection there's no single "current" value to target
+      (each shape may already be at a different scale), so it keeps the old relative-multiplier
+      behavior: the typed percent is applied fresh, once, to every selected shape via their shared
+      pivot — same as the multi-shape scale handle's own drag. */
   function applyScalePercent() {
-    const factor = Number(scalePercentInput) / 100;
-    if (selectedShapes.length === 0 || !Number.isFinite(factor) || factor <= 0) return;
+    const target = Number(scalePercentInput) / 100;
+    if (selectedShapes.length === 0 || !Number.isFinite(target) || target <= 0) return;
     const pivot = selectionPivot(selectedShapes, canvasWidthPx, canvasHeightPx);
-    commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? scaleShape(s, factor, pivot.x, pivot.y) : s)));
+    if (singleSelectedShape) {
+      const factor = target / (singleSelectedShape.scale ?? 1);
+      if (!Number.isFinite(factor) || factor <= 0) return;
+      commitShapes(shapes.map((s) => (s.id === singleSelectedShape.id ? scaleShape(s, factor, pivot.x, pivot.y) : s)));
+    } else {
+      commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? scaleShape(s, target, pivot.x, pivot.y) : s)));
+    }
   }
 
   function duplicateSelection() {
@@ -798,14 +821,21 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
 
   /** Screen px (viewport-relative) → world px (the artwork's own fixed canvasWidthPx/heightPx
       box) → fraction, inverting the current view transform. Every caller keeps working purely
-      in 0–1 fraction space, unchanged by zoom/pan — only this screen→fraction conversion does. */
-  function fractionFromEvent(clientX: number, clientY: number): { fractionX: number; fractionY: number } {
+      in 0–1 fraction space, unchanged by zoom/pan — only this screen→fraction conversion does.
+      `clamp` defaults to true (new content — a port, a drawn shape — always lands inside the
+      canvas/stamp bounds); pass false for anything that targets EXISTING geometry (select-tool
+      hit-testing, dragging/resizing/rotating/scaling a shape) so a shape that was scaled past the
+      bounds (still visibly drawn — nothing clips it) stays reachable by the pointer instead of
+      every click/drag past the edge silently landing on the boundary itself. */
+  function fractionFromEvent(clientX: number, clientY: number, clamp = true): { fractionX: number; fractionY: number } {
     const rect = viewportRef.current!.getBoundingClientRect();
     const screenX = clientX - rect.left;
     const screenY = clientY - rect.top;
     const worldX = (screenX - view.panX) / view.scale;
     const worldY = (screenY - view.panY) / view.scale;
-    return { fractionX: clamp01(worldX / canvasWidthPx), fractionY: clamp01(worldY / canvasHeightPx) };
+    const fractionX = worldX / canvasWidthPx;
+    const fractionY = worldY / canvasHeightPx;
+    return clamp ? { fractionX: clamp01(fractionX), fractionY: clamp01(fractionY) } : { fractionX, fractionY };
   }
 
   function addPortAt(fractionX: number, fractionY: number) {
@@ -870,6 +900,11 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     }
 
     if (tool === 'select') {
+      // Unclamped — a shape scaled past the canvas/stamp bounds is still drawn (nothing clips it),
+      // so selecting/dragging/resizing it needs the click's true position, not one pinned to the
+      // [0,1] edge. Shadows the outer (clamped) `start` for the rest of this block only; every other
+      // tool above still places new content — port/text/shape — clamped inside the bounds.
+      const start = fractionFromEvent(event.clientX, event.clientY, false);
       const canvasEl = event.currentTarget;
       // Hit-test order (§4): rotate handle → geometry handle (single selection only) → shape-body drag → marquee.
       const selectedForRotate = shapes.filter((s) => selectedShapeIds.has(s.id));
@@ -885,7 +920,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           const pivotPxY = pivot.y * canvasHeightPx;
           const startAngle = Math.atan2(clickPxY - pivotPxY, clickPxX - pivotPxX);
           const move = (ev: PointerEvent) => {
-            const current = fractionFromEvent(ev.clientX, ev.clientY);
+            const current = fractionFromEvent(ev.clientX, ev.clientY, false);
             const currentPxX = current.fractionX * canvasWidthPx;
             const currentPxY = current.fractionY * canvasHeightPx;
             const currentAngle = Math.atan2(currentPxY - pivotPxY, currentPxX - pivotPxX);
@@ -926,7 +961,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
             const pivotPxY = pivot.y * canvasHeightPx;
             const startDistPx = Math.max(1, Math.hypot(handlePxX - pivotPxX, handlePxY - pivotPxY));
             const move = (ev: PointerEvent) => {
-              const current = fractionFromEvent(ev.clientX, ev.clientY);
+              const current = fractionFromEvent(ev.clientX, ev.clientY, false);
               const currentPxX = current.fractionX * canvasWidthPx;
               const currentPxY = current.fractionY * canvasHeightPx;
               const currentDistPx = Math.hypot(currentPxX - pivotPxX, currentPxY - pivotPxY);
@@ -967,7 +1002,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           // snapshot alone — chained forward here as each move's own result feeds the next.
           let sweepReference = originalShape.kind === 'arc' ? normalizeAngle(originalShape.endAngle - originalShape.startAngle) : undefined;
           const move = (ev: PointerEvent) => {
-            const current = fractionFromEvent(ev.clientX, ev.clientY);
+            const current = fractionFromEvent(ev.clientX, ev.clientY, false);
             let point = { x: current.fractionX, y: current.fractionY };
             // Angle snap only for a line/arrow endpoint handle — a "fixed point + moving point" drag.
             if (angleSnapEnabled && (originalShape.kind === 'line' || originalShape.kind === 'arrow')) {
@@ -1028,7 +1063,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
         setSelectedShapeIds(dragIds);
         const dragShapes = shapes.filter((s) => dragIds.has(s.id));
         const move = (ev: PointerEvent) => {
-          let current = fractionFromEvent(ev.clientX, ev.clientY);
+          let current = fractionFromEvent(ev.clientX, ev.clientY, false);
           if (gridSnapEnabled) {
             current = { fractionX: gridSnap(current.fractionX, GRID_SPACING_FRACTION), fractionY: gridSnap(current.fractionY, GRID_SPACING_FRACTION) };
           }
@@ -1056,7 +1091,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       if (!event.shiftKey) setSelectedShapeIds(new Set());
       setMarquee({ start, current: start, additive: event.shiftKey });
       const move = (ev: PointerEvent) => {
-        const current = fractionFromEvent(ev.clientX, ev.clientY);
+        const current = fractionFromEvent(ev.clientX, ev.clientY, false);
         setMarquee((prev) => (prev ? { ...prev, current } : prev));
       };
       const up = () => {
@@ -1134,7 +1169,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       return;
     }
     if (tool === 'select') {
-      const { fractionX, fractionY } = fractionFromEvent(event.clientX, event.clientY);
+      const { fractionX, fractionY } = fractionFromEvent(event.clientX, event.clientY, false);
       const hit = hitTestSymbolShape(shapes, fractionX, fractionY, canvasWidthPx, canvasHeightPx, 6 / view.scale);
       if (hit && hit.kind === 'text') {
         setSelectedShapeIds(new Set([hit.id]));

@@ -684,26 +684,28 @@ export function mirrorShape(shape: SymbolShape, axis: 'horizontal' | 'vertical',
   }
 }
 
+/** `shape.scale` (see its own doc comment in symbol-shapes.ts) accumulates multiplicatively across repeat calls, so the Element Editor can read back an absolute "current scale" for the selected shape instead of only ever applying a fresh relative multiplier. */
 export function scaleShape(shape: SymbolShape, factor: number, pivotX: number, pivotY: number): SymbolShape {
   const sx = (x: number) => pivotX + (x - pivotX) * factor;
   const sy = (y: number) => pivotY + (y - pivotY) * factor;
+  const scale = (shape.scale ?? 1) * factor;
   switch (shape.kind) {
     case 'line':
     case 'arrow':
-      return { ...shape, x1: sx(shape.x1), y1: sy(shape.y1), x2: sx(shape.x2), y2: sy(shape.y2) };
+      return { ...shape, scale, x1: sx(shape.x1), y1: sy(shape.y1), x2: sx(shape.x2), y2: sy(shape.y2) };
     case 'rect':
     case 'image':
-      return { ...shape, x: sx(shape.x), y: sy(shape.y), width: shape.width * factor, height: shape.height * factor };
+      return { ...shape, scale, x: sx(shape.x), y: sy(shape.y), width: shape.width * factor, height: shape.height * factor };
     case 'circle':
-      return { ...shape, cx: sx(shape.cx), cy: sy(shape.cy), radius: shape.radius * factor };
+      return { ...shape, scale, cx: sx(shape.cx), cy: sy(shape.cy), radius: shape.radius * factor };
     case 'arc':
-      return { ...shape, cx: sx(shape.cx), cy: sy(shape.cy), radius: shape.radius * factor };
+      return { ...shape, scale, cx: sx(shape.cx), cy: sy(shape.cy), radius: shape.radius * factor };
     case 'text':
-      return { ...shape, x: sx(shape.x), y: sy(shape.y), fontSize: shape.fontSize * factor };
+      return { ...shape, scale, x: sx(shape.x), y: sy(shape.y), fontSize: shape.fontSize * factor };
     case 'ellipse':
-      return { ...shape, cx: sx(shape.cx), cy: sy(shape.cy), radiusX: shape.radiusX * factor, radiusY: shape.radiusY * factor };
+      return { ...shape, scale, cx: sx(shape.cx), cy: sy(shape.cy), radiusX: shape.radiusX * factor, radiusY: shape.radiusY * factor };
     case 'polygon':
-      return { ...shape, points: shape.points.map((p) => ({ x: sx(p.x), y: sy(p.y) })) };
+      return { ...shape, scale, points: shape.points.map((p) => ({ x: sx(p.x), y: sy(p.y) })) };
   }
 }
 
