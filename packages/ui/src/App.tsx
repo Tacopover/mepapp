@@ -433,6 +433,14 @@ export function MepSketchApp({
           seed: {
             ...definition,
             id: crypto.randomUUID(),
+            // A straight-through save (name untouched) would otherwise show two tiles sharing the
+            // library original's exact name — the read-only library entry can never be the thing
+            // that gets overwritten, so the copy needs its own name from the start. labelNl is
+            // dropped too: a 'custom' definition's label is meant to stay fixed regardless of the
+            // language toggle (see StampsPanel's stampLabelFor doc comment), so carrying the
+            // library original's Dutch translation forward here would defeat that.
+            label: `${definition.label} Copy`,
+            labelNl: undefined,
             iconRef,
             source: 'custom',
             ports: definition.ports.map((port) => ({ ...port })),
@@ -578,9 +586,15 @@ export function MepSketchApp({
   const [forcedTabId, setForcedTabId] = useState<string | null>(null);
   const [forcedTabNonce, setForcedTabNonce] = useState(0);
   useEffect(() => {
+    // Placing a stamp auto-selects it (see SketchScene.placeStamp), which would otherwise force-jump
+    // the dock to Properties mid-placement — annoying while place-terminal/place-equipment (or any
+    // other active tool) stays armed for repeated placement. Only jump when the user isn't in an
+    // active tool (i.e. back on 'select'), matching the moment a selection change actually reflects
+    // a deliberate pick rather than a placement side-effect.
+    if (tool !== 'select') return;
     setForcedTabId(selection.length > 0 || selectedSegment ? 'properties' : null);
     setForcedTabNonce((n) => n + 1);
-  }, [selection, selectedSegment]);
+  }, [selection, selectedSegment, tool]);
 
   return (
     <div className="mep-app">

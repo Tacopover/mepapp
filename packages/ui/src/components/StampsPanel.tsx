@@ -85,7 +85,11 @@ export function StampsPanel({
   const definitions = allDefinitions
     .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)
     .filter((def) => def.category === categoryFilter)
-    .filter((def) => trimmedQuery === '' || stampLabelFor(def, labelLanguage).toLowerCase().includes(trimmedQuery));
+    .filter((def) => trimmedQuery === '' || stampLabelFor(def, labelLanguage).toLowerCase().includes(trimmedQuery))
+    // Sorted by displayed label rather than left in library-then-custom-append-order, so a newly
+    // created/duplicated custom element lands in its correct alphabetical spot immediately instead
+    // of always trailing at the bottom of the grid.
+    .sort((a, b) => stampLabelFor(a, labelLanguage).localeCompare(stampLabelFor(b, labelLanguage)));
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
   // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id
