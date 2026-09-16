@@ -393,17 +393,6 @@ export function MepSketchApp({
     await saveAsNewFile(bytes);
   }, [saveAsNewFile, syncAndGetPdfBytes]);
 
-  const handleCustomStampFile = useCallback(
-    async (file: File, category: StampCategory) => {
-      const bitmap = await loadStampBitmap(file);
-      sceneRef.current?.setStampTexture(bitmap);
-      sceneRef.current?.setTool(category === 'equipment' ? 'place-equipment' : 'place-terminal');
-      setActiveDefinitionId(null);
-      setStatus(`Stamp art ready: ${file.name} — click the canvas to place it.`);
-    },
-    [sceneRef],
-  );
-
   const handleStampPick = useCallback((definition: StampDefinition) => {
     setActiveDefinitionId(definition.id);
     setStatus(`${definition.label} ready — click the canvas to place it.`);
@@ -433,13 +422,14 @@ export function MepSketchApp({
           seed: {
             ...definition,
             id: crypto.randomUUID(),
-            // A straight-through save (name untouched) would otherwise show two tiles sharing the
-            // library original's exact name — the read-only library entry can never be the thing
-            // that gets overwritten, so the copy needs its own name from the start. labelNl is
-            // dropped too: a 'custom' definition's label is meant to stay fixed regardless of the
-            // language toggle (see StampsPanel's stampLabelFor doc comment), so carrying the
-            // library original's Dutch translation forward here would defeat that.
-            label: `${definition.label} Copy`,
+            // Keeps the library original's exact name rather than auto-appending "Copy" — most of
+            // the time the user is just re-authoring this stamp in place and saving under the same
+            // name, and ElementEditorDialog's own Name-collision check (against both
+            // customStampDefinitions and STAMP_LIBRARY) blocks a straight-through save if they don't
+            // rename it, asking for a different name instead. labelNl is still dropped: a 'custom'
+            // definition's label is meant to stay fixed regardless of the language toggle (see
+            // StampsPanel's stampLabelFor doc comment), so carrying the library original's Dutch
+            // translation forward here would defeat that.
             labelNl: undefined,
             iconRef,
             source: 'custom',
@@ -544,7 +534,6 @@ export function MepSketchApp({
         onChangeLabelLanguage={handleChangeLabelLanguage}
         activeDefinitionId={activeDefinitionId}
         onPick={handleStampPick}
-        onCustomStampFile={handleCustomStampFile}
         customStampDefinitions={customStampDefinitions}
         onCreateCustomElement={() => setElementEditorTarget({ mode: 'create' })}
         onDuplicateStampDefinition={(definition) => void handleDuplicateStampDefinition(definition)}

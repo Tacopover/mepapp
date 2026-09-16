@@ -1,11 +1,11 @@
 import { useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
 import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
-import { IconFile, IconPencil, IconTrash } from '../icons.js';
+import { IconPencil, IconTrash } from '../icons.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 
@@ -17,7 +17,6 @@ export interface StampsPanelProps {
   onChangeLabelLanguage: (value: StampLabelLanguage) => void;
   activeDefinitionId: string | null;
   onPick: (definition: StampDefinition) => void;
-  onCustomStampFile: (file: File, category: StampCategory) => void;
   /** The active document's user-authored elements (Element Editor dialog) — shown in the grid alongside STAMP_LIBRARY. */
   customStampDefinitions: StampDefinition[];
   onCreateCustomElement: () => void;
@@ -71,7 +70,6 @@ export function StampsPanel({
   onChangeLabelLanguage,
   activeDefinitionId,
   onPick,
-  onCustomStampFile,
   customStampDefinitions,
   onCreateCustomElement,
   onDuplicateStampDefinition,
@@ -213,24 +211,6 @@ export function StampsPanel({
                 )}
               </div>
             ))}
-            <label className="mep-stamp-tile mep-file-btn">
-              <IconFile size={20} />
-              Custom terminal…
-              <input
-                type="file"
-                accept="image/png,image/svg+xml"
-                onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'terminal')}
-              />
-            </label>
-            <label className="mep-stamp-tile mep-file-btn">
-              <IconFile size={20} />
-              Custom equipment…
-              <input
-                type="file"
-                accept="image/png,image/svg+xml"
-                onChange={(e) => e.target.files?.[0] && onCustomStampFile(e.target.files[0], 'equipment')}
-              />
-            </label>
             <button type="button" className="mep-stamp-tile" onClick={onCreateCustomElement}>
               <IconPencil size={20} />
               Create custom element…
