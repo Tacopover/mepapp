@@ -477,6 +477,17 @@ export function MepSketchApp({
     [customStampDefinitions, sceneRef],
   );
 
+  const handleDeleteCustomStampDefinition = useCallback(
+    (definition: StampDefinition) => {
+      const placedCount = allStamps.filter((s) => s.definitionId === definition.id).length;
+      const usageWarning = placedCount > 0 ? ` ${placedCount} placed element${placedCount === 1 ? '' : 's'} on this sheet use it and will keep their current look but lose their icon if this document is reopened later.` : '';
+      if (!window.confirm(`Delete "${definition.label}"? This cannot be undone.${usageWarning}`)) return;
+      sceneRef.current?.removeCustomStampDefinition(definition.id);
+      setStatus(`${definition.label} deleted.`);
+    },
+    [allStamps, sceneRef],
+  );
+
   const handleNetworkTypePick = useCallback(
     (type: NetworkType) => {
       sceneRef.current?.setActiveNetworkType(type);
@@ -537,6 +548,8 @@ export function MepSketchApp({
         customStampDefinitions={customStampDefinitions}
         onCreateCustomElement={() => setElementEditorTarget({ mode: 'create' })}
         onDuplicateStampDefinition={(definition) => void handleDuplicateStampDefinition(definition)}
+        onEditCustomStampDefinition={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
+        onDeleteCustomStampDefinition={handleDeleteCustomStampDefinition}
         resolveIconUrl={resolveStampIconUrl}
         networkTypes={networkTypes}
         activeNetworkTypeId={activeNetworkTypeId}

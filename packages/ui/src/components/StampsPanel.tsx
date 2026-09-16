@@ -5,7 +5,7 @@ import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js'
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
 import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
-import { IconFile, IconPencil } from '../icons.js';
+import { IconFile, IconPencil, IconTrash } from '../icons.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 
@@ -21,8 +21,12 @@ export interface StampsPanelProps {
   /** The active document's user-authored elements (Element Editor dialog) — shown in the grid alongside STAMP_LIBRARY. */
   customStampDefinitions: StampDefinition[];
   onCreateCustomElement: () => void;
-  /** Opens the Element Editor pre-filled from a library stamp (source: 'library') so the user can save it as their own editable custom stamp — see App.tsx's handleDuplicateStampDefinition. Never offered for an already-custom definition; those get "Edit ports…" from a placed instance's Properties panel instead. */
+  /** Opens the Element Editor pre-filled from a library stamp (source: 'library') so the user can save it as their own editable custom stamp — see App.tsx's handleDuplicateStampDefinition. Only offered for a library definition; an already-custom one gets onEditCustomStampDefinition below instead. */
   onDuplicateStampDefinition: (definition: StampDefinition) => void;
+  /** Opens the Element Editor in true edit-in-place mode for an already-custom definition — same target shape as "Edit ports…" from a placed instance's Properties panel (see App.tsx's elementEditorTarget), just reachable straight from the Stamps tab instead of requiring a placed instance first. */
+  onEditCustomStampDefinition: (definitionId: string) => void;
+  /** Removes a custom definition from the active document's palette — see App.tsx's handleDeleteCustomStampDefinition for the confirmation prompt. Never offered for a library definition; those are read-only and not stored per-document. */
+  onDeleteCustomStampDefinition: (definition: StampDefinition) => void;
   /** Resolves a StampDefinition's iconRef to a fetchable URL — apps/web owns where stamp art actually lives. A custom definition's iconRef is already a self-contained `data:` URL (see stamp-library.ts's StampDefinition doc comment) and is used as-is, never passed through this. */
   resolveIconUrl: (iconRef: string) => string;
   /** The active document's own network types — only ones actually picked at least once get an entry here (see SketchScene.setActiveNetworkType). Everything else falls back to NETWORK_TYPE_LIBRARY's default name. */
@@ -71,6 +75,8 @@ export function StampsPanel({
   customStampDefinitions,
   onCreateCustomElement,
   onDuplicateStampDefinition,
+  onEditCustomStampDefinition,
+  onDeleteCustomStampDefinition,
   resolveIconUrl,
   networkTypes,
   activeNetworkTypeId,
@@ -178,6 +184,32 @@ export function StampsPanel({
                   >
                     <IconPencil size={12} />
                   </button>
+                )}
+                {definition.source === 'custom' && (
+                  <>
+                    <button
+                      type="button"
+                      className="mep-stamp-tile-duplicate"
+                      title="Edit stamp…"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditCustomStampDefinition(definition.id);
+                      }}
+                    >
+                      <IconPencil size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      className="mep-stamp-tile-delete"
+                      title="Delete stamp…"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteCustomStampDefinition(definition);
+                      }}
+                    >
+                      <IconTrash size={12} />
+                    </button>
+                  </>
                 )}
               </div>
             ))}

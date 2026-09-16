@@ -1071,6 +1071,15 @@ export class SketchScene {
     this.emitter.emit('customStampDefinitionsChanged', this.doc.customStampDefinitions);
   }
 
+  /** Removes a user-authored element from the active document's palette (Stamps tab's delete button). Any already-placed instances keep rendering as-is (their sprite/texture is already loaded) but lose their icon on the next project reload — loadProjectFromJson already tolerates a stamp whose definitionId no longer resolves ("stamp library changed since this project was saved"), so no extra migration is needed here. No-op if `id` isn't a custom definition in this document. */
+  removeCustomStampDefinition(id: string): void {
+    const index = this.doc.customStampDefinitions.findIndex((def) => def.id === id);
+    if (index === -1) return;
+    this.doc.customStampDefinitions.splice(index, 1);
+    this.markDirty();
+    this.emitter.emit('customStampDefinitionsChanged', this.doc.customStampDefinitions);
+  }
+
   /** Current segment-endpoint snap radius, screen px at zoom 1 — see onDrawSegmentClick. */
   getSnapRadius(): number {
     return this.snapRadiusScreenPx;
