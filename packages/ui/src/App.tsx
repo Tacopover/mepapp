@@ -393,17 +393,6 @@ export function MepSketchApp({
     await saveAsNewFile(bytes);
   }, [saveAsNewFile, syncAndGetPdfBytes]);
 
-  const handleCustomStampFile = useCallback(
-    async (file: File, category: StampCategory) => {
-      const bitmap = await loadStampBitmap(file);
-      sceneRef.current?.setStampTexture(bitmap);
-      sceneRef.current?.setTool(category === 'equipment' ? 'place-equipment' : 'place-terminal');
-      setActiveDefinitionId(null);
-      setStatus(`Stamp art ready: ${file.name} — click the canvas to place it.`);
-    },
-    [sceneRef],
-  );
-
   const handleStampPick = useCallback((definition: StampDefinition) => {
     setActiveDefinitionId(definition.id);
     setStatus(`${definition.label} ready — click the canvas to place it.`);
@@ -433,14 +422,14 @@ export function MepSketchApp({
           seed: {
             ...definition,
             id: crypto.randomUUID(),
-            // A straight-through save (name untouched) would otherwise show two tiles sharing the
-            // library original's exact name — the read-only library entry can never be the thing
-            // that gets overwritten, so the copy needs its own name from the start. labelNl is
-            // dropped too: a 'custom' definition's label is meant to stay fixed regardless of the
-            // language toggle (see StampsPanel's stampLabelFor doc comment), so carrying the
-            // library original's Dutch translation forward here would defeat that.
-            label: `${definition.label} Copy`,
-            labelNl: undefined,
+            // Keeps the library original's exact name rather than auto-appending "Copy" — most of
+            // the time the user is just re-authoring this stamp in place and saving under the same
+            // name, and ElementEditorDialog's own Name-collision check (against both
+            // customStampDefinitions and STAMP_LIBRARY) prompts to overwrite instead of silently
+            // duplicating. labelNl is kept (not stripped) so the dialog's Name field seeds from the
+            // library original's Dutch name when the Stamps tab's language toggle is set to NL —
+            // buildDefinition() never copies labelNl into the saved definition, so this never leaks
+            // into the resulting custom stamp; it only affects what the Name field starts as.
             iconRef,
             source: 'custom',
             ports: definition.ports.map((port) => ({ ...port })),
@@ -475,6 +464,17 @@ export function MepSketchApp({
       setElementEditorTarget(null);
     },
     [customStampDefinitions, sceneRef],
+  );
+
+  const handleDeleteCustomStampDefinition = useCallback(
+    (definition: StampDefinition) => {
+      const placedCount = allStamps.filter((s) => s.definitionId === definition.id).length;
+      const usageWarning = placedCount > 0 ? ` ${placedCount} placed element${placedCount === 1 ? '' : 's'} on this sheet use it and will keep their current look but lose their icon if this document is reopened later.` : '';
+      if (!window.confirm(`Delete "${definition.label}"? This cannot be undone.${usageWarning}`)) return;
+      sceneRef.current?.removeCustomStampDefinition(definition.id);
+      setStatus(`${definition.label} deleted.`);
+    },
+    [allStamps, sceneRef],
   );
 
   const handleNetworkTypePick = useCallback(
@@ -533,10 +533,11 @@ export function MepSketchApp({
         onChangeLabelLanguage={handleChangeLabelLanguage}
         activeDefinitionId={activeDefinitionId}
         onPick={handleStampPick}
-        onCustomStampFile={handleCustomStampFile}
         customStampDefinitions={customStampDefinitions}
         onCreateCustomElement={() => setElementEditorTarget({ mode: 'create' })}
         onDuplicateStampDefinition={(definition) => void handleDuplicateStampDefinition(definition)}
+        onEditCustomStampDefinition={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
+        onDeleteCustomStampDefinition={handleDeleteCustomStampDefinition}
         resolveIconUrl={resolveStampIconUrl}
         networkTypes={networkTypes}
         activeNetworkTypeId={activeNetworkTypeId}

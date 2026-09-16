@@ -54,7 +54,7 @@ describe('serializeProject / loadProject round trip', () => {
       nativeHeight: 10,
       ports: [],
     };
-    const libraryStamp = { ...bareStamp, id: 'st2', definitionId: 'fire-hose-reel' }; // stamp-library.ts: category 'equipment'
+    const libraryStamp = { ...bareStamp, id: 'st2', definitionId: 'air-handling-unit' }; // stamp-library.generated.ts: category 'equipment' — differs from the 'terminal' default, so this proves the lookup actually ran rather than just falling through
     const legacyDoc = {
       schemaVersion: 1,
       networkTypes: [networkType],

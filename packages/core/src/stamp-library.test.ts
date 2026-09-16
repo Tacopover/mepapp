@@ -53,10 +53,10 @@ describe('stamp library', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('fixture-generated entries carry a Dutch label; the hand-typed fire-hose-reel does not', () => {
+  it('the hand-typed fire-hose-reel carries its own Dutch label alongside the fixture-generated entries', () => {
     const pump = getStampDefinition('pump-plumbing');
     expect(pump?.labelNl).toBe('Pomp');
-    expect(getStampDefinition('fire-hose-reel')?.labelNl).toBeUndefined();
+    expect(getStampDefinition('fire-hose-reel')?.labelNl).toBe('Brandslanghaspel');
   });
 
   it('a multi-discipline fixture item (Pump) gets one entry per discipline, same art and ports', () => {

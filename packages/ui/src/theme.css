@@ -865,6 +865,26 @@
   border-color: var(--ink);
   color: var(--ink);
 }
+.mep-stamp-tile-delete {
+  position: absolute;
+  top: 4px;
+  right: 24px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.mep-stamp-tile-delete:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
 
 /* Stamps-panel sub-tabs: Stamps / Network Types, each with the full panel
    height and its own scroll (via the shared .mep-dock-body scroll — see

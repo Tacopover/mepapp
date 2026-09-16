@@ -38,8 +38,9 @@ export const STAMP_LIBRARY: StampDefinition[] = [
   {
     id: 'fire-hose-reel',
     label: 'Fire Hose Reel',
+    labelNl: 'Brandslanghaspel',
     discipline: 'fireProtection',
-    category: 'equipment',
+    category: 'terminal',
     nativeWidth: 48,
     nativeHeight: 48,
     ports: [],
