@@ -10,7 +10,7 @@
 export interface SymbolShapeStyle {
   stroke: string;
   strokeWidth: number;
-  /** null = unfilled (stroke only). Ignored by 'line' and 'arc', which are never filled. */
+  /** null = unfilled (stroke only). Ignored by 'line' and 'arc', which are never filled. Stroke/strokeWidth/fill are all ignored by 'image' too — every SymbolShape still carries a style so call sites (the style toolbar, activeStyle fallback) never need a kind-aware branch. */
   fill: string | null;
 }
 
@@ -36,4 +36,6 @@ export type SymbolShape =
   /** Same two-point shape as 'line', rendered with an arrowhead at (x2,y2). */
   | ({ id: string; kind: 'arrow'; x1: number; y1: number; x2: number; y2: number; style: SymbolShapeStyle } & Rotatable)
   | ({ id: string; kind: 'ellipse'; cx: number; cy: number; radiusX: number; radiusY: number; style: SymbolShapeStyle } & Rotatable)
-  | ({ id: string; kind: 'polygon'; points: { x: number; y: number }[]; style: SymbolShapeStyle } & Rotatable);
+  | ({ id: string; kind: 'polygon'; points: { x: number; y: number }[]; style: SymbolShapeStyle } & Rotatable)
+  /** An imported raster/SVG image placed as a movable/deletable/resizable shape among the others (ports-custom-element-editor-spec.md's Import/Draw merge) — `dataUrl` is the same self-contained `data:` URL convention StampDefinition.iconRef already uses. Same x/y/width/height/rotation shape as 'rect'; `style` is carried but unused (drawSymbolShapes draws the image itself, no stroke/fill). */
+  | ({ id: string; kind: 'image'; dataUrl: string; x: number; y: number; width: number; height: number; style: SymbolShapeStyle } & Rotatable);

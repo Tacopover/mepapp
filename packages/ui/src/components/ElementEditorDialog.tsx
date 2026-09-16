@@ -45,6 +45,7 @@ import {
   gridSnap,
   hitTestSymbolShape,
   isDraftLargeEnough,
+  loadShapeImages,
   mirrorShape,
   normalizeAngle,
   rasterizeSymbolShapes,
@@ -72,6 +73,9 @@ const ROTATE_HANDLE_RADIUS_PX = 6;
 const GEOMETRY_HANDLE_RADIUS_PX = 5;
 const GEOMETRY_HANDLE_HIT_RADIUS_PX = 8;
 const POLYGON_CLOSE_HIT_RADIUS_PX = 10;
+/** Multi-shape-selection scale handle (square, at the selection bounds' bottom-right corner) — same screen-px-constant-size convention as the other handles above. */
+const SCALE_HANDLE_HALF_PX = 5;
+const SCALE_HANDLE_HIT_RADIUS_PX = 8;
 
 /** Zoom/pan range — mirrors packages/render/src/scene.ts's own MIN_ZOOM/MAX_ZOOM convention, tightened since symbol artwork is small and a full PDF page's 0.05–32 range doesn't apply (element-editor-ui-redesign-spec.md §3). */
 const MIN_ZOOM = 0.25;
@@ -125,7 +129,6 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = {
   other: 'Other',
 };
 
-type ArtworkMode = 'import' | 'shapes';
 type ShapeTool = 'select' | 'port' | ShapeDrawTool | 'text' | 'polygon' | 'arcThreePoint';
 
 const SHAPE_TOOLS: { tool: ShapeTool; label: string }[] = [
@@ -172,6 +175,13 @@ function rotateHandlePosition(selected: SymbolShape[], widthPx: number, heightPx
   return { x: b.x + b.width / 2, y: b.y - ROTATE_HANDLE_OFFSET_PX / scale / heightPx };
 }
 
+/** Multi-shape-only scale handle at the selection bounds' bottom-right corner — a single shape already has its own per-kind resize handles (shapeHandles), so this only ever shows once 2+ shapes are selected, dragging to uniformly scale the whole group around selectionPivot (same pivot mirror/rotate/Scale % already use for a group). */
+function scaleHandlePosition(selected: SymbolShape[], widthPx: number, heightPx: number): { x: number; y: number } | null {
+  if (selected.length < 2) return null;
+  const b = selectionBounds(selected, widthPx, heightPx);
+  return { x: b.x + b.width, y: b.y + b.height };
+}
+
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -194,10 +204,12 @@ export interface ElementEditorDialogProps {
 
 /**
  * Element Editor dialog (ports-custom-element-editor-spec.md §5.2 + §5.3) —
- * authors a custom StampDefinition: name/discipline/category, artwork (a
- * raster import, or a vector Shapes-mode drawing canvas rasterized to the
- * same iconRef `data:` URL at save time so every downstream render/placement
- * call site keeps treating artwork as "an image"), and click-to-place ports
+ * authors a custom StampDefinition: name/discipline/category, artwork (one
+ * vector Shapes canvas — drawn shapes, imported images, or both at once,
+ * each import landing as its own movable/deletable/resizable 'image' shape
+ * alongside the rest — rasterized together to the same iconRef `data:` URL
+ * at save time so every downstream render/placement call site keeps
+ * treating artwork as "an image"), and click-to-place ports
  * with drag-to-reposition, double-click-to-rename, and a link-mode toggle
  * for grouping ports that are internally wired together (converted to a real
  * instance-level PortGroup at placement, see SketchScene.placeStamp).
@@ -206,14 +218,6 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   const [name, setName] = useState(definition ? stampLabelFor(definition, labelLanguage ?? 'en') : '');
   const [discipline, setDiscipline] = useState<Discipline>(definition?.discipline ?? 'ventilation');
   const [category, setCategory] = useState<StampCategory>(definition?.category === 'equipment' ? 'equipment' : 'terminal');
-  // A brand-new "Create custom element" (no definition at all) defaults to Shapes mode so it opens
-  // on a ready-to-draw empty canvas, same as editing an existing shapes-based stamp does — Import
-  // mode would otherwise show nothing until the user picks a file. Editing/duplicating a
-  // raster-based definition still defaults to Import so its existing artwork shows immediately.
-  const [mode, setMode] = useState<ArtworkMode>(
-    definition?.shapes && definition.shapes.length > 0 ? 'shapes' : definition ? 'import' : 'shapes',
-  );
-  const [artworkDataUrl, setArtworkDataUrl] = useState<string | null>(mode === 'import' ? (definition?.iconRef ?? null) : null);
   const [nativeWidth, setNativeWidth] = useState(definition?.nativeWidth ?? 48);
   const [nativeHeight, setNativeHeight] = useState(definition?.nativeHeight ?? 48);
   const [ports, setPorts] = useState<PortSpec[]>(definition?.ports ?? []);
@@ -226,12 +230,9 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   /** The fixed-size viewport DOM element (§2/§3) — the coordinate-space reference for fractionFromEvent, wheel-zoom, and pan-drag; distinct from the artwork's own "world" pixel box (canvasWidthPx × canvasHeightPx), which is drawn inside it at the current view.scale/pan. */
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  // Shapes/Ports/Labels tab bar (§2) — Shapes is only ever offered while artwork mode is 'shapes'
-  // (no vector geometry to edit in 'import' mode), so switching mode away from it falls back to Ports.
-  const [activeTab, setActiveTab] = useState<ElementEditorTab>(mode === 'shapes' ? 'shapes' : 'ports');
-  useEffect(() => {
-    if (mode !== 'shapes' && activeTab === 'shapes') setActiveTab('ports');
-  }, [mode, activeTab]);
+  // Shapes/Ports/Labels tab bar (§2) — Shapes and Ports are both always available now that
+  // Import/Draw are merged into one always-on canvas (an imported image is just another shape).
+  const [activeTab, setActiveTab] = useState<ElementEditorTab>('shapes');
 
   // Recomputed as the user edits nativeWidth/nativeHeight so the preview box
   // and canvas stay in sync with the definition's true aspect ratio.
@@ -319,9 +320,19 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     window.addEventListener('pointerup', up);
   }
 
-  // Shapes mode (§5.3) — local undo/redo history, same Command/CommandManager
-  // primitive the rest of the app uses, scoped to just this dialog's canvas.
-  const [shapesManager] = useState(() => new CommandManager<SymbolShape[]>(definition?.shapes ?? []));
+  // Shapes canvas (§5.3) — local undo/redo history, same Command/CommandManager primitive the
+  // rest of the app uses, scoped to just this dialog's canvas. A definition saved before the
+  // Import/Draw merge has an iconRef but no shapes (it was raster-only, no vector source) — seed
+  // one full-canvas 'image' shape from that iconRef so its art becomes an editable/movable/
+  // deletable shape like any newly-imported one, instead of vanishing from the (now sole) canvas.
+  const [shapesManager] = useState(() => {
+    if (definition?.shapes && definition.shapes.length > 0) return new CommandManager<SymbolShape[]>(definition.shapes);
+    if (definition?.iconRef) {
+      const seeded: SymbolShape = { id: crypto.randomUUID(), kind: 'image', dataUrl: definition.iconRef, x: 0, y: 0, width: 1, height: 1, style: DEFAULT_STYLE };
+      return new CommandManager<SymbolShape[]>([seeded]);
+    }
+    return new CommandManager<SymbolShape[]>([]);
+  });
   const [shapes, setShapes] = useState<SymbolShape[]>(shapesManager.getState());
 
   // Unsaved-changes warning (§7) — isDirty is a snapshot diff, not a scattered `dirty = true` flag
@@ -331,7 +342,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // its useRef initializer expression re-evaluates every render (a JS-argument-evaluation quirk),
   // but useRef only keeps the very first result, which is exactly the mount-time snapshot we want.
   function computeSnapshot(): string {
-    return JSON.stringify({ name, discipline, category, mode, artworkDataUrl, nativeWidth, nativeHeight, ports, groups, shapes });
+    return JSON.stringify({ name, discipline, category, nativeWidth, nativeHeight, ports, groups, shapes });
   }
   const initialSnapshotRef = useRef(computeSnapshot());
   const isDirty = computeSnapshot() !== initialSnapshotRef.current;
@@ -397,6 +408,22 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   const selectedShapes = shapes.filter((s) => selectedShapeIds.has(s.id));
   const singleSelectedShape = selectedShapes.length === 1 ? selectedShapes[0] : undefined;
   const activeStyle = selectedShapes[0]?.style ?? defaultStyle;
+
+  // 'image' shapes' art (imageCacheRef, keyed by dataUrl) — the draw effect below needs a
+  // pre-decoded <img> to drawImage() with (see drawSymbolShapes' own doc comment), so any new
+  // dataUrl showing up in `shapes` gets loaded here; imagesLoadedTick bumps once a load lands,
+  // since mutating the ref's Map directly doesn't itself trigger the draw effect to rerun.
+  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [imagesLoadedTick, setImagesLoadedTick] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    void loadShapeImages(shapes, imageCacheRef.current).then(() => {
+      if (!cancelled) setImagesLoadedTick((t) => t + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [shapes]);
 
   function commitShapes(next: SymbolShape[]) {
     shapesManager.execute({ description: 'Edit shape', execute: () => next, undo: () => shapes });
@@ -530,7 +557,6 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // view.scale/pan are baked into the draw transform below instead of a CSS transform on the
   // canvas element, so lines stay crisp at high zoom instead of a scaled bitmap blurring (§3).
   useEffect(() => {
-    if (mode !== 'shapes') return;
     const canvas = shapesCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -565,7 +591,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     const toDraw = draftById
       ? [...shapes.map((s) => draftById.get(s.id) ?? s), ...draftShapes!.filter((s) => !shapes.some((orig) => orig.id === s.id))]
       : shapes;
-    drawSymbolShapes(ctx, toDraw, canvasWidthPx, canvasHeightPx);
+    drawSymbolShapes(ctx, toDraw, canvasWidthPx, canvasHeightPx, imageCacheRef.current);
     for (const shape of toDraw) {
       if (!selectedShapeIds.has(shape.id)) continue;
       const b = symbolShapeBounds(shape, canvasWidthPx, canvasHeightPx);
@@ -623,6 +649,23 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           ctx.arc(geomHandle.x * canvasWidthPx, geomHandle.y * canvasHeightPx, GEOMETRY_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
+          ctx.restore();
+        }
+      }
+      // Scale handle — multi-shape selections only (see scaleHandlePosition's own doc comment).
+      // Drawn as a square (vs. the round geometry/rotate handles) so it reads as a distinct affordance.
+      if (selectedForHandle.length > 1) {
+        const scaleHandle = scaleHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx);
+        if (scaleHandle) {
+          const hx = scaleHandle.x * canvasWidthPx;
+          const hy = scaleHandle.y * canvasHeightPx;
+          const half = SCALE_HANDLE_HALF_PX * chromeScale;
+          ctx.save();
+          ctx.strokeStyle = '#2f6fed';
+          ctx.fillStyle = '#fff';
+          ctx.lineWidth = chromeScale;
+          ctx.fillRect(hx - half, hy - half, half * 2, half * 2);
+          ctx.strokeRect(hx - half, hy - half, half * 2, half * 2);
           ctx.restore();
         }
       }
@@ -690,11 +733,10 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       ctx.restore();
     }
     ctx.restore();
-  }, [mode, shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint, canvasWidthPx, canvasHeightPx, viewportSize, view, defaultStyle]);
+  }, [shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint, canvasWidthPx, canvasHeightPx, viewportSize, view, defaultStyle, imagesLoadedTick]);
 
-  // Delete/Backspace removes the selected shape; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes — only while Shapes mode is active and no text field has focus.
+  // Delete/Backspace removes the selected shape; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes — only while no text field has focus.
   useEffect(() => {
-    if (mode !== 'shapes') return;
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
@@ -724,13 +766,34 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     document.addEventListener('keydown', onKeyDown, { capture: true });
     return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, selectedShapeIds, shapes, polygonDraft, arcThreePointDraft]);
+  }, [selectedShapeIds, shapes, polygonDraft, arcThreePointDraft]);
 
   async function handleArtworkFile(file: File) {
     const [dataUrl, bitmap] = await Promise.all([readAsDataUrl(file), loadStampBitmap(file)]);
-    setArtworkDataUrl(dataUrl);
-    setNativeWidth((bitmap.width * 72) / STAMP_SOURCE_DPI);
-    setNativeHeight((bitmap.height * 72) / STAMP_SOURCE_DPI);
+    const id = crypto.randomUUID();
+    if (shapes.length === 0) {
+      // First content on an empty canvas — the image defines the element's own physical size and
+      // fills the canvas exactly, same as the old Import mode's behavior. nativeSizeRef is updated
+      // in lockstep so the nativeWidth/nativeHeight effect below (which exists to preserve EXISTING
+      // shapes' physical footprint across a manual canvas-size edit) sees no change and skips its
+      // rescale — this image shape already matches the new size 1:1 and doesn't need re-fitting to it.
+      const newWidth = (bitmap.width * 72) / STAMP_SOURCE_DPI;
+      const newHeight = (bitmap.height * 72) / STAMP_SOURCE_DPI;
+      nativeSizeRef.current = { width: newWidth, height: newHeight };
+      setNativeWidth(newWidth);
+      setNativeHeight(newHeight);
+      commitShapes([{ id, kind: 'image', dataUrl, x: 0, y: 0, width: 1, height: 1, style: DEFAULT_STYLE }]);
+    } else {
+      // Importing onto an existing drawing must not resize the canvas out from under it — fit the
+      // image centered within the current canvas box at its own aspect ratio instead (shapeCanvasSize's
+      // own "contain" convention), landing as a new shape the user can then move/resize/delete.
+      const aspect = bitmap.width / bitmap.height;
+      const canvasAspect = canvasWidthPx / canvasHeightPx;
+      const width = Math.min(1, aspect / canvasAspect);
+      const height = Math.min(1, canvasAspect / aspect);
+      commitShapes([...shapes, { id, kind: 'image', dataUrl, x: (1 - width) / 2, y: (1 - height) / 2, width, height, style: DEFAULT_STYLE }]);
+    }
+    setSelectedShapeIds(new Set([id]));
   }
 
   /** Screen px (viewport-relative) → world px (the artwork's own fixed canvasWidthPx/heightPx
@@ -752,11 +815,6 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     setPorts((prev) => [...prev, { id, name: `Port ${prev.length + 1}`, fractionX: x, fractionY: y }]);
   }
 
-  function handlePreviewClick(event: MouseEvent<HTMLDivElement>) {
-    if (mode !== 'import' || !artworkDataUrl) return;
-    const { fractionX, fractionY } = fractionFromEvent(event.clientX, event.clientY);
-    addPortAt(fractionX, fractionY);
-  }
 
   function handleShapesCanvasPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
     const start = fractionFromEvent(event.clientX, event.clientY);
@@ -848,6 +906,48 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           window.addEventListener('pointermove', move);
           window.addEventListener('pointerup', up);
           return;
+        }
+      }
+
+      // Scale handle hit test — multi-shape selections only (scaleHandlePosition returns null for
+      // 0/1 shapes; a single shape already has its own per-kind resize handles below). factor is a
+      // pixel-space distance ratio from the pivot captured once at drag-start (never re-derived from
+      // the shrinking/growing draft), same anchor-captured-once discipline as every other handle here.
+      if (selectedForRotate.length > 1) {
+        const sHandle = scaleHandlePosition(selectedForRotate, canvasWidthPx, canvasHeightPx);
+        if (sHandle) {
+          const handlePxX = sHandle.x * canvasWidthPx;
+          const handlePxY = sHandle.y * canvasHeightPx;
+          const clickPxX = start.fractionX * canvasWidthPx;
+          const clickPxY = start.fractionY * canvasHeightPx;
+          if (Math.hypot(clickPxX - handlePxX, clickPxY - handlePxY) <= SCALE_HANDLE_HIT_RADIUS_PX / view.scale) {
+            const pivot = selectionPivot(selectedForRotate, canvasWidthPx, canvasHeightPx);
+            const pivotPxX = pivot.x * canvasWidthPx;
+            const pivotPxY = pivot.y * canvasHeightPx;
+            const startDistPx = Math.max(1, Math.hypot(handlePxX - pivotPxX, handlePxY - pivotPxY));
+            const move = (ev: PointerEvent) => {
+              const current = fractionFromEvent(ev.clientX, ev.clientY);
+              const currentPxX = current.fractionX * canvasWidthPx;
+              const currentPxY = current.fractionY * canvasHeightPx;
+              const currentDistPx = Math.hypot(currentPxX - pivotPxX, currentPxY - pivotPxY);
+              const factor = Math.max(0.02, currentDistPx / startDistPx);
+              setDraftShapes(selectedForRotate.map((s) => scaleShape(s, factor, pivot.x, pivot.y)));
+            };
+            const up = () => {
+              window.removeEventListener('pointermove', move);
+              window.removeEventListener('pointerup', up);
+              setDraftShapes((current) => {
+                if (current) {
+                  const currentById = new Map(current.map((s) => [s.id, s]));
+                  commitShapes(shapes.map((s) => currentById.get(s.id) ?? s));
+                }
+                return null;
+              });
+            };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+            return;
+          }
         }
       }
 
@@ -1125,7 +1225,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       entry (see handleSaveElementDefinition's `isOverwrite` check, keyed on id membership). */
   const [pendingOverwrite, setPendingOverwrite] = useState<{ built: StampDefinition; existingId: string; existingLabel: string } | null>(null);
 
-  function buildDefinition(): StampDefinition | null {
+  async function buildDefinition(): Promise<StampDefinition | null> {
     if (!name.trim()) {
       setError('Name is required.');
       return null;
@@ -1134,22 +1234,13 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       setError('Width and height are required.');
       return null;
     }
-    let iconRef: string;
-    if (mode === 'shapes') {
-      if (shapes.length === 0) {
-        setError('Draw at least one shape, or switch to Import image.');
-        return null;
-      }
-      const widthPx = (nativeWidth / 72) * STAMP_SOURCE_DPI;
-      const heightPx = (nativeHeight / 72) * STAMP_SOURCE_DPI;
-      iconRef = rasterizeSymbolShapes(shapes, widthPx, heightPx);
-    } else {
-      if (!artworkDataUrl) {
-        setError('Artwork is required.');
-        return null;
-      }
-      iconRef = artworkDataUrl;
+    if (shapes.length === 0) {
+      setError('Draw at least one shape, or import an image.');
+      return null;
     }
+    const widthPx = (nativeWidth / 72) * STAMP_SOURCE_DPI;
+    const heightPx = (nativeHeight / 72) * STAMP_SOURCE_DPI;
+    const iconRef = await rasterizeSymbolShapes(shapes, widthPx, heightPx);
     return {
       id: definition?.id ?? crypto.randomUUID(),
       label: name.trim(),
@@ -1161,13 +1252,13 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       iconRef,
       source: 'custom',
       definitionPortGroups: groups.length > 0 ? groups : undefined,
-      shapes: mode === 'shapes' ? shapes : undefined,
+      shapes,
     };
   }
 
-  function handleSave() {
+  async function handleSave() {
     setError(null);
-    const built = buildDefinition();
+    const built = await buildDefinition();
     if (!built) return;
     // A different existing custom element already has this Name — saving straight through would
     // silently add a second element sharing it (the original bug report). Ask before overwriting
@@ -1250,21 +1341,6 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
               </button>
             ))}
           </div>
-          <div className="mep-seg2">
-            <button type="button" className={mode === 'import' ? 'on' : ''} onClick={() => setMode('import')}>
-              Import
-            </button>
-            <button
-              type="button"
-              className={mode === 'shapes' ? 'on' : ''}
-              onClick={() => {
-                setMode('shapes');
-                setActiveTab('shapes');
-              }}
-            >
-              Draw
-            </button>
-          </div>
           <div className="mep-ee-header-wh">
             <label>
               W <input type="number" min={1} value={nativeWidth} onChange={(e) => setNativeWidth(Number(e.target.value))} />
@@ -1273,24 +1349,20 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
               H <input type="number" min={1} value={nativeHeight} onChange={(e) => setNativeHeight(Number(e.target.value))} />
             </label>
           </div>
-          {mode === 'import' && (
-            <label className="mep-stamp-tile mep-file-btn mep-ee-header-import">
-              {artworkDataUrl ? 'Replace image…' : 'Import image…'}
-              <input
-                type="file"
-                accept="image/png,image/svg+xml"
-                onChange={(e) => e.target.files?.[0] && void handleArtworkFile(e.target.files[0])}
-              />
-            </label>
-          )}
+          <label className="mep-stamp-tile mep-file-btn mep-ee-header-import">
+            Import image…
+            <input
+              type="file"
+              accept="image/png,image/svg+xml"
+              onChange={(e) => e.target.files?.[0] && void handleArtworkFile(e.target.files[0])}
+            />
+          </label>
         </div>
 
         <div className="mep-subtabs">
-          {mode === 'shapes' && (
-            <button type="button" className={activeTab === 'shapes' ? 'on' : ''} onClick={() => setActiveTab('shapes')}>
-              Shapes
-            </button>
-          )}
+          <button type="button" className={activeTab === 'shapes' ? 'on' : ''} onClick={() => setActiveTab('shapes')}>
+            Shapes
+          </button>
           <button type="button" className={activeTab === 'ports' ? 'on' : ''} onClick={() => setActiveTab('ports')}>
             Ports
           </button>
@@ -1300,7 +1372,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
         </div>
 
         <div className="mep-ee-grid">
-          {mode === 'shapes' && activeTab === 'shapes' && (
+          {activeTab === 'shapes' && (
             <div className="mep-ee-rail" style={{ gridColumn: '1 / 2' }}>
               {SHAPE_TOOLS.map(({ tool: t, label }) => {
                 const Icon = SHAPE_TOOL_ICONS[t];
@@ -1324,18 +1396,14 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
             <div
               className="mep-element-editor-preview"
               ref={viewportRef}
-              onClick={handlePreviewClick}
               onPointerDown={handleViewportPointerDown}
               onContextMenu={(e) => e.preventDefault()}
             >
-              {mode === 'shapes' && (
-                <canvas ref={shapesCanvasRef} onPointerDown={handleShapesCanvasPointerDown} onPointerMove={handleShapesCanvasPointerMove} onDoubleClick={handleShapesCanvasDoubleClick} />
-              )}
+              <canvas ref={shapesCanvasRef} onPointerDown={handleShapesCanvasPointerDown} onPointerMove={handleShapesCanvasPointerMove} onDoubleClick={handleShapesCanvasDoubleClick} />
               <div
                 className="mep-ee-artwork"
                 style={{ width: canvasWidthPx, height: canvasHeightPx, transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.scale})` }}
               >
-                {mode === 'import' && artworkDataUrl && <img src={artworkDataUrl} alt="" />}
                 {ports.map((port) => (
                   <div
                     key={port.id}
@@ -1394,12 +1462,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           <div className="mep-ee-sidebar" style={{ gridColumn: '3 / 4' }}>
             {activeTab === 'ports' && (
               <>
-                <p className="mep-hint">
-                  {mode === 'import'
-                    ? 'Click the preview to add a port.'
-                    : 'Use the Port tool on the Shapes tab to add a port.'}{' '}
-                  Drag a port to move it. Double-click a port to rename it.
-                </p>
+                <p className="mep-hint">Use the Port tool on the Shapes tab to add a port. Drag a port to move it. Double-click a port to rename it.</p>
                 {ports.length > 0 && (
                   <div className="mep-section">
                     <h4>Ports</h4>
@@ -1451,7 +1514,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           </div>
         </div>
 
-        {mode === 'shapes' && activeTab === 'shapes' && (
+        {activeTab === 'shapes' && (
           <div className="mep-ee-bar">
             <div className="mep-ee-bar-cluster mep-shape-style-row">
               <label>

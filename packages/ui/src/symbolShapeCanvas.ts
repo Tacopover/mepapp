@@ -19,6 +19,8 @@ function shapeCenter(shape: SymbolShape): { x: number; y: number } {
     case 'arc':
     case 'ellipse':
       return { x: shape.cx, y: shape.cy };
+    case 'image':
+      return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
     case 'text': {
       const width = shape.text.length * shape.fontSize * 0.6;
       return { x: shape.x + width / 2, y: shape.y + shape.fontSize / 2 };
@@ -62,7 +64,14 @@ function aabbOfPoints(points: { x: number; y: number }[]): { x: number; y: numbe
   return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
 }
 
-export function drawSymbolShapes(ctx: CanvasRenderingContext2D, shapes: SymbolShape[], widthPx: number, heightPx: number): void {
+/**
+ * `imageCache` resolves an 'image' shape's `dataUrl` to an already-decoded `<img>` — canvas
+ * drawImage() needs a loaded element, not a data: URL string, and this draw call is itself
+ * synchronous (called every render frame), so it can't await a load mid-draw. A shape whose
+ * dataUrl isn't in the cache yet (or omitted entirely) draws as a dashed placeholder rect
+ * instead — see loadShapeImages for how the cache gets populated.
+ */
+export function drawSymbolShapes(ctx: CanvasRenderingContext2D, shapes: SymbolShape[], widthPx: number, heightPx: number, imageCache?: Map<string, HTMLImageElement>): void {
   for (const shape of shapes) {
     ctx.save();
     const rotation = shape.rotation ?? 0;
@@ -149,18 +158,65 @@ export function drawSymbolShapes(ctx: CanvasRenderingContext2D, shapes: SymbolSh
         if (shape.style.fill) ctx.fill();
         ctx.stroke();
         break;
+      case 'image': {
+        const ix = shape.x * widthPx;
+        const iy = shape.y * heightPx;
+        const iw = shape.width * widthPx;
+        const ih = shape.height * heightPx;
+        const img = imageCache?.get(shape.dataUrl);
+        if (img && img.complete && img.naturalWidth > 0) {
+          ctx.drawImage(img, ix, iy, iw, ih);
+        } else {
+          ctx.save();
+          ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = '#9aa5ab';
+          ctx.strokeRect(ix, iy, iw, ih);
+          ctx.restore();
+        }
+        break;
+      }
     }
     ctx.restore();
   }
 }
 
-export function rasterizeSymbolShapes(shapes: SymbolShape[], widthPx: number, heightPx: number): string {
+/**
+ * Loads every distinct 'image' shape's `dataUrl` not already in `cache` into it, as decoded
+ * `<img>` elements ready for drawSymbolShapes's ctx.drawImage(). A failed load is swallowed
+ * (the shape just keeps drawing as the placeholder rect) rather than rejecting the whole batch.
+ */
+export async function loadShapeImages(shapes: SymbolShape[], cache: Map<string, HTMLImageElement>): Promise<void> {
+  const urls = new Set<string>();
+  for (const shape of shapes) {
+    if (shape.kind === 'image' && !cache.has(shape.dataUrl)) urls.add(shape.dataUrl);
+  }
+  if (urls.size === 0) return;
+  await Promise.all(
+    [...urls].map(
+      (url) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            cache.set(url, img);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = url;
+        }),
+    ),
+  );
+}
+
+/** Rasterizes to a flat PNG `data:` URL — awaits every 'image' shape's own art decoding first (see loadShapeImages) since the actual draw pass is synchronous. Called once at save time, so a fresh local cache (rather than a shared one) is fine. */
+export async function rasterizeSymbolShapes(shapes: SymbolShape[], widthPx: number, heightPx: number): Promise<string> {
+  const cache = new Map<string, HTMLImageElement>();
+  await loadShapeImages(shapes, cache);
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(widthPx));
   canvas.height = Math.max(1, Math.round(heightPx));
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context unavailable for shape rasterization');
-  drawSymbolShapes(ctx, shapes, canvas.width, canvas.height);
+  drawSymbolShapes(ctx, shapes, canvas.width, canvas.height, cache);
   return canvas.toDataURL('image/png');
 }
 
@@ -224,6 +280,10 @@ export function hitTestSymbolShape(shapes: SymbolShape[], fractionX: number, fra
         }
         if (minDist <= tolerancePx) return shape;
       }
+    } else if (shape.kind === 'image') {
+      const ix = shape.x * widthPx;
+      const iy = shape.y * heightPx;
+      if (x >= ix && x <= ix + shape.width * widthPx && y >= iy && y <= iy + shape.height * heightPx) return shape;
     }
   }
   return null;
@@ -259,7 +319,8 @@ export function symbolShapeBounds(shape: SymbolShape, widthPx: number, heightPx:
       const center = shapeCenter(shape);
       return aabbOfPoints([rotatePoint(shape.x1, shape.y1, center.x, center.y, rotation), rotatePoint(shape.x2, shape.y2, center.x, center.y, rotation)]);
     }
-    case 'rect': {
+    case 'rect':
+    case 'image': {
       if (rotation === 0) return { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
       const center = shapeCenter(shape);
       const corners = [
@@ -345,6 +406,7 @@ export function shapeHandles(shape: SymbolShape, widthPx: number, heightPx: numb
         { id: 'p2', ...toScreen(shape.x2, shape.y2) },
       ];
     case 'rect':
+    case 'image':
       return [
         { id: 'tl', ...toScreen(shape.x, shape.y) },
         { id: 'tr', ...toScreen(shape.x + shape.width, shape.y) },
@@ -427,7 +489,8 @@ export function applyHandleDrag(
     case 'line':
     case 'arrow':
       return handleId === 'p1' ? { ...originalShape, x1: local.x, y1: local.y } : { ...originalShape, x2: local.x, y2: local.y };
-    case 'rect': {
+    case 'rect':
+    case 'image': {
       const opposite =
         handleId === 'tl'
           ? { x: originalShape.x + originalShape.width, y: originalShape.y + originalShape.height }
@@ -530,6 +593,10 @@ export function updateDraftShape(
     }
     case 'polygon':
       return draft;
+    case 'image':
+      // Unreachable via the draft-shape flow — an image shape is created directly from an
+      // imported file, not via a drag-to-create tool (there's no 'image' entry in ShapeDrawTool).
+      return draft;
   }
 }
 
@@ -551,6 +618,9 @@ export function isDraftLargeEnough(draft: SymbolShape): boolean {
       return draft.radiusX >= MIN_FRACTION && draft.radiusY >= MIN_FRACTION;
     case 'polygon':
       // Unreachable via the draft-shape flow — Polygon uses its own click-accumulate state instead.
+      return true;
+    case 'image':
+      // Unreachable via the draft-shape flow — see updateDraftShape's own 'image' case.
       return true;
   }
 }
@@ -582,7 +652,8 @@ export function mirrorShape(shape: SymbolShape, axis: 'horizontal' | 'vertical',
     case 'line':
     case 'arrow':
       return { ...shape, x1: mx(shape.x1), y1: my(shape.y1), x2: mx(shape.x2), y2: my(shape.y2), rotation };
-    case 'rect': {
+    case 'rect':
+    case 'image': {
       const x1 = mx(shape.x);
       const y1 = my(shape.y);
       const x2 = mx(shape.x + shape.width);
@@ -621,6 +692,7 @@ export function scaleShape(shape: SymbolShape, factor: number, pivotX: number, p
     case 'arrow':
       return { ...shape, x1: sx(shape.x1), y1: sy(shape.y1), x2: sx(shape.x2), y2: sy(shape.y2) };
     case 'rect':
+    case 'image':
       return { ...shape, x: sx(shape.x), y: sy(shape.y), width: shape.width * factor, height: shape.height * factor };
     case 'circle':
       return { ...shape, cx: sx(shape.cx), cy: sy(shape.cy), radius: shape.radius * factor };
@@ -656,6 +728,7 @@ export function rescaleShapeForCanvasResize(shape: SymbolShape, sx: number, sy: 
     case 'arrow':
       return { ...shape, style, x1: shape.x1 * sx, y1: shape.y1 * sy, x2: shape.x2 * sx, y2: shape.y2 * sy };
     case 'rect':
+    case 'image':
       return { ...shape, style, x: shape.x * sx, y: shape.y * sy, width: shape.width * sx, height: shape.height * sy };
     case 'circle':
     case 'arc':
@@ -674,6 +747,7 @@ export function translateShape(shape: SymbolShape, dx: number, dy: number): Symb
     case 'line':
       return { ...shape, x1: shape.x1 + dx, y1: shape.y1 + dy, x2: shape.x2 + dx, y2: shape.y2 + dy };
     case 'rect':
+    case 'image':
       return { ...shape, x: shape.x + dx, y: shape.y + dy };
     case 'circle':
     case 'arc':
@@ -809,6 +883,7 @@ export function collectSnapPoints(shapes: SymbolShape[], excludeId: string): Sna
         points.push({ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }, { x: (shape.x1 + shape.x2) / 2, y: (shape.y1 + shape.y2) / 2 });
         break;
       case 'rect':
+      case 'image':
         points.push(
           { x: shape.x, y: shape.y },
           { x: shape.x + shape.width, y: shape.y },
