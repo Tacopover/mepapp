@@ -31,6 +31,12 @@ function shapeCenter(shape: SymbolShape): { x: number; y: number } {
   }
 }
 
+/** Reduces any angle to its canonical [0, 2π) representative. */
+export function normalizeAngle(a: number): number {
+  const twoPi = Math.PI * 2;
+  return ((a % twoPi) + twoPi) % twoPi;
+}
+
 /** The representative of `raw`'s angle class (mod 2π) that's within π of `reference` — keeps a dragged angle continuous with its own prior value instead of jumping by a spurious multiple of 2π. */
 function unwrapAngle(raw: number, reference: number): number {
   const twoPi = Math.PI * 2;
@@ -388,7 +394,29 @@ export function shapeHandles(shape: SymbolShape, widthPx: number, heightPx: numb
  * class of bug structurally impossible — the fixed reference point (opposite corner, circle/arc
  * center, or the line/arrow's other endpoint) never moves during the drag.
  */
-export function applyHandleDrag(originalShape: SymbolShape, handleId: string, current: { x: number; y: number }, widthPx: number, heightPx: number): SymbolShape {
+export function applyHandleDrag(
+  originalShape: SymbolShape,
+  handleId: string,
+  current: { x: number; y: number },
+  widthPx: number,
+  heightPx: number,
+  /**
+   * Arc start/end only: the previous frame's own (clamped) sweep — `normalizeAngle(endAngle -
+   * startAngle)` — chained forward frame-to-frame instead of recomputed fresh each time. The
+   * rendered arc only ever depends on this sweep mod 2π, which has a genuine discontinuity right
+   * where the two endpoints coincide: a hair's-width arc and an almost-full circle sit right next
+   * to each other there. Re-deriving the sweep from the raw pointer angle each frame (with no
+   * memory of which side of that seam the drag is on) lets a slow, continuous drag cross it and
+   * have the "big arc" pop back in in a single frame — a *correct* rendering of "the endpoint's raw
+   * angle passed the other endpoint's," but not what shrinking-toward-zero drag was going for.
+   * Clamping the chained sweep just short of 0 and 2π (see MIN_SWEEP below) stops the drag right at
+   * that seam instead of crossing it; dragging back the other way immediately resumes tracking
+   * (nothing pins it beyond the clamp itself), and a large sweep is still fully reachable by
+   * dragging around the *other* side, which never approaches the seam. Omit it (a fresh drag) to
+   * fall back to originalShape's own sweep.
+   */
+  sweepReference?: number,
+): SymbolShape {
   const rotation = originalShape.rotation ?? 0;
   const center = shapeCenter(originalShape);
   // Inverse-rotate the pointer into the shape's local (unrotated) space before computing the update — same convention hitTestSymbolShape uses.
@@ -425,14 +453,19 @@ export function applyHandleDrag(originalShape: SymbolShape, handleId: string, cu
       const dxPx = (local.x - originalShape.cx) * widthPx;
       const dyPx = (local.y - originalShape.cy) * heightPx;
       if (handleId === 'start' || handleId === 'end') {
-        // Unwrap the dragged angle relative to its OWN prior value (not the other endpoint) so a
-        // small drag never jumps by a spurious ±2π — ctx.ellipse itself accepts any real start/end
-        // and always sweeps in the increasing direction, wrapping through 2π as needed, so the two
-        // angles never need to be kept in a particular start<end order here.
-        const raw = Math.atan2(dyPx, dxPx);
-        const reference = handleId === 'start' ? originalShape.startAngle : originalShape.endAngle;
-        const angle = unwrapAngle(raw, reference);
-        return handleId === 'start' ? { ...originalShape, startAngle: angle } : { ...originalShape, endAngle: angle };
+        // Sweep can't reach exactly 0 or 2π — see sweepReference's doc comment for why the clamp
+        // lives here instead of just picking a continuous branch for the raw angle.
+        const MIN_SWEEP = Math.PI / 180; // 1°
+        const twoPi = Math.PI * 2;
+        const fixedAngle = handleId === 'end' ? originalShape.startAngle : originalShape.endAngle;
+        const rawMouseAngle = Math.atan2(dyPx, dxPx);
+        // The sweep implied by the raw mouse angle alone, with no continuity correction — what
+        // ctx.ellipse would actually render if this were used directly.
+        const naiveSweep = handleId === 'end' ? normalizeAngle(rawMouseAngle - fixedAngle) : normalizeAngle(fixedAngle - rawMouseAngle);
+        const previousSweep = sweepReference ?? normalizeAngle(originalShape.endAngle - originalShape.startAngle);
+        const delta = unwrapAngle(naiveSweep, normalizeAngle(previousSweep)) - normalizeAngle(previousSweep);
+        const clampedSweep = Math.min(Math.max(previousSweep + delta, MIN_SWEEP), twoPi - MIN_SWEEP);
+        return handleId === 'end' ? { ...originalShape, endAngle: fixedAngle + clampedSweep } : { ...originalShape, startAngle: fixedAngle - clampedSweep };
       }
       return { ...originalShape, radius: Math.hypot(dxPx, dyPx) / minDim };
     }
@@ -611,24 +644,28 @@ export function scaleShape(shape: SymbolShape, factor: number, pivotX: number, p
  * content stays put, the box around it changes) rather than an "image resize" (content stretches to
  * fill the new box). `sMin` is the same correction for circle/arc radius, which scales by
  * Math.min(widthPx, heightPx) instead (see symbolShapeBounds's own aspect-correction comment);
- * text's fontSize uses `sy` since drawSymbolShapes scales it by heightPx alone.
+ * text's fontSize uses `sy` since drawSymbolShapes scales it by heightPx alone. strokeWidth is
+ * itself a fraction of Math.min(widthPx, heightPx) (same convention as circle/arc radius, see
+ * drawSymbolShapes), so it needs the same `sMin` correction — otherwise a shape's on-screen line
+ * thickness silently changes whenever a canvas resize changes which side is shorter.
  */
 export function rescaleShapeForCanvasResize(shape: SymbolShape, sx: number, sy: number, sMin: number): SymbolShape {
+  const style = { ...shape.style, strokeWidth: shape.style.strokeWidth * sMin };
   switch (shape.kind) {
     case 'line':
     case 'arrow':
-      return { ...shape, x1: shape.x1 * sx, y1: shape.y1 * sy, x2: shape.x2 * sx, y2: shape.y2 * sy };
+      return { ...shape, style, x1: shape.x1 * sx, y1: shape.y1 * sy, x2: shape.x2 * sx, y2: shape.y2 * sy };
     case 'rect':
-      return { ...shape, x: shape.x * sx, y: shape.y * sy, width: shape.width * sx, height: shape.height * sy };
+      return { ...shape, style, x: shape.x * sx, y: shape.y * sy, width: shape.width * sx, height: shape.height * sy };
     case 'circle':
     case 'arc':
-      return { ...shape, cx: shape.cx * sx, cy: shape.cy * sy, radius: shape.radius * sMin };
+      return { ...shape, style, cx: shape.cx * sx, cy: shape.cy * sy, radius: shape.radius * sMin };
     case 'text':
-      return { ...shape, x: shape.x * sx, y: shape.y * sy, fontSize: shape.fontSize * sy };
+      return { ...shape, style, x: shape.x * sx, y: shape.y * sy, fontSize: shape.fontSize * sy };
     case 'ellipse':
-      return { ...shape, cx: shape.cx * sx, cy: shape.cy * sy, radiusX: shape.radiusX * sx, radiusY: shape.radiusY * sy };
+      return { ...shape, style, cx: shape.cx * sx, cy: shape.cy * sy, radiusX: shape.radiusX * sx, radiusY: shape.radiusY * sy };
     case 'polygon':
-      return { ...shape, points: shape.points.map((p) => ({ x: p.x * sx, y: p.y * sy })) };
+      return { ...shape, style, points: shape.points.map((p) => ({ x: p.x * sx, y: p.y * sy })) };
   }
 }
 
@@ -695,7 +732,6 @@ export function arcFromThreePoints(
   if (radius < MIN_RADIUS) return null;
 
   const twoPi = Math.PI * 2;
-  const normalizeAngle = (a: number) => ((a % twoPi) + twoPi) % twoPi;
   const aStart = normalizeAngle(Math.atan2(start.fractionY - cy, start.fractionX - cx));
   const aEnd = normalizeAngle(Math.atan2(end.fractionY - cy, end.fractionX - cx));
   const aThrough = normalizeAngle(Math.atan2(through.fractionY - cy, through.fractionX - cx));
