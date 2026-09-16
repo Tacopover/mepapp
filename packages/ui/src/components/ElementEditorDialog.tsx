@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { CommandManager, type Discipline, type PortSpec, type StampCategory, type StampDefinition, type SymbolShape, type SymbolShapeStyle } from '@mepapp/core';
+import { CommandManager, STAMP_LIBRARY, type Discipline, type PortSpec, type StampCategory, type StampDefinition, type SymbolShape, type SymbolShapeStyle } from '@mepapp/core';
 import { ColorPicker } from './ColorPicker.js';
 import { Dialog } from './Dialog.js';
 import { loadStampBitmap } from '../stampBitmap.js';
@@ -1177,6 +1177,15 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     const collision = existingCustomDefinitions.find((d) => d.id !== built.id && d.label.trim().toLowerCase() === built.label.toLowerCase());
     if (collision) {
       setPendingOverwrite({ built, existingId: collision.id, existingLabel: collision.label });
+      return;
+    }
+    // The Name field can also be edited back onto a read-only STAMP_LIBRARY entry's name (e.g.
+    // clearing the " Copy" suffix a duplicate starts with) — there's no document-side element to
+    // overwrite there, only a hardcoded library entry, so this can't become an update-in-place the
+    // way the collision above does. Block the save instead of silently adding a same-named stamp.
+    const libraryCollision = STAMP_LIBRARY.find((d) => d.label.trim().toLowerCase() === built.label.toLowerCase());
+    if (libraryCollision) {
+      setError(`"${libraryCollision.label}" is already a stamp library element. Choose a different name.`);
       return;
     }
     onSave(built);
