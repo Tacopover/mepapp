@@ -1,5 +1,24 @@
 # Snap-to-object alignment guides + angle-snap for segment drawing
 
+**Status: DONE (2026-09-17).** Implemented on branch `worktree-snap-alignment-and-angle-snap`,
+commit `df696d9`. Built exactly as specced below, no deviations. `resolveSnappedPoint`
+now dispatches by `kind`: draw-segment routes through the new `angleSnap.ts`
+(`resolveAngleSnap`, anchor + increment + shiftKey-disables), move-selection routes
+through the new `alignmentGuides.ts` (`resolveAlignmentSnap`, edges+centers, independent
+X/Y). The one implementation detail not spelled out below: the alignment guide state
+(matched line(s) to render, plus the selection's bounds captured once at gesture start)
+lives as two new fields directly on `move-selection`'s `DragState` variant
+(`selectionBoundsAtStart`, `guides`) rather than new `ToolContext` methods — mutated in
+place each frame, the same pattern the existing `moved` flag already uses; `redrawOverlay`
+reads `this.drag.guides` directly, same as its other `this.drag.kind === '...'` branches.
+Verification: `pnpm build` (root, all 9 workspace packages) passes clean.
+`pnpm --filter @mepapp/core test` (134 tests, unmodified) passes — no core package
+changes were needed, since both new helpers depend on render-only types (`ToolContext`,
+`DrawingState`) and correctly live in `packages/render/src/tools/`, not `packages/core`.
+**Not verified**: actual in-browser interaction (dragging, drawing, watching a guide line
+render, Shift behavior) — no browser was available this session. See "Verification" below
+for the manual checklist still to run in `apps/web` before merging.
+
 ## Context
 
 The feature atlas has no dedicated "snapping guides/gridlines" entry. Its only related
