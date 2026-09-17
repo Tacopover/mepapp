@@ -19,6 +19,22 @@ changes were needed, since both new helpers depend on render-only types (`ToolCo
 render, Shift behavior) — no browser was available this session. See "Verification" below
 for the manual checklist still to run in `apps/web` before merging.
 
+**Follow-on (2026-09-17, same branch, commit TBD after this edit):** extended
+snap-to-object alignment guides to stamp placement (`place-terminal`/`place-equipment`),
+per user request after trying the first cut. `resolveSnappedPoint` gained a third `kind`,
+`'place-stamp'`: computes a virtual bounding box for the not-yet-placed stamp (new
+`computeStampBoundsWorld` in `alignmentGuides.ts`, same corner/rotation math as
+`SketchScene`'s private `stampCornersWorld` but against a candidate center instead of an
+existing `PlacedStamp`) and runs it through the same `resolveAlignmentSnap` used by
+move-selection — no new alignment logic, just a new bounds source. `SketchScene`'s
+ghost-sprite positioning (`onPointerMove`) now snaps the ghost through this path and
+stores the matched guides in a new `stampGhostGuides` field, rendered in `redrawOverlay`
+identically to `move-selection`'s guides. `PlaceStampTool.onPointerDown` places at the
+same snapped point the ghost showed, so click position matches what was previewed.
+`pnpm build` passes clean (9/9). Not verified in-browser — add "place a stamp near
+another element's edge/center, confirm the ghost snaps and a guide renders" to the manual
+checklist below.
+
 ## Context
 
 The feature atlas has no dedicated "snapping guides/gridlines" entry. Its only related

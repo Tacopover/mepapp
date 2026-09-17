@@ -3,6 +3,7 @@ import { getStampDefinition, normalizeDegrees, type PlacedStamp, type StampCateg
 import { applyStampColor } from '../colorize.js';
 import { createStampCommand } from '../drawingCommands.js';
 import { applyTransformToSprite, computeStampBaseScale } from '../stampSprite.js';
+import { resolveSnappedPoint } from './dragSnap.js';
 import type { Tool, ToolContext } from './types.js';
 
 /**
@@ -22,7 +23,9 @@ export class PlaceStampTool implements Tool {
   onPointerDown(ctx: ToolContext, _event: unknown, world: Vec2): void {
     const pending = ctx.getPendingStampTexture();
     if (!pending) return;
-    this.placeStamp(ctx, world, pending);
+    // Snaps to the same point the ghost preview showed (see SketchScene.onPointerMove), so the placed stamp lands exactly where it looked like it would.
+    const { point } = resolveSnappedPoint(world, { ctx, kind: 'place-stamp' });
+    this.placeStamp(ctx, point, pending);
   }
 
   onKeyDown(ctx: ToolContext, event: KeyboardEvent): boolean {

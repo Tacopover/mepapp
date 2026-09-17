@@ -1,4 +1,4 @@
-import type { Vec2 } from '@mepapp/core';
+import { rotatePointAround, type Vec2 } from '@mepapp/core';
 import type { DrawingState } from '../document.js';
 import type { Bounds, SelectableRef, ToolContext } from './types.js';
 
@@ -104,6 +104,32 @@ export function resolveAlignmentSnap(ctx: ToolContext, state: DrawingState, rawP
   if (guideX) guides.push(guideX);
   if (guideY) guides.push(guideY);
   return { point: { x: rawPoint.x + bestDx, y: rawPoint.y + bestDy }, guides };
+}
+
+/**
+ * World-space bounds of a stamp not yet placed (the placement-preview ghost), given the
+ * center it would land at — same corner/rotation math as SketchScene's private
+ * stampCornersWorld, but against a candidate center instead of an already-placed
+ * PlacedStamp, since the ghost has no id/state entry to look up bounds for.
+ */
+export function computeStampBoundsWorld(center: Vec2, nativeWidth: number, nativeHeight: number, scale: number, rotationDegrees: number): Bounds {
+  const halfWidth = (nativeWidth / 2) * scale;
+  const halfHeight = (nativeHeight / 2) * scale;
+  const corners = [
+    { x: -halfWidth, y: -halfHeight },
+    { x: halfWidth, y: -halfHeight },
+    { x: halfWidth, y: halfHeight },
+    { x: -halfWidth, y: halfHeight },
+  ].map((local) => {
+    const r = rotationDegrees === 0 ? local : rotatePointAround(local, { x: 0, y: 0 }, rotationDegrees);
+    return { x: r.x + center.x, y: r.y + center.y };
+  });
+  return {
+    minX: Math.min(...corners.map((c) => c.x)),
+    minY: Math.min(...corners.map((c) => c.y)),
+    maxX: Math.max(...corners.map((c) => c.x)),
+    maxY: Math.max(...corners.map((c) => c.y)),
+  };
 }
 
 function candidateRefs(state: DrawingState, excludeIds: ReadonlySet<string>): SelectableRef[] {

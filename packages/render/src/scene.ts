@@ -65,6 +65,8 @@ import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import type { DragState, SelectableRef, SketchTool, Tool, ToolContext, ToolDragHandlers } from './tools/types.js';
+import type { AlignmentGuide } from './tools/alignmentGuides.js';
+import { resolveSnappedPoint } from './tools/dragSnap.js';
 import { SelectTool } from './tools/selectTool.js';
 import { DrawSegmentTool } from './tools/drawSegmentTool.js';
 import { DrawPolylineTool } from './tools/drawPolylineTool.js';
@@ -353,6 +355,8 @@ export class SketchScene {
   private stampGhostSprite: Sprite | null = null;
   /** The stamp-placement preview's current rotation (Space advances this by 45°) — persists across repeated placements of the same stamp until Escape, a tool switch, or a different stamp pick resets it to 0. Also becomes the next placed stamp's initial rotationDegrees (see placeStamp). */
   private stampGhostRotationDegrees = 0;
+  /** Alignment guide(s) matched at the ghost's current (snapped) position — see resolveSnappedPoint's 'place-stamp' case. Drawn in redrawOverlay while a place-* tool is active, same as move-selection's drag.guides. */
+  private stampGhostGuides: AlignmentGuide[] = [];
   // Every open document, kept fully resident (sprites/textures/undo history
   // and all) — see decisions log 2026-09-07's multi-document plan, D1.
   // SketchScene renders whichever one is active; switching just reparents
@@ -1862,7 +1866,14 @@ export class SketchScene {
     if (this.stampGhostSprite) {
       const showGhost = this.tool === 'place-terminal' || this.tool === 'place-equipment';
       this.stampGhostSprite.visible = showGhost;
-      if (showGhost) this.stampGhostSprite.position.set(world.x, world.y);
+      if (showGhost) {
+        const { point, guides } = resolveSnappedPoint(world, { ctx: this.ctx, kind: 'place-stamp' });
+        this.stampGhostSprite.position.set(point.x, point.y);
+        this.stampGhostGuides = guides;
+        this.redrawOverlay();
+      } else {
+        this.stampGhostGuides = [];
+      }
     }
 
     this.toolMap.get(this.tool)?.onPointerMoveIdle?.(this.ctx, event, world, screen);
@@ -2390,6 +2401,17 @@ export class SketchScene {
 
     if (this.drag.kind === 'move-selection') {
       for (const guide of this.drag.guides) {
+        if (guide.axis === 'x') {
+          this.overlay.moveTo(guide.value, guide.from).lineTo(guide.value, guide.to);
+        } else {
+          this.overlay.moveTo(guide.from, guide.value).lineTo(guide.to, guide.value);
+        }
+        this.overlay.stroke({ width: 1 / this.world.scale.x, color: 0xff4081 });
+      }
+    }
+
+    if (this.stampGhostSprite?.visible) {
+      for (const guide of this.stampGhostGuides) {
         if (guide.axis === 'x') {
           this.overlay.moveTo(guide.value, guide.from).lineTo(guide.value, guide.to);
         } else {
