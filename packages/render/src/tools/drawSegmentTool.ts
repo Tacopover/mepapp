@@ -1,3 +1,4 @@
+import type { FederatedPointerEvent } from 'pixi.js';
 import {
   CompositeCommand,
   getStampPorts,
@@ -55,13 +56,14 @@ export class DrawSegmentTool implements Tool {
     return this.activeChainAnchorId;
   }
 
-  onPointerDown(ctx: ToolContext, _event: unknown, world: Vec2): void {
-    this.onDrawSegmentClick(ctx, world);
+  onPointerDown(ctx: ToolContext, event: FederatedPointerEvent, world: Vec2): void {
+    this.onDrawSegmentClick(ctx, world, event.shiftKey);
   }
 
-  onPointerMoveIdle(ctx: ToolContext, _event: unknown, world: Vec2): void {
+  onPointerMoveIdle(ctx: ToolContext, event: FederatedPointerEvent, world: Vec2): void {
     if (!this.pendingStart) return;
-    this.pendingCursor = resolveSnappedPoint(world, { ctx, kind: 'draw-segment' });
+    const { point } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart.worldPosition, shiftKey: event.shiftKey });
+    this.pendingCursor = point;
     ctx.redrawOverlay();
   }
 
@@ -85,14 +87,14 @@ export class DrawSegmentTool implements Tool {
     this.activeChainAnchorId = null;
   }
 
-  private onDrawSegmentClick(ctx: ToolContext, world: Vec2): void {
+  private onDrawSegmentClick(ctx: ToolContext, world: Vec2, shiftKey: boolean): void {
     const snapRadius = ctx.getSnapRadiusScreenPx() / ctx.getZoomScale();
     const state = ctx.doc.drawingHistory.getState();
     const stamps = Object.values(state.stamps);
     const segments = Object.values(state.segments);
     const fittings = Object.values(state.fittings);
 
-    const snappedWorld = resolveSnappedPoint(world, { ctx, kind: 'draw-segment' });
+    const { point: snappedWorld } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart?.worldPosition, shiftKey });
     const target = resolveSegmentEndpoint(snappedWorld, stamps, fittings, segments, { radius: snapRadius });
     const resolved = this.resolveDrawTarget(ctx, target);
 

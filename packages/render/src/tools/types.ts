@@ -1,7 +1,16 @@
 import type { FederatedPointerEvent, Sprite, Texture } from 'pixi.js';
 import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, Transaction, Transform2D, Vec2 } from '@mepapp/core';
+import type { AlignmentGuide } from './alignmentGuides.js';
 import type { DrawingState, SketchDocument } from '../document.js';
 import type { StampInfo } from '../scene.js';
+
+/** A world-space axis-aligned bounding box. */
+export interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
 
 export type SketchTool =
   | 'select'
@@ -42,6 +51,10 @@ export type DragState =
       reopenTextEditId: string | null;
       /** True once onPointerMove has actually applied a delta — a plain click never sets this, since a real pointermove never fires for zero on-screen movement. Gates whether onPointerUp commits anything. */
       moved: boolean;
+      /** The selection's own bounds at gesture start, captured once — snap-to-object shifts this by the frame's raw delta rather than recomputing per-element every frame. Null when the selection has nothing with resolvable bounds. */
+      selectionBoundsAtStart: Bounds | null;
+      /** Alignment guide line(s) matched on the current frame, for redrawOverlay to draw — mutated in place each onMove, same pattern as `moved`. Empty when nothing is currently snapped. */
+      guides: AlignmentGuide[];
     }
   | {
       kind: 'rotate-selection';
@@ -102,6 +115,8 @@ export interface ToolContext {
 
   getActiveNetworkTypeId(): string;
   getSnapRadiusScreenPx(): number;
+  /** Degrees a segment's heading snaps to while drawing (0/45/90° by default) — Settings-configurable, Shift disables it for the current drag. */
+  getAngleSnapDegrees(): number;
 
   /** The stamp-placement preview sprite/state, shared across place-terminal/place-equipment — see SketchScene's stamp-ghost fields. */
   getPendingStampTexture(): {

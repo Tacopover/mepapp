@@ -10,6 +10,7 @@ import {
   type Vec2,
 } from '@mepapp/core';
 import type { DrawingState } from '../document.js';
+import { computeSelectionBoundsWorld } from './alignmentGuides.js';
 import { resolveSnappedPoint } from './dragSnap.js';
 import type { AnnotationSnapshot, SelectableRef, Tool, ToolContext } from './types.js';
 
@@ -140,6 +141,8 @@ export class SelectTool implements Tool {
         drawingTx: hasDrawingChanges ? new Transaction(ctx.doc.drawingHistory, 'Move selection') : null,
         reopenTextEditId: alreadySoleSelected && isTextEditable ? hit.id : null,
         moved: false,
+        selectionBoundsAtStart: computeSelectionBoundsWorld(ctx, ctx.doc.selectedIds, state),
+        guides: [],
       };
       ctx.syncDrawingLayer();
       ctx.redrawOverlay();
@@ -161,7 +164,8 @@ export class SelectTool implements Tool {
         const drag = ctx.drag;
         if (drag.kind !== 'move-selection') return;
         drag.moved = true;
-        const world = resolveSnappedPoint(rawWorld, { ctx, kind: 'move-selection' });
+        const { point: world, guides } = resolveSnappedPoint(rawWorld, { ctx, kind: 'move-selection' });
+        drag.guides = guides;
         const dx = world.x - drag.startPointerWorld.x;
         const dy = world.y - drag.startPointerWorld.y;
         if (drag.drawingTx) {
@@ -211,7 +215,7 @@ export class SelectTool implements Tool {
         const drag = ctx.drag;
         if (drag.kind !== 'rotate-selection') return;
         drag.moved = true;
-        const world = resolveSnappedPoint(rawWorld, { ctx, kind: 'rotate-selection' });
+        const { point: world } = resolveSnappedPoint(rawWorld, { ctx, kind: 'rotate-selection' });
         const currentAngle = angleDegrees(drag.pivot, world);
         const rawDelta = currentAngle - drag.startPointerAngleDeg;
         const delta = event.shiftKey ? rawDelta : snapToNearest(rawDelta, ROTATE_SNAP_DEGREES);
@@ -257,7 +261,7 @@ export class SelectTool implements Tool {
         drag.moved = true;
         const { id, corner, original, tx } = drag;
         if (original.kind !== 'rectangle' && original.kind !== 'highlight') return; // always true by construction — see onPointerDown's resize-handle branch
-        const world = resolveSnappedPoint(rawWorld, { ctx, kind: 'resize-rect' });
+        const { point: world } = resolveSnappedPoint(rawWorld, { ctx, kind: 'resize-rect' });
         const fixed =
           corner === 'x0y0'
             ? { x: original.rect.x1, y: original.rect.y1 }
@@ -288,7 +292,7 @@ export class SelectTool implements Tool {
         if (drag.kind !== 'resize-circle') return;
         drag.moved = true;
         const { id, center, tx } = drag;
-        const world = resolveSnappedPoint(rawWorld, { ctx, kind: 'resize-circle' });
+        const { point: world } = resolveSnappedPoint(rawWorld, { ctx, kind: 'resize-circle' });
         const radius = Math.max(0, Math.hypot(world.x - center.x, world.y - center.y));
         tx.update((state: DrawingState) => {
           const annotation = state.annotations[id];

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
-import { DEFAULT_SNAP_RADIUS_SCREEN_PX } from '@mepapp/render';
+import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { loadStampBitmap } from './stampBitmap.js';
@@ -15,7 +15,7 @@ import { DrawingsPanel } from './components/DrawingsPanel.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { Dialog } from './components/Dialog.js';
-import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX } from './components/SettingsDialog.js';
+import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
@@ -64,6 +64,7 @@ function supportsFileSystemAccess(): boolean {
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
 
 const SNAP_RADIUS_STORAGE_KEY = 'mepapp.settings.snapRadiusPx.v1';
+const ANGLE_SNAP_STORAGE_KEY = 'mepapp.settings.angleSnapDegrees.v1';
 const LABEL_LANGUAGE_STORAGE_KEY = 'mepapp.settings.labelLanguage.v1';
 const ONBOARDING_STORAGE_KEY = 'mepapp.onboarding.seen.v1';
 const CUSTOM_PROPERTIES_STORAGE_KEY = 'mepapp.customProperties.v1';
@@ -165,6 +166,10 @@ export function MepSketchApp({
     const saved = Number(localStorage.getItem(SNAP_RADIUS_STORAGE_KEY));
     return saved >= MIN_SNAP_RADIUS_PX && saved <= MAX_SNAP_RADIUS_PX ? saved : DEFAULT_SNAP_RADIUS_SCREEN_PX;
   });
+  const [angleSnapDegrees, setAngleSnapDegrees] = useState(() => {
+    const saved = Number(localStorage.getItem(ANGLE_SNAP_STORAGE_KEY));
+    return saved >= MIN_ANGLE_SNAP_DEGREES && saved <= MAX_ANGLE_SNAP_DEGREES ? saved : DEFAULT_ANGLE_SNAP_DEGREES;
+  });
   const textboxRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Applies the persisted/user-set snap radius to the scene once it exists
@@ -174,9 +179,19 @@ export function MepSketchApp({
     if (ready) sceneRef.current?.setSnapRadius(snapRadiusPx);
   }, [ready, snapRadiusPx, sceneRef]);
 
+  // Same pattern as snapRadiusPx above, for the segment-drawing angle snap.
+  useEffect(() => {
+    if (ready) sceneRef.current?.setAngleSnapDegrees(angleSnapDegrees);
+  }, [ready, angleSnapDegrees, sceneRef]);
+
   const handleChangeSnapRadiusPx = useCallback((px: number) => {
     setSnapRadiusPx(px);
     localStorage.setItem(SNAP_RADIUS_STORAGE_KEY, String(px));
+  }, []);
+
+  const handleChangeAngleSnapDegrees = useCallback((degrees: number) => {
+    setAngleSnapDegrees(degrees);
+    localStorage.setItem(ANGLE_SNAP_STORAGE_KEY, String(degrees));
   }, []);
 
   const handleChangeLabelLanguage = useCallback((language: StampLabelLanguage) => {
@@ -737,7 +752,13 @@ export function MepSketchApp({
       )}
 
       {settingsOpen && (
-        <SettingsDialog snapRadiusPx={snapRadiusPx} onChangeSnapRadiusPx={handleChangeSnapRadiusPx} onClose={() => setSettingsOpen(false)} />
+        <SettingsDialog
+          snapRadiusPx={snapRadiusPx}
+          onChangeSnapRadiusPx={handleChangeSnapRadiusPx}
+          angleSnapDegrees={angleSnapDegrees}
+          onChangeAngleSnapDegrees={handleChangeAngleSnapDegrees}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
 
       {globalPropertiesOpen && (

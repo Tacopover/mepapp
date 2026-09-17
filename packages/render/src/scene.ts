@@ -197,6 +197,11 @@ const MAX_ZOOM = 32;
 // of starting a new one. User-adjustable via setSnapRadius (Settings dialog).
 export const DEFAULT_SNAP_RADIUS_SCREEN_PX = 12;
 
+// Degrees a segment's heading snaps to while drawing (see dragSnap.ts's
+// resolveSnappedPoint) — Shift disables the snap for the current drag.
+// User-adjustable via setAngleSnapDegrees (Settings dialog).
+export const DEFAULT_ANGLE_SNAP_DEGREES = 45;
+
 // How close a click needs to be to a thin-stroke annotation (line/arrow/
 // freehand/polyline) or a circle's edge to count as a hit — a plain
 // bounding-box test would be far too generous for a 2pt-wide stroke.
@@ -367,6 +372,7 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
+  private angleSnapDegrees = DEFAULT_ANGLE_SNAP_DEGREES;
   private resizeObserver: ResizeObserver | null = null;
 
   // Tool instances owning their own pending/transient gesture state — see
@@ -450,6 +456,7 @@ export class SketchScene {
       },
       getActiveNetworkTypeId: () => self.activeNetworkTypeId,
       getSnapRadiusScreenPx: () => self.snapRadiusScreenPx,
+      getAngleSnapDegrees: () => self.angleSnapDegrees,
       getPendingStampTexture: () => self.pendingStampTexture,
       getStampGhostSprite: () => self.stampGhostSprite,
       getStampGhostRotationDegrees: () => self.stampGhostRotationDegrees,
@@ -1025,6 +1032,16 @@ export class SketchScene {
   /** Sets the segment-endpoint snap radius (Settings dialog) — screen px, applied zoom-independently at draw time. */
   setSnapRadius(px: number): void {
     this.snapRadiusScreenPx = px;
+  }
+
+  /** Current segment-drawing angle-snap increment, in degrees — see dragSnap.ts's resolveSnappedPoint. */
+  getAngleSnapDegrees(): number {
+    return this.angleSnapDegrees;
+  }
+
+  /** Sets the segment-drawing angle-snap increment (Settings dialog). */
+  setAngleSnapDegrees(degrees: number): void {
+    this.angleSnapDegrees = degrees;
   }
 
   /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
@@ -2368,6 +2385,17 @@ export class SketchScene {
         const w = Math.abs(currentWorld.x - startWorld.x);
         const h = Math.abs(currentWorld.y - startWorld.y);
         this.overlay.rect(x, y, w, h).stroke({ width: 2 / this.world.scale.x, color: 0x42a5f5 });
+      }
+    }
+
+    if (this.drag.kind === 'move-selection') {
+      for (const guide of this.drag.guides) {
+        if (guide.axis === 'x') {
+          this.overlay.moveTo(guide.value, guide.from).lineTo(guide.value, guide.to);
+        } else {
+          this.overlay.moveTo(guide.from, guide.value).lineTo(guide.to, guide.value);
+        }
+        this.overlay.stroke({ width: 1 / this.world.scale.x, color: 0xff4081 });
       }
     }
 

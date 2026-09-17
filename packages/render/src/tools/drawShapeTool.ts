@@ -29,7 +29,7 @@ export class DrawShapeTool implements Tool {
       onMove: (ctx, _event, rawWorld) => {
         const drag = ctx.drag;
         if (drag.kind !== 'draw-shape') return;
-        const world = resolveSnappedPoint(rawWorld, { ctx, kind: 'draw-shape' });
+        const { point: world } = resolveSnappedPoint(rawWorld, { ctx, kind: 'draw-shape' });
         ctx.drag = { ...drag, currentWorld: world };
         ctx.redrawOverlay();
       },
