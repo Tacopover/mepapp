@@ -10,17 +10,14 @@ import {
 } from 'pixi.js';
 import {
   annotationBoundsWorld,
-  calibrateFromKnownDistance,
   centroid,
   coerceDefaultValue,
-  CompositeCommand,
   computeNetworks,
   distance,
   getNetworkTypeFromLibrary,
   getStampDefinition,
   getStampPorts,
   loadProject,
-  measureRealDistance,
   multiRotate,
   NETWORK_TYPE_LIBRARY,
   normalizeDegrees,
@@ -31,26 +28,21 @@ import {
   pointNearSegment,
   reconcilePdfSync,
   recomputeAttachedSegments,
-  rectIntersectsRotatedRect,
   resolveSegmentEndpoint,
   rotateAnnotationGeometry,
   rotatedRectCorners,
   rotatePointAround,
   serializeProject,
   solveFlow,
-  splitSegmentAtFitting,
-  SYNTHETIC_CENTER_PORT_ID,
   Transaction,
   translateAnnotationGeometry,
   type Annotation,
   type AnnotationGeometry,
   type Calibration,
-  type Command,
   type ConnectionPoint,
   type CustomPropertyDefinition,
   type CustomPropertyValues,
   type Discipline,
-  type Fitting,
   type FlowResult,
   type LinePattern,
   type Network,
@@ -70,7 +62,23 @@ import {
 import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
+import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
+import type { DragState, SelectableRef, SketchTool, Tool, ToolContext, ToolDragHandlers } from './tools/types.js';
+import { SelectTool } from './tools/selectTool.js';
+import { DrawSegmentTool } from './tools/drawSegmentTool.js';
+import { DrawPolylineTool } from './tools/drawPolylineTool.js';
+import { DrawFreehandTool } from './tools/drawFreehandTool.js';
+import { DrawLineTool } from './tools/drawLineTool.js';
+import { DrawShapeTool } from './tools/drawShapeTool.js';
+import { DrawHighlightTool } from './tools/drawHighlightTool.js';
+import { DrawTextboxTool } from './tools/drawTextboxTool.js';
+import { DrawStickyNoteTool } from './tools/drawStickyNoteTool.js';
+import { CalibrateTool } from './tools/calibrateTool.js';
+import { MeasureTool } from './tools/measureTool.js';
+import { PlaceStampTool } from './tools/placeStampTool.js';
+
+export type { SketchTool } from './tools/types.js';
 
 export type { DocumentSummary } from './document.js';
 
@@ -168,60 +176,6 @@ function domainAnnotationGeometry(g: AnnotationGeometry): Record<string, number>
   return geometry;
 }
 
-function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
-  const rest = { ...record };
-  delete rest[key];
-  return rest;
-}
-
-function createFittingCommand(fitting: Fitting): Command<DrawingState> {
-  return {
-    description: `Create fitting ${fitting.id}`,
-    execute: (state) => ({ ...state, fittings: { ...state.fittings, [fitting.id]: fitting } }),
-    undo: (state) => ({ ...state, fittings: withoutKey(state.fittings, fitting.id) }),
-  };
-}
-
-function createSegmentCommand(segment: Segment): Command<DrawingState> {
-  return {
-    description: `Create segment ${segment.id}`,
-    execute: (state) => ({ ...state, segments: { ...state.segments, [segment.id]: segment } }),
-    undo: (state) => ({ ...state, segments: withoutKey(state.segments, segment.id) }),
-  };
-}
-
-function deleteSegmentCommand(segment: Segment): Command<DrawingState> {
-  return {
-    description: `Delete segment ${segment.id}`,
-    execute: (state) => ({ ...state, segments: withoutKey(state.segments, segment.id) }),
-    undo: (state) => ({ ...state, segments: { ...state.segments, [segment.id]: segment } }),
-  };
-}
-
-function createStampCommand(stamp: PlacedStamp): Command<DrawingState> {
-  return {
-    description: `Place stamp ${stamp.id}`,
-    execute: (state) => ({ ...state, stamps: { ...state.stamps, [stamp.id]: stamp } }),
-    undo: (state) => ({ ...state, stamps: withoutKey(state.stamps, stamp.id) }),
-  };
-}
-
-/** One command per whole annotation (a freehand stroke's every point included) — never one command per point, so undoing a drawn annotation is always a single step. */
-function createAnnotationCommand(annotation: Annotation): Command<DrawingState> {
-  return {
-    description: `Create annotation ${annotation.id}`,
-    execute: (state) => ({ ...state, annotations: { ...state.annotations, [annotation.id]: annotation } }),
-    undo: (state) => ({ ...state, annotations: withoutKey(state.annotations, annotation.id) }),
-  };
-}
-
-interface DrawEndpointResolution {
-  point: Segment['endpointA'];
-  worldPosition: Vec2;
-  /** Present when resolving this endpoint requires new state (a bare new fitting, or breaking an existing segment) — bundled into the draw's single undo step rather than applied on its own. */
-  setupCommand?: Command<DrawingState>;
-}
-
 // Stamp art in fixtures/stamps is expected to be authored at 300 DPI (see the
 // fixtures README) — this converts a stamp texture's native pixel size into
 // world units (1 world unit = 1 PDF point) for its initial, unscaled size.
@@ -235,7 +189,6 @@ const HANDLE_HIT_RADIUS_SCREEN_PX = 10;
 const FITTING_MARKER_RADIUS_WORLD = 6;
 /** Extra click-target slack around a fitting's drawn radius, in screen px at zoom 1 — same generous-target idea as HANDLE_HIT_RADIUS_SCREEN_PX. */
 const FITTING_HIT_RADIUS_SCREEN_PX = 8;
-const ROTATE_SNAP_DEGREES = 45;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 32;
 
@@ -257,12 +210,6 @@ const CLICK_VS_DRAG_SCREEN_PX = 3;
 // A draw-shape drag shorter than this (screen px, zoom-independent — see
 // onPointerUp's 'draw-shape' case) is treated as a stray click, not a
 // zero-size rectangle/circle nobody meant to create.
-const MIN_SHAPE_DRAG_SCREEN_PX = 3;
-// A textbox annotation has no drag-to-size gesture (it's a single click, see
-// onPointerDown's 'draw-textbox' case) — this is its placeholder rect size in
-// PDF points, matching AnnotationGeometry's 'textbox' rect shape.
-const DEFAULT_TEXTBOX_WIDTH_PT = 160;
-const DEFAULT_TEXTBOX_HEIGHT_PT = 40;
 // Fixed on-page footprint of a placed sticky note's icon — a sticky note has
 // no drag-to-size gesture (single click, like a textbox's placeholder rect
 // above), just a point plus its always-visible text label drawn beside it.
@@ -303,22 +250,6 @@ export interface SegmentInfo {
   material?: string;
   lengthPt: number;
 }
-
-export type SketchTool =
-  | 'select'
-  | 'pan'
-  | 'place-terminal'
-  | 'place-equipment'
-  | 'calibrate'
-  | 'measure'
-  | 'draw-segment'
-  | 'draw-freehand'
-  | 'draw-line'
-  | 'draw-shape'
-  | 'draw-textbox'
-  | 'draw-sticky-note'
-  | 'draw-highlight'
-  | 'draw-polyline';
 
 /**
  * Resolves a stamp-library iconRef to loaded image bytes — `loadProjectFromJson`'s
@@ -408,67 +339,6 @@ class TypedEmitter<Events extends Record<string, unknown[]>> {
   }
 }
 
-/** A selectable object is a placed stamp, a fitting, a drawn segment, or a drawn annotation — see hitTest. */
-type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'fitting'; id: string } | { kind: 'segment'; id: string } | { kind: 'annotation'; id: string };
-
-/** Original per-annotation geometry captured at gesture start, so move/rotate can recompute the whole gesture's delta from a fixed origin on every pointermove rather than drifting by accumulating per-frame deltas. */
-type AnnotationSnapshot = Record<string, AnnotationGeometry>;
-
-type DragState =
-  | { kind: 'none' }
-  | { kind: 'pan'; startScreen: Vec2; startWorldPos: Vec2 }
-  | {
-      kind: 'move-selection';
-      startPointerWorld: Vec2;
-      /** Selected stamps' positions at gesture start (from getSelection(), so stamp-only) — the stamp counterpart to annotationSnapshot/fittingSnapshot below. */
-      snapshot: Array<{ id: string; position: Vec2 }>;
-      annotationSnapshot: AnnotationSnapshot;
-      /** Fitting positions at gesture start, keyed by fitting id — the fitting counterpart to annotationSnapshot above. */
-      fittingSnapshot: Record<string, Vec2>;
-      /** Undoable transaction covering snapshot's/annotationSnapshot's/fittingSnapshot's moves, plus the cascaded recompute of any segment attached to a moved fitting — null when none of the three is present in the selection. */
-      drawingTx: Transaction<DrawingState> | null;
-      /** Set when this gesture began on an already-sole-selected textbox/stickyNote — a click with no drag reopens its text editor instead of committing a zero-length move. */
-      reopenTextEditId: string | null;
-      /** True once onPointerMove has actually applied a delta — a plain click never sets this, since a real pointermove never fires for zero on-screen movement. Gates whether onPointerUp commits anything. */
-      moved: boolean;
-    }
-  | {
-      kind: 'rotate-selection';
-      pivot: Vec2;
-      startPointerAngleDeg: number;
-      /** Selected stamps' transforms at gesture start (from getSelection(), so stamp-only). */
-      snapshot: Array<{ id: string; transform: Transform2D }>;
-      annotationSnapshot: AnnotationSnapshot;
-      /** Undoable transaction covering both snapshot's stamp rotations and annotationSnapshot's — null when neither is present in the selection. */
-      drawingTx: Transaction<DrawingState> | null;
-      moved: boolean;
-    }
-  | { kind: 'resize-rect'; id: string; corner: 'x0y0' | 'x1y0' | 'x1y1' | 'x0y1'; original: AnnotationGeometry; tx: Transaction<DrawingState>; moved: boolean }
-  | { kind: 'resize-circle'; id: string; center: Vec2; tx: Transaction<DrawingState>; moved: boolean }
-  | { kind: 'rubber-band'; startWorld: Vec2; currentWorld: Vec2; additive: boolean }
-  | { kind: 'draw-freehand'; points: Vec2[] }
-  | { kind: 'draw-shape'; shapeKind: 'rectangle' | 'circle'; startWorld: Vec2; currentWorld: Vec2 }
-  | { kind: 'draw-highlight'; startWorld: Vec2; currentWorld: Vec2 };
-
-function applyTransformToSprite(sprite: Sprite, transform: Transform2D, baseScale: Vec2): void {
-  sprite.position.set(transform.position.x, transform.position.y);
-  sprite.rotation = (transform.rotationDegrees * Math.PI) / 180; // absolute set — never +=, see core/geometry.ts
-  sprite.scale.set(baseScale.x * transform.scale.x, baseScale.y * transform.scale.y);
-}
-
-/** Converts texture pixels -> world units at transform.scale = 1, shared by placeStamp and the stamp ghost preview so the two never drift apart. */
-function computeStampBaseScale(nativeWidth: number, nativeHeight: number, texture: Texture): Vec2 {
-  return { x: nativeWidth / texture.width, y: nativeHeight / texture.height };
-}
-
-function angleDegrees(from: Vec2, to: Vec2): number {
-  return (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
-}
-
-function snapToNearest(degrees: number, step: number): number {
-  return Math.round(degrees / step) * step;
-}
-
 export class SketchScene {
   private readonly app = new Application();
   private readonly world = new Container();
@@ -493,34 +363,103 @@ export class SketchScene {
     definitionId?: string;
     appearanceDefault?: { color?: string; scale?: number };
   } | null = null;
-  private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure two-click flows
-  // draw-polyline's own scratch: an arbitrary-length click-to-add-vertex
-  // gesture doesn't fit pendingPoints' fixed two-click contract above, so it
-  // gets a dedicated pair — the committed vertices, and the live cursor
-  // position for the rubber-band segment drawn out to the pointer.
-  private pendingPolylinePoints: Vec2[] = [];
-  private pendingPolylineCursor: Vec2 | null = null;
-  // Hand-rolled double-click detection for draw-polyline's finish gesture —
-  // see onPointerDown's 'draw-polyline' case for why native detail-based
-  // detection doesn't work here.
-  private lastPolylineClickAt = 0;
-  private lastPolylineClickScreen: Vec2 | null = null;
-  private static readonly DOUBLE_CLICK_MS = 400;
-  private static readonly DOUBLE_CLICK_SCREEN_PX = 6;
+  private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure/draw-line two-click flows
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
-  private pendingSegmentStart: DrawEndpointResolution | null = null;
-  /** Live cursor position while a segment's start point is pending — draws the rubber-band preview line to where the segment would land if clicked now. Mirrors pendingPolylineCursor's pattern. */
-  private pendingSegmentCursor: Vec2 | null = null;
-  /** Id of the most recently committed segment in the chain currently being drawn (draw-segment tool, chain still continuing) — governs fitting visibility (computeVisibleFittingIds) alongside the current selection. Cleared whenever the chain stops being "in progress": natural end, Escape-finish, or switching tools. */
-  private activeChainAnchorId: string | null = null;
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
   private resizeObserver: ResizeObserver | null = null;
+
+  // Tool instances owning their own pending/transient gesture state — see
+  // packages/render/src/tools/*.ts. drawSegmentTool/drawPolylineTool are kept
+  // as typed references (not just entries in toolMap) because the shared
+  // rendering code below (redrawOverlay/computeVisibleFittingIds) reads their
+  // tool-owned pending state directly.
+  private readonly drawSegmentTool = new DrawSegmentTool();
+  private readonly drawPolylineTool = new DrawPolylineTool();
+  private readonly ctx: ToolContext = this.buildToolContext();
+  private readonly toolMap: Map<SketchTool, Tool> = this.buildToolMap();
+  private readonly dragHandlers: Map<DragState['kind'], ToolDragHandlers> = this.buildDragHandlers();
 
   constructor(private readonly container: HTMLElement) {
     const first = new SketchDocument();
     this.documents.push(first);
     this.activeId = first.id;
+  }
+
+  private buildToolMap(): Map<SketchTool, Tool> {
+    const tools: Tool[] = [
+      new SelectTool(),
+      this.drawSegmentTool,
+      this.drawPolylineTool,
+      new DrawFreehandTool(),
+      new DrawLineTool(),
+      new DrawShapeTool(),
+      new DrawHighlightTool(),
+      new DrawTextboxTool(),
+      new DrawStickyNoteTool(),
+      new CalibrateTool(),
+      new MeasureTool(),
+      new PlaceStampTool('terminal'),
+      new PlaceStampTool('equipment'),
+    ];
+    return new Map(tools.map((tool) => [tool.id, tool]));
+  }
+
+  /** Merges every registered tool's declared drag kinds into one dispatch map — see tools/types.ts's `Tool.dragKinds` doc comment for why this is keyed by drag kind, not by the currently active tool. */
+  private buildDragHandlers(): Map<DragState['kind'], ToolDragHandlers> {
+    const handlers = new Map<DragState['kind'], ToolDragHandlers>();
+    for (const tool of this.toolMap.values()) {
+      for (const [kind, handler] of Object.entries(tool.dragKinds ?? {})) {
+        handlers.set(kind as DragState['kind'], handler as ToolDragHandlers);
+      }
+    }
+    return handlers;
+  }
+
+  /** Builds the seam every tool reaches shared scene state through — see tools/types.ts's `ToolContext` doc comment. */
+  private buildToolContext(): ToolContext {
+    const self = this;
+    return {
+      get doc() {
+        return self.doc;
+      },
+      get drag() {
+        return self.drag;
+      },
+      set drag(value: DragState) {
+        self.drag = value;
+      },
+      setTool: (tool) => self.setTool(tool),
+      markDirty: () => self.markDirty(),
+      syncDrawingLayer: () => self.syncDrawingLayer(),
+      redrawOverlay: () => self.redrawOverlay(),
+      emit: (event, ...args) => (self.emitter.emit as (event: string, ...args: unknown[]) => void)(event, ...args),
+      openTextEditor: (id) => self.openTextEditor(id),
+      getZoomScale: () => self.world.scale.x,
+      hitTest: (worldPoint) => self.hitTest(worldPoint),
+      selectableRefForId: (id, state) => self.selectableRefForId(id, state),
+      resolveSelectableBoundsWorld: (ref, state) => self.resolveSelectableBoundsWorld(ref, state),
+      getResizeHandlesWorld: () => self.getResizeHandlesWorld(),
+      getRotationHandleWorld: () => self.getRotationHandleWorld(),
+      getSelection: () => self.getSelection(),
+      applyConnectivityCascade: (state, changed) => self.applyConnectivityCascade(state, changed),
+      stampPortConnectionPoints: (ids, stamps) => self.stampPortConnectionPoints(ids, stamps),
+      getPendingPoints: () => self.pendingPoints,
+      setPendingPoints: (points) => {
+        self.pendingPoints = points;
+      },
+      getActiveNetworkTypeId: () => self.activeNetworkTypeId,
+      getSnapRadiusScreenPx: () => self.snapRadiusScreenPx,
+      getPendingStampTexture: () => self.pendingStampTexture,
+      getStampGhostSprite: () => self.stampGhostSprite,
+      getStampGhostRotationDegrees: () => self.stampGhostRotationDegrees,
+      setStampGhostRotationDegrees: (degrees) => {
+        self.stampGhostRotationDegrees = degrees;
+      },
+      hideStampGhost: () => {
+        if (self.stampGhostSprite) self.stampGhostSprite.visible = false;
+      },
+    };
   }
 
   /** The active document — every per-document read/mutation goes through this. */
@@ -579,7 +518,7 @@ export class SketchScene {
         { radius: snapRadius },
       );
       if (target.kind !== 'existing') return;
-      this.emitter.emit('drawFromMenuRequested', screen, this.drawFromMenuLabel(target.point, state), target.point, target.worldPosition);
+      this.emitter.emit('drawFromMenuRequested', screen, this.drawSegmentTool.drawFromMenuLabel(target.point, state), target.point, target.worldPosition);
     });
     window.addEventListener('keydown', this.onKeyDown);
   }
@@ -601,14 +540,13 @@ export class SketchScene {
   }
 
   setTool(tool: SketchTool): void {
+    // Resets the outgoing tool's own pending/transient gesture state (e.g. draw-segment's
+    // in-progress chain, draw-polyline's committed vertices) — see Tool.onDeactivate's doc
+    // comment. A no-op for tools with no such state (select, pan, the place-* tools, every
+    // plain click/drag-only annotation tool).
+    this.toolMap.get(this.tool)?.onDeactivate?.(this.ctx);
     this.tool = tool;
     this.pendingPoints = [];
-    this.pendingSegmentStart = null;
-    this.pendingSegmentCursor = null;
-    this.activeChainAnchorId = null;
-    this.pendingPolylinePoints = [];
-    this.pendingPolylineCursor = null;
-    this.lastPolylineClickScreen = null;
     if (tool !== 'place-terminal' && tool !== 'place-equipment') {
       this.stampGhostRotationDegrees = 0;
       if (this.stampGhostSprite) this.stampGhostSprite.visible = false;
@@ -769,8 +707,7 @@ export class SketchScene {
     this.stampGhostSprite = null;
     this.stampGhostRotationDegrees = 0;
     this.pendingPoints = [];
-    this.pendingSegmentStart = null;
-    this.pendingSegmentCursor = null;
+    this.drawSegmentTool.onDeactivate();
     this.drag = { kind: 'none' };
 
     this.redrawOverlay();
@@ -1861,274 +1798,7 @@ export class SketchScene {
       return;
     }
 
-    if (this.tool === 'place-terminal' || this.tool === 'place-equipment') {
-      if (!this.pendingStampTexture) return;
-      this.placeStamp(world, this.tool === 'place-terminal' ? 'terminal' : 'equipment');
-      return;
-    }
-
-    if (this.tool === 'draw-segment') {
-      this.onDrawSegmentClick(world);
-      return;
-    }
-
-    if (this.tool === 'draw-freehand') {
-      this.drag = { kind: 'draw-freehand', points: [world] };
-      this.redrawOverlay();
-      return;
-    }
-
-    if (this.tool === 'draw-line') {
-      // Plain two-click = line; Shift+(either click) = arrow — same
-      // one-tool-two-kinds modifier pattern as draw-shape's rectangle/circle
-      // Shift toggle, per the arrow addition confirmed in the Decisions-Log.
-      // pdf-engine already models arrow as the same {from,to} shape as line.
-      const isArrow = event.shiftKey;
-      this.pendingPoints.push(world);
-      if (this.pendingPoints.length === 2) {
-        const [from, to] = this.pendingPoints;
-        this.pendingPoints = [];
-        const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: isArrow ? 'arrow' : 'line', from, to } };
-        this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
-        this.syncDrawingLayer();
-        this.markDirty();
-      }
-      this.redrawOverlay();
-      return;
-    }
-
-    if (this.tool === 'draw-shape') {
-      // Plain drag = rectangle (opposite corners); Shift+drag = circle (start point is the center, drag distance is the radius) — one tool covering both shapes per the atlas' "generalized shape tool", disambiguated the same way rotate-selection already uses shiftKey for a modifier (see onPointerMove's 'rotate-selection' case).
-      this.drag = { kind: 'draw-shape', shapeKind: event.shiftKey ? 'circle' : 'rectangle', startWorld: world, currentWorld: world };
-      this.redrawOverlay();
-      return;
-    }
-
-    if (this.tool === 'draw-textbox') {
-      this.emitter.emit('textboxRequested', screen, '', (text) => {
-        const trimmed = text?.trim();
-        if (trimmed) {
-          const annotation: Annotation = {
-            id: `annotation-${this.doc.nextAnnotationSeq++}`,
-            pageIndex: 0,
-            geometry: { kind: 'textbox', rect: { x0: world.x, y0: world.y, x1: world.x + DEFAULT_TEXTBOX_WIDTH_PT, y1: world.y + DEFAULT_TEXTBOX_HEIGHT_PT }, text: trimmed, rotationDegrees: 0 },
-          };
-          this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
-          this.syncDrawingLayer();
-          this.markDirty();
-          this.setTool('select'); // one-shot, matching placeStamp's revert-after-place convention
-        }
-        this.redrawOverlay();
-      });
-      return;
-    }
-
-    if (this.tool === 'draw-sticky-note') {
-      // Same floating-textarea event draw-textbox uses — a point instead of a
-      // rect is the only difference, so no new UI event/App.tsx wiring is needed.
-      this.emitter.emit('textboxRequested', screen, '', (text) => {
-        const trimmed = text?.trim();
-        if (trimmed) {
-          const annotation: Annotation = {
-            id: `annotation-${this.doc.nextAnnotationSeq++}`,
-            pageIndex: 0,
-            geometry: { kind: 'stickyNote', position: world, text: trimmed },
-          };
-          this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
-          this.syncDrawingLayer();
-          this.markDirty();
-          this.setTool('select'); // one-shot, matching placeStamp/draw-textbox's revert-after-place convention
-        }
-        this.redrawOverlay();
-      });
-      return;
-    }
-
-    if (this.tool === 'draw-highlight') {
-      this.drag = { kind: 'draw-highlight', startWorld: world, currentWorld: world };
-      this.redrawOverlay();
-      return;
-    }
-
-    if (this.tool === 'draw-polyline') {
-      // Click adds a vertex; double-click finishes. Chromium leaves
-      // PointerEvent.detail at 0 on every 'pointerdown' regardless of click
-      // count (click-count semantics only apply to the native 'click' event,
-      // which this class's gesture model doesn't otherwise use) — confirmed
-      // empirically, not assumed. Double-clicks are detected by hand instead:
-      // two pointerdowns close together in time and screen position.
-      const now = performance.now();
-      const isDoubleClick =
-        this.lastPolylineClickScreen !== null &&
-        now - this.lastPolylineClickAt <= SketchScene.DOUBLE_CLICK_MS &&
-        Math.hypot(screen.x - this.lastPolylineClickScreen.x, screen.y - this.lastPolylineClickScreen.y) <= SketchScene.DOUBLE_CLICK_SCREEN_PX;
-      this.lastPolylineClickAt = now;
-      this.lastPolylineClickScreen = screen;
-      if (isDoubleClick) {
-        // The first click of this double-click already added its vertex
-        // below on the previous pointerdown — this one only ever closes the
-        // shape out, it never adds a second point of its own.
-        if (this.pendingPolylinePoints.length >= 2) {
-          const annotation: Annotation = {
-            id: `annotation-${this.doc.nextAnnotationSeq++}`,
-            pageIndex: 0,
-            geometry: { kind: 'polyline', points: this.pendingPolylinePoints },
-          };
-          this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
-          this.syncDrawingLayer();
-          this.markDirty();
-        }
-        this.pendingPolylinePoints = [];
-        this.pendingPolylineCursor = null;
-        this.lastPolylineClickScreen = null;
-        this.redrawOverlay();
-        return;
-      }
-      this.pendingPolylinePoints.push(world);
-      this.pendingPolylineCursor = world;
-      this.redrawOverlay();
-      return;
-    }
-
-    if (this.tool === 'calibrate' || this.tool === 'measure') {
-      this.pendingPoints.push(world);
-      if (this.pendingPoints.length === 2) {
-        const [p1, p2] = this.pendingPoints;
-        this.pendingPoints = [];
-        if (this.tool === 'calibrate') {
-          this.emitter.emit('calibrationNeeded', p1, p2, (mm) => {
-            if (mm !== null && mm > 0) {
-              this.doc.calibration = calibrateFromKnownDistance(p1, p2, mm);
-              this.emitter.emit('calibrationSet', this.doc.calibration);
-              this.setTool('select');
-            }
-            this.redrawOverlay();
-          });
-        } else if (this.doc.calibration) {
-          this.emitter.emit('measurement', measureRealDistance(p1, p2, this.doc.calibration));
-        } else {
-          console.warn('[render] measure tool used with no calibration set yet.');
-        }
-      }
-      this.redrawOverlay();
-      return;
-    }
-
-    // tool === 'select'
-    const handleRadiusWorld = HANDLE_HIT_RADIUS_SCREEN_PX / this.world.scale.x;
-
-    for (const resizeHandle of this.getResizeHandlesWorld()) {
-      if (Math.hypot(world.x - resizeHandle.position.x, world.y - resizeHandle.position.y) > handleRadiusWorld) continue;
-      const annotation = this.doc.drawingHistory.getState().annotations[resizeHandle.id];
-      if (!annotation) break;
-      const tx = new Transaction(this.doc.drawingHistory, `Resize annotation ${resizeHandle.id}`);
-      if ('corner' in resizeHandle) {
-        this.drag = { kind: 'resize-rect', id: resizeHandle.id, corner: resizeHandle.corner, original: annotation.geometry, tx, moved: false };
-        return;
-      }
-      if (annotation.geometry.kind === 'circle') {
-        this.drag = { kind: 'resize-circle', id: resizeHandle.id, center: annotation.geometry.center, tx, moved: false };
-        return;
-      }
-    }
-
-    const handle = this.getRotationHandleWorld();
-    if (handle && Math.hypot(world.x - handle.x, world.y - handle.y) <= handleRadiusWorld) {
-      const state = this.doc.drawingHistory.getState();
-      const selectedRefs: SelectableRef[] = [...this.doc.selectedIds].map((id) => this.selectableRefForId(id, state));
-      const pivotPoints = selectedRefs
-        .map((ref) => this.resolveSelectableBoundsWorld(ref, state))
-        .filter((b): b is NonNullable<typeof b> => b !== null)
-        .map((b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }));
-      if (pivotPoints.length === 0) return;
-      const centroidPoint = centroid(pivotPoints);
-      const annotationSnapshot: AnnotationSnapshot = {};
-      for (const id of this.doc.selectedIds) {
-        const annotation = state.annotations[id];
-        if (annotation) annotationSnapshot[id] = annotation.geometry;
-      }
-      const stampSnapshot = this.getSelection().map((s) => ({ id: s.id, transform: s.transform }));
-      this.drag = {
-        kind: 'rotate-selection',
-        pivot: centroidPoint,
-        startPointerAngleDeg: angleDegrees(centroidPoint, world),
-        snapshot: stampSnapshot,
-        annotationSnapshot,
-        drawingTx: stampSnapshot.length > 0 || Object.keys(annotationSnapshot).length > 0 ? new Transaction(this.doc.drawingHistory, 'Rotate selection') : null,
-        moved: false,
-      };
-      return;
-    }
-
-    const hit = this.hitTest(world);
-    if (hit) {
-      // A click (not drag) on an already-sole-selected textbox/stickyNote reopens its text editor — checked before selectedIds is mutated below, see onPointerUp's move-selection case.
-      const alreadySoleSelected = this.doc.selectedIds.size === 1 && this.doc.selectedIds.has(hit.id);
-      if (event.shiftKey) {
-        if (this.doc.selectedIds.has(hit.id)) {
-          this.doc.selectedIds.delete(hit.id);
-        } else {
-          this.doc.selectedIds.add(hit.id);
-        }
-        this.emitter.emit('selectionChanged', this.getSelection());
-        this.syncDrawingLayer();
-        this.redrawOverlay();
-        return;
-      }
-      if (!this.doc.selectedIds.has(hit.id)) {
-        this.doc.selectedIds = new Set([hit.id]);
-        this.emitter.emit('selectionChanged', this.getSelection());
-      }
-      const state = this.doc.drawingHistory.getState();
-      const annotationSnapshot: AnnotationSnapshot = {};
-      const fittingSnapshot: Record<string, Vec2> = {};
-      for (const id of this.doc.selectedIds) {
-        const annotation = state.annotations[id];
-        if (annotation) annotationSnapshot[id] = annotation.geometry;
-        const fitting = state.fittings[id];
-        if (fitting) fittingSnapshot[id] = fitting.position;
-        // A selected segment has no position of its own to drag — instead, drag
-        // both its endpoint fittings by the same delta and let the existing
-        // fitting-move + applyConnectivityCascade path (below) recompute the
-        // segment's own geometry and re-seat any neighboring segment sharing
-        // one of those fittings, exactly like dragging those fittings directly.
-        // A 'port' endpoint (attached to a placed stamp) is left alone — that
-        // end stays pinned to the equipment, matching the old app's behavior.
-        const segment = state.segments[id];
-        if (segment) {
-          for (const endpoint of [segment.endpointA, segment.endpointB]) {
-            if (endpoint.kind !== 'fitting') continue;
-            const endpointFitting = state.fittings[endpoint.fittingId];
-            if (endpointFitting) fittingSnapshot[endpoint.fittingId] = endpointFitting.position;
-          }
-        }
-      }
-      const hitAnnotationKind = hit.kind === 'annotation' ? state.annotations[hit.id]?.geometry.kind : null;
-      const isTextEditable = hitAnnotationKind === 'textbox' || hitAnnotationKind === 'stickyNote';
-      const stampSnapshot = this.getSelection().map((s) => ({ id: s.id, position: s.transform.position }));
-      const hasDrawingChanges = stampSnapshot.length > 0 || Object.keys(annotationSnapshot).length > 0 || Object.keys(fittingSnapshot).length > 0;
-      this.drag = {
-        kind: 'move-selection',
-        startPointerWorld: world,
-        snapshot: stampSnapshot,
-        annotationSnapshot,
-        fittingSnapshot,
-        drawingTx: hasDrawingChanges ? new Transaction(this.doc.drawingHistory, 'Move selection') : null,
-        reopenTextEditId: alreadySoleSelected && isTextEditable ? hit.id : null,
-        moved: false,
-      };
-      this.syncDrawingLayer();
-      this.redrawOverlay();
-      return;
-    }
-
-    if (!event.shiftKey) {
-      this.doc.selectedIds.clear();
-      this.emitter.emit('selectionChanged', this.getSelection());
-      this.syncDrawingLayer();
-    }
-    this.drag = { kind: 'rubber-band', startWorld: world, currentWorld: world, additive: event.shiftKey };
-    this.redrawOverlay();
+    this.toolMap.get(this.tool)?.onPointerDown(this.ctx, event, world, screen);
   };
 
   private readonly onPointerMove = (event: FederatedPointerEvent): void => {
@@ -2148,242 +1818,13 @@ export class SketchScene {
       if (showGhost) this.stampGhostSprite.position.set(world.x, world.y);
     }
 
-    if (this.tool === 'draw-segment' && this.pendingSegmentStart) {
-      this.pendingSegmentCursor = world;
-      this.redrawOverlay();
-    }
+    this.toolMap.get(this.tool)?.onPointerMoveIdle?.(this.ctx, event, world, screen);
 
-    if (this.drag.kind === 'move-selection') {
-      this.drag.moved = true;
-      const dx = world.x - this.drag.startPointerWorld.x;
-      const dy = world.y - this.drag.startPointerWorld.y;
-      if (this.drag.drawingTx) {
-        const stampOriginals = this.drag.snapshot;
-        const annotationOriginals = this.drag.annotationSnapshot;
-        const fittingOriginals = this.drag.fittingSnapshot;
-        this.drag.drawingTx.update((state) => {
-          const stamps = { ...state.stamps };
-          const movedStampIds: string[] = [];
-          for (const { id, position } of stampOriginals) {
-            if (!stamps[id]) continue;
-            stamps[id] = { ...stamps[id], transform: { ...stamps[id].transform, position: { x: position.x + dx, y: position.y + dy } } };
-            movedStampIds.push(id);
-          }
-          const annotations = { ...state.annotations };
-          for (const [id, original] of Object.entries(annotationOriginals)) {
-            if (!annotations[id]) continue;
-            annotations[id] = { ...annotations[id], geometry: translateAnnotationGeometry(original, dx, dy) };
-          }
-          const fittings = { ...state.fittings };
-          const changed = this.stampPortConnectionPoints(movedStampIds, stamps);
-          for (const [id, original] of Object.entries(fittingOriginals)) {
-            if (!fittings[id]) continue;
-            fittings[id] = { ...fittings[id], position: { x: original.x + dx, y: original.y + dy } };
-            changed.push({ kind: 'fitting', fittingId: id });
-          }
-          return this.applyConnectivityCascade({ ...state, stamps, annotations, fittings }, changed);
-        });
-        this.syncDrawingLayer();
-      }
-      this.redrawOverlay();
-      this.markDirty();
-      this.emitter.emit('selectionChanged', this.getSelection());
-      return;
-    }
-
-    if (this.drag.kind === 'rotate-selection') {
-      this.drag.moved = true;
-      const currentAngle = angleDegrees(this.drag.pivot, world);
-      const rawDelta = currentAngle - this.drag.startPointerAngleDeg;
-      const delta = event.shiftKey ? rawDelta : snapToNearest(rawDelta, ROTATE_SNAP_DEGREES);
-      const rotated = multiRotate(
-        this.drag.snapshot.map((s) => s.transform),
-        delta,
-      );
-      if (this.drag.drawingTx) {
-        const stampSnapshot = this.drag.snapshot;
-        const originals = this.drag.annotationSnapshot;
-        const pivot = this.drag.pivot;
-        this.drag.drawingTx.update((state) => {
-          const stamps = { ...state.stamps };
-          const rotatedIds: string[] = [];
-          stampSnapshot.forEach((s, i) => {
-            if (!stamps[s.id]) return;
-            stamps[s.id] = { ...stamps[s.id], transform: rotated[i] };
-            rotatedIds.push(s.id);
-          });
-          const annotations = { ...state.annotations };
-          for (const [id, original] of Object.entries(originals)) {
-            if (!annotations[id]) continue;
-            annotations[id] = { ...annotations[id], geometry: rotateAnnotationGeometry(original, pivot, delta) };
-          }
-          return this.applyConnectivityCascade({ ...state, stamps, annotations }, this.stampPortConnectionPoints(rotatedIds, stamps));
-        });
-        this.syncDrawingLayer();
-      }
-      this.redrawOverlay();
-      this.markDirty();
-      this.emitter.emit('selectionChanged', this.getSelection());
-      return;
-    }
-
-    if (this.drag.kind === 'resize-rect') {
-      this.drag.moved = true;
-      const { id, corner, original, tx } = this.drag;
-      if (original.kind !== 'rectangle' && original.kind !== 'highlight') return; // always true by construction — see onPointerDown's resize-handle branch
-      const fixed =
-        corner === 'x0y0'
-          ? { x: original.rect.x1, y: original.rect.y1 }
-          : corner === 'x1y0'
-            ? { x: original.rect.x0, y: original.rect.y1 }
-            : corner === 'x1y1'
-              ? { x: original.rect.x0, y: original.rect.y0 }
-              : { x: original.rect.x1, y: original.rect.y0 };
-      const rect = { x0: Math.min(fixed.x, world.x), y0: Math.min(fixed.y, world.y), x1: Math.max(fixed.x, world.x), y1: Math.max(fixed.y, world.y) };
-      tx.update((state) => {
-        const annotation = state.annotations[id];
-        if (!annotation || (annotation.geometry.kind !== 'rectangle' && annotation.geometry.kind !== 'highlight')) return state;
-        return { ...state, annotations: { ...state.annotations, [id]: { ...annotation, geometry: { ...annotation.geometry, rect } } } };
-      });
-      this.syncDrawingLayer();
-      this.redrawOverlay();
-      this.markDirty();
-      return;
-    }
-
-    if (this.drag.kind === 'resize-circle') {
-      this.drag.moved = true;
-      const { id, center, tx } = this.drag;
-      const radius = Math.max(0, Math.hypot(world.x - center.x, world.y - center.y));
-      tx.update((state) => {
-        const annotation = state.annotations[id];
-        if (!annotation || annotation.geometry.kind !== 'circle') return state;
-        return { ...state, annotations: { ...state.annotations, [id]: { ...annotation, geometry: { ...annotation.geometry, radius } } } };
-      });
-      this.syncDrawingLayer();
-      this.redrawOverlay();
-      this.markDirty();
-      return;
-    }
-
-    if (this.drag.kind === 'rubber-band') {
-      this.drag = { ...this.drag, currentWorld: world };
-      this.redrawOverlay();
-    }
-
-    if (this.drag.kind === 'draw-freehand') {
-      this.drag = { ...this.drag, points: [...this.drag.points, world] };
-      this.redrawOverlay();
-    }
-
-    if (this.drag.kind === 'draw-shape' || this.drag.kind === 'draw-highlight') {
-      this.drag = { ...this.drag, currentWorld: world };
-      this.redrawOverlay();
-    }
-
-    if (this.tool === 'draw-polyline' && this.pendingPolylinePoints.length > 0) {
-      this.pendingPolylineCursor = world;
-      this.redrawOverlay();
-    }
+    this.dragHandlers.get(this.drag.kind)?.onMove(this.ctx, event, world);
   };
 
-  private readonly onPointerUp = (): void => {
-    if (this.drag.kind === 'rubber-band') {
-      const { startWorld, currentWorld, additive } = this.drag;
-      const rectMin = { x: Math.min(startWorld.x, currentWorld.x), y: Math.min(startWorld.y, currentWorld.y) };
-      const rectMax = { x: Math.max(startWorld.x, currentWorld.x), y: Math.max(startWorld.y, currentWorld.y) };
-      const hits = new Set<string>();
-      const state = this.doc.drawingHistory.getState();
-      for (const data of Object.values(state.stamps)) {
-        const halfWidth = (data.nativeWidth / 2) * data.transform.scale.x;
-        const halfHeight = (data.nativeHeight / 2) * data.transform.scale.y;
-        if (rectIntersectsRotatedRect(rectMin, rectMax, data.transform, halfWidth, halfHeight)) {
-          hits.add(data.id);
-        }
-      }
-      for (const annotation of Object.values(state.annotations)) {
-        const bounds = annotationBoundsWorld(annotation.geometry, STICKY_NOTE_ICON_SIZE_PT);
-        // Plain AABB overlap — annotations carry no rotation, so this needs none of rectIntersectsRotatedRect's separating-axis machinery.
-        if (bounds.minX <= rectMax.x && bounds.maxX >= rectMin.x && bounds.minY <= rectMax.y && bounds.maxY >= rectMin.y) {
-          hits.add(annotation.id);
-        }
-      }
-      for (const segment of Object.values(state.segments)) {
-        const bounds = this.resolveSelectableBoundsWorld({ kind: 'segment', id: segment.id }, state);
-        if (bounds && bounds.minX <= rectMax.x && bounds.maxX >= rectMin.x && bounds.minY <= rectMax.y && bounds.maxY >= rectMin.y) {
-          hits.add(segment.id);
-        }
-      }
-      this.doc.selectedIds = additive ? new Set([...this.doc.selectedIds, ...hits]) : hits;
-      this.emitter.emit('selectionChanged', this.getSelection());
-      this.syncDrawingLayer();
-    }
-
-    if (this.drag.kind === 'move-selection') {
-      if (this.drag.moved) {
-        this.drag.drawingTx?.commit();
-      } else if (this.drag.reopenTextEditId) {
-        this.openTextEditor(this.drag.reopenTextEditId);
-      }
-    }
-
-    if (this.drag.kind === 'rotate-selection' && this.drag.moved) {
-      this.drag.drawingTx?.commit();
-    }
-
-    if ((this.drag.kind === 'resize-rect' || this.drag.kind === 'resize-circle') && this.drag.moved) {
-      this.drag.tx.commit();
-    }
-
-    if (this.drag.kind === 'draw-freehand' && this.drag.points.length >= 2) {
-      const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: 'freehand', points: this.drag.points } };
-      this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
-      this.syncDrawingLayer();
-      this.markDirty();
-    }
-
-    if (this.drag.kind === 'draw-shape') {
-      const { shapeKind, startWorld, currentWorld } = this.drag;
-      const dx = currentWorld.x - startWorld.x;
-      const dy = currentWorld.y - startWorld.y;
-      const dragScreenPx = Math.hypot(dx, dy) * this.world.scale.x;
-      if (dragScreenPx >= MIN_SHAPE_DRAG_SCREEN_PX) {
-        const geometry: AnnotationGeometry =
-          shapeKind === 'circle'
-            ? { kind: 'circle', center: startWorld, radius: Math.hypot(dx, dy) }
-            : {
-                kind: 'rectangle',
-                rect: {
-                  x0: Math.min(startWorld.x, currentWorld.x),
-                  y0: Math.min(startWorld.y, currentWorld.y),
-                  x1: Math.max(startWorld.x, currentWorld.x),
-                  y1: Math.max(startWorld.y, currentWorld.y),
-                },
-              };
-        const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry };
-        this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
-        this.syncDrawingLayer();
-        this.markDirty();
-      }
-    }
-
-    if (this.drag.kind === 'draw-highlight') {
-      const { startWorld, currentWorld } = this.drag;
-      const dragScreenPx = Math.hypot(currentWorld.x - startWorld.x, currentWorld.y - startWorld.y) * this.world.scale.x;
-      if (dragScreenPx >= MIN_SHAPE_DRAG_SCREEN_PX) {
-        const rect = {
-          x0: Math.min(startWorld.x, currentWorld.x),
-          y0: Math.min(startWorld.y, currentWorld.y),
-          x1: Math.max(startWorld.x, currentWorld.x),
-          y1: Math.max(startWorld.y, currentWorld.y),
-        };
-        const annotation: Annotation = { id: `annotation-${this.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: 'highlight', rect } };
-        this.doc.drawingHistory.execute(createAnnotationCommand(annotation));
-        this.syncDrawingLayer();
-        this.markDirty();
-      }
-    }
-
+  private readonly onPointerUp = (event: FederatedPointerEvent): void => {
+    this.dragHandlers.get(this.drag.kind)?.onEnd(this.ctx, event);
     this.drag = { kind: 'none' };
     this.redrawOverlay();
   };
@@ -2440,30 +1881,12 @@ export class SketchScene {
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
 
     if (event.key === 'Escape') {
-      if (this.tool === 'draw-segment') {
-        if (this.pendingSegmentStart) {
-          this.pendingSegmentStart = null;
-          this.pendingSegmentCursor = null;
-          this.activeChainAnchorId = null;
-          this.syncDrawingLayer();
-          this.redrawOverlay();
-          return;
-        }
-        this.setTool('select');
-        return;
-      }
-      if (this.tool === 'place-terminal' || this.tool === 'place-equipment') {
-        this.setTool('select');
-        return;
-      }
+      this.toolMap.get(this.tool)?.onKeyDown?.(this.ctx, event);
       return;
     }
 
-    if (event.code === 'Space' && (this.tool === 'place-terminal' || this.tool === 'place-equipment') && this.stampGhostSprite) {
-      event.preventDefault(); // Space otherwise scrolls the page
-      this.stampGhostRotationDegrees = normalizeDegrees(this.stampGhostRotationDegrees + 45);
-      this.stampGhostSprite.rotation = (this.stampGhostRotationDegrees * Math.PI) / 180;
-      return;
+    if (event.code === 'Space') {
+      if (this.toolMap.get(this.tool)?.onKeyDown?.(this.ctx, event)) return;
     }
 
     const meta = event.ctrlKey || event.metaKey;
@@ -2621,182 +2044,22 @@ export class SketchScene {
     });
   }
 
-  private placeStamp(worldPosition: Vec2, category: StampCategory): void {
-    if (!this.pendingStampTexture) return;
-    const { texture, nativeWidth, nativeHeight, definitionId, appearanceDefault } = this.pendingStampTexture;
-    const id = `stamp-${this.doc.nextStampSeq++}`;
-    // Copy the definition's ports onto the placed instance (previously always []) so
-    // resolveSegmentEndpoint's existing port-snapping has something to snap to.
-    const definition = definitionId ? getStampDefinition(definitionId, this.doc.customStampDefinitions) : undefined;
-    const ports = definition ? [...definition.ports] : [];
-    const scaleFactor = appearanceDefault?.scale ?? 1;
-    const data: PlacedStamp = {
-      id,
-      category,
-      transform: { position: worldPosition, rotationDegrees: this.stampGhostRotationDegrees, scale: { x: scaleFactor, y: scaleFactor } },
-      nativeWidth,
-      nativeHeight,
-      ports,
-      definitionId,
-      color: appearanceDefault?.color,
-    };
-    const sprite = new Sprite(texture);
-    sprite.anchor.set(0.5); // pivot = own center, matching the reference semantics
-    const baseScale = computeStampBaseScale(nativeWidth, nativeHeight, texture);
-    applyTransformToSprite(sprite, data.transform, baseScale);
-    applyStampColor(sprite, texture, data.color);
-    this.doc.stamps.set(id, { sprite, baseScale, baseTexture: texture });
-    this.doc.stampsLayer.addChild(sprite);
-    this.doc.drawingHistory.execute(createStampCommand(data));
-    // Instantiates the definition's authoring-time port groups (Element Editor
-    // dialog link mode) into real instance-level PortGroup entries, same idea
-    // as the connectivity spec's synthetic-center-port replacement — pushed
-    // directly (not via setPortGroup, which assumes one group per element)
-    // since a definition can carry several independent groups (e.g. an AHU's
-    // supply pair and return pair as two separate connectivity nodes).
-    for (const group of definition?.definitionPortGroups ?? []) {
-      this.doc.portGroups.push({ elementId: id, portIds: group });
-    }
-    this.doc.selectedIds = new Set([id]);
-    this.syncDrawingLayer();
-    this.markDirty();
-    // Deliberately does NOT revert to Select (unlike draw-textbox/draw-sticky-note) —
-    // stamp placement stays active so the user can place the same stamp repeatedly;
-    // Escape (onKeyDown) is the only way out of place-terminal/place-equipment.
-    this.emitter.emit('selectionChanged', this.getSelection());
-  }
-
   /**
-   * Click-to-draw segment tool: the first click resolves and remembers a
-   * start endpoint (without mutating anything yet — see DrawEndpointResolution),
-   * the next click resolves the end endpoint and applies both endpoints'
-   * setup plus the new segment as one CompositeCommand, so each individual
-   * segment is always exactly one undo step. After committing, the run
-   * chains on automatically (§2.2, Phase 6): connecting to a fitting or an
-   * Equipment's port re-arms pendingSegmentStart from the endpoint just
-   * placed, so the very next click continues the run; connecting to a
-   * Terminal's port ends the chain (an end-use device, not a pass-through
-   * node) — mirrors the old app's MepSegmentCreate. Escape (onKeyDown)
-   * cancels an in-progress chain early.
-   */
-  private onDrawSegmentClick(world: Vec2): void {
-    const snapRadius = this.snapRadiusScreenPx / this.world.scale.x;
-    const state = this.doc.drawingHistory.getState();
-    const stamps = Object.values(state.stamps);
-    const segments = Object.values(state.segments);
-    const fittings = Object.values(state.fittings);
-
-    const target = resolveSegmentEndpoint(world, stamps, fittings, segments, { radius: snapRadius });
-    const resolved = this.resolveDrawTarget(target);
-
-    if (!this.pendingSegmentStart) {
-      this.pendingSegmentStart = resolved;
-      this.redrawOverlay();
-      return;
-    }
-
-    const start = this.pendingSegmentStart;
-    this.pendingSegmentStart = null;
-
-    const newSegment: Segment = {
-      id: `segment-${this.doc.nextSegmentSeq++}`,
-      pageIndex: 0,
-      networkTypeId: this.activeNetworkTypeId,
-      shape: 'round',
-      diameter: 200,
-      endpointA: start.point,
-      endpointB: resolved.point,
-      geometry: [start.worldPosition, resolved.worldPosition],
-    };
-
-    const subCommands: Command<DrawingState>[] = [];
-    if (start.setupCommand) subCommands.push(start.setupCommand);
-    if (resolved.setupCommand) subCommands.push(resolved.setupCommand);
-    subCommands.push(createSegmentCommand(newSegment));
-
-    this.doc.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
-    this.pendingSegmentStart = this.chainContinuationFrom(resolved, state.stamps);
-    this.pendingSegmentCursor = null;
-    this.activeChainAnchorId = this.pendingSegmentStart ? newSegment.id : null;
-    this.syncDrawingLayer();
-    this.markDirty();
-    this.redrawOverlay();
-  }
-
-  /** Whether a just-placed segment endpoint continues the chain (§2.2/Phase 6): a bare fitting always continues; a stamp's port continues only for Equipment (a pass-through node), not Terminal (an end-use device that should end the run). */
-  private chainContinuationFrom(resolved: DrawEndpointResolution, stamps: Record<string, PlacedStamp>): DrawEndpointResolution | null {
-    if (resolved.point.kind === 'fitting') return resolved;
-    const stamp = stamps[resolved.point.elementId];
-    return stamp?.category === 'equipment' ? resolved : null;
-  }
-
-  private resolveDrawTarget(target: ReturnType<typeof resolveSegmentEndpoint>): DrawEndpointResolution {
-    if (target.kind === 'existing') {
-      return { point: target.point, worldPosition: target.worldPosition };
-    }
-
-    if (target.kind === 'new-fitting') {
-      const fitting: Fitting = { id: `fitting-${this.doc.nextFittingSeq++}`, pageIndex: 0, position: target.worldPosition, kind: 'junction' };
-      return {
-        point: { kind: 'fitting', fittingId: fitting.id },
-        worldPosition: target.worldPosition,
-        setupCommand: createFittingCommand(fitting),
-      };
-    }
-
-    // target.kind === 'break': auto-generates a junction at the click point on an existing run.
-    const newFitting: Fitting = {
-      id: `fitting-${this.doc.nextFittingSeq++}`,
-      pageIndex: target.original.pageIndex,
-      position: target.breakPoint,
-      kind: 'junction',
-    };
-    const { segmentA, segmentB } = splitSegmentAtFitting(target.original, newFitting, target.breakPoint, {
-      segmentA: `segment-${this.doc.nextSegmentSeq++}`,
-      segmentB: `segment-${this.doc.nextSegmentSeq++}`,
-    });
-    const setupCommand = new CompositeCommand(`Break segment ${target.original.id} into a junction`, [
-      deleteSegmentCommand(target.original),
-      createFittingCommand(newFitting),
-      createSegmentCommand(segmentA),
-      createSegmentCommand(segmentB),
-    ]);
-    return { point: { kind: 'fitting', fittingId: newFitting.id }, worldPosition: target.breakPoint, setupCommand };
-  }
-
-  /** Right-click "Draw from" menu's item text — names the specific port when the target is a real authored one (matching the old app's "Draw From Port" header), otherwise the generic "Draw from" (bare fitting, or a stamp's synthetic center point). */
-  private drawFromMenuLabel(point: ConnectionPoint, state: DrawingState): string {
-    if (point.kind === 'fitting' || point.portId === SYNTHETIC_CENTER_PORT_ID) return 'Draw from';
-    const stamp = state.stamps[point.elementId];
-    const port = stamp && getStampPorts(stamp).find((p) => p.id === point.portId);
-    return port ? `Draw from Port: ${port.name}` : 'Draw from';
-  }
-
-  /**
-   * Arms pendingSegmentStart from an already-existing port/fitting (the
-   * right-click "Draw from" menu's action) without creating anything new —
-   * unlike resolveDrawTarget's 'new-fitting'/'break' cases, this always
-   * targets an element that's already there, so there's no setupCommand to
-   * bundle. Switches into draw-segment with the start already pending, so
-   * the very next canvas click finishes the segment through
-   * onDrawSegmentClick's existing second-click path. Deliberately doesn't
-   * go through setTool() (which resets pendingSegmentStart as its first
+   * Arms draw-segment's pending start from an already-existing port/fitting (the
+   * right-click "Draw from" menu's action) without creating anything new. Switches into
+   * draw-segment with the start already pending, so the very next canvas click finishes
+   * the segment through DrawSegmentTool's existing second-click path. Deliberately doesn't
+   * go through setTool() (which resets the outgoing tool's own pending state as its first
    * line) — only replicates the other gesture resets it performs.
    */
   armSegmentStartFromTarget(point: ConnectionPoint, worldPosition: Vec2): void {
     this.tool = 'draw-segment';
     this.pendingPoints = [];
-    this.pendingPolylinePoints = [];
-    this.pendingPolylineCursor = null;
-    this.lastPolylineClickScreen = null;
-    this.activeChainAnchorId = null;
+    this.drawPolylineTool.onDeactivate();
     this.stampGhostRotationDegrees = 0;
     if (this.stampGhostSprite) this.stampGhostSprite.visible = false;
-    this.pendingSegmentStart = { point, worldPosition };
-    this.pendingSegmentCursor = null;
     this.emitter.emit('toolChanged', this.tool);
-    this.syncDrawingLayer();
-    this.redrawOverlay();
+    this.drawSegmentTool.armStartFromTarget(this.ctx, point, worldPosition);
   }
 
   private syncDrawingLayer(): void {
@@ -2881,7 +2144,8 @@ export class SketchScene {
   private computeVisibleFittingIds(state: DrawingState): Set<string> {
     const visible = new Set<string>();
     const anchorIds = new Set<string>(this.doc.selectedIds);
-    if (this.tool === 'draw-segment' && this.activeChainAnchorId) anchorIds.add(this.activeChainAnchorId);
+    const activeChainAnchorId = this.drawSegmentTool.getActiveChainAnchorId();
+    if (this.tool === 'draw-segment' && activeChainAnchorId) anchorIds.add(activeChainAnchorId);
     if (anchorIds.size === 0) return visible;
 
     const segments = Object.values(state.segments);
@@ -3042,14 +2306,16 @@ export class SketchScene {
       this.overlay.circle(p.x, p.y, 4 / this.world.scale.x).fill({ color: 0xffb300 });
     }
 
-    if (this.pendingSegmentStart) {
-      const p = this.pendingSegmentStart.worldPosition;
+    const pendingSegmentStart = this.drawSegmentTool.getPendingStart();
+    if (pendingSegmentStart) {
+      const p = pendingSegmentStart.worldPosition;
       this.overlay.circle(p.x, p.y, 5 / this.world.scale.x).fill({ color: 0xffa726 });
-      if (this.pendingSegmentCursor) {
+      const pendingSegmentCursor = this.drawSegmentTool.getPendingCursor();
+      if (pendingSegmentCursor) {
         const visuals = this.resolveNetworkTypeVisuals(this.activeNetworkTypeId);
         this.overlay
           .moveTo(p.x, p.y)
-          .lineTo(this.pendingSegmentCursor.x, this.pendingSegmentCursor.y)
+          .lineTo(pendingSegmentCursor.x, pendingSegmentCursor.y)
           .stroke({ width: 2 / this.world.scale.x, color: visuals.color });
       }
     }
@@ -3084,13 +2350,15 @@ export class SketchScene {
       this.overlay.rect(x, y, w, h).fill({ color: 0xfff176, alpha: 0.35 }).stroke({ width: 1 / this.world.scale.x, color: 0xf9a825 });
     }
 
-    if (this.pendingPolylinePoints.length > 0) {
-      const [first, ...rest] = this.pendingPolylinePoints;
+    const pendingPolylinePoints = this.drawPolylineTool.getPendingVertices();
+    if (pendingPolylinePoints.length > 0) {
+      const [first, ...rest] = pendingPolylinePoints;
       this.overlay.moveTo(first.x, first.y);
       for (const p of rest) this.overlay.lineTo(p.x, p.y);
-      if (this.pendingPolylineCursor) this.overlay.lineTo(this.pendingPolylineCursor.x, this.pendingPolylineCursor.y);
+      const pendingPolylineCursor = this.drawPolylineTool.getPendingCursor();
+      if (pendingPolylineCursor) this.overlay.lineTo(pendingPolylineCursor.x, pendingPolylineCursor.y);
       this.overlay.stroke({ width: 2 / this.world.scale.x, color: 0x42a5f5 });
-      for (const p of this.pendingPolylinePoints) {
+      for (const p of pendingPolylinePoints) {
         this.overlay.circle(p.x, p.y, 4 / this.world.scale.x).fill({ color: 0xffb300 });
       }
     }
