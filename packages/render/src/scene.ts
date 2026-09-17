@@ -1315,7 +1315,20 @@ export class SketchScene {
     const segment = state.segments[id];
     if (segment) {
       const [a, b] = segment.geometry;
-      await handle.addAnnotation({ id, kind: 'line', pageIndex: segment.pageIndex, geometry: { kind: 'line', from: a, to: b } });
+      const visuals = this.resolveNetworkTypeVisuals(segment.networkTypeId);
+      const colorRGBA: [number, number, number, number] = [
+        ((visuals.color >> 16) & 0xff) / 255,
+        ((visuals.color >> 8) & 0xff) / 255,
+        (visuals.color & 0xff) / 255,
+        1,
+      ];
+      await handle.addAnnotation({
+        id,
+        kind: 'line',
+        pageIndex: segment.pageIndex,
+        geometry: { kind: 'line', from: a, to: b },
+        style: { colorRGBA, strokeWidthPt: visuals.lineWidthPt },
+      });
       return;
     }
     const stampEntry = this.doc.stamps.get(id);
@@ -1340,10 +1353,27 @@ export class SketchScene {
       // reflects rotation baked into its pixels — the adapter does not
       // rotate pngBytes itself (see AnnotationGeometry's 'stamp' doc comment
       // in @mepapp/pdf-engine).
+      // stampEntry.sprite.scale bakes in computeStampBaseScale's 300-DPI-source
+      // -> PDF-point conversion (~0.24) — copying it here would extract the PNG
+      // at that same shrunk pixel density, discarding the source art's real
+      // resolution before it ever reaches the PDF (see round-trip
+      // investigation, issue 1: stamps came out pixelated at ~72 DPI
+      // equivalent). Using only transform.scale (the user's own resize factor,
+      // 1 unless they've dragged a resize handle) keeps the extraction at the
+      // source texture's native pixel density regardless of its physical
+      // placement size — the annotation's Rect (from stampWorldBounds below)
+      // is what carries the physical size into the PDF.
+      const pageInfo = handle.getPageInfo(0);
       const extractionSprite = new Sprite(stampEntry.sprite.texture);
       extractionSprite.anchor.set(0.5);
-      extractionSprite.rotation = stampEntry.sprite.rotation;
-      extractionSprite.scale.copyFrom(stampEntry.sprite.scale);
+      // Also compensates for the destination page's own /Rotate (see issue 3:
+      // Test_doc.pdf's stamp came out deformed/misrotated) — the PDF adapter
+      // writes this annotation's Rect in the page's native, unrotated
+      // content-stream space, so the baked-in pixels need the same rotation
+      // added on top of the stamp's own world-space rotation for the two to
+      // still agree once a viewer re-applies /Rotate for display.
+      extractionSprite.rotation = stampEntry.sprite.rotation + (pageInfo.rotationDegrees * Math.PI) / 180;
+      extractionSprite.scale.set(stampData.transform.scale.x, stampData.transform.scale.y);
       const extractionRoot = new Container();
       extractionRoot.addChild(extractionSprite);
       const pngBytes = dataUrlToBytes(await this.app.renderer.extract.base64({ target: extractionRoot, format: 'png' }));

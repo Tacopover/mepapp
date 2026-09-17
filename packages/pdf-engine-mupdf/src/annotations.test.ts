@@ -254,6 +254,79 @@ describe('MupdfEngine stamp annotation (Step 7)', () => {
   });
 });
 
+describe('MupdfEngine stamp annotation on a rotated page (round-trip investigation, issue 3)', () => {
+  it('writes the Rect/rotation in the page\'s native content-stream space and reads back the original world-space geometry', async () => {
+    const engine = new MupdfEngine();
+    const rotatedDoc = new mupdf.PDFDocument();
+    rotatedDoc.insertPage(-1, rotatedDoc.addPage([0, 0, 300, 400], 90, {}, ''));
+    const bytes = rotatedDoc.saveToBuffer().asUint8Array();
+    rotatedDoc.destroy();
+    const doc = await engine.openDocument(bytes);
+
+    const tinyDoc = new mupdf.PDFDocument();
+    tinyDoc.insertPage(-1, tinyDoc.addPage([0, 0, 10, 10], 0, {}, ''));
+    const pngBytes = tinyDoc.loadPage(0).toPixmap([1, 0, 0, 1, 0, 0], mupdf.ColorSpace.DeviceRGB, false, true).asPNG();
+    tinyDoc.destroy();
+
+    await doc.addAnnotation({
+      id: 'stamp-rot',
+      kind: 'stamp',
+      pageIndex: 0,
+      geometry: { kind: 'stamp', position: { x: 20, y: 30 }, widthPt: 40, heightPt: 25, rotationDegrees: 0, pngBytes: new Uint8Array(pngBytes) },
+    });
+
+    // The stored Rect must be in the page's native (unrotated) content-stream
+    // space, not the world-space numbers passed in — for a 90° page, that
+    // means swapped width/height at a different position, matching
+    // worldPointToContent's hand-derived formula (verified against
+    // PDFPage.getTransform() ground truth in the round-trip investigation).
+    const saved = await doc.save();
+    const rawCheck = new mupdf.PDFDocument(saved);
+    const rawRect = rawCheck.loadPage(0).getAnnotations()[0].getRect();
+    expect(rawRect).toEqual([245, 20, 270, 60]);
+    rawCheck.destroy();
+
+    // But listAnnotations (the public, world-space-facing API) must undo that
+    // conversion and hand back exactly what was written in.
+    const reopened = await engine.openDocument(saved);
+    const listed = await reopened.listAnnotations(0);
+    expect(listed).toHaveLength(1);
+    if (listed[0].geometry.kind === 'stamp') {
+      expect(listed[0].geometry.position).toEqual({ x: 20, y: 30 });
+      expect(listed[0].geometry.widthPt).toBe(40);
+      expect(listed[0].geometry.heightPt).toBe(25);
+      expect(listed[0].geometry.rotationDegrees).toBe(0);
+    }
+  });
+});
+
+describe('MupdfEngine save() called more than once per open session (round-trip investigation, issue 4)', () => {
+  it('does not corrupt the xref chain when save() is called again after further edits, without reopening', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+
+    await doc.addAnnotation({ kind: 'rectangle', pageIndex: 0, geometry: { kind: 'rectangle', rect: { x0: 0, y0: 0, x1: 10, y1: 10 } } });
+    await doc.save(); // first Save click
+
+    await doc.addAnnotation({ kind: 'rectangle', pageIndex: 0, geometry: { kind: 'rectangle', rect: { x0: 20, y0: 20, x1: 30, y1: 30 } } });
+    const secondSave = await doc.save(); // second Save click, same handle, no reopen in between
+
+    await doc.addAnnotation({ kind: 'rectangle', pageIndex: 0, geometry: { kind: 'rectangle', rect: { x0: 40, y0: 40, x1: 50, y1: 50 } } });
+    const thirdSave = await doc.save(); // third Save click
+
+    const rawSecond = new mupdf.PDFDocument(secondSave);
+    expect(rawSecond.wasRepaired()).toBe(false);
+    rawSecond.destroy();
+
+    const rawThird = new mupdf.PDFDocument(thirdSave);
+    expect(rawThird.wasRepaired()).toBe(false);
+    rawThird.destroy();
+
+    const reopened = await engine.openDocument(thirdSave);
+    expect(await reopened.listAnnotations(0)).toHaveLength(3);
+  });
+});
+
 describe('MupdfEngine embedded project JSON (Step 7)', () => {
   it('setEmbeddedFile then getEmbeddedFile round-trips through save+reopen', async () => {
     const engine = new MupdfEngine();
