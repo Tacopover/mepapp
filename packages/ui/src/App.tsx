@@ -117,6 +117,7 @@ export function MepSketchApp({
     tool,
     selection,
     selectedSegment,
+    selectedFitting,
     hasSelection,
     allStamps,
     networkSummaries,
@@ -589,11 +590,13 @@ export function MepSketchApp({
         sceneRef={sceneRef}
         selection={selection}
         selectedSegment={selectedSegment}
+        selectedFitting={selectedFitting}
         networkTypes={networkTypes}
         capacityInput={capacityInput}
         setCapacityInput={setCapacityInput}
         customPropertyDefs={customPropertyDefs}
         customStampDefinitions={customStampDefinitions}
+        labelLanguage={labelLanguage}
         onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
       />
     ),
@@ -608,9 +611,9 @@ export function MepSketchApp({
     // active tool (i.e. back on 'select'), matching the moment a selection change actually reflects
     // a deliberate pick rather than a placement side-effect.
     if (tool !== 'select') return;
-    setForcedTabId(selection.length > 0 || selectedSegment ? 'properties' : null);
+    setForcedTabId(selection.length > 0 || selectedSegment || selectedFitting ? 'properties' : null);
     setForcedTabNonce((n) => n + 1);
-  }, [selection, selectedSegment, tool]);
+  }, [selection, selectedSegment, selectedFitting, tool]);
 
   return (
     <div className="mep-app">

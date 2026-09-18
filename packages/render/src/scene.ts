@@ -43,6 +43,7 @@ import {
   type CustomPropertyDefinition,
   type CustomPropertyValues,
   type Discipline,
+  type FittingKind,
   type FlowResult,
   type LinePattern,
   type Network,
@@ -256,6 +257,13 @@ export interface SegmentInfo {
   height?: number;
   material?: string;
   lengthPt: number;
+}
+
+/** The Properties panel's read model for a single selected fitting — see getSelectedFittingInfo. */
+export interface FittingInfo {
+  id: string;
+  kind: FittingKind;
+  position: Vec2;
 }
 
 /**
@@ -820,6 +828,37 @@ export class SketchScene {
       material: segment.material,
       lengthPt,
     };
+  }
+
+  /** The Properties panel's Shape/Diameter/Width/Height/Material fields for a selected segment — edits just this one segment, unlike setNetworkTypeForSegmentNetwork which retags a whole connected run. These fields are data-only today (see core's Segment doc comment: color/width/pattern for drawing come from the segment's NetworkType instead), so no redraw is needed, just persistence + a refreshed read model. */
+  updateSegmentFields(segmentId: string, patch: Partial<Pick<Segment, 'shape' | 'diameter' | 'width' | 'height' | 'material'>>): void {
+    const state = this.doc.drawingHistory.getState();
+    if (!state.segments[segmentId]) return;
+    const tx = new Transaction(this.doc.drawingHistory, 'Edit segment');
+    tx.update((s) => ({ ...s, segments: { ...s.segments, [segmentId]: { ...s.segments[segmentId], ...patch } } }));
+    tx.commit();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** The Properties panel's read model for a fitting selection — null unless exactly one fitting (and nothing else) is selected, mirroring getSelectedSegmentInfo. */
+  getSelectedFittingInfo(): FittingInfo | null {
+    if (this.doc.selectedIds.size !== 1) return null;
+    const [id] = this.doc.selectedIds;
+    const fitting = this.doc.drawingHistory.getState().fittings[id];
+    if (!fitting) return null;
+    return { id: fitting.id, kind: fitting.kind, position: fitting.position };
+  }
+
+  /** The Properties panel's Kind dropdown for a selected fitting. Fitting markers don't render differently per kind today (see redrawOverlay), so no redraw is needed, just persistence + a refreshed read model. */
+  setFittingKind(fittingId: string, kind: FittingKind): void {
+    const state = this.doc.drawingHistory.getState();
+    if (!state.fittings[fittingId]) return;
+    const tx = new Transaction(this.doc.drawingHistory, 'Change fitting kind');
+    tx.update((s) => ({ ...s, fittings: { ...s.fittings, [fittingId]: { ...s.fittings[fittingId], kind } } }));
+    tx.commit();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /**
