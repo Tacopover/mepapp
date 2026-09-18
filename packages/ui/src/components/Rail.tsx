@@ -12,6 +12,7 @@ export interface RailProps {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  onOpenSettings: () => void;
 }
 
 function needsStamp(t: SketchTool | null): boolean {
@@ -25,10 +26,17 @@ function needsStamp(t: SketchTool | null): boolean {
  * listing the rest. Members with `tool: null` (toolRegistry.ts) are reserved
  * slots for tools nobody has built yet — they render disabled.
  */
-export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRedo, onUndo, onRedo }: RailProps) {
+export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRedo, onUndo, onRedo, onOpenSettings }: RailProps) {
   const [lastPickedByRow, setLastPickedByRow] = useState<Record<string, string>>({});
   const [openRow, setOpenRow] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // The single 'Stamp' button re-enters whichever of place-terminal/place-equipment was last
+  // active (the actual Terminal/Equipment choice happens in the MEP dock tab's stamp grid),
+  // so re-clicking it after an Escape resumes the same category instead of always Terminal.
+  const [lastStampTool, setLastStampTool] = useState<'place-terminal' | 'place-equipment'>('place-terminal');
+  useEffect(() => {
+    if (tool === 'place-terminal' || tool === 'place-equipment') setLastStampTool(tool);
+  }, [tool]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
@@ -45,16 +53,24 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
         const current = row.members.find((m) => m.id === currentId) ?? row.members[0];
         const flyoutMembers = row.members.filter((m) => m.id !== current.id);
         const isOpen = openRow === row.id;
+        const isStampRow = row.id === 'place';
+        const stampRowActive = tool === 'place-terminal' || tool === 'place-equipment';
 
         return (
           <div key={row.id} className="mep-rail-row">
             <div className="mep-rail-row-main">
               <button
                 type="button"
-                className={`mep-rail-btn${tool === current.tool ? ' active' : ''}`}
+                className={`mep-rail-btn${(isStampRow ? stampRowActive : tool === current.tool) ? ' active' : ''}`}
                 title={current.tool === null ? `${current.label} — coming soon` : current.label}
                 disabled={current.tool === null || (needsStamp(current.tool) && !stampReady)}
-                onClick={() => current.tool && sceneRef.current?.setTool(current.tool)}
+                onClick={() => {
+                  if (isStampRow) {
+                    if (stampReady) sceneRef.current?.setTool(lastStampTool);
+                    return;
+                  }
+                  current.tool && sceneRef.current?.setTool(current.tool);
+                }}
               >
                 <current.Icon size={18} />
               </button>
@@ -72,24 +88,33 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
 
             {isOpen && (
               <div className="mep-rail-flyout">
-                {flyoutMembers.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className="mep-rail-flyout-btn"
-                    title={m.tool === null ? `${m.label} — coming soon` : m.label}
-                    disabled={m.tool === null || (needsStamp(m.tool) && !stampReady)}
-                    onClick={() => {
-                      if (!m.tool) return;
-                      sceneRef.current?.setTool(m.tool);
-                      setLastPickedByRow((prev) => ({ ...prev, [row.id]: m.id }));
-                      setOpenRow(null);
-                    }}
-                  >
-                    <m.Icon size={16} />
-                    <span>{m.label}</span>
-                  </button>
-                ))}
+                {flyoutMembers.map((m) => {
+                  const isSnapAngle = m.id === 'snap-angle';
+                  const comingSoon = m.tool === null && !isSnapAngle;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className="mep-rail-flyout-btn"
+                      title={comingSoon ? `${m.label} — coming soon` : m.label}
+                      disabled={comingSoon || (needsStamp(m.tool) && !stampReady)}
+                      onClick={() => {
+                        if (isSnapAngle) {
+                          onOpenSettings();
+                          setOpenRow(null);
+                          return;
+                        }
+                        if (!m.tool) return;
+                        sceneRef.current?.setTool(m.tool);
+                        setLastPickedByRow((prev) => ({ ...prev, [row.id]: m.id }));
+                        setOpenRow(null);
+                      }}
+                    >
+                      <m.Icon size={16} />
+                      <span>{m.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

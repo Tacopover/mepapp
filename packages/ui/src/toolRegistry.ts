@@ -4,11 +4,8 @@
 import type { ReactElement } from 'react';
 import type { SketchTool } from '@mepapp/render';
 import {
-  IconSelect,
-  IconMove,
   IconPan,
-  IconTerminal,
-  IconEquipment,
+  IconStamp,
   IconSegment,
   IconSnapAngle,
   IconConnection,
@@ -43,24 +40,16 @@ export interface RailRow {
 
 export const RAIL_ROWS: RailRow[] = [
   {
-    id: 'select-edit',
-    members: [
-      { id: 'select', label: 'Select', Icon: IconSelect, tool: 'select' },
-      // No distinct action of its own — Select's drag-to-move (generalized to cover annotations, not just stamps) already handles continuous move.
-      { id: 'move', label: 'Move', Icon: IconMove, tool: null },
-    ],
-  },
-  {
     id: 'pan',
     singleton: true,
     members: [{ id: 'pan', label: 'Pan', Icon: IconPan, tool: 'pan' }],
   },
   {
+    // Terminal vs. Equipment is chosen in the MEP dock tab's stamp grid (CategorySwitcher),
+    // not here — see Rail.tsx's isStampRow handling for why this stays a singleton.
     id: 'place',
-    members: [
-      { id: 'place-terminal', label: 'Terminal', Icon: IconTerminal, tool: 'place-terminal' },
-      { id: 'place-equipment', label: 'Equipment', Icon: IconEquipment, tool: 'place-equipment' },
-    ],
+    singleton: true,
+    members: [{ id: 'stamp', label: 'Stamp', Icon: IconStamp, tool: 'place-terminal' }],
   },
   {
     id: 'draw-network',

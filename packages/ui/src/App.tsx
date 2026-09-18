@@ -665,6 +665,7 @@ export function MepSketchApp({
                 canRedo={drawingSummary.canRedo}
                 onUndo={() => sceneRef.current?.undoDrawing()}
                 onRedo={() => sceneRef.current?.redoDrawing()}
+                onOpenSettings={() => setSettingsOpen(true)}
               />
               {textboxPrompt && (
                 <textarea
