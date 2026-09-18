@@ -51,6 +51,8 @@ export interface PropertiesPanelProps {
   selection: StampInfo[];
   /** The lone selected segment's read model — see SketchScene.getSelectedSegmentInfo. Only non-null when exactly one segment (and nothing else) is selected. */
   selectedSegment: SegmentInfo | null;
+  /** A pure multi-segment selection's read models — see SketchScene.getSelectedSegments. Only non-empty when 2+ segments (and nothing else) are selected. */
+  selectedSegments: SegmentInfo[];
   /** The lone selected fitting's read model — see SketchScene.getSelectedFittingInfo. Only non-null when exactly one fitting (and nothing else) is selected. */
   selectedFitting: FittingInfo | null;
   /** The active document's adopted network types — the selected segment's "Network Type" dropdown. */
@@ -70,6 +72,7 @@ export function PropertiesPanel({
   sceneRef,
   selection,
   selectedSegment,
+  selectedSegments,
   selectedFitting,
   networkTypes,
   capacityInput,
@@ -79,14 +82,16 @@ export function PropertiesPanel({
   labelLanguage,
   onEditPorts,
 }: PropertiesPanelProps) {
+  // Every library type, resolved against this document's own adopted
+  // overrides (name/color/etc), plus any duplicated types that only exist
+  // in this document — same effective-list logic as StampsPanel's tiles.
+  // Shared by the single- and multi-segment branches below.
+  const availableNetworkTypes = [
+    ...NETWORK_TYPE_LIBRARY.map((lib) => networkTypes.find((t) => t.id === lib.id) ?? lib),
+    ...networkTypes.filter((t) => !NETWORK_TYPE_LIBRARY.some((lib) => lib.id === t.id)),
+  ];
+
   if (selection.length === 0 && selectedSegment) {
-    // Every library type, resolved against this document's own adopted
-    // overrides (name/color/etc), plus any duplicated types that only exist
-    // in this document — same effective-list logic as StampsPanel's tiles.
-    const availableNetworkTypes = [
-      ...NETWORK_TYPE_LIBRARY.map((lib) => networkTypes.find((t) => t.id === lib.id) ?? lib),
-      ...networkTypes.filter((t) => !NETWORK_TYPE_LIBRARY.some((lib) => lib.id === t.id)),
-    ];
     return (
       <div>
         <div className="mep-elem-row">
@@ -202,6 +207,102 @@ export function PropertiesPanel({
             <label>Y (pt)</label>
             <input type="number" value={Math.round(selectedFitting.position.y * 100) / 100} disabled />
           </div>
+        </div>
+      </div>
+    );
+  }
+  if (selection.length === 0 && selectedSegments.length > 1) {
+    const networkTypeId = commonValue(selectedSegments, (s) => s.networkTypeId);
+    const shape = commonValue(selectedSegments, (s) => s.shape);
+    const diameter = commonValue(selectedSegments, (s) => s.diameter);
+    const width = commonValue(selectedSegments, (s) => s.width);
+    const height = commonValue(selectedSegments, (s) => s.height);
+    const material = commonValue(selectedSegments, (s) => s.material);
+
+    return (
+      <div>
+        <div className="mep-elem-row">
+          <div style={{ flex: 1 }}>
+            <b>{selectedSegments.length} segments selected</b>
+          </div>
+        </div>
+        <div className="mep-section">
+          <div className="mep-field-row">
+            <label>Network Type{networkTypeId === undefined ? ` (${VARIES})` : ''}</label>
+            <select
+              value={networkTypeId ?? ''}
+              onChange={(e) => sceneRef.current?.updateSegmentsForSelection({ networkTypeId: e.target.value })}
+            >
+              {networkTypeId === undefined && <option value="">{VARIES}</option>}
+              {availableNetworkTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="mep-field-row">
+            <label>Shape{shape === undefined ? ` (${VARIES})` : ''}</label>
+            <select
+              value={shape ?? ''}
+              onChange={(e) => {
+                const nextShape = e.target.value as SegmentShape;
+                sceneRef.current?.updateSegmentsForSelection({
+                  shape: nextShape,
+                  diameter: nextShape === 'round' ? (diameter ?? DEFAULT_DIAMETER) : undefined,
+                  width: nextShape === 'rectangular' ? (width ?? DEFAULT_WIDTH) : undefined,
+                  height: nextShape === 'rectangular' ? (height ?? DEFAULT_HEIGHT) : undefined,
+                });
+              }}
+            >
+              {shape === undefined && <option value="">{VARIES}</option>}
+              <option value="round">Round</option>
+              <option value="rectangular">Rectangular</option>
+            </select>
+          </div>
+          {shape === 'round' && (
+            <div className="mep-field-row">
+              <label>Diameter (pt){diameter === undefined ? ` (${VARIES})` : ''}</label>
+              <input
+                type="number"
+                value={diameter ?? ''}
+                placeholder={diameter === undefined ? VARIES : undefined}
+                onChange={(e) => sceneRef.current?.updateSegmentsForSelection({ diameter: Number(e.target.value) || 0 })}
+              />
+            </div>
+          )}
+          {shape === 'rectangular' && (
+            <>
+              <div className="mep-field-row">
+                <label>Width (pt){width === undefined ? ` (${VARIES})` : ''}</label>
+                <input
+                  type="number"
+                  value={width ?? ''}
+                  placeholder={width === undefined ? VARIES : undefined}
+                  onChange={(e) => sceneRef.current?.updateSegmentsForSelection({ width: Number(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="mep-field-row">
+                <label>Height (pt){height === undefined ? ` (${VARIES})` : ''}</label>
+                <input
+                  type="number"
+                  value={height ?? ''}
+                  placeholder={height === undefined ? VARIES : undefined}
+                  onChange={(e) => sceneRef.current?.updateSegmentsForSelection({ height: Number(e.target.value) || 0 })}
+                />
+              </div>
+            </>
+          )}
+          <div className="mep-field-row">
+            <label>Material{material === undefined ? ` (${VARIES})` : ''}</label>
+            <input
+              type="text"
+              value={material ?? ''}
+              placeholder={material === undefined ? VARIES : undefined}
+              onChange={(e) => sceneRef.current?.updateSegmentsForSelection({ material: e.target.value })}
+            />
+          </div>
+          <p className="mep-hint">Editing here applies only to the selected segments, not their whole connected runs.</p>
         </div>
       </div>
     );

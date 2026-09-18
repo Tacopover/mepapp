@@ -810,12 +810,8 @@ export class SketchScene {
     return this.doc.selectedIds.size > 0;
   }
 
-  /** The Properties panel's read model for a segment selection — null unless exactly one segment (and nothing else) is selected, mirroring getSelection()'s stamps-only counterpart. */
-  getSelectedSegmentInfo(): SegmentInfo | null {
-    if (this.doc.selectedIds.size !== 1) return null;
-    const [id] = this.doc.selectedIds;
-    const segment = this.doc.drawingHistory.getState().segments[id];
-    if (!segment) return null;
+  /** Shared by getSelectedSegmentInfo/getSelectedSegments — recomputes the polyline length live rather than storing it, same "derive, don't cache" stance as the rest of this read-model layer. */
+  private toSegmentInfo(segment: Segment): SegmentInfo {
     let lengthPt = 0;
     for (let i = 1; i < segment.geometry.length; i++) lengthPt += distance(segment.geometry[i - 1], segment.geometry[i]);
     return {
@@ -830,6 +826,23 @@ export class SketchScene {
     };
   }
 
+  /** The Properties panel's read model for a segment selection — null unless exactly one segment (and nothing else) is selected, mirroring getSelection()'s stamps-only counterpart. */
+  getSelectedSegmentInfo(): SegmentInfo | null {
+    if (this.doc.selectedIds.size !== 1) return null;
+    const [id] = this.doc.selectedIds;
+    const segment = this.doc.drawingHistory.getState().segments[id];
+    return segment ? this.toSegmentInfo(segment) : null;
+  }
+
+  /** The Properties panel's read model for a pure multi-segment selection (the segment counterpart of getSelection()'s multi-stamp list) — empty unless every currently selected id is a segment and there are at least two, so a mixed stamp/fitting/segment selection still falls back to the "nothing to show" empty state rather than a half-populated one. */
+  getSelectedSegments(): SegmentInfo[] {
+    if (this.doc.selectedIds.size < 2) return [];
+    const state = this.doc.drawingHistory.getState();
+    const segments = [...this.doc.selectedIds].map((id) => state.segments[id]).filter((s): s is Segment => s !== undefined);
+    if (segments.length !== this.doc.selectedIds.size) return [];
+    return segments.map((segment) => this.toSegmentInfo(segment));
+  }
+
   /** The Properties panel's Shape/Diameter/Width/Height/Material fields for a selected segment — edits just this one segment, unlike setNetworkTypeForSegmentNetwork which retags a whole connected run. These fields are data-only today (see core's Segment doc comment: color/width/pattern for drawing come from the segment's NetworkType instead), so no redraw is needed, just persistence + a refreshed read model. */
   updateSegmentFields(segmentId: string, patch: Partial<Pick<Segment, 'shape' | 'diameter' | 'width' | 'height' | 'material'>>): void {
     const state = this.doc.drawingHistory.getState();
@@ -837,6 +850,37 @@ export class SketchScene {
     const tx = new Transaction(this.doc.drawingHistory, 'Edit segment');
     tx.update((s) => ({ ...s, segments: { ...s.segments, [segmentId]: { ...s.segments[segmentId], ...patch } } }));
     tx.commit();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /**
+   * The Properties panel's bulk field edits for a multi-segment selection —
+   * applies directly to just the selected segments, unlike the single-segment
+   * Network Type dropdown's setNetworkTypeForSegmentNetwork, which retags
+   * every segment in the whole connected run. A multi-select is already an
+   * explicit, deliberate choice of segments, so re-extending it to each
+   * one's whole run would silently widen the edit past what was selected.
+   */
+  updateSegmentsForSelection(patch: Partial<Pick<Segment, 'networkTypeId' | 'shape' | 'diameter' | 'width' | 'height' | 'material'>>): void {
+    const state = this.doc.drawingHistory.getState();
+    const segmentIds = [...this.doc.selectedIds].filter((id) => state.segments[id]);
+    if (segmentIds.length === 0) return;
+    if (patch.networkTypeId && !this.doc.networkTypes.some((t) => t.id === patch.networkTypeId)) {
+      const type = getNetworkTypeFromLibrary(patch.networkTypeId);
+      if (type) {
+        this.doc.networkTypes.push(type);
+        this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+      }
+    }
+    const tx = new Transaction(this.doc.drawingHistory, 'Edit segments');
+    tx.update((s) => {
+      const segments = { ...s.segments };
+      for (const id of segmentIds) segments[id] = { ...segments[id], ...patch };
+      return { ...s, segments };
+    });
+    tx.commit();
+    this.syncDrawingLayer();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
