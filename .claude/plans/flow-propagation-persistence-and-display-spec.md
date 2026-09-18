@@ -1,0 +1,85 @@
+# Flow propagation — persistence + on-canvas display (Option A)
+
+Scope decided with the user 2026-09-18: close the two gaps in the
+already-built flow-propagation solver — values aren't saved with the
+project, and nothing shows on the canvas except one document-wide total.
+Two other options investigated the same session are explicitly deferred:
+an explicit equipment "source" flag (replacing today's degree-1-node
+heuristic) and duct/pipe auto-sizing from solved capacity. Neither is in
+scope here.
+
+## 1. What already exists (confirmed by reading the code, 2026-09-18)
+
+The solver itself is fully built and tested — this is a persistence +
+display task, not new solver work:
+
+- `packages/core/src/flow.ts` — `solveFlow()`. Post-order DFS over a
+  `nodeKeyOf`-keyed adjacency graph, summing each terminal's user-entered
+  capacity up through fittings/segments toward a root. A cycle-closing
+  edge is left `null` (unresolved) via a visited-set check. Root:
+  explicit `rootElementId`, else a degree-1 non-terminal node, else any
+  degree-1 node, else arbitrary. Ported from the old app's
+  `NetworkFlowProcessor.cs` (`flow.ts`'s own header comment cites exact
+  line ranges). Full test coverage in `flow.test.ts`.
+- `packages/core/src/network.ts` — `computeNetworks()` (union-find) is
+  the shared connectivity graph, already reused by the network-type
+  retagging feature.
+- `packages/render/src/document.ts:85` — `terminalCapacities: Map<string,
+  number>` lives on `SketchDocument`, **in memory only**.
+- `packages/render/src/document.ts:91` — `lastFlowResult: FlowResult[] |
+  null`, also in memory only.
+- `packages/render/src/scene.ts`:
+  - `setTerminalCapacity(elementId, capacity)` (~L1052) — single-stamp input.
+  - `setCapacityForSelection(capacity)` (~L1585) — multi-select input, not undoable (matches `setTerminalCapacity`'s own non-undoable status — capacity is a working-value input, not drawing-history state).
+  - `computeFlow()` (~L1129) — recomputes `computeNetworks()` fresh, runs `solveFlow` per network, stores into `doc.lastFlowResult`, emits `flowSolved`.
+  - `exportProject()` (~L1142) / `loadProjectFromJson()` (~L1180) — the **only** save/load boundary in the app (there is no separate `.mep`/JSON file save path — `App.tsx` only ever writes a PDF with the project embedded as a file via `exportToPdf`/`loadFromPdf`). Today neither method touches `terminalCapacities` at all.
+- `packages/ui/src/App.tsx:527-576` — "Solve flow" button (Networks tab) plus one line: total capacity summed across every segment's `segmentCapacity` in every network, no per-segment breakdown, no direction indicator.
+- `packages/ui/src/components/PropertiesPanel.tsx:171-176,285-290` — capacity input fields exist for a stamp selection; `SegmentInfo` (`scene.ts:806-823`, the segment-selected read model) has **no** capacity/solved-value field at all.
+- Confirmed by grep: no `Text(`/label-drawing call anywhere in `scene.ts` references capacity or flow — the only two `new Text(...)` call sites (~L2290, ~L2305) are annotation freehand/textbox rendering, unrelated.
+
+## 2. Gap vs. this spec's scope
+
+| Need | Exists today? | Where it must be added |
+|---|---|---|
+| Save `terminalCapacities` with the project | No — in-memory `Map` only | `ProjectDocument` schema + `exportProject`/`loadProjectFromJson` |
+| Restore `terminalCapacities` on load | No | same as above |
+| Schema migration for old saves (no field) | N/A (field doesn't exist yet) | `project.ts` migration step v7→v8 |
+| Per-segment solved-capacity label on canvas | No | new render pass in `scene.ts` |
+| Flow-direction indicator on canvas | No (legacy had "F"/"T" text; MepApp has nothing) | same new render pass |
+| Per-segment capacity in the Properties panel | No (`SegmentInfo` has no such field) | `getSelectedSegmentInfo()` + `PropertiesPanel.tsx` |
+
+## 3. Phase 1 — Persistence
+
+1. **Schema.** Bump `CURRENT_SCHEMA_VERSION` 7 → 8 in `packages/core/src/project.ts`. Add `terminalCapacities: Record<string, number>` to `ProjectDocument`. Add a migration step (`fromVersion: 7, toVersion: 8`) defaulting `terminalCapacities` to `{}` when absent, following the exact pattern of the v3→v4/v4→v5 steps (plain array/object default, no inference of values that were never recorded). Add `requireArray` — no, this field is an object not an array, so add a small `requireObject` validator alongside the existing `requireArray` helper, or just validate it's a plain object inline.
+2. **Export.** `SketchScene.exportProject()` (`scene.ts` ~L1142): add `terminalCapacities: Object.fromEntries(this.doc.terminalCapacities)` to the object passed into `serializeProject`.
+3. **Import.** `SketchScene.loadProjectFromJson()` (`scene.ts` ~L1180): after the existing `target.portGroups.splice(...)` line, add `target.terminalCapacities.clear(); for (const [id, value] of Object.entries(doc.terminalCapacities)) target.terminalCapacities.set(id, value);` (mirrors how `portGroups`/`customStampDefinitions` are restored — clear-then-repopulate the live document field from the loaded `doc`).
+4. **Tests.** `packages/core/src/project.test.ts`: one round-trip test (capacities survive a full serialize/load cycle unchanged) plus one migration test (`migrates a pre-terminalCapacities (v7) save, defaulting to an empty object`), following the file's existing per-version test pattern exactly.
+5. **Do not persist `lastFlowResult`.** Solved values stay derived/in-memory only, recomputed by clicking "Solve flow" after a project loads — consistent with `computeFlow()`'s own doc comment ("recomputed from current topology on every call — there is no stored NetworkId to go stale"). Persisting a stale solve would reintroduce exactly the staleness problem that comment is written to avoid.
+
+## 4. Phase 2 — On-canvas display
+
+1. **New render layer.** Add a `flowLabelLayer` `Container` on `SketchDocument` (`document.ts`), added to `this.world` alongside `stampsLayer`/`annotationTextLayer` wherever those are (`scene.ts` ~L505/~L707). Rebuilt fully on every successful `computeFlow()` call (not on every `syncDrawingLayer()` — flow values only change when explicitly solved, matching the existing manual-trigger model; wiring it into `syncDrawingLayer` would force a recompute-and-redraw on every unrelated edit, which is unnecessary and a behavior change nobody asked for).
+2. **Per-segment label.** For each segment with a non-null `segmentCapacity`, place a small `Text` node at the segment's midpoint (same node-construction pattern as the existing annotation labels at `scene.ts` ~L2290) showing the numeric value. No units suffix — `NetworkType.units` is documented as "never consulted," and this task doesn't change that; if the user wants units shown, that's a one-line follow-up, not core to this spec.
+3. **Direction indicator.** Legacy MEPSketcher used "F"/"T" text at each endpoint (`LineGraphics.cs`), not an arrowhead graphic. MepApp starts with nothing, so this is a fresh design decision, not a port — see D2 below.
+4. **Properties panel.** Add `solvedCapacity: number | null` to `SegmentInfo` (`scene.ts` `getSelectedSegmentInfo()`, ~L806) — look up the selected segment's id in `this.doc.lastFlowResult` (across all networks) if a solve has run, else `null`. Display it as a read-only row in `PropertiesPanel.tsx` next to the existing diameter/width/material fields, labeled distinctly from the (editable) terminal "Capacity" input so the two aren't confused — a segment's solved value is a derived read-out, a terminal's capacity is a user-entered input.
+5. **Fix the existing total-capacity metric while touching this code.** `App.tsx:527-531` sums `segmentCapacity` across *every* segment in *every* network — since each segment's value is already a subtree total (a segment nearer the root includes everything downstream of it), this over-counts rather than reporting true total demand. The correct total per network is the *root's* own demand (the max value at the network's source end), not a sum of every segment's value. This is a small, self-contained bug found during investigation, directly adjacent to the label work — fix it in the same phase rather than filing it separately and leaving the display visibly wrong while everything else around it gets fixed.
+
+## 5. Open decisions
+
+- **D1 — label visibility.** Always-on once solved, or a toggle (e.g. next to "Solve flow")? Recommend always-on for now — there's no existing show/hide affordance for any other overlay (dimension text, network-type color) to be consistent with, and a toggle can be added later if labels prove cluttered on dense drawings.
+- **D2 — direction indicator style.** Small arrowhead glyph (cleaner, no text collision with the capacity number) vs. reusing the legacy app's "F"/"T" text (proven, but old-fashioned and adds a second text node per segment right next to the capacity label). Recommend a small triangular arrowhead drawn into `flowLabelLayer` alongside the text, pointing from child toward root (i.e., the direction flow is assumed to travel) — cheaper to read at a glance than two-letter text, and doesn't require a font decision.
+- **D3 — where the fitting-capacity value (also solved, currently unused anywhere) is worth surfacing.** `FlowResult.fittingCapacity` is already computed but nothing reads it — out of scope for this pass unless the user wants a fitting (junction/tee) to show its through-capacity too. Flag only; no action unless requested.
+
+## 6. Non-goals (explicitly deferred, per user decision 2026-09-18)
+
+- **Option B** — explicit `isSource`/equipment-root flag on `PlacedStamp`, replacing the degree-1-node root heuristic. User will reconsider separately.
+- **Option C** — feeding solved capacity into automatic duct/pipe sizing. No precedent in either codebase; a genuinely separate, larger feature.
+
+## 7. Verification plan
+
+- `pnpm turbo run typecheck` and `pnpm turbo run test` clean across all packages, including the two new `project.test.ts` cases.
+- Manual/Playwright walkthrough against a fixture PDF: place an equipment stamp and a terminal stamp, connect them with segments, enter a terminal capacity, click "Solve flow," confirm the per-segment label and direction indicator render correctly and the network total is no longer over-counted, save to PDF, reopen it, confirm the capacity value is still present in the Properties panel input (persistence round-trip through the real save/load path, not just the unit test).
+
+## 8. Status
+
+Not started.
