@@ -97,10 +97,17 @@ export function PropertiesPanel({
         <div className="mep-elem-row">
           <div style={{ flex: 1 }}>
             <b>Segment · {selectedSegment.id}</b>
-            <span>{Math.round(selectedSegment.lengthPt)} pt</span>
           </div>
         </div>
         <div className="mep-section">
+          <div className="mep-field-row">
+            <label>Length</label>
+            <input
+              type="text"
+              value={selectedSegment.lengthMm !== null ? `${selectedSegment.lengthMm.toFixed(2)} mm` : `${Math.round(selectedSegment.lengthPt)} pt`}
+              disabled
+            />
+          </div>
           <div className="mep-field-row">
             <label>Network Type</label>
             <select
@@ -231,7 +238,12 @@ export function PropertiesPanel({
             <label>Network Type{networkTypeId === undefined ? ` (${VARIES})` : ''}</label>
             <select
               value={networkTypeId ?? ''}
-              onChange={(e) => sceneRef.current?.updateSegmentsForSelection({ networkTypeId: e.target.value })}
+              onChange={(e) =>
+                sceneRef.current?.setNetworkTypeForSegmentsNetworks(
+                  selectedSegments.map((s) => s.id),
+                  e.target.value,
+                )
+              }
             >
               {networkTypeId === undefined && <option value="">{VARIES}</option>}
               {availableNetworkTypes.map((t) => (
@@ -302,7 +314,10 @@ export function PropertiesPanel({
               onChange={(e) => sceneRef.current?.updateSegmentsForSelection({ material: e.target.value })}
             />
           </div>
-          <p className="mep-hint">Editing here applies only to the selected segments, not their whole connected runs.</p>
+          <p className="mep-hint">
+            Changing the network type retags every segment connected to any of the selected segments, across every run
+            touched. The other fields here apply only to the segments you selected.
+          </p>
         </div>
       </div>
     );

@@ -257,6 +257,8 @@ export interface SegmentInfo {
   height?: number;
   material?: string;
   lengthPt: number;
+  /** Real-world length in mm, converted via the document's calibration (see core's measureRealDistance) — null when the document isn't calibrated yet, in which case the Properties panel falls back to lengthPt. */
+  lengthMm: number | null;
 }
 
 /** The Properties panel's read model for a single selected fitting — see getSelectedFittingInfo. */
@@ -814,6 +816,7 @@ export class SketchScene {
   private toSegmentInfo(segment: Segment): SegmentInfo {
     let lengthPt = 0;
     for (let i = 1; i < segment.geometry.length; i++) lengthPt += distance(segment.geometry[i - 1], segment.geometry[i]);
+    const calibration = this.doc.calibration;
     return {
       id: segment.id,
       networkTypeId: segment.networkTypeId,
@@ -823,6 +826,9 @@ export class SketchScene {
       height: segment.height,
       material: segment.material,
       lengthPt,
+      // measureRealDistance(p1, p2, cal) is hypot(p1, p2) / cal.pageUnitsPerRealUnit, and lengthPt is already that same
+      // sum of hypots across the polyline, so dividing the total once is equivalent to summing per-segment conversions.
+      lengthMm: calibration ? lengthPt / calibration.pageUnitsPerRealUnit : null,
     };
   }
 
@@ -855,24 +861,18 @@ export class SketchScene {
   }
 
   /**
-   * The Properties panel's bulk field edits for a multi-segment selection —
-   * applies directly to just the selected segments, unlike the single-segment
-   * Network Type dropdown's setNetworkTypeForSegmentNetwork, which retags
-   * every segment in the whole connected run. A multi-select is already an
-   * explicit, deliberate choice of segments, so re-extending it to each
-   * one's whole run would silently widen the edit past what was selected.
+   * The Properties panel's bulk Shape/Diameter/Width/Height/Material edits
+   * for a multi-segment selection — applies directly to just the selected
+   * segments, same "just these, not their whole runs" stance as
+   * updateSegmentFields. Network Type is deliberately not part of this
+   * method's patch type — see setNetworkTypeForSegmentsNetworks, which
+   * always retags whole connected runs regardless of selection size, because
+   * every segment in one physically-connected run must share one type.
    */
-  updateSegmentsForSelection(patch: Partial<Pick<Segment, 'networkTypeId' | 'shape' | 'diameter' | 'width' | 'height' | 'material'>>): void {
+  updateSegmentsForSelection(patch: Partial<Pick<Segment, 'shape' | 'diameter' | 'width' | 'height' | 'material'>>): void {
     const state = this.doc.drawingHistory.getState();
     const segmentIds = [...this.doc.selectedIds].filter((id) => state.segments[id]);
     if (segmentIds.length === 0) return;
-    if (patch.networkTypeId && !this.doc.networkTypes.some((t) => t.id === patch.networkTypeId)) {
-      const type = getNetworkTypeFromLibrary(patch.networkTypeId);
-      if (type) {
-        this.doc.networkTypes.push(type);
-        this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
-      }
-    }
     const tx = new Transaction(this.doc.drawingHistory, 'Edit segments');
     tx.update((s) => {
       const segments = { ...s.segments };
@@ -880,7 +880,6 @@ export class SketchScene {
       return { ...s, segments };
     });
     tx.commit();
-    this.syncDrawingLayer();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
@@ -910,11 +909,27 @@ export class SketchScene {
    * core's computeNetworks) with a new network type — segments are physically
    * connected, so changing one segment's type in isolation would leave the
    * rest of the run visually/logically split. The Properties panel's Network
-   * Type dropdown for a selected segment.
+   * Type dropdown for a single selected segment; delegates to the
+   * multi-segment version below with a one-element list.
    */
   setNetworkTypeForSegmentNetwork(segmentId: string, networkTypeId: string): void {
+    this.setNetworkTypeForSegmentsNetworks([segmentId], networkTypeId);
+  }
+
+  /**
+   * Same whole-connected-run retag as setNetworkTypeForSegmentNetwork, but
+   * seeded from every segment in a multi-segment selection at once (unioned
+   * into one undo step) — the Properties panel's Network Type dropdown for a
+   * multi-segment selection. Segments in one physically-connected run can
+   * never disagree on network type, so this always cascades regardless of
+   * how many (or few) of that run's segments the user actually selected —
+   * unlike updateSegmentsForSelection's other fields, which apply only to
+   * the segments actually selected.
+   */
+  setNetworkTypeForSegmentsNetworks(segmentIds: string[], networkTypeId: string): void {
     const state = this.doc.drawingHistory.getState();
-    if (!state.segments[segmentId]) return;
+    const validIds = segmentIds.filter((id) => state.segments[id]);
+    if (validIds.length === 0) return;
     // The dropdown offers every library type, not just ones already adopted
     // by this document (see setActiveNetworkType) — adopt it now so its own
     // color/thickness/pattern resolve correctly instead of falling back to
@@ -931,8 +946,11 @@ export class SketchScene {
       fittings: Object.values(state.fittings),
       portGroups: this.doc.portGroups,
     });
-    const network = networks.find((n) => n.segmentIds.includes(segmentId));
-    const targetIds = network ? network.segmentIds : [segmentId];
+    const targetIds = new Set<string>();
+    for (const segmentId of validIds) {
+      const network = networks.find((n) => n.segmentIds.includes(segmentId));
+      for (const id of network ? network.segmentIds : [segmentId]) targetIds.add(id);
+    }
     const tx = new Transaction(this.doc.drawingHistory, 'Change network type');
     tx.update((s) => {
       const segments = { ...s.segments };
