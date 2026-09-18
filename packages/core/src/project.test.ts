@@ -28,6 +28,7 @@ describe('serializeProject / loadProject round trip', () => {
       portGroups: [],
       annotations: [annotation],
       customStampDefinitions: [],
+      terminalCapacities: { 'stamp-1': 400 },
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -165,6 +166,23 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.customStampDefinitions[0].discipline).toBe('electrical');
   });
 
+  it('migrates a pre-terminalCapacities (v7) save, defaulting to an empty object', () => {
+    const legacyDoc = {
+      schemaVersion: 7,
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.terminalCapacities).toEqual({});
+  });
+
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
     const doc = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -174,6 +192,7 @@ describe('serializeProject / loadProject round trip', () => {
       portGroups: [],
       annotations: [],
       customStampDefinitions: [],
+      terminalCapacities: {},
     };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {

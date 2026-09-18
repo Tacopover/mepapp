@@ -139,7 +139,23 @@ export function useSketchScene(): UseSketchScene {
       setSelectedSegments(scene.getSelectedSegments());
       setSelectedFitting(scene.getSelectedFittingInfo());
     };
-    const onFlowSolved = (result: FlowResult[]) => setFlowResult(result);
+    const onFlowSolved = (result: FlowResult[]) => {
+      setFlowResult(result);
+      // SegmentInfo.solvedCapacity is derived from the same solve — refresh an
+      // already-selected segment's read model too, or its Properties panel
+      // readout would keep showing the previous (or no) solved value. Only do
+      // this when a segment is actually selected: getSelectedSegments() always
+      // returns a fresh array reference, and calling these setters unconditionally
+      // would churn that reference even with a stamp (or nothing) selected —
+      // App.tsx's dock-tab-forcing effect has selectedSegments in its deps, so
+      // that churn alone would yank the dock back to Properties on every solve.
+      const segmentInfo = scene.getSelectedSegmentInfo();
+      const segments = scene.getSelectedSegments();
+      if (segmentInfo || segments.length > 0) {
+        setSelectedSegment(segmentInfo);
+        setSelectedSegments(segments);
+      }
+    };
     const onProjectLoaded = () => {
       setFlowResult(null);
       setAllStamps(scene.listStamps());

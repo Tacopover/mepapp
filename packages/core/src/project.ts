@@ -10,7 +10,7 @@ import type { PlacedStamp } from './stamp.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -22,6 +22,8 @@ export interface ProjectDocument {
   annotations: Annotation[];
   /** User-authored elements (Element Editor dialog, ports-custom-element-editor-spec.md §5.2) — embedded in the project document itself rather than a shared app-wide library, so the definitions travel with the file. Kept separate from the fixture-backed STAMP_LIBRARY; stamp-library.ts's lookups accept this list as an optional second argument. */
   customStampDefinitions: StampDefinition[];
+  /** User-entered flow-solve input, keyed by terminal/equipment stamp id (see flow.ts's solveFlow). Solved output (FlowResult) is deliberately not part of this document — it's derived from current topology and recomputed on demand, never persisted. */
+  terminalCapacities: Record<string, number>;
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -137,10 +139,30 @@ const migrationSteps: MigrationStep[] = [
       };
     },
   },
+  {
+    fromVersion: 7,
+    toVersion: 8,
+    // Version 7 predates persisting flow-solve input (terminalCapacities) —
+    // no save before this could have any, so default to an empty object
+    // rather than trying to infer capacity values that were never recorded.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 8,
+      terminalCapacities:
+        data.terminalCapacities && typeof data.terminalCapacities === 'object' && !Array.isArray(data.terminalCapacities)
+          ? data.terminalCapacities
+          : {},
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
   return Array.isArray(data[field]) ? [] : [{ path: field, message: `expected an array` }];
+}
+
+function requireRecord(data: JsonRecord, field: string): ValidationIssue[] {
+  const value = data[field];
+  return value && typeof value === 'object' && !Array.isArray(value) ? [] : [{ path: field, message: `expected an object` }];
 }
 
 const validators = [
@@ -151,6 +173,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'portGroups'),
   (data: JsonRecord) => requireArray(data, 'annotations'),
   (data: JsonRecord) => requireArray(data, 'customStampDefinitions'),
+  (data: JsonRecord) => requireRecord(data, 'terminalCapacities'),
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

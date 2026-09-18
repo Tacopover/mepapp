@@ -227,6 +227,11 @@ const STICKY_NOTE_ICON_SIZE_PT = 16;
 // stroke-only convention for every other kind.
 const ARROWHEAD_LENGTH_PT = 10;
 const ARROWHEAD_ANGLE_RAD = Math.PI / 7;
+// Flow-direction indicator (syncFlowLabels) — same stroke-only V-shape as the
+// 'arrow' annotation above, just smaller: it marks a segment's own midpoint
+// rather than terminating a user-drawn line.
+const FLOW_ARROWHEAD_LENGTH_PT = 7;
+const FLOW_LABEL_COLOR = 0x00796b;
 
 export interface StampInfo {
   id: string;
@@ -259,6 +264,8 @@ export interface SegmentInfo {
   lengthPt: number;
   /** Real-world length in mm, converted via the document's calibration (see core's measureRealDistance) — null when the document isn't calibrated yet, in which case the Properties panel falls back to lengthPt. */
   lengthMm: number | null;
+  /** This segment's capacity from the last "Solve flow" run (see computeFlow) — null if no solve has run yet, or if this segment was left unresolved (no root found, or it closes a cycle). A read-out, not an input; the editable terminal Capacity field is separate (see StampInfo.capacity). */
+  solvedCapacity: number | null;
 }
 
 /** The Properties panel's read model for a single selected fitting — see getSelectedFittingInfo. */
@@ -513,6 +520,7 @@ export class SketchScene {
     this.world.addChild(this.doc.stampsLayer);
     this.world.addChild(this.doc.drawingLayer);
     this.world.addChild(this.doc.annotationTextLayer);
+    this.world.addChild(this.doc.flowLabelLayer);
     this.world.addChild(this.stampGhostLayer);
     this.world.addChild(this.overlay);
     this.app.stage.addChild(this.world);
@@ -715,6 +723,7 @@ export class SketchScene {
     this.world.addChild(target.stampsLayer);
     this.world.addChild(target.drawingLayer);
     this.world.addChild(target.annotationTextLayer);
+    this.world.addChild(target.flowLabelLayer);
     this.world.addChild(this.stampGhostLayer);
     this.world.addChild(this.overlay);
     this.world.x = target.viewport.x;
@@ -829,7 +838,17 @@ export class SketchScene {
       // measureRealDistance(p1, p2, cal) is hypot(p1, p2) / cal.pageUnitsPerRealUnit, and lengthPt is already that same
       // sum of hypots across the polyline, so dividing the total once is equivalent to summing per-segment conversions.
       lengthMm: calibration ? lengthPt / calibration.pageUnitsPerRealUnit : null,
+      solvedCapacity: this.solvedCapacityOf(segment.id),
     };
+  }
+
+  /** Looks up a segment's capacity across every network from the last solve — see computeFlow/SegmentInfo.solvedCapacity. */
+  private solvedCapacityOf(segmentId: string): number | null {
+    if (!this.doc.lastFlowResult) return null;
+    for (const result of this.doc.lastFlowResult) {
+      if (segmentId in result.segmentCapacity) return result.segmentCapacity[segmentId];
+    }
+    return null;
   }
 
   /** The Properties panel's read model for a segment selection — null unless exactly one segment (and nothing else) is selected, mirroring getSelection()'s stamps-only counterpart. */
@@ -1236,8 +1255,53 @@ export class SketchScene {
     this.doc.lastFlowResult = networks.map((network: Network) =>
       solveFlow({ network, segments, fittings, portGroups: this.doc.portGroups, terminalCapacities: capacities }),
     );
+    this.syncFlowLabels();
     this.emitter.emit('flowSolved', this.doc.lastFlowResult);
     return this.doc.lastFlowResult;
+  }
+
+  /**
+   * Rebuilds the on-canvas flow overlay from the last solve: a capacity
+   * number plus a small direction arrowhead at each resolved segment's
+   * midpoint. Only called from computeFlow (and from loadProjectFromJson to
+   * clear stale labels) — never from syncDrawingLayer, since flow values
+   * only change when the user re-solves, not on every topology edit.
+   */
+  private syncFlowLabels(): void {
+    for (const child of this.doc.flowLabelLayer.removeChildren()) child.destroy();
+    const results = this.doc.lastFlowResult;
+    if (!results) return;
+    const state = this.doc.drawingHistory.getState();
+    const arrows = new Graphics();
+
+    for (const result of results) {
+      for (const [segmentId, capacity] of Object.entries(result.segmentCapacity)) {
+        if (capacity === null) continue;
+        const segment = state.segments[segmentId];
+        if (!segment || segment.geometry.length < 2) continue;
+        const a = segment.geometry[0];
+        const b = segment.geometry[segment.geometry.length - 1];
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        // segmentDirection's 'AtoB' means flow runs endpointA -> endpointB, i.e.
+        // geometry[0] -> geometry[last] (see network.ts's Segment doc comment).
+        const [from, to] = result.segmentDirection[segmentId] === 'BtoA' ? [b, a] : [a, b];
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+
+        for (const sign of [-1, 1]) {
+          const headAngle = angle + sign * ARROWHEAD_ANGLE_RAD;
+          arrows.moveTo(mid.x, mid.y);
+          arrows.lineTo(mid.x - FLOW_ARROWHEAD_LENGTH_PT * Math.cos(headAngle), mid.y - FLOW_ARROWHEAD_LENGTH_PT * Math.sin(headAngle));
+        }
+
+        const text = new Text({ text: String(capacity), style: { fontSize: 11, fill: FLOW_LABEL_COLOR } });
+        text.anchor.set(0.5, 1);
+        text.position.set(mid.x, mid.y - 8);
+        this.doc.flowLabelLayer.addChild(text);
+      }
+    }
+
+    arrows.stroke({ width: 2, color: FLOW_LABEL_COLOR });
+    this.doc.flowLabelLayer.addChild(arrows);
   }
 
   exportProject(): ProjectDocument {
@@ -1250,6 +1314,7 @@ export class SketchScene {
       portGroups: this.doc.portGroups,
       annotations: Object.values(state.annotations),
       customStampDefinitions: this.doc.customStampDefinitions,
+      terminalCapacities: Object.fromEntries(this.doc.terminalCapacities),
     }) as unknown as ProjectDocument;
   }
 
@@ -1292,6 +1357,15 @@ export class SketchScene {
     target.networkTypes.splice(0, target.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
     target.portGroups.splice(0, target.portGroups.length, ...doc.portGroups);
     target.customStampDefinitions.splice(0, target.customStampDefinitions.length, ...doc.customStampDefinitions);
+    target.terminalCapacities.clear();
+    for (const [elementId, capacity] of Object.entries(doc.terminalCapacities)) {
+      target.terminalCapacities.set(elementId, capacity);
+    }
+    // The solve itself isn't persisted (see ProjectDocument's terminalCapacities doc
+    // comment) — clear the stale overlay from before the load rather than showing
+    // labels for a topology that may no longer match.
+    target.lastFlowResult = null;
+    for (const child of target.flowLabelLayer.removeChildren()) child.destroy();
 
     let maxAnnotationSeq = 0;
     for (const annotation of doc.annotations) {

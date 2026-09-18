@@ -537,11 +537,11 @@ export function MepSketchApp({
     [sceneRef],
   );
 
+  // Each network's own totalCapacity (the root's subtree demand), not a sum of every
+  // segment's value — a segment's value is already a subtree total on its own, so
+  // summing all of them would over-count everything except the leaf segments.
   const totalFlowCapacity = flowResult
-    ? flowResult
-        .flatMap((r) => Object.values(r.segmentCapacity))
-        .filter((c): c is number => c !== null)
-        .reduce((sum, c) => sum + c, 0)
+    ? flowResult.reduce((sum, r) => sum + (r.totalCapacity ?? 0), 0)
     : null;
 
   const dockTabDefs: DockTabDef[] = [

@@ -82,4 +82,18 @@ display task, not new solver work:
 
 ## 8. Status
 
-Not started.
+**Done** — 2026-09-18, on branch `worktree-flow-propagation-plan` (not yet merged to `master` — this touches `apps/web`'s dependency packages, so it goes through the branch-first workflow, not straight to master).
+
+Shipped, matching §3/§4 exactly:
+- Schema v7→v8: `ProjectDocument.terminalCapacities: Record<string, number>`, migration step, `requireRecord` validator, round-trip + migration tests in `project.test.ts`.
+- `exportProject()`/`loadProjectFromJson()` (`scene.ts`) now carry `terminalCapacities`; a fresh load clears `lastFlowResult` and the flow-label overlay (the solve itself is never persisted, per §3 point 5).
+- `flow.ts`'s `FlowResult` gained `totalCapacity` (the root's own subtree demand) and `segmentDirection` (`'AtoB'`/`'BtoA'`, structural leaf-to-root) — both covered by new `flow.test.ts` cases.
+- New `flowLabelLayer` (`document.ts`/`scene.ts`): a capacity number + small V-shaped arrowhead per resolved segment, rebuilt on every `computeFlow()` call — resolves D2 in favor of the arrowhead option, reusing the existing 'arrow' annotation's stroke-only V idiom rather than a filled triangle, for visual consistency with the rest of the app.
+- `SegmentInfo.solvedCapacity` + a read-only "Solved capacity" row in `PropertiesPanel.tsx` (single- and multi-segment views).
+- Fixed the total-capacity over-counting bug found during investigation (`App.tsx` now sums `totalCapacity` per network, not every segment's value).
+
+One regression was found and fixed during live verification, not anticipated in the original spec: `useSketchScene.ts`'s `onFlowSolved` handler originally refreshed `selectedSegment`/`selectedSegments` unconditionally on every solve, which churned `selectedSegments`' array reference even when a stamp (not a segment) was selected — that reference change re-triggered `App.tsx`'s dock-tab-forcing effect (`selectedSegments` is in its dependency array) and yanked the dock back to the Properties tab on every "Solve flow" click. Fixed by only calling those setters when a segment selection actually exists to refresh.
+
+Verified: `pnpm build` + `pnpm turbo run typecheck` clean across all 10 packages; `pnpm turbo run test` — 136 core tests (up from 135; new flow.ts/project.ts cases) + 13 pdf-engine-mupdf tests, all passing. Live headless-Chromium Playwright walkthrough: placed a Terminal + Equipment stamp, connected with a segment, entered a capacity, solved flow — confirmed correct `totalCapacity`/`segmentDirection`, the canvas overlay (label + arrowhead) rendering (screenshot-confirmed), the Properties panel's live-updating "Solved capacity" row, and a full `exportProject()`/`loadProjectFromJson()` round-trip (schema v8, capacity value survives reload, stale overlay correctly cleared). Re-verified after the dock-tab-forcing fix that both the original bug repro and the segment-selected live-update case now work correctly together.
+
+D1 (label visibility) resolved as always-on, matching the spec's recommendation — no toggle was added. D3 (fitting-capacity display) remains unaddressed, as scoped.

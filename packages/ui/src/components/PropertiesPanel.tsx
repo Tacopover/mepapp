@@ -18,6 +18,11 @@ import type { StampLabelLanguage } from './LanguageToggle.js';
 
 const VARIES = 'Varies';
 
+/** SegmentInfo.solvedCapacity is null both before any solve has run and when a solve left this particular segment unresolved — one label covers both, since the Properties panel has no way to tell them apart without also knowing whether flowResult is null. */
+function formatSolvedCapacity(value: number | null): string {
+  return value === null ? 'Not solved' : String(value);
+}
+
 const FITTING_KINDS: FittingKind[] = ['junction', 'elbow', 'tee', 'reducer', 'cross'];
 const FITTING_KIND_LABELS: Record<FittingKind, string> = {
   junction: 'Junction',
@@ -107,6 +112,10 @@ export function PropertiesPanel({
               value={selectedSegment.lengthMm !== null ? `${selectedSegment.lengthMm.toFixed(2)} mm` : `${Math.round(selectedSegment.lengthPt)} pt`}
               disabled
             />
+          </div>
+          <div className="mep-field-row">
+            <label>Solved capacity</label>
+            <input type="text" value={formatSolvedCapacity(selectedSegment.solvedCapacity)} disabled />
           </div>
           <div className="mep-field-row">
             <label>Network Type</label>
@@ -225,6 +234,7 @@ export function PropertiesPanel({
     const width = commonValue(selectedSegments, (s) => s.width);
     const height = commonValue(selectedSegments, (s) => s.height);
     const material = commonValue(selectedSegments, (s) => s.material);
+    const solvedCapacity = commonValue(selectedSegments, (s) => s.solvedCapacity);
 
     return (
       <div>
@@ -234,6 +244,10 @@ export function PropertiesPanel({
           </div>
         </div>
         <div className="mep-section">
+          <div className="mep-field-row">
+            <label>Solved capacity{solvedCapacity === undefined ? ` (${VARIES})` : ''}</label>
+            <input type="text" value={solvedCapacity === undefined ? VARIES : formatSolvedCapacity(solvedCapacity)} disabled />
+          </div>
           <div className="mep-field-row">
             <label>Network Type{networkTypeId === undefined ? ` (${VARIES})` : ''}</label>
             <select

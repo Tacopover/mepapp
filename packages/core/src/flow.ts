@@ -26,6 +26,10 @@ export interface FlowResult {
   segmentCapacity: Record<string, number | null>;
   fittingCapacity: Record<string, number | null>;
   resolved: boolean;
+  /** The root's own total subtree demand — the whole network's total capacity. Not the sum of segmentCapacity's values: each of those is already a subtree total on its own, so summing them over-counts everything except the leaf segments. Null when unresolved. */
+  totalCapacity: number | null;
+  /** Which physical endpoint is upstream (toward the resolved root): 'AtoB' means flow travels from endpointA to endpointB. A purely structural direction (leaf-to-root), not a supply/return distinction — this layer has no such concept. Null wherever segmentCapacity is null. */
+  segmentDirection: Record<string, 'AtoB' | 'BtoA' | null>;
 }
 
 interface Edge {
@@ -59,12 +63,13 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
 
   const nodeKeys = Array.from(adjacency.keys()).sort();
   const segmentCapacity: Record<string, number | null> = Object.fromEntries(segments.map((s) => [s.id, null]));
+  const segmentDirection: Record<string, 'AtoB' | 'BtoA' | null> = Object.fromEntries(segments.map((s) => [s.id, null]));
   const fittingCapacity: Record<string, number | null> = Object.fromEntries(
     input.network.fittingIds.map((id) => [id, null]),
   );
 
   if (nodeKeys.length === 0) {
-    return { segmentCapacity, fittingCapacity, resolved: false };
+    return { segmentCapacity, fittingCapacity, resolved: false, totalCapacity: null, segmentDirection };
   }
 
   const rootKey =
@@ -85,6 +90,12 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
       }
       const childDemand = demandOf(edge.neighborKey);
       segmentCapacity[edge.segmentId] = childDemand;
+      const segment = segmentById.get(edge.segmentId);
+      if (segment) {
+        // nodeKey is the parent (toward-root) end of this edge — whichever of the
+        // segment's two endpoints resolves to nodeKey is the upstream one.
+        segmentDirection[edge.segmentId] = nodeKeyOf(segment.endpointA, input.portGroups) === nodeKey ? 'BtoA' : 'AtoB';
+      }
       demand += childDemand;
       const fittingMatch = /^fitting:(.+)$/.exec(edge.neighborKey);
       if (fittingMatch && fittingMatch[1] in fittingCapacity) {
@@ -94,7 +105,7 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     return demand;
   };
 
-  demandOf(rootKey);
+  const totalCapacity = demandOf(rootKey);
 
-  return { segmentCapacity, fittingCapacity, resolved: true };
+  return { segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection };
 }

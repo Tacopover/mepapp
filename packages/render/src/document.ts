@@ -73,6 +73,8 @@ export class SketchDocument {
   readonly drawingLayer = new Graphics();
   /** PixiJS Text nodes for placed textbox annotations — a Graphics object can't render text, so these live in their own container, fully rebuilt alongside drawingLayer on every syncDrawingLayer (see SketchScene.drawAnnotation). */
   readonly annotationTextLayer = new Container();
+  /** Per-segment solved-capacity labels + direction arrowheads — fully rebuilt on every computeFlow() call (see SketchScene.syncFlowLabels), not on every syncDrawingLayer: flow values only change when the user re-solves, not on every topology edit. */
+  readonly flowLabelLayer = new Container();
   readonly stamps = new Map<string, StampEntry>();
   selectedIds = new Set<string>();
   calibration: Calibration | null = null;
@@ -117,5 +119,6 @@ export class SketchDocument {
     this.stampsLayer.destroy();
     this.drawingLayer.destroy();
     this.annotationTextLayer.destroy({ children: true });
+    this.flowLabelLayer.destroy({ children: true });
   }
 }
