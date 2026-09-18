@@ -17,6 +17,8 @@ export interface StampsPanelProps {
   onChangeLabelLanguage: (value: StampLabelLanguage) => void;
   activeDefinitionId: string | null;
   onPick: (definition: StampDefinition) => void;
+  categoryFilter: StampCategoryFilter;
+  onChangeCategoryFilter: (value: StampCategoryFilter) => void;
   /** The active document's user-authored elements (Element Editor dialog) — shown in the grid alongside STAMP_LIBRARY. */
   customStampDefinitions: StampDefinition[];
   onCreateCustomElement: () => void;
@@ -62,6 +64,44 @@ function loadBitmap(url: string, definition: StampDefinition): Promise<ImageBitm
   return cached;
 }
 
+/** The same library+custom, discipline/category/search-filtered, label-sorted list the grid below renders — shared so the left rail's Stamp button can auto-pick "the first stamp shown here" without duplicating this logic (see App.tsx's handlePickDefaultStamp). */
+export function getVisibleStampDefinitions(
+  customStampDefinitions: StampDefinition[],
+  disciplineGroup: DisciplineGroup | null,
+  categoryFilter: StampCategoryFilter,
+  labelLanguage: StampLabelLanguage,
+  searchQuery = '',
+): StampDefinition[] {
+  const shadowedLibraryIds = new Set(
+    STAMP_LIBRARY.filter((lib) =>
+      customStampDefinitions.some((c) => {
+        const label = c.label.trim().toLowerCase();
+        return label === lib.label.toLowerCase() || (!!lib.labelNl && label === lib.labelNl.toLowerCase());
+      }),
+    ).map((lib) => lib.id),
+  );
+  const allDefinitions = [...STAMP_LIBRARY.filter((lib) => !shadowedLibraryIds.has(lib.id)), ...customStampDefinitions];
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  return allDefinitions
+    .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)
+    .filter((def) => def.category === categoryFilter)
+    .filter((def) => trimmedQuery === '' || stampLabelFor(def, labelLanguage).toLowerCase().includes(trimmedQuery))
+    .sort((a, b) => stampLabelFor(a, labelLanguage).localeCompare(stampLabelFor(b, labelLanguage)));
+}
+
+/** Loads the definition's art, arms the scene's placement tool, and reports the pick — shared between the grid's own tile click and the left rail's Stamp-button auto-pick fallback. */
+export async function pickStampDefinition(
+  sceneRef: RefObject<SketchScene | null>,
+  definition: StampDefinition,
+  resolveIconUrl: (iconRef: string) => string,
+  onPick: (definition: StampDefinition) => void,
+): Promise<void> {
+  const bitmap = await loadBitmap(iconUrlFor(definition, resolveIconUrl), definition);
+  sceneRef.current?.setStampTexture(bitmap, definition.id, getStampAppearanceDefault(definition.id));
+  sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
+  onPick(definition);
+}
+
 export function StampsPanel({
   sceneRef,
   disciplineGroup,
@@ -70,6 +110,8 @@ export function StampsPanel({
   onChangeLabelLanguage,
   activeDefinitionId,
   onPick,
+  categoryFilter,
+  onChangeCategoryFilter,
   customStampDefinitions,
   onCreateCustomElement,
   onDuplicateStampDefinition,
@@ -81,31 +123,12 @@ export function StampsPanel({
   onPickNetworkType,
   onEditNetworkType,
 }: StampsPanelProps) {
-  const [categoryFilter, setCategoryFilter] = useState<StampCategoryFilter>('terminal');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // A custom element saved under the same English or Dutch name as a library one (see
-  // ElementEditorDialog's overwrite-confirmation prompt) shadows it here — STAMP_LIBRARY itself is
-  // read-only and can't actually be edited, so "overwriting" a preloaded element in practice means
-  // the user's own custom version takes that library tile's place in the grid.
-  const shadowedLibraryIds = new Set(
-    STAMP_LIBRARY.filter((lib) =>
-      customStampDefinitions.some((c) => {
-        const label = c.label.trim().toLowerCase();
-        return label === lib.label.toLowerCase() || (!!lib.labelNl && label === lib.labelNl.toLowerCase());
-      }),
-    ).map((lib) => lib.id),
-  );
-  const allDefinitions = [...STAMP_LIBRARY.filter((lib) => !shadowedLibraryIds.has(lib.id)), ...customStampDefinitions];
-  const trimmedQuery = searchQuery.trim().toLowerCase();
-  const definitions = allDefinitions
-    .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)
-    .filter((def) => def.category === categoryFilter)
-    .filter((def) => trimmedQuery === '' || stampLabelFor(def, labelLanguage).toLowerCase().includes(trimmedQuery))
-    // Sorted by displayed label rather than left in library-then-custom-append-order, so a newly
-    // created/duplicated custom element lands in its correct alphabetical spot immediately instead
-    // of always trailing at the bottom of the grid.
-    .sort((a, b) => stampLabelFor(a, labelLanguage).localeCompare(stampLabelFor(b, labelLanguage)));
+  // Sorted by displayed label rather than left in library-then-custom-append-order, so a newly
+  // created/duplicated custom element lands in its correct alphabetical spot immediately instead
+  // of always trailing at the bottom of the grid.
+  const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, categoryFilter, labelLanguage, searchQuery);
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
   // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id
@@ -120,10 +143,7 @@ export function StampsPanel({
   const [subTab, setSubTab] = useState<'stamps' | 'networkTypes'>('stamps');
 
   async function handlePick(definition: StampDefinition) {
-    const bitmap = await loadBitmap(iconUrlFor(definition, resolveIconUrl), definition);
-    sceneRef.current?.setStampTexture(bitmap, definition.id, getStampAppearanceDefault(definition.id));
-    sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
-    onPick(definition);
+    await pickStampDefinition(sceneRef, definition, resolveIconUrl, onPick);
   }
 
   return (
@@ -152,7 +172,7 @@ export function StampsPanel({
         <DisciplineSwitcher value={disciplineGroup} onChange={onChangeDisciplineGroup} />
         {subTab === 'stamps' && (
           <div className="mep-stamps-filter-row2">
-            <CategorySwitcher value={categoryFilter} onChange={setCategoryFilter} />
+            <CategorySwitcher value={categoryFilter} onChange={onChangeCategoryFilter} />
             <LanguageToggle value={labelLanguage} onChange={onChangeLabelLanguage} />
             <input
               type="search"
@@ -169,7 +189,7 @@ export function StampsPanel({
       {subTab === 'stamps' ? (
         <>
           {definitions.length === 0 && (
-            <div className="mep-empty-panel">{trimmedQuery === '' ? 'No stamp art available yet for this discipline.' : `No stamps match "${searchQuery.trim()}".`}</div>
+            <div className="mep-empty-panel">{searchQuery.trim() === '' ? 'No stamp art available yet for this discipline.' : `No stamps match "${searchQuery.trim()}".`}</div>
           )}
           <div className="mep-stamp-grid">
             {definitions.map((definition) => (

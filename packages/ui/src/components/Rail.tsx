@@ -13,6 +13,8 @@ export interface RailProps {
   onUndo: () => void;
   onRedo: () => void;
   onOpenSettings: () => void;
+  /** Stamp clicked with no active definition yet — auto-picks the first stamp shown in the MEP tab's grid. */
+  onPickDefaultStamp: () => void;
 }
 
 function needsStamp(t: SketchTool | null): boolean {
@@ -26,7 +28,7 @@ function needsStamp(t: SketchTool | null): boolean {
  * listing the rest. Members with `tool: null` (toolRegistry.ts) are reserved
  * slots for tools nobody has built yet — they render disabled.
  */
-export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRedo, onUndo, onRedo, onOpenSettings }: RailProps) {
+export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRedo, onUndo, onRedo, onOpenSettings, onPickDefaultStamp }: RailProps) {
   const [lastPickedByRow, setLastPickedByRow] = useState<Record<string, string>>({});
   const [openRow, setOpenRow] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -63,10 +65,11 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
                 type="button"
                 className={`mep-rail-btn${(isStampRow ? stampRowActive : tool === current.tool) ? ' active' : ''}`}
                 title={current.tool === null ? `${current.label} — coming soon` : current.label}
-                disabled={current.tool === null || (needsStamp(current.tool) && !stampReady)}
+                disabled={isStampRow ? false : current.tool === null || (needsStamp(current.tool) && !stampReady)}
                 onClick={() => {
                   if (isStampRow) {
                     if (stampReady) sceneRef.current?.setTool(lastStampTool);
+                    else onPickDefaultStamp();
                     return;
                   }
                   current.tool && sceneRef.current?.setTool(current.tool);

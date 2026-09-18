@@ -35,9 +35,10 @@ export const IconPan = (props: IconProps) => (
 
 export const IconStamp = (props: IconProps) => (
   <Svg {...props}>
-    <circle cx="12" cy="12" r="8" />
-    <rect x="9.4" y="7" width="1.8" height="4.5" fill="currentColor" stroke="none" />
-    <rect x="12.8" y="7" width="1.8" height="4.5" fill="currentColor" stroke="none" />
+    <rect x="9" y="2.5" width="6" height="4" rx="1.2" />
+    <path d="M7.3 6.5h9.4l1.8 6.5H5.5z" />
+    <rect x="4" y="15.5" width="16" height="3" rx="1" />
+    <line x1="6" y1="20.5" x2="18" y2="20.5" />
   </Svg>
 );
 

@@ -7,13 +7,15 @@ import { loadStampBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
 import { DrawFromMenu } from './components/DrawFromMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
-import { StampsPanel } from './components/StampsPanel.js';
+import { StampsPanel, getVisibleStampDefinitions, pickStampDefinition } from './components/StampsPanel.js';
 import type { StampLabelLanguage } from './components/LanguageToggle.js';
+import type { StampCategoryFilter } from './components/CategorySwitcher.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
+import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { Dialog } from './components/Dialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
@@ -146,6 +148,7 @@ export function MepSketchApp({
   const [capacityInput, setCapacityInput] = useState('');
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
+  const [stampCategoryFilter, setStampCategoryFilter] = useState<StampCategoryFilter>('terminal');
   const [labelLanguage, setLabelLanguage] = useState<StampLabelLanguage>(() =>
     localStorage.getItem(LABEL_LANGUAGE_STORAGE_KEY) === 'nl' ? 'nl' : 'en',
   );
@@ -413,6 +416,14 @@ export function MepSketchApp({
     setStatus(`${definition.label} ready — click the canvas to place it.`);
   }, []);
 
+  // Left rail's Stamp button, clicked with nothing picked yet — arms the same
+  // first stamp the MEP tab's grid itself would show (its current discipline/category filters).
+  const handlePickDefaultStamp = useCallback(() => {
+    const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage);
+    const first = definitions[0];
+    if (first) void pickStampDefinition(sceneRef, first, resolveStampIconUrl, handleStampPick);
+  }, [customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage, resolveStampIconUrl, handleStampPick, sceneRef]);
+
   // Opens the Element Editor pre-filled from a read-only library stamp so the
   // user can reposition ports / rename / recategorize and save as their own
   // custom stamp. Its iconRef is a fixture-relative asset key (see
@@ -548,6 +559,8 @@ export function MepSketchApp({
         onChangeLabelLanguage={handleChangeLabelLanguage}
         activeDefinitionId={activeDefinitionId}
         onPick={handleStampPick}
+        categoryFilter={stampCategoryFilter}
+        onChangeCategoryFilter={setStampCategoryFilter}
         customStampDefinitions={customStampDefinitions}
         onCreateCustomElement={() => setElementEditorTarget({ mode: 'create' })}
         onDuplicateStampDefinition={(definition) => void handleDuplicateStampDefinition(definition)}
@@ -632,7 +645,7 @@ export function MepSketchApp({
           onOpenManageBuildings={() => setManageBuildingsOpen(true)}
           pdfLoaded={pdfHandle !== null}
         />
-        <span className="mep-title">{sheetName ?? 'No sheet loaded'}</span>
+        <DocumentSwitcher documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
         <div className="mep-fill" />
         {status && <span className="mep-header-status">{status}</span>}
       </div>
@@ -666,6 +679,7 @@ export function MepSketchApp({
                 onUndo={() => sceneRef.current?.undoDrawing()}
                 onRedo={() => sceneRef.current?.redoDrawing()}
                 onOpenSettings={() => setSettingsOpen(true)}
+                onPickDefaultStamp={handlePickDefaultStamp}
               />
               {textboxPrompt && (
                 <textarea
