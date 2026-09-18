@@ -3,6 +3,7 @@ import {
   SketchScene,
   type DocumentSummary,
   type DrawingSummary,
+  type FittingInfo,
   type NetworkSummary,
   type SegmentInfo,
   type SketchTool,
@@ -42,6 +43,10 @@ export interface UseSketchScene {
   selection: StampInfo[];
   /** The lone selected segment's read model, or null — see SketchScene.getSelectedSegmentInfo. */
   selectedSegment: SegmentInfo | null;
+  /** A pure multi-segment selection's read models — empty unless 2+ segments (and nothing else) are selected. See SketchScene.getSelectedSegments. */
+  selectedSegments: SegmentInfo[];
+  /** The lone selected fitting's read model, or null — see SketchScene.getSelectedFittingInfo. */
+  selectedFitting: FittingInfo | null;
   /** Whether anything — a stamp or an annotation — is selected, for gating UI (e.g. the rail's Rotate/Delete actions) that `selection` alone can't answer since it only reports stamps. */
   hasSelection: boolean;
   allStamps: StampInfo[];
@@ -76,6 +81,8 @@ export function useSketchScene(): UseSketchScene {
   const [tool, setTool] = useState<SketchTool>('select');
   const [selection, setSelection] = useState<StampInfo[]>([]);
   const [selectedSegment, setSelectedSegment] = useState<SegmentInfo | null>(null);
+  const [selectedSegments, setSelectedSegments] = useState<SegmentInfo[]>([]);
+  const [selectedFitting, setSelectedFitting] = useState<FittingInfo | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [allStamps, setAllStamps] = useState<StampInfo[]>([]);
   const [networkSummaries, setNetworkSummaries] = useState<NetworkSummary[]>([]);
@@ -111,6 +118,8 @@ export function useSketchScene(): UseSketchScene {
     const onSelectionChanged = (s: StampInfo[]) => {
       setSelection(s);
       setSelectedSegment(scene.getSelectedSegmentInfo());
+      setSelectedSegments(scene.getSelectedSegments());
+      setSelectedFitting(scene.getSelectedFittingInfo());
       setHasSelection(scene.hasSelection());
       setAllStamps(scene.listStamps());
     };
@@ -127,6 +136,8 @@ export function useSketchScene(): UseSketchScene {
       setDrawingSummary(summary);
       setNetworkSummaries(scene.getNetworkSummaries());
       setSelectedSegment(scene.getSelectedSegmentInfo());
+      setSelectedSegments(scene.getSelectedSegments());
+      setSelectedFitting(scene.getSelectedFittingInfo());
     };
     const onFlowSolved = (result: FlowResult[]) => setFlowResult(result);
     const onProjectLoaded = () => {
@@ -159,6 +170,8 @@ export function useSketchScene(): UseSketchScene {
     const onDocumentActivated = () => {
       setSelection(scene.getSelection());
       setSelectedSegment(scene.getSelectedSegmentInfo());
+      setSelectedSegments(scene.getSelectedSegments());
+      setSelectedFitting(scene.getSelectedFittingInfo());
       setAllStamps(scene.listStamps());
       setNetworkSummaries(scene.getNetworkSummaries());
       setCalibration(scene.getCalibration());
@@ -237,6 +250,8 @@ export function useSketchScene(): UseSketchScene {
     tool,
     selection,
     selectedSegment,
+    selectedSegments,
+    selectedFitting,
     hasSelection,
     allStamps,
     networkSummaries,

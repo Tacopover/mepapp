@@ -43,6 +43,7 @@ import {
   type CustomPropertyDefinition,
   type CustomPropertyValues,
   type Discipline,
+  type FittingKind,
   type FlowResult,
   type LinePattern,
   type Network,
@@ -256,6 +257,15 @@ export interface SegmentInfo {
   height?: number;
   material?: string;
   lengthPt: number;
+  /** Real-world length in mm, converted via the document's calibration (see core's measureRealDistance) — null when the document isn't calibrated yet, in which case the Properties panel falls back to lengthPt. */
+  lengthMm: number | null;
+}
+
+/** The Properties panel's read model for a single selected fitting — see getSelectedFittingInfo. */
+export interface FittingInfo {
+  id: string;
+  kind: FittingKind;
+  position: Vec2;
 }
 
 /**
@@ -802,14 +812,11 @@ export class SketchScene {
     return this.doc.selectedIds.size > 0;
   }
 
-  /** The Properties panel's read model for a segment selection — null unless exactly one segment (and nothing else) is selected, mirroring getSelection()'s stamps-only counterpart. */
-  getSelectedSegmentInfo(): SegmentInfo | null {
-    if (this.doc.selectedIds.size !== 1) return null;
-    const [id] = this.doc.selectedIds;
-    const segment = this.doc.drawingHistory.getState().segments[id];
-    if (!segment) return null;
+  /** Shared by getSelectedSegmentInfo/getSelectedSegments — recomputes the polyline length live rather than storing it, same "derive, don't cache" stance as the rest of this read-model layer. */
+  private toSegmentInfo(segment: Segment): SegmentInfo {
     let lengthPt = 0;
     for (let i = 1; i < segment.geometry.length; i++) lengthPt += distance(segment.geometry[i - 1], segment.geometry[i]);
+    const calibration = this.doc.calibration;
     return {
       id: segment.id,
       networkTypeId: segment.networkTypeId,
@@ -819,7 +826,82 @@ export class SketchScene {
       height: segment.height,
       material: segment.material,
       lengthPt,
+      // measureRealDistance(p1, p2, cal) is hypot(p1, p2) / cal.pageUnitsPerRealUnit, and lengthPt is already that same
+      // sum of hypots across the polyline, so dividing the total once is equivalent to summing per-segment conversions.
+      lengthMm: calibration ? lengthPt / calibration.pageUnitsPerRealUnit : null,
     };
+  }
+
+  /** The Properties panel's read model for a segment selection — null unless exactly one segment (and nothing else) is selected, mirroring getSelection()'s stamps-only counterpart. */
+  getSelectedSegmentInfo(): SegmentInfo | null {
+    if (this.doc.selectedIds.size !== 1) return null;
+    const [id] = this.doc.selectedIds;
+    const segment = this.doc.drawingHistory.getState().segments[id];
+    return segment ? this.toSegmentInfo(segment) : null;
+  }
+
+  /** The Properties panel's read model for a pure multi-segment selection (the segment counterpart of getSelection()'s multi-stamp list) — empty unless every currently selected id is a segment and there are at least two, so a mixed stamp/fitting/segment selection still falls back to the "nothing to show" empty state rather than a half-populated one. */
+  getSelectedSegments(): SegmentInfo[] {
+    if (this.doc.selectedIds.size < 2) return [];
+    const state = this.doc.drawingHistory.getState();
+    const segments = [...this.doc.selectedIds].map((id) => state.segments[id]).filter((s): s is Segment => s !== undefined);
+    if (segments.length !== this.doc.selectedIds.size) return [];
+    return segments.map((segment) => this.toSegmentInfo(segment));
+  }
+
+  /** The Properties panel's Shape/Diameter/Width/Height/Material fields for a selected segment — edits just this one segment, unlike setNetworkTypeForSegmentNetwork which retags a whole connected run. These fields are data-only today (see core's Segment doc comment: color/width/pattern for drawing come from the segment's NetworkType instead), so no redraw is needed, just persistence + a refreshed read model. */
+  updateSegmentFields(segmentId: string, patch: Partial<Pick<Segment, 'shape' | 'diameter' | 'width' | 'height' | 'material'>>): void {
+    const state = this.doc.drawingHistory.getState();
+    if (!state.segments[segmentId]) return;
+    const tx = new Transaction(this.doc.drawingHistory, 'Edit segment');
+    tx.update((s) => ({ ...s, segments: { ...s.segments, [segmentId]: { ...s.segments[segmentId], ...patch } } }));
+    tx.commit();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /**
+   * The Properties panel's bulk Shape/Diameter/Width/Height/Material edits
+   * for a multi-segment selection — applies directly to just the selected
+   * segments, same "just these, not their whole runs" stance as
+   * updateSegmentFields. Network Type is deliberately not part of this
+   * method's patch type — see setNetworkTypeForSegmentsNetworks, which
+   * always retags whole connected runs regardless of selection size, because
+   * every segment in one physically-connected run must share one type.
+   */
+  updateSegmentsForSelection(patch: Partial<Pick<Segment, 'shape' | 'diameter' | 'width' | 'height' | 'material'>>): void {
+    const state = this.doc.drawingHistory.getState();
+    const segmentIds = [...this.doc.selectedIds].filter((id) => state.segments[id]);
+    if (segmentIds.length === 0) return;
+    const tx = new Transaction(this.doc.drawingHistory, 'Edit segments');
+    tx.update((s) => {
+      const segments = { ...s.segments };
+      for (const id of segmentIds) segments[id] = { ...segments[id], ...patch };
+      return { ...s, segments };
+    });
+    tx.commit();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** The Properties panel's read model for a fitting selection — null unless exactly one fitting (and nothing else) is selected, mirroring getSelectedSegmentInfo. */
+  getSelectedFittingInfo(): FittingInfo | null {
+    if (this.doc.selectedIds.size !== 1) return null;
+    const [id] = this.doc.selectedIds;
+    const fitting = this.doc.drawingHistory.getState().fittings[id];
+    if (!fitting) return null;
+    return { id: fitting.id, kind: fitting.kind, position: fitting.position };
+  }
+
+  /** The Properties panel's Kind dropdown for a selected fitting. Fitting markers don't render differently per kind today (see redrawOverlay), so no redraw is needed, just persistence + a refreshed read model. */
+  setFittingKind(fittingId: string, kind: FittingKind): void {
+    const state = this.doc.drawingHistory.getState();
+    if (!state.fittings[fittingId]) return;
+    const tx = new Transaction(this.doc.drawingHistory, 'Change fitting kind');
+    tx.update((s) => ({ ...s, fittings: { ...s.fittings, [fittingId]: { ...s.fittings[fittingId], kind } } }));
+    tx.commit();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /**
@@ -827,11 +909,27 @@ export class SketchScene {
    * core's computeNetworks) with a new network type — segments are physically
    * connected, so changing one segment's type in isolation would leave the
    * rest of the run visually/logically split. The Properties panel's Network
-   * Type dropdown for a selected segment.
+   * Type dropdown for a single selected segment; delegates to the
+   * multi-segment version below with a one-element list.
    */
   setNetworkTypeForSegmentNetwork(segmentId: string, networkTypeId: string): void {
+    this.setNetworkTypeForSegmentsNetworks([segmentId], networkTypeId);
+  }
+
+  /**
+   * Same whole-connected-run retag as setNetworkTypeForSegmentNetwork, but
+   * seeded from every segment in a multi-segment selection at once (unioned
+   * into one undo step) — the Properties panel's Network Type dropdown for a
+   * multi-segment selection. Segments in one physically-connected run can
+   * never disagree on network type, so this always cascades regardless of
+   * how many (or few) of that run's segments the user actually selected —
+   * unlike updateSegmentsForSelection's other fields, which apply only to
+   * the segments actually selected.
+   */
+  setNetworkTypeForSegmentsNetworks(segmentIds: string[], networkTypeId: string): void {
     const state = this.doc.drawingHistory.getState();
-    if (!state.segments[segmentId]) return;
+    const validIds = segmentIds.filter((id) => state.segments[id]);
+    if (validIds.length === 0) return;
     // The dropdown offers every library type, not just ones already adopted
     // by this document (see setActiveNetworkType) — adopt it now so its own
     // color/thickness/pattern resolve correctly instead of falling back to
@@ -848,8 +946,11 @@ export class SketchScene {
       fittings: Object.values(state.fittings),
       portGroups: this.doc.portGroups,
     });
-    const network = networks.find((n) => n.segmentIds.includes(segmentId));
-    const targetIds = network ? network.segmentIds : [segmentId];
+    const targetIds = new Set<string>();
+    for (const segmentId of validIds) {
+      const network = networks.find((n) => n.segmentIds.includes(segmentId));
+      for (const id of network ? network.segmentIds : [segmentId]) targetIds.add(id);
+    }
     const tx = new Transaction(this.doc.drawingHistory, 'Change network type');
     tx.update((s) => {
       const segments = { ...s.segments };

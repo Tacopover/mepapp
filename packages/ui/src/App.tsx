@@ -119,6 +119,8 @@ export function MepSketchApp({
     tool,
     selection,
     selectedSegment,
+    selectedSegments,
+    selectedFitting,
     hasSelection,
     allStamps,
     networkSummaries,
@@ -602,11 +604,14 @@ export function MepSketchApp({
         sceneRef={sceneRef}
         selection={selection}
         selectedSegment={selectedSegment}
+        selectedSegments={selectedSegments}
+        selectedFitting={selectedFitting}
         networkTypes={networkTypes}
         capacityInput={capacityInput}
         setCapacityInput={setCapacityInput}
         customPropertyDefs={customPropertyDefs}
         customStampDefinitions={customStampDefinitions}
+        labelLanguage={labelLanguage}
         onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
       />
     ),
@@ -626,9 +631,11 @@ export function MepSketchApp({
     // handled above and never reaches this branch while armed. Only jump to Properties on 'select'
     // with something selected; any other tool (or 'select' with nothing selected) restores whatever
     // tab the user had open.
-    setForcedTabId(tool === 'select' && (selection.length > 0 || selectedSegment) ? 'properties' : null);
+    setForcedTabId(
+      tool === 'select' && (selection.length > 0 || selectedSegment || selectedSegments.length > 0 || selectedFitting) ? 'properties' : null,
+    );
     setForcedTabNonce((n) => n + 1);
-  }, [selection, selectedSegment, tool]);
+  }, [selection, selectedSegment, selectedSegments, selectedFitting, tool]);
 
   return (
     <div className="mep-app">
