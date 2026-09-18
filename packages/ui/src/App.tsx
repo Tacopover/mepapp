@@ -615,13 +615,18 @@ export function MepSketchApp({
   const [forcedTabId, setForcedTabId] = useState<string | null>(null);
   const [forcedTabNonce, setForcedTabNonce] = useState(0);
   useEffect(() => {
+    if (tool === 'place-terminal' || tool === 'place-equipment') {
+      // Jump to the MEP tab so the user sees which stamp is armed and can pick a different one.
+      setForcedTabId('stamps');
+      setForcedTabNonce((n) => n + 1);
+      return;
+    }
     // Placing a stamp auto-selects it (see SketchScene.placeStamp), which would otherwise force-jump
-    // the dock to Properties mid-placement — annoying while place-terminal/place-equipment (or any
-    // other active tool) stays armed for repeated placement. Only jump when the user isn't in an
-    // active tool (i.e. back on 'select'), matching the moment a selection change actually reflects
-    // a deliberate pick rather than a placement side-effect.
-    if (tool !== 'select') return;
-    setForcedTabId(selection.length > 0 || selectedSegment ? 'properties' : null);
+    // the dock to Properties mid-placement — moot here since place-terminal/place-equipment is
+    // handled above and never reaches this branch while armed. Only jump to Properties on 'select'
+    // with something selected; any other tool (or 'select' with nothing selected) restores whatever
+    // tab the user had open.
+    setForcedTabId(tool === 'select' && (selection.length > 0 || selectedSegment) ? 'properties' : null);
     setForcedTabNonce((n) => n + 1);
   }, [selection, selectedSegment, tool]);
 
