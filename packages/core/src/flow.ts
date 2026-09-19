@@ -107,5 +107,14 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
 
   const totalCapacity = demandOf(rootKey);
 
+  // The loop above only records a fitting's capacity when it's visited as someone else's
+  // child edge — the root itself is never anyone's child, so a fitting that happens to BE
+  // the root (the common case: a bare open trunk end) would otherwise stay null forever
+  // even though totalCapacity already holds its correct subtree demand right here.
+  const rootFittingMatch = /^fitting:(.+)$/.exec(rootKey);
+  if (rootFittingMatch && rootFittingMatch[1] in fittingCapacity) {
+    fittingCapacity[rootFittingMatch[1]] = totalCapacity;
+  }
+
   return { segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection };
 }

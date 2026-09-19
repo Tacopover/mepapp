@@ -147,7 +147,6 @@ export function MepSketchApp({
   const [status, setStatus] = useState('');
   const [calibrationInput, setCalibrationInput] = useState('');
   const [textboxInput, setTextboxInput] = useState('');
-  const [capacityInput, setCapacityInput] = useState('');
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
   const [stampCategoryFilter, setStampCategoryFilter] = useState<StampCategoryFilter>('terminal');
@@ -607,8 +606,6 @@ export function MepSketchApp({
         selectedSegments={selectedSegments}
         selectedFitting={selectedFitting}
         networkTypes={networkTypes}
-        capacityInput={capacityInput}
-        setCapacityInput={setCapacityInput}
         customPropertyDefs={customPropertyDefs}
         customStampDefinitions={customStampDefinitions}
         labelLanguage={labelLanguage}

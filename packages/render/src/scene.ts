@@ -273,6 +273,8 @@ export interface FittingInfo {
   id: string;
   kind: FittingKind;
   position: Vec2;
+  /** This fitting's subtree capacity from the last flow solve (see core/flow.ts's FlowResult.fittingCapacity) — null if unresolved or nothing has been solved yet. A read-out, same stance as SegmentInfo.solvedCapacity. */
+  solvedCapacity: number | null;
 }
 
 /**
@@ -851,6 +853,15 @@ export class SketchScene {
     return null;
   }
 
+  /** Same lookup as solvedCapacityOf, against FlowResult.fittingCapacity instead — see FittingInfo.solvedCapacity. */
+  private solvedFittingCapacityOf(fittingId: string): number | null {
+    if (!this.doc.lastFlowResult) return null;
+    for (const result of this.doc.lastFlowResult) {
+      if (fittingId in result.fittingCapacity) return result.fittingCapacity[fittingId];
+    }
+    return null;
+  }
+
   /** The Properties panel's read model for a segment selection — null unless exactly one segment (and nothing else) is selected, mirroring getSelection()'s stamps-only counterpart. */
   getSelectedSegmentInfo(): SegmentInfo | null {
     if (this.doc.selectedIds.size !== 1) return null;
@@ -909,7 +920,7 @@ export class SketchScene {
     const [id] = this.doc.selectedIds;
     const fitting = this.doc.drawingHistory.getState().fittings[id];
     if (!fitting) return null;
-    return { id: fitting.id, kind: fitting.kind, position: fitting.position };
+    return { id: fitting.id, kind: fitting.kind, position: fitting.position, solvedCapacity: this.solvedFittingCapacityOf(fitting.id) };
   }
 
   /** The Properties panel's Kind dropdown for a selected fitting. Fitting markers don't render differently per kind today (see redrawOverlay), so no redraw is needed, just persistence + a refreshed read model. */
@@ -1171,6 +1182,11 @@ export class SketchScene {
   /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
   setTerminalCapacity(elementId: string, capacity: number): void {
     this.doc.terminalCapacities.set(elementId, capacity);
+    this.recomputeFlow();
+    // Not part of PlacedStamp, so applyToSelectedStamps' own emit doesn't cover it — without this,
+    // the Properties panel's now-directly-bound Capacity field (StampInfo.capacity) would keep
+    // showing the value from the last unrelated selection change instead of what was just typed.
+    this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /**
@@ -1242,11 +1258,22 @@ export class SketchScene {
 
   /**
    * Runs the capacity-accumulation flow solve (core/flow.ts) over every
-   * derived network and returns one FlowResult per network. Networks are
-   * recomputed from current topology on every call — there is no stored
-   * NetworkId to go stale, unlike the old app (see decisions log 2026-09-06).
+   * derived network and stores one FlowResult per network — see
+   * recomputeFlow, which this and every topology/capacity-changing method
+   * call automatically so lastFlowResult (and the segment/fitting Capacity
+   * readouts derived from it) never goes stale without needing a manual
+   * "Solve flow" click. This method itself is only the button's action now:
+   * it also turns the on-canvas arrow overlay on for the current selection
+   * (see flowOverlayActive/syncFlowLabels) — a deliberate, backup/test
+   * visualization, not the thing that makes the numbers correct.
    */
   computeFlow(): FlowResult[] {
+    this.doc.flowOverlayActive = true;
+    return this.recomputeFlow();
+  }
+
+  /** The actual solve, run after every mutation that can change flow (see call sites: syncDrawingLayer, setTerminalCapacity, setCapacityForSelection). Always keeps lastFlowResult live; only touches the visible overlay via syncFlowLabels, which no-ops unless flowOverlayActive. */
+  private recomputeFlow(): FlowResult[] {
     const state = this.doc.drawingHistory.getState();
     const segments = Object.values(state.segments);
     const fittings = Object.values(state.fittings);
@@ -1263,18 +1290,24 @@ export class SketchScene {
   /**
    * Rebuilds the on-canvas flow overlay from the last solve: a capacity
    * number plus a small direction arrowhead at each resolved segment's
-   * midpoint. Only called from computeFlow (and from loadProjectFromJson to
-   * clear stale labels) — never from syncDrawingLayer, since flow values
-   * only change when the user re-solves, not on every topology edit.
+   * midpoint, restricted to whichever network(s) contain a currently
+   * selected segment. Empty whenever flowOverlayActive is false or no
+   * segment is selected — see computeFlow (turns it on) and redrawOverlay
+   * (turns it back off the moment the selection no longer includes a
+   * segment, i.e. on deselect).
    */
   private syncFlowLabels(): void {
     for (const child of this.doc.flowLabelLayer.removeChildren()) child.destroy();
+    if (!this.doc.flowOverlayActive) return;
     const results = this.doc.lastFlowResult;
     if (!results) return;
     const state = this.doc.drawingHistory.getState();
+    const selectedSegmentIds = [...this.doc.selectedIds].filter((id) => state.segments[id]);
+    if (selectedSegmentIds.length === 0) return;
+    const relevantResults = results.filter((result) => selectedSegmentIds.some((id) => id in result.segmentCapacity));
     const arrows = new Graphics();
 
-    for (const result of results) {
+    for (const result of relevantResults) {
       for (const [segmentId, capacity] of Object.entries(result.segmentCapacity)) {
         if (capacity === null) continue;
         const segment = state.segments[segmentId];
@@ -1362,9 +1395,12 @@ export class SketchScene {
       target.terminalCapacities.set(elementId, capacity);
     }
     // The solve itself isn't persisted (see ProjectDocument's terminalCapacities doc
-    // comment) — clear the stale overlay from before the load rather than showing
-    // labels for a topology that may no longer match.
+    // comment) — clear the stale overlay from before the load. If target is the
+    // active document, syncDrawingLayer below immediately recomputes it fresh
+    // against the just-loaded topology (see recomputeFlow); otherwise it stays
+    // cleared until that document is activated or next edited.
     target.lastFlowResult = null;
+    target.flowOverlayActive = false;
     for (const child of target.flowLabelLayer.removeChildren()) child.destroy();
 
     let maxAnnotationSeq = 0;
@@ -1762,6 +1798,8 @@ export class SketchScene {
     for (const id of this.doc.selectedIds) {
       if (state.stamps[id]) this.doc.terminalCapacities.set(id, capacity);
     }
+    this.recomputeFlow();
+    this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /** Current world scale (1 = 100%) — the status bar's zoom readout. */
@@ -2156,6 +2194,9 @@ export class SketchScene {
       });
       tx.commit();
     }
+    // Same non-undoable stance as setTerminalCapacity: a deleted stamp's entered
+    // capacity has no home to be restored to on undo, so it's just dropped.
+    for (const id of stampIds) this.doc.terminalCapacities.delete(id);
     this.doc.selectedIds.clear();
     this.syncDrawingLayer();
     this.markDirty();
@@ -2325,6 +2366,7 @@ export class SketchScene {
       this.drawAnnotation(annotation);
     }
     this.emitter.emit('drawingChanged', this.getDrawingSummary());
+    this.recomputeFlow();
   }
 
   /** A segment's stroke color/width/pattern, resolved from its networkTypeId against the active document's adopted network types — falls back field-by-field to DEFAULT_NETWORK_TYPE, which also covers a project saved before these fields existed. */
@@ -2492,6 +2534,7 @@ export class SketchScene {
 
   private redrawOverlay(): void {
     this.overlay.clear();
+    this.syncFlowLabels();
 
     const state = this.doc.drawingHistory.getState();
     for (const id of this.doc.selectedIds) {

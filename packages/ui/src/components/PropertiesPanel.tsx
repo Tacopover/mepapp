@@ -62,8 +62,6 @@ export interface PropertiesPanelProps {
   selectedFitting: FittingInfo | null;
   /** The active document's adopted network types — the selected segment's "Network Type" dropdown. */
   networkTypes: NetworkType[];
-  capacityInput: string;
-  setCapacityInput: (value: string) => void;
   /** Global Properties definitions (Terminal/Equipment only) — see GlobalPropertiesDialog. */
   customPropertyDefs: { terminal: CustomPropertyDefinition[]; equipment: CustomPropertyDefinition[] };
   /** The active document's user-authored elements — looked up against the selected stamp's definitionId to gate the "Edit ports…" action to custom (source: 'custom') elements only; the four hardcoded STAMP_LIBRARY entries stay read-only. */
@@ -80,8 +78,6 @@ export function PropertiesPanel({
   selectedSegments,
   selectedFitting,
   networkTypes,
-  capacityInput,
-  setCapacityInput,
   customPropertyDefs,
   customStampDefinitions,
   labelLanguage,
@@ -222,6 +218,10 @@ export function PropertiesPanel({
           <div className="mep-field-row">
             <label>Y (pt)</label>
             <input type="number" value={Math.round(selectedFitting.position.y * 100) / 100} disabled />
+          </div>
+          <div className="mep-field-row">
+            <label>Solved capacity</label>
+            <input type="text" value={formatSolvedCapacity(selectedFitting.solvedCapacity)} disabled />
           </div>
         </div>
       </div>
@@ -513,9 +513,8 @@ export function PropertiesPanel({
           <label>Capacity</label>
           <input
             type="number"
-            value={capacityInput}
-            onChange={(e) => setCapacityInput(e.target.value)}
-            onBlur={() => sceneRef.current?.setTerminalCapacity(stamp.id, Number(capacityInput) || 0)}
+            value={stamp.capacity}
+            onChange={(e) => sceneRef.current?.setTerminalCapacity(stamp.id, Number(e.target.value) || 0)}
           />
         </div>
       </div>

@@ -73,7 +73,7 @@ export class SketchDocument {
   readonly drawingLayer = new Graphics();
   /** PixiJS Text nodes for placed textbox annotations — a Graphics object can't render text, so these live in their own container, fully rebuilt alongside drawingLayer on every syncDrawingLayer (see SketchScene.drawAnnotation). */
   readonly annotationTextLayer = new Container();
-  /** Per-segment solved-capacity labels + direction arrowheads — fully rebuilt on every computeFlow() call (see SketchScene.syncFlowLabels), not on every syncDrawingLayer: flow values only change when the user re-solves, not on every topology edit. */
+  /** Per-segment solved-capacity labels + direction arrowheads — rebuilt on every flow recompute (see SketchScene.recomputeFlow/syncFlowLabels), but only actually populated while flowOverlayActive is true and a segment is selected. */
   readonly flowLabelLayer = new Container();
   readonly stamps = new Map<string, StampEntry>();
   selectedIds = new Set<string>();
@@ -91,6 +91,8 @@ export class SketchDocument {
   nextSegmentSeq = 1;
   nextAnnotationSeq = 1;
   lastFlowResult: FlowResult[] | null = null;
+  /** Whether the on-canvas flow overlay (syncFlowLabels) should currently render — turned on by computeFlow() (the "Solve flow" button) and off whenever no segment stays selected, so the overlay reads as a deliberate, selection-scoped visualization rather than a permanent one. lastFlowResult itself is always kept live (see SketchScene.recomputeFlow) regardless of this flag, so Properties-panel capacity readouts never depend on it. */
+  flowOverlayActive = false;
   viewport = { x: 0, y: 0, scale: 1 };
   isDirty = false;
 

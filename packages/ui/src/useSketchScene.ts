@@ -141,20 +141,24 @@ export function useSketchScene(): UseSketchScene {
     };
     const onFlowSolved = (result: FlowResult[]) => {
       setFlowResult(result);
-      // SegmentInfo.solvedCapacity is derived from the same solve — refresh an
-      // already-selected segment's read model too, or its Properties panel
-      // readout would keep showing the previous (or no) solved value. Only do
-      // this when a segment is actually selected: getSelectedSegments() always
-      // returns a fresh array reference, and calling these setters unconditionally
-      // would churn that reference even with a stamp (or nothing) selected —
-      // App.tsx's dock-tab-forcing effect has selectedSegments in its deps, so
-      // that churn alone would yank the dock back to Properties on every solve.
+      // SegmentInfo/FittingInfo.solvedCapacity are derived from the same solve —
+      // refresh an already-selected segment/fitting's read model too, or its
+      // Properties panel readout would keep showing a stale value. Flow now
+      // recomputes automatically on every topology/capacity edit (not just the
+      // "Solve flow" button), so this fires often — only refresh when a segment
+      // or fitting is actually selected: these getters always return fresh
+      // object/array references, and setting them unconditionally would churn
+      // that reference even with a stamp (or nothing) selected — App.tsx's
+      // dock-tab-forcing effect has these in its deps, so that churn alone would
+      // yank the dock back to Properties on every recompute.
       const segmentInfo = scene.getSelectedSegmentInfo();
       const segments = scene.getSelectedSegments();
       if (segmentInfo || segments.length > 0) {
         setSelectedSegment(segmentInfo);
         setSelectedSegments(segments);
       }
+      const fittingInfo = scene.getSelectedFittingInfo();
+      if (fittingInfo) setSelectedFitting(fittingInfo);
     };
     const onProjectLoaded = () => {
       setFlowResult(null);

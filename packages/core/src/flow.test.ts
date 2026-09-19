@@ -67,6 +67,25 @@ describe('solveFlow — capacity accumulation (not physics)', () => {
     expect(result.totalCapacity).toBe(175);
   });
 
+  it('records fittingCapacity for a bare fitting that resolves as the root itself, not just as someone else\'s child', () => {
+    // A terminal wired straight to an open trunk end (a bare junction) — the fitting is
+    // degree-1 with no capacity of its own, so it's picked as root (see solveFlow's root
+    // heuristic), meaning it's never visited as anyone's "child" edge.
+    const segments = [segment('trunk', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'fitting', fittingId: 'end' })];
+    const [network] = computeNetworks({ segments, fittings: [fitting('end')], portGroups: [] });
+
+    const result = solveFlow({
+      network,
+      segments,
+      fittings: [fitting('end')],
+      portGroups: [],
+      terminalCapacities: { diffuser: 50 },
+    });
+
+    expect(result.totalCapacity).toBe(50);
+    expect(result.fittingCapacity.end).toBe(50);
+  });
+
   it('flips segmentDirection when an explicit rootElementId puts the root on the other physical endpoint', () => {
     const segments = [
       segment('trunk', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
