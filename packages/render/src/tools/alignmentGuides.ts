@@ -46,10 +46,20 @@ export function computeSelectionBoundsWorld(ctx: ToolContext, ids: Iterable<stri
  * position) to the nearest edge/center alignment with any other stamp/fitting/annotation
  * on the page, independently per axis — the Figma/Illustrator "smart guide" behavior.
  * `excludeIds` is every id already part of the drag, so a selection never aligns to
- * itself. Returns `rawPoint` adjusted by whichever axis matched (either, both, or
- * neither), plus the guide line(s) to render for visual feedback.
+ * itself. `originBounds` (move-selection only) is the selection's own bounds at drag
+ * start, matched like any other candidate so an element snaps back onto its starting
+ * x or y and can be dragged purely orthogonally. Returns `rawPoint` adjusted by
+ * whichever axis matched (either, both, or neither), plus the guide line(s) to render
+ * for visual feedback.
  */
-export function resolveAlignmentSnap(ctx: ToolContext, state: DrawingState, rawPoint: Vec2, draggedBounds: Bounds, excludeIds: ReadonlySet<string>): AlignmentSnapResult {
+export function resolveAlignmentSnap(
+  ctx: ToolContext,
+  state: DrawingState,
+  rawPoint: Vec2,
+  draggedBounds: Bounds,
+  excludeIds: ReadonlySet<string>,
+  originBounds?: Bounds | null,
+): AlignmentSnapResult {
   const tolerance = GUIDE_SNAP_SCREEN_PX / ctx.getZoomScale();
   const draggedCenterX = (draggedBounds.minX + draggedBounds.maxX) / 2;
   const draggedCenterY = (draggedBounds.minY + draggedBounds.maxY) / 2;
@@ -61,9 +71,14 @@ export function resolveAlignmentSnap(ctx: ToolContext, state: DrawingState, rawP
   let bestDyDistance = tolerance;
   let guideY: AlignmentGuide | null = null;
 
+  const candidateBounds: Bounds[] = [];
   for (const ref of candidateRefs(state, excludeIds)) {
     const bounds = ctx.resolveSelectableBoundsWorld(ref, state);
-    if (!bounds) continue;
+    if (bounds) candidateBounds.push(bounds);
+  }
+  if (originBounds) candidateBounds.push(originBounds);
+
+  for (const bounds of candidateBounds) {
     const candidateCenterX = (bounds.minX + bounds.maxX) / 2;
     const candidateCenterY = (bounds.minY + bounds.maxY) / 2;
 

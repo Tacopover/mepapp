@@ -44,7 +44,7 @@ export function resolveSnappedPoint(rawWorldPoint: Vec2, context: DragSnapContex
     };
     const excludeIds = new Set<string>([...drag.snapshot.map((s) => s.id), ...Object.keys(drag.annotationSnapshot), ...Object.keys(drag.fittingSnapshot)]);
     const state = context.ctx.doc.drawingHistory.getState();
-    return resolveAlignmentSnap(context.ctx, state, rawWorldPoint, draggedBounds, excludeIds);
+    return resolveAlignmentSnap(context.ctx, state, rawWorldPoint, draggedBounds, excludeIds, drag.selectionBoundsAtStart);
   }
 
   if (context.kind === 'place-stamp') {
