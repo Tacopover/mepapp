@@ -99,12 +99,11 @@ function readSvgSize(svgPath) {
   return { width: Number(widthMatch[1]), height: Number(heightMatch[1]) };
 }
 
-/** Palette-tile nominal size only (StampDefinition.nativeWidth/Height doc comment — real placed size is recomputed from the art's actual pixel dimensions at 300 DPI). Preserves the SVG's own aspect ratio, capping the longer side at NATIVE_BASELINE, matching how the hand-typed luminaire-rectangular entry derived its 16.87 from a 676x190 viewBox. */
-const NATIVE_BASELINE = 48;
+/** PDF points per SVG user unit. One factor for every stamp, so the SVGs keep their real size relative to each other (an air handling unit's 1156-unit width stays ~2.8x a connection point's 410-unit height). 0.18 keeps the library's median SVG (~272 units) near its earlier 48 pt size. The rasterizer (ui/stampBitmap.ts) and scene.ts recompute the placed size from this value at 300 DPI. */
+const SVG_UNIT_TO_PT = 0.18;
 function nativeSizeFor(svgPath) {
   const { width, height } = readSvgSize(svgPath);
-  if (width >= height) return { nativeWidth: NATIVE_BASELINE, nativeHeight: round2((NATIVE_BASELINE * height) / width) };
-  return { nativeWidth: round2((NATIVE_BASELINE * width) / height), nativeHeight: NATIVE_BASELINE };
+  return { nativeWidth: round2(width * SVG_UNIT_TO_PT), nativeHeight: round2(height * SVG_UNIT_TO_PT) };
 }
 
 function round2(n) {
