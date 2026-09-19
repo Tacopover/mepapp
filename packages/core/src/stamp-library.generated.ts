@@ -11,8 +11,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '74 Bad',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 19.08,
+    nativeWidth: 106.07,
+    nativeHeight: 42.15,
     ports: [],
     shapes: [
       {
@@ -184,8 +184,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '53 Oogdouche',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 45.01,
-    nativeHeight: 48,
+    nativeWidth: 46.4,
+    nativeHeight: 49.48,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -511,8 +511,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '52 Vloerput',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 47.96,
+    nativeWidth: 24.34,
+    nativeHeight: 24.32,
     ports: [],
     shapes: [
       {
@@ -754,8 +754,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '74 Uitstortgootsteen',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 35.86,
+    nativeWidth: 45.66,
+    nativeHeight: 34.12,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -1129,8 +1129,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '52 Riolering Afvoerpunt',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 17.54,
+    nativeHeight: 17.54,
     ports: [],
     shapes: [
       {
@@ -1155,8 +1155,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '74 Douchebak',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 47.82,
-    nativeHeight: 48,
+    nativeWidth: 47.47,
+    nativeHeight: 47.65,
     ports: [],
     shapes: [
       {
@@ -1354,8 +1354,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '74 Wastafel',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 30.84,
+    nativeWidth: 45.25,
+    nativeHeight: 29.07,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -1468,8 +1468,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '52 Ontlastput',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 40.92,
+    nativeWidth: 65.92,
+    nativeHeight: 56.19,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -1623,8 +1623,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '53 Tappunt koud water',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 22.35,
-    nativeHeight: 48,
+    nativeWidth: 25.92,
+    nativeHeight: 55.67,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -1682,8 +1682,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '53 Tappunt gevelkraan',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 39.27,
-    nativeHeight: 48,
+    nativeWidth: 43.27,
+    nativeHeight: 52.9,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -1755,8 +1755,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '53 Tappunt warm koud water',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 41.25,
-    nativeHeight: 48,
+    nativeWidth: 55.08,
+    nativeHeight: 64.09,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -1871,8 +1871,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '53 Tappunt warm water',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 22.35,
-    nativeHeight: 48,
+    nativeWidth: 25.92,
+    nativeHeight: 55.67,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -1956,8 +1956,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '52 Toilet Inbouwreservoir',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 17.35,
+    nativeWidth: 41.59,
+    nativeHeight: 15.03,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -2035,8 +2035,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '74 Toilet',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 32.04,
-    nativeHeight: 48,
+    nativeWidth: 28.93,
+    nativeHeight: 43.35,
     ports: [],
     shapes: [
       {
@@ -2167,8 +2167,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '74 Urinoir',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 43.65,
+    nativeWidth: 29.1,
+    nativeHeight: 26.46,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -2376,8 +2376,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '53 Watermeter',
     discipline: 'plumbing',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 44.01,
+    nativeHeight: 44.01,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -2422,8 +2422,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Rozet',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 17.54,
+    nativeHeight: 17.54,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -2467,8 +2467,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '54 Aansluitpunt CO2',
     discipline: 'other',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 23.4,
+    nativeHeight: 23.4,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -2538,8 +2538,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '54 Aansluitpunt Perslucht',
     discipline: 'other',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 23.4,
+    nativeHeight: 23.4,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -2634,8 +2634,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Demper',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 35.58,
+    nativeWidth: 37.79,
+    nativeHeight: 28.01,
     ports: [],
     shapes: [
       {
@@ -2739,8 +2739,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Deurspleet',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 38.09,
+    nativeWidth: 45.45,
+    nativeHeight: 36.06,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -2887,8 +2887,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Stromingspijl Retour',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 7.48,
-    nativeHeight: 48,
+    nativeWidth: 18.66,
+    nativeHeight: 119.79,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -2983,8 +2983,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Stromingspijl Toevoer',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 7.48,
-    nativeHeight: 48,
+    nativeWidth: 18.66,
+    nativeHeight: 119.79,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -3040,8 +3040,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Inductieunit Toevoer',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 47.28,
-    nativeHeight: 48,
+    nativeWidth: 102.93,
+    nativeHeight: 104.49,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -3256,8 +3256,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Lijnrooster',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 8.78,
+    nativeWidth: 95.4,
+    nativeHeight: 17.46,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -3315,8 +3315,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Nozzle',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 27.71,
+    nativeWidth: 29.94,
+    nativeHeight: 17.28,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -3362,8 +3362,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '56 Stralingspaneel',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 14.56,
-    nativeHeight: 48,
+    nativeWidth: 95.4,
+    nativeHeight: 314.6,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -3489,8 +3489,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '56 Radiator Type22',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 3.99,
+    nativeWidth: 93.64,
+    nativeHeight: 7.79,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -3684,8 +3684,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '56 Radiator Type33',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 6.07,
+    nativeWidth: 93.64,
+    nativeHeight: 11.85,
     ports: [],
     shapes: [
       {
@@ -3957,8 +3957,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Dakkap',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 47.94,
+    nativeWidth: 151.92,
+    nativeHeight: 151.74,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -4069,8 +4069,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '56 Vloerverwarming',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 34.75,
+    nativeWidth: 110.37,
+    nativeHeight: 79.89,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -5021,8 +5021,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilatierooster Rechthoekig',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 47.66,
+    nativeWidth: 25.38,
+    nativeHeight: 25.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -5132,8 +5132,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilatierooster Rh Toevoer 2',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 47.75,
+    nativeWidth: 105.85,
+    nativeHeight: 105.3,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -5387,8 +5387,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilatierooster Rh Toevoer',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 47.75,
+    nativeWidth: 105.85,
+    nativeHeight: 105.3,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -5655,8 +5655,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilatierooster Rond Toevoer',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 47.75,
+    nativeWidth: 105.85,
+    nativeHeight: 105.3,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -5856,8 +5856,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilatierooster',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 32.04,
+    nativeHeight: 32.04,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -5927,8 +5927,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Wandrooster Plenum',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 16.05,
+    nativeWidth: 119.34,
+    nativeHeight: 39.91,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -5974,8 +5974,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Wandrooster',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 9.05,
+    nativeWidth: 38.95,
+    nativeHeight: 7.34,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6021,8 +6021,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '59 Droge Blusleiding Gevelkast',
     discipline: 'fireProtection',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 44.28,
+    nativeWidth: 85.86,
+    nativeHeight: 79.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6119,8 +6119,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '59 Droge Blusleiding Brandkraan',
     discipline: 'fireProtection',
     category: 'terminal',
-    nativeWidth: 30.13,
-    nativeHeight: 48,
+    nativeWidth: 37.55,
+    nativeHeight: 59.81,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6204,8 +6204,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '53 Brandslanghaspelkast',
     discipline: 'fireProtection',
     category: 'terminal',
-    nativeWidth: 20.51,
-    nativeHeight: 48,
+    nativeWidth: 36.35,
+    nativeHeight: 85.06,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6626,8 +6626,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '54 Aansluitpunt Stikstof',
     discipline: 'other',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 23.4,
+    nativeHeight: 23.4,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6672,8 +6672,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '54 Aansluitpunt Zuurstof',
     discipline: 'other',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 23.4,
+    nativeHeight: 23.4,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6731,8 +6731,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '59 Sprinklerkop',
     discipline: 'other',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 28.08,
+    nativeHeight: 28.08,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6776,8 +6776,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '54 Aansluitpunt Vacuum',
     discipline: 'other',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 23.4,
+    nativeHeight: 23.4,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6836,8 +6836,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Aansluitpunt 400V 3FPE',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 22.83,
-    nativeHeight: 48,
+    nativeWidth: 36.14,
+    nativeHeight: 75.98,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -6972,8 +6972,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Aansluitpunt Zonwering',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 18.42,
-    nativeHeight: 48,
+    nativeWidth: 36.14,
+    nativeHeight: 94.18,
     ports: [],
     shapes: [
       {
@@ -7089,8 +7089,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Aansluitpunt',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 23.48,
-    nativeHeight: 48,
+    nativeWidth: 36.14,
+    nativeHeight: 73.88,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -7199,8 +7199,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '61 Aarding CAP',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 27.38,
-    nativeHeight: 48,
+    nativeWidth: 27,
+    nativeHeight: 47.34,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -7284,8 +7284,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '61 Aarding Potentiaalvereffening',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 25.79,
-    nativeHeight: 48,
+    nativeWidth: 27.36,
+    nativeHeight: 50.92,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -7382,8 +7382,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '61 Aardpen',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 22.35,
-    nativeHeight: 48,
+    nativeWidth: 42.82,
+    nativeHeight: 91.97,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -7516,8 +7516,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Vluchtroute Omlaag',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.81,
+    nativeWidth: 71.6,
+    nativeHeight: 37.01,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -8139,8 +8139,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Vluchtroute Links',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.81,
+    nativeWidth: 71.6,
+    nativeHeight: 37.01,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -8762,8 +8762,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Vluchtroute Rechts',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.81,
+    nativeWidth: 71.6,
+    nativeHeight: 37.01,
     ports: [],
     shapes: [
       {
@@ -9378,8 +9378,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Vluchtroute Trap Neer Links',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.81,
+    nativeWidth: 71.6,
+    nativeHeight: 37.01,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -10001,8 +10001,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Vluchtroute Trap Neer Rechts',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.81,
+    nativeWidth: 71.6,
+    nativeHeight: 37.01,
     ports: [],
     shapes: [
       {
@@ -10617,8 +10617,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Vluchtroute Trap Op Links',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.81,
+    nativeWidth: 71.6,
+    nativeHeight: 37.01,
     ports: [],
     shapes: [
       {
@@ -11233,8 +11233,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Vluchtroute Trap Op Rechts',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.81,
+    nativeWidth: 71.6,
+    nativeHeight: 37.01,
     ports: [],
     shapes: [
       {
@@ -11849,8 +11849,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Vluchtroute Omhoog',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.81,
+    nativeWidth: 71.6,
+    nativeHeight: 37.01,
     ports: [],
     shapes: [
       {
@@ -12465,8 +12465,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '61 Aardingsmat',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 47.83,
+    nativeWidth: 48.37,
+    nativeHeight: 48.19,
     ports: [],
     shapes: [
       {
@@ -12674,8 +12674,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Centraaldoos',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 47.83,
-    nativeHeight: 48,
+    nativeWidth: 50.4,
+    nativeHeight: 50.58,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -12838,8 +12838,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Sleutelbuis',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 68.76,
+    nativeHeight: 68.76,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -12914,8 +12914,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '61 Kilowatuurmeter',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 20.09,
+    nativeWidth: 43.42,
+    nativeHeight: 18.18,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -12961,8 +12961,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rechthoekig Nood',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 13.49,
+    nativeWidth: 121.68,
+    nativeHeight: 34.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -13183,8 +13183,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rechthoekig Waterdicht',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 13.49,
+    nativeWidth: 121.68,
+    nativeHeight: 34.2,
     ports: [],
     shapes: [
       {
@@ -13353,8 +13353,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rechthoekig',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 13.49,
+    nativeWidth: 121.68,
+    nativeHeight: 34.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -13516,8 +13516,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rh Wand',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 43.64,
+    nativeWidth: 39,
+    nativeHeight: 35.46,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -13692,8 +13692,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rh2 Wand',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 19.8,
+    nativeWidth: 85.95,
+    nativeHeight: 35.46,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -13868,8 +13868,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rond Nood',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 42.97,
+    nativeWidth: 38.2,
+    nativeHeight: 34.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14025,8 +14025,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rond Wand Nood',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 44.55,
+    nativeWidth: 38.2,
+    nativeHeight: 35.46,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14195,8 +14195,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rond Wand Waterdicht',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 44.55,
+    nativeWidth: 38.2,
+    nativeHeight: 35.46,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14320,8 +14320,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rond Wand',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 44.76,
-    nativeHeight: 48,
+    nativeWidth: 36,
+    nativeHeight: 38.61,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14366,8 +14366,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rond Waterdicht',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 42.97,
+    nativeWidth: 38.2,
+    nativeHeight: 34.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14478,8 +14478,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Rond',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 42.97,
+    nativeWidth: 38.2,
+    nativeHeight: 34.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14576,8 +14576,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Spot Nood',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 34.2,
+    nativeHeight: 34.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14668,8 +14668,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Spot Waterdicht',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 34.2,
+    nativeHeight: 34.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14715,8 +14715,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Armatuur Spot',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 34.2,
+    nativeHeight: 34.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14748,8 +14748,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 LUTO',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 17.91,
+    nativeWidth: 97.82,
+    nativeHeight: 36.5,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14795,8 +14795,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Bewegingsensor Wand',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 22.36,
+    nativeWidth: 60.29,
+    nativeHeight: 28.08,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -14941,8 +14941,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Bewegingsensor',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 44.56,
-    nativeHeight: 48,
+    nativeWidth: 38.07,
+    nativeHeight: 41,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -15066,8 +15066,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Signaallamp',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 20.88,
+    nativeHeight: 20.88,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -15125,8 +15125,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '61 PV Paneel',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 22.18,
+    nativeWidth: 173.83,
+    nativeHeight: 80.32,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -15429,8 +15429,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar Wissel',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 39.23,
-    nativeHeight: 48,
+    nativeWidth: 61.74,
+    nativeHeight: 75.53,
     ports: [],
     shapes: [
       {
@@ -15507,8 +15507,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar Dimmer',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 40.77,
-    nativeHeight: 48,
+    nativeWidth: 41.14,
+    nativeHeight: 48.43,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -15589,8 +15589,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar 2voudig',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 40.77,
-    nativeHeight: 48,
+    nativeWidth: 41.14,
+    nativeHeight: 48.43,
     ports: [],
     shapes: [
       {
@@ -15654,8 +15654,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar Elleboog',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 46.23,
-    nativeHeight: 48,
+    nativeWidth: 46.65,
+    nativeHeight: 48.43,
     ports: [],
     shapes: [
       {
@@ -15745,8 +15745,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Noodschakelaar',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 26.64,
+    nativeHeight: 26.64,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -15790,8 +15790,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar Trekkoord',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 40.77,
-    nativeHeight: 48,
+    nativeWidth: 41.14,
+    nativeHeight: 48.43,
     ports: [],
     shapes: [
       {
@@ -15904,8 +15904,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar Pulsdrukker',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 32.76,
+    nativeHeight: 32.76,
     ports: [],
     shapes: [
       {
@@ -15942,8 +15942,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar Wcd Combi Wissel',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 33.5,
-    nativeHeight: 48,
+    nativeWidth: 61.74,
+    nativeHeight: 88.47,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -16067,8 +16067,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar Wcd Combi',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 33.72,
-    nativeHeight: 48,
+    nativeWidth: 43.11,
+    nativeHeight: 61.37,
     ports: [],
     shapes: [
       {
@@ -16159,8 +16159,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar Op Neer',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 46.66,
-    nativeHeight: 48,
+    nativeWidth: 62.5,
+    nativeHeight: 64.29,
     ports: [],
     shapes: [
       {
@@ -16289,8 +16289,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Schakelaar',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 40.77,
-    nativeHeight: 48,
+    nativeWidth: 41.14,
+    nativeHeight: 48.43,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -16348,8 +16348,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos 230V',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 25.32,
-    nativeHeight: 48,
+    nativeWidth: 36.31,
+    nativeHeight: 68.84,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -16473,8 +16473,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos 400V 3FPE',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 21.99,
-    nativeHeight: 48,
+    nativeWidth: 37.37,
+    nativeHeight: 81.58,
     ports: [],
     shapes: [
       {
@@ -16617,8 +16617,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos 2voudig USB',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 18.8,
-    nativeHeight: 48,
+    nativeWidth: 25.6,
+    nativeHeight: 65.37,
     ports: [],
     shapes: [
       {
@@ -16788,8 +16788,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos 2voudig',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 22.93,
-    nativeHeight: 48,
+    nativeWidth: 25.6,
+    nativeHeight: 53.59,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -16863,8 +16863,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos Perilex',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 21.99,
-    nativeHeight: 48,
+    nativeWidth: 37.37,
+    nativeHeight: 81.58,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -17001,8 +17001,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos 4voudig',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 16.39,
-    nativeHeight: 48,
+    nativeWidth: 25.6,
+    nativeHeight: 74.99,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -17104,8 +17104,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos 3voudig',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 19.12,
-    nativeHeight: 48,
+    nativeWidth: 25.6,
+    nativeHeight: 64.29,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -17193,8 +17193,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos USB',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 22.93,
-    nativeHeight: 48,
+    nativeWidth: 25.6,
+    nativeHeight: 53.59,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -17357,8 +17357,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '62 Wandcontactdoos',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 22.93,
-    nativeHeight: 48,
+    nativeWidth: 25.6,
+    nativeHeight: 53.59,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -17418,8 +17418,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '63 Draadloze Oplader',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 49.02,
+    nativeHeight: 49.02,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -17575,8 +17575,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '64 Intercom',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 40.65,
+    nativeWidth: 51.61,
+    nativeHeight: 43.71,
     ports: [],
     shapes: [
       {
@@ -17713,8 +17713,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '64 Speaker',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 29.8,
+    nativeWidth: 43.24,
+    nativeHeight: 26.84,
     ports: [],
     shapes: [
       {
@@ -17779,8 +17779,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '64 Intercom Video',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 29.46,
-    nativeHeight: 48,
+    nativeWidth: 52.58,
+    nativeHeight: 85.67,
     ports: [],
     shapes: [
       {
@@ -17968,8 +17968,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Inbraakcentrale',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 25.59,
+    nativeWidth: 34.76,
+    nativeHeight: 18.53,
     ports: [],
     shapes: [
       {
@@ -18018,8 +18018,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Camera Dome',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.02,
+    nativeWidth: 75.46,
+    nativeHeight: 37.76,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -18157,8 +18157,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Camera Beweegbaar',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 20.93,
-    nativeHeight: 48,
+    nativeWidth: 20.95,
+    nativeHeight: 48.05,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -18329,8 +18329,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Camera',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 16.79,
-    nativeHeight: 48,
+    nativeWidth: 15.08,
+    nativeHeight: 43.13,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -18441,8 +18441,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Kaartlezer',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 34.05,
-    nativeHeight: 48,
+    nativeWidth: 31.98,
+    nativeHeight: 45.08,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -18488,8 +18488,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Codebedienpaneel',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 36.23,
-    nativeHeight: 48,
+    nativeWidth: 34.92,
+    nativeHeight: 46.26,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -18594,8 +18594,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Datapunt 2voudig',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 22.18,
-    nativeHeight: 48,
+    nativeWidth: 22.32,
+    nativeHeight: 48.3,
     ports: [],
     shapes: [
       {
@@ -18670,8 +18670,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Datapunt 4voudig',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 22.18,
-    nativeHeight: 48,
+    nativeWidth: 22.32,
+    nativeHeight: 48.3,
     ports: [],
     shapes: [
       {
@@ -18772,8 +18772,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Datapunt 3voudig',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 21.45,
-    nativeHeight: 48,
+    nativeWidth: 22.32,
+    nativeHeight: 49.95,
     ports: [],
     shapes: [
       {
@@ -18861,8 +18861,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Datapunt',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 22.18,
-    nativeHeight: 48,
+    nativeWidth: 22.32,
+    nativeHeight: 48.3,
     ports: [],
     shapes: [
       {
@@ -18924,8 +18924,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Beeldscherm',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 24.33,
+    nativeWidth: 73.68,
+    nativeHeight: 37.34,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -19010,8 +19010,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Kleefmagneet',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 29.86,
+    nativeWidth: 38.26,
+    nativeHeight: 23.8,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -19089,8 +19089,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Deursignalering',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 16.35,
+    nativeWidth: 61.64,
+    nativeHeight: 20.99,
     ports: [],
     shapes: [
       {
@@ -19155,8 +19155,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Beldrukker',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 25.53,
+    nativeHeight: 25.53,
     ports: [],
     shapes: [
       {
@@ -19193,8 +19193,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Speaker Ontruiming',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 29.97,
+    nativeWidth: 44.28,
+    nativeHeight: 27.64,
     ports: [],
     shapes: [
       {
@@ -19259,8 +19259,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Interlocklampen',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 21.98,
+    nativeWidth: 49.24,
+    nativeHeight: 22.55,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -19369,8 +19369,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Sleutelkluis',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 15.9,
-    nativeHeight: 48,
+    nativeWidth: 40.98,
+    nativeHeight: 123.72,
     ports: [],
     shapes: [
       {
@@ -19474,8 +19474,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Handbrandmelder',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 44.31,
-    nativeHeight: 48,
+    nativeWidth: 33.4,
+    nativeHeight: 36.19,
     ports: [],
     shapes: [
       {
@@ -19528,8 +19528,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Sensor PIR 90 Graden',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 33.65,
-    nativeHeight: 48,
+    nativeWidth: 45.83,
+    nativeHeight: 65.38,
     ports: [],
     shapes: [
       {
@@ -19651,8 +19651,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Multimelder',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 34.08,
+    nativeHeight: 34.08,
     ports: [],
     shapes: [
       {
@@ -19812,8 +19812,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Optische Melder Alternatief',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 24.21,
-    nativeHeight: 48,
+    nativeWidth: 33.94,
+    nativeHeight: 67.31,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -19913,8 +19913,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Optische Melder',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 34.08,
+    nativeHeight: 34.08,
     ports: [],
     shapes: [
       {
@@ -20007,8 +20007,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Nevenindicator',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 22.13,
+    nativeHeight: 22.13,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -20114,8 +20114,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Sirene Inbraak',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 45.62,
+    nativeWidth: 42.22,
+    nativeHeight: 40.13,
     ports: [],
     shapes: [
       {
@@ -20207,8 +20207,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Alarmlicht Zwaai',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 50.46,
+    nativeHeight: 50.46,
     ports: [],
     shapes: [
       {
@@ -20296,8 +20296,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Alarmlicht Flits',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 36.1,
+    nativeWidth: 46.78,
+    nativeHeight: 35.18,
     ports: [],
     shapes: [
       {
@@ -20410,8 +20410,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Sensor Long Beam',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 31.82,
-    nativeHeight: 48,
+    nativeWidth: 45.83,
+    nativeHeight: 69.12,
     ports: [],
     shapes: [
       {
@@ -20487,8 +20487,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Sensor PIR 360 Graden',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 47.96,
+    nativeWidth: 45.35,
+    nativeHeight: 45.31,
     ports: [],
     shapes: [
       {
@@ -20729,8 +20729,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Thermische Melder',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 34.08,
+    nativeHeight: 34.08,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -20788,8 +20788,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Thermo Optische Melder',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 34.08,
+    nativeHeight: 34.08,
     ports: [],
     shapes: [
       {
@@ -20907,8 +20907,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Aansluitpunt Bedraad',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 10.47,
-    nativeHeight: 48,
+    nativeWidth: 10.8,
+    nativeHeight: 49.5,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -20953,8 +20953,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '65 Aansluitpunt Onbedraad',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 11.7,
-    nativeHeight: 48,
+    nativeWidth: 12.24,
+    nativeHeight: 50.22,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -20999,8 +20999,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '58 CO LPG Detector',
     discipline: 'electrical',
     category: 'terminal',
-    nativeWidth: 29.59,
-    nativeHeight: 48,
+    nativeWidth: 50.76,
+    nativeHeight: 82.35,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -21105,8 +21105,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '58 Opnemer Temperatuur',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 48.93,
+    nativeHeight: 48.93,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -21151,8 +21151,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '58 Thermostaat 1',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 40.14,
-    nativeHeight: 48,
+    nativeWidth: 25.74,
+    nativeHeight: 30.78,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -21198,8 +21198,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '58 Thermostaat 2',
     discipline: 'heatingAndCooling',
     category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 27.79,
+    nativeHeight: 27.79,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -21245,8 +21245,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Luchtbehandelingskast Warmtewiel',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 26.15,
+    nativeWidth: 208.15,
+    nativeHeight: 113.4,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -21335,8 +21335,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '53 Boiler',
     discipline: 'plumbing',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 37.8,
+    nativeHeight: 37.8,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -21381,8 +21381,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '55 Drycooler Sectie',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 33.4,
-    nativeHeight: 48,
+    nativeWidth: 42.96,
+    nativeHeight: 61.74,
     ports: [],
     iconRef: 'D3_Drycooler_section.svg',
     source: 'library'
@@ -21393,8 +21393,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '55 Drycooler',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 16.04,
-    nativeHeight: 48,
+    nativeWidth: 84.45,
+    nativeHeight: 252.74,
     ports: [],
     shapes: [
       {
@@ -22142,8 +22142,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilator Axiaal',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 38.68,
-    nativeHeight: 48,
+    nativeWidth: 17.75,
+    nativeHeight: 22.03,
     ports: [],
     shapes: [
       {
@@ -22247,8 +22247,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilator Stuwdruk',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 29.26,
-    nativeHeight: 48,
+    nativeWidth: 47.09,
+    nativeHeight: 77.26,
     ports: [],
     shapes: [
       {
@@ -22467,8 +22467,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Fan Coil Unit',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 21.39,
+    nativeWidth: 136.86,
+    nativeHeight: 60.99,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -22552,8 +22552,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilator Afblaas',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 29.08,
+    nativeHeight: 29.08,
     ports: [],
     shapes: [
       {
@@ -22626,8 +22626,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 Ventilator',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 45.63,
+    nativeWidth: 43.94,
+    nativeHeight: 41.77,
     ports: [],
     shapes: [
       {
@@ -22832,8 +22832,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '57 WTW Unit',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 170.57,
+    nativeHeight: 170.57,
     ports: [],
     shapes: [
       {
@@ -22960,8 +22960,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '61 Verdeelinrichting',
     discipline: 'electrical',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 16.81,
+    nativeWidth: 40.51,
+    nativeHeight: 14.19,
     ports: [],
     shapes: [
       {
@@ -23052,8 +23052,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '61 Kilowatuurmeter',
     discipline: 'electrical',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 20.09,
+    nativeWidth: 43.42,
+    nativeHeight: 18.18,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -23099,8 +23099,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '60 Paneel Kruis 2',
     discipline: 'electrical',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 16.9,
+    nativeWidth: 40.33,
+    nativeHeight: 14.2,
     ports: [],
     shapes: [
       {
@@ -23153,8 +23153,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '60 Paneel Kruis Leeg',
     discipline: 'electrical',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 16.9,
+    nativeWidth: 40.33,
+    nativeHeight: 14.2,
     ports: [],
     shapes: [
       {
@@ -23206,8 +23206,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '60 Paneel Kruis',
     discipline: 'electrical',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 16.9,
+    nativeWidth: 40.33,
+    nativeHeight: 14.2,
     ports: [],
     shapes: [
       {
@@ -23260,8 +23260,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '60 Paneel Leeg',
     discipline: 'electrical',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 16.9,
+    nativeWidth: 40.33,
+    nativeHeight: 14.2,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -23294,8 +23294,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '60 Paneel Half',
     discipline: 'electrical',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 16.9,
+    nativeWidth: 40.33,
+    nativeHeight: 14.2,
     ports: [],
     shapes: [
       {
@@ -23344,8 +23344,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '50 Pomp Tweevoudig Toerental',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 29.8,
+    nativeHeight: 29.8,
     ports: [],
     shapes: [
       {
@@ -23405,8 +23405,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '50 Pomp Tweevoudig Toerental',
     discipline: 'plumbing',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 29.8,
+    nativeHeight: 29.8,
     ports: [],
     shapes: [
       {
@@ -23466,8 +23466,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '50 Pomp Toerengeregeld',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 47.49,
-    nativeHeight: 48,
+    nativeWidth: 23.6,
+    nativeHeight: 23.86,
     ports: [],
     shapes: [
       {
@@ -23528,8 +23528,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '50 Pomp Toerengeregeld',
     discipline: 'plumbing',
     category: 'equipment',
-    nativeWidth: 47.49,
-    nativeHeight: 48,
+    nativeWidth: 23.6,
+    nativeHeight: 23.86,
     ports: [],
     shapes: [
       {
@@ -23590,8 +23590,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '50 Pomp',
     discipline: 'heatingAndCooling',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 23.14,
+    nativeHeight: 23.14,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -23646,8 +23646,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '50 Pomp',
     discipline: 'plumbing',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 48,
+    nativeWidth: 23.14,
+    nativeHeight: 23.14,
     ports: [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -23702,8 +23702,8 @@ export const GENERATED_STAMP_LIBRARY: StampDefinition[] = [
     labelNl: '64 Patchkast',
     discipline: 'electrical',
     category: 'equipment',
-    nativeWidth: 48,
-    nativeHeight: 33.57,
+    nativeWidth: 51.18,
+    nativeHeight: 35.79,
     ports: [],
     shapes: [
       {
