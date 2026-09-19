@@ -188,6 +188,8 @@ const STAMP_GHOST_ALPHA = 0.5;
 
 const HANDLE_OFFSET_WORLD_AT_ZOOM_1 = 32;
 const HANDLE_HIT_RADIUS_SCREEN_PX = 10;
+/** Smallest width/height, in screen px, the selection outline is drawn at — keeps an axis-aligned segment's flat bounding box visible. */
+const SELECTION_BOX_MIN_SCREEN_PX = 12;
 /** Drawn radius of a fitting's marker circle (syncDrawingLayer) — also its bounding box for selection/pivot purposes. */
 const FITTING_MARKER_RADIUS_WORLD = 6;
 /** Extra click-target slack around a fitting's drawn radius, in screen px at zoom 1 — same generous-target idea as HANDLE_HIT_RADIUS_SCREEN_PX. */
@@ -2550,8 +2552,12 @@ export class SketchScene {
       // The selection box is always the bounding AABB, a plain rect — even for a rotated textbox, whose own outline (drawn separately in drawAnnotation) is the true rotated quad.
       const bounds = this.resolveSelectableBoundsWorld(this.selectableRefForId(id, state), state);
       if (!bounds) continue;
+      // A horizontal/vertical segment (or line annotation) has a zero-thickness AABB, which strokes as nothing — widen each thin axis to a minimum on-screen size, drawing only (hit-testing and snapping keep the true bounds).
+      const minSize = SELECTION_BOX_MIN_SCREEN_PX / this.world.scale.x;
+      const padX = Math.max(0, (minSize - (bounds.maxX - bounds.minX)) / 2);
+      const padY = Math.max(0, (minSize - (bounds.maxY - bounds.minY)) / 2);
       this.overlay
-        .rect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
+        .rect(bounds.minX - padX, bounds.minY - padY, bounds.maxX - bounds.minX + 2 * padX, bounds.maxY - bounds.minY + 2 * padY)
         .stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
     }
 
