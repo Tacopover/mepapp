@@ -75,10 +75,9 @@ function parseCsv(path) {
   return rows.map((line) => line.split(',').map(unquote));
 }
 
-/** Strips a leading "D<n>_" (English) or "<digits>_" (Dutch) discipline-code prefix, turns remaining underscores into spaces, then title-cases each word — matches the 4 hand-typed entries' label style ("Fire Hose Reel", "Supply Grille"). Already-uppercase tokens (USB, CO2, PIR, LUTO, 230V, 3FPE) are left untouched. */
+/** Turns underscores into spaces and title-cases each word, keeping the leading "D<n>_" (English, Uniformat) or "<digits>_" (Dutch, NL-SfB) classification prefix as the first word ("D3 Air Socket", "65 Aansluitpunt Bedraad"). Already-uppercase tokens (D3, 65, USB, CO2, PIR, LUTO, 230V, 3FPE) are left untouched. */
 function humanizeLabel(base) {
-  const stripped = base.replace(/^(?:D\d+_|\d+_)/, '');
-  return stripped
+  return base
     .split('_')
     .map((word) => (word === word.toUpperCase() ? word : word.charAt(0).toUpperCase() + word.slice(1)))
     .join(' ');

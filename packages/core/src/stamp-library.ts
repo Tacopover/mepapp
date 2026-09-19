@@ -37,8 +37,8 @@ export interface StampDefinition {
 export const STAMP_LIBRARY: StampDefinition[] = [
   {
     id: 'fire-hose-reel',
-    label: 'Fire Hose Reel',
-    labelNl: 'Brandslanghaspel',
+    label: 'D4 Fire Hose Reel',
+    labelNl: '53 Brandslanghaspel',
     discipline: 'fireProtection',
     category: 'terminal',
     nativeWidth: 48,

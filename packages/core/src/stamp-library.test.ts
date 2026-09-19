@@ -24,7 +24,7 @@ describe('stamp library', () => {
   });
 
   it('finds a definition by id', () => {
-    expect(getStampDefinition('fire-hose-reel')?.label).toBe('Fire Hose Reel');
+    expect(getStampDefinition('fire-hose-reel')?.label).toBe('D4 Fire Hose Reel');
     expect(getStampDefinition('does-not-exist')).toBeUndefined();
   });
 
@@ -55,8 +55,8 @@ describe('stamp library', () => {
 
   it('the hand-typed fire-hose-reel carries its own Dutch label alongside the fixture-generated entries', () => {
     const pump = getStampDefinition('pump-plumbing');
-    expect(pump?.labelNl).toBe('Pomp');
-    expect(getStampDefinition('fire-hose-reel')?.labelNl).toBe('Brandslanghaspel');
+    expect(pump?.labelNl).toBe('50 Pomp');
+    expect(getStampDefinition('fire-hose-reel')?.labelNl).toBe('53 Brandslanghaspel');
   });
 
   it('a multi-discipline fixture item (Pump) gets one entry per discipline, same art and ports', () => {
