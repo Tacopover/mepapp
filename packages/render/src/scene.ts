@@ -21,6 +21,7 @@ import {
   multiRotate,
   NETWORK_TYPE_LIBRARY,
   normalizeDegrees,
+  pasteSegments,
   planPdfSync,
   pointInAxisAlignedRect,
   pointInRotatedRect,
@@ -43,6 +44,7 @@ import {
   type CustomPropertyDefinition,
   type CustomPropertyValues,
   type Discipline,
+  type Fitting,
   type FittingKind,
   type FlowResult,
   type LinePattern,
@@ -2221,9 +2223,17 @@ export class SketchScene {
   }
 
   /** Snapshot for pasteClipboard — each stamp's already-loaded base texture is kept by reference (cheap, and shared safely: deleteSelection already never destroys a texture, only its sprite). Always the pristine base texture, never a colorized variant (see colorize.ts) — pasteClipboard re-derives the right variant from `pasted.color` itself. */
-  private clipboard: { stamps: Array<{ data: PlacedStamp; baseTexture: Texture; baseScale: Vec2 }>; annotations: Annotation[] } | null = null;
+  private clipboard: {
+    stamps: Array<{ data: PlacedStamp; baseTexture: Texture; baseScale: Vec2 }>;
+    annotations: Annotation[];
+    segments: Segment[];
+    /** The fittings the copied segments end on — a fitting that no copied segment touches is not copied. */
+    fittings: Record<string, Fitting>;
+    /** The copied segments' network types, so a paste into a document that never adopted one still resolves its visuals (see setNetworkTypeForSegmentsNetworks). */
+    networkTypes: NetworkType[];
+  } | null = null;
 
-  /** Copies the current selection (stamps + annotations) — the rail's Copy flyout action / Ctrl+C. */
+  /** Copies the current selection (stamps, annotations and segments) — the rail's Copy flyout action / Ctrl+C. */
   copySelection(): void {
     if (this.doc.selectedIds.size === 0) return;
     const state = this.doc.drawingHistory.getState();
@@ -2234,8 +2244,17 @@ export class SketchScene {
         return { data: state.stamps[id], baseTexture: entry.baseTexture, baseScale: entry.baseScale };
       });
     const annotations = [...this.doc.selectedIds].filter((id) => state.annotations[id]).map((id) => state.annotations[id]);
-    if (stamps.length === 0 && annotations.length === 0) return;
-    this.clipboard = { stamps, annotations };
+    const segments = [...this.doc.selectedIds].filter((id) => state.segments[id]).map((id) => state.segments[id]);
+    if (stamps.length === 0 && annotations.length === 0 && segments.length === 0) return;
+    const fittings: Record<string, Fitting> = {};
+    for (const segment of segments) {
+      for (const end of [segment.endpointA, segment.endpointB]) {
+        if (end.kind === 'fitting' && state.fittings[end.fittingId]) fittings[end.fittingId] = state.fittings[end.fittingId];
+      }
+    }
+    const networkTypeIds = new Set(segments.map((segment) => segment.networkTypeId));
+    const networkTypes = this.doc.networkTypes.filter((type) => networkTypeIds.has(type.id)).map((type) => ({ ...type }));
+    this.clipboard = { stamps, annotations, segments, fittings, networkTypes };
   }
 
   /**
@@ -2250,9 +2269,11 @@ export class SketchScene {
     const OFFSET = 20; // world units — enough to read as a separate copy without straying far from the originals
     const newSelection = new Set<string>();
     const pastedStamps: PlacedStamp[] = [];
+    const stampIdMap = new Map<string, string>();
 
     for (const { data, baseTexture, baseScale } of this.clipboard.stamps) {
       const id = `stamp-${this.doc.nextStampSeq++}`;
+      stampIdMap.set(data.id, id);
       const pasted: PlacedStamp = {
         ...data,
         id,
@@ -2269,18 +2290,39 @@ export class SketchScene {
     }
 
     const pastedAnnotations = this.clipboard.annotations;
-    if (pastedStamps.length > 0 || pastedAnnotations.length > 0) {
-      const tx = new Transaction(this.doc.drawingHistory, `Paste ${pastedStamps.length + pastedAnnotations.length} item(s)`);
+    const pastedRun = pasteSegments({
+      segments: this.clipboard.segments,
+      fittingsById: this.clipboard.fittings,
+      stampIdMap,
+      offset: { x: OFFSET, y: OFFSET },
+      newSegmentId: () => `segment-${this.doc.nextSegmentSeq++}`,
+      newFittingId: () => `fitting-${this.doc.nextFittingSeq++}`,
+    });
+    let adoptedNetworkType = false;
+    for (const type of this.clipboard.networkTypes) {
+      if (this.doc.networkTypes.some((t) => t.id === type.id)) continue;
+      this.doc.networkTypes.push({ ...type });
+      adoptedNetworkType = true;
+    }
+    if (adoptedNetworkType) this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+    for (const segment of pastedRun.segments) newSelection.add(segment.id);
+
+    if (pastedStamps.length > 0 || pastedAnnotations.length > 0 || pastedRun.segments.length > 0) {
+      const tx = new Transaction(this.doc.drawingHistory, `Paste ${pastedStamps.length + pastedAnnotations.length + pastedRun.segments.length} item(s)`);
       tx.update((s) => {
         const stamps = { ...s.stamps };
         for (const stamp of pastedStamps) stamps[stamp.id] = stamp;
+        const segments = { ...s.segments };
+        for (const segment of pastedRun.segments) segments[segment.id] = segment;
+        const fittings = { ...s.fittings };
+        for (const fitting of pastedRun.fittings) fittings[fitting.id] = fitting;
         const annotations = { ...s.annotations };
         for (const annotation of pastedAnnotations) {
           const id = `annotation-${this.doc.nextAnnotationSeq++}`;
           annotations[id] = { ...annotation, id, geometry: translateAnnotationGeometry(annotation.geometry, OFFSET, OFFSET) };
           newSelection.add(id);
         }
-        return { ...s, stamps, annotations };
+        return { ...s, stamps, annotations, segments, fittings };
       });
       tx.commit();
       this.syncDrawingLayer();
