@@ -1410,6 +1410,20 @@ export class SketchScene {
     }
     target.nextAnnotationSeq = Math.max(target.nextAnnotationSeq, maxAnnotationSeq + 1);
 
+    let maxSegmentSeq = 0;
+    for (const segment of doc.segments) {
+      const numericSuffix = /^segment-(\d+)$/.exec(segment.id)?.[1];
+      if (numericSuffix) maxSegmentSeq = Math.max(maxSegmentSeq, Number(numericSuffix));
+    }
+    target.nextSegmentSeq = Math.max(target.nextSegmentSeq, maxSegmentSeq + 1);
+
+    let maxFittingSeq = 0;
+    for (const fitting of doc.fittings) {
+      const numericSuffix = /^fitting-(\d+)$/.exec(fitting.id)?.[1];
+      if (numericSuffix) maxFittingSeq = Math.max(maxFittingSeq, Number(numericSuffix));
+    }
+    target.nextFittingSeq = Math.max(target.nextFittingSeq, maxFittingSeq + 1);
+
     destroyStampEntries(target.stamps.values());
     target.stamps.clear();
     target.stampsLayer.removeChildren();
