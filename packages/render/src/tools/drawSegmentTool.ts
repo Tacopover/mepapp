@@ -14,6 +14,7 @@ import {
 } from '@mepapp/core';
 import type { DrawingState } from '../document.js';
 import { createFittingCommand, createSegmentCommand, deleteSegmentCommand } from '../drawingCommands.js';
+import type { AlignmentGuide } from './alignmentGuides.js';
 import { resolveSnappedPoint } from './dragSnap.js';
 import type { Tool, ToolContext } from './types.js';
 
@@ -41,6 +42,8 @@ export class DrawSegmentTool implements Tool {
   private pendingStart: DrawEndpointResolution | null = null;
   /** Live cursor position while a segment's start point is pending — draws the rubber-band preview line to where the segment would land if clicked now. */
   private pendingCursor: Vec2 | null = null;
+  /** Alignment guide(s) matched at the cursor's current snapped position — tracked before the start point too, since the start snaps to surrounding elements as well. */
+  private guides: AlignmentGuide[] = [];
   /** Id of the most recently committed segment in the chain currently being drawn — governs fitting visibility alongside the current selection. Cleared whenever the chain stops being "in progress": natural end, Escape-finish, or switching tools. */
   private activeChainAnchorId: string | null = null;
 
@@ -56,14 +59,18 @@ export class DrawSegmentTool implements Tool {
     return this.activeChainAnchorId;
   }
 
+  getGuides(): AlignmentGuide[] {
+    return this.guides;
+  }
+
   onPointerDown(ctx: ToolContext, event: FederatedPointerEvent, world: Vec2): void {
     this.onDrawSegmentClick(ctx, world, event.shiftKey);
   }
 
   onPointerMoveIdle(ctx: ToolContext, event: FederatedPointerEvent, world: Vec2): void {
-    if (!this.pendingStart) return;
-    const { point } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart.worldPosition, shiftKey: event.shiftKey });
-    this.pendingCursor = point;
+    const { point, guides } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart?.worldPosition, shiftKey: event.shiftKey });
+    if (this.pendingStart) this.pendingCursor = point;
+    this.guides = guides;
     ctx.redrawOverlay();
   }
 
@@ -72,6 +79,7 @@ export class DrawSegmentTool implements Tool {
     if (this.pendingStart) {
       this.pendingStart = null;
       this.pendingCursor = null;
+      this.guides = [];
       this.activeChainAnchorId = null;
       ctx.syncDrawingLayer();
       ctx.redrawOverlay();
@@ -84,6 +92,7 @@ export class DrawSegmentTool implements Tool {
   onDeactivate(): void {
     this.pendingStart = null;
     this.pendingCursor = null;
+    this.guides = [];
     this.activeChainAnchorId = null;
   }
 
@@ -95,6 +104,7 @@ export class DrawSegmentTool implements Tool {
     const fittings = Object.values(state.fittings);
 
     const { point: snappedWorld } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart?.worldPosition, shiftKey });
+    this.guides = [];
     const target = resolveSegmentEndpoint(snappedWorld, stamps, fittings, segments, { radius: snapRadius });
     const resolved = this.resolveDrawTarget(ctx, target);
 
@@ -193,6 +203,7 @@ export class DrawSegmentTool implements Tool {
     this.activeChainAnchorId = null;
     this.pendingStart = { point, worldPosition };
     this.pendingCursor = null;
+    this.guides = [];
     ctx.syncDrawingLayer();
     ctx.redrawOverlay();
   }

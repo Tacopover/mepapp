@@ -2639,6 +2639,15 @@ export class SketchScene {
       }
     }
 
+    for (const guide of this.drawSegmentTool.getGuides()) {
+      if (guide.axis === 'x') {
+        this.overlay.moveTo(guide.value, guide.from).lineTo(guide.value, guide.to);
+      } else {
+        this.overlay.moveTo(guide.from, guide.value).lineTo(guide.to, guide.value);
+      }
+      this.overlay.stroke({ width: 1 / this.world.scale.x, color: 0xff4081 });
+    }
+
     if (this.drag.kind === 'draw-highlight') {
       const { startWorld, currentWorld } = this.drag;
       const x = Math.min(startWorld.x, currentWorld.x);
