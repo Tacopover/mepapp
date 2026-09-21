@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   SketchScene,
+  type CanvasContextMenuTarget,
   type DocumentSummary,
   type DrawingSummary,
   type FittingInfo,
@@ -9,7 +10,7 @@ import {
   type SketchTool,
   type StampInfo,
 } from '@mepapp/render';
-import type { Calibration, ConnectionPoint, FlowResult, NetworkType, StampDefinition, Vec2 } from '@mepapp/core';
+import type { Calibration, FlowResult, NetworkType, StampDefinition, Vec2 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 export interface CalibrationPrompt {
@@ -26,13 +27,11 @@ export interface TextboxPrompt {
   resolve: (text: string | null) => void;
 }
 
-export interface DrawFromMenuRequest {
+export interface CanvasContextMenuRequest {
   /** Container-relative pixels — where the floating menu should be positioned over the canvas. */
   screenPosition: Vec2;
-  /** "Draw from" or "Draw from Port: <name>" — see SketchScene.drawFromMenuLabel. */
-  label: string;
-  point: ConnectionPoint;
-  worldPosition: Vec2;
+  /** One menu item per field set — see SketchScene's canvasContextMenuRequested event. */
+  target: CanvasContextMenuTarget;
 }
 
 export interface UseSketchScene {
@@ -62,8 +61,8 @@ export interface UseSketchScene {
   setCalibrationPrompt: (prompt: CalibrationPrompt | null) => void;
   textboxPrompt: TextboxPrompt | null;
   setTextboxPrompt: (prompt: TextboxPrompt | null) => void;
-  drawFromMenuRequest: DrawFromMenuRequest | null;
-  setDrawFromMenuRequest: (request: DrawFromMenuRequest | null) => void;
+  canvasContextMenuRequest: CanvasContextMenuRequest | null;
+  setCanvasContextMenuRequest: (request: CanvasContextMenuRequest | null) => void;
   drawingSummary: DrawingSummary;
   flowResult: FlowResult[] | null;
   refreshLayers: () => void;
@@ -95,7 +94,7 @@ export function useSketchScene(): UseSketchScene {
   const [measurementMm, setMeasurementMm] = useState<number | null>(null);
   const [calibrationPrompt, setCalibrationPrompt] = useState<CalibrationPrompt | null>(null);
   const [textboxPrompt, setTextboxPrompt] = useState<TextboxPrompt | null>(null);
-  const [drawFromMenuRequest, setDrawFromMenuRequest] = useState<DrawFromMenuRequest | null>(null);
+  const [canvasContextMenuRequest, setCanvasContextMenuRequest] = useState<CanvasContextMenuRequest | null>(null);
   const [drawingSummary, setDrawingSummary] = useState<DrawingSummary>(EMPTY_DRAWING_SUMMARY);
   const [flowResult, setFlowResult] = useState<FlowResult[] | null>(null);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
@@ -130,8 +129,8 @@ export function useSketchScene(): UseSketchScene {
       setCalibrationPrompt({ p1, p2, resolve });
     const onTextboxRequested = (screenPosition: Vec2, initialText: string, resolve: (text: string | null) => void) =>
       setTextboxPrompt({ screenPosition, initialText, resolve });
-    const onDrawFromMenuRequested = (screenPosition: Vec2, label: string, point: ConnectionPoint, worldPosition: Vec2) =>
-      setDrawFromMenuRequest({ screenPosition, label, point, worldPosition });
+    const onCanvasContextMenuRequested = (screenPosition: Vec2, target: CanvasContextMenuTarget) =>
+      setCanvasContextMenuRequest({ screenPosition, target });
     const onDrawingChanged = (summary: DrawingSummary) => {
       setDrawingSummary(summary);
       setNetworkSummaries(scene.getNetworkSummaries());
@@ -211,7 +210,7 @@ export function useSketchScene(): UseSketchScene {
     scene.on('measurement', onMeasurement);
     scene.on('calibrationNeeded', onCalibrationNeeded);
     scene.on('textboxRequested', onTextboxRequested);
-    scene.on('drawFromMenuRequested', onDrawFromMenuRequested);
+    scene.on('canvasContextMenuRequested', onCanvasContextMenuRequested);
     scene.on('drawingChanged', onDrawingChanged);
     scene.on('flowSolved', onFlowSolved);
     scene.on('projectLoaded', onProjectLoaded);
@@ -248,7 +247,7 @@ export function useSketchScene(): UseSketchScene {
       scene.off('measurement', onMeasurement);
       scene.off('calibrationNeeded', onCalibrationNeeded);
       scene.off('textboxRequested', onTextboxRequested);
-      scene.off('drawFromMenuRequested', onDrawFromMenuRequested);
+      scene.off('canvasContextMenuRequested', onCanvasContextMenuRequested);
       scene.off('drawingChanged', onDrawingChanged);
       scene.off('flowSolved', onFlowSolved);
       scene.off('projectLoaded', onProjectLoaded);
@@ -286,8 +285,8 @@ export function useSketchScene(): UseSketchScene {
     setCalibrationPrompt,
     textboxPrompt,
     setTextboxPrompt,
-    drawFromMenuRequest,
-    setDrawFromMenuRequest,
+    canvasContextMenuRequest,
+    setCanvasContextMenuRequest,
     drawingSummary,
     flowResult,
     refreshLayers,

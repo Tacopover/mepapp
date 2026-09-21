@@ -5,7 +5,7 @@ import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { loadStampBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
-import { DrawFromMenu } from './components/DrawFromMenu.js';
+import { CanvasContextMenu } from './components/CanvasContextMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { StampsPanel, getVisibleStampDefinitions, pickStampDefinition } from './components/StampsPanel.js';
 import type { StampLabelLanguage } from './components/LanguageToggle.js';
@@ -135,8 +135,8 @@ export function MepSketchApp({
     setCalibrationPrompt,
     textboxPrompt,
     setTextboxPrompt,
-    drawFromMenuRequest,
-    setDrawFromMenuRequest,
+    canvasContextMenuRequest,
+    setCanvasContextMenuRequest,
     drawingSummary,
     flowResult,
     documents,
@@ -717,8 +717,8 @@ export function MepSketchApp({
                   }}
                 />
               )}
-              {drawFromMenuRequest && (
-                <DrawFromMenu request={drawFromMenuRequest} sceneRef={sceneRef} onDismiss={() => setDrawFromMenuRequest(null)} />
+              {canvasContextMenuRequest && (
+                <CanvasContextMenu request={canvasContextMenuRequest} sceneRef={sceneRef} onDismiss={() => setCanvasContextMenuRequest(null)} />
               )}
             </>
           )}

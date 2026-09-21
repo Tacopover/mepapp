@@ -18,6 +18,7 @@ import {
   getStampDefinition,
   getStampPorts,
   loadProject,
+  mergeSegmentsAtFitting,
   multiRotate,
   NETWORK_TYPE_LIBRARY,
   normalizeDegrees,
@@ -35,6 +36,7 @@ import {
   rotatePointAround,
   serializeProject,
   solveFlow,
+  splitSegmentAtFitting,
   Transaction,
   translateAnnotationGeometry,
   type Annotation,
@@ -310,6 +312,16 @@ export interface NetworkSummary {
   elementIds: string[];
 }
 
+/** What a right-click on the canvas can offer — see SketchSceneEvents.canvasContextMenuRequested. */
+export interface CanvasContextMenuTarget {
+  /** "Draw from" an existing port or fitting; `label` names the specific port when there is one. */
+  drawFrom?: { label: string; point: ConnectionPoint; worldPosition: Vec2 };
+  /** Split the segment at `breakPoint`, the point on its interior nearest the click. */
+  insertFitting?: { segmentId: string; breakPoint: Vec2 };
+  /** A fitting with exactly two segments, which removeFitting can merge into one. */
+  removeFittingId?: string;
+}
+
 interface SketchSceneEvents {
   [key: string]: unknown[];
   selectionChanged: [StampInfo[]];
@@ -341,14 +353,14 @@ interface SketchSceneEvents {
   /** The active document's customStampDefinitions list changed (a new one authored, or an existing one edited) — the Stamps tab's cue to re-render its palette. */
   customStampDefinitionsChanged: [StampDefinition[]];
   /**
-   * A right-click landed on an existing port or fitting (the same targets
-   * onDrawSegmentClick's resolveSegmentEndpoint would snap to) — the UI's
-   * cue to show a "Draw from" context menu at screenPosition
-   * (container-relative pixels, matching textboxRequested's convention).
-   * Clicking the menu item should call armSegmentStartFromTarget(point,
-   * worldPosition).
+   * A right-click landed on an existing port, fitting or segment interior (the
+   * same targets onDrawSegmentClick's resolveSegmentEndpoint would snap to) —
+   * the UI's cue to show a context menu at screenPosition (container-relative
+   * pixels, matching textboxRequested's convention) with one item per field
+   * set on `target`. Each item calls the matching scene method:
+   * armSegmentStartFromTarget, insertFittingOnSegment or removeFitting.
    */
-  drawFromMenuRequested: [screenPosition: Vec2, label: string, point: ConnectionPoint, worldPosition: Vec2];
+  canvasContextMenuRequested: [screenPosition: Vec2, target: CanvasContextMenuTarget];
 }
 
 type Listener<A extends unknown[]> = (...args: A) => void;
@@ -552,8 +564,15 @@ export class SketchScene {
         Object.values(state.segments),
         { radius: snapRadius },
       );
-      if (target.kind !== 'existing') return;
-      this.emitter.emit('drawFromMenuRequested', screen, this.drawSegmentTool.drawFromMenuLabel(target.point, state), target.point, target.worldPosition);
+      if (target.kind === 'break') {
+        this.emitter.emit('canvasContextMenuRequested', screen, { insertFitting: { segmentId: target.original.id, breakPoint: target.breakPoint } });
+      } else if (target.kind === 'existing') {
+        const menu: CanvasContextMenuTarget = {
+          drawFrom: { label: this.drawSegmentTool.drawFromMenuLabel(target.point, state), point: target.point, worldPosition: target.worldPosition },
+        };
+        if (target.point.kind === 'fitting' && this.canRemoveFitting(target.point.fittingId)) menu.removeFittingId = target.point.fittingId;
+        this.emitter.emit('canvasContextMenuRequested', screen, menu);
+      }
     });
     window.addEventListener('keydown', this.onKeyDown);
   }
@@ -935,6 +954,62 @@ export class SketchScene {
     tx.update((s) => ({ ...s, fittings: { ...s.fittings, [fittingId]: { ...s.fittings[fittingId], kind } } }));
     tx.commit();
     this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** Whether removeFitting would merge this fitting's two segments — false for a fitting with any other segment count, or one whose merge would loop back on itself. */
+  canRemoveFitting(fittingId: string): boolean {
+    const state = this.doc.drawingHistory.getState();
+    return !!state.fittings[fittingId] && mergeSegmentsAtFitting(fittingId, Object.values(state.segments), '') !== null;
+  }
+
+  /** Splits a segment into two around a new junction fitting at `breakPoint` (the right-click "Insert fitting here" action), as one undo step, and selects the new fitting. */
+  insertFittingOnSegment(segmentId: string, breakPoint: Vec2): void {
+    const original = this.doc.drawingHistory.getState().segments[segmentId];
+    if (!original) return;
+    const fitting: Fitting = { id: `fitting-${this.doc.nextFittingSeq++}`, pageIndex: original.pageIndex, position: breakPoint, kind: 'junction' };
+    const { segmentA, segmentB } = splitSegmentAtFitting(original, fitting, breakPoint, {
+      segmentA: `segment-${this.doc.nextSegmentSeq++}`,
+      segmentB: `segment-${this.doc.nextSegmentSeq++}`,
+    });
+    const tx = new Transaction(this.doc.drawingHistory, `Insert fitting on segment ${segmentId}`);
+    tx.update((s) => {
+      const segments = { ...s.segments };
+      delete segments[segmentId];
+      segments[segmentA.id] = segmentA;
+      segments[segmentB.id] = segmentB;
+      return { ...s, segments, fittings: { ...s.fittings, [fitting.id]: fitting } };
+    });
+    tx.commit();
+    this.finishFittingEdit(fitting.id);
+  }
+
+  /** Deletes a fitting that has exactly two segments and joins those segments into one between their far ends (the reverse of insertFittingOnSegment), as one undo step, and selects the merged segment. Does nothing if canRemoveFitting is false. */
+  removeFitting(fittingId: string): void {
+    const state = this.doc.drawingHistory.getState();
+    if (!state.fittings[fittingId]) return;
+    const merge = mergeSegmentsAtFitting(fittingId, Object.values(state.segments), `segment-${this.doc.nextSegmentSeq}`);
+    if (!merge) return;
+    this.doc.nextSegmentSeq++;
+    const tx = new Transaction(this.doc.drawingHistory, `Remove fitting ${fittingId}`);
+    tx.update((s) => {
+      const segments = { ...s.segments };
+      for (const segment of merge.removed) delete segments[segment.id];
+      segments[merge.merged.id] = merge.merged;
+      const fittings = { ...s.fittings };
+      delete fittings[fittingId];
+      return { ...s, segments, fittings };
+    });
+    tx.commit();
+    this.finishFittingEdit(merge.merged.id);
+  }
+
+  private finishFittingEdit(selectId: string): void {
+    this.doc.selectedIds.clear();
+    this.doc.selectedIds.add(selectId);
+    this.syncDrawingLayer();
+    this.markDirty();
+    this.redrawOverlay();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
@@ -2191,10 +2266,14 @@ export class SketchScene {
     }
   };
 
-  /** Deletes every currently selected stamp and annotation, as one undo step. A deleted stamp's sprite is only detached (see syncStampSprites), never destroyed — an undo has to be able to re-attach the same sprite without re-fetching its art, since a re-fetch is async and, for an ad hoc uploaded stamp with no saved bytes, not even possible. No PDF-sync call is needed here — the next exportToPdf's planPdfSync diff already detects a domain object that disappeared and calls handle.deleteAnnotation for it. */
+  /** Deletes every currently selected stamp, annotation and segment, as one undo step — except a lone selected fitting that has two segments, which removeFitting merges instead. A deleted stamp's sprite is only detached (see syncStampSprites), never destroyed — an undo has to be able to re-attach the same sprite without re-fetching its art, since a re-fetch is async and, for an ad hoc uploaded stamp with no saved bytes, not even possible. No PDF-sync call is needed here — the next exportToPdf's planPdfSync diff already detects a domain object that disappeared and calls handle.deleteAnnotation for it. */
   deleteSelection(): void {
     const ids = [...this.doc.selectedIds];
     if (ids.length === 0) return;
+    if (ids.length === 1 && this.canRemoveFitting(ids[0])) {
+      this.removeFitting(ids[0]);
+      return;
+    }
     const state = this.doc.drawingHistory.getState();
     const annotationIds = ids.filter((id) => state.annotations[id]);
     const stampIds = ids.filter((id) => state.stamps[id]);
