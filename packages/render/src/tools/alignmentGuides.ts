@@ -41,16 +41,36 @@ export function computeSelectionBoundsWorld(ctx: ToolContext, ids: Iterable<stri
   return minX === Infinity ? null : { minX, minY, maxX, maxY };
 }
 
+interface SnapCandidate {
+  bounds: Bounds;
+  /** A fitting is a point, not a box — its circle's edges are drawing detail, so only its center is a snap target. */
+  centerOnly: boolean;
+}
+
+interface AxisMatch {
+  delta: number;
+  distance: number;
+  guide: AlignmentGuide;
+}
+
+function nearerMatch(current: AxisMatch | null, next: AxisMatch): AxisMatch {
+  return current === null || next.distance < current.distance ? next : current;
+}
+
 /**
  * Snaps a dragged selection's bounding box (`draggedBounds`, at the raw unsnapped drag
  * position) to the nearest edge/center alignment with any other stamp/fitting/annotation
  * on the page, independently per axis — the Figma/Illustrator "smart guide" behavior.
+ * A center-to-center match on an axis always beats an edge match within tolerance, so
+ * two similarly sized elements snap (and draw their guide) at the centers rather than
+ * at whichever edge happens to be a hair nearer.
  * `excludeIds` is every id already part of the drag, so a selection never aligns to
  * itself. `originBounds` (move-selection only) is the selection's own bounds at drag
  * start, matched like any other candidate so an element snaps back onto its starting
- * x or y and can be dragged purely orthogonally. Returns `rawPoint` adjusted by
- * whichever axis matched (either, both, or neither), plus the guide line(s) to render
- * for visual feedback.
+ * x or y and can be dragged purely orthogonally. `draggedCenterOnly` drops the dragged
+ * bounds' edges (a lone dragged fitting). Returns `rawPoint` adjusted by whichever
+ * axis matched (either, both, or neither), plus the guide line(s) to render for visual
+ * feedback.
  */
 export function resolveAlignmentSnap(
   ctx: ToolContext,
@@ -59,66 +79,71 @@ export function resolveAlignmentSnap(
   draggedBounds: Bounds,
   excludeIds: ReadonlySet<string>,
   originBounds?: Bounds | null,
+  draggedCenterOnly = false,
 ): AlignmentSnapResult {
   const tolerance = GUIDE_SNAP_SCREEN_PX / ctx.getZoomScale();
   const draggedCenterX = (draggedBounds.minX + draggedBounds.maxX) / 2;
   const draggedCenterY = (draggedBounds.minY + draggedBounds.maxY) / 2;
+  const draggedXs = draggedCenterOnly ? [] : [draggedBounds.minX, draggedBounds.maxX];
+  const draggedYs = draggedCenterOnly ? [] : [draggedBounds.minY, draggedBounds.maxY];
 
-  let bestDx = 0;
-  let bestDxDistance = tolerance;
-  let guideX: AlignmentGuide | null = null;
-  let bestDy = 0;
-  let bestDyDistance = tolerance;
-  let guideY: AlignmentGuide | null = null;
-
-  const candidateBounds: Bounds[] = [];
+  const candidates: SnapCandidate[] = [];
   for (const ref of candidateRefs(state, excludeIds)) {
     const bounds = ctx.resolveSelectableBoundsWorld(ref, state);
-    if (bounds) candidateBounds.push(bounds);
+    if (bounds) candidates.push({ bounds, centerOnly: ref.kind === 'fitting' });
   }
-  if (originBounds) candidateBounds.push(originBounds);
+  if (originBounds) candidates.push({ bounds: originBounds, centerOnly: draggedCenterOnly });
 
-  for (const bounds of candidateBounds) {
+  let centerX: AxisMatch | null = null;
+  let edgeX: AxisMatch | null = null;
+  let centerY: AxisMatch | null = null;
+  let edgeY: AxisMatch | null = null;
+
+  for (const { bounds, centerOnly } of candidates) {
     const candidateCenterX = (bounds.minX + bounds.maxX) / 2;
     const candidateCenterY = (bounds.minY + bounds.maxY) / 2;
+    const candidateXs = centerOnly ? [] : [bounds.minX, bounds.maxX];
+    const candidateYs = centerOnly ? [] : [bounds.minY, bounds.maxY];
+    const spanY = { from: Math.min(draggedBounds.minY, bounds.minY), to: Math.max(draggedBounds.maxY, bounds.maxY) };
+    const spanX = { from: Math.min(draggedBounds.minX, bounds.minX), to: Math.max(draggedBounds.maxX, bounds.maxX) };
+    const matchX = (draggedValue: number, candidateValue: number): AxisMatch => ({
+      delta: candidateValue - draggedValue,
+      distance: Math.abs(candidateValue - draggedValue),
+      guide: { axis: 'x', value: candidateValue, ...spanY },
+    });
+    const matchY = (draggedValue: number, candidateValue: number): AxisMatch => ({
+      delta: candidateValue - draggedValue,
+      distance: Math.abs(candidateValue - draggedValue),
+      guide: { axis: 'y', value: candidateValue, ...spanX },
+    });
 
-    const xPairs: Array<[number, number]> = [
-      [draggedBounds.minX, bounds.minX],
-      [draggedBounds.minX, bounds.maxX],
-      [draggedBounds.maxX, bounds.minX],
-      [draggedBounds.maxX, bounds.maxX],
-      [draggedCenterX, candidateCenterX],
-    ];
-    for (const [draggedValue, candidateValue] of xPairs) {
-      const distance = Math.abs(candidateValue - draggedValue);
-      if (distance < bestDxDistance) {
-        bestDxDistance = distance;
-        bestDx = candidateValue - draggedValue;
-        guideX = { axis: 'x', value: candidateValue, from: Math.min(draggedBounds.minY, bounds.minY), to: Math.max(draggedBounds.maxY, bounds.maxY) };
+    const centersX = matchX(draggedCenterX, candidateCenterX);
+    if (centersX.distance < tolerance) centerX = nearerMatch(centerX, centersX);
+    for (const draggedValue of [...draggedXs, draggedCenterX]) {
+      for (const candidateValue of [...candidateXs, candidateCenterX]) {
+        if (draggedValue === draggedCenterX && candidateValue === candidateCenterX) continue;
+        const match = matchX(draggedValue, candidateValue);
+        if (match.distance < tolerance) edgeX = nearerMatch(edgeX, match);
       }
     }
 
-    const yPairs: Array<[number, number]> = [
-      [draggedBounds.minY, bounds.minY],
-      [draggedBounds.minY, bounds.maxY],
-      [draggedBounds.maxY, bounds.minY],
-      [draggedBounds.maxY, bounds.maxY],
-      [draggedCenterY, candidateCenterY],
-    ];
-    for (const [draggedValue, candidateValue] of yPairs) {
-      const distance = Math.abs(candidateValue - draggedValue);
-      if (distance < bestDyDistance) {
-        bestDyDistance = distance;
-        bestDy = candidateValue - draggedValue;
-        guideY = { axis: 'y', value: candidateValue, from: Math.min(draggedBounds.minX, bounds.minX), to: Math.max(draggedBounds.maxX, bounds.maxX) };
+    const centersY = matchY(draggedCenterY, candidateCenterY);
+    if (centersY.distance < tolerance) centerY = nearerMatch(centerY, centersY);
+    for (const draggedValue of [...draggedYs, draggedCenterY]) {
+      for (const candidateValue of [...candidateYs, candidateCenterY]) {
+        if (draggedValue === draggedCenterY && candidateValue === candidateCenterY) continue;
+        const match = matchY(draggedValue, candidateValue);
+        if (match.distance < tolerance) edgeY = nearerMatch(edgeY, match);
       }
     }
   }
 
+  const snapX = centerX ?? edgeX;
+  const snapY = centerY ?? edgeY;
   const guides: AlignmentGuide[] = [];
-  if (guideX) guides.push(guideX);
-  if (guideY) guides.push(guideY);
-  return { point: { x: rawPoint.x + bestDx, y: rawPoint.y + bestDy }, guides };
+  if (snapX) guides.push(snapX.guide);
+  if (snapY) guides.push(snapY.guide);
+  return { point: { x: rawPoint.x + (snapX?.delta ?? 0), y: rawPoint.y + (snapY?.delta ?? 0) }, guides };
 }
 
 /**
