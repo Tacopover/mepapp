@@ -103,3 +103,59 @@ export function splitSegmentAtFitting(
     },
   };
 }
+
+function isFittingEnd(point: ConnectionPoint, fittingId: string): boolean {
+  return point.kind === 'fitting' && point.fittingId === fittingId;
+}
+
+function sameConnectionPoint(a: ConnectionPoint, b: ConnectionPoint): boolean {
+  if (a.kind === 'fitting') return b.kind === 'fitting' && a.fittingId === b.fittingId;
+  return b.kind === 'port' && a.elementId === b.elementId && a.portId === b.portId;
+}
+
+/** Every segment with an endpoint on `fittingId`. */
+export function segmentsAtFitting(fittingId: string, segments: Segment[]): Segment[] {
+  return segments.filter((s) => isFittingEnd(s.endpointA, fittingId) || isFittingEnd(s.endpointB, fittingId));
+}
+
+/**
+ * The reverse of splitSegmentAtFitting: joins the two segments meeting at `fittingId` into one
+ * running between their far ends, keeping the first piece's engineering properties. Returns
+ * null when the fitting is not a plain pass-through — anything other than exactly two segments
+ * (a one-segment fitting would strand an open end; three or more is a real junction), a segment
+ * looping back onto the fitting, or both far ends being the same point (a zero-length merge).
+ * The piece that ends at the fitting comes first, so a split followed by a merge restores the
+ * original segment's direction.
+ */
+export function mergeSegmentsAtFitting(
+  fittingId: string,
+  segments: Segment[],
+  newId: string,
+): { merged: Segment; removed: [Segment, Segment] } | null {
+  const attached = segmentsAtFitting(fittingId, segments);
+  if (attached.length !== 2) return null;
+  if (attached.some((s) => isFittingEnd(s.endpointA, fittingId) && isFittingEnd(s.endpointB, fittingId))) return null;
+
+  const [first, second] = isFittingEnd(attached[1].endpointB, fittingId) && !isFittingEnd(attached[0].endpointB, fittingId)
+    ? [attached[1], attached[0]]
+    : [attached[0], attached[1]];
+
+  const farOfFirst = isFittingEnd(first.endpointB, fittingId)
+    ? { point: first.endpointA, position: first.geometry[0] }
+    : { point: first.endpointB, position: first.geometry[first.geometry.length - 1] };
+  const farOfSecond = isFittingEnd(second.endpointA, fittingId)
+    ? { point: second.endpointB, position: second.geometry[second.geometry.length - 1] }
+    : { point: second.endpointA, position: second.geometry[0] };
+  if (sameConnectionPoint(farOfFirst.point, farOfSecond.point)) return null;
+
+  return {
+    merged: {
+      ...first,
+      id: newId,
+      endpointA: farOfFirst.point,
+      endpointB: farOfSecond.point,
+      geometry: [farOfFirst.position, farOfSecond.position],
+    },
+    removed: [first, second],
+  };
+}

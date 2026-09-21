@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSegmentEndpoint, splitSegmentAtFitting } from './segmentTool.js';
+import { mergeSegmentsAtFitting, resolveSegmentEndpoint, segmentsAtFitting, splitSegmentAtFitting } from './segmentTool.js';
 import type { Fitting, Segment } from './network.js';
 import { SYNTHETIC_CENTER_PORT_ID, type PlacedStamp } from './stamp.js';
 
@@ -118,5 +118,57 @@ describe('splitSegmentAtFitting', () => {
 
     expect(segmentB.endpointA).toEqual({ kind: 'fitting', fittingId: 'f-new' });
     expect(segmentB.endpointB).toEqual(existingSegment.endpointB);
+  });
+});
+
+describe('mergeSegmentsAtFitting', () => {
+  const newFitting: Fitting = { id: 'f-new', pageIndex: 0, position: { x: 400, y: 100 }, kind: 'junction' };
+  const { segmentA, segmentB } = splitSegmentAtFitting(existingSegment, newFitting, { x: 400, y: 100 }, { segmentA: 's1-a', segmentB: 's1-b' });
+
+  it('restores the original segment when it reverses a split', () => {
+    const result = mergeSegmentsAtFitting('f-new', [segmentA, segmentB], 's1-merged');
+    expect(result?.merged).toEqual({ ...existingSegment, id: 's1-merged' });
+    expect(result?.removed).toEqual([segmentA, segmentB]);
+  });
+
+  it('keeps the direction of the piece ending at the fitting regardless of input order', () => {
+    const result = mergeSegmentsAtFitting('f-new', [segmentB, segmentA], 's1-merged');
+    expect(result?.merged.endpointA).toEqual(existingSegment.endpointA);
+    expect(result?.merged.endpointB).toEqual(existingSegment.endpointB);
+  });
+
+  it('joins two segments whose far ends are stamp ports, using the port positions from their geometry', () => {
+    const toPort: Segment = { ...segmentA, endpointA: { kind: 'port', elementId: 'ahu', portId: 'p1' }, geometry: [{ x: 120, y: 100 }, { x: 400, y: 100 }] };
+    const fromPort: Segment = { ...segmentB, endpointB: { kind: 'port', elementId: 'grille', portId: 'center' }, geometry: [{ x: 400, y: 100 }, { x: 600, y: 100 }] };
+    const result = mergeSegmentsAtFitting('f-new', [toPort, fromPort], 'm');
+    expect(result?.merged.endpointA).toEqual({ kind: 'port', elementId: 'ahu', portId: 'p1' });
+    expect(result?.merged.endpointB).toEqual({ kind: 'port', elementId: 'grille', portId: 'center' });
+    expect(result?.merged.geometry).toEqual([{ x: 120, y: 100 }, { x: 600, y: 100 }]);
+  });
+
+  it('refuses a fitting with only one segment', () => {
+    expect(mergeSegmentsAtFitting('f-new', [segmentA], 'm')).toBeNull();
+  });
+
+  it('refuses a fitting with three segments', () => {
+    const third: Segment = { ...segmentA, id: 's3', endpointA: { kind: 'fitting', fittingId: 'f-other' }, endpointB: { kind: 'fitting', fittingId: 'f-new' } };
+    expect(mergeSegmentsAtFitting('f-new', [segmentA, segmentB, third], 'm')).toBeNull();
+  });
+
+  it('refuses when both far ends are the same point', () => {
+    const loopB: Segment = { ...segmentB, endpointB: segmentA.endpointA };
+    expect(mergeSegmentsAtFitting('f-new', [segmentA, loopB], 'm')).toBeNull();
+  });
+
+  it('refuses a segment that starts and ends on the fitting', () => {
+    const selfLoop: Segment = { ...segmentA, endpointA: { kind: 'fitting', fittingId: 'f-new' } };
+    expect(mergeSegmentsAtFitting('f-new', [selfLoop, segmentB], 'm')).toBeNull();
+  });
+});
+
+describe('segmentsAtFitting', () => {
+  it('returns only the segments with an endpoint on the fitting', () => {
+    expect(segmentsAtFitting('f1', [existingSegment]).map((s) => s.id)).toEqual(['s1']);
+    expect(segmentsAtFitting('f-none', [existingSegment])).toEqual([]);
   });
 });
