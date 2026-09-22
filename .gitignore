@@ -7,3 +7,7 @@ dist/
 .env.local
 src-tauri/target/
 *.tsbuildinfo
+
+# Real client project files used as schematic reference material — not for
+# the open-source repo (see .claude/plans/electrical-schematic-templates.md §2).
+fixtures/schematics/
