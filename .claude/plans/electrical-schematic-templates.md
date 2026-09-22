@@ -24,6 +24,7 @@ The first schematic type is the **distribution board schedule**. It is more comp
 5. A user-made group of building blocks repeats for each circuit. The user decides which building blocks are in the group.
 6. **A mockup comes before any implementation** (Phase 0).
 7. Circuits do not exist in MepApp yet. The circuit model is a prerequisite (Phase 1).
+8. The circuit model has its own plan, [[electrical-circuits-model.md]], written 2026-09-22. See §13 below for how the two plans align.
 
 ## 2. Sources
 
@@ -155,35 +156,21 @@ Terminals and circuits have no fixed count of blocks. A circuit group is a user-
 
 ## 7. Logical model (prerequisite)
 
-The old `Circuit` has no phase, rating, cable, or length. The new model needs at least these fields. The mockup and the fixtures may add more.
+**The full design lives in [[electrical-circuits-model.md]] (written 2026-09-22).** It covers the `Circuit`, `Panel`, `PanelSection`, and `CircuitType` records, the numbering rules, every command, and eight gaps found and deliberately fixed in the old app (a dangling terminal reference on delete, an unpersisted load factor, and others — see that plan's §4). Field summary, for reference:
 
-**Circuit**
+**Circuit** — `id`, `prefix`, `number` (unique in its scope), `panelId`, `sectionId`, `terminalIds`, `isSpare`, `customName`, `phase`, `device` (breaker curve, rating, RCD), `cable` (type, cores, cross-section, typed length), `diversityPercent`, `circuitTypeId`.
 
-- `id`, `prefix`, `number` (number is unique in its panel)
-- `panelId` (optional)
-- `sectionId` (optional)
-- `terminalIds` (terminals are `PlacedStamp` ids)
-- `isSpare`
-- `name` (the description text)
-- `phase`
-- Protective device: type, rating, RCD sensitivity
-- Cable: type, core count, cross-section, length (typed by the user)
-- `diversityPercent`
-- `circuitType` (used to choose a group variant)
+**Panel** — a record that *references* an Equipment stamp by id, rather than replacing it (a deliberate simplification over the old app's C#-subtype hack — see [[electrical-circuits-model.md]] §5). Holds `name`, `sortDirection`, `mainDevice`, `feederCable`, `accessories`, `sectionIds`, `circuitIds`.
 
-**Panel** (an Equipment stamp that the user converts to a panel)
+**`device`, `cable`, and `phase` are marked provisional** in that plan, pending this plan's own Phase 0 mockup review (§10) — the "Circuit assignment" mockup screen is exactly where those shapes get pressure-tested.
 
-- `name`, `sortDirection`
-- Main device, feeder cable
-- Accessories (CT, meter, surge protector)
-- Sections
-
-**Existing MepApp data to reuse**
+**Existing MepApp data reused**
 
 - `PlacedStamp` with category Terminal, Equipment, or Fitting (`packages/core/src/stamp.ts`)
 - `terminalCapacities` in the project document (`packages/core/src/project.ts`)
-- Custom properties on Terminal and Equipment stamps (`packages/core/src/custom-properties.ts`)
-- The `Discipline` union, which already has an electrical circuits value (`packages/core/src/network.ts`)
+- Custom properties on Terminal and Equipment stamps (`packages/core/src/custom-properties.ts`) — candidate home for the "Custom annotation" building block (§6); open question in [[electrical-circuits-model.md]] §12.7
+- The `Discipline` union, which already has an electrical value (`packages/core/src/network.ts`)
+- The `NetworkType`/`network-type-library.ts` pattern (built-in seed + per-document editable copy), reused for `CircuitType`
 
 ## 8. Template format (concept)
 
@@ -232,13 +219,13 @@ The mockup shows:
 
 Acceptance: the user reviews the mockup and approves it. The catalogue (section 6), the model (section 7), and the open questions (section 12) are updated from the review.
 
-### Phase 1 — Circuit model in `@mepapp/core` — not started
+### Phase 1 — Circuit model in `@mepapp/core` — not started, tracked in its own plan
 
-`Circuit` and `Panel`, commands with undo, schema migration, and tests.
+Full plan: [[electrical-circuits-model.md]]. Its own Phase A (types, numbering, capacity) and Phase B (schema migration) do not depend on this plan's Phase 0 mockup and may start in parallel with it. Its Phase C (commands) is safe to build once Phase A/B land. Its Phase D (UI) should wait for this plan's Phase 0 mockup review, per §7 above.
 
-### Phase 2 — Circuit UI — not started
+### Phase 2 — Circuit UI — not started, tracked as electrical-circuits-model.md's Phase D
 
-Convert Equipment to panel, create circuit, assign terminals, edit circuit properties. Reuse the tree from `networks-panel-spec.md`.
+Convert Equipment to panel, create circuit, assign terminals, edit circuit properties. Reuse the tree from `networks-panel-spec.md`. See [[electrical-circuits-model.md]] §9.
 
 ### Phase 3 — Template schema, built-in templates, generator — not started
 
@@ -264,11 +251,20 @@ Storage and export format depend on open questions 1 and 2.
 
 ## 12. Open questions
 
-1. **Template storage.** Per installation (like custom properties), per document, or both?
+1. **Template storage.** Per installation (like custom properties), per document, or both? Consider mirroring `CircuitType`'s built-in-seed-plus-per-document-copy pattern ([[electrical-circuits-model.md]] §3, §5) for consistency.
 2. **Export.** Does the schematic export to PDF? Does it insert into the drawing sheet? The old app only printed.
-3. **Phase model.** Fixtures show one phase for each circuit. How does a three-phase circuit appear?
+3. **Phase model.** Fixtures show one phase for each circuit. How does a three-phase circuit appear? Shared with [[electrical-circuits-model.md]] open question 2 — resolve together.
 4. **Several boards on one sheet.** E60 shows boards A and B on one sheet. Does one schematic cover one panel or many panels?
 5. **Load type columns.** Do they come from stamp categories in the stamp library, or does the user define them?
 6. **Locale.** Table headers and labels are template text. Number format and the decimal separator need a setting in the template.
-7. **Circuit type.** The old app had `CircuitType` but the generator never used it. Does the new template use it to choose a group variant?
+7. ~~**Circuit type.** The old app had `CircuitType` but the generator never used it. Does the new template use it to choose a group variant?~~ **Resolved 2026-09-22:** yes, deliberately — a genuine new use the old app never had. See [[electrical-circuits-model.md]] §5.
 8. **Example schematics.** Do we get permission to commit sanitised copies, or do we recreate similar files?
+
+## 13. Alignment with the circuit model
+
+[[electrical-circuits-model.md]] is this plan's Phase 1, written and cross-checked against this plan on 2026-09-22. Two-way check:
+
+- Every field this plan's §6 catalogue needs from a circuit or a panel (device, cable, diversity, phase, sections, accessories) has a home in the circuit model's §5 data shapes.
+- The circuit model's provisional fields (`device`, `cable`, `phase`) are explicitly gated on this plan's Phase 0 mockup review, so a UI-driven correction there does not require redesigning the circuit model from scratch — only adjusting field shapes that are already marked not-yet-final.
+- The circuit model's `CircuitType.id` use for group-variant selection (its §5) is what resolves this plan's open question 7.
+- Nothing in this plan requires a change to the circuit model's numbering, exclusivity, or persistence design (its §3, §7, §8) — those are settled independently of the schematic template concept.

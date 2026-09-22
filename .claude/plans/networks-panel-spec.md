@@ -59,7 +59,7 @@ An empty Networks tab containing only the "Solve Flow" button + its result (both
 ## 6. Open decisions for whoever picks this up
 
 - **D1 — rename UX.** Inline double-click-to-edit (old app's pattern) vs. a name field in the Properties panel when a network is the "selection." Old app's pattern is proven; only reason to deviate is if MepApp's selection model doesn't cleanly support "a network is selected" as a concept yet (today, selection is stamps only).
-- **D2 — does Phase 2 happen at all soon?** Confirm whether Electrical Circuits parity is a near-term goal before investing in `Circuit`/`Panel` domain modeling — it's a meaningfully sized addition to `@mepapp/core`, not a small one.
+- **D2 — does Phase 2 happen at all soon?** **Resolved 2026-09-22: yes.** Full domain design now lives in `.claude/plans/electrical-circuits-model.md` (a prerequisite for the electrical-schematics-templates feature, `.claude/plans/electrical-schematic-templates.md`). That plan's §9 is this section's Phase 2, refined; that plan's Phase D is the implementation phase for it. Treat §4's Phase 2 and §6's D2 below as superseded by that plan rather than a separate scope.
 - **D3 — tree component.** A plain recursive React component is enough for this tree's size and behavior; no tree UI library is needed.
 
 ## 7. Phase 1 status
