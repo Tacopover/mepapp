@@ -206,7 +206,7 @@ Suggested built-in templates: one with circuits as columns (like OV) and one wit
 
 ## 10. Phases
 
-### Phase 0 — Mockup — **not started, blocks all other phases**
+### Phase 0 — Mockup — **mockup built, awaiting user review**
 
 Make a static HTML mockup. Publish it as a private Artifact. Store the source in `.claude/plans/electrical-schematic-mockup/` so the mockup survives in git.
 
@@ -216,6 +216,30 @@ The mockup shows:
 2. **Generated schematic in both layout styles.** One with circuits as columns and one with circuits as rows. Use sample data that follows the example schematics. Include the frame, the sections, the summary table, and the title block.
 3. **Template picker.** Choose, copy, save, and load a template.
 4. **Circuit assignment.** Convert Equipment to a panel, create a circuit, assign terminals, and edit the circuit properties.
+
+Built 2026-09-23, commit `4909cd7` on `worktree-electrical-schematic-mockup`
+(pushed straight to `master` — plan-housekeeping exception, no `apps/web`
+code touched). Source: `.claude/plans/electrical-schematic-mockup/mockup.html`,
+a single-file static app (vanilla JS, no build step). Published as a
+private Artifact: https://claude.ai/artifact/A5wn3XUw87BqTj1LQPuEbF
+
+All four items above are present and interactive: block selection +
+rotation + bindings on screen 1, a Columns/Rows toggle with both boards
+shown side by side on screen 2 (bears on open question 4), copy/load/new
+on screen 3, and a tree + provisional device/cable/phase fields +
+terminal assignment with a live derived-capacity readout on screen 4.
+Sample data is shaped from the real `OV-HKantoor-2` and `E60_LK1+2`
+fixtures, but every project/client identifier in the title blocks was
+fictionalised (e.g. "Voorbeeldgebouw") — the fixtures policy in this
+project's `CLAUDE.md` says not to commit or reproduce real client data,
+and typed-in sample text falls under that same spirit even though it
+isn't the source files themselves.
+
+Not done: this was built with no in-browser check (no browser tool was
+available this session) — only a JS syntax check (`node --check`) and a
+structural sanity pass (balanced tags, every referenced element id
+exists). The user should open the Artifact link and look for real
+rendering issues before relying on it for review.
 
 Acceptance: the user reviews the mockup and approves it. The catalogue (section 6), the model (section 7), and the open questions (section 12) are updated from the review.
 
