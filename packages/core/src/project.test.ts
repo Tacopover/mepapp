@@ -208,6 +208,28 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.circuitTypes).toEqual([]);
   });
 
+  it('migrates a pre-circuit-defaults (v9) save unchanged, since the new fields are all optional', () => {
+    const legacyDoc = {
+      schemaVersion: 9,
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [],
+      terminalCapacities: {},
+      circuits: [],
+      panels: [],
+      panelSections: [],
+      circuitTypes: [],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.panels).toEqual([]);
+  });
+
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
     const doc = {
       schemaVersion: CURRENT_SCHEMA_VERSION,

@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–C done, D not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–C done (plus a post-C addendum for panel circuit defaults), D not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -71,33 +71,44 @@ The old app's `Panel : Equipment` subtype exists to satisfy C#'s mutable-object-
 ```ts
 interface Circuit {
   id: string;
-  prefix: string;              // e.g. "A" in E60's "A1" — Circuit.CircuitPrefix
+  prefix?: string;              // e.g. "A" in E60's "A1" — Circuit.CircuitPrefix. undefined = inherits the panel's circuitDefaults.prefix, or '' with no panel/default
   number: number;               // unique within (panelId, isSpare doesn't affect scope)
   panelId?: string;              // undefined = unassigned pool, same scope as null in the old app
   sectionId?: string;            // new — old app has no equivalent; see PanelSection below
   terminalIds: string[];
   isSpare: boolean;
   customName?: string;           // auto-populated from the first terminal's name, same rule as the old app (§CircuitService.AddTerminalToCircuit)
-  circuitTypeId?: string;
-  phase?: 'L1' | 'L2' | 'L3' | 'L1L2' | 'L2L3' | 'L1L3' | 'L1L2L3'; // provisional — see open question 2
-  device?: {
+  circuitTypeId?: string;        // undefined = inherits the panel's circuitDefaults.circuitTypeId, if any
+  phase?: 'L1' | 'L2' | 'L3' | 'L1L2' | 'L2L3' | 'L1L3' | 'L1L2L3'; // provisional — see open question 2. undefined = inherits the panel's circuitDefaults.phase, if any
+  device?: {                     // undefined = inherits the panel's circuitDefaults.device, if any (whole-object override, not per-subfield)
     kind: 'breaker' | 'other';
     curve?: string;               // "B", "C", "D" — breaker curve letter
     ratingA?: number;
     rcdMilliamps?: number;
   };
   cable?: {
-    type?: string;                // e.g. "B2CA"
-    coreCount?: number;
-    crossSectionMm2?: number;
-    lengthM?: number;              // user-typed, per the user's decision in electrical-schematic-templates.md §1
+    type?: string;                // e.g. "B2CA". undefined = inherits circuitDefaults.cable.type
+    coreCount?: number;           // undefined = inherits circuitDefaults.cable.coreCount
+    crossSectionMm2?: number;     // undefined = inherits circuitDefaults.cable.crossSectionMm2
+    lengthM?: number;              // user-typed, per the user's decision in electrical-schematic-templates.md §1 — never inherited, always per-circuit
   };
-  diversityPercent: number;      // default 100 — replaces the old app's unpersisted LoadFactor
+  diversityPercent?: number;      // undefined = inherits the panel's circuitDefaults.diversityPercent, or 100 with no panel/default — replaces the old app's unpersisted LoadFactor
   properties?: CustomPropertyValues; // arbitrary user-added annotations — see open question 7, resolved: reuse custom-properties.ts scoped to circuits
+}
+
+interface PanelCircuitDefaults {
+  prefix?: string;
+  circuitTypeId?: string;
+  phase?: Circuit['phase'];
+  device?: Circuit['device'];
+  cable?: { type?: string; coreCount?: number; crossSectionMm2?: number }; // no lengthM — never a panel default
+  diversityPercent?: number;
 }
 ```
 
 Fields marked provisional (`phase`, `device`, `cable` shapes) are a first pass from the fixtures and the old app. **They are exactly what electrical-schematic-templates.md's Phase 0 mockup (its "Circuit assignment" screen) is meant to pressure-test — do not finalize these shapes before that review lands.**
+
+**Panel-level defaults with per-circuit override**, decided in that same Phase 0 mockup's round 4 (2026-09-23, `electrical-schematic-templates.md` §7): `prefix`, `circuitTypeId`, `phase`, `device`, `cable.type`/`cable.coreCount`/`cable.crossSectionMm2`, and `diversityPercent` are all defaultable at the panel level via `Panel.circuitDefaults`; a circuit leaving one of these fields `undefined` inherits it from its panel instead of falling back to a hardcoded literal. `cable.lengthM` is excluded — always a per-circuit typed measurement, since two circuits off the same panel practically always run different physical lengths. `circuit.ts` exposes one resolver per field (`getEffectivePrefix`, `getEffectiveCircuitTypeId`, `getEffectivePhase`, `getEffectiveDevice`, `getEffectiveCable`, `getEffectiveDiversityPercent`) rather than one generic resolver, since `device` resolves as a whole object while `cable`'s three defaultable subfields resolve individually.
 
 ### `Panel`
 
@@ -111,6 +122,7 @@ interface Panel {
   feederCable?: { type?: string; crossSectionMm2?: number; lengthM?: number };
   accessories: PanelAccessory[];   // CT, meter, surge protector — new, generalizes the old app's fixed feeder-only fields
   sectionIds: string[];
+  circuitDefaults?: PanelCircuitDefaults;   // fallback values a member circuit inherits for any field it leaves unset — see the note under Circuit above
   // No circuitIds field — derived via getPanelCircuitIds(panel, circuits), see open question 1 (resolved)
 }
 
@@ -177,6 +189,7 @@ One factory per old-app command, following the `drawingCommands.ts` pattern (§2
 | (Panel rename, uncommanded in old app) | `setPanelNameCommand` | |
 | `ChangePanelSortDirectionCommand` | `setPanelSortDirectionCommand` | |
 | (new) | `setPanelMainDeviceCommand`, `setPanelFeederCableCommand`, `addPanelAccessoryCommand`, `removePanelAccessoryCommand` | |
+| (new) | `setPanelCircuitDefaultsCommand` | Whole-object replacement of `Panel.circuitDefaults` — added post-Phase-C, templates plan §7 round 4. |
 | (new) | `createPanelSectionCommand`, `renamePanelSectionCommand`, `deletePanelSectionCommand`, `setCircuitSectionCommand` | No old-app equivalent (§5). |
 
 Delete-terminal and delete-panel-equipment-stamp commands (already existing in `drawingCommands.ts`) need to become composites that also run the circuit-cleanup commands above, closing §4's dangling-reference gap.
@@ -195,6 +208,7 @@ Delete-terminal and delete-panel-equipment-stamp commands (already existing in `
 - `ProjectDocument` gains: `circuits: Circuit[]`, `panels: Panel[]`, `panelSections: PanelSection[]`, `circuitTypes: CircuitType[]`.
 - `CURRENT_SCHEMA_VERSION` bumps from 8 to 9. One migration step, defaulting all four to `[]` for any older document — same pattern as every prior step in `project.ts` (e.g. the `portGroups` and `customStampDefinitions` steps).
 - No DTO translation layer is needed — the new app persists its domain types directly as JSON (confirmed by every existing field in `ProjectDocument`), unlike the old app's separate `CircuitDto`/`PanelDto` mapping layer. This is also what closes the `LoadFactor`-not-persisted gap: there is no separate DTO to have forgotten a field on.
+- **Addendum (post-Phase-C):** `CURRENT_SCHEMA_VERSION` bumps again, 9 to 10, for `Panel.circuitDefaults` and the override-or-inherit reading of several `Circuit` fields (see §5's addendum note). The v9→v10 step is a version-number-only migration with no data transform — every touched field is optional and every reader already treats "absent" as "no override"/"no default", the same reasoning `project.ts` used for `PlacedStamp.color`'s v5→v6 step.
 
 ## 9. UI (not started — comes after the domain model)
 
@@ -324,6 +338,53 @@ at repo root — all 9 workspace tasks succeeded. `pnpm turbo run test` —
 infra to extend — consistent with the rest of that package, per this
 project's CLAUDE.md). No UI to verify in-browser — this phase has no UI
 surface.
+
+### Phase C addendum — panel circuit defaults
+
+**Done** — 2026-09-23, commit `<pending>` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Triggered by `electrical-schematic-templates.md`'s Phase 0 mockup round 4
+(2026-09-23): the user decided panels should hold default values for
+several circuit fields, with each circuit free to override or inherit.
+That plan's §13 flagged this as a to-do against this plan's §5/§6 before
+Phase D starts, since Phase C's commands were already built against the
+old flat shape.
+
+Shipped: `Panel` gains `circuitDefaults?: PanelCircuitDefaults` (§5).
+`Circuit.prefix` and `Circuit.diversityPercent` become optional, joining
+`circuitTypeId`/`phase`/`device`/`cable.type`/`cable.coreCount`/
+`cable.crossSectionMm2`, which were already optional — an unset field on
+any of these now means "inherit from the panel", not "unset". `cable.lengthM`
+stays excluded from defaulting (§5's note). Six resolver functions in
+`circuit.ts` (`getEffectivePrefix`, `getEffectiveCircuitTypeId`,
+`getEffectivePhase`, `getEffectiveDevice`, `getEffectiveCable`,
+`getEffectiveDiversityPercent`) read circuit-then-panel-then-hardcoded-
+fallback, mirroring `computeCircuitCapacity`'s existing pure-function
+style rather than one generic resolver, since `device` resolves as a
+whole object while `cable`'s three defaultable subfields resolve
+individually. `circuitCommands.ts` gained `setPanelCircuitDefaultsCommand`
+(whole-object replacement, matching `setPanelMainDeviceCommand`'s
+pattern); `setCircuitPrefixCommand`/`setCircuitDiversityCommand` widened
+to accept `undefined` so a caller can clear an override back to
+inheriting; `createCircuitCommand` no longer forces `prefix: ''` /
+`diversityPercent: 100` onto a new circuit, so a circuit created under a
+panel with defaults inherits them immediately rather than needing an
+explicit reset. `CURRENT_SCHEMA_VERSION` bumped 9 → 10 (§8's addendum
+note) — a version-marker-only step, no data transform needed since every
+touched field is optional.
+
+Not done: no UI reads or writes `circuitDefaults` yet (Phase D's job,
+same as the rest of this plan's command surface).
+
+Verified: `pnpm --filter @mepapp/core exec vitest run` — 176 tests passed
+(6 new in `circuit.test.ts`'s resolver-function suite, 1 new migration
+test in `project.test.ts`), 0 failures. `pnpm --filter @mepapp/core exec
+tsc --noEmit` and `pnpm --filter @mepapp/render exec tsc --noEmit` both
+clean (after rebuilding `@mepapp/core`'s `dist/` — render typechecks
+against the built package, not source). `pnpm build` at repo root — all 9
+workspace tasks succeeded. `pnpm turbo run test` — 176 core +
+pdf-engine-mupdf tests, all passing. No UI to verify in-browser — this
+addendum has no UI surface.
 
 ### Phase D — UI — not started, blocked on electrical-schematic-templates.md Phase 0
 The tree branch, properties panel, and interactions in §9.

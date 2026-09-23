@@ -11,7 +11,7 @@ import type { PlacedStamp } from './stamp.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -174,6 +174,21 @@ const migrationSteps: MigrationStep[] = [
       panels: Array.isArray(data.panels) ? data.panels : [],
       panelSections: Array.isArray(data.panelSections) ? data.panelSections : [],
       circuitTypes: Array.isArray(data.circuitTypes) ? data.circuitTypes : [],
+    }),
+  },
+  {
+    fromVersion: 9,
+    toVersion: 10,
+    // Version 9 predates Panel.circuitDefaults and the override-or-inherit
+    // reading of Circuit.prefix/circuitTypeId/phase/device/cable/
+    // diversityPercent (electrical-schematic-templates.md §7 round 4) — all
+    // of these are optional and every reader already treats "absent" as
+    // "no override"/"no default", the same way PlacedStamp.color (v5->v6)
+    // never needed a data transform, so this step only advances the version
+    // number.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 10,
     }),
   },
 ];

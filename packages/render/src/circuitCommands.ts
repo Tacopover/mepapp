@@ -31,6 +31,7 @@ function byId<T extends { id: string }>(items: T[]): Record<string, T> {
   return Object.fromEntries(items.map((item) => [item.id, item]));
 }
 
+/** `prefix` and `diversityPercent` are left unset unless the caller passes an explicit override, so a new circuit inherits its panel's circuitDefaults (templates plan §7 round 4) rather than pinning the old app's `''`/100 literals in. */
 export function createCircuitCommand(
   circuits: Circuit[],
   id: string,
@@ -39,12 +40,11 @@ export function createCircuitCommand(
   const number = getNextCircuitNumber(circuits, { panelId: options.panelId });
   const circuit: Circuit = {
     id,
-    prefix: options.prefix ?? '',
+    prefix: options.prefix,
     number,
     panelId: options.panelId,
     terminalIds: [],
     isSpare: false,
-    diversityPercent: 100,
   };
   return {
     description: `Create circuit ${id}`,
@@ -193,7 +193,8 @@ function withCircuitField<K extends keyof Circuit>(circuit: Circuit, field: K, v
   };
 }
 
-export function setCircuitPrefixCommand(circuit: Circuit, prefix: string): Command<DrawingState> {
+/** `prefix: undefined` clears the circuit's own override so it goes back to inheriting its panel's circuitDefaults.prefix (templates plan §7 round 4). */
+export function setCircuitPrefixCommand(circuit: Circuit, prefix: string | undefined): Command<DrawingState> {
   return withCircuitField(circuit, 'prefix', prefix, `Set circuit ${circuit.id} prefix`);
 }
 
@@ -226,7 +227,8 @@ export function setCircuitCableCommand(circuit: Circuit, cable: Circuit['cable']
   return withCircuitField(circuit, 'cable', cable, `Set circuit ${circuit.id} cable`);
 }
 
-export function setCircuitDiversityCommand(circuit: Circuit, diversityPercent: number): Command<DrawingState> {
+/** `diversityPercent: undefined` clears the circuit's own override so it goes back to inheriting its panel's circuitDefaults.diversityPercent (templates plan §7 round 4). */
+export function setCircuitDiversityCommand(circuit: Circuit, diversityPercent: number | undefined): Command<DrawingState> {
   return withCircuitField(circuit, 'diversityPercent', diversityPercent, `Set circuit ${circuit.id} diversity`);
 }
 
@@ -312,6 +314,11 @@ export function setPanelMainDeviceCommand(panel: Panel, mainDevice: Panel['mainD
 
 export function setPanelFeederCableCommand(panel: Panel, feederCable: Panel['feederCable']): Command<DrawingState> {
   return withPanelField(panel, 'feederCable', feederCable, `Set panel ${panel.id} feeder cable`);
+}
+
+/** Whole-object replacement, same as setPanelMainDeviceCommand/setPanelFeederCableCommand — the caller builds the full PanelCircuitDefaults it wants (templates plan §7 round 4). */
+export function setPanelCircuitDefaultsCommand(panel: Panel, circuitDefaults: Panel['circuitDefaults']): Command<DrawingState> {
+  return withPanelField(panel, 'circuitDefaults', circuitDefaults, `Set panel ${panel.id} circuit defaults`);
 }
 
 export function addPanelAccessoryCommand(panel: Panel, accessory: PanelAccessory): Command<DrawingState> {

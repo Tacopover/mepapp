@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   computeCircuitCapacity,
   computePanelCapacity,
+  getEffectiveCable,
+  getEffectiveCircuitTypeId,
+  getEffectiveDevice,
+  getEffectiveDiversityPercent,
+  getEffectivePhase,
+  getEffectivePrefix,
   getNextCircuitNumber,
   getPanelCircuitIds,
   renumberCircuitWithSwap,
@@ -142,5 +148,66 @@ describe('computePanelCapacity', () => {
       circuit('c3', 1, { terminalIds: ['t3'] }), // unassigned pool, not this panel
     ];
     expect(computePanelCapacity(panel, circuits, { t1: 100, t2: 200, t3: 999 })).toBe(300);
+  });
+});
+
+describe('panel-default resolvers (templates plan §7 round 4)', () => {
+  const panel: Panel = {
+    id: 'p1',
+    equipmentStampId: 'eq1',
+    name: 'Panel 1',
+    sortDirection: 'ascending',
+    accessories: [],
+    sectionIds: [],
+    circuitDefaults: {
+      prefix: 'B',
+      circuitTypeId: 'lighting',
+      phase: 'L1',
+      device: { kind: 'breaker', curve: 'B', ratingA: 16 },
+      cable: { type: 'B2CA', coreCount: 3, crossSectionMm2: 2.5 },
+      diversityPercent: 80,
+    },
+  };
+
+  it('reads the panel default when the circuit leaves a field unset', () => {
+    const c = circuit('c1', 1, { panelId: 'p1', prefix: undefined, circuitTypeId: undefined, phase: undefined, device: undefined, diversityPercent: undefined });
+    expect(getEffectivePrefix(c, panel)).toBe('B');
+    expect(getEffectiveCircuitTypeId(c, panel)).toBe('lighting');
+    expect(getEffectivePhase(c, panel)).toBe('L1');
+    expect(getEffectiveDevice(c, panel)).toEqual({ kind: 'breaker', curve: 'B', ratingA: 16 });
+    expect(getEffectiveDiversityPercent(c, panel)).toBe(80);
+  });
+
+  it('prefers the circuit\'s own override over the panel default', () => {
+    const c = circuit('c1', 1, {
+      panelId: 'p1',
+      prefix: 'A',
+      circuitTypeId: 'sockets',
+      phase: 'L2',
+      device: { kind: 'breaker', curve: 'C', ratingA: 10 },
+      diversityPercent: 100,
+    });
+    expect(getEffectivePrefix(c, panel)).toBe('A');
+    expect(getEffectiveCircuitTypeId(c, panel)).toBe('sockets');
+    expect(getEffectivePhase(c, panel)).toBe('L2');
+    expect(getEffectiveDevice(c, panel)).toEqual({ kind: 'breaker', curve: 'C', ratingA: 10 });
+    expect(getEffectiveDiversityPercent(c, panel)).toBe(100);
+  });
+
+  it('falls back to \'\' and 100 with no panel at all', () => {
+    const c = circuit('c1', 1, { prefix: undefined, diversityPercent: undefined });
+    expect(getEffectivePrefix(c, undefined)).toBe('');
+    expect(getEffectiveDiversityPercent(c, undefined)).toBe(100);
+  });
+
+  it('resolves cable fields individually, never inheriting lengthM', () => {
+    const c = circuit('c1', 1, { panelId: 'p1', cable: { crossSectionMm2: 4, lengthM: 12 } });
+    expect(getEffectiveCable(c, panel)).toEqual({ type: 'B2CA', coreCount: 3, crossSectionMm2: 4, lengthM: 12 });
+  });
+
+  it('returns undefined for cable when neither the circuit nor the panel default sets any field', () => {
+    const noDefaultsPanel: Panel = { ...panel, circuitDefaults: undefined };
+    const c = circuit('c1', 1, { panelId: 'p1' });
+    expect(getEffectiveCable(c, noDefaultsPanel)).toBeUndefined();
   });
 });
