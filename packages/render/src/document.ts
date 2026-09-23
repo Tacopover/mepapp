@@ -5,9 +5,13 @@ import {
   NETWORK_TYPE_LIBRARY,
   type Annotation,
   type Calibration,
+  type Circuit,
+  type CircuitType,
   type Fitting,
   type FlowResult,
   type NetworkType,
+  type Panel,
+  type PanelSection,
   type PlacedStamp,
   type PortGroup,
   type Segment,
@@ -22,6 +26,10 @@ export interface DrawingState {
   fittings: Record<string, Fitting>;
   stamps: Record<string, PlacedStamp>;
   annotations: Record<string, Annotation>;
+  /** electrical-circuits-model.md Phase C — undo-tracked alongside the rest of the drawing, unlike networkTypes/customStampDefinitions/terminalCapacities below, which are plain per-document state with no undo history. */
+  circuits: Record<string, Circuit>;
+  panels: Record<string, Panel>;
+  panelSections: Record<string, PanelSection>;
 }
 
 /** The PixiJS-side render cache for one placed stamp — its actual data (position/transform/ports/etc.) lives in DrawingState.stamps instead, so this holds only what can't be derived from that: the sprite object and its base texture-to-world scale. A sprite is kept alive (detached, not destroyed) if its stamp is deleted, so an undo can re-attach it without re-fetching art — see SketchScene.syncStampSprites. */
@@ -78,18 +86,31 @@ export class SketchDocument {
   readonly stamps = new Map<string, StampEntry>();
   selectedIds = new Set<string>();
   calibration: Calibration | null = null;
-  readonly drawingHistory = new CommandManager<DrawingState>({ segments: {}, fittings: {}, stamps: {}, annotations: {} });
+  readonly drawingHistory = new CommandManager<DrawingState>({
+    segments: {},
+    fittings: {},
+    stamps: {},
+    annotations: {},
+    circuits: {},
+    panels: {},
+    panelSections: {},
+  });
   readonly networkTypes: NetworkType[] = [{ ...NETWORK_TYPE_LIBRARY[0] }];
   /** Ports on the same element linked into one connectivity node — e.g. an AHU's supply + return (see core's PortGroup doc comment). Set via SketchScene.setPortGroup. */
   readonly portGroups: PortGroup[] = [];
   /** User-authored elements (Element Editor dialog) — embedded per-document, same as networkTypes/portGroups, so they travel with this PDF's own project data. Set via SketchScene.addCustomStampDefinition/updateCustomStampDefinition. */
   readonly customStampDefinitions: StampDefinition[] = [];
+  /** Per-document editable copy of the circuit-type library (electrical-circuits-model.md §5) — starts empty, same as customStampDefinitions; a circuit references one by id, resolved against this list or CIRCUIT_TYPE_LIBRARY's built-ins. No "adopt on first use" mechanism yet (unlike networkTypes) — nothing in Phase C needs one. */
+  readonly circuitTypes: CircuitType[] = [];
   readonly terminalCapacities = new Map<string, number>();
   pdfSyncIds = new Set<string>();
   nextStampSeq = 1;
   nextFittingSeq = 1;
   nextSegmentSeq = 1;
   nextAnnotationSeq = 1;
+  nextCircuitSeq = 1;
+  nextPanelSeq = 1;
+  nextPanelSectionSeq = 1;
   lastFlowResult: FlowResult[] | null = null;
   /** Whether the on-canvas flow overlay (syncFlowLabels) should currently render — turned on by computeFlow() (the "Solve flow" button) and off whenever no segment stays selected, so the overlay reads as a deliberate, selection-scoped visualization rather than a permanent one. lastFlowResult itself is always kept live (see SketchScene.recomputeFlow) regardless of this flag, so Properties-panel capacity readouts never depend on it. */
   flowOverlayActive = false;
@@ -105,7 +126,9 @@ export class SketchDocument {
       Object.keys(state.stamps).length === 0 &&
       Object.keys(state.segments).length === 0 &&
       Object.keys(state.fittings).length === 0 &&
-      Object.keys(state.annotations).length === 0
+      Object.keys(state.annotations).length === 0 &&
+      Object.keys(state.circuits).length === 0 &&
+      Object.keys(state.panels).length === 0
     );
   }
 

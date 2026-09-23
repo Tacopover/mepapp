@@ -69,6 +69,7 @@ import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
+import { detachPanelCircuits } from './circuitCommands.js';
 import type { DragState, SelectableRef, SketchTool, Tool, ToolContext, ToolDragHandlers } from './tools/types.js';
 import type { AlignmentGuide } from './tools/alignmentGuides.js';
 import { resolveSnappedPoint } from './tools/dragSnap.js';
@@ -1427,12 +1428,10 @@ export class SketchScene {
       annotations: Object.values(state.annotations),
       customStampDefinitions: this.doc.customStampDefinitions,
       terminalCapacities: Object.fromEntries(this.doc.terminalCapacities),
-      // SketchScene has no circuit/panel state yet (electrical-circuits-model.md
-      // Phase C/D) — round-tripped as empty until that state exists here.
-      circuits: [],
-      panels: [],
-      panelSections: [],
-      circuitTypes: [],
+      circuits: Object.values(state.circuits),
+      panels: Object.values(state.panels),
+      panelSections: Object.values(state.panelSections),
+      circuitTypes: this.doc.circuitTypes,
     }) as unknown as ProjectDocument;
   }
 
@@ -1471,10 +1470,14 @@ export class SketchScene {
       fittings: Object.fromEntries(doc.fittings.map((f) => [f.id, f])),
       stamps: Object.fromEntries(doc.stamps.map((s) => [s.id, s])),
       annotations: Object.fromEntries(doc.annotations.map((a) => [a.id, a])),
+      circuits: Object.fromEntries(doc.circuits.map((c) => [c.id, c])),
+      panels: Object.fromEntries(doc.panels.map((p) => [p.id, p])),
+      panelSections: Object.fromEntries(doc.panelSections.map((s) => [s.id, s])),
     });
     target.networkTypes.splice(0, target.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
     target.portGroups.splice(0, target.portGroups.length, ...doc.portGroups);
     target.customStampDefinitions.splice(0, target.customStampDefinitions.length, ...doc.customStampDefinitions);
+    target.circuitTypes.splice(0, target.circuitTypes.length, ...doc.circuitTypes);
     target.terminalCapacities.clear();
     for (const [elementId, capacity] of Object.entries(doc.terminalCapacities)) {
       target.terminalCapacities.set(elementId, capacity);
@@ -1508,6 +1511,27 @@ export class SketchScene {
       if (numericSuffix) maxFittingSeq = Math.max(maxFittingSeq, Number(numericSuffix));
     }
     target.nextFittingSeq = Math.max(target.nextFittingSeq, maxFittingSeq + 1);
+
+    let maxCircuitSeq = 0;
+    for (const circuit of doc.circuits) {
+      const numericSuffix = /^circuit-(\d+)$/.exec(circuit.id)?.[1];
+      if (numericSuffix) maxCircuitSeq = Math.max(maxCircuitSeq, Number(numericSuffix));
+    }
+    target.nextCircuitSeq = Math.max(target.nextCircuitSeq, maxCircuitSeq + 1);
+
+    let maxPanelSeq = 0;
+    for (const panel of doc.panels) {
+      const numericSuffix = /^panel-(\d+)$/.exec(panel.id)?.[1];
+      if (numericSuffix) maxPanelSeq = Math.max(maxPanelSeq, Number(numericSuffix));
+    }
+    target.nextPanelSeq = Math.max(target.nextPanelSeq, maxPanelSeq + 1);
+
+    let maxPanelSectionSeq = 0;
+    for (const section of doc.panelSections) {
+      const numericSuffix = /^panel-section-(\d+)$/.exec(section.id)?.[1];
+      if (numericSuffix) maxPanelSectionSeq = Math.max(maxPanelSectionSeq, Number(numericSuffix));
+    }
+    target.nextPanelSectionSeq = Math.max(target.nextPanelSectionSeq, maxPanelSectionSeq + 1);
 
     destroyStampEntries(target.stamps.values());
     target.stamps.clear();
@@ -2293,7 +2317,33 @@ export class SketchScene {
         for (const id of stampIds) delete stamps[id];
         const segments = { ...s.segments };
         for (const id of segmentIds) delete segments[id];
-        return { ...s, annotations, stamps, segments };
+        let next: DrawingState = { ...s, annotations, stamps, segments };
+        // Dangling-reference cleanup (electrical-circuits-model.md §4/§6): a
+        // deleted terminal can't be left in any circuit's terminalIds, and a
+        // deleted equipment stamp that backed a Panel takes that Panel (and
+        // its circuits, returned to the unassigned pool) down with it.
+        for (const id of stampIds) {
+          const stillReferenced = Object.values(next.circuits).some((c) => c.terminalIds.includes(id));
+          if (stillReferenced) {
+            next = {
+              ...next,
+              circuits: Object.fromEntries(
+                Object.entries(next.circuits).map(([circuitId, circuit]) => [
+                  circuitId,
+                  circuit.terminalIds.includes(id) ? { ...circuit, terminalIds: circuit.terminalIds.filter((t) => t !== id) } : circuit,
+                ]),
+              ),
+            };
+          }
+          const panel = Object.values(next.panels).find((p) => p.equipmentStampId === id);
+          if (panel) {
+            next = detachPanelCircuits(next, panel.id);
+            const panels = { ...next.panels };
+            delete panels[panel.id];
+            next = { ...next, panels };
+          }
+        }
+        return next;
       });
       tx.commit();
     }
