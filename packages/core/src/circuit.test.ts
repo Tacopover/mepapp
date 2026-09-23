@@ -3,6 +3,7 @@ import {
   computeCircuitCapacity,
   computePanelCapacity,
   getNextCircuitNumber,
+  getPanelCircuitIds,
   renumberCircuitWithSwap,
   shiftCircuitNumbersUpFrom,
   type Circuit,
@@ -95,6 +96,25 @@ describe('renumberCircuitWithSwap', () => {
   });
 });
 
+describe('getPanelCircuitIds', () => {
+  it('derives member circuit ids from Circuit.panelId rather than a stored list', () => {
+    const panel: Panel = {
+      id: 'p1',
+      equipmentStampId: 'eq1',
+      name: 'Panel 1',
+      sortDirection: 'ascending',
+      accessories: [],
+      sectionIds: [],
+    };
+    const circuits = [
+      circuit('c1', 1, { panelId: 'p1' }),
+      circuit('c2', 2, { panelId: 'p1' }),
+      circuit('c3', 1), // unassigned pool
+    ];
+    expect(getPanelCircuitIds(panel, circuits).sort()).toEqual(['c1', 'c2']);
+  });
+});
+
 describe('computeCircuitCapacity', () => {
   it('sums capacity over member terminals, defaulting an unlisted terminal to 0', () => {
     const c = circuit('c1', 1, { terminalIds: ['t1', 't2', 't3'] });
@@ -115,12 +135,11 @@ describe('computePanelCapacity', () => {
       sortDirection: 'ascending',
       accessories: [],
       sectionIds: [],
-      circuitIds: ['c1', 'c2'],
     };
     const circuits = [
       circuit('c1', 1, { panelId: 'p1', terminalIds: ['t1'] }),
       circuit('c2', 2, { panelId: 'p1', terminalIds: ['t2'] }),
-      circuit('c3', 1, { terminalIds: ['t3'] }), // unassigned pool, not in panel.circuitIds
+      circuit('c3', 1, { terminalIds: ['t3'] }), // unassigned pool, not this panel
     ];
     expect(computePanelCapacity(panel, circuits, { t1: 100, t2: 200, t3: 999 })).toBe(300);
   });

@@ -61,9 +61,9 @@ Path: `/root/MepSketcher`. Two survey passes were made (2026-09-21, 2026-09-22),
 
 The old app's `Panel : Equipment` subtype exists to satisfy C#'s mutable-object-identity model — the element map needs the *same slot* to now hold a richer type. MepApp's `PlacedStamp` is plain data with a fixed `category`, and nothing else in the codebase does this kind of type-swap. So:
 
-- **`Panel`** is a new top-level record: `{ id, equipmentStampId, name, sortDirection, mainDevice, feederCable, accessories, sectionIds, circuitIds }`.
+- **`Panel`** is a new top-level record: `{ id, equipmentStampId, name, sortDirection, mainDevice, feederCable, accessories, sectionIds }`. (No stored `circuitIds` — see §12 open question 1, resolved: derived via `getPanelCircuitIds(panel, circuits)`.)
 - `equipmentStampId` points at an existing `PlacedStamp` with `category: 'equipment'`. That stamp is unchanged — same rendering, same ports, same position — a panel is simply an Equipment stamp that a `Panel` record now references.
-- "Convert to panel" = create a `Panel` record. "Revert to equipment" = delete it. Both are one-line, fully symmetric commands — no restriction on segments/ports needed at this layer (the old app's "must have zero segments" rule was UI-layer only, `CircuitSelectionTool.cs:235-240`, not enforced by the service; carry the same UI-layer-only convention forward, or drop it — open question 9).
+- "Convert to panel" = create a `Panel` record. "Revert to equipment" = delete it. Both are one-line, fully symmetric commands — no restriction on segments/ports needed at this layer (the old app's "must have zero segments" rule was UI-layer only, `CircuitSelectionTool.cs:235-240`, not enforced by the service — §12 open question 6, resolved 2026-09-23: dropped, not carried forward even at the UI layer).
 - One `PlacedStamp` id can have at most one `Panel` record. Enforced the same way terminal-circuit exclusivity is: the command factory returns `null` if a `Panel` already references that stamp id.
 
 ### `Circuit`
@@ -79,7 +79,7 @@ interface Circuit {
   isSpare: boolean;
   customName?: string;           // auto-populated from the first terminal's name, same rule as the old app (§CircuitService.AddTerminalToCircuit)
   circuitTypeId?: string;
-  phase?: 'L1' | 'L2' | 'L3' | 'L1L2' | 'L2L3' | 'L1L3' | 'L1L2L3'; // provisional — see open question 3
+  phase?: 'L1' | 'L2' | 'L3' | 'L1L2' | 'L2L3' | 'L1L3' | 'L1L2L3'; // provisional — see open question 2
   device?: {
     kind: 'breaker' | 'other';
     curve?: string;               // "B", "C", "D" — breaker curve letter
@@ -93,6 +93,7 @@ interface Circuit {
     lengthM?: number;              // user-typed, per the user's decision in electrical-schematic-templates.md §1
   };
   diversityPercent: number;      // default 100 — replaces the old app's unpersisted LoadFactor
+  properties?: CustomPropertyValues; // arbitrary user-added annotations — see open question 7, resolved: reuse custom-properties.ts scoped to circuits
 }
 ```
 
@@ -110,7 +111,7 @@ interface Panel {
   feederCable?: { type?: string; crossSectionMm2?: number; lengthM?: number };
   accessories: PanelAccessory[];   // CT, meter, surge protector — new, generalizes the old app's fixed feeder-only fields
   sectionIds: string[];
-  circuitIds: string[];           // derived-cacheable from Circuit.panelId, or authoritative — see open question 4
+  // No circuitIds field — derived via getPanelCircuitIds(panel, circuits), see open question 1 (resolved)
 }
 
 interface PanelAccessory {
@@ -163,7 +164,7 @@ One factory per old-app command, following the `drawingCommands.ts` pattern (§2
 | `AddTerminalToCircuitCommand` | `addTerminalToCircuitCommand` | Returns `null` if the terminal is already in a different circuit, or the target is a spare (fixes §4's gap). |
 | `RemoveTerminalFromCircuitCommand` | `removeTerminalFromCircuitCommand` | |
 | `AssignPanelToCircuitCommand` | `assignCircuitToPanelCommand` | Renumbers into the target panel's scope (gap-fill), same as old. |
-| `RemoveCircuitFromPanelCommand` | `removeCircuitFromPanelCommand` | Old app deletes a spare outright on panel removal instead of returning it to the unassigned pool — confirm this is still wanted, or make spares behave like any other circuit here (open question 5). |
+| `RemoveCircuitFromPanelCommand` | `removeCircuitFromPanelCommand` | A spare is deleted outright on panel removal, matching the old app — non-spare circuits return to the unassigned pool (open question 4, resolved 2026-09-23: keep the old app's spare-deletion behavior). |
 | `CreateSpareCircuitCommand` | `insertSpareCircuitCommand` | Shifts every circuit in scope at/after the target number up by one first. |
 | `RenumberCircuitCommand` (new — old app calls `RenumberCircuit` directly, uncommanded in places) | `renumberCircuitCommand` | Swap semantics. |
 | `ChangeCircuitPrefixCommand` | `setCircuitPrefixCommand` | |
@@ -207,7 +208,7 @@ Discipline: Electrical
          └─ Circuit (shows "spare" state, terminal count)
 ```
 
-Plus a circuit/panel properties panel (new component, alongside the existing `PropertiesPanel.tsx`), a bulk prefix-edit mode (matches the old app's checkbox multi-select), and the "select panel" / "convert to panel" interaction (matches `CircuitSelectionTool`'s click-to-pick flow, without porting the segment-count restriction unless open question 9 says to keep it).
+Plus a circuit/panel properties panel (new component, alongside the existing `PropertiesPanel.tsx`), a bulk prefix-edit mode (matches the old app's checkbox multi-select), and the "select panel" / "convert to panel" interaction (matches `CircuitSelectionTool`'s click-to-pick flow — no segment-count restriction, per open question 6, resolved).
 
 **This phase should follow, not precede, electrical-schematic-templates.md's Phase 0 mockup** — its "Circuit assignment" screen is where the exact fields and flows in §5–§6 above get pressure-tested against a real user judgment call, same reasoning as §5's provisional-fields note.
 
@@ -255,15 +256,24 @@ The tree branch, properties panel, and interactions in §9.
 ## 11. Non-goals for v1
 
 - Nested panels (`parentPanelId` exists as a reserved, unused field in the old app too — leave it out until a real need appears).
-- Enforcing "equipment must have zero segments before becoming a panel" at the domain layer (open question 9).
+- Enforcing "equipment must have zero segments before becoming a panel" at the domain layer, or anywhere else — open question 6, resolved 2026-09-23: dropped entirely, not carried forward.
 - Any schematic drawing or template concept — that is entirely electrical-schematic-templates.md's scope.
 
 ## 12. Open questions
 
+All 7 resolved 2026-09-23, ahead of Phase B, after Phase A's types landed.
+
 1. Should `Panel.circuitIds` be authoritative or derived on the fly from `Circuit.panelId` (avoiding two sources of truth, same tradeoff `network.ts`'s doc comment calls out for its own decision to derive network membership rather than store it)?
+   **Resolved: derived.** `network.ts`'s own precedent for exactly this tradeoff was decisive. `Panel.circuitIds` is dropped from the type; `getPanelCircuitIds(panel, circuits)` in `circuit.ts` derives it. `computePanelCapacity` updated to filter by `Circuit.panelId` directly instead of consulting a stored list.
 2. Exact `phase` representation — the fixtures show single-phase circuits only; how does a three-phase circuit's `phase` field look? (Same as electrical-schematic-templates.md open question 3 — resolve together.)
+   **Not resolved — still blocked** on electrical-schematic-templates.md's Phase 0 mockup, which hasn't run yet. Deciding now risks a redo once that review lands. `Circuit.phase` stays provisional as shipped in Phase A.
 3. `device`/`cable` field shapes are provisional (§5) — confirm after the mockup review.
+   **Not resolved — same blocker as #2.** Both stay provisional as shipped in Phase A.
 4. Does `removeCircuitFromPanelCommand` keep the old app's behavior of deleting a spare outright, or return it to the unassigned pool like any other circuit?
+   **Resolved: keep the old app's behavior** — a spare is deleted outright on panel removal; a non-spare circuit returns to the unassigned pool. User's explicit choice, against this plan's own recommendation (returning every circuit to the pool for consistency) — no code change needed yet, this shapes `removeCircuitFromPanelCommand` in Phase C.
 5. Should `PanelAccessory.kind` be a closed enum or free text? The fixtures show current transformers, a meter, and a surge protector; there may be more per country.
+   **Resolved: free text**, as already shipped in Phase A (`kind: string`) — matches the plan's own observation that the accessory set varies per country and isn't closed.
 6. Carry forward the old app's "equipment must have zero segments to become a panel" UI-layer restriction, or drop it?
+   **Resolved: dropped.** Not carried forward at the domain layer (never was) or the UI layer (was, in the old app). No restriction anywhere in MepApp's panel conversion.
 7. Where do `CustomPropertyDefinition`-style custom annotations (electrical-schematic-templates.md §6, "Custom annotation" building block) attach — to the `Circuit` record directly, or reuse the existing per-installation custom-properties mechanism (`custom-properties.ts`), scoped to circuits instead of stamps?
+   **Resolved: reuse `custom-properties.ts`, scoped to circuits.** One editing mechanism instead of two. `Circuit` gained a `properties?: CustomPropertyValues` field in Phase A (reusing the existing type as-is). Generalizing `custom-properties.ts` itself — its `RESERVED_PROPERTY_NAMES`/`isReservedPropertyName` are currently stamp-only (`'x position' | 'y position' | 'rotation' | 'capacity'`, none of which are meaningful reserved names for a `Circuit`) — is deliberately left to whichever phase builds the circuit properties UI (Phase C for the command, Phase D for the panel), since it requires auditing every current call site of those exports first.

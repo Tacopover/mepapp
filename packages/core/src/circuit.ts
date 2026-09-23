@@ -3,6 +3,8 @@
 // and a Panel have no presence on the PDF canvas, same as the old app
 // (Circuit.ContainsPoint always returns false — never drawn).
 
+import type { CustomPropertyValues } from './custom-properties.js';
+
 export interface Circuit {
   id: string;
   /** e.g. "A" in "A1" — Circuit.CircuitPrefix in the old app. */
@@ -32,6 +34,8 @@ export interface Circuit {
   };
   /** Default 100 — replaces the old app's unpersisted LoadFactor (plan §4). */
   diversityPercent: number;
+  /** Arbitrary user-added annotations (plan §12 open question 7, resolved: reuse custom-properties.ts scoped to circuits rather than a dedicated field set). Definition/reserved-name scoping for circuits is Phase C/D's job — see custom-properties.ts. */
+  properties?: CustomPropertyValues;
 }
 
 export interface PanelAccessory {
@@ -51,7 +55,6 @@ export interface Panel {
   feederCable?: { type?: string; crossSectionMm2?: number; lengthM?: number };
   accessories: PanelAccessory[];
   sectionIds: string[];
-  circuitIds: string[];
 }
 
 export interface PanelSection {
@@ -128,6 +131,16 @@ export function renumberCircuitWithSwap(circuits: Circuit[], circuitId: string, 
 }
 
 /**
+ * A panel's member circuit ids, derived from Circuit.panelId rather than
+ * stored on Panel — same tradeoff network.ts's doc comment calls out for
+ * its own decision to derive network membership from topology instead of
+ * stamping it on elements (plan §12 open question 1, resolved: derived).
+ */
+export function getPanelCircuitIds(panel: Panel, circuits: Circuit[]): string[] {
+  return circuits.filter((c) => c.panelId === panel.id).map((c) => c.id);
+}
+
+/**
  * Sum of terminalCapacities over a circuit's member terminals — never
  * stored (plan §3). terminalCapacities mirrors flow.ts's FlowSolveInput
  * shape: user-entered capacity keyed by element id.
@@ -139,6 +152,6 @@ export function computeCircuitCapacity(circuit: Circuit, terminalCapacities: Rec
 /** Sum of computeCircuitCapacity over every circuit assigned to a panel — cascades the per-circuit sum up to the panel total (plan §3). */
 export function computePanelCapacity(panel: Panel, circuits: Circuit[], terminalCapacities: Record<string, number>): number {
   return circuits
-    .filter((c) => panel.circuitIds.includes(c.id))
+    .filter((c) => c.panelId === panel.id)
     .reduce((sum, c) => sum + computeCircuitCapacity(c, terminalCapacities), 0);
 }
