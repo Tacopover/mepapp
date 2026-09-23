@@ -113,11 +113,66 @@ passes, confirming `ElementEditorDialog.tsx` and the rest of
 `@mepapp/web` typecheck unchanged against the new re-exports. No
 in-browser check yet — nothing user-visible changed in this phase.
 
-### Phase 2 — Extract the shared editor hook and ports module; migrate the stamp editor to SVG — not started
+### Phase 2 — Extract the shared editor hook and ports module; migrate the stamp editor to SVG
 
-Pull the generic half of `ElementEditorDialog.tsx` (§6) into `useShapeDrawEditor`, and the ports tab/overlay into `usePortEditor`. Build the SVG renderer adapter (§4). Migrate `ElementEditorDialog.tsx`'s live canvas from Canvas2D to the SVG adapter, keeping the Canvas2D bake (§4) as a save-time-only call. This is a real change to a shipped surface's rendering path, not a pure refactor.
+**Done** — 2026-09-23, commits `62e2cf6` (step 1/2: extraction) and
+`fa15afb` (step 2/2: the renderer swap) on
+`worktree-shared-drawing-tool-plan`.
 
-Verify: full manual pass of the stamp editor's existing feature list (every tool, undo/redo, handle drag, marquee, angle/grid/object snap, port place/rename/link, image import, save/name-collision) against its current (pre-migration) behavior, plus `pnpm build`/`pnpm test`. Evaluate the single-shared-dialog-shell question (§6) here, once the real shape of both consumers is in front of you.
+Shipped in two checkpoints, deliberately kept separable so the
+state-extraction and the render-target change could each be verified
+on their own:
+
+Step 1 pulled `ElementEditorDialog.tsx`'s generic half into
+`useShapeDrawEditor` (tool palette, draft/marquee/handle/select, undo,
+view pan/zoom, keyboard shortcuts) and its ports tab/overlay into
+`usePortEditor`, as pure refactors — the Canvas2D draw effect stayed
+untouched, only reading from the hooks' state instead of local state.
+Confirmed behavior-preserving by diffing the draw effect's dependency
+array against `HEAD`: byte-for-byte identical, including a
+pre-existing `snapIndicator` omission that predates this change (not
+introduced by it). Also built the SVG renderer adapter
+(`symbolShapeSvg.tsx`), unwired.
+
+Step 2 replaced the `<canvas>` with the SVG adapter for live editing.
+The interaction model is unchanged: a full-viewport transparent
+hit-rect on the root `<svg>` (outside the pan/zoom `<g>`) catches
+every pointer event, while shapes and all chrome are
+`pointer-events: none` (inherited from one wrapping `<g>`), so
+everything still funnels through `fractionFromEvent` +
+`hitTestSymbolShape` — never native SVG per-element hit-testing. Same
+pattern the schematic mockup's own SVG editor already uses for its
+block drag handles. All chrome (bounds rect, selection outlines,
+marquee, rotate/scale/geometry handles, snap indicator, polygon/arc
+preview) became render-time JSX, a 1:1 translation of the old
+Canvas2D calls' colors, dash patterns, and the
+`chromeScale = 1/view.scale` convention. Canvas2D's only remaining job
+is the stamp editor's save-time raster bake
+(`rasterizeSymbolShapes`, textually unchanged — it already loaded its
+own images independent of the live canvas). Deleted the now-dead
+`imageCacheRef`/`loadShapeImages` live-loading effect.
+
+Verified beyond build/test, per this repo's own bar for UI changes
+(see `feedback-verify-ui-wiring-via-real-dom-not-scene-api` — drive
+real DOM, not just the scene API): a Playwright walkthrough against a
+running build (production `vite preview`, since the dev server's file
+watcher hit this container's inotify limit) — opened the custom
+element editor, drew a rectangle, selected it through the new
+hit-testing path, dragged it (position changed), undid the drag
+(reverted), dragged the rotate handle (`transform="rotate(...)"`
+applied), dragged a corner resize handle (width changed), placed a
+port (overlay div appeared), and saved (dialog closed cleanly, no
+console/page errors at any point). A mid-walkthrough screenshot
+confirms the selection outline, all four corner handles, and the
+rotate handle render correctly. 188 core + 13 ui tests pass; root
+build passes.
+
+Not resolved here (as anticipated in §6/§9 open question 5): whether
+the stamp dialog and the schematic symbol dialog end up as one shared
+shell or two thin shells around the same hooks — there is still only
+one real consumer (the stamp editor) until Phase 4 builds the second,
+so that evaluation stays deferred to Phase 4, where it can be made
+with both consumers' actual shapes in view.
 
 ### Phase 3 — Wire the schematic template editor's free-item tools — not started
 
