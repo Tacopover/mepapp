@@ -79,11 +79,39 @@ What the block system *should* reuse: the low-level interaction math, not the da
 
 ## 8. Phases
 
-### Phase 1 — Move pure geometry into `@mepapp/core`, generalize the transform primitives — not started
+### Phase 1 — Move pure geometry into `@mepapp/core`, generalize the transform primitives
 
-Move the ~21 renderer-agnostic functions from `packages/ui/src/symbolShapeCanvas.ts` into `packages/core/src/symbol-shape-geometry.ts`. Generalize `translateShape`, `rotateShapeAround`, `gridSnap`, `angleSnap`, and `findNearestSnapPoint` to take plain position/rotation values where practical (§5), keeping `SymbolShape`-typed wrappers for existing call sites. No behavior change. Add vitest coverage (none exists today).
+**Done** — 2026-09-23, commit `df4fb7c` on `worktree-shared-drawing-tool-plan`.
 
-Verify: `pnpm build` and `pnpm test` pass; the stamp editor opens and works exactly as before (manual check — still Canvas2D at this point, Phase 2 migrates it).
+Shipped: moved the ~21 renderer-agnostic functions (hit-test, bounds,
+handles, handle-drag, draft create/update, selection, mirror, scale,
+rotate, translate, snapping — plus their private helpers and the types
+`ShapeHandle`/`ShapeDrawTool`/`SnapPoint`) from
+`packages/ui/src/symbolShapeCanvas.ts` into
+`packages/core/src/symbol-shape-geometry.ts`, exported from
+`@mepapp/core`'s barrel. `symbolShapeCanvas.ts` re-exports them from
+`@mepapp/core`, so `ElementEditorDialog.tsx` needed zero changes; it
+now keeps only the three Canvas2D/DOM-coupled functions
+(`drawSymbolShapes`, `loadShapeImages`, `rasterizeSymbolShapes`).
+
+Generalized `translateShape` and `rotateShapeAround` by extracting
+plain-value `translatePoint`/`rotatePoint` primitives that a later
+phase can reuse for the template editor's block-catalogue drag system
+without it adopting `SymbolShape` (§7, Phase 6). `gridSnap`,
+`angleSnap`, and `findNearestSnapPoint` were already plain-value —
+moved as-is. Note: the extracted rotation primitive is named
+`rotatePoint`, not `rotatePointAround` as originally planned in §5 —
+`packages/core/src/geometry.ts` already exports a differently-shaped
+`rotatePointAround` (degrees, `Vec2`) that the name would have
+collided with.
+
+Verified: `packages/core` vitest suite 188/188 passing (37 new tests
+in `symbol-shape-geometry.test.ts`, no regressions in the other 15
+files), independently re-run, not just taken from the implementing
+agent's report. Root `pnpm build` (turbo, all 9 workspace tasks)
+passes, confirming `ElementEditorDialog.tsx` and the rest of
+`@mepapp/web` typecheck unchanged against the new re-exports. No
+in-browser check yet — nothing user-visible changed in this phase.
 
 ### Phase 2 — Extract the shared editor hook and ports module; migrate the stamp editor to SVG — not started
 
