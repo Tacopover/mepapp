@@ -325,6 +325,12 @@
     display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 8px;
     background: var(--select-soft); color: var(--select); font-weight: 600; font-size: 13px;
   }
+  .field input.inherited, .field select.inherited { color: var(--text-muted); font-style: italic; border-style: dashed; }
+  .link-reset {
+    background: none; border: none; color: var(--select); font-size: 10.5px; font-weight: 500;
+    cursor: pointer; padding: 0; margin-left: 4px;
+  }
+  .link-reset:hover { text-decoration: underline; }
 
   @media (max-width: 860px) {
     .shell { grid-template-columns: 64px 1fr; }
@@ -1360,28 +1366,86 @@
     { id: "t-3", label: "Wandcontactdoos — Kantoor 12", va: 200 },
     { id: "t-4", label: "Wandcontactdoos — Kantoor 13", va: 200 }
   ];
-  var circuits = {
-    "c-1": {
-      id: "c-1", prefix: "A", number: 2, panelId: "p-a", sectionId: "s-a1", isSpare: false,
-      customName: "Verlichting-TL-100", circuitType: "Lighting", phase: "L1",
-      device: { curve: "C", ratingA: 16, rcdMilliamps: "" }, cable: { type: "B2CA", coreCount: 3, crossSectionMm2: 2.5, lengthM: 49 },
-      diversityPercent: 100, terminals: ["t-1", "t-2"]
-    },
-    "c-2": {
-      id: "c-2", prefix: "A", number: 76, panelId: "p-a", sectionId: "s-a3", isSpare: false,
-      customName: "WCD-50 — Room 02.02.03", circuitType: "Sockets", phase: "L2",
-      device: { curve: "C", ratingA: 16, rcdMilliamps: 30 }, cable: { type: "B2CA", coreCount: 3, crossSectionMm2: 2.5, lengthM: 46 },
-      diversityPercent: 50, terminals: ["t-3"]
-    },
-    "c-3": {
-      id: "c-3", prefix: "A", number: 6, panelId: "p-a", sectionId: "s-a2", isSpare: true,
-      customName: "", circuitType: "", phase: "",
-      device: { curve: "C", ratingA: 16, rcdMilliamps: "" }, cable: {},
-      diversityPercent: 100, terminals: []
+
+  // panel-level defaults: a circuit inherits every one of these unless it
+  // sets its own override (see circuits[*].overrides below). Cable length
+  // has no panel default — it's always a per-circuit measured value.
+  var panels = {
+    "p-a": {
+      name: "Panel A",
+      defaults: {
+        prefix: "A", circuitType: "", phase: "",
+        device: { curve: "C", ratingA: 16, rcdMilliamps: "" },
+        cable: { type: "B2CA", coreCount: 3, crossSectionMm2: 2.5 },
+        diversityPercent: 100
+      }
     }
   };
-  var selectedCircuit = "c-1";
+
+  var circuits = {
+    // fully inherits device + cable + prefix + diversity from Panel A; only circuit type + phase differ
+    "c-1": {
+      id: "c-1", number: 2, panelId: "p-a", sectionId: "s-a1", isSpare: false,
+      customName: "Verlichting-TL-100", terminals: ["t-1", "t-2"], cableLengthM: 49,
+      overrides: {
+        prefix: null, circuitType: "Lighting", phase: "L1",
+        device: { curve: null, ratingA: null, rcdMilliamps: null },
+        cable: { type: null, coreCount: null, crossSectionMm2: null },
+        diversityPercent: null
+      }
+    },
+    // overrides one device sub-field (rcdMilliamps) while curve + rating still inherit
+    "c-2": {
+      id: "c-2", number: 76, panelId: "p-a", sectionId: "s-a3", isSpare: false,
+      customName: "WCD-50 — Room 02.02.03", terminals: ["t-3"], cableLengthM: 46,
+      overrides: {
+        prefix: null, circuitType: "Sockets", phase: "L2",
+        device: { curve: null, ratingA: null, rcdMilliamps: 30 },
+        cable: { type: null, coreCount: null, crossSectionMm2: null },
+        diversityPercent: 50
+      }
+    },
+    // spare — every field just follows the panel default, nothing overridden
+    "c-3": {
+      id: "c-3", number: 6, panelId: "p-a", sectionId: "s-a2", isSpare: true,
+      customName: "", terminals: [], cableLengthM: null,
+      overrides: {
+        prefix: null, circuitType: null, phase: null,
+        device: { curve: null, ratingA: null, rcdMilliamps: null },
+        cable: { type: null, coreCount: null, crossSectionMm2: null },
+        diversityPercent: null
+      }
+    }
+  };
+  var selectedTarget = { type: "circuit", id: "c-1" };
   var equipmentConverted = false;
+
+  function pathGet(obj, path) {
+    var v = obj;
+    path.split(".").forEach(function (k) { v = v ? v[k] : undefined; });
+    return v;
+  }
+  function pathSet(obj, path, value) {
+    var parts = path.split("."), o = obj;
+    for (var i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+    o[parts[parts.length - 1]] = value;
+  }
+  function isOverridden(c, path) {
+    var v = pathGet(c.overrides, path);
+    return v !== null && v !== undefined && v !== "";
+  }
+  function effective(c, path) {
+    var v = pathGet(c.overrides, path);
+    if (v !== null && v !== undefined && v !== "") return v;
+    return pathGet(panels[c.panelId].defaults, path);
+  }
+  function setOverride(c, path, value) { pathSet(c.overrides, path, value); }
+  function clearOverride(c, path) { pathSet(c.overrides, path, null); }
+  function coerce(raw) {
+    if (raw === "") return "";
+    var n = parseFloat(raw);
+    return (/^-?[0-9.]+$/.test(raw) && !isNaN(n)) ? n : raw;
+  }
 
   function terminalCapacity(c) {
     return c.terminals.reduce(function (sum, tid) {
@@ -1400,12 +1464,13 @@
     });
 
     var html = '<details open><summary><strong>Electrical</strong></summary><div class="nest">';
-    html += '<details open><summary>Sockets / Lighting — Panel A</summary><div class="nest">';
+    html += '<details open><summary>Sockets / Lighting — ' + panels["p-a"].name +
+      ' <button type="button" class="btn btn-sm btn-ghost panel-defaults-btn" data-panel="p-a" title="Edit this panel’s default circuit values">⚙ Defaults</button></summary><div class="nest">';
     Object.keys(sections).forEach(function (sid) {
       html += '<details open><summary>' + sections[sid] + '</summary><div class="nest">';
       (bySection[sid] || []).forEach(function (c) {
-        html += '<div class="circuit-row" data-id="' + c.id + '" aria-selected="' + (c.id === selectedCircuit) + '">' +
-          '<span class="num mono">' + c.prefix + c.number + '</span>' +
+        html += '<div class="circuit-row" data-id="' + c.id + '" aria-selected="' + (selectedTarget.type === "circuit" && c.id === selectedTarget.id) + '">' +
+          '<span class="num mono">' + effective(c, "prefix") + c.number + '</span>' +
           '<span>' + (c.isSpare ? "spare" : (c.customName || "unnamed")) + '</span>' +
           (c.isSpare ? '<span class="badge badge-spare">spare</span>' : '') +
           '<span class="term-count">' + c.terminals.length + ' term.</span>' +
@@ -1427,18 +1492,105 @@
     host.innerHTML = html;
 
     Array.prototype.forEach.call(host.querySelectorAll(".circuit-row"), function (row) {
-      row.addEventListener("click", function () { selectedCircuit = row.dataset.id; renderTree(); renderAssignProps(); });
+      row.addEventListener("click", function () { selectedTarget = { type: "circuit", id: row.dataset.id }; renderTree(); renderAssignProps(); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll(".panel-defaults-btn"), function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault(); // clicking inside <summary> would otherwise also toggle the disclosure
+        selectedTarget = { type: "panel", id: btn.dataset.panel };
+        renderTree(); renderAssignProps();
+      });
     });
     var convertBtn = document.getElementById("convert-btn");
     if (convertBtn) convertBtn.addEventListener("click", function () { equipmentConverted = true; renderTree(); });
   }
 
-  function renderAssignProps() {
-    var c = circuits[selectedCircuit];
+  function overridableField(label, c, path, opts) {
+    opts = opts || {};
+    var ov = isOverridden(c, path);
+    var val = effective(c, path);
+    return '<div class="field"' + (opts.style ? ' style="' + opts.style + '"' : '') + '>' +
+      '<label>' + label + (ov
+        ? ' <button type="button" class="link-reset" data-reset="' + path + '">↺ panel default</button>'
+        : ' <span class="hint">panel default</span>') + '</label>' +
+      '<input class="mono' + (ov ? "" : " inherited") + '" data-field="' + path + '" value="' + (val == null ? "" : val) + '"/>' +
+    '</div>';
+  }
+  function overridableSelect(label, c, path, options) {
+    var ov = isOverridden(c, path);
+    var val = effective(c, path);
+    var optHtml = options.map(function (o) {
+      return '<option value="' + o + '"' + (o === val ? " selected" : "") + '>' + (o || "—") + '</option>';
+    }).join("");
+    return '<div class="field">' +
+      '<label>' + label + (ov
+        ? ' <button type="button" class="link-reset" data-reset="' + path + '">↺ panel default</button>'
+        : ' <span class="hint">panel default</span>') + '</label>' +
+      '<select class="' + (ov ? "" : "inherited") + '" data-field="' + path + '">' + optHtml + '</select>' +
+    '</div>';
+  }
+
+  function bindOverrideInputs(host, c) {
+    Array.prototype.forEach.call(host.querySelectorAll("[data-field]"), function (input) {
+      input.addEventListener("change", function () {
+        var path = input.dataset.field, raw = input.value;
+        if (raw === "") clearOverride(c, path); else setOverride(c, path, coerce(raw));
+        renderTree(); renderAssignProps();
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-reset]"), function (btn) {
+      btn.addEventListener("click", function () { clearOverride(c, btn.dataset.reset); renderTree(); renderAssignProps(); });
+    });
+  }
+
+  function renderPanelDefaults(panelId) {
+    var p = panels[panelId], d = p.defaults;
+    document.getElementById("assign-props-title").textContent = "Panel defaults — " + p.name;
     var host = document.getElementById("assign-props");
-    document.getElementById("assign-props-title").textContent = "Circuit " + c.prefix + c.number + (c.isSpare ? " — spare" : "");
+    function df(label, path, style) {
+      var v = pathGet(d, path);
+      return '<div class="field"' + (style ? ' style="' + style + '"' : '') + '><label>' + label + '</label>' +
+        '<input class="mono" data-def-field="' + path + '" value="' + (v == null ? "" : v) + '"/></div>';
+    }
+    function dsel(label, path, options) {
+      var v = pathGet(d, path);
+      var optHtml = options.map(function (o) { return '<option value="' + o + '"' + (o === v ? " selected" : "") + '>' + (o || "—") + '</option>'; }).join("");
+      return '<div class="field"><label>' + label + '</label><select data-def-field="' + path + '">' + optHtml + '</select></div>';
+    }
+    host.innerHTML =
+      '<p class="hint">These are the starting values for every circuit on ' + p.name + '. A circuit can override any one of them — see the “↺ panel default” link that appears next to an overridden field on a circuit.</p>' +
+      '<hr class="divider"/>' +
+      '<div class="field-row">' + df("Prefix", "prefix", "max-width:120px") + '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field-row">' +
+        dsel("Circuit type", "circuitType", ["", "Lighting", "Sockets", "Power"]) +
+        dsel("Phase", "phase", ["", "L1", "L2", "L3", "L1L2L3"]) +
+      '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field" style="margin-bottom:8px"><label>Device</label></div>' +
+      '<div class="field-row">' + df("Curve", "device.curve") + df("Rating (A)", "device.ratingA") + df("RCD (mA)", "device.rcdMilliamps") + '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field" style="margin-bottom:8px"><label>Cable <span class="hint">(length has no panel default — always typed per circuit)</span></label></div>' +
+      '<div class="field-row">' + df("Type", "cable.type") + df("Cores", "cable.coreCount") + df("mm²", "cable.crossSectionMm2") + '</div>' +
+      '<hr class="divider"/>' +
+      df("Diversity %", "diversityPercent", "max-width:160px");
+
+    Array.prototype.forEach.call(host.querySelectorAll("[data-def-field]"), function (input) {
+      input.addEventListener("change", function () {
+        pathSet(d, input.dataset.defField, coerce(input.value));
+        renderTree();
+        if (selectedTarget.type === "circuit" && circuits[selectedTarget.id].panelId === panelId) renderAssignProps();
+      });
+    });
+  }
+
+  function renderAssignProps() {
+    if (selectedTarget.type === "panel") { renderPanelDefaults(selectedTarget.id); return; }
+    var c = circuits[selectedTarget.id];
+    var host = document.getElementById("assign-props");
+    document.getElementById("assign-props-title").textContent = "Circuit " + effective(c, "prefix") + c.number + (c.isSpare ? " — spare" : "");
     var cap = terminalCapacity(c);
-    var diversified = Math.round(cap * c.diversityPercent / 100);
+    var diversified = Math.round(cap * effective(c, "diversityPercent") / 100);
 
     var termHtml = c.terminals.map(function (tid) {
       var t = terminalPool.filter(function (x) { return x.id === tid; })[0];
@@ -1448,33 +1600,33 @@
 
     host.innerHTML =
       '<div class="field-row">' +
-        '<div class="field"><label>Prefix</label><input value="' + c.prefix + '" ' + (c.isSpare ? "" : "") + ' /></div>' +
+        overridableField("Prefix", c, "prefix", { style: "max-width:120px" }) +
         '<div class="field"><label>Number</label><input class="mono" value="' + c.number + '" readonly title="Gap-fill scoped to panel — not user-typed" /></div>' +
         '<div class="field"><label>Is spare</label><select ' + (c.isSpare ? "" : "disabled") + '><option>' + (c.isSpare ? "Yes" : "No") + '</option></select></div>' +
       '</div>' +
       '<div class="field" style="margin-top:10px"><label>Custom name</label><input value="' + (c.customName || "") + '" placeholder="Auto-filled from first terminal" /></div>' +
       '<hr class="divider"/>' +
       '<div class="field-row">' +
-        '<div class="field"><label>Circuit type</label><select><option' + (c.circuitType === "Lighting" ? " selected" : "") + '>Lighting</option><option' + (c.circuitType === "Sockets" ? " selected" : "") + '>Sockets</option><option>Power</option></select></div>' +
-        '<div class="field"><label>Phase <span class="hint">(provisional shape)</span></label><select><option' + (c.phase === "L1" ? " selected" : "") + '>L1</option><option' + (c.phase === "L2" ? " selected" : "") + '>L2</option><option>L3</option><option>L1L2L3</option></select></div>' +
+        overridableSelect("Circuit type", c, "circuitType", ["", "Lighting", "Sockets", "Power"]) +
+        overridableSelect("Phase (provisional shape)", c, "phase", ["", "L1", "L2", "L3", "L1L2L3"]) +
       '</div>' +
       '<hr class="divider"/>' +
       '<div class="field" style="margin-bottom:8px"><label>Device <span class="hint">(provisional shape)</span></label></div>' +
       '<div class="field-row">' +
-        '<div class="field"><label>Curve</label><input value="' + (c.device.curve || "") + '" style="width:100%"/></div>' +
-        '<div class="field"><label>Rating (A)</label><input class="mono" value="' + (c.device.ratingA || "") + '"/></div>' +
-        '<div class="field"><label>RCD (mA)</label><input class="mono" value="' + (c.device.rcdMilliamps || "") + '"/></div>' +
+        overridableField("Curve", c, "device.curve") +
+        overridableField("Rating (A)", c, "device.ratingA") +
+        overridableField("RCD (mA)", c, "device.rcdMilliamps") +
       '</div>' +
       '<hr class="divider"/>' +
-      '<div class="field" style="margin-bottom:8px"><label>Cable <span class="hint">(provisional shape — length is user-typed, never computed)</span></label></div>' +
+      '<div class="field" style="margin-bottom:8px"><label>Cable <span class="hint">(provisional shape — length is always typed per circuit, never a panel default)</span></label></div>' +
       '<div class="field-row">' +
-        '<div class="field"><label>Type</label><input value="' + (c.cable.type || "") + '"/></div>' +
-        '<div class="field"><label>Cores</label><input class="mono" value="' + (c.cable.coreCount || "") + '"/></div>' +
-        '<div class="field"><label>mm²</label><input class="mono" value="' + (c.cable.crossSectionMm2 || "") + '"/></div>' +
-        '<div class="field"><label>Length (m)</label><input class="mono" id="cable-length" value="' + (c.cable.lengthM || "") + '"/></div>' +
+        overridableField("Type", c, "cable.type") +
+        overridableField("Cores", c, "cable.coreCount") +
+        overridableField("mm²", c, "cable.crossSectionMm2") +
+        '<div class="field"><label>Length (m)</label><input class="mono" id="cable-length" value="' + (c.cableLengthM || "") + '"/></div>' +
       '</div>' +
       '<hr class="divider"/>' +
-      '<div class="field" style="max-width:160px"><label>Diversity %</label><input class="mono" id="diversity-input" value="' + c.diversityPercent + '"/></div>' +
+      overridableField("Diversity %", c, "diversityPercent", { style: "max-width:160px" }) +
       '<hr class="divider"/>' +
       '<div class="field-row" style="margin-bottom:8px"><h3 style="font-size:12.5px;color:var(--text-muted)">Assigned terminals</h3></div>' +
       '<p class="hint" style="margin-top:-4px">Assigned by selecting terminals on the PDF canvas — not from this panel.</p>' +
@@ -1487,14 +1639,9 @@
         renderTree(); renderAssignProps();
       });
     });
-    var divInput = document.getElementById("diversity-input");
-    divInput.addEventListener("input", function () {
-      var v = parseFloat(divInput.value); if (isNaN(v)) return;
-      c.diversityPercent = v; renderAssignProps();
-      // restore focus/caret since we re-render
-      var again = document.getElementById("diversity-input");
-      again.focus(); again.setSelectionRange(again.value.length, again.value.length);
-    });
+    var lenInput = document.getElementById("cable-length");
+    lenInput.addEventListener("change", function () { c.cableLengthM = parseFloat(lenInput.value) || null; });
+    bindOverrideInputs(host, c);
   }
 
   renderTree();

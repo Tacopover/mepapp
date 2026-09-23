@@ -147,6 +147,7 @@ Scope: **once** = one instance in the schematic. **per panel** = one for each pa
 | Table cell: derived value (total, %, diversified VA, per-phase VA) | — | Sum of terminal capacity and the circuit diversity factor | per circuit |
 | Table header cell or legend symbol | — | Load type definition | once |
 | Aggregate cell (sum, count) | — | Sum over circuits | aggregate |
+| Totals table | — | User-defined rows, each a label plus a formula (e.g. `sum(terminal.capacity)`), one column per circuit or panel | aggregate |
 | Section box and label | — | Panel section | per panel |
 | Frame | — | Panel | per panel |
 | Title block | — | Project data | once |
@@ -163,6 +164,8 @@ Terminals and circuits have no fixed count of blocks. A circuit group is a user-
 **Panel** — a record that *references* an Equipment stamp by id, rather than replacing it (a deliberate simplification over the old app's C#-subtype hack — see [[electrical-circuits-model.md]] §5). Holds `name`, `sortDirection`, `mainDevice`, `feederCable`, `accessories`, `sectionIds`, `circuitIds`.
 
 **`device`, `cable`, and `phase` are marked provisional** in that plan, pending this plan's own Phase 0 mockup review (§10) — the "Circuit assignment" mockup screen is exactly where those shapes get pressure-tested.
+
+**Panel-level defaults with per-circuit override (decided 2026-09-23, Phase 0 round 4).** A panel holds a `circuitDefaults` shape mirroring the defaultable circuit fields (`prefix`, `circuitTypeId`, `phase`, `device`, `cable.type`/`cable.coreCount`/`cable.crossSectionMm2`, `diversityPercent`). A circuit only stores an override for a field it actually sets; an unset field reads from its panel's `circuitDefaults` at display and generation time. `cable.lengthM` is excluded — it is always a per-circuit typed measurement, never a panel default, since two circuits from the same panel practically always run different physical lengths. This needs to land in [[electrical-circuits-model.md]] §5 (`Circuit`/`Panel` shapes) — not yet done there, since that plan lives in a different, actively-used worktree; see §13 below.
 
 **Existing MepApp data reused**
 
@@ -206,7 +209,7 @@ Suggested built-in templates: one with circuits as columns (like OV) and one wit
 
 ## 10. Phases
 
-### Phase 0 — Mockup — **mockup built, 3 review rounds done, awaiting further user review**
+### Phase 0 — Mockup — **done** (4 review rounds, user signed off 2026-09-23)
 
 Make a static HTML mockup. Publish it as a private Artifact. Store the source in `.claude/plans/electrical-schematic-mockup/` so the mockup survives in git.
 
@@ -236,9 +239,11 @@ exception, no `apps/web` code touched.
   a different mechanism, not from this panel).
 - **Round 3** (`4f637dd`, 2026-09-23): added a "Totals table" block
   type with user-defined rows (label + formula per row, editable in the
-  properties panel, rendered live in the layout preview) — answers §12
-  open question 5 for the totals-row case. Made the binding field generic:
-  every block, not just the ones the catalogue predefines a binding for,
+  properties panel, rendered live in the layout preview) — this is
+  separate from open question 5, which is about load-type *columns*, not
+  which summary *rows* a totals table shows; question 5 is still open.
+  Made the binding field generic: every block, not just the ones the
+  catalogue predefines a binding for,
   now has an editable binding expression and an editable preview value in
   its properties panel. Added a placeholder "Symbol library" (opened from
   the properties panel for `main`/`device`/`acc` blocks) so a block can
@@ -248,6 +253,14 @@ exception, no `apps/web` code touched.
   canvas — see open question 9 below; that work needs its own plan since
   it shares a primitive with the existing custom-stamp editor and with
   "create your own component" in the symbol library.
+- **Round 4** (commit pending, 2026-09-23): added a per-panel defaults
+  system to the circuit assignment screen — each panel has a "⚙ Defaults"
+  view (prefix, circuit type, phase, device, cable type/cores/cross-section,
+  diversity) and every circuit's properties panel shows each of those
+  fields as either inherited (dashed, italic, labelled "panel default") or
+  overridden (solid, with a "↺ panel default" reset link). See the new
+  §7 note on this. User signed off that the mockup is functionally
+  complete enough to move to implementation from here.
 
 All four spec items are present and interactive: block selection, drag,
 rotation, and bindings on screen 1 (now with the two-mode editor above),
@@ -261,14 +274,14 @@ identifier in the title blocks was fictionalised (e.g. "Voorbeeldgebouw")
 reproduce real client data, and typed-in sample text falls under that same
 spirit even though it isn't the source files themselves.
 
-Not done: this was built with no in-browser check in any of the three
+Not done: this was built with no in-browser check in any of the four
 rounds (no browser tool was available this session) — only a JS syntax
 check (`node --check`) and a structural sanity pass (balanced tags, every
 referenced element id exists) after each round. The user should open the
 Artifact link and look for real rendering/interaction issues before
-relying on it for review.
+relying on it for real.
 
-Acceptance: the user reviews the mockup and approves it. The catalogue (section 6), the model (section 7), and the open questions (section 12) are updated from the review.
+Acceptance: the user reviews the mockup and approves it. The catalogue (section 6), the model (section 7), and the open questions (section 12) are updated from the review. **Done 2026-09-23** — user confirmed the mockup covers the functional shape well enough, remaining details are expected to change during real implementation anyway. §6 and §7 updated above (Totals table row, panel-default/override pattern); §12 gained open question 9 (shared drawing tools). Phase 1 (electrical-circuits-model.md) may now proceed, including its Phase D UI work, once it also picks up the §7 panel-defaults note.
 
 ### Phase 1 — Circuit model in `@mepapp/core` — not started, tracked in its own plan
 
@@ -320,3 +333,4 @@ Storage and export format depend on open questions 1 and 2.
 - The circuit model's provisional fields (`device`, `cable`, `phase`) are explicitly gated on this plan's Phase 0 mockup review, so a UI-driven correction there does not require redesigning the circuit model from scratch — only adjusting field shapes that are already marked not-yet-final.
 - The circuit model's `CircuitType.id` use for group-variant selection (its §5) is what resolves this plan's open question 7.
 - Nothing in this plan requires a change to the circuit model's numbering, exclusivity, or persistence design (its §3, §7, §8) — those are settled independently of the schematic template concept.
+- **Still to do in electrical-circuits-model.md** (added 2026-09-23, Phase 0 round 4): its §5 `Panel` shape needs a `circuitDefaults` field, and its `Circuit` shape needs each defaultable field (`prefix`, `circuitTypeId`, `phase`, `device`, `cable.type`/`cable.coreCount`/`cable.crossSectionMm2`, `diversityPercent`) represented as an explicit override-or-inherit, not a plain value — see this plan's §7 for the decided shape. Not applied to that file from here because it lives in a different, actively-used worktree (`worktree-electrical-schematic-templates-plan`) — apply it there, or hand this note to whichever session picks that plan back up.
