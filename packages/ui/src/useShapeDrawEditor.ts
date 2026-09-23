@@ -187,9 +187,14 @@ export interface ShapeDrawEditor<TTool extends string> {
 
   fractionFromEvent: (clientX: number, clientY: number, clamp?: boolean) => { fractionX: number; fractionY: number };
 
-  handleCanvasPointerDown: (event: ReactPointerEvent<HTMLCanvasElement>) => void;
-  handleCanvasPointerMove: (event: ReactPointerEvent<HTMLCanvasElement>) => void;
-  handleCanvasDoubleClick: (event: ReactMouseEvent<HTMLCanvasElement>) => void;
+  // Element, not HTMLCanvasElement: the geometry-handle-drag branch calls
+  // event.currentTarget.setPointerCapture/releasePointerCapture, which are plain Element methods,
+  // so any consumer's root (a Canvas2D <canvas> today, an <svg> for the schematic surfaces and,
+  // per shared-drawing-tool.md §4, ElementEditorDialog's own canvas once it moves to SVG too) can
+  // supply these handlers without this hook caring which one it is.
+  handleCanvasPointerDown: (event: ReactPointerEvent<Element>) => void;
+  handleCanvasPointerMove: (event: ReactPointerEvent<Element>) => void;
+  handleCanvasDoubleClick: (event: ReactMouseEvent<Element>) => void;
 }
 
 export function useShapeDrawEditor<TTool extends string = BuiltinShapeTool>(options: UseShapeDrawEditorOptions<TTool>): ShapeDrawEditor<TTool> {
@@ -437,7 +442,7 @@ export function useShapeDrawEditor<TTool extends string = BuiltinShapeTool>(opti
     return clamp ? { fractionX: clamp01(fractionX), fractionY: clamp01(fractionY) } : { fractionX, fractionY };
   }
 
-  function handleCanvasPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
+  function handleCanvasPointerDown(event: ReactPointerEvent<Element>) {
     const start = fractionFromEvent(event.clientX, event.clientY);
 
     if (tool === 'text') {
@@ -717,13 +722,13 @@ export function useShapeDrawEditor<TTool extends string = BuiltinShapeTool>(opti
     onUnhandledToolPointerDown?.(tool, start);
   }
 
-  function handleCanvasPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+  function handleCanvasPointerMove(event: ReactPointerEvent<Element>) {
     if ((tool === 'polygon' && polygonDraft) || (tool === 'arcThreePoint' && arcThreePointDraft)) {
       setPendingPoint(fractionFromEvent(event.clientX, event.clientY));
     }
   }
 
-  function handleCanvasDoubleClick(event: ReactMouseEvent<HTMLCanvasElement>) {
+  function handleCanvasDoubleClick(event: ReactMouseEvent<Element>) {
     if (tool === 'polygon') {
       finishPolygon(polygonDraft && polygonDraft.length > 1 ? polygonDraft.slice(0, -1) : polygonDraft);
       return;

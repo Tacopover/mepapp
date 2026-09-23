@@ -1588,7 +1588,7 @@
   object-fit: contain;
   pointer-events: none;
 }
-.mep-element-editor-preview canvas {
+.mep-element-editor-preview svg {
   position: absolute;
   inset: 0;
   width: 100%;

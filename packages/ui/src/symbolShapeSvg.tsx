@@ -28,8 +28,9 @@ function rotationTransform(shape: SymbolShape, widthPx: number, heightPx: number
     swept in the increasing-angle direction (sweep-flag 1, consistent with both Canvas2D and
     SVG sharing a y-down coordinate system), wrapping past 2*PI if endAngle < startAngle. A
     sweep of (near) a full turn can't be expressed as one arc command (degenerate start==end
-    point) — the caller falls back to a full circle in that case. */
-function describeArcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
+    point) — the caller falls back to a full circle in that case. Exported: ElementEditorDialog's
+    arc-three-point live preview chrome reuses this instead of re-deriving the same math. */
+export function describeArcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
   let delta = (endAngle - startAngle) % (Math.PI * 2);
   if (delta <= 0) delta += Math.PI * 2;
   const startX = cx + r * Math.cos(startAngle);

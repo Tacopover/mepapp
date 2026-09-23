@@ -17,6 +17,7 @@ import {
   type BuiltinShapeTool,
 } from '../useShapeDrawEditor.js';
 import { usePortEditor } from '../usePortEditor.js';
+import { SymbolShapesSvg, describeArcPath } from '../symbolShapeSvg.js';
 import {
   IconArcThreePointTool,
   IconArcTool,
@@ -48,8 +49,6 @@ import {
 } from '../icons.js';
 import {
   arcFromThreePoints,
-  drawSymbolShapes,
-  loadShapeImages,
   rasterizeSymbolShapes,
   rescaleShapeForCanvasResize,
   selectionBounds,
@@ -181,7 +180,6 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // and canvas stay in sync with the definition's true aspect ratio.
   const { widthPx: canvasWidthPx, heightPx: canvasHeightPx } = useMemo(() => shapeCanvasSize(nativeWidth, nativeHeight), [nativeWidth, nativeHeight]);
 
-  const shapesCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const textRenameRef = useRef<HTMLInputElement | null>(null);
 
   // The shared shape-draw/edit primitive (shared-drawing-tool.md) — tool palette, draft/handle/
@@ -264,22 +262,6 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     return () => clearTimeout(id);
   }, [editor.editingTextId]);
 
-  // 'image' shapes' art (imageCacheRef, keyed by dataUrl) — the draw effect below needs a
-  // pre-decoded <img> to drawImage() with (see drawSymbolShapes' own doc comment), so any new
-  // dataUrl showing up in `editor.shapes` gets loaded here; imagesLoadedTick bumps once a load
-  // lands, since mutating the ref's Map directly doesn't itself trigger the draw effect to rerun.
-  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
-  const [imagesLoadedTick, setImagesLoadedTick] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    void loadShapeImages(editor.shapes, imageCacheRef.current).then(() => {
-      if (!cancelled) setImagesLoadedTick((t) => t + 1);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [editor.shapes]);
-
   // Canvas resize, not image resize: editing nativeWidth/nativeHeight changes the fraction-space
   // box's own aspect ratio (via shapeCanvasSize), so without this, every shape/port's fraction
   // coordinates would be silently reinterpreted against the new aspect and visibly shift. Rescale
@@ -292,7 +274,8 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // the aspect ratio changes — only the native sizes themselves do.
   //
   // sMin (for radius/strokeWidth) needs the same native-unit basis, not the derived canvas pixel
-  // box, even though drawSymbolShapes itself scales radius by Math.min(canvasWidthPx, canvasHeightPx):
+  // box, even though shape rendering itself (renderSymbolShapeSvg live, drawSymbolShapes at save-time
+  // bake — both share this convention) scales radius by Math.min(canvasWidthPx, canvasHeightPx):
   // that pixel min equals k * Math.min(nativeWidth, nativeHeight) for the single uniform scale
   // k = SHAPE_CANVAS_MAX_PX / Math.max(nativeWidth, nativeHeight), so the *physical* (native-unit)
   // radius a fraction represents is `radius * Math.min(nativeWidth, nativeHeight)` — k cancels out.
@@ -314,203 +297,174 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nativeWidth, nativeHeight]);
 
-  // Redraw the Shapes-mode canvas whenever its state changes. The canvas's own backing buffer
-  // is sized to the viewport's CSS size × devicePixelRatio (not the artwork's world size) —
-  // view.scale/pan are baked into the draw transform below instead of a CSS transform on the
-  // canvas element, so lines stay crisp at high zoom instead of a scaled bitmap blurring (§3).
-  useEffect(() => {
-    const canvas = shapesCanvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const bufferWidth = Math.max(1, Math.round(editor.viewportSize.width * dpr));
-    const bufferHeight = Math.max(1, Math.round(editor.viewportSize.height * dpr));
-    if (canvas.width !== bufferWidth) canvas.width = bufferWidth;
-    if (canvas.height !== bufferHeight) canvas.height = bufferHeight;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, editor.viewportSize.width, editor.viewportSize.height);
-    ctx.save();
-    ctx.translate(editor.view.panX, editor.view.panY);
-    ctx.scale(editor.view.scale, editor.view.scale);
-    // Selection/handle/marquee "chrome" is drawn in this same zoomed world-space transform, so a
-    // literal screen-px size (line width, dash length, handle radius) would visibly grow/shrink
-    // with zoom — divide by view.scale first so it renders at a constant size on screen instead,
-    // same convention scene.ts uses for its own handle/selection-outline drawing.
-    const chromeScale = 1 / editor.view.scale;
-    // Canvas/stamp bounds — the fixed nativeWidth×nativeHeight box shapes/ports are defined
-    // against, drawn first (behind shapes/selection chrome) so the user can see the element's
-    // actual extent while placing geometry.
-    ctx.save();
-    ctx.setLineDash([6 * chromeScale, 4 * chromeScale]);
-    ctx.strokeStyle = '#57676f';
-    ctx.lineWidth = chromeScale;
-    ctx.strokeRect(0, 0, canvasWidthPx, canvasHeightPx);
-    ctx.restore();
-    // draftShapes either replaces in-place shapes being dragged (select tool) or
-    // holds one not-yet-committed new shape being drawn (drag-to-create tools) —
-    // handle both by replacing matching ids and appending any that aren't found.
-    const draftById = editor.draftShapes ? new Map(editor.draftShapes.map((s) => [s.id, s])) : null;
-    const toDraw = draftById
-      ? [...editor.shapes.map((s) => draftById.get(s.id) ?? s), ...editor.draftShapes!.filter((s) => !editor.shapes.some((orig) => orig.id === s.id))]
-      : editor.shapes;
-    drawSymbolShapes(ctx, toDraw, canvasWidthPx, canvasHeightPx, imageCacheRef.current);
-    for (const shape of toDraw) {
-      if (!editor.selectedShapeIds.has(shape.id)) continue;
-      const b = symbolShapeBounds(shape, canvasWidthPx, canvasHeightPx);
-      const pad = 3 * chromeScale;
-      ctx.save();
-      ctx.setLineDash([4 * chromeScale, 3 * chromeScale]);
-      ctx.strokeStyle = '#2f6fed';
-      ctx.lineWidth = chromeScale;
-      ctx.strokeRect(b.x * canvasWidthPx - pad, b.y * canvasHeightPx - pad, b.width * canvasWidthPx + pad * 2, b.height * canvasHeightPx + pad * 2);
-      ctx.restore();
-    }
-    if (editor.marquee) {
-      const minX = Math.min(editor.marquee.start.fractionX, editor.marquee.current.fractionX) * canvasWidthPx;
-      const minY = Math.min(editor.marquee.start.fractionY, editor.marquee.current.fractionY) * canvasHeightPx;
-      const w = Math.abs(editor.marquee.current.fractionX - editor.marquee.start.fractionX) * canvasWidthPx;
-      const h = Math.abs(editor.marquee.current.fractionY - editor.marquee.start.fractionY) * canvasHeightPx;
-      ctx.save();
-      ctx.fillStyle = 'rgba(47, 111, 237, 0.12)';
-      ctx.fillRect(minX, minY, w, h);
-      ctx.strokeStyle = '#2f6fed';
-      ctx.lineWidth = chromeScale;
-      ctx.strokeRect(minX, minY, w, h);
-      ctx.restore();
-    }
-    if (editor.tool === 'select' && !editor.marquee) {
-      const selectedForHandle = toDraw.filter((s) => editor.selectedShapeIds.has(s.id));
-      const handle = rotateHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx, editor.view.scale);
-      if (handle) {
-        const b = selectionBounds(selectedForHandle, canvasWidthPx, canvasHeightPx);
-        const handleX = handle.x * canvasWidthPx;
-        const handleY = handle.y * canvasHeightPx;
-        const stemTopY = b.y * canvasHeightPx;
-        ctx.save();
-        ctx.strokeStyle = '#2f6fed';
-        ctx.fillStyle = '#2f6fed';
-        ctx.lineWidth = chromeScale;
-        ctx.beginPath();
-        ctx.moveTo(handleX, stemTopY);
-        ctx.lineTo(handleX, handleY);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(handleX, handleY, ROTATE_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-      // Geometry (resize/reshape) handles — only when exactly one shape is selected, per the
-      // hit-test order in useShapeDrawEditor's pointer-down handler: rotate handle → geometry handle → body drag.
-      if (selectedForHandle.length === 1) {
-        for (const geomHandle of shapeHandles(selectedForHandle[0], canvasWidthPx, canvasHeightPx)) {
-          ctx.save();
-          ctx.strokeStyle = '#2f6fed';
-          ctx.fillStyle = '#fff';
-          ctx.lineWidth = chromeScale;
-          ctx.beginPath();
-          ctx.arc(geomHandle.x * canvasWidthPx, geomHandle.y * canvasHeightPx, GEOMETRY_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
-      // Scale handle — multi-shape selections only (see scaleHandlePosition's own doc comment).
-      // Drawn as a square (vs. the round geometry/rotate handles) so it reads as a distinct affordance.
-      if (selectedForHandle.length > 1) {
-        const scaleHandle = scaleHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx);
-        if (scaleHandle) {
+  // Shapes-mode canvas, rendered live as SVG (shared-drawing-tool.md §4/§6 Phase 2 — was
+  // Canvas2D; the save-time raster bake in buildDefinition below is unaffected, it calls
+  // rasterizeSymbolShapes directly and loads its own images). Plain render-time JSX, not a
+  // useEffect + imperative draw call: React already re-renders whenever any of the values below
+  // change, an SVG element tree needs no separate "clear and redraw" step the way a Canvas2D
+  // backing buffer did, and there's no devicePixelRatio buffer-sizing concern — the browser
+  // rasterizes SVG at native resolution from its CSS size.
+  //
+  // draftShapes either replaces in-place shapes being dragged (select tool) or holds one
+  // not-yet-committed new shape being drawn (drag-to-create tools) — handle both by replacing
+  // matching ids and appending any that aren't found.
+  const draftById = editor.draftShapes ? new Map(editor.draftShapes.map((s) => [s.id, s])) : null;
+  const toDraw = draftById
+    ? [...editor.shapes.map((s) => draftById.get(s.id) ?? s), ...editor.draftShapes!.filter((s) => !editor.shapes.some((orig) => orig.id === s.id))]
+    : editor.shapes;
+  // Selection/handle/marquee "chrome" is drawn in the same zoomed world-space <g> as the shapes
+  // (see the transform on the <g> in the JSX below), so a literal screen-px size (stroke width,
+  // dash length, handle radius) would visibly grow/shrink with zoom — divide by view.scale first
+  // so it renders at a constant size on screen instead, same convention scene.ts uses for its own
+  // handle/selection-outline drawing.
+  const chromeScale = 1 / editor.view.scale;
+
+  const selectedForHandle = editor.tool === 'select' && !editor.marquee ? toDraw.filter((s) => editor.selectedShapeIds.has(s.id)) : [];
+  const rotateHandle = rotateHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx, editor.view.scale);
+  const rotateHandleStemTopY = rotateHandle ? selectionBounds(selectedForHandle, canvasWidthPx, canvasHeightPx).y * canvasHeightPx : 0;
+  const scaleHandle = scaleHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx);
+
+  // Click-accumulate previews for Polygon and Arc (3-pt): placed vertices plus a rubber-band line
+  // (or, for Arc 3-pt once start+end are placed, a live preview of the actual arc bulging toward
+  // the pointer) to the current pointer position.
+  const activeDraftPoints = editor.tool === 'polygon' ? editor.polygonDraft : editor.tool === 'arcThreePoint' ? editor.arcThreePointDraft : null;
+  const previewArc =
+    editor.tool === 'arcThreePoint' && activeDraftPoints && activeDraftPoints.length === 2 && editor.pendingPoint
+      ? arcFromThreePoints(activeDraftPoints[0], activeDraftPoints[1], editor.pendingPoint, editor.defaultStyle, canvasWidthPx, canvasHeightPx)
+      : null;
+  const polygonClosePx =
+    editor.tool === 'polygon' && activeDraftPoints && activeDraftPoints.length >= 3 && editor.pendingPoint
+      ? Math.hypot(
+          (editor.pendingPoint.fractionX - activeDraftPoints[0].fractionX) * canvasWidthPx,
+          (editor.pendingPoint.fractionY - activeDraftPoints[0].fractionY) * canvasHeightPx,
+        )
+      : Infinity;
+  const showPolygonCloseHint = polygonClosePx <= POLYGON_CLOSE_HIT_RADIUS_PX / editor.view.scale;
+
+  const chrome = (
+    <>
+      {/* Canvas/stamp bounds — the fixed nativeWidth×nativeHeight box shapes/ports are defined
+          against, drawn first (behind shapes/selection chrome) so the user can see the element's
+          actual extent while placing geometry. */}
+      <rect x={0} y={0} width={canvasWidthPx} height={canvasHeightPx} fill="none" stroke="#57676f" strokeWidth={chromeScale} strokeDasharray={`${6 * chromeScale} ${4 * chromeScale}`} />
+      <SymbolShapesSvg shapes={toDraw} widthPx={canvasWidthPx} heightPx={canvasHeightPx} />
+      {toDraw
+        .filter((s) => editor.selectedShapeIds.has(s.id))
+        .map((shape) => {
+          const b = symbolShapeBounds(shape, canvasWidthPx, canvasHeightPx);
+          const pad = 3 * chromeScale;
+          return (
+            <rect
+              key={shape.id}
+              x={b.x * canvasWidthPx - pad}
+              y={b.y * canvasHeightPx - pad}
+              width={b.width * canvasWidthPx + pad * 2}
+              height={b.height * canvasHeightPx + pad * 2}
+              fill="none"
+              stroke="#2f6fed"
+              strokeWidth={chromeScale}
+              strokeDasharray={`${4 * chromeScale} ${3 * chromeScale}`}
+            />
+          );
+        })}
+      {editor.marquee &&
+        (() => {
+          const minX = Math.min(editor.marquee.start.fractionX, editor.marquee.current.fractionX) * canvasWidthPx;
+          const minY = Math.min(editor.marquee.start.fractionY, editor.marquee.current.fractionY) * canvasHeightPx;
+          const w = Math.abs(editor.marquee.current.fractionX - editor.marquee.start.fractionX) * canvasWidthPx;
+          const h = Math.abs(editor.marquee.current.fractionY - editor.marquee.start.fractionY) * canvasHeightPx;
+          return <rect x={minX} y={minY} width={w} height={h} fill="rgba(47, 111, 237, 0.12)" stroke="#2f6fed" strokeWidth={chromeScale} />;
+        })()}
+      {rotateHandle && (
+        <>
+          <line x1={rotateHandle.x * canvasWidthPx} y1={rotateHandleStemTopY} x2={rotateHandle.x * canvasWidthPx} y2={rotateHandle.y * canvasHeightPx} stroke="#2f6fed" strokeWidth={chromeScale} />
+          <circle cx={rotateHandle.x * canvasWidthPx} cy={rotateHandle.y * canvasHeightPx} r={ROTATE_HANDLE_RADIUS_PX * chromeScale} fill="#2f6fed" />
+        </>
+      )}
+      {/* Geometry (resize/reshape) handles — only when exactly one shape is selected, per the
+          hit-test order in useShapeDrawEditor's pointer-down handler: rotate handle → geometry
+          handle → body drag. */}
+      {selectedForHandle.length === 1 &&
+        shapeHandles(selectedForHandle[0], canvasWidthPx, canvasHeightPx).map((geomHandle) => (
+          <circle
+            key={geomHandle.id}
+            cx={geomHandle.x * canvasWidthPx}
+            cy={geomHandle.y * canvasHeightPx}
+            r={GEOMETRY_HANDLE_RADIUS_PX * chromeScale}
+            fill="#fff"
+            stroke="#2f6fed"
+            strokeWidth={chromeScale}
+          />
+        ))}
+      {/* Scale handle — multi-shape selections only (see scaleHandlePosition's own doc comment).
+          Drawn as a square (vs. the round geometry/rotate handles) so it reads as a distinct
+          affordance. */}
+      {scaleHandle &&
+        (() => {
           const hx = scaleHandle.x * canvasWidthPx;
           const hy = scaleHandle.y * canvasHeightPx;
           const half = SCALE_HANDLE_HALF_PX * chromeScale;
-          ctx.save();
-          ctx.strokeStyle = '#2f6fed';
-          ctx.fillStyle = '#fff';
-          ctx.lineWidth = chromeScale;
-          ctx.fillRect(hx - half, hy - half, half * 2, half * 2);
-          ctx.strokeRect(hx - half, hy - half, half * 2, half * 2);
-          ctx.restore();
-        }
-      }
-    }
-
-    // Object-snap indicator (§6.3) — a distinct accent color so it doesn't get lost against the
-    // selection-blue #2f6fed, shown at whatever point a handle-drag is currently snapped to.
-    if (editor.snapIndicator) {
-      ctx.save();
-      ctx.strokeStyle = SNAP_INDICATOR_COLOR;
-      ctx.lineWidth = 1.5 * chromeScale;
-      ctx.beginPath();
-      ctx.arc(editor.snapIndicator.x * canvasWidthPx, editor.snapIndicator.y * canvasHeightPx, SNAP_INDICATOR_RADIUS_PX * chromeScale, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Click-accumulate previews for Polygon and Arc (3-pt): placed vertices plus a
-    // rubber-band line (or, for Arc 3-pt once start+end are placed, a live preview of the actual
-    // arc bulging toward the pointer) to the current pointer position.
-    const activeDraftPoints = editor.tool === 'polygon' ? editor.polygonDraft : editor.tool === 'arcThreePoint' ? editor.arcThreePointDraft : null;
-    if (activeDraftPoints && activeDraftPoints.length > 0) {
-      ctx.save();
-      ctx.setLineDash([4 * chromeScale, 3 * chromeScale]);
-      ctx.strokeStyle = '#2f6fed';
-      ctx.fillStyle = '#2f6fed';
-      ctx.lineWidth = chromeScale;
-      const previewArc =
-        editor.tool === 'arcThreePoint' && activeDraftPoints.length === 2 && editor.pendingPoint
-          ? arcFromThreePoints(activeDraftPoints[0], activeDraftPoints[1], editor.pendingPoint, editor.defaultStyle, canvasWidthPx, canvasHeightPx)
-          : null;
-      if (previewArc && previewArc.kind === 'arc') {
-        const r = previewArc.radius * Math.min(canvasWidthPx, canvasHeightPx);
-        ctx.beginPath();
-        ctx.ellipse(previewArc.cx * canvasWidthPx, previewArc.cy * canvasHeightPx, r, r, 0, previewArc.startAngle, previewArc.endAngle);
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx);
-        for (const p of activeDraftPoints.slice(1)) ctx.lineTo(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx);
-        if (editor.pendingPoint) ctx.lineTo(editor.pendingPoint.fractionX * canvasWidthPx, editor.pendingPoint.fractionY * canvasHeightPx);
-        ctx.stroke();
-      }
-      for (const p of activeDraftPoints) {
-        ctx.beginPath();
-        ctx.arc(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx, 3 * chromeScale, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Highlight the polygon's start vertex when the pointer is within closing range, hinting
-      // that clicking there finishes the shape instead of adding another vertex.
-      if (editor.tool === 'polygon' && activeDraftPoints.length >= 3 && editor.pendingPoint) {
-        const closePx = Math.hypot(
-          (editor.pendingPoint.fractionX - activeDraftPoints[0].fractionX) * canvasWidthPx,
-          (editor.pendingPoint.fractionY - activeDraftPoints[0].fractionY) * canvasHeightPx,
-        );
-        if (closePx <= POLYGON_CLOSE_HIT_RADIUS_PX / editor.view.scale) {
-          ctx.setLineDash([]);
-          ctx.fillStyle = '#fff';
-          ctx.beginPath();
-          ctx.arc(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx, GEOMETRY_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    }
-    ctx.restore();
-  }, [
-    editor.shapes,
-    editor.draftShapes,
-    editor.selectedShapeIds,
-    editor.marquee,
-    editor.tool,
-    editor.polygonDraft,
-    editor.arcThreePointDraft,
-    editor.pendingPoint,
-    canvasWidthPx,
-    canvasHeightPx,
-    editor.viewportSize,
-    editor.view,
-    editor.defaultStyle,
-    imagesLoadedTick,
-  ]);
+          return <rect x={hx - half} y={hy - half} width={half * 2} height={half * 2} fill="#fff" stroke="#2f6fed" strokeWidth={chromeScale} />;
+        })()}
+      {/* Object-snap indicator (§6.3) — a distinct accent color so it doesn't get lost against
+          the selection-blue #2f6fed, shown at whatever point a handle-drag is currently snapped
+          to. */}
+      {editor.snapIndicator && (
+        <circle
+          cx={editor.snapIndicator.x * canvasWidthPx}
+          cy={editor.snapIndicator.y * canvasHeightPx}
+          r={SNAP_INDICATOR_RADIUS_PX * chromeScale}
+          fill="none"
+          stroke={SNAP_INDICATOR_COLOR}
+          strokeWidth={1.5 * chromeScale}
+        />
+      )}
+      {activeDraftPoints && activeDraftPoints.length > 0 && (
+        <>
+          {previewArc && previewArc.kind === 'arc' ? (
+            <path
+              d={describeArcPath(
+                previewArc.cx * canvasWidthPx,
+                previewArc.cy * canvasHeightPx,
+                previewArc.radius * Math.min(canvasWidthPx, canvasHeightPx),
+                previewArc.startAngle,
+                previewArc.endAngle,
+              )}
+              fill="none"
+              stroke="#2f6fed"
+              strokeWidth={chromeScale}
+              strokeDasharray={`${4 * chromeScale} ${3 * chromeScale}`}
+            />
+          ) : (
+            <polyline
+              points={[...activeDraftPoints, ...(editor.pendingPoint ? [editor.pendingPoint] : [])]
+                .map((p) => `${p.fractionX * canvasWidthPx},${p.fractionY * canvasHeightPx}`)
+                .join(' ')}
+              fill="none"
+              stroke="#2f6fed"
+              strokeWidth={chromeScale}
+              strokeDasharray={`${4 * chromeScale} ${3 * chromeScale}`}
+            />
+          )}
+          {activeDraftPoints.map((p, i) => (
+            <circle key={i} cx={p.fractionX * canvasWidthPx} cy={p.fractionY * canvasHeightPx} r={3 * chromeScale} fill="#2f6fed" />
+          ))}
+          {/* Highlight the polygon's start vertex when the pointer is within closing range,
+              hinting that clicking there finishes the shape instead of adding another vertex. */}
+          {showPolygonCloseHint && (
+            <circle
+              cx={activeDraftPoints[0].fractionX * canvasWidthPx}
+              cy={activeDraftPoints[0].fractionY * canvasHeightPx}
+              r={GEOMETRY_HANDLE_RADIUS_PX * chromeScale}
+              fill="#fff"
+              stroke="#2f6fed"
+              strokeWidth={chromeScale}
+            />
+          )}
+        </>
+      )}
+    </>
+  );
 
   async function handleArtworkFile(file: File) {
     const [dataUrl, bitmap] = await Promise.all([readAsDataUrl(file), loadStampBitmap(file)]);
@@ -740,7 +694,25 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
               onPointerDown={editor.handleViewportPointerDown}
               onContextMenu={(e) => e.preventDefault()}
             >
-              <canvas ref={shapesCanvasRef} onPointerDown={editor.handleCanvasPointerDown} onPointerMove={editor.handleCanvasPointerMove} onDoubleClick={editor.handleCanvasDoubleClick} />
+              <svg className="mep-ee-shapes-svg" onPointerDown={editor.handleCanvasPointerDown} onPointerMove={editor.handleCanvasPointerMove} onDoubleClick={editor.handleCanvasDoubleClick}>
+                {/* Full-viewport transparent hit target — an <svg> only reports pointer events where
+                    something is "painted" (pointer-events: visiblePainted, the default), unlike an
+                    HTML <canvas> which is hit-testable across its whole box regardless of pixel
+                    content. Outside the pan/zoom <g> below, so it always covers the full viewport
+                    regardless of pan/zoom state, matching the canvas's old inset:0/100%/100%
+                    coverage — same trick the schematic mockup's own SVG editor uses for its block
+                    drag handles (mockup.html's hitEl). */}
+                <rect x={0} y={0} width="100%" height="100%" fill="transparent" />
+                {/* Shapes and all chrome are pointer-events:none (inherited by every descendant) so
+                    every click/drag funnels through this <svg>'s own handlers above, doing the same
+                    manual fractionFromEvent + hitTestSymbolShape hit-testing the Canvas2D canvas did
+                    — never native SVG per-element hit-testing, which would behave differently (e.g.
+                    an unfilled shape's interior wouldn't be clickable the way hitTestSymbolShape's
+                    tolerance-based edge test makes it clickable today). */}
+                <g pointerEvents="none" transform={`translate(${editor.view.panX} ${editor.view.panY}) scale(${editor.view.scale})`}>
+                  {chrome}
+                </g>
+              </svg>
               <div
                 className="mep-ee-artwork"
                 style={{ width: canvasWidthPx, height: canvasHeightPx, transform: `translate(${editor.view.panX}px, ${editor.view.panY}px) scale(${editor.view.scale})` }}
