@@ -206,7 +206,7 @@ Suggested built-in templates: one with circuits as columns (like OV) and one wit
 
 ## 10. Phases
 
-### Phase 0 — Mockup — **mockup built, awaiting user review**
+### Phase 0 — Mockup — **mockup built, 3 review rounds done, awaiting further user review**
 
 Make a static HTML mockup. Publish it as a private Artifact. Store the source in `.claude/plans/electrical-schematic-mockup/` so the mockup survives in git.
 
@@ -217,29 +217,56 @@ The mockup shows:
 3. **Template picker.** Choose, copy, save, and load a template.
 4. **Circuit assignment.** Convert Equipment to a panel, create a circuit, assign terminals, and edit the circuit properties.
 
-Built 2026-09-23, commit `4909cd7` on `worktree-electrical-schematic-mockup`
-(pushed straight to `master` — plan-housekeeping exception, no `apps/web`
-code touched). Source: `.claude/plans/electrical-schematic-mockup/mockup.html`,
-a single-file static app (vanilla JS, no build step). Published as a
+Source: `.claude/plans/electrical-schematic-mockup/mockup.html`, a
+single-file static app (vanilla JS, no build step). Published as a
 private Artifact: https://claude.ai/artifact/A5wn3XUw87BqTj1LQPuEbF
+(now Version 3). All commits pushed straight to `master` — plan-housekeeping
+exception, no `apps/web` code touched.
 
-All four items above are present and interactive: block selection +
-rotation + bindings on screen 1, a Columns/Rows toggle with both boards
-shown side by side on screen 2 (bears on open question 4), copy/load/new
-on screen 3, and a tree + provisional device/cable/phase fields +
-terminal assignment with a live derived-capacity readout on screen 4.
-Sample data is shaped from the real `OV-HKantoor-2` and `E60_LK1+2`
-fixtures, but every project/client identifier in the title blocks was
-fictionalised (e.g. "Voorbeeldgebouw") — the fixtures policy in this
-project's `CLAUDE.md` says not to commit or reproduce real client data,
-and typed-in sample text falls under that same spirit even though it
-isn't the source files themselves.
+- **Round 1** (`4909cd7`, 2026-09-23): first build of all four screens above.
+- **Round 2** (`0cabb86`, 2026-09-23): reworked the template editor into two
+  modes — layout (once/per-panel/aggregate blocks, plus a draggable anchor
+  and a "preview repeat" count for the active circuit group) and group-edit
+  (one full-size instance of a circuit group, same drag/rotate tools).
+  Palette items became real HTML5 drag sources with scope-checked drops.
+  Repeat direction/pitch/rule/spare moved from a template-global toolbar to
+  per-group settings. Template picker's Load button now seeds the editor
+  and switches to it. Removed the "Assign a terminal" control from circuit
+  assignment (terminals get assigned by selecting them on the PDF canvas,
+  a different mechanism, not from this panel).
+- **Round 3** (commit pending, 2026-09-23): added a "Totals table" block
+  type with user-defined rows (label + formula per row, editable in the
+  properties panel, rendered live in the layout preview) — answers §12
+  open question 5 for the totals-row case. Made the binding field generic:
+  every block, not just the ones the catalogue predefines a binding for,
+  now has an editable binding expression and an editable preview value in
+  its properties panel. Added a placeholder "Symbol library" (opened from
+  the properties panel for `main`/`device`/`acc` blocks) so a block can
+  swap its default vector art for a picked symbol — icons are placeholders,
+  not the user's real artwork. Reserved, but did not build, space for
+  freeform drawing tools (line/rect/circle/text/symbol) on the template
+  canvas — see open question 9 below; that work needs its own plan since
+  it shares a primitive with the existing custom-stamp editor and with
+  "create your own component" in the symbol library.
 
-Not done: this was built with no in-browser check (no browser tool was
-available this session) — only a JS syntax check (`node --check`) and a
-structural sanity pass (balanced tags, every referenced element id
-exists). The user should open the Artifact link and look for real
-rendering issues before relying on it for review.
+All four spec items are present and interactive: block selection, drag,
+rotation, and bindings on screen 1 (now with the two-mode editor above),
+a Columns/Rows toggle with both boards shown side by side on screen 2
+(bears on open question 4), copy/load/new on screen 3, and a tree +
+provisional device/cable/phase fields + terminal assignment with a live
+derived-capacity readout on screen 4. Sample data is shaped from the real
+`OV-HKantoor-2` and `E60_LK1+2` fixtures, but every project/client
+identifier in the title blocks was fictionalised (e.g. "Voorbeeldgebouw")
+— the fixtures policy in this project's `CLAUDE.md` says not to commit or
+reproduce real client data, and typed-in sample text falls under that same
+spirit even though it isn't the source files themselves.
+
+Not done: this was built with no in-browser check in any of the three
+rounds (no browser tool was available this session) — only a JS syntax
+check (`node --check`) and a structural sanity pass (balanced tags, every
+referenced element id exists) after each round. The user should open the
+Artifact link and look for real rendering/interaction issues before
+relying on it for review.
 
 Acceptance: the user reviews the mockup and approves it. The catalogue (section 6), the model (section 7), and the open questions (section 12) are updated from the review.
 
@@ -283,6 +310,7 @@ Storage and export format depend on open questions 1 and 2.
 6. **Locale.** Table headers and labels are template text. Number format and the decimal separator need a setting in the template.
 7. ~~**Circuit type.** The old app had `CircuitType` but the generator never used it. Does the new template use it to choose a group variant?~~ **Resolved 2026-09-22:** yes, deliberately — a genuine new use the old app never had. See [[electrical-circuits-model.md]] §5.
 8. **Example schematics.** Do we get permission to commit sanitised copies, or do we recreate similar files?
+9. **Shared drawing tools.** Added 2026-09-23. Three surfaces need the same freeform draw/edit primitive (line, rectangle, circle, text, symbol placement, with select/move/rotate): the template canvas's "once"-scope blocks, a user-created entry in the component/symbol library, and the app's existing custom-stamp editor. Build one shared component and reuse it in all three, rather than three separate implementations. Needs its own plan — not drafted yet. The Phase 0 mockup only reserves screen space for this (a disabled toolbar strip on the template canvas); none of the three surfaces are wired up.
 
 ## 13. Alignment with the circuit model
 

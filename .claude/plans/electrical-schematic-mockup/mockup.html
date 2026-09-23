@@ -332,6 +332,42 @@
     .editor-grid, .assign-grid { grid-template-columns: 1fr; }
     .sched-toolbar { flex-direction: column; align-items: flex-start; }
   }
+
+  /* -- drawing-tools reservation strip -- */
+  .draw-tools-strip {
+    display: flex; align-items: center; gap: 6px; padding: 8px 10px; margin-bottom: 10px;
+    background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: 8px;
+  }
+  .draw-tool-btn {
+    width: 28px; height: 28px; border: 1px solid var(--border-strong); border-radius: 6px;
+    background: var(--surface); color: var(--text-muted); font-size: 13px; cursor: not-allowed;
+  }
+  .draw-tool-btn[disabled] { opacity: .55; }
+  .draw-tools-strip .hint { margin-left: 4px; }
+
+  /* -- symbol library modal -- */
+  .symbol-modal-backdrop {
+    position: fixed; inset: 0; background: rgba(10, 14, 20, .45); display: flex;
+    align-items: center; justify-content: center; z-index: 50; padding: 24px;
+  }
+  .symbol-modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 18px 20px;
+    box-shadow: 0 18px 44px rgba(0,0,0,.28);
+  }
+  .symbol-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .symbol-modal-head h3 { font-size: 14px; }
+  .symbol-cat-label { font-size: 11.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 6px; }
+  .symbol-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px,1fr)); gap: 8px; }
+  .symbol-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); cursor: pointer; text-align: center;
+  }
+  .symbol-tile:hover { border-color: var(--select); color: var(--select); }
+  .symbol-tile-icon { font-size: 18px; }
+  .symbol-tile-label { font-size: 10.5px; color: var(--text-muted); line-height: 1.25; }
+  .symbol-tile:hover .symbol-tile-label { color: var(--select); }
+  .symbol-current { font-size: 12.5px; padding: 4px 0; }
 </style>
 
 <div class="shell">
@@ -393,8 +429,16 @@
             <h3 id="canvas-heading">Template layout</h3>
           </div>
           <div class="panel-body">
+            <div class="draw-tools-strip" title="Reserved for a shared drawing-tools plan — see electrical-schematic-templates.md">
+              <button class="draw-tool-btn" disabled>／</button>
+              <button class="draw-tool-btn" disabled>▭</button>
+              <button class="draw-tool-btn" disabled>◯</button>
+              <button class="draw-tool-btn" disabled>Ab</button>
+              <button class="draw-tool-btn" disabled>☺</button>
+              <span class="hint">Drawing tools (line/rect/circle/text/symbol) — reserved space, planned as one shared tool with the stamp editor and the component library</span>
+            </div>
             <div class="canvas-wrap" id="canvas-drop-target">
-              <svg class="paper-sheet" id="editor-canvas" width="640" height="320" viewBox="0 0 640 320"></svg>
+              <svg class="paper-sheet" id="editor-canvas" width="640" height="400" viewBox="0 0 640 400"></svg>
             </div>
             <p class="hint" id="canvas-note" style="margin-top:8px"></p>
           </div>
@@ -550,6 +594,30 @@
     g.appendChild(el("rect", { x: 0, y: h / 2 - 5, width: 10, height: 10, fill: "var(--select-soft)", stroke: "var(--select)" }));
     g.appendChild(textEl(16, h / 2 + 3, "Legend", 9, "start", 500));
   }
+  function drawTotalsTable(g, w, h, label) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "none", stroke: "var(--ink)", "stroke-width": 1.2 }));
+    var lines = String(label || "").split("\n").filter(Boolean);
+    if (!lines.length) lines = ["(no rows yet)"];
+    var lh = Math.min(16, (h - 8) / lines.length);
+    lines.forEach(function (line, i) {
+      g.appendChild(el("line", { x1: 0, y1: (i + 1) * lh, x2: w, y2: (i + 1) * lh, stroke: "var(--border-strong)", "stroke-width": 0.8 }));
+      g.appendChild(textEl(6, i * lh + lh * 0.7, line, 8.5, "start", 500));
+    });
+  }
+
+  // library of placeholder symbol art — real artwork/upload comes via the shared drawing-tools plan
+  var SYMBOL_LIBRARY = [
+    { id: "mcb-b", label: "MCB — curve B", category: "Protective devices", icon: "⎍" },
+    { id: "mcb-c", label: "MCB — curve C", category: "Protective devices", icon: "⎍" },
+    { id: "rcd", label: "RCD (residual current device)", category: "Protective devices", icon: "⏚" },
+    { id: "rcbo", label: "RCBO (combined MCB+RCD)", category: "Protective devices", icon: "⏚" },
+    { id: "fuse", label: "Fuse", category: "Protective devices", icon: "▭" },
+    { id: "mccb", label: "MCCB", category: "Protective devices", icon: "⎍" },
+    { id: "contactor", label: "Contactor", category: "Switching", icon: "⧉" },
+    { id: "timer", label: "Timer switch", category: "Switching", icon: "◷" },
+    { id: "meter", label: "kWh meter", category: "Metering", icon: "Ⓜ" },
+    { id: "surge", label: "Surge protection (SPD)", category: "Protective devices", icon: "⚡" }
+  ];
 
   var SCOPE_LABEL = { once: "Once", panel: "Per panel", circuit: "Per circuit", aggregate: "Aggregate" };
   var CATALOGUE = {
@@ -557,13 +625,13 @@
     title:       { label: "Title block",                   scope: "once",      w: 150, h: 60,  binding: null, draw: drawTitleBlock },
     free:        { label: "Free text / line / symbol",      scope: "once",      w: 100, h: 22,  binding: null, draw: drawFreeText },
     feed:        { label: "Feed cable",                     scope: "panel",     w: 130, h: 26,  binding: "{panel.feederCable.type} {panel.feederCable.crossSectionMm2} mm²  l={panel.feederCable.lengthM} m", draw: drawCableText },
-    main:        { label: "Main device",                    scope: "panel",     w: 40,  h: 44,  binding: "{panel.mainDevice.label}", draw: drawBreaker },
-    acc:         { label: "Accessory device",                scope: "panel",     w: 36,  h: 36,  binding: "{panel.accessories[*].label}", draw: drawAccessory },
+    main:        { label: "Main device",                    scope: "panel",     w: 40,  h: 44,  binding: "{panel.mainDevice.label}", draw: drawBreaker, symbolizable: true },
+    acc:         { label: "Accessory device",                scope: "panel",     w: 36,  h: 36,  binding: "{panel.accessories[*].label}", draw: drawAccessory, symbolizable: true },
     bus:         { label: "Busbar",                          scope: "panel",     w: 500, h: 8,   binding: null, draw: drawBusbar },
     section:     { label: "Section box and label",           scope: "panel",     w: 200, h: 70,  binding: "{section.name}", draw: drawSectionBox },
     frame:       { label: "Frame",                           scope: "panel",     w: 560, h: 260, binding: null, draw: drawFrame },
     num:         { label: "Circuit number label",            scope: "circuit",   w: 34,  h: 22,  binding: "{circuit.prefix}{circuit.number}", draw: drawNumberLabel },
-    device:      { label: "Protective device",               scope: "circuit",   w: 34,  h: 34,  binding: "{device.curve}{device.ratingA}", draw: drawBreaker },
+    device:      { label: "Protective device",               scope: "circuit",   w: 34,  h: 34,  binding: "{device.curve}{device.ratingA}", draw: drawBreaker, symbolizable: true },
     phase:       { label: "Phase label",                     scope: "circuit",   w: 28,  h: 16,  binding: "{circuit.phase}", draw: drawPhaseLabel },
     conductor:   { label: "Cable line + conductor mark",     scope: "circuit",   w: 40,  h: 16,  binding: "{cable.coreCount}x", draw: drawConductor },
     cabletext:   { label: "Cable text",                      scope: "circuit",   w: 150, h: 34,  binding: "{cable.type} {cable.coreCount}G{cable.crossSectionMm2} mm²  l={cable.lengthM} m", draw: drawCableText },
@@ -572,8 +640,17 @@
     custom:      { label: "Custom annotation",                scope: "circuit",   w: 110, h: 18,  binding: "{circuit.properties.*}", draw: drawCustom },
     cellva:      { label: "Table cell: count + VA",           scope: "circuit",   w: 70,  h: 22,  binding: "count(terminals) · sum(terminal.capacity)", draw: drawCell },
     cellderived: { label: "Table cell: derived value",        scope: "circuit",   w: 70,  h: 22,  binding: "sum(terminal.capacity) * circuit.diversityPercent / 100", draw: drawCell },
-    agg:         { label: "Aggregate cell (sum, count)",      scope: "aggregate", w: 76,  h: 24,  binding: "sum/count over all circuits", draw: drawCell }
+    agg:         { label: "Aggregate cell (sum, count)",      scope: "aggregate", w: 76,  h: 24,  binding: "sum/count over all circuits", draw: drawCell },
+    table:       { label: "Totals table",                    scope: "aggregate", w: 300, h: 96,  binding: null, draw: drawTotalsTable, configurable: true }
   };
+  function defaultTableRows() {
+    return [
+      { label: "Count", formula: "count(terminals)" },
+      { label: "Total VA", formula: "sum(terminal.capacity)" },
+      { label: "Divers. VA", formula: "sum(terminal.capacity) * circuit.diversityPercent / 100" },
+      { label: "%", formula: "circuit.diversityPercent" }
+    ];
+  }
   function previewFor(type) {
     var map = {
       num: "A2", device: "C16", phase: "L1", conductor: "3x",
@@ -601,7 +678,8 @@
 
   function seedRowsTemplate(name) {
     template = makeBaseTemplate(name || "Rows (NL)");
-    template.layoutBlocks.push(mkBlock("frame", 6, 6), mkBlock("title", 470, 230), mkBlock("feed", 20, 20), mkBlock("bus", 20, 56));
+    var rowsTable = mkBlock("table", 20, 300); rowsTable.tableRows = defaultTableRows();
+    template.layoutBlocks.push(mkBlock("frame", 6, 6), mkBlock("title", 470, 300), mkBlock("feed", 20, 20), mkBlock("bus", 20, 56), rowsTable);
     var g1 = mkGroup("standard", "Standard", "Circuit type = Sockets", false, "column", 26);
     g1.blocks = [
       mkBlock("num", 4, 4), mkBlock("device", 40, 0), mkBlock("conductor", 82, 8), mkBlock("cabletext", 128, 0),
@@ -619,7 +697,8 @@
 
   function seedColumnsTemplate(name) {
     template = makeBaseTemplate(name || "Columns (NL)");
-    template.layoutBlocks.push(mkBlock("frame", 6, 6), mkBlock("title", 470, 230), mkBlock("feed", 20, 20), mkBlock("bus", 20, 56));
+    var colsTable = mkBlock("table", 20, 300); colsTable.tableRows = defaultTableRows();
+    template.layoutBlocks.push(mkBlock("frame", 6, 6), mkBlock("title", 470, 300), mkBlock("feed", 20, 20), mkBlock("bus", 20, 56), colsTable);
     var g1 = mkGroup("standard", "Standard", "Circuit type = Lighting", false, "row", 46);
     g1.blocks = [mkBlock("device", 4, 0), mkBlock("phase", 8, 38), mkBlock("cabletext", -30, 58), mkBlock("num", 6, 108), mkBlock("cellva", -4, 130)];
     var g2 = mkGroup("branch", "Branch + switch", "Circuit number = 1, 2", false, "row", 46);
@@ -702,7 +781,15 @@
     if (!isPreview) outer.setAttribute("data-selected", String(!!(selected && selected.id === block.id)));
     var wrap = el("g", { transform: "translate(" + block.x + "," + block.y + ") rotate(" + (block.rotation || 0) + " " + def.w / 2 + " " + def.h / 2 + ")" });
     if (block.type !== "frame") wrap.appendChild(el("rect", { class: "box", x: -4, y: -4, width: def.w + 8, height: def.h + 8, rx: 4 }));
-    def.draw(wrap, def.w, def.h, block.previewLabel || previewFor(block.type));
+    if (def.configurable && block.type === "table") {
+      def.draw(wrap, def.w, def.h, (block.tableRows || []).map(function (r) { return r.label; }).join("\n"));
+    } else if (def.symbolizable && block.symbolId) {
+      var sym = SYMBOL_LIBRARY.filter(function (s) { return s.id === block.symbolId; })[0];
+      wrap.appendChild(el("rect", { x: 0, y: 0, width: def.w, height: def.h, fill: "var(--select-soft)", stroke: "var(--select)", "stroke-dasharray": "2 2", rx: 3 }));
+      wrap.appendChild(textEl(def.w / 2, def.h / 2 + 4, sym ? sym.icon : "?", 14));
+    } else {
+      def.draw(wrap, def.w, def.h, block.previewLabel || previewFor(block.type));
+    }
     var hit = block.type === "frame"
       ? el("rect", { class: "hit frame-hit", x: 0, y: 0, width: def.w, height: def.h, fill: "none" })
       : el("rect", { class: "hit", x: -4, y: -4, width: def.w + 8, height: def.h + 8 });
@@ -855,16 +942,93 @@
     }
   }
 
+  function bindDeleteButton(host, block) {
+    document.getElementById("prop-delete").addEventListener("click", function () {
+      var coll = currentCollection(), idx = coll.indexOf(block);
+      if (idx > -1) coll.splice(idx, 1);
+      selected = null; renderActive(); renderProps();
+    });
+  }
+
+  function renderTableProps(host, block, def) {
+    var rowsHtml = (block.tableRows || []).map(function (r, i) {
+      return '<div class="field-row" data-row="' + i + '" style="grid-template-columns:1fr 2fr auto;align-items:flex-end;gap:6px;margin-top:6px">' +
+        '<div class="field"><label>' + (i === 0 ? "Row label" : "&nbsp;") + '</label><input class="mono table-row-label" value="' + r.label + '"/></div>' +
+        '<div class="field"><label>' + (i === 0 ? "Formula" : "&nbsp;") + '</label><input class="mono table-row-formula" value="' + r.formula + '" placeholder="e.g. sum(terminal.capacity)"/></div>' +
+        '<button class="btn btn-sm btn-ghost table-row-remove" title="Remove row">✕</button>' +
+      '</div>';
+    }).join("");
+    host.innerHTML =
+      '<div class="field"><label>Block type (role)</label><input value="' + def.label + '" readonly/></div>' +
+      '<div class="hint" style="margin-top:4px">Scope: ' + SCOPE_LABEL[def.scope] + '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="hint">One row per line in the generated table. Each formula runs per column — per circuit for a per-panel table like this one.</div>' +
+      (rowsHtml || '<p class="hint" style="margin-top:8px">No rows yet.</p>') +
+      '<button class="btn btn-sm btn-ghost" id="table-row-add" style="margin-top:10px">+ Add row</button>' +
+      '<hr class="divider"/><button class="btn btn-sm btn-ghost" id="prop-delete">Remove block</button>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-row]"), function (rowEl) {
+      var i = Number(rowEl.dataset.row);
+      rowEl.querySelector(".table-row-label").addEventListener("change", function () { block.tableRows[i].label = this.value; renderActive(); renderProps(); });
+      rowEl.querySelector(".table-row-formula").addEventListener("change", function () { block.tableRows[i].formula = this.value; renderActive(); });
+      rowEl.querySelector(".table-row-remove").addEventListener("click", function () { block.tableRows.splice(i, 1); renderActive(); renderProps(); });
+    });
+    document.getElementById("table-row-add").addEventListener("click", function () {
+      block.tableRows = block.tableRows || [];
+      block.tableRows.push({ label: "New row", formula: "" });
+      renderActive(); renderProps();
+    });
+    bindDeleteButton(host, block);
+  }
+
+  function openSymbolLibrary(block) {
+    var backdrop = document.createElement("div");
+    backdrop.className = "symbol-modal-backdrop";
+    var cats = {};
+    SYMBOL_LIBRARY.forEach(function (s) { (cats[s.category] = cats[s.category] || []).push(s); });
+    var body = Object.keys(cats).map(function (cat) {
+      return '<div class="symbol-cat-label">' + cat + '</div><div class="symbol-grid">' +
+        cats[cat].map(function (s) {
+          return '<button class="symbol-tile" data-id="' + s.id + '"><span class="symbol-tile-icon">' + s.icon + '</span><span class="symbol-tile-label">' + s.label + '</span></button>';
+        }).join("") + '</div>';
+    }).join("");
+    backdrop.innerHTML =
+      '<div class="symbol-modal">' +
+        '<div class="symbol-modal-head"><h3>Symbol library</h3><button class="btn btn-sm btn-ghost" id="symbol-modal-close">✕</button></div>' +
+        '<p class="hint">Placeholder icons for this mockup — real symbol artwork gets uploaded here once the shared drawing-tools plan lands.</p>' +
+        body +
+        '<button class="btn btn-sm btn-ghost" id="symbol-add-own" disabled title="Needs the shared drawing-tools plan" style="margin-top:14px">+ Draw your own symbol…</button>' +
+      '</div>';
+    document.body.appendChild(backdrop);
+    function close() { document.body.removeChild(backdrop); }
+    backdrop.addEventListener("click", function (e) { if (e.target === backdrop) close(); });
+    document.getElementById("symbol-modal-close").addEventListener("click", close);
+    Array.prototype.forEach.call(backdrop.querySelectorAll(".symbol-tile"), function (tile) {
+      tile.addEventListener("click", function () {
+        block.symbolId = tile.dataset.id;
+        close();
+        renderActive(); renderProps();
+      });
+    });
+  }
+
   function renderProps() {
     var host = document.getElementById("props-panel");
     if (!selected) { host.innerHTML = '<p class="props-empty">Select a block on the canvas to edit it, or drag one in from the palette.</p>'; return; }
     var block = findBlock(selected.id);
     if (!block) { selected = null; host.innerHTML = '<p class="props-empty">Select a block on the canvas to edit it.</p>'; return; }
     var def = CATALOGUE[block.type];
+
+    if (def.configurable && block.type === "table") { renderTableProps(host, block, def); return; }
+
     var rotButtons = [0, 90, 180, 270].map(function (r) {
       return '<button class="btn btn-sm' + (block.rotation === r ? ' btn-primary' : '') + '" data-rot="' + r + '">' + r + '°</button>';
     }).join("");
+    var bindingVal = block.binding != null ? block.binding : (def.binding || "");
     var previewVal = block.previewLabel || previewFor(block.type);
+    var symbolLabel = block.symbolId ? (function () {
+      var s = SYMBOL_LIBRARY.filter(function (x) { return x.id === block.symbolId; })[0];
+      return s ? s.label : block.symbolId;
+    })() : "Default vector symbol";
     host.innerHTML =
       '<div class="field"><label>Block type (role)</label><input value="' + def.label + '" readonly/></div>' +
       '<div class="hint" style="margin-top:4px">Scope: ' + SCOPE_LABEL[def.scope] + '</div>' +
@@ -876,10 +1040,16 @@
       '<div class="field" style="margin-top:10px"><label>Rotation — drag the canvas handle, or set exactly</label><div class="rot-row">' + rotButtons + '</div></div>' +
       '<hr class="divider"/>' +
       '<div class="field"><label>Style — line thickness</label><select><option>Thin (0.25 mm)</option><option selected>Regular (0.35 mm)</option><option>Bold (0.5 mm)</option></select></div>' +
-      (def.binding
-        ? '<hr class="divider"/><div class="field"><label>Binding</label><input class="mono" value="' + def.binding + '"/></div>' +
+      (def.symbolizable
+        ? '<hr class="divider"/><div class="field"><label>Symbol</label><div class="symbol-current">' + symbolLabel + '</div></div>' +
+          '<button class="btn btn-sm" id="prop-choose-symbol">Choose from library…</button>' +
+          (block.symbolId ? ' <button class="btn btn-sm btn-ghost" id="prop-clear-symbol">Use default</button>' : '')
+        : '') +
+      '<hr class="divider"/><div class="field"><label>Binding <span class="hint">(optional — leave blank for a static block)</span></label><input class="mono" id="prop-binding" value="' + bindingVal + '" placeholder="e.g. {circuit.customName}"/></div>' +
+      (bindingVal
+        ? '<div class="field" style="margin-top:8px"><label>Preview value for this sample</label><input id="prop-preview" value="' + previewVal + '"/></div>' +
           '<div class="binding-preview"><span class="hint">Resolved for the sample circuit —</span> <strong class="mono">' + previewVal + '</strong></div>'
-        : '<p class="hint" style="margin-top:8px">This block type has no data binding.</p>') +
+        : '<p class="hint" style="margin-top:8px">No binding — this block always renders the same.</p>') +
       '<hr class="divider"/><button class="btn btn-sm btn-ghost" id="prop-delete">Remove block</button>';
 
     document.getElementById("prop-x").addEventListener("change", function () { block.x = parseFloat(this.value) || 0; renderActive(); });
@@ -887,11 +1057,15 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-rot]"), function (b) {
       b.addEventListener("click", function () { block.rotation = Number(b.dataset.rot); renderActive(); renderProps(); });
     });
-    document.getElementById("prop-delete").addEventListener("click", function () {
-      var coll = currentCollection(), idx = coll.indexOf(block);
-      if (idx > -1) coll.splice(idx, 1);
-      selected = null; renderActive(); renderProps();
-    });
+    document.getElementById("prop-binding").addEventListener("change", function () { block.binding = this.value; renderActive(); renderProps(); });
+    var previewInput = document.getElementById("prop-preview");
+    if (previewInput) previewInput.addEventListener("change", function () { block.previewLabel = this.value; renderActive(); renderProps(); });
+    if (def.symbolizable) {
+      document.getElementById("prop-choose-symbol").addEventListener("click", function () { openSymbolLibrary(block); });
+      var clearBtn = document.getElementById("prop-clear-symbol");
+      if (clearBtn) clearBtn.addEventListener("click", function () { block.symbolId = null; renderActive(); renderProps(); });
+    }
+    bindDeleteButton(host, block);
   }
 
   function renderPalette() {
@@ -941,6 +1115,7 @@
     }
     var p = svgPoint(e);
     var block = mkBlock(type, Math.round(p.x - def.w / 2), Math.round(p.y - def.h / 2));
+    if (type === "table") block.tableRows = defaultTableRows();
     currentCollection().push(block);
     selected = { id: block.id };
     renderActive(); renderProps();
