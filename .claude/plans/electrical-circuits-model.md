@@ -495,7 +495,7 @@ record rather than rewriting history — see the addendum for the fix.
 
 ### Phase D review & fixes — post-implementation
 
-**Done** — 2026-09-23, commit `<pending>` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+**Done** — 2026-09-23, commit `28d48e5` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
 
 Requested by the user as a second-opinion check on Phase D before trusting
 it ("assume it finished correctly, but check to be sure") — appropriate
