@@ -641,7 +641,7 @@ Order matters. E1–E4 answer the user's three complaints and only need commands
 - Replace the raw stamp ids in the circuit's terminal list with stamp labels. Clicking a label selects that stamp on the canvas (`selectStampById`).
 - Constraint: circuit selection and canvas selection are mutually exclusive (`useSketchScene.ts`). The tool must not fight that rule. The tool runs with a circuit selected and leaves the canvas selection empty.
 
-**E1 + E2 Done note — 2026-09-23, commit `<hash>` on `worktree-electrical-schematic-templates-plan`.**
+**E1 + E2 Done note — 2026-09-23, commit `924c3cf` on `worktree-electrical-schematic-templates-plan`.**
 
 Shipped:
 - `core/circuit.ts`: `findCircuitForTerminal`, `getCircuitLabel` and `planTerminalAssignment` (add / move / already-member / rejected), with 9 new vitest cases (core now 185 tests).
