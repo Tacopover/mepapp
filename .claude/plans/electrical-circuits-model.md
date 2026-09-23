@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–C done (plus a post-C addendum for panel circuit defaults), D not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–D done.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -386,8 +386,91 @@ workspace tasks succeeded. `pnpm turbo run test` — 176 core +
 pdf-engine-mupdf tests, all passing. No UI to verify in-browser — this
 addendum has no UI surface.
 
-### Phase D — UI — not started, blocked on electrical-schematic-templates.md Phase 0
-The tree branch, properties panel, and interactions in §9.
+### Phase D — UI
+
+**Done** — 2026-09-23, commit `7bcba5f` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Shipped: a full `SketchScene` read/write API for circuits and panels
+(`listCircuits`/`listPanels`/`listPanelSections`/`listCircuitTypes`,
+`getPanelForEquipmentStamp`, and a wrapper method per §6 command factory,
+plus `setCircuitProperty` — new, no factory existed for it — and
+`setPanelCircuitDefaults`/`addPanelAccessory`/`removePanelAccessory`, the
+latter minting ids off a new `nextPanelAccessorySeq` counter with its own
+reseed-on-load block, matching the existing segment/fitting/stamp/circuit/
+panel/panelSection pattern). `NetworkTreePanel.tsx` gained a "Circuits"
+subsection nested under the Electrical discipline row, alongside (not
+replacing) the existing per-network element list: Panel → Section → Circuit
+rows, an "Unassigned" bucket for panel-less circuits, spare styling, and
+"+ Add circuit" affordances. A new `CircuitPanelProperties.tsx` exports
+`CircuitProperties` and `PanelProperties`, wired into `PropertiesPanel.tsx`
+ahead of its existing stamp/segment/fitting branches via two new pieces of
+app-level selection state (`selectedCircuitId`/`selectedPanelId` in
+`useSketchScene.ts` — a Circuit/Panel has no canvas presence to select via
+the normal stamp-selection path, so `SketchScene.clearSelection()` (new)
+keeps the two selection concepts mutually exclusive). Every defaultable
+field (`prefix`, `circuitTypeId`, `phase`, `device`, `cable.type`/
+`coreCount`/`crossSectionMm2`, `diversityPercent`) renders as inherited
+(dashed/italic, panel default as placeholder) or overridden (solid, with a
+↺ reset-to-default link) via three small `Inheritable*Field` components,
+matching the Phase 0 mockup round 4's exact described UX. Panel's own
+Properties view edits `circuitDefaults` inline (no separate dialog — same
+inline-field convention as `mainDevice`/`feederCable`) and its own sections
+list. `PropertiesPanel.tsx`'s single-stamp branch gained "Convert to
+panel"/"Manage panel…" buttons for an Equipment-category stamp, gated on
+`SketchScene.getPanelForEquipmentStamp`.
+
+A real bug surfaced and fixed during verification, not just a premise
+mismatch this time: the first implementation routed every circuit/panel
+mutation through the existing `'drawingChanged'` event (reusing
+`syncDrawingLayer`'s notification channel to avoid inventing a new one).
+`useSketchScene.ts`'s `onDrawingChanged` handler also refreshes
+`selectedSegment`/`selectedSegments`/`selectedFitting`, and
+`getSelectedSegments()` always returns a fresh array reference even when
+nothing about segments changed — so a circuit edit made `selectedSegments`
+change reference too, which spuriously re-ran `App.tsx`'s "an armed
+placement tool forces the Stamps tab" effect (keyed on `selectedSegments`
+among others) on every circuit edit. Caught via a real Playwright
+walkthrough: editing a freshly-created circuit's prefix while the
+equipment-placement tool was still armed (a reachable state — placing a
+stamp doesn't auto-disarm the tool, and nothing stops a user manually
+opening Properties while it's still armed) yanked the dock from Properties
+back to the Stamps tab mid-edit. Fixed by giving circuit/panel changes
+their own `'circuitsChanged'` event, decoupled from segment-selection
+refresh entirely — see that event's doc comment in `scene.ts`.
+
+Not done, deliberately deferred:
+- **Assigning a terminal to a circuit** only works from the circuit's own
+  Properties view removing one — no "assign this terminal to a circuit"
+  affordance on a Terminal stamp's own Properties panel yet. `addTerminalToCircuit`
+  exists on `SketchScene` and is fully wired/undo-tracked; only the UI
+  entry point is missing.
+- **`Circuit.properties`** (plan §12 open question 7) has a working
+  `setCircuitProperty` command but no definitions/reserved-name editor —
+  same gap Phase C's own note already flagged as belonging here, still open.
+- **`PanelAccessory` add/remove** has a working `SketchScene` method
+  (`addPanelAccessory`/`removePanelAccessory`) but no UI row in
+  `PanelProperties` yet.
+- **Bulk prefix-edit mode** (`setCircuitPrefixBulkCommand`, checkbox
+  multi-select across circuits, §9) — command exists, no tree UI for it.
+- No dedicated `circuit.test.ts`/`render` test coverage was added (UI-only
+  change; `@mepapp/render` has no test infrastructure, consistent with the
+  rest of that package per this project's `CLAUDE.md`).
+
+Verified: `pnpm --filter @mepapp/core exec tsc --noEmit`, `pnpm --filter
+@mepapp/render exec tsc --noEmit`, and `pnpm --filter @mepapp/ui exec tsc
+--noEmit` all clean. `pnpm build` at repo root — all 9 workspace tasks
+succeeded. `pnpm turbo run test` — 176 core + pdf-engine-mupdf tests
+unchanged. **Live in-browser walkthrough** (headless Chromium via
+Playwright, `fixtures/pdfs/arch_simple_A4.pdf`): placed a
+D3 Air Handling Unit equipment stamp, clicked "Convert to panel" (panel
+created, Panel Properties view opened automatically), expanded the tree's
+new Panel row, clicked "+ Add circuit" (circuit created inside the panel,
+tree/properties both updated, dock auto-switched to Properties), edited
+the circuit's Prefix field from inherited to "A" (label updated live to
+"Circuit A1", value persisted via `listCircuits()`), clicked Undo (prefix
+correctly reverted to unset/inherited). Screenshots taken at each step
+confirmed the inherited-field dashed/italic styling and the panel
+defaults section rendering correctly.
 
 ## 11. Non-goals for v1
 

@@ -283,13 +283,13 @@ relying on it for real.
 
 Acceptance: the user reviews the mockup and approves it. The catalogue (section 6), the model (section 7), and the open questions (section 12) are updated from the review. **Done 2026-09-23** — user confirmed the mockup covers the functional shape well enough, remaining details are expected to change during real implementation anyway. §6 and §7 updated above (Totals table row, panel-default/override pattern); §12 gained open question 9 (shared drawing tools). Phase 1 (electrical-circuits-model.md) may now proceed, including its Phase D UI work, once it also picks up the §7 panel-defaults note.
 
-### Phase 1 — Circuit model in `@mepapp/core` — not started, tracked in its own plan
+### Phase 1 — Circuit model in `@mepapp/core` — **Done**, tracked in its own plan
 
-Full plan: [[electrical-circuits-model.md]]. Its own Phase A (types, numbering, capacity) and Phase B (schema migration) do not depend on this plan's Phase 0 mockup and may start in parallel with it. Its Phase C (commands) is safe to build once Phase A/B land. Its Phase D (UI) should wait for this plan's Phase 0 mockup review, per §7 above.
+Full plan: [[electrical-circuits-model.md]] — all four of its phases (A–D) shipped 2026-09-23, commit `7bcba5f` on `worktree-electrical-schematic-templates-plan`. See that plan's own Phase A–D done-blocks for the shipped shape, including the Phase C addendum that picked up this plan's §7 panel-defaults decision before Phase D UI work began.
 
-### Phase 2 — Circuit UI — not started, tracked as electrical-circuits-model.md's Phase D
+### Phase 2 — Circuit UI — **Done**, tracked as electrical-circuits-model.md's Phase D
 
-Convert Equipment to panel, create circuit, assign terminals, edit circuit properties. Reuse the tree from `networks-panel-spec.md`. See [[electrical-circuits-model.md]] §9.
+Convert Equipment to panel, create circuit, assign terminals, edit circuit properties. Reuse the tree from `networks-panel-spec.md`. See [[electrical-circuits-model.md]] §9 and its Phase D done-block — terminal-assignment-from-the-terminal-side, a `Circuit.properties` editor, and `PanelAccessory` add/remove UI are explicitly called out there as not done yet.
 
 ### Phase 3 — Template schema, built-in templates, generator — not started
 
