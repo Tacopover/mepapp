@@ -234,7 +234,7 @@ exception, no `apps/web` code touched.
   and switches to it. Removed the "Assign a terminal" control from circuit
   assignment (terminals get assigned by selecting them on the PDF canvas,
   a different mechanism, not from this panel).
-- **Round 3** (commit pending, 2026-09-23): added a "Totals table" block
+- **Round 3** (`4f637dd`, 2026-09-23): added a "Totals table" block
   type with user-defined rows (label + formula per row, editable in the
   properties panel, rendered live in the layout preview) — answers §12
   open question 5 for the totals-row case. Made the binding field generic:
