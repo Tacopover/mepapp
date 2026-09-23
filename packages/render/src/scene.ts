@@ -1427,6 +1427,12 @@ export class SketchScene {
       annotations: Object.values(state.annotations),
       customStampDefinitions: this.doc.customStampDefinitions,
       terminalCapacities: Object.fromEntries(this.doc.terminalCapacities),
+      // SketchScene has no circuit/panel state yet (electrical-circuits-model.md
+      // Phase C/D) — round-tripped as empty until that state exists here.
+      circuits: [],
+      panels: [],
+      panelSections: [],
+      circuitTypes: [],
     }) as unknown as ProjectDocument;
   }
 

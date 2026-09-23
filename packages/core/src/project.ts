@@ -5,12 +5,13 @@
 // development; see decisions log 2026-09-06).
 
 import type { Annotation } from './annotation.js';
+import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { PlacedStamp } from './stamp.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -24,6 +25,11 @@ export interface ProjectDocument {
   customStampDefinitions: StampDefinition[];
   /** User-entered flow-solve input, keyed by terminal/equipment stamp id (see flow.ts's solveFlow). Solved output (FlowResult) is deliberately not part of this document — it's derived from current topology and recomputed on demand, never persisted. */
   terminalCapacities: Record<string, number>;
+  circuits: Circuit[];
+  panels: Panel[];
+  panelSections: PanelSection[];
+  /** Per-document editable copy of the circuit-type library, mirroring how networkTypes seeds from NETWORK_TYPE_LIBRARY (see circuit-type-library.ts). */
+  circuitTypes: CircuitType[];
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -154,6 +160,22 @@ const migrationSteps: MigrationStep[] = [
           : {},
     }),
   },
+  {
+    fromVersion: 8,
+    toVersion: 9,
+    // Version 8 predates the Circuit/Panel/PanelSection/CircuitType domain
+    // model (electrical-circuits-model.md) — no save before this could have
+    // any, so default all four to an empty array rather than trying to infer
+    // circuit/panel data that was never recorded.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 9,
+      circuits: Array.isArray(data.circuits) ? data.circuits : [],
+      panels: Array.isArray(data.panels) ? data.panels : [],
+      panelSections: Array.isArray(data.panelSections) ? data.panelSections : [],
+      circuitTypes: Array.isArray(data.circuitTypes) ? data.circuitTypes : [],
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -174,6 +196,10 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'annotations'),
   (data: JsonRecord) => requireArray(data, 'customStampDefinitions'),
   (data: JsonRecord) => requireRecord(data, 'terminalCapacities'),
+  (data: JsonRecord) => requireArray(data, 'circuits'),
+  (data: JsonRecord) => requireArray(data, 'panels'),
+  (data: JsonRecord) => requireArray(data, 'panelSections'),
+  (data: JsonRecord) => requireArray(data, 'circuitTypes'),
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

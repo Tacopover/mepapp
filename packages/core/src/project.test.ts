@@ -29,6 +29,10 @@ describe('serializeProject / loadProject round trip', () => {
       annotations: [annotation],
       customStampDefinitions: [],
       terminalCapacities: { 'stamp-1': 400 },
+      circuits: [],
+      panels: [],
+      panelSections: [],
+      circuitTypes: [],
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -183,6 +187,27 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.terminalCapacities).toEqual({});
   });
 
+  it('migrates a pre-circuit-model (v8) save, defaulting circuits/panels/panelSections/circuitTypes to empty arrays', () => {
+    const legacyDoc = {
+      schemaVersion: 8,
+      networkTypes: [networkType],
+      segments: [segment],
+      fittings: [fitting],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [],
+      terminalCapacities: {},
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.circuits).toEqual([]);
+    expect(loaded.panels).toEqual([]);
+    expect(loaded.panelSections).toEqual([]);
+    expect(loaded.circuitTypes).toEqual([]);
+  });
+
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
     const doc = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -193,6 +218,10 @@ describe('serializeProject / loadProject round trip', () => {
       annotations: [],
       customStampDefinitions: [],
       terminalCapacities: {},
+      circuits: [],
+      panels: [],
+      panelSections: [],
+      circuitTypes: [],
     };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {
