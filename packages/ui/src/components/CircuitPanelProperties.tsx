@@ -1,14 +1,13 @@
 import type { RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import type { Circuit, CircuitType, Panel, PanelSection } from '@mepapp/core';
+import { getEffectiveDiversityPercent, getEffectivePrefix, type Circuit, type CircuitType, type Panel, type PanelSection } from '@mepapp/core';
 import { IconTrash } from '../icons.js';
 
 const PHASES: NonNullable<Circuit['phase']>[] = ['L1', 'L2', 'L3', 'L1L2', 'L2L3', 'L1L3', 'L1L2L3'];
 
-/** "A1", "12" — a circuit's effective prefix+number, resolved against its panel's circuitDefaults when prefix is left unset (electrical-circuits-model.md Phase C addendum). Duplicated from NetworkTreePanel.tsx's own copy rather than shared — both are three-line, unlikely-to-drift display helpers, not a real abstraction boundary. */
+/** "A1", "12" — a circuit's effective prefix+number. Defers to circuit.ts's getEffectivePrefix for the inherit-or-fallback rule (same reasoning as NetworkTreePanel.tsx's own copy of this helper) rather than reimplementing it, so this can't drift from the canonical resolver. */
 function circuitLabel(circuit: Circuit, panel: Panel | undefined): string {
-  const prefix = circuit.prefix ?? panel?.circuitDefaults?.prefix ?? '';
-  return `${prefix}${circuit.number}`;
+  return `${getEffectivePrefix(circuit, panel)}${circuit.number}`;
 }
 
 export interface CircuitPropertiesProps {
@@ -117,7 +116,7 @@ export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSecti
         <InheritableNumberField
           label="Diversity %"
           value={circuit.diversityPercent}
-          defaultValue={defaults?.diversityPercent ?? 100}
+          defaultValue={getEffectiveDiversityPercent(circuit, panel)}
           onChange={(v) => sceneRef.current?.setCircuitDiversity(circuit.id, v)}
         />
       </div>
@@ -129,7 +128,7 @@ export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSecti
           <select
             value={circuit.device?.kind ?? ''}
             onChange={(e) => {
-              const kind = e.target.value as Circuit['device'] extends { kind: infer K } ? K : never;
+              const kind = e.target.value as NonNullable<Circuit['device']>['kind'] | '';
               sceneRef.current?.setCircuitDevice(circuit.id, kind ? { kind, ...circuit.device } : undefined);
             }}
           >
@@ -326,7 +325,7 @@ export function PanelProperties({ sceneRef, panel, circuits, panelSections, circ
         </div>
         <div className="mep-field-row">
           <label>Phase</label>
-          <select value={defaults.phase ?? ''} onChange={(e) => setDefaults({ phase: (e.target.value || undefined) as Panel['circuitDefaults'] extends { phase?: infer P } ? P : never })}>
+          <select value={defaults.phase ?? ''} onChange={(e) => setDefaults({ phase: (e.target.value || undefined) as NonNullable<Panel['circuitDefaults']>['phase'] })}>
             <option value="">None</option>
             {PHASES.map((p) => (
               <option key={p} value={p}>

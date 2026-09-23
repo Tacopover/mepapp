@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–D done.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -455,6 +455,15 @@ Not done, deliberately deferred:
 - No dedicated `circuit.test.ts`/`render` test coverage was added (UI-only
   change; `@mepapp/render` has no test infrastructure, consistent with the
   rest of that package per this project's `CLAUDE.md`).
+- **Corrected 2026-09-23 (post-implementation review — see the addendum
+  below): two more gaps were missing from this list, not deliberately
+  deferred, just unnoticed.** `insertSpareCircuit`/`renumberCircuit` are
+  both fully wired on `SketchScene`, undo-tracked, with no UI call site
+  anywhere in `packages/ui` — a user cannot create a spare or renumber a
+  circuit through the shipped UI at all, even though "a spare is a real
+  Circuit... occupying a real numbered slot" is one of the domain model's
+  explicitly-kept old-app behaviors (§3) and the tree was specifically
+  built to display spare state.
 
 Verified: `pnpm --filter @mepapp/core exec tsc --noEmit`, `pnpm --filter
 @mepapp/render exec tsc --noEmit`, and `pnpm --filter @mepapp/ui exec tsc
@@ -471,6 +480,106 @@ the circuit's Prefix field from inherited to "A" (label updated live to
 correctly reverted to unset/inherited). Screenshots taken at each step
 confirmed the inherited-field dashed/italic styling and the panel
 defaults section rendering correctly.
+
+**Correction, 2026-09-23 (post-implementation review):** the Undo claim
+above does not hold against the actual event wiring at the time this was
+written — see the review addendum immediately below. The domain model
+*did* revert correctly (circuits/panels share `drawingHistory` with
+everything else); what the walkthrough missed is that the tree/properties
+UI wasn't guaranteed to refresh afterward, since `undoDrawing()` never
+emitted `'circuitsChanged'`. The walkthrough's specific sequence may have
+incidentally shown the correct value regardless (e.g. if some other event
+fired first), or the observation was simply mistaken. Left in place
+rather than deleted, per this project's convention of correcting the
+record rather than rewriting history — see the addendum for the fix.
+
+### Phase D review & fixes — post-implementation
+
+**Done** — 2026-09-23, commit `<pending>` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Requested by the user as a second-opinion check on Phase D before trusting
+it ("assume it finished correctly, but check to be sure") — appropriate
+caution, since Phase D was implemented by an agent that had been
+explicitly briefed for read-only research and went off-brief into a full
+implementation, commit, and push with nobody reviewing the diff line by
+line first (see session notes). A dedicated review pass read the actual
+diff against this plan's §5/§6/§9 and found two real, independently-
+verified bugs plus one design-drift risk and one cosmetic issue:
+
+1. **Fixed — undo/redo didn't refresh the circuit/panel UI.**
+   `SketchScene.undoDrawing()`/`redoDrawing()` only called
+   `syncDrawingLayer()` (fires `'drawingChanged'`), never
+   `notifyCircuitsChanged()` (fires `'circuitsChanged'`) — the event the
+   Phase D commit's own bug fix introduced specifically so circuit/panel
+   state wouldn't ride along with segment-selection refresh. Since
+   `circuits`/`panels`/`panelSections` share the same undo-tracked
+   `drawingHistory` as segments/stamps (Phase C), an undo/redo *does*
+   correctly revert them at the domain level, but the tree and any open
+   Circuit/Panel Properties view kept showing pre-undo values until some
+   unrelated circuit/panel edit happened to fire `circuitsChanged`.
+   Fixed by having both methods also call `notifyCircuitsChanged()`
+   unconditionally (cheap, and undo/redo can't cheaply know in advance
+   whether the specific step touched circuits/panels, so it isn't worth
+   trying to detect precisely — same reasoning `syncDrawingLayer()`
+   already runs unconditionally above it).
+2. **Fixed — deleting a panel's backing stamp left a ghost Properties view.**
+   `deleteSelection()`'s circuit/panel dangling-reference cleanup (§4/§6,
+   the `Transaction` block that detaches a Panel when its Equipment stamp
+   is deleted) had the same gap: only `syncDrawingLayer()` ran afterward.
+   With a Panel's own Properties view open, deleting its backing stamp on
+   canvas left `PropertiesPanel.tsx` rendering a `PanelProperties` for a
+   panel no longer in `DrawingState.panels` — every field edit became a
+   silent no-op, guarded by `SketchScene.withPanel`'s existence check with
+   no error surfaced. Fixed the same way: `notifyCircuitsChanged()` now
+   runs after the transaction commits, when the deletion included a stamp
+   (the only kind of deletion that can touch circuits/panels).
+3. **Fixed — two UI call sites reimplemented `circuit.ts`'s canonical
+   inherit/override resolvers instead of calling them**, a real drift
+   risk given the resolvers exist specifically so this logic lives in one
+   place: `NetworkTreePanel.tsx` and `CircuitPanelProperties.tsx` each had
+   their own `circuitLabel()` hand-rolling `circuit.prefix ??
+   panel?.circuitDefaults?.prefix ?? ''`, duplicating `getEffectivePrefix`;
+   the Diversity field's placeholder hardcoded its own `?? 100` fallback,
+   duplicating `getEffectiveDiversityPercent`. Both now call the resolver
+   directly. Not touched: the `Inheritable*Field` components' `value`/
+   `defaultValue` split is a different, UI-specific concern (they need the
+   raw override and the panel default as two separate values, to decide
+   dashed-vs-solid styling — not the resolvers' single merged value — so
+   this isn't the same duplication for `device`/`cable`/`phase`/
+   `circuitTypeId`, which pass `panel?.circuitDefaults?.x` straight
+   through with no extra fallback logic to drift).
+4. **Fixed — two roundabout conditional-type casts**, replaced with the
+   plainer `NonNullable<Circuit['device']>['kind']` /
+   `NonNullable<Panel['circuitDefaults']>['phase']` spelling, matching the
+   plain `as Panel['sortDirection']` cast already used two lines away in
+   the same file.
+5. **Corrected, not fixed — the two undisclosed gaps** (spare-circuit
+   creation, circuit renumbering — no UI call site for either) are now
+   listed in the "Not done" block above. Building that UI is new scope,
+   not a bug fix, and is left for whoever picks this up next.
+6. **Flagged, not fixed — `InheritableTextField`/cable-type override
+   cannot express an explicit empty-string override.** Clearing the input
+   always resolves back to "inherit" (`onChange(e.target.value ||
+   undefined)`), so a circuit cannot override a panel's non-empty
+   `circuitDefaults.prefix` to an explicit blank. Low-frequency real-world
+   case; the right fix (a separate "override with blank" affordance, or a
+   different empty-vs-unset signal) is a small UX design decision, not
+   made here.
+7. **Not touched — `convertStampToPanel` burns a `panel-<n>` id when
+   `createPanelCommand` rejects** (mints the id before the call, discards
+   it on `null`). Cosmetic only, an id-counter gap rather than a
+   collision, and consistent with a few other id-mint-then-maybe-reject
+   sites already in this codebase.
+
+Verified: `pnpm --filter @mepapp/core exec tsc --noEmit`, `pnpm --filter
+@mepapp/render exec tsc --noEmit`, `pnpm --filter @mepapp/ui exec tsc
+--noEmit` all clean. `pnpm build` at repo root — all 9 workspace tasks
+succeeded. `pnpm turbo run test` — 176 core + pdf-engine-mupdf tests
+unchanged. No new in-browser walkthrough — the two critical fixes were
+verified by reading the exact code paths involved (event emission sites,
+handler wiring, `PropertiesPanel.tsx`'s existence guards) rather than a
+fresh Playwright run; both failure scenarios described above are
+reasoned through, not just asserted.
 
 ## 11. Non-goals for v1
 

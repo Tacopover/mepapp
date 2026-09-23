@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene, NetworkSummary, StampInfo } from '@mepapp/render';
-import { getStampDefinition, type Circuit, type CircuitType, type Discipline, type Panel, type PanelSection } from '@mepapp/core';
+import { getEffectivePrefix, getStampDefinition, type Circuit, type CircuitType, type Discipline, type Panel, type PanelSection } from '@mepapp/core';
 import { IconChevRight, IconChevDown, IconTerminal, IconEquipment } from '../icons.js';
 
 export interface NetworkTreePanelProps {
@@ -60,10 +60,9 @@ function panelKey(panelId: string): string {
   return `panel:${panelId}`;
 }
 
-/** "A1", "12" — the circuit's effective prefix+number, resolved against its panel's circuitDefaults when the circuit leaves prefix unset (electrical-circuits-model.md Phase C addendum). */
+/** "A1", "12" — the circuit's effective prefix+number. Defers to circuit.ts's getEffectivePrefix for the inherit-or-fallback rule rather than reimplementing it, so this can't drift from the canonical resolver (electrical-circuits-model.md Phase C addendum). */
 function circuitLabel(circuit: Circuit, panel: Panel | undefined): string {
-  const prefix = circuit.prefix ?? panel?.circuitDefaults?.prefix ?? '';
-  return `${prefix}${circuit.number}`;
+  return `${getEffectivePrefix(circuit, panel)}${circuit.number}`;
 }
 
 function circuitDescription(circuit: Circuit): string {

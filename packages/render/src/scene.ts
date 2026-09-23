@@ -1433,6 +1433,11 @@ export class SketchScene {
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
+    // drawingHistory covers circuits/panels/panelSections too (Phase C), so an
+    // undo/redo can revert one even though this method has no way to know
+    // whether it did — always notify rather than trying to detect it, same
+    // as syncDrawingLayer() always running above regardless of what changed.
+    this.notifyCircuitsChanged();
   }
 
   redoDrawing(): void {
@@ -1441,6 +1446,7 @@ export class SketchScene {
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
+    this.notifyCircuitsChanged();
   }
 
   /** Every network type known to the active document — the effective library the Stamps tab's Network Types section renders (falls back to the static NETWORK_TYPE_LIBRARY entry for any type never yet picked). */
@@ -2643,6 +2649,10 @@ export class SketchScene {
         return next;
       });
       tx.commit();
+      // Only a stamp deletion can touch circuits/panels (the dangling-reference
+      // cleanup above), but notifying unconditionally here is cheap and avoids
+      // re-deriving which branch of that cleanup actually fired.
+      if (stampIds.length > 0) this.notifyCircuitsChanged();
     }
     // Same non-undoable stance as setTerminalCapacity: a deleted stamp's entered
     // capacity has no home to be restored to on undo, so it's just dropped.
