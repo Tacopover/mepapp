@@ -10,6 +10,8 @@ export * from './network.js';
 export * from './connectivity.js';
 export * from './network-type-library.js';
 export * from './flow.js';
+export * from './circuit.js';
+export * from './circuit-type-library.js';
 export * from './commands.js';
 export * from './schema.js';
 export * from './segmentTool.js';
