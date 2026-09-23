@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–B done, C–D not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–C done, D not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -270,8 +270,60 @@ workspace tasks succeeded, confirming `@mepapp/render`/`@mepapp/ui`/
 `@mepapp/web` still typecheck against the wider `ProjectDocument` shape.
 No UI to verify in-browser — this phase has no UI surface.
 
-### Phase C — Commands — not started
-Every factory in §6, in a new `packages/render/src/circuitCommands.ts` alongside `drawingCommands.ts`. Composite delete-cleanup wiring into the existing delete-terminal/delete-stamp commands.
+### Phase C — Commands
+
+**Done** — 2026-09-23, commit `5904e8c` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Shipped: `packages/render/src/circuitCommands.ts` — every factory in §6
+(24 exports), following `drawingCommands.ts`'s `Command<DrawingState>`
+pattern. `addTerminalToCircuitCommand` and `createPanelCommand` return
+`null` on their plan-specified invalid preconditions; other factories
+follow `drawingCommands.ts`'s existing convention of trusting the caller
+for basic CRUD. `removeCircuitFromPanelCommand` implements open question
+4's resolution (a spare is deleted outright; a non-spare returns to the
+unassigned pool). `detachPanelCircuits` is exported as a plain pure
+helper (not a `Command`), reused by both `deletePanelCommand` and
+`scene.ts`'s delete-cleanup below. `DrawingState` (`document.ts`) gained
+`circuits`/`panels`/`panelSections` as undo-tracked records, plus
+`circuitTypes` as a plain per-document array (mirroring
+`networkTypes`/`customStampDefinitions` — no "adopt on first use"
+mechanism, since nothing in Phase C needs one) and matching
+`nextCircuitSeq`/`nextPanelSeq`/`nextPanelSectionSeq` id counters.
+`isEmpty()` now also checks circuits/panels are empty.
+
+Correction to this plan's own premise: §6's closing line assumed
+"delete-terminal and delete-panel-equipment-stamp commands... already
+existing in `drawingCommands.ts`" could become `CompositeCommand`s.
+Investigation found no such per-item delete commands exist —
+`drawingCommands.ts` only has create/delete-by-type factories, and actual
+stamp/segment/annotation deletion happens through `scene.ts`'s
+`deleteSelection()`, a `Transaction`-based bulk mutation with its own
+single before/after undo snapshot. The dangling-reference cleanup this
+phase's §4 needs is wired into `deleteSelection()` directly instead: it
+now purges a deleted terminal from every circuit's `terminalIds`, and
+detaches a Panel (returning its circuits to the unassigned pool via
+`detachPanelCircuits`) when its underlying equipment stamp is deleted —
+same net effect the plan asked for, different integration point than
+described. `exportProject`/`loadProjectFromJson` also updated to
+round-trip real circuit/panel/panelSection/circuitType state (replacing
+Phase B's empty-array placeholder), with id-counter reseeding on load
+matching the existing segment/fitting/stamp pattern (id format:
+`circuit-<n>`, `panel-<n>`, `panel-section-<n>`) — skipping this would
+have reintroduced the exact reload-id-collision class of bug fixed
+2026-09-21 (Decisions-Log; commit `6dd1098`).
+
+Not done: no UI calls any of these commands yet (Phase D); no id-minting
+call sites exist yet either (the three new `nextXSeq` counters are
+declared but unused until Phase D mints an id from one, same relationship
+`nextStampSeq` etc. already have to their own placement tools).
+
+Verified: `pnpm --filter @mepapp/core exec tsc --noEmit` and
+`pnpm --filter @mepapp/render exec tsc --noEmit` both clean. `pnpm build`
+at repo root — all 9 workspace tasks succeeded. `pnpm turbo run test` —
+170 core + 13 pdf-engine-mupdf tests, unchanged (render has no test
+infra to extend — consistent with the rest of that package, per this
+project's CLAUDE.md). No UI to verify in-browser — this phase has no UI
+surface.
 
 ### Phase D — UI — not started, blocked on electrical-schematic-templates.md Phase 0
 The tree branch, properties panel, and interactions in §9.
