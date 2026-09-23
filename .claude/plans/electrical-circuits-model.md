@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phase A done, B–D not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–B done, C–D not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -232,9 +232,10 @@ into the capacity formula (no such rule was specified — left for whichever
 phase defines it).
 
 Not done: no `createCircuit`-style id-generating factories (Phase C's job,
-per the `network.ts` pattern of not allocating ids in `core`); the 7 open
-questions in §12 are still open and may still change these shapes before
-Phase C locks in the command surface.
+per the `network.ts` pattern of not allocating ids in `core`). The 7 open
+questions in §12 were open at the time this phase shipped; all 7 are now
+resolved (2026-09-23, see §12) — `Panel.circuitIds` and `Circuit.properties`
+already reflect those resolutions as of the commit below.
 
 Verified: `pnpm exec vitest run` in `packages/core` — 168 tests passed
 (17 new, in `circuit.test.ts` and `circuit-type-library.test.ts`), 0
@@ -244,8 +245,30 @@ including `@mepapp/render`, `@mepapp/ui`, `@mepapp/web`), confirming the
 new exports don't break downstream packages. No UI to verify in-browser —
 this phase has no UI surface (§9 is Phase D).
 
-### Phase B — Schema migration — not started
-Bump to schema v9, one migration step, `project.test.ts` coverage for the new step (matches every prior migration's test).
+### Phase B — Schema migration
+
+**Done** — 2026-09-23, commit `752a378` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Shipped: `CURRENT_SCHEMA_VERSION` bumped 8 → 9. `ProjectDocument` gains
+`circuits: Circuit[]`, `panels: Panel[]`, `panelSections: PanelSection[]`,
+`circuitTypes: CircuitType[]`. One migration step (`fromVersion: 8,
+toVersion: 9`) defaulting all four to `[]`, matching every prior step's
+pattern. Four new `requireArray` validators. `render/src/scene.ts`'s
+`exportProject()` updated to pass empty arrays for the four new fields —
+`SketchScene` has no circuit/panel state of its own yet, so this is a
+placeholder pending Phase C, not a real round trip yet.
+
+Not done: `loadProjectFromJson()` reads the four new fields off the
+migrated document but doesn't store them anywhere yet (no render-side
+state exists to put them in) — Phase C's job, alongside the command
+factories that will actually mutate them.
+
+Verified: `pnpm exec vitest run` in `packages/core` — 170 tests passed
+(1 new migration test + updated round-trip/missing-field tests in
+`project.test.ts`), 0 failures. `pnpm build` at repo root — all 9
+workspace tasks succeeded, confirming `@mepapp/render`/`@mepapp/ui`/
+`@mepapp/web` still typecheck against the wider `ProjectDocument` shape.
+No UI to verify in-browser — this phase has no UI surface.
 
 ### Phase C — Commands — not started
 Every factory in §6, in a new `packages/render/src/circuitCommands.ts` alongside `drawingCommands.ts`. Composite delete-cleanup wiring into the existing delete-terminal/delete-stamp commands.
