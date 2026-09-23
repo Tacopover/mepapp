@@ -10,6 +10,7 @@
 
 import {
   getNextCircuitNumber,
+  planTerminalAssignment,
   renumberCircuitWithSwap,
   shiftCircuitNumbersUpFrom,
   type Circuit,
@@ -118,6 +119,37 @@ export function removeTerminalFromCircuitCommand(circuit: Circuit, terminalId: s
       },
     }),
     undo: (s) => ({ ...s, circuits: { ...s.circuits, [circuit.id]: circuit } }),
+  };
+}
+
+/**
+ * Adds a terminal to a circuit, first taking it out of whichever circuit
+ * holds it now — one undo step either way (plan Phase E, decision 1: unlike
+ * addTerminalToCircuitCommand, which rejects a terminal that is already in a
+ * circuit, this moves it). Returns null on planTerminalAssignment's
+ * rejected/already-member cases. Neither circuit's customName is touched:
+ * the caller does not auto-name a circuit from its first terminal here, so
+ * there is no stale name to clean up on the circuit being left.
+ */
+export function assignTerminalToCircuitCommand(circuits: Circuit[], circuitId: string, terminalId: string): Command<DrawingState> | null {
+  const plan = planTerminalAssignment(circuits, terminalId, circuitId);
+  if (plan.kind === 'rejected' || plan.kind === 'already-member') return null;
+
+  const target = circuits.find((c) => c.id === circuitId)!;
+  const source = plan.kind === 'move' ? circuits.find((c) => c.id === plan.fromCircuitId)! : undefined;
+  return {
+    description: source ? `Move terminal ${terminalId} from circuit ${source.id} to ${circuitId}` : `Add terminal ${terminalId} to circuit ${circuitId}`,
+    execute: (s) => {
+      const next = { ...s.circuits };
+      if (source) next[source.id] = { ...s.circuits[source.id], terminalIds: s.circuits[source.id].terminalIds.filter((id) => id !== terminalId) };
+      next[circuitId] = { ...s.circuits[circuitId], terminalIds: [...s.circuits[circuitId].terminalIds, terminalId] };
+      return { ...s, circuits: next };
+    },
+    undo: (s) => {
+      const next = { ...s.circuits, [circuitId]: target };
+      if (source) next[source.id] = source;
+      return { ...s, circuits: next };
+    },
   };
 }
 

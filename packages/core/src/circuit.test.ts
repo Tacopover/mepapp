@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   computeCircuitCapacity,
   computePanelCapacity,
+  findCircuitForTerminal,
+  getCircuitLabel,
   getEffectiveCable,
   getEffectiveCircuitTypeId,
   getEffectiveDevice,
@@ -10,6 +12,7 @@ import {
   getEffectivePrefix,
   getNextCircuitNumber,
   getPanelCircuitIds,
+  planTerminalAssignment,
   renumberCircuitWithSwap,
   shiftCircuitNumbersUpFrom,
   type Circuit,
@@ -209,5 +212,56 @@ describe('panel-default resolvers (templates plan §7 round 4)', () => {
     const noDefaultsPanel: Panel = { ...panel, circuitDefaults: undefined };
     const c = circuit('c1', 1, { panelId: 'p1' });
     expect(getEffectiveCable(c, noDefaultsPanel)).toBeUndefined();
+  });
+});
+
+describe('findCircuitForTerminal', () => {
+  it('returns the circuit holding the terminal, or undefined', () => {
+    const circuits = [circuit('c1', 1, { terminalIds: ['t1'] }), circuit('c2', 2, { terminalIds: ['t2', 't3'] })];
+    expect(findCircuitForTerminal(circuits, 't3')?.id).toBe('c2');
+    expect(findCircuitForTerminal(circuits, 't9')).toBeUndefined();
+  });
+});
+
+describe('getCircuitLabel', () => {
+  it('joins the resolved prefix and the number', () => {
+    expect(getCircuitLabel(circuit('c1', 3, { prefix: 'L1.' }))).toBe('L1.3');
+  });
+
+  it('falls back to the panel default prefix when the circuit sets none', () => {
+    const panel = { circuitDefaults: { prefix: 'B' } } as Panel;
+    expect(getCircuitLabel(circuit('c1', 4, { prefix: undefined }), panel)).toBe('B4');
+  });
+
+  it('is just the number when no prefix resolves anywhere', () => {
+    expect(getCircuitLabel(circuit('c1', 5, { prefix: undefined }))).toBe('5');
+  });
+});
+
+describe('planTerminalAssignment', () => {
+  const circuits = [
+    circuit('c1', 1, { terminalIds: ['t1'] }),
+    circuit('c2', 2),
+    circuit('spare', 3, { isSpare: true }),
+  ];
+
+  it('adds a terminal that belongs to no circuit', () => {
+    expect(planTerminalAssignment(circuits, 't9', 'c2')).toEqual({ kind: 'add' });
+  });
+
+  it('moves a terminal out of another circuit, naming the one it leaves', () => {
+    expect(planTerminalAssignment(circuits, 't1', 'c2')).toEqual({ kind: 'move', fromCircuitId: 'c1' });
+  });
+
+  it('reports a terminal already in the target circuit', () => {
+    expect(planTerminalAssignment(circuits, 't1', 'c1')).toEqual({ kind: 'already-member' });
+  });
+
+  it('rejects a spare target', () => {
+    expect(planTerminalAssignment(circuits, 't9', 'spare')).toEqual({ kind: 'rejected', reason: 'target-is-spare' });
+  });
+
+  it('rejects a missing target', () => {
+    expect(planTerminalAssignment(circuits, 't9', 'nope')).toEqual({ kind: 'rejected', reason: 'target-not-found' });
   });
 });

@@ -19,6 +19,7 @@ import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
 import { ColorPicker } from './ColorPicker.js';
 import { stampLabelFor } from './StampsPanel.js';
+import { TerminalCircuitSection } from './TerminalCircuitSection.js';
 import type { StampLabelLanguage } from './LanguageToggle.js';
 
 const VARIES = 'Varies';
@@ -83,6 +84,8 @@ export interface PropertiesPanelProps {
   selectedPanelId: string | null;
   setSelectedCircuitId: (id: string | null) => void;
   setSelectedPanelId: (id: string | null) => void;
+  /** Every placed stamp — the circuit Properties terminal list resolves ids to labels through it. */
+  allStamps: StampInfo[];
 }
 
 export function PropertiesPanel({
@@ -104,6 +107,7 @@ export function PropertiesPanel({
   selectedPanelId,
   setSelectedCircuitId,
   setSelectedPanelId,
+  allStamps,
 }: PropertiesPanelProps) {
   if (selectedCircuitId) {
     const circuit = circuits.find((c) => c.id === selectedCircuitId);
@@ -117,6 +121,8 @@ export function PropertiesPanel({
           panels={panels}
           panelSections={panelSections}
           circuitTypes={circuitTypes}
+          allStamps={allStamps}
+          customStampDefinitions={customStampDefinitions}
           onDeleted={() => setSelectedCircuitId(null)}
         />
       );
@@ -407,6 +413,7 @@ export function PropertiesPanel({
     const color = commonValue(selection, (s) => s.color);
     const scalePercent = commonValue(selection, (s) => Math.round(s.transform.scale.x * 100));
     const capacity = commonValue(selection, (s) => s.capacity);
+    const selectedTerminals = selection.filter((s) => s.category === 'terminal');
 
     return (
       <div>
@@ -467,6 +474,7 @@ export function PropertiesPanel({
             />
           </div>
         </div>
+        <TerminalCircuitSection sceneRef={sceneRef} terminals={selectedTerminals} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} />
         {commonCustomPropertyDefs.length > 0 && (
           <div className="mep-section">
             <h4>Custom</h4>
@@ -591,6 +599,9 @@ export function PropertiesPanel({
           />
         </div>
       </div>
+      {stamp.category === 'terminal' && (
+        <TerminalCircuitSection sceneRef={sceneRef} terminals={[stamp]} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} />
+      )}
       {(stamp.category === 'terminal' || stamp.category === 'equipment') && customPropertyDefs[stamp.category].length > 0 && (
         <div className="mep-section">
           <h4>Custom</h4>

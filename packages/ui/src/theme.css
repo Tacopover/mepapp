@@ -1271,6 +1271,67 @@
   margin-left: 8px;
 }
 
+/* ---------- Circuit tool banner + toasts (electrical-circuits-model.md Phase E) ---------- */
+
+.mep-tool-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: min(640px, calc(100% - 120px));
+  padding: 8px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.mep-tool-banner button {
+  margin-left: 8px;
+}
+
+.mep-toasts {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  pointer-events: none;
+}
+.mep-toast {
+  pointer-events: auto;
+  cursor: pointer;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 8px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+  border: 2px solid var(--ink);
+  border-left-width: 6px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.mep-toast-info {
+  border-left-color: var(--accent);
+}
+.mep-toast-warning {
+  border-left-color: var(--elec);
+}
+
+.mep-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
 /* ---------- Shared Dialog (calibration, Settings, ...) ---------- */
 
 .mep-modal-backdrop {

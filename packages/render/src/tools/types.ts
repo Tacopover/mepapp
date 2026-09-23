@@ -2,7 +2,7 @@ import type { FederatedPointerEvent, Sprite, Texture } from 'pixi.js';
 import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, Transaction, Transform2D, Vec2 } from '@mepapp/core';
 import type { AlignmentGuide } from './alignmentGuides.js';
 import type { DrawingState, SketchDocument } from '../document.js';
-import type { StampInfo } from '../scene.js';
+import type { StampInfo, TerminalAssignmentResult } from '../scene.js';
 
 /** A world-space axis-aligned bounding box. */
 export interface Bounds {
@@ -26,7 +26,14 @@ export type SketchTool =
   | 'draw-textbox'
   | 'draw-sticky-note'
   | 'draw-highlight'
-  | 'draw-polyline';
+  | 'draw-polyline'
+  | 'circuit-add-terminals';
+
+/** The terminal the Add-to-Circuit tool's pointer is over, and what clicking it would do — 'free' joins the circuit, 'move' takes it out of another circuit first, 'member' is already in the target circuit. Drawn by SketchScene.redrawOverlay. */
+export interface CircuitToolHover {
+  stampId: string;
+  status: 'free' | 'move' | 'member';
+}
 
 /** A selectable object is a placed stamp, a fitting, a drawn segment, or a drawn annotation — see ToolContext.hitTest. */
 export type SelectableRef = { kind: 'stamp'; id: string } | { kind: 'fitting'; id: string } | { kind: 'segment'; id: string } | { kind: 'annotation'; id: string };
@@ -129,6 +136,12 @@ export interface ToolContext {
   getStampGhostSprite(): Sprite | null;
   getStampGhostRotationDegrees(): number;
   setStampGhostRotationDegrees(degrees: number): void;
+  /** The circuit the Add-to-Circuit tool is filling (SketchScene.beginAddTerminalsToCircuit), or null when that tool is not active. */
+  getCircuitToolTarget(): string | null;
+  setCircuitToolHover(hover: CircuitToolHover | null): void;
+  /** Adds or moves a terminal into a circuit and raises the user-facing notice — see SketchScene.assignTerminalToCircuit. */
+  assignTerminalToCircuit(circuitId: string, terminalId: string): TerminalAssignmentResult;
+
   /** Hides the ghost sprite, if one exists — leaving a place-* tool without resetting `pendingStampTexture` itself (a re-pick, not a tool switch, is what clears that — see setStampTexture). */
   hideStampGhost(): void;
 }

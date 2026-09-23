@@ -15,6 +15,8 @@ import {
   coerceDefaultValue,
   computeNetworks,
   distance,
+  findCircuitForTerminal,
+  getCircuitLabel,
   getNetworkTypeFromLibrary,
   getStampDefinition,
   getStampPorts,
@@ -25,6 +27,7 @@ import {
   normalizeDegrees,
   pasteSegments,
   planPdfSync,
+  planTerminalAssignment,
   pointInAxisAlignedRect,
   pointInRotatedRect,
   pointNearPolyline,
@@ -67,6 +70,7 @@ import {
   type StampCategory,
   type StampDefinition,
   type SyncedGeometry,
+  type TerminalAssignmentPlan,
   type Transform2D,
   type Vec2,
 } from '@mepapp/core';
@@ -79,6 +83,7 @@ import {
   addPanelAccessoryCommand,
   addTerminalToCircuitCommand,
   assignCircuitToPanelCommand,
+  assignTerminalToCircuitCommand,
   createCircuitCommand,
   createPanelCommand,
   createPanelSectionCommand,
@@ -107,7 +112,7 @@ import {
   setPanelNameCommand,
   setPanelSortDirectionCommand,
 } from './circuitCommands.js';
-import type { DragState, SelectableRef, SketchTool, Tool, ToolContext, ToolDragHandlers } from './tools/types.js';
+import type { CircuitToolHover, DragState, SelectableRef, SketchTool, Tool, ToolContext, ToolDragHandlers } from './tools/types.js';
 import type { AlignmentGuide } from './tools/alignmentGuides.js';
 import { resolveSnappedPoint } from './tools/dragSnap.js';
 import { SelectTool } from './tools/selectTool.js';
@@ -122,10 +127,20 @@ import { DrawStickyNoteTool } from './tools/drawStickyNoteTool.js';
 import { CalibrateTool } from './tools/calibrateTool.js';
 import { MeasureTool } from './tools/measureTool.js';
 import { PlaceStampTool } from './tools/placeStampTool.js';
+import { AddToCircuitTool } from './tools/addToCircuitTool.js';
 
 export type { SketchTool } from './tools/types.js';
 
 export type { DocumentSummary } from './document.js';
+
+/** A short, self-dismissing message for the user — the UI's toast. Raised for outcomes a click alone does not make obvious (a terminal moved between circuits, a rejected target), never for ones that need an answer. */
+export interface SceneNotice {
+  message: string;
+  kind: 'info' | 'warning';
+}
+
+/** What SketchScene.assignTerminalToCircuit did — core's planTerminalAssignment outcomes, plus the one rule only the scene can check (the stamp must be a terminal). */
+export type TerminalAssignmentResult = TerminalAssignmentPlan | { kind: 'rejected'; reason: 'not-a-terminal' };
 
 // The embedded-file name the project JSON is stored under inside the PDF
 // itself (see decisions log 2026-09-06: single self-contained .pdf, no
@@ -271,6 +286,8 @@ const STICKY_NOTE_ICON_SIZE_PT = 16;
 // stroke-only convention for every other kind.
 const ARROWHEAD_LENGTH_PT = 10;
 const ARROWHEAD_ANGLE_RAD = Math.PI / 7;
+// Add-to-Circuit tool hover outline — green joins the circuit, orange moves the terminal out of another circuit, grey is already a member.
+const CIRCUIT_TOOL_HOVER_COLOR: Record<CircuitToolHover['status'], number> = { free: 0x66bb6a, move: 0xffa726, member: 0x9e9e9e };
 // Flow-direction indicator (syncFlowLabels) — same stroke-only V-shape as the
 // 'arrow' annotation above, just smaller: it marks a segment's own midpoint
 // rather than terminating a user-drawn line.
@@ -404,6 +421,8 @@ interface SketchSceneEvents {
    * Properties mid-edit whenever a stamp tool happens to still be armed.
    */
   circuitsChanged: [];
+  /** A transient message for the UI's toast — see SceneNotice. */
+  notice: [SceneNotice];
   /**
    * A right-click landed on an existing port, fitting or segment interior (the
    * same targets onDrawSegmentClick's resolveSegmentEndpoint would snap to) —
@@ -459,6 +478,9 @@ export class SketchScene {
     definitionId?: string;
     appearanceDefault?: { color?: string; scale?: number };
   } | null = null;
+  /** The circuit the 'circuit-add-terminals' tool is filling, and the terminal its pointer is over — both cleared by setTool() on leaving that tool. See beginAddTerminalsToCircuit. */
+  private circuitToolTargetId: string | null = null;
+  private circuitToolHover: CircuitToolHover | null = null;
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure/draw-line two-click flows
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
@@ -498,6 +520,7 @@ export class SketchScene {
       new MeasureTool(),
       new PlaceStampTool('terminal'),
       new PlaceStampTool('equipment'),
+      new AddToCircuitTool(),
     ];
     return new Map(tools.map((tool) => [tool.id, tool]));
   }
@@ -554,6 +577,9 @@ export class SketchScene {
       setStampGhostRotationDegrees: (degrees) => {
         self.stampGhostRotationDegrees = degrees;
       },
+      getCircuitToolTarget: () => self.circuitToolTargetId,
+      setCircuitToolHover: (hover) => self.setCircuitToolHover(hover),
+      assignTerminalToCircuit: (circuitId, terminalId) => self.assignTerminalToCircuit(circuitId, terminalId),
       hideStampGhost: () => {
         if (self.stampGhostSprite) self.stampGhostSprite.visible = false;
       },
@@ -653,6 +679,10 @@ export class SketchScene {
     this.toolMap.get(this.tool)?.onDeactivate?.(this.ctx);
     this.tool = tool;
     this.pendingPoints = [];
+    if (tool !== 'circuit-add-terminals') {
+      this.circuitToolTargetId = null;
+      this.circuitToolHover = null;
+    }
     if (tool !== 'place-terminal' && tool !== 'place-equipment') {
       this.stampGhostRotationDegrees = 0;
       if (this.stampGhostSprite) this.stampGhostSprite.visible = false;
@@ -808,6 +838,8 @@ export class SketchScene {
     this.world.scale.set(target.viewport.scale);
 
     this.tool = 'select';
+    this.circuitToolTargetId = null; // names a circuit of the outgoing document, same reset rule as `tool`
+    this.circuitToolHover = null;
     this.activeNetworkTypeId = NETWORK_TYPE_LIBRARY[0].id; // per-document context, same reset rule as `tool`
     this.pendingStampTexture = null;
     this.stampGhostSprite?.destroy();
@@ -1250,6 +1282,97 @@ export class SketchScene {
     this.doc.drawingHistory.execute(cmd);
     this.notifyCircuitsChanged();
     return true;
+  }
+
+  /**
+   * Adds a terminal to a circuit, or moves it there if it already belongs to another one (plan
+   * Phase E, decision 1) — one undo step either way. Raises a 'notice' for the outcomes a click
+   * alone does not make obvious: a move (naming both circuits), a spare target, a stamp that is
+   * not a terminal, a terminal already in that circuit. A plain add raises none. Returns what
+   * happened so a non-canvas caller (the terminal Properties picker) can react too.
+   */
+  assignTerminalToCircuit(circuitId: string, terminalId: string): TerminalAssignmentResult {
+    const state = this.doc.drawingHistory.getState();
+    const terminal = state.stamps[terminalId];
+    if (terminal?.category !== 'terminal') {
+      this.emitNotice('Only terminals can be added to a circuit.', 'warning');
+      return { kind: 'rejected', reason: 'not-a-terminal' };
+    }
+    const circuits = this.listCircuits();
+    const plan = planTerminalAssignment(circuits, terminalId, circuitId);
+    const labelOf = (id: string): string => {
+      const circuit = state.circuits[id];
+      return circuit ? getCircuitLabel(circuit, circuit.panelId ? state.panels[circuit.panelId] : undefined) : id;
+    };
+    const terminalName = `\u2018${getStampDefinition(terminal.definitionId ?? '', this.doc.customStampDefinitions)?.label ?? 'Terminal'}\u2019`;
+    switch (plan.kind) {
+      case 'rejected':
+        if (plan.reason === 'target-is-spare') this.emitNotice(`${labelOf(circuitId)} is a spare circuit and cannot hold terminals.`, 'warning');
+        return plan;
+      case 'already-member':
+        this.emitNotice(`${terminalName} is already in ${labelOf(circuitId)}.`, 'info');
+        return plan;
+      case 'move':
+        this.emitNotice(`Moved ${terminalName} from ${labelOf(plan.fromCircuitId)} to ${labelOf(circuitId)}.`, 'warning');
+        break;
+      case 'add':
+        break;
+    }
+    this.doc.drawingHistory.execute(assignTerminalToCircuitCommand(circuits, circuitId, terminalId)!);
+    this.notifyCircuitsChanged();
+    return plan;
+  }
+
+  /**
+   * Creates a circuit holding the given terminals (moving any that already belong to another
+   * circuit) as a single undo step — the terminal Properties panel's "Create circuit". Returns
+   * null, creating nothing, when no id is a placed terminal stamp.
+   */
+  createCircuitFromTerminals(terminalIds: string[], options: { panelId?: string } = {}): string | null {
+    const stamps = this.doc.drawingHistory.getState().stamps;
+    const validIds = terminalIds.filter((id) => stamps[id]?.category === 'terminal');
+    if (validIds.length === 0) return null;
+    const id = `circuit-${this.doc.nextCircuitSeq++}`;
+    const tx = new Transaction(this.doc.drawingHistory, `Create circuit ${id} from ${validIds.length} terminal(s)`);
+    let state = tx.update((s) => createCircuitCommand(Object.values(s.circuits), id, options).execute(s));
+    let moved = 0;
+    for (const terminalId of validIds) {
+      const circuits = Object.values(state.circuits);
+      if (findCircuitForTerminal(circuits, terminalId)) moved++;
+      const cmd = assignTerminalToCircuitCommand(circuits, id, terminalId);
+      if (cmd) state = tx.update((s) => cmd.execute(s));
+    }
+    tx.commit();
+    const created = state.circuits[id];
+    const label = getCircuitLabel(created, options.panelId ? state.panels[options.panelId] : undefined);
+    this.emitNotice(`Created circuit ${label} with ${validIds.length} terminal${validIds.length === 1 ? '' : 's'}.`, 'info');
+    if (moved > 0) this.emitNotice(`Moved ${moved} terminal${moved === 1 ? '' : 's'} out of ${moved === 1 ? 'its' : 'their'} previous circuit${moved === 1 ? '' : 's'}.`, 'warning');
+    this.notifyCircuitsChanged();
+    return id;
+  }
+
+  /** Starts the Add-to-Circuit tool on one circuit — the user then clicks terminals on the canvas, Escape to finish. No-op for a missing or spare circuit. */
+  beginAddTerminalsToCircuit(circuitId: string): void {
+    const circuit = this.doc.drawingHistory.getState().circuits[circuitId];
+    if (!circuit || circuit.isSpare) return;
+    this.circuitToolTargetId = circuitId;
+    this.setTool('circuit-add-terminals');
+  }
+
+  /** The circuit the Add-to-Circuit tool is filling, or null when it is not the active tool — the UI's tool banner. */
+  getCircuitToolTarget(): string | null {
+    return this.circuitToolTargetId;
+  }
+
+  private setCircuitToolHover(hover: CircuitToolHover | null): void {
+    const current = this.circuitToolHover;
+    if (current?.stampId === hover?.stampId && current?.status === hover?.status) return;
+    this.circuitToolHover = hover;
+    this.redrawOverlay();
+  }
+
+  private emitNotice(message: string, kind: SceneNotice['kind']): void {
+    this.emitter.emit('notice', { message, kind });
   }
 
   removeTerminalFromCircuit(circuitId: string, terminalId: string): void {
@@ -3057,6 +3180,17 @@ export class SketchScene {
       this.overlay
         .rect(bounds.minX - padX, bounds.minY - padY, bounds.maxX - bounds.minX + 2 * padX, bounds.maxY - bounds.minY + 2 * padY)
         .stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
+    }
+
+    if (this.tool === 'circuit-add-terminals' && this.circuitToolHover) {
+      const hovered = state.stamps[this.circuitToolHover.stampId];
+      if (hovered) {
+        const corners = this.stampCornersWorld(hovered);
+        this.overlay.moveTo(corners[0].x, corners[0].y);
+        for (const c of corners.slice(1)) this.overlay.lineTo(c.x, c.y);
+        this.overlay.closePath();
+        this.overlay.stroke({ width: 3 / this.world.scale.x, color: CIRCUIT_TOOL_HOVER_COLOR[this.circuitToolHover.status] });
+      }
     }
 
     const handle = this.getRotationHandleWorld();

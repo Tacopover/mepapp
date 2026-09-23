@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { getCircuitLabel, STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
@@ -12,6 +12,7 @@ import type { StampLabelLanguage } from './components/LanguageToggle.js';
 import type { StampCategoryFilter } from './components/CategorySwitcher.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
+import { ToastStack, useToasts } from './components/Toasts.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
@@ -134,6 +135,7 @@ export function MepSketchApp({
     setSelectedCircuitId,
     selectedPanelId,
     setSelectedPanelId,
+    circuitToolTargetId,
     zoom,
     pageIndex,
     pageCount,
@@ -153,6 +155,14 @@ export function MepSketchApp({
   } = useSketchScene();
 
   const [status, setStatus] = useState('');
+  const { toasts, pushToast, dismissToast } = useToasts();
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    scene.on('notice', pushToast);
+    return () => scene.off('notice', pushToast);
+  }, [ready, sceneRef, pushToast]);
+  const circuitToolTarget = circuitToolTargetId ? circuits.find((c) => c.id === circuitToolTargetId) : undefined;
   const [calibrationInput, setCalibrationInput] = useState('');
   const [textboxInput, setTextboxInput] = useState('');
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
@@ -634,6 +644,7 @@ export function MepSketchApp({
         selectedCircuitId={selectedCircuitId}
         selectedPanelId={selectedPanelId}
         setSelectedCircuitId={setSelectedCircuitId}
+        allStamps={allStamps}
         setSelectedPanelId={setSelectedPanelId}
       />
     ),
@@ -653,11 +664,19 @@ export function MepSketchApp({
     // handled above and never reaches this branch while armed. Only jump to Properties on 'select'
     // with something selected; any other tool (or 'select' with nothing selected) restores whatever
     // tab the user had open.
+    // A selected circuit/panel counts as "something selected" too, and the Add-to-Circuit tool keeps
+    // Properties (its live terminal list) on screen: without these, any 'drawingChanged' (Undo, a stamp
+    // move) re-runs this effect with a fresh selectedSegments array, resolves to null, and releases the
+    // dock back to whatever tab the user had before the circuit selection jumped it to Properties.
     setForcedTabId(
-      tool === 'select' && (selection.length > 0 || selectedSegment || selectedSegments.length > 0 || selectedFitting) ? 'properties' : null,
+      tool === 'circuit-add-terminals' ||
+        (tool === 'select' &&
+          (selection.length > 0 || selectedSegment || selectedSegments.length > 0 || selectedFitting || selectedCircuitId || selectedPanelId))
+        ? 'properties'
+        : null,
     );
     setForcedTabNonce((n) => n + 1);
-  }, [selection, selectedSegment, selectedSegments, selectedFitting, tool]);
+  }, [selection, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool]);
 
   // The Electrical Circuits tree's own selection (selectedCircuitId/selectedPanelId) is app-level
   // state, not a canvas selection, so it needs its own jump-to-Properties effect rather than folding
@@ -752,6 +771,16 @@ export function MepSketchApp({
                   }}
                 />
               )}
+              {circuitToolTarget && (
+                <div className="mep-tool-banner">
+                  Adding terminals to <b>{getCircuitLabel(circuitToolTarget, panels.find((p) => p.id === circuitToolTarget.panelId))}</b> — click terminals on the canvas.
+                  Orange outline: the terminal moves out of its current circuit.{' '}
+                  <button type="button" onClick={() => sceneRef.current?.setTool('select')}>
+                    Done (Esc)
+                  </button>
+                </div>
+              )}
+              <ToastStack toasts={toasts} onDismiss={dismissToast} />
               {canvasContextMenuRequest && (
                 <CanvasContextMenu request={canvasContextMenuRequest} sceneRef={sceneRef} onDismiss={() => setCanvasContextMenuRequest(null)} />
               )}

@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
-import type { SketchScene } from '@mepapp/render';
-import { getEffectiveDiversityPercent, getEffectivePrefix, type Circuit, type CircuitType, type Panel, type PanelSection } from '@mepapp/core';
+import type { SketchScene, StampInfo } from '@mepapp/render';
+import { getEffectiveDiversityPercent, getEffectivePrefix, getStampDefinition, type Circuit, type CircuitType, type Panel, type PanelSection, type StampDefinition } from '@mepapp/core';
 import { IconTrash } from '../icons.js';
 
 const PHASES: NonNullable<Circuit['phase']>[] = ['L1', 'L2', 'L3', 'L1L2', 'L2L3', 'L1L3', 'L1L2L3'];
@@ -17,6 +17,9 @@ export interface CircuitPropertiesProps {
   panels: Panel[];
   panelSections: PanelSection[];
   circuitTypes: CircuitType[];
+  /** Every placed stamp — resolves the terminal list's ids to labels. */
+  allStamps: StampInfo[];
+  customStampDefinitions: StampDefinition[];
   onDeleted: () => void;
 }
 
@@ -29,7 +32,7 @@ export interface CircuitPropertiesProps {
  * default shown as placeholder) or overridden (solid, with a ↺ reset
  * link), matching the Phase 0 mockup's round-4 decision.
  */
-export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSections, circuitTypes, onDeleted }: CircuitPropertiesProps) {
+export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSections, circuitTypes, allStamps, customStampDefinitions, onDeleted }: CircuitPropertiesProps) {
   const defaults = panel?.circuitDefaults;
   const sections = panel ? panelSections.filter((s) => s.panelId === panel.id) : [];
 
@@ -206,15 +209,32 @@ export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSecti
       <div className="mep-section">
         <h4>Terminals ({circuit.terminalIds.length})</h4>
         {circuit.terminalIds.length === 0 && <p className="mep-hint">No terminals assigned.</p>}
-        {circuit.terminalIds.map((id) => (
-          <div className="mep-field-row" key={id}>
-            <label>{id}</label>
-            <button type="button" onClick={() => sceneRef.current?.removeTerminalFromCircuit(circuit.id, id)}>
-              Remove
-            </button>
-          </div>
-        ))}
-        <p className="mep-hint">Select a Terminal stamp on the canvas, then use its Properties panel to assign it to this circuit.</p>
+        {circuit.terminalIds.map((id) => {
+          const stamp = allStamps.find((s) => s.id === id);
+          const label = (stamp?.definitionId ? getStampDefinition(stamp.definitionId, customStampDefinitions)?.label : undefined) ?? 'Terminal';
+          return (
+            <div className="mep-field-row" key={id}>
+              <label>
+                <button type="button" className="mep-link-btn" title="Select on canvas" onClick={() => sceneRef.current?.selectStampById(id)}>
+                  {label}
+                </button>
+              </label>
+              <button type="button" onClick={() => sceneRef.current?.removeTerminalFromCircuit(circuit.id, id)}>
+                Remove
+              </button>
+            </div>
+          );
+        })}
+        {!circuit.isSpare && (
+          <button type="button" onClick={() => sceneRef.current?.beginAddTerminalsToCircuit(circuit.id)}>
+            Add terminals…
+          </button>
+        )}
+        <p className="mep-hint">
+          {circuit.isSpare
+            ? 'A spare circuit holds no terminals.'
+            : 'Add terminals… lets you click terminals on the canvas (Esc to finish). You can also pick a circuit from a terminal\'s own Properties.'}
+        </p>
       </div>
     </div>
   );

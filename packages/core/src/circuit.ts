@@ -165,6 +165,39 @@ export function getPanelCircuitIds(panel: Panel, circuits: Circuit[]): string[] 
   return circuits.filter((c) => c.panelId === panel.id).map((c) => c.id);
 }
 
+/** The circuit a terminal currently belongs to, if any — membership is exclusive (plan §7), so at most one. */
+export function findCircuitForTerminal(circuits: Circuit[], terminalId: string): Circuit | undefined {
+  return circuits.find((c) => c.terminalIds.includes(terminalId));
+}
+
+/** A circuit's display label — resolved prefix (own override, else its panel's default) followed by its number, e.g. "L1.3". */
+export function getCircuitLabel(circuit: Circuit, panel?: Panel): string {
+  return `${getEffectivePrefix(circuit, panel)}${circuit.number}`;
+}
+
+/**
+ * What assigning a terminal to a circuit would do — the single rule set
+ * behind the Add-to-Circuit tool and the terminal Properties picker (plan
+ * Phase E, decision 1: a terminal already in another circuit is *moved*,
+ * not rejected as the old app did). `move` carries the circuit it is
+ * leaving so the caller can tell the user.
+ */
+export type TerminalAssignmentPlan =
+  | { kind: 'add' }
+  | { kind: 'move'; fromCircuitId: string }
+  | { kind: 'already-member' }
+  | { kind: 'rejected'; reason: 'target-not-found' | 'target-is-spare' };
+
+export function planTerminalAssignment(circuits: Circuit[], terminalId: string, targetCircuitId: string): TerminalAssignmentPlan {
+  const target = circuits.find((c) => c.id === targetCircuitId);
+  if (!target) return { kind: 'rejected', reason: 'target-not-found' };
+  if (target.isSpare) return { kind: 'rejected', reason: 'target-is-spare' };
+  const current = findCircuitForTerminal(circuits, terminalId);
+  if (!current) return { kind: 'add' };
+  if (current.id === targetCircuitId) return { kind: 'already-member' };
+  return { kind: 'move', fromCircuitId: current.id };
+}
+
 /**
  * Sum of terminalCapacities over a circuit's member terminals — never
  * stored (plan §3). terminalCapacities mirrors flow.ts's FlowSolveInput

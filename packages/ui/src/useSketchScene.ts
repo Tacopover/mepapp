@@ -61,6 +61,8 @@ export interface UseSketchScene {
   setSelectedCircuitId: (id: string | null) => void;
   selectedPanelId: string | null;
   setSelectedPanelId: (id: string | null) => void;
+  /** The circuit the Add-to-Circuit tool is filling, or null when that tool is not active — see SketchScene.getCircuitToolTarget. */
+  circuitToolTargetId: string | null;
   zoom: number;
   pageIndex: number;
   pageCount: number;
@@ -103,6 +105,7 @@ export function useSketchScene(): UseSketchScene {
   const [circuitTypes, setCircuitTypes] = useState<CircuitType[]>([]);
   const [selectedCircuitId, setSelectedCircuitIdState] = useState<string | null>(null);
   const [selectedPanelId, setSelectedPanelIdState] = useState<string | null>(null);
+  const [circuitToolTargetId, setCircuitToolTargetId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
@@ -172,7 +175,10 @@ export function useSketchScene(): UseSketchScene {
         setSelectedPanelIdState(null);
       }
     };
-    const onToolChanged = (t: SketchTool) => setTool(t);
+    const onToolChanged = (t: SketchTool) => {
+      setTool(t);
+      setCircuitToolTargetId(scene.getCircuitToolTarget());
+    };
     const onCalibrationSet = (c: Calibration) => setCalibration(c);
     const onMeasurement = (mm: number) => setMeasurementMm(mm);
     const onCalibrationNeeded = (p1: Vec2, p2: Vec2, resolve: (mm: number | null) => void) =>
@@ -357,6 +363,7 @@ export function useSketchScene(): UseSketchScene {
     setSelectedCircuitId,
     selectedPanelId,
     setSelectedPanelId,
+    circuitToolTargetId,
     zoom,
     pageIndex,
     pageCount,
