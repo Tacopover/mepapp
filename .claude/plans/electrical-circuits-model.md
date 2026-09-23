@@ -341,7 +341,7 @@ surface.
 
 ### Phase C addendum — panel circuit defaults
 
-**Done** — 2026-09-23, commit `<pending>` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+**Done** — 2026-09-23, commit `cf4520b` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
 
 Triggered by `electrical-schematic-templates.md`'s Phase 0 mockup round 4
 (2026-09-23): the user decided panels should hold default values for
