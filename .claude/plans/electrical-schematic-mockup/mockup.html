@@ -1,0 +1,1650 @@
+<title>Schematic Studio</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #eef1f5;
+    --surface: #ffffff;
+    --surface-2: #f5f7fa;
+    --paper: #fbfaf5;
+    --ink: #1b2330;
+    --border: #d7dde6;
+    --border-strong: #b7c0cd;
+    --text: #1b2330;
+    --text-muted: #5b6472;
+    --accent: #b85c1c;
+    --accent-ink: #ffffff;
+    --accent-soft: #f3e3d2;
+    --select: #2f7dd1;
+    --select-soft: #dbe9fb;
+    --good: #2e8b57;
+    --good-soft: #dcefe3;
+    --warn: #9c7a12;
+    --warn-soft: #f3ecd2;
+    --shadow: 0 1px 2px rgba(27,35,48,.06), 0 4px 14px rgba(27,35,48,.06);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10151d;
+      --surface: #171e29;
+      --surface-2: #1d2531;
+      --paper: #f1eee5;
+      --ink: #1b2330;
+      --border: #2a3444;
+      --border-strong: #3c4a5e;
+      --text: #e7ebf1;
+      --text-muted: #94a1b3;
+      --accent: #e0913f;
+      --accent-ink: #1b1206;
+      --accent-soft: #3a2a18;
+      --select: #6ba6ec;
+      --select-soft: #1c3350;
+      --good: #57c290;
+      --good-soft: #163325;
+      --warn: #d9b34c;
+      --warn-soft: #362c11;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10151d;
+    --surface: #171e29;
+    --surface-2: #1d2531;
+    --paper: #f1eee5;
+    --ink: #1b2330;
+    --border: #2a3444;
+    --border-strong: #3c4a5e;
+    --text: #e7ebf1;
+    --text-muted: #94a1b3;
+    --accent: #e0913f;
+    --accent-ink: #1b1206;
+    --accent-soft: #3a2a18;
+    --select: #6ba6ec;
+    --select-soft: #1c3350;
+    --good: #57c290;
+    --good-soft: #163325;
+    --warn: #d9b34c;
+    --warn-soft: #362c11;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { font-weight: 600; text-wrap: balance; margin: 0; }
+  button { font-family: inherit; font-size: inherit; }
+  input, select { font-family: inherit; font-size: inherit; color: var(--text); }
+  a { color: var(--select); }
+
+  /* ---------- shell ---------- */
+  .shell {
+    display: grid;
+    grid-template-columns: 84px 1fr;
+    min-height: 100vh;
+  }
+  .rail {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .rail-brand {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--accent); color: var(--accent-ink);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; margin-bottom: 18px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .rail-btn {
+    width: 68px; padding: 10px 4px 8px;
+    border: none; background: transparent; border-radius: 10px;
+    color: var(--text-muted); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    font-size: 11px; letter-spacing: .01em;
+    transition: background .12s ease, color .12s ease;
+  }
+  .rail-btn svg { width: 20px; height: 20px; }
+  .rail-btn:hover { background: var(--surface-2); color: var(--text); }
+  .rail-btn[aria-current="true"] { background: var(--select-soft); color: var(--select); }
+  .rail-btn[aria-current="true"] svg { stroke: var(--select); }
+
+  .main { display: flex; flex-direction: column; min-width: 0; }
+  .topbar {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 16px; padding: 18px 28px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h1 { font-size: 18px; }
+  .topbar .crumb { color: var(--text-muted); font-size: 12.5px; margin-top: 2px; }
+  .topbar .flag {
+    font-size: 11.5px; color: var(--warn); background: var(--warn-soft);
+    border: 1px solid var(--border); padding: 3px 9px; border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .screen { display: none; padding: 22px 28px 40px; gap: 18px; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* ---------- generic components ---------- */
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: var(--shadow);
+  }
+  .panel-head {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .panel-head h3 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+  .panel-body { padding: 14px 16px; }
+
+  .btn {
+    border: 1px solid var(--border-strong); background: var(--surface);
+    color: var(--text); border-radius: 8px; padding: 7px 13px;
+    cursor: pointer; font-size: 12.5px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: border-color .12s ease, background .12s ease;
+  }
+  .btn:hover { border-color: var(--select); }
+  .btn:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-ghost { border-color: transparent; background: transparent; }
+  .btn-ghost:hover { background: var(--surface-2); border-color: transparent; }
+  .btn-sm { padding: 4px 9px; font-size: 11.5px; border-radius: 6px; }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+  .badge {
+    font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px;
+    letter-spacing: .03em; text-transform: uppercase;
+  }
+  .badge-locale { background: var(--select-soft); color: var(--select); }
+  .badge-spare { background: var(--warn-soft); color: var(--warn); }
+  .badge-active { background: var(--good-soft); color: var(--good); }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11.5px; color: var(--text-muted); font-weight: 500; }
+  .field input, .field select {
+    border: 1px solid var(--border-strong); background: var(--surface-2);
+    border-radius: 7px; padding: 7px 9px; color: var(--text);
+  }
+  .field input:focus, .field select:focus { outline: 2px solid var(--select); outline-offset: -1px; }
+  .field-row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); }
+
+  .segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+  .segmented button {
+    border: none; background: var(--surface); color: var(--text-muted);
+    padding: 7px 13px; font-size: 12.5px; cursor: pointer; border-right: 1px solid var(--border-strong);
+  }
+  .segmented button:last-child { border-right: none; }
+  .segmented button[aria-pressed="true"] { background: var(--select); color: #fff; }
+
+  .chip {
+    border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface);
+    padding: 5px 11px; font-size: 12px; cursor: pointer; color: var(--text-muted);
+  }
+  .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  .hint { font-size: 11.5px; color: var(--text-muted); }
+  .divider { height: 1px; background: var(--border); margin: 12px 0; border: none; }
+
+  ::selection { background: var(--select-soft); }
+
+  /* ================= SCREEN 1 — Template editor ================= */
+  .editor-grid { display: grid; grid-template-columns: 240px 1fr 300px; gap: 16px; align-items: start; }
+  .editor-toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .editor-toolbar .field { min-width: 160px; }
+
+  .palette-group summary {
+    list-style: none; cursor: pointer; padding: 9px 4px;
+    font-size: 12px; font-weight: 600; color: var(--text-muted);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .palette-group summary::-webkit-details-marker { display: none; }
+  .palette-group summary::after { content: "▾"; font-size: 10px; }
+  .palette-group[open] summary::after { content: "▴"; }
+  .palette-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 7px;
+    font-size: 12.5px; cursor: grab; border: 1px solid transparent;
+  }
+  .palette-item:hover { background: var(--surface-2); border-color: var(--border); }
+  .palette-item[aria-pressed="true"] { background: var(--select-soft); border-color: var(--select); color: var(--select); }
+  .palette-item .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--border-strong); flex: none; }
+
+  .variant-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .canvas-wrap {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px; overflow: auto;
+  }
+  .paper-sheet {
+    background: var(--paper); border-radius: 4px; box-shadow: var(--shadow);
+    padding: 30px 20px; display: block; margin: 0 auto;
+  }
+  .grp-block { cursor: pointer; }
+  .grp-block rect.hit { fill: transparent; }
+  .grp-block:hover .box { stroke: var(--select); }
+  .grp-block[data-selected="true"] .box { stroke: var(--accent); stroke-width: 1.6; }
+  .box { fill: none; stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3 2; }
+  .sym-line { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+  .sym-text { fill: var(--ink); font-family: 'IBM Plex Mono', monospace; }
+  .handle { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; cursor: grab; }
+
+  .props-empty { color: var(--text-muted); font-size: 12.5px; padding: 6px 2px; }
+  .binding-preview {
+    margin-top: 6px; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 10px; font-size: 12px;
+  }
+  .rot-row { display: flex; gap: 6px; }
+
+  .grp-block .hit { fill: transparent; cursor: grab; }
+  .grp-block.dragging .hit { cursor: grabbing; }
+  .grp-block .frame-hit { pointer-events: stroke; stroke: transparent; stroke-width: 18; }
+  .instance-ghost { cursor: pointer; }
+  .instance-ghost .box { display: none; }
+  .instance-ghost:hover .sym-line, .instance-ghost:hover .sym-text { opacity: .7; }
+  .anchor-marker { fill: var(--select); stroke: var(--surface); stroke-width: 1.5; cursor: grab; }
+  .canvas-wrap.drop-ok { outline: 2px dashed var(--select); outline-offset: -2px; }
+  .canvas-wrap.drop-block { outline: 2px dashed var(--warn); outline-offset: -2px; }
+  .palette-item[draggable="true"] { cursor: grab; }
+  .palette-item .scope-tag {
+    margin-left: auto; font-size: 9px; text-transform: uppercase; letter-spacing: .04em;
+    padding: 1px 5px; border-radius: 4px; background: var(--surface-2); color: var(--text-muted); flex: none;
+  }
+  .canvas-note.warn { color: var(--warn); font-weight: 500; }
+
+  /* ================= SCREEN 2 — Generated schematic ================= */
+  .sched-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .titleblock { font-size: 10.5px; }
+  .titleblock .tb-row { display: flex; gap: 6px; }
+  .titleblock .tb-label { color: var(--text-muted); min-width: 64px; }
+  .sched-table { border-collapse: collapse; font-size: 10px; }
+  .sched-table td, .sched-table th {
+    border: 1px solid #9aa3ad; padding: 2px 5px; text-align: center;
+    font-family: 'IBM Plex Mono', monospace; white-space: nowrap;
+  }
+  .sched-table th { background: rgba(0,0,0,.04); font-weight: 600; }
+
+  /* ================= SCREEN 3 — Template picker ================= */
+  .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .tpl-card { display: flex; flex-direction: column; gap: 10px; }
+  .tpl-thumb {
+    height: 110px; border-radius: 8px; background: var(--paper);
+    border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+  }
+  .tpl-card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .tpl-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tpl-actions { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; }
+  .tpl-new {
+    border: 1.5px dashed var(--border-strong); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px;
+    color: var(--text-muted); cursor: pointer; min-height: 220px; background: transparent;
+  }
+  .tpl-new:hover { border-color: var(--select); color: var(--select); }
+
+  /* ================= SCREEN 4 — Circuit assignment ================= */
+  .assign-grid { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+  .tree { padding: 6px; }
+  .tree details { border-radius: 7px; }
+  .tree summary {
+    list-style: none; cursor: pointer; padding: 7px 8px; border-radius: 7px;
+    display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500;
+  }
+  .tree summary::-webkit-details-marker { display: none; }
+  .tree summary::before { content: "▸"; font-size: 9px; color: var(--text-muted); transition: transform .1s; }
+  .tree details[open] > summary::before { transform: rotate(90deg); }
+  .tree .nest { margin-left: 16px; border-left: 1px solid var(--border); padding-left: 6px; }
+  .circuit-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px;
+    cursor: pointer; font-size: 12.5px; border: 1px solid transparent;
+  }
+  .circuit-row:hover { background: var(--surface-2); }
+  .circuit-row[aria-selected="true"] { background: var(--select-soft); border-color: var(--select); }
+  .circuit-row .num { font-family: 'IBM Plex Mono', monospace; font-weight: 600; min-width: 30px; }
+  .circuit-row .term-count { margin-left: auto; color: var(--text-muted); font-size: 11px; }
+  .equip-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 12.5px; }
+
+  .term-list { display: flex; flex-direction: column; gap: 6px; }
+  .term-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 12.5px; background: var(--surface-2);
+  }
+  .term-item .va { margin-left: auto; font-family: 'IBM Plex Mono', monospace; color: var(--text-muted); }
+  .cap-readout {
+    display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 8px;
+    background: var(--select-soft); color: var(--select); font-weight: 600; font-size: 13px;
+  }
+  .field input.inherited, .field select.inherited { color: var(--text-muted); font-style: italic; border-style: dashed; }
+  .link-reset {
+    background: none; border: none; color: var(--select); font-size: 10.5px; font-weight: 500;
+    cursor: pointer; padding: 0; margin-left: 4px;
+  }
+  .link-reset:hover { text-decoration: underline; }
+
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 64px 1fr; }
+    .rail-btn { width: 52px; font-size: 9.5px; }
+    .editor-grid, .assign-grid { grid-template-columns: 1fr; }
+    .sched-toolbar { flex-direction: column; align-items: flex-start; }
+  }
+
+  /* -- drawing-tools reservation strip -- */
+  .draw-tools-strip {
+    display: flex; align-items: center; gap: 6px; padding: 8px 10px; margin-bottom: 10px;
+    background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: 8px;
+  }
+  .draw-tool-btn {
+    width: 28px; height: 28px; border: 1px solid var(--border-strong); border-radius: 6px;
+    background: var(--surface); color: var(--text-muted); font-size: 13px; cursor: not-allowed;
+  }
+  .draw-tool-btn[disabled] { opacity: .55; }
+  .draw-tools-strip .hint { margin-left: 4px; }
+
+  /* -- symbol library modal -- */
+  .symbol-modal-backdrop {
+    position: fixed; inset: 0; background: rgba(10, 14, 20, .45); display: flex;
+    align-items: center; justify-content: center; z-index: 50; padding: 24px;
+  }
+  .symbol-modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 18px 20px;
+    box-shadow: 0 18px 44px rgba(0,0,0,.28);
+  }
+  .symbol-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .symbol-modal-head h3 { font-size: 14px; }
+  .symbol-cat-label { font-size: 11.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 6px; }
+  .symbol-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px,1fr)); gap: 8px; }
+  .symbol-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); cursor: pointer; text-align: center;
+  }
+  .symbol-tile:hover { border-color: var(--select); color: var(--select); }
+  .symbol-tile-icon { font-size: 18px; }
+  .symbol-tile-label { font-size: 10.5px; color: var(--text-muted); line-height: 1.25; }
+  .symbol-tile:hover .symbol-tile-label { color: var(--select); }
+  .symbol-current { font-size: 12.5px; padding: 4px 0; }
+</style>
+
+<div class="shell">
+  <nav class="rail" aria-label="Mockup screens">
+    <div class="rail-brand" title="MepApp electrical schematics">ES</div>
+    <button class="rail-btn" data-screen="editor" aria-current="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="14" rx="1.5"/><path d="M3 15h18M8 15v3M14 15v3"/></svg>
+      Template editor
+    </button>
+    <button class="rail-btn" data-screen="generated">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V6a2 2 0 0 1 2-2h9l5 5v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M14 4v5h5"/><path d="M8 13h8M8 16h5"/></svg>
+      Generated schematic
+    </button>
+    <button class="rail-btn" data-screen="picker">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="7" height="7" rx="1"/><rect x="14" y="6" width="7" height="7" rx="1"/><rect x="3" y="15" width="7" height="5" rx="1"/><rect x="14" y="15" width="7" height="5" rx="1"/></svg>
+      Template picker
+    </button>
+    <button class="rail-btn" data-screen="assignment">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2.3"/><circle cx="6" cy="18" r="2.3"/><circle cx="18" cy="12" r="2.3"/><path d="M8 6h4a3 3 0 0 1 3 3v0M8 18h4a3 3 0 0 0 3-3v0"/></svg>
+      Circuit assignment
+    </button>
+  </nav>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="crumb-title">Template editor</h1>
+        <div class="crumb">Phase 0 mockup · electrical-schematic-templates.md §10 · static, nothing here is saved</div>
+      </div>
+      <span class="flag">Review draft — not implementation</span>
+    </header>
+
+    <!-- ============ SCREEN 1 — TEMPLATE EDITOR ============ -->
+    <section class="screen active" id="screen-editor">
+      <div class="editor-toolbar panel panel-body">
+        <div class="field">
+          <label for="tpl-name">Template name</label>
+          <input id="tpl-name" value="Rows (NL)" />
+        </div>
+        <div class="field">
+          <label>Locale</label>
+          <div style="padding-top:6px"><span class="badge badge-locale">NL</span></div>
+        </div>
+        <div class="hint" id="loaded-note" style="margin-left:auto"></div>
+      </div>
+
+      <div class="editor-toolbar panel panel-body" id="group-bar"></div>
+
+      <div class="editor-grid">
+        <!-- palette -->
+        <div class="panel">
+          <div class="panel-head"><h3>Building blocks</h3></div>
+          <div class="panel-body" style="padding:6px" id="palette-host"></div>
+        </div>
+
+        <!-- canvas -->
+        <div class="panel">
+          <div class="panel-head">
+            <h3 id="canvas-heading">Template layout</h3>
+          </div>
+          <div class="panel-body">
+            <div class="draw-tools-strip" title="Reserved for a shared drawing-tools plan — see electrical-schematic-templates.md">
+              <button class="draw-tool-btn" disabled>／</button>
+              <button class="draw-tool-btn" disabled>▭</button>
+              <button class="draw-tool-btn" disabled>◯</button>
+              <button class="draw-tool-btn" disabled>Ab</button>
+              <button class="draw-tool-btn" disabled>☺</button>
+              <span class="hint">Drawing tools (line/rect/circle/text/symbol) — reserved space, planned as one shared tool with the stamp editor and the component library</span>
+            </div>
+            <div class="canvas-wrap" id="canvas-drop-target">
+              <svg class="paper-sheet" id="editor-canvas" width="640" height="400" viewBox="0 0 640 400"></svg>
+            </div>
+            <p class="hint" id="canvas-note" style="margin-top:8px"></p>
+          </div>
+        </div>
+
+        <!-- properties -->
+        <div class="panel">
+          <div class="panel-head"><h3>Block properties</h3></div>
+          <div class="panel-body" id="props-panel"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN 2 — GENERATED SCHEMATIC ============ -->
+    <section class="screen" id="screen-generated">
+      <div class="sched-toolbar panel panel-body">
+        <div class="segmented" id="layout-toggle">
+          <button aria-pressed="true" data-val="columns">Columns — OV style</button>
+          <button aria-pressed="false" data-val="rows">Rows — E60 style</button>
+        </div>
+        <div class="hint">Sample data shaped like the two example fixtures (project names fictionalised for this mockup)</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-body canvas-wrap" style="padding:22px">
+          <div id="sched-columns"></div>
+          <div id="sched-rows" style="display:none"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN 3 — TEMPLATE PICKER ============ -->
+    <section class="screen" id="screen-picker">
+      <div class="panel panel-body">
+        <p class="hint">Built-in templates ship read-only. Copy one to get an editable version, or start blank.</p>
+      </div>
+      <div class="tpl-grid" id="tpl-grid"></div>
+    </section>
+
+    <!-- ============ SCREEN 4 — CIRCUIT ASSIGNMENT ============ -->
+    <section class="screen" id="screen-assignment">
+      <div class="assign-grid">
+        <div class="panel">
+          <div class="panel-head"><h3>Electrical — panels &amp; circuits</h3></div>
+          <div class="panel-body tree" id="circuit-tree"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3 id="assign-props-title">Circuit properties</h3></div>
+          <div class="panel-body" id="assign-props"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- rail navigation ---------------- */
+  var screens = {
+    editor: { title: "Template editor", el: document.getElementById("screen-editor") },
+    generated: { title: "Generated schematic", el: document.getElementById("screen-generated") },
+    picker: { title: "Template picker", el: document.getElementById("screen-picker") },
+    assignment: { title: "Circuit assignment", el: document.getElementById("screen-assignment") }
+  };
+  var railBtns = Array.prototype.slice.call(document.querySelectorAll(".rail-btn"));
+  function showScreen(name) {
+    Object.keys(screens).forEach(function (k) {
+      screens[k].el.classList.toggle("active", k === name);
+    });
+    railBtns.forEach(function (b) {
+      b.setAttribute("aria-current", String(b.dataset.screen === name));
+    });
+    document.getElementById("crumb-title").textContent = screens[name].title;
+    try { localStorage.setItem("mockup-screen", name); } catch (e) {}
+  }
+  railBtns.forEach(function (b) {
+    b.addEventListener("click", function () { showScreen(b.dataset.screen); });
+  });
+  (function initScreen() {
+    var last = null;
+    try { last = localStorage.getItem("mockup-screen"); } catch (e) {}
+    showScreen(last && screens[last] ? last : "editor");
+  })();
+
+  /* ================= SCREEN 1 — template editor ================= */
+  var svgNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs) {
+    var e = document.createElementNS(svgNS, tag);
+    for (var k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function line(g, x1, y1, x2, y2) { g.appendChild(el("line", { x1: x1, y1: y1, x2: x2, y2: y2, class: "sym-line" })); }
+  function rect(g, x, y, w, h) { g.appendChild(el("rect", { x: x, y: y, width: w, height: h, class: "sym-line" })); }
+  function textEl(x, y, str, size, anchor, weight, extra) {
+    var attrs = { x: x, y: y, "font-size": size || 9, "text-anchor": anchor || "middle", "font-weight": weight || 500, class: "sym-text" };
+    if (extra) for (var k in extra) attrs[k] = extra[k];
+    var t = el("text", attrs);
+    t.textContent = str;
+    return t;
+  }
+
+  // ---- building block catalogue (scope drives where a drop is allowed) ----
+  function drawGeneric(g, w, h, label) { g.appendChild(textEl(w / 2, h / 2 + 3, label, 9)); }
+  function drawBreaker(g, w, h, label) {
+    var topH = h * 0.62, cx = w / 2;
+    line(g, cx, 0, cx, topH * 0.35);
+    rect(g, w * 0.15, topH * 0.35, w * 0.7, topH * 0.55);
+    line(g, w * 0.15, topH * 0.9, w * 0.85, topH * 0.35);
+    g.appendChild(textEl(w / 2, h - 3, label, 9, "middle", 600));
+  }
+  function drawBusbar(g, w, h) { g.appendChild(el("line", { x1: 0, y1: h / 2, x2: w, y2: h / 2, stroke: "var(--ink)", "stroke-width": Math.max(3, h * 0.7) })); }
+  function drawLoad(g, w, h) {
+    line(g, 0, h / 2, w * 0.55, h / 2);
+    g.appendChild(el("path", { d: "M" + (w * 0.55) + "," + (h * 0.22) + " L" + w + "," + (h / 2) + " L" + (w * 0.55) + "," + (h * 0.78) + " Z", fill: "var(--ink)" }));
+  }
+  function drawFrame(g, w, h) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "none", stroke: "var(--ink)", "stroke-width": 1.6, "stroke-dasharray": "7 4", rx: 3 }));
+    g.appendChild(textEl(10, 16, "Frame", 9, "start", 700));
+  }
+  function drawTitleBlock(g, w, h) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "var(--paper)", stroke: "var(--ink)" }));
+    g.appendChild(textEl(8, 16, "Project name", 9, "start", 700));
+    g.appendChild(textEl(8, 30, "Status: Concept", 8, "start", 400));
+    g.appendChild(textEl(8, 44, "Tekening: —", 8, "start", 400));
+  }
+  function drawSectionBox(g, w, h, label) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "none", stroke: "var(--warn)", "stroke-width": 1.2, "stroke-dasharray": "4 3", rx: 3 }));
+    g.appendChild(textEl(6, 14, label, 9, "start", 600, { fill: "var(--warn)" }));
+  }
+  function drawAccessory(g, w, h, label) {
+    g.appendChild(el("circle", { cx: w / 2, cy: h * 0.4, r: Math.min(w, h) * 0.32, fill: "none", stroke: "var(--ink)", "stroke-width": 1.3 }));
+    g.appendChild(textEl(w / 2, h - 3, label, 8));
+  }
+  function drawNumberLabel(g, w, h, label) { g.appendChild(textEl(w / 2, h / 2 + 4, label, 13, "middle", 700)); }
+  function drawPhaseLabel(g, w, h, label) { g.appendChild(textEl(w / 2, h / 2 + 3, label, 10, "middle", 600)); }
+  function drawConductor(g, w, h, label) { line(g, 0, h / 2, w, h / 2); g.appendChild(textEl(2, h / 2 - 4, label, 9, "start", 600)); }
+  function drawCableText(g, w, h, label) {
+    var parts = String(label).split("  ");
+    g.appendChild(textEl(4, h * 0.42, parts[0], 9, "start", 600));
+    if (parts[1]) g.appendChild(textEl(4, h * 0.8, parts[1], 8, "start", 400));
+  }
+  function drawDescText(g, w, h, label) { g.appendChild(textEl(4, h / 2 + 3, label, 9, "start", 400)); }
+  function drawCustom(g, w, h, label) { g.appendChild(textEl(4, h / 2 + 3, label, 9, "start", 400, { "font-style": "italic" })); }
+  function drawCell(g, w, h, label) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "none", stroke: "#9aa3ad" }));
+    g.appendChild(textEl(w / 2, h / 2 + 3, label, 9));
+  }
+  function drawFreeText(g, w, h, label) { g.appendChild(textEl(w / 2, h / 2 + 3, label || "Free", 9, "middle", 400, { "font-style": "italic", opacity: 0.8 })); }
+  function drawLegend(g, w, h) {
+    g.appendChild(el("rect", { x: 0, y: h / 2 - 5, width: 10, height: 10, fill: "var(--select-soft)", stroke: "var(--select)" }));
+    g.appendChild(textEl(16, h / 2 + 3, "Legend", 9, "start", 500));
+  }
+  function drawTotalsTable(g, w, h, label) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "none", stroke: "var(--ink)", "stroke-width": 1.2 }));
+    var lines = String(label || "").split("\n").filter(Boolean);
+    if (!lines.length) lines = ["(no rows yet)"];
+    var lh = Math.min(16, (h - 8) / lines.length);
+    lines.forEach(function (line, i) {
+      g.appendChild(el("line", { x1: 0, y1: (i + 1) * lh, x2: w, y2: (i + 1) * lh, stroke: "var(--border-strong)", "stroke-width": 0.8 }));
+      g.appendChild(textEl(6, i * lh + lh * 0.7, line, 8.5, "start", 500));
+    });
+  }
+
+  // library of placeholder symbol art — real artwork/upload comes via the shared drawing-tools plan
+  var SYMBOL_LIBRARY = [
+    { id: "mcb-b", label: "MCB — curve B", category: "Protective devices", icon: "⎍" },
+    { id: "mcb-c", label: "MCB — curve C", category: "Protective devices", icon: "⎍" },
+    { id: "rcd", label: "RCD (residual current device)", category: "Protective devices", icon: "⏚" },
+    { id: "rcbo", label: "RCBO (combined MCB+RCD)", category: "Protective devices", icon: "⏚" },
+    { id: "fuse", label: "Fuse", category: "Protective devices", icon: "▭" },
+    { id: "mccb", label: "MCCB", category: "Protective devices", icon: "⎍" },
+    { id: "contactor", label: "Contactor", category: "Switching", icon: "⧉" },
+    { id: "timer", label: "Timer switch", category: "Switching", icon: "◷" },
+    { id: "meter", label: "kWh meter", category: "Metering", icon: "Ⓜ" },
+    { id: "surge", label: "Surge protection (SPD)", category: "Protective devices", icon: "⚡" }
+  ];
+
+  var SCOPE_LABEL = { once: "Once", panel: "Per panel", circuit: "Per circuit", aggregate: "Aggregate" };
+  var CATALOGUE = {
+    legend:      { label: "Table header / legend symbol", scope: "once",      w: 100, h: 28,  binding: null, draw: drawLegend },
+    title:       { label: "Title block",                   scope: "once",      w: 150, h: 60,  binding: null, draw: drawTitleBlock },
+    free:        { label: "Free text / line / symbol",      scope: "once",      w: 100, h: 22,  binding: null, draw: drawFreeText },
+    feed:        { label: "Feed cable",                     scope: "panel",     w: 130, h: 26,  binding: "{panel.feederCable.type} {panel.feederCable.crossSectionMm2} mm²  l={panel.feederCable.lengthM} m", draw: drawCableText },
+    main:        { label: "Main device",                    scope: "panel",     w: 40,  h: 44,  binding: "{panel.mainDevice.label}", draw: drawBreaker, symbolizable: true },
+    acc:         { label: "Accessory device",                scope: "panel",     w: 36,  h: 36,  binding: "{panel.accessories[*].label}", draw: drawAccessory, symbolizable: true },
+    bus:         { label: "Busbar",                          scope: "panel",     w: 500, h: 8,   binding: null, draw: drawBusbar },
+    section:     { label: "Section box and label",           scope: "panel",     w: 200, h: 70,  binding: "{section.name}", draw: drawSectionBox },
+    frame:       { label: "Frame",                           scope: "panel",     w: 560, h: 260, binding: null, draw: drawFrame },
+    num:         { label: "Circuit number label",            scope: "circuit",   w: 34,  h: 22,  binding: "{circuit.prefix}{circuit.number}", draw: drawNumberLabel },
+    device:      { label: "Protective device",               scope: "circuit",   w: 34,  h: 34,  binding: "{device.curve}{device.ratingA}", draw: drawBreaker, symbolizable: true },
+    phase:       { label: "Phase label",                     scope: "circuit",   w: 28,  h: 16,  binding: "{circuit.phase}", draw: drawPhaseLabel },
+    conductor:   { label: "Cable line + conductor mark",     scope: "circuit",   w: 40,  h: 16,  binding: "{cable.coreCount}x", draw: drawConductor },
+    cabletext:   { label: "Cable text",                      scope: "circuit",   w: 150, h: 34,  binding: "{cable.type} {cable.coreCount}G{cable.crossSectionMm2} mm²  l={cable.lengthM} m", draw: drawCableText },
+    load:        { label: "Load symbol",                     scope: "circuit",   w: 26,  h: 26,  binding: "from assigned terminals", draw: drawLoad },
+    desc:        { label: "Description text",                scope: "circuit",   w: 130, h: 20,  binding: "{circuit.customName}", draw: drawDescText },
+    custom:      { label: "Custom annotation",                scope: "circuit",   w: 110, h: 18,  binding: "{circuit.properties.*}", draw: drawCustom },
+    cellva:      { label: "Table cell: count + VA",           scope: "circuit",   w: 70,  h: 22,  binding: "count(terminals) · sum(terminal.capacity)", draw: drawCell },
+    cellderived: { label: "Table cell: derived value",        scope: "circuit",   w: 70,  h: 22,  binding: "sum(terminal.capacity) * circuit.diversityPercent / 100", draw: drawCell },
+    agg:         { label: "Aggregate cell (sum, count)",      scope: "aggregate", w: 76,  h: 24,  binding: "sum/count over all circuits", draw: drawCell },
+    table:       { label: "Totals table",                    scope: "aggregate", w: 300, h: 96,  binding: null, draw: drawTotalsTable, configurable: true }
+  };
+  function defaultTableRows() {
+    return [
+      { label: "Count", formula: "count(terminals)" },
+      { label: "Total VA", formula: "sum(terminal.capacity)" },
+      { label: "Divers. VA", formula: "sum(terminal.capacity) * circuit.diversityPercent / 100" },
+      { label: "%", formula: "circuit.diversityPercent" }
+    ];
+  }
+  function previewFor(type) {
+    var map = {
+      num: "A2", device: "C16", phase: "L1", conductor: "3x",
+      cabletext: "B2CA 3G2.5 mm²  l=49 m", load: "▶", desc: "Verlichting-TL-100",
+      custom: "Custom note", cellva: "19 (466VA)", cellderived: "466 · 100%",
+      feed: "B2CA 5G25 mm²  l=23 m", main: "Q1A/160A", acc: "CT-L1A",
+      section: "Preferent A (1e pref.)", agg: "Σ 33892 VA"
+    };
+    return map[type] || CATALOGUE[type].label;
+  }
+
+  // ---- template state ----
+  var idSeq = 1;
+  function newId(prefix) { return prefix + "-" + (idSeq++); }
+  function mkBlock(type, x, y) { return { id: newId("blk"), type: type, x: x, y: y, rotation: 0 }; }
+  function cloneChild(b) { return { id: newId("blk"), type: b.type, x: b.x, y: b.y, rotation: b.rotation }; }
+  function mkGroup(id, name, rule, isSpare, direction, pitch) { return { id: id, name: name, rule: rule, isSpare: isSpare, direction: direction, pitch: pitch, blocks: [] }; }
+  function makeBaseTemplate(name) { return { name: name, locale: "NL", layoutBlocks: [], groupAnchor: { x: 20, y: 90 }, groups: {}, groupOrder: [], activeGroupId: null, previewCount: 5 }; }
+  function addGroups(list) { list.forEach(function (g) { template.groups[g.id] = g; template.groupOrder.push(g.id); }); }
+
+  var template;
+  var mode = "layout"; // "layout" | "group-edit"
+  var selected = null; // { id }
+  var instanceEls = [];
+
+  function seedRowsTemplate(name) {
+    template = makeBaseTemplate(name || "Rows (NL)");
+    var rowsTable = mkBlock("table", 20, 300); rowsTable.tableRows = defaultTableRows();
+    template.layoutBlocks.push(mkBlock("frame", 6, 6), mkBlock("title", 470, 300), mkBlock("feed", 20, 20), mkBlock("bus", 20, 56), rowsTable);
+    var g1 = mkGroup("standard", "Standard", "Circuit type = Sockets", false, "column", 26);
+    g1.blocks = [
+      mkBlock("num", 4, 4), mkBlock("device", 40, 0), mkBlock("conductor", 82, 8), mkBlock("cabletext", 128, 0),
+      mkBlock("desc", 286, 8), mkBlock("load", 424, 4), mkBlock("cellva", 458, 0), mkBlock("cellderived", 458, 26)
+    ];
+    var g2 = mkGroup("branch", "Branch + switch", "Circuit number = 1, 2", false, "column", 48);
+    g2.blocks = g1.blocks.map(cloneChild).concat([mkBlock("device", 40, 40), mkBlock("cabletext", 128, 40)]);
+    var g3 = mkGroup("spare", "Spare", "Is spare", true, "column", 26);
+    g3.blocks = [mkBlock("num", 4, 4), mkBlock("device", 40, 0)];
+    addGroups([g1, g2, g3]);
+    template.activeGroupId = "standard";
+    template.groupAnchor = { x: 20, y: 90 };
+    template.previewCount = 5;
+  }
+
+  function seedColumnsTemplate(name) {
+    template = makeBaseTemplate(name || "Columns (NL)");
+    var colsTable = mkBlock("table", 20, 300); colsTable.tableRows = defaultTableRows();
+    template.layoutBlocks.push(mkBlock("frame", 6, 6), mkBlock("title", 470, 300), mkBlock("feed", 20, 20), mkBlock("bus", 20, 56), colsTable);
+    var g1 = mkGroup("standard", "Standard", "Circuit type = Lighting", false, "row", 46);
+    g1.blocks = [mkBlock("device", 4, 0), mkBlock("phase", 8, 38), mkBlock("cabletext", -30, 58), mkBlock("num", 6, 108), mkBlock("cellva", -4, 130)];
+    var g2 = mkGroup("branch", "Branch + switch", "Circuit number = 1, 2", false, "row", 46);
+    g2.blocks = g1.blocks.map(cloneChild).concat([mkBlock("conductor", 4, 150)]);
+    var g3 = mkGroup("spare", "Spare", "Is spare", true, "row", 46);
+    g3.blocks = [mkBlock("device", 4, 0), mkBlock("num", 6, 108)];
+    addGroups([g1, g2, g3]);
+    template.activeGroupId = "standard";
+    template.groupAnchor = { x: 90, y: 90 };
+    template.previewCount = 6;
+  }
+
+  seedRowsTemplate();
+
+  function currentCollection() { return mode === "group-edit" ? template.groups[template.activeGroupId].blocks : template.layoutBlocks; }
+  function findBlock(id) { var c = currentCollection(); for (var i = 0; i < c.length; i++) if (c[i].id === id) return c[i]; return null; }
+
+  var editorCanvas = document.getElementById("editor-canvas");
+  var canvasWrap = document.getElementById("canvas-drop-target");
+
+  function svgPoint(evt) {
+    var pt = editorCanvas.createSVGPoint();
+    pt.x = evt.clientX; pt.y = evt.clientY;
+    return pt.matrixTransform(editorCanvas.getScreenCTM().inverse());
+  }
+
+  function attachDrag(hitEl, block, wrapEl, outerEl) {
+    hitEl.addEventListener("pointerdown", function (e) {
+      e.stopPropagation();
+      hitEl.setPointerCapture(e.pointerId);
+      outerEl.classList.add("dragging");
+      var def = CATALOGUE[block.type];
+      var start = svgPoint(e), ox = block.x, oy = block.y;
+      function move(ev) {
+        var p = svgPoint(ev);
+        block.x = ox + (p.x - start.x);
+        block.y = oy + (p.y - start.y);
+        wrapEl.setAttribute("transform", "translate(" + block.x + "," + block.y + ") rotate(" + (block.rotation || 0) + " " + def.w / 2 + " " + def.h / 2 + ")");
+      }
+      function up() {
+        hitEl.releasePointerCapture(e.pointerId);
+        hitEl.removeEventListener("pointermove", move);
+        hitEl.removeEventListener("pointerup", up);
+        outerEl.classList.remove("dragging");
+        selectBlock(block.id);
+      }
+      hitEl.addEventListener("pointermove", move);
+      hitEl.addEventListener("pointerup", up);
+    });
+  }
+
+  function attachRotateDrag(handle, block, wrapEl, def) {
+    handle.addEventListener("pointerdown", function (e) {
+      e.stopPropagation();
+      handle.setPointerCapture(e.pointerId);
+      function move(ev) {
+        var p = svgPoint(ev);
+        var cx = block.x + def.w / 2, cy = block.y + def.h / 2;
+        var deg = Math.atan2(p.x - cx, -(p.y - cy)) * 180 / Math.PI;
+        deg = Math.round(deg / 5) * 5;
+        if (deg < 0) deg += 360;
+        block.rotation = deg;
+        wrapEl.setAttribute("transform", "translate(" + block.x + "," + block.y + ") rotate(" + deg + " " + def.w / 2 + " " + def.h / 2 + ")");
+      }
+      function up() {
+        handle.releasePointerCapture(e.pointerId);
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        renderActive();
+        renderProps();
+      }
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+    });
+  }
+
+  function renderBlockGroup(block, isPreview) {
+    var def = CATALOGUE[block.type];
+    var outer = el("g", { class: "grp-block" + (isPreview ? " instance-ghost" : ""), "data-id": block.id });
+    if (!isPreview) outer.setAttribute("data-selected", String(!!(selected && selected.id === block.id)));
+    var wrap = el("g", { transform: "translate(" + block.x + "," + block.y + ") rotate(" + (block.rotation || 0) + " " + def.w / 2 + " " + def.h / 2 + ")" });
+    if (block.type !== "frame") wrap.appendChild(el("rect", { class: "box", x: -4, y: -4, width: def.w + 8, height: def.h + 8, rx: 4 }));
+    if (def.configurable && block.type === "table") {
+      def.draw(wrap, def.w, def.h, (block.tableRows || []).map(function (r) { return r.label; }).join("\n"));
+    } else if (def.symbolizable && block.symbolId) {
+      var sym = SYMBOL_LIBRARY.filter(function (s) { return s.id === block.symbolId; })[0];
+      wrap.appendChild(el("rect", { x: 0, y: 0, width: def.w, height: def.h, fill: "var(--select-soft)", stroke: "var(--select)", "stroke-dasharray": "2 2", rx: 3 }));
+      wrap.appendChild(textEl(def.w / 2, def.h / 2 + 4, sym ? sym.icon : "?", 14));
+    } else {
+      def.draw(wrap, def.w, def.h, block.previewLabel || previewFor(block.type));
+    }
+    var hit = block.type === "frame"
+      ? el("rect", { class: "hit frame-hit", x: 0, y: 0, width: def.w, height: def.h, fill: "none" })
+      : el("rect", { class: "hit", x: -4, y: -4, width: def.w + 8, height: def.h + 8 });
+    wrap.appendChild(hit);
+    outer.appendChild(wrap);
+
+    if (!isPreview) {
+      if (selected && selected.id === block.id) {
+        var cx = def.w / 2, cy = -14;
+        wrap.appendChild(el("line", { x1: cx, y1: cy + 4, x2: def.w / 2, y2: 0, stroke: "var(--accent)", "stroke-width": 1 }));
+        var handle = el("circle", { class: "handle", cx: cx, cy: cy, r: 4 });
+        wrap.appendChild(handle);
+        attachRotateDrag(handle, block, wrap, def);
+      }
+      attachDrag(hit, block, wrap, outer);
+      outer.addEventListener("click", function (e) { e.stopPropagation(); selectBlock(block.id); });
+    }
+    return outer;
+  }
+
+  function renderGroupPreviewInstances() {
+    instanceEls = [];
+    var group = template.groups[template.activeGroupId];
+    if (!group) return;
+    var dirVec = group.direction === "column" ? { x: 0, y: 1 } : { x: 1, y: 0 };
+    for (var i = 0; i < template.previewCount; i++) {
+      var gi = el("g", { class: "instance-ghost", opacity: i === 0 ? 1 : 0.68 });
+      group.blocks.forEach(function (b) { gi.appendChild(renderBlockGroup(b, true)); });
+      gi.addEventListener("click", function () { enterGroupEdit(); });
+      editorCanvas.appendChild(gi);
+      instanceEls.push({ el: gi, i: i, dir: dirVec, pitch: group.pitch });
+    }
+    updateInstancePositions();
+  }
+  function updateInstancePositions() {
+    instanceEls.forEach(function (inst) {
+      var x = template.groupAnchor.x + inst.dir.x * inst.i * inst.pitch;
+      var y = template.groupAnchor.y + inst.dir.y * inst.i * inst.pitch;
+      inst.el.setAttribute("transform", "translate(" + x + "," + y + ")");
+    });
+  }
+
+  function renderAnchor() {
+    var a = el("circle", { cx: 0, cy: 0, r: 5, class: "anchor-marker" });
+    var label = el("text", { x: 8, y: -8, "font-size": 8, fill: "var(--select)", "font-weight": 600 });
+    label.textContent = "circuit group start";
+    var ga = el("g", { transform: "translate(" + template.groupAnchor.x + "," + template.groupAnchor.y + ")" });
+    ga.appendChild(a); ga.appendChild(label);
+    a.addEventListener("pointerdown", function (e) {
+      e.stopPropagation();
+      a.setPointerCapture(e.pointerId);
+      var start = svgPoint(e), ox = template.groupAnchor.x, oy = template.groupAnchor.y;
+      function move(ev) {
+        var p = svgPoint(ev);
+        template.groupAnchor.x = ox + (p.x - start.x);
+        template.groupAnchor.y = oy + (p.y - start.y);
+        ga.setAttribute("transform", "translate(" + template.groupAnchor.x + "," + template.groupAnchor.y + ")");
+        updateInstancePositions();
+      }
+      function up() {
+        a.releasePointerCapture(e.pointerId);
+        a.removeEventListener("pointermove", move);
+        a.removeEventListener("pointerup", up);
+      }
+      a.addEventListener("pointermove", move);
+      a.addEventListener("pointerup", up);
+    });
+    editorCanvas.appendChild(ga);
+  }
+
+  function renderActive() {
+    editorCanvas.innerHTML = "";
+    if (mode === "layout") {
+      template.layoutBlocks.forEach(function (b) { editorCanvas.appendChild(renderBlockGroup(b, false)); });
+      renderGroupPreviewInstances();
+      renderAnchor();
+    } else {
+      template.groups[template.activeGroupId].blocks.forEach(function (b) { editorCanvas.appendChild(renderBlockGroup(b, false)); });
+    }
+    renderGroupBar();
+    renderCanvasHeading();
+  }
+
+  editorCanvas.addEventListener("pointerdown", function (e) {
+    if (e.target === editorCanvas && selected) { selected = null; renderActive(); renderProps(); }
+  });
+
+  function selectBlock(id) { selected = { id: id }; renderActive(); renderProps(); }
+
+  function enterGroupEdit() { mode = "group-edit"; selected = null; renderActive(); renderProps(); }
+
+  function renderCanvasHeading() {
+    var h = document.getElementById("canvas-heading"), note = document.getElementById("canvas-note");
+    if (mode === "layout") {
+      h.textContent = "Template layout";
+      note.innerHTML = "Drag once/per-panel blocks anywhere on the sheet. Drag the small blue marker to move where the circuit group starts repeating. Click any repeated instance to edit that group.";
+    } else {
+      h.textContent = "Editing circuit group: " + template.groups[template.activeGroupId].name;
+      note.innerHTML = "One instance, shown at full size. Drag blocks and the rotate handle freely — every circuit using this group repeats exactly what you build here.";
+    }
+  }
+
+  function renderGroupBar() {
+    var bar = document.getElementById("group-bar");
+    if (mode === "layout") {
+      var g = template.groups[template.activeGroupId];
+      var chips = template.groupOrder.map(function (id) {
+        var gg = template.groups[id];
+        return '<button class="chip" data-group="' + id + '" aria-pressed="' + (id === template.activeGroupId) + '">' + gg.name + '</button>';
+      }).join("");
+      bar.innerHTML =
+        '<div class="variant-row">' + chips + '<button class="btn btn-sm btn-ghost" id="new-variant-btn">+ New variant</button></div>' +
+        '<div class="field"><label>Repeat direction</label><div class="segmented" id="dir-toggle">' +
+          '<button aria-pressed="' + (g.direction === "row") + '" data-val="row">Row →</button>' +
+          '<button aria-pressed="' + (g.direction === "column") + '" data-val="column">Column ↓</button></div></div>' +
+        '<div class="field" style="max-width:90px"><label>Pitch</label><input class="mono" id="pitch-input" value="' + g.pitch + '"/></div>' +
+        '<div class="field" style="max-width:210px"><label>Applies when</label><input id="rule-input" value="' + g.rule + '"/></div>' +
+        '<div class="field" style="max-width:110px"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding-top:6px"><input type="checkbox" id="spare-toggle" style="width:auto" ' + (g.isSpare ? "checked" : "") + '/> Is spare</label></div>' +
+        '<div class="field" style="max-width:130px"><label>Preview repeat</label><input class="mono" id="preview-count" value="' + template.previewCount + '"/></div>';
+
+      Array.prototype.forEach.call(bar.querySelectorAll("[data-group]"), function (chip) {
+        chip.addEventListener("click", function () { template.activeGroupId = chip.dataset.group; renderActive(); });
+      });
+      document.getElementById("new-variant-btn").addEventListener("click", function () {
+        var id = newId("group");
+        template.groups[id] = mkGroup(id, "New variant", "Any", false, g.direction, g.pitch);
+        template.groupOrder.push(id);
+        template.activeGroupId = id;
+        mode = "group-edit"; selected = null;
+        renderActive(); renderProps();
+      });
+      document.getElementById("dir-toggle").addEventListener("click", function (e) {
+        var b = e.target.closest("button"); if (!b) return;
+        g.direction = b.dataset.val; renderActive();
+      });
+      document.getElementById("pitch-input").addEventListener("change", function () { g.pitch = parseFloat(this.value) || g.pitch; renderActive(); });
+      document.getElementById("rule-input").addEventListener("change", function () { g.rule = this.value; });
+      document.getElementById("spare-toggle").addEventListener("change", function () { g.isSpare = this.checked; });
+      document.getElementById("preview-count").addEventListener("change", function () { template.previewCount = Math.max(1, parseInt(this.value, 10) || 1); renderActive(); });
+    } else {
+      var eg = template.groups[template.activeGroupId];
+      bar.innerHTML =
+        '<button class="btn btn-sm" id="back-to-layout">◂ Back to layout</button>' +
+        '<div><strong>' + eg.name + '</strong></div>' +
+        '<div class="field" style="max-width:210px;margin-left:auto"><label>Applies when</label><input id="rule-input" value="' + eg.rule + '"/></div>' +
+        '<div class="field" style="max-width:110px"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding-top:6px"><input type="checkbox" id="spare-toggle" style="width:auto" ' + (eg.isSpare ? "checked" : "") + '/> Is spare</label></div>';
+      document.getElementById("back-to-layout").addEventListener("click", function () { mode = "layout"; selected = null; renderActive(); renderProps(); });
+      document.getElementById("rule-input").addEventListener("change", function () { eg.rule = this.value; });
+      document.getElementById("spare-toggle").addEventListener("change", function () { eg.isSpare = this.checked; });
+    }
+  }
+
+  function bindDeleteButton(host, block) {
+    document.getElementById("prop-delete").addEventListener("click", function () {
+      var coll = currentCollection(), idx = coll.indexOf(block);
+      if (idx > -1) coll.splice(idx, 1);
+      selected = null; renderActive(); renderProps();
+    });
+  }
+
+  function renderTableProps(host, block, def) {
+    var rowsHtml = (block.tableRows || []).map(function (r, i) {
+      return '<div class="field-row" data-row="' + i + '" style="grid-template-columns:1fr 2fr auto;align-items:flex-end;gap:6px;margin-top:6px">' +
+        '<div class="field"><label>' + (i === 0 ? "Row label" : "&nbsp;") + '</label><input class="mono table-row-label" value="' + r.label + '"/></div>' +
+        '<div class="field"><label>' + (i === 0 ? "Formula" : "&nbsp;") + '</label><input class="mono table-row-formula" value="' + r.formula + '" placeholder="e.g. sum(terminal.capacity)"/></div>' +
+        '<button class="btn btn-sm btn-ghost table-row-remove" title="Remove row">✕</button>' +
+      '</div>';
+    }).join("");
+    host.innerHTML =
+      '<div class="field"><label>Block type (role)</label><input value="' + def.label + '" readonly/></div>' +
+      '<div class="hint" style="margin-top:4px">Scope: ' + SCOPE_LABEL[def.scope] + '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="hint">One row per line in the generated table. Each formula runs per column — per circuit for a per-panel table like this one.</div>' +
+      (rowsHtml || '<p class="hint" style="margin-top:8px">No rows yet.</p>') +
+      '<button class="btn btn-sm btn-ghost" id="table-row-add" style="margin-top:10px">+ Add row</button>' +
+      '<hr class="divider"/><button class="btn btn-sm btn-ghost" id="prop-delete">Remove block</button>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-row]"), function (rowEl) {
+      var i = Number(rowEl.dataset.row);
+      rowEl.querySelector(".table-row-label").addEventListener("change", function () { block.tableRows[i].label = this.value; renderActive(); renderProps(); });
+      rowEl.querySelector(".table-row-formula").addEventListener("change", function () { block.tableRows[i].formula = this.value; renderActive(); });
+      rowEl.querySelector(".table-row-remove").addEventListener("click", function () { block.tableRows.splice(i, 1); renderActive(); renderProps(); });
+    });
+    document.getElementById("table-row-add").addEventListener("click", function () {
+      block.tableRows = block.tableRows || [];
+      block.tableRows.push({ label: "New row", formula: "" });
+      renderActive(); renderProps();
+    });
+    bindDeleteButton(host, block);
+  }
+
+  function openSymbolLibrary(block) {
+    var backdrop = document.createElement("div");
+    backdrop.className = "symbol-modal-backdrop";
+    var cats = {};
+    SYMBOL_LIBRARY.forEach(function (s) { (cats[s.category] = cats[s.category] || []).push(s); });
+    var body = Object.keys(cats).map(function (cat) {
+      return '<div class="symbol-cat-label">' + cat + '</div><div class="symbol-grid">' +
+        cats[cat].map(function (s) {
+          return '<button class="symbol-tile" data-id="' + s.id + '"><span class="symbol-tile-icon">' + s.icon + '</span><span class="symbol-tile-label">' + s.label + '</span></button>';
+        }).join("") + '</div>';
+    }).join("");
+    backdrop.innerHTML =
+      '<div class="symbol-modal">' +
+        '<div class="symbol-modal-head"><h3>Symbol library</h3><button class="btn btn-sm btn-ghost" id="symbol-modal-close">✕</button></div>' +
+        '<p class="hint">Placeholder icons for this mockup — real symbol artwork gets uploaded here once the shared drawing-tools plan lands.</p>' +
+        body +
+        '<button class="btn btn-sm btn-ghost" id="symbol-add-own" disabled title="Needs the shared drawing-tools plan" style="margin-top:14px">+ Draw your own symbol…</button>' +
+      '</div>';
+    document.body.appendChild(backdrop);
+    function close() { document.body.removeChild(backdrop); }
+    backdrop.addEventListener("click", function (e) { if (e.target === backdrop) close(); });
+    document.getElementById("symbol-modal-close").addEventListener("click", close);
+    Array.prototype.forEach.call(backdrop.querySelectorAll(".symbol-tile"), function (tile) {
+      tile.addEventListener("click", function () {
+        block.symbolId = tile.dataset.id;
+        close();
+        renderActive(); renderProps();
+      });
+    });
+  }
+
+  function renderProps() {
+    var host = document.getElementById("props-panel");
+    if (!selected) { host.innerHTML = '<p class="props-empty">Select a block on the canvas to edit it, or drag one in from the palette.</p>'; return; }
+    var block = findBlock(selected.id);
+    if (!block) { selected = null; host.innerHTML = '<p class="props-empty">Select a block on the canvas to edit it.</p>'; return; }
+    var def = CATALOGUE[block.type];
+
+    if (def.configurable && block.type === "table") { renderTableProps(host, block, def); return; }
+
+    var rotButtons = [0, 90, 180, 270].map(function (r) {
+      return '<button class="btn btn-sm' + (block.rotation === r ? ' btn-primary' : '') + '" data-rot="' + r + '">' + r + '°</button>';
+    }).join("");
+    var bindingVal = block.binding != null ? block.binding : (def.binding || "");
+    var previewVal = block.previewLabel || previewFor(block.type);
+    var symbolLabel = block.symbolId ? (function () {
+      var s = SYMBOL_LIBRARY.filter(function (x) { return x.id === block.symbolId; })[0];
+      return s ? s.label : block.symbolId;
+    })() : "Default vector symbol";
+    host.innerHTML =
+      '<div class="field"><label>Block type (role)</label><input value="' + def.label + '" readonly/></div>' +
+      '<div class="hint" style="margin-top:4px">Scope: ' + SCOPE_LABEL[def.scope] + '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>x (' + (mode === "group-edit" ? "from group origin" : "on sheet") + ')</label><input class="mono" id="prop-x" value="' + Math.round(block.x) + '"/></div>' +
+        '<div class="field"><label>y</label><input class="mono" id="prop-y" value="' + Math.round(block.y) + '"/></div>' +
+      '</div>' +
+      '<div class="field" style="margin-top:10px"><label>Rotation — drag the canvas handle, or set exactly</label><div class="rot-row">' + rotButtons + '</div></div>' +
+      '<hr class="divider"/>' +
+      '<div class="field"><label>Style — line thickness</label><select><option>Thin (0.25 mm)</option><option selected>Regular (0.35 mm)</option><option>Bold (0.5 mm)</option></select></div>' +
+      (def.symbolizable
+        ? '<hr class="divider"/><div class="field"><label>Symbol</label><div class="symbol-current">' + symbolLabel + '</div></div>' +
+          '<button class="btn btn-sm" id="prop-choose-symbol">Choose from library…</button>' +
+          (block.symbolId ? ' <button class="btn btn-sm btn-ghost" id="prop-clear-symbol">Use default</button>' : '')
+        : '') +
+      '<hr class="divider"/><div class="field"><label>Binding <span class="hint">(optional — leave blank for a static block)</span></label><input class="mono" id="prop-binding" value="' + bindingVal + '" placeholder="e.g. {circuit.customName}"/></div>' +
+      (bindingVal
+        ? '<div class="field" style="margin-top:8px"><label>Preview value for this sample</label><input id="prop-preview" value="' + previewVal + '"/></div>' +
+          '<div class="binding-preview"><span class="hint">Resolved for the sample circuit —</span> <strong class="mono">' + previewVal + '</strong></div>'
+        : '<p class="hint" style="margin-top:8px">No binding — this block always renders the same.</p>') +
+      '<hr class="divider"/><button class="btn btn-sm btn-ghost" id="prop-delete">Remove block</button>';
+
+    document.getElementById("prop-x").addEventListener("change", function () { block.x = parseFloat(this.value) || 0; renderActive(); });
+    document.getElementById("prop-y").addEventListener("change", function () { block.y = parseFloat(this.value) || 0; renderActive(); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rot]"), function (b) {
+      b.addEventListener("click", function () { block.rotation = Number(b.dataset.rot); renderActive(); renderProps(); });
+    });
+    document.getElementById("prop-binding").addEventListener("change", function () { block.binding = this.value; renderActive(); renderProps(); });
+    var previewInput = document.getElementById("prop-preview");
+    if (previewInput) previewInput.addEventListener("change", function () { block.previewLabel = this.value; renderActive(); renderProps(); });
+    if (def.symbolizable) {
+      document.getElementById("prop-choose-symbol").addEventListener("click", function () { openSymbolLibrary(block); });
+      var clearBtn = document.getElementById("prop-clear-symbol");
+      if (clearBtn) clearBtn.addEventListener("click", function () { block.symbolId = null; renderActive(); renderProps(); });
+    }
+    bindDeleteButton(host, block);
+  }
+
+  function renderPalette() {
+    var host = document.getElementById("palette-host");
+    var groups = { once: [], panel: [], circuit: [], aggregate: [] };
+    Object.keys(CATALOGUE).forEach(function (key) { groups[CATALOGUE[key].scope].push(key); });
+    var openSet = { once: true, panel: false, circuit: true, aggregate: false };
+    var html = "";
+    ["once", "panel", "circuit", "aggregate"].forEach(function (scope) {
+      html += '<details class="palette-group"' + (openSet[scope] ? " open" : "") + '><summary>' + SCOPE_LABEL[scope] + ' <span class="hint">' + groups[scope].length + '</span></summary>';
+      groups[scope].forEach(function (key) {
+        html += '<div class="palette-item" draggable="true" data-type="' + key + '" tabindex="0"><span class="dot"></span>' + CATALOGUE[key].label + '</div>';
+      });
+      html += '</details>';
+    });
+    host.innerHTML = html;
+    Array.prototype.forEach.call(host.querySelectorAll(".palette-item"), function (item) {
+      item.addEventListener("dragstart", function (e) {
+        e.dataTransfer.setData("text/plain", item.dataset.type);
+        e.dataTransfer.effectAllowed = "copy";
+      });
+      item.addEventListener("click", function () {
+        var def = CATALOGUE[item.dataset.type];
+        document.getElementById("props-panel").innerHTML =
+          '<div class="field"><label>Block type (role)</label><input value="' + def.label + '" readonly/></div>' +
+          '<div class="hint" style="margin-top:4px">Scope: ' + SCOPE_LABEL[def.scope] + '</div>' +
+          '<p class="hint" style="margin-top:10px">Drag this onto the canvas to place it.' +
+          (def.scope === "circuit" && mode === "layout" ? " You'll need to be inside a circuit group first — click a repeated instance, or “+ New variant”." : "") + '</p>';
+      });
+    });
+  }
+
+  canvasWrap.addEventListener("dragover", function (e) { e.preventDefault(); canvasWrap.classList.add("drop-ok"); });
+  canvasWrap.addEventListener("dragleave", function () { canvasWrap.classList.remove("drop-ok", "drop-block"); });
+  canvasWrap.addEventListener("drop", function (e) {
+    e.preventDefault();
+    canvasWrap.classList.remove("drop-ok", "drop-block");
+    var type = e.dataTransfer.getData("text/plain");
+    var def = CATALOGUE[type];
+    if (!def) return;
+    var allowedScopes = mode === "group-edit" ? ["circuit"] : ["once", "panel", "aggregate"];
+    if (allowedScopes.indexOf(def.scope) === -1) {
+      document.getElementById("canvas-note").innerHTML =
+        '<span class="canvas-note warn">“' + def.label + '” is a ' + SCOPE_LABEL[def.scope].toLowerCase() + ' block — ' +
+        (mode === "group-edit" ? "go back to the layout to place it." : "open a circuit group to place it (click a repeated instance, or “+ New variant”).") + '</span>';
+      return;
+    }
+    var p = svgPoint(e);
+    var block = mkBlock(type, Math.round(p.x - def.w / 2), Math.round(p.y - def.h / 2));
+    if (type === "table") block.tableRows = defaultTableRows();
+    currentCollection().push(block);
+    selected = { id: block.id };
+    renderActive(); renderProps();
+  });
+
+  document.getElementById("tpl-name").addEventListener("change", function () { template.name = this.value; });
+
+  renderPalette();
+  renderActive();
+  renderProps();
+
+  /* ================= SCREEN 2 — generated schematic ================= */
+  function buildColumnsSchematic() {
+    var circuits = [
+      { n: 1, phase: "L1", dev: "B16", desc: "Verlichting gangzone", cable: "5x2.5", count: 12, va: 252, div: 227, pct: "90%" },
+      { n: 2, phase: "L2", dev: "B16", desc: "Verlichting gangzone", cable: "5x2.5", count: 8, va: 64, div: 58, pct: "90%" },
+      { n: 3, phase: "L3", dev: "B16", desc: "Verlichting kantoren", cable: "3x2.5", count: 21, va: 861, div: 775, pct: "90%" },
+      { n: 4, phase: "L1", dev: "B16", desc: "Verlichting kantoren", cable: "3x2.5", count: 24, va: 984, div: 886, pct: "90%" },
+      { n: 5, phase: "L2", dev: "B16", desc: "Verlichting kantoren", cable: "3x2.5", count: 22, va: 902, div: 812, pct: "90%" },
+      { n: 9, phase: "L3", dev: "B16", desc: "…Reserve…", cable: "—", count: 0, va: 0, div: 0, pct: "—" },
+      { n: 11, phase: "L2", dev: "B16/30mA", desc: "Werkplek", cable: "3x2.5", count: 13, va: 2600, div: 1820, pct: "70%" },
+      { n: 20, phase: "L2", dev: "B16/30mA", desc: "Algemeen", cable: "3x2.5", count: 12, va: 2400, div: 720, pct: "30%" }
+    ];
+    var w = 62, x0 = 170, top = 30;
+    var svg = ['<svg width="' + (x0 + circuits.length * w + 40) + '" height="430" viewBox="0 0 ' + (x0 + circuits.length * w + 40) + ' 430" xmlns="http://www.w3.org/2000/svg">'];
+    svg.push('<style>.i{font-family:IBM Plex Mono,monospace;font-size:9px;fill:#1b2330}.l{stroke:#1b2330;stroke-width:1.1}.f{stroke:#1b2330;stroke-width:1.6;stroke-dasharray:5 3;fill:none}</style>');
+    // frame
+    svg.push('<rect x="14" y="16" width="' + (x0 + circuits.length * w + 4) + '" height="300" class="f" rx="2"/>');
+    // incoming feed
+    svg.push('<text x="24" y="' + (top - 6) + '" class="i" font-weight="600">80A · Vanaf: HV-13</text>');
+    svg.push('<text x="24" y="' + (top + 8) + '" class="i">CCA 5x25 mm² l=23 m</text>');
+    svg.push('<line x1="24" y1="' + (top + 20) + '" x2="120" y2="' + (top + 20) + '" class="l"/>');
+    // busbar
+    var busY = top + 30;
+    svg.push('<line x1="24" y1="' + busY + '" x2="' + (x0 + circuits.length * w) + '" y2="' + busY + '" class="l" stroke-width="3"/>');
+
+    circuits.forEach(function (c, i) {
+      var cx = x0 + i * w + w / 2;
+      svg.push('<line x1="' + cx + '" y1="' + busY + '" x2="' + cx + '" y2="' + (busY + 20) + '" class="l"/>');
+      svg.push('<rect x="' + (cx - 10) + '" y="' + (busY + 20) + '" width="20" height="14" class="l" fill="none"/>');
+      svg.push('<line x1="' + (cx - 10) + '" y1="' + (busY + 34) + '" x2="' + (cx + 10) + '" y2="' + (busY + 20) + '" class="l"/>');
+      svg.push('<text x="' + cx + '" y="' + (busY + 50) + '" class="i" text-anchor="middle" font-weight="600">' + c.dev + '</text>');
+      svg.push('<line x1="' + cx + '" y1="' + (busY + 56) + '" x2="' + cx + '" y2="' + (busY + 130) + '" class="l"/>');
+      // rotated cable text (90°, as in OV)
+      svg.push('<text x="' + (cx + 4) + '" y="' + (busY + 62) + '" class="i" transform="rotate(90 ' + (cx + 4) + ' ' + (busY + 62) + ')">' + c.desc + ' · CCA ' + c.cable + '</text>');
+      svg.push('<circle cx="' + cx + '" cy="' + (busY + 134) + '" r="4" fill="#1b2330"/>');
+      svg.push('<text x="' + cx + '" y="' + (busY + 152) + '" class="i" text-anchor="middle" font-weight="700">' + c.n + '</text>');
+      svg.push('<text x="' + cx + '" y="' + (busY + 164) + '" class="i" text-anchor="middle">' + c.phase + '</text>');
+    });
+
+    // summary table
+    var tblY = busY + 178;
+    var rows = [
+      ["Count", circuits.map(function (c) { return c.count || "—"; })],
+      ["Total VA", circuits.map(function (c) { return c.va || "—"; })],
+      ["Divers. VA", circuits.map(function (c) { return c.div || "—"; })],
+      ["%", circuits.map(function (c) { return c.pct; })]
+    ];
+    rows.forEach(function (row, ri) {
+      var y = tblY + ri * 18;
+      svg.push('<text x="26" y="' + (y + 12) + '" class="i" fill="#5b6472">' + row[0] + '</text>');
+      row[1].forEach(function (v, i) {
+        var cx = x0 + i * w + w / 2;
+        svg.push('<rect x="' + (cx - w / 2) + '" y="' + y + '" width="' + w + '" height="17" fill="none" stroke="#c7cdd6"/>');
+        svg.push('<text x="' + cx + '" y="' + (y + 12) + '" class="i" text-anchor="middle">' + v + '</text>');
+      });
+    });
+
+    // title block
+    svg.push('<g transform="translate(' + (x0 + circuits.length * w - 150) + ',' + (tblY + 90) + ')">');
+    svg.push('<rect x="0" y="0" width="180" height="70" fill="none" stroke="#1b2330"/>');
+    svg.push('<text x="8" y="16" class="i" font-weight="700">Voorbeeldgebouw</text>');
+    svg.push('<text x="8" y="30" class="i" fill="#5b6472">Hoofdverdeler HV-1</text>');
+    svg.push('<text x="8" y="44" class="i" fill="#5b6472">Status: Concept — mockup</text>');
+    svg.push('<text x="8" y="58" class="i" fill="#5b6472">Tekening: MOCK-COL-01</text>');
+    svg.push('</g>');
+
+    svg.push('</svg>');
+    return svg.join("");
+  }
+
+  function buildRowsSchematic() {
+    function board(label, circuits, feedLabel, w) {
+      var rowH = 15, top = 28, x0 = 220;
+      var h = top + circuits.length * rowH + 60;
+      var out = ['<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">'];
+      out.push('<style>.i{font-family:IBM Plex Mono,monospace;font-size:9px;fill:#1b2330}.l{stroke:#1b2330;stroke-width:1}.f{stroke:#1b2330;stroke-width:1.6;stroke-dasharray:5 3;fill:none}</style>');
+      out.push('<rect x="4" y="4" width="' + (w - 8) + '" height="' + (h - 8) + '" class="f" rx="2"/>');
+      out.push('<text x="12" y="20" class="i" font-weight="700">' + label + '</text>');
+      out.push('<text x="12" y="' + (h - 14) + '" class="i" fill="#5b6472">Vanaf: ' + feedLabel + '</text>');
+      // vertical busbar
+      out.push('<line x1="60" y1="' + top + '" x2="60" y2="' + (top + circuits.length * rowH) + '" class="l" stroke-width="3"/>');
+      var sectionSeen = {};
+      circuits.forEach(function (c, i) {
+        var y = top + i * rowH + rowH / 2;
+        if (c.section && !sectionSeen[c.section]) {
+          sectionSeen[c.section] = true;
+          out.push('<text x="70" y="' + (y - 4) + '" class="i" fill="#9c7a12" font-weight="600">' + c.section + '</text>');
+        }
+        out.push('<line x1="60" y1="' + y + '" x2="80" y2="' + y + '" class="l"/>');
+        out.push('<rect x="80" y="' + (y - 5) + '" width="12" height="10" class="l" fill="none"/>');
+        out.push('<text x="98" y="' + (y + 3) + '" class="i" font-weight="600">' + c.dev + '</text>');
+        out.push('<line x1="122" y1="' + y + '" x2="150" y2="' + y + '" class="l"/>');
+        out.push('<text x="152" y="' + (y + 3) + '" class="i" font-weight="700">' + c.n + '</text>');
+        out.push('<text x="' + x0 + '" y="' + (y + 3) + '" class="i">' + c.desc + '</text>');
+        out.push('<text x="' + (w - 130) + '" y="' + (y + 3) + '" class="i" text-anchor="end">' + c.cable + '</text>');
+        out.push('<text x="' + (w - 60) + '" y="' + (y + 3) + '" class="i" text-anchor="end">' + (c.va ? c.va + " VA" : "—") + '</text>');
+      });
+      out.push('</svg>');
+      return out.join("");
+    }
+    var boardA = [
+      { n: "A1", dev: "C16", desc: "Verlichting-TL-100 · B2CA 3G2.5", cable: "l=33 m", va: 392, section: "preferent A (1e pref.)" },
+      { n: "A2", dev: "C16", desc: "Verlichting-TL-100 · B2CA 3G2.5", cable: "l=49 m", va: 466 },
+      { n: "A4", dev: "C16", desc: "Verlichting-PL-100 · B2CA 3G2.5", cable: "l=22 m", va: 252 },
+      { n: "A6", dev: "C16", desc: "…Reserve…", cable: "—", va: 0, section: "preferent A (2e pref.)" },
+      { n: "A76", dev: "C16", desc: "WCD-50 · B2CA 3G2.5", cable: "l=46 m", va: 1600 },
+      { n: "A86", dev: "C32", desc: "ASP kracht groep D · B2CA 5G2.5", cable: "l=17 m", va: 6500, section: "preferent A (3e pref.)" },
+      { n: "A90", dev: "C32", desc: "ASP kracht · B2CA 5G4", cable: "l=28 m", va: 11000 }
+    ];
+    var boardB = [
+      { n: "B1", dev: "C16", desc: "Verlichting-TL-100 · B2CA 3G2.5", cable: "l=31 m", va: 343, section: "preferent B (1e pref.)" },
+      { n: "B4", dev: "C16", desc: "Verlichting-LED-100 · B2CA 3G2.5", cable: "l=38 m", va: 60 },
+      { n: "B7", dev: "C16", desc: "…Reserve…", cable: "—", va: 0, section: "preferent B (2e pref.)" },
+      { n: "B74", dev: "C16", desc: "WCD-50 · B2CA 3G2.5", cable: "l=29 m", va: 1600 },
+      { n: "B83", dev: "C32", desc: "ASP kracht groep D · B2CA 5G2.5", cable: "l=17 m", va: 6500, section: "preferent B (3e pref.)" }
+    ];
+    var wrap = '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">' +
+      '<div>' + board("Sectie A", boardA, "HKL-A", 540) + '</div>' +
+      '<div>' + board("Sectie B", boardB, "HKL-B", 480) + '</div>' +
+      '</div>' +
+      '<div style="margin-top:16px;display:flex;gap:28px" class="mono hint">' +
+        '<span>Totaal vermogen: <strong>52434 VA</strong></span>' +
+        '<span>Te verwachten (80%): <strong>42365 VA</strong></span>' +
+      '</div>' +
+      '<div style="margin-top:10px;border:1px solid #1b2330;padding:8px 12px;width:220px;font-size:10.5px" class="mono">' +
+        '<div style="font-weight:700">Voorbeeldschool</div>' +
+        '<div style="color:#5b6472">Installatieschema EC-1</div>' +
+        '<div style="color:#5b6472">Status: Concept — mockup</div>' +
+        '<div style="color:#5b6472">Tekening: MOCK-ROW-01</div>' +
+      '</div>';
+    return wrap;
+  }
+
+  document.getElementById("sched-columns").innerHTML = buildColumnsSchematic();
+  document.getElementById("sched-rows").innerHTML = buildRowsSchematic();
+
+  document.getElementById("layout-toggle").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    Array.prototype.forEach.call(this.querySelectorAll("button"), function (x) { x.setAttribute("aria-pressed", "false"); });
+    b.setAttribute("aria-pressed", "true");
+    var isCols = b.dataset.val === "columns";
+    document.getElementById("sched-columns").style.display = isCols ? "" : "none";
+    document.getElementById("sched-rows").style.display = isCols ? "none" : "";
+  });
+
+  /* ================= SCREEN 3 — template picker ================= */
+  var builtins = [
+    { id: "bi-columns", name: "Columns (NL)", locale: "NL", builtin: true, note: "Circuits repeat left→right — matches the OV example." },
+    { id: "bi-rows", name: "Rows (NL)", locale: "NL", builtin: true, note: "Circuits repeat top→bottom, grouped by section — matches the E60 example." }
+  ];
+  var myTemplates = [];
+  var loadedId = "bi-rows";
+  var tplCounter = 1;
+
+  function thumbSvg(kind) {
+    if (kind === "rows") {
+      return '<svg width="120" height="70" viewBox="0 0 120 70"><rect x="4" y="4" width="112" height="62" fill="none" stroke="#b7c0cd" stroke-dasharray="3 2"/><line x1="20" y1="10" x2="20" y2="60" stroke="#1b2330" stroke-width="2"/>' +
+        [16,26,36,46,56].map(function(y){return '<line x1="20" y1="'+y+'" x2="108" y2="'+y+'" stroke="#1b2330" stroke-width="0.8"/>';}).join('') + '</svg>';
+    }
+    return '<svg width="120" height="70" viewBox="0 0 120 70"><rect x="4" y="4" width="112" height="62" fill="none" stroke="#b7c0cd" stroke-dasharray="3 2"/><line x1="10" y1="20" x2="110" y2="20" stroke="#1b2330" stroke-width="2"/>' +
+      [20,38,56,74,92].map(function(x){return '<line x1="'+x+'" y1="20" x2="'+x+'" y2="60" stroke="#1b2330" stroke-width="0.8"/>';}).join('') + '</svg>';
+  }
+
+  function renderTemplates() {
+    var grid = document.getElementById("tpl-grid");
+    grid.innerHTML = "";
+    builtins.concat(myTemplates).forEach(function (t) {
+      var card = document.createElement("div");
+      card.className = "panel tpl-card";
+      var kind = t.name.toLowerCase().indexOf("row") > -1 ? "rows" : "columns";
+      card.innerHTML =
+        '<div class="tpl-thumb">' + thumbSvg(kind) + '</div>' +
+        '<div class="tpl-card-body">' +
+          '<div class="tpl-name-row"><strong>' + t.name + '</strong>' +
+            '<span class="badge badge-locale">' + t.locale + '</span></div>' +
+          (t.builtin ? '<span class="hint">Built-in · read-only</span>' : '<span class="hint">Copy · editable</span>') +
+          (t.id === loadedId ? '<span class="badge badge-active" style="width:fit-content">Loaded</span>' : '') +
+          '<p class="hint">' + (t.note || "") + '</p>' +
+          '<div class="tpl-actions">' +
+            '<button class="btn btn-sm btn-primary" data-act="load" data-id="' + t.id + '">Load</button>' +
+            '<button class="btn btn-sm" data-act="copy" data-id="' + t.id + '">Copy</button>' +
+            (t.builtin ? '' : '<button class="btn btn-sm btn-ghost" data-act="delete" data-id="' + t.id + '">Delete</button>') +
+          '</div>' +
+        '</div>';
+      grid.appendChild(card);
+    });
+    var newTile = document.createElement("button");
+    newTile.className = "tpl-new";
+    newTile.innerHTML = '<span style="font-size:22px">+</span><span>New template</span>';
+    newTile.addEventListener("click", function () {
+      var id = "new-" + (tplCounter++);
+      myTemplates.push({ id: id, name: "Untitled " + tplCounter, locale: "—", builtin: false, note: "Blank — no blocks placed yet." });
+      renderTemplates();
+    });
+    grid.appendChild(newTile);
+
+    Array.prototype.forEach.call(grid.querySelectorAll("[data-act]"), function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.dataset.id, act = btn.dataset.act;
+        var all = builtins.concat(myTemplates);
+        var src = all.filter(function (t) { return t.id === id; })[0];
+        if (act === "load") {
+          loadedId = id; renderTemplates();
+          var kind = src.name.toLowerCase().indexOf("row") > -1 ? "rows" : "columns";
+          if (kind === "rows") seedRowsTemplate(src.name); else seedColumnsTemplate(src.name);
+          mode = "layout"; selected = null;
+          document.getElementById("tpl-name").value = template.name;
+          document.getElementById("loaded-note").textContent = "Loaded from Template picker: " + src.name;
+          renderActive(); renderProps();
+          showScreen("editor");
+        }
+        if (act === "copy") {
+          var copyId = "copy-" + (tplCounter++);
+          myTemplates.push({ id: copyId, name: src.name + " copy", locale: src.locale, builtin: false, note: "Copied from " + src.name + "." });
+          renderTemplates();
+        }
+        if (act === "delete") {
+          myTemplates = myTemplates.filter(function (t) { return t.id !== id; });
+          if (loadedId === id) loadedId = "bi-rows";
+          renderTemplates();
+        }
+      });
+    });
+  }
+  renderTemplates();
+
+  /* ================= SCREEN 4 — circuit assignment ================= */
+  var terminalPool = [
+    { id: "t-1", label: "TL armatuur — Gang 02.01.06", va: 24 },
+    { id: "t-2", label: "TL armatuur — Gang 02.01.07", va: 24 },
+    { id: "t-3", label: "Wandcontactdoos — Kantoor 12", va: 200 },
+    { id: "t-4", label: "Wandcontactdoos — Kantoor 13", va: 200 }
+  ];
+
+  // panel-level defaults: a circuit inherits every one of these unless it
+  // sets its own override (see circuits[*].overrides below). Cable length
+  // has no panel default — it's always a per-circuit measured value.
+  var panels = {
+    "p-a": {
+      name: "Panel A",
+      defaults: {
+        prefix: "A", circuitType: "", phase: "",
+        device: { curve: "C", ratingA: 16, rcdMilliamps: "" },
+        cable: { type: "B2CA", coreCount: 3, crossSectionMm2: 2.5 },
+        diversityPercent: 100
+      }
+    }
+  };
+
+  var circuits = {
+    // fully inherits device + cable + prefix + diversity from Panel A; only circuit type + phase differ
+    "c-1": {
+      id: "c-1", number: 2, panelId: "p-a", sectionId: "s-a1", isSpare: false,
+      customName: "Verlichting-TL-100", terminals: ["t-1", "t-2"], cableLengthM: 49,
+      overrides: {
+        prefix: null, circuitType: "Lighting", phase: "L1",
+        device: { curve: null, ratingA: null, rcdMilliamps: null },
+        cable: { type: null, coreCount: null, crossSectionMm2: null },
+        diversityPercent: null
+      }
+    },
+    // overrides one device sub-field (rcdMilliamps) while curve + rating still inherit
+    "c-2": {
+      id: "c-2", number: 76, panelId: "p-a", sectionId: "s-a3", isSpare: false,
+      customName: "WCD-50 — Room 02.02.03", terminals: ["t-3"], cableLengthM: 46,
+      overrides: {
+        prefix: null, circuitType: "Sockets", phase: "L2",
+        device: { curve: null, ratingA: null, rcdMilliamps: 30 },
+        cable: { type: null, coreCount: null, crossSectionMm2: null },
+        diversityPercent: 50
+      }
+    },
+    // spare — every field just follows the panel default, nothing overridden
+    "c-3": {
+      id: "c-3", number: 6, panelId: "p-a", sectionId: "s-a2", isSpare: true,
+      customName: "", terminals: [], cableLengthM: null,
+      overrides: {
+        prefix: null, circuitType: null, phase: null,
+        device: { curve: null, ratingA: null, rcdMilliamps: null },
+        cable: { type: null, coreCount: null, crossSectionMm2: null },
+        diversityPercent: null
+      }
+    }
+  };
+  var selectedTarget = { type: "circuit", id: "c-1" };
+  var equipmentConverted = false;
+
+  function pathGet(obj, path) {
+    var v = obj;
+    path.split(".").forEach(function (k) { v = v ? v[k] : undefined; });
+    return v;
+  }
+  function pathSet(obj, path, value) {
+    var parts = path.split("."), o = obj;
+    for (var i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+    o[parts[parts.length - 1]] = value;
+  }
+  function isOverridden(c, path) {
+    var v = pathGet(c.overrides, path);
+    return v !== null && v !== undefined && v !== "";
+  }
+  function effective(c, path) {
+    var v = pathGet(c.overrides, path);
+    if (v !== null && v !== undefined && v !== "") return v;
+    return pathGet(panels[c.panelId].defaults, path);
+  }
+  function setOverride(c, path, value) { pathSet(c.overrides, path, value); }
+  function clearOverride(c, path) { pathSet(c.overrides, path, null); }
+  function coerce(raw) {
+    if (raw === "") return "";
+    var n = parseFloat(raw);
+    return (/^-?[0-9.]+$/.test(raw) && !isNaN(n)) ? n : raw;
+  }
+
+  function terminalCapacity(c) {
+    return c.terminals.reduce(function (sum, tid) {
+      var t = terminalPool.filter(function (x) { return x.id === tid; })[0];
+      return sum + (t ? t.va : 0);
+    }, 0);
+  }
+
+  function renderTree() {
+    var host = document.getElementById("circuit-tree");
+    var sections = { "s-a1": "Preferent A (1e pref.)", "s-a2": "Preferent A (2e pref.)", "s-a3": "Preferent A (3e pref.)" };
+    var bySection = {};
+    Object.keys(circuits).forEach(function (id) {
+      var c = circuits[id];
+      (bySection[c.sectionId] = bySection[c.sectionId] || []).push(c);
+    });
+
+    var html = '<details open><summary><strong>Electrical</strong></summary><div class="nest">';
+    html += '<details open><summary>Sockets / Lighting — ' + panels["p-a"].name +
+      ' <button type="button" class="btn btn-sm btn-ghost panel-defaults-btn" data-panel="p-a" title="Edit this panel’s default circuit values">⚙ Defaults</button></summary><div class="nest">';
+    Object.keys(sections).forEach(function (sid) {
+      html += '<details open><summary>' + sections[sid] + '</summary><div class="nest">';
+      (bySection[sid] || []).forEach(function (c) {
+        html += '<div class="circuit-row" data-id="' + c.id + '" aria-selected="' + (selectedTarget.type === "circuit" && c.id === selectedTarget.id) + '">' +
+          '<span class="num mono">' + effective(c, "prefix") + c.number + '</span>' +
+          '<span>' + (c.isSpare ? "spare" : (c.customName || "unnamed")) + '</span>' +
+          (c.isSpare ? '<span class="badge badge-spare">spare</span>' : '') +
+          '<span class="term-count">' + c.terminals.length + ' term.</span>' +
+          '</div>';
+      });
+      html += '</div></details>';
+    });
+    html += '</div></details>';
+
+    html += '<div class="equip-row"><span>⏚ Equipment E-04 (unconverted)</span>' +
+      (equipmentConverted
+        ? '<span class="badge badge-active">Panel B</span>'
+        : '<button class="btn btn-sm" id="convert-btn">Convert to panel</button>') +
+      '</div>';
+    if (equipmentConverted) {
+      html += '<div class="nest hint" style="padding:4px 8px">New panel created — no circuits assigned yet.</div>';
+    }
+    html += '</div></details>';
+    host.innerHTML = html;
+
+    Array.prototype.forEach.call(host.querySelectorAll(".circuit-row"), function (row) {
+      row.addEventListener("click", function () { selectedTarget = { type: "circuit", id: row.dataset.id }; renderTree(); renderAssignProps(); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll(".panel-defaults-btn"), function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault(); // clicking inside <summary> would otherwise also toggle the disclosure
+        selectedTarget = { type: "panel", id: btn.dataset.panel };
+        renderTree(); renderAssignProps();
+      });
+    });
+    var convertBtn = document.getElementById("convert-btn");
+    if (convertBtn) convertBtn.addEventListener("click", function () { equipmentConverted = true; renderTree(); });
+  }
+
+  function overridableField(label, c, path, opts) {
+    opts = opts || {};
+    var ov = isOverridden(c, path);
+    var val = effective(c, path);
+    return '<div class="field"' + (opts.style ? ' style="' + opts.style + '"' : '') + '>' +
+      '<label>' + label + (ov
+        ? ' <button type="button" class="link-reset" data-reset="' + path + '">↺ panel default</button>'
+        : ' <span class="hint">panel default</span>') + '</label>' +
+      '<input class="mono' + (ov ? "" : " inherited") + '" data-field="' + path + '" value="' + (val == null ? "" : val) + '"/>' +
+    '</div>';
+  }
+  function overridableSelect(label, c, path, options) {
+    var ov = isOverridden(c, path);
+    var val = effective(c, path);
+    var optHtml = options.map(function (o) {
+      return '<option value="' + o + '"' + (o === val ? " selected" : "") + '>' + (o || "—") + '</option>';
+    }).join("");
+    return '<div class="field">' +
+      '<label>' + label + (ov
+        ? ' <button type="button" class="link-reset" data-reset="' + path + '">↺ panel default</button>'
+        : ' <span class="hint">panel default</span>') + '</label>' +
+      '<select class="' + (ov ? "" : "inherited") + '" data-field="' + path + '">' + optHtml + '</select>' +
+    '</div>';
+  }
+
+  function bindOverrideInputs(host, c) {
+    Array.prototype.forEach.call(host.querySelectorAll("[data-field]"), function (input) {
+      input.addEventListener("change", function () {
+        var path = input.dataset.field, raw = input.value;
+        if (raw === "") clearOverride(c, path); else setOverride(c, path, coerce(raw));
+        renderTree(); renderAssignProps();
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-reset]"), function (btn) {
+      btn.addEventListener("click", function () { clearOverride(c, btn.dataset.reset); renderTree(); renderAssignProps(); });
+    });
+  }
+
+  function renderPanelDefaults(panelId) {
+    var p = panels[panelId], d = p.defaults;
+    document.getElementById("assign-props-title").textContent = "Panel defaults — " + p.name;
+    var host = document.getElementById("assign-props");
+    function df(label, path, style) {
+      var v = pathGet(d, path);
+      return '<div class="field"' + (style ? ' style="' + style + '"' : '') + '><label>' + label + '</label>' +
+        '<input class="mono" data-def-field="' + path + '" value="' + (v == null ? "" : v) + '"/></div>';
+    }
+    function dsel(label, path, options) {
+      var v = pathGet(d, path);
+      var optHtml = options.map(function (o) { return '<option value="' + o + '"' + (o === v ? " selected" : "") + '>' + (o || "—") + '</option>'; }).join("");
+      return '<div class="field"><label>' + label + '</label><select data-def-field="' + path + '">' + optHtml + '</select></div>';
+    }
+    host.innerHTML =
+      '<p class="hint">These are the starting values for every circuit on ' + p.name + '. A circuit can override any one of them — see the “↺ panel default” link that appears next to an overridden field on a circuit.</p>' +
+      '<hr class="divider"/>' +
+      '<div class="field-row">' + df("Prefix", "prefix", "max-width:120px") + '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field-row">' +
+        dsel("Circuit type", "circuitType", ["", "Lighting", "Sockets", "Power"]) +
+        dsel("Phase", "phase", ["", "L1", "L2", "L3", "L1L2L3"]) +
+      '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field" style="margin-bottom:8px"><label>Device</label></div>' +
+      '<div class="field-row">' + df("Curve", "device.curve") + df("Rating (A)", "device.ratingA") + df("RCD (mA)", "device.rcdMilliamps") + '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field" style="margin-bottom:8px"><label>Cable <span class="hint">(length has no panel default — always typed per circuit)</span></label></div>' +
+      '<div class="field-row">' + df("Type", "cable.type") + df("Cores", "cable.coreCount") + df("mm²", "cable.crossSectionMm2") + '</div>' +
+      '<hr class="divider"/>' +
+      df("Diversity %", "diversityPercent", "max-width:160px");
+
+    Array.prototype.forEach.call(host.querySelectorAll("[data-def-field]"), function (input) {
+      input.addEventListener("change", function () {
+        pathSet(d, input.dataset.defField, coerce(input.value));
+        renderTree();
+        if (selectedTarget.type === "circuit" && circuits[selectedTarget.id].panelId === panelId) renderAssignProps();
+      });
+    });
+  }
+
+  function renderAssignProps() {
+    if (selectedTarget.type === "panel") { renderPanelDefaults(selectedTarget.id); return; }
+    var c = circuits[selectedTarget.id];
+    var host = document.getElementById("assign-props");
+    document.getElementById("assign-props-title").textContent = "Circuit " + effective(c, "prefix") + c.number + (c.isSpare ? " — spare" : "");
+    var cap = terminalCapacity(c);
+    var diversified = Math.round(cap * effective(c, "diversityPercent") / 100);
+
+    var termHtml = c.terminals.map(function (tid) {
+      var t = terminalPool.filter(function (x) { return x.id === tid; })[0];
+      return '<div class="term-item"><span>' + t.label + '</span><span class="va mono">' + t.va + ' VA</span>' +
+        '<button class="btn btn-sm btn-ghost" data-remove="' + tid + '">✕</button></div>';
+    }).join("") || '<p class="hint">No terminals assigned.</p>';
+
+    host.innerHTML =
+      '<div class="field-row">' +
+        overridableField("Prefix", c, "prefix", { style: "max-width:120px" }) +
+        '<div class="field"><label>Number</label><input class="mono" value="' + c.number + '" readonly title="Gap-fill scoped to panel — not user-typed" /></div>' +
+        '<div class="field"><label>Is spare</label><select ' + (c.isSpare ? "" : "disabled") + '><option>' + (c.isSpare ? "Yes" : "No") + '</option></select></div>' +
+      '</div>' +
+      '<div class="field" style="margin-top:10px"><label>Custom name</label><input value="' + (c.customName || "") + '" placeholder="Auto-filled from first terminal" /></div>' +
+      '<hr class="divider"/>' +
+      '<div class="field-row">' +
+        overridableSelect("Circuit type", c, "circuitType", ["", "Lighting", "Sockets", "Power"]) +
+        overridableSelect("Phase (provisional shape)", c, "phase", ["", "L1", "L2", "L3", "L1L2L3"]) +
+      '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field" style="margin-bottom:8px"><label>Device <span class="hint">(provisional shape)</span></label></div>' +
+      '<div class="field-row">' +
+        overridableField("Curve", c, "device.curve") +
+        overridableField("Rating (A)", c, "device.ratingA") +
+        overridableField("RCD (mA)", c, "device.rcdMilliamps") +
+      '</div>' +
+      '<hr class="divider"/>' +
+      '<div class="field" style="margin-bottom:8px"><label>Cable <span class="hint">(provisional shape — length is always typed per circuit, never a panel default)</span></label></div>' +
+      '<div class="field-row">' +
+        overridableField("Type", c, "cable.type") +
+        overridableField("Cores", c, "cable.coreCount") +
+        overridableField("mm²", c, "cable.crossSectionMm2") +
+        '<div class="field"><label>Length (m)</label><input class="mono" id="cable-length" value="' + (c.cableLengthM || "") + '"/></div>' +
+      '</div>' +
+      '<hr class="divider"/>' +
+      overridableField("Diversity %", c, "diversityPercent", { style: "max-width:160px" }) +
+      '<hr class="divider"/>' +
+      '<div class="field-row" style="margin-bottom:8px"><h3 style="font-size:12.5px;color:var(--text-muted)">Assigned terminals</h3></div>' +
+      '<p class="hint" style="margin-top:-4px">Assigned by selecting terminals on the PDF canvas — not from this panel.</p>' +
+      '<div class="term-list">' + termHtml + '</div>' +
+      '<div class="cap-readout" style="margin-top:14px"><span>Capacity — sum(terminals) × diversity</span><span class="mono">' + cap + ' VA → ' + diversified + ' VA</span></div>';
+
+    Array.prototype.forEach.call(host.querySelectorAll("[data-remove]"), function (b) {
+      b.addEventListener("click", function () {
+        c.terminals = c.terminals.filter(function (id) { return id !== b.dataset.remove; });
+        renderTree(); renderAssignProps();
+      });
+    });
+    var lenInput = document.getElementById("cable-length");
+    lenInput.addEventListener("change", function () { c.cableLengthM = parseFloat(lenInput.value) || null; });
+    bindOverrideInputs(host, c);
+  }
+
+  renderTree();
+  renderAssignProps();
+})();
+</script>
