@@ -248,6 +248,22 @@
   }
   .rot-row { display: flex; gap: 6px; }
 
+  .grp-block .hit { fill: transparent; cursor: grab; }
+  .grp-block.dragging .hit { cursor: grabbing; }
+  .grp-block .frame-hit { pointer-events: stroke; stroke: transparent; stroke-width: 18; }
+  .instance-ghost { cursor: pointer; }
+  .instance-ghost .box { display: none; }
+  .instance-ghost:hover .sym-line, .instance-ghost:hover .sym-text { opacity: .7; }
+  .anchor-marker { fill: var(--select); stroke: var(--surface); stroke-width: 1.5; cursor: grab; }
+  .canvas-wrap.drop-ok { outline: 2px dashed var(--select); outline-offset: -2px; }
+  .canvas-wrap.drop-block { outline: 2px dashed var(--warn); outline-offset: -2px; }
+  .palette-item[draggable="true"] { cursor: grab; }
+  .palette-item .scope-tag {
+    margin-left: auto; font-size: 9px; text-transform: uppercase; letter-spacing: .04em;
+    padding: 1px 5px; border-radius: 4px; background: var(--surface-2); color: var(--text-muted); flex: none;
+  }
+  .canvas-note.warn { color: var(--warn); font-weight: 500; }
+
   /* ================= SCREEN 2 — Generated schematic ================= */
   .sched-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
   .titleblock { font-size: 10.5px; }
@@ -359,90 +375,28 @@
           <label>Locale</label>
           <div style="padding-top:6px"><span class="badge badge-locale">NL</span></div>
         </div>
-        <div class="field">
-          <label>Repeat direction</label>
-          <div class="segmented" id="repeat-dir">
-            <button aria-pressed="true" data-val="row">Row →</button>
-            <button aria-pressed="false" data-val="column">Column ↓</button>
-          </div>
-        </div>
-        <div class="field" style="max-width:110px">
-          <label for="pitch">Pitch</label>
-          <input id="pitch" value="28 mm" />
-        </div>
-        <div class="field" style="max-width:220px">
-          <label>Group applies when</label>
-          <select id="rule-select">
-            <option>Circuit type = Lighting</option>
-            <option selected>Circuit type = Sockets</option>
-            <option>Circuit type = Power</option>
-            <option>Any</option>
-          </select>
-        </div>
-        <div class="field" style="max-width:120px">
-          <label for="spare-toggle">&nbsp;</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding-top:6px">
-            <input type="checkbox" id="spare-toggle" style="width:auto" /> Is spare
-          </label>
-        </div>
+        <div class="hint" id="loaded-note" style="margin-left:auto"></div>
       </div>
+
+      <div class="editor-toolbar panel panel-body" id="group-bar"></div>
 
       <div class="editor-grid">
         <!-- palette -->
         <div class="panel">
           <div class="panel-head"><h3>Building blocks</h3></div>
-          <div class="panel-body" style="padding:6px">
-            <details class="palette-group" open>
-              <summary>Once <span class="hint">3</span></summary>
-              <div class="palette-item" data-block="pal-legend" tabindex="0"><span class="dot"></span>Table header / legend symbol</div>
-              <div class="palette-item" data-block="pal-title" tabindex="0"><span class="dot"></span>Title block</div>
-              <div class="palette-item" data-block="pal-free" tabindex="0"><span class="dot"></span>Free text / line / symbol</div>
-            </details>
-            <details class="palette-group">
-              <summary>Per panel <span class="hint">6</span></summary>
-              <div class="palette-item" data-block="pal-feed" tabindex="0"><span class="dot"></span>Feed cable</div>
-              <div class="palette-item" data-block="pal-main" tabindex="0"><span class="dot"></span>Main device</div>
-              <div class="palette-item" data-block="pal-acc" tabindex="0"><span class="dot"></span>Accessory device</div>
-              <div class="palette-item" data-block="pal-bus" tabindex="0"><span class="dot"></span>Busbar</div>
-              <div class="palette-item" data-block="pal-section" tabindex="0"><span class="dot"></span>Section box and label</div>
-              <div class="palette-item" data-block="pal-frame" tabindex="0"><span class="dot"></span>Frame</div>
-            </details>
-            <details class="palette-group" open>
-              <summary>Per circuit <span class="hint">10</span></summary>
-              <div class="palette-item" data-block="pal-num" tabindex="0"><span class="dot"></span>Circuit number label</div>
-              <div class="palette-item" data-block="pal-device" tabindex="0"><span class="dot"></span>Protective device</div>
-              <div class="palette-item" data-block="pal-phase" tabindex="0"><span class="dot"></span>Phase label</div>
-              <div class="palette-item" data-block="pal-conductor" tabindex="0"><span class="dot"></span>Cable line + conductor mark</div>
-              <div class="palette-item" data-block="pal-cabletext" tabindex="0"><span class="dot"></span>Cable text</div>
-              <div class="palette-item" data-block="pal-load" tabindex="0"><span class="dot"></span>Load symbol</div>
-              <div class="palette-item" data-block="pal-desc" tabindex="0"><span class="dot"></span>Description text</div>
-              <div class="palette-item" data-block="pal-custom" tabindex="0"><span class="dot"></span>Custom annotation</div>
-              <div class="palette-item" data-block="pal-cellva" tabindex="0"><span class="dot"></span>Table cell: count + VA</div>
-              <div class="palette-item" data-block="pal-cellderived" tabindex="0"><span class="dot"></span>Table cell: derived value</div>
-            </details>
-            <details class="palette-group">
-              <summary>Aggregate <span class="hint">1</span></summary>
-              <div class="palette-item" data-block="pal-agg" tabindex="0"><span class="dot"></span>Aggregate cell (sum, count)</div>
-            </details>
-          </div>
+          <div class="panel-body" style="padding:6px" id="palette-host"></div>
         </div>
 
         <!-- canvas -->
         <div class="panel">
           <div class="panel-head">
-            <h3>Circuit group — editing</h3>
-            <div class="variant-row">
-              <button class="chip" data-variant="standard" aria-pressed="true">Standard</button>
-              <button class="chip" data-variant="branch" aria-pressed="false">Branch + switch</button>
-              <button class="chip" data-variant="spare" aria-pressed="false">Spare</button>
-              <button class="btn btn-sm btn-ghost">+ New variant</button>
-            </div>
+            <h3 id="canvas-heading">Template layout</h3>
           </div>
           <div class="panel-body">
-            <div class="canvas-wrap">
-              <svg class="paper-sheet" id="editor-canvas" width="640" height="200" viewBox="0 0 640 200"></svg>
+            <div class="canvas-wrap" id="canvas-drop-target">
+              <svg class="paper-sheet" id="editor-canvas" width="640" height="320" viewBox="0 0 640 320"></svg>
             </div>
-            <p class="hint" style="margin-top:8px">Sample circuit <strong>A2</strong> · click a block to edit it on the right · rotate handle shown on the selected block</p>
+            <p class="hint" id="canvas-note" style="margin-top:8px"></p>
           </div>
         </div>
 
@@ -529,229 +483,474 @@
   })();
 
   /* ================= SCREEN 1 — template editor ================= */
-  var blockDefs = {
-    num: {
-      label: "Circuit number label", role: "per circuit",
-      x: 10, y: 70, w: 34, h: 24, rotation: 0,
-      symbol: "—", binding: "{circuit.prefix}{circuit.number}",
-      preview: "A2",
-      draw: function (g) { text(g, 27, 84, "A2", 13, "middle", 600); }
-    },
-    device: {
-      label: "Protective device", role: "per circuit",
-      x: 54, y: 60, w: 40, h: 44, rotation: 0,
-      symbol: "IEC breaker · single pole", binding: "{device.curve}{device.ratingA}",
-      preview: "C16",
-      draw: function (g) {
-        line(g, 74, 60, 74, 78);
-        rect(g, 62, 78, 24, 14);
-        line(g, 62, 92, 86, 78);
-        text(g, 74, 55, "C16", 10, "middle", 500);
-      }
-    },
-    conductor: {
-      label: "Cable line + conductor mark", role: "per circuit",
-      x: 96, y: 76, w: 40, h: 18, rotation: 0,
-      symbol: "—", binding: "{cable.coreCount}x",
-      preview: "3x",
-      draw: function (g) {
-        line(g, 96, 84, 136, 84);
-        text(g, 100, 76, "3x", 9, "start", 500);
-      }
-    },
-    cabletext: {
-      label: "Cable text", role: "per circuit",
-      x: 140, y: 60, w: 150, h: 44, rotation: 0,
-      symbol: "—", binding: "{cable.type} {cable.coreCount}G{cable.crossSectionMm2} mm²  l={cable.lengthM} m",
-      preview: "B2CA 3G2.5 mm²  l=49 m",
-      draw: function (g) {
-        text(g, 142, 78, "B2CA 3G2.5 mm²", 10, "start", 500);
-        text(g, 142, 92, "l=49 m", 10, "start", 400);
-      }
-    },
-    desc: {
-      label: "Description text", role: "per circuit",
-      x: 296, y: 60, w: 130, h: 30, rotation: 0,
-      symbol: "—", binding: "{circuit.customName}",
-      preview: "Verlichting-TL-100",
-      draw: function (g) { text(g, 298, 78, "Verlichting-TL-100", 10, "start", 400); }
-    },
-    load: {
-      label: "Load symbol", role: "per circuit",
-      x: 432, y: 68, w: 26, h: 26, rotation: 0,
-      symbol: "Utilisation arrow", binding: "from assigned terminals",
-      preview: "▶",
-      draw: function (g) {
-        line(g, 432, 84, 452, 84);
-        var p = document.createElementNS(svgNS, "path");
-        p.setAttribute("d", "M452,78 L462,84 L452,90 Z");
-        p.setAttribute("fill", "var(--ink)");
-        g.appendChild(p);
-      }
-    },
-    cellva: {
-      label: "Table cell: count + VA", role: "per circuit",
-      x: 470, y: 55, w: 70, h: 55, rotation: 0,
-      symbol: "—", binding: "count(terminals) · sum(terminal.capacity)",
-      preview: "19 (466VA)",
-      draw: function (g) {
-        rectFilled(g, 470, 60, 70, 20);
-        text(g, 505, 74, "19 (466VA)", 9, "middle", 500);
-      }
-    },
-    cellderived: {
-      label: "Table cell: derived value", role: "per circuit",
-      x: 470, y: 90, w: 70, h: 30, rotation: 0,
-      symbol: "—", binding: "sum(terminal.capacity) * circuit.diversityPercent / 100",
-      preview: "466 → 466 (100%)",
-      draw: function (g) {
-        rectFilled(g, 470, 90, 70, 20);
-        text(g, 505, 104, "466 · 100%", 9, "middle", 500);
-      }
-    }
-  };
-  var blockOrder = ["num", "device", "conductor", "cabletext", "desc", "load", "cellva", "cellderived"];
   var svgNS = "http://www.w3.org/2000/svg";
   function el(tag, attrs) {
     var e = document.createElementNS(svgNS, tag);
-    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    for (var k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]);
     return e;
   }
   function line(g, x1, y1, x2, y2) { g.appendChild(el("line", { x1: x1, y1: y1, x2: x2, y2: y2, class: "sym-line" })); }
   function rect(g, x, y, w, h) { g.appendChild(el("rect", { x: x, y: y, width: w, height: h, class: "sym-line" })); }
-  function rectFilled(g, x, y, w, h) { g.appendChild(el("rect", { x: x, y: y, width: w, height: h, fill: "none", stroke: "#9aa3ad" })); }
-  function text(g, x, y, str, size, anchor, weight) {
-    var t = el("text", { x: x, y: y, "font-size": size, "text-anchor": anchor || "start", "font-weight": weight || 400, class: "sym-text" });
+  function textEl(x, y, str, size, anchor, weight, extra) {
+    var attrs = { x: x, y: y, "font-size": size || 9, "text-anchor": anchor || "middle", "font-weight": weight || 500, class: "sym-text" };
+    if (extra) for (var k in extra) attrs[k] = extra[k];
+    var t = el("text", attrs);
     t.textContent = str;
-    g.appendChild(t);
+    return t;
   }
 
-  var selectedBlock = "cabletext";
+  // ---- building block catalogue (scope drives where a drop is allowed) ----
+  function drawGeneric(g, w, h, label) { g.appendChild(textEl(w / 2, h / 2 + 3, label, 9)); }
+  function drawBreaker(g, w, h, label) {
+    var topH = h * 0.62, cx = w / 2;
+    line(g, cx, 0, cx, topH * 0.35);
+    rect(g, w * 0.15, topH * 0.35, w * 0.7, topH * 0.55);
+    line(g, w * 0.15, topH * 0.9, w * 0.85, topH * 0.35);
+    g.appendChild(textEl(w / 2, h - 3, label, 9, "middle", 600));
+  }
+  function drawBusbar(g, w, h) { g.appendChild(el("line", { x1: 0, y1: h / 2, x2: w, y2: h / 2, stroke: "var(--ink)", "stroke-width": Math.max(3, h * 0.7) })); }
+  function drawLoad(g, w, h) {
+    line(g, 0, h / 2, w * 0.55, h / 2);
+    g.appendChild(el("path", { d: "M" + (w * 0.55) + "," + (h * 0.22) + " L" + w + "," + (h / 2) + " L" + (w * 0.55) + "," + (h * 0.78) + " Z", fill: "var(--ink)" }));
+  }
+  function drawFrame(g, w, h) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "none", stroke: "var(--ink)", "stroke-width": 1.6, "stroke-dasharray": "7 4", rx: 3 }));
+    g.appendChild(textEl(10, 16, "Frame", 9, "start", 700));
+  }
+  function drawTitleBlock(g, w, h) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "var(--paper)", stroke: "var(--ink)" }));
+    g.appendChild(textEl(8, 16, "Project name", 9, "start", 700));
+    g.appendChild(textEl(8, 30, "Status: Concept", 8, "start", 400));
+    g.appendChild(textEl(8, 44, "Tekening: —", 8, "start", 400));
+  }
+  function drawSectionBox(g, w, h, label) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "none", stroke: "var(--warn)", "stroke-width": 1.2, "stroke-dasharray": "4 3", rx: 3 }));
+    g.appendChild(textEl(6, 14, label, 9, "start", 600, { fill: "var(--warn)" }));
+  }
+  function drawAccessory(g, w, h, label) {
+    g.appendChild(el("circle", { cx: w / 2, cy: h * 0.4, r: Math.min(w, h) * 0.32, fill: "none", stroke: "var(--ink)", "stroke-width": 1.3 }));
+    g.appendChild(textEl(w / 2, h - 3, label, 8));
+  }
+  function drawNumberLabel(g, w, h, label) { g.appendChild(textEl(w / 2, h / 2 + 4, label, 13, "middle", 700)); }
+  function drawPhaseLabel(g, w, h, label) { g.appendChild(textEl(w / 2, h / 2 + 3, label, 10, "middle", 600)); }
+  function drawConductor(g, w, h, label) { line(g, 0, h / 2, w, h / 2); g.appendChild(textEl(2, h / 2 - 4, label, 9, "start", 600)); }
+  function drawCableText(g, w, h, label) {
+    var parts = String(label).split("  ");
+    g.appendChild(textEl(4, h * 0.42, parts[0], 9, "start", 600));
+    if (parts[1]) g.appendChild(textEl(4, h * 0.8, parts[1], 8, "start", 400));
+  }
+  function drawDescText(g, w, h, label) { g.appendChild(textEl(4, h / 2 + 3, label, 9, "start", 400)); }
+  function drawCustom(g, w, h, label) { g.appendChild(textEl(4, h / 2 + 3, label, 9, "start", 400, { "font-style": "italic" })); }
+  function drawCell(g, w, h, label) {
+    g.appendChild(el("rect", { x: 0, y: 0, width: w, height: h, fill: "none", stroke: "#9aa3ad" }));
+    g.appendChild(textEl(w / 2, h / 2 + 3, label, 9));
+  }
+  function drawFreeText(g, w, h, label) { g.appendChild(textEl(w / 2, h / 2 + 3, label || "Free", 9, "middle", 400, { "font-style": "italic", opacity: 0.8 })); }
+  function drawLegend(g, w, h) {
+    g.appendChild(el("rect", { x: 0, y: h / 2 - 5, width: 10, height: 10, fill: "var(--select-soft)", stroke: "var(--select)" }));
+    g.appendChild(textEl(16, h / 2 + 3, "Legend", 9, "start", 500));
+  }
+
+  var SCOPE_LABEL = { once: "Once", panel: "Per panel", circuit: "Per circuit", aggregate: "Aggregate" };
+  var CATALOGUE = {
+    legend:      { label: "Table header / legend symbol", scope: "once",      w: 100, h: 28,  binding: null, draw: drawLegend },
+    title:       { label: "Title block",                   scope: "once",      w: 150, h: 60,  binding: null, draw: drawTitleBlock },
+    free:        { label: "Free text / line / symbol",      scope: "once",      w: 100, h: 22,  binding: null, draw: drawFreeText },
+    feed:        { label: "Feed cable",                     scope: "panel",     w: 130, h: 26,  binding: "{panel.feederCable.type} {panel.feederCable.crossSectionMm2} mm²  l={panel.feederCable.lengthM} m", draw: drawCableText },
+    main:        { label: "Main device",                    scope: "panel",     w: 40,  h: 44,  binding: "{panel.mainDevice.label}", draw: drawBreaker },
+    acc:         { label: "Accessory device",                scope: "panel",     w: 36,  h: 36,  binding: "{panel.accessories[*].label}", draw: drawAccessory },
+    bus:         { label: "Busbar",                          scope: "panel",     w: 500, h: 8,   binding: null, draw: drawBusbar },
+    section:     { label: "Section box and label",           scope: "panel",     w: 200, h: 70,  binding: "{section.name}", draw: drawSectionBox },
+    frame:       { label: "Frame",                           scope: "panel",     w: 560, h: 260, binding: null, draw: drawFrame },
+    num:         { label: "Circuit number label",            scope: "circuit",   w: 34,  h: 22,  binding: "{circuit.prefix}{circuit.number}", draw: drawNumberLabel },
+    device:      { label: "Protective device",               scope: "circuit",   w: 34,  h: 34,  binding: "{device.curve}{device.ratingA}", draw: drawBreaker },
+    phase:       { label: "Phase label",                     scope: "circuit",   w: 28,  h: 16,  binding: "{circuit.phase}", draw: drawPhaseLabel },
+    conductor:   { label: "Cable line + conductor mark",     scope: "circuit",   w: 40,  h: 16,  binding: "{cable.coreCount}x", draw: drawConductor },
+    cabletext:   { label: "Cable text",                      scope: "circuit",   w: 150, h: 34,  binding: "{cable.type} {cable.coreCount}G{cable.crossSectionMm2} mm²  l={cable.lengthM} m", draw: drawCableText },
+    load:        { label: "Load symbol",                     scope: "circuit",   w: 26,  h: 26,  binding: "from assigned terminals", draw: drawLoad },
+    desc:        { label: "Description text",                scope: "circuit",   w: 130, h: 20,  binding: "{circuit.customName}", draw: drawDescText },
+    custom:      { label: "Custom annotation",                scope: "circuit",   w: 110, h: 18,  binding: "{circuit.properties.*}", draw: drawCustom },
+    cellva:      { label: "Table cell: count + VA",           scope: "circuit",   w: 70,  h: 22,  binding: "count(terminals) · sum(terminal.capacity)", draw: drawCell },
+    cellderived: { label: "Table cell: derived value",        scope: "circuit",   w: 70,  h: 22,  binding: "sum(terminal.capacity) * circuit.diversityPercent / 100", draw: drawCell },
+    agg:         { label: "Aggregate cell (sum, count)",      scope: "aggregate", w: 76,  h: 24,  binding: "sum/count over all circuits", draw: drawCell }
+  };
+  function previewFor(type) {
+    var map = {
+      num: "A2", device: "C16", phase: "L1", conductor: "3x",
+      cabletext: "B2CA 3G2.5 mm²  l=49 m", load: "▶", desc: "Verlichting-TL-100",
+      custom: "Custom note", cellva: "19 (466VA)", cellderived: "466 · 100%",
+      feed: "B2CA 5G25 mm²  l=23 m", main: "Q1A/160A", acc: "CT-L1A",
+      section: "Preferent A (1e pref.)", agg: "Σ 33892 VA"
+    };
+    return map[type] || CATALOGUE[type].label;
+  }
+
+  // ---- template state ----
+  var idSeq = 1;
+  function newId(prefix) { return prefix + "-" + (idSeq++); }
+  function mkBlock(type, x, y) { return { id: newId("blk"), type: type, x: x, y: y, rotation: 0 }; }
+  function cloneChild(b) { return { id: newId("blk"), type: b.type, x: b.x, y: b.y, rotation: b.rotation }; }
+  function mkGroup(id, name, rule, isSpare, direction, pitch) { return { id: id, name: name, rule: rule, isSpare: isSpare, direction: direction, pitch: pitch, blocks: [] }; }
+  function makeBaseTemplate(name) { return { name: name, locale: "NL", layoutBlocks: [], groupAnchor: { x: 20, y: 90 }, groups: {}, groupOrder: [], activeGroupId: null, previewCount: 5 }; }
+  function addGroups(list) { list.forEach(function (g) { template.groups[g.id] = g; template.groupOrder.push(g.id); }); }
+
+  var template;
+  var mode = "layout"; // "layout" | "group-edit"
+  var selected = null; // { id }
+  var instanceEls = [];
+
+  function seedRowsTemplate(name) {
+    template = makeBaseTemplate(name || "Rows (NL)");
+    template.layoutBlocks.push(mkBlock("frame", 6, 6), mkBlock("title", 470, 230), mkBlock("feed", 20, 20), mkBlock("bus", 20, 56));
+    var g1 = mkGroup("standard", "Standard", "Circuit type = Sockets", false, "column", 26);
+    g1.blocks = [
+      mkBlock("num", 4, 4), mkBlock("device", 40, 0), mkBlock("conductor", 82, 8), mkBlock("cabletext", 128, 0),
+      mkBlock("desc", 286, 8), mkBlock("load", 424, 4), mkBlock("cellva", 458, 0), mkBlock("cellderived", 458, 26)
+    ];
+    var g2 = mkGroup("branch", "Branch + switch", "Circuit number = 1, 2", false, "column", 48);
+    g2.blocks = g1.blocks.map(cloneChild).concat([mkBlock("device", 40, 40), mkBlock("cabletext", 128, 40)]);
+    var g3 = mkGroup("spare", "Spare", "Is spare", true, "column", 26);
+    g3.blocks = [mkBlock("num", 4, 4), mkBlock("device", 40, 0)];
+    addGroups([g1, g2, g3]);
+    template.activeGroupId = "standard";
+    template.groupAnchor = { x: 20, y: 90 };
+    template.previewCount = 5;
+  }
+
+  function seedColumnsTemplate(name) {
+    template = makeBaseTemplate(name || "Columns (NL)");
+    template.layoutBlocks.push(mkBlock("frame", 6, 6), mkBlock("title", 470, 230), mkBlock("feed", 20, 20), mkBlock("bus", 20, 56));
+    var g1 = mkGroup("standard", "Standard", "Circuit type = Lighting", false, "row", 46);
+    g1.blocks = [mkBlock("device", 4, 0), mkBlock("phase", 8, 38), mkBlock("cabletext", -30, 58), mkBlock("num", 6, 108), mkBlock("cellva", -4, 130)];
+    var g2 = mkGroup("branch", "Branch + switch", "Circuit number = 1, 2", false, "row", 46);
+    g2.blocks = g1.blocks.map(cloneChild).concat([mkBlock("conductor", 4, 150)]);
+    var g3 = mkGroup("spare", "Spare", "Is spare", true, "row", 46);
+    g3.blocks = [mkBlock("device", 4, 0), mkBlock("num", 6, 108)];
+    addGroups([g1, g2, g3]);
+    template.activeGroupId = "standard";
+    template.groupAnchor = { x: 90, y: 90 };
+    template.previewCount = 6;
+  }
+
+  seedRowsTemplate();
+
+  function currentCollection() { return mode === "group-edit" ? template.groups[template.activeGroupId].blocks : template.layoutBlocks; }
+  function findBlock(id) { var c = currentCollection(); for (var i = 0; i < c.length; i++) if (c[i].id === id) return c[i]; return null; }
+
   var editorCanvas = document.getElementById("editor-canvas");
+  var canvasWrap = document.getElementById("canvas-drop-target");
 
-  function renderEditorCanvas() {
-    editorCanvas.innerHTML = "";
-    // busbar reference line
-    var busGroup = el("g");
-    editorCanvas.appendChild(busGroup);
-    line(busGroup, 10, 40, 560, 40);
-    text(busGroup, 10, 30, "busbar (context only — not part of this group)", 9, "start", 400);
-    busGroup.querySelector("text").setAttribute("fill", "var(--text-muted, #888)");
+  function svgPoint(evt) {
+    var pt = editorCanvas.createSVGPoint();
+    pt.x = evt.clientX; pt.y = evt.clientY;
+    return pt.matrixTransform(editorCanvas.getScreenCTM().inverse());
+  }
 
-    blockOrder.forEach(function (key) {
-      var def = blockDefs[key];
-      var g = el("g", { class: "grp-block", "data-key": key });
-      g.setAttribute("data-selected", String(key === selectedBlock));
-      var rotWrap = el("g", { transform: "rotate(" + (def.rotation || 0) + " " + (def.x + def.w / 2) + " " + (def.y + def.h / 2) + ")" });
-      rotWrap.appendChild(el("rect", { class: "box", x: def.x - 4, y: def.y - 4, width: def.w + 8, height: def.h + 8, rx: 4 }));
-      def.draw(rotWrap);
-      g.appendChild(rotWrap);
-      g.appendChild(el("rect", { class: "hit", x: def.x - 4, y: def.y - 4, width: def.w + 8, height: def.h + 8 }));
-      if (key === selectedBlock) {
-        var cx = def.x + def.w / 2, cy = def.y - 12;
-        g.appendChild(el("circle", { class: "handle", cx: cx, cy: cy, r: 4 }));
-        g.appendChild(el("line", { x1: cx, y1: cy + 4, x2: def.x + def.w / 2, y2: def.y - 4, stroke: "var(--accent)", "stroke-width": 1 }));
+  function attachDrag(hitEl, block, wrapEl, outerEl) {
+    hitEl.addEventListener("pointerdown", function (e) {
+      e.stopPropagation();
+      hitEl.setPointerCapture(e.pointerId);
+      outerEl.classList.add("dragging");
+      var def = CATALOGUE[block.type];
+      var start = svgPoint(e), ox = block.x, oy = block.y;
+      function move(ev) {
+        var p = svgPoint(ev);
+        block.x = ox + (p.x - start.x);
+        block.y = oy + (p.y - start.y);
+        wrapEl.setAttribute("transform", "translate(" + block.x + "," + block.y + ") rotate(" + (block.rotation || 0) + " " + def.w / 2 + " " + def.h / 2 + ")");
       }
-      g.addEventListener("click", function () { selectBlock(key); });
-      editorCanvas.appendChild(g);
+      function up() {
+        hitEl.releasePointerCapture(e.pointerId);
+        hitEl.removeEventListener("pointermove", move);
+        hitEl.removeEventListener("pointerup", up);
+        outerEl.classList.remove("dragging");
+        selectBlock(block.id);
+      }
+      hitEl.addEventListener("pointermove", move);
+      hitEl.addEventListener("pointerup", up);
     });
   }
 
-  function selectBlock(key) {
-    selectedBlock = key;
-    renderEditorCanvas();
-    renderProps(key);
+  function attachRotateDrag(handle, block, wrapEl, def) {
+    handle.addEventListener("pointerdown", function (e) {
+      e.stopPropagation();
+      handle.setPointerCapture(e.pointerId);
+      function move(ev) {
+        var p = svgPoint(ev);
+        var cx = block.x + def.w / 2, cy = block.y + def.h / 2;
+        var deg = Math.atan2(p.x - cx, -(p.y - cy)) * 180 / Math.PI;
+        deg = Math.round(deg / 5) * 5;
+        if (deg < 0) deg += 360;
+        block.rotation = deg;
+        wrapEl.setAttribute("transform", "translate(" + block.x + "," + block.y + ") rotate(" + deg + " " + def.w / 2 + " " + def.h / 2 + ")");
+      }
+      function up() {
+        handle.releasePointerCapture(e.pointerId);
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        renderActive();
+        renderProps();
+      }
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+    });
   }
 
-  function renderProps(key) {
-    var def = blockDefs[key];
+  function renderBlockGroup(block, isPreview) {
+    var def = CATALOGUE[block.type];
+    var outer = el("g", { class: "grp-block" + (isPreview ? " instance-ghost" : ""), "data-id": block.id });
+    if (!isPreview) outer.setAttribute("data-selected", String(!!(selected && selected.id === block.id)));
+    var wrap = el("g", { transform: "translate(" + block.x + "," + block.y + ") rotate(" + (block.rotation || 0) + " " + def.w / 2 + " " + def.h / 2 + ")" });
+    if (block.type !== "frame") wrap.appendChild(el("rect", { class: "box", x: -4, y: -4, width: def.w + 8, height: def.h + 8, rx: 4 }));
+    def.draw(wrap, def.w, def.h, block.previewLabel || previewFor(block.type));
+    var hit = block.type === "frame"
+      ? el("rect", { class: "hit frame-hit", x: 0, y: 0, width: def.w, height: def.h, fill: "none" })
+      : el("rect", { class: "hit", x: -4, y: -4, width: def.w + 8, height: def.h + 8 });
+    wrap.appendChild(hit);
+    outer.appendChild(wrap);
+
+    if (!isPreview) {
+      if (selected && selected.id === block.id) {
+        var cx = def.w / 2, cy = -14;
+        wrap.appendChild(el("line", { x1: cx, y1: cy + 4, x2: def.w / 2, y2: 0, stroke: "var(--accent)", "stroke-width": 1 }));
+        var handle = el("circle", { class: "handle", cx: cx, cy: cy, r: 4 });
+        wrap.appendChild(handle);
+        attachRotateDrag(handle, block, wrap, def);
+      }
+      attachDrag(hit, block, wrap, outer);
+      outer.addEventListener("click", function (e) { e.stopPropagation(); selectBlock(block.id); });
+    }
+    return outer;
+  }
+
+  function renderGroupPreviewInstances() {
+    instanceEls = [];
+    var group = template.groups[template.activeGroupId];
+    if (!group) return;
+    var dirVec = group.direction === "column" ? { x: 0, y: 1 } : { x: 1, y: 0 };
+    for (var i = 0; i < template.previewCount; i++) {
+      var gi = el("g", { class: "instance-ghost", opacity: i === 0 ? 1 : 0.68 });
+      group.blocks.forEach(function (b) { gi.appendChild(renderBlockGroup(b, true)); });
+      gi.addEventListener("click", function () { enterGroupEdit(); });
+      editorCanvas.appendChild(gi);
+      instanceEls.push({ el: gi, i: i, dir: dirVec, pitch: group.pitch });
+    }
+    updateInstancePositions();
+  }
+  function updateInstancePositions() {
+    instanceEls.forEach(function (inst) {
+      var x = template.groupAnchor.x + inst.dir.x * inst.i * inst.pitch;
+      var y = template.groupAnchor.y + inst.dir.y * inst.i * inst.pitch;
+      inst.el.setAttribute("transform", "translate(" + x + "," + y + ")");
+    });
+  }
+
+  function renderAnchor() {
+    var a = el("circle", { cx: 0, cy: 0, r: 5, class: "anchor-marker" });
+    var label = el("text", { x: 8, y: -8, "font-size": 8, fill: "var(--select)", "font-weight": 600 });
+    label.textContent = "circuit group start";
+    var ga = el("g", { transform: "translate(" + template.groupAnchor.x + "," + template.groupAnchor.y + ")" });
+    ga.appendChild(a); ga.appendChild(label);
+    a.addEventListener("pointerdown", function (e) {
+      e.stopPropagation();
+      a.setPointerCapture(e.pointerId);
+      var start = svgPoint(e), ox = template.groupAnchor.x, oy = template.groupAnchor.y;
+      function move(ev) {
+        var p = svgPoint(ev);
+        template.groupAnchor.x = ox + (p.x - start.x);
+        template.groupAnchor.y = oy + (p.y - start.y);
+        ga.setAttribute("transform", "translate(" + template.groupAnchor.x + "," + template.groupAnchor.y + ")");
+        updateInstancePositions();
+      }
+      function up() {
+        a.releasePointerCapture(e.pointerId);
+        a.removeEventListener("pointermove", move);
+        a.removeEventListener("pointerup", up);
+      }
+      a.addEventListener("pointermove", move);
+      a.addEventListener("pointerup", up);
+    });
+    editorCanvas.appendChild(ga);
+  }
+
+  function renderActive() {
+    editorCanvas.innerHTML = "";
+    if (mode === "layout") {
+      template.layoutBlocks.forEach(function (b) { editorCanvas.appendChild(renderBlockGroup(b, false)); });
+      renderGroupPreviewInstances();
+      renderAnchor();
+    } else {
+      template.groups[template.activeGroupId].blocks.forEach(function (b) { editorCanvas.appendChild(renderBlockGroup(b, false)); });
+    }
+    renderGroupBar();
+    renderCanvasHeading();
+  }
+
+  editorCanvas.addEventListener("pointerdown", function (e) {
+    if (e.target === editorCanvas && selected) { selected = null; renderActive(); renderProps(); }
+  });
+
+  function selectBlock(id) { selected = { id: id }; renderActive(); renderProps(); }
+
+  function enterGroupEdit() { mode = "group-edit"; selected = null; renderActive(); renderProps(); }
+
+  function renderCanvasHeading() {
+    var h = document.getElementById("canvas-heading"), note = document.getElementById("canvas-note");
+    if (mode === "layout") {
+      h.textContent = "Template layout";
+      note.innerHTML = "Drag once/per-panel blocks anywhere on the sheet. Drag the small blue marker to move where the circuit group starts repeating. Click any repeated instance to edit that group.";
+    } else {
+      h.textContent = "Editing circuit group: " + template.groups[template.activeGroupId].name;
+      note.innerHTML = "One instance, shown at full size. Drag blocks and the rotate handle freely — every circuit using this group repeats exactly what you build here.";
+    }
+  }
+
+  function renderGroupBar() {
+    var bar = document.getElementById("group-bar");
+    if (mode === "layout") {
+      var g = template.groups[template.activeGroupId];
+      var chips = template.groupOrder.map(function (id) {
+        var gg = template.groups[id];
+        return '<button class="chip" data-group="' + id + '" aria-pressed="' + (id === template.activeGroupId) + '">' + gg.name + '</button>';
+      }).join("");
+      bar.innerHTML =
+        '<div class="variant-row">' + chips + '<button class="btn btn-sm btn-ghost" id="new-variant-btn">+ New variant</button></div>' +
+        '<div class="field"><label>Repeat direction</label><div class="segmented" id="dir-toggle">' +
+          '<button aria-pressed="' + (g.direction === "row") + '" data-val="row">Row →</button>' +
+          '<button aria-pressed="' + (g.direction === "column") + '" data-val="column">Column ↓</button></div></div>' +
+        '<div class="field" style="max-width:90px"><label>Pitch</label><input class="mono" id="pitch-input" value="' + g.pitch + '"/></div>' +
+        '<div class="field" style="max-width:210px"><label>Applies when</label><input id="rule-input" value="' + g.rule + '"/></div>' +
+        '<div class="field" style="max-width:110px"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding-top:6px"><input type="checkbox" id="spare-toggle" style="width:auto" ' + (g.isSpare ? "checked" : "") + '/> Is spare</label></div>' +
+        '<div class="field" style="max-width:130px"><label>Preview repeat</label><input class="mono" id="preview-count" value="' + template.previewCount + '"/></div>';
+
+      Array.prototype.forEach.call(bar.querySelectorAll("[data-group]"), function (chip) {
+        chip.addEventListener("click", function () { template.activeGroupId = chip.dataset.group; renderActive(); });
+      });
+      document.getElementById("new-variant-btn").addEventListener("click", function () {
+        var id = newId("group");
+        template.groups[id] = mkGroup(id, "New variant", "Any", false, g.direction, g.pitch);
+        template.groupOrder.push(id);
+        template.activeGroupId = id;
+        mode = "group-edit"; selected = null;
+        renderActive(); renderProps();
+      });
+      document.getElementById("dir-toggle").addEventListener("click", function (e) {
+        var b = e.target.closest("button"); if (!b) return;
+        g.direction = b.dataset.val; renderActive();
+      });
+      document.getElementById("pitch-input").addEventListener("change", function () { g.pitch = parseFloat(this.value) || g.pitch; renderActive(); });
+      document.getElementById("rule-input").addEventListener("change", function () { g.rule = this.value; });
+      document.getElementById("spare-toggle").addEventListener("change", function () { g.isSpare = this.checked; });
+      document.getElementById("preview-count").addEventListener("change", function () { template.previewCount = Math.max(1, parseInt(this.value, 10) || 1); renderActive(); });
+    } else {
+      var eg = template.groups[template.activeGroupId];
+      bar.innerHTML =
+        '<button class="btn btn-sm" id="back-to-layout">◂ Back to layout</button>' +
+        '<div><strong>' + eg.name + '</strong></div>' +
+        '<div class="field" style="max-width:210px;margin-left:auto"><label>Applies when</label><input id="rule-input" value="' + eg.rule + '"/></div>' +
+        '<div class="field" style="max-width:110px"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding-top:6px"><input type="checkbox" id="spare-toggle" style="width:auto" ' + (eg.isSpare ? "checked" : "") + '/> Is spare</label></div>';
+      document.getElementById("back-to-layout").addEventListener("click", function () { mode = "layout"; selected = null; renderActive(); renderProps(); });
+      document.getElementById("rule-input").addEventListener("change", function () { eg.rule = this.value; });
+      document.getElementById("spare-toggle").addEventListener("change", function () { eg.isSpare = this.checked; });
+    }
+  }
+
+  function renderProps() {
     var host = document.getElementById("props-panel");
-    if (!def) { host.innerHTML = '<p class="props-empty">Select a block on the canvas, or a palette item, to edit its properties.</p>'; return; }
+    if (!selected) { host.innerHTML = '<p class="props-empty">Select a block on the canvas to edit it, or drag one in from the palette.</p>'; return; }
+    var block = findBlock(selected.id);
+    if (!block) { selected = null; host.innerHTML = '<p class="props-empty">Select a block on the canvas to edit it.</p>'; return; }
+    var def = CATALOGUE[block.type];
     var rotButtons = [0, 90, 180, 270].map(function (r) {
-      return '<button class="btn btn-sm' + (def.rotation === r ? ' btn-primary' : '') + '" data-rot="' + r + '">' + r + '°</button>';
+      return '<button class="btn btn-sm' + (block.rotation === r ? ' btn-primary' : '') + '" data-rot="' + r + '">' + r + '°</button>';
     }).join("");
+    var previewVal = block.previewLabel || previewFor(block.type);
     host.innerHTML =
-      '<div class="field"><label>Block type (role)</label><input value="' + def.label + '" readonly /></div>' +
+      '<div class="field"><label>Block type (role)</label><input value="' + def.label + '" readonly/></div>' +
+      '<div class="hint" style="margin-top:4px">Scope: ' + SCOPE_LABEL[def.scope] + '</div>' +
       '<hr class="divider"/>' +
       '<div class="field-row">' +
-        '<div class="field"><label>x (from group origin)</label><input class="mono" value="' + def.x + '" /></div>' +
-        '<div class="field"><label>y</label><input class="mono" value="' + def.y + '" /></div>' +
+        '<div class="field"><label>x (' + (mode === "group-edit" ? "from group origin" : "on sheet") + ')</label><input class="mono" id="prop-x" value="' + Math.round(block.x) + '"/></div>' +
+        '<div class="field"><label>y</label><input class="mono" id="prop-y" value="' + Math.round(block.y) + '"/></div>' +
       '</div>' +
-      '<div class="field" style="margin-top:10px"><label>Rotation</label><div class="rot-row">' + rotButtons + '</div></div>' +
+      '<div class="field" style="margin-top:10px"><label>Rotation — drag the canvas handle, or set exactly</label><div class="rot-row">' + rotButtons + '</div></div>' +
       '<hr class="divider"/>' +
       '<div class="field"><label>Style — line thickness</label><select><option>Thin (0.25 mm)</option><option selected>Regular (0.35 mm)</option><option>Bold (0.5 mm)</option></select></div>' +
-      '<div class="field" style="margin-top:10px"><label>Symbol reference</label><input value="' + def.symbol + '" ' + (def.symbol === "—" ? "readonly" : "") + ' /></div>' +
-      '<hr class="divider"/>' +
-      '<div class="field"><label>Binding</label><input class="mono" value="' + def.binding + '" /></div>' +
-      '<div class="binding-preview"><span class="hint">Resolved for sample circuit A2 —</span> <strong class="mono">' + def.preview + '</strong></div>';
+      (def.binding
+        ? '<hr class="divider"/><div class="field"><label>Binding</label><input class="mono" value="' + def.binding + '"/></div>' +
+          '<div class="binding-preview"><span class="hint">Resolved for the sample circuit —</span> <strong class="mono">' + previewVal + '</strong></div>'
+        : '<p class="hint" style="margin-top:8px">This block type has no data binding.</p>') +
+      '<hr class="divider"/><button class="btn btn-sm btn-ghost" id="prop-delete">Remove block</button>';
 
+    document.getElementById("prop-x").addEventListener("change", function () { block.x = parseFloat(this.value) || 0; renderActive(); });
+    document.getElementById("prop-y").addEventListener("change", function () { block.y = parseFloat(this.value) || 0; renderActive(); });
     Array.prototype.forEach.call(host.querySelectorAll("[data-rot]"), function (b) {
-      b.addEventListener("click", function () {
-        def.rotation = Number(b.dataset.rot);
-        renderEditorCanvas();
-        renderProps(key);
+      b.addEventListener("click", function () { block.rotation = Number(b.dataset.rot); renderActive(); renderProps(); });
+    });
+    document.getElementById("prop-delete").addEventListener("click", function () {
+      var coll = currentCollection(), idx = coll.indexOf(block);
+      if (idx > -1) coll.splice(idx, 1);
+      selected = null; renderActive(); renderProps();
+    });
+  }
+
+  function renderPalette() {
+    var host = document.getElementById("palette-host");
+    var groups = { once: [], panel: [], circuit: [], aggregate: [] };
+    Object.keys(CATALOGUE).forEach(function (key) { groups[CATALOGUE[key].scope].push(key); });
+    var openSet = { once: true, panel: false, circuit: true, aggregate: false };
+    var html = "";
+    ["once", "panel", "circuit", "aggregate"].forEach(function (scope) {
+      html += '<details class="palette-group"' + (openSet[scope] ? " open" : "") + '><summary>' + SCOPE_LABEL[scope] + ' <span class="hint">' + groups[scope].length + '</span></summary>';
+      groups[scope].forEach(function (key) {
+        html += '<div class="palette-item" draggable="true" data-type="' + key + '" tabindex="0"><span class="dot"></span>' + CATALOGUE[key].label + '</div>';
+      });
+      html += '</details>';
+    });
+    host.innerHTML = html;
+    Array.prototype.forEach.call(host.querySelectorAll(".palette-item"), function (item) {
+      item.addEventListener("dragstart", function (e) {
+        e.dataTransfer.setData("text/plain", item.dataset.type);
+        e.dataTransfer.effectAllowed = "copy";
+      });
+      item.addEventListener("click", function () {
+        var def = CATALOGUE[item.dataset.type];
+        document.getElementById("props-panel").innerHTML =
+          '<div class="field"><label>Block type (role)</label><input value="' + def.label + '" readonly/></div>' +
+          '<div class="hint" style="margin-top:4px">Scope: ' + SCOPE_LABEL[def.scope] + '</div>' +
+          '<p class="hint" style="margin-top:10px">Drag this onto the canvas to place it.' +
+          (def.scope === "circuit" && mode === "layout" ? " You'll need to be inside a circuit group first — click a repeated instance, or “+ New variant”." : "") + '</p>';
       });
     });
   }
 
-  renderEditorCanvas();
-  renderProps(selectedBlock);
-
-  // palette clicks select a placeholder block (shows a generic properties view)
-  var paletteMeta = {
-    "pal-legend": "Table header / legend symbol", "pal-title": "Title block", "pal-free": "Free text / line / symbol",
-    "pal-feed": "Feed cable", "pal-main": "Main device", "pal-acc": "Accessory device", "pal-bus": "Busbar",
-    "pal-section": "Section box and label", "pal-frame": "Frame",
-    "pal-num": "Circuit number label", "pal-device": "Protective device", "pal-phase": "Phase label",
-    "pal-conductor": "Cable line + conductor mark", "pal-cabletext": "Cable text", "pal-load": "Load symbol",
-    "pal-desc": "Description text", "pal-custom": "Custom annotation",
-    "pal-cellva": "Table cell: count + VA", "pal-cellderived": "Table cell: derived value",
-    "pal-agg": "Aggregate cell (sum, count)"
-  };
-  var paletteMap = {
-    "pal-num": "num", "pal-device": "device", "pal-conductor": "conductor",
-    "pal-cabletext": "cabletext", "pal-desc": "desc", "pal-load": "load",
-    "pal-cellva": "cellva", "pal-cellderived": "cellderived"
-  };
-  Array.prototype.forEach.call(document.querySelectorAll(".palette-item"), function (item) {
-    item.addEventListener("click", function () {
-      Array.prototype.forEach.call(document.querySelectorAll(".palette-item"), function (i) { i.removeAttribute("aria-pressed"); });
-      item.setAttribute("aria-pressed", "true");
-      var key = item.dataset.block;
-      if (paletteMap[key]) { selectBlock(paletteMap[key]); return; }
-      document.getElementById("props-panel").innerHTML =
-        '<div class="field"><label>Block type (role)</label><input value="' + paletteMeta[key] + '" readonly /></div>' +
-        '<p class="hint" style="margin-top:10px">Drag onto the canvas to place a new instance of this block. Not in the current sample group.</p>';
-    });
-  });
-
-  document.getElementById("repeat-dir").addEventListener("click", function (e) {
-    var b = e.target.closest("button"); if (!b) return;
-    Array.prototype.forEach.call(this.querySelectorAll("button"), function (x) { x.setAttribute("aria-pressed", "false"); });
-    b.setAttribute("aria-pressed", "true");
-  });
-
-  var variantCanvasNote = document.querySelector('.panel-body p.hint');
-  document.querySelectorAll(".variant-row .chip").forEach(function (chip) {
-    chip.addEventListener("click", function () {
-      document.querySelectorAll(".variant-row .chip").forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
-      chip.setAttribute("aria-pressed", "true");
-      var v = chip.dataset.variant;
-      var notes = {
-        standard: "Sample circuit <strong>A2</strong> · click a block to edit it on the right · rotate handle shown on the selected block",
-        branch: "Sample circuit <strong>1</strong> (OV) · branches to a second cable + switch below the standard group — a second block set, not a copy",
-        spare: "Sample circuit <strong>9</strong> · spare — only the number label and breaker are placed, everything else omitted"
-      };
-      variantCanvasNote.innerHTML = notes[v];
-    });
-  });
-
-  var spareToggle = document.getElementById("spare-toggle");
-  spareToggle.addEventListener("change", function () {
-    if (spareToggle.checked) {
-      document.querySelector('.chip[data-variant="spare"]').click();
+  canvasWrap.addEventListener("dragover", function (e) { e.preventDefault(); canvasWrap.classList.add("drop-ok"); });
+  canvasWrap.addEventListener("dragleave", function () { canvasWrap.classList.remove("drop-ok", "drop-block"); });
+  canvasWrap.addEventListener("drop", function (e) {
+    e.preventDefault();
+    canvasWrap.classList.remove("drop-ok", "drop-block");
+    var type = e.dataTransfer.getData("text/plain");
+    var def = CATALOGUE[type];
+    if (!def) return;
+    var allowedScopes = mode === "group-edit" ? ["circuit"] : ["once", "panel", "aggregate"];
+    if (allowedScopes.indexOf(def.scope) === -1) {
+      document.getElementById("canvas-note").innerHTML =
+        '<span class="canvas-note warn">“' + def.label + '” is a ' + SCOPE_LABEL[def.scope].toLowerCase() + ' block — ' +
+        (mode === "group-edit" ? "go back to the layout to place it." : "open a circuit group to place it (click a repeated instance, or “+ New variant”).") + '</span>';
+      return;
     }
+    var p = svgPoint(e);
+    var block = mkBlock(type, Math.round(p.x - def.w / 2), Math.round(p.y - def.h / 2));
+    currentCollection().push(block);
+    selected = { id: block.id };
+    renderActive(); renderProps();
   });
+
+  document.getElementById("tpl-name").addEventListener("change", function () { template.name = this.value; });
+
+  renderPalette();
+  renderActive();
+  renderProps();
 
   /* ================= SCREEN 2 — generated schematic ================= */
   function buildColumnsSchematic() {
@@ -954,7 +1153,16 @@
         var id = btn.dataset.id, act = btn.dataset.act;
         var all = builtins.concat(myTemplates);
         var src = all.filter(function (t) { return t.id === id; })[0];
-        if (act === "load") { loadedId = id; renderTemplates(); }
+        if (act === "load") {
+          loadedId = id; renderTemplates();
+          var kind = src.name.toLowerCase().indexOf("row") > -1 ? "rows" : "columns";
+          if (kind === "rows") seedRowsTemplate(src.name); else seedColumnsTemplate(src.name);
+          mode = "layout"; selected = null;
+          document.getElementById("tpl-name").value = template.name;
+          document.getElementById("loaded-note").textContent = "Loaded from Template picker: " + src.name;
+          renderActive(); renderProps();
+          showScreen("editor");
+        }
         if (act === "copy") {
           var copyId = "copy-" + (tplCounter++);
           myTemplates.push({ id: copyId, name: src.name + " copy", locale: src.locale, builtin: false, note: "Copied from " + src.name + "." });
@@ -1063,9 +1271,6 @@
         '<button class="btn btn-sm btn-ghost" data-remove="' + tid + '">✕</button></div>';
     }).join("") || '<p class="hint">No terminals assigned.</p>';
 
-    var unassigned = terminalPool.filter(function (t) { return c.terminals.indexOf(t.id) === -1; });
-    var addOptions = unassigned.map(function (t) { return '<option value="' + t.id + '">' + t.label + ' (' + t.va + ' VA)</option>'; }).join("");
-
     host.innerHTML =
       '<div class="field-row">' +
         '<div class="field"><label>Prefix</label><input value="' + c.prefix + '" ' + (c.isSpare ? "" : "") + ' /></div>' +
@@ -1097,10 +1302,8 @@
       '<div class="field" style="max-width:160px"><label>Diversity %</label><input class="mono" id="diversity-input" value="' + c.diversityPercent + '"/></div>' +
       '<hr class="divider"/>' +
       '<div class="field-row" style="margin-bottom:8px"><h3 style="font-size:12.5px;color:var(--text-muted)">Assigned terminals</h3></div>' +
+      '<p class="hint" style="margin-top:-4px">Assigned by selecting terminals on the PDF canvas — not from this panel.</p>' +
       '<div class="term-list">' + termHtml + '</div>' +
-      (unassigned.length
-        ? '<div class="field" style="margin-top:10px"><label>Assign a terminal</label><div style="display:flex;gap:6px"><select id="term-select" style="flex:1">' + addOptions + '</select><button class="btn btn-sm btn-primary" id="term-add">Add</button></div></div>'
-        : '<p class="hint" style="margin-top:8px">All fixture terminals already assigned somewhere.</p>') +
       '<div class="cap-readout" style="margin-top:14px"><span>Capacity — sum(terminals) × diversity</span><span class="mono">' + cap + ' VA → ' + diversified + ' VA</span></div>';
 
     Array.prototype.forEach.call(host.querySelectorAll("[data-remove]"), function (b) {
@@ -1108,11 +1311,6 @@
         c.terminals = c.terminals.filter(function (id) { return id !== b.dataset.remove; });
         renderTree(); renderAssignProps();
       });
-    });
-    var addBtn = document.getElementById("term-add");
-    if (addBtn) addBtn.addEventListener("click", function () {
-      var sel = document.getElementById("term-select");
-      if (sel.value) { c.terminals.push(sel.value); renderTree(); renderAssignProps(); }
     });
     var divInput = document.getElementById("diversity-input");
     divInput.addEventListener("input", function () {
