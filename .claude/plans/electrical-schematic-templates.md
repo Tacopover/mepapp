@@ -253,7 +253,7 @@ exception, no `apps/web` code touched.
   canvas — see open question 9 below; that work needs its own plan since
   it shares a primitive with the existing custom-stamp editor and with
   "create your own component" in the symbol library.
-- **Round 4** (commit pending, 2026-09-23): added a per-panel defaults
+- **Round 4** (`128a3d1`, 2026-09-23): added a per-panel defaults
   system to the circuit assignment screen — each panel has a "⚙ Defaults"
   view (prefix, circuit type, phase, device, cable type/cores/cross-section,
   diversity) and every circuit's properties panel shows each of those
