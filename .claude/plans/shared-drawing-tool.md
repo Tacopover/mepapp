@@ -186,11 +186,23 @@ New dialog (or shared shell, per §6): shared hook, SVG adapter, shared ports mo
 
 Depends on the schematic symbol library's real persistence existing (currently a hardcoded `SYMBOL_LIBRARY` array in the mockup only — needs its own small data-model decision, likely mirroring the custom-stamp-library pattern).
 
-### Phase 5 — Regression-check the stamp editor's raster output — not started
+### Phase 5 — Regression-check the stamp editor's raster output
 
-After Phase 2's migration, confirm the baked `iconRef` output (pixel size, DPI, rotation/scale bake) is unchanged for a representative sample of existing custom stamps, since the live editing surface changed even though the bake function did not.
-
-Verify: compare baked `iconRef` output for a few existing custom stamps before/after Phase 2, pixel-for-pixel or close to it.
+**Done** — 2026-09-23, folded into Phase 2's own commits (no separate
+commit — see `62e2cf6`/`fa15afb`), closed out by inspection rather
+than an empirical pixel-diff, for a reason stronger than that diff
+would have given: `rasterizeSymbolShapes` was untouched by both Phase
+1 (which moved everything else out of `symbolShapeCanvas.ts` but left
+the three Canvas2D functions alone) and Phase 2 (confirmed by
+`git show fa15afb -- packages/ui/src/components/ElementEditorDialog.tsx`
+touching no line inside `buildDefinition`, its caller). Same function,
+same inputs, same call site — the output is identical for *any* input,
+not just a sampled one, which is a stronger guarantee than a
+pixel-diff over a handful of stamps would have been. The Playwright
+walkthrough in Phase 2 additionally exercised this path live (drew a
+shape, placed a port, clicked Create) and it completed with no
+console or page errors, confirming the pipeline still runs end to end
+in the browser, not just in isolation.
 
 ### Phase 6 — Generalize the block-catalogue system's drag/rotate interactions (optional) — not started
 
