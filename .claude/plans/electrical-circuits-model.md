@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft. No part is started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phase A done, B–D not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -213,8 +213,35 @@ Plus a circuit/panel properties panel (new component, alongside the existing `Pr
 
 ## 10. Phases
 
-### Phase A — Core types, numbering, capacity — not started
-`Circuit`, `Panel`, `PanelSection`, `CircuitType` types; pure numbering functions (gap-fill, shift-up, swap); capacity/diversity sum functions. Vitest coverage — this is the one package with real test coverage (per project CLAUDE.md), so this phase needs it, mirroring the depth of `network.test.ts`/`flow.test.ts`.
+### Phase A — Core types, numbering, capacity
+
+**Done** — 2026-09-23, commit `b2b884e` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Shipped: `packages/core/src/circuit.ts` (`Circuit`, `Panel`, `PanelAccessory`,
+`PanelSection`, `CircuitType` types per §5; `getNextCircuitNumber` (gap-fill),
+`shiftCircuitNumbersUpFrom` (spare-insertion shift), `renumberCircuitWithSwap`
+(swap semantics, scoped to the moving circuit's own panel), `computeCircuitCapacity`
+and `computePanelCapacity` (derived sums, `terminalCapacities: Record<string, number>`
+matching `flow.ts`'s existing shape)) and `packages/core/src/circuit-type-library.ts`
+(`CIRCUIT_TYPE_LIBRARY` seed of 8 built-in types + `getCircuitTypeFromLibrary`,
+mirroring `network-type-library.ts` — the old app shipped no built-in
+`CircuitType`s, so this seed is new to MepApp). Both re-exported from
+`packages/core/src/index.ts`. diversityPercent is stored but not yet folded
+into the capacity formula (no such rule was specified — left for whichever
+phase defines it).
+
+Not done: no `createCircuit`-style id-generating factories (Phase C's job,
+per the `network.ts` pattern of not allocating ids in `core`); the 7 open
+questions in §12 are still open and may still change these shapes before
+Phase C locks in the command surface.
+
+Verified: `pnpm exec vitest run` in `packages/core` — 168 tests passed
+(17 new, in `circuit.test.ts` and `circuit-type-library.test.ts`), 0
+failures. `pnpm --filter @mepapp/core exec tsc --noEmit` clean. `pnpm build`
+at repo root — all 9 workspace tasks succeeded (5 cached, 4 rebuilt
+including `@mepapp/render`, `@mepapp/ui`, `@mepapp/web`), confirming the
+new exports don't break downstream packages. No UI to verify in-browser —
+this phase has no UI surface (§9 is Phase D).
 
 ### Phase B — Schema migration — not started
 Bump to schema v9, one migration step, `project.test.ts` coverage for the new step (matches every prior migration's test).
