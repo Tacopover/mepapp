@@ -10,7 +10,7 @@ import {
   type SketchTool,
   type StampInfo,
 } from '@mepapp/render';
-import type { Calibration, FlowResult, NetworkType, StampDefinition, Vec2 } from '@mepapp/core';
+import type { Calibration, Circuit, CircuitType, FlowResult, NetworkType, Panel, PanelSection, StampDefinition, Vec2 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 export interface CalibrationPrompt {
@@ -52,6 +52,15 @@ export interface UseSketchScene {
   networkSummaries: NetworkSummary[];
   networkTypes: NetworkType[];
   customStampDefinitions: StampDefinition[];
+  circuits: Circuit[];
+  panels: Panel[];
+  panelSections: PanelSection[];
+  circuitTypes: CircuitType[];
+  /** The Electrical Circuits tree's own selection concept — a Circuit/Panel has no canvas presence to select via the usual stamp-selection path (see SketchScene.clearSelection). Mutually exclusive with each other and with a stamp/segment/fitting selection; selecting one clears the others. */
+  selectedCircuitId: string | null;
+  setSelectedCircuitId: (id: string | null) => void;
+  selectedPanelId: string | null;
+  setSelectedPanelId: (id: string | null) => void;
   zoom: number;
   pageIndex: number;
   pageCount: number;
@@ -66,6 +75,7 @@ export interface UseSketchScene {
   drawingSummary: DrawingSummary;
   flowResult: FlowResult[] | null;
   refreshLayers: () => void;
+  refreshCircuits: () => void;
   documents: DocumentSummary[];
   activeDocumentId: string | null;
   activePdfHandle: PdfDocumentHandle | null;
@@ -87,6 +97,12 @@ export function useSketchScene(): UseSketchScene {
   const [networkSummaries, setNetworkSummaries] = useState<NetworkSummary[]>([]);
   const [networkTypes, setNetworkTypes] = useState<NetworkType[]>([]);
   const [customStampDefinitions, setCustomStampDefinitions] = useState<StampDefinition[]>([]);
+  const [circuits, setCircuits] = useState<Circuit[]>([]);
+  const [panels, setPanels] = useState<Panel[]>([]);
+  const [panelSections, setPanelSections] = useState<PanelSection[]>([]);
+  const [circuitTypes, setCircuitTypes] = useState<CircuitType[]>([]);
+  const [selectedCircuitId, setSelectedCircuitIdState] = useState<string | null>(null);
+  const [selectedPanelId, setSelectedPanelIdState] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
@@ -108,6 +124,32 @@ export function useSketchScene(): UseSketchScene {
     setNetworkSummaries(scene.getNetworkSummaries());
   }, []);
 
+  const refreshCircuits = useCallback(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    setCircuits(scene.listCircuits());
+    setPanels(scene.listPanels());
+    setPanelSections(scene.listPanelSections());
+    setCircuitTypes(scene.listCircuitTypes());
+  }, []);
+
+  /** Selecting a circuit clears any panel selection, and vice versa, and both clear the canvas's own stamp/segment/fitting selection (SketchScene.clearSelection) — a Circuit/Panel has no canvas presence to co-select alongside. */
+  const setSelectedCircuitId = useCallback((id: string | null) => {
+    setSelectedCircuitIdState(id);
+    if (id !== null) {
+      setSelectedPanelIdState(null);
+      sceneRef.current?.clearSelection();
+    }
+  }, []);
+
+  const setSelectedPanelId = useCallback((id: string | null) => {
+    setSelectedPanelIdState(id);
+    if (id !== null) {
+      setSelectedCircuitIdState(null);
+      sceneRef.current?.clearSelection();
+    }
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current) return;
     const scene = new SketchScene(containerRef.current);
@@ -121,6 +163,14 @@ export function useSketchScene(): UseSketchScene {
       setSelectedFitting(scene.getSelectedFittingInfo());
       setHasSelection(scene.hasSelection());
       setAllStamps(scene.listStamps());
+      // A real canvas selection (stamp/segment/fitting) and the Electrical
+      // Circuits tree's own circuit/panel selection are mutually exclusive
+      // (see setSelectedCircuitId/setSelectedPanelId) — clicking a real
+      // canvas element clears whichever tree selection was active.
+      if (scene.hasSelection()) {
+        setSelectedCircuitIdState(null);
+        setSelectedPanelIdState(null);
+      }
     };
     const onToolChanged = (t: SketchTool) => setTool(t);
     const onCalibrationSet = (c: Calibration) => setCalibration(c);
@@ -137,6 +187,15 @@ export function useSketchScene(): UseSketchScene {
       setSelectedSegment(scene.getSelectedSegmentInfo());
       setSelectedSegments(scene.getSelectedSegments());
       setSelectedFitting(scene.getSelectedFittingInfo());
+    };
+    // Deliberately separate from onDrawingChanged — see SketchScene's
+    // 'circuitsChanged' event doc comment for why a circuit/panel edit must
+    // not touch selectedSegment/selectedSegments/selectedFitting.
+    const onCircuitsChanged = () => {
+      setCircuits(scene.listCircuits());
+      setPanels(scene.listPanels());
+      setPanelSections(scene.listPanelSections());
+      setCircuitTypes(scene.listCircuitTypes());
     };
     const onFlowSolved = (result: FlowResult[]) => {
       setFlowResult(result);
@@ -165,6 +224,12 @@ export function useSketchScene(): UseSketchScene {
       setNetworkSummaries(scene.getNetworkSummaries());
       setNetworkTypes(scene.getNetworkTypes());
       setCustomStampDefinitions(scene.getCustomStampDefinitions());
+      setCircuits(scene.listCircuits());
+      setPanels(scene.listPanels());
+      setPanelSections(scene.listPanelSections());
+      setCircuitTypes(scene.listCircuitTypes());
+      setSelectedCircuitIdState(null);
+      setSelectedPanelIdState(null);
     };
     // getNetworkSummaries() copies each resolved NetworkType's name into
     // networkTypeName at call time, so a rename (which mutates the type
@@ -202,6 +267,12 @@ export function useSketchScene(): UseSketchScene {
       setPageIndex(scene.getPageIndex());
       setPageCount(scene.getPageCount());
       setCustomStampDefinitions(scene.getCustomStampDefinitions());
+      setCircuits(scene.listCircuits());
+      setPanels(scene.listPanels());
+      setPanelSections(scene.listPanelSections());
+      setCircuitTypes(scene.listCircuitTypes());
+      setSelectedCircuitIdState(null);
+      setSelectedPanelIdState(null);
     };
 
     scene.on('selectionChanged', onSelectionChanged);
@@ -212,6 +283,7 @@ export function useSketchScene(): UseSketchScene {
     scene.on('textboxRequested', onTextboxRequested);
     scene.on('canvasContextMenuRequested', onCanvasContextMenuRequested);
     scene.on('drawingChanged', onDrawingChanged);
+    scene.on('circuitsChanged', onCircuitsChanged);
     scene.on('flowSolved', onFlowSolved);
     scene.on('projectLoaded', onProjectLoaded);
     scene.on('networkTypesChanged', onNetworkTypesChanged);
@@ -249,6 +321,7 @@ export function useSketchScene(): UseSketchScene {
       scene.off('textboxRequested', onTextboxRequested);
       scene.off('canvasContextMenuRequested', onCanvasContextMenuRequested);
       scene.off('drawingChanged', onDrawingChanged);
+      scene.off('circuitsChanged', onCircuitsChanged);
       scene.off('flowSolved', onFlowSolved);
       scene.off('projectLoaded', onProjectLoaded);
       scene.off('networkTypesChanged', onNetworkTypesChanged);
@@ -276,6 +349,14 @@ export function useSketchScene(): UseSketchScene {
     networkSummaries,
     networkTypes,
     customStampDefinitions,
+    circuits,
+    panels,
+    panelSections,
+    circuitTypes,
+    selectedCircuitId,
+    setSelectedCircuitId,
+    selectedPanelId,
+    setSelectedPanelId,
     zoom,
     pageIndex,
     pageCount,
@@ -290,6 +371,7 @@ export function useSketchScene(): UseSketchScene {
     drawingSummary,
     flowResult,
     refreshLayers,
+    refreshCircuits,
     documents,
     activeDocumentId,
     activePdfHandle,

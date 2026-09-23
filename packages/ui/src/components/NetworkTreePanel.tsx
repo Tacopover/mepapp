@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene, NetworkSummary, StampInfo } from '@mepapp/render';
-import { getStampDefinition, type Discipline } from '@mepapp/core';
+import { getStampDefinition, type Circuit, type CircuitType, type Discipline, type Panel, type PanelSection } from '@mepapp/core';
 import { IconChevRight, IconChevDown, IconTerminal, IconEquipment } from '../icons.js';
 
 export interface NetworkTreePanelProps {
@@ -9,6 +9,16 @@ export interface NetworkTreePanelProps {
   allStamps: StampInfo[];
   selection: StampInfo[];
   onRenameNetworkType: (id: string, name: string) => void;
+  /** Electrical Circuits branch (electrical-circuits-model.md §9) — a sibling section under the Electrical discipline row, alongside the existing Network list above. Circuit/Panel/PanelSection have no canvas presence, so their "selection" is app-level state (see useSketchScene's selectedCircuitId/selectedPanelId), not a stamp selection. */
+  circuits: Circuit[];
+  panels: Panel[];
+  panelSections: PanelSection[];
+  circuitTypes: CircuitType[];
+  selectedCircuitId: string | null;
+  selectedPanelId: string | null;
+  onSelectCircuit: (id: string) => void;
+  onSelectPanel: (id: string) => void;
+  onCreateCircuit: (panelId?: string) => void;
 }
 
 // Same six values as core's Discipline union (network.ts) — order and labels
@@ -46,6 +56,22 @@ function networkKey(networkId: string): string {
   return `network:${networkId}`;
 }
 
+function panelKey(panelId: string): string {
+  return `panel:${panelId}`;
+}
+
+/** "A1", "12" — the circuit's effective prefix+number, resolved against its panel's circuitDefaults when the circuit leaves prefix unset (electrical-circuits-model.md Phase C addendum). */
+function circuitLabel(circuit: Circuit, panel: Panel | undefined): string {
+  const prefix = circuit.prefix ?? panel?.circuitDefaults?.prefix ?? '';
+  return `${prefix}${circuit.number}`;
+}
+
+function circuitDescription(circuit: Circuit): string {
+  if (circuit.isSpare) return 'spare';
+  if (circuit.customName) return circuit.customName;
+  return `${circuit.terminalIds.length} terminal${circuit.terminalIds.length === 1 ? '' : 's'}`;
+}
+
 /**
  * Networks dock tab's tree — Discipline (all 6, always shown) → Network
  * (renamable) → Element (Terminal/Equipment), spec'd in
@@ -53,11 +79,55 @@ function networkKey(networkId: string): string {
  * levels rendered directly, no generic recursion needed since the shape is
  * fixed depth-3 and no tree library — see spec's D3.
  */
-export function NetworkTreePanel({ sceneRef, networkSummaries, allStamps, selection, onRenameNetworkType }: NetworkTreePanelProps) {
+export function NetworkTreePanel({
+  sceneRef,
+  networkSummaries,
+  allStamps,
+  selection,
+  onRenameNetworkType,
+  circuits,
+  panels,
+  panelSections,
+  circuitTypes,
+  selectedCircuitId,
+  selectedPanelId,
+  onSelectCircuit,
+  onSelectPanel,
+  onCreateCircuit,
+}: NetworkTreePanelProps) {
   const [expandedDisciplines, setExpandedDisciplines] = useState<Set<string>>(new Set());
   const [expandedNetworks, setExpandedNetworks] = useState<Set<string>>(new Set());
+  const [expandedPanels, setExpandedPanels] = useState<Set<string>>(new Set());
   const [editingNetworkTypeId, setEditingNetworkTypeId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const panelById = new Map(panels.map((p) => [p.id, p]));
+  const circuitTypeById = new Map(circuitTypes.map((t) => [t.id, t]));
+
+  function toggleExpandedPanel(key: string) {
+    setExpandedPanels((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function renderCircuitRow(circuit: Circuit) {
+    const panel = circuit.panelId ? panelById.get(circuit.panelId) : undefined;
+    const type = circuit.circuitTypeId ? circuitTypeById.get(circuit.circuitTypeId) : undefined;
+    return (
+      <button
+        key={circuit.id}
+        type="button"
+        className={`mep-net-tree-row mep-net-tree-row-element mep-net-tree-row-circuit${selectedCircuitId === circuit.id ? ' on' : ''}${circuit.isSpare ? ' mep-net-tree-row-spare' : ''}`}
+        onClick={() => onSelectCircuit(circuit.id)}
+      >
+        <span className="mep-net-tree-label">
+          {circuitLabel(circuit, panel)} <span className="mep-net-tree-count">({circuitDescription(circuit)}{type ? `, ${type.abbreviation}` : ''})</span>
+        </span>
+      </button>
+    );
+  }
 
   const stampById = new Map(allStamps.map((s) => [s.id, s]));
   const selectedIds = new Set(selection.map((s) => s.id));
@@ -174,6 +244,69 @@ export function NetworkTreePanel({ sceneRef, networkSummaries, allStamps, select
                     </div>
                   );
                 })}
+                {discipline === 'electrical' && (
+                  <div className="mep-net-tree-network">
+                    <div className="mep-net-tree-row mep-net-tree-row-network">
+                      <span className="mep-net-tree-label">
+                        Circuits{' '}
+                        <button type="button" className="mep-net-tree-add" onClick={() => onCreateCircuit()} title="New unassigned circuit">
+                          +
+                        </button>
+                      </span>
+                    </div>
+                    <div className="mep-net-tree-children">
+                      {panels.length === 0 && circuits.length === 0 && <div className="mep-net-tree-empty">No panels or circuits yet.</div>}
+                      {panels.map((panel) => {
+                        const pKey = panelKey(panel.id);
+                        const pExpanded = expandedPanels.has(pKey);
+                        const panelCircuits = circuits.filter((c) => c.panelId === panel.id);
+                        const sections = panelSections.filter((s) => s.panelId === panel.id).sort((a, b) => a.order - b.order);
+                        const unsectioned = panelCircuits.filter((c) => !c.sectionId);
+                        return (
+                          <div key={panel.id} className="mep-net-tree-network">
+                            <div className="mep-net-tree-row mep-net-tree-row-network mep-net-tree-row-panel">
+                              <button type="button" className="mep-net-tree-toggle" onClick={() => toggleExpandedPanel(pKey)}>
+                                {pExpanded ? <IconChevDown size={12} /> : <IconChevRight size={12} />}
+                              </button>
+                              <span
+                                className={`mep-net-tree-label${selectedPanelId === panel.id ? ' on' : ''}`}
+                                onClick={() => onSelectPanel(panel.id)}
+                              >
+                                <IconEquipment size={12} /> {panel.name} <span className="mep-net-tree-count">({panelCircuits.length})</span>
+                              </span>
+                            </div>
+                            {pExpanded && (
+                              <div className="mep-net-tree-children">
+                                {sections.map((section) => (
+                                  <div key={section.id} className="mep-net-tree-network">
+                                    <div className="mep-net-tree-row mep-net-tree-row-network mep-net-tree-row-section">
+                                      <span className="mep-net-tree-label">{section.name}</span>
+                                    </div>
+                                    <div className="mep-net-tree-children">
+                                      {panelCircuits.filter((c) => c.sectionId === section.id).map((c) => renderCircuitRow(c))}
+                                    </div>
+                                  </div>
+                                ))}
+                                {unsectioned.length === 0 && sections.length > 0 ? null : unsectioned.map((c) => renderCircuitRow(c))}
+                                <button type="button" className="mep-net-tree-add" onClick={() => onCreateCircuit(panel.id)} title="Add circuit to this panel">
+                                  + Add circuit
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {circuits.some((c) => !c.panelId) && (
+                        <div className="mep-net-tree-network">
+                          <div className="mep-net-tree-row mep-net-tree-row-network">
+                            <span className="mep-net-tree-label">Unassigned</span>
+                          </div>
+                          <div className="mep-net-tree-children">{circuits.filter((c) => !c.panelId).map((c) => renderCircuitRow(c))}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

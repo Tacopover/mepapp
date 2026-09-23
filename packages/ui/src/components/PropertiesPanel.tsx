@@ -4,14 +4,19 @@ import {
   coerceDefaultValue,
   getStampDefinition,
   NETWORK_TYPE_LIBRARY,
+  type Circuit,
+  type CircuitType,
   type CustomPropertyDefinition,
   type FittingKind,
   type NetworkType,
+  type Panel,
+  type PanelSection,
   type SegmentShape,
   type StampDefinition,
 } from '@mepapp/core';
 import { IconRotate } from '../icons.js';
 import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
+import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
 import { ColorPicker } from './ColorPicker.js';
 import { stampLabelFor } from './StampsPanel.js';
 import type { StampLabelLanguage } from './LanguageToggle.js';
@@ -69,6 +74,15 @@ export interface PropertiesPanelProps {
   /** Resolves a stamp definition's display name the same way the Stamps tab does — see stampLabelFor. */
   labelLanguage: StampLabelLanguage;
   onEditPorts: (definitionId: string) => void;
+  /** Electrical Circuits branch (electrical-circuits-model.md §9) — takes precedence over the stamp/segment/fitting branches below when set, since a Circuit/Panel selection is app-level state, not a canvas selection (see useSketchScene's selectedCircuitId/selectedPanelId). */
+  circuits: Circuit[];
+  panels: Panel[];
+  panelSections: PanelSection[];
+  circuitTypes: CircuitType[];
+  selectedCircuitId: string | null;
+  selectedPanelId: string | null;
+  setSelectedCircuitId: (id: string | null) => void;
+  setSelectedPanelId: (id: string | null) => void;
 }
 
 export function PropertiesPanel({
@@ -82,7 +96,48 @@ export function PropertiesPanel({
   customStampDefinitions,
   labelLanguage,
   onEditPorts,
+  circuits,
+  panels,
+  panelSections,
+  circuitTypes,
+  selectedCircuitId,
+  selectedPanelId,
+  setSelectedCircuitId,
+  setSelectedPanelId,
 }: PropertiesPanelProps) {
+  if (selectedCircuitId) {
+    const circuit = circuits.find((c) => c.id === selectedCircuitId);
+    if (circuit) {
+      const panel = circuit.panelId ? panels.find((p) => p.id === circuit.panelId) : undefined;
+      return (
+        <CircuitProperties
+          sceneRef={sceneRef}
+          circuit={circuit}
+          panel={panel}
+          panels={panels}
+          panelSections={panelSections}
+          circuitTypes={circuitTypes}
+          onDeleted={() => setSelectedCircuitId(null)}
+        />
+      );
+    }
+  }
+  if (selectedPanelId) {
+    const panel = panels.find((p) => p.id === selectedPanelId);
+    if (panel) {
+      return (
+        <PanelProperties
+          sceneRef={sceneRef}
+          panel={panel}
+          circuits={circuits}
+          panelSections={panelSections}
+          circuitTypes={circuitTypes}
+          onReverted={() => setSelectedPanelId(null)}
+        />
+      );
+    }
+  }
+
   // Every library type, resolved against this document's own adopted
   // overrides (name/color/etc), plus any duplicated types that only exist
   // in this document — same effective-list logic as StampsPanel's tiles.
@@ -439,6 +494,7 @@ export function PropertiesPanel({
 
   const stamp = selection[0];
   const definition = stamp.definitionId ? getStampDefinition(stamp.definitionId, customStampDefinitions) : undefined;
+  const backingPanel = stamp.category === 'equipment' ? panels.find((p) => p.equipmentStampId === stamp.id) : undefined;
 
   return (
     <div>
@@ -450,6 +506,23 @@ export function PropertiesPanel({
         {definition?.source === 'custom' && (
           <button type="button" onClick={() => onEditPorts(definition.id)}>
             Edit ports…
+          </button>
+        )}
+        {stamp.category === 'equipment' && backingPanel && (
+          <button type="button" onClick={() => setSelectedPanelId(backingPanel.id)}>
+            Manage panel…
+          </button>
+        )}
+        {stamp.category === 'equipment' && !backingPanel && (
+          <button
+            type="button"
+            onClick={() => {
+              const label = definition ? stampLabelFor(definition, labelLanguage) : 'Panel';
+              const id = sceneRef.current?.convertStampToPanel(stamp.id, label);
+              if (id) setSelectedPanelId(id);
+            }}
+          >
+            Convert to panel
           </button>
         )}
       </div>

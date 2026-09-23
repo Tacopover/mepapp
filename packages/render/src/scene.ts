@@ -11,6 +11,7 @@ import {
 import {
   annotationBoundsWorld,
   centroid,
+  CIRCUIT_TYPE_LIBRARY,
   coerceDefaultValue,
   computeNetworks,
   distance,
@@ -42,6 +43,9 @@ import {
   type Annotation,
   type AnnotationGeometry,
   type Calibration,
+  type Circuit,
+  type CircuitScope,
+  type CircuitType,
   type ConnectionPoint,
   type CustomPropertyDefinition,
   type CustomPropertyValues,
@@ -52,6 +56,8 @@ import {
   type LinePattern,
   type Network,
   type NetworkType,
+  type Panel,
+  type PanelSection,
   type PlacedStamp,
   type PortGroup,
   type PortSpec,
@@ -69,7 +75,38 @@ import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
-import { detachPanelCircuits } from './circuitCommands.js';
+import {
+  addPanelAccessoryCommand,
+  addTerminalToCircuitCommand,
+  assignCircuitToPanelCommand,
+  createCircuitCommand,
+  createPanelCommand,
+  createPanelSectionCommand,
+  deleteCircuitCommand,
+  deletePanelCommand,
+  deletePanelSectionCommand,
+  detachPanelCircuits,
+  insertSpareCircuitCommand,
+  removeCircuitFromPanelCommand,
+  removePanelAccessoryCommand,
+  removeTerminalFromCircuitCommand,
+  renamePanelSectionCommand,
+  renumberCircuitCommand,
+  setCircuitCableCommand,
+  setCircuitCustomNameCommand,
+  setCircuitDeviceCommand,
+  setCircuitDiversityCommand,
+  setCircuitPhaseCommand,
+  setCircuitPrefixBulkCommand,
+  setCircuitPrefixCommand,
+  setCircuitSectionCommand,
+  setCircuitTypeCommand,
+  setPanelCircuitDefaultsCommand,
+  setPanelFeederCableCommand,
+  setPanelMainDeviceCommand,
+  setPanelNameCommand,
+  setPanelSortDirectionCommand,
+} from './circuitCommands.js';
 import type { DragState, SelectableRef, SketchTool, Tool, ToolContext, ToolDragHandlers } from './tools/types.js';
 import type { AlignmentGuide } from './tools/alignmentGuides.js';
 import { resolveSnappedPoint } from './tools/dragSnap.js';
@@ -353,6 +390,20 @@ interface SketchSceneEvents {
   documentsChanged: [DocumentSummary[]];
   /** The active document's customStampDefinitions list changed (a new one authored, or an existing one edited) — the Stamps tab's cue to re-render its palette. */
   customStampDefinitionsChanged: [StampDefinition[]];
+  /**
+   * A circuit, panel, panel section, or circuit type changed — the
+   * Electrical Circuits tree/properties' cue to re-render. Deliberately
+   * separate from 'drawingChanged' rather than reusing it: that event's
+   * listener (useSketchScene's onDrawingChanged) also refreshes
+   * selectedSegment/selectedSegments/selectedFitting, and getSelectedSegments()
+   * always returns a fresh array reference even when nothing about segments
+   * changed — routing circuit edits through 'drawingChanged' would make that
+   * reference change on every circuit edit too, which spuriously re-runs any
+   * effect keyed on selectedSegments (e.g. App.tsx's "an armed placement
+   * tool forces the Stamps tab" effect), yanking the dock away from
+   * Properties mid-edit whenever a stamp tool happens to still be armed.
+   */
+  circuitsChanged: [];
   /**
    * A right-click landed on an existing port, fitting or segment interior (the
    * same targets onDrawSegmentClick's resolveSegmentEndpoint would snap to) —
@@ -1083,6 +1134,14 @@ export class SketchScene {
     this.redrawOverlay();
   }
 
+  /** Clears the canvas selection — the Electrical Circuits tree's click-to-select-a-circuit/panel action needs this first, since a Circuit/Panel has no canvas presence of its own to select instead (see the Circuit/Panel API section below). */
+  clearSelection(): void {
+    if (this.doc.selectedIds.size === 0) return;
+    this.doc.selectedIds.clear();
+    this.emitter.emit('selectionChanged', this.getSelection());
+    this.redrawOverlay();
+  }
+
   /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. */
   listStamps(): StampInfo[] {
     return Object.values(this.doc.drawingHistory.getState().stamps).map((d) => this.toStampInfo(d));
@@ -1116,6 +1175,235 @@ export class SketchScene {
         elementIds: [...elementIds],
       };
     });
+  }
+
+  // --- Circuit/Panel API (electrical-circuits-model.md Phase D) -----------
+  // Circuit/Panel/PanelSection/CircuitType have no presence on the PDF
+  // canvas (circuit.ts's own doc comment) — no sprites, no redraw needed.
+  // Every mutation still runs through the same undo-tracked drawingHistory
+  // as segments/stamps/annotations (document.ts's DrawingState); each just
+  // calls notifyCircuitsChanged() instead of syncDrawingLayer(), which
+  // fires 'circuitsChanged' (see that event's doc comment for why it's not
+  // 'drawingChanged') without paying for a full canvas redraw nothing here
+  // needs.
+
+  private notifyCircuitsChanged(): void {
+    this.markDirty();
+    this.emitter.emit('circuitsChanged');
+  }
+
+  private withCircuit(circuitId: string, build: (circuit: Circuit) => ReturnType<typeof deleteCircuitCommand>): void {
+    const circuit = this.doc.drawingHistory.getState().circuits[circuitId];
+    if (!circuit) return;
+    this.doc.drawingHistory.execute(build(circuit));
+    this.notifyCircuitsChanged();
+  }
+
+  private withPanel(panelId: string, build: (panel: Panel) => ReturnType<typeof setPanelNameCommand>): void {
+    const panel = this.doc.drawingHistory.getState().panels[panelId];
+    if (!panel) return;
+    this.doc.drawingHistory.execute(build(panel));
+    this.notifyCircuitsChanged();
+  }
+
+  /** Every circuit in the active document, unassigned and panel-scoped alike — the Electrical Circuits tree's leaf nodes. Circuit is plain data (no PixiJS resource attached, unlike PlacedStamp/StampInfo), so it's returned as-is rather than through a separate read-model transform. */
+  listCircuits(): Circuit[] {
+    return Object.values(this.doc.drawingHistory.getState().circuits);
+  }
+
+  listPanels(): Panel[] {
+    return Object.values(this.doc.drawingHistory.getState().panels);
+  }
+
+  listPanelSections(): PanelSection[] {
+    return Object.values(this.doc.drawingHistory.getState().panelSections);
+  }
+
+  /** Every circuit type known to the active document, library entries resolved against this document's own overrides — same merge as getNetworkTypes' availableNetworkTypes counterpart in PropertiesPanel.tsx. Unlike network types, circuit types have no "adopt on first use" step (circuit.ts's doc comment), so this always returns the full effective set. */
+  listCircuitTypes(): CircuitType[] {
+    return [
+      ...CIRCUIT_TYPE_LIBRARY.map((lib) => this.doc.circuitTypes.find((t) => t.id === lib.id) ?? lib),
+      ...this.doc.circuitTypes.filter((t) => !CIRCUIT_TYPE_LIBRARY.some((lib) => lib.id === t.id)),
+    ];
+  }
+
+  /** The Panel already referencing this equipment stamp, if any — Properties panel's "Convert to panel"/"Revert to equipment" gating for a selected Equipment stamp. */
+  getPanelForEquipmentStamp(equipmentStampId: string): Panel | undefined {
+    return Object.values(this.doc.drawingHistory.getState().panels).find((p) => p.equipmentStampId === equipmentStampId);
+  }
+
+  createCircuit(options: { panelId?: string; prefix?: string } = {}): string {
+    const id = `circuit-${this.doc.nextCircuitSeq++}`;
+    this.doc.drawingHistory.execute(createCircuitCommand(this.listCircuits(), id, options));
+    this.notifyCircuitsChanged();
+    return id;
+  }
+
+  deleteCircuit(circuitId: string): void {
+    this.withCircuit(circuitId, (c) => deleteCircuitCommand(c));
+  }
+
+  /** Returns false on addTerminalToCircuitCommand's invalid preconditions: the terminal already belongs to a different circuit, or the target circuit is a spare. */
+  addTerminalToCircuit(circuitId: string, terminalId: string, terminalName?: string): boolean {
+    const cmd = addTerminalToCircuitCommand(this.listCircuits(), circuitId, terminalId, terminalName);
+    if (!cmd) return false;
+    this.doc.drawingHistory.execute(cmd);
+    this.notifyCircuitsChanged();
+    return true;
+  }
+
+  removeTerminalFromCircuit(circuitId: string, terminalId: string): void {
+    this.withCircuit(circuitId, (c) => removeTerminalFromCircuitCommand(c, terminalId));
+  }
+
+  assignCircuitToPanel(circuitId: string, panelId: string): void {
+    this.doc.drawingHistory.execute(assignCircuitToPanelCommand(this.listCircuits(), circuitId, panelId));
+    this.notifyCircuitsChanged();
+  }
+
+  removeCircuitFromPanel(circuitId: string): void {
+    this.doc.drawingHistory.execute(removeCircuitFromPanelCommand(this.listCircuits(), circuitId));
+    this.notifyCircuitsChanged();
+  }
+
+  insertSpareCircuit(scope: CircuitScope, targetNumber: number, prefix?: string): string {
+    const id = `circuit-${this.doc.nextCircuitSeq++}`;
+    this.doc.drawingHistory.execute(insertSpareCircuitCommand(this.listCircuits(), id, scope, targetNumber, prefix));
+    this.notifyCircuitsChanged();
+    return id;
+  }
+
+  renumberCircuit(circuitId: string, targetNumber: number): void {
+    this.doc.drawingHistory.execute(renumberCircuitCommand(this.listCircuits(), circuitId, targetNumber));
+    this.notifyCircuitsChanged();
+  }
+
+  /** `prefix: undefined` clears the circuit's own override so it inherits its panel's circuitDefaults.prefix (electrical-circuits-model.md Phase C addendum). */
+  setCircuitPrefix(circuitId: string, prefix: string | undefined): void {
+    this.withCircuit(circuitId, (c) => setCircuitPrefixCommand(c, prefix));
+  }
+
+  setCircuitPrefixBulk(circuitIds: string[], prefix: string): void {
+    const state = this.doc.drawingHistory.getState();
+    const circuits = circuitIds.map((id) => state.circuits[id]).filter((c): c is Circuit => c !== undefined);
+    if (circuits.length === 0) return;
+    this.doc.drawingHistory.execute(setCircuitPrefixBulkCommand(circuits, prefix));
+    this.notifyCircuitsChanged();
+  }
+
+  setCircuitCustomName(circuitId: string, customName: string | undefined): void {
+    this.withCircuit(circuitId, (c) => setCircuitCustomNameCommand(c, customName));
+  }
+
+  setCircuitType(circuitId: string, circuitTypeId: string | undefined): void {
+    this.withCircuit(circuitId, (c) => setCircuitTypeCommand(c, circuitTypeId));
+  }
+
+  setCircuitDevice(circuitId: string, device: Circuit['device']): void {
+    this.withCircuit(circuitId, (c) => setCircuitDeviceCommand(c, device));
+  }
+
+  setCircuitCable(circuitId: string, cable: Circuit['cable']): void {
+    this.withCircuit(circuitId, (c) => setCircuitCableCommand(c, cable));
+  }
+
+  /** `diversityPercent: undefined` clears the circuit's own override so it inherits its panel's circuitDefaults.diversityPercent. */
+  setCircuitDiversity(circuitId: string, diversityPercent: number | undefined): void {
+    this.withCircuit(circuitId, (c) => setCircuitDiversityCommand(c, diversityPercent));
+  }
+
+  setCircuitPhase(circuitId: string, phase: Circuit['phase']): void {
+    this.withCircuit(circuitId, (c) => setCircuitPhaseCommand(c, phase));
+  }
+
+  setCircuitSection(circuitId: string, sectionId: string | undefined): void {
+    this.withCircuit(circuitId, (c) => setCircuitSectionCommand(c, sectionId));
+  }
+
+  /** One custom-property value on a circuit (Circuit.properties, electrical-circuits-model.md §12 open question 7) — same shallow-merge-via-Transaction pattern as setStampProperty. No reserved-name/definition-scoping UI yet (deliberately deferred, see circuit.ts's doc comment on Circuit.properties). */
+  setCircuitProperty(circuitId: string, name: string, value: string | number): void {
+    if (!this.doc.drawingHistory.getState().circuits[circuitId]) return;
+    const tx = new Transaction(this.doc.drawingHistory, `Set circuit ${circuitId} property ${name}`);
+    tx.update((state) => {
+      const circuit = state.circuits[circuitId];
+      if (!circuit) return state;
+      return { ...state, circuits: { ...state.circuits, [circuitId]: { ...circuit, properties: { ...circuit.properties, [name]: value } } } };
+    });
+    tx.commit();
+    this.notifyCircuitsChanged();
+  }
+
+  /** Converts an existing Equipment-category stamp into a Panel — null if that stamp already backs one (createPanelCommand's invalid precondition), or if `equipmentStampId` isn't actually a placed equipment stamp. */
+  convertStampToPanel(equipmentStampId: string, name: string): string | null {
+    const stamp = this.doc.drawingHistory.getState().stamps[equipmentStampId];
+    if (!stamp || stamp.category !== 'equipment') return null;
+    const id = `panel-${this.doc.nextPanelSeq++}`;
+    const cmd = createPanelCommand(this.listPanels(), id, equipmentStampId, name);
+    if (!cmd) return null;
+    this.doc.drawingHistory.execute(cmd);
+    this.notifyCircuitsChanged();
+    return id;
+  }
+
+  /** Reverts a Panel back to a plain Equipment stamp — every member circuit (including spares) returns to the unassigned pool first (deletePanelCommand). */
+  revertPanelToEquipment(panelId: string): void {
+    const state = this.doc.drawingHistory.getState();
+    if (!state.panels[panelId]) return;
+    this.doc.drawingHistory.execute(deletePanelCommand(state, panelId));
+    this.notifyCircuitsChanged();
+  }
+
+  setPanelName(panelId: string, name: string): void {
+    this.withPanel(panelId, (p) => setPanelNameCommand(p, name));
+  }
+
+  setPanelSortDirection(panelId: string, sortDirection: Panel['sortDirection']): void {
+    this.withPanel(panelId, (p) => setPanelSortDirectionCommand(p, sortDirection));
+  }
+
+  setPanelMainDevice(panelId: string, mainDevice: Panel['mainDevice']): void {
+    this.withPanel(panelId, (p) => setPanelMainDeviceCommand(p, mainDevice));
+  }
+
+  setPanelFeederCable(panelId: string, feederCable: Panel['feederCable']): void {
+    this.withPanel(panelId, (p) => setPanelFeederCableCommand(p, feederCable));
+  }
+
+  /** Whole-object replacement of a panel's circuitDefaults (electrical-circuits-model.md Phase C addendum) — the caller builds the full PanelCircuitDefaults it wants. */
+  setPanelCircuitDefaults(panelId: string, circuitDefaults: Panel['circuitDefaults']): void {
+    this.withPanel(panelId, (p) => setPanelCircuitDefaultsCommand(p, circuitDefaults));
+  }
+
+  addPanelAccessory(panelId: string, kind: string, label?: string): string {
+    const id = `panel-accessory-${this.doc.nextPanelAccessorySeq++}`;
+    this.withPanel(panelId, (p) => addPanelAccessoryCommand(p, { id, kind, label }));
+    return id;
+  }
+
+  removePanelAccessory(panelId: string, accessoryId: string): void {
+    this.withPanel(panelId, (p) => removePanelAccessoryCommand(p, accessoryId));
+  }
+
+  createPanelSection(panelId: string, name: string): string {
+    const id = `panel-section-${this.doc.nextPanelSectionSeq++}`;
+    const order = this.listPanelSections().filter((s) => s.panelId === panelId).length;
+    this.doc.drawingHistory.execute(createPanelSectionCommand(id, panelId, name, order));
+    this.notifyCircuitsChanged();
+    return id;
+  }
+
+  renamePanelSection(sectionId: string, name: string): void {
+    const section = this.doc.drawingHistory.getState().panelSections[sectionId];
+    if (!section) return;
+    this.doc.drawingHistory.execute(renamePanelSectionCommand(section, name));
+    this.notifyCircuitsChanged();
+  }
+
+  deletePanelSection(sectionId: string): void {
+    const state = this.doc.drawingHistory.getState();
+    if (!state.panelSections[sectionId]) return;
+    this.doc.drawingHistory.execute(deletePanelSectionCommand(state, sectionId));
+    this.notifyCircuitsChanged();
   }
 
   getCalibration(): Calibration | null {
@@ -1532,6 +1820,15 @@ export class SketchScene {
       if (numericSuffix) maxPanelSectionSeq = Math.max(maxPanelSectionSeq, Number(numericSuffix));
     }
     target.nextPanelSectionSeq = Math.max(target.nextPanelSectionSeq, maxPanelSectionSeq + 1);
+
+    let maxPanelAccessorySeq = 0;
+    for (const panel of doc.panels) {
+      for (const accessory of panel.accessories) {
+        const numericSuffix = /^panel-accessory-(\d+)$/.exec(accessory.id)?.[1];
+        if (numericSuffix) maxPanelAccessorySeq = Math.max(maxPanelAccessorySeq, Number(numericSuffix));
+      }
+    }
+    target.nextPanelAccessorySeq = Math.max(target.nextPanelAccessorySeq, maxPanelAccessorySeq + 1);
 
     destroyStampEntries(target.stamps.values());
     target.stamps.clear();

@@ -126,6 +126,14 @@ export function MepSketchApp({
     networkSummaries,
     networkTypes,
     customStampDefinitions,
+    circuits,
+    panels,
+    panelSections,
+    circuitTypes,
+    selectedCircuitId,
+    setSelectedCircuitId,
+    selectedPanelId,
+    setSelectedPanelId,
     zoom,
     pageIndex,
     pageCount,
@@ -595,6 +603,15 @@ export function MepSketchApp({
           allStamps={allStamps}
           selection={selection}
           onRenameNetworkType={handleRenameNetworkType}
+          circuits={circuits}
+          panels={panels}
+          panelSections={panelSections}
+          circuitTypes={circuitTypes}
+          selectedCircuitId={selectedCircuitId}
+          selectedPanelId={selectedPanelId}
+          onSelectCircuit={setSelectedCircuitId}
+          onSelectPanel={setSelectedPanelId}
+          onCreateCircuit={(panelId) => setSelectedCircuitId(sceneRef.current?.createCircuit({ panelId }) ?? null)}
         />
       </div>
     ),
@@ -610,6 +627,14 @@ export function MepSketchApp({
         customStampDefinitions={customStampDefinitions}
         labelLanguage={labelLanguage}
         onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
+        circuits={circuits}
+        panels={panels}
+        panelSections={panelSections}
+        circuitTypes={circuitTypes}
+        selectedCircuitId={selectedCircuitId}
+        selectedPanelId={selectedPanelId}
+        setSelectedCircuitId={setSelectedCircuitId}
+        setSelectedPanelId={setSelectedPanelId}
       />
     ),
   };
@@ -633,6 +658,16 @@ export function MepSketchApp({
     );
     setForcedTabNonce((n) => n + 1);
   }, [selection, selectedSegment, selectedSegments, selectedFitting, tool]);
+
+  // The Electrical Circuits tree's own selection (selectedCircuitId/selectedPanelId) is app-level
+  // state, not a canvas selection, so it needs its own jump-to-Properties effect rather than folding
+  // into the one above (which is keyed on 'select' tool + canvas selection state only).
+  useEffect(() => {
+    if (selectedCircuitId || selectedPanelId) {
+      setForcedTabId('properties');
+      setForcedTabNonce((n) => n + 1);
+    }
+  }, [selectedCircuitId, selectedPanelId]);
 
   return (
     <div className="mep-app">

@@ -111,6 +111,7 @@ export class SketchDocument {
   nextCircuitSeq = 1;
   nextPanelSeq = 1;
   nextPanelSectionSeq = 1;
+  nextPanelAccessorySeq = 1;
   lastFlowResult: FlowResult[] | null = null;
   /** Whether the on-canvas flow overlay (syncFlowLabels) should currently render — turned on by computeFlow() (the "Solve flow" button) and off whenever no segment stays selected, so the overlay reads as a deliberate, selection-scoped visualization rather than a permanent one. lastFlowResult itself is always kept live (see SketchScene.recomputeFlow) regardless of this flag, so Properties-panel capacity readouts never depend on it. */
   flowOverlayActive = false;
