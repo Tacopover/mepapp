@@ -1,6 +1,6 @@
 # Electrical schematic templates — plan
 
-Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phases 5–6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
+Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 block editor done 2026-09-24, free-drawn items still open; Phase 6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
 ## 1. Goal
 
@@ -351,7 +351,7 @@ Not done:
 
 Verified: `pnpm build` (9 of 9 tasks); `pnpm --filter @mepapp/core test` (327 tests) and `pnpm --filter @mepapp/ui test` (16 tests) pass. A real headless Chromium run (fork, on a preview build of this worktree) built a panel with 2 sections and 6 circuits (one spare, one with RCD, different phase, typed lengths, terminals of two kinds) through real clicks, then opened the dialog. Text in the SVG matched the entered data (labels A1 to A6, `B16/30mA`, `B2CA 3G2,5 mm²  l=27,5 m`, cells and totals). Both templates draw, zoom, pan, fit and Escape work, reopening after a change shows the new data, no console errors. The first run found the defects listed above; they were fixed and re-checked in the browser.
 
-### Phase 5 — Template editor — in progress (started 2026-09-24)
+### Phase 5 — Template editor — **block editor done 2026-09-24; free-drawn items not done**
 
 Place, rotate, and bind building blocks. Snap using ports. Edit a circuit group with sample data.
 
@@ -362,11 +362,24 @@ Design (decided 2026-09-24):
 - **Where it lives.** Inside `SchematicDialog`, as an edit mode that replaces the view (no second modal). Built-in templates stay read-only: "Edit template" first makes a copy. Copies live in App state for the session. Saving them is Phase 6.
 - **Pure edit functions in `@mepapp/core`** (`schematic-template-edit.ts`), with vitest tests: add, remove, move, resize (rotation-aware), duplicate and reorder blocks; add, remove and reorder groups; set the direction of all groups; copy a template; a list of the fields a binding can use.
 - **Tools.** Select, drag, rotate handle, resize handle, grid snap (1 mm default), a draggable group anchor, undo and redo, a palette that adds a block by click, a properties panel (position, size, rotation, binding with an "insert field" list, style, load type filter, totals table rows), a group list (rule, pitch, name) and template settings (name, sheet size, decimal separator, direction).
-- **Progress (2026-09-24):**
-  - Core: pure edit functions, sample data and the binding field list, with tests (`ff1a386`).
-  - UI, built but not yet browser-verified: `SchematicTemplateEditor` (canvas with move, rotate and resize handles, draggable group anchor, grid snap, undo and redo, palette, group and block lists), `SchematicTemplateProperties` (template, group and block panels), `useSheetView` (shared zoom and pan), `templateHistory`, and an "Edit template…" mode in `SchematicDialog`.
-  - Custom templates live in App state and in localStorage (`mepapp.schematicTemplates`) until Phase 6 replaces that.
-- **Not in this phase's first pass:** snapping to ports (blocks have no ports yet, so this becomes grid and edge alignment), free-drawn shapes (shared-drawing-tool Phase 3, added after the block editor works), saving (Phase 6).
+**Done (block editor)** — 2026-09-24, commits `ff1a386` (core), `03499f6` (UI) and `2722e80` (two fixes) on `worktree-electrical-schematic-templates-plan`.
+
+Shipped:
+- Core (`schematic-template-edit.ts`): pure edit functions, sample data and the binding field list. 36 tests. `validateSchematicTemplate` now accepts a template with no groups.
+- UI: `SchematicTemplateEditor` inside `SchematicDialog` (edit mode). The canvas shows the generated schematic. It has move, rotate and resize handles, a draggable group anchor, grid snap (Alt turns it off), undo and redo (one drag is one step), a palette, group and block lists, and keyboard shortcuts. `SchematicTemplateProperties` has template, group and block panels with an "Insert field" list and live binding errors. `useSheetView` is the zoom and pan shared with the viewer.
+- Built-in templates stay read-only. "Edit template…" makes a copy under "My templates". Duplicate and Delete template work.
+- Custom templates live in App state and in localStorage (`mepapp.schematicTemplates`, interim). Phase 6 replaces this.
+
+Not done:
+- Free-drawn shapes on the sheet (shared-drawing-tool Phase 3). The `freeItem` block is still text only.
+- Snapping to ports. Blocks have no ports, so the editor uses grid snap. Edge alignment guides are not built.
+- Grid dots on the canvas.
+- No component tests. Only the pure modules have tests.
+- The default totals rows use `count(circuits)`. In "one column per circuit" mode that row shows 0 for every circuit.
+- The sample data's load types are made-up strings, so a load type filter only matches on real panels.
+
+Verified: core 363 tests pass; UI 30 tests pass; root `pnpm build` 9 of 9. Two headless-browser passes (Playwright, own port): items 1 to 10 of the check list passed with no page errors. The pass found two defects: a text selection that cancelled the second drag, and block properties below the fold. Both were fixed, and a recheck passed (three drags in a row, after Undo, typing after a drag, block heading at y=119). Not checked: a real touch device, and Windows.
+
 
 ### Phase 6 — Save and load templates, export — not started
 
