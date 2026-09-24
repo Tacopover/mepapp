@@ -2067,3 +2067,45 @@
   display: flex;
   gap: 6px;
 }
+
+/* Schematic dialog (electrical-schematic-templates.md Phase 4) */
+.mep-schematic {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.mep-schematic-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.mep-schematic-bar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mep-schematic-hint {
+  opacity: 0.7;
+  font-size: 12px;
+}
+.mep-schematic-note,
+.mep-schematic-empty {
+  margin: 0;
+  font-size: 13px;
+}
+.mep-schematic-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  background: #d8dde2;
+  border: 1px solid var(--mep-border, #9aa3ad);
+  cursor: grab;
+  touch-action: none;
+}
+.mep-schematic-canvas:active {
+  cursor: grabbing;
+}

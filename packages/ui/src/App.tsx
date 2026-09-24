@@ -25,6 +25,7 @@ import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/Gl
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
 import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
+import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
@@ -190,6 +191,7 @@ export function MepSketchApp({
   >(null);
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
   const [circuitTypesOpen, setCircuitTypesOpen] = useState(false);
+  const [schematicPanelId, setSchematicPanelId] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
@@ -653,6 +655,7 @@ export function MepSketchApp({
         customStampDefinitions={customStampDefinitions}
         labelLanguage={labelLanguage}
         onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
+        onOpenSchematic={setSchematicPanelId}
         circuits={circuits}
         panels={panels}
         panelSections={panelSections}
@@ -926,6 +929,18 @@ export function MepSketchApp({
         />
       )}
 
+      {schematicPanelId && (
+        <SchematicDialog
+          panels={panels}
+          circuits={circuits}
+          panelSections={panelSections}
+          circuitTypes={circuitTypes}
+          stamps={allStamps}
+          customStampDefinitions={customStampDefinitions}
+          initialPanelId={schematicPanelId}
+          onClose={() => setSchematicPanelId(null)}
+        />
+      )}
       {circuitTypesOpen && (
         <CircuitTypesDialog sceneRef={sceneRef} circuitTypes={circuitTypes} circuits={circuits} panels={panels} onClose={() => setCircuitTypesOpen(false)} />
       )}

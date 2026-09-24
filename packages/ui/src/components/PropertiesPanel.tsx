@@ -75,6 +75,8 @@ export interface PropertiesPanelProps {
   /** Resolves a stamp definition's display name the same way the Stamps tab does — see stampLabelFor. */
   labelLanguage: StampLabelLanguage;
   onEditPorts: (definitionId: string) => void;
+  /** Opens the generated schematic dialog for a panel (electrical-schematic-templates.md Phase 4). */
+  onOpenSchematic: (panelId: string) => void;
   /** Electrical Circuits branch (electrical-circuits-model.md §9) — takes precedence over the stamp/segment/fitting branches below when set, since a Circuit/Panel selection is app-level state, not a canvas selection (see useSketchScene's selectedCircuitId/selectedPanelId). */
   circuits: Circuit[];
   panels: Panel[];
@@ -102,6 +104,7 @@ export function PropertiesPanel({
   customStampDefinitions,
   labelLanguage,
   onEditPorts,
+  onOpenSchematic,
   circuits,
   panels,
   panelSections,
@@ -148,6 +151,7 @@ export function PropertiesPanel({
           circuitTypes={circuitTypes}
           showCircuitLines={showCircuitLines}
           onToggleCircuitLines={onToggleCircuitLines}
+          onOpenSchematic={() => onOpenSchematic(panel.id)}
           onReverted={() => setSelectedPanelId(null)}
         />
       );

@@ -132,7 +132,21 @@ describe('bindings', () => {
     expect(render('')).toBe('');
   });
 
+  it('shows an optional group only when one of its expressions has a value', () => {
+    expect(render('{cable.type}[  l={cable.lengthM} m]')).toBe('B2CA');
+    expect(render('{cable.type}[  t={cable.type} m]')).toBe('B2CA  t=B2CA m');
+    expect(render('[{cable.lengthM} m][ / {circuit.number}]')).toBe(' / 3');
+  });
+
+  it('always shows an optional group that has no expression, and treats doubled brackets as literal', () => {
+    expect(render('a[ - b]c')).toBe('a - bc');
+    expect(render('[[{circuit.number}]]')).toBe('[3]');
+  });
+
   it('rejects an unclosed or stray brace and a bad expression', () => {
+    expect(() => parseBinding('[{circuit.number}')).toThrow(ExpressionError);
+    expect(() => parseBinding('a]')).toThrow(ExpressionError);
+    expect(() => parseBinding('[a[b]]')).toThrow(ExpressionError);
     expect(() => parseBinding('{circuit.number')).toThrow(ExpressionError);
     expect(() => parseBinding('a } b')).toThrow(ExpressionError);
     expect(() => parseBinding('{1 +}')).toThrow(ExpressionError);

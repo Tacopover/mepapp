@@ -316,6 +316,16 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
     return { columns, rows };
   };
 
+  /** A busbar with no size on the repeat axis covers every circuit, overhanging both ends by the gap between its start and the group anchor. */
+  const busbarSize = (block: SchematicBlock) => {
+    if (block.type !== 'busbar' || placed.length === 0) return undefined;
+    const alongRow = axis === 'row';
+    if ((alongRow ? block.width : block.height) !== undefined) return undefined;
+    const overhang = Math.max((alongRow ? template.groupAnchor.x - block.x : template.groupAnchor.y - block.y), 0);
+    const length = cursor + overhang * 2;
+    return alongRow ? { width: length, height: getBlockHeight(block) } : { width: getBlockWidth(block), height: length };
+  };
+
   for (const block of template.layoutBlocks) {
     const info = SCHEMATIC_BLOCK_CATALOGUE[block.type];
     if (!info) continue;
@@ -335,7 +345,7 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
       continue;
     }
     const context = info.scope === 'aggregate' ? aggregateContext(block) : { panel: panelFields };
-    const resolved = emit(block, info.scope, origin, context, { scopeId: '-' });
+    const resolved = emit(block, info.scope, origin, context, { scopeId: '-' }, busbarSize(block));
     if (block.type === 'totalsTable') resolved.table = resolveTable(block);
   }
 
@@ -344,6 +354,7 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
     const at = offsetPoint(p.offset);
     circuitOrigins[p.facts.circuit.id] = at;
     for (const block of p.group.blocks) {
+      if (block.type === 'loadSymbol' && p.facts.terminals.length === 0) continue;
       const resolved = emit(block, 'circuit', at, circuitContext(p.facts, block), { scopeId: p.facts.circuit.id, groupId: p.group.id, circuitId: p.facts.circuit.id });
       if (block.type === 'loadSymbol') resolved.loadStampDefinitionId = p.facts.terminals.find((t) => t.stampDefinitionId !== undefined)?.stampDefinitionId;
     }

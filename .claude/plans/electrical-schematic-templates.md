@@ -1,6 +1,6 @@
 # Electrical schematic templates — plan
 
-Status: **draft. Phases 0–3 done (Phase 3 on 2026-09-24); Phases 4–6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
+Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phases 5–6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
 ## 1. Goal
 
@@ -326,9 +326,30 @@ Not done:
 
 Verified: `pnpm --filter @mepapp/core test` (22 files, 317 tests, all pass; 70 are new); `tsc --noEmit` and `pnpm --filter @mepapp/core build` clean. Nothing in `render`, `ui` or `apps/web` changed, so no browser run was needed.
 
-### Phase 4 — Schematic view — not started
+### Phase 4 — Schematic view — **Done**
 
 Draw the generated schematic. Regenerate on change.
+
+**Done** — 2026-09-24, commit `PENDING` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Shipped:
+
+- **`SchematicDialog`** (`packages/ui`), opened by a new "View schematic…" button in a panel's Properties. It has a Panel select, a Template select (the two built-ins), "Fit to sheet", wheel zoom and drag pan. It is a modal: the page behind it cannot change while it is open. It regenerates from React props (circuits, sections, circuit types, stamps) on every render, so it always shows the current document when opened. It reports circuits that no group matches and invalid bindings above the sheet.
+- **`schematicBlockSvg.tsx`** draws one resolved block as SVG in sheet mm (all 21 block types). The sheet is fixed white paper with black ink, whatever the app theme. A load symbol draws the vector art of a custom stamp when its definition has shapes; otherwise a generic load mark.
+- **`schematicTerminals.ts`** builds the generator's terminal info from the placed stamps: label from the stamp definition, capacity from `terminalCapacities`, and **load type = the stamp's definition id** (category for an uploaded stamp with none). This is the working answer to open question 5.
+- **Generator and template changes found by the browser check** (core, with tests): section box offsets in the built-ins were sheet coordinates instead of offsets from the first circuit; a busbar with no size on the repeat axis now stretches over every circuit (both built-ins use this); a binding can hold optional `[...]` groups that only show when one of their `{...}` values exists (so a missing cable length no longer leaves "l= m"); no load symbol on a circuit without terminals.
+
+Not done:
+
+- **Read-only and modal.** No editing, no side-by-side dock. Phase 5 adds the template editor.
+- **The template choice is not saved.** The dialog opens on the first built-in every time.
+- **One panel per view.** A sheet with several panels (open question 4) is not drawn; the generator supports it through `origin`.
+- **Library stamps show a generic load mark.** Only custom stamps have vector shapes. Drawing the PNG art of library stamps needs the app's icon resolver and was not done.
+- **No export** (Phase 6, open question 2), and no title-block data (there is no project-data model).
+- **The circuit's custom name is not auto-filled from a terminal name.** `addTerminalToCircuit` takes a terminal name, but a placed stamp has none to give, so the description block is blank until the user types a name. This gap is older than Phase 4 (Phase C).
+- **No visual comparison with the real E60 and OV drawings.** The built-in layouts are still a first guess; the browser check only confirmed they are readable and consistent.
+
+Verified: `pnpm build` (9 of 9 tasks); `pnpm --filter @mepapp/core test` (327 tests) and `pnpm --filter @mepapp/ui test` (16 tests) pass. A real headless Chromium run (fork, on a preview build of this worktree) built a panel with 2 sections and 6 circuits (one spare, one with RCD, different phase, typed lengths, terminals of two kinds) through real clicks, then opened the dialog. Text in the SVG matched the entered data (labels A1 to A6, `B16/30mA`, `B2CA 3G2,5 mm²  l=27,5 m`, cells and totals). Both templates draw, zoom, pan, fit and Escape work, reopening after a change shows the new data, no console errors. The first run found the defects listed above; they were fixed and re-checked in the browser.
 
 ### Phase 5 — Template editor — not started
 

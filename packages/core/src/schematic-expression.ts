@@ -219,20 +219,33 @@ interface BindingPart {
   literal?: string;
   expression?: ParsedExpression;
   decimals?: number;
+  /** An optional group: shown only when at least one of its expressions has a value. */
+  group?: BindingPart[];
 }
 
 export interface ParsedBinding {
   parts: BindingPart[];
 }
 
-/** "{expr}" or "{expr:2}" segments (":2" = two fixed decimals) between literal text; "{{" and "}}" are literal braces. Throws ExpressionError. */
+/**
+ * "{expr}" or "{expr:2}" segments (":2" = two fixed decimals) between literal text. A "[...]" group
+ * holds text and segments that are shown only when at least one segment inside has a value, so
+ * "[  l={cable.lengthM} m]" disappears when there is no length. "{{", "}}", "[[" and "]]" are
+ * literal braces and brackets. Groups do not nest. Throws ExpressionError.
+ */
 export function parseBinding(source: string): ParsedBinding {
   const parts: BindingPart[] = [];
+  let group: BindingPart[] | undefined;
   let literal = '';
+  const target = () => group ?? parts;
+  const flush = () => {
+    if (literal) target().push({ literal });
+    literal = '';
+  };
   let i = 0;
   while (i < source.length) {
     const ch = source[i];
-    if ((ch === '{' || ch === '}') && source[i + 1] === ch) {
+    if ((ch === '{' || ch === '}' || ch === '[' || ch === ']') && source[i + 1] === ch) {
       literal += ch;
       i += 2;
     } else if (ch === '{') {
@@ -245,10 +258,20 @@ export function parseBinding(source: string): ParsedBinding {
         decimals = Number(spec[1]);
         body = body.slice(0, spec.index);
       }
-      if (literal) parts.push({ literal });
-      literal = '';
-      parts.push({ expression: parseExpression(body), decimals });
+      flush();
+      target().push({ expression: parseExpression(body), decimals });
       i = end + 1;
+    } else if (ch === '[') {
+      if (group) throw new ExpressionError(`Nested "[" in "${source}"`);
+      flush();
+      group = [];
+      i++;
+    } else if (ch === ']') {
+      if (!group) throw new ExpressionError(`Unexpected "]" in "${source}"`);
+      flush();
+      parts.push({ group });
+      group = undefined;
+      i++;
     } else if (ch === '}') {
       throw new ExpressionError(`Unexpected "}" in "${source}"`);
     } else {
@@ -256,12 +279,35 @@ export function parseBinding(source: string): ParsedBinding {
       i++;
     }
   }
-  if (literal) parts.push({ literal });
+  if (group) throw new ExpressionError(`Missing "]" in "${source}"`);
+  flush();
   return { parts };
 }
 
+interface RenderedParts {
+  text: string;
+  expressions: number;
+  filled: number;
+}
+
+function renderParts(parts: BindingPart[], context: unknown, format: NumberFormat): RenderedParts {
+  const result: RenderedParts = { text: '', expressions: 0, filled: 0 };
+  for (const part of parts) {
+    if (part.group) {
+      const inner = renderParts(part.group, context, format);
+      if (inner.expressions === 0 || inner.filled > 0) result.text += inner.text;
+    } else if (part.expression) {
+      const shown = formatValue(evaluateExpression(part.expression, context), format, part.decimals);
+      result.expressions++;
+      if (shown !== '') result.filled++;
+      result.text += shown;
+    } else {
+      result.text += part.literal ?? '';
+    }
+  }
+  return result;
+}
+
 export function renderBinding(binding: ParsedBinding, context: unknown, format: NumberFormat): string {
-  return binding.parts
-    .map((part) => (part.expression ? formatValue(evaluateExpression(part.expression, context), format, part.decimals) : (part.literal ?? '')))
-    .join('');
+  return renderParts(binding.parts, context, format).text;
 }

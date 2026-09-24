@@ -294,11 +294,12 @@ export interface PanelPropertiesProps {
   circuitTypes: CircuitType[];
   showCircuitLines: boolean;
   onToggleCircuitLines: () => void;
+  onOpenSchematic: () => void;
   onReverted: () => void;
 }
 
 /** The Electrical Circuits tree's properties view for one selected panel (electrical-circuits-model.md §9), including its circuitDefaults (Phase C addendum) — edited inline here rather than in a separate dialog, same as mainDevice/feederCable below. */
-export function PanelProperties({ sceneRef, panel, circuits, panelSections, circuitTypes, showCircuitLines, onToggleCircuitLines, onReverted }: PanelPropertiesProps) {
+export function PanelProperties({ sceneRef, panel, circuits, panelSections, circuitTypes, showCircuitLines, onToggleCircuitLines, onOpenSchematic, onReverted }: PanelPropertiesProps) {
   const memberCircuits = circuits.filter((c) => c.panelId === panel.id);
   const sections = panelSections.filter((s) => s.panelId === panel.id).sort((a, b) => a.order - b.order);
   const defaults = panel.circuitDefaults ?? {};
@@ -326,6 +327,9 @@ export function PanelProperties({ sceneRef, panel, circuits, panelSections, circ
 
       <div className="mep-section">
         <CircuitLinesToggle show={showCircuitLines} onToggle={onToggleCircuitLines} />
+        <button type="button" onClick={onOpenSchematic} title="Show this panel's circuits as a distribution board schedule">
+          View schematic…
+        </button>
       </div>
 
       <div className="mep-section">

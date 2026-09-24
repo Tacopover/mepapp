@@ -240,6 +240,16 @@ describe('generateSchematic bindings', () => {
     expect(byId(loads.blocks, 'c3/load')?.loadStampDefinitionId).toBeUndefined();
   });
 
+  it('draws no load symbol for a circuit without terminals', () => {
+    const loads = generateSchematic(input, template({}, [{ id: 'g', name: 'g', rule: { kind: 'any' }, direction: 'row', pitch: 10, blocks: [block('load', 'loadSymbol', 0, 0)] }]));
+    expect(loads.blocks.filter((b) => b.type === 'loadSymbol').map((b) => b.circuitId)).toEqual(['c1', 'c2', 'c4']);
+  });
+
+  it('leaves out the optional length text of a cable that has no length', () => {
+    const noLength = generateSchematic({ ...input, circuits: [circuit('x', 1)] }, template({}, [{ id: 'g', name: 'g', rule: { kind: 'any' }, direction: 'row', pitch: 10, blocks: [block('cable', 'cableText', 0, 0)] }]));
+    expect(byId(noLength.blocks, 'x/cable')?.text).toBe('B2CA 3G2,5 mm²');
+  });
+
   it('reports a bad binding for every circuit it is resolved for and renders blank text', () => {
     const bad = generateSchematic(input, template({}, [{ id: 'g', name: 'g', rule: { kind: 'any' }, direction: 'row', pitch: 10, blocks: [block('oops', 'description', 0, 0, { binding: '{1 +}' })] }]));
     expect(byId(bad.blocks, 'c1/oops')?.text).toBe('');
@@ -292,6 +302,20 @@ describe('generateSchematic layout blocks', () => {
     const columnGroups: CircuitGroupDefinition[] = [{ id: 'g', name: 'g', rule: { kind: 'any' }, direction: 'column', pitch: 8, blocks: [] }];
     const columns = generateSchematic(input, template({ layoutBlocks: [block('sec', 'section', 0, 0, { width: 50 })] }, columnGroups));
     expect(columns.blocks[0]).toMatchObject({ width: 50, height: 16, y: 20 });
+  });
+
+  it('stretches a busbar with no size on the repeat axis over every circuit', () => {
+    const rowBar = generateSchematic(input, template({ layoutBlocks: [block('bus', 'busbar', 6, 0, { height: 2 })] }));
+    // Circuits span 10 + 10 + 5 + 10 = 35 from an anchor at x=10, so the bar starts 4 before it and ends 4 after.
+    expect(rowBar.blocks[0]).toMatchObject({ x: 6, width: 35 + 8, height: 2 });
+    const columnGroups: CircuitGroupDefinition[] = [{ id: 'g', name: 'g', rule: { kind: 'any' }, direction: 'column', pitch: 8, blocks: [] }];
+    const columnBar = generateSchematic(input, template({ layoutBlocks: [block('bus', 'busbar', 0, 20, { width: 2 })] }, columnGroups));
+    expect(columnBar.blocks[0]).toMatchObject({ y: 20, height: 32, width: 2 });
+  });
+
+  it('keeps a busbar with an explicit size on the repeat axis as it is', () => {
+    const fixed = generateSchematic(input, template({ layoutBlocks: [block('bus', 'busbar', 6, 0, { width: 100, height: 2 })] }));
+    expect(fixed.blocks[0]).toMatchObject({ width: 100 });
   });
 
   it('draws no section block for a panel without sections', () => {
@@ -357,5 +381,35 @@ describe('built-in templates', () => {
       expect(b.x + b.width, `${b.id} right edge`).toBeLessThanOrEqual(builtIn.sheet.widthMm);
       expect(b.y + b.height, `${b.id} bottom edge`).toBeLessThanOrEqual(builtIn.sheet.heightMm);
     }
+  });
+
+  it.each(SCHEMATIC_TEMPLATE_LIBRARY.map((t) => [t.name, t] as const))('draws each section box around its own circuits on the %s template', (_name, builtIn) => {
+    const result = generateSchematic(input, builtIn);
+    const alongRow = builtIn.groups[0].direction === 'row';
+    const axisStart = (b: ResolvedBlock) => (alongRow ? b.x : b.y);
+    const axisEnd = (b: ResolvedBlock) => axisStart(b) + (alongRow ? b.width : b.height);
+    const boxes = result.blocks.filter((b) => b.type === 'section');
+    expect(boxes.map((b) => b.sectionId)).toEqual(['sec-a', 'sec-b']);
+    for (const box of boxes) {
+      const members = orderPanelCircuits(panel, circuits, sections).filter((c) => c.sectionId === box.sectionId);
+      for (const member of members) {
+        const at = result.circuitOrigins[member.id];
+        const start = alongRow ? at.x : at.y;
+        expect(start, `${member.id} inside ${box.sectionId}`).toBeGreaterThanOrEqual(axisStart(box));
+        expect(start, `${member.id} inside ${box.sectionId}`).toBeLessThan(axisEnd(box));
+      }
+    }
+    const outside = result.circuitOrigins.c4;
+    for (const box of boxes) expect(alongRow ? outside.x : outside.y).toBeGreaterThanOrEqual(axisEnd(box));
+  });
+
+  it.each(SCHEMATIC_TEMPLATE_LIBRARY.map((t) => [t.name, t] as const))('runs the busbar of the %s template past the first and last circuit', (_name, builtIn) => {
+    const result = generateSchematic(input, builtIn);
+    const bar = result.blocks.find((b) => b.type === 'busbar')!;
+    const alongRow = builtIn.groups[0].direction === 'row';
+    const first = result.circuitOrigins.c1;
+    const last = result.circuitOrigins.c4;
+    expect(alongRow ? bar.x : bar.y).toBeLessThan(alongRow ? first.x : first.y);
+    expect((alongRow ? bar.x + bar.width : bar.y + bar.height)).toBeGreaterThan(alongRow ? last.x : last.y);
   });
 });
