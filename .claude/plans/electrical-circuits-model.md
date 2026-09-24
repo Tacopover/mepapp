@@ -786,7 +786,7 @@ Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (204 core + 13 pdf-
 
 **E7 — Circuit type editor**
 
-**Done 2026-09-24, commit `HASH`.**
+**Done 2026-09-24, commit `fef41bb`.**
 - Core: `getCircuitTypeUsage` (circuits and panel defaults that use a type) and `validateCircuitTypeFields` (name required and unique ignoring case, abbreviation required, capacity a number of 0 or more), 3 new tests (207 core tests).
 - `SketchScene`: `createCircuitType`, `updateCircuitType` (returns the refusal reason; a built-in type is copied into the document on first change), `deleteCircuitType`, `resetCircuitType`. Circuit types live in `doc.circuitTypes`, not in the undo history, so these edits are direct and not undoable, like the network type edits. They raise `circuitsChanged`, which marks the document dirty and refreshes the UI.
 - Decisions: a built-in type can be changed and reset but not deleted (the library always shows). A user type cannot be deleted while a circuit or a panel default uses it; the dialog shows the usage and disables Delete. This means no circuit is ever left with a type that is gone, and no dangling id can come back through Undo. The old app allowed a delete only while another type remained; that rule does not apply because the built-ins always remain.
