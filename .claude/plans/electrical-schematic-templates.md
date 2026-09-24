@@ -362,6 +362,10 @@ Design (decided 2026-09-24):
 - **Where it lives.** Inside `SchematicDialog`, as an edit mode that replaces the view (no second modal). Built-in templates stay read-only: "Edit template" first makes a copy. Copies live in App state for the session. Saving them is Phase 6.
 - **Pure edit functions in `@mepapp/core`** (`schematic-template-edit.ts`), with vitest tests: add, remove, move, resize (rotation-aware), duplicate and reorder blocks; add, remove and reorder groups; set the direction of all groups; copy a template; a list of the fields a binding can use.
 - **Tools.** Select, drag, rotate handle, resize handle, grid snap (1 mm default), a draggable group anchor, undo and redo, a palette that adds a block by click, a properties panel (position, size, rotation, binding with an "insert field" list, style, load type filter, totals table rows), a group list (rule, pitch, name) and template settings (name, sheet size, decimal separator, direction).
+- **Progress (2026-09-24):**
+  - Core: pure edit functions, sample data and the binding field list, with tests (`ff1a386`).
+  - UI, built but not yet browser-verified: `SchematicTemplateEditor` (canvas with move, rotate and resize handles, draggable group anchor, grid snap, undo and redo, palette, group and block lists), `SchematicTemplateProperties` (template, group and block panels), `useSheetView` (shared zoom and pan), `templateHistory`, and an "Edit template…" mode in `SchematicDialog`.
+  - Custom templates live in App state and in localStorage (`mepapp.schematicTemplates`) until Phase 6 replaces that.
 - **Not in this phase's first pass:** snapping to ports (blocks have no ports yet, so this becomes grid and edge alignment), free-drawn shapes (shared-drawing-tool Phase 3, added after the block editor works), saving (Phase 6).
 
 ### Phase 6 — Save and load templates, export — not started

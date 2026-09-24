@@ -1602,6 +1602,12 @@
   display: flex;
   min-height: 0;
 }
+.mep-modal--full {
+  width: min(1400px, 97vw);
+  max-width: min(1400px, 97vw);
+  height: min(860px, 94vh);
+  max-height: min(860px, 94vh);
+}
 .mep-ee-body {
   position: relative;
   display: flex;
@@ -2108,4 +2114,176 @@
 }
 .mep-schematic-canvas:active {
   cursor: grabbing;
+}
+
+/* Schematic template editor (electrical-schematic-templates.md Phase 5) */
+.mep-schematic-editor {
+  outline: none;
+}
+.mep-schematic-editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 300px;
+  gap: 8px;
+}
+.mep-schematic-side {
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.mep-schematic-stage {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mep-schematic-palette-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.mep-schematic-palette-heading {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+.mep-schematic-palette-button {
+  text-align: left;
+  font-size: 11.5px;
+  padding: 3px 6px;
+}
+.mep-schematic-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mep-schematic-list button {
+  width: 100%;
+  text-align: left;
+  font-size: 11.5px;
+  padding: 3px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mep-schematic-list button span {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+.mep-schematic-list button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.mep-schematic-list-row {
+  display: flex;
+  gap: 2px;
+}
+.mep-schematic-list-row > button {
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: row;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-schematic-list-tools {
+  display: flex;
+  gap: 2px;
+}
+.mep-schematic-list-tools button {
+  width: auto;
+  padding: 3px 6px;
+}
+.mep-schematic-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+.mep-schematic-props summary {
+  cursor: pointer;
+  list-style: none;
+}
+.mep-schematic-props summary h4 {
+  display: block;
+}
+.mep-schematic-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.mep-schematic-field label {
+  font-size: 9.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.mep-schematic-field input[type='text'],
+.mep-schematic-field select {
+  width: 100%;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.mep-schematic-readonly {
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--ink);
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+.mep-schematic-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  margin-bottom: 6px;
+}
+.mep-schematic-radios,
+.mep-schematic-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.mep-schematic-checks {
+  flex-direction: column;
+}
+.mep-schematic-radios label,
+.mep-schematic-checks label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mep-schematic-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mep-schematic-row-edit {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.mep-schematic-row-edit input {
+  min-width: 0;
+  font-size: 11.5px;
+}
+.mep-schematic-row-edit .mep-schematic-note {
+  grid-column: 1 / -1;
+}
+.mep-schematic-editor .mep-field-row input {
+  width: 84px;
 }

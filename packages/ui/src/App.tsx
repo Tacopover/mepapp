@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { STAMP_LIBRARY, SCHEMATIC_TEMPLATE_LIBRARY, type NetworkType, type ReconciliationReport, type SchematicTemplate, type StampCategory, type StampDefinition } from '@mepapp/core';
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
@@ -28,6 +28,7 @@ import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
+import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
@@ -192,6 +193,9 @@ export function MepSketchApp({
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
   const [circuitTypesOpen, setCircuitTypesOpen] = useState(false);
   const [schematicPanelId, setSchematicPanelId] = useState<string | null>(null);
+  const [customSchematicTemplates, setCustomSchematicTemplates] = useState<SchematicTemplate[]>(() => loadCustomTemplates(typeof localStorage === 'undefined' ? undefined : localStorage));
+  const [schematicTemplateId, setSchematicTemplateId] = useState(SCHEMATIC_TEMPLATE_LIBRARY[0].id);
+  useEffect(() => saveCustomTemplates(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicTemplates), [customSchematicTemplates]);
   const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
@@ -938,6 +942,10 @@ export function MepSketchApp({
           stamps={allStamps}
           customStampDefinitions={customStampDefinitions}
           initialPanelId={schematicPanelId}
+          customTemplates={customSchematicTemplates}
+          onCustomTemplatesChange={setCustomSchematicTemplates}
+          templateId={schematicTemplateId}
+          onTemplateIdChange={setSchematicTemplateId}
           onClose={() => setSchematicPanelId(null)}
         />
       )}
