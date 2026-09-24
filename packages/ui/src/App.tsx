@@ -14,7 +14,7 @@ import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ToastStack, useToasts } from './components/Toasts.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
-import { useNetworkTreeExpansion } from './useNetworkTreeExpansion.js';
+import { useNetworkTreeState } from './useNetworkTreeState.js';
 import { CircuitsToolbar } from './components/CircuitsToolbar.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
@@ -161,7 +161,7 @@ export function MepSketchApp({
 
   const [status, setStatus] = useState('');
   const { toasts, pushToast, dismissToast } = useToasts();
-  const networkTreeExpansion = useNetworkTreeExpansion();
+  const networkTreeState = useNetworkTreeState();
   useEffect(() => {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
@@ -627,7 +627,7 @@ export function MepSketchApp({
           onSelectCircuit={setSelectedCircuitId}
           onSelectPanel={setSelectedPanelId}
           onCreateCircuit={(panelId) => setSelectedCircuitId(sceneRef.current?.createCircuit({ panelId }) ?? null)}
-          expansion={networkTreeExpansion}
+          treeState={networkTreeState}
           onDeleteCircuit={(id) => {
             sceneRef.current?.deleteCircuit(id);
             if (selectedCircuitId === id) setSelectedCircuitId(null);

@@ -156,6 +156,38 @@ export function renumberCircuitWithSwap(circuits: Circuit[], circuitId: string, 
   });
 }
 
+/** Where an inserted spare goes, and how many circuits it pushes up (plan Phase E6). */
+export interface SpareInsertion {
+  scope: CircuitScope;
+  targetNumber: number;
+  /** Circuits in scope numbered at or after targetNumber; each moves up by one. */
+  shiftedCount: number;
+}
+
+/**
+ * Resolves where "insert spare" puts the new circuit. With a circuit as the target, the spare takes
+ * that circuit's number and the circuit (and every later one in the same panel or unassigned pool)
+ * moves up by one — the old app's "insert before the selected circuit". With a panel (or the
+ * unassigned pool, `panelId` undefined) as the target, the spare goes after the last circuit.
+ * Null when the circuit id does not exist.
+ */
+export function getSpareInsertion(circuits: Circuit[], target: { circuitId: string } | { panelId?: string }): SpareInsertion | null {
+  if ('circuitId' in target) {
+    const circuit = circuits.find((c) => c.id === target.circuitId);
+    if (!circuit) return null;
+    const scope = { panelId: circuit.panelId };
+    return { scope, targetNumber: circuit.number, shiftedCount: circuits.filter((c) => inScope(c, scope) && c.number >= circuit.number).length };
+  }
+  const scope = { panelId: target.panelId };
+  const numbers = circuits.filter((c) => inScope(c, scope)).map((c) => c.number);
+  return { scope, targetNumber: numbers.length === 0 ? 1 : Math.max(...numbers) + 1, shiftedCount: 0 };
+}
+
+/** A circuit number must be a whole number of at least 1. */
+export function isValidCircuitNumber(value: number): boolean {
+  return Number.isInteger(value) && value >= 1;
+}
+
 /**
  * A panel's member circuit ids, derived from Circuit.panelId rather than
  * stored on Panel — same tradeoff network.ts's doc comment calls out for

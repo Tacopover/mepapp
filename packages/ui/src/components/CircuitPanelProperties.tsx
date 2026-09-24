@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene, StampInfo } from '@mepapp/render';
 import { getEffectiveDiversityPercent, getEffectivePrefix, getStampDefinition, type Circuit, type CircuitType, type Panel, type PanelSection, type StampDefinition } from '@mepapp/core';
 import { IconTrash } from '../icons.js';
@@ -75,6 +75,13 @@ export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSecti
       </div>
 
       <div className="mep-section">
+        <CircuitNumberField circuit={circuit} sceneRef={sceneRef} />
+        <div className="mep-field-row">
+          <label>Spare</label>
+          <button type="button" onClick={() => sceneRef.current?.insertSpareAt({ circuitId: circuit.id })} title="Insert a spare before this circuit. This circuit and every later one in the same panel move up by one.">
+            Insert spare above
+          </button>
+        </div>
         <div className="mep-field-row">
           <label>Panel</label>
           <select
@@ -305,6 +312,12 @@ export function PanelProperties({ sceneRef, panel, circuits, panelSections, circ
 
       <div className="mep-section">
         <div className="mep-field-row">
+          <label>Spare</label>
+          <button type="button" onClick={() => sceneRef.current?.insertSpareAt({ panelId: panel.id })} title="Add a spare circuit after the last circuit of this panel">
+            Add spare
+          </button>
+        </div>
+        <div className="mep-field-row">
           <label>Name</label>
           <input type="text" value={panel.name} onChange={(e) => sceneRef.current?.setPanelName(panel.id, e.target.value)} />
         </div>
@@ -511,6 +524,41 @@ function InheritableSelectField({
           ↺
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * The circuit's number inside its panel. Commits on blur or Enter, reverts on Escape or a value that
+ * is not a whole number from 1. A number another circuit of the panel already has swaps the two —
+ * the scene raises the toast (SketchScene.renumberCircuit). The draft is local so a half-typed value
+ * never reaches the command stack.
+ */
+function CircuitNumberField({ circuit, sceneRef }: { circuit: Circuit; sceneRef: RefObject<SketchScene | null> }) {
+  const [draft, setDraft] = useState(String(circuit.number));
+  useEffect(() => setDraft(String(circuit.number)), [circuit.id, circuit.number]);
+
+  function commit() {
+    const value = Number(draft);
+    const result = draft.trim() === '' ? 'invalid' : sceneRef.current?.renumberCircuit(circuit.id, value);
+    if (result !== 'renumbered' && result !== 'swapped') setDraft(String(circuit.number));
+  }
+
+  return (
+    <div className="mep-field-row">
+      <label>Number</label>
+      <input
+        type="number"
+        min={1}
+        step={1}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') setDraft(String(circuit.number));
+        }}
+      />
     </div>
   );
 }

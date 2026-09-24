@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4 (Circuits mode and floating toolbar) and E5 (tree, menus, halos, delete) done 2026-09-24, E6–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4 (Circuits mode and floating toolbar) E5 (tree, menus, halos, delete) and E6 (spares, renumber, bulk edit) done 2026-09-24, E7–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -583,7 +583,7 @@ reasoned through, not just asserted.
 
 ### Phase E — circuit workflow UI (canvas tools, connection lines, tree, terminal side)
 
-Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4 (Circuits mode and floating toolbar) and E5 (tree, menus, halos, delete) done 2026-09-24; E6–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
+Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4 (Circuits mode and floating toolbar) E5 (tree, menus, halos, delete) and E6 (spares, renumber, bulk edit) done 2026-09-24; E7–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
 
 **The finding that shapes this phase.** Phase C built every command the core workflow needs. Phase D built property editors for circuits and panels. Neither built the *canvas-side* workflow that the old app used for almost everything. The old app does circuit work with three canvas features, not with the tree or the Properties panel:
 
@@ -769,9 +769,20 @@ Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (200 core + 13 pdf-
 
 Not done: Add terminals started from Properties keeps the dock on Properties (the user is already there); Properties edits do not switch tabs.
 
-**E6 — Lifecycle UI for existing commands**
+**E6 — Lifecycle UI for existing commands** — **Done** (2026-09-24, see the Done note after E6's list)
 - Insert spare (Circuits toolbar, tree menu, panel and circuit Properties). Renumber field with commit on blur. A swap must raise a toast ("Swapped with L1.4"). Bulk prefix/type edit mode with tree checkboxes. Bulk type edit must go through the command stack, unlike the old app.
 - All three commands already exist (`insertSpareCircuit`, `renumberCircuit`, `setCircuitPrefixBulk`). This sub-phase is UI only.
+
+**E6 Done note — 2026-09-24, commit `HASH` on `worktree-electrical-schematic-templates-plan`.**
+
+Shipped:
+- `core/circuit.ts`: `getSpareInsertion` (before a circuit: takes its number, counts how many circuits move up; after the last circuit of a panel; null for a missing circuit) and `isValidCircuitNumber`. 4 new vitest cases (core now 204).
+- `SketchScene`: `insertSpareAt` (one undo step, notice with the number of circuits that moved up), `renumberCircuit` (now returns `'renumbered' | 'swapped' | 'unchanged' | 'invalid'`; a swap raises a warning toast), `applyCircuitBulkEdit` (prefix and/or type on many circuits as one `Transaction`; the type edit is undoable, unlike the old app). `insertSpareCircuitCommand` no longer gives a spare an empty own prefix, so it inherits its panel's (before, a spare in a panel with prefix "L1." showed as "3", not "L1.3").
+- UI: toolbar **Add spare**; tree menus "Insert spare above" (circuit) and "Add spare" (panel); circuit Properties "Number" field (commit on blur or Enter, Escape or an invalid value reverts) and "Insert spare above"; panel Properties "Add spare". The tree has an **Edit** toggle: checkboxes on circuit rows, group checkboxes on panel rows and "Unassigned" (mixed state when partly checked), and a bar with prefix, type and Apply. An empty field keeps the current value. The bulk state lives in `useNetworkTreeState.ts` (renamed from `useNetworkTreeExpansion.ts`), so it survives the dock unmounting the tree.
+
+Not done: the toast for a swap names the edited circuit first ("Swapped numbers: circuit 1 and circuit 3."). The Circuits toolbar wraps onto several rows at some widths (icons are the planned fix, see E8); after the run its chip and spacing were tightened, and that change was not re-measured. The panel row's icon still wraps onto its own line, and the tree is wider than the dock (440 px in 400 px), both from Phase D and unchanged. The chip lists a panel circuit and an unassigned circuit with the same number identically, apart from their terminal counts.
+
+Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (204 core + 13 pdf-engine-mupdf passed). Real Playwright run, real keyboard and mouse input, steps 1 to 11 all passed with no page or console errors: toolbar Add spare (toast, shift, one-step Undo/Redo, disabled with no circuit and while a tool runs), tree and Properties spare buttons, spare menu and "Deleted spare" toast, panel prefix inherited by spares (L1.x labels), renumber by Enter and Tab (free number, swap with toast and one-step Undo, 0, negative, empty, fractional and Escape all revert, separate numbering for the unassigned pool), bulk edit (prefix only, type only, both, one-step Undo, group checkbox and its mixed state, state kept across tabs), row click versus checkbox click. After the run, the panel checkbox was moved before the chevron so the two checkbox columns line up (checked in a screenshot).
 
 **E7 — Circuit type editor**
 - Add a **Circuit types** button to the Circuits toolbar that opens the editor (the old app had a Circuit Type group on the Circuits tab).

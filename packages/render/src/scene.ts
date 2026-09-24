@@ -19,6 +19,8 @@ import {
   getCircuitConnectionLines,
   getCircuitLabel,
   getCircuitLineColor,
+  getSpareInsertion,
+  isValidCircuitNumber,
   getNetworkTypeFromLibrary,
   getStampDefinition,
   getStampPorts,
@@ -1564,9 +1566,48 @@ export class SketchScene {
     return id;
   }
 
-  renumberCircuit(circuitId: string, targetNumber: number): void {
+  /**
+   * Inserts a spare before a circuit (the circuit and every later one in its panel move up by one),
+   * or after the last circuit of a panel — see core's getSpareInsertion. One undo step. The spare has
+   * no prefix of its own, so it inherits its panel's. Raises a notice that says how many circuits
+   * were renumbered. Returns the new circuit id, or null when the target does not exist.
+   */
+  insertSpareAt(target: { circuitId: string } | { panelId?: string }): string | null {
+    const state = this.doc.drawingHistory.getState();
+    const insertion = getSpareInsertion(Object.values(state.circuits), target);
+    if (!insertion) return null;
+    const id = this.insertSpareCircuit(insertion.scope, insertion.targetNumber);
+    const created = this.doc.drawingHistory.getState().circuits[id];
+    const panel = created.panelId ? state.panels[created.panelId] : undefined;
+    const moved = insertion.shiftedCount;
+    this.emitNotice(
+      `Inserted spare ${getCircuitLabel(created, panel)}.${moved > 0 ? ` ${moved} later circuit${moved === 1 ? '' : 's'} moved up by one.` : ''}`,
+      'info',
+    );
+    return id;
+  }
+
+  /**
+   * Gives a circuit a new number in its own panel. If another circuit already has that number, the
+   * two swap (plan §3) and a notice says so. One undo step. Returns 'invalid' for a number that is
+   * not a whole number from 1, 'unchanged' when the circuit already has it.
+   */
+  renumberCircuit(circuitId: string, targetNumber: number): 'renumbered' | 'swapped' | 'unchanged' | 'invalid' {
+    const state = this.doc.drawingHistory.getState();
+    const circuit = state.circuits[circuitId];
+    if (!circuit || !isValidCircuitNumber(targetNumber)) return 'invalid';
+    if (circuit.number === targetNumber) return 'unchanged';
+    const occupant = Object.values(state.circuits).find((c) => c.id !== circuitId && c.panelId === circuit.panelId && c.number === targetNumber);
+    const panel = circuit.panelId ? state.panels[circuit.panelId] : undefined;
+    const previousNumber = circuit.number;
     this.doc.drawingHistory.execute(renumberCircuitCommand(this.listCircuits(), circuitId, targetNumber));
     this.notifyCircuitsChanged();
+    if (!occupant) return 'renumbered';
+    this.emitNotice(
+      `Swapped numbers: circuit ${getCircuitLabel({ ...circuit, number: targetNumber }, panel)} and circuit ${getCircuitLabel({ ...occupant, number: previousNumber }, panel)}.`,
+      'warning',
+    );
+    return 'swapped';
   }
 
   /** `prefix: undefined` clears the circuit's own override so it inherits its panel's circuitDefaults.prefix (electrical-circuits-model.md Phase C addendum). */
@@ -1580,6 +1621,31 @@ export class SketchScene {
     if (circuits.length === 0) return;
     this.doc.drawingHistory.execute(setCircuitPrefixBulkCommand(circuits, prefix));
     this.notifyCircuitsChanged();
+  }
+
+  /**
+   * The Networks tree's bulk edit: sets a prefix and/or a circuit type on every given circuit as one
+   * undo step. Unlike the old app, the type edit goes through the command stack too. Returns how many
+   * circuits changed, and raises a notice.
+   */
+  applyCircuitBulkEdit(circuitIds: string[], edit: { prefix?: string; circuitTypeId?: string }): number {
+    const state = this.doc.drawingHistory.getState();
+    const circuits = circuitIds.map((id) => state.circuits[id]).filter((c): c is Circuit => c !== undefined);
+    if (circuits.length === 0 || (edit.prefix === undefined && edit.circuitTypeId === undefined)) return 0;
+    const tx = new Transaction(this.doc.drawingHistory, `Edit ${circuits.length} circuit(s)`);
+    if (edit.prefix !== undefined) {
+      const prefix = edit.prefix;
+      tx.update((s) => setCircuitPrefixBulkCommand(circuits.map((c) => s.circuits[c.id]), prefix).execute(s));
+    }
+    if (edit.circuitTypeId !== undefined) {
+      const typeId = edit.circuitTypeId;
+      for (const circuit of circuits) tx.update((s) => setCircuitTypeCommand(s.circuits[circuit.id], typeId).execute(s));
+    }
+    tx.commit();
+    const changed = [edit.prefix !== undefined ? 'prefix' : null, edit.circuitTypeId !== undefined ? 'type' : null].filter(Boolean).join(' and ');
+    this.emitNotice(`Updated ${changed} of ${circuits.length} circuit${circuits.length === 1 ? '' : 's'}.`, 'info');
+    this.notifyCircuitsChanged();
+    return circuits.length;
   }
 
   setCircuitCustomName(circuitId: string, customName: string | undefined): void {

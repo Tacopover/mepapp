@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import type { SketchScene, NetworkSummary, StampInfo } from '@mepapp/render';
 import { getEffectivePrefix, getStampDefinition, type Circuit, type CircuitType, type Discipline, type Panel, type PanelSection } from '@mepapp/core';
-import type { NetworkTreeExpansion } from '../useNetworkTreeExpansion.js';
+import type { NetworkTreeState } from '../useNetworkTreeState.js';
 import { IconChevRight, IconChevDown, IconTerminal, IconEquipment } from '../icons.js';
 
 export interface NetworkTreePanelProps {
@@ -20,8 +20,8 @@ export interface NetworkTreePanelProps {
   onSelectCircuit: (id: string) => void;
   onSelectPanel: (id: string) => void;
   onCreateCircuit: (panelId?: string) => void;
-  /** Open rows, kept by the caller so they survive the dock unmounting this tree — see useNetworkTreeExpansion. */
-  expansion: NetworkTreeExpansion;
+  /** Open rows and bulk-edit state, kept by the caller so they survive the dock unmounting this tree — see useNetworkTreeState. */
+  treeState: NetworkTreeState;
   /** Deletes a circuit and clears the tree selection if it was that circuit — see App.tsx. */
   onDeleteCircuit: (id: string) => void;
   /** The Show Circuits toggle — see SketchScene.setShowCircuitLines. */
@@ -148,13 +148,15 @@ export function NetworkTreePanel({
   onSelectCircuit,
   onSelectPanel,
   onCreateCircuit,
-  expansion,
+  treeState,
   onDeleteCircuit,
   showCircuitLines,
   onToggleCircuitLines,
 }: NetworkTreePanelProps) {
-  const { disciplines: expandedDisciplines, setDisciplines: setExpandedDisciplines, networks: expandedNetworks, setNetworks: setExpandedNetworks, panels: expandedPanels, setPanels: setExpandedPanels } = expansion;
-  const { circuits: expandedCircuits, setCircuits: setExpandedCircuits } = expansion;
+  const { disciplines: expandedDisciplines, setDisciplines: setExpandedDisciplines, networks: expandedNetworks, setNetworks: setExpandedNetworks, panels: expandedPanels, setPanels: setExpandedPanels } = treeState;
+  const { circuits: expandedCircuits, setCircuits: setExpandedCircuits, bulkMode, setBulkMode, checkedCircuits, setCheckedCircuits } = treeState;
+  const [bulkPrefix, setBulkPrefix] = useState('');
+  const [bulkTypeId, setBulkTypeId] = useState('');
   const [editingNetworkTypeId, setEditingNetworkTypeId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [menu, setMenu] = useState<{ x: number; y: number; items: TreeMenuItem[] } | null>(null);
@@ -177,6 +179,53 @@ export function NetworkTreePanel({
       else next.add(id);
       return next;
     });
+  }
+
+  function toggleChecked(ids: string[], checked: boolean) {
+    setCheckedCircuits((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleBulkMode() {
+    if (bulkMode) setCheckedCircuits(new Set());
+    setBulkMode(!bulkMode);
+  }
+
+  const checkedIds = circuits.filter((c) => checkedCircuits.has(c.id)).map((c) => c.id);
+
+  function applyBulkEdit() {
+    const done = sceneRef.current?.applyCircuitBulkEdit(checkedIds, {
+      prefix: bulkPrefix !== '' ? bulkPrefix : undefined,
+      circuitTypeId: bulkTypeId !== '' ? bulkTypeId : undefined,
+    });
+    if (done) {
+      setBulkPrefix('');
+      setBulkTypeId('');
+    }
+  }
+
+  /** A checkbox that checks or unchecks a whole group of circuits (a panel, or the unassigned pool); shows the mixed state when only some are checked. */
+  function renderGroupCheckbox(label: string, ids: string[]) {
+    if (!bulkMode || ids.length === 0) return null;
+    const checkedCount = ids.filter((id) => checkedCircuits.has(id)).length;
+    return (
+      <input
+        type="checkbox"
+        className="mep-net-tree-check"
+        aria-label={`Check all circuits of ${label}`}
+        checked={checkedCount === ids.length}
+        ref={(el) => {
+          if (el) el.indeterminate = checkedCount > 0 && checkedCount < ids.length;
+        }}
+        onChange={(e) => toggleChecked(ids, e.target.checked)}
+      />
+    );
   }
 
   function openMenu(event: MouseEvent, items: TreeMenuItem[]) {
@@ -204,6 +253,7 @@ export function NetworkTreePanel({
       });
       if (circuit.panelId) items.push({ label: 'Remove from panel', onSelect: () => sceneRef.current?.removeCircuitFromPanel(circuit.id) });
     }
+    items.push({ label: 'Insert spare above', onSelect: () => sceneRef.current?.insertSpareAt({ circuitId: circuit.id }) });
     items.push({ label: 'Delete circuit', onSelect: () => onDeleteCircuit(circuit.id) });
     return items;
   }
@@ -216,6 +266,15 @@ export function NetworkTreePanel({
     return (
       <div key={circuit.id} className="mep-net-tree-network">
         <div className="mep-net-tree-circuit-line" onContextMenu={(e) => openMenu(e, circuitMenuItems(circuit))}>
+          {bulkMode && (
+            <input
+              type="checkbox"
+              className="mep-net-tree-check mep-net-tree-check-circuit"
+              aria-label={`Check circuit ${circuitLabel(circuit, panel)}`}
+              checked={checkedCircuits.has(circuit.id)}
+              onChange={(e) => toggleChecked([circuit.id], e.target.checked)}
+            />
+          )}
           <button
             type="button"
             className="mep-net-tree-toggle mep-net-tree-circuit-toggle"
@@ -401,8 +460,35 @@ export function NetworkTreePanel({
                         >
                           Lines
                         </button>
+                        <button
+                          type="button"
+                          className={`mep-net-tree-add mep-net-tree-lines${bulkMode ? ' on' : ''}`}
+                          aria-pressed={bulkMode}
+                          onClick={toggleBulkMode}
+                          title="Check circuits to set their prefix and type together"
+                        >
+                          Edit
+                        </button>
                       </span>
                     </div>
+                    {bulkMode && (
+                      <div className="mep-net-tree-bulk">
+                        <span className="mep-net-tree-count">{checkedIds.length} checked</span>
+                        <input type="text" placeholder="Prefix" aria-label="Prefix for checked circuits" value={bulkPrefix} onChange={(e) => setBulkPrefix(e.target.value)} />
+                        <select aria-label="Circuit type for checked circuits" value={bulkTypeId} onChange={(e) => setBulkTypeId(e.target.value)}>
+                          <option value="">Keep type</option>
+                          {circuitTypes.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="button" disabled={checkedIds.length === 0 || (bulkPrefix === '' && bulkTypeId === '')} onClick={applyBulkEdit}>
+                          Apply
+                        </button>
+                        <span className="mep-net-tree-count">An empty field keeps the current value.</span>
+                      </div>
+                    )}
                     <div className="mep-net-tree-children">
                       {panels.length === 0 && circuits.length === 0 && <div className="mep-net-tree-empty">No panels or circuits yet.</div>}
                       {panels.map((panel) => {
@@ -418,11 +504,13 @@ export function NetworkTreePanel({
                               onContextMenu={(e) =>
                                 openMenu(e, [
                                   { label: 'Add circuit', onSelect: () => onCreateCircuit(panel.id) },
+                                  { label: 'Add spare', onSelect: () => sceneRef.current?.insertSpareAt({ panelId: panel.id }) },
                                   { label: 'Manage panel', onSelect: () => onSelectPanel(panel.id) },
                                   { label: 'Select equipment on canvas', onSelect: () => sceneRef.current?.selectStampById(panel.equipmentStampId) },
                                 ])
                               }
                             >
+                              {renderGroupCheckbox(panel.name, panelCircuits.map((c) => c.id))}
                               <button type="button" className="mep-net-tree-toggle" onClick={() => toggleExpandedPanel(pKey)}>
                                 {pExpanded ? <IconChevDown size={12} /> : <IconChevRight size={12} />}
                               </button>
@@ -460,6 +548,7 @@ export function NetworkTreePanel({
                             className="mep-net-tree-row mep-net-tree-row-network"
                             onContextMenu={(e) => openMenu(e, [{ label: 'New circuit', onSelect: () => onCreateCircuit() }])}
                           >
+                            {renderGroupCheckbox('Unassigned', circuits.filter((c) => !c.panelId).map((c) => c.id))}
                             <span className="mep-net-tree-label">Unassigned</span>
                           </div>
                           <div className="mep-net-tree-children">{byNumber(circuits.filter((c) => !c.panelId)).map((c) => renderCircuitRow(c))}</div>

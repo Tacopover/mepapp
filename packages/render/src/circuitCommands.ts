@@ -192,7 +192,7 @@ export function insertSpareCircuitCommand(
   id: string,
   scope: CircuitScope,
   targetNumber: number,
-  prefix = '',
+  prefix?: string,
 ): Command<DrawingState> {
   const before = byId(circuits);
   const shifted = shiftCircuitNumbersUpFrom(circuits, scope, targetNumber);

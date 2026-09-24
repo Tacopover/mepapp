@@ -135,6 +135,14 @@ export function CircuitsToolbar({
           <button
             type="button"
             disabled={toolRunning || !current}
+            title={current ? 'Insert a spare before this circuit. This circuit and every later one in its panel move up by one.' : needCircuit}
+            onClick={() => current && scene?.insertSpareAt({ circuitId: current.id })}
+          >
+            Add spare
+          </button>
+          <button
+            type="button"
+            disabled={toolRunning || !current}
             title={current ? 'Delete this circuit. Its terminals stay on the canvas. Undo restores it.' : needCircuit}
             onClick={() => {
               if (!current) return;

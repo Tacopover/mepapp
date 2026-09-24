@@ -18,6 +18,8 @@ import {
   planTerminalAssignment,
   renumberCircuitWithSwap,
   resolveCircuitLineTargets,
+  getSpareInsertion,
+  isValidCircuitNumber,
   resolveCurrentCircuitId,
   shiftCircuitNumbersUpFrom,
   type Circuit,
@@ -368,5 +370,39 @@ describe('resolveCurrentCircuitId', () => {
     expect(resolveCurrentCircuitId(circuits, { selectedStampIds: ['free-terminal'] })).toBeNull();
     expect(resolveCurrentCircuitId(circuits, { selectedStampIds: ['t1', 't3'] })).toBeNull();
     expect(resolveCurrentCircuitId(circuits, { selectedStampIds: ['t1', 'free-terminal'] })).toBeNull();
+  });
+});
+
+describe('getSpareInsertion', () => {
+  const circuits: Circuit[] = [
+    { id: 'a', number: 1, panelId: 'p1', terminalIds: [], diversityPercent: 100 } as Circuit,
+    { id: 'b', number: 2, panelId: 'p1', terminalIds: [], diversityPercent: 100 } as Circuit,
+    { id: 'c', number: 4, panelId: 'p1', terminalIds: [], diversityPercent: 100 } as Circuit,
+    { id: 'd', number: 1, terminalIds: [], diversityPercent: 100 } as Circuit,
+  ];
+
+  it('inserts before a circuit and counts what moves up, only inside that circuit\'s panel', () => {
+    expect(getSpareInsertion(circuits, { circuitId: 'b' })).toEqual({ scope: { panelId: 'p1' }, targetNumber: 2, shiftedCount: 2 });
+    expect(getSpareInsertion(circuits, { circuitId: 'd' })).toEqual({ scope: { panelId: undefined }, targetNumber: 1, shiftedCount: 1 });
+  });
+
+  it('appends after the last circuit of a panel, or at 1 in an empty scope', () => {
+    expect(getSpareInsertion(circuits, { panelId: 'p1' })).toEqual({ scope: { panelId: 'p1' }, targetNumber: 5, shiftedCount: 0 });
+    expect(getSpareInsertion(circuits, { panelId: 'empty' })).toEqual({ scope: { panelId: 'empty' }, targetNumber: 1, shiftedCount: 0 });
+  });
+
+  it('returns null for a missing circuit', () => {
+    expect(getSpareInsertion(circuits, { circuitId: 'nope' })).toBeNull();
+  });
+});
+
+describe('isValidCircuitNumber', () => {
+  it('accepts whole numbers from 1 and rejects the rest', () => {
+    expect(isValidCircuitNumber(1)).toBe(true);
+    expect(isValidCircuitNumber(12)).toBe(true);
+    expect(isValidCircuitNumber(0)).toBe(false);
+    expect(isValidCircuitNumber(-2)).toBe(false);
+    expect(isValidCircuitNumber(2.5)).toBe(false);
+    expect(isValidCircuitNumber(Number.NaN)).toBe(false);
   });
 });
