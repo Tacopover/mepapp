@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { isReservedPropertyName, type CustomPropertyDefinition, type CustomPropertyKind } from '@mepapp/core';
+import { isReservedCircuitPropertyName, isReservedPropertyName, type CustomPropertyDefinition, type CustomPropertyKind } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 
 export interface GlobalPropertyDefs {
   terminal: CustomPropertyDefinition[];
   equipment: CustomPropertyDefinition[];
+  circuit: CustomPropertyDefinition[];
 }
 
 export interface GlobalPropertiesDialogProps {
@@ -15,15 +16,15 @@ export interface GlobalPropertiesDialogProps {
 
 type Category = keyof GlobalPropertyDefs;
 
-const CATEGORY_LABELS: Record<Category, string> = { terminal: 'Terminal', equipment: 'Equipment' };
+const CATEGORY_LABELS: Record<Category, string> = { terminal: 'Terminal', equipment: 'Equipment', circuit: 'Circuit' };
 
-function validate(defs: CustomPropertyDefinition[]): string | null {
+function validate(defs: CustomPropertyDefinition[], category: Category): string | null {
   const seen = new Set<string>();
   for (const def of defs) {
     const trimmed = def.name.trim();
     if (!trimmed) return 'Property name cannot be empty.';
     const lower = trimmed.toLowerCase();
-    if (isReservedPropertyName(lower)) return `"${trimmed}" is already a built-in field.`;
+    if ((category === 'circuit' ? isReservedCircuitPropertyName(lower) : isReservedPropertyName(lower))) return `"${trimmed}" is already a built-in field.`;
     if (seen.has(lower)) return `"${trimmed}" is used twice.`;
     seen.add(lower);
   }
@@ -32,17 +33,17 @@ function validate(defs: CustomPropertyDefinition[]): string | null {
 
 /**
  * Per-installation custom property editor (ui-atlas-layout-mapping.md §4's
- * "Global Properties" row) — Menu → Global Properties. Terminal and
- * Equipment only for now: both are the undo-untracked PlacedStamp type, the
- * simplest real target. Segment/Fitting need a new undo command first
- * (their edits go through SketchDocument's CommandManager) and are deferred.
+ * "Global Properties" row) — Menu → Global Properties. Terminal, Equipment
+ * and Circuit. Segment/Fitting need a new undo command first (their edits go
+ * through SketchDocument's CommandManager) and are deferred.
  */
 export function GlobalPropertiesDialog({ definitions, onSave, onClose }: GlobalPropertiesDialogProps) {
   const [draft, setDraft] = useState<GlobalPropertyDefs>(definitions);
   const [category, setCategory] = useState<Category>('terminal');
 
   const rows = draft[category];
-  const error = validate(rows);
+  const error = validate(rows, category);
+  const hasError = (Object.keys(CATEGORY_LABELS) as Category[]).some((c) => validate(draft[c], c) !== null);
 
   function updateRows(next: CustomPropertyDefinition[]) {
     setDraft((prev) => ({ ...prev, [category]: next }));
@@ -61,7 +62,7 @@ export function GlobalPropertiesDialog({ definitions, onSave, onClose }: GlobalP
   }
 
   function handleSave() {
-    if (validate(draft.terminal) || validate(draft.equipment)) return;
+    if (hasError) return;
     onSave(draft);
   }
 
@@ -72,7 +73,7 @@ export function GlobalPropertiesDialog({ definitions, onSave, onClose }: GlobalP
       actions={
         <>
           <button onClick={onClose}>Cancel</button>
-          <button onClick={handleSave} disabled={Boolean(validate(draft.terminal) || validate(draft.equipment))}>
+          <button onClick={handleSave} disabled={hasError}>
             Save
           </button>
         </>

@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene, StampInfo } from '@mepapp/render';
-import { getEffectiveDiversityPercent, getEffectivePrefix, getStampDefinition, type Circuit, type CircuitType, type Panel, type PanelSection, type StampDefinition } from '@mepapp/core';
+import { coerceDefaultValue, getEffectiveDiversityPercent, getEffectivePrefix, getStampDefinition, type Circuit, type CustomPropertyDefinition, type CircuitType, type Panel, type PanelSection, type StampDefinition } from '@mepapp/core';
 import { IconTrash } from '../icons.js';
 
 const PHASES: NonNullable<Circuit['phase']>[] = ['L1', 'L2', 'L3', 'L1L2', 'L2L3', 'L1L3', 'L1L2L3'];
@@ -32,6 +32,8 @@ export interface CircuitPropertiesProps {
   panels: Panel[];
   panelSections: PanelSection[];
   circuitTypes: CircuitType[];
+  /** The Circuit tab of Global Properties: the custom fields every circuit shows. */
+  customPropertyDefinitions: CustomPropertyDefinition[];
   /** Every placed stamp — resolves the terminal list's ids to labels. */
   allStamps: StampInfo[];
   customStampDefinitions: StampDefinition[];
@@ -49,7 +51,7 @@ export interface CircuitPropertiesProps {
  * default shown as placeholder) or overridden (solid, with a ↺ reset
  * link), matching the Phase 0 mockup's round-4 decision.
  */
-export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSections, circuitTypes, allStamps, customStampDefinitions, showCircuitLines, onToggleCircuitLines, onDeleted }: CircuitPropertiesProps) {
+export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSections, circuitTypes, customPropertyDefinitions, allStamps, customStampDefinitions, showCircuitLines, onToggleCircuitLines, onDeleted }: CircuitPropertiesProps) {
   const defaults = panel?.circuitDefaults;
   const sections = panel ? panelSections.filter((s) => s.panelId === panel.id) : [];
 
@@ -233,6 +235,22 @@ export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSecti
         </div>
         <p className="mep-hint">Length is always typed per circuit — it's never a panel default, since two circuits off the same panel practically always run different physical lengths.</p>
       </div>
+
+      {customPropertyDefinitions.length > 0 && (
+        <div className="mep-section">
+          <h4>Custom</h4>
+          {customPropertyDefinitions.map((def) => (
+            <div className="mep-field-row" key={def.name}>
+              <label>{def.name}</label>
+              <input
+                type={def.kind === 'numeric' ? 'number' : 'text'}
+                value={circuit.properties?.[def.name] ?? coerceDefaultValue(def)}
+                onChange={(e) => sceneRef.current?.setCircuitProperty(circuit.id, def.name, def.kind === 'numeric' ? Number(e.target.value) : e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="mep-section">
         <h4>Terminals ({circuit.terminalIds.length})</h4>
@@ -443,15 +461,18 @@ function InheritableTextField({
   onChange: (value: string | undefined) => void;
 }) {
   const isInherited = value === undefined;
+  // An emptied field is an explicit blank only while the panel default has text to override; without one, empty just means "unset".
+  const hasDefaultText = defaultValue !== undefined && defaultValue !== '';
+  const isBlankOverride = value === '' && hasDefaultText;
   return (
     <div className="mep-field-row">
-      <label>{label}{isInherited && defaultValue !== undefined ? ' (panel default)' : ''}</label>
+      <label>{label}{isInherited && defaultValue !== undefined ? ' (panel default)' : ''}{isBlankOverride ? ' (blank, panel default overridden)' : ''}</label>
       <input
         type="text"
         className={isInherited ? 'mep-field-inherited' : ''}
         value={value ?? ''}
         placeholder={isInherited ? defaultValue : undefined}
-        onChange={(e) => onChange(e.target.value || undefined)}
+        onChange={(e) => onChange(e.target.value === '' && !hasDefaultText ? undefined : e.target.value)}
       />
       {!isInherited && (
         <button type="button" className="mep-inherit-reset" title="Reset to panel default" onClick={() => onChange(undefined)}>

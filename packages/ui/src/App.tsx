@@ -74,7 +74,7 @@ const ANGLE_SNAP_STORAGE_KEY = 'mepapp.settings.angleSnapDegrees.v1';
 const LABEL_LANGUAGE_STORAGE_KEY = 'mepapp.settings.labelLanguage.v1';
 const ONBOARDING_STORAGE_KEY = 'mepapp.onboarding.seen.v1';
 const CUSTOM_PROPERTIES_STORAGE_KEY = 'mepapp.customProperties.v1';
-const EMPTY_CUSTOM_PROPERTY_DEFS: GlobalPropertyDefs = { terminal: [], equipment: [] };
+const EMPTY_CUSTOM_PROPERTY_DEFS: GlobalPropertyDefs = { terminal: [], equipment: [], circuit: [] };
 
 function loadCustomPropertyDefs(): GlobalPropertyDefs {
   try {
@@ -84,6 +84,7 @@ function loadCustomPropertyDefs(): GlobalPropertyDefs {
     return {
       terminal: Array.isArray(parsed.terminal) ? parsed.terminal : [],
       equipment: Array.isArray(parsed.equipment) ? parsed.equipment : [],
+      circuit: Array.isArray(parsed.circuit) ? parsed.circuit : [],
     };
   } catch {
     return EMPTY_CUSTOM_PROPERTY_DEFS;
@@ -237,6 +238,7 @@ export function MepSketchApp({
     (next: GlobalPropertyDefs) => {
       sceneRef.current?.applyCustomPropertyCascade('terminal', customPropertyDefs.terminal, next.terminal);
       sceneRef.current?.applyCustomPropertyCascade('equipment', customPropertyDefs.equipment, next.equipment);
+      sceneRef.current?.applyCustomPropertyCascade('circuit', customPropertyDefs.circuit, next.circuit);
       setCustomPropertyDefs(next);
       localStorage.setItem(CUSTOM_PROPERTIES_STORAGE_KEY, JSON.stringify(next));
       setGlobalPropertiesOpen(false);

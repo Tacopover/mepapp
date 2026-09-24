@@ -68,8 +68,8 @@ export interface PropertiesPanelProps {
   selectedFitting: FittingInfo | null;
   /** The active document's adopted network types — the selected segment's "Network Type" dropdown. */
   networkTypes: NetworkType[];
-  /** Global Properties definitions (Terminal/Equipment only) — see GlobalPropertiesDialog. */
-  customPropertyDefs: { terminal: CustomPropertyDefinition[]; equipment: CustomPropertyDefinition[] };
+  /** Global Properties definitions (Terminal, Equipment and Circuit) — see GlobalPropertiesDialog. */
+  customPropertyDefs: { terminal: CustomPropertyDefinition[]; equipment: CustomPropertyDefinition[]; circuit: CustomPropertyDefinition[] };
   /** The active document's user-authored elements — looked up against the selected stamp's definitionId to gate the "Edit ports…" action to custom (source: 'custom') elements only; the four hardcoded STAMP_LIBRARY entries stay read-only. */
   customStampDefinitions: StampDefinition[];
   /** Resolves a stamp definition's display name the same way the Stamps tab does — see stampLabelFor. */
@@ -126,6 +126,7 @@ export function PropertiesPanel({
           panels={panels}
           panelSections={panelSections}
           circuitTypes={circuitTypes}
+          customPropertyDefinitions={customPropertyDefs.circuit}
           allStamps={allStamps}
           customStampDefinitions={customStampDefinitions}
           showCircuitLines={showCircuitLines}

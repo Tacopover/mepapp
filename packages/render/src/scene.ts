@@ -1736,7 +1736,7 @@ export class SketchScene {
     this.withCircuit(circuitId, (c) => setCircuitSectionCommand(c, sectionId));
   }
 
-  /** One custom-property value on a circuit (Circuit.properties, electrical-circuits-model.md §12 open question 7) — same shallow-merge-via-Transaction pattern as setStampProperty. No reserved-name/definition-scoping UI yet (deliberately deferred, see circuit.ts's doc comment on Circuit.properties). */
+  /** One custom-property value on a circuit (Circuit.properties, electrical-circuits-model.md §12 open question 7) — same shallow-merge-via-Transaction pattern as setStampProperty. The definitions come from the Global Properties dialog's Circuit tab. */
   setCircuitProperty(circuitId: string, name: string, value: string | number): void {
     if (!this.doc.drawingHistory.getState().circuits[circuitId]) return;
     const tx = new Transaction(this.doc.drawingHistory, `Set circuit ${circuitId} property ${name}`);
@@ -2014,13 +2014,13 @@ export class SketchScene {
 
   /**
    * Applies a Global Properties definitions change to every already-placed
-   * stamp of the given category: a newly added definition gets its default
+   * stamp of the given category (or, for 'circuit', to every circuit): a newly added definition gets its default
    * value, a removed one is dropped. A rename is treated as remove+add (the
    * value resets to the new definition's default) rather than carried over —
    * simplest first-pass behavior, no separate rename affordance in the dialog.
    */
   applyCustomPropertyCascade(
-    category: StampCategory,
+    category: StampCategory | 'circuit',
     previous: CustomPropertyDefinition[],
     next: CustomPropertyDefinition[],
   ): void {
@@ -2031,17 +2031,29 @@ export class SketchScene {
     if (removedNames.length === 0 && addedDefs.length === 0) return;
     const tx = new Transaction(this.doc.drawingHistory, `Update ${category} properties`);
     tx.update((state) => {
+      const applyTo = (properties: CustomPropertyValues | undefined): CustomPropertyValues => {
+        const next = { ...properties };
+        for (const name of removedNames) delete next[name];
+        for (const def of addedDefs) next[def.name] = coerceDefaultValue(def);
+        return next;
+      };
+      if (category === 'circuit') {
+        const circuits = { ...state.circuits };
+        for (const [id, circuit] of Object.entries(circuits)) circuits[id] = { ...circuit, properties: applyTo(circuit.properties) };
+        return { ...state, circuits };
+      }
       const stamps = { ...state.stamps };
       for (const [id, data] of Object.entries(stamps)) {
         if (data.category !== category) continue;
-        const properties = { ...data.properties };
-        for (const name of removedNames) delete properties[name];
-        for (const def of addedDefs) properties[def.name] = coerceDefaultValue(def);
-        stamps[id] = { ...data, properties };
+        stamps[id] = { ...data, properties: applyTo(data.properties) };
       }
       return { ...state, stamps };
     });
     tx.commit();
+    if (category === 'circuit') {
+      this.notifyCircuitsChanged();
+      return;
+    }
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }

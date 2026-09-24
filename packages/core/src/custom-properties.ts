@@ -23,6 +23,30 @@ export function isReservedPropertyName(name: string): boolean {
   return RESERVED_PROPERTY_NAMES.includes(name.trim().toLowerCase());
 }
 
+/** Field labels the Circuit Properties view already shows — a custom circuit property can't reuse one of these. */
+export const RESERVED_CIRCUIT_PROPERTY_NAMES = [
+  'panel',
+  'section',
+  'number',
+  'custom name',
+  'prefix',
+  'circuit type',
+  'phase',
+  'diversity %',
+  'kind',
+  'curve',
+  'rating (a)',
+  'rcd (ma)',
+  'type',
+  'core count',
+  'cross-section (mm²)',
+  'length (m)',
+];
+
+export function isReservedCircuitPropertyName(name: string): boolean {
+  return RESERVED_CIRCUIT_PROPERTY_NAMES.includes(name.trim().toLowerCase());
+}
+
 export function coerceDefaultValue(definition: CustomPropertyDefinition): string | number {
   if (definition.kind === 'numeric') {
     const parsed = Number(definition.defaultValue);
