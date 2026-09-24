@@ -330,7 +330,7 @@ Verified: `pnpm --filter @mepapp/core test` (22 files, 317 tests, all pass; 70 a
 
 Draw the generated schematic. Regenerate on change.
 
-**Done** — 2026-09-24, commit `PENDING` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+**Done** — 2026-09-24, commit `e8e0d28` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
 
 Shipped:
 
