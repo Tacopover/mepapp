@@ -295,7 +295,7 @@ Convert Equipment to panel, create circuit, assign terminals, edit circuit prope
 
 All in `@mepapp/core`. Tests use structures taken from the example schematics.
 
-**Done** — 2026-09-24, commit `PENDING` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+**Done** — 2026-09-24, commit `7b23d7d` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
 
 Shipped (four new modules, all exported from `@mepapp/core`, plus three test files; no schema migration, since nothing is persisted yet):
 
