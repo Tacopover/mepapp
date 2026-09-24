@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4 (Circuits mode and floating toolbar) rewritten and in progress 2026-09-24, E5–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -583,7 +583,7 @@ reasoned through, not just asserted.
 
 ### Phase E — circuit workflow UI (canvas tools, connection lines, tree, terminal side)
 
-Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
+Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4 rewritten 2026-09-24 as "Circuits mode and floating toolbar" (in progress); E5–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
 
 **The finding that shapes this phase.** Phase C built every command the core workflow needs. Phase D built property editors for circuits and panels. Neither built the *canvas-side* workflow that the old app used for almost everything. The old app does circuit work with three canvas features, not with the tree or the Properties panel:
 
@@ -616,6 +616,10 @@ MepApp has none of these. Its only assignment paths are the panel dropdown and t
 
 1. **Adding a terminal that is already in a circuit moves it.** The old app rejected this. MepApp lets it happen, because a terminal belongs to at most one circuit. The user must be told when a move happens, but *not* with a dialog that needs a click. Use a **transient toast that disappears on its own**. See E1.
 2. **Connection lines show only while the Show Circuits toggle is on**, as in the old app. Nothing draws circuit lines while the toggle is off.
+3. **Circuit actions get a dedicated Circuits mode with a floating toolbar (2026-09-24).** The user found that every circuit action sat in the Properties panel or the Networks tab and asked for the equivalent of the old app's Circuits ribbon tab. Agreed design: a **Circuits button on the left rail** (always visible, in every discipline) enters **Circuits mode**. A **floating toolbar** at the top of the canvas shows only in that mode. See E4.
+4. **Circuits mode behaves like Select.** A click selects terminals and panels, and a rubber band selects several. It is a real tool (`'circuits'`), so the toolbar and the lines have a clear lifetime.
+5. **The Lines toggle turns on when the user enters Circuits mode and off when the user leaves it.** The toggle stays manual inside the mode. This keeps decision 2 (lines show only while the toggle is on) and saves one click.
+6. **Empty start.** With nothing selected that belongs to a circuit, only **New circuit** is enabled. The user clicks it, the new empty circuit becomes the current circuit, and **Add terminals** becomes enabled.
 
 #### Contradiction with shipped code that E1 must resolve
 
@@ -623,7 +627,7 @@ MepApp has none of these. Its only assignment paths are the panel dropdown and t
 
 #### Sub-phases
 
-Order matters. E1–E4 answer the user's three complaints and only need commands that already exist (plus the move command). E5–E8 follow.
+Order matters. E1–E4 answer the user's three complaints and only need commands that already exist (plus the move command). E4 also adds the toolbar that later sub-phases extend. E5–E8 follow.
 
 **E1 — Move command and toast mechanism (foundation)** — **Done** (2026-09-23, see the Done note after E2's list)
 - New `moveTerminalToCircuitCommand(circuits, terminalId, targetCircuitId, terminalName?)`. One undo step. Returns the source circuit id to the caller. Rules: reject a spare target. Same-circuit target is a no-op with a notice. Open detail: the old app advanced the source circuit's `customName` when the removed terminal's name matched it. `removeTerminalFromCircuitCommand` here does not. Decide whether the move should, and keep both consistent.
@@ -666,7 +670,7 @@ Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (185 core + 13 pdf-
 - When the toggle is **off**: nothing circuit-related draws. This deliberately differs from the old app, where a tree selection drew lines even with the toggle off.
 - Toggle location: MepApp has no ribbon. Proposal: a toggle in the Circuits section header of the Networks tab, mirrored in circuit and panel Properties. Confirm with the user during E3.
 - Toggle lifetime. Proposal: it stays on until switched off (session state, not saved in the project file). The old app reset it on every canvas selection change, which is easy to lose track of.
-- After a successful Select Panel assignment (E4), turn the toggle on, as the old app did.
+- The old app turned the toggle on after a Select Panel assignment. Decision 5 replaces this: the toggle turns on when the user enters Circuits mode (E4).
 - Only terminals on the active page draw lines. Circuits stay cross-page in the data.
 - Do not use `drawingChanged` for redraws. Use the `circuitsChanged` path.
 
@@ -684,10 +688,34 @@ Known oddity, not from E3: clicking the already-selected circuit row in the tree
 
 Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (197 core + 13 pdf-engine-mupdf passed). Real Playwright run against the built bundle, with pixel counts on canvas screenshots: no lines with the toggle off; a star for a circuit with no panel; panel → terminal lines after assignment (the star disappears); two circuits in two colors when the panel is selected; a terminal selection shows only its own circuit; the toggle survives every selection change; Undo and Redo update the lines without reselecting; constant 2 px thickness and 11 px dash period at 62%, 100% and 133% zoom; the tree button and both checkboxes always agree; no page errors.
 
-**E4 — Select Panel tool (complaint 3)**
-- New tool `'circuit-assign-panel'`, mirroring E2. Click a Panel or Equipment stamp. Equipment is converted through `convertStampToPanel`, then the circuit is assigned. Make convert plus assign one undo step with a `Transaction` (the old app used two commands).
-- No "no segments" restriction (open question 6, resolved: dropped).
-- Keep the dropdown in circuit Properties. Both paths stay.
+**E4 — Circuits mode, floating toolbar and Select Panel tool (complaint 3, and the "where are the tools" complaint)**
+
+Added 2026-09-24. This replaces the earlier "E4 — Select Panel tool". The user tested E1–E3 and asked for the old app's Circuits ribbon tab, because the actions were scattered over Properties and the Networks tab. The old ribbon groups were Circuit Type, Circuits (Create, Add to, Remove from, Select Panel, Remove from Panel, Show Circuits), Panels (Edit Circuits, Apply Edits, Add Spare) and Schematics. Every old button acted on the current selection. The two tools ran until Escape.
+
+*Entry point.* A **Circuits** button on the left rail (`toolRegistry.ts`, singleton row like Stamp, bolt icon). It is always visible. A click runs `setTool('circuits')`.
+
+*Tools.* Three new `SketchTool` values form the "circuits family":
+- `'circuits'`: the mode itself. It wraps `SelectTool` (click, Shift-click, rubber band, drag). Escape leaves the mode (to `'select'`).
+- `'circuit-add-terminals'`: exists from E2. Escape now returns to where the tool started: `'circuits'` if the user came from Circuits mode, else `'select'`.
+- `'circuit-assign-panel'`: new. Click a Panel or Equipment stamp. Equipment is converted through the same steps as `convertStampToPanel`, then the current circuit is assigned. **Convert plus assign is one undo step** (`Transaction`; the old app used two commands). Panel name for a new panel: the stamp's label. No "no segments" restriction (open question 6, dropped). Hover outline: green for a panel, blue for equipment that becomes a panel, none for anything else. Escape returns as above.
+- The scene keeps `circuitToolReturn` (`'select' | 'circuits'`), set when a sub-tool starts and cleared by `setTool` for other tools and by `activateInternal`.
+
+*Current circuit.* The toolbar acts on one **current circuit**, resolved in this order: the circuit selected in the tree (`selectedCircuitId`), else the circuit that all selected terminals share, else none. A pure helper in `core` (`resolveCurrentCircuitId`) does the resolution so vitest covers it.
+
+*Toolbar.* A floating bar at the top-center of the canvas. It replaces the E2 banner. The second line of the bar shows the hint text of the running sub-tool and a Done button. Groups:
+- **Circuit:** a chip with the current circuit label (a select that changes it), **New circuit**, **Add terminals**, **Remove from circuit**.
+- **Panel:** **Assign panel** (starts `'circuit-assign-panel'`), **Remove from panel**.
+- **View:** **Lines** toggle.
+- Enabling rules: New circuit is always enabled. It creates an empty circuit and makes it current. When terminals are selected, it creates the circuit from those terminals (`createCircuitFromTerminals`). Add terminals and Assign panel need a current circuit that is not a spare. Remove from circuit needs at least one selected terminal that is in a circuit. Remove from panel needs a current circuit that has a panel. A disabled button has a tooltip that says what to do first.
+- Later sub-phases add buttons to the same bar: Add spare and Delete (E5, E6), Circuit types (E7).
+
+*Dock.* In the circuits family the dock keeps Properties while a circuit, panel or canvas item is selected, and shows Networks when nothing is selected.
+
+*Lines.* `showCircuitLines` becomes true on entering the family from outside it and false on leaving it. Starting Add terminals from Properties (outside the mode) also enters the family, so the lines show during that tool and hide after it.
+
+*Keep.* The dropdown in circuit Properties, the "Add terminals…" button there, and the terminal Circuit section all stay. They are the detail view. The toolbar is the entry point.
+
+Done when: `resolveCurrentCircuitId` has unit tests. A real Playwright run shows: the rail button enters the mode; with nothing selected only New circuit is enabled; New circuit makes the current circuit and enables Add terminals; Add terminals then Escape returns to Circuits mode with the toolbar still visible; Assign panel converts plain equipment and assigns in one undo step; Remove from circuit and Remove from panel work; the Lines toggle turns on at entry and off at exit; Select on the rail leaves the mode and hides the toolbar; no page errors.
 
 **E5 — Tree: terminal children, context menus, sync**
 - Terminal nodes under each circuit. Click selects the stamp on the canvas.
@@ -696,13 +724,14 @@ Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (197 core + 13 pdf-
   - Panel: Add circuit, Add spare, Manage panel.
   - Terminal node: Remove from circuit, Select on canvas.
 - "Highlight members" for a selected circuit: because of the mutual-exclusion rule in E2, do **not** implement it as canvas multi-select. Draw halo rings around the member terminals instead, gated by the same toggle as E3 for consistency with Decision 2. Confirm gating with the user.
-- Delete circuit: it is undoable, so skip a confirm dialog. Show a toast that says how many terminals were released. Proposal only; confirm with the user.
+- Delete circuit: it is undoable, so skip a confirm dialog. Show a toast that says how many terminals were released. Proposal only; confirm with the user. Also add a **Delete** button to the Circuits toolbar (E4).
 
 **E6 — Lifecycle UI for existing commands**
-- Insert spare (tree menu, panel and circuit Properties). Renumber field with commit on blur. A swap must raise a toast ("Swapped with L1.4"). Bulk prefix/type edit mode with tree checkboxes. Bulk type edit must go through the command stack, unlike the old app.
+- Insert spare (Circuits toolbar, tree menu, panel and circuit Properties). Renumber field with commit on blur. A swap must raise a toast ("Swapped with L1.4"). Bulk prefix/type edit mode with tree checkboxes. Bulk type edit must go through the command stack, unlike the old app.
 - All three commands already exist (`insertSpareCircuit`, `renumberCircuit`, `setCircuitPrefixBulk`). This sub-phase is UI only.
 
 **E7 — Circuit type editor**
+- Add a **Circuit types** button to the Circuits toolbar that opens the editor (the old app had a Circuit Type group on the Circuits tab).
 - The inventory found no create/update/delete command for `CircuitType` in `circuitCommands.ts`. Verify, then add commands plus an editor (name, abbreviation, description, units, default capacity). The old app allowed deleting a type only while another type remains.
 - Decide what happens to circuits that reference a deleted type.
 
