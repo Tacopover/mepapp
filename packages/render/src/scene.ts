@@ -12,6 +12,9 @@ import {
   annotationBoundsWorld,
   centroid,
   CIRCUIT_TYPE_LIBRARY,
+  getCircuitTypeFromLibrary,
+  getCircuitTypeUsage,
+  validateCircuitTypeFields,
   coerceDefaultValue,
   computeNetworks,
   distance,
@@ -1342,6 +1345,62 @@ export class SketchScene {
       ...CIRCUIT_TYPE_LIBRARY.map((lib) => this.doc.circuitTypes.find((t) => t.id === lib.id) ?? lib),
       ...this.doc.circuitTypes.filter((t) => !CIRCUIT_TYPE_LIBRARY.some((lib) => lib.id === t.id)),
     ];
+  }
+
+  /**
+   * Adds a new, empty circuit type to the active document — the Circuit types dialog's New action.
+   * Like the network type edits, the circuit type edits below change the document directly and are
+   * not undoable (electrical-circuits-model.md E7). The name is made unique.
+   */
+  createCircuitType(): CircuitType {
+    const taken = new Set(this.listCircuitTypes().map((t) => t.name.trim().toLowerCase()));
+    let name = 'New circuit type';
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `New circuit type ${n}`;
+    const type: CircuitType = { id: `circuit-type-${crypto.randomUUID()}`, name, abbreviation: 'NEW', description: '', units: 'W', defaultCapacity: 0 };
+    this.doc.circuitTypes.push(type);
+    this.notifyCircuitsChanged();
+    return type;
+  }
+
+  /** Changes a circuit type's fields. Returns the reason for a refusal, or null on success. A library type that the document has not yet changed is copied into the document first, so the change persists. */
+  updateCircuitType(id: string, patch: Partial<Omit<CircuitType, 'id'>>): string | null {
+    const current = this.listCircuitTypes().find((t) => t.id === id);
+    if (!current) return 'This circuit type no longer exists.';
+    const next = { ...current, ...patch };
+    const error = validateCircuitTypeFields(next, this.listCircuitTypes().filter((t) => t.id !== id));
+    if (error) return error;
+    next.name = next.name.trim();
+    next.abbreviation = next.abbreviation.trim();
+    const index = this.doc.circuitTypes.findIndex((t) => t.id === id);
+    if (index >= 0) this.doc.circuitTypes[index] = next;
+    else this.doc.circuitTypes.push(next);
+    this.notifyCircuitsChanged();
+    return null;
+  }
+
+  /**
+   * Deletes a circuit type the user created. Refuses a library type (it can only be reset) and a type
+   * that a circuit or a panel default still uses, so no circuit is left with a type that is gone.
+   */
+  deleteCircuitType(id: string): 'deleted' | 'library' | 'in-use' | 'unknown' {
+    if (getCircuitTypeFromLibrary(id)) return 'library';
+    const index = this.doc.circuitTypes.findIndex((t) => t.id === id);
+    if (index < 0) return 'unknown';
+    const state = this.doc.drawingHistory.getState();
+    const usage = getCircuitTypeUsage(id, Object.values(state.circuits), Object.values(state.panels));
+    if (usage.circuitCount > 0 || usage.panelCount > 0) return 'in-use';
+    this.doc.circuitTypes.splice(index, 1);
+    this.notifyCircuitsChanged();
+    return 'deleted';
+  }
+
+  /** Drops this document's changes to a library circuit type, so it shows the built-in values again. Returns false for a type that is not a changed library type. */
+  resetCircuitType(id: string): boolean {
+    const index = this.doc.circuitTypes.findIndex((t) => t.id === id);
+    if (index < 0 || !getCircuitTypeFromLibrary(id)) return false;
+    this.doc.circuitTypes.splice(index, 1);
+    this.notifyCircuitsChanged();
+    return true;
   }
 
   /** The Panel already referencing this equipment stamp, if any — Properties panel's "Convert to panel"/"Revert to equipment" gating for a selected Equipment stamp. */

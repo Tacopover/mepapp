@@ -21,7 +21,10 @@ export interface DialogProps {
 export function Dialog({ title, onClose, children, actions, className, closeOnBackdropClick = true }: DialogProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      // The scene listens on window; without this the same Escape would also act on the canvas (e.g. leave Circuits mode).
+      event.stopPropagation();
+      onClose();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);

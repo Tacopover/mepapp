@@ -250,6 +250,14 @@ export const IconCircuitLines = (props: IconProps) => (
   </Svg>
 );
 
+export const IconCircuitTypes = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 5h6.5l9 9-5.5 5.5-9-9V5z" />
+    <circle cx="8" cy="9" r="1.4" fill="currentColor" stroke="none" />
+    <path d="M13 8.5l4 4" />
+  </Svg>
+);
+
 // ---------- Left rail chrome ----------
 
 export const IconChevRight = (props: IconProps) => (

@@ -10,7 +10,7 @@ import {
   type SketchTool,
   type StampInfo,
 } from '@mepapp/render';
-import type { Calibration, Circuit, CircuitType, FlowResult, NetworkType, Panel, PanelSection, StampDefinition, Vec2 } from '@mepapp/core';
+import { CIRCUIT_TYPE_LIBRARY, type Calibration, type Circuit, type CircuitType, type FlowResult, type NetworkType, type Panel, type PanelSection, type StampDefinition, type Vec2 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 export interface CalibrationPrompt {
@@ -107,7 +107,7 @@ export function useSketchScene(): UseSketchScene {
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [panels, setPanels] = useState<Panel[]>([]);
   const [panelSections, setPanelSections] = useState<PanelSection[]>([]);
-  const [circuitTypes, setCircuitTypes] = useState<CircuitType[]>([]);
+  const [circuitTypes, setCircuitTypes] = useState<CircuitType[]>(CIRCUIT_TYPE_LIBRARY);
   const [selectedCircuitId, setSelectedCircuitIdState] = useState<string | null>(null);
   const [selectedPanelId, setSelectedPanelIdState] = useState<string | null>(null);
   const [circuitToolTargetId, setCircuitToolTargetId] = useState<string | null>(null);

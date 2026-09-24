@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode, RefObject } from 'react';
 import { findCircuitForTerminal, getCircuitLabel, resolveCurrentCircuitId, type Circuit, type Panel } from '@mepapp/core';
 import type { SketchScene, SketchTool, StampInfo } from '@mepapp/render';
-import { IconCircuitLines, IconCircuitNew, IconPanelAssign, IconPanelRemove, IconSpareAdd, IconTerminalAdd, IconTerminalRemove, IconTrash, type IconProps } from '../icons.js';
+import { IconCircuitLines, IconCircuitNew, IconCircuitTypes, IconPanelAssign, IconPanelRemove, IconSpareAdd, IconTerminalAdd, IconTerminalRemove, IconTrash, type IconProps } from '../icons.js';
 
 export interface CircuitsToolbarProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -16,6 +16,7 @@ export interface CircuitsToolbarProps {
   setSelectedCircuitId: (id: string | null) => void;
   showCircuitLines: boolean;
   onToggleCircuitLines: (show: boolean) => void;
+  onOpenCircuitTypes: () => void;
 }
 
 /**
@@ -36,6 +37,7 @@ export function CircuitsToolbar({
   setSelectedCircuitId,
   showCircuitLines,
   onToggleCircuitLines,
+  onOpenCircuitTypes,
 }: CircuitsToolbarProps) {
   const scene = sceneRef.current;
   const panelOf = (circuit: Circuit) => (circuit.panelId ? panels.find((p) => p.id === circuit.panelId) : undefined);
@@ -176,6 +178,15 @@ export function CircuitsToolbar({
             pressed={showCircuitLines}
             detail="show the dashed connection lines of the current circuit or panel"
             onClick={() => onToggleCircuitLines(!showCircuitLines)}
+          />
+        </div>
+        <div className="mep-circuits-group">
+          <span className="mep-circuits-group-label">Setup</span>
+          <ToolbarIconButton
+            Icon={IconCircuitTypes}
+            label="Circuit types"
+            detail="add, edit or delete the circuit types of this document"
+            onClick={onOpenCircuitTypes}
           />
         </div>
       </div>

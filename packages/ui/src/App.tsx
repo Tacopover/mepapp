@@ -24,6 +24,7 @@ import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
+import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
@@ -187,6 +188,7 @@ export function MepSketchApp({
     { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | null
   >(null);
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
+  const [circuitTypesOpen, setCircuitTypesOpen] = useState(false);
   const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
@@ -807,6 +809,7 @@ export function MepSketchApp({
                   setSelectedCircuitId={setSelectedCircuitId}
                   showCircuitLines={showCircuitLines}
                   onToggleCircuitLines={setShowCircuitLines}
+                  onOpenCircuitTypes={() => setCircuitTypesOpen(true)}
                 />
               )}
               <ToastStack toasts={toasts} onDismiss={dismissToast} />
@@ -919,6 +922,10 @@ export function MepSketchApp({
           onDuplicate={handleDuplicateNetworkType}
           onClose={() => setNetworkTypeEditorTarget(null)}
         />
+      )}
+
+      {circuitTypesOpen && (
+        <CircuitTypesDialog sceneRef={sceneRef} circuitTypes={circuitTypes} circuits={circuits} panels={panels} onClose={() => setCircuitTypesOpen(false)} />
       )}
 
       {correspondingSourceUrl && (

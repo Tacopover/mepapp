@@ -6,7 +6,7 @@
 // drives schematic template group-variant selection, a use the old
 // CircuitType never had.
 
-import type { CircuitType } from './circuit.js';
+import type { Circuit, CircuitType, Panel } from './circuit.js';
 
 export const CIRCUIT_TYPE_LIBRARY: CircuitType[] = [
   { id: 'lighting', name: 'Lighting', abbreviation: 'LGT', description: 'General and task lighting circuits.', units: 'W', defaultCapacity: 200 },
@@ -21,4 +21,22 @@ export const CIRCUIT_TYPE_LIBRARY: CircuitType[] = [
 
 export function getCircuitTypeFromLibrary(id: string): CircuitType | undefined {
   return CIRCUIT_TYPE_LIBRARY.find((t) => t.id === id);
+}
+
+/** How many circuits and panel defaults reference a circuit type. A type in use cannot be deleted (electrical-circuits-model.md E7). */
+export function getCircuitTypeUsage(circuitTypeId: string, circuits: Circuit[], panels: Panel[]): { circuitCount: number; panelCount: number } {
+  return {
+    circuitCount: circuits.filter((c) => c.circuitTypeId === circuitTypeId).length,
+    panelCount: panels.filter((p) => p.circuitDefaults?.circuitTypeId === circuitTypeId).length,
+  };
+}
+
+/** The reason a circuit type's editable fields are not acceptable, or null when they are. `others` are the other types of the document; a name must differ from theirs, ignoring case. */
+export function validateCircuitTypeFields(fields: Omit<CircuitType, 'id'>, others: CircuitType[]): string | null {
+  const name = fields.name.trim();
+  if (name === '') return 'Enter a name.';
+  if (others.some((t) => t.name.trim().toLowerCase() === name.toLowerCase())) return 'Another circuit type has this name.';
+  if (fields.abbreviation.trim() === '') return 'Enter an abbreviation.';
+  if (!Number.isFinite(fields.defaultCapacity) || fields.defaultCapacity < 0) return 'The default capacity must be a number of 0 or more.';
+  return null;
 }
