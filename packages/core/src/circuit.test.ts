@@ -18,6 +18,7 @@ import {
   planTerminalAssignment,
   renumberCircuitWithSwap,
   resolveCircuitLineTargets,
+  resolveCurrentCircuitId,
   shiftCircuitNumbersUpFrom,
   type Circuit,
   type Panel,
@@ -343,5 +344,29 @@ describe('resolveCircuitLineTargets', () => {
 
   it("shows a panel's circuits when its equipment stamp is selected, without duplicates", () => {
     expect(ids(resolveCircuitLineTargets(circuits, [panel], { focusCircuitId: 'c1', selectedStampIds: ['eq1', 't1'] }))).toEqual(['c1', 'c2']);
+  });
+});
+
+describe('resolveCurrentCircuitId', () => {
+  const circuits: Circuit[] = [
+    { id: 'c1', number: 1, terminalIds: ['t1', 't2'], diversityPercent: 100 } as Circuit,
+    { id: 'c2', number: 2, terminalIds: ['t3'], diversityPercent: 100 } as Circuit,
+  ];
+
+  it('prefers the tool target, then the tree selection, then the terminals', () => {
+    expect(resolveCurrentCircuitId(circuits, { toolTargetId: 'c2', selectedCircuitId: 'c1', selectedStampIds: ['t1'] })).toBe('c2');
+    expect(resolveCurrentCircuitId(circuits, { selectedCircuitId: 'c1', selectedStampIds: ['t3'] })).toBe('c1');
+    expect(resolveCurrentCircuitId(circuits, { selectedStampIds: ['t1', 't2'] })).toBe('c1');
+  });
+
+  it('ignores an id that no longer exists', () => {
+    expect(resolveCurrentCircuitId(circuits, { toolTargetId: 'gone', selectedCircuitId: 'gone', selectedStampIds: ['t3'] })).toBe('c2');
+  });
+
+  it('returns null when nothing applies or the terminals disagree', () => {
+    expect(resolveCurrentCircuitId(circuits, { selectedStampIds: [] })).toBeNull();
+    expect(resolveCurrentCircuitId(circuits, { selectedStampIds: ['free-terminal'] })).toBeNull();
+    expect(resolveCurrentCircuitId(circuits, { selectedStampIds: ['t1', 't3'] })).toBeNull();
+    expect(resolveCurrentCircuitId(circuits, { selectedStampIds: ['t1', 'free-terminal'] })).toBeNull();
   });
 });

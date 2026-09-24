@@ -271,6 +271,33 @@ export function resolveCircuitLineTargets(
 }
 
 /**
+ * The one circuit the Circuits toolbar acts on (plan Phase E4). Priority: the circuit a running
+ * Add-terminals/Assign-panel tool works on, then the circuit selected in the tree, then the circuit
+ * every selected terminal shares. Null when none applies — including when the selected terminals
+ * belong to different circuits or some of them to none, because then "the" circuit is ambiguous.
+ */
+export function resolveCurrentCircuitId(
+  circuits: Circuit[],
+  input: { toolTargetId?: string | null; selectedCircuitId?: string | null; selectedStampIds: Iterable<string> },
+): string | null {
+  const exists = (id: string | null | undefined): id is string => !!id && circuits.some((c) => c.id === id);
+  if (exists(input.toolTargetId)) return input.toolTargetId;
+  if (exists(input.selectedCircuitId)) return input.selectedCircuitId;
+  let shared: string | null = null;
+  let any = false;
+  for (const stampId of input.selectedStampIds) {
+    const owner = findCircuitForTerminal(circuits, stampId)?.id ?? null;
+    if (!any) {
+      shared = owner;
+      any = true;
+    } else if (owner !== shared) {
+      return null;
+    }
+  }
+  return shared;
+}
+
+/**
  * Sum of terminalCapacities over a circuit's member terminals — never
  * stored (plan §3). terminalCapacities mirrors flow.ts's FlowSolveInput
  * shape: user-entered capacity keyed by element id.

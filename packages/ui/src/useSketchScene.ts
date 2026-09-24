@@ -163,8 +163,8 @@ export function useSketchScene(): UseSketchScene {
     if (ready) sceneRef.current?.setShowCircuitLines(showCircuitLines);
   }, [ready, showCircuitLines]);
   useEffect(() => {
-    if (ready) sceneRef.current?.setCircuitLinesFocus({ circuitId: selectedCircuitId, panelId: selectedPanelId });
-  }, [ready, selectedCircuitId, selectedPanelId]);
+    if (ready) sceneRef.current?.setCircuitLinesFocus({ circuitId: selectedCircuitId ?? circuitToolTargetId, panelId: selectedPanelId });
+  }, [ready, selectedCircuitId, selectedPanelId, circuitToolTargetId]);
 
   useEffect(() => {
     if (!containerRef.current) return;

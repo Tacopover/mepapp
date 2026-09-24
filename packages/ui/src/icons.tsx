@@ -27,6 +27,12 @@ export const IconSelect = (props: IconProps) => (
   </Svg>
 );
 
+export const IconBolt = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M13 2.5 5.5 13.5h5.5l-1 8 7.5-11h-5.5z" />
+  </Svg>
+);
+
 export const IconPan = (props: IconProps) => (
   <Svg {...props}>
     <path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3" />

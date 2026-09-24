@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4 (Circuits mode and floating toolbar) rewritten and in progress 2026-09-24, E5–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4 (Circuits mode and floating toolbar) done 2026-09-24, E5–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -583,7 +583,7 @@ reasoned through, not just asserted.
 
 ### Phase E — circuit workflow UI (canvas tools, connection lines, tree, terminal side)
 
-Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4 rewritten 2026-09-24 as "Circuits mode and floating toolbar" (in progress); E5–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
+Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4 (Circuits mode and floating toolbar) done 2026-09-24; E5–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
 
 **The finding that shapes this phase.** Phase C built every command the core workflow needs. Phase D built property editors for circuits and panels. Neither built the *canvas-side* workflow that the old app used for almost everything. The old app does circuit work with three canvas features, not with the tree or the Properties panel:
 
@@ -688,7 +688,7 @@ Known oddity, not from E3: clicking the already-selected circuit row in the tree
 
 Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (197 core + 13 pdf-engine-mupdf passed). Real Playwright run against the built bundle, with pixel counts on canvas screenshots: no lines with the toggle off; a star for a circuit with no panel; panel → terminal lines after assignment (the star disappears); two circuits in two colors when the panel is selected; a terminal selection shows only its own circuit; the toggle survives every selection change; Undo and Redo update the lines without reselecting; constant 2 px thickness and 11 px dash period at 62%, 100% and 133% zoom; the tree button and both checkboxes always agree; no page errors.
 
-**E4 — Circuits mode, floating toolbar and Select Panel tool (complaint 3, and the "where are the tools" complaint)**
+**E4 — Circuits mode, floating toolbar and Select Panel tool (complaint 3, and the "where are the tools" complaint)** — **Done** (2026-09-24, see the Done note after E4's spec)
 
 Added 2026-09-24. This replaces the earlier "E4 — Select Panel tool". The user tested E1–E3 and asked for the old app's Circuits ribbon tab, because the actions were scattered over Properties and the Networks tab. The old ribbon groups were Circuit Type, Circuits (Create, Add to, Remove from, Select Panel, Remove from Panel, Show Circuits), Panels (Edit Circuits, Apply Edits, Add Spare) and Schematics. Every old button acted on the current selection. The two tools ran until Escape.
 
@@ -716,6 +716,20 @@ Added 2026-09-24. This replaces the earlier "E4 — Select Panel tool". The user
 *Keep.* The dropdown in circuit Properties, the "Add terminals…" button there, and the terminal Circuit section all stay. They are the detail view. The toolbar is the entry point.
 
 Done when: `resolveCurrentCircuitId` has unit tests. A real Playwright run shows: the rail button enters the mode; with nothing selected only New circuit is enabled; New circuit makes the current circuit and enables Add terminals; Add terminals then Escape returns to Circuits mode with the toolbar still visible; Assign panel converts plain equipment and assigns in one undo step; Remove from circuit and Remove from panel work; the Lines toggle turns on at entry and off at exit; Select on the rail leaves the mode and hides the toolbar; no page errors.
+
+**E4 Done note — 2026-09-24, commit `HASH` on `worktree-electrical-schematic-templates-plan`.**
+
+Shipped:
+- `core/circuit.ts`: `resolveCurrentCircuitId` (tool target, then tree selection, then the circuit all selected terminals share; null when ambiguous), 3 new vitest cases (core now 200).
+- `SketchScene`: tools `'circuits'` (wraps `SelectTool`, Escape leaves) and `'circuit-assign-panel'` (`tools/assignPanelTool.ts`); `circuitToolReturn` so Escape returns a sub-tool to where it started; `beginAssignPanelToCircuit`; `assignCircuitToPanelStamp` (convert plus assign in one `Transaction`, notices, ends the tool); `removeTerminalsFromCircuits` (one undo step, notice); public `leaveCircuitTool`. Hover outlines for the assign tool: green panel, blue equipment.
+- UI: a **Circuits** rail button (`toolRegistry.ts`, `IconBolt`), `CircuitsToolbar.tsx` (circuit picker, New circuit, Add terminals, Remove from circuit, Assign panel, Remove from panel, Lines) with a hint row and Done button, replacing the E2 banner. `App.tsx`: the Lines toggle turns on when the circuits family is entered and off when it is left; the Networks tab opens on entering Circuits mode; the dock keeps Properties while a circuit sub-tool runs. `useSketchScene.ts`: the lines focus also follows the tool's target circuit.
+- New circuit does not start Add terminals by itself. The user presses Add terminals next.
+
+Not done: toolbar buttons for Add spare, Delete and Circuit types (they arrive with E5–E7). A circuit picker label is only "number (count)", so "1" can exist both unassigned and under a panel; the group name in the list tells them apart.
+
+Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (200 core + 13 pdf-engine-mupdf passed). Real Playwright run against the built bundle, real DOM and canvas clicks, all 12 steps passed with no page or console errors: rail button and toolbar enable rules (only New circuit enabled on an empty start), New circuit makes the current circuit, Add terminals then Escape returns to Circuits mode, New circuit from a selected terminal and its one-step Undo/Redo, Remove from circuit with a self-dismissing toast, Assign panel converting equipment in one undo step (plus assigning to an existing panel, Escape, a terminal click warning), Remove from panel, Lines toggle by pixel count, leaving and re-entering the mode, and Add terminals started from Properties.
+
+Known oddities, not fixed: one run under heavy load lost the first canvas click after Add terminals started (not reproduced in clean runs). Clicking an already-selected tree row still does not switch the dock to Properties.
 
 **E5 — Tree: terminal children, context menus, sync**
 - Terminal nodes under each circuit. Click selects the stamp on the canvas.

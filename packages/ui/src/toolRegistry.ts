@@ -4,6 +4,7 @@
 import type { ReactElement } from 'react';
 import type { SketchTool } from '@mepapp/render';
 import {
+  IconBolt,
   IconPan,
   IconStamp,
   IconSegment,
@@ -77,5 +78,11 @@ export const RAIL_ROWS: RailRow[] = [
       { id: 'calibrate', label: 'Calibrate', Icon: IconRuler, tool: 'calibrate' },
       { id: 'measure', label: 'Measure', Icon: IconMeasure, tool: 'measure' },
     ],
+  },
+  {
+    // Circuits mode (electrical-circuits-model.md Phase E4). Rail.tsx lights this row for every tool in the circuits family, not just 'circuits'.
+    id: 'circuits',
+    singleton: true,
+    members: [{ id: 'circuits', label: 'Circuits', Icon: IconBolt, tool: 'circuits' }],
   },
 ];

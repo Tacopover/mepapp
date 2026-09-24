@@ -1276,24 +1276,58 @@
   margin-left: 8px;
 }
 
-/* ---------- Circuit tool banner + toasts (electrical-circuits-model.md Phase E) ---------- */
+/* ---------- Circuits toolbar + toasts (electrical-circuits-model.md Phase E) ---------- */
 
-.mep-tool-banner {
+.mep-circuits-toolbar {
   position: absolute;
   top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 56px;
+  right: 12px;
+  margin: 0 auto;
+  width: max-content;
+  max-width: calc(100% - 68px);
   z-index: 30;
-  max-width: min(640px, calc(100% - 120px));
-  padding: 8px 14px;
   background: var(--surface);
   color: var(--ink);
   font-size: 12.5px;
   border: 2px solid var(--ink);
   box-shadow: 3px 3px 0 var(--ink);
 }
-.mep-tool-banner button {
-  margin-left: 8px;
+.mep-circuits-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+.mep-circuits-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+}
+.mep-circuits-group + .mep-circuits-group {
+  border-left: 2px solid var(--ink);
+}
+.mep-circuits-group-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.mep-circuits-group button.on {
+  background: var(--accent);
+  color: #fff;
+}
+.mep-circuits-chip {
+  max-width: 180px;
+}
+.mep-circuits-toolbar-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  border-top: 2px solid var(--ink);
+  background: var(--surface-2);
 }
 
 .mep-toasts {

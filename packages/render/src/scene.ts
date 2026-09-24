@@ -115,7 +115,7 @@ import {
   setPanelNameCommand,
   setPanelSortDirectionCommand,
 } from './circuitCommands.js';
-import type { CircuitToolHover, DragState, SelectableRef, SketchTool, Tool, ToolContext, ToolDragHandlers } from './tools/types.js';
+import { isCircuitsTool, type CircuitToolHover, type DragState, type SelectableRef, type SketchTool, type Tool, type ToolContext, type ToolDragHandlers } from './tools/types.js';
 import type { AlignmentGuide } from './tools/alignmentGuides.js';
 import { resolveSnappedPoint } from './tools/dragSnap.js';
 import { SelectTool } from './tools/selectTool.js';
@@ -131,8 +131,11 @@ import { CalibrateTool } from './tools/calibrateTool.js';
 import { MeasureTool } from './tools/measureTool.js';
 import { PlaceStampTool } from './tools/placeStampTool.js';
 import { AddToCircuitTool } from './tools/addToCircuitTool.js';
+import { AssignPanelTool } from './tools/assignPanelTool.js';
+import { CircuitsTool } from './tools/circuitsTool.js';
 
 export type { SketchTool } from './tools/types.js';
+export { isCircuitsTool } from './tools/types.js';
 
 export type { DocumentSummary } from './document.js';
 
@@ -289,8 +292,8 @@ const STICKY_NOTE_ICON_SIZE_PT = 16;
 // stroke-only convention for every other kind.
 const ARROWHEAD_LENGTH_PT = 10;
 const ARROWHEAD_ANGLE_RAD = Math.PI / 7;
-// Add-to-Circuit tool hover outline — green joins the circuit, orange moves the terminal out of another circuit, grey is already a member.
-const CIRCUIT_TOOL_HOVER_COLOR: Record<CircuitToolHover['status'], number> = { free: 0x66bb6a, move: 0xffa726, member: 0x9e9e9e };
+// Circuit tool hover outline — Add-to-Circuit: green joins the circuit, orange moves the terminal out of another circuit, grey is already a member. Assign-Panel: green is a panel, blue is equipment that becomes one.
+const CIRCUIT_TOOL_HOVER_COLOR: Record<CircuitToolHover['status'], number> = { free: 0x66bb6a, move: 0xffa726, member: 0x9e9e9e, panel: 0x66bb6a, equipment: 0x42a5f5 };
 // Flow-direction indicator (syncFlowLabels) — same stroke-only V-shape as the
 // 'arrow' annotation above, just smaller: it marks a segment's own midpoint
 // rather than terminating a user-drawn line.
@@ -483,6 +486,8 @@ export class SketchScene {
   } | null = null;
   /** The circuit the 'circuit-add-terminals' tool is filling, and the terminal its pointer is over — both cleared by setTool() on leaving that tool. See beginAddTerminalsToCircuit. */
   private circuitToolTargetId: string | null = null;
+  /** Where Escape sends a running circuit sub-tool: 'circuits' when it started inside Circuits mode, else 'select'. See setTool. */
+  private circuitToolReturn: 'select' | 'circuits' = 'select';
   private circuitToolHover: CircuitToolHover | null = null;
   /** The Show Circuits toggle (electrical-circuits-model.md Phase E3) and the circuit/panel the Electrical Circuits tree has selected — session state, not saved in the project. Both come from the UI (setShowCircuitLines/setCircuitLinesFocus); the canvas selection is read from the active document. */
   private showCircuitLines = false;
@@ -512,8 +517,9 @@ export class SketchScene {
   }
 
   private buildToolMap(): Map<SketchTool, Tool> {
+    const selectTool = new SelectTool();
     const tools: Tool[] = [
-      new SelectTool(),
+      selectTool,
       this.drawSegmentTool,
       this.drawPolylineTool,
       new DrawFreehandTool(),
@@ -527,6 +533,8 @@ export class SketchScene {
       new PlaceStampTool('terminal'),
       new PlaceStampTool('equipment'),
       new AddToCircuitTool(),
+      new AssignPanelTool(),
+      new CircuitsTool(selectTool),
     ];
     return new Map(tools.map((tool) => [tool.id, tool]));
   }
@@ -586,6 +594,8 @@ export class SketchScene {
       getCircuitToolTarget: () => self.circuitToolTargetId,
       setCircuitToolHover: (hover) => self.setCircuitToolHover(hover),
       assignTerminalToCircuit: (circuitId, terminalId) => self.assignTerminalToCircuit(circuitId, terminalId),
+      assignCircuitToPanelStamp: (circuitId, stampId) => self.assignCircuitToPanelStamp(circuitId, stampId),
+      leaveCircuitTool: () => self.leaveCircuitTool(),
       hideStampGhost: () => {
         if (self.stampGhostSprite) self.stampGhostSprite.visible = false;
       },
@@ -683,9 +693,18 @@ export class SketchScene {
     // comment. A no-op for tools with no such state (select, pan, the place-* tools, every
     // plain click/drag-only annotation tool).
     this.toolMap.get(this.tool)?.onDeactivate?.(this.ctx);
+    const isCircuitSubTool = tool === 'circuit-add-terminals' || tool === 'circuit-assign-panel';
+    // A sub-tool remembers where it started so Escape can go back there; switching to anything
+    // outside the circuits family forgets it.
+    if (isCircuitSubTool) {
+      if (!isCircuitsTool(this.tool)) this.circuitToolReturn = 'select';
+      else if (this.tool === 'circuits') this.circuitToolReturn = 'circuits';
+    } else if (tool !== 'circuits') {
+      this.circuitToolReturn = 'select';
+    }
     this.tool = tool;
     this.pendingPoints = [];
-    if (tool !== 'circuit-add-terminals') {
+    if (!isCircuitSubTool) {
       this.circuitToolTargetId = null;
       this.circuitToolHover = null;
     }
@@ -845,6 +864,7 @@ export class SketchScene {
 
     this.tool = 'select';
     this.circuitToolTargetId = null; // names a circuit of the outgoing document, same reset rule as `tool`
+    this.circuitToolReturn = 'select';
     this.circuitToolHover = null;
     this.activeNetworkTypeId = NETWORK_TYPE_LIBRARY[0].id; // per-document context, same reset rule as `tool`
     this.pendingStampTexture = null;
@@ -1401,7 +1421,82 @@ export class SketchScene {
     this.setTool('circuit-add-terminals');
   }
 
-  /** The circuit the Add-to-Circuit tool is filling, or null when it is not the active tool — the UI's tool banner. */
+  /** Ends the running circuit sub-tool (Add terminals, Assign panel) and returns to the tool it started from: Circuits mode, or Select. */
+  leaveCircuitTool(): void {
+    this.setTool(this.circuitToolReturn);
+  }
+
+  /** Starts the Assign-Panel tool for one circuit — the user clicks a panel or an equipment stamp, which becomes that circuit's panel. No-op for a missing or spare circuit. */
+  beginAssignPanelToCircuit(circuitId: string): void {
+    const circuit = this.doc.drawingHistory.getState().circuits[circuitId];
+    if (!circuit || circuit.isSpare) return;
+    this.circuitToolTargetId = circuitId;
+    this.setTool('circuit-assign-panel');
+  }
+
+  /**
+   * Assigns a circuit to the panel behind a stamp — converting plain equipment to a panel first,
+   * as the old app's Select Panel tool did, but as one undo step instead of two. Raises a notice
+   * for the outcome (assigned, already on that panel) and a warning for a stamp that cannot be a
+   * panel. Ends the running sub-tool after an assignment. Returns whether the circuit changed.
+   */
+  assignCircuitToPanelStamp(circuitId: string, stampId: string): boolean {
+    const state = this.doc.drawingHistory.getState();
+    const circuit = state.circuits[circuitId];
+    const stamp = state.stamps[stampId];
+    if (!circuit || circuit.isSpare) return false;
+    if (stamp?.category !== 'equipment') {
+      this.emitNotice('Click an equipment stamp or a panel.', 'warning');
+      return false;
+    }
+    const existing = Object.values(state.panels).find((p) => p.equipmentStampId === stampId);
+    if (existing && circuit.panelId === existing.id) {
+      this.emitNotice(`${getCircuitLabel(circuit, existing)} is already on ${existing.name}.`, 'info');
+      return false;
+    }
+    const tx = new Transaction(this.doc.drawingHistory, `Assign circuit ${circuitId} to a panel`);
+    let panel = existing;
+    let next = state;
+    if (!panel) {
+      const id = `panel-${this.doc.nextPanelSeq++}`;
+      const name = getStampDefinition(stamp.definitionId ?? '', this.doc.customStampDefinitions)?.label ?? 'Panel';
+      const create = createPanelCommand(Object.values(state.panels), id, stampId, name);
+      if (!create) return false;
+      next = tx.update((s) => create.execute(s));
+      panel = next.panels[id];
+    }
+    const panelId = panel.id;
+    next = tx.update((s) => assignCircuitToPanelCommand(Object.values(s.circuits), circuitId, panelId).execute(s));
+    tx.commit();
+    const assigned = next.circuits[circuitId];
+    this.emitNotice(
+      `Assigned ${getCircuitLabel(assigned, panel)} to ${panel.name}${existing ? '' : ' (equipment converted to a panel)'}.`,
+      'info',
+    );
+    this.notifyCircuitsChanged();
+    this.setTool(this.circuitToolReturn);
+    return true;
+  }
+
+  /** Takes every given terminal out of whichever circuit holds it, as one undo step. Terminals in no circuit are skipped. Returns how many were removed. */
+  removeTerminalsFromCircuits(terminalIds: string[]): number {
+    const tx = new Transaction(this.doc.drawingHistory, `Remove ${terminalIds.length} terminal(s) from their circuits`);
+    let current = this.doc.drawingHistory.getState();
+    let removed = 0;
+    for (const terminalId of terminalIds) {
+      const owner = findCircuitForTerminal(Object.values(current.circuits), terminalId);
+      if (!owner) continue;
+      current = tx.update((s) => removeTerminalFromCircuitCommand(s.circuits[owner.id], terminalId).execute(s));
+      removed++;
+    }
+    if (removed === 0) return 0;
+    tx.commit();
+    this.emitNotice(`Removed ${removed} terminal${removed === 1 ? '' : 's'} from ${removed === 1 ? 'its' : 'their'} circuit${removed === 1 ? '' : 's'}.`, 'info');
+    this.notifyCircuitsChanged();
+    return removed;
+  }
+
+  /** The circuit the Add-to-Circuit or Assign-Panel tool is working on, or null when neither is the active tool — the UI's current circuit while a tool runs. */
   getCircuitToolTarget(): string | null {
     return this.circuitToolTargetId;
   }
@@ -3226,7 +3321,7 @@ export class SketchScene {
 
     this.drawCircuitLines(state);
 
-    if (this.tool === 'circuit-add-terminals' && this.circuitToolHover) {
+    if ((this.tool === 'circuit-add-terminals' || this.tool === 'circuit-assign-panel') && this.circuitToolHover) {
       const hovered = state.stamps[this.circuitToolHover.stampId];
       if (hovered) {
         const corners = this.stampCornersWorld(hovered);

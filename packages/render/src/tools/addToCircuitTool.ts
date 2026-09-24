@@ -29,7 +29,7 @@ export class AddToCircuitTool implements Tool {
 
   onKeyDown(ctx: ToolContext, event: KeyboardEvent): boolean {
     if (event.key !== 'Escape') return false;
-    ctx.setTool('select');
+    ctx.leaveCircuitTool();
     return true;
   }
 

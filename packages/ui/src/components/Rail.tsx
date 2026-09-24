@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import type { SketchScene, SketchTool } from '@mepapp/render';
+import { isCircuitsTool, type SketchScene, type SketchTool } from '@mepapp/render';
 import { RAIL_ROWS } from '../toolRegistry.js';
 import { IconChevRight, IconCopy, IconRedo, IconSelect, IconTrash, IconUndo } from '../icons.js';
 
@@ -63,7 +63,7 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
             <div className="mep-rail-row-main">
               <button
                 type="button"
-                className={`mep-rail-btn${(isStampRow ? stampRowActive : tool === current.tool) ? ' active' : ''}`}
+                className={`mep-rail-btn${(isStampRow ? stampRowActive : row.id === 'circuits' ? isCircuitsTool(tool) : tool === current.tool) ? ' active' : ''}`}
                 title={current.tool === null ? `${current.label} — coming soon` : current.label}
                 disabled={isStampRow ? false : current.tool === null || (needsStamp(current.tool) && !stampReady)}
                 onClick={() => {

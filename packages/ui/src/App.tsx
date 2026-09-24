@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { getCircuitLabel, STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
-import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES } from '@mepapp/render';
+import { STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { loadStampBitmap } from './stampBitmap.js';
@@ -14,6 +14,7 @@ import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ToastStack, useToasts } from './components/Toasts.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
+import { CircuitsToolbar } from './components/CircuitsToolbar.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { DocumentSwitcher } from './components/DocumentSwitcher.js';
@@ -164,7 +165,6 @@ export function MepSketchApp({
     scene.on('notice', pushToast);
     return () => scene.off('notice', pushToast);
   }, [ready, sceneRef, pushToast]);
-  const circuitToolTarget = circuitToolTargetId ? circuits.find((c) => c.id === circuitToolTargetId) : undefined;
   const [calibrationInput, setCalibrationInput] = useState('');
   const [textboxInput, setTextboxInput] = useState('');
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
@@ -676,13 +676,29 @@ export function MepSketchApp({
     // dock back to whatever tab the user had before the circuit selection jumped it to Properties.
     setForcedTabId(
       tool === 'circuit-add-terminals' ||
-        (tool === 'select' &&
+        tool === 'circuit-assign-panel' ||
+        ((tool === 'select' || tool === 'circuits') &&
           (selection.length > 0 || selectedSegment || selectedSegments.length > 0 || selectedFitting || selectedCircuitId || selectedPanelId))
         ? 'properties'
         : null,
     );
     setForcedTabNonce((n) => n + 1);
   }, [selection, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool]);
+
+  // Circuits mode (Phase E4) turns the connection lines on while it is active and off when the user leaves
+  // it, and opens the Networks tab so the circuit tree is in view. Any tool of the circuits family counts:
+  // starting Add terminals from the Properties panel enters the family too.
+  const inCircuitsFamily = isCircuitsTool(tool);
+  const wasInCircuitsFamily = useRef(false);
+  useEffect(() => {
+    if (inCircuitsFamily === wasInCircuitsFamily.current) return;
+    wasInCircuitsFamily.current = inCircuitsFamily;
+    setShowCircuitLines(inCircuitsFamily);
+    if (inCircuitsFamily && tool === 'circuits') {
+      setForcedTabId('networks');
+      setForcedTabNonce((n) => n + 1);
+    }
+  }, [inCircuitsFamily, tool, setShowCircuitLines]);
 
   // The Electrical Circuits tree's own selection (selectedCircuitId/selectedPanelId) is app-level
   // state, not a canvas selection, so it needs its own jump-to-Properties effect rather than folding
@@ -777,14 +793,19 @@ export function MepSketchApp({
                   }}
                 />
               )}
-              {circuitToolTarget && (
-                <div className="mep-tool-banner">
-                  Adding terminals to <b>{getCircuitLabel(circuitToolTarget, panels.find((p) => p.id === circuitToolTarget.panelId))}</b> — click terminals on the canvas.
-                  Orange outline: the terminal moves out of its current circuit.{' '}
-                  <button type="button" onClick={() => sceneRef.current?.setTool('select')}>
-                    Done (Esc)
-                  </button>
-                </div>
+              {isCircuitsTool(tool) && (
+                <CircuitsToolbar
+                  sceneRef={sceneRef}
+                  tool={tool}
+                  circuits={circuits}
+                  panels={panels}
+                  selection={selection}
+                  selectedCircuitId={selectedCircuitId}
+                  circuitToolTargetId={circuitToolTargetId}
+                  setSelectedCircuitId={setSelectedCircuitId}
+                  showCircuitLines={showCircuitLines}
+                  onToggleCircuitLines={setShowCircuitLines}
+                />
               )}
               <ToastStack toasts={toasts} onDismiss={dismissToast} />
               {canvasContextMenuRequest && (

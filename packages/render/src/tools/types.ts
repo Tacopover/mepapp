@@ -27,12 +27,19 @@ export type SketchTool =
   | 'draw-sticky-note'
   | 'draw-highlight'
   | 'draw-polyline'
-  | 'circuit-add-terminals';
+  | 'circuits'
+  | 'circuit-add-terminals'
+  | 'circuit-assign-panel';
 
-/** The terminal the Add-to-Circuit tool's pointer is over, and what clicking it would do — 'free' joins the circuit, 'move' takes it out of another circuit first, 'member' is already in the target circuit. Drawn by SketchScene.redrawOverlay. */
+/** The stamp a circuit tool's pointer is over, and what clicking it would do. Add-to-Circuit: 'free' joins the circuit, 'move' takes it out of another circuit first, 'member' is already in the target circuit. Assign-Panel: 'panel' is an existing panel, 'equipment' becomes a panel first. Drawn by SketchScene.redrawOverlay. */
 export interface CircuitToolHover {
   stampId: string;
-  status: 'free' | 'move' | 'member';
+  status: 'free' | 'move' | 'member' | 'panel' | 'equipment';
+}
+
+/** The circuits family: the mode itself and the two sub-tools that run inside it. */
+export function isCircuitsTool(tool: SketchTool): boolean {
+  return tool === 'circuits' || tool === 'circuit-add-terminals' || tool === 'circuit-assign-panel';
 }
 
 /** A selectable object is a placed stamp, a fitting, a drawn segment, or a drawn annotation — see ToolContext.hitTest. */
@@ -141,6 +148,12 @@ export interface ToolContext {
   setCircuitToolHover(hover: CircuitToolHover | null): void;
   /** Adds or moves a terminal into a circuit and raises the user-facing notice — see SketchScene.assignTerminalToCircuit. */
   assignTerminalToCircuit(circuitId: string, terminalId: string): TerminalAssignmentResult;
+
+  /** Puts a stamp on the panel side of a circuit: an existing panel is used as is, plain equipment is converted first. One undo step, raises the user-facing notice — see SketchScene.assignCircuitToPanelStamp. Returns whether it assigned. */
+  assignCircuitToPanelStamp(circuitId: string, stampId: string): boolean;
+
+  /** Ends the running circuit sub-tool and returns to the tool it started from ('circuits' or 'select'). */
+  leaveCircuitTool(): void;
 
   /** Hides the ghost sprite, if one exists — leaving a place-* tool without resetting `pendingStampTexture` itself (a re-pick, not a tool switch, is what clears that — see setStampTexture). */
   hideStampGhost(): void;
