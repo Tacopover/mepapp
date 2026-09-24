@@ -670,7 +670,7 @@ Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (185 core + 13 pdf-
 - Only terminals on the active page draw lines. Circuits stay cross-page in the data.
 - Do not use `drawingChanged` for redraws. Use the `circuitsChanged` path.
 
-**E3 Done note — 2026-09-24, commit `<hash>` on `worktree-electrical-schematic-templates-plan`.**
+**E3 Done note — 2026-09-24, commit `84bed94` on `worktree-electrical-schematic-templates-plan`.**
 
 Shipped:
 - `core/circuit.ts`: `CIRCUIT_LINE_PALETTE` (12 colors), `getCircuitLineColor` (color from the number in the circuit id, so it never changes when other circuits are added or renumbered), `getCircuitConnectionLines` (panel → each terminal, or a star from the first terminal when the circuit has no panel) and `resolveCircuitLineTargets` (tree focus plus canvas selection: a terminal shows its circuit, a panel's equipment stamp shows all that panel's circuits). 12 new vitest cases (core now 197).
