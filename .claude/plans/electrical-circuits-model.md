@@ -740,7 +740,7 @@ Known oddities, not fixed: one run under heavy load lost the first canvas click 
 - "Highlight members" for a selected circuit: because of the mutual-exclusion rule in E2, do **not** implement it as canvas multi-select. Draw halo rings around the member terminals instead, gated by the same toggle as E3 for consistency with Decision 2. Confirm gating with the user.
 - Delete circuit: it is undoable, so skip a confirm dialog. Show a toast that says how many terminals were released. Proposal only; confirm with the user. Also add a **Delete** button to the Circuits toolbar (E4).
 
-**E5 Done note — 2026-09-24, commit `HASH` on `worktree-electrical-schematic-templates-plan`.**
+**E5 Done note — 2026-09-24, commit `29b91fe` on `worktree-electrical-schematic-templates-plan`.**
 
 Decisions applied (user, 2026-09-24: "go with your recommendations"): halo rings only while the Lines toggle is on; delete circuit without a confirm dialog, toast only.
 
