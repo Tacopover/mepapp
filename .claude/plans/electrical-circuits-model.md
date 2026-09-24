@@ -717,7 +717,7 @@ Added 2026-09-24. This replaces the earlier "E4 — Select Panel tool". The user
 
 Done when: `resolveCurrentCircuitId` has unit tests. A real Playwright run shows: the rail button enters the mode; with nothing selected only New circuit is enabled; New circuit makes the current circuit and enables Add terminals; Add terminals then Escape returns to Circuits mode with the toolbar still visible; Assign panel converts plain equipment and assigns in one undo step; Remove from circuit and Remove from panel work; the Lines toggle turns on at entry and off at exit; Select on the rail leaves the mode and hides the toolbar; no page errors.
 
-**E4 Done note — 2026-09-24, commit `HASH` on `worktree-electrical-schematic-templates-plan`.**
+**E4 Done note — 2026-09-24, commit `08ef0c9` on `worktree-electrical-schematic-templates-plan`.**
 
 Shipped:
 - `core/circuit.ts`: `resolveCurrentCircuitId` (tool target, then tree selection, then the circuit all selected terminals share; null when ambiguous), 3 new vitest cases (core now 200).
