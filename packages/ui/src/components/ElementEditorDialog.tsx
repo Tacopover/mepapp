@@ -1,10 +1,23 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { CommandManager, STAMP_LIBRARY, type Discipline, type PortSpec, type StampCategory, type StampDefinition, type SymbolShape, type SymbolShapeStyle } from '@mepapp/core';
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { STAMP_LIBRARY, type Discipline, type StampCategory, type StampDefinition } from '@mepapp/core';
 import { ColorPicker } from './ColorPicker.js';
 import { Dialog } from './Dialog.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { stampLabelFor } from './StampsPanel.js';
 import type { StampLabelLanguage } from './LanguageToggle.js';
+import {
+  DEFAULT_STYLE,
+  GRID_SPACING_FRACTION,
+  POLYGON_CLOSE_HIT_RADIUS_PX,
+  ROTATE_HANDLE_RADIUS_PX,
+  ZOOM_STEP,
+  rotateHandlePosition,
+  scaleHandlePosition,
+  useShapeDrawEditor,
+  type BuiltinShapeTool,
+} from '../useShapeDrawEditor.js';
+import { usePortEditor } from '../usePortEditor.js';
+import { SymbolShapesSvg, describeArcPath } from '../symbolShapeSvg.js';
 import {
   IconArcThreePointTool,
   IconArcTool,
@@ -35,30 +48,12 @@ import {
   type IconProps,
 } from '../icons.js';
 import {
-  angleSnap,
-  applyHandleDrag,
   arcFromThreePoints,
-  collectSnapPoints,
-  createDraftShape,
-  drawSymbolShapes,
-  findNearestSnapPoint,
-  gridSnap,
-  hitTestSymbolShape,
-  isDraftLargeEnough,
-  loadShapeImages,
-  mirrorShape,
-  normalizeAngle,
   rasterizeSymbolShapes,
   rescaleShapeForCanvasResize,
-  rotateShapeAround,
-  scaleShape,
   selectionBounds,
-  selectionPivot,
   shapeHandles,
   symbolShapeBounds,
-  translateShape,
-  updateDraftShape,
-  type ShapeDrawTool,
 } from '../symbolShapeCanvas.js';
 
 /** Same 300 DPI convention as stampBitmap.ts/scene.ts's STAMP_SOURCE_DPI — stamp art's pixel size at 300 DPI is expected to match its nominal size in PDF points. */
@@ -67,41 +62,15 @@ const STAMP_SOURCE_DPI = 300;
 /** Cap on the Shapes-mode canvas's longer side, in drawing-buffer px — the shorter side is derived from the definition's own nativeWidth:nativeHeight aspect (see shapeCanvasSize) so a wide/tall stamp doesn't get squished into a square, matching how it actually looks placed on the PDF. */
 const SHAPE_CANVAS_MAX_PX = 520;
 
-/** Rotate/geometry handle geometry — all in screen px (constant on-screen size regardless of zoom, same "screen px, zoom-independent" convention as scene.ts's own handle constants), converted to world px via `/ view.scale` wherever they're drawn or hit-tested against world-space coordinates. */
-const ROTATE_HANDLE_OFFSET_PX = 28;
-const ROTATE_HANDLE_RADIUS_PX = 6;
+/** Geometry-handle and scale-handle drawing radii — the hit-test radii these handles are
+    actually caught by live inside useShapeDrawEditor (deliberately larger, for a forgiving
+    click target); only the visual radius belongs here. */
 const GEOMETRY_HANDLE_RADIUS_PX = 5;
-const GEOMETRY_HANDLE_HIT_RADIUS_PX = 8;
-const POLYGON_CLOSE_HIT_RADIUS_PX = 10;
-/** Multi-shape-selection scale handle (square, at the selection bounds' bottom-right corner) — same screen-px-constant-size convention as the other handles above. */
 const SCALE_HANDLE_HALF_PX = 5;
-const SCALE_HANDLE_HIT_RADIUS_PX = 8;
 
-/** Zoom/pan range — mirrors packages/render/src/scene.ts's own MIN_ZOOM/MAX_ZOOM convention, tightened since symbol artwork is small and a full PDF page's 0.05–32 range doesn't apply (element-editor-ui-redesign-spec.md §3). */
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 8;
-const ZOOM_STEP = 1.1;
-
-/** Grid/angle/object snap (§6) — a fractional spacing of 0.02 (~2% of the artwork box) and a 10-screen-px object-snap catch radius are reasonable starting guesses, untested against real fixture-scale symbols (§8 open item). */
-const GRID_SPACING_FRACTION = 0.02;
-const OBJECT_SNAP_THRESHOLD_PX = 10;
-const DEFAULT_ANGLE_SNAP_DEGREES = 45;
+/** Object-snap indicator chrome — a distinct accent color so it doesn't get lost against the selection-blue #2f6fed. */
 const SNAP_INDICATOR_COLOR = '#e8590c';
 const SNAP_INDICATOR_RADIUS_PX = 5;
-
-/** Duplicate's fixed fractional offset (§4.2) — same convention element-editor-snapping-clipboard-spec.md §5.2 already settled on for its own Ctrl+V paste. */
-const DUPLICATE_OFFSET_FRACTION = 0.03;
-
-/** Screen-px pan offset plus a uniform scale — same shape as scene.ts's own world transform, just plain state instead of a PixiJS Container. Maps a "world" point (artwork px, the same fixed space shapeCanvasSize computes) to a screen point (CSS px within the viewport) via screen = pan + world * scale. */
-interface View {
-  scale: number;
-  panX: number;
-  panY: number;
-}
-
-function clampZoom(scale: number): number {
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
-}
 
 /** Longer side fixed at SHAPE_CANVAS_MAX_PX, shorter side scaled down to match the artwork's own aspect ratio — same "contain within a box" sizing the placed-on-PDF render and the final rasterize-to-iconRef step already use via nativeWidth/nativeHeight. */
 function shapeCanvasSize(nativeWidth: number, nativeHeight: number): { widthPx: number; heightPx: number } {
@@ -129,7 +98,7 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = {
   other: 'Other',
 };
 
-type ShapeTool = 'select' | 'port' | ShapeDrawTool | 'text' | 'polygon' | 'arcThreePoint';
+type ShapeTool = BuiltinShapeTool | 'port';
 
 const SHAPE_TOOLS: { tool: ShapeTool; label: string }[] = [
   { tool: 'select', label: 'Select' },
@@ -162,26 +131,6 @@ const SHAPE_TOOL_ICONS: Record<ShapeTool, ComponentType<IconProps>> = {
 
 type ElementEditorTab = 'shapes' | 'ports' | 'labels';
 
-const DEFAULT_STYLE: SymbolShapeStyle = { stroke: '#1a1a1a', strokeWidth: 0.01, fill: null };
-
-function clamp01(n: number): number {
-  return Math.max(0, Math.min(1, n));
-}
-
-/** Rotate handle sits centered above the selection's top edge, offset by a fixed screen-px distance (divided by `scale` to convert to the world-px space bounds/coordinates live in, so it stays a constant size on screen regardless of zoom). */
-function rotateHandlePosition(selected: SymbolShape[], widthPx: number, heightPx: number, scale: number): { x: number; y: number } | null {
-  if (selected.length === 0) return null;
-  const b = selectionBounds(selected, widthPx, heightPx);
-  return { x: b.x + b.width / 2, y: b.y - ROTATE_HANDLE_OFFSET_PX / scale / heightPx };
-}
-
-/** Multi-shape-only scale handle at the selection bounds' bottom-right corner — a single shape already has its own per-kind resize handles (shapeHandles), so this only ever shows once 2+ shapes are selected, dragging to uniformly scale the whole group around selectionPivot (same pivot mirror/rotate/Scale % already use for a group). */
-function scaleHandlePosition(selected: SymbolShape[], widthPx: number, heightPx: number): { x: number; y: number } | null {
-  if (selected.length < 2) return null;
-  const b = selectionBounds(selected, widthPx, heightPx);
-  return { x: b.x + b.width, y: b.y + b.height };
-}
-
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -203,7 +152,8 @@ export interface ElementEditorDialogProps {
 }
 
 /**
- * Element Editor dialog (ports-custom-element-editor-spec.md §5.2 + §5.3) —
+ * Element Editor dialog (ports-custom-element-editor-spec.md §5.2 + §5.3;
+ * shared-drawing-tool.md §6 Phase 2 for the useShapeDrawEditor/usePortEditor split) —
  * authors a custom StampDefinition: name/discipline/category, artwork (one
  * vector Shapes canvas — drawn shapes, imported images, or both at once,
  * each import landing as its own movable/deletable/resizable 'image' shape
@@ -220,15 +170,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   const [category, setCategory] = useState<StampCategory>(definition?.category === 'equipment' ? 'equipment' : 'terminal');
   const [nativeWidth, setNativeWidth] = useState(definition?.nativeWidth ?? 48);
   const [nativeHeight, setNativeHeight] = useState(definition?.nativeHeight ?? 48);
-  const [ports, setPorts] = useState<PortSpec[]>(definition?.ports ?? []);
-  const [groups, setGroups] = useState<string[][]>(definition?.definitionPortGroups ?? []);
-  const [linkMode, setLinkMode] = useState(false);
-  const [linkFirstPortId, setLinkFirstPortId] = useState<string | null>(null);
-  const [editingPortId, setEditingPortId] = useState<string | null>(null);
-  const [editPortName, setEditPortName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  /** The fixed-size viewport DOM element (§2/§3) — the coordinate-space reference for fractionFromEvent, wheel-zoom, and pan-drag; distinct from the artwork's own "world" pixel box (canvasWidthPx × canvasHeightPx), which is drawn inside it at the current view.scale/pan. */
-  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   // Shapes/Ports/Labels tab bar (§2) — Shapes and Ports are both always available now that
   // Import/Draw are merged into one always-on canvas (an imported image is just another shape).
@@ -238,102 +180,41 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // and canvas stay in sync with the definition's true aspect ratio.
   const { widthPx: canvasWidthPx, heightPx: canvasHeightPx } = useMemo(() => shapeCanvasSize(nativeWidth, nativeHeight), [nativeWidth, nativeHeight]);
 
-  // Zoom & pan (§3) — the viewport's own CSS size is independent of the artwork's aspect
-  // ratio (unlike the pre-redesign canvas, which was sized to match it exactly), so it's
-  // tracked separately via ResizeObserver and used both for Fit and for the Shapes-mode
-  // canvas's device-pixel backing buffer (see the draw effect below).
-  const [view, setView] = useState<View>({ scale: 1, panX: 0, panY: 0 });
-  const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 });
-  const hasFitRef = useRef(false);
+  const textRenameRef = useRef<HTMLInputElement | null>(null);
 
-  function fitView(size: { width: number; height: number } = viewportSize) {
-    const scale = clampZoom(Math.min(size.width / canvasWidthPx, size.height / canvasHeightPx));
-    setView({ scale, panX: (size.width - canvasWidthPx * scale) / 2, panY: (size.height - canvasHeightPx * scale) / 2 });
-  }
-
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const size = { width: entry.contentRect.width, height: entry.contentRect.height };
-      setViewportSize(size);
-      if (!hasFitRef.current && size.width > 4 && size.height > 4) {
-        hasFitRef.current = true;
-        fitView(size);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Re-fit whenever the artwork's own world size changes (W/H edits, artwork import
-  // changing aspect) — but only after the initial mount fit above has already happened,
-  // so this doesn't race it with a stale (pre-measurement) viewportSize.
-  useEffect(() => {
-    if (hasFitRef.current) fitView();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasWidthPx, canvasHeightPx]);
-
-  // Wheel-to-zoom, pivoted on the cursor so the artwork point under it stays fixed — a plain
-  // addEventListener (not React's onWheel) so preventDefault reliably stops the page scrolling.
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    function onWheel(event: WheelEvent) {
-      event.preventDefault();
-      const rect = el!.getBoundingClientRect();
-      const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-      zoomAtScreenPoint(factor, { x: event.clientX - rect.left, y: event.clientY - rect.top });
-    }
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /** Shared by the wheel handler and the bottom bar's zoom buttons — zooms so screenPoint's world position stays fixed under it, same convention as scene.ts's own applyZoomAtScreenPoint. */
-  function zoomAtScreenPoint(factor: number, screenPoint: { x: number; y: number }) {
-    setView((prev) => {
-      const newScale = clampZoom(prev.scale * factor);
-      const worldX = (screenPoint.x - prev.panX) / prev.scale;
-      const worldY = (screenPoint.y - prev.panY) / prev.scale;
-      return { scale: newScale, panX: screenPoint.x - worldX * newScale, panY: screenPoint.y - worldY * newScale };
-    });
-  }
-
-  /** Pan on middle- or right-mouse-button drag — same raw screen-space delta as scene.ts's own pan branch, no scale division. */
-  function handleViewportPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 1 && event.button !== 2) return;
-    event.preventDefault();
-    const startScreen = { x: event.clientX, y: event.clientY };
-    const startView = view;
-    const move = (ev: PointerEvent) => {
-      setView({ ...startView, panX: startView.panX + (ev.clientX - startScreen.x), panY: startView.panY + (ev.clientY - startScreen.y) });
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }
-
-  // Shapes canvas (§5.3) — local undo/redo history, same Command/CommandManager primitive the
-  // rest of the app uses, scoped to just this dialog's canvas. A definition saved before the
-  // Import/Draw merge has an iconRef but no shapes (it was raster-only, no vector source) — seed
-  // one full-canvas 'image' shape from that iconRef so its art becomes an editable/movable/
-  // deletable shape like any newly-imported one, instead of vanishing from the (now sole) canvas.
-  const [shapesManager] = useState(() => {
-    if (definition?.shapes && definition.shapes.length > 0) return new CommandManager<SymbolShape[]>(definition.shapes);
-    if (definition?.iconRef) {
-      const seeded: SymbolShape = { id: crypto.randomUUID(), kind: 'image', dataUrl: definition.iconRef, x: 0, y: 0, width: 1, height: 1, style: DEFAULT_STYLE };
-      return new CommandManager<SymbolShape[]>([seeded]);
-    }
-    return new CommandManager<SymbolShape[]>([]);
+  // The shared shape-draw/edit primitive (shared-drawing-tool.md) — tool palette, draft/handle/
+  // marquee/select interactions, undo, view pan/zoom, keyboard shortcuts. 'port' isn't a tool it
+  // knows about, so its pointer-down falls through to onUnhandledToolPointerDown, which hands
+  // off to portsEditor below.
+  const editor = useShapeDrawEditor<ShapeTool>({
+    canvasWidthPx,
+    canvasHeightPx,
+    // Seeds the undo-tracked shape list once, on mount (useState lazy-initializer semantics —
+    // see useShapeDrawEditor's own doc comment). A definition saved before the Import/Draw merge
+    // has an iconRef but no shapes (it was raster-only, no vector source) — seed one full-canvas
+    // 'image' shape from that iconRef so its art becomes an editable/movable/deletable shape like
+    // any newly-imported one, instead of vanishing from the (now sole) canvas.
+    initialShapes:
+      definition?.shapes && definition.shapes.length > 0
+        ? definition.shapes
+        : definition?.iconRef
+          ? [{ id: crypto.randomUUID(), kind: 'image', dataUrl: definition.iconRef, x: 0, y: 0, width: 1, height: 1, style: DEFAULT_STYLE }]
+          : [],
+    onUnhandledToolPointerDown: (t, point) => {
+      if (t === 'port') portsEditor.addPortAt(point.fractionX, point.fractionY);
+    },
   });
-  const [shapes, setShapes] = useState<SymbolShape[]>(shapesManager.getState());
+
+  // Ports tool state + logic, shared with the (not-yet-built) schematic symbol editor —
+  // shared-drawing-tool.md §6. Wired to editor's grid-snap toggle and coordinate conversion
+  // explicitly (not a shared global), per usePortEditor's own doc comment.
+  const portsEditor = usePortEditor({
+    initialPorts: definition?.ports ?? [],
+    initialGroups: definition?.definitionPortGroups ?? [],
+    gridSnapEnabled: editor.gridSnapEnabled,
+    gridSpacingFraction: GRID_SPACING_FRACTION,
+    fractionFromEvent: editor.fractionFromEvent,
+  });
 
   // Unsaved-changes warning (§7) — isDirty is a snapshot diff, not a scattered `dirty = true` flag
   // touched by every setter: one JSON comparison correctly treats "moved a shape back to where it
@@ -342,7 +223,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // its useRef initializer expression re-evaluates every render (a JS-argument-evaluation quirk),
   // but useRef only keeps the very first result, which is exactly the mount-time snapshot we want.
   function computeSnapshot(): string {
-    return JSON.stringify({ name, discipline, category, nativeWidth, nativeHeight, ports, groups, shapes });
+    return JSON.stringify({ name, discipline, category, nativeWidth, nativeHeight, ports: portsEditor.ports, groups: portsEditor.groups, shapes: editor.shapes });
   }
   const initialSnapshotRef = useRef(computeSnapshot());
   const isDirty = computeSnapshot() !== initialSnapshotRef.current;
@@ -354,9 +235,9 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   }
 
   // Escape closes just the confirm block, not the whole dialog — a capture-phase listener with
-  // stopPropagation, same pattern the polygon/arc-3pt draft-cancel handler below already uses,
-  // since Dialog's own Escape-closes-everything listener is also on document (see
-  // project-dialog-escape-listener-conflict).
+  // stopPropagation, same pattern the polygon/arc-3pt draft-cancel handler (inside
+  // useShapeDrawEditor) already uses, since Dialog's own Escape-closes-everything listener is
+  // also on document (see project-dialog-escape-listener-conflict).
   useEffect(() => {
     if (!pendingClose) return;
     function onKeyDown(event: KeyboardEvent) {
@@ -369,30 +250,6 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [pendingClose]);
 
-  const [tool, setTool] = useState<ShapeTool>('select');
-  const [defaultStyle, setDefaultStyle] = useState<SymbolShapeStyle>(DEFAULT_STYLE);
-  const [selectedShapeIds, setSelectedShapeIds] = useState<Set<string>>(new Set());
-  const [draftShapes, setDraftShapes] = useState<SymbolShape[] | null>(null);
-  const [marquee, setMarquee] = useState<{ start: { fractionX: number; fractionY: number }; current: { fractionX: number; fractionY: number }; additive: boolean } | null>(null);
-  const [polygonDraft, setPolygonDraft] = useState<{ fractionX: number; fractionY: number }[] | null>(null);
-  const [arcThreePointDraft, setArcThreePointDraft] = useState<{ fractionX: number; fractionY: number }[] | null>(null);
-  const [pendingPoint, setPendingPoint] = useState<{ fractionX: number; fractionY: number } | null>(null);
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [editingTextValue, setEditingTextValue] = useState('');
-  const [scalePercentInput, setScalePercentInput] = useState('100');
-  const shapesCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const textRenameRef = useRef<HTMLInputElement | null>(null);
-
-  // Grid/angle/object snap (§6) — three independently toggleable modes, since a user may want any
-  // one without the others. snapIndicator (fraction space) shows what point is currently
-  // snapped-to during a handle-drag, matching the old app's SnapIndicator concept.
-  const [gridSnapEnabled, setGridSnapEnabled] = useState(false);
-  const [angleSnapEnabled, setAngleSnapEnabled] = useState(false);
-  const [angleSnapDegreesInput, setAngleSnapDegreesInput] = useState(String(DEFAULT_ANGLE_SNAP_DEGREES));
-  const [objectSnapEnabled, setObjectSnapEnabled] = useState(false);
-  const [snapIndicator, setSnapIndicator] = useState<{ x: number; y: number } | null>(null);
-  const angleSnapDegrees = Number(angleSnapDegreesInput) || DEFAULT_ANGLE_SNAP_DEGREES;
-
   // Text placement opens the rename input from inside the same pointerdown
   // that created the shape — autoFocus there loses a race against the
   // browser's own post-mousedown focus handling (mousedown targets the
@@ -400,45 +257,10 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // Deferring the focus call, same fix already used for the floating
   // textbox-annotation prompt in App.tsx.
   useEffect(() => {
-    if (!editingTextId) return;
+    if (!editor.editingTextId) return;
     const id = setTimeout(() => textRenameRef.current?.focus(), 0);
     return () => clearTimeout(id);
-  }, [editingTextId]);
-
-  const selectedShapes = shapes.filter((s) => selectedShapeIds.has(s.id));
-  const singleSelectedShape = selectedShapes.length === 1 ? selectedShapes[0] : undefined;
-  const activeStyle = selectedShapes[0]?.style ?? defaultStyle;
-
-  // Keeps the Scale % field honest: without this it just holds whatever was last typed/dragged,
-  // so selecting a fresh (never-scaled) shape after scaling another one to e.g. 150% would still
-  // show "150" and silently re-apply that on the next Enter/blur. Synced to the single selected
-  // shape's own cumulative scale (100 for 0/multi selection, where there's no one "current" value
-  // — see applyScalePercent's own doc comment); re-fires when that shape's scale actually changes
-  // (field/handle apply) too, so the field settles back to matching reality after either one.
-  useEffect(() => {
-    setScalePercentInput(singleSelectedShape ? String(Math.round((singleSelectedShape.scale ?? 1) * 100)) : '100');
-  }, [singleSelectedShape?.id, singleSelectedShape?.scale]);
-
-  // 'image' shapes' art (imageCacheRef, keyed by dataUrl) — the draw effect below needs a
-  // pre-decoded <img> to drawImage() with (see drawSymbolShapes' own doc comment), so any new
-  // dataUrl showing up in `shapes` gets loaded here; imagesLoadedTick bumps once a load lands,
-  // since mutating the ref's Map directly doesn't itself trigger the draw effect to rerun.
-  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
-  const [imagesLoadedTick, setImagesLoadedTick] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    void loadShapeImages(shapes, imageCacheRef.current).then(() => {
-      if (!cancelled) setImagesLoadedTick((t) => t + 1);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [shapes]);
-
-  function commitShapes(next: SymbolShape[]) {
-    shapesManager.execute({ description: 'Edit shape', execute: () => next, undo: () => shapes });
-    setShapes(next);
-  }
+  }, [editor.editingTextId]);
 
   // Canvas resize, not image resize: editing nativeWidth/nativeHeight changes the fraction-space
   // box's own aspect ratio (via shapeCanvasSize), so without this, every shape/port's fraction
@@ -452,7 +274,8 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // the aspect ratio changes — only the native sizes themselves do.
   //
   // sMin (for radius/strokeWidth) needs the same native-unit basis, not the derived canvas pixel
-  // box, even though drawSymbolShapes itself scales radius by Math.min(canvasWidthPx, canvasHeightPx):
+  // box, even though shape rendering itself (renderSymbolShapeSvg live, drawSymbolShapes at save-time
+  // bake — both share this convention) scales radius by Math.min(canvasWidthPx, canvasHeightPx):
   // that pixel min equals k * Math.min(nativeWidth, nativeHeight) for the single uniform scale
   // k = SHAPE_CANVAS_MAX_PX / Math.max(nativeWidth, nativeHeight), so the *physical* (native-unit)
   // radius a fraction represents is `radius * Math.min(nativeWidth, nativeHeight)` — k cancels out.
@@ -468,336 +291,188 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     const sx = prev.width / nativeWidth;
     const sy = prev.height / nativeHeight;
     const sMin = Math.min(prev.width, prev.height) / Math.min(nativeWidth, nativeHeight);
-    commitShapes(shapes.map((s) => rescaleShapeForCanvasResize(s, sx, sy, sMin)));
-    setPorts((prevPorts) => prevPorts.map((p) => ({ ...p, fractionX: p.fractionX * sx, fractionY: p.fractionY * sy })));
+    editor.commitShapes(editor.shapes.map((s) => rescaleShapeForCanvasResize(s, sx, sy, sMin)));
+    portsEditor.setPorts((prevPorts) => prevPorts.map((p) => ({ ...p, fractionX: p.fractionX * sx, fractionY: p.fractionY * sy })));
     nativeSizeRef.current = { width: nativeWidth, height: nativeHeight };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nativeWidth, nativeHeight]);
 
-  function undoShapes() {
-    setShapes(shapesManager.undo());
-    setSelectedShapeIds(new Set());
-  }
+  // Shapes-mode canvas, rendered live as SVG (shared-drawing-tool.md §4/§6 Phase 2 — was
+  // Canvas2D; the save-time raster bake in buildDefinition below is unaffected, it calls
+  // rasterizeSymbolShapes directly and loads its own images). Plain render-time JSX, not a
+  // useEffect + imperative draw call: React already re-renders whenever any of the values below
+  // change, an SVG element tree needs no separate "clear and redraw" step the way a Canvas2D
+  // backing buffer did, and there's no devicePixelRatio buffer-sizing concern — the browser
+  // rasterizes SVG at native resolution from its CSS size.
+  //
+  // draftShapes either replaces in-place shapes being dragged (select tool) or holds one
+  // not-yet-committed new shape being drawn (drag-to-create tools) — handle both by replacing
+  // matching ids and appending any that aren't found.
+  const draftById = editor.draftShapes ? new Map(editor.draftShapes.map((s) => [s.id, s])) : null;
+  const toDraw = draftById
+    ? [...editor.shapes.map((s) => draftById.get(s.id) ?? s), ...editor.draftShapes!.filter((s) => !editor.shapes.some((orig) => orig.id === s.id))]
+    : editor.shapes;
+  // Selection/handle/marquee "chrome" is drawn in the same zoomed world-space <g> as the shapes
+  // (see the transform on the <g> in the JSX below), so a literal screen-px size (stroke width,
+  // dash length, handle radius) would visibly grow/shrink with zoom — divide by view.scale first
+  // so it renders at a constant size on screen instead, same convention scene.ts uses for its own
+  // handle/selection-outline drawing.
+  const chromeScale = 1 / editor.view.scale;
 
-  function redoShapes() {
-    setShapes(shapesManager.redo());
-    setSelectedShapeIds(new Set());
-  }
+  const selectedForHandle = editor.tool === 'select' && !editor.marquee ? toDraw.filter((s) => editor.selectedShapeIds.has(s.id)) : [];
+  const rotateHandle = rotateHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx, editor.view.scale);
+  const rotateHandleStemTopY = rotateHandle ? selectionBounds(selectedForHandle, canvasWidthPx, canvasHeightPx).y * canvasHeightPx : 0;
+  const scaleHandle = scaleHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx);
 
-  function updateActiveStyle(patch: Partial<SymbolShapeStyle>) {
-    if (selectedShapeIds.size > 0) {
-      commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? { ...s, style: { ...s.style, ...patch } } : s)));
-    } else {
-      setDefaultStyle((prev) => ({ ...prev, ...patch }));
-    }
-  }
+  // Click-accumulate previews for Polygon and Arc (3-pt): placed vertices plus a rubber-band line
+  // (or, for Arc 3-pt once start+end are placed, a live preview of the actual arc bulging toward
+  // the pointer) to the current pointer position.
+  const activeDraftPoints = editor.tool === 'polygon' ? editor.polygonDraft : editor.tool === 'arcThreePoint' ? editor.arcThreePointDraft : null;
+  const previewArc =
+    editor.tool === 'arcThreePoint' && activeDraftPoints && activeDraftPoints.length === 2 && editor.pendingPoint
+      ? arcFromThreePoints(activeDraftPoints[0], activeDraftPoints[1], editor.pendingPoint, editor.defaultStyle, canvasWidthPx, canvasHeightPx)
+      : null;
+  const polygonClosePx =
+    editor.tool === 'polygon' && activeDraftPoints && activeDraftPoints.length >= 3 && editor.pendingPoint
+      ? Math.hypot(
+          (editor.pendingPoint.fractionX - activeDraftPoints[0].fractionX) * canvasWidthPx,
+          (editor.pendingPoint.fractionY - activeDraftPoints[0].fractionY) * canvasHeightPx,
+        )
+      : Infinity;
+  const showPolygonCloseHint = polygonClosePx <= POLYGON_CLOSE_HIT_RADIUS_PX / editor.view.scale;
 
-  function deleteSelectedShapes() {
-    if (selectedShapeIds.size === 0) return;
-    commitShapes(shapes.filter((s) => !selectedShapeIds.has(s.id)));
-    setSelectedShapeIds(new Set());
-  }
-
-  function mirrorSelection(axis: 'horizontal' | 'vertical') {
-    if (selectedShapes.length === 0) return;
-    const pivot = selectionPivot(selectedShapes, canvasWidthPx, canvasHeightPx);
-    commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? mirrorShape(s, axis, pivot.x, pivot.y) : s)));
-  }
-
-  /** For a single selected shape, the field shows/targets that shape's own absolute cumulative
-      `scale` (see scaleShape's doc comment) — typing 140 sets it to exactly 140% of its size at
-      creation, regardless of what it's currently at, by deriving the one-off factor needed to get
-      there from here. For a multi-shape selection there's no single "current" value to target
-      (each shape may already be at a different scale), so it keeps the old relative-multiplier
-      behavior: the typed percent is applied fresh, once, to every selected shape via their shared
-      pivot — same as the multi-shape scale handle's own drag. */
-  function applyScalePercent() {
-    const target = Number(scalePercentInput) / 100;
-    if (selectedShapes.length === 0 || !Number.isFinite(target) || target <= 0) return;
-    const pivot = selectionPivot(selectedShapes, canvasWidthPx, canvasHeightPx);
-    if (singleSelectedShape) {
-      const factor = target / (singleSelectedShape.scale ?? 1);
-      if (!Number.isFinite(factor) || factor <= 0) return;
-      commitShapes(shapes.map((s) => (s.id === singleSelectedShape.id ? scaleShape(s, factor, pivot.x, pivot.y) : s)));
-    } else {
-      commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? scaleShape(s, target, pivot.x, pivot.y) : s)));
-    }
-  }
-
-  function duplicateSelection() {
-    if (selectedShapes.length === 0) return;
-    const clones = selectedShapes.map((s) => ({ ...translateShape(s, DUPLICATE_OFFSET_FRACTION, DUPLICATE_OFFSET_FRACTION), id: crypto.randomUUID() }));
-    commitShapes([...shapes, ...clones]);
-    setSelectedShapeIds(new Set(clones.map((c) => c.id)));
-  }
-
-  function rotateSelection90() {
-    if (selectedShapes.length === 0) return;
-    const pivot = selectionPivot(selectedShapes, canvasWidthPx, canvasHeightPx);
-    commitShapes(shapes.map((s) => (selectedShapeIds.has(s.id) ? rotateShapeAround(s, Math.PI / 2, pivot.x, pivot.y) : s)));
-  }
-
-  /** z-order is array order (drawSymbolShapes' own paint-order convention) — bring-to-front/send-to-back reorder the selection to the end/start, keeping the selected shapes' own relative order among themselves. */
-  function bringSelectionToFront() {
-    if (selectedShapeIds.size === 0) return;
-    commitShapes([...shapes.filter((s) => !selectedShapeIds.has(s.id)), ...shapes.filter((s) => selectedShapeIds.has(s.id))]);
-  }
-
-  function sendSelectionToBack() {
-    if (selectedShapeIds.size === 0) return;
-    commitShapes([...shapes.filter((s) => selectedShapeIds.has(s.id)), ...shapes.filter((s) => !selectedShapeIds.has(s.id))]);
-  }
-
-  function finishPolygon(points = polygonDraft) {
-    if (!points || points.length < 3) return;
-    const shape: SymbolShape = {
-      id: crypto.randomUUID(),
-      kind: 'polygon',
-      points: points.map((p) => ({ x: p.fractionX, y: p.fractionY })),
-      style: defaultStyle,
-    };
-    commitShapes([...shapes, shape]);
-    setSelectedShapeIds(new Set([shape.id]));
-    setTool('select');
-    setPolygonDraft(null);
-    setPendingPoint(null);
-  }
-
-  function cancelActiveDraft() {
-    setPolygonDraft(null);
-    setArcThreePointDraft(null);
-    setPendingPoint(null);
-  }
-
-  // Switching tools abandons any in-progress Polygon/Arc(3-pt) click-accumulation.
-  useEffect(() => {
-    cancelActiveDraft();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tool]);
-
-  // Redraw the Shapes-mode canvas whenever its state changes. The canvas's own backing buffer
-  // is sized to the viewport's CSS size × devicePixelRatio (not the artwork's world size) —
-  // view.scale/pan are baked into the draw transform below instead of a CSS transform on the
-  // canvas element, so lines stay crisp at high zoom instead of a scaled bitmap blurring (§3).
-  useEffect(() => {
-    const canvas = shapesCanvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const bufferWidth = Math.max(1, Math.round(viewportSize.width * dpr));
-    const bufferHeight = Math.max(1, Math.round(viewportSize.height * dpr));
-    if (canvas.width !== bufferWidth) canvas.width = bufferWidth;
-    if (canvas.height !== bufferHeight) canvas.height = bufferHeight;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, viewportSize.width, viewportSize.height);
-    ctx.save();
-    ctx.translate(view.panX, view.panY);
-    ctx.scale(view.scale, view.scale);
-    // Selection/handle/marquee "chrome" is drawn in this same zoomed world-space transform, so a
-    // literal screen-px size (line width, dash length, handle radius) would visibly grow/shrink
-    // with zoom — divide by view.scale first so it renders at a constant size on screen instead,
-    // same convention scene.ts uses for its own handle/selection-outline drawing.
-    const chromeScale = 1 / view.scale;
-    // Canvas/stamp bounds — the fixed nativeWidth×nativeHeight box shapes/ports are defined
-    // against, drawn first (behind shapes/selection chrome) so the user can see the element's
-    // actual extent while placing geometry.
-    ctx.save();
-    ctx.setLineDash([6 * chromeScale, 4 * chromeScale]);
-    ctx.strokeStyle = '#57676f';
-    ctx.lineWidth = chromeScale;
-    ctx.strokeRect(0, 0, canvasWidthPx, canvasHeightPx);
-    ctx.restore();
-    // draftShapes either replaces in-place shapes being dragged (select tool) or
-    // holds one not-yet-committed new shape being drawn (drag-to-create tools) —
-    // handle both by replacing matching ids and appending any that aren't found.
-    const draftById = draftShapes ? new Map(draftShapes.map((s) => [s.id, s])) : null;
-    const toDraw = draftById
-      ? [...shapes.map((s) => draftById.get(s.id) ?? s), ...draftShapes!.filter((s) => !shapes.some((orig) => orig.id === s.id))]
-      : shapes;
-    drawSymbolShapes(ctx, toDraw, canvasWidthPx, canvasHeightPx, imageCacheRef.current);
-    for (const shape of toDraw) {
-      if (!selectedShapeIds.has(shape.id)) continue;
-      const b = symbolShapeBounds(shape, canvasWidthPx, canvasHeightPx);
-      const pad = 3 * chromeScale;
-      ctx.save();
-      ctx.setLineDash([4 * chromeScale, 3 * chromeScale]);
-      ctx.strokeStyle = '#2f6fed';
-      ctx.lineWidth = chromeScale;
-      ctx.strokeRect(b.x * canvasWidthPx - pad, b.y * canvasHeightPx - pad, b.width * canvasWidthPx + pad * 2, b.height * canvasHeightPx + pad * 2);
-      ctx.restore();
-    }
-    if (marquee) {
-      const minX = Math.min(marquee.start.fractionX, marquee.current.fractionX) * canvasWidthPx;
-      const minY = Math.min(marquee.start.fractionY, marquee.current.fractionY) * canvasHeightPx;
-      const w = Math.abs(marquee.current.fractionX - marquee.start.fractionX) * canvasWidthPx;
-      const h = Math.abs(marquee.current.fractionY - marquee.start.fractionY) * canvasHeightPx;
-      ctx.save();
-      ctx.fillStyle = 'rgba(47, 111, 237, 0.12)';
-      ctx.fillRect(minX, minY, w, h);
-      ctx.strokeStyle = '#2f6fed';
-      ctx.lineWidth = chromeScale;
-      ctx.strokeRect(minX, minY, w, h);
-      ctx.restore();
-    }
-    if (tool === 'select' && !marquee) {
-      const selectedForHandle = toDraw.filter((s) => selectedShapeIds.has(s.id));
-      const handle = rotateHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx, view.scale);
-      if (handle) {
-        const b = selectionBounds(selectedForHandle, canvasWidthPx, canvasHeightPx);
-        const handleX = handle.x * canvasWidthPx;
-        const handleY = handle.y * canvasHeightPx;
-        const stemTopY = b.y * canvasHeightPx;
-        ctx.save();
-        ctx.strokeStyle = '#2f6fed';
-        ctx.fillStyle = '#2f6fed';
-        ctx.lineWidth = chromeScale;
-        ctx.beginPath();
-        ctx.moveTo(handleX, stemTopY);
-        ctx.lineTo(handleX, handleY);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(handleX, handleY, ROTATE_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-      // Geometry (resize/reshape) handles — only when exactly one shape is selected, per the
-      // hit-test order in handleShapesCanvasPointerDown: rotate handle → geometry handle → body drag.
-      if (selectedForHandle.length === 1) {
-        for (const geomHandle of shapeHandles(selectedForHandle[0], canvasWidthPx, canvasHeightPx)) {
-          ctx.save();
-          ctx.strokeStyle = '#2f6fed';
-          ctx.fillStyle = '#fff';
-          ctx.lineWidth = chromeScale;
-          ctx.beginPath();
-          ctx.arc(geomHandle.x * canvasWidthPx, geomHandle.y * canvasHeightPx, GEOMETRY_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
-      // Scale handle — multi-shape selections only (see scaleHandlePosition's own doc comment).
-      // Drawn as a square (vs. the round geometry/rotate handles) so it reads as a distinct affordance.
-      if (selectedForHandle.length > 1) {
-        const scaleHandle = scaleHandlePosition(selectedForHandle, canvasWidthPx, canvasHeightPx);
-        if (scaleHandle) {
+  const chrome = (
+    <>
+      {/* Canvas/stamp bounds — the fixed nativeWidth×nativeHeight box shapes/ports are defined
+          against, drawn first (behind shapes/selection chrome) so the user can see the element's
+          actual extent while placing geometry. */}
+      <rect x={0} y={0} width={canvasWidthPx} height={canvasHeightPx} fill="none" stroke="#57676f" strokeWidth={chromeScale} strokeDasharray={`${6 * chromeScale} ${4 * chromeScale}`} />
+      <SymbolShapesSvg shapes={toDraw} widthPx={canvasWidthPx} heightPx={canvasHeightPx} />
+      {toDraw
+        .filter((s) => editor.selectedShapeIds.has(s.id))
+        .map((shape) => {
+          const b = symbolShapeBounds(shape, canvasWidthPx, canvasHeightPx);
+          const pad = 3 * chromeScale;
+          return (
+            <rect
+              key={shape.id}
+              x={b.x * canvasWidthPx - pad}
+              y={b.y * canvasHeightPx - pad}
+              width={b.width * canvasWidthPx + pad * 2}
+              height={b.height * canvasHeightPx + pad * 2}
+              fill="none"
+              stroke="#2f6fed"
+              strokeWidth={chromeScale}
+              strokeDasharray={`${4 * chromeScale} ${3 * chromeScale}`}
+            />
+          );
+        })}
+      {editor.marquee &&
+        (() => {
+          const minX = Math.min(editor.marquee.start.fractionX, editor.marquee.current.fractionX) * canvasWidthPx;
+          const minY = Math.min(editor.marquee.start.fractionY, editor.marquee.current.fractionY) * canvasHeightPx;
+          const w = Math.abs(editor.marquee.current.fractionX - editor.marquee.start.fractionX) * canvasWidthPx;
+          const h = Math.abs(editor.marquee.current.fractionY - editor.marquee.start.fractionY) * canvasHeightPx;
+          return <rect x={minX} y={minY} width={w} height={h} fill="rgba(47, 111, 237, 0.12)" stroke="#2f6fed" strokeWidth={chromeScale} />;
+        })()}
+      {rotateHandle && (
+        <>
+          <line x1={rotateHandle.x * canvasWidthPx} y1={rotateHandleStemTopY} x2={rotateHandle.x * canvasWidthPx} y2={rotateHandle.y * canvasHeightPx} stroke="#2f6fed" strokeWidth={chromeScale} />
+          <circle cx={rotateHandle.x * canvasWidthPx} cy={rotateHandle.y * canvasHeightPx} r={ROTATE_HANDLE_RADIUS_PX * chromeScale} fill="#2f6fed" />
+        </>
+      )}
+      {/* Geometry (resize/reshape) handles — only when exactly one shape is selected, per the
+          hit-test order in useShapeDrawEditor's pointer-down handler: rotate handle → geometry
+          handle → body drag. */}
+      {selectedForHandle.length === 1 &&
+        shapeHandles(selectedForHandle[0], canvasWidthPx, canvasHeightPx).map((geomHandle) => (
+          <circle
+            key={geomHandle.id}
+            cx={geomHandle.x * canvasWidthPx}
+            cy={geomHandle.y * canvasHeightPx}
+            r={GEOMETRY_HANDLE_RADIUS_PX * chromeScale}
+            fill="#fff"
+            stroke="#2f6fed"
+            strokeWidth={chromeScale}
+          />
+        ))}
+      {/* Scale handle — multi-shape selections only (see scaleHandlePosition's own doc comment).
+          Drawn as a square (vs. the round geometry/rotate handles) so it reads as a distinct
+          affordance. */}
+      {scaleHandle &&
+        (() => {
           const hx = scaleHandle.x * canvasWidthPx;
           const hy = scaleHandle.y * canvasHeightPx;
           const half = SCALE_HANDLE_HALF_PX * chromeScale;
-          ctx.save();
-          ctx.strokeStyle = '#2f6fed';
-          ctx.fillStyle = '#fff';
-          ctx.lineWidth = chromeScale;
-          ctx.fillRect(hx - half, hy - half, half * 2, half * 2);
-          ctx.strokeRect(hx - half, hy - half, half * 2, half * 2);
-          ctx.restore();
-        }
-      }
-    }
-
-    // Object-snap indicator (§6.3) — a distinct accent color so it doesn't get lost against the
-    // selection-blue #2f6fed, shown at whatever point a handle-drag is currently snapped to.
-    if (snapIndicator) {
-      ctx.save();
-      ctx.strokeStyle = SNAP_INDICATOR_COLOR;
-      ctx.lineWidth = 1.5 * chromeScale;
-      ctx.beginPath();
-      ctx.arc(snapIndicator.x * canvasWidthPx, snapIndicator.y * canvasHeightPx, SNAP_INDICATOR_RADIUS_PX * chromeScale, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Click-accumulate previews for Polygon and Arc (3-pt): placed vertices plus a
-    // rubber-band line (or, for Arc 3-pt once start+end are placed, a live preview of the actual
-    // arc bulging toward the pointer) to the current pointer position.
-    const activeDraftPoints = tool === 'polygon' ? polygonDraft : tool === 'arcThreePoint' ? arcThreePointDraft : null;
-    if (activeDraftPoints && activeDraftPoints.length > 0) {
-      ctx.save();
-      ctx.setLineDash([4 * chromeScale, 3 * chromeScale]);
-      ctx.strokeStyle = '#2f6fed';
-      ctx.fillStyle = '#2f6fed';
-      ctx.lineWidth = chromeScale;
-      const previewArc =
-        tool === 'arcThreePoint' && activeDraftPoints.length === 2 && pendingPoint
-          ? arcFromThreePoints(activeDraftPoints[0], activeDraftPoints[1], pendingPoint, defaultStyle, canvasWidthPx, canvasHeightPx)
-          : null;
-      if (previewArc && previewArc.kind === 'arc') {
-        const r = previewArc.radius * Math.min(canvasWidthPx, canvasHeightPx);
-        ctx.beginPath();
-        ctx.ellipse(previewArc.cx * canvasWidthPx, previewArc.cy * canvasHeightPx, r, r, 0, previewArc.startAngle, previewArc.endAngle);
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx);
-        for (const p of activeDraftPoints.slice(1)) ctx.lineTo(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx);
-        if (pendingPoint) ctx.lineTo(pendingPoint.fractionX * canvasWidthPx, pendingPoint.fractionY * canvasHeightPx);
-        ctx.stroke();
-      }
-      for (const p of activeDraftPoints) {
-        ctx.beginPath();
-        ctx.arc(p.fractionX * canvasWidthPx, p.fractionY * canvasHeightPx, 3 * chromeScale, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Highlight the polygon's start vertex when the pointer is within closing range, hinting
-      // that clicking there finishes the shape instead of adding another vertex.
-      if (tool === 'polygon' && activeDraftPoints.length >= 3 && pendingPoint) {
-        const closePx = Math.hypot(
-          (pendingPoint.fractionX - activeDraftPoints[0].fractionX) * canvasWidthPx,
-          (pendingPoint.fractionY - activeDraftPoints[0].fractionY) * canvasHeightPx,
-        );
-        if (closePx <= POLYGON_CLOSE_HIT_RADIUS_PX / view.scale) {
-          ctx.setLineDash([]);
-          ctx.fillStyle = '#fff';
-          ctx.beginPath();
-          ctx.arc(activeDraftPoints[0].fractionX * canvasWidthPx, activeDraftPoints[0].fractionY * canvasHeightPx, GEOMETRY_HANDLE_RADIUS_PX * chromeScale, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    }
-    ctx.restore();
-  }, [shapes, draftShapes, selectedShapeIds, marquee, tool, polygonDraft, arcThreePointDraft, pendingPoint, canvasWidthPx, canvasHeightPx, viewportSize, view, defaultStyle, imagesLoadedTick]);
-
-  // Delete/Backspace removes the selected shape; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes — only while no text field has focus.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedShapeIds.size > 0) {
-        event.preventDefault();
-        deleteSelectedShapes();
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        if (event.shiftKey) redoShapes();
-        else undoShapes();
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
-        event.preventDefault();
-        redoShapes();
-      } else if (event.key === 'Escape' && (polygonDraft || arcThreePointDraft)) {
-        // Cancel the in-progress draft only — stop the event reaching Dialog's own
-        // Escape-closes-the-whole-dialog listener (also on document, registered
-        // during Dialog's child-mounts-first effect, so capture phase is the only
-        // way to run before it).
-        event.preventDefault();
-        event.stopPropagation();
-        cancelActiveDraft();
-      } else if (event.key === 'Enter' && polygonDraft && polygonDraft.length >= 3) {
-        event.preventDefault();
-        finishPolygon();
-      }
-    }
-    document.addEventListener('keydown', onKeyDown, { capture: true });
-    return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedShapeIds, shapes, polygonDraft, arcThreePointDraft]);
+          return <rect x={hx - half} y={hy - half} width={half * 2} height={half * 2} fill="#fff" stroke="#2f6fed" strokeWidth={chromeScale} />;
+        })()}
+      {/* Object-snap indicator (§6.3) — a distinct accent color so it doesn't get lost against
+          the selection-blue #2f6fed, shown at whatever point a handle-drag is currently snapped
+          to. */}
+      {editor.snapIndicator && (
+        <circle
+          cx={editor.snapIndicator.x * canvasWidthPx}
+          cy={editor.snapIndicator.y * canvasHeightPx}
+          r={SNAP_INDICATOR_RADIUS_PX * chromeScale}
+          fill="none"
+          stroke={SNAP_INDICATOR_COLOR}
+          strokeWidth={1.5 * chromeScale}
+        />
+      )}
+      {activeDraftPoints && activeDraftPoints.length > 0 && (
+        <>
+          {previewArc && previewArc.kind === 'arc' ? (
+            <path
+              d={describeArcPath(
+                previewArc.cx * canvasWidthPx,
+                previewArc.cy * canvasHeightPx,
+                previewArc.radius * Math.min(canvasWidthPx, canvasHeightPx),
+                previewArc.startAngle,
+                previewArc.endAngle,
+              )}
+              fill="none"
+              stroke="#2f6fed"
+              strokeWidth={chromeScale}
+              strokeDasharray={`${4 * chromeScale} ${3 * chromeScale}`}
+            />
+          ) : (
+            <polyline
+              points={[...activeDraftPoints, ...(editor.pendingPoint ? [editor.pendingPoint] : [])]
+                .map((p) => `${p.fractionX * canvasWidthPx},${p.fractionY * canvasHeightPx}`)
+                .join(' ')}
+              fill="none"
+              stroke="#2f6fed"
+              strokeWidth={chromeScale}
+              strokeDasharray={`${4 * chromeScale} ${3 * chromeScale}`}
+            />
+          )}
+          {activeDraftPoints.map((p, i) => (
+            <circle key={i} cx={p.fractionX * canvasWidthPx} cy={p.fractionY * canvasHeightPx} r={3 * chromeScale} fill="#2f6fed" />
+          ))}
+          {/* Highlight the polygon's start vertex when the pointer is within closing range,
+              hinting that clicking there finishes the shape instead of adding another vertex. */}
+          {showPolygonCloseHint && (
+            <circle
+              cx={activeDraftPoints[0].fractionX * canvasWidthPx}
+              cy={activeDraftPoints[0].fractionY * canvasHeightPx}
+              r={GEOMETRY_HANDLE_RADIUS_PX * chromeScale}
+              fill="#fff"
+              stroke="#2f6fed"
+              strokeWidth={chromeScale}
+            />
+          )}
+        </>
+      )}
+    </>
+  );
 
   async function handleArtworkFile(file: File) {
     const [dataUrl, bitmap] = await Promise.all([readAsDataUrl(file), loadStampBitmap(file)]);
     const id = crypto.randomUUID();
-    if (shapes.length === 0) {
+    if (editor.shapes.length === 0) {
       // First content on an empty canvas — the image defines the element's own physical size and
       // fills the canvas exactly, same as the old Import mode's behavior. nativeSizeRef is updated
-      // in lockstep so the nativeWidth/nativeHeight effect below (which exists to preserve EXISTING
+      // in lockstep so the nativeWidth/nativeHeight effect above (which exists to preserve EXISTING
       // shapes' physical footprint across a manual canvas-size edit) sees no change and skips its
       // rescale — this image shape already matches the new size 1:1 and doesn't need re-fitting to it.
       const newWidth = (bitmap.width * 72) / STAMP_SOURCE_DPI;
@@ -805,7 +480,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       nativeSizeRef.current = { width: newWidth, height: newHeight };
       setNativeWidth(newWidth);
       setNativeHeight(newHeight);
-      commitShapes([{ id, kind: 'image', dataUrl, x: 0, y: 0, width: 1, height: 1, style: DEFAULT_STYLE }]);
+      editor.commitShapes([{ id, kind: 'image', dataUrl, x: 0, y: 0, width: 1, height: 1, style: DEFAULT_STYLE }]);
     } else {
       // Importing onto an existing drawing must not resize the canvas out from under it — fit the
       // image centered within the current canvas box at its own aspect ratio instead (shapeCanvasSize's
@@ -814,444 +489,9 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       const canvasAspect = canvasWidthPx / canvasHeightPx;
       const width = Math.min(1, aspect / canvasAspect);
       const height = Math.min(1, canvasAspect / aspect);
-      commitShapes([...shapes, { id, kind: 'image', dataUrl, x: (1 - width) / 2, y: (1 - height) / 2, width, height, style: DEFAULT_STYLE }]);
+      editor.commitShapes([...editor.shapes, { id, kind: 'image', dataUrl, x: (1 - width) / 2, y: (1 - height) / 2, width, height, style: DEFAULT_STYLE }]);
     }
-    setSelectedShapeIds(new Set([id]));
-  }
-
-  /** Screen px (viewport-relative) → world px (the artwork's own fixed canvasWidthPx/heightPx
-      box) → fraction, inverting the current view transform. Every caller keeps working purely
-      in 0–1 fraction space, unchanged by zoom/pan — only this screen→fraction conversion does.
-      `clamp` defaults to true (new content — a port, a drawn shape — always lands inside the
-      canvas/stamp bounds); pass false for anything that targets EXISTING geometry (select-tool
-      hit-testing, dragging/resizing/rotating/scaling a shape) so a shape that was scaled past the
-      bounds (still visibly drawn — nothing clips it) stays reachable by the pointer instead of
-      every click/drag past the edge silently landing on the boundary itself. */
-  function fractionFromEvent(clientX: number, clientY: number, clamp = true): { fractionX: number; fractionY: number } {
-    const rect = viewportRef.current!.getBoundingClientRect();
-    const screenX = clientX - rect.left;
-    const screenY = clientY - rect.top;
-    const worldX = (screenX - view.panX) / view.scale;
-    const worldY = (screenY - view.panY) / view.scale;
-    const fractionX = worldX / canvasWidthPx;
-    const fractionY = worldY / canvasHeightPx;
-    return clamp ? { fractionX: clamp01(fractionX), fractionY: clamp01(fractionY) } : { fractionX, fractionY };
-  }
-
-  function addPortAt(fractionX: number, fractionY: number) {
-    const id = crypto.randomUUID();
-    const x = gridSnapEnabled ? gridSnap(fractionX, GRID_SPACING_FRACTION) : fractionX;
-    const y = gridSnapEnabled ? gridSnap(fractionY, GRID_SPACING_FRACTION) : fractionY;
-    setPorts((prev) => [...prev, { id, name: `Port ${prev.length + 1}`, fractionX: x, fractionY: y }]);
-  }
-
-
-  function handleShapesCanvasPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
-    const start = fractionFromEvent(event.clientX, event.clientY);
-
-    if (tool === 'port') {
-      addPortAt(start.fractionX, start.fractionY);
-      return;
-    }
-
-    if (tool === 'text') {
-      const shape: SymbolShape = { id: crypto.randomUUID(), kind: 'text', x: start.fractionX, y: start.fractionY, text: 'Label', fontSize: 0.08, style: defaultStyle };
-      commitShapes([...shapes, shape]);
-      setSelectedShapeIds(new Set([shape.id]));
-      setEditingTextId(shape.id);
-      setEditingTextValue('Label');
-      setTool('select');
-      return;
-    }
-
-    if (tool === 'polygon') {
-      // Clicking back near the first vertex closes the polygon instead of requiring a double-click
-      // — the intuitive "close the loop" gesture. Needs at least 3 vertices placed already so this
-      // click isn't just re-clicking the first point of a still-open 1- or 2-point draft.
-      if (polygonDraft && polygonDraft.length >= 3) {
-        const first = polygonDraft[0];
-        const closePx = Math.hypot((start.fractionX - first.fractionX) * canvasWidthPx, (start.fractionY - first.fractionY) * canvasHeightPx);
-        if (closePx <= POLYGON_CLOSE_HIT_RADIUS_PX / view.scale) {
-          finishPolygon(polygonDraft);
-          return;
-        }
-      }
-      setPolygonDraft(polygonDraft ? [...polygonDraft, start] : [start]);
-      return;
-    }
-
-    if (tool === 'arcThreePoint') {
-      const nextPoints = arcThreePointDraft ? [...arcThreePointDraft, start] : [start];
-      if (nextPoints.length < 3) {
-        setArcThreePointDraft(nextPoints);
-        return;
-      }
-      // Click order is start, end, then a point the arc bulges toward (sets the radius) —
-      // arcFromThreePoints's own (start, end, through) parameter order, so no reordering needed.
-      const arc = arcFromThreePoints(nextPoints[0], nextPoints[1], nextPoints[2], defaultStyle, canvasWidthPx, canvasHeightPx);
-      setArcThreePointDraft(null);
-      setPendingPoint(null);
-      if (arc) {
-        commitShapes([...shapes, arc]);
-        setSelectedShapeIds(new Set([arc.id]));
-        setTool('select');
-      }
-      return;
-    }
-
-    if (tool === 'select') {
-      // Unclamped — a shape scaled past the canvas/stamp bounds is still drawn (nothing clips it),
-      // so selecting/dragging/resizing it needs the click's true position, not one pinned to the
-      // [0,1] edge. Shadows the outer (clamped) `start` for the rest of this block only; every other
-      // tool above still places new content — port/text/shape — clamped inside the bounds.
-      const start = fractionFromEvent(event.clientX, event.clientY, false);
-      const canvasEl = event.currentTarget;
-      // Hit-test order (§4): rotate handle → geometry handle (single selection only) → shape-body drag → marquee.
-      const selectedForRotate = shapes.filter((s) => selectedShapeIds.has(s.id));
-      const handle = rotateHandlePosition(selectedForRotate, canvasWidthPx, canvasHeightPx, view.scale);
-      if (handle) {
-        const handlePxX = handle.x * canvasWidthPx;
-        const handlePxY = handle.y * canvasHeightPx;
-        const clickPxX = start.fractionX * canvasWidthPx;
-        const clickPxY = start.fractionY * canvasHeightPx;
-        if (Math.hypot(clickPxX - handlePxX, clickPxY - handlePxY) <= (ROTATE_HANDLE_RADIUS_PX + 3) / view.scale) {
-          const pivot = selectionPivot(selectedForRotate, canvasWidthPx, canvasHeightPx);
-          const pivotPxX = pivot.x * canvasWidthPx;
-          const pivotPxY = pivot.y * canvasHeightPx;
-          const startAngle = Math.atan2(clickPxY - pivotPxY, clickPxX - pivotPxX);
-          const move = (ev: PointerEvent) => {
-            const current = fractionFromEvent(ev.clientX, ev.clientY, false);
-            const currentPxX = current.fractionX * canvasWidthPx;
-            const currentPxY = current.fractionY * canvasHeightPx;
-            const currentAngle = Math.atan2(currentPxY - pivotPxY, currentPxX - pivotPxX);
-            const delta = currentAngle - startAngle;
-            setDraftShapes(selectedForRotate.map((s) => rotateShapeAround(s, delta, pivot.x, pivot.y)));
-          };
-          const up = () => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            setDraftShapes((current) => {
-              if (current) {
-                const currentById = new Map(current.map((s) => [s.id, s]));
-                commitShapes(shapes.map((s) => currentById.get(s.id) ?? s));
-              }
-              return null;
-            });
-          };
-          window.addEventListener('pointermove', move);
-          window.addEventListener('pointerup', up);
-          return;
-        }
-      }
-
-      // Scale handle hit test — multi-shape selections only (scaleHandlePosition returns null for
-      // 0/1 shapes; a single shape already has its own per-kind resize handles below). factor is a
-      // pixel-space distance ratio from the pivot captured once at drag-start (never re-derived from
-      // the shrinking/growing draft), same anchor-captured-once discipline as every other handle here.
-      if (selectedForRotate.length > 1) {
-        const sHandle = scaleHandlePosition(selectedForRotate, canvasWidthPx, canvasHeightPx);
-        if (sHandle) {
-          const handlePxX = sHandle.x * canvasWidthPx;
-          const handlePxY = sHandle.y * canvasHeightPx;
-          const clickPxX = start.fractionX * canvasWidthPx;
-          const clickPxY = start.fractionY * canvasHeightPx;
-          if (Math.hypot(clickPxX - handlePxX, clickPxY - handlePxY) <= SCALE_HANDLE_HIT_RADIUS_PX / view.scale) {
-            const pivot = selectionPivot(selectedForRotate, canvasWidthPx, canvasHeightPx);
-            const pivotPxX = pivot.x * canvasWidthPx;
-            const pivotPxY = pivot.y * canvasHeightPx;
-            const startDistPx = Math.max(1, Math.hypot(handlePxX - pivotPxX, handlePxY - pivotPxY));
-            const move = (ev: PointerEvent) => {
-              const current = fractionFromEvent(ev.clientX, ev.clientY, false);
-              const currentPxX = current.fractionX * canvasWidthPx;
-              const currentPxY = current.fractionY * canvasHeightPx;
-              const currentDistPx = Math.hypot(currentPxX - pivotPxX, currentPxY - pivotPxY);
-              const factor = Math.max(0.02, currentDistPx / startDistPx);
-              setDraftShapes(selectedForRotate.map((s) => scaleShape(s, factor, pivot.x, pivot.y)));
-            };
-            const up = () => {
-              window.removeEventListener('pointermove', move);
-              window.removeEventListener('pointerup', up);
-              setDraftShapes((current) => {
-                if (current) {
-                  const currentById = new Map(current.map((s) => [s.id, s]));
-                  commitShapes(shapes.map((s) => currentById.get(s.id) ?? s));
-                }
-                return null;
-              });
-            };
-            window.addEventListener('pointermove', move);
-            window.addEventListener('pointerup', up);
-            return;
-          }
-        }
-      }
-
-      // Geometry (resize/reshape) handle hit test — only when exactly one shape is selected.
-      // originalShape is captured once here and passed unchanged to every applyHandleDrag call
-      // in `move`, never re-derived from the mutating draft — the §4.1 fix.
-      if (selectedForRotate.length === 1) {
-        const originalShape = selectedForRotate[0];
-        const hitRadius = GEOMETRY_HANDLE_HIT_RADIUS_PX / view.scale;
-        const hitHandle = shapeHandles(originalShape, canvasWidthPx, canvasHeightPx).find(
-          (h) => Math.hypot(h.x * canvasWidthPx - start.fractionX * canvasWidthPx, h.y * canvasHeightPx - start.fractionY * canvasHeightPx) <= hitRadius,
-        );
-        if (hitHandle) {
-          canvasEl.setPointerCapture(event.pointerId);
-          // Arc start/end handles need their sweep clamped continuously frame-to-frame (see
-          // applyHandleDrag's sweepReference doc comment) rather than against the drag-start
-          // snapshot alone — chained forward here as each move's own result feeds the next.
-          let sweepReference = originalShape.kind === 'arc' ? normalizeAngle(originalShape.endAngle - originalShape.startAngle) : undefined;
-          const move = (ev: PointerEvent) => {
-            const current = fractionFromEvent(ev.clientX, ev.clientY, false);
-            let point = { x: current.fractionX, y: current.fractionY };
-            // Angle snap only for a line/arrow endpoint handle — a "fixed point + moving point" drag.
-            if (angleSnapEnabled && (originalShape.kind === 'line' || originalShape.kind === 'arrow')) {
-              const fixed = hitHandle.id === 'p1' ? { x: originalShape.x2, y: originalShape.y2 } : { x: originalShape.x1, y: originalShape.y1 };
-              point = angleSnap(fixed, point, angleSnapDegrees);
-            }
-            // Object/endpoint snap takes priority over grid snap — an exact geometric match beats a rounded-to-grid guess (§6.3).
-            let indicator: { x: number; y: number } | null = null;
-            if (objectSnapEnabled) {
-              const candidates = collectSnapPoints(shapes, originalShape.id);
-              const snapped = findNearestSnapPoint(point, candidates, canvasWidthPx, canvasHeightPx, OBJECT_SNAP_THRESHOLD_PX / view.scale);
-              if (snapped) {
-                point = snapped;
-                indicator = snapped;
-              }
-            }
-            if (!indicator && gridSnapEnabled) {
-              point = { x: gridSnap(point.x, GRID_SPACING_FRACTION), y: gridSnap(point.y, GRID_SPACING_FRACTION) };
-            }
-            setSnapIndicator(indicator);
-            const draftShape = applyHandleDrag(originalShape, hitHandle.id, point, canvasWidthPx, canvasHeightPx, sweepReference);
-            if (sweepReference !== undefined && draftShape.kind === 'arc') sweepReference = normalizeAngle(draftShape.endAngle - draftShape.startAngle);
-            setDraftShapes([draftShape]);
-          };
-          const up = () => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            canvasEl.releasePointerCapture(event.pointerId);
-            setSnapIndicator(null);
-            setDraftShapes((current) => {
-              if (current) {
-                const currentById = new Map(current.map((s) => [s.id, s]));
-                commitShapes(shapes.map((s) => currentById.get(s.id) ?? s));
-              }
-              return null;
-            });
-          };
-          window.addEventListener('pointermove', move);
-          window.addEventListener('pointerup', up);
-          return;
-        }
-      }
-
-      const hit = hitTestSymbolShape(shapes, start.fractionX, start.fractionY, canvasWidthPx, canvasHeightPx, 6 / view.scale);
-      if (hit) {
-        if (event.shiftKey) {
-          setSelectedShapeIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(hit.id)) next.delete(hit.id);
-            else next.add(hit.id);
-            return next;
-          });
-          return; // shift-click only toggles membership, no drag — matches scene.ts's shift-click convention
-        }
-        // Clicking a shape already in a multi-selection keeps the whole group selected
-        // (so it can be group-dragged); clicking outside it replaces the selection.
-        const dragIds = selectedShapeIds.has(hit.id) ? selectedShapeIds : new Set([hit.id]);
-        setSelectedShapeIds(dragIds);
-        const dragShapes = shapes.filter((s) => dragIds.has(s.id));
-        const move = (ev: PointerEvent) => {
-          let current = fractionFromEvent(ev.clientX, ev.clientY, false);
-          if (gridSnapEnabled) {
-            current = { fractionX: gridSnap(current.fractionX, GRID_SPACING_FRACTION), fractionY: gridSnap(current.fractionY, GRID_SPACING_FRACTION) };
-          }
-          const dx = current.fractionX - start.fractionX;
-          const dy = current.fractionY - start.fractionY;
-          setDraftShapes(dragShapes.map((s) => translateShape(s, dx, dy)));
-        };
-        const up = () => {
-          window.removeEventListener('pointermove', move);
-          window.removeEventListener('pointerup', up);
-          setDraftShapes((current) => {
-            if (current) {
-              const currentById = new Map(current.map((s) => [s.id, s]));
-              commitShapes(shapes.map((s) => currentById.get(s.id) ?? s));
-            }
-            return null;
-          });
-        };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-        return;
-      }
-
-      // Empty canvas: marquee-select. Non-additive click clears the current selection immediately.
-      if (!event.shiftKey) setSelectedShapeIds(new Set());
-      setMarquee({ start, current: start, additive: event.shiftKey });
-      const move = (ev: PointerEvent) => {
-        const current = fractionFromEvent(ev.clientX, ev.clientY, false);
-        setMarquee((prev) => (prev ? { ...prev, current } : prev));
-      };
-      const up = () => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        setMarquee((prev) => {
-          if (prev) {
-            const minX = Math.min(prev.start.fractionX, prev.current.fractionX);
-            const maxX = Math.max(prev.start.fractionX, prev.current.fractionX);
-            const minY = Math.min(prev.start.fractionY, prev.current.fractionY);
-            const maxY = Math.max(prev.start.fractionY, prev.current.fractionY);
-            // A shape counts as inside if its bounds midpoint falls inside the marquee
-            // rectangle — same rule as the old app's rubber-band select, not full overlap.
-            const hitIds = shapes
-              .filter((s) => {
-                const b = symbolShapeBounds(s, canvasWidthPx, canvasHeightPx);
-                const midX = b.x + b.width / 2;
-                const midY = b.y + b.height / 2;
-                return midX >= minX && midX <= maxX && midY >= minY && midY <= maxY;
-              })
-              .map((s) => s.id);
-            setSelectedShapeIds((prevIds) => (prev.additive ? new Set([...prevIds, ...hitIds]) : new Set(hitIds)));
-          }
-          return null;
-        });
-      };
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-      return;
-    }
-
-    // Drag-to-create: line, rect, circle, arc.
-    const id = crypto.randomUUID();
-    let draft = createDraftShape(tool, id, start, defaultStyle);
-    setDraftShapes([draft]);
-    const move = (ev: PointerEvent) => {
-      let current = fractionFromEvent(ev.clientX, ev.clientY);
-      let point = { x: current.fractionX, y: current.fractionY };
-      if (angleSnapEnabled && (tool === 'line' || tool === 'arrow')) {
-        point = angleSnap({ x: start.fractionX, y: start.fractionY }, point, angleSnapDegrees);
-      }
-      if (gridSnapEnabled) {
-        point = { x: gridSnap(point.x, GRID_SPACING_FRACTION), y: gridSnap(point.y, GRID_SPACING_FRACTION) };
-      }
-      current = { fractionX: point.x, fractionY: point.y };
-      draft = updateDraftShape(draft, start, current);
-      setDraftShapes([draft]);
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      if (isDraftLargeEnough(draft)) {
-        commitShapes([...shapes, draft]);
-        setSelectedShapeIds(new Set([draft.id]));
-        setTool('select');
-      }
-      setDraftShapes(null);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }
-
-  function handleShapesCanvasPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
-    if ((tool === 'polygon' && polygonDraft) || (tool === 'arcThreePoint' && arcThreePointDraft)) {
-      setPendingPoint(fractionFromEvent(event.clientX, event.clientY));
-    }
-  }
-
-  function handleShapesCanvasDoubleClick(event: MouseEvent<HTMLCanvasElement>) {
-    if (tool === 'polygon') {
-      // The dblclick's own two constituent pointerdowns each already appended a point (there's no
-      // reliable native signal at pointerdown time to know a dblclick is coming) — drop the last one,
-      // a near-duplicate of the true final vertex, before finishing.
-      finishPolygon(polygonDraft && polygonDraft.length > 1 ? polygonDraft.slice(0, -1) : polygonDraft);
-      return;
-    }
-    if (tool === 'select') {
-      const { fractionX, fractionY } = fractionFromEvent(event.clientX, event.clientY, false);
-      const hit = hitTestSymbolShape(shapes, fractionX, fractionY, canvasWidthPx, canvasHeightPx, 6 / view.scale);
-      if (hit && hit.kind === 'text') {
-        setSelectedShapeIds(new Set([hit.id]));
-        setEditingTextId(hit.id);
-        setEditingTextValue(hit.text);
-      }
-    }
-  }
-
-  function commitTextEdit() {
-    if (editingTextId && editingTextValue.trim()) {
-      const trimmed = editingTextValue.trim();
-      commitShapes(shapes.map((s) => (s.id === editingTextId && s.kind === 'text' ? { ...s, text: trimmed } : s)));
-    }
-    setEditingTextId(null);
-  }
-
-  function linkPorts(a: string, b: string) {
-    setGroups((prev) => {
-      const groupA = prev.find((g) => g.includes(a));
-      const groupB = prev.find((g) => g.includes(b));
-      if (groupA && groupA === groupB) return prev; // already linked
-      if (groupA && groupB) return [...prev.filter((g) => g !== groupA && g !== groupB), [...new Set([...groupA, ...groupB])]];
-      if (groupA) return prev.map((g) => (g === groupA ? [...g, b] : g));
-      if (groupB) return prev.map((g) => (g === groupB ? [...g, a] : g));
-      return [...prev, [a, b]];
-    });
-  }
-
-  function handlePortPointerDown(event: ReactPointerEvent<HTMLDivElement>, portId: string) {
-    event.stopPropagation();
-    if (linkMode) {
-      if (!linkFirstPortId) {
-        setLinkFirstPortId(portId);
-      } else if (linkFirstPortId === portId) {
-        setLinkFirstPortId(null);
-      } else {
-        linkPorts(linkFirstPortId, portId);
-        setLinkFirstPortId(null);
-      }
-      return;
-    }
-    const move = (ev: PointerEvent) => {
-      const current = fractionFromEvent(ev.clientX, ev.clientY);
-      const fractionX = gridSnapEnabled ? gridSnap(current.fractionX, GRID_SPACING_FRACTION) : current.fractionX;
-      const fractionY = gridSnapEnabled ? gridSnap(current.fractionY, GRID_SPACING_FRACTION) : current.fractionY;
-      setPorts((prev) => prev.map((p) => (p.id === portId ? { ...p, fractionX, fractionY } : p)));
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }
-
-  function handlePortDoubleClick(event: MouseEvent<HTMLDivElement>, port: PortSpec) {
-    event.stopPropagation();
-    setEditingPortId(port.id);
-    setEditPortName(port.name);
-  }
-
-  function commitPortRename() {
-    if (editingPortId && editPortName.trim()) {
-      const trimmed = editPortName.trim();
-      setPorts((prev) => prev.map((p) => (p.id === editingPortId ? { ...p, name: trimmed } : p)));
-    }
-    setEditingPortId(null);
-  }
-
-  function removePort(id: string) {
-    setPorts((prev) => prev.filter((p) => p.id !== id));
-    setGroups((prev) => prev.map((g) => g.filter((pid) => pid !== id)).filter((g) => g.length >= 2));
-    if (linkFirstPortId === id) setLinkFirstPortId(null);
-  }
-
-  function ungroup(index: number) {
-    setGroups((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function portName(id: string): string {
-    return ports.find((p) => p.id === id)?.name ?? id;
+    editor.setSelectedShapeIds(new Set([id]));
   }
 
   /** Built definition awaiting the user's confirm/cancel on the Name-collision prompt below — its
@@ -1273,13 +513,13 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       setError('Width and height are required.');
       return null;
     }
-    if (shapes.length === 0) {
+    if (editor.shapes.length === 0) {
       setError('Draw at least one shape, or import an image.');
       return null;
     }
     const widthPx = (nativeWidth / 72) * STAMP_SOURCE_DPI;
     const heightPx = (nativeHeight / 72) * STAMP_SOURCE_DPI;
-    const iconRef = await rasterizeSymbolShapes(shapes, widthPx, heightPx);
+    const iconRef = await rasterizeSymbolShapes(editor.shapes, widthPx, heightPx);
     return {
       id: definition?.id ?? crypto.randomUUID(),
       label: name.trim(),
@@ -1287,11 +527,11 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       category,
       nativeWidth,
       nativeHeight,
-      ports,
+      ports: portsEditor.ports,
       iconRef,
       source: 'custom',
-      definitionPortGroups: groups.length > 0 ? groups : undefined,
-      shapes,
+      definitionPortGroups: portsEditor.groups.length > 0 ? portsEditor.groups : undefined,
+      shapes: editor.shapes,
     };
   }
 
@@ -1330,8 +570,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     setPendingOverwrite(null);
   }
 
-  const editingPort = editingPortId ? ports.find((p) => p.id === editingPortId) : undefined;
-  const editingTextShape = editingTextId ? shapes.find((s) => s.id === editingTextId) : undefined;
+  const editingTextShape = editor.editingTextShape;
 
   return (
     <Dialog
@@ -1433,16 +672,16 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
               {SHAPE_TOOLS.map(({ tool: t, label }) => {
                 const Icon = SHAPE_TOOL_ICONS[t];
                 return (
-                  <button key={t} type="button" className={`mep-rail-btn${tool === t ? ' active' : ''}`} title={label} onClick={() => setTool(t)}>
+                  <button key={t} type="button" className={`mep-rail-btn${editor.tool === t ? ' active' : ''}`} title={label} onClick={() => editor.setTool(t)}>
                     <Icon size={18} />
                   </button>
                 );
               })}
               <div className="mep-rail-divider" />
-              <button type="button" className="mep-rail-btn" title="Undo" disabled={!shapesManager.canUndo} onClick={undoShapes}>
+              <button type="button" className="mep-rail-btn" title="Undo" disabled={!editor.shapesManager.canUndo} onClick={editor.undoShapes}>
                 <IconUndo size={18} />
               </button>
-              <button type="button" className="mep-rail-btn" title="Redo" disabled={!shapesManager.canRedo} onClick={redoShapes}>
+              <button type="button" className="mep-rail-btn" title="Redo" disabled={!editor.shapesManager.canRedo} onClick={editor.redoShapes}>
                 <IconRedo size={18} />
               </button>
             </div>
@@ -1451,63 +690,81 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           <div className="mep-ee-canvas-col" style={{ gridColumn: '2 / 3' }}>
             <div
               className="mep-element-editor-preview"
-              ref={viewportRef}
-              onPointerDown={handleViewportPointerDown}
+              ref={editor.viewportRef}
+              onPointerDown={editor.handleViewportPointerDown}
               onContextMenu={(e) => e.preventDefault()}
             >
-              <canvas ref={shapesCanvasRef} onPointerDown={handleShapesCanvasPointerDown} onPointerMove={handleShapesCanvasPointerMove} onDoubleClick={handleShapesCanvasDoubleClick} />
+              <svg className="mep-ee-shapes-svg" onPointerDown={editor.handleCanvasPointerDown} onPointerMove={editor.handleCanvasPointerMove} onDoubleClick={editor.handleCanvasDoubleClick}>
+                {/* Full-viewport transparent hit target — an <svg> only reports pointer events where
+                    something is "painted" (pointer-events: visiblePainted, the default), unlike an
+                    HTML <canvas> which is hit-testable across its whole box regardless of pixel
+                    content. Outside the pan/zoom <g> below, so it always covers the full viewport
+                    regardless of pan/zoom state, matching the canvas's old inset:0/100%/100%
+                    coverage — same trick the schematic mockup's own SVG editor uses for its block
+                    drag handles (mockup.html's hitEl). */}
+                <rect x={0} y={0} width="100%" height="100%" fill="transparent" />
+                {/* Shapes and all chrome are pointer-events:none (inherited by every descendant) so
+                    every click/drag funnels through this <svg>'s own handlers above, doing the same
+                    manual fractionFromEvent + hitTestSymbolShape hit-testing the Canvas2D canvas did
+                    — never native SVG per-element hit-testing, which would behave differently (e.g.
+                    an unfilled shape's interior wouldn't be clickable the way hitTestSymbolShape's
+                    tolerance-based edge test makes it clickable today). */}
+                <g pointerEvents="none" transform={`translate(${editor.view.panX} ${editor.view.panY}) scale(${editor.view.scale})`}>
+                  {chrome}
+                </g>
+              </svg>
               <div
                 className="mep-ee-artwork"
-                style={{ width: canvasWidthPx, height: canvasHeightPx, transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.scale})` }}
+                style={{ width: canvasWidthPx, height: canvasHeightPx, transform: `translate(${editor.view.panX}px, ${editor.view.panY}px) scale(${editor.view.scale})` }}
               >
-                {ports.map((port) => (
+                {portsEditor.ports.map((port) => (
                   <div
                     key={port.id}
-                    className={`mep-element-editor-port${linkMode && linkFirstPortId === port.id ? ' selected' : ''}`}
+                    className={`mep-element-editor-port${portsEditor.linkMode && portsEditor.linkFirstPortId === port.id ? ' selected' : ''}`}
                     style={{ left: `${port.fractionX * 100}%`, top: `${port.fractionY * 100}%` }}
-                    onPointerDown={(e) => handlePortPointerDown(e, port.id)}
+                    onPointerDown={(e) => portsEditor.handlePortPointerDown(e, port.id)}
                     onClick={(e) => e.stopPropagation()}
-                    onDoubleClick={(e) => handlePortDoubleClick(e, port)}
+                    onDoubleClick={(e) => portsEditor.handlePortDoubleClick(e, port)}
                     title={port.name}
                   >
                     <span className="mep-element-editor-port-label">{port.name}</span>
                   </div>
                 ))}
-                {editingPort && (
+                {portsEditor.editingPort && (
                   <input
                     autoFocus
                     className="mep-element-editor-port-rename"
                     style={{
-                      left: `${editingPort.fractionX * 100}%`,
-                      top: `${editingPort.fractionY * 100}%`,
-                      transform: `scale(${1 / view.scale}) translate(-50%, -140%)`,
+                      left: `${portsEditor.editingPort.fractionX * 100}%`,
+                      top: `${portsEditor.editingPort.fractionY * 100}%`,
+                      transform: `scale(${1 / editor.view.scale}) translate(-50%, -140%)`,
                     }}
-                    value={editPortName}
+                    value={portsEditor.editPortName}
                     onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setEditPortName(e.target.value)}
-                    onBlur={commitPortRename}
+                    onChange={(e) => portsEditor.setEditPortName(e.target.value)}
+                    onBlur={portsEditor.commitPortRename}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitPortRename();
-                      if (e.key === 'Escape') setEditingPortId(null);
+                      if (e.key === 'Enter') portsEditor.commitPortRename();
+                      if (e.key === 'Escape') portsEditor.setEditingPortId(null);
                     }}
                   />
                 )}
-                {editingTextShape && editingTextShape.kind === 'text' && (
+                {editingTextShape && (
                   <input
                     ref={textRenameRef}
                     className="mep-element-editor-port-rename"
                     style={{
                       left: `${editingTextShape.x * 100}%`,
                       top: `${editingTextShape.y * 100}%`,
-                      transform: `scale(${1 / view.scale}) translate(-50%, -140%)`,
+                      transform: `scale(${1 / editor.view.scale}) translate(-50%, -140%)`,
                     }}
-                    value={editingTextValue}
+                    value={editor.editingTextValue}
                     onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setEditingTextValue(e.target.value)}
-                    onBlur={commitTextEdit}
+                    onChange={(e) => editor.setEditingTextValue(e.target.value)}
+                    onBlur={editor.commitTextEdit}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitTextEdit();
-                      if (e.key === 'Escape') setEditingTextId(null);
+                      if (e.key === 'Enter') editor.commitTextEdit();
+                      if (e.key === 'Escape') editor.setEditingTextId(null);
                     }}
                   />
                 )}
@@ -1519,20 +776,20 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
             {activeTab === 'ports' && (
               <>
                 <p className="mep-hint">Use the Port tool on the Shapes tab to add a port. Drag a port to move it. Double-click a port to rename it.</p>
-                {ports.length > 0 && (
+                {portsEditor.ports.length > 0 && (
                   <div className="mep-section">
                     <h4>Ports</h4>
-                    {ports.map((port) => (
+                    {portsEditor.ports.map((port) => (
                       <div className="mep-port-list-row" key={port.id}>
-                        <input value={port.name} onChange={(e) => setPorts((prev) => prev.map((p) => (p.id === port.id ? { ...p, name: e.target.value } : p)))} />
-                        <button type="button" className="mep-property-row-remove" onClick={() => removePort(port.id)} title="Remove port">
+                        <input value={port.name} onChange={(e) => portsEditor.setPorts((prev) => prev.map((p) => (p.id === port.id ? { ...p, name: e.target.value } : p)))} />
+                        <button type="button" className="mep-property-row-remove" onClick={() => portsEditor.removePort(port.id)} title="Remove port">
                           ✕
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
-                {ports.length >= 2 && (
+                {portsEditor.ports.length >= 2 && (
                   <div className="mep-section">
                     <h4>Linked Ports</h4>
                     <p className="mep-hint">
@@ -1541,21 +798,21 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
                     </p>
                     <button
                       type="button"
-                      className={linkMode ? 'on' : ''}
+                      className={portsEditor.linkMode ? 'on' : ''}
                       onClick={() => {
-                        setLinkMode(!linkMode);
-                        setLinkFirstPortId(null);
+                        portsEditor.setLinkMode(!portsEditor.linkMode);
+                        portsEditor.setLinkFirstPortId(null);
                       }}
                     >
-                      {linkMode ? 'Done linking' : 'Link ports…'}
+                      {portsEditor.linkMode ? 'Done linking' : 'Link ports…'}
                     </button>
-                    {linkMode && <p className="mep-hint">Click two ports above to link them.</p>}
-                    {groups.length > 0 && (
+                    {portsEditor.linkMode && <p className="mep-hint">Click two ports above to link them.</p>}
+                    {portsEditor.groups.length > 0 && (
                       <div style={{ marginTop: 8 }}>
-                        {groups.map((group, i) => (
+                        {portsEditor.groups.map((group, i) => (
                           <span className="mep-port-group-chip" key={i}>
-                            {group.map(portName).join(' + ')}
-                            <button type="button" className="mep-property-row-remove" onClick={() => ungroup(i)} title="Ungroup">
+                            {group.map(portsEditor.portName).join(' + ')}
+                            <button type="button" className="mep-property-row-remove" onClick={() => portsEditor.ungroup(i)} title="Ungroup">
                               ✕
                             </button>
                           </span>
@@ -1574,7 +831,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           <div className="mep-ee-bar">
             <div className="mep-ee-bar-cluster mep-shape-style-row">
               <label>
-                Stroke <ColorPicker value={activeStyle.stroke} onChange={(color) => updateActiveStyle({ stroke: color })} />
+                Stroke <ColorPicker value={editor.activeStyle.stroke} onChange={(color) => editor.updateActiveStyle({ stroke: color })} />
               </label>
               <label>
                 Width{' '}
@@ -1583,32 +840,32 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
                   min={0.002}
                   max={0.05}
                   step={0.002}
-                  value={activeStyle.strokeWidth}
-                  onChange={(e) => updateActiveStyle({ strokeWidth: Number(e.target.value) })}
+                  value={editor.activeStyle.strokeWidth}
+                  onChange={(e) => editor.updateActiveStyle({ strokeWidth: Number(e.target.value) })}
                   style={{ width: 56 }}
                 />
               </label>
               <label>
-                <input type="checkbox" checked={activeStyle.fill !== null} onChange={(e) => updateActiveStyle({ fill: e.target.checked ? activeStyle.stroke : null })} /> Fill
+                <input type="checkbox" checked={editor.activeStyle.fill !== null} onChange={(e) => editor.updateActiveStyle({ fill: e.target.checked ? editor.activeStyle.stroke : null })} /> Fill
               </label>
-              {activeStyle.fill !== null && <ColorPicker value={activeStyle.fill} onChange={(color) => updateActiveStyle({ fill: color })} />}
+              {editor.activeStyle.fill !== null && <ColorPicker value={editor.activeStyle.fill} onChange={(color) => editor.updateActiveStyle({ fill: color })} />}
             </div>
             <div className="mep-ee-bar-divider" />
             <div className="mep-ee-bar-cluster">
-              <button type="button" className="mep-rail-btn" onClick={duplicateSelection} disabled={selectedShapes.length === 0} title="Duplicate">
+              <button type="button" className="mep-rail-btn" onClick={editor.duplicateSelection} disabled={editor.selectedShapes.length === 0} title="Duplicate">
                 <IconCopy size={18} />
               </button>
-              <button type="button" className="mep-rail-btn" onClick={rotateSelection90} disabled={selectedShapes.length === 0} title="Rotate 90°">
+              <button type="button" className="mep-rail-btn" onClick={editor.rotateSelection90} disabled={editor.selectedShapes.length === 0} title="Rotate 90°">
                 <IconRotate size={18} />
               </button>
-              <button type="button" className="mep-rail-btn" onClick={() => mirrorSelection('horizontal')} disabled={selectedShapes.length === 0} title="Mirror horizontally">
+              <button type="button" className="mep-rail-btn" onClick={() => editor.mirrorSelection('horizontal')} disabled={editor.selectedShapes.length === 0} title="Mirror horizontally">
                 <IconMirror size={18} />
               </button>
               <button
                 type="button"
                 className="mep-rail-btn"
-                onClick={() => mirrorSelection('vertical')}
-                disabled={selectedShapes.length === 0}
+                onClick={() => editor.mirrorSelection('vertical')}
+                disabled={editor.selectedShapes.length === 0}
                 title="Mirror vertically"
               >
                 <IconMirror size={18} style={{ transform: 'rotate(90deg)' }} />
@@ -1619,48 +876,48 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
                   type="number"
                   min={1}
                   style={{ width: 48 }}
-                  value={scalePercentInput}
-                  disabled={selectedShapes.length === 0}
-                  onChange={(e) => setScalePercentInput(e.target.value)}
-                  onBlur={applyScalePercent}
+                  value={editor.scalePercentInput}
+                  disabled={editor.selectedShapes.length === 0}
+                  onChange={(e) => editor.setScalePercentInput(e.target.value)}
+                  onBlur={editor.applyScalePercent}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') applyScalePercent();
+                    if (e.key === 'Enter') editor.applyScalePercent();
                   }}
                 />
                 %
               </label>
-              <button type="button" className="mep-rail-btn" onClick={bringSelectionToFront} disabled={selectedShapes.length === 0} title="Bring to front">
+              <button type="button" className="mep-rail-btn" onClick={editor.bringSelectionToFront} disabled={editor.selectedShapes.length === 0} title="Bring to front">
                 <IconBringToFront size={18} />
               </button>
-              <button type="button" className="mep-rail-btn" onClick={sendSelectionToBack} disabled={selectedShapes.length === 0} title="Send to back">
+              <button type="button" className="mep-rail-btn" onClick={editor.sendSelectionToBack} disabled={editor.selectedShapes.length === 0} title="Send to back">
                 <IconSendToBack size={18} />
               </button>
-              <button type="button" className="mep-rail-btn" onClick={deleteSelectedShapes} disabled={selectedShapes.length === 0} title="Delete">
+              <button type="button" className="mep-rail-btn" onClick={editor.deleteSelectedShapes} disabled={editor.selectedShapes.length === 0} title="Delete">
                 <IconTrash size={18} />
               </button>
             </div>
             <div className="mep-ee-bar-divider" />
             <div className="mep-ee-bar-cluster">
-              <button type="button" className="mep-rail-btn" onClick={() => zoomAtScreenPoint(1 / ZOOM_STEP, { x: viewportSize.width / 2, y: viewportSize.height / 2 })} title="Zoom out">
+              <button type="button" className="mep-rail-btn" onClick={() => editor.zoomAtScreenPoint(1 / ZOOM_STEP, { x: editor.viewportSize.width / 2, y: editor.viewportSize.height / 2 })} title="Zoom out">
                 <IconMinus size={16} />
               </button>
-              <span className="mep-ee-zoom-readout">{Math.round(view.scale * 100)}%</span>
-              <button type="button" className="mep-rail-btn" onClick={() => zoomAtScreenPoint(ZOOM_STEP, { x: viewportSize.width / 2, y: viewportSize.height / 2 })} title="Zoom in">
+              <span className="mep-ee-zoom-readout">{Math.round(editor.view.scale * 100)}%</span>
+              <button type="button" className="mep-rail-btn" onClick={() => editor.zoomAtScreenPoint(ZOOM_STEP, { x: editor.viewportSize.width / 2, y: editor.viewportSize.height / 2 })} title="Zoom in">
                 <IconPlus size={16} />
               </button>
-              <button type="button" className="mep-rail-btn" onClick={() => fitView()} title="Fit">
+              <button type="button" className="mep-rail-btn" onClick={() => editor.fitView()} title="Fit">
                 <IconZoomFit size={18} />
               </button>
             </div>
             <div className="mep-ee-bar-divider" />
             <div className="mep-ee-bar-cluster">
-              <button type="button" className={`mep-rail-btn${gridSnapEnabled ? ' active' : ''}`} onClick={() => setGridSnapEnabled((v) => !v)} title="Grid snap">
+              <button type="button" className={`mep-rail-btn${editor.gridSnapEnabled ? ' active' : ''}`} onClick={() => editor.setGridSnapEnabled((v) => !v)} title="Grid snap">
                 <IconGridSnap size={16} />
               </button>
-              <button type="button" className={`mep-rail-btn${objectSnapEnabled ? ' active' : ''}`} onClick={() => setObjectSnapEnabled((v) => !v)} title="Object snap">
+              <button type="button" className={`mep-rail-btn${editor.objectSnapEnabled ? ' active' : ''}`} onClick={() => editor.setObjectSnapEnabled((v) => !v)} title="Object snap">
                 <IconObjectSnap size={16} />
               </button>
-              <button type="button" className={`mep-rail-btn${angleSnapEnabled ? ' active' : ''}`} onClick={() => setAngleSnapEnabled((v) => !v)} title="Angle snap">
+              <button type="button" className={`mep-rail-btn${editor.angleSnapEnabled ? ' active' : ''}`} onClick={() => editor.setAngleSnapEnabled((v) => !v)} title="Angle snap">
                 <IconSnapAngle size={16} />
               </button>
               <input
@@ -1668,13 +925,13 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
                 min={1}
                 max={180}
                 className="mep-ee-angle-input"
-                value={angleSnapDegreesInput}
-                disabled={!angleSnapEnabled}
-                onChange={(e) => setAngleSnapDegreesInput(e.target.value)}
+                value={editor.angleSnapDegreesInput}
+                disabled={!editor.angleSnapEnabled}
+                onChange={(e) => editor.setAngleSnapDegreesInput(e.target.value)}
                 title="Angle snap increment (degrees)"
               />
             </div>
-            {singleSelectedShape?.kind === 'arc' && (
+            {editor.singleSelectedShape?.kind === 'arc' && (
               <>
                 <div className="mep-ee-bar-divider" />
                 <div className="mep-ee-bar-cluster">
@@ -1683,10 +940,10 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
                     <input
                       type="number"
                       style={{ width: 52 }}
-                      value={Math.round((singleSelectedShape.startAngle * 180) / Math.PI)}
+                      value={Math.round((editor.singleSelectedShape.startAngle * 180) / Math.PI)}
                       onChange={(e) =>
-                        commitShapes(
-                          shapes.map((s) => (s.id === singleSelectedShape.id && s.kind === 'arc' ? { ...s, startAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
+                        editor.commitShapes(
+                          editor.shapes.map((s) => (s.id === editor.singleSelectedShape!.id && s.kind === 'arc' ? { ...s, startAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
                         )
                       }
                     />
@@ -1696,10 +953,10 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
                     <input
                       type="number"
                       style={{ width: 52 }}
-                      value={Math.round((singleSelectedShape.endAngle * 180) / Math.PI)}
+                      value={Math.round((editor.singleSelectedShape.endAngle * 180) / Math.PI)}
                       onChange={(e) =>
-                        commitShapes(
-                          shapes.map((s) => (s.id === singleSelectedShape.id && s.kind === 'arc' ? { ...s, endAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
+                        editor.commitShapes(
+                          editor.shapes.map((s) => (s.id === editor.singleSelectedShape!.id && s.kind === 'arc' ? { ...s, endAngle: (Number(e.target.value) * Math.PI) / 180 } : s)),
                         )
                       }
                     />
