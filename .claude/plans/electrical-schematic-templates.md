@@ -351,9 +351,18 @@ Not done:
 
 Verified: `pnpm build` (9 of 9 tasks); `pnpm --filter @mepapp/core test` (327 tests) and `pnpm --filter @mepapp/ui test` (16 tests) pass. A real headless Chromium run (fork, on a preview build of this worktree) built a panel with 2 sections and 6 circuits (one spare, one with RCD, different phase, typed lengths, terminals of two kinds) through real clicks, then opened the dialog. Text in the SVG matched the entered data (labels A1 to A6, `B16/30mA`, `B2CA 3G2,5 mm²  l=27,5 m`, cells and totals). Both templates draw, zoom, pan, fit and Escape work, reopening after a change shows the new data, no console errors. The first run found the defects listed above; they were fixed and re-checked in the browser.
 
-### Phase 5 — Template editor — not started
+### Phase 5 — Template editor — in progress (started 2026-09-24)
 
 Place, rotate, and bind building blocks. Snap using ports. Edit a circuit group with sample data.
+
+Design (decided 2026-09-24):
+
+- **The editor canvas shows the generated schematic.** It calls `generateSchematic` on every change, so the user edits what the schematic view shows. Each generated block keeps `templateBlockId` and `groupId`, so a click selects the template block. A drag changes the template block's `x` and `y` by the drag distance, so every repeat moves together.
+- **Preview data.** A select picks a real panel or built-in sample data. The sample data has circuits in two sections, one spare, terminals with capacity, and one extra circuit for each `circuitType` or `circuitNumber` group rule.
+- **Where it lives.** Inside `SchematicDialog`, as an edit mode that replaces the view (no second modal). Built-in templates stay read-only: "Edit template" first makes a copy. Copies live in App state for the session. Saving them is Phase 6.
+- **Pure edit functions in `@mepapp/core`** (`schematic-template-edit.ts`), with vitest tests: add, remove, move, resize (rotation-aware), duplicate and reorder blocks; add, remove and reorder groups; set the direction of all groups; copy a template; a list of the fields a binding can use.
+- **Tools.** Select, drag, rotate handle, resize handle, grid snap (1 mm default), a draggable group anchor, undo and redo, a palette that adds a block by click, a properties panel (position, size, rotation, binding with an "insert field" list, style, load type filter, totals table rows), a group list (rule, pitch, name) and template settings (name, sheet size, decimal separator, direction).
+- **Not in this phase's first pass:** snapping to ports (blocks have no ports yet, so this becomes grid and edge alignment), free-drawn shapes (shared-drawing-tool Phase 3, added after the block editor works), saving (Phase 6).
 
 ### Phase 6 — Save and load templates, export — not started
 

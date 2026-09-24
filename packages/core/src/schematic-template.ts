@@ -216,7 +216,7 @@ export function validateSchematicTemplate(template: SchematicTemplate): string[]
     if (groupIds.has(group.id)) issues.push(`Group "${group.id}" reuses an id.`);
     groupIds.add(group.id);
     if (!(Number.isFinite(group.pitch) && group.pitch > 0)) issues.push(`Group "${group.id}" needs a pitch above zero.`);
-    if (group.direction !== template.groups[0].direction) issues.push(`Group "${group.id}" has direction "${group.direction}" but the first group has "${template.groups[0].direction}". All groups must have the same direction.`);
+    if (group.direction !== template.groups[0]?.direction) issues.push(`Group "${group.id}" has direction "${group.direction}" but the first group has "${template.groups[0]?.direction}". All groups must have the same direction.`);
     const groupBlockIds = new Set<string>();
     for (const block of group.blocks) validateBlock(block, `group "${group.id}"`, ['circuit'], groupBlockIds, issues);
   }

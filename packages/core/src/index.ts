@@ -17,6 +17,7 @@ export * from './schematic-expression.js';
 export * from './schematic-template.js';
 export * from './schematic-template-library.js';
 export * from './schematic-generator.js';
+export * from './schematic-template-edit.js';
 export * from './commands.js';
 export * from './schema.js';
 export * from './segmentTool.js';
