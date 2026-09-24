@@ -1277,12 +1277,27 @@ export class SketchScene {
     const scale = this.world.scale.x;
     const positionOf = (id: string): Vec2 | undefined => state.stamps[id]?.transform.position;
     for (const circuit of targets) {
+      if (circuit.id === this.circuitLinesFocus.circuitId) this.drawCircuitHalos(state, circuit, scale);
       const panel = circuit.panelId ? state.panels[circuit.panelId] : undefined;
       const lines = getCircuitConnectionLines(circuit, panel ? positionOf(panel.equipmentStampId) : undefined, positionOf);
       const color = getCircuitLineColor(circuit.id);
       for (const line of lines) {
         this.strokeDashedPolyline([line.from, line.to], 2 / scale, color, [7 / scale, 4 / scale], this.overlay);
       }
+    }
+  }
+
+  /** A solid ring around every member terminal of the circuit being worked on, in the circuit's line color — the tree's "show members" (electrical-circuits-model.md E5). A ring, not a canvas selection, because circuit selection and canvas selection are mutually exclusive. */
+  private drawCircuitHalos(state: DrawingState, circuit: Circuit, scale: number): void {
+    const color = getCircuitLineColor(circuit.id);
+    for (const terminalId of circuit.terminalIds) {
+      const stamp = state.stamps[terminalId];
+      if (!stamp) continue;
+      const corners = this.stampCornersWorld(stamp);
+      const cx = corners.reduce((sum, c) => sum + c.x, 0) / corners.length;
+      const cy = corners.reduce((sum, c) => sum + c.y, 0) / corners.length;
+      const radius = Math.max(...corners.map((c) => Math.hypot(c.x - cx, c.y - cy))) + 5 / scale;
+      this.overlay.circle(cx, cy, radius).stroke({ width: 2.5 / scale, color });
     }
   }
 
@@ -1333,8 +1348,18 @@ export class SketchScene {
     return id;
   }
 
+  /** Deletes a circuit; its terminals return to "in no circuit". One undo step. Raises a notice that says how many terminals were released — there is no confirm dialog, because Undo restores the circuit. */
   deleteCircuit(circuitId: string): void {
+    const state = this.doc.drawingHistory.getState();
+    const circuit = state.circuits[circuitId];
+    if (!circuit) return;
+    const label = getCircuitLabel(circuit, circuit.panelId ? state.panels[circuit.panelId] : undefined);
+    const count = circuit.terminalIds.length;
     this.withCircuit(circuitId, (c) => deleteCircuitCommand(c));
+    this.emitNotice(
+      circuit.isSpare ? `Deleted spare ${label}.` : `Deleted circuit ${label}. ${count} terminal${count === 1 ? '' : 's'} released.`,
+      'info',
+    );
   }
 
   /** Returns false on addTerminalToCircuitCommand's invalid preconditions: the terminal already belongs to a different circuit, or the target circuit is a spare. */

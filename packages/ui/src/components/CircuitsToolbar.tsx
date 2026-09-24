@@ -132,6 +132,18 @@ export function CircuitsToolbar({
           >
             Remove from circuit
           </button>
+          <button
+            type="button"
+            disabled={toolRunning || !current}
+            title={current ? 'Delete this circuit. Its terminals stay on the canvas. Undo restores it.' : needCircuit}
+            onClick={() => {
+              if (!current) return;
+              scene?.deleteCircuit(current.id);
+              setSelectedCircuitId(null);
+            }}
+          >
+            Delete
+          </button>
         </div>
         <div className="mep-circuits-group">
           <span className="mep-circuits-group-label">Panel</span>

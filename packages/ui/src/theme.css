@@ -1133,6 +1133,25 @@
 .mep-net-tree-row-circuit {
   padding-left: 50px;
 }
+.mep-net-tree-circuit-line {
+  display: flex;
+  align-items: center;
+}
+.mep-net-tree-circuit-toggle {
+  margin-left: 42px;
+  flex: none;
+}
+.mep-net-tree-circuit-line .mep-net-tree-row-circuit {
+  padding-left: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.mep-net-tree-row-circuit-terminal {
+  padding-left: 80px;
+}
+.mep-tree-menu {
+  position: fixed;
+}
 .mep-net-tree-row-spare {
   font-style: italic;
   opacity: 0.65;

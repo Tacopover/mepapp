@@ -624,6 +624,10 @@ export function MepSketchApp({
           onSelectCircuit={setSelectedCircuitId}
           onSelectPanel={setSelectedPanelId}
           onCreateCircuit={(panelId) => setSelectedCircuitId(sceneRef.current?.createCircuit({ panelId }) ?? null)}
+          onDeleteCircuit={(id) => {
+            sceneRef.current?.deleteCircuit(id);
+            if (selectedCircuitId === id) setSelectedCircuitId(null);
+          }}
           showCircuitLines={showCircuitLines}
           onToggleCircuitLines={() => setShowCircuitLines((show) => !show)}
         />
@@ -684,6 +688,12 @@ export function MepSketchApp({
     );
     setForcedTabNonce((n) => n + 1);
   }, [selection, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool]);
+
+  // A circuit or panel that disappears (delete, or Undo of its creation) cannot stay selected in the tree.
+  useEffect(() => {
+    if (selectedCircuitId && !circuits.some((c) => c.id === selectedCircuitId)) setSelectedCircuitId(null);
+    if (selectedPanelId && !panels.some((p) => p.id === selectedPanelId)) setSelectedPanelId(null);
+  }, [circuits, panels, selectedCircuitId, selectedPanelId, setSelectedCircuitId, setSelectedPanelId]);
 
   // Circuits mode (Phase E4) turns the connection lines on while it is active and off when the user leaves
   // it, and opens the Networks tab so the circuit tree is in view. Any tool of the circuits family counts:

@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import type { SketchScene, NetworkSummary, StampInfo } from '@mepapp/render';
 import { getEffectivePrefix, getStampDefinition, type Circuit, type CircuitType, type Discipline, type Panel, type PanelSection } from '@mepapp/core';
 import { IconChevRight, IconChevDown, IconTerminal, IconEquipment } from '../icons.js';
@@ -19,6 +19,8 @@ export interface NetworkTreePanelProps {
   onSelectCircuit: (id: string) => void;
   onSelectPanel: (id: string) => void;
   onCreateCircuit: (panelId?: string) => void;
+  /** Deletes a circuit and clears the tree selection if it was that circuit — see App.tsx. */
+  onDeleteCircuit: (id: string) => void;
   /** The Show Circuits toggle — see SketchScene.setShowCircuitLines. */
   showCircuitLines: boolean;
   onToggleCircuitLines: () => void;
@@ -46,6 +48,48 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = {
   other: 'Other',
 };
 
+interface TreeMenuItem {
+  label: string;
+  onSelect: () => void;
+}
+
+/** Right-click menu of a tree node — the same look and dismissal as CanvasContextMenu (any outside pointerdown, or Escape), placed at the pointer with fixed positioning because the tree scrolls. */
+function TreeContextMenu({ x, y, items, onDismiss }: { x: number; y: number; items: TreeMenuItem[]; onDismiss: () => void }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) onDismiss();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onDismiss();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onDismiss]);
+  return (
+    <div ref={rootRef} className="mep-draw-from-menu mep-tree-menu" role="menu" style={{ left: x, top: y }}>
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          role="menuitem"
+          className="mep-draw-from-menu-btn"
+          onClick={() => {
+            item.onSelect();
+            onDismiss();
+          }}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function elementLabel(stamp: StampInfo): string {
   const definitionLabel = stamp.definitionId ? getStampDefinition(stamp.definitionId)?.label : undefined;
   return definitionLabel ?? (stamp.category === 'equipment' ? 'Equipment' : 'Terminal');
@@ -66,6 +110,11 @@ function panelKey(panelId: string): string {
 /** "A1", "12" — the circuit's effective prefix+number. Defers to circuit.ts's getEffectivePrefix for the inherit-or-fallback rule rather than reimplementing it, so this can't drift from the canonical resolver (electrical-circuits-model.md Phase C addendum). */
 function circuitLabel(circuit: Circuit, panel: Panel | undefined): string {
   return `${getEffectivePrefix(circuit, panel)}${circuit.number}`;
+}
+
+/** Circuits in number order, so a circuit restored by Undo returns to its place instead of the end of the list. */
+function byNumber(circuits: Circuit[]): Circuit[] {
+  return [...circuits].sort((a, b) => a.number - b.number);
 }
 
 function circuitDescription(circuit: Circuit): string {
@@ -96,6 +145,7 @@ export function NetworkTreePanel({
   onSelectCircuit,
   onSelectPanel,
   onCreateCircuit,
+  onDeleteCircuit,
   showCircuitLines,
   onToggleCircuitLines,
 }: NetworkTreePanelProps) {
@@ -104,6 +154,8 @@ export function NetworkTreePanel({
   const [expandedPanels, setExpandedPanels] = useState<Set<string>>(new Set());
   const [editingNetworkTypeId, setEditingNetworkTypeId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [expandedCircuits, setExpandedCircuits] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState<{ x: number; y: number; items: TreeMenuItem[] } | null>(null);
   const panelById = new Map(panels.map((p) => [p.id, p]));
   const circuitTypeById = new Map(circuitTypes.map((t) => [t.id, t]));
 
@@ -116,20 +168,90 @@ export function NetworkTreePanel({
     });
   }
 
+  function toggleExpandedCircuit(id: string) {
+    setExpandedCircuits((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function openMenu(event: MouseEvent, items: TreeMenuItem[]) {
+    event.preventDefault();
+    event.stopPropagation();
+    setMenu({ x: event.clientX, y: event.clientY, items });
+  }
+
+  function circuitMenuItems(circuit: Circuit): TreeMenuItem[] {
+    const items: TreeMenuItem[] = [];
+    if (!circuit.isSpare) {
+      items.push({
+        label: 'Add terminals',
+        onSelect: () => {
+          onSelectCircuit(circuit.id);
+          sceneRef.current?.beginAddTerminalsToCircuit(circuit.id);
+        },
+      });
+      items.push({
+        label: 'Assign panel',
+        onSelect: () => {
+          onSelectCircuit(circuit.id);
+          sceneRef.current?.beginAssignPanelToCircuit(circuit.id);
+        },
+      });
+      if (circuit.panelId) items.push({ label: 'Remove from panel', onSelect: () => sceneRef.current?.removeCircuitFromPanel(circuit.id) });
+    }
+    items.push({ label: 'Delete circuit', onSelect: () => onDeleteCircuit(circuit.id) });
+    return items;
+  }
+
   function renderCircuitRow(circuit: Circuit) {
     const panel = circuit.panelId ? panelById.get(circuit.panelId) : undefined;
     const type = circuit.circuitTypeId ? circuitTypeById.get(circuit.circuitTypeId) : undefined;
+    const expanded = expandedCircuits.has(circuit.id);
+    const members = circuit.terminalIds.map((id) => stampById.get(id)).filter((t): t is StampInfo => t !== undefined);
     return (
-      <button
-        key={circuit.id}
-        type="button"
-        className={`mep-net-tree-row mep-net-tree-row-element mep-net-tree-row-circuit${selectedCircuitId === circuit.id ? ' on' : ''}${circuit.isSpare ? ' mep-net-tree-row-spare' : ''}`}
-        onClick={() => onSelectCircuit(circuit.id)}
-      >
-        <span className="mep-net-tree-label">
-          {circuitLabel(circuit, panel)} <span className="mep-net-tree-count">({circuitDescription(circuit)}{type ? `, ${type.abbreviation}` : ''})</span>
-        </span>
-      </button>
+      <div key={circuit.id} className="mep-net-tree-network">
+        <div className="mep-net-tree-circuit-line" onContextMenu={(e) => openMenu(e, circuitMenuItems(circuit))}>
+          <button
+            type="button"
+            className="mep-net-tree-toggle mep-net-tree-circuit-toggle"
+            aria-label={expanded && members.length > 0 ? 'Hide terminals' : 'Show terminals'}
+            disabled={members.length === 0}
+            onClick={() => toggleExpandedCircuit(circuit.id)}
+          >
+            {members.length === 0 ? null : expanded ? <IconChevDown size={12} /> : <IconChevRight size={12} />}
+          </button>
+          <button
+            type="button"
+            className={`mep-net-tree-row mep-net-tree-row-element mep-net-tree-row-circuit${selectedCircuitId === circuit.id ? ' on' : ''}${circuit.isSpare ? ' mep-net-tree-row-spare' : ''}`}
+            onClick={() => onSelectCircuit(circuit.id)}
+          >
+            <span className="mep-net-tree-label">
+              {circuitLabel(circuit, panel)} <span className="mep-net-tree-count">({circuitDescription(circuit)}{type ? `, ${type.abbreviation}` : ''})</span>
+            </span>
+          </button>
+        </div>
+        {expanded &&
+          members.map((terminal) => (
+            <button
+              key={terminal.id}
+              type="button"
+              className={`mep-net-tree-row mep-net-tree-row-element mep-net-tree-row-circuit-terminal${selectedIds.has(terminal.id) ? ' on' : ''}`}
+              onClick={() => sceneRef.current?.selectStampById(terminal.id)}
+              onContextMenu={(e) =>
+                openMenu(e, [
+                  { label: 'Select on canvas', onSelect: () => sceneRef.current?.selectStampById(terminal.id) },
+                  { label: 'Remove from circuit', onSelect: () => sceneRef.current?.removeTerminalFromCircuit(circuit.id, terminal.id) },
+                ])
+              }
+            >
+              <IconTerminal size={12} />
+              <span className="mep-net-tree-label">{elementLabel(terminal)}</span>
+            </button>
+          ))}
+      </div>
     );
   }
 
@@ -156,6 +278,18 @@ export function NetworkTreePanel({
     setExpandedNetworks((prev) => new Set([...prev, ...networksToExpand]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection]);
+
+  // Tree selection → members: a circuit picked in the tree, or a terminal picked on the canvas, opens its
+  // circuit so the member rows are in view. Nothing the user collapsed by hand stays closed against a
+  // new selection, and nothing is collapsed here.
+  useEffect(() => {
+    const toOpen = new Set<string>();
+    if (selectedCircuitId) toOpen.add(selectedCircuitId);
+    for (const circuit of circuits) if (circuit.terminalIds.some((id) => selectedIds.has(id))) toOpen.add(circuit.id);
+    if (toOpen.size === 0) return;
+    setExpandedCircuits((prev) => (Array.from(toOpen).every((id) => prev.has(id)) ? prev : new Set([...prev, ...toOpen])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCircuitId, selection]);
 
   function toggleDiscipline(key: string) {
     setExpandedDisciplines((prev) => {
@@ -277,7 +411,16 @@ export function NetworkTreePanel({
                         const unsectioned = panelCircuits.filter((c) => !c.sectionId);
                         return (
                           <div key={panel.id} className="mep-net-tree-network">
-                            <div className="mep-net-tree-row mep-net-tree-row-network mep-net-tree-row-panel">
+                            <div
+                              className="mep-net-tree-row mep-net-tree-row-network mep-net-tree-row-panel"
+                              onContextMenu={(e) =>
+                                openMenu(e, [
+                                  { label: 'Add circuit', onSelect: () => onCreateCircuit(panel.id) },
+                                  { label: 'Manage panel', onSelect: () => onSelectPanel(panel.id) },
+                                  { label: 'Select equipment on canvas', onSelect: () => sceneRef.current?.selectStampById(panel.equipmentStampId) },
+                                ])
+                              }
+                            >
                               <button type="button" className="mep-net-tree-toggle" onClick={() => toggleExpandedPanel(pKey)}>
                                 {pExpanded ? <IconChevDown size={12} /> : <IconChevRight size={12} />}
                               </button>
@@ -296,11 +439,11 @@ export function NetworkTreePanel({
                                       <span className="mep-net-tree-label">{section.name}</span>
                                     </div>
                                     <div className="mep-net-tree-children">
-                                      {panelCircuits.filter((c) => c.sectionId === section.id).map((c) => renderCircuitRow(c))}
+                                      {byNumber(panelCircuits.filter((c) => c.sectionId === section.id)).map((c) => renderCircuitRow(c))}
                                     </div>
                                   </div>
                                 ))}
-                                {unsectioned.length === 0 && sections.length > 0 ? null : unsectioned.map((c) => renderCircuitRow(c))}
+                                {unsectioned.length === 0 && sections.length > 0 ? null : byNumber(unsectioned).map((c) => renderCircuitRow(c))}
                                 <button type="button" className="mep-net-tree-add" onClick={() => onCreateCircuit(panel.id)} title="Add circuit to this panel">
                                   + Add circuit
                                 </button>
@@ -311,10 +454,13 @@ export function NetworkTreePanel({
                       })}
                       {circuits.some((c) => !c.panelId) && (
                         <div className="mep-net-tree-network">
-                          <div className="mep-net-tree-row mep-net-tree-row-network">
+                          <div
+                            className="mep-net-tree-row mep-net-tree-row-network"
+                            onContextMenu={(e) => openMenu(e, [{ label: 'New circuit', onSelect: () => onCreateCircuit() }])}
+                          >
                             <span className="mep-net-tree-label">Unassigned</span>
                           </div>
-                          <div className="mep-net-tree-children">{circuits.filter((c) => !c.panelId).map((c) => renderCircuitRow(c))}</div>
+                          <div className="mep-net-tree-children">{byNumber(circuits.filter((c) => !c.panelId)).map((c) => renderCircuitRow(c))}</div>
                         </div>
                       )}
                     </div>
@@ -325,6 +471,7 @@ export function NetworkTreePanel({
           </div>
         );
       })}
+      {menu && <TreeContextMenu x={menu.x} y={menu.y} items={menu.items} onDismiss={() => setMenu(null)} />}
     </div>
   );
 }

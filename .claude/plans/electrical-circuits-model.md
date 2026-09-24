@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4 (Circuits mode and floating toolbar) done 2026-09-24, E5–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4 (Circuits mode and floating toolbar) and E5 (tree, menus, halos, delete) done 2026-09-24, E6–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -583,7 +583,7 @@ reasoned through, not just asserted.
 
 ### Phase E — circuit workflow UI (canvas tools, connection lines, tree, terminal side)
 
-Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4 (Circuits mode and floating toolbar) done 2026-09-24; E5–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
+Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4 (Circuits mode and floating toolbar) and E5 (tree, menus, halos, delete) done 2026-09-24; E6–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
 
 **The finding that shapes this phase.** Phase C built every command the core workflow needs. Phase D built property editors for circuits and panels. Neither built the *canvas-side* workflow that the old app used for almost everything. The old app does circuit work with three canvas features, not with the tree or the Properties panel:
 
@@ -731,7 +731,7 @@ Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (200 core + 13 pdf-
 
 Known oddities, not fixed: one run under heavy load lost the first canvas click after Add terminals started (not reproduced in clean runs). Clicking an already-selected tree row still does not switch the dock to Properties.
 
-**E5 — Tree: terminal children, context menus, sync**
+**E5 — Tree: terminal children, context menus, sync** — **Done** (2026-09-24, see the Done note after E5's list)
 - Terminal nodes under each circuit. Click selects the stamp on the canvas.
 - Right-click menus on tree nodes (none exist today; the canvas menu in `CanvasContextMenu.tsx` is the pattern to reuse):
   - Circuit: Add terminals, Select panel, Insert spare above, Renumber, Remove from panel, Delete.
@@ -739,6 +739,21 @@ Known oddities, not fixed: one run under heavy load lost the first canvas click 
   - Terminal node: Remove from circuit, Select on canvas.
 - "Highlight members" for a selected circuit: because of the mutual-exclusion rule in E2, do **not** implement it as canvas multi-select. Draw halo rings around the member terminals instead, gated by the same toggle as E3 for consistency with Decision 2. Confirm gating with the user.
 - Delete circuit: it is undoable, so skip a confirm dialog. Show a toast that says how many terminals were released. Proposal only; confirm with the user. Also add a **Delete** button to the Circuits toolbar (E4).
+
+**E5 Done note — 2026-09-24, commit `HASH` on `worktree-electrical-schematic-templates-plan`.**
+
+Decisions applied (user, 2026-09-24: "go with your recommendations"): halo rings only while the Lines toggle is on; delete circuit without a confirm dialog, toast only.
+
+Shipped:
+- `NetworkTreePanel.tsx`: each circuit row has a chevron that lists its member terminals. A terminal row selects the stamp on the canvas. A circuit selected in the tree, or a member terminal selected on the canvas, opens its circuit. Circuits are listed in number order, so an Undo of a delete puts the circuit back in its place.
+- Right-click menus (`TreeContextMenu`, same look and dismissal as the canvas menu). Circuit: Add terminals, Assign panel, Remove from panel (only when it has a panel), Delete circuit; spares get Delete only. Terminal: Select on canvas, Remove from circuit. Panel: Add circuit, Manage panel, Select equipment on canvas. "Unassigned" header: New circuit.
+- `SketchScene.deleteCircuit` now raises a toast ("Deleted circuit L. N terminals released." or "Deleted spare L."). No confirm dialog; Undo restores. A **Delete** button joined the Circuits toolbar. `App.tsx` clears a tree selection that points at a circuit or panel that no longer exists (delete, or Undo of its creation).
+- `SketchScene.drawCircuitHalos`: a solid ring in the circuit colour around each member terminal, drawn while Lines is on for the circuit selected in the tree or filled by a running Add terminals tool. A terminal or panel selection draws lines only.
+- Moved to E6: Insert spare and Renumber in the circuit menu, because their UI belongs to E6.
+
+Not done: no way to create a spare through the UI yet (E6), so the spare menu and toast were not exercised. The dock leaves the Networks tab on almost every selection, and the tree loses its expansion when it remounts, so the auto-expand is only visible after the user re-expands Electrical. This is the existing dock behaviour (Phase D) and needs its own fix: keep the tree's expansion state above the tab. Panel rows still wrap their icon onto its own line, and "+ Add circuit" sits right-aligned; both come from Phase D CSS and are unchanged.
+
+Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (200 core + 13 pdf-engine-mupdf passed). Real Playwright run, real DOM and canvas input, 11 of 12 steps passed and 1 blocked (spare, see above), no page or console errors: chevron and terminal rows, click selects on canvas, auto-expand, halo ring pixel counts (308 px in the ring band at each member, 0 at a non-member, 0 with Lines off, lines only for a terminal or panel selection, rings also during Add terminals), all four context menus and their items, Escape and outside-click dismissal, Assign panel and Add terminals from the menu, delete with no dialog and a self-dismissing toast, Undo and Redo, toolbar Delete enable rules, stale selection cleared after Undo of a creation. After the run, the number-order sort, the indent (circuits now nest under their panel) and an aria-label fix were re-checked with a screenshot only.
 
 **E6 — Lifecycle UI for existing commands**
 - Insert spare (Circuits toolbar, tree menu, panel and circuit Properties). Renumber field with commit on blur. A swap must raise a toast ("Swapped with L1.4"). Bulk prefix/type edit mode with tree checkboxes. Bulk type edit must go through the command stack, unlike the old app.
@@ -752,6 +767,7 @@ Known oddities, not fixed: one run under heavy load lost the first canvas click 
 **E8 — Later / optional**
 - Circuit label next to each terminal (for example "L1.3"). The old app never had this. New work, not a port.
 - Carried from Phase D "Not done": `PanelAccessory` add/remove UI, `Circuit.properties` editor, explicit-blank override affordance.
+- **Icons on the Circuits toolbar buttons** (user request 2026-09-24, to do later). Today the buttons are text only. Add an icon per button, in the style of `icons.tsx`, keeping the text label or a tooltip. Do this after E5–E7 have added their buttons, so the icon set is designed once.
 - Click a terminal already in the active circuit to *remove* it (old-app gap). Not requested. Only if the user asks.
 
 #### Verification plan
