@@ -773,7 +773,7 @@ Not done: Add terminals started from Properties keeps the dock on Properties (th
 - Insert spare (Circuits toolbar, tree menu, panel and circuit Properties). Renumber field with commit on blur. A swap must raise a toast ("Swapped with L1.4"). Bulk prefix/type edit mode with tree checkboxes. Bulk type edit must go through the command stack, unlike the old app.
 - All three commands already exist (`insertSpareCircuit`, `renumberCircuit`, `setCircuitPrefixBulk`). This sub-phase is UI only.
 
-**E6 Done note — 2026-09-24, commit `HASH` on `worktree-electrical-schematic-templates-plan`.**
+**E6 Done note — 2026-09-24, commit `ebdf809` on `worktree-electrical-schematic-templates-plan`.**
 
 Shipped:
 - `core/circuit.ts`: `getSpareInsertion` (before a circuit: takes its number, counts how many circuits move up; after the last circuit of a panel; null for a missing circuit) and `isValidCircuitNumber`. 4 new vitest cases (core now 204).
