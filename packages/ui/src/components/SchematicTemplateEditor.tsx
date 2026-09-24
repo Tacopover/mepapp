@@ -229,6 +229,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   }
 
   function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    event.preventDefault();
     rootRef.current?.focus({ preventScroll: true });
     const pointer = clientToSheet(event.clientX, event.clientY);
     if (event.button === 1 || !pointer) {

@@ -2111,6 +2111,7 @@
   border: 1px solid var(--mep-border, #9aa3ad);
   cursor: grab;
   touch-action: none;
+  user-select: none;
 }
 .mep-schematic-canvas:active {
   cursor: grabbing;

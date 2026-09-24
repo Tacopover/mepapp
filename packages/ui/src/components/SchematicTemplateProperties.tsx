@@ -139,48 +139,14 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
         </div>
       )}
 
-      <details open className="mep-section">
-        <summary>
-          <h4>Template</h4>
-        </summary>
-        <div className="mep-schematic-field">
-          <label>Name</label>
-          <input type="text" value={template.name} onChange={(e) => edit((t) => ({ ...t, name: e.target.value }), 'template:name')} onBlur={endGesture} />
+      {block && selection && (
+        <BlockProperties template={template} block={block} selection={selection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} />
+      )}
+      {!block && (
+        <div className="mep-section">
+          <p className="mep-schematic-hint">Select a block on the sheet or in the list to edit it.</p>
         </div>
-        <div className="mep-schematic-field">
-          <label>Description</label>
-          <input type="text" value={template.description} onChange={(e) => edit((t) => ({ ...t, description: e.target.value }), 'template:description')} onBlur={endGesture} />
-        </div>
-        <div className="mep-schematic-field">
-          <label>Locale label</label>
-          <input type="text" value={template.locale} onChange={(e) => edit((t) => ({ ...t, locale: e.target.value }), 'template:locale')} onBlur={endGesture} />
-        </div>
-        <NumberField label="Sheet width mm" value={template.sheet.widthMm} min={1} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, sheet: { ...t.sheet, widthMm: v } }), 'template:sheetW')} />
-        <NumberField label="Sheet height mm" value={template.sheet.heightMm} min={1} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, sheet: { ...t.sheet, heightMm: v } }), 'template:sheetH')} />
-        <div className="mep-schematic-buttons">
-          {SHEET_SIZES.map((size) => (
-            <button key={size.label} type="button" onClick={() => edit((t) => ({ ...t, sheet: { widthMm: size.widthMm, heightMm: size.heightMm } }))} title={`${size.widthMm} x ${size.heightMm} mm`}>
-              {size.label}
-            </button>
-          ))}
-        </div>
-        <div className="mep-schematic-field">
-          <label>Decimal separator</label>
-          <select value={template.numberFormat.decimalSeparator} onChange={(e) => edit((t) => ({ ...t, numberFormat: { decimalSeparator: e.target.value === ',' ? ',' : '.' } }))}>
-            <option value=",">Comma (1,5)</option>
-            <option value=".">Point (1.5)</option>
-          </select>
-        </div>
-        <div className="mep-schematic-field">
-          <label>Circuits run</label>
-          <select value={template.groups[0]?.direction ?? 'column'} onChange={(e) => edit((t) => setTemplateDirection(t, e.target.value === 'row' ? 'row' : 'column'))} disabled={template.groups.length === 0}>
-            <option value="column">Down the sheet (rows)</option>
-            <option value="row">Across the sheet (columns)</option>
-          </select>
-        </div>
-        <NumberField label="Group anchor x" value={template.groupAnchor.x} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, groupAnchor: { ...t.groupAnchor, x: v } }), 'template:anchorX')} />
-        <NumberField label="Group anchor y" value={template.groupAnchor.y} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, groupAnchor: { ...t.groupAnchor, y: v } }), 'template:anchorY')} />
-      </details>
+      )}
 
       {group && (
         <details open className="mep-section">
@@ -224,14 +190,48 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
         </details>
       )}
 
-      {block && selection && (
-        <BlockProperties template={template} block={block} selection={selection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} />
-      )}
-      {!block && (
-        <div className="mep-section">
-          <p className="mep-schematic-hint">Select a block on the sheet or in the list to edit it.</p>
+      <details open className="mep-section">
+        <summary>
+          <h4>Template</h4>
+        </summary>
+        <div className="mep-schematic-field">
+          <label>Name</label>
+          <input type="text" value={template.name} onChange={(e) => edit((t) => ({ ...t, name: e.target.value }), 'template:name')} onBlur={endGesture} />
         </div>
-      )}
+        <div className="mep-schematic-field">
+          <label>Description</label>
+          <input type="text" value={template.description} onChange={(e) => edit((t) => ({ ...t, description: e.target.value }), 'template:description')} onBlur={endGesture} />
+        </div>
+        <div className="mep-schematic-field">
+          <label>Locale label</label>
+          <input type="text" value={template.locale} onChange={(e) => edit((t) => ({ ...t, locale: e.target.value }), 'template:locale')} onBlur={endGesture} />
+        </div>
+        <NumberField label="Sheet width mm" value={template.sheet.widthMm} min={1} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, sheet: { ...t.sheet, widthMm: v } }), 'template:sheetW')} />
+        <NumberField label="Sheet height mm" value={template.sheet.heightMm} min={1} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, sheet: { ...t.sheet, heightMm: v } }), 'template:sheetH')} />
+        <div className="mep-schematic-buttons">
+          {SHEET_SIZES.map((size) => (
+            <button key={size.label} type="button" onClick={() => edit((t) => ({ ...t, sheet: { widthMm: size.widthMm, heightMm: size.heightMm } }))} title={`${size.widthMm} x ${size.heightMm} mm`}>
+              {size.label}
+            </button>
+          ))}
+        </div>
+        <div className="mep-schematic-field">
+          <label>Decimal separator</label>
+          <select value={template.numberFormat.decimalSeparator} onChange={(e) => edit((t) => ({ ...t, numberFormat: { decimalSeparator: e.target.value === ',' ? ',' : '.' } }))}>
+            <option value=",">Comma (1,5)</option>
+            <option value=".">Point (1.5)</option>
+          </select>
+        </div>
+        <div className="mep-schematic-field">
+          <label>Circuits run</label>
+          <select value={template.groups[0]?.direction ?? 'column'} onChange={(e) => edit((t) => setTemplateDirection(t, e.target.value === 'row' ? 'row' : 'column'))} disabled={template.groups.length === 0}>
+            <option value="column">Down the sheet (rows)</option>
+            <option value="row">Across the sheet (columns)</option>
+          </select>
+        </div>
+        <NumberField label="Group anchor x" value={template.groupAnchor.x} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, groupAnchor: { ...t.groupAnchor, x: v } }), 'template:anchorX')} />
+        <NumberField label="Group anchor y" value={template.groupAnchor.y} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, groupAnchor: { ...t.groupAnchor, y: v } }), 'template:anchorY')} />
+      </details>
     </div>
   );
 }
