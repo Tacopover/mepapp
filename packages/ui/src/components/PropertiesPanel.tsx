@@ -86,6 +86,9 @@ export interface PropertiesPanelProps {
   setSelectedPanelId: (id: string | null) => void;
   /** Every placed stamp — the circuit Properties terminal list resolves ids to labels through it. */
   allStamps: StampInfo[];
+  /** The Show Circuits toggle — see SketchScene.setShowCircuitLines. */
+  showCircuitLines: boolean;
+  onToggleCircuitLines: () => void;
 }
 
 export function PropertiesPanel({
@@ -108,6 +111,8 @@ export function PropertiesPanel({
   setSelectedCircuitId,
   setSelectedPanelId,
   allStamps,
+  showCircuitLines,
+  onToggleCircuitLines,
 }: PropertiesPanelProps) {
   if (selectedCircuitId) {
     const circuit = circuits.find((c) => c.id === selectedCircuitId);
@@ -123,6 +128,8 @@ export function PropertiesPanel({
           circuitTypes={circuitTypes}
           allStamps={allStamps}
           customStampDefinitions={customStampDefinitions}
+          showCircuitLines={showCircuitLines}
+          onToggleCircuitLines={onToggleCircuitLines}
           onDeleted={() => setSelectedCircuitId(null)}
         />
       );
@@ -138,6 +145,8 @@ export function PropertiesPanel({
           circuits={circuits}
           panelSections={panelSections}
           circuitTypes={circuitTypes}
+          showCircuitLines={showCircuitLines}
+          onToggleCircuitLines={onToggleCircuitLines}
           onReverted={() => setSelectedPanelId(null)}
         />
       );

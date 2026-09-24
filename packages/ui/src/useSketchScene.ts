@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import {
   SketchScene,
   type CanvasContextMenuTarget,
@@ -63,6 +63,9 @@ export interface UseSketchScene {
   setSelectedPanelId: (id: string | null) => void;
   /** The circuit the Add-to-Circuit tool is filling, or null when that tool is not active — see SketchScene.getCircuitToolTarget. */
   circuitToolTargetId: string | null;
+  /** The Show Circuits toggle — connection lines from the selected terminal/circuit/panel. Session state; stays on until switched off. */
+  showCircuitLines: boolean;
+  setShowCircuitLines: Dispatch<SetStateAction<boolean>>;
   zoom: number;
   pageIndex: number;
   pageCount: number;
@@ -106,6 +109,7 @@ export function useSketchScene(): UseSketchScene {
   const [selectedCircuitId, setSelectedCircuitIdState] = useState<string | null>(null);
   const [selectedPanelId, setSelectedPanelIdState] = useState<string | null>(null);
   const [circuitToolTargetId, setCircuitToolTargetId] = useState<string | null>(null);
+  const [showCircuitLines, setShowCircuitLines] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
@@ -152,6 +156,15 @@ export function useSketchScene(): UseSketchScene {
       sceneRef.current?.clearSelection();
     }
   }, []);
+
+  // The scene draws the connection lines (SketchScene.drawCircuitLines) but knows nothing about the
+  // Electrical Circuits tree's selection or the toggle — both live here, so push them down.
+  useEffect(() => {
+    if (ready) sceneRef.current?.setShowCircuitLines(showCircuitLines);
+  }, [ready, showCircuitLines]);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setCircuitLinesFocus({ circuitId: selectedCircuitId, panelId: selectedPanelId });
+  }, [ready, selectedCircuitId, selectedPanelId]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -364,6 +377,8 @@ export function useSketchScene(): UseSketchScene {
     selectedPanelId,
     setSelectedPanelId,
     circuitToolTargetId,
+    showCircuitLines,
+    setShowCircuitLines,
     zoom,
     pageIndex,
     pageCount,

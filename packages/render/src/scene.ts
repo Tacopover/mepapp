@@ -16,7 +16,9 @@ import {
   computeNetworks,
   distance,
   findCircuitForTerminal,
+  getCircuitConnectionLines,
   getCircuitLabel,
+  getCircuitLineColor,
   getNetworkTypeFromLibrary,
   getStampDefinition,
   getStampPorts,
@@ -34,6 +36,7 @@ import {
   pointNearSegment,
   reconcilePdfSync,
   recomputeAttachedSegments,
+  resolveCircuitLineTargets,
   resolveSegmentEndpoint,
   rotateAnnotationGeometry,
   rotatedRectCorners,
@@ -481,6 +484,9 @@ export class SketchScene {
   /** The circuit the 'circuit-add-terminals' tool is filling, and the terminal its pointer is over — both cleared by setTool() on leaving that tool. See beginAddTerminalsToCircuit. */
   private circuitToolTargetId: string | null = null;
   private circuitToolHover: CircuitToolHover | null = null;
+  /** The Show Circuits toggle (electrical-circuits-model.md Phase E3) and the circuit/panel the Electrical Circuits tree has selected — session state, not saved in the project. Both come from the UI (setShowCircuitLines/setCircuitLinesFocus); the canvas selection is read from the active document. */
+  private showCircuitLines = false;
+  private circuitLinesFocus: { circuitId: string | null; panelId: string | null } = { circuitId: null, panelId: null };
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure/draw-line two-click flows
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
@@ -1221,7 +1227,43 @@ export class SketchScene {
 
   private notifyCircuitsChanged(): void {
     this.markDirty();
+    if (this.showCircuitLines) this.redrawOverlay();
     this.emitter.emit('circuitsChanged');
+  }
+
+  /** Turns the editing-view-only dashed connection lines (terminal → panel, one color per circuit) on or off. Off draws nothing circuit-related. */
+  setShowCircuitLines(show: boolean): void {
+    if (this.showCircuitLines === show) return;
+    this.showCircuitLines = show;
+    this.redrawOverlay();
+  }
+
+  /** The circuit or panel selected in the Electrical Circuits tree — a circuit or panel has no canvas selection of its own, so the UI reports it here. Only matters while the toggle is on. */
+  setCircuitLinesFocus(focus: { circuitId: string | null; panelId: string | null }): void {
+    if (this.circuitLinesFocus.circuitId === focus.circuitId && this.circuitLinesFocus.panelId === focus.panelId) return;
+    this.circuitLinesFocus = focus;
+    if (this.showCircuitLines) this.redrawOverlay();
+  }
+
+  /** Dashed lines from each terminal of the targeted circuits to its panel's equipment stamp (or a star between the terminals when the circuit has no panel). Widths and dashes are in screen pixels, so they stay the same size at every zoom. */
+  private drawCircuitLines(state: DrawingState): void {
+    if (!this.showCircuitLines) return;
+    const circuits = Object.values(state.circuits);
+    const targets = resolveCircuitLineTargets(circuits, Object.values(state.panels), {
+      focusCircuitId: this.circuitLinesFocus.circuitId,
+      focusPanelId: this.circuitLinesFocus.panelId,
+      selectedStampIds: this.doc.selectedIds,
+    });
+    const scale = this.world.scale.x;
+    const positionOf = (id: string): Vec2 | undefined => state.stamps[id]?.transform.position;
+    for (const circuit of targets) {
+      const panel = circuit.panelId ? state.panels[circuit.panelId] : undefined;
+      const lines = getCircuitConnectionLines(circuit, panel ? positionOf(panel.equipmentStampId) : undefined, positionOf);
+      const color = getCircuitLineColor(circuit.id);
+      for (const line of lines) {
+        this.strokeDashedPolyline([line.from, line.to], 2 / scale, color, [7 / scale, 4 / scale], this.overlay);
+      }
+    }
   }
 
   private withCircuit(circuitId: string, build: (circuit: Circuit) => ReturnType<typeof deleteCircuitCommand>): void {
@@ -3003,7 +3045,7 @@ export class SketchScene {
   }
 
   /** Draws a dashed/dotted polyline as a series of short stroke() calls (moveTo/lineTo per "on" entry) — see DASH_PATTERN_WORLD's doc comment for why this is manual. `pattern` cycles [dash, gap, dash, gap, ...]; even indices draw, odd indices skip. */
-  private strokeDashedPolyline(points: Vec2[], width: number, color: number, pattern: number[]): void {
+  private strokeDashedPolyline(points: Vec2[], width: number, color: number, pattern: number[], target: Graphics = this.doc.drawingLayer): void {
     for (let i = 0; i < points.length - 1; i++) {
       const a = points[i];
       const b = points[i + 1];
@@ -3018,7 +3060,7 @@ export class SketchScene {
       while (covered < length) {
         const step = Math.min(pattern[patternIndex % pattern.length], length - covered);
         if (patternIndex % 2 === 0) {
-          this.doc.drawingLayer
+          target
             .moveTo(a.x + ux * covered, a.y + uy * covered)
             .lineTo(a.x + ux * (covered + step), a.y + uy * (covered + step))
             .stroke({ width, color });
@@ -3181,6 +3223,8 @@ export class SketchScene {
         .rect(bounds.minX - padX, bounds.minY - padY, bounds.maxX - bounds.minX + 2 * padX, bounds.maxY - bounds.minY + 2 * padY)
         .stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
     }
+
+    this.drawCircuitLines(state);
 
     if (this.tool === 'circuit-add-terminals' && this.circuitToolHover) {
       const hovered = state.stamps[this.circuitToolHover.stampId];

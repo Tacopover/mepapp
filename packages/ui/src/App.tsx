@@ -136,6 +136,8 @@ export function MepSketchApp({
     selectedPanelId,
     setSelectedPanelId,
     circuitToolTargetId,
+    showCircuitLines,
+    setShowCircuitLines,
     zoom,
     pageIndex,
     pageCount,
@@ -622,6 +624,8 @@ export function MepSketchApp({
           onSelectCircuit={setSelectedCircuitId}
           onSelectPanel={setSelectedPanelId}
           onCreateCircuit={(panelId) => setSelectedCircuitId(sceneRef.current?.createCircuit({ panelId }) ?? null)}
+          showCircuitLines={showCircuitLines}
+          onToggleCircuitLines={() => setShowCircuitLines((show) => !show)}
         />
       </div>
     ),
@@ -645,6 +649,8 @@ export function MepSketchApp({
         selectedPanelId={selectedPanelId}
         setSelectedCircuitId={setSelectedCircuitId}
         allStamps={allStamps}
+        showCircuitLines={showCircuitLines}
+        onToggleCircuitLines={() => setShowCircuitLines((show) => !show)}
         setSelectedPanelId={setSelectedPanelId}
       />
     ),

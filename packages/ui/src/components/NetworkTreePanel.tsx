@@ -19,6 +19,9 @@ export interface NetworkTreePanelProps {
   onSelectCircuit: (id: string) => void;
   onSelectPanel: (id: string) => void;
   onCreateCircuit: (panelId?: string) => void;
+  /** The Show Circuits toggle — see SketchScene.setShowCircuitLines. */
+  showCircuitLines: boolean;
+  onToggleCircuitLines: () => void;
 }
 
 // Same six values as core's Discipline union (network.ts) — order and labels
@@ -93,6 +96,8 @@ export function NetworkTreePanel({
   onSelectCircuit,
   onSelectPanel,
   onCreateCircuit,
+  showCircuitLines,
+  onToggleCircuitLines,
 }: NetworkTreePanelProps) {
   const [expandedDisciplines, setExpandedDisciplines] = useState<Set<string>>(new Set());
   const [expandedNetworks, setExpandedNetworks] = useState<Set<string>>(new Set());
@@ -250,6 +255,15 @@ export function NetworkTreePanel({
                         Circuits{' '}
                         <button type="button" className="mep-net-tree-add" onClick={() => onCreateCircuit()} title="New unassigned circuit">
                           +
+                        </button>
+                        <button
+                          type="button"
+                          className={`mep-net-tree-add mep-net-tree-lines${showCircuitLines ? ' on' : ''}`}
+                          aria-pressed={showCircuitLines}
+                          onClick={onToggleCircuitLines}
+                          title="Show connection lines from the selected terminal, circuit or panel"
+                        >
+                          Lines
                         </button>
                       </span>
                     </div>

@@ -1148,6 +1148,11 @@
 .mep-net-tree-add:hover {
   text-decoration: underline;
 }
+.mep-net-tree-lines.on {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
 
 .mep-net-tree-rename-input {
   flex: 1;

@@ -1,6 +1,6 @@
 # Electrical circuits and panels — data model plan
 
-Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
+Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4–E8 not started.** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
 ## 1. Goal
 
@@ -583,7 +583,7 @@ reasoned through, not just asserted.
 
 ### Phase E — circuit workflow UI (canvas tools, connection lines, tree, terminal side)
 
-Status: **E1 and E2 done 2026-09-23 (see their Done notes); E3–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
+Status: **E1 and E2 done 2026-09-23, E3 done 2026-09-24 (see their Done notes); E4–E8 not started.** Written 2026-09-23, after the user tested Phase D on Windows and reported: no way to assign terminals to a circuit, no visual indication of what belongs to a circuit, and assigning a circuit to a panel only works through the Networks tab. The user asked for a full investigation of the old app so the gaps did not have to be listed by hand. Four read-only research passes covered the old app's commands, UI entry points and visualization, plus an inventory of what MepApp has today. Findings below. Old-app `file:line` references come from those passes and were not re-checked one by one.
 
 **The finding that shapes this phase.** Phase C built every command the core workflow needs. Phase D built property editors for circuits and panels. Neither built the *canvas-side* workflow that the old app used for almost everything. The old app does circuit work with three canvas features, not with the tree or the Properties panel:
 
@@ -655,7 +655,7 @@ Not done: the circuit tree's own "Add terminals" menu (E5). A terminal's label i
 
 Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (185 core + 13 pdf-engine-mupdf passed, before the dock-tab fix; core and render are unchanged since). Real Playwright run against the built bundle, driving real DOM and real canvas clicks: add via the tool, move with a toast that disappeared on its own, equipment click warning, one-step Undo/Redo, terminal Properties picker (assign, move, None, New circuit…), multi-select "Assign all to", no page errors. After the dock-tab fix, a second run confirmed that Add terminals… keeps Properties on screen and that Undo keeps the circuit panel in 4 of 4 runs.
 
-**E3 — Connection lines and Show Circuits toggle (complaint 2)**
+**E3 — Connection lines and Show Circuits toggle (complaint 2)** — **Done** (2026-09-24, see the Done note after E3's list)
 - New render layer for circuit lines, on the per-document layer set next to `flowLabelLayer` (`document.ts`). Follow the flow overlay's lifecycle: rebuild on change, clear on document swap (`scene.ts` ~1785 pattern). Lines are non-interactive.
 - Style from the old app: dashed, about 1.5 px, about 0.85 opacity, drawn below stamps' hit layers. Palette: 11+ colors, one per circuit, wrapping. Assign colors by circuit order in a pure function in `core` so it is unit-testable. Check how existing strokes keep a constant on-screen width across zoom and match that.
 - What draws, when the toggle is **on**:
@@ -669,6 +669,20 @@ Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (185 core + 13 pdf-
 - After a successful Select Panel assignment (E4), turn the toggle on, as the old app did.
 - Only terminals on the active page draw lines. Circuits stay cross-page in the data.
 - Do not use `drawingChanged` for redraws. Use the `circuitsChanged` path.
+
+**E3 Done note — 2026-09-24, commit `<hash>` on `worktree-electrical-schematic-templates-plan`.**
+
+Shipped:
+- `core/circuit.ts`: `CIRCUIT_LINE_PALETTE` (12 colors), `getCircuitLineColor` (color from the number in the circuit id, so it never changes when other circuits are added or renumbered), `getCircuitConnectionLines` (panel → each terminal, or a star from the first terminal when the circuit has no panel) and `resolveCircuitLineTargets` (tree focus plus canvas selection: a terminal shows its circuit, a panel's equipment stamp shows all that panel's circuits). 12 new vitest cases (core now 197).
+- `SketchScene`: `setShowCircuitLines`, `setCircuitLinesFocus`, and `drawCircuitLines` inside `redrawOverlay`. The lines are drawn in the existing overlay, so they follow zoom and never reach the PDF. Width (2 px) and dash (7 + 4 px) are in screen pixels. `notifyCircuitsChanged` redraws while the toggle is on, so Undo and Redo update the lines live.
+- UI: a "Lines" toggle button in the Networks tab's Circuits row, and a "Show connection lines" checkbox at the top of circuit and panel Properties. Both show one shared state, held in `useSketchScene` and pushed down to the scene. The toggle stays on until switched off. It is session state and is not saved in the project.
+- With the toggle off, nothing circuit-related draws. This deliberately differs from the old app, where a tree selection drew lines even with the toggle off.
+
+Not done: turning the toggle on after a Select Panel assignment (E4). Halo rings around a selected circuit's members (E5). A circuit label next to each terminal (E8). Lines only draw for terminals on the active page, because each page is its own document here.
+
+Known oddity, not from E3: clicking the already-selected circuit row in the tree does not switch the dock to Properties, because the selection did not change.
+
+Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (197 core + 13 pdf-engine-mupdf passed). Real Playwright run against the built bundle, with pixel counts on canvas screenshots: no lines with the toggle off; a star for a circuit with no panel; panel → terminal lines after assignment (the star disappears); two circuits in two colors when the panel is selected; a terminal selection shows only its own circuit; the toggle survives every selection change; Undo and Redo update the lines without reselecting; constant 2 px thickness and 11 px dash period at 62%, 100% and 133% zoom; the tree button and both checkboxes always agree; no page errors.
 
 **E4 — Select Panel tool (complaint 3)**
 - New tool `'circuit-assign-panel'`, mirroring E2. Click a Panel or Equipment stamp. Equipment is converted through `convertStampToPanel`, then the circuit is assigned. Make convert plus assign one undo step with a `Transaction` (the old app used two commands).

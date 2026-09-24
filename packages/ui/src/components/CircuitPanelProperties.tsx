@@ -10,6 +10,21 @@ function circuitLabel(circuit: Circuit, panel: Panel | undefined): string {
   return `${getEffectivePrefix(circuit, panel)}${circuit.number}`;
 }
 
+export interface CircuitLinesToggleProps {
+  show: boolean;
+  onToggle: () => void;
+}
+
+/** The Show Circuits toggle (electrical-circuits-model.md Phase E3) — the same switch as the one in the Networks tab's Circuits header. */
+export function CircuitLinesToggle({ show, onToggle }: CircuitLinesToggleProps) {
+  return (
+    <label className="mep-checkbox-row">
+      <input type="checkbox" checked={show} onChange={onToggle} />
+      Show connection lines
+    </label>
+  );
+}
+
 export interface CircuitPropertiesProps {
   sceneRef: RefObject<SketchScene | null>;
   circuit: Circuit;
@@ -20,6 +35,8 @@ export interface CircuitPropertiesProps {
   /** Every placed stamp — resolves the terminal list's ids to labels. */
   allStamps: StampInfo[];
   customStampDefinitions: StampDefinition[];
+  showCircuitLines: boolean;
+  onToggleCircuitLines: () => void;
   onDeleted: () => void;
 }
 
@@ -32,7 +49,7 @@ export interface CircuitPropertiesProps {
  * default shown as placeholder) or overridden (solid, with a ↺ reset
  * link), matching the Phase 0 mockup's round-4 decision.
  */
-export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSections, circuitTypes, allStamps, customStampDefinitions, onDeleted }: CircuitPropertiesProps) {
+export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSections, circuitTypes, allStamps, customStampDefinitions, showCircuitLines, onToggleCircuitLines, onDeleted }: CircuitPropertiesProps) {
   const defaults = panel?.circuitDefaults;
   const sections = panel ? panelSections.filter((s) => s.panelId === panel.id) : [];
 
@@ -51,6 +68,10 @@ export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSecti
         <button type="button" onClick={handleDelete} title="Delete circuit">
           <IconTrash size={13} />
         </button>
+      </div>
+
+      <div className="mep-section">
+        <CircuitLinesToggle show={showCircuitLines} onToggle={onToggleCircuitLines} />
       </div>
 
       <div className="mep-section">
@@ -246,11 +267,13 @@ export interface PanelPropertiesProps {
   circuits: Circuit[];
   panelSections: PanelSection[];
   circuitTypes: CircuitType[];
+  showCircuitLines: boolean;
+  onToggleCircuitLines: () => void;
   onReverted: () => void;
 }
 
 /** The Electrical Circuits tree's properties view for one selected panel (electrical-circuits-model.md §9), including its circuitDefaults (Phase C addendum) — edited inline here rather than in a separate dialog, same as mainDevice/feederCable below. */
-export function PanelProperties({ sceneRef, panel, circuits, panelSections, circuitTypes, onReverted }: PanelPropertiesProps) {
+export function PanelProperties({ sceneRef, panel, circuits, panelSections, circuitTypes, showCircuitLines, onToggleCircuitLines, onReverted }: PanelPropertiesProps) {
   const memberCircuits = circuits.filter((c) => c.panelId === panel.id);
   const sections = panelSections.filter((s) => s.panelId === panel.id).sort((a, b) => a.order - b.order);
   const defaults = panel.circuitDefaults ?? {};
@@ -274,6 +297,10 @@ export function PanelProperties({ sceneRef, panel, circuits, panelSections, circ
         <button type="button" onClick={handleRevert} title="Revert to a plain Equipment stamp">
           Revert to equipment
         </button>
+      </div>
+
+      <div className="mep-section">
+        <CircuitLinesToggle show={showCircuitLines} onToggle={onToggleCircuitLines} />
       </div>
 
       <div className="mep-section">

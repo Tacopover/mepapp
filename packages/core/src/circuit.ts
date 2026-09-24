@@ -4,6 +4,7 @@
 // (Circuit.ContainsPoint always returns false — never drawn).
 
 import type { CustomPropertyValues } from './custom-properties.js';
+import type { Vec2 } from './geometry.js';
 
 export interface Circuit {
   id: string;
@@ -196,6 +197,77 @@ export function planTerminalAssignment(circuits: Circuit[], terminalId: string, 
   if (!current) return { kind: 'add' };
   if (current.id === targetCircuitId) return { kind: 'already-member' };
   return { kind: 'move', fromCircuitId: current.id };
+}
+
+// --- Connection-line overlay (electrical-circuits-model.md Phase E3) ------
+// Editing-view-only dashed lines from a circuit's terminals to its panel.
+// Nothing here is persisted or exported to the PDF — a circuit still has no
+// canvas presence of its own; this only says what the overlay should draw.
+
+/** Distinct, dashed-line-friendly colors (0xRRGGBB), one per circuit, cycling — the old app's CircuitConnectionVisualizer palette idea. */
+export const CIRCUIT_LINE_PALETTE: readonly number[] = [
+  0x1e88e5, 0xe53935, 0x43a047, 0xfb8c00, 0x8e24aa, 0x00acc1, 0xd81b60, 0x7cb342, 0x6d4c41, 0x3949ab, 0x00897b, 0xf4511e,
+];
+
+/**
+ * A circuit's line color, derived from the number in its id ("circuit-12" → 12) rather than its
+ * position in any list, so it never changes when other circuits are added, renumbered or removed.
+ * Ids without a trailing number fall back to a string hash.
+ */
+export function getCircuitLineColor(circuitId: string): number {
+  const match = /(\d+)$/.exec(circuitId);
+  let index = match ? Number(match[1]) : 0;
+  if (!match) {
+    for (let i = 0; i < circuitId.length; i++) index = (index * 31 + circuitId.charCodeAt(i)) >>> 0;
+  }
+  return CIRCUIT_LINE_PALETTE[index % CIRCUIT_LINE_PALETTE.length];
+}
+
+export interface CircuitConnectionLine {
+  from: Vec2;
+  to: Vec2;
+}
+
+/**
+ * The lines to draw for one circuit: panel → each member terminal when the panel's position is
+ * known, otherwise a star from the first terminal that has a position (a circuit with no panel yet
+ * still shows what it groups). Terminals whose position `positionOf` cannot resolve (not on this
+ * document) are skipped.
+ */
+export function getCircuitConnectionLines(
+  circuit: Circuit,
+  panelPosition: Vec2 | undefined,
+  positionOf: (terminalId: string) => Vec2 | undefined,
+): CircuitConnectionLine[] {
+  const points = circuit.terminalIds.map(positionOf).filter((p): p is Vec2 => p !== undefined);
+  if (panelPosition) return points.map((to) => ({ from: panelPosition, to }));
+  if (points.length < 2) return [];
+  const [hub, ...rest] = points;
+  return rest.map((to) => ({ from: hub, to }));
+}
+
+/**
+ * Which circuits the connection lines show right now, when the toggle is on: the circuit or panel
+ * selected in the tree (`focus`), plus whatever the canvas selection implies — a selected terminal
+ * shows its circuit, a selected equipment stamp that backs a panel shows all that panel's circuits.
+ * Deduplicated, in circuit-list order.
+ */
+export function resolveCircuitLineTargets(
+  circuits: Circuit[],
+  panels: Panel[],
+  input: { focusCircuitId?: string | null; focusPanelId?: string | null; selectedStampIds: Iterable<string> },
+): Circuit[] {
+  const wanted = new Set<string>();
+  if (input.focusCircuitId) wanted.add(input.focusCircuitId);
+  const panelIds = new Set<string>();
+  if (input.focusPanelId) panelIds.add(input.focusPanelId);
+  for (const stampId of input.selectedStampIds) {
+    const owner = findCircuitForTerminal(circuits, stampId);
+    if (owner) wanted.add(owner.id);
+    const backed = panels.find((p) => p.equipmentStampId === stampId);
+    if (backed) panelIds.add(backed.id);
+  }
+  return circuits.filter((c) => wanted.has(c.id) || (c.panelId !== undefined && panelIds.has(c.panelId)));
 }
 
 /**
