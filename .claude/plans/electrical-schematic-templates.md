@@ -1,6 +1,6 @@
 # Electrical schematic templates — plan
 
-Status: **draft. No part is started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
+Status: **draft. Phases 0–3 done (Phase 3 on 2026-09-24); Phases 4–6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
 ## 1. Goal
 
@@ -291,9 +291,40 @@ Full plan: [[electrical-circuits-model.md]] — all four of its phases (A–D) s
 
 Convert Equipment to panel, create circuit, assign terminals, edit circuit properties. Reuse the tree from `networks-panel-spec.md`. See [[electrical-circuits-model.md]] §9 and its Phase D done-block — terminal-assignment-from-the-terminal-side, a `Circuit.properties` editor, and `PanelAccessory` add/remove UI are explicitly called out there as not done yet.
 
-### Phase 3 — Template schema, built-in templates, generator — not started
+### Phase 3 — Template schema, built-in templates, generator — **Done**
 
 All in `@mepapp/core`. Tests use structures taken from the example schematics.
+
+**Done** — 2026-09-24, commit `PENDING` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Shipped (four new modules, all exported from `@mepapp/core`, plus three test files; no schema migration, since nothing is persisted yet):
+
+- `schematic-expression.ts` — binding language. A binding is text with `{expression}` segments. An expression is a dotted path (`cable.type`, `circuit.properties."Serial number"`), a number, `+ - * /`, parentheses, and `sum()` / `count()`. A path over a list maps over it, so `sum(terminal.capacity)` sums every terminal. A missing value gives blank text, never an error. `{expr:2}` forces two decimals. `{{` and `}}` are literal braces. Numbers show at most two decimals, with the template's decimal separator. Syntax errors throw `ExpressionError`.
+- `schematic-template.ts` — the schema: `SchematicTemplate` (sheet size in mm, number format, layout blocks, group anchor, ordered circuit groups), `SchematicBlock` (every property saved: position, rotation, size, binding, style, symbol id, table rows, load-type filter), the 21-type block catalogue with default size, scope and binding, and `validateSchematicTemplate` (structure, scope-per-collection, unique ids, positive pitch, one direction for all groups, every binding parses).
+- `schematic-template-library.ts` — two built-ins, "Rows (NL)" (like E60) and "Columns (NL)" (like OV, text rotated 90°), each a spare group plus a catch-all group. Sheet is A1 landscape (841 x 594 mm), the OV example's size.
+- `schematic-generator.ts` — `generateSchematic(input, template, { origin })`, a pure function returning flat `ResolvedBlock`s (position, size, rotation, resolved text, stable id `<panel>/<circuit | section | ->/<block>`), `circuitOrigins` (for user-drawn extras that follow their circuit), and diagnostics (`no-matching-group`, `binding-error`).
+
+Decisions made while building it (all reversible; the template editor in Phase 5 is where they meet a real user):
+
+- **Units and pivot.** Sheet mm. `x`/`y` is the top-left corner. Rotation is clockwise degrees about the block's centre (the mockup's convention).
+- **A fifth scope, `section`.** The catalogue in §6 said the section box is "per panel". It repeats once per section that has circuits, spanning that section's circuits along the repeat direction, so it got its own scope.
+- **Group selection.** First matching group wins; each group has its own pitch, and the cursor advances by the pitch of the group just placed. A spare matches only `spare` and `any` rules, so a `circuitType` group never swallows a spare. All groups must repeat in the same direction (validated), which narrows the mockup's per-group direction.
+- **Circuit order.** By section order (circuits with no section last), then number. `sortDirection: 'descending'` reverses the numbers inside each section, not the sections.
+- **Three-phase capacity.** `circuit.capacityL1/L2/L3` split a circuit's capacity across its phase letters equally (L1L2L3 gives a third to each; no phase gives none). This is a first answer to open question 3 for the per-phase VA cells.
+- **Totals table.** `tableColumns: 'panel'` (default) evaluates each row once over all non-spare circuits; `'circuits'` evaluates each row once per circuit in layout order.
+- **Load-type cells.** A block's `loadTypeFilter` narrows `terminals` and `terminal.*` to one load type. The generator only reads `loadType` from the caller's terminal info. Where a terminal's load type comes from is still open question 5.
+- **One panel per call.** Open question 4 (several boards on one sheet) is answered for the generator only: call it once per panel with a different `origin`.
+
+Not done:
+
+- **Not run against the real fixtures.** The tests use a synthetic panel shaped like the examples (sections, a spare, a three-phase circuit, an RCD breaker, a 40-circuit board that must fit the sheet). The two real PDFs are not committed (client data), so no test compares generated output to them. Compare visually once Phase 4 draws it.
+- **The built-in layouts are a first guess.** The positions were computed, not looked at, because nothing draws them yet. Expect to adjust them in Phase 4 and 5.
+- **No persistence.** Where templates are stored (open question 1) and how they are saved and loaded is Phase 6. No terminal-info builder exists yet (stamp plus `terminalCapacities` to `SchematicTerminalInfo`); Phase 4 writes it.
+- **Title block, legend and free items have no data.** They are static text or art. There is no project-data model to bind a title block to.
+- **Aggregate cells only see non-spare circuits** and there is no reserve-capacity function yet.
+- **`accessoryDevice` renders all accessories in one block** (joined text), not one block per accessory.
+
+Verified: `pnpm --filter @mepapp/core test` (22 files, 317 tests, all pass; 70 are new); `tsc --noEmit` and `pnpm --filter @mepapp/core build` clean. Nothing in `render`, `ui` or `apps/web` changed, so no browser run was needed.
 
 ### Phase 4 — Schematic view — not started
 
