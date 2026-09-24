@@ -1060,6 +1060,7 @@
   padding: 6px 0;
 }
 .mep-net-tree-row {
+  box-sizing: border-box; /* rows are divs as well as buttons; width 100% plus padding overflowed the dock as a div */
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1126,6 +1127,11 @@
 /* Electrical Circuits branch (electrical-circuits-model.md §9) — one indent step deeper than the plain Network/Element pair above at each of its extra nesting levels: Panel sits under the "Circuits" pseudo-network row (20px), Section under Panel, Circuit (the leaf) deepest of all. */
 .mep-net-tree-row-panel {
   padding-left: 30px;
+}
+.mep-net-tree-row-panel .mep-net-tree-label {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* keeps the equipment icon on the same line as the panel name */
 }
 .mep-net-tree-row-section {
   padding-left: 40px;
@@ -1351,6 +1357,14 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
+}
+.mep-circuits-icon-btn {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .mep-circuits-group button.on {
   background: var(--accent);
@@ -1970,4 +1984,11 @@
 }
 .mep-source-footer a {
   color: var(--accent-ink);
+}
+
+/* Below this window width the canvas is too narrow for the group labels and the icon row together. */
+@media (max-width: 1100px) {
+  .mep-circuits-group-label {
+    display: none;
+  }
 }

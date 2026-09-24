@@ -193,6 +193,63 @@ export const IconTrash = (props: IconProps) => (
   </Svg>
 );
 
+// ---------- Circuits toolbar ----------
+
+export const IconCircuitNew = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M10.5 2.5 4 12.5h4.5l-1 7 6.5-10H9.5z" />
+    <path d="M18 14v7M14.5 17.5h7" />
+  </Svg>
+);
+
+export const IconTerminalAdd = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="9.5" cy="9.5" r="5.5" />
+    <circle cx="9.5" cy="9.5" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M18 14.5v7M14.5 18h7" />
+  </Svg>
+);
+
+export const IconTerminalRemove = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="9.5" cy="9.5" r="5.5" />
+    <circle cx="9.5" cy="9.5" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M14.5 18h7" />
+  </Svg>
+);
+
+export const IconSpareAdd = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="3" y="6" width="18" height="12" rx="2" strokeDasharray="3 2.5" />
+    <path d="M12 9.5v5M9.5 12h5" />
+  </Svg>
+);
+
+export const IconPanelAssign = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="3" y="3.5" width="11" height="17" rx="1.5" />
+    <path d="M6.5 8h4M6.5 12h4M6.5 16h4" />
+    <path d="M22 12h-5.5M19 9l-3 3 3 3" />
+  </Svg>
+);
+
+export const IconPanelRemove = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="3" y="3.5" width="11" height="17" rx="1.5" />
+    <path d="M6.5 8h4M6.5 12h4M6.5 16h4" />
+    <path d="M17 9l5 6M22 9l-5 6" />
+  </Svg>
+);
+
+export const IconCircuitLines = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M12 6.5 6 17.5M12 6.5l6 11" strokeDasharray="2.6 2.4" />
+    <circle cx="12" cy="5" r="2.2" fill="currentColor" stroke="none" />
+    <circle cx="5.5" cy="19" r="2.2" fill="currentColor" stroke="none" />
+    <circle cx="18.5" cy="19" r="2.2" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
 // ---------- Left rail chrome ----------
 
 export const IconChevRight = (props: IconProps) => (

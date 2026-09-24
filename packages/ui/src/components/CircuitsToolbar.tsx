@@ -1,6 +1,7 @@
-import type { ReactNode, RefObject } from 'react';
+import type { ReactElement, ReactNode, RefObject } from 'react';
 import { findCircuitForTerminal, getCircuitLabel, resolveCurrentCircuitId, type Circuit, type Panel } from '@mepapp/core';
 import type { SketchScene, SketchTool, StampInfo } from '@mepapp/render';
+import { IconCircuitLines, IconCircuitNew, IconPanelAssign, IconPanelRemove, IconSpareAdd, IconTerminalAdd, IconTerminalRemove, IconTrash, type IconProps } from '../icons.js';
 
 export interface CircuitsToolbarProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -107,83 +108,75 @@ export function CircuitsToolbar({
               </optgroup>
             ))}
           </select>
-          <button
-            type="button"
+          <ToolbarIconButton
+            Icon={IconCircuitNew}
+            label="New circuit"
             disabled={toolRunning}
-            title={terminals.length > 0 ? `New circuit from the ${terminals.length} selected terminal${terminals.length === 1 ? '' : 's'}` : 'New empty circuit'}
+            detail={terminals.length > 0 ? `create it from the ${terminals.length} selected terminal${terminals.length === 1 ? '' : 's'}` : 'create an empty circuit'}
             onClick={newCircuit}
-          >
-            New circuit
-          </button>
-          <button
-            type="button"
-            className={tool === 'circuit-add-terminals' ? 'on' : ''}
+          />
+          <ToolbarIconButton
+            Icon={IconTerminalAdd}
+            label="Add terminals"
+            on={tool === 'circuit-add-terminals'}
             disabled={!canWork}
-            title={canWork ? 'Click terminals on the canvas to add them to this circuit' : current?.isSpare ? 'A spare circuit holds no terminals' : needCircuit}
+            detail={canWork ? 'click terminals on the canvas to add them to this circuit' : current?.isSpare ? 'a spare circuit holds no terminals' : needCircuit}
             onClick={() => current && scene?.beginAddTerminalsToCircuit(current.id)}
-          >
-            Add terminals
-          </button>
-          <button
-            type="button"
+          />
+          <ToolbarIconButton
+            Icon={IconTerminalRemove}
+            label="Remove from circuit"
             disabled={toolRunning || removableTerminals.length === 0}
-            title={removableTerminals.length > 0 ? 'Take the selected terminals out of their circuits' : 'Select a terminal that is in a circuit first'}
+            detail={removableTerminals.length > 0 ? 'take the selected terminals out of their circuits' : 'select a terminal that is in a circuit first'}
             onClick={() => scene?.removeTerminalsFromCircuits(removableTerminals.map((t) => t.id))}
-          >
-            Remove from circuit
-          </button>
-          <button
-            type="button"
+          />
+          <ToolbarIconButton
+            Icon={IconSpareAdd}
+            label="Add spare"
             disabled={toolRunning || !current}
-            title={current ? 'Insert a spare before this circuit. This circuit and every later one in its panel move up by one.' : needCircuit}
+            detail={current ? 'insert a spare before this circuit; this circuit and every later one in its panel move up by one' : needCircuit}
             onClick={() => current && scene?.insertSpareAt({ circuitId: current.id })}
-          >
-            Add spare
-          </button>
-          <button
-            type="button"
+          />
+          <ToolbarIconButton
+            Icon={IconTrash}
+            label="Delete"
             disabled={toolRunning || !current}
-            title={current ? 'Delete this circuit. Its terminals stay on the canvas. Undo restores it.' : needCircuit}
+            detail={current ? 'delete this circuit; its terminals stay on the canvas and Undo restores it' : needCircuit}
             onClick={() => {
               if (!current) return;
               scene?.deleteCircuit(current.id);
               setSelectedCircuitId(null);
             }}
-          >
-            Delete
-          </button>
+          />
         </div>
         <div className="mep-circuits-group">
           <span className="mep-circuits-group-label">Panel</span>
-          <button
-            type="button"
-            className={tool === 'circuit-assign-panel' ? 'on' : ''}
+          <ToolbarIconButton
+            Icon={IconPanelAssign}
+            label="Assign panel"
+            on={tool === 'circuit-assign-panel'}
             disabled={!canWork}
-            title={canWork ? 'Click a panel, or equipment to turn into a panel, for this circuit' : current?.isSpare ? 'A spare circuit is created inside its panel' : needCircuit}
+            detail={canWork ? 'click a panel, or equipment to turn into a panel, for this circuit' : current?.isSpare ? 'a spare circuit is created inside its panel' : needCircuit}
             onClick={() => current && scene?.beginAssignPanelToCircuit(current.id)}
-          >
-            Assign panel
-          </button>
-          <button
-            type="button"
+          />
+          <ToolbarIconButton
+            Icon={IconPanelRemove}
+            label="Remove from panel"
             disabled={toolRunning || !current?.panelId || current.isSpare}
-            title={current?.panelId && !current.isSpare ? 'Return this circuit to the unassigned pool' : 'Select a circuit that is on a panel first'}
+            detail={current?.panelId && !current.isSpare ? 'return this circuit to the unassigned pool' : 'select a circuit that is on a panel first'}
             onClick={() => current && scene?.removeCircuitFromPanel(current.id)}
-          >
-            Remove from panel
-          </button>
+          />
         </div>
         <div className="mep-circuits-group">
           <span className="mep-circuits-group-label">View</span>
-          <button
-            type="button"
-            className={showCircuitLines ? 'on' : ''}
-            aria-pressed={showCircuitLines}
-            title="Show the dashed connection lines of the current circuit or panel"
+          <ToolbarIconButton
+            Icon={IconCircuitLines}
+            label="Lines"
+            on={showCircuitLines}
+            pressed={showCircuitLines}
+            detail="show the dashed connection lines of the current circuit or panel"
             onClick={() => onToggleCircuitLines(!showCircuitLines)}
-          >
-            Lines
-          </button>
+          />
         </div>
       </div>
       {(hint || toolRunning) && (
@@ -197,5 +190,36 @@ export function CircuitsToolbar({
         </div>
       )}
     </div>
+  );
+}
+
+interface ToolbarIconButtonProps {
+  Icon: (props: IconProps) => ReactElement;
+  /** The accessible name. Also the first words of the tooltip. */
+  label: string;
+  /** What the button does now, or why it cannot: the second half of the tooltip. */
+  detail: string;
+  onClick: () => void;
+  disabled?: boolean;
+  /** Draws the button as pressed: a running tool or an active toggle. */
+  on?: boolean;
+  /** Set for a toggle so assistive tools read its state. */
+  pressed?: boolean;
+}
+
+/** An icon-only button: the label is the accessible name and the tooltip, so the toolbar stays narrow enough to never wrap at the window widths the app supports. */
+function ToolbarIconButton({ Icon, label, detail, onClick, disabled, on, pressed }: ToolbarIconButtonProps) {
+  return (
+    <button
+      type="button"
+      className={`mep-circuits-icon-btn${on ? ' on' : ''}`}
+      aria-label={label}
+      aria-pressed={pressed}
+      title={`${label} — ${detail}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <Icon size={18} />
+    </button>
   );
 }
