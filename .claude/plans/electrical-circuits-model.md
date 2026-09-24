@@ -755,7 +755,7 @@ Not done: no way to create a spare through the UI yet (E6), so the spare menu an
 
 Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (200 core + 13 pdf-engine-mupdf passed). Real Playwright run, real DOM and canvas input, 11 of 12 steps passed and 1 blocked (spare, see above), no page or console errors: chevron and terminal rows, click selects on canvas, auto-expand, halo ring pixel counts (308 px in the ring band at each member, 0 at a non-member, 0 with Lines off, lines only for a terminal or panel selection, rings also during Add terminals), all four context menus and their items, Escape and outside-click dismissal, Assign panel and Add terminals from the menu, delete with no dialog and a self-dismissing toast, Undo and Redo, toolbar Delete enable rules, stale selection cleared after Undo of a creation. After the run, the number-order sort, the indent (circuits now nest under their panel) and an aria-label fix were re-checked with a screenshot only.
 
-**E5 follow-up — dock stays on Networks; tree keeps its open rows — 2026-09-24, commit `HASH`.**
+**E5 follow-up — dock stays on Networks; tree keeps its open rows — 2026-09-24, commit `8c0b758`.**
 
 User request after E5: selecting an element in the Networks tree (any network, not only circuits) must not jump the dock to Properties. Only a click on the canvas does.
 
