@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import type { SketchScene, NetworkSummary, StampInfo } from '@mepapp/render';
 import { getEffectivePrefix, getStampDefinition, type Circuit, type CircuitType, type Discipline, type Panel, type PanelSection } from '@mepapp/core';
+import type { NetworkTreeExpansion } from '../useNetworkTreeExpansion.js';
 import { IconChevRight, IconChevDown, IconTerminal, IconEquipment } from '../icons.js';
 
 export interface NetworkTreePanelProps {
@@ -19,6 +20,8 @@ export interface NetworkTreePanelProps {
   onSelectCircuit: (id: string) => void;
   onSelectPanel: (id: string) => void;
   onCreateCircuit: (panelId?: string) => void;
+  /** Open rows, kept by the caller so they survive the dock unmounting this tree — see useNetworkTreeExpansion. */
+  expansion: NetworkTreeExpansion;
   /** Deletes a circuit and clears the tree selection if it was that circuit — see App.tsx. */
   onDeleteCircuit: (id: string) => void;
   /** The Show Circuits toggle — see SketchScene.setShowCircuitLines. */
@@ -145,16 +148,15 @@ export function NetworkTreePanel({
   onSelectCircuit,
   onSelectPanel,
   onCreateCircuit,
+  expansion,
   onDeleteCircuit,
   showCircuitLines,
   onToggleCircuitLines,
 }: NetworkTreePanelProps) {
-  const [expandedDisciplines, setExpandedDisciplines] = useState<Set<string>>(new Set());
-  const [expandedNetworks, setExpandedNetworks] = useState<Set<string>>(new Set());
-  const [expandedPanels, setExpandedPanels] = useState<Set<string>>(new Set());
+  const { disciplines: expandedDisciplines, setDisciplines: setExpandedDisciplines, networks: expandedNetworks, setNetworks: setExpandedNetworks, panels: expandedPanels, setPanels: setExpandedPanels } = expansion;
+  const { circuits: expandedCircuits, setCircuits: setExpandedCircuits } = expansion;
   const [editingNetworkTypeId, setEditingNetworkTypeId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [expandedCircuits, setExpandedCircuits] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<{ x: number; y: number; items: TreeMenuItem[] } | null>(null);
   const panelById = new Map(panels.map((p) => [p.id, p]));
   const circuitTypeById = new Map(circuitTypes.map((t) => [t.id, t]));

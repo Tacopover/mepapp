@@ -155,7 +155,15 @@ export function DockPanel({ tabs, content, forcedTabId = null, forcedTabNonce = 
         <div className="mep-dock-header">
           {openTabs.map((t) => (
             <div key={t.id} className={`mep-dock-tab${t.id === activeTab?.id ? ' on' : ''}`}>
-              <button type="button" className="mep-dock-tab-label" onClick={() => setActiveTabId(t.id)}>
+              <button
+                type="button"
+                className="mep-dock-tab-label"
+                onClick={() => {
+                  // A tab the user picks by hand wins over the tab a later release would restore.
+                  wasForcedRef.current = false;
+                  setActiveTabId(t.id);
+                }}
+              >
                 {t.label}
               </button>
               {openTabs.length > 1 && (

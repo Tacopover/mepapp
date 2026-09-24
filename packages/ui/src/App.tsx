@@ -14,6 +14,7 @@ import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ToastStack, useToasts } from './components/Toasts.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
+import { useNetworkTreeExpansion } from './useNetworkTreeExpansion.js';
 import { CircuitsToolbar } from './components/CircuitsToolbar.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
@@ -137,6 +138,7 @@ export function MepSketchApp({
     selectedPanelId,
     setSelectedPanelId,
     circuitToolTargetId,
+    selectionFromCanvas,
     showCircuitLines,
     setShowCircuitLines,
     zoom,
@@ -159,6 +161,7 @@ export function MepSketchApp({
 
   const [status, setStatus] = useState('');
   const { toasts, pushToast, dismissToast } = useToasts();
+  const networkTreeExpansion = useNetworkTreeExpansion();
   useEffect(() => {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
@@ -624,6 +627,7 @@ export function MepSketchApp({
           onSelectCircuit={setSelectedCircuitId}
           onSelectPanel={setSelectedPanelId}
           onCreateCircuit={(panelId) => setSelectedCircuitId(sceneRef.current?.createCircuit({ panelId }) ?? null)}
+          expansion={networkTreeExpansion}
           onDeleteCircuit={(id) => {
             sceneRef.current?.deleteCircuit(id);
             if (selectedCircuitId === id) setSelectedCircuitId(null);
@@ -669,25 +673,23 @@ export function MepSketchApp({
       setForcedTabNonce((n) => n + 1);
       return;
     }
-    // Placing a stamp auto-selects it (see SketchScene.placeStamp), which would otherwise force-jump
-    // the dock to Properties mid-placement — moot here since place-terminal/place-equipment is
-    // handled above and never reaches this branch while armed. Only jump to Properties on 'select'
-    // with something selected; any other tool (or 'select' with nothing selected) restores whatever
-    // tab the user had open.
-    // A selected circuit/panel counts as "something selected" too, and the Add-to-Circuit tool keeps
-    // Properties (its live terminal list) on screen: without these, any 'drawingChanged' (Undo, a stamp
-    // move) re-runs this effect with a fresh selectedSegments array, resolves to null, and releases the
-    // dock back to whatever tab the user had before the circuit selection jumped it to Properties.
-    setForcedTabId(
-      tool === 'circuit-add-terminals' ||
-        tool === 'circuit-assign-panel' ||
-        ((tool === 'select' || tool === 'circuits') &&
-          (selection.length > 0 || selectedSegment || selectedSegments.length > 0 || selectedFitting || selectedCircuitId || selectedPanelId))
-        ? 'properties'
-        : null,
-    );
+    // The dock jumps to Properties only for a selection the user made with a click on the canvas.
+    // Anything made in a panel (a Networks-tree row, a Properties link, a circuit or panel picked in
+    // the tree or the Circuits toolbar) leaves the dock alone, so the user can keep navigating the
+    // tree; so does a running Add-terminals or Assign-panel tool. "Leaves the dock alone" means
+    // returning without touching forcedTabId: setting it to null would release an earlier canvas-click
+    // force and send the dock back to the tab the user had before that click.
+    // Placing a stamp auto-selects it (see SketchScene.placeStamp), but place-terminal/place-equipment
+    // is handled above and never reaches here while armed.
+    if (tool === 'circuit-add-terminals' || tool === 'circuit-assign-panel') return;
+    if (selectedCircuitId || selectedPanelId) return;
+    const canvasSelection = (selection.length > 0 && selectionFromCanvas) || selectedSegment || selectedSegments.length > 0 || selectedFitting;
+    if (selection.length > 0 && !selectionFromCanvas && !canvasSelection) return;
+    // A drawingChanged (Undo, a stamp move) re-runs this effect with a fresh selectedSegments array;
+    // a canvas selection must keep resolving to 'properties', or that re-run would release the dock.
+    setForcedTabId((tool === 'select' || tool === 'circuits') && canvasSelection ? 'properties' : null);
     setForcedTabNonce((n) => n + 1);
-  }, [selection, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool]);
+  }, [selection, selectionFromCanvas, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool]);
 
   // A circuit or panel that disappears (delete, or Undo of its creation) cannot stay selected in the tree.
   useEffect(() => {
@@ -709,16 +711,6 @@ export function MepSketchApp({
       setForcedTabNonce((n) => n + 1);
     }
   }, [inCircuitsFamily, tool, setShowCircuitLines]);
-
-  // The Electrical Circuits tree's own selection (selectedCircuitId/selectedPanelId) is app-level
-  // state, not a canvas selection, so it needs its own jump-to-Properties effect rather than folding
-  // into the one above (which is keyed on 'select' tool + canvas selection state only).
-  useEffect(() => {
-    if (selectedCircuitId || selectedPanelId) {
-      setForcedTabId('properties');
-      setForcedTabNonce((n) => n + 1);
-    }
-  }, [selectedCircuitId, selectedPanelId]);
 
   return (
     <div className="mep-app">

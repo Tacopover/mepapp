@@ -755,6 +755,20 @@ Not done: no way to create a spare through the UI yet (E6), so the spare menu an
 
 Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (200 core + 13 pdf-engine-mupdf passed). Real Playwright run, real DOM and canvas input, 11 of 12 steps passed and 1 blocked (spare, see above), no page or console errors: chevron and terminal rows, click selects on canvas, auto-expand, halo ring pixel counts (308 px in the ring band at each member, 0 at a non-member, 0 with Lines off, lines only for a terminal or panel selection, rings also during Add terminals), all four context menus and their items, Escape and outside-click dismissal, Assign panel and Add terminals from the menu, delete with no dialog and a self-dismissing toast, Undo and Redo, toolbar Delete enable rules, stale selection cleared after Undo of a creation. After the run, the number-order sort, the indent (circuits now nest under their panel) and an aria-label fix were re-checked with a screenshot only.
 
+**E5 follow-up — dock stays on Networks; tree keeps its open rows — 2026-09-24, commit `HASH`.**
+
+User request after E5: selecting an element in the Networks tree (any network, not only circuits) must not jump the dock to Properties. Only a click on the canvas does.
+
+Shipped:
+- `SketchScene.isCanvasSelectionChange`: true while a selection change runs inside a canvas pointer-down, pointer-up or key-down handler (`asCanvasInteraction` wrapper). Tree selection (`selectStampById`), Undo, Redo and Properties edits are not canvas interactions. `useSketchScene` exposes it as `selectionFromCanvas`.
+- `App.tsx` dock effect: it returns early, without touching the dock, for a tree-made stamp selection, for a selected circuit or panel, and while Add terminals or Assign panel runs. The separate "circuit selected → Properties" effect is gone. A canvas click on a stamp, segment or fitting still jumps to Properties.
+- `useNetworkTreeExpansion.ts`: the open discipline, network, panel and circuit rows live in `App.tsx`, so they survive the dock unmounting the tree.
+- `DockPanel.tsx`: a tab the user clicks by hand cancels the pending restore. Without it, deselecting on the canvas sent the dock back to a tab from before the last force (MEP), not the one the user was on.
+
+Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (200 core + 13 pdf-engine-mupdf passed). Real Playwright run, real DOM and canvas input, 9 steps: tree selection of circuit-terminal, circuit, panel and network-element rows keeps Networks with the stamp highlighted on the canvas; the panel and terminal menu items keep Networks; a canvas click on a terminal or segment jumps to Properties; open rows survive an MEP round trip and a canvas selection opens its circuit; toolbar flows, tree "Add terminals" and Assign panel keep Networks; Undo and Redo keep Networks (the first run found Undo jumping to Properties, which the canvas-interaction flag fixed); placing a stamp still opens MEP; no page or console errors. Deselecting on the canvas after a manual switch to Networks now stays on Networks (re-run of that step after the DockPanel change).
+
+Not done: Add terminals started from Properties keeps the dock on Properties (the user is already there); Properties edits do not switch tabs.
+
 **E6 — Lifecycle UI for existing commands**
 - Insert spare (Circuits toolbar, tree menu, panel and circuit Properties). Renumber field with commit on blur. A swap must raise a toast ("Swapped with L1.4"). Bulk prefix/type edit mode with tree checkboxes. Bulk type edit must go through the command stack, unlike the old app.
 - All three commands already exist (`insertSpareCircuit`, `renumberCircuit`, `setCircuitPrefixBulk`). This sub-phase is UI only.

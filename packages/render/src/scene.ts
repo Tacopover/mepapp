@@ -485,6 +485,7 @@ export class SketchScene {
     appearanceDefault?: { color?: string; scale?: number };
   } | null = null;
   /** The circuit the 'circuit-add-terminals' tool is filling, and the terminal its pointer is over — both cleared by setTool() on leaving that tool. See beginAddTerminalsToCircuit. */
+  private canvasInteraction = false;
   private circuitToolTargetId: string | null = null;
   /** Where Escape sends a running circuit sub-tool: 'circuits' when it started inside Circuits mode, else 'select'. See setTool. */
   private circuitToolReturn: 'select' | 'circuits' = 'select';
@@ -1190,6 +1191,11 @@ export class SketchScene {
     this.doc.selectedIds = new Set([id]);
     this.emitter.emit('selectionChanged', this.getSelection());
     this.redrawOverlay();
+  }
+
+  /** True only while a 'selectionChanged' listener runs for a selection made by a click, drag or key press on the canvas — not for one made through selectStampById (the Networks tree, a Properties link), Undo or a Properties edit. The dock uses it to jump to Properties only for the first kind. */
+  isCanvasSelectionChange(): boolean {
+    return this.canvasInteraction;
   }
 
   /** Clears the canvas selection — the Electrical Circuits tree's click-to-select-a-circuit/panel action needs this first, since a Circuit/Panel has no canvas presence of its own to select instead (see the Circuit/Panel API section below). */
@@ -2763,7 +2769,23 @@ export class SketchScene {
     return [];
   }
 
-  private readonly onPointerDown = (event: FederatedPointerEvent): void => {
+  // A selection that a click, drag or key press on the canvas produces is what makes the dock jump to
+  // Properties; one made by the Networks tree, a Properties link, Undo or a panel edit is not. These
+  // wrappers mark the first kind — see isCanvasSelectionChange.
+  private readonly onPointerDown = (event: FederatedPointerEvent): void => this.asCanvasInteraction(() => this.pointerDownImpl(event));
+  private readonly onPointerUp = (event: FederatedPointerEvent): void => this.asCanvasInteraction(() => this.pointerUpImpl(event));
+  private readonly onKeyDown = (event: KeyboardEvent): void => this.asCanvasInteraction(() => this.keyDownImpl(event));
+
+  private asCanvasInteraction(run: () => void): void {
+    this.canvasInteraction = true;
+    try {
+      run();
+    } finally {
+      this.canvasInteraction = false;
+    }
+  }
+
+  private readonly pointerDownImpl = (event: FederatedPointerEvent): void => {
     const screen = { x: event.global.x, y: event.global.y };
     const world = this.screenToWorld(screen);
 
@@ -2805,7 +2827,7 @@ export class SketchScene {
     this.dragHandlers.get(this.drag.kind)?.onMove(this.ctx, event, world);
   };
 
-  private readonly onPointerUp = (event: FederatedPointerEvent): void => {
+  private readonly pointerUpImpl = (event: FederatedPointerEvent): void => {
     this.dragHandlers.get(this.drag.kind)?.onEnd(this.ctx, event);
     this.drag = { kind: 'none' };
     this.redrawOverlay();
@@ -2858,7 +2880,7 @@ export class SketchScene {
    * input/textarea so it doesn't fight typing in, e.g., the Properties
    * panel or the textbox-annotation floating textarea.
    */
-  private readonly onKeyDown = (event: KeyboardEvent): void => {
+  private readonly keyDownImpl = (event: KeyboardEvent): void => {
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
 

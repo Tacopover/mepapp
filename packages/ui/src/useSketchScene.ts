@@ -63,6 +63,8 @@ export interface UseSketchScene {
   setSelectedPanelId: (id: string | null) => void;
   /** The circuit the Add-to-Circuit tool is filling, or null when that tool is not active — see SketchScene.getCircuitToolTarget. */
   circuitToolTargetId: string | null;
+  /** True when the current stamp selection came from a click, drag or key press on the canvas; false when it came from the Networks tree, a Properties link, Undo or a panel edit. Decides whether the dock jumps to Properties (App.tsx). */
+  selectionFromCanvas: boolean;
   /** The Show Circuits toggle — connection lines from the selected terminal/circuit/panel. Session state; stays on until switched off. */
   showCircuitLines: boolean;
   setShowCircuitLines: Dispatch<SetStateAction<boolean>>;
@@ -109,6 +111,7 @@ export function useSketchScene(): UseSketchScene {
   const [selectedCircuitId, setSelectedCircuitIdState] = useState<string | null>(null);
   const [selectedPanelId, setSelectedPanelIdState] = useState<string | null>(null);
   const [circuitToolTargetId, setCircuitToolTargetId] = useState<string | null>(null);
+  const [selectionFromCanvas, setSelectionFromCanvas] = useState(true);
   const [showCircuitLines, setShowCircuitLines] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pageIndex, setPageIndex] = useState(0);
@@ -174,6 +177,7 @@ export function useSketchScene(): UseSketchScene {
 
     const onSelectionChanged = (s: StampInfo[]) => {
       setSelection(s);
+      setSelectionFromCanvas(scene.isCanvasSelectionChange());
       setSelectedSegment(scene.getSelectedSegmentInfo());
       setSelectedSegments(scene.getSelectedSegments());
       setSelectedFitting(scene.getSelectedFittingInfo());
@@ -377,6 +381,7 @@ export function useSketchScene(): UseSketchScene {
     selectedPanelId,
     setSelectedPanelId,
     circuitToolTargetId,
+    selectionFromCanvas,
     showCircuitLines,
     setShowCircuitLines,
     zoom,
