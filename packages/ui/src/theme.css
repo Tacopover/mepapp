@@ -2116,6 +2116,42 @@
 .mep-schematic-canvas:active {
   cursor: grabbing;
 }
+.mep-schematic-main {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-height: 0;
+}
+.mep-schematic-side {
+  flex: 0 0 250px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.mep-schematic-side input[type='text'],
+.mep-schematic-side input[type='date'],
+.mep-schematic-side textarea,
+.mep-schematic-create input[type='text'],
+.mep-schematic-create select {
+  width: 100%;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.mep-schematic-create {
+  max-width: 420px;
+}
+.mep-schematic-create-actions {
+  display: flex;
+  gap: 8px;
+}
+.mep-schematic-textedit {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.mep-schematic-textedit textarea {
+  flex: 1 1 auto;
+  font-size: 12px;
+}
 
 /* Schematic template editor (electrical-schematic-templates.md Phase 5) */
 .mep-schematic-editor {
