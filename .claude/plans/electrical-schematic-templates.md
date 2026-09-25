@@ -387,11 +387,31 @@ Not done:
 
 Verified: core 367 tests; UI 33 tests; root `pnpm build` 9 of 9. Headless browser (Playwright, own port): the stamp editor regression (all shape tools, transform, mirror, undo, snap indicators, port tool, view, save and place) passed. Drawing blocks passed: 4-shape drawing at the right proportion with 0.300 mm strokes; move, resize, rotate; one undo step for a whole drawing session; Cancel; Escape keeps the dialog open; a group drawing on all 5 circuits changing together; the drawn symbol replacing the deleted protective device; empty drawings dashed only in the editor; reload keeps 1 layout and 2 group drawings and `validateSchematicTemplate` returns no issues. No page or console errors. Not checked: Windows, touch.
 
-### Phase 6 — Save and load templates, export — not started
+### Phase 5b — Fields, saved schematics, drawing everywhere — in progress (started 2026-09-25)
 
-Storage and export format depend on open questions 1 and 2.
+Added after the user reviewed Phase 5 on 2026-09-25. A template generates about 80% of a schematic. The rest is filled in per schematic (project name, date, author, revision) or drawn on the schematic. Decisions by the user:
 
-A block stores only a symbol's id (`symbolId`). So saving or exporting a template must bundle the symbols that the template uses, and loading it must add any symbol the installation does not have (shared-drawing-tool Phase 4 note, 2026-09-25). Custom templates and symbols are in localStorage until then.
+1. Project-wide fields are entered once and shared by every schematic.
+2. The project file keeps a copy of the template (and of the symbols it uses). The user loads later template edits into the schematic by hand.
+3. A schematic covers exactly one panel.
+4. **Deferred, ask again later** with a concrete example: how the protective device symbol is chosen per circuit (per group, or from a mapping by device kind such as breaker, RCD, fuse).
+
+Design:
+- **Template fields.** `SchematicTemplate.fields?: SchematicFieldDefinition[]` (optional, so saved templates still load). A definition has `id` (a name usable in bindings as `{field.<id>}`), `label`, `type` (text, multiline, date, number), `scope` (`project` or `schematic`) and an optional default (a binding evaluated on the panel, or "today" for a date). Every block scope can read `field`. The built-in title block uses fields.
+- **Values.** A project-scope value is stored once in the project, by field id, so two templates that define the same id share it. A schematic-scope value is stored in the schematic. No value stored means the default applies.
+- **Schematic** (stored in the project document, schema version 11): `id`, `name`, `panelId`, a copy of the template, the source template id, a copy of the symbols the template uses, `fieldValues`, `textOverrides` (text typed over a generated block, keyed by the block's stable resolved id), and `extras` (items drawn on the schematic, step 5b-3).
+- **Update from template.** The schematic dialog shows a banner when the source template no longer matches the copy. "Update from template" replaces the copy and the symbol copies. Text overrides that no longer match a block are listed, not dropped.
+- **Dialog change.** The schematic dialog opens for one panel. It lists that panel's schematics, creates one from a template, has a Fields form, edits text in place, and has draw and symbol tools on the sheet.
+- **Drawing tools everywhere.** The same draw and symbol tools work on the template canvas and on the schematic sheet. The separate "Drawing" palette entries then go.
+
+Steps, in order:
+- 5b-1 Symbol property on device blocks (mainDevice, protectiveDevice, accessoryDevice, loadSymbol). Status: not started.
+- 5b-2 Fields and the saved schematic (core, project schema, dialogs). Status: not started.
+- 5b-3 Drawing and symbol tools on the template canvas and on the schematic sheet. Status: not started.
+
+### Phase 6 — Export, and loading templates from a file — not started
+
+Storage in the project file moved into Phase 5b. What is left: export (open question 2), and loading and saving a template as a file to share between projects. Custom templates and symbols stay in localStorage until then.
 
 ## 11. Non-goals for v1
 
