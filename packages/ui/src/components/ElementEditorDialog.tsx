@@ -4,13 +4,13 @@ import { Dialog } from './Dialog.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { stampLabelFor } from './StampsPanel.js';
 import type { StampLabelLanguage } from './LanguageToggle.js';
-import { DEFAULT_STYLE, GRID_SPACING_FRACTION, useShapeDrawEditor, type BuiltinShapeTool } from '../useShapeDrawEditor.js';
+import { DEFAULT_STYLE, GRID_SPACING_FRACTION, useShapeDrawEditor } from '../useShapeDrawEditor.js';
 import { usePortEditor } from '../usePortEditor.js';
 import { fitCanvasSize } from '../shapeCanvasSize.js';
-import { IconPort } from '../icons.js';
 import { rasterizeSymbolShapes, rescaleShapeForCanvasResize } from '../symbolShapeCanvas.js';
 import { ShapeDrawSurface } from './ShapeDrawSurface.js';
-import { BUILTIN_SHAPE_TOOL_DEFS, ShapeStyleBar, ShapeToolRail, type ShapeToolDef } from './ShapeDrawToolbar.js';
+import { PORT_SHAPE_TOOL_DEFS, ShapeStyleBar, ShapeToolRail, type PortShapeTool } from './ShapeDrawToolbar.js';
+import { PortMarkers, PortsSidebar } from './PortEditorParts.js';
 
 /** Same 300 DPI convention as stampBitmap.ts/scene.ts's STAMP_SOURCE_DPI — stamp art's pixel size at 300 DPI is expected to match its nominal size in PDF points. */
 const STAMP_SOURCE_DPI = 300;
@@ -35,11 +35,6 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = {
   electrical: 'Electrical',
   other: 'Other',
 };
-
-type ShapeTool = BuiltinShapeTool | 'port';
-
-/** The Shape tools plus the stamp-only Port tool, right after Select. */
-const SHAPE_TOOLS: ShapeToolDef<ShapeTool>[] = [BUILTIN_SHAPE_TOOL_DEFS[0], { tool: 'port', label: 'Port', Icon: IconPort }, ...BUILTIN_SHAPE_TOOL_DEFS.slice(1)];
 
 type ElementEditorTab = 'shapes' | 'ports' | 'labels';
 
@@ -96,7 +91,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // marquee/select interactions, undo, view pan/zoom, keyboard shortcuts. 'port' isn't a tool it
   // knows about, so its pointer-down falls through to onUnhandledToolPointerDown, which hands
   // off to portsEditor below.
-  const editor = useShapeDrawEditor<ShapeTool>({
+  const editor = useShapeDrawEditor<PortShapeTool>({
     canvasWidthPx,
     canvasHeightPx,
     // Seeds the undo-tracked shape list once, on mount (useState lazy-initializer semantics —
@@ -394,94 +389,14 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
         </div>
 
         <div className="mep-ee-grid">
-          {activeTab === 'shapes' && <ShapeToolRail editor={editor} tools={SHAPE_TOOLS} />}
+          {activeTab === 'shapes' && <ShapeToolRail editor={editor} tools={PORT_SHAPE_TOOL_DEFS} />}
 
           <ShapeDrawSurface editor={editor} canvasWidthPx={canvasWidthPx} canvasHeightPx={canvasHeightPx}>
-            {portsEditor.ports.map((port) => (
-              <div
-                key={port.id}
-                className={`mep-element-editor-port${portsEditor.linkMode && portsEditor.linkFirstPortId === port.id ? ' selected' : ''}`}
-                style={{ left: `${port.fractionX * 100}%`, top: `${port.fractionY * 100}%` }}
-                onPointerDown={(e) => portsEditor.handlePortPointerDown(e, port.id)}
-                onClick={(e) => e.stopPropagation()}
-                onDoubleClick={(e) => portsEditor.handlePortDoubleClick(e, port)}
-                title={port.name}
-              >
-                <span className="mep-element-editor-port-label">{port.name}</span>
-              </div>
-            ))}
-            {portsEditor.editingPort && (
-              <input
-                autoFocus
-                className="mep-element-editor-port-rename"
-                style={{
-                  left: `${portsEditor.editingPort.fractionX * 100}%`,
-                  top: `${portsEditor.editingPort.fractionY * 100}%`,
-                  transform: `scale(${1 / editor.view.scale}) translate(-50%, -140%)`,
-                }}
-                value={portsEditor.editPortName}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => portsEditor.setEditPortName(e.target.value)}
-                onBlur={portsEditor.commitPortRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') portsEditor.commitPortRename();
-                  if (e.key === 'Escape') portsEditor.setEditingPortId(null);
-                }}
-              />
-            )}
+            <PortMarkers portsEditor={portsEditor} viewScale={editor.view.scale} />
           </ShapeDrawSurface>
 
           <div className="mep-ee-sidebar" style={{ gridColumn: '3 / 4' }}>
-            {activeTab === 'ports' && (
-              <>
-                <p className="mep-hint">Use the Port tool on the Shapes tab to add a port. Drag a port to move it. Double-click a port to rename it.</p>
-                {portsEditor.ports.length > 0 && (
-                  <div className="mep-section">
-                    <h4>Ports</h4>
-                    {portsEditor.ports.map((port) => (
-                      <div className="mep-port-list-row" key={port.id}>
-                        <input value={port.name} onChange={(e) => portsEditor.setPorts((prev) => prev.map((p) => (p.id === port.id ? { ...p, name: e.target.value } : p)))} />
-                        <button type="button" className="mep-property-row-remove" onClick={() => portsEditor.removePort(port.id)} title="Remove port">
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {portsEditor.ports.length >= 2 && (
-                  <div className="mep-section">
-                    <h4>Linked Ports</h4>
-                    <p className="mep-hint">
-                      Linked ports collapse into one connectivity node once placed — e.g. a unit's supply and return,
-                      so a segment between them never bridges the two networks.
-                    </p>
-                    <button
-                      type="button"
-                      className={portsEditor.linkMode ? 'on' : ''}
-                      onClick={() => {
-                        portsEditor.setLinkMode(!portsEditor.linkMode);
-                        portsEditor.setLinkFirstPortId(null);
-                      }}
-                    >
-                      {portsEditor.linkMode ? 'Done linking' : 'Link ports…'}
-                    </button>
-                    {portsEditor.linkMode && <p className="mep-hint">Click two ports above to link them.</p>}
-                    {portsEditor.groups.length > 0 && (
-                      <div style={{ marginTop: 8 }}>
-                        {portsEditor.groups.map((group, i) => (
-                          <span className="mep-port-group-chip" key={i}>
-                            {group.map(portsEditor.portName).join(' + ')}
-                            <button type="button" className="mep-property-row-remove" onClick={() => portsEditor.ungroup(i)} title="Ungroup">
-                              ✕
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+            {activeTab === 'ports' && <PortsSidebar portsEditor={portsEditor} hint="Use the Port tool on the Shapes tab to add a port. Drag a port to move it. Double-click a port to rename it." />}
             {activeTab === 'labels' && <p className="mep-hint">Labels — coming soon.</p>}
           </div>
         </div>

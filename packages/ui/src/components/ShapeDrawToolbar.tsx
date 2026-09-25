@@ -15,6 +15,7 @@ import {
   IconObjectSnap,
   IconPlus,
   IconPolygonTool,
+  IconPort,
   IconRectTool,
   IconRedo,
   IconRotate,
@@ -49,6 +50,11 @@ export const BUILTIN_SHAPE_TOOL_DEFS: ShapeToolDef<BuiltinShapeTool>[] = [
   { tool: 'polygon', label: 'Polygon', Icon: IconPolygonTool },
   { tool: 'text', label: 'Text', Icon: IconTextbox },
 ];
+
+export type PortShapeTool = BuiltinShapeTool | 'port';
+
+/** The built-in tools plus the Port tool, right after Select. The stamp editor and the symbol editor both use it; `usePortEditor` handles the tool's click. */
+export const PORT_SHAPE_TOOL_DEFS: ShapeToolDef<PortShapeTool>[] = [BUILTIN_SHAPE_TOOL_DEFS[0], { tool: 'port', label: 'Port', Icon: IconPort }, ...BUILTIN_SHAPE_TOOL_DEFS.slice(1)];
 
 /** Icon-only rail (element-editor-ui-redesign-spec.md §2) — reuses the main canvas's own icon set (Rail.tsx / icons.tsx) where a tool already has one. Sits in the first column of `.mep-ee-grid`. */
 export function ShapeToolRail<TTool extends string>({ editor, tools }: { editor: ShapeDrawEditor<TTool>; tools: ShapeToolDef<TTool>[] }) {
