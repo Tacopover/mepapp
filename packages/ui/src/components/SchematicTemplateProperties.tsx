@@ -263,7 +263,7 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
 
 const FIELD_TYPE_LABELS: Record<SchematicFieldDefinition['type'], string> = { text: 'Text', multiline: 'Multi-line text', date: 'Date', number: 'Number' };
 
-/** The id box keeps its own text while it has focus and commits only an id that is valid and free, so the template never holds a bad or repeated id. */
+/** The id box keeps its own text while it has focus and commits, on Enter or when it loses focus, only an id that is valid and free, so the template never holds a bad or repeated id. */
 function FieldIdInput({ value, others, onCommit, onBlur }: { value: string; others: string[]; onCommit: (id: string) => void; onBlur: () => void }) {
   const [text, setText] = useState(value);
   const focused = useRef(false);
@@ -279,13 +279,14 @@ function FieldIdInput({ value, others, onCommit, onBlur }: { value: string; othe
         onFocus={() => {
           focused.current = true;
         }}
-        onChange={(e) => {
-          setText(e.target.value);
-          if (FIELD_ID_PATTERN.test(e.target.value) && !others.includes(e.target.value)) onCommit(e.target.value);
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
         }}
         onBlur={() => {
           focused.current = false;
-          setText(value);
+          if (text !== value && FIELD_ID_PATTERN.test(text) && !others.includes(text)) onCommit(text);
+          else setText(value);
           onBlur();
         }}
       />

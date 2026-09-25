@@ -101,7 +101,7 @@ export function SchematicSymbolLibrary({ symbols, onChange, usesOf, onPick, onCl
                 </button>
                 {pendingDeleteId === symbol.id ? (
                   <div className="mep-symbol-tile-actions">
-                    <span className="mep-schematic-hint">{uses > 0 ? (uses === 1 ? 'Used by 1 block. It shows a missing-symbol box.' : `Used by ${uses} blocks. They show a missing-symbol box.`) : 'Delete this symbol?'}</span>
+                    <span className="mep-schematic-hint">{uses > 0 ? (uses === 1 ? 'Used by 1 block. A drawing shows a missing-symbol box; a device block shows its built-in mark.' : `Used by ${uses} blocks. A drawing shows a missing-symbol box; a device block shows its built-in mark.`) : 'Delete this symbol?'}</span>
                     <button type="button" onClick={() => remove(symbol.id)}>
                       Delete
                     </button>
