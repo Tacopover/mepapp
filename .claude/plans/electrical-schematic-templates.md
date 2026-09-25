@@ -391,6 +391,8 @@ Verified: core 367 tests; UI 33 tests; root `pnpm build` 9 of 9. Headless browse
 
 Storage and export format depend on open questions 1 and 2.
 
+A block stores only a symbol's id (`symbolId`). So saving or exporting a template must bundle the symbols that the template uses, and loading it must add any symbol the installation does not have (shared-drawing-tool Phase 4 note, 2026-09-25). Custom templates and symbols are in localStorage until then.
+
 ## 11. Non-goals for v1
 
 - Single-line diagrams (a later schematic type that reuses the same building blocks)
