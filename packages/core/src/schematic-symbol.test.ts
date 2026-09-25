@@ -43,7 +43,9 @@ describe('countSymbolUses', () => {
     a.layoutBlocks.push({ id: 'x1', type: 'drawing', x: 0, y: 0, rotation: 0, symbolId: 'sym' });
     a.groups[0].blocks.push({ id: 'x2', type: 'drawing', x: 0, y: 0, rotation: 0, symbolId: 'sym' });
     b.groups[0].blocks.push({ id: 'x3', type: 'drawing', x: 0, y: 0, rotation: 0, symbolId: 'other' });
-    expect(countSymbolUses([a, b], 'sym')).toBe(2);
+    a.groups[1].blocks.push({ id: 'x4', type: 'protectiveDevice', x: 0, y: 0, rotation: 0, symbolId: 'sym' });
+    a.layoutBlocks.push({ id: 'x5', type: 'mainDevice', x: 0, y: 0, rotation: 0, symbolId: 'sym' });
+    expect(countSymbolUses([a, b], 'sym')).toBe(4);
     expect(countSymbolUses([a, b], 'other')).toBe(1);
     expect(countSymbolUses([a, b], 'none')).toBe(0);
   });

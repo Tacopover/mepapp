@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SCHEMATIC_TEMPLATE_LIBRARY } from './schematic-template-library.js';
-import { SCHEMATIC_BLOCK_CATALOGUE, getBlockBindingSource, getBlockHeight, getBlockWidth, validateSchematicTemplate, type SchematicBlock, type SchematicTemplate } from './schematic-template.js';
+import { SCHEMATIC_BLOCK_CATALOGUE, SYMBOL_CAPABLE_BLOCK_TYPES, getBlockBindingSource, getBlockHeight, getBlockWidth, validateSchematicTemplate, type SchematicBlock, type SchematicTemplate } from './schematic-template.js';
 
 const base = SCHEMATIC_TEMPLATE_LIBRARY[0];
 
@@ -91,6 +91,17 @@ describe('validateSchematicTemplate', () => {
     expect(validateSchematicTemplate(copy((t) => t.layoutBlocks.push(b('sym', 'drawing', { symbolId: 'my-symbol' }))))).toEqual([]);
     expect(validateSchematicTemplate(copy((t) => (t.layoutBlocks[0].symbolId = 'my-symbol')))).toHaveLength(1);
     expect(validateSchematicTemplate(copy((t) => t.layoutBlocks.push(b('sym', 'drawing', { symbolId: ' ' }))))).toHaveLength(1);
+  });
+
+  it('accepts a symbol on every symbol-capable type and flags one on any other type', () => {
+    for (const type of SYMBOL_CAPABLE_BLOCK_TYPES) {
+      const groupBlock = SCHEMATIC_BLOCK_CATALOGUE[type].scope === 'circuit';
+      const template = copy((t) => (groupBlock ? t.groups[1].blocks : t.layoutBlocks).push(b('sym', type, { symbolId: 'my-symbol' })));
+      expect(validateSchematicTemplate(template), type).toEqual([]);
+    }
+    const bad = validateSchematicTemplate(copy((t) => t.layoutBlocks.push(b('sym', 'legend', { symbolId: 'my-symbol' }))));
+    expect(bad).toHaveLength(1);
+    expect(bad[0]).toContain('cannot show one');
   });
 
   it('flags a duplicate group id and a missing name', () => {

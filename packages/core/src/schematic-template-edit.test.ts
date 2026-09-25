@@ -8,6 +8,7 @@ import {
   buildSampleSchematicInput,
   copyTemplate,
   detachBlockSymbol,
+  setBlockSymbol,
   duplicateBlock,
   duplicateGroup,
   findBlock,
@@ -406,3 +407,54 @@ describe('symbol blocks', () => {
 function mapGroup(template: SchematicTemplate, groupId: string, block: SchematicTemplate['layoutBlocks'][number]): SchematicTemplate {
   return { ...template, groups: template.groups.map((g) => (g.id === groupId ? { ...g, blocks: [...g.blocks, block] } : g)) };
 }
+
+describe('setBlockSymbol', () => {
+  const symbol = { id: 'sym-2' };
+  const protective = { blockId: base.groups[1].blocks.find((b) => b.type === 'protectiveDevice')!.id, groupId: base.groups[1].id };
+
+  it('points a device block at a symbol without changing its size or text', () => {
+    const before = findBlock(clone(), protective)!;
+    const after = findBlock(setBlockSymbol(clone(), protective, symbol), protective)!;
+    expect(after.symbolId).toBe('sym-2');
+    expect(after.width).toBe(before.width);
+    expect(after.height).toBe(before.height);
+    expect(after.binding).toBe(before.binding);
+  });
+
+  it('clears the symbol so the block returns to its built-in mark', () => {
+    const set = setBlockSymbol(clone(), protective, symbol);
+    const cleared = findBlock(setBlockSymbol(set, protective, undefined), protective)!;
+    expect('symbolId' in cleared).toBe(false);
+    expect(validateSchematicTemplate(setBlockSymbol(set, protective, undefined))).toEqual([]);
+  });
+
+  it('works for the main device in the layout and validates', () => {
+    const main = { blockId: base.layoutBlocks.find((b) => b.type === 'mainDevice')!.id };
+    const template = setBlockSymbol(clone(), main, symbol);
+    expect(findBlock(template, main)!.symbolId).toBe('sym-2');
+    expect(validateSchematicTemplate(template)).toEqual([]);
+  });
+
+  it('carries the symbol id into every generated instance', () => {
+    const template = setBlockSymbol(clone(), protective, symbol);
+    const generated = generateSchematic(buildSampleSchematicInput(template), template);
+    const instances = generated.blocks.filter((b) => b.templateBlockId === protective.blockId && b.groupId === protective.groupId);
+    expect(instances.length).toBeGreaterThan(1);
+    expect(instances.every((b) => b.symbolId === 'sym-2')).toBe(true);
+  });
+
+  it('on a drawing it drops the drawing shapes', () => {
+    const added = addBlock(clone(), 'drawing')!;
+    const drawn = updateBlock(added.template, added.ref, { shapes: [{ id: 's', kind: 'line', x1: 0, y1: 0, x2: 1, y2: 1, style: { stroke: '#000000', strokeWidth: 0.02, fill: null } }] });
+    const block = findBlock(setBlockSymbol(drawn, added.ref, symbol), added.ref)!;
+    expect(block.symbolId).toBe('sym-2');
+    expect('shapes' in block).toBe(false);
+  });
+
+  it('leaves a block that cannot show a symbol alone', () => {
+    const template = clone();
+    expect(setBlockSymbol(template, { blockId: 'nope' }, symbol)).toBe(template);
+    const frame = { blockId: base.layoutBlocks.find((b) => b.type === 'frame')!.id };
+    expect(setBlockSymbol(template, frame, symbol)).toBe(template);
+  });
+});

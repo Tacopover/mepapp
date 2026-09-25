@@ -8,6 +8,7 @@ import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import { circuitMatchesRule, type ResolvedBlock, type SchematicInput, type SchematicTerminalInfo } from './schematic-generator.js';
 import {
   SCHEMATIC_BLOCK_CATALOGUE,
+  SYMBOL_CAPABLE_BLOCK_TYPES,
   type CircuitGroupDefinition,
   type CircuitGroupRule,
   type SchematicBlock,
@@ -101,6 +102,18 @@ export function addSymbolBlock(
   const added = addBlock(template, 'drawing', options);
   if (!added) return undefined;
   return { template: updateBlock(added.template, added.ref, { symbolId: symbol.id, shapes: undefined, width: symbol.widthMm, height: symbol.heightMm }), ref: added.ref };
+}
+
+/**
+ * Points a block at a library symbol, or clears it with `undefined` so the block returns to its
+ * built-in mark. The block size does not change: the symbol is stretched into the block box. On a
+ * drawing the symbol replaces its own shapes.
+ */
+export function setBlockSymbol(template: SchematicTemplate, ref: BlockRef, symbol: Pick<SchematicSymbol, 'id'> | undefined): SchematicTemplate {
+  const block = findBlock(template, ref);
+  if (!block || !SYMBOL_CAPABLE_BLOCK_TYPES.includes(block.type)) return template;
+  if (!symbol) return updateBlock(template, ref, { symbolId: undefined });
+  return updateBlock(template, ref, block.type === 'drawing' ? { symbolId: symbol.id, shapes: undefined } : { symbolId: symbol.id });
 }
 
 /** Turns a symbol block into a free drawing: the block keeps a copy of the symbol's shapes and no longer follows the library. */

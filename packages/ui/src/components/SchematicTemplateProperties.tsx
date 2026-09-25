@@ -11,6 +11,7 @@ import {
   parseExpression,
   parseNumberList,
   setTemplateDirection,
+  setBlockSymbol,
   updateBlock,
   updateGroup,
   type BlockRef,
@@ -51,6 +52,8 @@ const SHEET_SIZES = [
   { label: 'A0', widthMm: 1189, heightMm: 841 },
 ];
 
+/** The types whose symbol is an optional visual override (a drawing has its own Symbol and Shapes rows). */
+const DEVICE_SYMBOL_TYPES: readonly string[] = ['mainDevice', 'protectiveDevice', 'accessoryDevice', 'loadSymbol'];
 const SCOPE_LABELS = { once: 'Sheet', panel: 'Panel', section: 'Section', circuit: 'Circuit', aggregate: 'Aggregate' } as const;
 
 function toHex(color: number): string {
@@ -346,6 +349,20 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             <button type="button" onClick={onDetachSymbol} disabled={!symbols.some((s) => s.id === block.symbolId)} title="Keep a copy of the symbol's shapes in this block, so it no longer follows the library">
               Detach to drawing
             </button>
+          </div>
+        )}
+        {DEVICE_SYMBOL_TYPES.includes(block.type) && (
+          <div className="mep-schematic-field">
+            <label>Symbol</label>
+            <span className="mep-schematic-readonly">{block.symbolId === undefined ? 'Default' : (symbols.find((s) => s.id === block.symbolId)?.name ?? 'Missing symbol')}</span>
+            <button type="button" onClick={onChangeSymbol}>
+              Choose symbol…
+            </button>
+            {block.symbolId !== undefined && (
+              <button type="button" onClick={() => edit((t) => setBlockSymbol(t, selection, undefined))} title="Go back to the built-in mark">
+                Use default
+              </button>
+            )}
           </div>
         )}
         {block.type === 'drawing' && block.symbolId === undefined && (

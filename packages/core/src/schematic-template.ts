@@ -77,6 +77,9 @@ export const SCHEMATIC_BLOCK_CATALOGUE: Record<SchematicBlockType, SchematicBloc
   totalsTable: { label: 'Totals table', scope: 'aggregate', width: 90, height: 30 },
 };
 
+/** The block types that can show a library symbol through `SchematicBlock.symbolId`. */
+export const SYMBOL_CAPABLE_BLOCK_TYPES: readonly SchematicBlockType[] = ['drawing', 'mainDevice', 'protectiveDevice', 'accessoryDevice', 'loadSymbol'];
+
 export interface SchematicBlockStyle {
   strokeWidthMm?: number;
   dash?: 'solid' | 'dashed' | 'dotted';
@@ -106,7 +109,7 @@ export interface SchematicBlock {
   /** Text with {expression} segments. undefined = the block type's default binding; '' = no text. */
   binding?: string;
   style?: SchematicBlockStyle;
-  /** drawing only. The id of a `SchematicSymbol` in the symbol library. The symbol's art replaces `shapes`. */
+  /** Only on a type in `SYMBOL_CAPABLE_BLOCK_TYPES`. The id of a `SchematicSymbol` in the symbol library. On a drawing the symbol's art replaces `shapes`. On a device or load block it replaces the built-in mark; the block keeps its text. */
   symbolId?: string;
   /** drawing only. Coordinates are fractions (0..1) of the block's width and height, the same convention as a custom stamp's shapes. */
   shapes?: SymbolShape[];
@@ -205,7 +208,10 @@ function validateBlock(block: SchematicBlock, where: string, expectedScopes: Sch
   }
   if (block.type !== 'totalsTable' && (block.tableRows || block.tableColumns)) issues.push(`${name} sets table fields but is not a totalsTable.`);
   if (block.shapes !== undefined && (block.type !== 'drawing' || !Array.isArray(block.shapes))) issues.push(`${name} sets shapes but is not a drawing.`);
-  if (block.symbolId !== undefined && (block.type !== 'drawing' || block.symbolId.trim() === '')) issues.push(`${name} sets a symbol but is not a drawing.`);
+  if (block.symbolId !== undefined) {
+    if (!SYMBOL_CAPABLE_BLOCK_TYPES.includes(block.type)) issues.push(`${name} sets a symbol but a ${block.type} block cannot show one.`);
+    else if (block.symbolId.trim() === '') issues.push(`${name} sets a symbol without an id.`);
+  }
 }
 
 /** The reasons a template cannot be generated from; an empty list means it is valid. Checks structure and that every binding parses. */

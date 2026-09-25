@@ -4,6 +4,7 @@ import {
   addBlock,
   addGroup,
   addSymbolBlock,
+  setBlockSymbol,
   buildSampleSchematicInput,
   describeRule,
   detachBlockSymbol,
@@ -230,7 +231,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     if (!symbolLibrary) return;
     if (symbolLibrary.kind === 'change') {
       const { ref } = symbolLibrary;
-      edit((t) => updateBlock(t, ref, { symbolId: symbol.id, shapes: undefined }));
+      edit((t) => setBlockSymbol(t, ref, symbol));
     } else {
       const present = historyRef.current.present;
       const groupId = activeGroupId ?? present.groups[0]?.id;
@@ -587,7 +588,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
             <g pointerEvents="none">
               {generated.blocks.map((block) => (
                 <g key={block.id} opacity={activeGroupId && block.groupId !== undefined && block.groupId !== activeGroupId ? 0.3 : 1}>
-                  <SchematicBlockSvg block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} symbolShapes={block.type === 'drawing' ? symbolShapesFor(block.symbolId) : undefined} showEmptyDrawings />
+                  <SchematicBlockSvg block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} symbolShapes={symbolShapesFor(block.symbolId)} showEmptyDrawings />
                 </g>
               ))}
             </g>

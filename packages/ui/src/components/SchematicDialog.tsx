@@ -172,7 +172,7 @@ export function SchematicDialog({ panels, circuits, panelSections, circuitTypes,
             <svg ref={setSvg} className="mep-schematic-canvas" role="img" aria-label={`Schematic of panel ${panel.name}`} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} {...panHandlers}>
               <rect x={0} y={0} width={template.sheet.widthMm} height={template.sheet.heightMm} fill="#ffffff" stroke="#9aa3ad" strokeWidth={0.4} />
               {generated?.blocks.map((block) => (
-                <SchematicBlockSvg key={block.id} block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} symbolShapes={block.type === 'drawing' ? symbolShapesFor(block.symbolId) : undefined} />
+                <SchematicBlockSvg key={block.id} block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} symbolShapes={symbolShapesFor(block.symbolId)} />
               ))}
             </svg>
           </>
