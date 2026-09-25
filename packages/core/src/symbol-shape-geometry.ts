@@ -426,10 +426,15 @@ export function createDraftShape(tool: ShapeDrawTool, id: string, start: { fract
   }
 }
 
+/**
+ * `size` is the drawing area in pixels. A circle or arc radius is a fraction of the shorter side, so
+ * on a drawing area that is not square the radius needs it. Without `size` the area counts as square.
+ */
 export function updateDraftShape(
   draft: SymbolShape,
   start: { fractionX: number; fractionY: number },
   current: { fractionX: number; fractionY: number },
+  size?: { widthPx: number; heightPx: number },
 ): SymbolShape {
   const { fractionX: sx, fractionY: sy } = start;
   const { fractionX: cx, fractionY: cy } = current;
@@ -439,8 +444,11 @@ export function updateDraftShape(
     case 'rect':
       return { ...draft, x: Math.min(sx, cx), y: Math.min(sy, cy), width: Math.abs(cx - sx), height: Math.abs(cy - sy) };
     case 'circle':
-    case 'arc':
-      return { ...draft, radius: Math.hypot(cx - sx, cy - sy) };
+    case 'arc': {
+      const widthPx = size?.widthPx ?? 1;
+      const heightPx = size?.heightPx ?? 1;
+      return { ...draft, radius: Math.hypot((cx - sx) * widthPx, (cy - sy) * heightPx) / Math.min(widthPx, heightPx) };
+    }
     case 'text':
       return draft;
     case 'arrow':

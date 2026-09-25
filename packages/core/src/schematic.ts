@@ -83,9 +83,16 @@ export function createSchematic(input: { id: string; name: string; panelId: stri
   };
 }
 
-/** Loads the latest edits of the source template and its symbols into the schematic. The entered values, text overrides and extras stay. */
+/** The ids of the symbols that the schematic's extras use. */
+export function collectExtraSymbolIds(extras: SchematicExtra[]): string[] {
+  return [...new Set(extras.flatMap((e) => (e.symbolId !== undefined ? [e.symbolId] : [])))];
+}
+
+/** Loads the latest edits of the source template and its symbols into the schematic. The entered values, text overrides and extras stay, and so do the symbol copies that extras use. */
 export function refreshSchematicFromTemplate(schematic: Schematic, source: SchematicTemplate, library: SchematicSymbol[]): Schematic {
-  return { ...schematic, sourceTemplateId: source.id, template: structuredClone(source), symbols: bundleSymbols(source, library) };
+  const fromTemplate = bundleSymbols(source, library);
+  const kept = schematic.symbols.filter((symbol) => collectExtraSymbolIds(schematic.extras).includes(symbol.id) && !fromTemplate.some((s) => s.id === symbol.id));
+  return { ...schematic, sourceTemplateId: source.id, template: structuredClone(source), symbols: [...fromTemplate, ...kept] };
 }
 
 /**
@@ -95,8 +102,9 @@ export function refreshSchematicFromTemplate(schematic: Schematic, source: Schem
 export function getSchematicTemplateStatus(schematic: Schematic, source: SchematicTemplate | undefined, library: SchematicSymbol[]): 'missing-source' | 'current' | 'changed' {
   if (!source) return 'missing-source';
   const sameTemplate = isSameData(schematic.template, source);
+  const templateIds = collectTemplateSymbolIds(schematic.template);
   const sameSymbols = isSameData(
-    [...schematic.symbols].sort((a, b) => a.id.localeCompare(b.id)),
+    schematic.symbols.filter((symbol) => templateIds.includes(symbol.id)).sort((a, b) => a.id.localeCompare(b.id)),
     bundleSymbols(source, library).sort((a, b) => a.id.localeCompare(b.id)),
   );
   return sameTemplate && sameSymbols ? 'current' : 'changed';
@@ -166,4 +174,15 @@ export function updateSchematicExtra(schematic: Schematic, extraId: string, patc
 
 export function removeSchematicExtra(schematic: Schematic, extraId: string): Schematic {
   return { ...schematic, extras: schematic.extras.filter((e) => e.id !== extraId) };
+}
+
+/**
+ * Adds a drawing extra that shows a library symbol, at the symbol's own size. A copy of the symbol goes
+ * into the schematic (unless it has one), so the project file stays complete.
+ */
+export function addSchematicSymbolExtra(schematic: Schematic, symbol: SchematicSymbol, options: { at?: { x: number; y: number }; circuitId?: string } = {}): { schematic: Schematic; extraId: string } {
+  const added = addSchematicExtra(schematic, 'drawing', options)!;
+  const withSymbol = updateSchematicExtra(added.schematic, added.extraId, { symbolId: symbol.id, shapes: undefined, width: symbol.widthMm, height: symbol.heightMm });
+  const symbols = withSymbol.symbols.some((s) => s.id === symbol.id) ? withSymbol.symbols : [...withSymbol.symbols, structuredClone(symbol)];
+  return { schematic: { ...withSymbol, symbols }, extraId: added.extraId };
 }

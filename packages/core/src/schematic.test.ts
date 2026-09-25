@@ -142,3 +142,25 @@ describe('schematic edits', () => {
     expect(addSchematicExtra(make(), 'busbar')).toBeUndefined();
   });
 });
+
+import { addSchematicSymbolExtra } from './schematic.js';
+
+describe('extras that use a symbol', () => {
+  it('copies the symbol into the schematic once and sizes the extra like the symbol', () => {
+    const one = addSchematicSymbolExtra(make(), symbol('s1'), { at: { x: 5, y: 6 } });
+    expect(one.schematic.symbols.map((s) => s.id)).toEqual(['s1']);
+    expect(one.schematic.extras[0]).toMatchObject({ type: 'drawing', symbolId: 's1', width: 10, height: 10, x: 5, y: 6 });
+    expect('shapes' in one.schematic.extras[0]).toBe(false);
+    const two = addSchematicSymbolExtra(one.schematic, symbol('s1'));
+    expect(two.schematic.symbols).toHaveLength(1);
+  });
+
+  it('keeps those symbol copies when the template is refreshed, and does not call the schematic changed because of them', () => {
+    const one = addSchematicSymbolExtra(make(), symbol('s2'));
+    expect(getSchematicTemplateStatus(one.schematic, base, library)).toBe('current');
+    const edited = updateBlock(structuredClone(base), { blockId: 'bus' }, { x: 99 });
+    const refreshed = refreshSchematicFromTemplate(one.schematic, edited, library);
+    expect(refreshed.symbols.map((s) => s.id)).toEqual(['s2']);
+    expect(getSchematicTemplateStatus(refreshed, edited, library)).toBe('current');
+  });
+});
