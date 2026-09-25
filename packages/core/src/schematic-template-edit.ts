@@ -75,14 +75,16 @@ const DEFAULT_TABLE_ROWS = [
 /**
  * Adds a block of `type` at the end of the draw order. A circuit-scope block goes into the group
  * `groupId` (returns undefined when that group does not exist); every other scope goes into the layout.
+ * A drawing goes into the group when `groupId` is given, and into the layout when it is not.
  */
 export function addBlock(template: SchematicTemplate, type: SchematicBlockType, options: { groupId?: string; at?: { x: number; y: number } } = {}): { template: SchematicTemplate; ref: BlockRef } | undefined {
-  const scope = SCHEMATIC_BLOCK_CATALOGUE[type].scope;
-  const groupId = scope === 'circuit' ? options.groupId : undefined;
-  if (scope === 'circuit' && !template.groups.some((g) => g.id === groupId)) return undefined;
+  const inGroup = SCHEMATIC_BLOCK_CATALOGUE[type].scope === 'circuit' || (type === 'drawing' && options.groupId !== undefined);
+  const groupId = inGroup ? options.groupId : undefined;
+  if (inGroup && !template.groups.some((g) => g.id === groupId)) return undefined;
   const taken = (groupId === undefined ? template.layoutBlocks : (template.groups.find((g) => g.id === groupId)?.blocks ?? [])).map((b) => b.id);
   const block: SchematicBlock = { id: nextId(type, taken), type, x: options.at?.x ?? 0, y: options.at?.y ?? 0, rotation: 0 };
   if (type === 'totalsTable') block.tableRows = DEFAULT_TABLE_ROWS.map((row) => ({ ...row }));
+  if (type === 'drawing') block.shapes = [];
   return { template: mapCollection(template, groupId, (blocks) => [...blocks, block]), ref: { blockId: block.id, groupId } };
 }
 

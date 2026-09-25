@@ -6,6 +6,7 @@
 // its rotation (degrees, clockwise) pivots on the block's centre, the same
 // convention as the Phase 0 mockup.
 
+import type { SymbolShape } from './symbol-shapes.js';
 import { parseBinding, parseExpression, ExpressionError, type NumberFormat } from './schematic-expression.js';
 
 /**
@@ -19,6 +20,7 @@ export type SchematicBlockType =
   | 'legend'
   | 'titleBlock'
   | 'freeItem'
+  | 'drawing'
   | 'feedCable'
   | 'mainDevice'
   | 'accessoryDevice'
@@ -52,6 +54,8 @@ export const SCHEMATIC_BLOCK_CATALOGUE: Record<SchematicBlockType, SchematicBloc
   legend: { label: 'Table header / legend symbol', scope: 'once', width: 30, height: 8 },
   titleBlock: { label: 'Title block', scope: 'once', width: 100, height: 40 },
   freeItem: { label: 'Free text', scope: 'once', width: 30, height: 6 },
+  /** Free-drawn shapes (`SchematicBlock.shapes`). The only type allowed in the layout and in a circuit group. */
+  drawing: { label: 'Drawing', scope: 'once', width: 40, height: 30, defaultBinding: '' },
   feedCable: { label: 'Feed cable', scope: 'panel', width: 60, height: 8, defaultBinding: '[{panel.feederCable.type} {panel.feederCable.crossSectionMm2} mm²][  l={panel.feederCable.lengthM} m]' },
   mainDevice: { label: 'Main device', scope: 'panel', width: 12, height: 14, defaultBinding: '{panel.mainDevice.label}' },
   accessoryDevice: { label: 'Accessory device', scope: 'panel', width: 10, height: 10, defaultBinding: '{panel.accessories.label}' },
@@ -104,6 +108,8 @@ export interface SchematicBlock {
   style?: SchematicBlockStyle;
   /** A symbol-library id that replaces the block's default vector art (mockup Round 3). */
   symbolId?: string;
+  /** drawing only. Coordinates are fractions (0..1) of the block's width and height, the same convention as a custom stamp's shapes. */
+  shapes?: SymbolShape[];
   /** totalsTable only. */
   tableRows?: TotalsTableRow[];
   /** totalsTable only. 'panel' = one value per row; 'circuits' = one value per row and circuit, in circuit order. Default 'panel'. */
@@ -198,6 +204,7 @@ function validateBlock(block: SchematicBlock, where: string, expectedScopes: Sch
     if (issue) issues.push(issue);
   }
   if (block.type !== 'totalsTable' && (block.tableRows || block.tableColumns)) issues.push(`${name} sets table fields but is not a totalsTable.`);
+  if (block.shapes !== undefined && (block.type !== 'drawing' || !Array.isArray(block.shapes))) issues.push(`${name} sets shapes but is not a drawing.`);
 }
 
 /** The reasons a template cannot be generated from; an empty list means it is valid. Checks structure and that every binding parses. */
@@ -218,7 +225,7 @@ export function validateSchematicTemplate(template: SchematicTemplate): string[]
     if (!(Number.isFinite(group.pitch) && group.pitch > 0)) issues.push(`Group "${group.id}" needs a pitch above zero.`);
     if (group.direction !== template.groups[0]?.direction) issues.push(`Group "${group.id}" has direction "${group.direction}" but the first group has "${template.groups[0]?.direction}". All groups must have the same direction.`);
     const groupBlockIds = new Set<string>();
-    for (const block of group.blocks) validateBlock(block, `group "${group.id}"`, ['circuit'], groupBlockIds, issues);
+    for (const block of group.blocks) validateBlock(block, `group "${group.id}"`, block.type === 'drawing' ? ['circuit', 'once'] : ['circuit'], groupBlockIds, issues);
   }
   return issues;
 }

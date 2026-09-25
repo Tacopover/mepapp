@@ -39,6 +39,7 @@ import {
   type SchematicBlockType,
   type SchematicTemplate,
 } from './schematic-template.js';
+import type { SymbolShape } from './symbol-shapes.js';
 
 /** What the generator needs to know about one terminal. The caller builds it from the placed stamp and `terminalCapacities`. */
 export interface SchematicTerminalInfo {
@@ -82,6 +83,8 @@ export interface ResolvedBlock {
   text?: string;
   style?: SchematicBlockStyle;
   symbolId?: string;
+  /** drawing only. */
+  shapes?: SymbolShape[];
   /** loadSymbol only: the first assigned terminal that names a stamp definition. */
   loadStampDefinitionId?: string;
   table?: ResolvedTable;
@@ -292,6 +295,7 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
       text: resolveText(block, context),
       style: block.style,
       symbolId: block.symbolId,
+      shapes: block.shapes,
       panelId: panel.id,
       circuitId: ids.circuitId,
       sectionId: ids.sectionId,

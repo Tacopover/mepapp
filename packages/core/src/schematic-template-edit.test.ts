@@ -322,3 +322,47 @@ describe('binding fields', () => {
     expect(SCHEMATIC_BINDING_FIELDS.every((f) => f.expression.length > 0)).toBe(true);
   });
 });
+
+describe('drawing blocks', () => {
+  const shape = { id: 's1', kind: 'line' as const, x1: 0, y1: 0, x2: 1, y2: 1, style: { stroke: '#000000', strokeWidth: 0.02, fill: null } };
+
+  it('goes into the layout without a group and into the group with one', () => {
+    const inLayout = addBlock(clone(), 'drawing')!;
+    expect(inLayout.ref.groupId).toBeUndefined();
+    expect(findBlock(inLayout.template, inLayout.ref)!.shapes).toEqual([]);
+    const groupId = base.groups[0].id;
+    const inGroup = addBlock(clone(), 'drawing', { groupId })!;
+    expect(inGroup.ref.groupId).toBe(groupId);
+    expect(addBlock(clone(), 'drawing', { groupId: 'nope' })).toBeUndefined();
+    expect(validateSchematicTemplate(inLayout.template)).toEqual([]);
+    expect(validateSchematicTemplate(inGroup.template)).toEqual([]);
+  });
+
+  it('carries its shapes into every generated instance and keeps them when duplicated', () => {
+    const groupId = base.groups[1].id;
+    const added = addBlock(clone(), 'drawing', { groupId })!;
+    const drawn = updateBlock(added.template, added.ref, { shapes: [shape] });
+    const generated = generateSchematic(buildSampleSchematicInput(drawn), drawn);
+    const instances = generated.blocks.filter((b) => b.type === 'drawing');
+    expect(instances.length).toBeGreaterThan(1);
+    expect(instances.every((b) => b.shapes?.length === 1 && b.scope === 'circuit')).toBe(true);
+    const copy = duplicateBlock(drawn, added.ref)!;
+    expect(findBlock(copy.template, copy.ref)!.shapes).toEqual([shape]);
+    expect(findBlock(copy.template, copy.ref)!.shapes).not.toBe(findBlock(drawn, added.ref)!.shapes);
+  });
+
+  it('rejects shapes on a block that is not a drawing', () => {
+    const bad = updateBlock(clone(), { blockId: 'bus' }, { shapes: [shape] });
+    expect(validateSchematicTemplate(bad).join(' ')).toContain('not a drawing');
+  });
+
+  it('is the only type that a group accepts besides circuit-scope types', () => {
+    const groupId = base.groups[0].id;
+    const misplaced = mapGroup(clone(), groupId, { id: 'x', type: 'legend', x: 0, y: 0, rotation: 0 });
+    expect(validateSchematicTemplate(misplaced).join(' ')).toContain('does not belong');
+  });
+});
+
+function mapGroup(template: SchematicTemplate, groupId: string, block: SchematicTemplate['layoutBlocks'][number]): SchematicTemplate {
+  return { ...template, groups: template.groups.map((g) => (g.id === groupId ? { ...g, blocks: [...g.blocks, block] } : g)) };
+}
