@@ -370,8 +370,12 @@ Shipped:
 - Built-in templates stay read-only. "Edit template…" makes a copy under "My templates". Duplicate and Delete template work.
 - Custom templates live in App state and in localStorage (`mepapp.schematicTemplates`, interim). Phase 6 replaces this.
 
+Progress on free-drawn shapes (2026-09-25, built, not yet browser-verified):
+- New `drawing` block type (`shapes: SymbolShape[]`, fractions of the block box). It can sit in the layout or in a circuit group, so a drawn symbol repeats for every circuit. Core in the commit after `2722e80`.
+- UI: `ShapeDrawSurface` and `ShapeDrawToolbar` are now shared between the stamp editor and the new `SchematicDrawingEditor`. The drawing editor replaces the template editor's body in place ("Edit drawing…" or double-click a drawing block). Done is one undo step.
+
 Not done:
-- Free-drawn shapes on the sheet (shared-drawing-tool Phase 3). The `freeItem` block is still text only.
+- Free-drawn shapes on the sheet: see the progress above. The `freeItem` block is still text only.
 - Snapping to ports. Blocks have no ports, so the editor uses grid snap. Edge alignment guides are not built.
 - Grid dots on the canvas.
 - No component tests. Only the pure modules have tests.

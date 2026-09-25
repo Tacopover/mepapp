@@ -2288,3 +2288,12 @@
 .mep-schematic-editor .mep-field-row input {
   width: 84px;
 }
+
+/* Free-shape drawing editor for a drawing block (shared-drawing-tool.md Phase 3). Reuses the
+   Element Editor's .mep-ee-* layout; there is no sidebar, so the grid has two columns. */
+.mep-schematic-drawing .mep-ee-grid {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+.mep-schematic-drawing .mep-schematic-bar strong {
+  font-size: 12px;
+}

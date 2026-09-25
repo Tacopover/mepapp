@@ -12,11 +12,15 @@ const SECTION_INK = '#a35f00';
 const CELL_INK = '#8a939d';
 const LINE_MM = 0.3;
 const TEXT_MM = 2.6;
+/** A drawn line never gets thinner than this on the sheet. SymbolShapesSvg's own minimum is 1 unit, which is 1 mm here. */
+const DRAWING_MIN_STROKE_MM = 0.05;
 
 export interface SchematicBlockSvgProps {
   block: ResolvedBlock;
   /** The vector art of the block's load stamp, when its definition has any (custom stamps do; library stamps are raster art and draw a generic load mark). */
   loadShapes?: SymbolShape[];
+  /** Draw a faint dashed outline for a drawing block that has no shapes yet. The editor sets it; the read-only viewer does not. */
+  showEmptyDrawings?: boolean;
 }
 
 function dashArray(dash: 'solid' | 'dashed' | 'dotted' | undefined, widthMm: number): string | undefined {
@@ -38,7 +42,7 @@ function Text({ x, y, size, anchor = 'middle', bold, italic, fill, children }: {
   );
 }
 
-export function SchematicBlockSvg({ block, loadShapes }: SchematicBlockSvgProps) {
+export function SchematicBlockSvg({ block, loadShapes, showEmptyDrawings }: SchematicBlockSvgProps) {
   const { x, y, width: w, height: h, rotation, style } = block;
   const strokeWidth = style?.strokeWidthMm ?? LINE_MM;
   const stroke = colorOf(style?.color, INK);
@@ -207,6 +211,14 @@ export function SchematicBlockSvg({ block, loadShapes }: SchematicBlockSvgProps)
       );
       break;
     }
+    case 'drawing':
+      art =
+        block.shapes && block.shapes.length > 0 ? (
+          <SymbolShapesSvg shapes={block.shapes} widthPx={w} heightPx={h} minStrokePx={DRAWING_MIN_STROKE_MM} />
+        ) : showEmptyDrawings ? (
+          <rect x={0} y={0} width={w} height={h} fill="none" stroke={CELL_INK} strokeWidth={LINE_MM} strokeDasharray={`${LINE_MM * 6} ${LINE_MM * 4}`} />
+        ) : null;
+      break;
     case 'description':
     case 'customAnnotation':
     case 'freeItem':

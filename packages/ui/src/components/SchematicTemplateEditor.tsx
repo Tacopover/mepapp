@@ -9,6 +9,8 @@ import {
   duplicateGroup,
   findBlock,
   generateSchematic,
+  getBlockHeight,
+  getBlockWidth,
   getBlocksBounds,
   getStampDefinition,
   removeBlock,
@@ -32,6 +34,7 @@ import {
   type SchematicInput,
   type SchematicTemplate,
   type StampDefinition,
+  type SymbolShape,
 } from '@mepapp/core';
 import type { StampInfo } from '@mepapp/render';
 import { SchematicBlockSvg } from '../schematicBlockSvg.js';
@@ -39,6 +42,7 @@ import { describeDiagnostics } from '../schematicDiagnostics.js';
 import { buildSchematicTerminals } from '../schematicTerminals.js';
 import { commit, createHistory, endGesture as endHistoryGesture, redo, undo, type History } from '../templateHistory.js';
 import { useSheetView } from '../useSheetView.js';
+import { SchematicDrawingEditor } from './SchematicDrawingEditor.js';
 import { SchematicTemplateProperties, type EditTemplate } from './SchematicTemplateProperties.js';
 
 export interface SchematicTemplateEditorProps {
@@ -108,6 +112,8 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const [instanceId, setInstanceId] = useState<string | null>(null);
   const [activeGroupState, setActiveGroupState] = useState<string | null>(null);
   const [grid, setGrid] = useState(1);
+  const [drawingRef, setDrawingRef] = useState<BlockRef | null>(null);
+  const drawingOpenRef = useRef(false);
   const [previewSource, setPreviewSource] = useState<string>(() => (circuits.some((c) => c.panelId === initialPanelId) ? initialPanelId : SAMPLE));
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -124,6 +130,8 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const selectedBlock = selection ? findBlock(template, selection) : undefined;
   const selectionRef = useRef<BlockRef | null>(null);
   selectionRef.current = selectedBlock ? selection : null;
+  const drawingBlock = drawingRef ? findBlock(template, drawingRef) : undefined;
+  drawingOpenRef.current = drawingBlock !== undefined;
 
   const terminals = useMemo(() => buildSchematicTerminals(stamps, customStampDefinitions), [stamps, customStampDefinitions]);
   const previewPanel = previewSource === SAMPLE ? undefined : panels.find((p) => p.id === previewSource);
@@ -138,7 +146,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   useEffect(() => {
     // Dialog listens for Escape on the document; a capture listener on the window runs first and keeps a block selection from closing the dialog.
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !selectionRef.current) return;
+      if (event.key !== 'Escape' || !selectionRef.current || drawingOpenRef.current) return;
       event.stopPropagation();
       setSelection(null);
       setInstanceId(null);
@@ -182,6 +190,28 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     if (!result) return;
     applyHistory(commit(historyRef.current, result.template));
     selectBlock(result.ref);
+  }
+
+  function addDrawing(inGroup: boolean) {
+    const present = historyRef.current.present;
+    const groupId = activeGroupId ?? present.groups[0]?.id;
+    if (inGroup && groupId === undefined) return;
+    const info = SCHEMATIC_BLOCK_CATALOGUE.drawing;
+    const at = inGroup ? { x: 0, y: 0 } : { x: snapToGrid(view.x + view.w / 2 - info.width / 2, grid), y: snapToGrid(view.y + view.h / 2 - info.height / 2, grid) };
+    const result = addBlock(present, 'drawing', { groupId: inGroup ? groupId : undefined, at });
+    if (!result) return;
+    applyHistory(commit(historyRef.current, result.template));
+    selectBlock(result.ref);
+    setDrawingRef(result.ref);
+  }
+
+  function finishDrawing(shapes: SymbolShape[]) {
+    if (drawingRef) edit((t) => updateBlock(t, drawingRef, { shapes }));
+    setDrawingRef(null);
+  }
+
+  function openSelectedDrawing() {
+    if (selection && selectedBlock?.type === 'drawing') setDrawingRef(selection);
   }
 
   function deleteSelected() {
@@ -322,6 +352,20 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   ];
   const canAddCircuitBlock = template.groups.length > 0;
 
+  if (drawingRef && drawingBlock) {
+    return (
+      <SchematicDrawingEditor
+        key={`${drawingRef.groupId ?? '-'}/${drawingRef.blockId}`}
+        title={`Drawing · ${drawingRef.blockId}${drawingRef.groupId !== undefined ? ' (each circuit)' : ''}`}
+        shapes={drawingBlock.shapes ?? []}
+        widthMm={getBlockWidth(drawingBlock)}
+        heightMm={getBlockHeight(drawingBlock)}
+        onDone={finishDrawing}
+        onCancel={() => setDrawingRef(null)}
+      />
+    );
+  }
+
   return (
     <div className="mep-schematic mep-schematic-editor" ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown}>
       <div className="mep-schematic-bar">
@@ -376,11 +420,16 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
                   .map((type) => {
                     const disabled = scope === 'circuit' && !canAddCircuitBlock;
                     return (
-                      <button key={type} type="button" className="mep-schematic-palette-button" disabled={disabled} title={disabled ? 'Add a group first: circuit blocks belong to a group.' : `Add: ${SCHEMATIC_BLOCK_CATALOGUE[type].label}`} onClick={() => addFromPalette(type)}>
+                      <button key={type} type="button" className="mep-schematic-palette-button" disabled={disabled} title={disabled ? 'Add a group first: circuit blocks belong to a group.' : `Add: ${SCHEMATIC_BLOCK_CATALOGUE[type].label}`} onClick={() => (type === 'drawing' ? addDrawing(false) : addFromPalette(type))}>
                         {SCHEMATIC_BLOCK_CATALOGUE[type].label}
                       </button>
                     );
                   })}
+                {scope === 'circuit' && (
+                  <button type="button" className="mep-schematic-palette-button" disabled={!canAddCircuitBlock} title={canAddCircuitBlock ? 'Add a drawing that repeats for every circuit of the selected group' : 'Add a group first: circuit blocks belong to a group.'} onClick={() => addDrawing(true)}>
+                    Drawing (each circuit)
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -483,12 +532,13 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
+            onDoubleClick={openSelectedDrawing}
           >
             <rect x={0} y={0} width={template.sheet.widthMm} height={template.sheet.heightMm} fill="#ffffff" stroke="#9aa3ad" strokeWidth={0.4} />
             <g pointerEvents="none">
               {generated.blocks.map((block) => (
                 <g key={block.id} opacity={activeGroupId && block.groupId !== undefined && block.groupId !== activeGroupId ? 0.3 : 1}>
-                  <SchematicBlockSvg block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} />
+                  <SchematicBlockSvg block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} showEmptyDrawings />
                 </g>
               ))}
             </g>
@@ -562,6 +612,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
             notes={notes}
             onDuplicateBlock={duplicateSelected}
             onDeleteBlock={deleteSelected}
+            onEditDrawing={openSelectedDrawing}
           />
         </aside>
       </div>

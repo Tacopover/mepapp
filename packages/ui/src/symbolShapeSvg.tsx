@@ -10,9 +10,9 @@
 import type { JSX } from 'react';
 import { shapeCenter, type SymbolShape } from '@mepapp/core';
 
-/** Canvas2D's `Math.max(1, strokeWidth * Math.min(widthPx, heightPx))` convention, unchanged. */
-function strokeWidthPx(shape: SymbolShape, widthPx: number, heightPx: number): number {
-  return Math.max(1, shape.style.strokeWidth * Math.min(widthPx, heightPx));
+/** Canvas2D's `Math.max(1, strokeWidth * Math.min(widthPx, heightPx))` convention. `minStrokePx` is that 1; a caller drawing in millimetres passes a smaller minimum. */
+function strokeWidthPx(shape: SymbolShape, widthPx: number, heightPx: number, minStrokePx: number): number {
+  return Math.max(minStrokePx, shape.style.strokeWidth * Math.min(widthPx, heightPx));
 }
 
 function rotationTransform(shape: SymbolShape, widthPx: number, heightPx: number): string | undefined {
@@ -44,10 +44,10 @@ export function describeArcPath(cx: number, cy: number, r: number, startAngle: n
 const FULL_TURN_EPSILON = 1e-6;
 
 /** Renders one SymbolShape as an SVG element, matching drawSymbolShapes' per-kind semantics. */
-export function renderSymbolShapeSvg(shape: SymbolShape, widthPx: number, heightPx: number): JSX.Element {
+export function renderSymbolShapeSvg(shape: SymbolShape, widthPx: number, heightPx: number, minStrokePx = 1): JSX.Element {
   const stroke = shape.style.stroke;
   const fill = shape.style.fill ?? 'none';
-  const lineWidth = strokeWidthPx(shape, widthPx, heightPx);
+  const lineWidth = strokeWidthPx(shape, widthPx, heightPx, minStrokePx);
   const transform = rotationTransform(shape, widthPx, heightPx);
 
   switch (shape.kind) {
@@ -173,15 +173,17 @@ export interface SymbolShapesSvgProps {
   shapes: SymbolShape[];
   widthPx: number;
   heightPx: number;
+  /** Smallest stroke width drawn, in the same units as widthPx. Default 1. */
+  minStrokePx?: number;
 }
 
 /** Renders a whole SymbolShape[] as one <g>, in array order (same paint-order convention as
     drawSymbolShapes — later shapes draw over earlier ones). */
-export function SymbolShapesSvg({ shapes, widthPx, heightPx }: SymbolShapesSvgProps): JSX.Element {
+export function SymbolShapesSvg({ shapes, widthPx, heightPx, minStrokePx }: SymbolShapesSvgProps): JSX.Element {
   return (
     <g>
       {shapes.map((shape) => (
-        <g key={shape.id}>{renderSymbolShapeSvg(shape, widthPx, heightPx)}</g>
+        <g key={shape.id}>{renderSymbolShapeSvg(shape, widthPx, heightPx, minStrokePx)}</g>
       ))}
     </g>
   );

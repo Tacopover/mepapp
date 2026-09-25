@@ -37,6 +37,7 @@ export interface SchematicTemplatePropertiesProps {
   notes: string[];
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
+  onEditDrawing: () => void;
 }
 
 const SHEET_SIZES = [
@@ -123,7 +124,7 @@ function formulaError(source: string): string | null {
   }
 }
 
-export function SchematicTemplateProperties({ template, edit, endGesture, selection, activeGroupId, circuitTypes, loadTypes, notes, onDuplicateBlock, onDeleteBlock }: SchematicTemplatePropertiesProps) {
+export function SchematicTemplateProperties({ template, edit, endGesture, selection, activeGroupId, circuitTypes, loadTypes, notes, onDuplicateBlock, onDeleteBlock, onEditDrawing }: SchematicTemplatePropertiesProps) {
   const group = activeGroupId ? template.groups.find((g) => g.id === activeGroupId) : undefined;
   const block = selection ? findBlock(template, selection) : undefined;
 
@@ -140,7 +141,7 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
       )}
 
       {block && selection && (
-        <BlockProperties template={template} block={block} selection={selection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} />
+        <BlockProperties template={template} block={block} selection={selection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} onEditDrawing={onEditDrawing} />
       )}
       {!block && (
         <div className="mep-section">
@@ -271,9 +272,10 @@ interface BlockPropertiesProps {
   loadTypes: string[];
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
+  onEditDrawing: () => void;
 }
 
-function BlockProperties({ template, block, selection, edit, endGesture, loadTypes, onDuplicateBlock, onDeleteBlock }: BlockPropertiesProps) {
+function BlockProperties({ template, block, selection, edit, endGesture, loadTypes, onDuplicateBlock, onDeleteBlock, onEditDrawing }: BlockPropertiesProps) {
   const info = SCHEMATIC_BLOCK_CATALOGUE[block.type];
   const key = (field: string) => `field:${block.id}:${field}`;
   const patch = (fields: Partial<SchematicBlock>, gestureKey?: string) => edit((t) => updateBlock(t, selection, fields), gestureKey);
@@ -313,7 +315,7 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
         <div className="mep-schematic-field">
           <label>Type and scope</label>
           <span className="mep-schematic-readonly">
-            {block.type} · {SCOPE_LABELS[info.scope]}
+            {block.type} · {block.type === 'drawing' && selection.groupId !== undefined ? 'Each circuit' : SCOPE_LABELS[info.scope]}
           </span>
         </div>
         <div className="mep-schematic-field">
@@ -326,6 +328,15 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
         <NumberField label="Height mm" value={block.height} optional min={0.1} step={0.5} placeholder={String(getBlockHeight({ ...block, height: undefined }))} onBlur={endGesture} onCommit={(v) => patch({ height: v }, key('height'))} />
         <NumberField label="Rotation °" value={block.rotation} step={5} onBlur={endGesture} onCommit={(v) => v !== undefined && patch({ rotation: v }, key('rotation'))} />
         {(block.type === 'busbar' || block.type === 'section') && <p className="mep-schematic-hint">Leave the size blank along the circuit direction, so the block spans its circuits.</p>}
+        {block.type === 'drawing' && (
+          <div className="mep-schematic-field">
+            <label>Shapes</label>
+            <span className="mep-schematic-readonly">{block.shapes?.length ?? 0} shapes</span>
+            <button type="button" onClick={onEditDrawing}>
+              Edit drawing…
+            </button>
+          </div>
+        )}
         <div className="mep-schematic-buttons">
           <button type="button" onClick={onDuplicateBlock}>
             Duplicate
@@ -336,7 +347,7 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
         </div>
       </details>
 
-      {block.type !== 'totalsTable' && block.type !== 'frame' && block.type !== 'busbar' && (
+      {block.type !== 'totalsTable' && block.type !== 'frame' && block.type !== 'busbar' && block.type !== 'drawing' && (
         <details open className="mep-section">
           <summary>
             <h4>Text binding</h4>
@@ -384,50 +395,52 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
         </details>
       )}
 
-      <details open className="mep-section">
-        <summary>
-          <h4>Style</h4>
-        </summary>
-        <NumberField label="Font size mm" value={style.fontSizeMm} optional min={0.5} step={0.1} onBlur={endGesture} onCommit={(v) => setStyle({ fontSizeMm: v }, key('fontSize'))} />
-        <NumberField label="Line width mm" value={style.strokeWidthMm} optional min={0.05} step={0.05} onBlur={endGesture} onCommit={(v) => setStyle({ strokeWidthMm: v }, key('strokeWidth'))} />
-        <div className="mep-schematic-radios">
-          <label>
-            <input type="checkbox" checked={style.bold === true} onChange={(e) => setStyle({ bold: e.target.checked || undefined })} />
-            Bold
-          </label>
-          <label>
-            <input type="checkbox" checked={style.italic === true} onChange={(e) => setStyle({ italic: e.target.checked || undefined })} />
-            Italic
-          </label>
-        </div>
-        <div className="mep-schematic-field">
-          <label>Align</label>
-          <select value={style.align ?? ''} onChange={(e) => setStyle({ align: e.target.value === '' ? undefined : (e.target.value as SchematicBlockStyle['align']) })}>
-            <option value="">Default</option>
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </select>
-        </div>
-        <div className="mep-schematic-field">
-          <label>Line style</label>
-          <select value={style.dash ?? ''} onChange={(e) => setStyle({ dash: e.target.value === '' ? undefined : (e.target.value as SchematicBlockStyle['dash']) })}>
-            <option value="">Default</option>
-            <option value="solid">Solid</option>
-            <option value="dashed">Dashed</option>
-            <option value="dotted">Dotted</option>
-          </select>
-        </div>
-        <div className="mep-schematic-field">
-          <label>Color</label>
-          <span className="mep-schematic-color">
-            <input type="color" value={style.color === undefined ? '#111111' : toHex(style.color)} onChange={(e) => setStyle({ color: parseInt(e.target.value.slice(1), 16) }, key('color'))} onBlur={endGesture} />
-            <button type="button" onClick={() => setStyle({ color: undefined })} disabled={style.color === undefined}>
-              Clear
-            </button>
-          </span>
-        </div>
-      </details>
+      {block.type !== 'drawing' && (
+        <details open className="mep-section">
+          <summary>
+            <h4>Style</h4>
+          </summary>
+          <NumberField label="Font size mm" value={style.fontSizeMm} optional min={0.5} step={0.1} onBlur={endGesture} onCommit={(v) => setStyle({ fontSizeMm: v }, key('fontSize'))} />
+          <NumberField label="Line width mm" value={style.strokeWidthMm} optional min={0.05} step={0.05} onBlur={endGesture} onCommit={(v) => setStyle({ strokeWidthMm: v }, key('strokeWidth'))} />
+          <div className="mep-schematic-radios">
+            <label>
+              <input type="checkbox" checked={style.bold === true} onChange={(e) => setStyle({ bold: e.target.checked || undefined })} />
+              Bold
+            </label>
+            <label>
+              <input type="checkbox" checked={style.italic === true} onChange={(e) => setStyle({ italic: e.target.checked || undefined })} />
+              Italic
+            </label>
+          </div>
+          <div className="mep-schematic-field">
+            <label>Align</label>
+            <select value={style.align ?? ''} onChange={(e) => setStyle({ align: e.target.value === '' ? undefined : (e.target.value as SchematicBlockStyle['align']) })}>
+              <option value="">Default</option>
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div className="mep-schematic-field">
+            <label>Line style</label>
+            <select value={style.dash ?? ''} onChange={(e) => setStyle({ dash: e.target.value === '' ? undefined : (e.target.value as SchematicBlockStyle['dash']) })}>
+              <option value="">Default</option>
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+            </select>
+          </div>
+          <div className="mep-schematic-field">
+            <label>Color</label>
+            <span className="mep-schematic-color">
+              <input type="color" value={style.color === undefined ? '#111111' : toHex(style.color)} onChange={(e) => setStyle({ color: parseInt(e.target.value.slice(1), 16) }, key('color'))} onBlur={endGesture} />
+              <button type="button" onClick={() => setStyle({ color: undefined })} disabled={style.color === undefined}>
+                Clear
+              </button>
+            </span>
+          </div>
+        </details>
+      )}
 
       {(info.scope === 'circuit' || info.scope === 'aggregate') && (
         <details open className="mep-section">
