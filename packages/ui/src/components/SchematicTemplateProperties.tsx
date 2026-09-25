@@ -18,6 +18,7 @@ import {
   type CircuitType,
   type SchematicBlock,
   type SchematicBlockStyle,
+  type SchematicSymbol,
   type SchematicTemplate,
   type TotalsTableRow,
 } from '@mepapp/core';
@@ -38,6 +39,10 @@ export interface SchematicTemplatePropertiesProps {
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
   onEditDrawing: () => void;
+  /** The symbol library, to name the symbol a drawing block points at. */
+  symbols: SchematicSymbol[];
+  onChangeSymbol: () => void;
+  onDetachSymbol: () => void;
 }
 
 const SHEET_SIZES = [
@@ -124,7 +129,7 @@ function formulaError(source: string): string | null {
   }
 }
 
-export function SchematicTemplateProperties({ template, edit, endGesture, selection, activeGroupId, circuitTypes, loadTypes, notes, onDuplicateBlock, onDeleteBlock, onEditDrawing }: SchematicTemplatePropertiesProps) {
+export function SchematicTemplateProperties({ template, edit, endGesture, selection, activeGroupId, circuitTypes, loadTypes, notes, onDuplicateBlock, onDeleteBlock, onEditDrawing, symbols, onChangeSymbol, onDetachSymbol }: SchematicTemplatePropertiesProps) {
   const group = activeGroupId ? template.groups.find((g) => g.id === activeGroupId) : undefined;
   const block = selection ? findBlock(template, selection) : undefined;
 
@@ -141,7 +146,7 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
       )}
 
       {block && selection && (
-        <BlockProperties template={template} block={block} selection={selection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} onEditDrawing={onEditDrawing} />
+        <BlockProperties template={template} block={block} selection={selection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} onEditDrawing={onEditDrawing} symbols={symbols} onChangeSymbol={onChangeSymbol} onDetachSymbol={onDetachSymbol} />
       )}
       {!block && (
         <div className="mep-section">
@@ -273,9 +278,12 @@ interface BlockPropertiesProps {
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
   onEditDrawing: () => void;
+  symbols: SchematicSymbol[];
+  onChangeSymbol: () => void;
+  onDetachSymbol: () => void;
 }
 
-function BlockProperties({ template, block, selection, edit, endGesture, loadTypes, onDuplicateBlock, onDeleteBlock, onEditDrawing }: BlockPropertiesProps) {
+function BlockProperties({ template, block, selection, edit, endGesture, loadTypes, onDuplicateBlock, onDeleteBlock, onEditDrawing, symbols, onChangeSymbol, onDetachSymbol }: BlockPropertiesProps) {
   const info = SCHEMATIC_BLOCK_CATALOGUE[block.type];
   const key = (field: string) => `field:${block.id}:${field}`;
   const patch = (fields: Partial<SchematicBlock>, gestureKey?: string) => edit((t) => updateBlock(t, selection, fields), gestureKey);
@@ -328,7 +336,19 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
         <NumberField label="Height mm" value={block.height} optional min={0.1} step={0.5} placeholder={String(getBlockHeight({ ...block, height: undefined }))} onBlur={endGesture} onCommit={(v) => patch({ height: v }, key('height'))} />
         <NumberField label="Rotation °" value={block.rotation} step={5} onBlur={endGesture} onCommit={(v) => v !== undefined && patch({ rotation: v }, key('rotation'))} />
         {(block.type === 'busbar' || block.type === 'section') && <p className="mep-schematic-hint">Leave the size blank along the circuit direction, so the block spans its circuits.</p>}
-        {block.type === 'drawing' && (
+        {block.type === 'drawing' && block.symbolId !== undefined && (
+          <div className="mep-schematic-field">
+            <label>Symbol</label>
+            <span className="mep-schematic-readonly">{symbols.find((s) => s.id === block.symbolId)?.name ?? 'Missing symbol'}</span>
+            <button type="button" onClick={onChangeSymbol}>
+              Change…
+            </button>
+            <button type="button" onClick={onDetachSymbol} disabled={!symbols.some((s) => s.id === block.symbolId)} title="Keep a copy of the symbol's shapes in this block, so it no longer follows the library">
+              Detach to drawing
+            </button>
+          </div>
+        )}
+        {block.type === 'drawing' && block.symbolId === undefined && (
           <div className="mep-schematic-field">
             <label>Shapes</label>
             <span className="mep-schematic-readonly">{block.shapes?.length ?? 0} shapes</span>

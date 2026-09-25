@@ -2297,3 +2297,59 @@
 .mep-schematic-drawing .mep-schematic-bar strong {
   font-size: 12px;
 }
+
+/* Symbol editor and library (shared-drawing-tool.md Phase 4). The editor is the drawing editor's
+   layout with the stamp editor's third column for ports. */
+.mep-schematic-symbol .mep-ee-grid {
+  grid-template-columns: 44px minmax(0, 1fr) 220px;
+}
+.mep-schematic-symbol .mep-schematic-bar input[type='number'] {
+  width: 70px;
+}
+.mep-symbol-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+}
+.mep-symbol-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+}
+.mep-symbol-tile:hover {
+  border-color: var(--ink);
+}
+.mep-symbol-tile-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: none;
+  background: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.mep-symbol-thumb {
+  background: #fff;
+  border: 1px solid var(--line);
+}
+.mep-symbol-tile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+.mep-symbol-tile-actions button {
+  font-size: 11px;
+}

@@ -4,8 +4,10 @@ import {
   SCHEMATIC_BINDING_FIELDS,
   addBlock,
   addGroup,
+  addSymbolBlock,
   buildSampleSchematicInput,
   copyTemplate,
+  detachBlockSymbol,
   duplicateBlock,
   duplicateGroup,
   findBlock,
@@ -360,6 +362,44 @@ describe('drawing blocks', () => {
     const groupId = base.groups[0].id;
     const misplaced = mapGroup(clone(), groupId, { id: 'x', type: 'legend', x: 0, y: 0, rotation: 0 });
     expect(validateSchematicTemplate(misplaced).join(' ')).toContain('does not belong');
+  });
+});
+
+describe('symbol blocks', () => {
+  const symbol = {
+    id: 'sym-1',
+    widthMm: 12,
+    heightMm: 7,
+    shapes: [{ id: 's1', kind: 'line' as const, x1: 0, y1: 0, x2: 1, y2: 1, style: { stroke: '#000000', strokeWidth: 0.02, fill: null } }],
+  };
+
+  it('adds a drawing block that points at the symbol and takes its size', () => {
+    const added = addSymbolBlock(clone(), symbol, { at: { x: 5, y: 6 } })!;
+    const block = findBlock(added.template, added.ref)!;
+    expect(block).toMatchObject({ type: 'drawing', symbolId: 'sym-1', width: 12, height: 7, x: 5, y: 6 });
+    expect(block.shapes).toBeUndefined();
+    expect(validateSchematicTemplate(added.template)).toEqual([]);
+  });
+
+  it('goes into a group so it repeats for every circuit, and carries the symbol id into each instance', () => {
+    const groupId = base.groups[1].id;
+    const added = addSymbolBlock(clone(), symbol, { groupId })!;
+    expect(added.ref.groupId).toBe(groupId);
+    const generated = generateSchematic(buildSampleSchematicInput(added.template), added.template);
+    const instances = generated.blocks.filter((b) => b.type === 'drawing');
+    expect(instances.length).toBeGreaterThan(1);
+    expect(instances.every((b) => b.symbolId === 'sym-1' && b.width === 12)).toBe(true);
+    expect(addSymbolBlock(clone(), symbol, { groupId: 'nope' })).toBeUndefined();
+  });
+
+  it('detaching keeps a copy of the shapes and drops the symbol id', () => {
+    const added = addSymbolBlock(clone(), symbol)!;
+    const detached = detachBlockSymbol(added.template, added.ref, symbol);
+    const block = findBlock(detached, added.ref)!;
+    expect(block.symbolId).toBeUndefined();
+    expect(block.shapes).toEqual(symbol.shapes);
+    expect(block.shapes).not.toBe(symbol.shapes);
+    expect(validateSchematicTemplate(detached)).toEqual([]);
   });
 });
 

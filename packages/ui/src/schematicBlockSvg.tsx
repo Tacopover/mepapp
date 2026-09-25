@@ -19,6 +19,8 @@ export interface SchematicBlockSvgProps {
   block: ResolvedBlock;
   /** The vector art of the block's load stamp, when its definition has any (custom stamps do; library stamps are raster art and draw a generic load mark). */
   loadShapes?: SymbolShape[];
+  /** The art of the library symbol a drawing block points at (`block.symbolId`). undefined when the symbol no longer exists; the block then draws a dashed box with a question mark. */
+  symbolShapes?: SymbolShape[];
   /** Draw a faint dashed outline for a drawing block that has no shapes yet. The editor sets it; the read-only viewer does not. */
   showEmptyDrawings?: boolean;
 }
@@ -42,7 +44,7 @@ function Text({ x, y, size, anchor = 'middle', bold, italic, fill, children }: {
   );
 }
 
-export function SchematicBlockSvg({ block, loadShapes, showEmptyDrawings }: SchematicBlockSvgProps) {
+export function SchematicBlockSvg({ block, loadShapes, symbolShapes, showEmptyDrawings }: SchematicBlockSvgProps) {
   const { x, y, width: w, height: h, rotation, style } = block;
   const strokeWidth = style?.strokeWidthMm ?? LINE_MM;
   const stroke = colorOf(style?.color, INK);
@@ -213,7 +215,18 @@ export function SchematicBlockSvg({ block, loadShapes, showEmptyDrawings }: Sche
     }
     case 'drawing':
       art =
-        block.shapes && block.shapes.length > 0 ? (
+        block.symbolId !== undefined ? (
+          symbolShapes && symbolShapes.length > 0 ? (
+            <SymbolShapesSvg shapes={symbolShapes} widthPx={w} heightPx={h} minStrokePx={DRAWING_MIN_STROKE_MM} />
+          ) : (
+            <>
+              <rect x={0} y={0} width={w} height={h} fill="none" stroke={CELL_INK} strokeWidth={LINE_MM} strokeDasharray={`${LINE_MM * 6} ${LINE_MM * 4}`} />
+              <Text x={w / 2} y={h / 2 + fontSize / 3} size={fontSize} fill={CELL_INK}>
+                ?
+              </Text>
+            </>
+          )
+        ) : block.shapes && block.shapes.length > 0 ? (
           <SymbolShapesSvg shapes={block.shapes} widthPx={w} heightPx={h} minStrokePx={DRAWING_MIN_STROKE_MM} />
         ) : showEmptyDrawings ? (
           <rect x={0} y={0} width={w} height={h} fill="none" stroke={CELL_INK} strokeWidth={LINE_MM} strokeDasharray={`${LINE_MM * 6} ${LINE_MM * 4}`} />

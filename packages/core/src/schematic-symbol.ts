@@ -1,4 +1,5 @@
 import type { PortSpec } from './geometry.js';
+import type { SchematicTemplate } from './schematic-template.js';
 import type { SymbolShape } from './symbol-shapes.js';
 
 /**
@@ -44,4 +45,14 @@ export function validateSchematicSymbol(symbol: SchematicSymbol): string[] {
     if (group.some((id) => !portIds.has(id))) issues.push('A linked group names a port that does not exist.');
   }
   return issues;
+}
+
+/** How many blocks in these templates point at the symbol. The library asks before it deletes a symbol that is in use. */
+export function countSymbolUses(templates: SchematicTemplate[], symbolId: string): number {
+  let count = 0;
+  for (const template of templates) {
+    for (const block of template.layoutBlocks) if (block.symbolId === symbolId) count++;
+    for (const group of template.groups) for (const block of group.blocks) if (block.symbolId === symbolId) count++;
+  }
+  return count;
 }

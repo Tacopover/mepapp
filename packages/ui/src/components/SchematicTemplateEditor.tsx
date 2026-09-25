@@ -3,8 +3,10 @@ import {
   SCHEMATIC_BLOCK_CATALOGUE,
   addBlock,
   addGroup,
+  addSymbolBlock,
   buildSampleSchematicInput,
   describeRule,
+  detachBlockSymbol,
   duplicateBlock,
   duplicateGroup,
   findBlock,
@@ -32,6 +34,7 @@ import {
   type SchematicBlockScope,
   type SchematicBlockType,
   type SchematicInput,
+  type SchematicSymbol,
   type SchematicTemplate,
   type StampDefinition,
   type SymbolShape,
@@ -43,6 +46,7 @@ import { buildSchematicTerminals } from '../schematicTerminals.js';
 import { commit, createHistory, endGesture as endHistoryGesture, redo, undo, type History } from '../templateHistory.js';
 import { useSheetView } from '../useSheetView.js';
 import { SchematicDrawingEditor } from './SchematicDrawingEditor.js';
+import { SchematicSymbolLibrary } from './SchematicSymbolLibrary.js';
 import { SchematicTemplateProperties, type EditTemplate } from './SchematicTemplateProperties.js';
 
 export interface SchematicTemplateEditorProps {
@@ -55,6 +59,11 @@ export interface SchematicTemplateEditorProps {
   circuitTypes: CircuitType[];
   stamps: StampInfo[];
   customStampDefinitions: StampDefinition[];
+  /** The symbol library (shared-drawing-tool.md Phase 4). A drawing block can point at one of these. */
+  symbols: SchematicSymbol[];
+  onSymbolsChange: (symbols: SchematicSymbol[]) => void;
+  /** How many template blocks use the symbol, across all the user's templates. */
+  symbolUses: (symbolId: string) => number;
   initialPanelId: string;
   onDone: () => void;
 }
@@ -91,7 +100,7 @@ type Gesture =
 
 const sameRef = (a: BlockRef | null, b: BlockRef | null) => a !== null && b !== null && a.blockId === b.blockId && a.groupId === b.groupId;
 
-export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, initialPanelId, onDone }: SchematicTemplateEditorProps) {
+export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, symbols, onSymbolsChange, symbolUses, initialPanelId, onDone }: SchematicTemplateEditorProps) {
   const [history, setHistoryState] = useState<History<SchematicTemplate>>(() => createHistory(initialTemplate));
   const historyRef = useRef(history);
   const onChangeRef = useRef(onChange);
@@ -113,6 +122,8 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const [activeGroupState, setActiveGroupState] = useState<string | null>(null);
   const [grid, setGrid] = useState(1);
   const [drawingRef, setDrawingRef] = useState<BlockRef | null>(null);
+  /** The symbol library is open in place of the editor: to add a symbol block, or to change the symbol of one. */
+  const [symbolLibrary, setSymbolLibrary] = useState<{ kind: 'add'; inGroup: boolean } | { kind: 'change'; ref: BlockRef } | null>(null);
   const drawingOpenRef = useRef(false);
   const [previewSource, setPreviewSource] = useState<string>(() => (circuits.some((c) => c.panelId === initialPanelId) ? initialPanelId : SAMPLE));
 
@@ -131,7 +142,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const selectionRef = useRef<BlockRef | null>(null);
   selectionRef.current = selectedBlock ? selection : null;
   const drawingBlock = drawingRef ? findBlock(template, drawingRef) : undefined;
-  drawingOpenRef.current = drawingBlock !== undefined;
+  drawingOpenRef.current = drawingBlock !== undefined || symbolLibrary !== null;
 
   const terminals = useMemo(() => buildSchematicTerminals(stamps, customStampDefinitions), [stamps, customStampDefinitions]);
   const previewPanel = previewSource === SAMPLE ? undefined : panels.find((p) => p.id === previewSource);
@@ -159,6 +170,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const instances = blocksByTemplateId(selectedBlock ? selection : null);
   const handleInstance = instances.find((b) => b.id === instanceId) ?? instances[0];
   const loadShapesFor = (definitionId: string | undefined) => (definitionId ? getStampDefinition(definitionId, customStampDefinitions)?.shapes : undefined);
+  const symbolShapesFor = (symbolId: string | undefined) => (symbolId ? symbols.find((s) => s.id === symbolId)?.shapes : undefined);
 
   function selectBlock(ref: BlockRef | null, instance: string | null = null) {
     setSelection(ref);
@@ -211,7 +223,30 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   }
 
   function openSelectedDrawing() {
-    if (selection && selectedBlock?.type === 'drawing') setDrawingRef(selection);
+    if (selection && selectedBlock?.type === 'drawing' && selectedBlock.symbolId === undefined) setDrawingRef(selection);
+  }
+
+  function pickSymbol(symbol: SchematicSymbol) {
+    if (!symbolLibrary) return;
+    if (symbolLibrary.kind === 'change') {
+      const { ref } = symbolLibrary;
+      edit((t) => updateBlock(t, ref, { symbolId: symbol.id, shapes: undefined }));
+    } else {
+      const present = historyRef.current.present;
+      const groupId = activeGroupId ?? present.groups[0]?.id;
+      if (symbolLibrary.inGroup && groupId === undefined) return;
+      const at = symbolLibrary.inGroup ? { x: 0, y: 0 } : { x: snapToGrid(view.x + view.w / 2 - symbol.widthMm / 2, grid), y: snapToGrid(view.y + view.h / 2 - symbol.heightMm / 2, grid) };
+      const result = addSymbolBlock(present, symbol, { groupId: symbolLibrary.inGroup ? groupId : undefined, at });
+      if (!result) return;
+      applyHistory(commit(historyRef.current, result.template));
+      selectBlock(result.ref);
+    }
+    setSymbolLibrary(null);
+  }
+
+  function detachSelectedSymbol() {
+    const symbol = selectedBlock?.symbolId !== undefined ? symbols.find((s) => s.id === selectedBlock.symbolId) : undefined;
+    if (selection && symbol) edit((t) => detachBlockSymbol(t, selection, symbol));
   }
 
   function deleteSelected() {
@@ -366,6 +401,10 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     );
   }
 
+  if (symbolLibrary) {
+    return <SchematicSymbolLibrary symbols={symbols} onChange={onSymbolsChange} usesOf={symbolUses} onPick={pickSymbol} onClose={() => setSymbolLibrary(null)} />;
+  }
+
   return (
     <div className="mep-schematic mep-schematic-editor" ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown}>
       <div className="mep-schematic-bar">
@@ -425,9 +464,19 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
                       </button>
                     );
                   })}
+                {scope === 'once' && (
+                  <button type="button" className="mep-schematic-palette-button" title="Place a symbol from the library on the sheet" onClick={() => setSymbolLibrary({ kind: 'add', inGroup: false })}>
+                    Symbol…
+                  </button>
+                )}
                 {scope === 'circuit' && (
                   <button type="button" className="mep-schematic-palette-button" disabled={!canAddCircuitBlock} title={canAddCircuitBlock ? 'Add a drawing that repeats for every circuit of the selected group' : 'Add a group first: circuit blocks belong to a group.'} onClick={() => addDrawing(true)}>
                     Drawing (each circuit)
+                  </button>
+                )}
+                {scope === 'circuit' && (
+                  <button type="button" className="mep-schematic-palette-button" disabled={!canAddCircuitBlock} title={canAddCircuitBlock ? 'Add a library symbol that repeats for every circuit of the selected group' : 'Add a group first: circuit blocks belong to a group.'} onClick={() => setSymbolLibrary({ kind: 'add', inGroup: true })}>
+                    Symbol (each circuit)…
                   </button>
                 )}
               </div>
@@ -538,7 +587,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
             <g pointerEvents="none">
               {generated.blocks.map((block) => (
                 <g key={block.id} opacity={activeGroupId && block.groupId !== undefined && block.groupId !== activeGroupId ? 0.3 : 1}>
-                  <SchematicBlockSvg block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} showEmptyDrawings />
+                  <SchematicBlockSvg block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} symbolShapes={block.type === 'drawing' ? symbolShapesFor(block.symbolId) : undefined} showEmptyDrawings />
                 </g>
               ))}
             </g>
@@ -613,6 +662,9 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
             onDuplicateBlock={duplicateSelected}
             onDeleteBlock={deleteSelected}
             onEditDrawing={openSelectedDrawing}
+            symbols={symbols}
+            onChangeSymbol={() => selection && setSymbolLibrary({ kind: 'change', ref: selection })}
+            onDetachSymbol={detachSelectedSymbol}
           />
         </aside>
       </div>

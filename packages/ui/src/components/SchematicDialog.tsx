@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import {
   SCHEMATIC_TEMPLATE_LIBRARY,
   copyTemplate,
+  countSymbolUses,
   generateSchematic,
   getStampDefinition,
   type Circuit,
   type CircuitType,
   type Panel,
   type PanelSection,
+  type SchematicSymbol,
   type SchematicTemplate,
   type StampDefinition,
 } from '@mepapp/core';
@@ -30,6 +32,9 @@ export interface SchematicDialogProps {
   /** The user's own templates, listed after the built-in ones. Built-in templates cannot be edited; "Edit template" copies one first. */
   customTemplates: SchematicTemplate[];
   onCustomTemplatesChange: (templates: SchematicTemplate[]) => void;
+  /** The user's own symbols (shared-drawing-tool.md Phase 4). A `drawing` block that names one draws its art. */
+  customSymbols: SchematicSymbol[];
+  onCustomSymbolsChange: (symbols: SchematicSymbol[]) => void;
   templateId: string;
   onTemplateIdChange: (id: string) => void;
   onClose: () => void;
@@ -41,7 +46,7 @@ export interface SchematicDialogProps {
  * regenerates from the props on every render, so it always shows the current circuits and terminals.
  * "Edit template…" swaps the view for the template editor (Phase 5). Export is Phase 6.
  */
-export function SchematicDialog({ panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, initialPanelId, customTemplates, onCustomTemplatesChange, templateId, onTemplateIdChange, onClose }: SchematicDialogProps) {
+export function SchematicDialog({ panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, initialPanelId, customTemplates, onCustomTemplatesChange, customSymbols, onCustomSymbolsChange, templateId, onTemplateIdChange, onClose }: SchematicDialogProps) {
   const [panelId, setPanelId] = useState(initialPanelId);
   const [editing, setEditing] = useState(false);
   const panel = panels.find((p) => p.id === panelId) ?? panels[0];
@@ -58,6 +63,7 @@ export function SchematicDialog({ panels, circuits, panelSections, circuitTypes,
   const { view, setSvg, fit, panHandlers } = useSheetView({ sheetWidthMm: template.sheet.widthMm, sheetHeightMm: template.sheet.heightMm, resetKey: `${template.id}:${template.sheet.widthMm}x${template.sheet.heightMm}` });
 
   const loadShapesFor = (definitionId: string | undefined) => (definitionId ? getStampDefinition(definitionId, customStampDefinitions)?.shapes : undefined);
+  const symbolShapesFor = (symbolId: string | undefined) => (symbolId ? customSymbols.find((s) => s.id === symbolId)?.shapes : undefined);
 
   const notes = generated ? describeDiagnostics(generated.diagnostics, circuits, panel) : [];
   const memberCount = panel ? circuits.filter((c) => c.panelId === panel.id).length : 0;
@@ -88,6 +94,9 @@ export function SchematicDialog({ panels, circuits, panelSections, circuitTypes,
           circuitTypes={circuitTypes}
           stamps={stamps}
           customStampDefinitions={customStampDefinitions}
+          symbols={customSymbols}
+          onSymbolsChange={onCustomSymbolsChange}
+          symbolUses={(symbolId) => countSymbolUses(customTemplates, symbolId)}
           initialPanelId={panel?.id ?? initialPanelId}
           onDone={() => setEditing(false)}
         />
@@ -163,7 +172,7 @@ export function SchematicDialog({ panels, circuits, panelSections, circuitTypes,
             <svg ref={setSvg} className="mep-schematic-canvas" role="img" aria-label={`Schematic of panel ${panel.name}`} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} {...panHandlers}>
               <rect x={0} y={0} width={template.sheet.widthMm} height={template.sheet.heightMm} fill="#ffffff" stroke="#9aa3ad" strokeWidth={0.4} />
               {generated?.blocks.map((block) => (
-                <SchematicBlockSvg key={block.id} block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} />
+                <SchematicBlockSvg key={block.id} block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} symbolShapes={block.type === 'drawing' ? symbolShapesFor(block.symbolId) : undefined} />
               ))}
             </svg>
           </>

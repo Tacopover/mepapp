@@ -15,6 +15,7 @@ import {
   type SchematicBlockType,
   type SchematicTemplate,
 } from './schematic-template.js';
+import type { SchematicSymbol } from './schematic-symbol.js';
 
 /** Points at one template block. `groupId` undefined means a layout block. */
 export interface BlockRef {
@@ -86,6 +87,25 @@ export function addBlock(template: SchematicTemplate, type: SchematicBlockType, 
   if (type === 'totalsTable') block.tableRows = DEFAULT_TABLE_ROWS.map((row) => ({ ...row }));
   if (type === 'drawing') block.shapes = [];
   return { template: mapCollection(template, groupId, (blocks) => [...blocks, block]), ref: { blockId: block.id, groupId } };
+}
+
+/**
+ * Adds a drawing block that shows a library symbol (shared-drawing-tool.md Phase 4), sized to the
+ * symbol. Like `addBlock` with a drawing, it goes into the group when `groupId` is given.
+ */
+export function addSymbolBlock(
+  template: SchematicTemplate,
+  symbol: Pick<SchematicSymbol, 'id' | 'widthMm' | 'heightMm'>,
+  options: { groupId?: string; at?: { x: number; y: number } } = {},
+): { template: SchematicTemplate; ref: BlockRef } | undefined {
+  const added = addBlock(template, 'drawing', options);
+  if (!added) return undefined;
+  return { template: updateBlock(added.template, added.ref, { symbolId: symbol.id, shapes: undefined, width: symbol.widthMm, height: symbol.heightMm }), ref: added.ref };
+}
+
+/** Turns a symbol block into a free drawing: the block keeps a copy of the symbol's shapes and no longer follows the library. */
+export function detachBlockSymbol(template: SchematicTemplate, ref: BlockRef, symbol: Pick<SchematicSymbol, 'shapes'>): SchematicTemplate {
+  return updateBlock(template, ref, { symbolId: undefined, shapes: structuredClone(symbol.shapes) });
 }
 
 export function removeBlock(template: SchematicTemplate, ref: BlockRef): SchematicTemplate {

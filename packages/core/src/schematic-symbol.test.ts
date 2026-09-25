@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { validateSchematicSymbol, type SchematicSymbol } from './schematic-symbol.js';
+import { SCHEMATIC_TEMPLATE_LIBRARY } from './schematic-template-library.js';
+import { countSymbolUses, validateSchematicSymbol, type SchematicSymbol } from './schematic-symbol.js';
 import type { SymbolShape } from './symbol-shapes.js';
 
 const line: SymbolShape = { id: 's1', kind: 'line', x1: 0, y1: 0.5, x2: 1, y2: 0.5, style: { stroke: '#000', strokeWidth: 1, fill: null } };
@@ -32,5 +33,18 @@ describe('validateSchematicSymbol', () => {
     const p = { id: 'a', name: 'In', fractionX: 0, fractionY: 0 };
     expect(validateSchematicSymbol(symbol({ ports: [p, p] }))).toEqual(['Port "a" reuses an id.']);
     expect(validateSchematicSymbol(symbol({ ports: [p], portGroups: [['a', 'gone']] }))).toEqual(['A linked group names a port that does not exist.']);
+  });
+});
+
+describe('countSymbolUses', () => {
+  it('counts blocks in the layout and in groups, across templates', () => {
+    const a = structuredClone(SCHEMATIC_TEMPLATE_LIBRARY[0]);
+    const b = structuredClone(SCHEMATIC_TEMPLATE_LIBRARY[0]);
+    a.layoutBlocks.push({ id: 'x1', type: 'drawing', x: 0, y: 0, rotation: 0, symbolId: 'sym' });
+    a.groups[0].blocks.push({ id: 'x2', type: 'drawing', x: 0, y: 0, rotation: 0, symbolId: 'sym' });
+    b.groups[0].blocks.push({ id: 'x3', type: 'drawing', x: 0, y: 0, rotation: 0, symbolId: 'other' });
+    expect(countSymbolUses([a, b], 'sym')).toBe(2);
+    expect(countSymbolUses([a, b], 'other')).toBe(1);
+    expect(countSymbolUses([a, b], 'none')).toBe(0);
   });
 });
