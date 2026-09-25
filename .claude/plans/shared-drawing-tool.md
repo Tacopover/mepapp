@@ -176,7 +176,7 @@ with both consumers' actual shapes in view.
 
 ### Phase 3 — Wire the schematic template editor's free-item tools — in progress (2026-09-25)
 
-Progress (built, not yet browser-verified): the drawing surface and the tool and style bars were extracted from `ElementEditorDialog.tsx` into `ShapeDrawSurface.tsx` and `ShapeDrawToolbar.tsx`, and the stamp editor now uses them (one implementation, ports stay stamp-only through the `children` slot and `onUnhandledToolPointerDown`). The template editor gets a `drawing` block whose art is a `SymbolShape[]`, edited in `SchematicDrawingEditor` (in place, no second Dialog). Free items are blocks, not a separate layer on the sheet.
+**Done** — 2026-09-25, commits `2d16143` and `4178964`. Free items are `drawing` blocks in the template (sheet or per circuit); the drawing surface is shared with the stamp editor (`ShapeDrawSurface`, `ShapeDrawToolbar`). Browser-verified, including a stamp editor regression pass. Details and gaps: [[electrical-schematic-templates]] Phase 5 done-note.
 
 Mount the shared hook plus the SVG adapter inside the schematic template editor canvas (built as part of [[electrical-schematic-templates]] Phase 5). Replace the mockup's disabled toolbar strip with real line/rect/circle/text/symbol-placement tools, writing to the template's static-blocks section.
 

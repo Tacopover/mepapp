@@ -1,6 +1,6 @@
 # Electrical schematic templates — plan
 
-Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 block editor done 2026-09-24, free-drawn items still open; Phase 6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
+Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
 ## 1. Goal
 
@@ -351,7 +351,7 @@ Not done:
 
 Verified: `pnpm build` (9 of 9 tasks); `pnpm --filter @mepapp/core test` (327 tests) and `pnpm --filter @mepapp/ui test` (16 tests) pass. A real headless Chromium run (fork, on a preview build of this worktree) built a panel with 2 sections and 6 circuits (one spare, one with RCD, different phase, typed lengths, terminals of two kinds) through real clicks, then opened the dialog. Text in the SVG matched the entered data (labels A1 to A6, `B16/30mA`, `B2CA 3G2,5 mm²  l=27,5 m`, cells and totals). Both templates draw, zoom, pan, fit and Escape work, reopening after a change shows the new data, no console errors. The first run found the defects listed above; they were fixed and re-checked in the browser.
 
-### Phase 5 — Template editor — **block editor done 2026-09-24; free-drawn items not done**
+### Phase 5 — Template editor — **Done** (block editor 2026-09-24, free-drawn shapes 2026-09-25)
 
 Place, rotate, and bind building blocks. Snap using ports. Edit a circuit group with sample data.
 
@@ -370,20 +370,22 @@ Shipped:
 - Built-in templates stay read-only. "Edit template…" makes a copy under "My templates". Duplicate and Delete template work.
 - Custom templates live in App state and in localStorage (`mepapp.schematicTemplates`, interim). Phase 6 replaces this.
 
-Progress on free-drawn shapes (2026-09-25, built, not yet browser-verified):
-- New `drawing` block type (`shapes: SymbolShape[]`, fractions of the block box). It can sit in the layout or in a circuit group, so a drawn symbol repeats for every circuit. Core in the commit after `2722e80`.
-- UI: `ShapeDrawSurface` and `ShapeDrawToolbar` are now shared between the stamp editor and the new `SchematicDrawingEditor`. The drawing editor replaces the template editor's body in place ("Edit drawing…" or double-click a drawing block). Done is one undo step.
+**Done (free-drawn shapes)** — 2026-09-25, commits `2d16143` (core) and `4178964` (UI) on `worktree-electrical-schematic-templates-plan`.
+
+Shipped:
+- A `drawing` block type. Its art is `shapes: SymbolShape[]`, in fractions of the block box. It can sit on the sheet or in a circuit group, where it repeats for every circuit. A drawn symbol in a group can stand in for the built-in protective device: delete that block and add "Drawing (each circuit)".
+- `SchematicDrawingEditor`: opens in place of the template editor body (double-click the block, "Edit drawing…", or on adding one). Done saves one undo step. Cancel discards.
+- The drawing surface and the tool and style bars now live in `ShapeDrawSurface` and `ShapeDrawToolbar`. The stamp editor uses them too (`ElementEditorDialog.tsx` 974 to 495 lines).
+- Strokes in the schematic are true millimetres (`minStrokePx` on `SymbolShapesSvg`, default unchanged for stamps).
 
 Not done:
-- Free-drawn shapes on the sheet: see the progress above. The `freeItem` block is still text only.
-- Snapping to ports. Blocks have no ports, so the editor uses grid snap. Edge alignment guides are not built.
-- Grid dots on the canvas.
-- No component tests. Only the pure modules have tests.
-- The default totals rows use `count(circuits)`. In "one column per circuit" mode that row shows 0 for every circuit.
-- The sample data's load types are made-up strings, so a load type filter only matches on real panels.
+- No symbol library and no symbol picker on a block (`symbolId` is still unused). That is shared-drawing-tool Phase 4.
+- No bound text inside a drawing. Use a description or free text block beside it.
+- No image import and no ports tool in the drawing editor.
+- `loadSymbol` art still has a 1 mm minimum stroke.
+- Old defect, not caused by this work: on a non-square canvas a circle's radius follows the pointer too little (a 4:3 block gives about 0.75 of the dragged radius). The draft uses the width fraction, the drawing uses the shorter side. Code: `symbol-shape-geometry.ts` (draft creation) and `useShapeDrawEditor.ts`.
 
-Verified: core 363 tests pass; UI 30 tests pass; root `pnpm build` 9 of 9. Two headless-browser passes (Playwright, own port): items 1 to 10 of the check list passed with no page errors. The pass found two defects: a text selection that cancelled the second drag, and block properties below the fold. Both were fixed, and a recheck passed (three drags in a row, after Undo, typing after a drag, block heading at y=119). Not checked: a real touch device, and Windows.
-
+Verified: core 367 tests; UI 33 tests; root `pnpm build` 9 of 9. Headless browser (Playwright, own port): the stamp editor regression (all shape tools, transform, mirror, undo, snap indicators, port tool, view, save and place) passed. Drawing blocks passed: 4-shape drawing at the right proportion with 0.300 mm strokes; move, resize, rotate; one undo step for a whole drawing session; Cancel; Escape keeps the dialog open; a group drawing on all 5 circuits changing together; the drawn symbol replacing the deleted protective device; empty drawings dashed only in the editor; reload keeps 1 layout and 2 group drawings and `validateSchematicTemplate` returns no issues. No page or console errors. Not checked: Windows, touch.
 
 ### Phase 6 — Save and load templates, export — not started
 
