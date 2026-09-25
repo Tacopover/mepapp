@@ -379,7 +379,7 @@ Shipped:
 - Strokes in the schematic are true millimetres (`minStrokePx` on `SymbolShapesSvg`, default unchanged for stamps).
 
 Not done:
-- No symbol library and no symbol picker on a block (`symbolId` is still unused). That is shared-drawing-tool Phase 4.
+- ~~No symbol library and no symbol picker on a block (`symbolId` is still unused).~~ Done 2026-09-25 in shared-drawing-tool Phase 4: a `drawing` block can point at a library symbol through `symbolId`. Exporting a template (Phase 6 here) must bundle the symbols it uses, because a block stores only the id.
 - No bound text inside a drawing. Use a description or free text block beside it.
 - No image import and no ports tool in the drawing editor.
 - `loadSymbol` art still has a 1 mm minimum stroke.

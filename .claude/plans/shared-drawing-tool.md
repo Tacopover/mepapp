@@ -1,6 +1,6 @@
 # Shared drawing-tool component — plan
 
-Status: **draft. No part is started.** Written 2026-09-23, resolving open question 9 of [[electrical-schematic-templates]]. Revised 2026-09-23 after user review: stamp editor moves to SVG too, ports become a shared module, thumbnail and ports open questions resolved.
+Status: **Phases 1, 2, 3, 4 and 5 done; Phase 6 closed without code (2026-09-25).** Written 2026-09-23, resolving open question 9 of [[electrical-schematic-templates]]. Revised 2026-09-23 after user review: stamp editor moves to SVG too, ports become a shared module, thumbnail and ports open questions resolved.
 
 ## 1. Goal
 
@@ -174,7 +174,7 @@ one real consumer (the stamp editor) until Phase 4 builds the second,
 so that evaluation stays deferred to Phase 4, where it can be made
 with both consumers' actual shapes in view.
 
-### Phase 3 — Wire the schematic template editor's free-item tools — in progress (2026-09-25)
+### Phase 3 — Wire the schematic template editor's free-item tools — **Done** (2026-09-25)
 
 **Done** — 2026-09-25, commits `2d16143` and `4178964`. Free items are `drawing` blocks in the template (sheet or per circuit); the drawing surface is shared with the stamp editor (`ShapeDrawSurface`, `ShapeDrawToolbar`). Browser-verified, including a stamp editor regression pass. Details and gaps: [[electrical-schematic-templates]] Phase 5 done-note.
 
@@ -182,7 +182,28 @@ Mount the shared hook plus the SVG adapter inside the schematic template editor 
 
 Depends on [[electrical-schematic-templates]] Phase 5 (the template editor itself) existing to mount into.
 
-### Phase 4 — "Create your own symbol" flow — not started
+### Phase 4 — "Create your own symbol" flow — **Done** (2026-09-25)
+
+**Done** — 2026-09-25, commits `5397030` (core), `92b985f` (storage, shared port parts) and `eb90c95` (UI) on `worktree-shared-drawing-tool-plan`, built on top of `worktree-electrical-schematic-templates-plan`.
+
+Shipped:
+- Core: `SchematicSymbol` (`id`, `name`, `widthMm`, `heightMm`, `shapes`, `ports`, `portGroups`), `validateSchematicSymbol`, `countSymbolUses`, `addSymbolBlock`, `detachBlockSymbol`. `validateSchematicTemplate` accepts `symbolId` only on a `drawing` block.
+- Storage: `schematicSymbolStorage.ts`, per installation in localStorage (`mepapp.schematicSymbols`), beside the template storage. It moves with templates when templates plan Phase 6 decides where both live.
+- UI: `SchematicSymbolEditor` (name, size in mm, all shape tools, Port tool, ports sidebar), `SchematicSymbolLibrary` (SVG thumbnails, "+ Draw your own symbol…", Edit, Copy, Delete with a used-by warning), and `PortMarkers`/`PortsSidebar`/`PORT_SHAPE_TOOL_DEFS` shared with the stamp editor. Both views replace the template editor body in place.
+- Template editor: palette buttons "Symbol…" and "Symbol (each circuit)…"; a symbol is a `drawing` block with `symbolId` and no `shapes`. The block follows the library, so editing a symbol updates every block that uses it. "Change…" swaps the symbol. "Detach to drawing" copies the shapes into the block. A deleted symbol leaves a dashed box with "?".
+
+Decisions (reversible):
+- Reference, not copy. A block stores `symbolId`, so a template that leaves this installation loses its art. Phase 6 of the templates plan (export) must bundle the symbols a template uses.
+- No built-in symbols yet. The library starts empty.
+- Symbol names are not checked for duplicates.
+- Ports are stored and drawn in the editor, but nothing snaps to them yet. Annotations on the schematic do not exist. A sheet-position helper for ports comes with that feature.
+- Size edits stretch shapes and ports together (fractions), the same as resizing a drawing block. There is no "canvas resize" rescale like the stamp editor's.
+
+Verified: core 376 tests, ui 36 tests, root `pnpm build` 9 of 9. Headless Chromium (Playwright, built bundle): stamp editor regression (ports, rename, link, save, reopen); symbol library (empty state, name validation, thumbnail with shapes, place, one undo step, each-circuit repeat across 6 sample circuits, edit propagates to placed blocks, change, detach, copy, delete with warning and "?" box, localStorage round trip, generated schematic view). No console or page errors. Not checked: Windows, touch, the library after a page reload (the panel is gone after reload).
+
+Known rough edges: the symbol editor's dialog title still reads "Schematic template". The name field wraps the size fields to a second row. A sheet block and a group block can share an id (`drawing-1`), as before.
+
+**Original spec:**
 
 New dialog (or shared shell, per §6): shared hook, SVG adapter, shared ports module, plus a name-and-save form. Writes a `SymbolShape[]` + ports entry to the schematic symbol library, replacing the mockup's disabled "+ Draw your own symbol…" button. Symbol-library thumbnails render the SVG artwork directly at thumbnail size — no raster step.
 
@@ -206,7 +227,11 @@ shape, placed a port, clicked Create) and it completed with no
 console or page errors, confirming the pipeline still runs end to end
 in the browser, not just in isolation.
 
-### Phase 6 — Generalize the block-catalogue system's drag/rotate interactions (optional) — not started
+### Phase 6 — Generalize the block-catalogue system's drag/rotate interactions (optional) — **Closed, not done** (2026-09-25)
+
+Not done, by decision. The template editor's drag, rotate, resize and grid-snap math already lives in `@mepapp/core` (`schematic-template-edit.ts`: `snapToGrid`, `rotationFromPointer`, `resizeKeepingCorner`, `toBlockAxes`) with tests. It works in millimetres and degrees on blocks that have a catalogue size and a rotation-aware resize. The shared tool's primitives work in fractions and radians on shapes. Pointing one at the other would add conversion code and remove none. The visible differences are modifier keys (Alt turns off the grid in the block editor; the shape editor has a toggle) and the default rotation snap. Those are a behaviour choice, not shared code. Revisit only if the user wants the two editors to feel identical.
+
+**Original spec:**
 
 Once §5's generalized transform primitives exist, point the template editor's block-catalogue drag/rotate handlers (`attachDrag`/`attachRotateDrag` in the mockup) at them instead of their own hand-written math, so block dragging/rotating feels the same as the shared drawing tool's. Scope this when the template editor (Phase 5 of [[electrical-schematic-templates]]) is being built; fall back to keeping the block system's interactions separate (§7) if this turns out awkward in practice.
 
@@ -214,9 +239,9 @@ Once §5's generalized transform primitives exist, point the template editor's b
 
 1. ~~**Thumbnail rasterization.**~~ **Resolved 2026-09-23:** SVG thumbnails render directly at thumbnail size. No raster step for the symbol library.
 2. ~~**Ports for schematic symbols.**~~ **Resolved 2026-09-23:** yes, needed — connection points for annotations (lines) to snap to, matching the old MEPSketcher app's behavior. See §6's shared ports module.
-3. **Naming collision.** The mockup's own `SYMBOL_LIBRARY` constant (a hardcoded array of 10 placeholder entries) needs a new name once real code lands near `symbol-shapes.ts`/`symbolShapeCanvas.ts`, which already use "symbol" terminology.
+3. ~~**Naming collision.**~~ **Resolved 2026-09-25:** the type is `SchematicSymbol` in `@mepapp/core/schematic-symbol.ts`; the mockup's `SYMBOL_LIBRARY` array is gone. The stamp side keeps `SymbolShape`.
 4. **Later unification of the block-catalogue system.** Could the semantic blocks (§7) eventually be redefined as `SymbolShape`s with a bound-text extension, removing the separate `mkBlock` model entirely? Not needed for v1, worth revisiting once the shared tool is proven in Phases 1-5.
-5. **One shared dialog shell or two.** §6 flags this for a decision during Phase 2, once the stamp dialog's and the schematic symbol dialog's real remaining differences (save step, metadata fields) are in front of the implementer.
+5. ~~**One shared dialog shell or two.**~~ **Resolved 2026-09-25: two shells, shared parts.** The stamp editor stays a `Dialog`. The symbol editor is an in-place view inside `SchematicDialog` (a second `Dialog` would close both on Escape). They share `useShapeDrawEditor`, `usePortEditor`, `ShapeDrawSurface`, `ShapeDrawToolbar` and, new in Phase 4, `PortMarkers`/`PortsSidebar` (`PortEditorParts.tsx`) and `PORT_SHAPE_TOOL_DEFS`. Their remaining differences are real: the stamp editor has discipline, category, image import, name-collision prompts and a raster bake; the symbol editor has a mm size and no raster step.
 
 ## 10. Non-goals
 
