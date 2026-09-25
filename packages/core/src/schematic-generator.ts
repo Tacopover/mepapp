@@ -26,6 +26,7 @@ import {
   type ParsedBinding,
   type ParsedExpression,
 } from './schematic-expression.js';
+import { resolveFields, type FieldValueSources, type ResolvedField } from './schematic-fields.js';
 import {
   SCHEMATIC_BLOCK_CATALOGUE,
   getBlockBindingSource,
@@ -37,6 +38,7 @@ import {
   type SchematicBlockScope,
   type SchematicBlockStyle,
   type SchematicBlockType,
+  type SchematicExtra,
   type SchematicTemplate,
 } from './schematic-template.js';
 import type { SymbolShape } from './symbol-shapes.js';
@@ -91,11 +93,19 @@ export interface ResolvedBlock {
   panelId: string;
   circuitId?: string;
   sectionId?: string;
+  /** The text was typed over by the user (`GenerateOptions.textOverrides`). */
+  overridden?: boolean;
+  /** Set on a block that comes from a schematic extra, not from the template. */
+  extraId?: string;
 }
 
 export type SchematicDiagnostic =
   | { kind: 'no-matching-group'; circuitId: string }
-  | { kind: 'binding-error'; blockId: string; message: string };
+  | { kind: 'binding-error'; blockId: string; message: string }
+  /** A typed-over text whose block is no longer generated, for example after the template changed. */
+  | { kind: 'orphan-override'; blockId: string }
+  /** An extra that follows a circuit that is not laid out. It is not drawn. */
+  | { kind: 'orphan-extra'; extraId: string };
 
 export interface GeneratedSchematic {
   blocks: ResolvedBlock[];
@@ -104,11 +114,19 @@ export interface GeneratedSchematic {
   /** Sheet position of each laid-out circuit's group origin, for user-drawn extras that follow their circuit. */
   circuitOrigins: Record<string, { x: number; y: number }>;
   diagnostics: SchematicDiagnostic[];
+  /** Every field of the template with its stored value and default, for a form. */
+  fields: ResolvedField[];
 }
 
 export interface GenerateOptions {
   /** Added to every block position. Default 0,0. */
   origin?: { x: number; y: number };
+  /** Entered field values and today's date. */
+  fieldSources?: FieldValueSources;
+  /** Text typed over a generated block, by the block's resolved id. Replaces the block's text as it is, without reading {expressions}. */
+  textOverrides?: Record<string, string>;
+  /** Blocks that the user added to this schematic. Drawn after the template's blocks. */
+  extras?: SchematicExtra[];
 }
 
 /** A panel's circuits in layout order: by section order (circuits without a section last), then by number, ascending or descending per `panel.sortDirection`. */
@@ -242,11 +260,13 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
     spareCount: facts.length - liveFacts.length,
   };
 
+  const { fields, values: fieldValues } = resolveFields(template, options.fieldSources ?? {}, { panel: panelFields });
+
   const filterTerminals = (terminals: SchematicTerminalInfo[], block: SchematicBlock) =>
     block.loadTypeFilter === undefined ? terminals : terminals.filter((t) => t.loadType === block.loadTypeFilter);
   const circuitContext = (f: CircuitFacts, block: SchematicBlock) => {
     const terminals = filterTerminals(f.terminals, block);
-    return { ...f.fields, panel: panelFields, terminals, terminal: terminals };
+    return { ...f.fields, panel: panelFields, field: fieldValues, terminals, terminal: terminals };
   };
   const aggregateContext = (block: SchematicBlock) => {
     const terminals = filterTerminals(
@@ -254,7 +274,7 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
       block,
     );
     const live = liveFacts.map((f) => f.fields.circuit);
-    return { panel: panelFields, circuit: live, circuits: live, spares: facts.filter((f) => f.circuit.isSpare).map((f) => f.fields.circuit), terminals, terminal: terminals };
+    return { panel: panelFields, field: fieldValues, circuit: live, circuits: live, spares: facts.filter((f) => f.circuit.isSpare).map((f) => f.fields.circuit), terminals, terminal: terminals };
   };
 
   // Layout: each matched circuit advances the cursor by its own group's pitch.
@@ -281,8 +301,10 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
     ids: { scopeId: string; groupId?: string; circuitId?: string; sectionId?: string },
     size?: { width: number; height: number },
   ): ResolvedBlock => {
+    const id = `${panel.id}/${ids.scopeId}/${block.id}`;
+    const override = block.type === 'totalsTable' ? undefined : options.textOverrides?.[id];
     const resolved: ResolvedBlock = {
-      id: `${panel.id}/${ids.scopeId}/${block.id}`,
+      id,
       templateBlockId: block.id,
       groupId: ids.groupId,
       type: block.type,
@@ -292,7 +314,8 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
       width: size?.width ?? getBlockWidth(block),
       height: size?.height ?? getBlockHeight(block),
       rotation: block.rotation,
-      text: resolveText(block, context),
+      text: override ?? resolveText(block, context),
+      overridden: override !== undefined ? true : undefined,
       style: block.style,
       symbolId: block.symbolId,
       shapes: block.shapes,
@@ -344,11 +367,11 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
         const last = members[members.length - 1];
         const span = last.offset + last.group.pitch - p.offset;
         const size = axis === 'row' ? { width: span, height: getBlockHeight(block) } : { width: getBlockWidth(block), height: span };
-        emit(block, 'section', offsetPoint(p.offset), { panel: panelFields, section }, { scopeId: section.id, sectionId: section.id }, size);
+        emit(block, 'section', offsetPoint(p.offset), { panel: panelFields, field: fieldValues, section }, { scopeId: section.id, sectionId: section.id }, size);
       }
       continue;
     }
-    const context = info.scope === 'aggregate' ? aggregateContext(block) : { panel: panelFields };
+    const context = info.scope === 'aggregate' ? aggregateContext(block) : { panel: panelFields, field: fieldValues };
     const resolved = emit(block, info.scope, origin, context, { scopeId: '-' }, busbarSize(block));
     if (block.type === 'totalsTable') resolved.table = resolveTable(block);
   }
@@ -364,5 +387,22 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
     }
   }
 
-  return { blocks, circuitOrder: placed.map((p) => p.facts.circuit.id), circuitOrigins, diagnostics };
+  for (const extra of options.extras ?? []) {
+    const followed = extra.circuitId !== undefined ? placed.find((p) => p.facts.circuit.id === extra.circuitId) : undefined;
+    if (extra.circuitId !== undefined && !followed) {
+      diagnostics.push({ kind: 'orphan-extra', extraId: extra.id });
+      continue;
+    }
+    const at = followed ? circuitOrigins[extra.circuitId as string] : origin;
+    const context = followed ? circuitContext(followed.facts, extra) : { panel: panelFields, field: fieldValues };
+    const resolved = emit(extra, followed ? 'circuit' : 'once', at, context, { scopeId: 'extra', circuitId: extra.circuitId });
+    resolved.extraId = extra.id;
+  }
+
+  const emitted = new Set(blocks.map((b) => b.id));
+  for (const blockId of Object.keys(options.textOverrides ?? {})) {
+    if (!emitted.has(blockId)) diagnostics.push({ kind: 'orphan-override', blockId });
+  }
+
+  return { blocks, circuitOrder: placed.map((p) => p.facts.circuit.id), circuitOrigins, diagnostics, fields };
 }

@@ -14,6 +14,7 @@ import {
   type SchematicBlock,
   type SchematicBlockScope,
   type SchematicBlockType,
+  type SchematicFieldDefinition,
   type SchematicTemplate,
 } from './schematic-template.js';
 import type { SchematicSymbol } from './schematic-symbol.js';
@@ -410,4 +411,42 @@ export function buildSampleSchematicInput(template: SchematicTemplate, circuitTy
     }
   }
   return { panel, circuits, sections, terminals, circuitTypes };
+}
+
+/** Adds a text field, scope schematic, with a new id. */
+export function addField(template: SchematicTemplate): { template: SchematicTemplate; fieldId: string } {
+  const fields = template.fields ?? [];
+  const fieldId = nextId('field', fields.map((f) => f.id.replace('_', '-'))).replace('-', '_');
+  const field: SchematicFieldDefinition = { id: fieldId, label: `Field ${fields.length + 1}`, type: 'text', scope: 'schematic' };
+  return { template: { ...template, fields: [...fields, field] }, fieldId };
+}
+
+/** Applies `patch` to a field. A patch key set to undefined removes it. */
+export function updateField(template: SchematicTemplate, fieldId: string, patch: Partial<SchematicFieldDefinition>): SchematicTemplate {
+  return {
+    ...template,
+    fields: (template.fields ?? []).map((field) => {
+      if (field.id !== fieldId) return field;
+      const next: Record<string, unknown> = { ...field, ...patch };
+      for (const key of Object.keys(patch)) if ((patch as Record<string, unknown>)[key] === undefined) delete next[key];
+      if (next.type !== 'date') delete next.defaultToday;
+      return next as unknown as SchematicFieldDefinition;
+    }),
+  };
+}
+
+export function removeField(template: SchematicTemplate, fieldId: string): SchematicTemplate {
+  return { ...template, fields: (template.fields ?? []).filter((f) => f.id !== fieldId) };
+}
+
+/** Moves a field `steps` places in the list, which is the order of the Fields form. */
+export function reorderField(template: SchematicTemplate, fieldId: string, steps: number): SchematicTemplate {
+  const fields = [...(template.fields ?? [])];
+  const from = fields.findIndex((f) => f.id === fieldId);
+  if (from < 0) return template;
+  const to = Math.min(Math.max(from + steps, 0), fields.length - 1);
+  if (to === from) return template;
+  const [moved] = fields.splice(from, 1);
+  fields.splice(to, 0, moved);
+  return { ...template, fields };
 }

@@ -16,6 +16,8 @@ export * from './circuit-type-library.js';
 export * from './schematic-expression.js';
 export * from './schematic-template.js';
 export * from './schematic-template-library.js';
+export * from './schematic-fields.js';
+export * from './schematic.js';
 export * from './schematic-generator.js';
 export * from './schematic-template-edit.js';
 export * from './schematic-symbol.js';

@@ -144,6 +144,33 @@ export interface CircuitGroupDefinition {
   blocks: SchematicBlock[];
 }
 
+export type SchematicFieldType = 'text' | 'multiline' | 'date' | 'number';
+
+/**
+ * A value that the user fills in per schematic, such as the project name or the revision. Blocks read
+ * it as `{field.<id>}`. The template only defines it; the value belongs to the project (scope
+ * `project`, entered once and shared by every schematic) or to one schematic (scope `schematic`).
+ */
+export interface SchematicFieldDefinition {
+  /** A name that starts with a letter or underscore and holds letters, digits and underscores. */
+  id: string;
+  label: string;
+  type: SchematicFieldType;
+  scope: 'project' | 'schematic';
+  /** Used while no value is entered: text with {expression} segments, evaluated on the panel, for example "Board {panel.name}". */
+  defaultBinding?: string;
+  /** A date field only: the default is the day the schematic is generated. */
+  defaultToday?: boolean;
+}
+
+/**
+ * A block that the user added to one schematic, not to the template. Its position is in sheet mm, or
+ * relative to the origin of circuit `circuitId` when that is set, so it follows that circuit.
+ */
+export interface SchematicExtra extends SchematicBlock {
+  circuitId?: string;
+}
+
 export interface SchematicTemplate {
   id: string;
   name: string;
@@ -158,6 +185,10 @@ export interface SchematicTemplate {
   groupAnchor: { x: number; y: number };
   /** Ordered: the first group whose rule matches a circuit is used for it. */
   groups: CircuitGroupDefinition[];
+  /** The fields the user fills in per schematic. Absent in templates saved before fields existed. */
+  fields?: SchematicFieldDefinition[];
+  /** How a date field shows in text. Default 'dd-mm-yyyy'. */
+  dateFormat?: 'dd-mm-yyyy' | 'yyyy-mm-dd';
 }
 
 export function getBlockWidth(block: SchematicBlock): number {
@@ -233,6 +264,21 @@ export function validateSchematicTemplate(template: SchematicTemplate): string[]
     if (group.direction !== template.groups[0]?.direction) issues.push(`Group "${group.id}" has direction "${group.direction}" but the first group has "${template.groups[0]?.direction}". All groups must have the same direction.`);
     const groupBlockIds = new Set<string>();
     for (const block of group.blocks) validateBlock(block, `group "${group.id}"`, block.type === 'drawing' ? ['circuit', 'once'] : ['circuit'], groupBlockIds, issues);
+  }
+  const fieldIds = new Set<string>();
+  for (const field of template.fields ?? []) {
+    const name = `Field "${field.id}"`;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(field.id)) issues.push(`${name} needs an id of letters, digits and underscores that does not start with a digit.`);
+    if (fieldIds.has(field.id)) issues.push(`${name} reuses an id.`);
+    fieldIds.add(field.id);
+    if (field.label.trim() === '') issues.push(`${name} needs a label.`);
+    if (!['text', 'multiline', 'date', 'number'].includes(field.type)) issues.push(`${name} has an unknown type "${String(field.type)}".`);
+    if (field.scope !== 'project' && field.scope !== 'schematic') issues.push(`${name} has an unknown scope "${String(field.scope)}".`);
+    if (field.defaultToday && field.type !== 'date') issues.push(`${name} uses "today" as its default but is not a date.`);
+    if (field.defaultBinding) {
+      const issue = bindingIssue(name, field.defaultBinding, 'binding');
+      if (issue) issues.push(issue);
+    }
   }
   return issues;
 }
