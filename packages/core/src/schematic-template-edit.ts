@@ -450,3 +450,13 @@ export function reorderField(template: SchematicTemplate, fieldId: string, steps
   fields.splice(to, 0, moved);
   return { ...template, fields };
 }
+
+/** The places in the template whose text or formula reads `{field.<id>}`, for example `layout block "title"`. Only text the user wrote counts; a default binding never reads a field. */
+export function findFieldUses(template: SchematicTemplate, fieldId: string): string[] {
+  const reads = new RegExp(`\\bfield\\.${fieldId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9_])`);
+  const uses = (block: SchematicBlock) => (block.binding !== undefined && reads.test(block.binding)) || (block.tableRows ?? []).some((row) => reads.test(row.formula));
+  return [
+    ...template.layoutBlocks.filter(uses).map((b) => `layout block "${b.id}"`),
+    ...template.groups.flatMap((g) => g.blocks.filter(uses).map((b) => `group "${g.name}" block "${b.id}"`)),
+  ];
+}

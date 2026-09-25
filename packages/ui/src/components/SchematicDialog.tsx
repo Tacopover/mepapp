@@ -280,6 +280,7 @@ export function SchematicDialog({
           symbols={customSymbols}
           onSymbolsChange={onCustomSymbolsChange}
           symbolUses={(symbolId) => countSymbolUses(customTemplates, symbolId)}
+          projectFieldValues={projectFields}
           initialPanelId={panelId}
           onDone={() => setEditingTemplateId(null)}
         />

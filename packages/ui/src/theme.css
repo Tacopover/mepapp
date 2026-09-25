@@ -2389,3 +2389,17 @@
 .mep-symbol-tile-actions button {
   font-size: 11px;
 }
+
+/* Template fields editor (electrical-schematic-templates.md Phase 5b) */
+.mep-schematic-fieldrow {
+  border-top: 1px solid var(--mep-border, #9aa3ad);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.mep-schematic-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}

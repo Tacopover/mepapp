@@ -12,6 +12,7 @@ import {
   duplicateGroup,
   findBlock,
   generateSchematic,
+  todayIso,
   getBlockHeight,
   getBlockWidth,
   getBlocksBounds,
@@ -65,6 +66,8 @@ export interface SchematicTemplateEditorProps {
   onSymbolsChange: (symbols: SchematicSymbol[]) => void;
   /** How many template blocks use the symbol, across all the user's templates. */
   symbolUses: (symbolId: string) => number;
+  /** Values of the fields shared by every schematic, so the preview shows realistic text. The editor never stores them. */
+  projectFieldValues?: Record<string, string>;
   initialPanelId: string;
   onDone: () => void;
 }
@@ -101,7 +104,7 @@ type Gesture =
 
 const sameRef = (a: BlockRef | null, b: BlockRef | null) => a !== null && b !== null && a.blockId === b.blockId && a.groupId === b.groupId;
 
-export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, symbols, onSymbolsChange, symbolUses, initialPanelId, onDone }: SchematicTemplateEditorProps) {
+export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, symbols, onSymbolsChange, symbolUses, projectFieldValues, initialPanelId, onDone }: SchematicTemplateEditorProps) {
   const [history, setHistoryState] = useState<History<SchematicTemplate>>(() => createHistory(initialTemplate));
   const historyRef = useRef(history);
   const onChangeRef = useRef(onChange);
@@ -151,7 +154,8 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     () => (previewPanel ? { panel: previewPanel, circuits, sections: panelSections, terminals, circuitTypes } : buildSampleSchematicInput(template, circuitTypes)),
     [previewPanel, circuits, panelSections, terminals, circuitTypes, template],
   );
-  const generated = useMemo(() => generateSchematic(input, template), [input, template]);
+  const today = useMemo(() => todayIso(), []);
+  const generated = useMemo(() => generateSchematic(input, template, { fieldSources: { projectValues: projectFieldValues, today } }), [input, template, projectFieldValues, today]);
   const notes = useMemo(() => [...validateSchematicTemplate(template), ...describeDiagnostics(generated.diagnostics, input.circuits, input.panel)], [template, generated, input]);
   const loadTypes = useMemo(() => [...new Set(Object.values(input.terminals).map((t) => t.loadType).filter((t): t is string => t !== undefined))], [input]);
 

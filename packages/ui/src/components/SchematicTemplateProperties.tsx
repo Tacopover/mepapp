@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ExpressionError,
   SCHEMATIC_BLOCK_CATALOGUE,
+  addField,
   findBlock,
+  findFieldUses,
   formatNumberList,
   getBindingFieldsForScope,
   getBlockHeight,
@@ -10,15 +12,19 @@ import {
   parseBinding,
   parseExpression,
   parseNumberList,
+  removeField,
+  reorderField,
   setTemplateDirection,
   setBlockSymbol,
   updateBlock,
+  updateField,
   updateGroup,
   type BlockRef,
   type CircuitGroupRule,
   type CircuitType,
   type SchematicBlock,
   type SchematicBlockStyle,
+  type SchematicFieldDefinition,
   type SchematicSymbol,
   type SchematicTemplate,
   type TotalsTableRow,
@@ -54,6 +60,7 @@ const SHEET_SIZES = [
 
 /** The types whose symbol is an optional visual override (a drawing has its own Symbol and Shapes rows). */
 const DEVICE_SYMBOL_TYPES: readonly string[] = ['mainDevice', 'protectiveDevice', 'accessoryDevice', 'loadSymbol'];
+const FIELD_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SCOPE_LABELS = { once: 'Sheet', panel: 'Panel', section: 'Section', circuit: 'Circuit', aggregate: 'Aggregate' } as const;
 
 function toHex(color: number): string {
@@ -199,6 +206,8 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
         </details>
       )}
 
+      <FieldsSection template={template} edit={edit} endGesture={endGesture} />
+
       <details open className="mep-section">
         <summary>
           <h4>Template</h4>
@@ -232,6 +241,13 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
           </select>
         </div>
         <div className="mep-schematic-field">
+          <label>Date format</label>
+          <select value={template.dateFormat ?? 'dd-mm-yyyy'} onChange={(e) => edit((t) => ({ ...t, dateFormat: e.target.value === 'yyyy-mm-dd' ? 'yyyy-mm-dd' : 'dd-mm-yyyy' }))}>
+            <option value="dd-mm-yyyy">Day-month-year (25-09-2026)</option>
+            <option value="yyyy-mm-dd">Year-month-day (2026-09-25)</option>
+          </select>
+        </div>
+        <div className="mep-schematic-field">
           <label>Circuits run</label>
           <select value={template.groups[0]?.direction ?? 'column'} onChange={(e) => edit((t) => setTemplateDirection(t, e.target.value === 'row' ? 'row' : 'column'))} disabled={template.groups.length === 0}>
             <option value="column">Down the sheet (rows)</option>
@@ -242,6 +258,137 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
         <NumberField label="Group anchor y" value={template.groupAnchor.y} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, groupAnchor: { ...t.groupAnchor, y: v } }), 'template:anchorY')} />
       </details>
     </div>
+  );
+}
+
+const FIELD_TYPE_LABELS: Record<SchematicFieldDefinition['type'], string> = { text: 'Text', multiline: 'Multi-line text', date: 'Date', number: 'Number' };
+
+/** The id box keeps its own text while it has focus and commits only an id that is valid and free, so the template never holds a bad or repeated id. */
+function FieldIdInput({ value, others, onCommit, onBlur }: { value: string; others: string[]; onCommit: (id: string) => void; onBlur: () => void }) {
+  const [text, setText] = useState(value);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(value);
+  }, [value]);
+  const problem = !FIELD_ID_PATTERN.test(text) ? 'Use letters, digits and underscores. Do not start with a digit.' : others.includes(text) ? 'Another field uses this id.' : null;
+  return (
+    <>
+      <input
+        type="text"
+        value={text}
+        onFocus={() => {
+          focused.current = true;
+        }}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (FIELD_ID_PATTERN.test(e.target.value) && !others.includes(e.target.value)) onCommit(e.target.value);
+        }}
+        onBlur={() => {
+          focused.current = false;
+          setText(value);
+          onBlur();
+        }}
+      />
+      {problem && (
+        <p className="mep-schematic-note" role="alert">
+          {problem}
+        </p>
+      )}
+    </>
+  );
+}
+
+function FieldsSection({ template, edit, endGesture }: { template: SchematicTemplate; edit: EditTemplate; endGesture: () => void }) {
+  const fields = template.fields ?? [];
+  const remove = (field: SchematicFieldDefinition) => {
+    const uses = findFieldUses(template, field.id);
+    if (uses.length > 0 && !window.confirm(`The field "${field.label}" is read by ${uses.join(', ')}. That text goes blank if you delete the field. Delete it?`)) return;
+    edit((t) => removeField(t, field.id));
+  };
+  return (
+    <details open className="mep-section">
+      <summary>
+        <h4>Fields</h4>
+      </summary>
+      <p className="mep-schematic-hint">A field is a value that the user fills in for each schematic, such as the project name. A block shows it with {'{field.id}'}.</p>
+      {fields.map((field, index) => {
+        const key = (name: string) => `field:${index}:${name}`;
+        const defaultError = field.defaultBinding ? bindingError(field.defaultBinding) : null;
+        return (
+          <div key={index} className="mep-schematic-fieldrow">
+            <div className="mep-schematic-field">
+              <label>Label</label>
+              <input type="text" value={field.label} onChange={(e) => edit((t) => updateField(t, field.id, { label: e.target.value }), key('label'))} onBlur={endGesture} />
+            </div>
+            <div className="mep-schematic-field">
+              <label>Id</label>
+              <FieldIdInput
+                value={field.id}
+                others={fields.filter((_, i) => i !== index).map((f) => f.id)}
+                onCommit={(id) => edit((t) => updateField(t, field.id, { id }), key('id'))}
+                onBlur={endGesture}
+              />
+              <span className="mep-schematic-hint">Text that shows it: {`{field.${field.id}}`}. Changing the id does not change text that already reads the old id.</span>
+            </div>
+            <div className="mep-schematic-field">
+              <label>Type</label>
+              <select value={field.type} onChange={(e) => edit((t) => updateField(t, field.id, { type: e.target.value as SchematicFieldDefinition['type'] }))}>
+                {(Object.keys(FIELD_TYPE_LABELS) as SchematicFieldDefinition['type'][]).map((type) => (
+                  <option key={type} value={type}>
+                    {FIELD_TYPE_LABELS[type]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mep-schematic-field">
+              <label>Entered</label>
+              <select value={field.scope} onChange={(e) => edit((t) => updateField(t, field.id, { scope: e.target.value === 'project' ? 'project' : 'schematic' }))}>
+                <option value="project">Once, shared by all schematics</option>
+                <option value="schematic">For each schematic</option>
+              </select>
+            </div>
+            {field.type === 'date' ? (
+              <label className="mep-schematic-check">
+                <input type="checkbox" checked={field.defaultToday === true} onChange={(e) => edit((t) => updateField(t, field.id, { defaultToday: e.target.checked ? true : undefined }))} />
+                Default to today
+              </label>
+            ) : (
+              <div className="mep-schematic-field">
+                <label>Default</label>
+                <input
+                  type="text"
+                  value={field.defaultBinding ?? ''}
+                  placeholder="Text with {panel.name}"
+                  onChange={(e) => edit((t) => updateField(t, field.id, { defaultBinding: e.target.value === '' ? undefined : e.target.value }), key('default'))}
+                  onBlur={endGesture}
+                />
+                {defaultError && (
+                  <p className="mep-schematic-note" role="alert">
+                    {defaultError}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="mep-schematic-buttons">
+              <button type="button" onClick={() => edit((t) => reorderField(t, field.id, -1))} disabled={index === 0} title="Move up">
+                Up
+              </button>
+              <button type="button" onClick={() => edit((t) => reorderField(t, field.id, 1))} disabled={index === fields.length - 1} title="Move down">
+                Down
+              </button>
+              <button type="button" onClick={() => remove(field)}>
+                Delete field
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      <div className="mep-schematic-buttons">
+        <button type="button" onClick={() => edit((t) => addField(t).template)}>
+          Add field
+        </button>
+      </div>
+    </details>
   );
 }
 
@@ -302,6 +449,7 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
   const errorText = custom && bindingText !== '' ? bindingError(bindingText) : null;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fields = getBindingFieldsForScope(info.scope);
+  const templateFields = (template.fields ?? []).filter((f) => FIELD_ID_PATTERN.test(f.id));
   const insertField = (expression: string) => {
     if (expression === '') return;
     const source = block.binding ?? info.defaultBinding ?? '';
@@ -421,11 +569,22 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             <label>Insert field</label>
             <select value="" onChange={(e) => insertField(e.target.value)}>
               <option value="">Insert field…</option>
-              {fields.map((field) => (
-                <option key={field.expression} value={field.expression} title={field.description}>
-                  {field.expression} — {field.description}
-                </option>
-              ))}
+              {templateFields.length > 0 && (
+                <optgroup label="Template fields">
+                  {templateFields.map((field) => (
+                    <option key={`field.${field.id}`} value={`field.${field.id}`} title={`{field.${field.id}}`}>
+                      Field: {field.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Data">
+                {fields.map((field) => (
+                  <option key={field.expression} value={field.expression} title={field.description}>
+                    {field.expression} — {field.description}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <p className="mep-schematic-hint">Write {'{field}'} for a value. Put text in [square brackets] to show it only when a field inside has a value.</p>

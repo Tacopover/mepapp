@@ -406,7 +406,7 @@ Design:
 
 Steps, in order:
 - 5b-1 Symbol property on device blocks (mainDevice, protectiveDevice, accessoryDevice, loadSymbol). Status: built, not yet browser-verified. `symbolId` is valid on `SYMBOL_CAPABLE_BLOCK_TYPES`; `setBlockSymbol` sets or clears it; the symbol replaces the built-in mark and the block keeps its text.
-- 5b-2 Fields and the saved schematic (core, project schema, dialogs). Status: core done (`7251d9c`); part 1 built (saved schematics, fields form, overrides), not yet browser-verified; part 2 (template fields editor) not started.
+- 5b-2 Fields and the saved schematic (core, project schema, dialogs). Status: core done (`7251d9c`); built (both parts: saved schematics, fields form, overrides, template fields editor), not yet browser-verified.
 - 5b-3 Drawing and symbol tools on the template canvas and on the schematic sheet. Status: not started.
 
 ### Phase 6 — Export, and loading templates from a file — not started

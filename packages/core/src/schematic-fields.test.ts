@@ -132,3 +132,19 @@ describe('field edits', () => {
     expect(addField(legacy).template.fields).toHaveLength(1);
   });
 });
+
+import { findFieldUses } from './schematic-template-edit.js';
+
+describe('findFieldUses', () => {
+  it('finds the built-in title block for the fields it reads and nothing for a field it does not', () => {
+    expect(findFieldUses(clone(), 'projectName')).toEqual(['layout block "title"']);
+    expect(findFieldUses(clone(), 'nothing')).toEqual([]);
+  });
+
+  it('finds a use in a group block and in a table formula, and does not match a longer id', () => {
+    let template = updateBlock(clone(), { blockId: 'desc', groupId: 'standard' }, { binding: '{field.rev2} x' });
+    template = updateBlock(template, { blockId: 'totals' }, { tableRows: [{ label: 'r', formula: 'field.rev + 1' }] });
+    expect(findFieldUses(template, 'rev2')).toEqual(['group "Standard" block "desc"']);
+    expect(findFieldUses(template, 'rev')).toEqual(['layout block "totals"']);
+  });
+});
