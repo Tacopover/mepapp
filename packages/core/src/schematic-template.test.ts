@@ -87,6 +87,12 @@ describe('validateSchematicTemplate', () => {
     expect(validateSchematicTemplate(copy((t) => (t.layoutBlocks[0].tableColumns = 'circuits')))).toHaveLength(1);
   });
 
+  it('accepts a symbol on a drawing block and flags one on any other block', () => {
+    expect(validateSchematicTemplate(copy((t) => t.layoutBlocks.push(b('sym', 'drawing', { symbolId: 'my-symbol' }))))).toEqual([]);
+    expect(validateSchematicTemplate(copy((t) => (t.layoutBlocks[0].symbolId = 'my-symbol')))).toHaveLength(1);
+    expect(validateSchematicTemplate(copy((t) => t.layoutBlocks.push(b('sym', 'drawing', { symbolId: ' ' }))))).toHaveLength(1);
+  });
+
   it('flags a duplicate group id and a missing name', () => {
     const issues = validateSchematicTemplate(
       copy((t) => {

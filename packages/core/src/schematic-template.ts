@@ -106,7 +106,7 @@ export interface SchematicBlock {
   /** Text with {expression} segments. undefined = the block type's default binding; '' = no text. */
   binding?: string;
   style?: SchematicBlockStyle;
-  /** A symbol-library id that replaces the block's default vector art (mockup Round 3). */
+  /** drawing only. The id of a `SchematicSymbol` in the symbol library. The symbol's art replaces `shapes`. */
   symbolId?: string;
   /** drawing only. Coordinates are fractions (0..1) of the block's width and height, the same convention as a custom stamp's shapes. */
   shapes?: SymbolShape[];
@@ -205,6 +205,7 @@ function validateBlock(block: SchematicBlock, where: string, expectedScopes: Sch
   }
   if (block.type !== 'totalsTable' && (block.tableRows || block.tableColumns)) issues.push(`${name} sets table fields but is not a totalsTable.`);
   if (block.shapes !== undefined && (block.type !== 'drawing' || !Array.isArray(block.shapes))) issues.push(`${name} sets shapes but is not a drawing.`);
+  if (block.symbolId !== undefined && (block.type !== 'drawing' || block.symbolId.trim() === '')) issues.push(`${name} sets a symbol but is not a drawing.`);
 }
 
 /** The reasons a template cannot be generated from; an empty list means it is valid. Checks structure and that every binding parses. */
