@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ResolvedBlock, ResolvedField } from '@mepapp/core';
-import { describeFieldDefault, findTextBlockAt, groupResolvedFields, isTextEditableType } from './schematicTextEdit.js';
+import { describeFieldDefault, findExtraBlockAt, findTextBlockAt, groupResolvedFields, isTextEditableType } from './schematicTextEdit.js';
 
 const block = (id: string, type: ResolvedBlock['type'], x: number, y: number, width: number, height: number, rotation = 0): ResolvedBlock =>
   ({ id, templateBlockId: id, type, scope: 'once', x, y, width, height, rotation, panelId: 'p' }) as ResolvedBlock;
@@ -43,5 +43,16 @@ describe('field form helpers', () => {
     expect(describeFieldDefault(field({ stored: '', defaultText: 'Board A' }))).toContain('Empty on purpose');
     expect(describeFieldDefault(field({ stored: 'x', defaultText: 'Board A' }))).toBeUndefined();
     expect(describeFieldDefault(field({}))).toBeUndefined();
+  });
+});
+
+describe('extra blocks', () => {
+  const extra = (id: string, type: ResolvedBlock['type'], x: number, y: number): ResolvedBlock => ({ ...block(id, type, x, y, 20, 10), extraId: id });
+
+  it('skips extras when looking for text to type over, and finds only extras when asked', () => {
+    const blocks = [block('a', 'description', 0, 0, 20, 10), extra('e1', 'freeItem', 5, 0)];
+    expect(findTextBlockAt(blocks, { x: 10, y: 5 })!.id).toBe('a');
+    expect(findExtraBlockAt(blocks, { x: 10, y: 5 })!.id).toBe('e1');
+    expect(findExtraBlockAt(blocks, { x: 100, y: 5 })).toBeUndefined();
   });
 });

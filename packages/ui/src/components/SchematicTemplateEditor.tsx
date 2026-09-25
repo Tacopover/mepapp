@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   SCHEMATIC_BLOCK_CATALOGUE,
   addBlock,
@@ -21,10 +21,7 @@ import {
   removeGroup,
   reorderBlock,
   reorderGroup,
-  resizeKeepingCorner,
-  rotationFromPointer,
   snapToGrid,
-  toBlockAxes,
   updateBlock,
   validateSchematicTemplate,
   type BlockRef,
@@ -32,7 +29,6 @@ import {
   type CircuitType,
   type Panel,
   type PanelSection,
-  type ResolvedBlock,
   type SchematicBlockScope,
   type SchematicBlockType,
   type SchematicInput,
@@ -42,12 +38,15 @@ import {
   type SymbolShape,
 } from '@mepapp/core';
 import type { StampInfo } from '@mepapp/render';
-import { SchematicBlockSvg } from '../schematicBlockSvg.js';
 import { describeDiagnostics } from '../schematicDiagnostics.js';
 import { buildSchematicTerminals } from '../schematicTerminals.js';
 import { commit, createHistory, endGesture as endHistoryGesture, redo, undo, type History } from '../templateHistory.js';
+import { firstCircuitOrigin, roundMm, textBlockSize, type DrawnItem } from '../sheetDraw.js';
+import { useSheetDraw } from '../useSheetDraw.js';
 import { useSheetView } from '../useSheetView.js';
 import { SchematicDrawingEditor } from './SchematicDrawingEditor.js';
+import { SheetBlockCanvas } from './SheetBlockCanvas.js';
+import { SheetDrawTools } from './SheetDrawTools.js';
 import { SchematicSymbolLibrary } from './SchematicSymbolLibrary.js';
 import { SchematicTemplateProperties, type EditTemplate } from './SchematicTemplateProperties.js';
 
@@ -81,27 +80,6 @@ const PALETTE_SCOPES: { scope: SchematicBlockScope; label: string }[] = [
   { scope: 'circuit', label: 'Circuit' },
   { scope: 'aggregate', label: 'Aggregate' },
 ];
-const MOVE_THRESHOLD_PX = 3;
-const ACCENT = '#175a8a';
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface GestureBase {
-  pointerId: number;
-  startClient: Point;
-  start: Point;
-  moved: boolean;
-}
-
-type Gesture =
-  | (GestureBase & { kind: 'move'; ref: BlockRef; blockX: number; blockY: number })
-  | (GestureBase & { kind: 'rotate'; ref: BlockRef; center: Point })
-  | (GestureBase & { kind: 'resize'; ref: BlockRef; blockX: number; blockY: number; width: number; height: number; rotation: number })
-  | (GestureBase & { kind: 'anchor'; anchor: Point });
-
 const sameRef = (a: BlockRef | null, b: BlockRef | null) => a !== null && b !== null && a.blockId === b.blockId && a.groupId === b.groupId;
 
 export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, symbols, onSymbolsChange, symbolUses, projectFieldValues, initialPanelId, onDone }: SchematicTemplateEditorProps) {
@@ -127,23 +105,25 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const [grid, setGrid] = useState(1);
   const [drawingRef, setDrawingRef] = useState<BlockRef | null>(null);
   /** The symbol library is open in place of the editor: to add a symbol block, or to change the symbol of one. */
-  const [symbolLibrary, setSymbolLibrary] = useState<{ kind: 'add'; inGroup: boolean } | { kind: 'change'; ref: BlockRef } | null>(null);
+  const [symbolLibrary, setSymbolLibrary] = useState<{ kind: 'add'; inGroup: boolean } | { kind: 'change'; ref: BlockRef } | { kind: 'draw' } | null>(null);
+  /** Where a shape drawn on the sheet goes: the sheet, or a group id (repeats on every circuit). */
+  const [drawTarget, setDrawTarget] = useState<string>('sheet');
   const drawingOpenRef = useRef(false);
   const [previewSource, setPreviewSource] = useState<string>(() => (circuits.some((c) => c.panelId === initialPanelId) ? initialPanelId : SAMPLE));
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const gestureRef = useRef<Gesture | null>(null);
-  const panClickRef = useRef<Point | null>(null);
 
-  const { view, setSvg, fit, zoomTo, clientToSheet, mmPerPixel, startPan, movePan, endPan } = useSheetView({
+  const sheetView = useSheetView({
     sheetWidthMm: template.sheet.widthMm,
     sheetHeightMm: template.sheet.heightMm,
     resetKey: `${template.id}:${template.sheet.widthMm}x${template.sheet.heightMm}`,
   });
+  const { view, fit, zoomTo } = sheetView;
 
   const activeGroupId = activeGroupState !== null && template.groups.some((g) => g.id === activeGroupState) ? activeGroupState : null;
   const selectedBlock = selection ? findBlock(template, selection) : undefined;
   const selectionRef = useRef<BlockRef | null>(null);
+  const drawEscapeRef = useRef<() => boolean>(() => false);
   selectionRef.current = selectedBlock ? selection : null;
   const drawingBlock = drawingRef ? findBlock(template, drawingRef) : undefined;
   drawingOpenRef.current = drawingBlock !== undefined || symbolLibrary !== null;
@@ -157,12 +137,18 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const today = useMemo(() => todayIso(), []);
   const generated = useMemo(() => generateSchematic(input, template, { fieldSources: { projectValues: projectFieldValues, today } }), [input, template, projectFieldValues, today]);
   const notes = useMemo(() => [...validateSchematicTemplate(template), ...describeDiagnostics(generated.diagnostics, input.circuits, input.panel)], [template, generated, input]);
+  const groupOriginOf = (groupId: string) => firstCircuitOrigin(template, input, generated, groupId);
   const loadTypes = useMemo(() => [...new Set(Object.values(input.terminals).map((t) => t.loadType).filter((t): t is string => t !== undefined))], [input]);
 
   useEffect(() => {
     // Dialog listens for Escape on the document; a capture listener on the window runs first and keeps a block selection from closing the dialog.
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !selectionRef.current || drawingOpenRef.current) return;
+      if (event.key !== 'Escape' || drawingOpenRef.current) return;
+      if (drawEscapeRef.current()) {
+        event.stopPropagation();
+        return;
+      }
+      if (!selectionRef.current) return;
       event.stopPropagation();
       setSelection(null);
       setInstanceId(null);
@@ -171,9 +157,6 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
-  const blocksByTemplateId = (ref: BlockRef | null): ResolvedBlock[] => (ref ? generated.blocks.filter((b) => b.templateBlockId === ref.blockId && b.groupId === ref.groupId) : []);
-  const instances = blocksByTemplateId(selectedBlock ? selection : null);
-  const handleInstance = instances.find((b) => b.id === instanceId) ?? instances[0];
   const loadShapesFor = (definitionId: string | undefined) => (definitionId ? getStampDefinition(definitionId, customStampDefinitions)?.shapes : undefined);
   const symbolShapesFor = (symbolId: string | undefined) => (symbolId ? symbols.find((s) => s.id === symbolId)?.shapes : undefined);
 
@@ -209,18 +192,32 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     selectBlock(result.ref);
   }
 
-  function addDrawing(inGroup: boolean) {
+  function onDrawFinish(item: DrawnItem) {
     const present = historyRef.current.present;
-    const groupId = activeGroupId ?? present.groups[0]?.id;
-    if (inGroup && groupId === undefined) return;
-    const info = SCHEMATIC_BLOCK_CATALOGUE.drawing;
-    const at = inGroup ? { x: 0, y: 0 } : { x: snapToGrid(view.x + view.w / 2 - info.width / 2, grid), y: snapToGrid(view.y + view.h / 2 - info.height / 2, grid) };
-    const result = addBlock(present, 'drawing', { groupId: inGroup ? groupId : undefined, at });
-    if (!result) return;
-    applyHistory(commit(historyRef.current, result.template));
-    selectBlock(result.ref);
-    setDrawingRef(result.ref);
+    const groupId = drawTarget !== 'sheet' && present.groups.some((g) => g.id === drawTarget) ? drawTarget : undefined;
+    const origin = groupId === undefined ? { x: 0, y: 0 } : groupOriginOf(groupId);
+    if (!origin) return;
+    let next: { template: SchematicTemplate; ref: BlockRef } | undefined;
+    if (item.kind === 'shape') {
+      const added = addBlock(present, 'drawing', { groupId });
+      if (!added) return;
+      next = { ref: added.ref, template: updateBlock(added.template, added.ref, { x: roundMm(item.box.x - origin.x), y: roundMm(item.box.y - origin.y), width: roundMm(item.box.width), height: roundMm(item.box.height), shapes: [item.shape] }) };
+    } else if (item.kind === 'text') {
+      const added = addBlock(present, groupId === undefined ? 'freeItem' : 'customAnnotation', { groupId });
+      if (!added) return;
+      const size = textBlockSize(item.text);
+      next = { ref: added.ref, template: updateBlock(added.template, added.ref, { x: roundMm(item.at.x - origin.x), y: roundMm(item.at.y - origin.y), width: size.width, height: size.height, binding: item.text }) };
+    } else {
+      next = addSymbolBlock(present, item.symbol, { groupId, at: { x: roundMm(item.at.x - origin.x), y: roundMm(item.at.y - origin.y) } });
+    }
+    if (!next) return;
+    applyHistory(commit(historyRef.current, next.template));
+    selectBlock(next.ref);
   }
+
+  const draw = useSheetDraw({ sheet: template.sheet, grid, onFinish: onDrawFinish });
+  drawEscapeRef.current = draw.escape;
+  const drawTargetValid = drawTarget === 'sheet' || (template.groups.some((g) => g.id === drawTarget) && groupOriginOf(drawTarget) !== undefined);
 
   function finishDrawing(shapes: SymbolShape[]) {
     if (drawingRef) edit((t) => updateBlock(t, drawingRef, { shapes }));
@@ -233,7 +230,10 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
 
   function pickSymbol(symbol: SchematicSymbol) {
     if (!symbolLibrary) return;
-    if (symbolLibrary.kind === 'change') {
+    if (symbolLibrary.kind === 'draw') {
+      draw.setSymbol(symbol);
+      draw.setTool('symbol');
+    } else if (symbolLibrary.kind === 'change') {
       const { ref } = symbolLibrary;
       edit((t) => setBlockSymbol(t, ref, symbol));
     } else {
@@ -276,6 +276,10 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     const tag = (event.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (draw.keyDown(event)) {
+      event.preventDefault();
+      return;
+    }
     const mod = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
     if (mod && key === 'z') {
@@ -298,85 +302,6 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     }
   }
 
-  function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
-    event.preventDefault();
-    rootRef.current?.focus({ preventScroll: true });
-    const pointer = clientToSheet(event.clientX, event.clientY);
-    if (event.button === 1 || !pointer) {
-      startPan(event);
-      return;
-    }
-    if (event.button !== 0) return;
-    const target = event.target as Element;
-    const handle = target.closest('[data-handle]')?.getAttribute('data-handle');
-    const hitId = target.closest('[data-hit-block]')?.getAttribute('data-hit-block');
-    const base = { pointerId: event.pointerId, startClient: { x: event.clientX, y: event.clientY }, start: pointer, moved: false };
-
-    if (handle === 'anchor') {
-      gestureRef.current = { ...base, kind: 'anchor', anchor: { ...template.groupAnchor } };
-    } else if ((handle === 'rotate' || handle === 'resize') && selection && selectedBlock && handleInstance) {
-      gestureRef.current =
-        handle === 'rotate'
-          ? { ...base, kind: 'rotate', ref: selection, center: { x: handleInstance.x + handleInstance.width / 2, y: handleInstance.y + handleInstance.height / 2 } }
-          : { ...base, kind: 'resize', ref: selection, blockX: selectedBlock.x, blockY: selectedBlock.y, width: handleInstance.width, height: handleInstance.height, rotation: handleInstance.rotation };
-    } else if (hitId) {
-      const hit = generated.blocks.find((b) => b.id === hitId);
-      const ref: BlockRef | undefined = hit ? { blockId: hit.templateBlockId, groupId: hit.groupId } : undefined;
-      const block = ref ? findBlock(template, ref) : undefined;
-      if (!hit || !ref || !block) return;
-      selectBlock(ref, hit.id);
-      gestureRef.current = { ...base, kind: 'move', ref, blockX: block.x, blockY: block.y };
-    } else {
-      startPan(event);
-      panClickRef.current = { x: event.clientX, y: event.clientY };
-      return;
-    }
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
-    const gesture = gestureRef.current;
-    if (!gesture) {
-      movePan(event);
-      return;
-    }
-    if (gesture.pointerId !== event.pointerId) return;
-    if (!gesture.moved && Math.hypot(event.clientX - gesture.startClient.x, event.clientY - gesture.startClient.y) < MOVE_THRESHOLD_PX) return;
-    gesture.moved = true;
-    const pointer = clientToSheet(event.clientX, event.clientY);
-    if (!pointer) return;
-    const snap = event.altKey ? 0 : grid;
-    const dx = pointer.x - gesture.start.x;
-    const dy = pointer.y - gesture.start.y;
-
-    if (gesture.kind === 'move') {
-      const x = snapToGrid(gesture.blockX + dx, snap);
-      const y = snapToGrid(gesture.blockY + dy, snap);
-      edit((t) => updateBlock(t, gesture.ref, { x, y }), `move:${gesture.ref.groupId ?? '-'}:${gesture.ref.blockId}`);
-    } else if (gesture.kind === 'rotate') {
-      const rotation = rotationFromPointer(gesture.center, pointer, event.shiftKey ? undefined : 5);
-      edit((t) => updateBlock(t, gesture.ref, { rotation }), `rotate:${gesture.ref.groupId ?? '-'}:${gesture.ref.blockId}`);
-    } else if (gesture.kind === 'resize') {
-      const local = toBlockAxes(dx, dy, gesture.rotation);
-      const width = Math.max(1, snapToGrid(gesture.width + local.x, snap));
-      const height = Math.max(1, snapToGrid(gesture.height + local.y, snap));
-      const position = resizeKeepingCorner({ x: gesture.blockX, y: gesture.blockY, rotation: gesture.rotation }, { width: gesture.width, height: gesture.height }, { width, height });
-      edit((t) => updateBlock(t, gesture.ref, { width, height, ...position }), `resize:${gesture.ref.groupId ?? '-'}:${gesture.ref.blockId}`);
-    } else {
-      const groupAnchor = { x: snapToGrid(gesture.anchor.x + dx, snap), y: snapToGrid(gesture.anchor.y + dy, snap) };
-      edit((t) => ({ ...t, groupAnchor }), 'anchor');
-    }
-  }
-
-  function onPointerUp(event: ReactPointerEvent<SVGSVGElement>) {
-    gestureRef.current = null;
-    endPan();
-    endGesture();
-    const click = panClickRef.current;
-    panClickRef.current = null;
-    if (click && event.type === 'pointerup' && Math.hypot(event.clientX - click.x, event.clientY - click.y) < MOVE_THRESHOLD_PX + 1) selectBlock(null);
-  }
-
   function zoomToGroup() {
     const first = generated.blocks.find((b) => b.groupId === activeGroupId);
     if (!first) return;
@@ -384,7 +309,6 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     if (bounds) zoomTo(bounds);
   }
 
-  const px = mmPerPixel;
   const activeGroup = activeGroupId ? template.groups.find((g) => g.id === activeGroupId) : undefined;
   const listedBlocks: { ref: BlockRef; type: SchematicBlockType }[] = [
     ...template.layoutBlocks.map((b) => ({ ref: { blockId: b.id } as BlockRef, type: b.type })),
@@ -452,6 +376,20 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
         <span className="mep-schematic-hint">Scroll to zoom, drag empty space to pan.</span>
       </div>
 
+      <SheetDrawTools draw={draw} onChooseSymbol={() => setSymbolLibrary({ kind: 'draw' })}>
+        <label>
+          Add to
+          <select value={drawTargetValid ? drawTarget : 'sheet'} onChange={(e) => setDrawTarget(e.target.value)} title="Where a drawn shape, text or symbol goes">
+            <option value="sheet">Sheet</option>
+            {template.groups.map((group) => (
+              <option key={group.id} value={group.id} disabled={groupOriginOf(group.id) === undefined} title={groupOriginOf(group.id) === undefined ? 'This group draws no circuit in the preview data' : undefined}>
+                {group.name} (repeats on every circuit)
+              </option>
+            ))}
+          </select>
+        </label>
+      </SheetDrawTools>
+
       <div className="mep-schematic-editor-body">
         <aside className="mep-schematic-side">
           <div className="mep-section">
@@ -460,11 +398,11 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
               <div key={scope} className="mep-schematic-palette-group">
                 <span className="mep-schematic-palette-heading">{label}</span>
                 {(Object.keys(SCHEMATIC_BLOCK_CATALOGUE) as SchematicBlockType[])
-                  .filter((type) => SCHEMATIC_BLOCK_CATALOGUE[type].scope === scope)
+                  .filter((type) => SCHEMATIC_BLOCK_CATALOGUE[type].scope === scope && type !== 'drawing')
                   .map((type) => {
                     const disabled = scope === 'circuit' && !canAddCircuitBlock;
                     return (
-                      <button key={type} type="button" className="mep-schematic-palette-button" disabled={disabled} title={disabled ? 'Add a group first: circuit blocks belong to a group.' : `Add: ${SCHEMATIC_BLOCK_CATALOGUE[type].label}`} onClick={() => (type === 'drawing' ? addDrawing(false) : addFromPalette(type))}>
+                      <button key={type} type="button" className="mep-schematic-palette-button" disabled={disabled} title={disabled ? 'Add a group first: circuit blocks belong to a group.' : `Add: ${SCHEMATIC_BLOCK_CATALOGUE[type].label}`} onClick={() => addFromPalette(type)}>
                         {SCHEMATIC_BLOCK_CATALOGUE[type].label}
                       </button>
                     );
@@ -472,11 +410,6 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
                 {scope === 'once' && (
                   <button type="button" className="mep-schematic-palette-button" title="Place a symbol from the library on the sheet" onClick={() => setSymbolLibrary({ kind: 'add', inGroup: false })}>
                     Symbol…
-                  </button>
-                )}
-                {scope === 'circuit' && (
-                  <button type="button" className="mep-schematic-palette-button" disabled={!canAddCircuitBlock} title={canAddCircuitBlock ? 'Add a drawing that repeats for every circuit of the selected group' : 'Add a group first: circuit blocks belong to a group.'} onClick={() => addDrawing(true)}>
-                    Drawing (each circuit)
                   </button>
                 )}
                 {scope === 'circuit' && (
@@ -576,82 +509,37 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
         </aside>
 
         <div className="mep-schematic-stage">
-          <svg
-            ref={setSvg}
-            className="mep-schematic-canvas"
-            role="img"
-            aria-label={`Editing template ${template.name}`}
-            viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
+          <SheetBlockCanvas<BlockRef>
+            ariaLabel={`Editing template ${template.name}`}
+            sheetWidthMm={template.sheet.widthMm}
+            sheetHeightMm={template.sheet.heightMm}
+            sheetView={sheetView}
+            blocks={generated.blocks}
+            grid={grid}
+            dimGroupId={activeGroupId}
+            showEmptyDrawings
+            loadShapesFor={loadShapesFor}
+            symbolShapesFor={symbolShapesFor}
+            targetOf={(block) => ({ blockId: block.templateBlockId, groupId: block.groupId })}
+            sameTarget={(a, b) => sameRef(a, b)}
+            targetKey={(ref) => `${ref.groupId ?? '-'}:${ref.blockId}`}
+            selected={selectedBlock ? selection : null}
+            instanceId={instanceId}
+            onSelect={selectBlock}
+            readOrigin={(ref) => {
+              const block = findBlock(historyRef.current.present, ref);
+              return block ? { x: block.x, y: block.y } : undefined;
+            }}
+            onMove={(ref, x, y, key) => edit((t) => updateBlock(t, ref, { x, y }), key)}
+            onRotate={(ref, rotation, key) => edit((t) => updateBlock(t, ref, { rotation }), key)}
+            onResize={(ref, patch, key) => edit((t) => updateBlock(t, ref, patch), key)}
+            onGestureEnd={endGesture}
+            anchor={{ x: template.groupAnchor.x, y: template.groupAnchor.y, label: 'Group anchor', onMove: (x, y, key) => edit((t) => ({ ...t, groupAnchor: { x, y } }), key) }}
+            draw={draw.pointer}
+            overlay={draw.overlay}
             onDoubleClick={openSelectedDrawing}
-          >
-            <rect x={0} y={0} width={template.sheet.widthMm} height={template.sheet.heightMm} fill="#ffffff" stroke="#9aa3ad" strokeWidth={0.4} />
-            <g pointerEvents="none">
-              {generated.blocks.map((block) => (
-                <g key={block.id} opacity={activeGroupId && block.groupId !== undefined && block.groupId !== activeGroupId ? 0.3 : 1}>
-                  <SchematicBlockSvg block={block} loadShapes={block.type === 'loadSymbol' ? loadShapesFor(block.loadStampDefinitionId) : undefined} symbolShapes={symbolShapesFor(block.symbolId)} showEmptyDrawings />
-                </g>
-              ))}
-            </g>
-
-            <g>
-              {generated.blocks.map((block) => {
-                const outlineOnly = block.type === 'frame' || block.type === 'section';
-                return (
-                  <g key={block.id} transform={`translate(${block.x} ${block.y}) rotate(${block.rotation} ${block.width / 2} ${block.height / 2})`}>
-                    <rect
-                      data-hit-block={block.id}
-                      width={block.width}
-                      height={block.height}
-                      fill={outlineOnly ? 'none' : 'transparent'}
-                      stroke={outlineOnly ? 'transparent' : 'none'}
-                      strokeWidth={outlineOnly ? Math.max(3, px * 6) : undefined}
-                      pointerEvents={outlineOnly ? 'stroke' : 'all'}
-                      cursor="move"
-                    />
-                  </g>
-                );
-              })}
-            </g>
-
-            <g pointerEvents="none">
-              {instances.map((block) => (
-                <rect
-                  key={block.id}
-                  transform={`translate(${block.x} ${block.y}) rotate(${block.rotation} ${block.width / 2} ${block.height / 2})`}
-                  width={block.width}
-                  height={block.height}
-                  fill="none"
-                  stroke={ACCENT}
-                  strokeWidth={px * (block === handleInstance ? 2 : 1)}
-                  strokeDasharray={block === handleInstance ? undefined : `${px * 4} ${px * 3}`}
-                />
-              ))}
-            </g>
-
-            {handleInstance && (
-              <g transform={`translate(${handleInstance.x} ${handleInstance.y}) rotate(${handleInstance.rotation} ${handleInstance.width / 2} ${handleInstance.height / 2})`}>
-                <line x1={handleInstance.width / 2} y1={0} x2={handleInstance.width / 2} y2={-px * 16} stroke={ACCENT} strokeWidth={px} pointerEvents="none" />
-                <circle data-handle="rotate" cx={handleInstance.width / 2} cy={-px * 16} r={px * 5} fill="#ffffff" stroke={ACCENT} strokeWidth={px * 1.5} cursor="grab" />
-                <rect data-handle="resize" x={handleInstance.width - px * 4} y={handleInstance.height - px * 4} width={px * 8} height={px * 8} fill="#ffffff" stroke={ACCENT} strokeWidth={px * 1.5} cursor="nwse-resize" />
-              </g>
-            )}
-
-            <g data-handle="anchor" cursor="move">
-              <circle cx={template.groupAnchor.x} cy={template.groupAnchor.y} r={px * 9} fill="transparent" pointerEvents="all" />
-              <g pointerEvents="none" stroke={ACCENT} strokeWidth={px * 1.5}>
-                <line x1={template.groupAnchor.x - px * 8} y1={template.groupAnchor.y} x2={template.groupAnchor.x + px * 8} y2={template.groupAnchor.y} />
-                <line x1={template.groupAnchor.x} y1={template.groupAnchor.y - px * 8} x2={template.groupAnchor.x} y2={template.groupAnchor.y + px * 8} />
-                <circle cx={template.groupAnchor.x} cy={template.groupAnchor.y} r={px * 4} fill="none" />
-                <text x={template.groupAnchor.x + px * 10} y={template.groupAnchor.y - px * 6} fontSize={px * 11} fill={ACCENT} stroke="none" fontFamily="Arial, Helvetica, sans-serif">
-                  Group anchor
-                </text>
-              </g>
-            </g>
-          </svg>
+            onFocusRequest={() => rootRef.current?.focus({ preventScroll: true })}
+          />
         </div>
 
         <aside className="mep-schematic-side mep-schematic-side--right">

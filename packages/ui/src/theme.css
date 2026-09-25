@@ -2403,3 +2403,28 @@
   margin-bottom: 8px;
   font-size: 12px;
 }
+
+/* Draw tools on the sheet (electrical-schematic-templates.md Phase 5b-3) */
+.mep-schematic-drawtools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.mep-schematic-drawtools-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.mep-schematic-drawtools-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.mep-schematic-drawtools button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}

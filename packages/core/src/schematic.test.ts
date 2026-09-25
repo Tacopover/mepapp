@@ -164,3 +164,20 @@ describe('extras that use a symbol', () => {
     expect(getSchematicTemplateStatus(refreshed, edited, library)).toBe('current');
   });
 });
+
+import { duplicateSchematicExtra } from './schematic.js';
+
+describe('duplicateSchematicExtra', () => {
+  it('copies an extra with a new id, offset, after the original, keeping its circuit and a separate shapes list', () => {
+    const added = addSchematicExtra(make(), 'drawing', { at: { x: 5, y: 6 }, circuitId: 'c1' })!;
+    const withShapes = updateSchematicExtra(added.schematic, added.extraId, { shapes: [{ id: 's', kind: 'line', x1: 0, y1: 0, x2: 1, y2: 1, style: { stroke: '#000000', strokeWidth: 0.01, fill: null } }] });
+    const result = duplicateSchematicExtra(withShapes, added.extraId)!;
+    expect(result.extraId).not.toBe(added.extraId);
+    expect(result.schematic.extras.map((e) => e.id)).toEqual([added.extraId, result.extraId]);
+    const copy = result.schematic.extras[1];
+    expect(copy).toMatchObject({ x: 9, y: 10, circuitId: 'c1' });
+    expect(copy.shapes).toEqual(withShapes.extras[0].shapes);
+    expect(copy.shapes).not.toBe(withShapes.extras[0].shapes);
+    expect(duplicateSchematicExtra(withShapes, 'nope')).toBeUndefined();
+  });
+});

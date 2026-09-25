@@ -80,7 +80,7 @@ interface NumberFieldProps {
 }
 
 /** Keeps its own text while it has focus, so the user can clear the box and type a new number. */
-function NumberField({ label, value, onCommit, onBlur, optional, placeholder, min, step = 1 }: NumberFieldProps) {
+export function NumberField({ label, value, onCommit, onBlur, optional, placeholder, min, step = 1 }: NumberFieldProps) {
   const format = (v: number | undefined) => (v === undefined ? '' : String(Math.round(v * 1000) / 1000));
   const [text, setText] = useState(format(value));
   const focused = useRef(false);

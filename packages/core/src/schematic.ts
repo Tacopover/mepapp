@@ -186,3 +186,15 @@ export function addSchematicSymbolExtra(schematic: Schematic, symbol: SchematicS
   const symbols = withSymbol.symbols.some((s) => s.id === symbol.id) ? withSymbol.symbols : [...withSymbol.symbols, structuredClone(symbol)];
   return { schematic: { ...withSymbol, symbols }, extraId: added.extraId };
 }
+
+/** Copies an extra, moved by `offset` mm on both axes, right after the original. It follows the same circuit. */
+export function duplicateSchematicExtra(schematic: Schematic, extraId: string, offset = 4): { schematic: Schematic; extraId: string } | undefined {
+  const index = schematic.extras.findIndex((e) => e.id === extraId);
+  if (index < 0) return undefined;
+  const source = schematic.extras[index];
+  const taken = new Set(schematic.extras.map((e) => e.id));
+  let n = 1;
+  while (taken.has(`${source.type}-${n}`)) n++;
+  const copy: SchematicExtra = { ...structuredClone(source), id: `${source.type}-${n}`, x: source.x + offset, y: source.y + offset };
+  return { schematic: { ...schematic, extras: [...schematic.extras.slice(0, index + 1), copy, ...schematic.extras.slice(index + 1)] }, extraId: copy.id };
+}
