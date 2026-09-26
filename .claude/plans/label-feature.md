@@ -1,6 +1,6 @@
 # Canvas labels — plan and spec
 
-Status: **draft. No part is started.** Written 2026-09-26. The "Label visibility controls" row in [[ui-atlas-layout-mapping]] §6 points here. The circuit label that [[electrical-circuits-model]] E8 moved out is part of this plan (Phase 1 and Phase 2).
+Status: **approved 2026-09-26; all recommendations in §11 accepted by the user. Implementation started with Phase 1.** Written 2026-09-26. The "Label visibility controls" row in [[ui-atlas-layout-mapping]] §6 points here. The circuit label that [[electrical-circuits-model]] E8 moved out is part of this plan (Phase 1 and Phase 2).
 
 ## 1. Goal
 
@@ -269,9 +269,14 @@ Every phase: `pnpm build` (all tasks), `pnpm turbo run test`, and a real Playwri
 
 Phases 1 to 4 give a usable feature. Phases 5 to 7 can wait for user feedback.
 
+**Phase 1 — Done** 2026-09-26, commit `PHASE1_HASH`. `core/src/stamp-properties.ts` (key catalogue, `buildStampPropertyContext`, `resolveStampProperty` / `resolveStampPropertyValue` with an `inherited` flag, device and cable formatting); `GlobalPropertyDefs` moved to `core/src/custom-properties.ts` (the dialog re-exports it). Properties panel: `TerminalCircuitSection.tsx` shows read-only rows under the picker (Circuit number, Circuit prefix, Circuit name, Panel, Circuit type, Phase, Device, Cable, circuit custom properties), "(panel default)" on an inherited value, "Varies" across a multi-selection; a panel's equipment stamp shows a read-only Panel name row. Verified: `pnpm build` (9 of 9 tasks), `pnpm turbo run test` (259 core, 13 ui, 13 pdf-engine-mupdf passed; 12 new core cases). Real Playwright run with real canvas clicks, 12 of 12 checks passed, no page errors: panel name row, every circuit row with the inherited marks, live update after a panel rename while selected, no rows for a terminal outside a circuit, "Varies" in a multi-selection, common value once both terminals share a circuit. Setup of the panel and circuit used the scene API, not the circuit UI. Not done: an empty value shows an empty row (for example Circuit name when the circuit has none), not a hidden row.
+
 Phase 1 ends with visible value on its own: the user sees circuit number, panel name and the other circuit values on a selected terminal before any label exists.
 
 ## 11. Decisions for the user
+
+**Resolved 2026-09-26:** the user had no comments on the spec, so every recommendation below is the decision. On D7 the user added: segments will get labels later, but through a different, more global mechanism than the per-definition stamp layout. That is a future plan, not part of this one.
+
 
 - **D1 — Circuit values on the stamp: derived or stored?** Recommendation: derived (§5.1). The values show as stamp properties everywhere, but only the circuit holds them.
 - **D2 — Edit circuit values from the terminal's Properties panel?** Recommendation: no, read-only plus "Show circuit" (§5.4).

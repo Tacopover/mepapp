@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import type { FittingInfo, SegmentInfo, SketchScene, StampInfo } from '@mepapp/render';
 import {
+  buildStampPropertyContext,
   coerceDefaultValue,
   getStampDefinition,
   NETWORK_TYPE_LIBRARY,
@@ -410,6 +411,15 @@ export function PropertiesPanel({
   if (selection.length === 0) {
     return <div className="mep-empty-panel">Select an element to see its properties.</div>;
   }
+  const propertyContext = buildStampPropertyContext({
+    customStampDefinitions,
+    terminalCapacities: Object.fromEntries(allStamps.map((s) => [s.id, s.capacity])),
+    circuits,
+    panels,
+    circuitTypes,
+    customPropertyDefs,
+    labelLanguage,
+  });
   if (selection.length > 1) {
     const editableCategories = [...new Set(selection.map((s) => s.category))].filter(
       (c): c is 'terminal' | 'equipment' => c === 'terminal' || c === 'equipment',
@@ -484,7 +494,7 @@ export function PropertiesPanel({
             />
           </div>
         </div>
-        <TerminalCircuitSection sceneRef={sceneRef} terminals={selectedTerminals} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} />
+        <TerminalCircuitSection sceneRef={sceneRef} terminals={selectedTerminals} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} propertyContext={propertyContext} />
         {commonCustomPropertyDefs.length > 0 && (
           <div className="mep-section">
             <h4>Custom</h4>
@@ -545,6 +555,12 @@ export function PropertiesPanel({
         )}
       </div>
       <div className="mep-section">
+        {backingPanel && (
+          <div className="mep-field-row">
+            <label>Panel name</label>
+            <input type="text" value={backingPanel.name} disabled />
+          </div>
+        )}
         <div className="mep-field-row">
           <label>X (pt)</label>
           <input
@@ -610,7 +626,7 @@ export function PropertiesPanel({
         </div>
       </div>
       {stamp.category === 'terminal' && (
-        <TerminalCircuitSection sceneRef={sceneRef} terminals={[stamp]} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} />
+        <TerminalCircuitSection sceneRef={sceneRef} terminals={[stamp]} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} propertyContext={propertyContext} />
       )}
       {(stamp.category === 'terminal' || stamp.category === 'equipment') && customPropertyDefs[stamp.category].length > 0 && (
         <div className="mep-section">
