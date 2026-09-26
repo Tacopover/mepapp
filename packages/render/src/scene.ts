@@ -15,6 +15,7 @@ import {
   getCircuitTypeFromLibrary,
   getCircuitTypeUsage,
   validateCircuitTypeFields,
+  buildStampPropertyContext,
   coerceDefaultValue,
   computeNetworks,
   distance,
@@ -75,8 +76,11 @@ import {
   type ProjectDocument,
   type ReconciliationReport,
   type Segment,
+  type GlobalPropertyDefs,
   type StampCategory,
   type StampDefinition,
+  type StampLabel,
+  type StampLabelLayouts,
   type SyncedGeometry,
   type TerminalAssignmentPlan,
   type Transform2D,
@@ -87,6 +91,7 @@ import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
+import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import {
   addPanelAccessoryCommand,
   addTerminalToCircuitCommand,
@@ -497,6 +502,11 @@ export class SketchScene {
   private circuitToolHover: CircuitToolHover | null = null;
   /** The Show Circuits toggle (electrical-circuits-model.md Phase E3) and the circuit/panel the Electrical Circuits tree has selected — session state, not saved in the project. Both come from the UI (setShowCircuitLines/setCircuitLinesFocus); the canvas selection is read from the active document. */
   private showCircuitLines = false;
+  /** App-level settings a stamp label's text depends on — pushed down by the UI (setLabelContext), since both live outside any document. */
+  private labelContext: { customPropertyDefs: GlobalPropertyDefs; labelLanguage: 'en' | 'nl' } = {
+    customPropertyDefs: { terminal: [], equipment: [], circuit: [] },
+    labelLanguage: 'en',
+  };
   private circuitLinesFocus: { circuitId: string | null; panelId: string | null } = { circuitId: null, panelId: null };
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure/draw-line two-click flows
   private drag: DragState = { kind: 'none' };
@@ -638,6 +648,7 @@ export class SketchScene {
     this.world.addChild(this.doc.stampsLayer);
     this.world.addChild(this.doc.drawingLayer);
     this.world.addChild(this.doc.annotationTextLayer);
+    this.world.addChild(this.doc.labelLayer);
     this.world.addChild(this.doc.flowLabelLayer);
     this.world.addChild(this.stampGhostLayer);
     this.world.addChild(this.overlay);
@@ -861,6 +872,7 @@ export class SketchScene {
     this.world.addChild(target.stampsLayer);
     this.world.addChild(target.drawingLayer);
     this.world.addChild(target.annotationTextLayer);
+    this.world.addChild(target.labelLayer);
     this.world.addChild(target.flowLabelLayer);
     this.world.addChild(this.stampGhostLayer);
     this.world.addChild(this.overlay);
@@ -881,6 +893,7 @@ export class SketchScene {
     this.drawSegmentTool.onDeactivate();
     this.drag = { kind: 'none' };
 
+    this.syncLabels(); // the label context may have changed while this document was inactive
     this.redrawOverlay();
     this.emitter.emit('toolChanged', this.tool);
     this.emitter.emit('networkTypesChanged', target.networkTypes);
@@ -1258,8 +1271,45 @@ export class SketchScene {
 
   private notifyCircuitsChanged(): void {
     this.markDirty();
+    this.syncLabels();
     if (this.showCircuitLines) this.redrawOverlay();
     this.emitter.emit('circuitsChanged');
+  }
+
+  /** The Global Properties definitions and the name language — a stamp label's text reads both, and neither lives in a document. */
+  setLabelContext(context: { customPropertyDefs: GlobalPropertyDefs; labelLanguage: 'en' | 'nl' }): void {
+    this.labelContext = context;
+    this.syncLabels();
+  }
+
+  /** The active document's label layout per stamp definition id (label-feature.md §6.2). */
+  getStampLabelLayouts(): StampLabelLayouts {
+    return this.doc.stampLabelLayouts;
+  }
+
+  /** Replaces one stamp definition's label layout — an empty list removes it. Not on the undo stack, same as customStampDefinitions. */
+  setStampLabelLayout(definitionId: string, labels: StampLabel[]): void {
+    const next = { ...this.doc.stampLabelLayouts };
+    if (labels.length > 0) next[definitionId] = labels;
+    else delete next[definitionId];
+    this.doc.stampLabelLayouts = next;
+    this.markDirty();
+    this.syncLabels();
+  }
+
+  /** Brings the active document's label layer in line with its stamps, circuits, layouts and the label context. */
+  private syncLabels(): void {
+    const state = this.doc.drawingHistory.getState();
+    const ctx = buildStampPropertyContext({
+      customStampDefinitions: this.doc.customStampDefinitions,
+      terminalCapacities: Object.fromEntries(this.doc.terminalCapacities),
+      circuits: Object.values(state.circuits),
+      panels: Object.values(state.panels),
+      circuitTypes: this.listCircuitTypes(),
+      customPropertyDefs: this.labelContext.customPropertyDefs,
+      labelLanguage: this.labelContext.labelLanguage,
+    });
+    syncStampLabels(this.doc.labelLayer, this.doc.labelNodes, Object.values(state.stamps), this.doc.stampLabelLayouts, ctx);
   }
 
   /** Turns the editing-view-only dashed connection lines (terminal → panel, one color per circuit) on or off. Off draws nothing circuit-related. */
@@ -1937,6 +1987,7 @@ export class SketchScene {
     if (index === -1) return;
     this.doc.customStampDefinitions[index] = { ...this.doc.customStampDefinitions[index], ...patch };
     this.markDirty();
+    this.syncLabels();
     this.emitter.emit('customStampDefinitionsChanged', this.doc.customStampDefinitions);
   }
 
@@ -1973,6 +2024,7 @@ export class SketchScene {
   setTerminalCapacity(elementId: string, capacity: number): void {
     this.doc.terminalCapacities.set(elementId, capacity);
     this.recomputeFlow();
+    this.syncLabels();
     // Not part of PlacedStamp, so applyToSelectedStamps' own emit doesn't cover it — without this,
     // the Properties panel's now-directly-bound Capacity field (StampInfo.capacity) would keep
     // showing the value from the last unrelated selection change instead of what was just typed.
@@ -2009,6 +2061,7 @@ export class SketchScene {
     });
     tx.commit();
     this.markDirty();
+    this.syncLabels();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
@@ -2055,6 +2108,7 @@ export class SketchScene {
       return;
     }
     this.markDirty();
+    this.syncLabels();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
@@ -2154,6 +2208,7 @@ export class SketchScene {
       panels: Object.values(state.panels),
       panelSections: Object.values(state.panelSections),
       circuitTypes: this.doc.circuitTypes,
+      stampLabelLayouts: this.doc.stampLabelLayouts,
     }) as unknown as ProjectDocument;
   }
 
@@ -2200,6 +2255,8 @@ export class SketchScene {
     target.portGroups.splice(0, target.portGroups.length, ...doc.portGroups);
     target.customStampDefinitions.splice(0, target.customStampDefinitions.length, ...doc.customStampDefinitions);
     target.circuitTypes.splice(0, target.circuitTypes.length, ...doc.circuitTypes);
+    target.stampLabelLayouts = doc.stampLabelLayouts;
+    clearStampLabels(target.labelNodes);
     target.terminalCapacities.clear();
     for (const [elementId, capacity] of Object.entries(doc.terminalCapacities)) {
       target.terminalCapacities.set(elementId, capacity);
@@ -2653,6 +2710,7 @@ export class SketchScene {
       if (state.stamps[id]) this.doc.terminalCapacities.set(id, capacity);
     }
     this.recomputeFlow();
+    this.syncLabels();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
@@ -3309,6 +3367,7 @@ export class SketchScene {
     for (const annotation of Object.values(state.annotations)) {
       this.drawAnnotation(annotation);
     }
+    this.syncLabels();
     this.emitter.emit('drawingChanged', this.getDrawingSummary());
     this.recomputeFlow();
   }

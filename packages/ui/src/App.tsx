@@ -213,6 +213,9 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setAngleSnapDegrees(angleSnapDegrees);
   }, [ready, angleSnapDegrees, sceneRef]);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setLabelContext({ customPropertyDefs, labelLanguage });
+  }, [ready, customPropertyDefs, labelLanguage, sceneRef]);
 
   const handleChangeSnapRadiusPx = useCallback((px: number) => {
     setSnapRadiusPx(px);

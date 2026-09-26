@@ -33,6 +33,7 @@ describe('serializeProject / loadProject round trip', () => {
       panels: [],
       panelSections: [],
       circuitTypes: [],
+      stampLabelLayouts: { 'fire-hose-reel': [{ id: 'l1', propertyKey: 'stamp:name', anchorX: 0.5, anchorY: 1, fontSize: 9, textColor: '#282828' }] },
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -230,6 +231,28 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.panels).toEqual([]);
   });
 
+  it('migrates a pre-labels (v10) save, defaulting stampLabelLayouts to an empty object', () => {
+    const legacyDoc = {
+      schemaVersion: 10,
+      networkTypes: [],
+      segments: [],
+      fittings: [],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [],
+      terminalCapacities: {},
+      circuits: [],
+      panels: [],
+      panelSections: [],
+      circuitTypes: [],
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.stampLabelLayouts).toEqual({});
+  });
+
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
     const doc = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -244,6 +267,7 @@ describe('serializeProject / loadProject round trip', () => {
       panels: [],
       panelSections: [],
       circuitTypes: [],
+      stampLabelLayouts: {},
     };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {
