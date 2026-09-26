@@ -17,6 +17,8 @@ import {
   validateCircuitTypeFields,
   buildStampPropertyContext,
   coerceDefaultValue,
+  DEFAULT_STAMP_LABEL_VISIBILITY,
+  isStampLabelVisible,
   computeNetworks,
   distance,
   findCircuitForTerminal,
@@ -81,6 +83,7 @@ import {
   type StampDefinition,
   type StampLabel,
   type StampLabelLayouts,
+  type StampLabelVisibility,
   type SyncedGeometry,
   type TerminalAssignmentPlan,
   type Transform2D,
@@ -423,6 +426,8 @@ interface SketchSceneEvents {
   documentsChanged: [DocumentSummary[]];
   /** The active document's customStampDefinitions list changed (a new one authored, or an existing one edited) — the Stamps tab's cue to re-render its palette. */
   customStampDefinitionsChanged: [StampDefinition[]];
+  /** The active document's label layouts changed (label-feature.md §6.2) — the status bar's label filter lists the definitions that have one. */
+  stampLabelLayoutsChanged: [StampLabelLayouts];
   /**
    * A circuit, panel, panel section, or circuit type changed — the
    * Electrical Circuits tree/properties' cue to re-render. Deliberately
@@ -507,6 +512,8 @@ export class SketchScene {
     customPropertyDefs: { terminal: [], equipment: [], circuit: [] },
     labelLanguage: 'en',
   };
+  /** The status bar's label toggle and filter — a view setting, same for every document. */
+  private labelVisibility: StampLabelVisibility = DEFAULT_STAMP_LABEL_VISIBILITY;
   private circuitLinesFocus: { circuitId: string | null; panelId: string | null } = { circuitId: null, panelId: null };
   private pendingPoints: Vec2[] = []; // shared scratch for calibrate/measure/draw-line two-click flows
   private drag: DragState = { kind: 'none' };
@@ -1295,6 +1302,12 @@ export class SketchScene {
     this.doc.stampLabelLayouts = next;
     this.markDirty();
     this.syncLabels();
+    this.emitter.emit('stampLabelLayoutsChanged', next);
+  }
+
+  setLabelVisibility(visibility: StampLabelVisibility): void {
+    this.labelVisibility = visibility;
+    this.syncLabels();
   }
 
   /** Brings the active document's label layer in line with its stamps, circuits, layouts and the label context. */
@@ -1309,7 +1322,10 @@ export class SketchScene {
       customPropertyDefs: this.labelContext.customPropertyDefs,
       labelLanguage: this.labelContext.labelLanguage,
     });
-    syncStampLabels(this.doc.labelLayer, this.doc.labelNodes, Object.values(state.stamps), this.doc.stampLabelLayouts, ctx);
+    const visibility = this.labelVisibility;
+    syncStampLabels(this.doc.labelLayer, this.doc.labelNodes, Object.values(state.stamps), this.doc.stampLabelLayouts, ctx, (stamp, label) =>
+      isStampLabelVisible(visibility, stamp, label),
+    );
   }
 
   /** Turns the editing-view-only dashed connection lines (terminal → panel, one color per circuit) on or off. Off draws nothing circuit-related. */

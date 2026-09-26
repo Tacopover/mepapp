@@ -1241,6 +1241,44 @@
 .mep-chip b {
   color: var(--ink);
 }
+/* Status bar label toggle + drop-up filter (label-feature.md §8.1). */
+.mep-labels-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mep-labels-chip label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.mep-labels-chip > button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0 2px;
+  color: var(--ink);
+}
+.mep-menu-dropdown.mep-dropup {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.mep-label-filter {
+  min-width: 220px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+.mep-label-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.mep-label-filter-item {
+  padding-left: 18px;
+}
 .mep-zoom-chip,
 .mep-page-chip {
   display: flex;

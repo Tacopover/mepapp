@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlacedStamp } from './stamp.js';
-import { computeStampLabelPlacement, resolveStampLabelText } from './stamp-label.js';
+import { computeStampLabelPlacement, DEFAULT_STAMP_LABEL_VISIBILITY, isStampLabelVisible, resolveStampLabelText } from './stamp-label.js';
 import { buildStampPropertyContext } from './stamp-properties.js';
 
 function stamp(rotationDegrees: number, scale = { x: 1, y: 1 }): PlacedStamp {
@@ -63,5 +63,20 @@ describe('label text', () => {
 
   it('returns null when the property has no value, so no empty prefix or suffix draws', () => {
     expect(resolveStampLabelText(ctx, stamp(0), { propertyKey: 'circuit:label', prefix: 'C ' })).toBeNull();
+  });
+});
+
+describe('label visibility', () => {
+  it('shows everything by default and nothing when turned off', () => {
+    expect(isStampLabelVisible(DEFAULT_STAMP_LABEL_VISIBILITY, stamp(0), { propertyKey: 'circuit:label' })).toBe(true);
+    expect(isStampLabelVisible({ ...DEFAULT_STAMP_LABEL_VISIBILITY, enabled: false }, stamp(0), { propertyKey: 'stamp:name' })).toBe(false);
+  });
+
+  it('hides by stamp definition and by label kind', () => {
+    const byDefinition = { ...DEFAULT_STAMP_LABEL_VISIBILITY, hiddenDefinitionIds: ['fire-hose-reel'] };
+    expect(isStampLabelVisible(byDefinition, stamp(0), { propertyKey: 'stamp:name' })).toBe(false);
+    const byKind = { ...DEFAULT_STAMP_LABEL_VISIBILITY, hiddenGroups: ['circuit' as const] };
+    expect(isStampLabelVisible(byKind, stamp(0), { propertyKey: 'circuit:custom:Group' })).toBe(false);
+    expect(isStampLabelVisible(byKind, stamp(0), { propertyKey: 'custom:Room' })).toBe(true);
   });
 });

@@ -6,7 +6,7 @@
 
 import { applyMatrix, composeTransform, type Vec2 } from './geometry.js';
 import type { PlacedStamp } from './stamp.js';
-import { resolveStampProperty, type StampPropertyContext } from './stamp-properties.js';
+import { resolveStampProperty, stampPropertyGroupOf, type StampPropertyContext, type StampPropertyGroup } from './stamp-properties.js';
 
 export interface StampLabel {
   id: string;
@@ -72,4 +72,21 @@ export function resolveStampLabelText(ctx: StampPropertyContext, stamp: PlacedSt
   const value = resolveStampProperty(ctx, stamp, label.propertyKey);
   if (value === null) return null;
   return `${label.prefix ?? ''}${value}${label.suffix ?? ''}`;
+}
+
+/** The status bar's label toggle and filter (label-feature.md §8.1) — a per-installation view setting, not project data. */
+export interface StampLabelVisibility {
+  enabled: boolean;
+  /** Stamp definitions whose labels are hidden. */
+  hiddenDefinitionIds: string[];
+  /** Label kinds that are hidden, by the group of their property key. */
+  hiddenGroups: StampPropertyGroup[];
+}
+
+export const DEFAULT_STAMP_LABEL_VISIBILITY: StampLabelVisibility = { enabled: true, hiddenDefinitionIds: [], hiddenGroups: [] };
+
+export function isStampLabelVisible(visibility: StampLabelVisibility, stamp: PlacedStamp, label: Pick<StampLabel, 'propertyKey'>): boolean {
+  if (!visibility.enabled) return false;
+  if (stamp.definitionId && visibility.hiddenDefinitionIds.includes(stamp.definitionId)) return false;
+  return !visibility.hiddenGroups.includes(stampPropertyGroupOf(label.propertyKey));
 }

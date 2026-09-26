@@ -91,6 +91,14 @@ const CIRCUIT_KEYS: StampPropertyKey[] = [
   { key: 'circuit:cable', label: 'Cable', group: 'circuit' },
 ];
 
+/** Which group a key belongs to — the label filter hides labels by group. */
+export function stampPropertyGroupOf(key: string): StampPropertyGroup {
+  if (key.startsWith('custom:')) return 'custom';
+  if (key.startsWith('circuit:')) return 'circuit';
+  if (key.startsWith('panel:')) return 'panel';
+  return 'stamp';
+}
+
 /** The keys a stamp of `category` can show, in display order. Circuit keys are terminal-only; panel keys are equipment-only. */
 export function listStampPropertyKeys(ctx: StampPropertyContext, category: StampCategory): StampPropertyKey[] {
   if (category === 'fitting') {

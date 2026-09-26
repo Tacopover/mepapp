@@ -10,7 +10,7 @@ import {
   type SketchTool,
   type StampInfo,
 } from '@mepapp/render';
-import { CIRCUIT_TYPE_LIBRARY, type Calibration, type Circuit, type CircuitType, type FlowResult, type NetworkType, type Panel, type PanelSection, type StampDefinition, type Vec2 } from '@mepapp/core';
+import { CIRCUIT_TYPE_LIBRARY, type Calibration, type Circuit, type CircuitType, type FlowResult, type NetworkType, type Panel, type PanelSection, type StampDefinition, type StampLabelLayouts, type Vec2 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 export interface CalibrationPrompt {
@@ -52,6 +52,8 @@ export interface UseSketchScene {
   networkSummaries: NetworkSummary[];
   networkTypes: NetworkType[];
   customStampDefinitions: StampDefinition[];
+  /** The active document's label layouts — see SketchScene.getStampLabelLayouts. */
+  stampLabelLayouts: StampLabelLayouts;
   circuits: Circuit[];
   panels: Panel[];
   panelSections: PanelSection[];
@@ -104,6 +106,7 @@ export function useSketchScene(): UseSketchScene {
   const [networkSummaries, setNetworkSummaries] = useState<NetworkSummary[]>([]);
   const [networkTypes, setNetworkTypes] = useState<NetworkType[]>([]);
   const [customStampDefinitions, setCustomStampDefinitions] = useState<StampDefinition[]>([]);
+  const [stampLabelLayouts, setStampLabelLayouts] = useState<StampLabelLayouts>({});
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [panels, setPanels] = useState<Panel[]>([]);
   const [panelSections, setPanelSections] = useState<PanelSection[]>([]);
@@ -247,6 +250,7 @@ export function useSketchScene(): UseSketchScene {
       setNetworkSummaries(scene.getNetworkSummaries());
       setNetworkTypes(scene.getNetworkTypes());
       setCustomStampDefinitions(scene.getCustomStampDefinitions());
+      setStampLabelLayouts(scene.getStampLabelLayouts());
       setCircuits(scene.listCircuits());
       setPanels(scene.listPanels());
       setPanelSections(scene.listPanelSections());
@@ -264,6 +268,7 @@ export function useSketchScene(): UseSketchScene {
       setNetworkSummaries(scene.getNetworkSummaries());
     };
     const onCustomStampDefinitionsChanged = (defs: StampDefinition[]) => setCustomStampDefinitions(defs);
+    const onStampLabelLayoutsChanged = (layouts: StampLabelLayouts) => setStampLabelLayouts(layouts);
     const onZoomChanged = (z: number) => setZoom(z);
     const onPageChanged = (p: number) => setPageIndex(p);
     const onDocumentsChanged = (docs: DocumentSummary[]) => {
@@ -290,6 +295,7 @@ export function useSketchScene(): UseSketchScene {
       setPageIndex(scene.getPageIndex());
       setPageCount(scene.getPageCount());
       setCustomStampDefinitions(scene.getCustomStampDefinitions());
+      setStampLabelLayouts(scene.getStampLabelLayouts());
       setCircuits(scene.listCircuits());
       setPanels(scene.listPanels());
       setPanelSections(scene.listPanelSections());
@@ -311,6 +317,7 @@ export function useSketchScene(): UseSketchScene {
     scene.on('projectLoaded', onProjectLoaded);
     scene.on('networkTypesChanged', onNetworkTypesChanged);
     scene.on('customStampDefinitionsChanged', onCustomStampDefinitionsChanged);
+    scene.on('stampLabelLayoutsChanged', onStampLabelLayoutsChanged);
     scene.on('zoomChanged', onZoomChanged);
     scene.on('pageChanged', onPageChanged);
     scene.on('documentsChanged', onDocumentsChanged);
@@ -326,6 +333,8 @@ export function useSketchScene(): UseSketchScene {
         setActiveDocumentId(scene.getActiveDocumentId());
         setActivePdfHandle(scene.getActivePdfHandle());
         setCustomStampDefinitions(scene.getCustomStampDefinitions());
+        setStampLabelLayouts(scene.getStampLabelLayouts());
+      setStampLabelLayouts(scene.getStampLabelLayouts());
       }
       // Dev-only hook so Playwright-driven benchmarks (Step 3, frame rate) can
       // reach the scene instance directly, without adding permanent UI surface.
@@ -349,6 +358,7 @@ export function useSketchScene(): UseSketchScene {
       scene.off('projectLoaded', onProjectLoaded);
       scene.off('networkTypesChanged', onNetworkTypesChanged);
       scene.off('customStampDefinitionsChanged', onCustomStampDefinitionsChanged);
+      scene.off('stampLabelLayoutsChanged', onStampLabelLayoutsChanged);
       scene.off('zoomChanged', onZoomChanged);
       scene.off('pageChanged', onPageChanged);
       scene.off('documentsChanged', onDocumentsChanged);
@@ -372,6 +382,7 @@ export function useSketchScene(): UseSketchScene {
     networkSummaries,
     networkTypes,
     customStampDefinitions,
+    stampLabelLayouts,
     circuits,
     panels,
     panelSections,

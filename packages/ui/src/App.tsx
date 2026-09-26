@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import {
   buildStampPropertyContext,
+  DEFAULT_STAMP_LABEL_VISIBILITY,
   getStampDefinition,
   STAMP_LIBRARY,
   type NetworkType,
@@ -8,6 +9,7 @@ import {
   type StampCategory,
   type StampDefinition,
   type StampLabel,
+  type StampLabelVisibility,
 } from '@mepapp/core';
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
@@ -84,6 +86,7 @@ const ANGLE_SNAP_STORAGE_KEY = 'mepapp.settings.angleSnapDegrees.v1';
 const LABEL_LANGUAGE_STORAGE_KEY = 'mepapp.settings.labelLanguage.v1';
 const ONBOARDING_STORAGE_KEY = 'mepapp.onboarding.seen.v1';
 const CUSTOM_PROPERTIES_STORAGE_KEY = 'mepapp.customProperties.v1';
+const LABEL_VISIBILITY_STORAGE_KEY = 'mepapp.settings.labelVisibility.v1';
 const EMPTY_CUSTOM_PROPERTY_DEFS: GlobalPropertyDefs = { terminal: [], equipment: [], circuit: [] };
 
 function loadCustomPropertyDefs(): GlobalPropertyDefs {
@@ -98,6 +101,21 @@ function loadCustomPropertyDefs(): GlobalPropertyDefs {
     };
   } catch {
     return EMPTY_CUSTOM_PROPERTY_DEFS;
+  }
+}
+
+function loadLabelVisibility(): StampLabelVisibility {
+  try {
+    const raw = localStorage.getItem(LABEL_VISIBILITY_STORAGE_KEY);
+    if (!raw) return DEFAULT_STAMP_LABEL_VISIBILITY;
+    const parsed = JSON.parse(raw) as Partial<StampLabelVisibility>;
+    return {
+      enabled: parsed.enabled !== false,
+      hiddenDefinitionIds: Array.isArray(parsed.hiddenDefinitionIds) ? parsed.hiddenDefinitionIds : [],
+      hiddenGroups: Array.isArray(parsed.hiddenGroups) ? parsed.hiddenGroups : [],
+    };
+  } catch {
+    return DEFAULT_STAMP_LABEL_VISIBILITY;
   }
 }
 
@@ -141,6 +159,7 @@ export function MepSketchApp({
     networkSummaries,
     networkTypes,
     customStampDefinitions,
+    stampLabelLayouts,
     circuits,
     panels,
     panelSections,
@@ -193,6 +212,7 @@ export function MepSketchApp({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [globalPropertiesOpen, setGlobalPropertiesOpen] = useState(false);
   const [customPropertyDefs, setCustomPropertyDefs] = useState<GlobalPropertyDefs>(loadCustomPropertyDefs);
+  const [labelVisibility, setLabelVisibility] = useState<StampLabelVisibility>(loadLabelVisibility);
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
   /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp copied into a new custom one via the Stamps tab's duplicate button (see handleDuplicateStampDefinition — `seed` always carries a fresh id and a self-contained iconRef, never the library entry's own id). */
   const [elementEditorTarget, setElementEditorTarget] = useState<
@@ -228,6 +248,13 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setLabelContext({ customPropertyDefs, labelLanguage });
   }, [ready, customPropertyDefs, labelLanguage, sceneRef]);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setLabelVisibility(labelVisibility);
+  }, [ready, labelVisibility, sceneRef]);
+  const handleLabelVisibilityChange = useCallback((next: StampLabelVisibility) => {
+    setLabelVisibility(next);
+    localStorage.setItem(LABEL_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
+  }, []);
 
   const handleChangeSnapRadiusPx = useCallback((px: number) => {
     setSnapRadiusPx(px);
@@ -529,6 +556,18 @@ export function MepSketchApp({
       }),
     [customStampDefinitions, allStamps, circuits, panels, circuitTypes, customPropertyDefs, labelLanguage],
   );
+  const labelFilterEntries = useMemo(() => {
+    const seen = new Set<string>();
+    const entries: Array<{ definitionId: string; name: string; category: StampCategory }> = [];
+    for (const stamp of allStamps) {
+      const id = stamp.definitionId;
+      if (!id || seen.has(id) || !stampLabelLayouts[id]) continue;
+      seen.add(id);
+      const def = getStampDefinition(id, customStampDefinitions);
+      entries.push({ definitionId: id, name: def ? (labelLanguage === 'nl' && def.labelNl ? def.labelNl : def.label) : id, category: stamp.category });
+    }
+    return entries.sort((a, b) => a.name.localeCompare(b.name));
+  }, [allStamps, stampLabelLayouts, customStampDefinitions, labelLanguage]);
   const labelEditorStamp = labelEditorStampId ? allStamps.find((s) => s.id === labelEditorStampId) : undefined;
   const labelEditorDefinition = labelEditorStamp?.definitionId ? getStampDefinition(labelEditorStamp.definitionId, customStampDefinitions) : undefined;
 
@@ -868,6 +907,9 @@ export function MepSketchApp({
         measurementMm={measurementMm}
         selectedCount={selection.length}
         drawingSummary={drawingSummary}
+        labelVisibility={labelVisibility}
+        onLabelVisibilityChange={handleLabelVisibilityChange}
+        labelFilterEntries={labelFilterEntries}
       />
 
       {calibrationPrompt && (
