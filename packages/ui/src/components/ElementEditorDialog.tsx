@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
-import { STAMP_LIBRARY, type Discipline, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { STAMP_LIBRARY, type Discipline, type StampCategory, type StampDefinition, type StampLabel, type StampPropertyContext } from '@mepapp/core';
 import { ColorPicker } from './ColorPicker.js';
 import { Dialog } from './Dialog.js';
+import { StampLabelsEditor } from './StampLabelsEditor.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { stampLabelFor } from './StampsPanel.js';
 import type { StampLabelLanguage } from './LanguageToggle.js';
@@ -147,7 +148,11 @@ export interface ElementEditorDialogProps {
   existingCustomDefinitions: StampDefinition[];
   /** The Stamps tab's picker-label language (see LanguageToggle) — only used to seed the Name field from definition.labelNl when opening a library stamp for editing; the saved definition always keeps a single label going forward (see StampsPanel's stampLabelFor doc comment). */
   labelLanguage?: StampLabelLanguage;
-  onSave: (definition: StampDefinition) => void;
+  /** The definition's current label layout (label-feature.md §7) — saved back through onSave's second argument. */
+  initialLabels?: StampLabel[];
+  /** Resolves the Labels tab's property list; without it the tab stays disabled. */
+  labelPropertyContext?: StampPropertyContext;
+  onSave: (definition: StampDefinition, labels?: StampLabel[]) => void;
   onClose: () => void;
 }
 
@@ -164,13 +169,14 @@ export interface ElementEditorDialogProps {
  * for grouping ports that are internally wired together (converted to a real
  * instance-level PortGroup at placement, see SketchScene.placeStamp).
  */
-export function ElementEditorDialog({ definition, existingCustomDefinitions, labelLanguage, onSave, onClose }: ElementEditorDialogProps) {
+export function ElementEditorDialog({ definition, existingCustomDefinitions, labelLanguage, initialLabels, labelPropertyContext, onSave, onClose }: ElementEditorDialogProps) {
   const [name, setName] = useState(definition ? stampLabelFor(definition, labelLanguage ?? 'en') : '');
   const [discipline, setDiscipline] = useState<Discipline>(definition?.discipline ?? 'ventilation');
   const [category, setCategory] = useState<StampCategory>(definition?.category === 'equipment' ? 'equipment' : 'terminal');
   const [nativeWidth, setNativeWidth] = useState(definition?.nativeWidth ?? 48);
   const [nativeHeight, setNativeHeight] = useState(definition?.nativeHeight ?? 48);
   const [error, setError] = useState<string | null>(null);
+  const [labels, setLabels] = useState<StampLabel[]>(initialLabels ?? []);
 
   // Shapes/Ports/Labels tab bar (§2) — Shapes and Ports are both always available now that
   // Import/Draw are merged into one always-on canvas (an imported image is just another shape).
@@ -223,7 +229,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   // its useRef initializer expression re-evaluates every render (a JS-argument-evaluation quirk),
   // but useRef only keeps the very first result, which is exactly the mount-time snapshot we want.
   function computeSnapshot(): string {
-    return JSON.stringify({ name, discipline, category, nativeWidth, nativeHeight, ports: portsEditor.ports, groups: portsEditor.groups, shapes: editor.shapes });
+    return JSON.stringify({ name, discipline, category, nativeWidth, nativeHeight, ports: portsEditor.ports, groups: portsEditor.groups, shapes: editor.shapes, labels });
   }
   const initialSnapshotRef = useRef(computeSnapshot());
   const isDirty = computeSnapshot() !== initialSnapshotRef.current;
@@ -561,12 +567,12 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       setPendingOverwrite({ built, existingId: null, existingLabel: libraryCollision.label, isLibrary: true });
       return;
     }
-    onSave(built);
+    onSave(built, labelPropertyContext ? labels : undefined);
   }
 
   function confirmOverwrite() {
     if (!pendingOverwrite) return;
-    onSave(pendingOverwrite.existingId ? { ...pendingOverwrite.built, id: pendingOverwrite.existingId } : pendingOverwrite.built);
+    onSave(pendingOverwrite.existingId ? { ...pendingOverwrite.built, id: pendingOverwrite.existingId } : pendingOverwrite.built, labelPropertyContext ? labels : undefined);
     setPendingOverwrite(null);
   }
 
@@ -661,12 +667,13 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           <button type="button" className={activeTab === 'ports' ? 'on' : ''} onClick={() => setActiveTab('ports')}>
             Ports
           </button>
-          <button type="button" className={activeTab === 'labels' ? 'on' : ''} disabled title="Coming soon">
+          <button type="button" className={activeTab === 'labels' ? 'on' : ''} disabled={!labelPropertyContext} onClick={() => setActiveTab('labels')}>
             Labels
           </button>
         </div>
 
-        <div className="mep-ee-grid">
+        {/* Stays mounted on the Labels tab: the shape editor keeps a ref into its canvas. */}
+        <div className="mep-ee-grid" style={activeTab === 'labels' ? { display: 'none' } : undefined}>
           {activeTab === 'shapes' && (
             <div className="mep-ee-rail" style={{ gridColumn: '1 / 2' }}>
               {SHAPE_TOOLS.map(({ tool: t, label }) => {
@@ -823,9 +830,19 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
                 )}
               </>
             )}
-            {activeTab === 'labels' && <p className="mep-hint">Labels — coming soon.</p>}
           </div>
         </div>
+        {activeTab === 'labels' && labelPropertyContext && (
+          <StampLabelsEditor
+            category={category}
+            nativeWidth={nativeWidth}
+            nativeHeight={nativeHeight}
+            renderArtwork={(widthPx, heightPx) => <SymbolShapesSvg shapes={editor.shapes} widthPx={widthPx} heightPx={heightPx} />}
+            initialLabels={labels}
+            onChange={setLabels}
+            propertyContext={labelPropertyContext}
+          />
+        )}
 
         {activeTab === 'shapes' && (
           <div className="mep-ee-bar">

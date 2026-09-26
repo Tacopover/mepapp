@@ -76,6 +76,8 @@ export interface PropertiesPanelProps {
   /** Resolves a stamp definition's display name the same way the Stamps tab does — see stampLabelFor. */
   labelLanguage: StampLabelLanguage;
   onEditPorts: (definitionId: string) => void;
+  /** Opens the label layout editor for the selected stamp's definition (label-feature.md §7). */
+  onEditLabels: (stampId: string) => void;
   /** Electrical Circuits branch (electrical-circuits-model.md §9) — takes precedence over the stamp/segment/fitting branches below when set, since a Circuit/Panel selection is app-level state, not a canvas selection (see useSketchScene's selectedCircuitId/selectedPanelId). */
   circuits: Circuit[];
   panels: Panel[];
@@ -103,6 +105,7 @@ export function PropertiesPanel({
   customStampDefinitions,
   labelLanguage,
   onEditPorts,
+  onEditLabels,
   circuits,
   panels,
   panelSections,
@@ -534,6 +537,11 @@ export function PropertiesPanel({
         {definition?.source === 'custom' && (
           <button type="button" onClick={() => onEditPorts(definition.id)}>
             Edit ports…
+          </button>
+        )}
+        {definition && (
+          <button type="button" onClick={() => onEditLabels(stamp.id)}>
+            Edit labels…
           </button>
         )}
         {stamp.category === 'equipment' && backingPanel && (

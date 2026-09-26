@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { STAMP_LIBRARY, type NetworkType, type ReconciliationReport, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import {
+  buildStampPropertyContext,
+  getStampDefinition,
+  STAMP_LIBRARY,
+  type NetworkType,
+  type ReconciliationReport,
+  type StampCategory,
+  type StampDefinition,
+  type StampLabel,
+} from '@mepapp/core';
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
@@ -24,6 +33,7 @@ import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
+import { StampLabelsDialog } from './components/StampLabelsDialog.js';
 import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
@@ -189,6 +199,8 @@ export function MepSketchApp({
     { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | null
   >(null);
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
+  /** The placed stamp whose definition's label layout is open in StampLabelsDialog. */
+  const [labelEditorStampId, setLabelEditorStampId] = useState<string | null>(null);
   const [circuitTypesOpen, setCircuitTypesOpen] = useState(false);
   const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
@@ -504,8 +516,25 @@ export function MepSketchApp({
     [resolveStampIconUrl],
   );
 
+  const labelPropertyContext = useMemo(
+    () =>
+      buildStampPropertyContext({
+        customStampDefinitions,
+        terminalCapacities: Object.fromEntries(allStamps.map((s) => [s.id, s.capacity])),
+        circuits,
+        panels,
+        circuitTypes,
+        customPropertyDefs,
+        labelLanguage,
+      }),
+    [customStampDefinitions, allStamps, circuits, panels, circuitTypes, customPropertyDefs, labelLanguage],
+  );
+  const labelEditorStamp = labelEditorStampId ? allStamps.find((s) => s.id === labelEditorStampId) : undefined;
+  const labelEditorDefinition = labelEditorStamp?.definitionId ? getStampDefinition(labelEditorStamp.definitionId, customStampDefinitions) : undefined;
+
   const handleSaveElementDefinition = useCallback(
-    (definition: StampDefinition) => {
+    (definition: StampDefinition, labels?: StampLabel[]) => {
+      if (labels) sceneRef.current?.setStampLabelLayout(definition.id, labels);
       // Whether this is an in-place update vs. a brand-new entry is decided by id membership, not
       // by elementEditorTarget.mode — the dialog's own overwrite-confirmation prompt (Name
       // collision) reassigns a create/duplicate save's id to an existing custom definition's id to
@@ -656,6 +685,7 @@ export function MepSketchApp({
         customStampDefinitions={customStampDefinitions}
         labelLanguage={labelLanguage}
         onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
+        onEditLabels={setLabelEditorStampId}
         circuits={circuits}
         panels={panels}
         panelSections={panelSections}
@@ -914,8 +944,25 @@ export function MepSketchApp({
           }
           existingCustomDefinitions={customStampDefinitions}
           labelLanguage={labelLanguage}
+          initialLabels={elementEditorTarget.mode === 'edit' ? sceneRef.current?.getStampLabelLayouts()[elementEditorTarget.definitionId] : undefined}
+          labelPropertyContext={labelPropertyContext}
           onSave={handleSaveElementDefinition}
           onClose={() => setElementEditorTarget(null)}
+        />
+      )}
+
+      {labelEditorStamp && labelEditorDefinition && (
+        <StampLabelsDialog
+          definition={labelEditorDefinition}
+          iconUrl={labelEditorDefinition.iconRef.startsWith('data:') ? labelEditorDefinition.iconRef : resolveStampIconUrl(labelEditorDefinition.iconRef)}
+          stamp={labelEditorStamp}
+          initialLabels={sceneRef.current?.getStampLabelLayouts()[labelEditorDefinition.id] ?? []}
+          propertyContext={labelPropertyContext}
+          onSave={(labels) => {
+            sceneRef.current?.setStampLabelLayout(labelEditorDefinition.id, labels);
+            setLabelEditorStampId(null);
+          }}
+          onClose={() => setLabelEditorStampId(null)}
         />
       )}
 

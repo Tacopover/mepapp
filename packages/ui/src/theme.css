@@ -1719,6 +1719,96 @@
   border-bottom: none;
   padding: 0 0 10px;
 }
+/* Stamp label layout editor (label-feature.md §7) — StampLabelsEditor, used by the Element Editor's Labels tab and StampLabelsDialog. */
+.mep-lbl-grid {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mep-lbl-canvas-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface-2);
+}
+.mep-lbl-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.mep-lbl-svg {
+  max-width: 100%;
+  height: auto;
+  user-select: none;
+  overflow: visible;
+  background: #fff;
+  border: 1px solid var(--line);
+  cursor: crosshair;
+  touch-action: none;
+}
+.mep-lbl-stamp-box {
+  fill: none;
+  stroke: var(--line);
+  stroke-dasharray: 3 3;
+}
+.mep-lbl-item {
+  cursor: move;
+}
+.mep-lbl-anchor {
+  fill: #fff;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+.mep-lbl-anchor.on {
+  fill: var(--accent);
+  stroke: var(--accent-ink);
+}
+.mep-lbl-selection {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+.mep-lbl-sidebar {
+  min-width: 0;
+  padding: 10px;
+  overflow-y: auto;
+  border-left: 1.5px solid var(--line);
+}
+.mep-lbl-sidebar .mep-section {
+  border-bottom: none;
+  padding: 0 0 10px;
+}
+.mep-lbl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.mep-lbl-row.on {
+  background: var(--accent-soft);
+}
+.mep-lbl-toggle-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mep-lbl-undo {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
 .mep-ee-bar {
   display: flex;
   align-items: center;
