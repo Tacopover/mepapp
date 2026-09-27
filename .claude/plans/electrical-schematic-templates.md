@@ -1,6 +1,6 @@
 # Electrical schematic templates — plan
 
-Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 5b and the Phase 5c design pass done 2026-09-25 and 2026-09-27; Phase 6 not started; Phase 7 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
+Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 5b and the Phase 5c design pass done 2026-09-25 and 2026-09-27; Phase 6 not started; Phase 7 round 1 (multi-select) done 2026-09-27, round 2 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
 ## 1. Goal
 
@@ -448,7 +448,7 @@ Status per round:
 
 Storage in the project file moved into Phase 5b. What is left: export (open question 2), and loading and saving a template as a file to share between projects. Custom templates and symbols stay in localStorage until then.
 
-### Phase 7 — Multi-select and movable generated blocks — not started
+### Phase 7 — Multi-select and movable generated blocks — round 1 done, round 2 not started
 
 Three requests from the user after trying the workspace (2026-09-27):
 
@@ -456,10 +456,12 @@ Three requests from the user after trying the workspace (2026-09-27):
 2. Already works, no code needed: in Template mode, a draw tool's "Add to" selector in the tool options bar can target a group instead of the sheet, and the drawn shape then repeats on every circuit the group matches.
 3. Let the user drag a template-generated block (not just an "extra") in Schematic mode, so the template only has to get the layout ~80% right. Decided with the user: a move applies to one circuit's copy only (not every repeat of the group), and it survives "Update from template" (matched by the block's resolved id, same rule as `textOverrides`).
 
-Round 1 — multi-select:
+Round 1 — multi-select: **done** 2026-09-27, commit `0ad11eb`. Browser-verified (headless Chromium) in both modes: marquee drag selects every overlapping block/extra (any overlap, not full containment — confirmed in Template mode, where a marquee over 24 blocks correctly deduped to "8 selected" targets); Shift-drag adds to the existing selection; Shift-click toggles one target in or out; a plain click on a block outside the current selection replaces it; a plain click on empty space clears it; drag or arrow keys move the whole selection by one shared delta; Delete removes the whole selection as one undo step in Template mode (24 → 12 blocks, one Ctrl+Z restored all 12, not one at a time); Ctrl+D and the panel's own Duplicate button duplicate the whole selection with the same offset each; rotate/resize handles show only with exactly one thing selected; the Outline panel highlights every selected row; left-drag on empty space no longer pans (middle-drag does); no console errors; no regressions to single selection, its full properties view, undo/redo, or the Outline's click-to-select. One expected, not-a-bug nuance the check found: a plain click on an item that is already part of a multi-selection keeps the whole selection (so it can be dragged at once) rather than collapsing to just that one item — this matches the main canvas's own `selectTool.ts` convention; dropping to a single item works via Shift-click-toggle-down-to-one, or by clicking an item outside the current selection.
 - `SheetBlockCanvas<T>`: `selected`/`onSelect` become a list instead of one target. A drag that starts on empty sheet space (not a block, not a handle) starts a rubber band instead of panning; on release, every block whose bounds overlap it is selected (replaces the selection, or adds to it when Shift is held). Shift-click toggles one target.
 - Move (drag or arrow keys), delete and duplicate work on the whole selection at once, in both `SchematicTemplateEditor` (blocks/groups) and `SchematicDialog` (extras, and generated blocks once round 2 lands). Group rotate/resize stays single-target for now.
 - `TemplateOutlinePanel` highlights every selected row. The Properties/Fields panel shows a plain "N selected" state (with Delete/Duplicate) instead of trying to edit mixed block types at once.
+
+Round 2 — movable generated blocks in the schematic: not started.
 
 Round 2 — movable generated blocks in the schematic:
 - New `Schematic.blockOverrides: Record<string, { x: number; y: number; rotation?: number; width?: number; height?: number }>`, keyed the same way as `textOverrides` (the block's resolved, per-instance id) — so one circuit's copy of a block can move without moving another circuit's copy of the same template block.
