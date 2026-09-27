@@ -409,6 +409,37 @@ Steps, in order:
 - 5b-2 Fields and the saved schematic. **Done** 2026-09-25, commits `7251d9c` (core, project schema v11), `de5053a` (saved schematics, dialog, fields form, text overrides) and `b2dda53` (template fields editor). Shipped: template fields with project or schematic scope, defaults (a binding, or today for a date), date format; the built-in templates define fields and their title block uses them; a `Schematic` per panel with its own template copy and symbol copies; the schematic dialog per panel (create, rename, delete, switch template, update from template); a fields form; typing over generated text (double-click); orphan reports; the template fields editor with a warning before removing a used field. Not done: changing a field id does not rewrite text that reads the old id; a schematic hides when its panel is reverted (undo brings it back, the next save drops it); circuit-number text is tiny to double-click at fit zoom; Duplicate template not browser-tested. Verified: core 411 tests, UI 49 tests, root build 9 of 9, and a headless browser pass (Playwright) over dialog flow, shared and per-schematic fields, text overrides, update-from-template and switch-template banners, the fields editor, symbols on device blocks, and Save then reopen of the PDF with the project JSON (schema 11). A small follow-up (id box commits on Enter or blur; symbol-delete warning wording) was tested by typecheck and unit tests only.
 - 5b-3 Drawing and symbol tools on the template canvas and on the schematic sheet. Status: done 2026-09-25 (commit a8e8f47), browser-verified in headless Chromium: all tools on the template sheet and in a group, extras on sheet and circuit (follow circuit after Update from template), move/rotate/resize/duplicate/delete, undo, reload persistence, no console errors. Known: edits to extras in the dialog are not undoable; text in a group becomes `customAnnotation`; Escape does not close the drawing editor. A draw tool bar (line, arrow, rectangle, circle, ellipse, arc, polygon, text, symbol) on both surfaces; each drawn shape becomes one small `drawing` block (template) or `drawing` extra (schematic), so the block tools work on it. The template editor adds to the sheet or to a group (repeats on every circuit); the schematic dialog attaches to the sheet or to a circuit and can select, move, rotate, resize, edit, duplicate and delete its extras. The two "Drawing" palette entries are gone. Shared code: `SheetBlockCanvas`, `SheetDrawTools`, `useSheetDraw`, `sheetDraw.ts`; core: `drawnShapeToBlock`, `duplicateSchematicExtra`, `addSchematicSymbolExtra`.
 
+### Phase 5c — Design pass on the schematic workspace — in progress (started 2026-09-27)
+
+The user found the function good but the design weak (2026-09-27). The user approved all 19 review items, in three rounds, in this order.
+
+Round 1, layout:
+1. Full-window workspace with a thin header, not a fixed-size dialog.
+2. One workspace with a "Schematic | Template" mode switch in the header, replacing the second dialog and "Back to schematic". The header names the schematic and the template.
+3. Draw tools in a vertical icon bar left of the sheet, with the drawing editor's icons, tooltips and keyboard keys (V, L, A, R, C, E, T and so on).
+4. Tool options (line width, fill, keep tool, add to / attach to) in one short bar, shown only while a draw tool is active.
+5. Zoom controls under the sheet (−, %, +, fit sheet, zoom to content).
+6. A status line under the sheet that changes with the active tool, replacing the fixed help line.
+14. Schematic header: a schematic selector with a "⋯" menu (new, rename, delete) and a template menu (edit, duplicate, delete, switch, update).
+15. Right panel in the schematic mode: tabs "Fields" and "Selection"; Selection opens when something is selected.
+
+Round 2, template editor panels:
+9. Left panel with two tabs: Outline (tree of the sheet and each group with their blocks: select, reorder, delete) and Add (palette with an icon per block type, drag onto the sheet).
+10. Readable block names in the outline ("Main device"), id in grey.
+11. Right panel tabs: Properties, Fields (compact list, edit one field at a time), Template (sheet size, date and number format).
+12. The selected group shows as a box around its repeats on the sheet, with its rule.
+13. Remove the palette entries "Symbol…" and "Symbol (each circuit)…"; the Symbol tool replaces them.
+
+Round 3, small fixes:
+7. Draw the grid on the sheet when a grid size is set.
+8. One input style in all panels; readable section titles.
+16. Hover highlight and tooltip on generated text that can be typed over.
+17. The date input follows the template's date format.
+18. Line width in mm in the drawing editor (stored as a fraction of the box).
+19. The drawing editor loses the extra Close button; Escape acts as Cancel.
+
+Status per round: not started.
+
 ### Phase 6 — Export, and loading templates from a file — not started
 
 Storage in the project file moved into Phase 5b. What is left: export (open question 2), and loading and saving a template as a file to share between projects. Custom templates and symbols stay in localStorage until then.
