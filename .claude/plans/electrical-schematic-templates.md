@@ -438,7 +438,9 @@ Round 3, small fixes:
 18. Line width in mm in the drawing editor (stored as a fraction of the box).
 19. The drawing editor loses the extra Close button; Escape acts as Cancel.
 
-Status per round: round 1 built 2026-09-27, not yet browser-verified (layout screenshots only). Rounds 2 and 3 not started.
+Status per round:
+- Round 1: **done** 2026-09-27, commit `fc64e3f`. Browser-verified (headless Chromium): full-window workspace, mode switch both ways (built-in template copied on first switch), both header menus, all ten tools by click and key (keys ignored in inputs), options bar only with a draw tool, add to group / attach to circuit, view bar zoom and zoom to content/group, status line, Fields/Selection tabs, Escape order, drawing editor in both modes, text override, template undo, save and reopen; no console errors. Found: the scene's window key handler still gets keys behind the workspace (Ctrl+V pasted into the hidden scene, Delete removed it), fixed in round 2. Minor: Escape with only a group selected closes the workspace (older behaviour); the options bar pushes the sheet down about 44 px; the Select status line is cut off at 1280 px.
+- Rounds 2 and 3: not started.
 
 ### Phase 6 — Export, and loading templates from a file — not started
 
