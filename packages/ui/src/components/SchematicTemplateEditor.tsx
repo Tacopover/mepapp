@@ -96,7 +96,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const edit: EditTemplate = (change, gestureKey = null) => applyHistory(commit(historyRef.current, change(historyRef.current.present), gestureKey));
   const endGesture = () => applyHistory(endHistoryGesture(historyRef.current));
 
-  const [selection, setSelection] = useState<BlockRef | null>(null);
+  const [selection, setSelection] = useState<BlockRef[]>([]);
   const [instanceId, setInstanceId] = useState<string | null>(null);
   const [activeGroupState, setActiveGroupState] = useState<string | null>(null);
   const [grid, setGrid] = useState(1);
@@ -121,10 +121,13 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const { view, zoomTo } = sheetView;
 
   const activeGroupId = activeGroupState !== null && template.groups.some((g) => g.id === activeGroupState) ? activeGroupState : null;
-  const selectedBlock = selection ? findBlock(template, selection) : undefined;
-  const selectionRef = useRef<BlockRef | null>(null);
+  /** `selection`, but with refs to blocks that no longer exist dropped. */
+  const liveSelection = selection.filter((ref) => findBlock(template, ref) !== undefined);
+  const singleSelection = liveSelection.length === 1 ? liveSelection[0] : undefined;
+  const selectedBlock = singleSelection ? findBlock(template, singleSelection) : undefined;
+  const selectionRef = useRef<BlockRef[]>([]);
   const drawEscapeRef = useRef<() => boolean>(() => false);
-  selectionRef.current = selectedBlock ? selection : null;
+  selectionRef.current = liveSelection;
   const activeGroupRef = useRef<string | null>(null);
   activeGroupRef.current = activeGroupId;
   const drawingBlock = drawingRef ? findBlock(template, drawingRef) : undefined;
@@ -159,9 +162,9 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
         event.stopPropagation();
         return;
       }
-      if (selectionRef.current) {
+      if (selectionRef.current.length > 0) {
         event.stopPropagation();
-        setSelection(null);
+        setSelection([]);
         setInstanceId(null);
       } else if (activeGroupRef.current) {
         event.stopPropagation();
@@ -175,16 +178,20 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const loadShapesFor = (definitionId: string | undefined) => (definitionId ? getStampDefinition(definitionId, customStampDefinitions)?.shapes : undefined);
   const symbolShapesFor = (symbolId: string | undefined) => (symbolId ? symbols.find((s) => s.id === symbolId)?.shapes : undefined);
 
-  function selectBlock(ref: BlockRef | null, instance: string | null = null) {
-    setSelection(ref);
+  function selectBlocks(refs: BlockRef[], instance: string | null = null) {
+    setSelection(refs);
     setInstanceId(instance);
-    if (ref?.groupId) setActiveGroupState(ref.groupId);
-    if (ref) setRightTab('properties');
+    if (refs.length === 1 && refs[0].groupId) setActiveGroupState(refs[0].groupId);
+    if (refs.length > 0) setRightTab('properties');
+  }
+
+  function selectBlock(ref: BlockRef | null, instance: string | null = null) {
+    selectBlocks(ref ? [ref] : [], instance);
   }
 
   function selectGroup(groupId: string | null) {
     setActiveGroupState(groupId);
-    setSelection(null);
+    setSelection([]);
     setInstanceId(null);
     if (groupId) setRightTab('properties');
   }
@@ -277,7 +284,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   }
 
   function openSelectedDrawing() {
-    if (selection && selectedBlock?.type === 'drawing' && selectedBlock.symbolId === undefined) setDrawingRef(selection);
+    if (singleSelection && selectedBlock?.type === 'drawing' && selectedBlock.symbolId === undefined) setDrawingRef(singleSelection);
   }
 
   function pickSymbol(symbol: SchematicSymbol) {
@@ -294,26 +301,36 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
 
   function detachSelectedSymbol() {
     const symbol = selectedBlock?.symbolId !== undefined ? symbols.find((s) => s.id === selectedBlock.symbolId) : undefined;
-    if (selection && symbol) edit((t) => detachBlockSymbol(t, selection, symbol));
+    if (singleSelection && symbol) edit((t) => detachBlockSymbol(t, singleSelection, symbol));
   }
 
   function deleteSelected() {
-    if (!selectedBlock || !selection) return;
-    edit((t) => removeBlock(t, selection));
-    selectBlock(null);
+    if (liveSelection.length === 0) return;
+    edit((t) => liveSelection.reduce((acc, ref) => removeBlock(acc, ref), t));
+    selectBlocks([]);
   }
 
   function duplicateSelected() {
-    if (!selectedBlock || !selection) return;
-    const result = duplicateBlock(historyRef.current.present, selection, 4);
-    if (!result) return;
-    applyHistory(commit(historyRef.current, result.template));
-    selectBlock(result.ref);
+    if (liveSelection.length === 0) return;
+    let next = historyRef.current.present;
+    const newRefs: BlockRef[] = [];
+    for (const ref of liveSelection) {
+      const result = duplicateBlock(next, ref, 4);
+      if (!result) continue;
+      next = result.template;
+      newRefs.push(result.ref);
+    }
+    if (newRefs.length === 0) return;
+    applyHistory(commit(historyRef.current, next));
+    selectBlocks(newRefs);
   }
 
   function nudgeSelected(dx: number, dy: number) {
-    if (!selectedBlock || !selection) return;
-    edit((t) => updateBlock(t, selection, { x: selectedBlock.x + dx, y: selectedBlock.y + dy }));
+    if (liveSelection.length === 0) return;
+    edit((t) => liveSelection.reduce((acc, ref) => {
+      const block = findBlock(acc, ref);
+      return block ? updateBlock(acc, ref, { x: block.x + dx, y: block.y + dy }) : acc;
+    }, t));
   }
 
   function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -339,10 +356,10 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
       event.preventDefault();
       duplicateSelected();
     } else if (event.key === 'Delete' || event.key === 'Backspace') {
-      if (!selectedBlock) return;
+      if (liveSelection.length === 0) return;
       event.preventDefault();
       deleteSelected();
-    } else if (event.key.startsWith('Arrow') && selectedBlock) {
+    } else if (event.key.startsWith('Arrow') && liveSelection.length > 0) {
       event.preventDefault();
       const step = (grid > 0 ? grid : 1) * (event.shiftKey ? 10 : 1);
       nudgeSelected(event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0, event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0);
@@ -370,8 +387,8 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   }
 
   const activeGroup = activeGroupId ? template.groups.find((g) => g.id === activeGroupId) : undefined;
-  /** The group shows on the sheet while it is selected, or while one of its blocks is. */
-  const shownGroup = activeGroup && (!selectedBlock || selection?.groupId === activeGroup.id) ? activeGroup : undefined;
+  /** The group shows on the sheet while it is selected, or while one of its blocks is (ambiguous for a multi-selection spanning groups, so it stays hidden then). */
+  const shownGroup = activeGroup && (liveSelection.length === 0 || (singleSelection !== undefined && singleSelection.groupId === activeGroup.id)) ? activeGroup : undefined;
   const repeatBoxes = shownGroup ? groupRepeatBoxes(generated.blocks, shownGroup.id) : [];
   const repeatLabelAt = repeatBoxes.length > 0 ? { x: Math.min(...repeatBoxes.map((b) => b.x)), y: Math.max(...repeatBoxes.map((b) => b.y + b.height)) } : undefined;
 
@@ -406,7 +423,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
       <TemplateOutlinePanel
         template={template}
         symbols={symbols}
-        selection={selectedBlock ? selection : null}
+        selection={liveSelection}
         activeGroupId={activeGroupId}
         onSelectBlock={(ref) => selectBlock(ref)}
         onSelectGroup={(groupId) => selectGroup(groupId)}
@@ -469,9 +486,9 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
           targetOf={(block) => ({ blockId: block.templateBlockId, groupId: block.groupId })}
           sameTarget={(a, b) => sameRef(a, b)}
           targetKey={(ref) => `${ref.groupId ?? '-'}:${ref.blockId}`}
-          selected={selectedBlock ? selection : null}
+          selected={liveSelection}
           instanceId={instanceId}
-          onSelect={selectBlock}
+          onSelect={selectBlocks}
           readOrigin={(ref) => {
             const block = findBlock(historyRef.current.present, ref);
             return block ? { x: block.x, y: block.y } : undefined;
@@ -503,7 +520,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
         <SheetViewBar
           sheetView={sheetView}
           onZoomToContent={zoomBounds ? () => zoomTo(zoomBounds) : undefined}
-          status={dropNotice ?? sheetStatusText(draw, 'Click a block to select it, drag to move it. Scroll to zoom, drag empty space to pan. Hold Alt to turn off the grid.')}
+          status={dropNotice ?? sheetStatusText(draw, 'Click a block to select it, drag to move it. Drag empty space to select, hold Shift to add or Shift-click to toggle one. Scroll to zoom, middle-drag to pan. Hold Alt to turn off the grid.')}
         >
           <button type="button" className="mep-ws-textbtn" onClick={zoomToGroup} disabled={!activeGroupId || !generated.blocks.some((b) => b.groupId === activeGroupId)} title="Zoom to the first circuit drawn by the selected group">
             Zoom to group
@@ -537,7 +554,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
           template={template}
           edit={edit}
           endGesture={endGesture}
-          selection={selectedBlock ? selection : null}
+          selection={liveSelection}
           activeGroupId={activeGroupId}
           circuitTypes={circuitTypes}
           loadTypes={loadTypes}
@@ -546,7 +563,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
           onDeleteBlock={deleteSelected}
           onEditDrawing={openSelectedDrawing}
           symbols={symbols}
-          onChangeSymbol={() => selection && setSymbolLibrary({ kind: 'change', ref: selection })}
+          onChangeSymbol={() => singleSelection && setSymbolLibrary({ kind: 'change', ref: singleSelection })}
           onDetachSymbol={detachSelectedSymbol}
           tab={rightTab}
           onTabChange={setRightTab}

@@ -18,7 +18,8 @@ const PALETTE_SCOPES: { scope: SchematicBlockScope; label: string; hint?: string
 export interface TemplateOutlinePanelProps {
   template: SchematicTemplate;
   symbols: SchematicSymbol[];
-  selection: BlockRef | null;
+  /** Every selected block. */
+  selection: BlockRef[];
   activeGroupId: string | null;
   onSelectBlock: (ref: BlockRef) => void;
   onSelectGroup: (groupId: string) => void;
@@ -32,7 +33,7 @@ export interface TemplateOutlinePanelProps {
   onAddBlock: (type: SchematicBlockType) => void;
 }
 
-const sameRef = (a: BlockRef | null, b: BlockRef) => a !== null && a.blockId === b.blockId && a.groupId === b.groupId;
+const sameRef = (a: BlockRef, b: BlockRef) => a.blockId === b.blockId && a.groupId === b.groupId;
 
 /** The template editor's left panel: an Outline tab (the sheet and each group, with their blocks) and an Add tab (the palette). */
 export function TemplateOutlinePanel(props: TemplateOutlinePanelProps) {
@@ -64,7 +65,7 @@ function OutlineTree({ template, symbols, selection, activeGroupId, onSelectBloc
       return next;
     });
 
-  const selectionKey = selection ? `${selection.groupId ?? '-'}/${selection.blockId}` : activeGroupId ? `group:${activeGroupId}` : null;
+  const selectionKey = selection.length === 1 ? `${selection[0].groupId ?? '-'}/${selection[0].blockId}` : activeGroupId ? `group:${activeGroupId}` : null;
   useEffect(() => {
     if (!selectionKey) return;
     const row = listRef.current?.querySelector(`[data-outline-key="${CSS.escape(selectionKey)}"]`);
@@ -73,7 +74,7 @@ function OutlineTree({ template, symbols, selection, activeGroupId, onSelectBloc
 
   const blockRows = (blocks: OutlineBlock[]) =>
     blocks.map((item, index) => {
-      const selected = sameRef(selection, item.ref);
+      const selected = selection.some((ref) => sameRef(ref, item.ref));
       const key = `${item.ref.groupId ?? '-'}/${item.id}`;
       return (
         <li key={key} className={`mep-outline-row mep-outline-block${selected ? ' on' : ''}`} data-outline-key={key}>
@@ -123,8 +124,8 @@ function OutlineTree({ template, symbols, selection, activeGroupId, onSelectBloc
       </div>
 
       {outline.groups.map((group, index) => {
-        const active = group.groupId === activeGroupId && !selection;
-        const current = group.groupId === activeGroupId && (!selection || selection.groupId === group.groupId);
+        const active = group.groupId === activeGroupId && selection.length === 0;
+        const current = group.groupId === activeGroupId && (selection.length === 0 || (selection.length === 1 && selection[0].groupId === group.groupId));
         const key = `group:${group.groupId}`;
         return (
           <div key={group.groupId} className="mep-outline-node">

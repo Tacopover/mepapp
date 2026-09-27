@@ -37,7 +37,8 @@ export interface SchematicTemplatePropertiesProps {
   template: SchematicTemplate;
   edit: EditTemplate;
   endGesture: () => void;
-  selection: BlockRef | null;
+  /** Every selected block. */
+  selection: BlockRef[];
   activeGroupId: string | null;
   circuitTypes: CircuitType[];
   /** Load types found on the preview data's terminals, offered when the user types a load type filter. */
@@ -152,7 +153,8 @@ const TABS: { id: TemplatePanelTab; label: string }[] = [
 
 export function SchematicTemplateProperties({ template, edit, endGesture, selection, activeGroupId, circuitTypes, loadTypes, notes, onDuplicateBlock, onDeleteBlock, onEditDrawing, symbols, onChangeSymbol, onDetachSymbol, tab, onTabChange }: SchematicTemplatePropertiesProps) {
   const group = activeGroupId ? template.groups.find((g) => g.id === activeGroupId) : undefined;
-  const block = selection ? findBlock(template, selection) : undefined;
+  const singleSelection = selection.length === 1 ? selection[0] : undefined;
+  const block = singleSelection ? findBlock(template, singleSelection) : undefined;
 
   return (
     <div className="mep-schematic-props">
@@ -176,14 +178,19 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
 
       {tab === 'properties' && (
         <>
-          {block && selection && (
-            <BlockProperties template={template} block={block} selection={selection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} onEditDrawing={onEditDrawing} symbols={symbols} onChangeSymbol={onChangeSymbol} onDetachSymbol={onDetachSymbol} />
-          )}
-          {group && (!block || selection?.groupId === group.id) && <GroupProperties group={group} edit={edit} endGesture={endGesture} circuitTypes={circuitTypes} />}
-          {!block && !group && (
-            <div className="mep-section">
-              <p className="mep-schematic-hint">Nothing is selected. Click a block on the sheet or in the Outline to edit it, or select a group to edit its rule and pitch.</p>
-            </div>
+          {selection.length > 1 && <MultiSelectionProperties count={selection.length} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} />}
+          {selection.length <= 1 && (
+            <>
+              {block && singleSelection && (
+                <BlockProperties template={template} block={block} selection={singleSelection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} onEditDrawing={onEditDrawing} symbols={symbols} onChangeSymbol={onChangeSymbol} onDetachSymbol={onDetachSymbol} />
+              )}
+              {group && (!block || singleSelection?.groupId === group.id) && <GroupProperties group={group} edit={edit} endGesture={endGesture} circuitTypes={circuitTypes} />}
+              {!block && !group && (
+                <div className="mep-section">
+                  <p className="mep-schematic-hint">Nothing is selected. Click a block on the sheet or in the Outline to edit it, or select a group to edit its rule and pitch.</p>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -191,6 +198,23 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
       {tab === 'fields' && <FieldsSection template={template} edit={edit} endGesture={endGesture} />}
 
       {tab === 'template' && <TemplateSettings template={template} edit={edit} endGesture={endGesture} />}
+    </div>
+  );
+}
+
+/** The Properties/Fields panel with 2+ things selected: no per-type fields (the selection may mix block types), just a count and the batch actions. */
+export function MultiSelectionProperties({ count, onDuplicateBlock, onDeleteBlock }: { count: number; onDuplicateBlock: () => void; onDeleteBlock: () => void }) {
+  return (
+    <div className="mep-section">
+      <h4>{count} selected</h4>
+      <div className="mep-schematic-buttons">
+        <button type="button" onClick={onDuplicateBlock}>
+          Duplicate
+        </button>
+        <button type="button" onClick={onDeleteBlock}>
+          Delete
+        </button>
+      </div>
     </div>
   );
 }

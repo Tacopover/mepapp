@@ -45,6 +45,7 @@ import { SchematicExtraProperties } from './SchematicExtraProperties.js';
 import { SchematicFieldsForm } from './SchematicFieldsForm.js';
 import { SchematicSymbolLibrary } from './SchematicSymbolLibrary.js';
 import { SchematicTemplateEditor } from './SchematicTemplateEditor.js';
+import { MultiSelectionProperties } from './SchematicTemplateProperties.js';
 import { SheetBlockCanvas } from './SheetBlockCanvas.js';
 import { SheetToolOptions, SheetToolRail, SheetViewBar, contentBounds, sheetStatusText } from './SheetDrawTools.js';
 import { WorkspaceMenu } from './WorkspaceMenu.js';
@@ -145,7 +146,7 @@ export function SchematicDialog({
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [switchTemplateId, setSwitchTemplateId] = useState(SCHEMATIC_TEMPLATE_LIBRARY[0].id);
   const [textEdit, setTextEdit] = useState<TextEdit | null>(null);
-  const [selectedExtraId, setSelectedExtraId] = useState<string | null>(null);
+  const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);
   const [instanceId, setInstanceId] = useState<string | null>(null);
   const [grid, setGrid] = useState(1);
   /** Where a drawn shape goes: the sheet, or the id of a circuit that it follows. */
@@ -181,7 +182,9 @@ export function SchematicDialog({
   const rootRef = useRef<HTMLDivElement>(null);
   const schematicRef = useRef(schematic);
   schematicRef.current = schematic;
-  const selectedExtra = schematic && selectedExtraId !== null ? schematic.extras.find((e) => e.id === selectedExtraId) : undefined;
+  /** `selectedExtraIds`, but with ids of extras that no longer exist dropped. */
+  const liveSelectedExtraIds = schematic ? selectedExtraIds.filter((id) => schematic.extras.some((e) => e.id === id)) : [];
+  const selectedExtra = schematic && liveSelectedExtraIds.length === 1 ? schematic.extras.find((e) => e.id === liveSelectedExtraIds[0]) : undefined;
   const drawingExtra = schematic && drawingExtraId !== null ? schematic.extras.find((e) => e.id === drawingExtraId) : undefined;
   const attachValid = attachTo === 'sheet' || generated?.circuitOrigins[attachTo] !== undefined;
 
@@ -196,10 +199,14 @@ export function SchematicDialog({
     if (current) commitSchematic(updateSchematicExtra(current, extraId, patch));
   }
 
-  function selectExtra(extraId: string | null, instance: string | null = null) {
-    setSelectedExtraId(extraId);
+  function selectExtras(extraIds: string[], instance: string | null = null) {
+    setSelectedExtraIds(extraIds);
     setInstanceId(instance);
-    if (extraId !== null) setSideTab('selection');
+    if (extraIds.length > 0) setSideTab('selection');
+  }
+
+  function selectExtra(extraId: string | null, instance: string | null = null) {
+    selectExtras(extraId !== null ? [extraId] : [], instance);
   }
 
   function onDrawFinish(item: DrawnItem) {
@@ -236,15 +243,15 @@ export function SchematicDialog({
 
   const textEditOpenRef = useRef(false);
   const drawEscapeRef = useRef<() => boolean>(() => false);
-  const selectedExtraRef = useRef<string | null>(null);
+  const selectedExtraIdsRef = useRef<string[]>([]);
   const subviewOpenRef = useRef(false);
   textEditOpenRef.current = textEdit !== null;
   drawEscapeRef.current = draw.escape;
-  selectedExtraRef.current = selectedExtraId;
+  selectedExtraIdsRef.current = liveSelectedExtraIds;
   subviewOpenRef.current = editingTemplateId !== null || drawingExtraId !== null || symbolLibraryOpen;
 
   useEffect(() => {
-    setSelectedExtraId(null);
+    setSelectedExtraIds([]);
     setInstanceId(null);
     setAttachTo('sheet');
     setDrawingExtraId(null);
@@ -260,9 +267,9 @@ export function SchematicDialog({
         setTextEdit(null);
       } else if (drawEscapeRef.current()) {
         event.stopPropagation();
-      } else if (selectedExtraRef.current !== null) {
+      } else if (selectedExtraIdsRef.current.length > 0) {
         event.stopPropagation();
-        setSelectedExtraId(null);
+        setSelectedExtraIds([]);
         setInstanceId(null);
       }
     };
@@ -387,17 +394,25 @@ export function SchematicDialog({
 
   function deleteSelectedExtra() {
     const current = schematicRef.current;
-    if (!current || selectedExtraId === null) return;
-    commitSchematic(removeSchematicExtra(current, selectedExtraId));
-    selectExtra(null);
+    if (!current || liveSelectedExtraIds.length === 0) return;
+    commitSchematic(liveSelectedExtraIds.reduce((acc, id) => removeSchematicExtra(acc, id), current));
+    selectExtras([]);
   }
 
   function duplicateSelectedExtra() {
     const current = schematicRef.current;
-    const result = current && selectedExtraId !== null ? duplicateSchematicExtra(current, selectedExtraId) : undefined;
-    if (!result) return;
-    commitSchematic(result.schematic);
-    selectExtra(result.extraId);
+    if (!current || liveSelectedExtraIds.length === 0) return;
+    let next = current;
+    const newIds: string[] = [];
+    for (const id of liveSelectedExtraIds) {
+      const result = duplicateSchematicExtra(next, id);
+      if (!result) continue;
+      next = result.schematic;
+      newIds.push(result.extraId);
+    }
+    if (newIds.length === 0) return;
+    commitSchematic(next);
+    selectExtras(newIds);
   }
 
   function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -407,7 +422,7 @@ export function SchematicDialog({
       event.preventDefault();
       return;
     }
-    if (!selectedExtra) return;
+    if (liveSelectedExtraIds.length === 0) return;
     const key = event.key.toLowerCase();
     if ((event.ctrlKey || event.metaKey) && key === 'd') {
       event.preventDefault();
@@ -418,7 +433,16 @@ export function SchematicDialog({
     } else if (event.key.startsWith('Arrow')) {
       event.preventDefault();
       const step = (grid > 0 ? grid : 1) * (event.shiftKey ? 10 : 1);
-      updateExtra(selectedExtra.id, { x: selectedExtra.x + (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0), y: selectedExtra.y + (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0) });
+      const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+      const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+      const current = schematicRef.current;
+      if (!current) return;
+      let next = current;
+      for (const id of liveSelectedExtraIds) {
+        const extra = next.extras.find((e) => e.id === id);
+        if (extra) next = updateSchematicExtra(next, id, { x: extra.x + dx, y: extra.y + dy });
+      }
+      commitSchematic(next);
     }
   }
 
@@ -712,9 +736,9 @@ export function SchematicDialog({
             targetOf={(block) => block.extraId}
             sameTarget={(a, b) => a === b}
             targetKey={(id) => id}
-            selected={selectedExtra ? selectedExtra.id : null}
+            selected={liveSelectedExtraIds}
             instanceId={instanceId}
-            onSelect={selectExtra}
+            onSelect={selectExtras}
             readOrigin={(id) => {
               const extra = schematicRef.current?.extras.find((e) => e.id === id);
               return extra ? { x: extra.x, y: extra.y } : undefined;
@@ -737,7 +761,7 @@ export function SchematicDialog({
           <SheetViewBar
             sheetView={sheetView}
             onZoomToContent={zoomBounds ? () => zoomTo(zoomBounds) : undefined}
-            status={sheetStatusText(draw, 'Click an item you added to select it, drag to move it. Double-click a text to type over it. Scroll to zoom, drag empty space to pan.')}
+            status={sheetStatusText(draw, 'Click an item you added to select it, drag to move it. Double-click a text to type over it. Drag empty space to select, hold Shift to add or Shift-click to toggle one. Scroll to zoom, middle-drag to pan.')}
           >
             <label>
               Grid
@@ -763,6 +787,8 @@ export function SchematicDialog({
           </div>
           {sideTab === 'fields' ? (
             <SchematicFieldsForm fields={generated?.fields ?? []} dateFormat={sheetTemplate.dateFormat} onChange={changeField} />
+          ) : liveSelectedExtraIds.length > 1 ? (
+            <MultiSelectionProperties count={liveSelectedExtraIds.length} onDuplicateBlock={duplicateSelectedExtra} onDeleteBlock={deleteSelectedExtra} />
           ) : selectedExtra ? (
             <SchematicExtraProperties
               extra={selectedExtra}

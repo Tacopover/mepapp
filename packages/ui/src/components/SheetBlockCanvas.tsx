@@ -1,11 +1,11 @@
-import { useId, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { resizeKeepingCorner, rotationFromPointer, snapToGrid, toBlockAxes, type ResolvedBlock, type SymbolShape } from '@mepapp/core';
+import { useId, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { rectIntersectsRotatedRect, resizeKeepingCorner, rotationFromPointer, snapToGrid, toBlockAxes, type ResolvedBlock, type SymbolShape } from '@mepapp/core';
 import { SchematicBlockSvg } from '../schematicBlockSvg.js';
 import type { useSheetView } from '../useSheetView.js';
 
 // The editing surface that the template editor and the schematic dialog share: the sheet, the drawn
-// blocks, a hit layer, outlines and handles for the selected block, and the pointer gestures that
-// move, rotate and resize it. What a block maps to (a template block, or an extra of a schematic) is
+// blocks, a hit layer, outlines and handles for the selected block(s), and the pointer gestures that
+// move, rotate and resize them. What a block maps to (a template block, or an extra of a schematic) is
 // the caller's business: it passes `targetOf` and receives edits in the target's own coordinates.
 
 const MOVE_THRESHOLD_PX = 3;
@@ -24,10 +24,25 @@ interface GestureBase {
 }
 
 type Gesture<T> =
-  | (GestureBase & { kind: 'move'; target: T; originX: number; originY: number })
+  | (GestureBase & { kind: 'move'; targets: { target: T; originX: number; originY: number }[] })
   | (GestureBase & { kind: 'rotate'; target: T; center: Point })
   | (GestureBase & { kind: 'resize'; target: T; originX: number; originY: number; width: number; height: number; rotation: number })
-  | (GestureBase & { kind: 'anchor'; anchor: Point });
+  | (GestureBase & { kind: 'anchor'; anchor: Point })
+  | (GestureBase & { kind: 'rubber-band'; additive: boolean });
+
+interface Marquee {
+  start: Point;
+  current: Point;
+  additive: boolean;
+}
+
+/** Same overlap test as the main canvas's rubber-band (`selectTool.ts`): any overlap counts, not full containment. */
+function blockOverlapsRect(block: ResolvedBlock, rectMin: Point, rectMax: Point): boolean {
+  const halfWidth = block.width / 2;
+  const halfHeight = block.height / 2;
+  const transform = { position: { x: block.x + halfWidth, y: block.y + halfHeight }, rotationDegrees: block.rotation, scale: { x: 1, y: 1 } };
+  return rectIntersectsRotatedRect(rectMin, rectMax, transform, halfWidth, halfHeight);
+}
 
 /** Pointer handlers of a draw tool. While `active`, the canvas sends every left-button gesture here instead of selecting blocks. */
 export interface SheetDrawPointer {
@@ -56,10 +71,11 @@ export interface SheetBlockCanvasProps<T> {
   sameTarget: (a: T, b: T) => boolean;
   /** Part of the history key of a gesture on this target. */
   targetKey: (target: T) => string;
-  selected: T | null;
+  /** Every selected target. Rotate/resize handles show only when this holds exactly one. */
+  selected: T[];
   /** The resolved block that was clicked, so its handles show when the target repeats. */
   instanceId: string | null;
-  onSelect: (target: T | null, instanceId: string | null) => void;
+  onSelect: (targets: T[], instanceId: string | null) => void;
   /** The target's own x and y: the values that a move and a resize start from. */
   readOrigin: (target: T) => Point | undefined;
   onMove: (target: T, x: number, y: number, gestureKey: string) => void;
@@ -142,15 +158,15 @@ export function SheetBlockCanvas<T>({
   const { view, setSvg, clientToSheet, mmPerPixel: px, startPan, movePan, endPan } = sheetView;
   const gridId = useId().replace(/:/g, '');
   const gestureRef = useRef<Gesture<T> | null>(null);
-  const panClickRef = useRef<Point | null>(null);
   const drawPointerRef = useRef<number | null>(null);
+  const [marquee, setMarquee] = useState<Marquee | null>(null);
 
   const isSelected = (block: ResolvedBlock) => {
     const target = targetOf(block);
-    return selected !== null && target !== undefined && sameTarget(target, selected);
+    return target !== undefined && selected.some((s) => sameTarget(s, target));
   };
-  const instances = selected === null ? [] : blocks.filter(isSelected);
-  const handleInstance = instances.find((b) => b.id === instanceId) ?? instances[0];
+  const instances = selected.length === 0 ? [] : blocks.filter(isSelected);
+  const handleInstance = selected.length === 1 ? instances.find((b) => b.id === instanceId) ?? instances[0] : undefined;
   const drawing = draw?.active === true;
 
   function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -175,24 +191,38 @@ export function SheetBlockCanvas<T>({
 
     if (handle === 'anchor' && anchor) {
       gestureRef.current = { ...base, kind: 'anchor', anchor: { x: anchor.x, y: anchor.y } };
-    } else if ((handle === 'rotate' || handle === 'resize') && selected !== null && handleInstance) {
-      const origin = readOrigin(selected);
+    } else if ((handle === 'rotate' || handle === 'resize') && selected.length === 1 && handleInstance) {
+      const origin = readOrigin(selected[0]);
       if (!origin) return;
       gestureRef.current =
         handle === 'rotate'
-          ? { ...base, kind: 'rotate', target: selected, center: { x: handleInstance.x + handleInstance.width / 2, y: handleInstance.y + handleInstance.height / 2 } }
-          : { ...base, kind: 'resize', target: selected, originX: origin.x, originY: origin.y, width: handleInstance.width, height: handleInstance.height, rotation: handleInstance.rotation };
+          ? { ...base, kind: 'rotate', target: selected[0], center: { x: handleInstance.x + handleInstance.width / 2, y: handleInstance.y + handleInstance.height / 2 } }
+          : { ...base, kind: 'resize', target: selected[0], originX: origin.x, originY: origin.y, width: handleInstance.width, height: handleInstance.height, rotation: handleInstance.rotation };
     } else if (hitId) {
       const hit = blocks.find((b) => b.id === hitId);
       const target = hit ? targetOf(hit) : undefined;
-      const origin = target !== undefined ? readOrigin(target) : undefined;
-      if (!hit || target === undefined || !origin) return;
-      onSelect(target, hit.id);
-      gestureRef.current = { ...base, kind: 'move', target, originX: origin.x, originY: origin.y };
+      if (!hit || target === undefined) return;
+      if (event.shiftKey) {
+        // Shift-click toggles one target in/out of the current selection, and never starts a drag — matches selectTool.ts's rubber-band/click convention.
+        const already = selected.some((s) => sameTarget(s, target));
+        const next = already ? selected.filter((s) => !sameTarget(s, target)) : [...selected, target];
+        onSelect(next, already ? null : hit.id);
+        return;
+      }
+      // A plain click on a target already in a multi-selection keeps the whole selection (so it can be dragged together); otherwise it replaces the selection.
+      const already = selected.some((s) => sameTarget(s, target));
+      const targets = already ? selected : [target];
+      const origins: { target: T; originX: number; originY: number }[] = [];
+      for (const t of targets) {
+        const origin = readOrigin(t);
+        if (!origin) return;
+        origins.push({ target: t, originX: origin.x, originY: origin.y });
+      }
+      onSelect(targets, hit.id);
+      gestureRef.current = { ...base, kind: 'move', targets: origins };
     } else {
-      startPan(event);
-      panClickRef.current = { x: event.clientX, y: event.clientY };
-      return;
+      // Empty sheet space starts a rubber band, not a pan (matches selectTool.ts's rubber-band case). Shift keeps the current selection and adds to it.
+      gestureRef.current = { ...base, kind: 'rubber-band', additive: event.shiftKey };
     }
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -218,7 +248,10 @@ export function SheetBlockCanvas<T>({
     const dy = pointer.y - gesture.start.y;
 
     if (gesture.kind === 'move') {
-      onMove(gesture.target, snapToGrid(gesture.originX + dx, snap), snapToGrid(gesture.originY + dy, snap), `move:${targetKey(gesture.target)}`);
+      const gestureKey = `move:${gesture.targets.map((t) => targetKey(t.target)).join('|')}`;
+      for (const { target, originX, originY } of gesture.targets) {
+        onMove(target, snapToGrid(originX + dx, snap), snapToGrid(originY + dy, snap), gestureKey);
+      }
     } else if (gesture.kind === 'rotate') {
       onRotate(gesture.target, rotationFromPointer(gesture.center, pointer, event.shiftKey ? undefined : 5), `rotate:${targetKey(gesture.target)}`);
     } else if (gesture.kind === 'resize') {
@@ -227,6 +260,8 @@ export function SheetBlockCanvas<T>({
       const height = Math.max(1, snapToGrid(gesture.height + local.y, snap));
       const position = resizeKeepingCorner({ x: gesture.originX, y: gesture.originY, rotation: gesture.rotation }, { width: gesture.width, height: gesture.height }, { width, height });
       onResize(gesture.target, { width, height, ...position }, `resize:${targetKey(gesture.target)}`);
+    } else if (gesture.kind === 'rubber-band') {
+      setMarquee({ start: gesture.start, current: pointer, additive: gesture.additive });
     } else if (anchor) {
       anchor.onMove(snapToGrid(gesture.anchor.x + dx, snap), snapToGrid(gesture.anchor.y + dy, snap), 'anchor');
     }
@@ -239,12 +274,29 @@ export function SheetBlockCanvas<T>({
       if (draw && point && event.type === 'pointerup') draw.onUp(point, event);
       return;
     }
+    const gesture = gestureRef.current;
     gestureRef.current = null;
     endPan();
     onGestureEnd();
-    const click = panClickRef.current;
-    panClickRef.current = null;
-    if (click && event.type === 'pointerup' && Math.hypot(event.clientX - click.x, event.clientY - click.y) < MOVE_THRESHOLD_PX + 1) onSelect(null, null);
+    if (gesture?.kind === 'rubber-band') {
+      if (gesture.moved && marquee) {
+        const rectMin = { x: Math.min(marquee.start.x, marquee.current.x), y: Math.min(marquee.start.y, marquee.current.y) };
+        const rectMax = { x: Math.max(marquee.start.x, marquee.current.x), y: Math.max(marquee.start.y, marquee.current.y) };
+        const hitTargets: T[] = [];
+        for (const block of blocks) {
+          const target = targetOf(block);
+          if (target === undefined || hitTargets.some((t) => sameTarget(t, target))) continue;
+          if (blockOverlapsRect(block, rectMin, rectMax)) hitTargets.push(target);
+        }
+        const next = gesture.additive ? [...selected, ...hitTargets.filter((t) => !selected.some((s) => sameTarget(s, t)))] : hitTargets;
+        const nextInstanceId = next.length === 1 ? blocks.find((b) => { const t = targetOf(b); return t !== undefined && sameTarget(t, next[0]); })?.id ?? null : null;
+        onSelect(next, nextInstanceId);
+      } else if (!gesture.additive) {
+        // A plain click (no drag) on empty space clears the selection; a Shift-click there is a no-op.
+        onSelect([], null);
+      }
+      setMarquee(null);
+    }
   }
 
   function handleDoubleClick(event: ReactMouseEvent<SVGSVGElement>) {
@@ -344,6 +396,21 @@ export function SheetBlockCanvas<T>({
           <circle data-handle="rotate" cx={handleInstance.width / 2} cy={-px * 16} r={px * 5} fill="#ffffff" stroke={ACCENT} strokeWidth={px * 1.5} cursor="grab" />
           <rect data-handle="resize" x={handleInstance.width - px * 4} y={handleInstance.height - px * 4} width={px * 8} height={px * 8} fill="#ffffff" stroke={ACCENT} strokeWidth={px * 1.5} cursor="nwse-resize" />
         </g>
+      )}
+
+      {marquee && (
+        <rect
+          x={Math.min(marquee.start.x, marquee.current.x)}
+          y={Math.min(marquee.start.y, marquee.current.y)}
+          width={Math.abs(marquee.current.x - marquee.start.x)}
+          height={Math.abs(marquee.current.y - marquee.start.y)}
+          fill={ACCENT}
+          fillOpacity={0.08}
+          stroke={ACCENT}
+          strokeWidth={px}
+          strokeDasharray={`${px * 4} ${px * 3}`}
+          pointerEvents="none"
+        />
       )}
 
       {anchor && (
