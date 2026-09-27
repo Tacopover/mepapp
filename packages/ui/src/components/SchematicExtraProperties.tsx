@@ -19,10 +19,8 @@ const noop = () => {};
 /** The properties of one item that the user added to a schematic (electrical-schematic-templates.md Phase 5b-3). */
 export function SchematicExtraProperties({ extra, circuitLabel, symbolName, onChange, onEditDrawing, onDuplicate, onDelete }: SchematicExtraPropertiesProps) {
   return (
-    <details open className="mep-section">
-      <summary>
-        <h4>Added item · {TYPE_LABELS[extra.type] ?? extra.type}</h4>
-      </summary>
+    <div className="mep-section">
+      <h4>Added item · {TYPE_LABELS[extra.type] ?? extra.type}</h4>
       <p className="mep-schematic-hint">
         {circuitLabel !== undefined ? `Follows circuit ${circuitLabel}. Position is measured from that circuit.` : 'Fixed on the sheet. Position is measured from the top-left corner of the sheet.'}
       </p>
@@ -52,6 +50,6 @@ export function SchematicExtraProperties({ extra, circuitLabel, symbolName, onCh
           Delete
         </button>
       </div>
-    </details>
+    </div>
   );
 }

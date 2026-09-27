@@ -2897,3 +2897,134 @@
   padding: 8px 8px 2px;
   border-top: 1px solid var(--line);
 }
+
+/* Schematic workspace panels (Phase 5c item 8): one input look and one label style for every
+   panel in the workspace, readable section titles. Scoped to the workspace, the rest of the app
+   keeps its own look. */
+.mep-modal--workspace .mep-ws-left .mep-section h4,
+.mep-modal--workspace .mep-ws-right .mep-section h4 {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.mep-modal--workspace .mep-ws-left .mep-schematic-field label,
+.mep-modal--workspace .mep-ws-right .mep-schematic-field label,
+.mep-modal--workspace .mep-ws-left .mep-field-row label,
+.mep-modal--workspace .mep-ws-right .mep-field-row label,
+.mep-modal--workspace .mep-schematic-palette-heading {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+.mep-modal--workspace .mep-ws-left input:not([type='checkbox']):not([type='radio']),
+.mep-modal--workspace .mep-ws-right input:not([type='checkbox']):not([type='radio']),
+.mep-modal--workspace .mep-ws-left select,
+.mep-modal--workspace .mep-ws-right select,
+.mep-modal--workspace .mep-ws-left textarea,
+.mep-modal--workspace .mep-ws-right textarea {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--surface);
+  padding: 4px 7px;
+  margin-bottom: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+.mep-modal--workspace .mep-ws-left input:focus,
+.mep-modal--workspace .mep-ws-right input:focus,
+.mep-modal--workspace .mep-ws-left select:focus,
+.mep-modal--workspace .mep-ws-right select:focus,
+.mep-modal--workspace .mep-ws-left textarea:focus,
+.mep-modal--workspace .mep-ws-right textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.mep-modal--workspace .mep-ws-left .mep-field-row input,
+.mep-modal--workspace .mep-ws-right .mep-field-row input {
+  width: 96px;
+  text-align: right;
+}
+.mep-modal--workspace .mep-ws-right .mep-field-row input.mep-field-inherited {
+  border-style: dashed;
+  font-style: italic;
+  color: var(--muted);
+}
+.mep-modal--workspace .mep-subtabs button {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.mep-schematic-field-error {
+  font-size: 11.5px;
+  color: #b3261e;
+}
+.mep-date-input {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+.mep-date-input > input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mep-date-input-picker {
+  position: relative;
+  flex: none;
+  width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.mep-modal--workspace .mep-date-input-picker > input[type='date'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Generated text that the user can type over (Phase 5c item 16). */
+.mep-sheet-hover {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+  cursor: text;
+}
+.mep-sheet-hover:hover {
+  fill: rgba(23, 90, 138, 0.08);
+  stroke: #175a8a;
+  stroke-dasharray: 2 1.5;
+}
+.mep-sheet-hover--outline {
+  fill: none;
+  stroke: transparent;
+  pointer-events: stroke;
+  stroke-width: 3;
+}
+.mep-sheet-hover--outline:hover {
+  fill: none;
+  stroke: rgba(23, 90, 138, 0.25);
+  stroke-dasharray: none;
+}
+.mep-modal--workspace .mep-schematic-field > button {
+  align-self: flex-start;
+}

@@ -35,6 +35,25 @@ export function formatDateValue(iso: string, format: SchematicTemplate['dateForm
   return format === 'yyyy-mm-dd' ? iso : `${match[3]}-${match[2]}-${match[1]}`;
 }
 
+/**
+ * Reads a date that the user typed in the template's date format (`-`, `/` or `.` between the parts)
+ * and returns it as YYYY-MM-DD. undefined = not a real date in that format.
+ */
+export function parseDateText(text: string, format: SchematicTemplate['dateFormat'] = 'dd-mm-yyyy'): string | undefined {
+  const parts = text.trim().split(/[-/.]/);
+  if (parts.length !== 3 || parts.some((p) => !/^\d+$/.test(p))) return undefined;
+  const [yearText, monthText, dayText] = format === 'yyyy-mm-dd' ? parts : [parts[2], parts[1], parts[0]];
+  if (yearText.length !== 4 || monthText.length > 2 || dayText.length > 2) return undefined;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (month < 1 || month > 12 || day < 1) return undefined;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day > daysInMonth) return undefined;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${yearText}-${pad(month)}-${pad(day)}`;
+}
+
 /** The value that an expression sees: a number field gives a number when its text is one, a date field gives the formatted date. */
 export function fieldExpressionValue(type: SchematicFieldDefinition['type'], text: string, dateFormat: SchematicTemplate['dateFormat']): ExprValue {
   if (type === 'number') {

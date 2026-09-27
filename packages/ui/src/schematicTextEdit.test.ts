@@ -40,6 +40,7 @@ describe('field form helpers', () => {
   it('names the default, marks an intentional empty value and says nothing otherwise', () => {
     expect(describeFieldDefault(field({ defaultText: 'Board A' }))).toBe('Default: Board A');
     expect(describeFieldDefault(field({ type: 'date', defaultText: '2026-09-25' }))).toBe('Default: today (2026-09-25)');
+    expect(describeFieldDefault(field({ type: 'date', defaultText: '2026-09-25' }), 'dd-mm-yyyy')).toBe('Default: today (25-09-2026)');
     expect(describeFieldDefault(field({ stored: '', defaultText: 'Board A' }))).toContain('Empty on purpose');
     expect(describeFieldDefault(field({ stored: 'x', defaultText: 'Board A' }))).toBeUndefined();
     expect(describeFieldDefault(field({}))).toBeUndefined();

@@ -35,7 +35,7 @@ import {
 import type { StampInfo } from '@mepapp/render';
 import { describeDiagnostics } from '../schematicDiagnostics.js';
 import { buildSchematicTerminals } from '../schematicTerminals.js';
-import { findExtraBlockAt, findTextBlockAt } from '../schematicTextEdit.js';
+import { findExtraBlockAt, findTextBlockAt, isTextEditableType } from '../schematicTextEdit.js';
 import { roundMm, textBlockSize, type DrawnItem } from '../sheetDraw.js';
 import { useSheetDraw } from '../useSheetDraw.js';
 import { useSheetView } from '../useSheetView.js';
@@ -721,6 +721,7 @@ export function SchematicDialog({
             draw={draw.pointer}
             overlay={draw.overlay}
             onDoubleClick={openTextEdit}
+            hoverTitleOf={(block) => (block.extraId === undefined && isTextEditableType(block.type) ? (block.overridden ? 'Typed over the template text. Double-click to edit it.' : 'Double-click to type over') : undefined)}
             onFocusRequest={() => rootRef.current?.focus({ preventScroll: true })}
             topOverlay={overriddenBlocks.map((block) => (
               <circle key={`override-${block.id}`} className="mep-schematic-override-mark" cx={block.x} cy={block.y} r={mmPerPixel * 3} fill="#d9822b" pointerEvents="none">
@@ -756,7 +757,7 @@ export function SchematicDialog({
             </button>
           </div>
           {sideTab === 'fields' ? (
-            <SchematicFieldsForm fields={generated?.fields ?? []} onChange={changeField} />
+            <SchematicFieldsForm fields={generated?.fields ?? []} dateFormat={sheetTemplate.dateFormat} onChange={changeField} />
           ) : selectedExtra ? (
             <SchematicExtraProperties
               extra={selectedExtra}

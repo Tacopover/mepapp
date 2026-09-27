@@ -1,4 +1,4 @@
-import type { ResolvedBlock, ResolvedField, SchematicBlockType } from '@mepapp/core';
+import { formatDateValue, type ResolvedBlock, type ResolvedField, type SchematicBlockType, type SchematicTemplate } from '@mepapp/core';
 
 const NOT_TEXT_TYPES: SchematicBlockType[] = ['frame', 'busbar', 'drawing', 'totalsTable', 'loadSymbol'];
 
@@ -41,8 +41,9 @@ export function groupResolvedFields(fields: ResolvedField[]): { shared: Resolved
 }
 
 /** The line under a field that names its default, or undefined when there is nothing to say. */
-export function describeFieldDefault(field: ResolvedField): string | undefined {
+export function describeFieldDefault(field: ResolvedField, dateFormat?: SchematicTemplate['dateFormat']): string | undefined {
   if (field.stored === '' && field.defaultText !== '') return 'Empty on purpose. Reset brings back the default.';
   if (field.stored !== undefined || field.defaultText === '') return undefined;
-  return field.type === 'date' ? `Default: today (${field.defaultText})` : `Default: ${field.defaultText}`;
+  if (field.type !== 'date') return `Default: ${field.defaultText}`;
+  return `Default: today (${dateFormat === undefined ? field.defaultText : formatDateValue(field.defaultText, dateFormat)})`;
 }

@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useId, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { resizeKeepingCorner, rotationFromPointer, snapToGrid, toBlockAxes, type ResolvedBlock, type SymbolShape } from '@mepapp/core';
 import { SchematicBlockSvg } from '../schematicBlockSvg.js';
 import type { useSheetView } from '../useSheetView.js';
@@ -76,6 +76,37 @@ export interface SheetBlockCanvasProps<T> {
   overlay?: ReactNode;
   /** Drawn on top of everything, in sheet mm (marks that must stay visible). */
   topOverlay?: ReactNode;
+  /** A tooltip for a block that cannot be selected but reacts to the pointer (text to type over). undefined = no hover. */
+  hoverTitleOf?: (block: ResolvedBlock) => string | undefined;
+}
+
+/** Grid lines closer than this on screen are left out, so the grid never becomes a grey wash. */
+const MIN_GRID_PX = 6;
+
+function SheetGrid({ id, grid, widthMm, heightMm, px }: { id: string; grid: number; widthMm: number; heightMm: number; px: number }) {
+  if (grid <= 0 || px <= 0) return null;
+  const major = grid * 10;
+  const showMinor = grid / px >= MIN_GRID_PX;
+  const showMajor = major / px >= MIN_GRID_PX;
+  if (!showMinor && !showMajor) return null;
+  return (
+    <g pointerEvents="none">
+      <defs>
+        {showMinor && (
+          <pattern id={`${id}-minor`} width={grid} height={grid} patternUnits="userSpaceOnUse">
+            <path d={`M ${grid} 0 L 0 0 0 ${grid}`} fill="none" stroke="#e4e9ee" strokeWidth={px} />
+          </pattern>
+        )}
+        {showMajor && (
+          <pattern id={`${id}-major`} width={major} height={major} patternUnits="userSpaceOnUse">
+            <path d={`M ${major} 0 L 0 0 0 ${major}`} fill="none" stroke="#cdd5dd" strokeWidth={px} />
+          </pattern>
+        )}
+      </defs>
+      {showMinor && <rect x={0} y={0} width={widthMm} height={heightMm} fill={`url(#${id}-minor)`} />}
+      {showMajor && <rect x={0} y={0} width={widthMm} height={heightMm} fill={`url(#${id}-major)`} />}
+    </g>
+  );
 }
 
 export function SheetBlockCanvas<T>({
@@ -106,8 +137,10 @@ export function SheetBlockCanvas<T>({
   onFocusRequest,
   overlay,
   topOverlay,
+  hoverTitleOf,
 }: SheetBlockCanvasProps<T>) {
   const { view, setSvg, clientToSheet, mmPerPixel: px, startPan, movePan, endPan } = sheetView;
+  const gridId = useId().replace(/:/g, '');
   const gestureRef = useRef<Gesture<T> | null>(null);
   const panClickRef = useRef<Point | null>(null);
   const drawPointerRef = useRef<number | null>(null);
@@ -234,6 +267,7 @@ export function SheetBlockCanvas<T>({
       onDoubleClick={handleDoubleClick}
     >
       <rect x={0} y={0} width={sheetWidthMm} height={sheetHeightMm} fill="#ffffff" stroke="#9aa3ad" strokeWidth={0.4} />
+      <SheetGrid id={gridId} grid={grid} widthMm={sheetWidthMm} heightMm={sheetHeightMm} px={px} />
       <g pointerEvents="none">
         {blocks.map((block) => (
           <g key={block.id} opacity={dimGroupId && block.groupId !== undefined && block.groupId !== dimGroupId ? 0.3 : 1}>
@@ -241,6 +275,28 @@ export function SheetBlockCanvas<T>({
           </g>
         ))}
       </g>
+
+      {!drawing && hoverTitleOf && (
+        <g>
+          {blocks.map((block) => {
+            const title = targetOf(block) === undefined ? hoverTitleOf(block) : undefined;
+            if (title === undefined) return null;
+            return (
+              <rect
+                key={block.id}
+                className={block.type === 'section' ? 'mep-sheet-hover mep-sheet-hover--outline' : 'mep-sheet-hover'}
+                data-hover-block={block.id}
+                transform={`translate(${block.x} ${block.y}) rotate(${block.rotation} ${block.width / 2} ${block.height / 2})`}
+                width={block.width}
+                height={block.height}
+                strokeWidth={px}
+              >
+                <title>{title}</title>
+              </rect>
+            );
+          })}
+        </g>
+      )}
 
       {!drawing && (
         <g>

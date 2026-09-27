@@ -197,10 +197,8 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
 
 function GroupProperties({ group, edit, endGesture, circuitTypes }: { group: SchematicTemplate['groups'][number]; edit: EditTemplate; endGesture: () => void; circuitTypes: CircuitType[] }) {
   return (
-    <details open className="mep-section">
-      <summary>
-        <h4>Group · {group.name}</h4>
-      </summary>
+    <div className="mep-section">
+      <h4>Group · {group.name}</h4>
       <div className="mep-schematic-field">
         <label>Name</label>
         <input type="text" value={group.name} onChange={(e) => edit((t) => updateGroup(t, group.id, { name: e.target.value }), `group:${group.id}:name`)} onBlur={endGesture} />
@@ -235,7 +233,7 @@ function GroupProperties({ group, edit, endGesture, circuitTypes }: { group: Sch
       {group.rule.kind === 'circuitNumber' && <CircuitNumberRule key={group.id} numbers={group.rule.numbers} onChange={(numbers) => edit((t) => updateGroup(t, group.id, { rule: { kind: 'circuitNumber', numbers } }), `group:${group.id}:numbers`)} onBlur={endGesture} />}
       <NumberField label="Pitch mm" value={group.pitch} min={0.1} step={0.5} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => updateGroup(t, group.id, { pitch: v }), `group:${group.id}:pitch`)} />
       <p className="mep-schematic-hint">The first group whose rule matches a circuit is used for it. The pitch is the distance to the next circuit.</p>
-    </details>
+    </div>
   );
 }
 
@@ -537,10 +535,8 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
 
   return (
     <>
-      <details open className="mep-section">
-        <summary>
-          <h4>Block · {info.label}</h4>
-        </summary>
+      <div className="mep-section">
+        <h4>Block · {info.label}</h4>
         <div className="mep-schematic-field">
           <label>Type and scope</label>
           <span className="mep-schematic-readonly">
@@ -600,13 +596,11 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             Delete
           </button>
         </div>
-      </details>
+      </div>
 
       {block.type !== 'totalsTable' && block.type !== 'frame' && block.type !== 'busbar' && block.type !== 'drawing' && (
-        <details open className="mep-section">
-          <summary>
-            <h4>Text binding</h4>
-          </summary>
+        <div className="mep-section">
+          <h4>Text binding</h4>
           <div className="mep-schematic-radios">
             <label>
               <input type="radio" name={`binding-${block.id}`} checked={!custom} onChange={() => patch({ binding: undefined })} />
@@ -658,14 +652,12 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             </select>
           </div>
           <p className="mep-schematic-hint">Write {'{field}'} for a value. Put text in [square brackets] to show it only when a field inside has a value.</p>
-        </details>
+        </div>
       )}
 
       {block.type !== 'drawing' && (
-        <details open className="mep-section">
-          <summary>
-            <h4>Style</h4>
-          </summary>
+        <div className="mep-section">
+          <h4>Style</h4>
           <NumberField label="Font size mm" value={style.fontSizeMm} optional min={0.5} step={0.1} onBlur={endGesture} onCommit={(v) => setStyle({ fontSizeMm: v }, key('fontSize'))} />
           <NumberField label="Line width mm" value={style.strokeWidthMm} optional min={0.05} step={0.05} onBlur={endGesture} onCommit={(v) => setStyle({ strokeWidthMm: v }, key('strokeWidth'))} />
           <div className="mep-schematic-radios">
@@ -705,14 +697,12 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
               </button>
             </span>
           </div>
-        </details>
+        </div>
       )}
 
       {(info.scope === 'circuit' || info.scope === 'aggregate') && (
-        <details open className="mep-section">
-          <summary>
-            <h4>Load type</h4>
-          </summary>
+        <div className="mep-section">
+          <h4>Load type</h4>
           <div className="mep-schematic-field">
             <label>Load type filter</label>
             <input
@@ -729,7 +719,7 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             </datalist>
           </div>
           <p className="mep-schematic-hint">Only terminals of this load type count in {'{terminals}'} and {'{terminal.…}'}. Leave blank for all.</p>
-        </details>
+        </div>
       )}
 
       {block.type === 'totalsTable' && <TotalsTableEditor block={block} patch={patch} endGesture={endGesture} keyOf={key} />}
@@ -741,10 +731,8 @@ function TotalsTableEditor({ block, patch, endGesture, keyOf }: { block: Schemat
   const rows = block.tableRows ?? [];
   const setRow = (index: number, change: Partial<TotalsTableRow>, gestureKey?: string) => patch({ tableRows: rows.map((row, i) => (i === index ? { ...row, ...change } : row)) }, gestureKey);
   return (
-    <details open className="mep-section">
-      <summary>
-        <h4>Table rows</h4>
-      </summary>
+    <div className="mep-section">
+      <h4>Table rows</h4>
       <div className="mep-schematic-field">
         <label>Columns</label>
         <select value={block.tableColumns ?? 'panel'} onChange={(e) => patch({ tableColumns: e.target.value === 'circuits' ? 'circuits' : 'panel' })}>
@@ -775,6 +763,6 @@ function TotalsTableEditor({ block, patch, endGesture, keyOf }: { block: Schemat
         </button>
       </div>
       <p className="mep-schematic-hint">A formula has no braces, for example sum(circuit.capacityL1).</p>
-    </details>
+    </div>
   );
 }

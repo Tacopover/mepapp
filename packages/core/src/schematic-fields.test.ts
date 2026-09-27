@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateValue, fieldExpressionValue, resolveFields, todayIso } from './schematic-fields.js';
+import { formatDateValue, fieldExpressionValue, parseDateText, resolveFields, todayIso } from './schematic-fields.js';
 import { generateSchematic } from './schematic-generator.js';
 import { buildSampleSchematicInput, updateBlock } from './schematic-template-edit.js';
 import { SCHEMATIC_TEMPLATE_LIBRARY } from './schematic-template-library.js';
@@ -53,6 +53,26 @@ describe('resolveFields', () => {
     expect(formatDateValue('2026-01-05')).toBe('05-01-2026');
     expect(formatDateValue('soon')).toBe('soon');
     expect(todayIso(new Date(2026, 8, 5))).toBe('2026-09-05');
+  });
+
+  it('reads a typed date in the template format', () => {
+    expect(parseDateText('05-01-2026')).toBe('2026-01-05');
+    expect(parseDateText('5/1/2026', 'dd-mm-yyyy')).toBe('2026-01-05');
+    expect(parseDateText(' 29.02.2028 ')).toBe('2028-02-29');
+    expect(parseDateText('2026-01-05', 'yyyy-mm-dd')).toBe('2026-01-05');
+    expect(parseDateText('2026/1/5', 'yyyy-mm-dd')).toBe('2026-01-05');
+  });
+
+  it('rejects text that is not a real date in the template format', () => {
+    expect(parseDateText('')).toBeUndefined();
+    expect(parseDateText('2026-01-05')).toBeUndefined();
+    expect(parseDateText('05-01-2026', 'yyyy-mm-dd')).toBeUndefined();
+    expect(parseDateText('29-02-2026')).toBeUndefined();
+    expect(parseDateText('31-04-2026')).toBeUndefined();
+    expect(parseDateText('00-01-2026')).toBeUndefined();
+    expect(parseDateText('05-13-2026')).toBeUndefined();
+    expect(parseDateText('05-01-26')).toBeUndefined();
+    expect(parseDateText('5 januari 2026')).toBeUndefined();
   });
 });
 
