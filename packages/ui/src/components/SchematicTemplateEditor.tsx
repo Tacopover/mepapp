@@ -299,6 +299,10 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
       event.preventDefault();
       return;
     }
+    editKeyDown(event);
+  }
+
+  function editKeyDown(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'preventDefault'>) {
     const mod = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
     if (mod && key === 'z') {
@@ -320,6 +324,19 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
       nudgeSelected(event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0, event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0);
     }
   }
+
+  const editKeyDownRef = useRef(editKeyDown);
+  editKeyDownRef.current = editKeyDown;
+  const bodyKeysEnabled = drawingBlock === undefined && symbolLibrary === null;
+  useEffect(() => {
+    if (!bodyKeysEnabled) return;
+    // A button that removes itself on click (outline duplicate, delete, move) drops focus to <body>, outside the editor's own onKeyDown.
+    const onBodyKey = (event: KeyboardEvent) => {
+      if (event.target === document.body) editKeyDownRef.current(event);
+    };
+    document.addEventListener('keydown', onBodyKey);
+    return () => document.removeEventListener('keydown', onBodyKey);
+  }, [bodyKeysEnabled]);
 
   function zoomToGroup() {
     const first = generated.blocks.find((b) => b.groupId === activeGroupId);
