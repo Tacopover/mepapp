@@ -387,7 +387,7 @@ Not done:
 
 Verified: core 367 tests; UI 33 tests; root `pnpm build` 9 of 9. Headless browser (Playwright, own port): the stamp editor regression (all shape tools, transform, mirror, undo, snap indicators, port tool, view, save and place) passed. Drawing blocks passed: 4-shape drawing at the right proportion with 0.300 mm strokes; move, resize, rotate; one undo step for a whole drawing session; Cancel; Escape keeps the dialog open; a group drawing on all 5 circuits changing together; the drawn symbol replacing the deleted protective device; empty drawings dashed only in the editor; reload keeps 1 layout and 2 group drawings and `validateSchematicTemplate` returns no issues. No page or console errors. Not checked: Windows, touch.
 
-### Phase 5b — Fields, saved schematics, drawing everywhere — in progress (started 2026-09-25)
+### Phase 5b — Fields, saved schematics, drawing everywhere — **done** 2026-09-25
 
 Added after the user reviewed Phase 5 on 2026-09-25. A template generates about 80% of a schematic. The rest is filled in per schematic (project name, date, author, revision) or drawn on the schematic. Decisions by the user:
 
