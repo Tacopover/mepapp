@@ -89,8 +89,9 @@ export function useSheetDraw({ sheet, grid, onFinish, shortcutsEnabled, onChoose
       event.preventDefault();
       chooseToolRef.current(tool.id);
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    // On the document, not the window: the workspace dialog stops key presses at the document so they never reach the scene's window handler.
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
   function finish(item: DrawnItem, keep: boolean) {

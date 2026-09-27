@@ -69,9 +69,16 @@ export interface SheetToolOptionsProps {
   children?: ReactNode;
 }
 
-/** The options of the active draw tool, in one bar above the sheet. Nothing shows while Select is active. */
+/** The options of the active draw tool, in one bar above the sheet. The bar keeps its height while Select is active, so the sheet does not move when a tool is picked. */
 export function SheetToolOptions({ draw, onChooseSymbol, children }: SheetToolOptionsProps) {
-  if (draw.tool === 'select' && !draw.pendingText) return null;
+  if (draw.tool === 'select' && !draw.pendingText) {
+    return (
+      <div className="mep-ws-options mep-ws-options--idle" role="group" aria-label="Tool options">
+        <strong>Select</strong>
+        <span className="mep-ws-options-hint">Pick a tool on the left to draw a shape, a text or a symbol. Its options show here.</span>
+      </div>
+    );
+  }
   const label = SHEET_DRAW_TOOLS.find((t) => t.id === draw.tool)?.label;
   return (
     <div className="mep-ws-options" role="group" aria-label="Tool options">

@@ -776,7 +776,7 @@ export function SchematicDialog({
   }
 
   return (
-    <Dialog title={editingTemplate ? `Schematic template ${editingTemplate.name}` : 'Schematic'} onClose={onClose} className="mep-modal--workspace" closeOnBackdropClick={false} header={header}>
+    <Dialog title={editingTemplate ? `Schematic template ${editingTemplate.name}` : 'Schematic'} onClose={onClose} className="mep-modal--workspace" closeOnBackdropClick={false} header={header} isolateKeys>
       {body}
     </Dialog>
   );

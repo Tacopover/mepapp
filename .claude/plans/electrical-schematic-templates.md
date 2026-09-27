@@ -440,7 +440,8 @@ Round 3, small fixes:
 
 Status per round:
 - Round 1: **done** 2026-09-27, commit `fc64e3f`. Browser-verified (headless Chromium): full-window workspace, mode switch both ways (built-in template copied on first switch), both header menus, all ten tools by click and key (keys ignored in inputs), options bar only with a draw tool, add to group / attach to circuit, view bar zoom and zoom to content/group, status line, Fields/Selection tabs, Escape order, drawing editor in both modes, text override, template undo, save and reopen; no console errors. Found: the scene's window key handler still gets keys behind the workspace (Ctrl+V pasted into the hidden scene, Delete removed it), fixed in round 2. Minor: Escape with only a group selected closes the workspace (older behaviour); the options bar pushes the sheet down about 44 px; the Select status line is cut off at 1280 px.
-- Rounds 2 and 3: not started.
+- Round 2: built 2026-09-27, not yet browser-verified (layout screenshots and a scripted check only). Left panel tabs Outline (tree of the sheet and groups with their blocks, readable names, block and group tools) and Add (palette with icons, click or drag onto the sheet; circuit blocks drop into the repeat under the pointer); right panel tabs Properties, Fields (compact list, one field open at a time) and Settings (named "Settings", not "Template", so it does not share a name with the mode switch); the selected group shows a dashed box around each repeat with its name and rule below them; the two Symbol palette entries are gone. Fixes from round 1: the workspace dialog stops key presses at the document, so the scene's window handler never sees them; Escape with only a group selected deselects it; the tool options bar keeps its height; the status line moves to its own row and wraps to two lines when the bar is narrow.
+- Round 3: not started.
 
 ### Phase 6 — Export, and loading templates from a file — not started
 

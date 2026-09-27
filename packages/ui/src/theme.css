@@ -2528,7 +2528,7 @@
   grid-template-columns: 44px minmax(0, 1fr) 300px;
 }
 .mep-ws-body--template {
-  grid-template-columns: 240px 44px minmax(0, 1fr) 300px;
+  grid-template-columns: 260px 44px minmax(0, 1fr) 300px;
 }
 .mep-ws-body--schematic > .mep-ws-rail {
   grid-column: 1 / 2;
@@ -2598,7 +2598,11 @@
   white-space: nowrap;
 }
 .mep-ws-options {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  height: 34px;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 2px 8px;
   border: 1.5px solid var(--line);
   border-radius: 3px;
@@ -2636,19 +2640,260 @@
 .mep-ws-options-value {
   font-weight: 600;
 }
-.mep-ws-viewbar {
+.mep-ws-options--idle {
+  background: transparent;
+  border-style: dashed;
+}
+.mep-ws-options-hint {
+  color: var(--muted);
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mep-ws-viewbar {
+  flex-wrap: wrap;
+  row-gap: 2px;
 }
 .mep-ws-textbtn {
   padding: 4px 8px;
   font-size: 11.5px;
 }
 .mep-ws-status {
+  /* Takes the rest of the row; below 320 px it moves to a row of its own, where it can use two lines. */
+  flex: 1 1 320px;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* Template editor panels (electrical-schematic-templates.md Phase 5c round 2) */
+.mep-ws-left > .mep-subtabs,
+.mep-schematic-props > .mep-subtabs {
+  margin: 10px 14px 4px;
+}
+.mep-ws-body > .mep-ws-left {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mep-ws-left > .mep-subtabs {
+  flex: none;
+}
+.mep-outline,
+.mep-palette {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 10px 12px;
+}
+.mep-schematic-props > .mep-subtabs {
+  position: sticky;
+  top: 10px;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: 0 -10px 0 var(--surface);
+}
+.mep-outline-node {
+  margin-bottom: 6px;
+}
+.mep-outline-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 26px;
+  font-size: 12px;
+}
+.mep-outline-title {
+  font-weight: 700;
+}
+.mep-outline-list {
+  list-style: none;
+  margin: 0 0 0 14px;
+  padding: 0 0 0 6px;
+  border-left: 1px solid var(--line);
+}
+.mep-outline-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 3px;
+}
+.mep-outline-row:hover {
+  background: var(--surface-2);
+}
+.mep-outline-row.on {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.mep-outline-head.current:not(.on) {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.mep-outline-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.mep-outline-row.on .mep-outline-main {
+  color: var(--accent-ink);
+}
+.mep-outline-label {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: right;
+  white-space: nowrap;
+}
+.mep-outline-detail,
+.mep-outline-id {
   color: var(--muted);
-  font-size: 11.5px;
+  font-weight: 400;
+}
+.mep-outline-id {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.mep-outline-caret,
+.mep-outline-tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+.mep-outline-tool:hover:not(:disabled),
+.mep-outline-caret:hover {
+  border-color: var(--line);
+  background: var(--surface);
+}
+.mep-outline-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mep-outline-row.on > .mep-outline-main .mep-outline-id,
+.mep-outline-head.current > .mep-outline-main .mep-outline-detail {
+  display: none;
+}
+.mep-outline-tools {
+  flex: none;
+  display: flex;
+  gap: 1px;
+  padding-right: 2px;
+}
+.mep-outline-empty {
+  margin: 4px 0 6px;
+}
+.mep-outline-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+.mep-palette-group {
+  margin-bottom: 10px;
+}
+.mep-palette-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.mep-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: grab;
+}
+.mep-palette-item:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mep-palette-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mep-field-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mep-field-item {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.mep-field-item.on {
+  border-color: var(--accent);
+}
+.mep-field-summary {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 5px;
+  align-items: center;
+  padding: 5px 6px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mep-field-item.on .mep-field-summary {
+  background: var(--accent-soft);
+}
+.mep-field-summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-field-summary-meta {
+  grid-column: 2;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.mep-field-editor {
+  padding: 8px 8px 2px;
+  border-top: 1px solid var(--line);
 }
