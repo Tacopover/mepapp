@@ -1,6 +1,6 @@
 import { useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampDefinition } from '@mepapp/core';
+import { findShadowingCustomDefinition, NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
@@ -72,14 +72,7 @@ export function getVisibleStampDefinitions(
   labelLanguage: StampLabelLanguage,
   searchQuery = '',
 ): StampDefinition[] {
-  const shadowedLibraryIds = new Set(
-    STAMP_LIBRARY.filter((lib) =>
-      customStampDefinitions.some((c) => {
-        const label = c.label.trim().toLowerCase();
-        return label === lib.label.toLowerCase() || (!!lib.labelNl && label === lib.labelNl.toLowerCase());
-      }),
-    ).map((lib) => lib.id),
-  );
+  const shadowedLibraryIds = new Set(STAMP_LIBRARY.filter((lib) => findShadowingCustomDefinition(lib, customStampDefinitions)).map((lib) => lib.id));
   const allDefinitions = [...STAMP_LIBRARY.filter((lib) => !shadowedLibraryIds.has(lib.id)), ...customStampDefinitions];
   const trimmedQuery = searchQuery.trim().toLowerCase();
   return allDefinitions

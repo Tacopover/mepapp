@@ -4,7 +4,6 @@ import {
   resolveStampLabelText,
   type PlacedStamp,
   type StampLabel,
-  type StampLabelLayouts,
   type StampPropertyContext,
 } from '@mepapp/core';
 import type { LabelNode } from './document.js';
@@ -57,13 +56,13 @@ export function syncStampLabels(
   layer: Container,
   nodes: Map<string, LabelNode>,
   stamps: PlacedStamp[],
-  layouts: StampLabelLayouts,
+  layoutOf: (stamp: PlacedStamp) => StampLabel[] | undefined,
   ctx: StampPropertyContext,
   visible: (stamp: PlacedStamp, label: StampLabel) => boolean = () => true,
 ): void {
   const alive = new Set<string>();
   for (const stamp of stamps) {
-    const labels = stamp.definitionId ? layouts[stamp.definitionId] : undefined;
+    const labels = layoutOf(stamp);
     if (!labels) continue;
     for (const label of labels) {
       if (!visible(stamp, label)) continue;

@@ -3,6 +3,7 @@ import {
   buildStampPropertyContext,
   DEFAULT_STAMP_LABEL_VISIBILITY,
   getStampDefinition,
+  labelLayoutDefinitionId,
   STAMP_LIBRARY,
   type NetworkType,
   type ReconciliationReport,
@@ -214,9 +215,9 @@ export function MepSketchApp({
   const [customPropertyDefs, setCustomPropertyDefs] = useState<GlobalPropertyDefs>(loadCustomPropertyDefs);
   const [labelVisibility, setLabelVisibility] = useState<StampLabelVisibility>(loadLabelVisibility);
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
-  /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp copied into a new custom one via the Stamps tab's duplicate button (see handleDuplicateStampDefinition — `seed` always carries a fresh id and a self-contained iconRef, never the library entry's own id). */
+  /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp copied into a new custom one via the Stamps tab's duplicate button (see handleDuplicateStampDefinition — `seed` always carries a fresh id and a self-contained iconRef, never the library entry's own id; `sourceDefinitionId` is that original's id, whose label layout the copy starts with). */
   const [elementEditorTarget, setElementEditorTarget] = useState<
-    { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | null
+    { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition; sourceDefinitionId: string } | null
   >(null);
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
   /** The placed stamp whose definition's label layout is open in StampLabelsDialog. */
@@ -515,6 +516,7 @@ export function MepSketchApp({
         });
         setElementEditorTarget({
           mode: 'duplicate',
+          sourceDefinitionId: definition.id,
           seed: {
             ...definition,
             id: crypto.randomUUID(),
@@ -560,7 +562,7 @@ export function MepSketchApp({
     const seen = new Set<string>();
     const entries: Array<{ definitionId: string; name: string; category: StampCategory }> = [];
     for (const stamp of allStamps) {
-      const id = stamp.definitionId;
+      const id = stamp.definitionId ? labelLayoutDefinitionId(stamp.definitionId, customStampDefinitions) : undefined;
       if (!id || seen.has(id) || !stampLabelLayouts[id]) continue;
       seen.add(id);
       const def = getStampDefinition(id, customStampDefinitions);
@@ -569,7 +571,9 @@ export function MepSketchApp({
     return entries.sort((a, b) => a.name.localeCompare(b.name));
   }, [allStamps, stampLabelLayouts, customStampDefinitions, labelLanguage]);
   const labelEditorStamp = labelEditorStampId ? allStamps.find((s) => s.id === labelEditorStampId) : undefined;
-  const labelEditorDefinition = labelEditorStamp?.definitionId ? getStampDefinition(labelEditorStamp.definitionId, customStampDefinitions) : undefined;
+  const labelEditorDefinition = labelEditorStamp?.definitionId
+    ? getStampDefinition(labelLayoutDefinitionId(labelEditorStamp.definitionId, customStampDefinitions), customStampDefinitions)
+    : undefined;
 
   const handleSaveElementDefinition = useCallback(
     (definition: StampDefinition, labels?: StampLabel[]) => {
@@ -986,7 +990,13 @@ export function MepSketchApp({
           }
           existingCustomDefinitions={customStampDefinitions}
           labelLanguage={labelLanguage}
-          initialLabels={elementEditorTarget.mode === 'edit' ? sceneRef.current?.getStampLabelLayouts()[elementEditorTarget.definitionId] : undefined}
+          initialLabels={
+            elementEditorTarget.mode === 'edit'
+              ? stampLabelLayouts[elementEditorTarget.definitionId]
+              : elementEditorTarget.mode === 'duplicate'
+                ? stampLabelLayouts[labelLayoutDefinitionId(elementEditorTarget.sourceDefinitionId, customStampDefinitions)]
+                : undefined
+          }
           labelPropertyContext={labelPropertyContext}
           onSave={handleSaveElementDefinition}
           onClose={() => setElementEditorTarget(null)}

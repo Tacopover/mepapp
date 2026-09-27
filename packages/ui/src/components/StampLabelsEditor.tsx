@@ -13,6 +13,8 @@ import {
   type StampPropertyGroup,
 } from '@mepapp/core';
 import { ColorPicker } from './ColorPicker.js';
+import { IconMinus, IconPlus, IconZoomFit } from '../icons.js';
+import { clampZoom, ZOOM_STEP, type View } from '../useShapeDrawEditor.js';
 
 const CANVAS_PX = 440;
 /** Anchors may sit outside the stamp box, up to one stamp size away on each side. */
@@ -83,6 +85,10 @@ export function StampLabelsEditor({ category, nativeWidth, nativeHeight, renderA
   const [selectedId, setSelectedId] = useState<string | null>(initialLabels[0]?.id ?? null);
   const dragRef = useRef<{ tx: Transaction<StampLabel[]>; id: string; start: StampLabel[] } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [view, setView] = useState<View>({ scale: 1, panX: 0, panY: 0 });
+  const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 });
+  const hasFitRef = useRef(false);
 
   const keys = useMemo(() => listStampPropertyKeys(propertyContext, category), [propertyContext, category]);
   const selected = labels.find((l) => l.id === selectedId) ?? null;
@@ -164,10 +170,69 @@ export function StampLabelsEditor({ category, nativeWidth, nativeHeight, renderA
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   });
 
+  // View pan and zoom, the same controls as the Element Editor's Shapes and Ports tabs (useShapeDrawEditor):
+  // the wheel zooms at the pointer, the middle or right button pans, and the bar has zoom buttons and Fit.
+  function fitView(size: { width: number; height: number } = viewportSize) {
+    const scale = clampZoom(Math.min(size.width / CANVAS_PX, size.height / CANVAS_PX));
+    setView({ scale, panX: (size.width - CANVAS_PX * scale) / 2, panY: (size.height - CANVAS_PX * scale) / 2 });
+  }
+
+  function zoomAtScreenPoint(factor: number, screenPoint: { x: number; y: number }) {
+    setView((prev) => {
+      const newScale = clampZoom(prev.scale * factor);
+      const worldX = (screenPoint.x - prev.panX) / prev.scale;
+      const worldY = (screenPoint.y - prev.panY) / prev.scale;
+      return { scale: newScale, panX: screenPoint.x - worldX * newScale, panY: screenPoint.y - worldY * newScale };
+    });
+  }
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const size = { width: entry.contentRect.width, height: entry.contentRect.height };
+      setViewportSize(size);
+      if (!hasFitRef.current && size.width > 4 && size.height > 4) {
+        hasFitRef.current = true;
+        fitView(size);
+      }
+    });
+    observer.observe(el);
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = el.getBoundingClientRect();
+      zoomAtScreenPoint(event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      observer.disconnect();
+      el.removeEventListener('wheel', onWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function onViewportPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.button !== 1 && e.button !== 2) return;
+    e.preventDefault();
+    const startScreen = { x: e.clientX, y: e.clientY };
+    const startView = view;
+    const move = (ev: PointerEvent) => {
+      setView({ ...startView, panX: startView.panX + (ev.clientX - startScreen.x), panY: startView.panY + (ev.clientY - startScreen.y) });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
   function fractionAt(e: ReactPointerEvent): { x: number; y: number } {
     const rect = svgRef.current!.getBoundingClientRect();
-    const px = ((e.clientX - rect.left) / rect.width) * CANVAS_PX;
-    const py = ((e.clientY - rect.top) / rect.height) * CANVAS_PX;
+    const px = (e.clientX - rect.left - view.panX) / view.scale;
+    const py = (e.clientY - rect.top - view.panY) / view.scale;
     return { x: clampFraction((px - originX) / boxW), y: clampFraction((py - originY) / boxH) };
   }
 
@@ -226,64 +291,84 @@ export function StampLabelsEditor({ category, nativeWidth, nativeHeight, renderA
   return (
     <div className="mep-lbl-grid">
       <div className="mep-lbl-canvas-col">
-        <svg
-          ref={svgRef}
-          className="mep-lbl-svg"
-          viewBox={`0 0 ${CANVAS_PX} ${CANVAS_PX}`}
-          width={CANVAS_PX}
-          height={CANVAS_PX}
-          onPointerDown={onBackgroundPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-        >
-          <rect x={originX} y={originY} width={boxW} height={boxH} className="mep-lbl-stamp-box" />
-          <g transform={`translate(${originX} ${originY})`} pointerEvents="none">
-            {renderArtwork(boxW, boxH)}
-          </g>
-          {labels.map((label) => {
-            const { anchor, align } = computeStampLabelPlacement(previewStamp, label);
-            const ax = originX + (anchor.x + nativeWidth / 2) * pxPerPt;
-            const ay = originY + (anchor.y + nativeHeight / 2) * pxPerPt;
-            const { text, placeholder, missing } = previewText(label);
-            const fontPx = label.fontSize * pxPerPt;
-            const width = measureTextPx(text, fontPx) + PADDING_X_PT * 2 * pxPerPt;
-            const height = fontPx * LINE_HEIGHT + PADDING_Y_PT * 2 * pxPerPt;
-            const left = align === 'left' ? ax : align === 'right' ? ax - width : ax - width / 2;
-            const isSelected = label.id === selectedId;
-            return (
-              <g key={label.id} className="mep-lbl-item" data-label-id={label.id} onPointerDown={(e) => onLabelPointerDown(e, label.id)}>
-                {(label.background || label.border) && (
-                  <rect
-                    x={left}
-                    y={ay - height / 2}
-                    width={width}
-                    height={height}
-                    rx={2 * pxPerPt}
-                    fill={label.background ? label.background.slice(0, 7) : 'none'}
-                    fillOpacity={label.background && label.background.length === 9 ? parseInt(label.background.slice(7, 9), 16) / 255 : 1}
-                    stroke={label.border ? label.border.slice(0, 7) : 'none'}
-                    strokeWidth={0.5 * pxPerPt}
-                  />
-                )}
-                <text
-                  x={left + PADDING_X_PT * pxPerPt}
-                  y={ay}
-                  dominantBaseline="central"
-                  fontFamily="Arial"
-                  fontWeight={600}
-                  fontSize={fontPx}
-                  fill={missing ? '#c62828' : label.textColor}
-                  fontStyle={placeholder ? 'italic' : undefined}
-                  opacity={placeholder && !missing ? 0.7 : 1}
-                >
-                  {text}
-                </text>
-                {isSelected && <rect x={left - 1.5} y={ay - height / 2 - 1.5} width={width + 3} height={height + 3} className="mep-lbl-selection" />}
-                <circle cx={ax} cy={ay} r={isSelected ? 5 : 4} className={`mep-lbl-anchor${isSelected ? ' on' : ''}`} />
+        <div className="mep-lbl-viewport" ref={viewportRef} onPointerDown={onViewportPointerDown} onContextMenu={(e) => e.preventDefault()}>
+          <svg ref={svgRef} className="mep-lbl-svg" onPointerDown={onBackgroundPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+            <rect x={0} y={0} width="100%" height="100%" fill="transparent" />
+            <g transform={`translate(${view.panX} ${view.panY}) scale(${view.scale})`}>
+              <rect x={0} y={0} width={CANVAS_PX} height={CANVAS_PX} className="mep-lbl-sheet" vectorEffect="non-scaling-stroke" />
+              <rect x={originX} y={originY} width={boxW} height={boxH} className="mep-lbl-stamp-box" vectorEffect="non-scaling-stroke" />
+              <g transform={`translate(${originX} ${originY})`} pointerEvents="none">
+                {renderArtwork(boxW, boxH)}
               </g>
-            );
-          })}
-        </svg>
+              {labels.map((label) => {
+                const { anchor, align } = computeStampLabelPlacement(previewStamp, label);
+                const ax = originX + (anchor.x + nativeWidth / 2) * pxPerPt;
+                const ay = originY + (anchor.y + nativeHeight / 2) * pxPerPt;
+                const { text, placeholder, missing } = previewText(label);
+                const fontPx = label.fontSize * pxPerPt;
+                const width = measureTextPx(text, fontPx) + PADDING_X_PT * 2 * pxPerPt;
+                const height = fontPx * LINE_HEIGHT + PADDING_Y_PT * 2 * pxPerPt;
+                const left = align === 'left' ? ax : align === 'right' ? ax - width : ax - width / 2;
+                const isSelected = label.id === selectedId;
+                return (
+                  <g key={label.id} className="mep-lbl-item" data-label-id={label.id} onPointerDown={(e) => onLabelPointerDown(e, label.id)}>
+                    {(label.background || label.border) && (
+                      <rect
+                        x={left}
+                        y={ay - height / 2}
+                        width={width}
+                        height={height}
+                        rx={2 * pxPerPt}
+                        fill={label.background ? label.background.slice(0, 7) : 'none'}
+                        fillOpacity={label.background && label.background.length === 9 ? parseInt(label.background.slice(7, 9), 16) / 255 : 1}
+                        stroke={label.border ? label.border.slice(0, 7) : 'none'}
+                        strokeWidth={0.5 * pxPerPt}
+                      />
+                    )}
+                    <text
+                      x={left + PADDING_X_PT * pxPerPt}
+                      y={ay}
+                      dominantBaseline="central"
+                      fontFamily="Arial"
+                      fontWeight={600}
+                      fontSize={fontPx}
+                      fill={missing ? '#c62828' : label.textColor}
+                      fontStyle={placeholder ? 'italic' : undefined}
+                      opacity={placeholder && !missing ? 0.7 : 1}
+                    >
+                      {text}
+                    </text>
+                    {isSelected && (
+                      <rect
+                        x={left - 1.5 / view.scale}
+                        y={ay - height / 2 - 1.5 / view.scale}
+                        width={width + 3 / view.scale}
+                        height={height + 3 / view.scale}
+                        className="mep-lbl-selection"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    <circle cx={ax} cy={ay} r={(isSelected ? 5 : 4) / view.scale} className={`mep-lbl-anchor${isSelected ? ' on' : ''}`} vectorEffect="non-scaling-stroke" />
+                  </g>
+                );
+              })}
+            </g>
+          </svg>
+        </div>
+        <div className="mep-ee-bar mep-lbl-bar">
+          <div className="mep-ee-bar-cluster">
+            <button type="button" className="mep-rail-btn" onClick={() => zoomAtScreenPoint(1 / ZOOM_STEP, { x: viewportSize.width / 2, y: viewportSize.height / 2 })} title="Zoom out">
+              <IconMinus size={16} />
+            </button>
+            <span className="mep-ee-zoom-readout">{Math.round(view.scale * 100)}%</span>
+            <button type="button" className="mep-rail-btn" onClick={() => zoomAtScreenPoint(ZOOM_STEP, { x: viewportSize.width / 2, y: viewportSize.height / 2 })} title="Zoom in">
+              <IconPlus size={16} />
+            </button>
+            <button type="button" className="mep-rail-btn" onClick={() => fitView()} title="Fit">
+              <IconZoomFit size={18} />
+            </button>
+          </div>
+        </div>
       </div>
       <div className="mep-lbl-sidebar">
         <div className="mep-section">

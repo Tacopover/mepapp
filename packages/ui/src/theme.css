@@ -1769,11 +1769,20 @@
 }
 .mep-lbl-canvas-col {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   min-width: 0;
-  padding: 12px;
+  min-height: 0;
   background: var(--surface-2);
+}
+.mep-lbl-viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.mep-lbl-bar {
+  margin-top: 0;
+  padding: 6px 8px;
 }
 .mep-lbl-dialog-body {
   display: flex;
@@ -1783,14 +1792,16 @@
   flex: 1 1 auto;
 }
 .mep-lbl-svg {
-  max-width: 100%;
-  height: auto;
+  display: block;
+  width: 100%;
+  height: 100%;
   user-select: none;
-  overflow: visible;
-  background: #fff;
-  border: 1px solid var(--line);
   cursor: crosshair;
   touch-action: none;
+}
+.mep-lbl-sheet {
+  fill: #fff;
+  stroke: var(--line);
 }
 .mep-lbl-stamp-box {
   fill: none;

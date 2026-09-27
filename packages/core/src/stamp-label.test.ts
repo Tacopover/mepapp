@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlacedStamp } from './stamp.js';
-import { computeStampLabelPlacement, DEFAULT_STAMP_LABEL_VISIBILITY, isStampLabelVisible, resolveStampLabelText } from './stamp-label.js';
+import { computeStampLabelPlacement, DEFAULT_STAMP_LABEL_VISIBILITY, isStampLabelVisible, labelLayoutDefinitionId, resolveStampLabelText } from './stamp-label.js';
+import { STAMP_LIBRARY, type StampDefinition } from './stamp-library.js';
 import { buildStampPropertyContext } from './stamp-properties.js';
 
 function stamp(rotationDegrees: number, scale = { x: 1, y: 1 }): PlacedStamp {
@@ -68,15 +69,30 @@ describe('label text', () => {
 
 describe('label visibility', () => {
   it('shows everything by default and nothing when turned off', () => {
-    expect(isStampLabelVisible(DEFAULT_STAMP_LABEL_VISIBILITY, stamp(0), { propertyKey: 'circuit:label' })).toBe(true);
-    expect(isStampLabelVisible({ ...DEFAULT_STAMP_LABEL_VISIBILITY, enabled: false }, stamp(0), { propertyKey: 'stamp:name' })).toBe(false);
+    expect(isStampLabelVisible(DEFAULT_STAMP_LABEL_VISIBILITY, 'fire-hose-reel', { propertyKey: 'circuit:label' })).toBe(true);
+    expect(isStampLabelVisible({ ...DEFAULT_STAMP_LABEL_VISIBILITY, enabled: false }, 'fire-hose-reel', { propertyKey: 'stamp:name' })).toBe(false);
   });
 
   it('hides by stamp definition and by label kind', () => {
     const byDefinition = { ...DEFAULT_STAMP_LABEL_VISIBILITY, hiddenDefinitionIds: ['fire-hose-reel'] };
-    expect(isStampLabelVisible(byDefinition, stamp(0), { propertyKey: 'stamp:name' })).toBe(false);
+    expect(isStampLabelVisible(byDefinition, 'fire-hose-reel', { propertyKey: 'stamp:name' })).toBe(false);
     const byKind = { ...DEFAULT_STAMP_LABEL_VISIBILITY, hiddenGroups: ['circuit' as const] };
-    expect(isStampLabelVisible(byKind, stamp(0), { propertyKey: 'circuit:custom:Group' })).toBe(false);
-    expect(isStampLabelVisible(byKind, stamp(0), { propertyKey: 'custom:Room' })).toBe(true);
+    expect(isStampLabelVisible(byKind, 'fire-hose-reel', { propertyKey: 'circuit:custom:Group' })).toBe(false);
+    expect(isStampLabelVisible(byKind, 'fire-hose-reel', { propertyKey: 'custom:Room' })).toBe(true);
+  });
+});
+
+describe('label layout definition', () => {
+  const library = STAMP_LIBRARY[0]!;
+  const custom = (label: string): StampDefinition => ({ ...library, id: 'custom-1', label, labelNl: undefined, source: 'custom' });
+
+  it('uses the custom definition that replaced a library definition under the same name', () => {
+    expect(labelLayoutDefinitionId(library.id, [custom(library.label)])).toBe('custom-1');
+    if (library.labelNl) expect(labelLayoutDefinitionId(library.id, [custom(library.labelNl)])).toBe('custom-1');
+  });
+
+  it('keeps its own id when no custom definition has the name, or when it is custom itself', () => {
+    expect(labelLayoutDefinitionId(library.id, [custom('Something else')])).toBe(library.id);
+    expect(labelLayoutDefinitionId('custom-1', [custom(library.label)])).toBe('custom-1');
   });
 });

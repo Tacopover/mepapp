@@ -60,6 +60,14 @@ export function getStampDefinition(id: string, customDefinitions: StampDefinitio
   return STAMP_LIBRARY.find((def) => def.id === id) ?? customDefinitions.find((def) => def.id === id);
 }
 
+/** The custom definition that replaces a library definition in the Stamps tab: one saved under the library entry's English or Dutch name (Element Editor overwrite prompt). */
+export function findShadowingCustomDefinition(library: StampDefinition, customDefinitions: StampDefinition[]): StampDefinition | undefined {
+  return customDefinitions.find((c) => {
+    const label = c.label.trim().toLowerCase();
+    return label === library.label.toLowerCase() || (!!library.labelNl && label === library.labelNl.toLowerCase());
+  });
+}
+
 export function stampDefinitionsForDiscipline(discipline: Discipline | null, customDefinitions: StampDefinition[] = []): StampDefinition[] {
   const all = [...STAMP_LIBRARY, ...customDefinitions];
   return discipline === null ? all : all.filter((def) => def.discipline === discipline);

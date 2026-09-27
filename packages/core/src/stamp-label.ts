@@ -6,6 +6,7 @@
 
 import { applyMatrix, composeTransform, type Vec2 } from './geometry.js';
 import type { PlacedStamp } from './stamp.js';
+import { findShadowingCustomDefinition, STAMP_LIBRARY, type StampDefinition } from './stamp-library.js';
 import { resolveStampProperty, stampPropertyGroupOf, type StampPropertyContext, type StampPropertyGroup } from './stamp-properties.js';
 
 export interface StampLabel {
@@ -29,6 +30,18 @@ export interface StampLabel {
 
 /** Label layout per stamp definition id. */
 export type StampLabelLayouts = Record<string, StampLabel[]>;
+
+/**
+ * The definition whose label layout a stamp placed from `definitionId` uses.
+ * Editing a library stamp saves a new custom definition under the same name,
+ * which replaces the library tile; stamps placed before that edit keep the
+ * library id but use the custom definition's layout.
+ */
+export function labelLayoutDefinitionId(definitionId: string, customStampDefinitions: StampDefinition[]): string {
+  const library = STAMP_LIBRARY.find((def) => def.id === definitionId);
+  if (!library) return definitionId;
+  return findShadowingCustomDefinition(library, customStampDefinitions)?.id ?? definitionId;
+}
 
 /** The old app's label defaults (MepElementLabel.cs), converted from ARGB to RGBA. */
 export const DEFAULT_STAMP_LABEL_STYLE: Pick<StampLabel, 'fontSize' | 'textColor' | 'background' | 'border'> = {
@@ -85,8 +98,9 @@ export interface StampLabelVisibility {
 
 export const DEFAULT_STAMP_LABEL_VISIBILITY: StampLabelVisibility = { enabled: true, hiddenDefinitionIds: [], hiddenGroups: [] };
 
-export function isStampLabelVisible(visibility: StampLabelVisibility, stamp: PlacedStamp, label: Pick<StampLabel, 'propertyKey'>): boolean {
+/** `layoutDefinitionId` is the definition whose layout the label comes from — see labelLayoutDefinitionId. */
+export function isStampLabelVisible(visibility: StampLabelVisibility, layoutDefinitionId: string | undefined, label: Pick<StampLabel, 'propertyKey'>): boolean {
   if (!visibility.enabled) return false;
-  if (stamp.definitionId && visibility.hiddenDefinitionIds.includes(stamp.definitionId)) return false;
+  if (layoutDefinitionId && visibility.hiddenDefinitionIds.includes(layoutDefinitionId)) return false;
   return !visibility.hiddenGroups.includes(stampPropertyGroupOf(label.propertyKey));
 }

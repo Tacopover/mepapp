@@ -19,6 +19,7 @@ import {
   coerceDefaultValue,
   DEFAULT_STAMP_LABEL_VISIBILITY,
   isStampLabelVisible,
+  labelLayoutDefinitionId,
   computeNetworks,
   distance,
   findCircuitForTerminal,
@@ -1323,8 +1324,28 @@ export class SketchScene {
       labelLanguage: this.labelContext.labelLanguage,
     });
     const visibility = this.labelVisibility;
-    syncStampLabels(this.doc.labelLayer, this.doc.labelNodes, Object.values(state.stamps), this.doc.stampLabelLayouts, ctx, (stamp, label) =>
-      isStampLabelVisible(visibility, stamp, label),
+    const layouts = this.doc.stampLabelLayouts;
+    const customs = this.doc.customStampDefinitions;
+    const layoutIds = new Map<string, string>();
+    const layoutIdOf = (stamp: PlacedStamp): string | undefined => {
+      if (!stamp.definitionId) return undefined;
+      let id = layoutIds.get(stamp.definitionId);
+      if (id === undefined) {
+        id = labelLayoutDefinitionId(stamp.definitionId, customs);
+        layoutIds.set(stamp.definitionId, id);
+      }
+      return id;
+    };
+    syncStampLabels(
+      this.doc.labelLayer,
+      this.doc.labelNodes,
+      Object.values(state.stamps),
+      (stamp) => {
+        const id = layoutIdOf(stamp);
+        return id ? layouts[id] : undefined;
+      },
+      ctx,
+      (stamp, label) => isStampLabelVisible(visibility, layoutIdOf(stamp), label),
     );
   }
 
@@ -1994,6 +2015,7 @@ export class SketchScene {
   addCustomStampDefinition(definition: StampDefinition): void {
     this.doc.customStampDefinitions.push(definition);
     this.markDirty();
+    this.syncLabels();
     this.emitter.emit('customStampDefinitionsChanged', this.doc.customStampDefinitions);
   }
 
@@ -2013,6 +2035,7 @@ export class SketchScene {
     if (index === -1) return;
     this.doc.customStampDefinitions.splice(index, 1);
     this.markDirty();
+    this.syncLabels();
     this.emitter.emit('customStampDefinitionsChanged', this.doc.customStampDefinitions);
   }
 
