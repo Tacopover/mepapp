@@ -1,6 +1,6 @@
 # Electrical schematic templates — plan
 
-Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 5b and the Phase 5c design pass done 2026-09-25 and 2026-09-27; Phase 6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
+Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 5b and the Phase 5c design pass done 2026-09-25 and 2026-09-27; Phase 6 not started; Phase 7 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
 ## 1. Goal
 
@@ -447,6 +447,27 @@ Status per round:
 ### Phase 6 — Export, and loading templates from a file — not started
 
 Storage in the project file moved into Phase 5b. What is left: export (open question 2), and loading and saving a template as a file to share between projects. Custom templates and symbols stay in localStorage until then.
+
+### Phase 7 — Multi-select and movable generated blocks — not started
+
+Three requests from the user after trying the workspace (2026-09-27):
+
+1. A drag-rectangle (marquee) selection, like the main canvas already has (`ctx.doc.selectedIds`, `selectTool.ts`'s rubber-band case): drag over empty sheet space to select every block/extra it overlaps, Shift adds to the current selection, Shift-click toggles one target. Same overlap test as the main canvas (any overlap, not full containment).
+2. Already works, no code needed: in Template mode, a draw tool's "Add to" selector in the tool options bar can target a group instead of the sheet, and the drawn shape then repeats on every circuit the group matches.
+3. Let the user drag a template-generated block (not just an "extra") in Schematic mode, so the template only has to get the layout ~80% right. Decided with the user: a move applies to one circuit's copy only (not every repeat of the group), and it survives "Update from template" (matched by the block's resolved id, same rule as `textOverrides`).
+
+Round 1 — multi-select:
+- `SheetBlockCanvas<T>`: `selected`/`onSelect` become a list instead of one target. A drag that starts on empty sheet space (not a block, not a handle) starts a rubber band instead of panning; on release, every block whose bounds overlap it is selected (replaces the selection, or adds to it when Shift is held). Shift-click toggles one target.
+- Move (drag or arrow keys), delete and duplicate work on the whole selection at once, in both `SchematicTemplateEditor` (blocks/groups) and `SchematicDialog` (extras, and generated blocks once round 2 lands). Group rotate/resize stays single-target for now.
+- `TemplateOutlinePanel` highlights every selected row. The Properties/Fields panel shows a plain "N selected" state (with Delete/Duplicate) instead of trying to edit mixed block types at once.
+
+Round 2 — movable generated blocks in the schematic:
+- New `Schematic.blockOverrides: Record<string, { x: number; y: number; rotation?: number; width?: number; height?: number }>`, keyed the same way as `textOverrides` (the block's resolved, per-instance id) — so one circuit's copy of a block can move without moving another circuit's copy of the same template block.
+- `generateFromSchematic`/`generateSchematic` (core) applies a block override the same way it already applies a text override. New core helpers mirroring `setTextOverride`, e.g. `setBlockOverride`.
+- `refreshSchematicFromTemplate` ("Update from template") keeps `blockOverrides` the same way it already keeps `textOverrides`.
+- `SchematicDialog`'s `SheetBlockCanvas`: `targetOf` currently resolves only an extra's id from a hit block. Extend it so a hit on a generated, non-extra block is also selectable and movable, writing to `blockOverrides` instead of an extra's fields.
+- A moved/resized generated block gets the same kind of visual cue an overridden text block already gets, so the user can tell it no longer sits where the template put it. A "Reset to template" action per block, alongside whatever the text-override reset already does.
+- Known limit, matching the existing gap for extras: a block override is not its own undo step unless this gets folded into the schematic's undo history, which round 2 does not attempt.
 
 ## 11. Non-goals for v1
 
