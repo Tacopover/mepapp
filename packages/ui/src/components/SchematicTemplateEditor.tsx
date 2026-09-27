@@ -46,7 +46,8 @@ import { useSheetDraw } from '../useSheetDraw.js';
 import { useSheetView } from '../useSheetView.js';
 import { SchematicDrawingEditor } from './SchematicDrawingEditor.js';
 import { SheetBlockCanvas } from './SheetBlockCanvas.js';
-import { SheetDrawTools } from './SheetDrawTools.js';
+import { SheetToolOptions, SheetToolRail, SheetViewBar, contentBounds, sheetStatusText } from './SheetDrawTools.js';
+import { IconRedo, IconUndo } from '../icons.js';
 import { SchematicSymbolLibrary } from './SchematicSymbolLibrary.js';
 import { SchematicTemplateProperties, type EditTemplate } from './SchematicTemplateProperties.js';
 
@@ -68,7 +69,6 @@ export interface SchematicTemplateEditorProps {
   /** Values of the fields shared by every schematic, so the preview shows realistic text. The editor never stores them. */
   projectFieldValues?: Record<string, string>;
   initialPanelId: string;
-  onDone: () => void;
 }
 
 const SAMPLE = 'sample';
@@ -82,7 +82,7 @@ const PALETTE_SCOPES: { scope: SchematicBlockScope; label: string }[] = [
 ];
 const sameRef = (a: BlockRef | null, b: BlockRef | null) => a !== null && b !== null && a.blockId === b.blockId && a.groupId === b.groupId;
 
-export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, symbols, onSymbolsChange, symbolUses, projectFieldValues, initialPanelId, onDone }: SchematicTemplateEditorProps) {
+export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, symbols, onSymbolsChange, symbolUses, projectFieldValues, initialPanelId }: SchematicTemplateEditorProps) {
   const [history, setHistoryState] = useState<History<SchematicTemplate>>(() => createHistory(initialTemplate));
   const historyRef = useRef(history);
   const onChangeRef = useRef(onChange);
@@ -118,7 +118,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     sheetHeightMm: template.sheet.heightMm,
     resetKey: `${template.id}:${template.sheet.widthMm}x${template.sheet.heightMm}`,
   });
-  const { view, fit, zoomTo } = sheetView;
+  const { view, zoomTo } = sheetView;
 
   const activeGroupId = activeGroupState !== null && template.groups.some((g) => g.id === activeGroupState) ? activeGroupState : null;
   const selectedBlock = selection ? findBlock(template, selection) : undefined;
@@ -215,7 +215,13 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     selectBlock(next.ref);
   }
 
-  const draw = useSheetDraw({ sheet: template.sheet, grid, onFinish: onDrawFinish });
+  const draw = useSheetDraw({
+    sheet: template.sheet,
+    grid,
+    onFinish: onDrawFinish,
+    shortcutsEnabled: drawingBlock === undefined && symbolLibrary === null,
+    onChooseSymbol: () => setSymbolLibrary({ kind: 'draw' }),
+  });
   drawEscapeRef.current = draw.escape;
   const drawTargetValid = drawTarget === 'sheet' || (template.groups.some((g) => g.id === drawTarget) && groupOriginOf(drawTarget) !== undefined);
 
@@ -318,249 +324,253 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
 
   if (drawingRef && drawingBlock) {
     return (
-      <SchematicDrawingEditor
-        key={`${drawingRef.groupId ?? '-'}/${drawingRef.blockId}`}
-        title={`Drawing · ${drawingRef.blockId}${drawingRef.groupId !== undefined ? ' (each circuit)' : ''}`}
-        shapes={drawingBlock.shapes ?? []}
-        widthMm={getBlockWidth(drawingBlock)}
-        heightMm={getBlockHeight(drawingBlock)}
-        onDone={finishDrawing}
-        onCancel={() => setDrawingRef(null)}
-      />
+      <div className="mep-ws-page">
+        <SchematicDrawingEditor
+          key={`${drawingRef.groupId ?? '-'}/${drawingRef.blockId}`}
+          title={`Drawing · ${drawingRef.blockId}${drawingRef.groupId !== undefined ? ' (each circuit)' : ''}`}
+          shapes={drawingBlock.shapes ?? []}
+          widthMm={getBlockWidth(drawingBlock)}
+          heightMm={getBlockHeight(drawingBlock)}
+          onDone={finishDrawing}
+          onCancel={() => setDrawingRef(null)}
+        />
+      </div>
     );
   }
 
   if (symbolLibrary) {
-    return <SchematicSymbolLibrary symbols={symbols} onChange={onSymbolsChange} usesOf={symbolUses} onPick={pickSymbol} onClose={() => setSymbolLibrary(null)} />;
+    return (
+      <div className="mep-ws-page">
+        <SchematicSymbolLibrary symbols={symbols} onChange={onSymbolsChange} usesOf={symbolUses} onPick={pickSymbol} onClose={() => setSymbolLibrary(null)} />
+      </div>
+    );
   }
 
+  const zoomBounds = contentBounds(generated.blocks);
+
   return (
-    <div className="mep-schematic mep-schematic-editor" ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown}>
-      <div className="mep-schematic-bar">
-        <button type="button" onClick={onDone}>
-          Back to schematic
-        </button>
-        <button type="button" onClick={() => applyHistory(undo(historyRef.current))} disabled={history.past.length === 0} title="Undo (Ctrl+Z)">
-          Undo
-        </button>
-        <button type="button" onClick={() => applyHistory(redo(historyRef.current))} disabled={history.future.length === 0} title="Redo (Ctrl+Shift+Z)">
-          Redo
-        </button>
-        <label>
-          Grid
-          <select value={grid} onChange={(e) => setGrid(Number(e.target.value))} title="Blocks snap to this grid. Hold Alt while dragging to turn it off.">
-            {GRID_OPTIONS.map((g) => (
-              <option key={g} value={g}>
-                {g === 0 ? 'Off' : `${g} mm`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Preview data
-          <select value={previewPanel ? previewPanel.id : SAMPLE} onChange={(e) => setPreviewSource(e.target.value)}>
-            <option value={SAMPLE}>Sample data</option>
-            {panels.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={fit}>
-          Fit to sheet
-        </button>
-        <button type="button" onClick={zoomToGroup} disabled={!activeGroupId || !generated.blocks.some((b) => b.groupId === activeGroupId)} title="Zoom to the first circuit drawn by the selected group">
-          Zoom to group
-        </button>
-        <span className="mep-schematic-hint">Scroll to zoom, drag empty space to pan.</span>
-      </div>
-
-      <SheetDrawTools draw={draw} onChooseSymbol={() => setSymbolLibrary({ kind: 'draw' })}>
-        <label>
-          Add to
-          <select value={drawTargetValid ? drawTarget : 'sheet'} onChange={(e) => setDrawTarget(e.target.value)} title="Where a drawn shape, text or symbol goes">
-            <option value="sheet">Sheet</option>
-            {template.groups.map((group) => (
-              <option key={group.id} value={group.id} disabled={groupOriginOf(group.id) === undefined} title={groupOriginOf(group.id) === undefined ? 'This group draws no circuit in the preview data' : undefined}>
-                {group.name} (repeats on every circuit)
-              </option>
-            ))}
-          </select>
-        </label>
-      </SheetDrawTools>
-
-      <div className="mep-schematic-editor-body">
-        <aside className="mep-schematic-side">
-          <div className="mep-section">
-            <h4>Add block</h4>
-            {PALETTE_SCOPES.map(({ scope, label }) => (
-              <div key={scope} className="mep-schematic-palette-group">
-                <span className="mep-schematic-palette-heading">{label}</span>
-                {(Object.keys(SCHEMATIC_BLOCK_CATALOGUE) as SchematicBlockType[])
-                  .filter((type) => SCHEMATIC_BLOCK_CATALOGUE[type].scope === scope && type !== 'drawing')
-                  .map((type) => {
-                    const disabled = scope === 'circuit' && !canAddCircuitBlock;
-                    return (
-                      <button key={type} type="button" className="mep-schematic-palette-button" disabled={disabled} title={disabled ? 'Add a group first: circuit blocks belong to a group.' : `Add: ${SCHEMATIC_BLOCK_CATALOGUE[type].label}`} onClick={() => addFromPalette(type)}>
-                        {SCHEMATIC_BLOCK_CATALOGUE[type].label}
-                      </button>
-                    );
-                  })}
-                {scope === 'once' && (
-                  <button type="button" className="mep-schematic-palette-button" title="Place a symbol from the library on the sheet" onClick={() => setSymbolLibrary({ kind: 'add', inGroup: false })}>
-                    Symbol…
-                  </button>
-                )}
-                {scope === 'circuit' && (
-                  <button type="button" className="mep-schematic-palette-button" disabled={!canAddCircuitBlock} title={canAddCircuitBlock ? 'Add a library symbol that repeats for every circuit of the selected group' : 'Add a group first: circuit blocks belong to a group.'} onClick={() => setSymbolLibrary({ kind: 'add', inGroup: true })}>
-                    Symbol (each circuit)…
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="mep-section">
-            <h4>Groups</h4>
-            <ul className="mep-schematic-list">
-              {template.groups.map((group) => (
-                <li key={group.id}>
-                  <button type="button" className={group.id === activeGroupId ? 'on' : undefined} onClick={() => selectGroup(group.id)}>
-                    <b>{group.name}</b>
-                    <span>{describeRule(group.rule)}</span>
-                  </button>
-                </li>
-              ))}
-              {template.groups.length === 0 && <li className="mep-schematic-hint">No groups. Circuits are not drawn until you add one.</li>}
-            </ul>
-            <div className="mep-schematic-buttons">
-              <button
-                type="button"
-                onClick={() => {
-                  const result = addGroup(historyRef.current.present);
-                  applyHistory(commit(historyRef.current, result.template));
-                  selectGroup(result.groupId);
-                }}
-              >
-                Add group
-              </button>
-              <button type="button" disabled={!activeGroupId} title="Move up: it is checked earlier" onClick={() => activeGroupId && edit((t) => reorderGroup(t, activeGroupId, -1))}>
-                ↑
-              </button>
-              <button type="button" disabled={!activeGroupId} title="Move down: it is checked later" onClick={() => activeGroupId && edit((t) => reorderGroup(t, activeGroupId, 1))}>
-                ↓
-              </button>
-              <button
-                type="button"
-                disabled={!activeGroupId}
-                title="Duplicate the group and its blocks"
-                onClick={() => {
-                  const result = activeGroupId ? duplicateGroup(historyRef.current.present, activeGroupId) : undefined;
-                  if (!result) return;
-                  applyHistory(commit(historyRef.current, result.template));
-                  selectGroup(result.groupId);
-                }}
-              >
-                Duplicate
-              </button>
-              <button
-                type="button"
-                disabled={!activeGroupId}
-                title="Delete the group and its blocks"
-                onClick={() => {
-                  if (!activeGroupId) return;
-                  edit((t) => removeGroup(t, activeGroupId));
-                  selectGroup(null);
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-
-          <div className="mep-section">
-            <h4>Blocks</h4>
-            <ul className="mep-schematic-list">
-              {listedBlocks.map(({ ref, type }) => {
-                const selected = sameRef(selection, ref);
-                return (
-                  <li key={`${ref.groupId ?? '-'}/${ref.blockId}`} className="mep-schematic-list-row">
-                    <button type="button" className={selected ? 'on' : undefined} onClick={() => selectBlock(ref)}>
-                      {type} · {ref.blockId}
-                      {ref.groupId === undefined ? '' : ' (group)'}
+    <div className="mep-schematic-editor mep-ws-body mep-ws-body--template" ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown}>
+      <aside className="mep-schematic-side mep-ws-left">
+        <div className="mep-section">
+          <h4>Add block</h4>
+          {PALETTE_SCOPES.map(({ scope, label }) => (
+            <div key={scope} className="mep-schematic-palette-group">
+              <span className="mep-schematic-palette-heading">{label}</span>
+              {(Object.keys(SCHEMATIC_BLOCK_CATALOGUE) as SchematicBlockType[])
+                .filter((type) => SCHEMATIC_BLOCK_CATALOGUE[type].scope === scope && type !== 'drawing')
+                .map((type) => {
+                  const disabled = scope === 'circuit' && !canAddCircuitBlock;
+                  return (
+                    <button key={type} type="button" className="mep-schematic-palette-button" disabled={disabled} title={disabled ? 'Add a group first: circuit blocks belong to a group.' : `Add: ${SCHEMATIC_BLOCK_CATALOGUE[type].label}`} onClick={() => addFromPalette(type)}>
+                      {SCHEMATIC_BLOCK_CATALOGUE[type].label}
                     </button>
-                    {selected && (
-                      <span className="mep-schematic-list-tools">
-                        <button type="button" title="Draw earlier (further back)" onClick={() => edit((t) => reorderBlock(t, ref, -1))}>
-                          ↑
-                        </button>
-                        <button type="button" title="Draw later (in front)" onClick={() => edit((t) => reorderBlock(t, ref, 1))}>
-                          ↓
-                        </button>
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {!activeGroup && template.groups.length > 0 && <p className="mep-schematic-hint">Select a group to list its blocks.</p>}
-          </div>
-        </aside>
-
-        <div className="mep-schematic-stage">
-          <SheetBlockCanvas<BlockRef>
-            ariaLabel={`Editing template ${template.name}`}
-            sheetWidthMm={template.sheet.widthMm}
-            sheetHeightMm={template.sheet.heightMm}
-            sheetView={sheetView}
-            blocks={generated.blocks}
-            grid={grid}
-            dimGroupId={activeGroupId}
-            showEmptyDrawings
-            loadShapesFor={loadShapesFor}
-            symbolShapesFor={symbolShapesFor}
-            targetOf={(block) => ({ blockId: block.templateBlockId, groupId: block.groupId })}
-            sameTarget={(a, b) => sameRef(a, b)}
-            targetKey={(ref) => `${ref.groupId ?? '-'}:${ref.blockId}`}
-            selected={selectedBlock ? selection : null}
-            instanceId={instanceId}
-            onSelect={selectBlock}
-            readOrigin={(ref) => {
-              const block = findBlock(historyRef.current.present, ref);
-              return block ? { x: block.x, y: block.y } : undefined;
-            }}
-            onMove={(ref, x, y, key) => edit((t) => updateBlock(t, ref, { x, y }), key)}
-            onRotate={(ref, rotation, key) => edit((t) => updateBlock(t, ref, { rotation }), key)}
-            onResize={(ref, patch, key) => edit((t) => updateBlock(t, ref, patch), key)}
-            onGestureEnd={endGesture}
-            anchor={{ x: template.groupAnchor.x, y: template.groupAnchor.y, label: 'Group anchor', onMove: (x, y, key) => edit((t) => ({ ...t, groupAnchor: { x, y } }), key) }}
-            draw={draw.pointer}
-            overlay={draw.overlay}
-            onDoubleClick={openSelectedDrawing}
-            onFocusRequest={() => rootRef.current?.focus({ preventScroll: true })}
-          />
+                  );
+                })}
+              {scope === 'once' && (
+                <button type="button" className="mep-schematic-palette-button" title="Place a symbol from the library on the sheet" onClick={() => setSymbolLibrary({ kind: 'add', inGroup: false })}>
+                  Symbol…
+                </button>
+              )}
+              {scope === 'circuit' && (
+                <button type="button" className="mep-schematic-palette-button" disabled={!canAddCircuitBlock} title={canAddCircuitBlock ? 'Add a library symbol that repeats for every circuit of the selected group' : 'Add a group first: circuit blocks belong to a group.'} onClick={() => setSymbolLibrary({ kind: 'add', inGroup: true })}>
+                  Symbol (each circuit)…
+                </button>
+              )}
+            </div>
+          ))}
         </div>
 
-        <aside className="mep-schematic-side mep-schematic-side--right">
-          <SchematicTemplateProperties
-            template={template}
-            edit={edit}
-            endGesture={endGesture}
-            selection={selectedBlock ? selection : null}
-            activeGroupId={activeGroupId}
-            circuitTypes={circuitTypes}
-            loadTypes={loadTypes}
-            notes={notes}
-            onDuplicateBlock={duplicateSelected}
-            onDeleteBlock={deleteSelected}
-            onEditDrawing={openSelectedDrawing}
-            symbols={symbols}
-            onChangeSymbol={() => selection && setSymbolLibrary({ kind: 'change', ref: selection })}
-            onDetachSymbol={detachSelectedSymbol}
-          />
-        </aside>
+        <div className="mep-section">
+          <h4>Groups</h4>
+          <ul className="mep-schematic-list">
+            {template.groups.map((group) => (
+              <li key={group.id}>
+                <button type="button" className={group.id === activeGroupId ? 'on' : undefined} onClick={() => selectGroup(group.id)}>
+                  <b>{group.name}</b>
+                  <span>{describeRule(group.rule)}</span>
+                </button>
+              </li>
+            ))}
+            {template.groups.length === 0 && <li className="mep-schematic-hint">No groups. Circuits are not drawn until you add one.</li>}
+          </ul>
+          <div className="mep-schematic-buttons">
+            <button
+              type="button"
+              onClick={() => {
+                const result = addGroup(historyRef.current.present);
+                applyHistory(commit(historyRef.current, result.template));
+                selectGroup(result.groupId);
+              }}
+            >
+              Add group
+            </button>
+            <button type="button" disabled={!activeGroupId} title="Move up: it is checked earlier" onClick={() => activeGroupId && edit((t) => reorderGroup(t, activeGroupId, -1))}>
+              ↑
+            </button>
+            <button type="button" disabled={!activeGroupId} title="Move down: it is checked later" onClick={() => activeGroupId && edit((t) => reorderGroup(t, activeGroupId, 1))}>
+              ↓
+            </button>
+            <button
+              type="button"
+              disabled={!activeGroupId}
+              title="Duplicate the group and its blocks"
+              onClick={() => {
+                const result = activeGroupId ? duplicateGroup(historyRef.current.present, activeGroupId) : undefined;
+                if (!result) return;
+                applyHistory(commit(historyRef.current, result.template));
+                selectGroup(result.groupId);
+              }}
+            >
+              Duplicate
+            </button>
+            <button
+              type="button"
+              disabled={!activeGroupId}
+              title="Delete the group and its blocks"
+              onClick={() => {
+                if (!activeGroupId) return;
+                edit((t) => removeGroup(t, activeGroupId));
+                selectGroup(null);
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+
+        <div className="mep-section">
+          <h4>Blocks</h4>
+          <ul className="mep-schematic-list">
+            {listedBlocks.map(({ ref, type }) => {
+              const selected = sameRef(selection, ref);
+              return (
+                <li key={`${ref.groupId ?? '-'}/${ref.blockId}`} className="mep-schematic-list-row">
+                  <button type="button" className={selected ? 'on' : undefined} onClick={() => selectBlock(ref)}>
+                    {type} · {ref.blockId}
+                    {ref.groupId === undefined ? '' : ' (group)'}
+                  </button>
+                  {selected && (
+                    <span className="mep-schematic-list-tools">
+                      <button type="button" title="Draw earlier (further back)" onClick={() => edit((t) => reorderBlock(t, ref, -1))}>
+                        ↑
+                      </button>
+                      <button type="button" title="Draw later (in front)" onClick={() => edit((t) => reorderBlock(t, ref, 1))}>
+                        ↓
+                      </button>
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {!activeGroup && template.groups.length > 0 && <p className="mep-schematic-hint">Select a group to list its blocks.</p>}
+        </div>
+      </aside>
+
+      <SheetToolRail draw={draw}>
+        <button type="button" className="mep-rail-btn" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={history.past.length === 0} onClick={() => applyHistory(undo(historyRef.current))}>
+          <IconUndo size={18} />
+        </button>
+        <button type="button" className="mep-rail-btn" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={history.future.length === 0} onClick={() => applyHistory(redo(historyRef.current))}>
+          <IconRedo size={18} />
+        </button>
+      </SheetToolRail>
+
+      <div className="mep-schematic-stage mep-ws-stage">
+        <SheetToolOptions draw={draw} onChooseSymbol={() => setSymbolLibrary({ kind: 'draw' })}>
+          <label>
+            Add to
+            <select value={drawTargetValid ? drawTarget : 'sheet'} onChange={(e) => setDrawTarget(e.target.value)} title="Where a drawn shape, text or symbol goes">
+              <option value="sheet">Sheet</option>
+              {template.groups.map((group) => (
+                <option key={group.id} value={group.id} disabled={groupOriginOf(group.id) === undefined} title={groupOriginOf(group.id) === undefined ? 'This group draws no circuit in the preview data' : undefined}>
+                  {group.name} (repeats on every circuit)
+                </option>
+              ))}
+            </select>
+          </label>
+        </SheetToolOptions>
+        <SheetBlockCanvas<BlockRef>
+          ariaLabel={`Editing template ${template.name}`}
+          sheetWidthMm={template.sheet.widthMm}
+          sheetHeightMm={template.sheet.heightMm}
+          sheetView={sheetView}
+          blocks={generated.blocks}
+          grid={grid}
+          dimGroupId={activeGroupId}
+          showEmptyDrawings
+          loadShapesFor={loadShapesFor}
+          symbolShapesFor={symbolShapesFor}
+          targetOf={(block) => ({ blockId: block.templateBlockId, groupId: block.groupId })}
+          sameTarget={(a, b) => sameRef(a, b)}
+          targetKey={(ref) => `${ref.groupId ?? '-'}:${ref.blockId}`}
+          selected={selectedBlock ? selection : null}
+          instanceId={instanceId}
+          onSelect={selectBlock}
+          readOrigin={(ref) => {
+            const block = findBlock(historyRef.current.present, ref);
+            return block ? { x: block.x, y: block.y } : undefined;
+          }}
+          onMove={(ref, x, y, key) => edit((t) => updateBlock(t, ref, { x, y }), key)}
+          onRotate={(ref, rotation, key) => edit((t) => updateBlock(t, ref, { rotation }), key)}
+          onResize={(ref, patch, key) => edit((t) => updateBlock(t, ref, patch), key)}
+          onGestureEnd={endGesture}
+          anchor={{ x: template.groupAnchor.x, y: template.groupAnchor.y, label: 'Group anchor', onMove: (x, y, key) => edit((t) => ({ ...t, groupAnchor: { x, y } }), key) }}
+          draw={draw.pointer}
+          overlay={draw.overlay}
+          onDoubleClick={openSelectedDrawing}
+          onFocusRequest={() => rootRef.current?.focus({ preventScroll: true })}
+        />
+        <SheetViewBar
+          sheetView={sheetView}
+          onZoomToContent={zoomBounds ? () => zoomTo(zoomBounds) : undefined}
+          status={sheetStatusText(draw, 'Click a block to select it, drag to move it. Scroll to zoom, drag empty space to pan. Hold Alt to turn off the grid.')}
+        >
+          <button type="button" className="mep-ws-textbtn" onClick={zoomToGroup} disabled={!activeGroupId || !generated.blocks.some((b) => b.groupId === activeGroupId)} title="Zoom to the first circuit drawn by the selected group">
+            Zoom to group
+          </button>
+          <label>
+            Grid
+            <select value={grid} onChange={(e) => setGrid(Number(e.target.value))} title="Blocks snap to this grid. Hold Alt while dragging to turn it off.">
+              {GRID_OPTIONS.map((g) => (
+                <option key={g} value={g}>
+                  {g === 0 ? 'Off' : `${g} mm`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label title="The circuits that the preview draws">
+            Preview
+            <select value={previewPanel ? previewPanel.id : SAMPLE} onChange={(e) => setPreviewSource(e.target.value)}>
+              <option value={SAMPLE}>Sample data</option>
+              {panels.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </SheetViewBar>
       </div>
+
+      <aside className="mep-schematic-side mep-schematic-side--right mep-ws-right">
+        <SchematicTemplateProperties
+          template={template}
+          edit={edit}
+          endGesture={endGesture}
+          selection={selectedBlock ? selection : null}
+          activeGroupId={activeGroupId}
+          circuitTypes={circuitTypes}
+          loadTypes={loadTypes}
+          notes={notes}
+          onDuplicateBlock={duplicateSelected}
+          onDeleteBlock={deleteSelected}
+          onEditDrawing={openSelectedDrawing}
+          symbols={symbols}
+          onChangeSymbol={() => selection && setSymbolLibrary({ kind: 'change', ref: selection })}
+          onDetachSymbol={detachSelectedSymbol}
+        />
+      </aside>
     </div>
   );
 }

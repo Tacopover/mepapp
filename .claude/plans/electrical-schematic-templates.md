@@ -438,7 +438,7 @@ Round 3, small fixes:
 18. Line width in mm in the drawing editor (stored as a fraction of the box).
 19. The drawing editor loses the extra Close button; Escape acts as Cancel.
 
-Status per round: not started.
+Status per round: round 1 built 2026-09-27, not yet browser-verified (layout screenshots only). Rounds 2 and 3 not started.
 
 ### Phase 6 — Export, and loading templates from a file — not started
 

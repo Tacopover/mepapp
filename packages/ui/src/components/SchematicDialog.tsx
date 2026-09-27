@@ -46,7 +46,9 @@ import { SchematicFieldsForm } from './SchematicFieldsForm.js';
 import { SchematicSymbolLibrary } from './SchematicSymbolLibrary.js';
 import { SchematicTemplateEditor } from './SchematicTemplateEditor.js';
 import { SheetBlockCanvas } from './SheetBlockCanvas.js';
-import { SheetDrawTools } from './SheetDrawTools.js';
+import { SheetToolOptions, SheetToolRail, SheetViewBar, contentBounds, sheetStatusText } from './SheetDrawTools.js';
+import { WorkspaceMenu } from './WorkspaceMenu.js';
+import { IconClose } from '../icons.js';
 
 export interface SchematicDialogProps {
   /** The panel this dialog is about. A schematic covers exactly one panel. */
@@ -150,6 +152,9 @@ export function SchematicDialog({
   const [attachTo, setAttachTo] = useState('sheet');
   const [drawingExtraId, setDrawingExtraId] = useState<string | null>(null);
   const [symbolLibraryOpen, setSymbolLibraryOpen] = useState(false);
+  const [sideTab, setSideTab] = useState<'fields' | 'selection'>('fields');
+  /** The "Switch template" chooser is open. */
+  const [switching, setSwitching] = useState(false);
   const today = useMemo(() => todayIso(), []);
 
   const allTemplates = [...SCHEMATIC_TEMPLATE_LIBRARY, ...customTemplates];
@@ -169,7 +174,7 @@ export function SchematicDialog({
     sheetHeightMm: sheetTemplate.sheet.heightMm,
     resetKey: `${schematic?.id ?? ''}:${sheetTemplate.sheet.widthMm}x${sheetTemplate.sheet.heightMm}`,
   });
-  const { fit, clientToSheet, mmPerPixel } = sheetView;
+  const { zoomTo, clientToSheet, mmPerPixel } = sheetView;
 
   const rootRef = useRef<HTMLDivElement>(null);
   const schematicRef = useRef(schematic);
@@ -192,6 +197,7 @@ export function SchematicDialog({
   function selectExtra(extraId: string | null, instance: string | null = null) {
     setSelectedExtraId(extraId);
     setInstanceId(instance);
+    if (extraId !== null) setSideTab('selection');
   }
 
   function onDrawFinish(item: DrawnItem) {
@@ -216,7 +222,15 @@ export function SchematicDialog({
     selectExtra(result.extraId);
   }
 
-  const draw = useSheetDraw({ sheet: sheetTemplate.sheet, grid, onFinish: onDrawFinish });
+  const editingTemplate = editingTemplateId ? customTemplates.find((t) => t.id === editingTemplateId) : undefined;
+  const showCreateForm = creating || !schematic;
+  const draw = useSheetDraw({
+    sheet: sheetTemplate.sheet,
+    grid,
+    onFinish: onDrawFinish,
+    shortcutsEnabled: panel !== undefined && !showCreateForm && !editingTemplate && drawingExtraId === null && !symbolLibraryOpen,
+    onChooseSymbol: () => setSymbolLibraryOpen(true),
+  });
 
   const textEditOpenRef = useRef(false);
   const drawEscapeRef = useRef<() => boolean>(() => false);
@@ -232,6 +246,7 @@ export function SchematicDialog({
     setInstanceId(null);
     setAttachTo('sheet');
     setDrawingExtraId(null);
+    setSwitching(false);
   }, [schematic?.id]);
 
   // The dialog's own Escape closes everything. Escape first closes the text bar, then leaves a draw tool or a half-drawn shape, then deselects.
@@ -263,7 +278,6 @@ export function SchematicDialog({
   const orphanOverrides = generated?.diagnostics.filter((d) => d.kind === 'orphan-override') ?? [];
   const orphanExtras = generated?.diagnostics.filter((d) => d.kind === 'orphan-extra') ?? [];
   const memberCount = panel ? circuits.filter((c) => c.panelId === panel.id).length : 0;
-  const showCreateForm = creating || !schematic;
   const circuitLabelOf = (circuitId: string) => {
     const circuit = circuits.find((c) => c.id === circuitId);
     return circuit ? getCircuitLabel(circuit, panel) : circuitId;
@@ -321,6 +335,7 @@ export function SchematicDialog({
 
   function updateFromTemplate(source: SchematicTemplate | undefined) {
     if (schematic && source) onUpdateSchematic(refreshSchematicFromTemplate(schematic, source, customSymbols));
+    setSwitching(false);
   }
 
   function changeField(field: ResolvedField, value: string | undefined) {
@@ -411,36 +426,115 @@ export function SchematicDialog({
     setSymbolLibraryOpen(false);
   }
 
-  const editingTemplate = editingTemplateId ? customTemplates.find((t) => t.id === editingTemplateId) : undefined;
-  if (editingTemplate) {
-    return (
-      <Dialog title="Schematic template" onClose={onClose} className="mep-modal--wide mep-modal--full" closeOnBackdropClick={false} actions={<button onClick={onClose}>Close</button>}>
-        <SchematicTemplateEditor
-          key={editingTemplate.id}
-          initialTemplate={editingTemplate}
-          onChange={(next) => onCustomTemplatesChange(customTemplates.map((t) => (t.id === next.id ? next : t)))}
-          panels={panels}
-          circuits={circuits}
-          panelSections={panelSections}
-          circuitTypes={circuitTypes}
-          stamps={stamps}
-          customStampDefinitions={customStampDefinitions}
-          symbols={customSymbols}
-          onSymbolsChange={onCustomSymbolsChange}
-          symbolUses={(symbolId) => countSymbolUses(customTemplates, symbolId)}
-          projectFieldValues={projectFields}
-          initialPanelId={panelId}
-          onDone={() => setEditingTemplateId(null)}
-        />
-      </Dialog>
-    );
+  function startSwitch() {
+    setSwitchTemplateId(sourceTemplate?.id ?? SCHEMATIC_TEMPLATE_LIBRARY[0].id);
+    setSwitching(true);
   }
 
   const overriddenBlocks: ResolvedBlock[] = generated?.blocks.filter((b) => b.overridden) ?? [];
+  const zoomBounds = generated ? contentBounds(generated.blocks) : undefined;
+  const subviewOpen = drawingExtra !== undefined || symbolLibraryOpen;
 
-  return (
-    <Dialog title="Schematic" onClose={onClose} className="mep-modal--wide" closeOnBackdropClick={false} actions={<button onClick={onClose}>Close</button>}>
-      {drawingExtra ? (
+  const header = (
+    <div className="mep-ws-header">
+      <div className="mep-ws-modes" role="tablist" aria-label="Mode">
+        <button type="button" role="tab" aria-selected={!editingTemplate} className={!editingTemplate ? 'on' : undefined} onClick={() => setEditingTemplateId(null)}>
+          Schematic
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={editingTemplate !== undefined}
+          className={editingTemplate ? 'on' : undefined}
+          disabled={!editingTemplate && (showCreateForm || !sourceTemplate || subviewOpen)}
+          title={editingTemplate ? undefined : !sourceTemplate ? 'The template of this schematic no longer exists' : sourceIsCustom ? 'Edit the template this schematic copied' : 'Built-in templates cannot change. This makes a copy and edits the copy.'}
+          onClick={() => !editingTemplate && editTemplate()}
+        >
+          Template
+        </button>
+      </div>
+      {editingTemplate ? (
+        <>
+          <span className="mep-ws-title">
+            Template <b>{editingTemplate.name}</b>
+          </span>
+          <span className="mep-schematic-hint">Changes are kept as you make them. A schematic gets them with "Update from template".</span>
+        </>
+      ) : panel && schematic && !showCreateForm ? (
+        <>
+          <span className="mep-ws-title">
+            Panel <b>{panel.name}</b>
+          </span>
+          <span className="mep-ws-sep" />
+          <span className="mep-ws-title">Schematic</span>
+          <select className="mep-ws-select" aria-label="Schematic" value={schematic.id} onChange={(event) => setSelectedId(event.target.value)}>
+            {panelSchematics.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <WorkspaceMenu
+            label="⋯"
+            title="Schematic actions"
+            items={[
+              { label: 'New schematic…', onClick: startCreate },
+              { label: 'Rename…', onClick: rename },
+              { label: 'Delete schematic…', onClick: remove },
+            ]}
+          />
+          <span className="mep-ws-sep" />
+          <span className="mep-ws-title">
+            Template <b>{schematic.template.name}</b>
+            {status === 'changed' && <span className="mep-ws-badge">changed</span>}
+          </span>
+          <WorkspaceMenu
+            label="Template ▾"
+            title="Template actions"
+            items={[
+              { label: 'Edit template', onClick: editTemplate, disabled: !sourceTemplate || subviewOpen },
+              { label: 'Update from template', onClick: () => updateFromTemplate(sourceTemplate), disabled: status !== 'changed', title: status === 'changed' ? 'Load the latest edits of the template' : 'The schematic already has the latest template' },
+              { label: 'Switch template…', onClick: startSwitch },
+              'divider',
+              { label: 'Duplicate template', onClick: duplicateTemplate, disabled: !sourceTemplate },
+              { label: 'Delete template…', onClick: deleteTemplate, disabled: !sourceIsCustom, title: sourceIsCustom ? undefined : 'Built-in templates cannot be deleted.' },
+            ]}
+          />
+        </>
+      ) : (
+        <span className="mep-ws-title">
+          Panel <b>{panel?.name ?? ''}</b>
+        </span>
+      )}
+      <button type="button" className="mep-rail-btn mep-ws-close" aria-label="Close" title="Close (Escape)" onClick={onClose}>
+        <IconClose size={18} />
+      </button>
+    </div>
+  );
+
+  let body;
+  if (editingTemplate) {
+    body = (
+      <SchematicTemplateEditor
+        key={editingTemplate.id}
+        initialTemplate={editingTemplate}
+        onChange={(next) => onCustomTemplatesChange(customTemplates.map((t) => (t.id === next.id ? next : t)))}
+        panels={panels}
+        circuits={circuits}
+        panelSections={panelSections}
+        circuitTypes={circuitTypes}
+        stamps={stamps}
+        customStampDefinitions={customStampDefinitions}
+        symbols={customSymbols}
+        onSymbolsChange={onCustomSymbolsChange}
+        symbolUses={(symbolId) => countSymbolUses(customTemplates, symbolId)}
+        projectFieldValues={projectFields}
+        initialPanelId={panelId}
+      />
+    );
+  } else if (drawingExtra) {
+    body = (
+      <div className="mep-ws-page">
         <SchematicDrawingEditor
           key={drawingExtra.id}
           title={`Drawing · ${drawingExtra.id}`}
@@ -453,7 +547,11 @@ export function SchematicDialog({
           }}
           onCancel={() => setDrawingExtraId(null)}
         />
-      ) : symbolLibraryOpen ? (
+      </div>
+    );
+  } else if (symbolLibraryOpen) {
+    body = (
+      <div className="mep-ws-page">
         <SchematicSymbolLibrary
           symbols={customSymbols}
           onChange={onCustomSymbolsChange}
@@ -463,220 +561,223 @@ export function SchematicDialog({
           backLabel="Back to schematic"
           pickHint="Click a symbol, then click on the sheet to place it."
         />
-      ) : (
-        <div className="mep-schematic mep-schematic-editor" ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown}>
-          {!panel ? (
-            <p className="mep-schematic-empty">This panel no longer exists.</p>
-          ) : showCreateForm ? (
-            <div className="mep-section mep-schematic-create">
-              <h4>{schematic ? 'New schematic' : `No schematic for ${panel.name} yet`}</h4>
-              <div className="mep-schematic-field">
-                <label htmlFor="sch-create-name">Name</label>
-                <input id="sch-create-name" type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} />
-              </div>
-              <div className="mep-schematic-field">
-                <label htmlFor="sch-create-template">Template</label>
-                <select id="sch-create-template" value={createTemplateId} onChange={(e) => setCreateTemplateId(e.target.value)}>
-                  <TemplateOptions customTemplates={customTemplates} />
-                </select>
-                <span className="mep-schematic-hint">{allTemplates.find((t) => t.id === createTemplateId)?.description}</span>
-              </div>
-              <div className="mep-schematic-create-actions">
-                <button type="button" onClick={create}>
-                  Create schematic
-                </button>
-                {schematic && (
-                  <button type="button" onClick={() => setCreating(false)}>
-                    Cancel
-                  </button>
-                )}
-              </div>
-              {!schematic && <p className="mep-schematic-hint">The schematic keeps its own copy of the template. Later template edits reach it when you choose "Update from template".</p>}
-            </div>
-          ) : (
-            <>
-              <div className="mep-schematic-bar">
-                <label>
-                  Schematic
-                  <select value={schematic.id} onChange={(event) => setSelectedId(event.target.value)}>
-                    {panelSchematics.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button type="button" onClick={startCreate}>
-                  New schematic…
-                </button>
-                <button type="button" onClick={rename}>
-                  Rename
-                </button>
-                <button type="button" onClick={remove}>
-                  Delete
-                </button>
-                <button type="button" onClick={editTemplate} disabled={!sourceTemplate} title={sourceIsCustom ? 'Edit the template this schematic copied' : 'Built-in templates cannot change. This makes a copy and edits the copy.'}>
-                  Edit template…
-                </button>
-                <button type="button" onClick={duplicateTemplate} disabled={!sourceTemplate}>
-                  Duplicate template
-                </button>
-                <button type="button" onClick={deleteTemplate} disabled={!sourceIsCustom} title={sourceIsCustom ? 'Delete this template' : 'Built-in templates cannot be deleted.'}>
-                  Delete template
-                </button>
-                <button type="button" onClick={fit}>
-                  Fit to sheet
-                </button>
-                <label>
-                  Grid
-                  <select value={grid} onChange={(e) => setGrid(Number(e.target.value))} title="Added items snap to this grid. Hold Alt to turn it off for one move.">
-                    {[0, 0.5, 1, 2, 5].map((g) => (
-                      <option key={g} value={g}>
-                        {g === 0 ? 'Off' : `${g} mm`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span className="mep-schematic-hint">Scroll to zoom, drag to pan, double-click a text to type over it.</span>
-              </div>
-              <SheetDrawTools draw={draw} onChooseSymbol={() => setSymbolLibraryOpen(true)}>
-                <label>
-                  Attach to
-                  <select value={attachValid ? attachTo : 'sheet'} onChange={(e) => setAttachTo(e.target.value)} title="A shape attached to a circuit moves with that circuit">
-                    <option value="sheet">Sheet</option>
-                    {(generated?.circuitOrder ?? []).map((circuitId) => {
-                      const circuit = circuits.find((c) => c.id === circuitId);
-                      return (
-                        <option key={circuitId} value={circuitId}>
-                          Circuit {circuit ? getCircuitLabel(circuit, panel) : circuitId}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </label>
-              </SheetDrawTools>
-
-              {status === 'changed' && sourceTemplate && (
-                <p className="mep-schematic-note" role="status">
-                  The template "{sourceTemplate.name}" has changed since this schematic copied it.{' '}
-                  <button type="button" onClick={() => updateFromTemplate(sourceTemplate)}>
-                    Update from template
-                  </button>
-                </p>
-              )}
-              {status === 'missing-source' && (
-                <p className="mep-schematic-note" role="status">
-                  The template that this schematic copied no longer exists. The schematic keeps its own copy. Switch to another template:{' '}
-                  <select value={switchTemplateId} onChange={(e) => setSwitchTemplateId(e.target.value)}>
-                    <TemplateOptions customTemplates={customTemplates} />
-                  </select>{' '}
-                  <button type="button" onClick={() => updateFromTemplate(allTemplates.find((t) => t.id === switchTemplateId))}>
-                    Switch template
-                  </button>
-                </p>
-              )}
-              {memberCount === 0 && <p className="mep-schematic-note">This panel has no circuits yet, so only the panel-level blocks are shown.</p>}
-              {notes.map((note, i) => (
-                <p key={i} className="mep-schematic-note" role="status">
-                  {note}
-                </p>
-              ))}
-              {orphanOverrides.length > 0 && (
-                <p className="mep-schematic-note" role="status">
-                  {orphanOverrides.length} typed text{orphanOverrides.length === 1 ? ' has' : 's have'} no block in the template any more.{' '}
-                  <button type="button" onClick={removeOrphanOverrides}>
-                    Remove them
-                  </button>
-                </p>
-              )}
-              {orphanExtras.length > 0 && (
-                <p className="mep-schematic-note" role="status">
-                  {orphanExtras.length} added item{orphanExtras.length === 1 ? ' follows' : 's follow'} a circuit that is not drawn and {orphanExtras.length === 1 ? 'is' : 'are'} hidden.{' '}
-                  <button type="button" onClick={removeOrphanExtras}>
-                    Remove them
-                  </button>
-                </p>
-              )}
-              {textEdit && (
-                <div className="mep-schematic-textedit">
-                  <label htmlFor="sch-text-edit">Text of {textEdit.label.toLowerCase()}</label>
-                  <textarea
-                    id="sch-text-edit"
-                    autoFocus
-                    rows={2}
-                    value={textEdit.draft}
-                    onChange={(e) => setTextEdit({ ...textEdit, draft: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        applyTextEdit();
-                      }
-                    }}
-                  />
-                  <button type="button" onClick={applyTextEdit}>
-                    Apply
-                  </button>
-                  <button type="button" onClick={resetTextEdit} disabled={!textEdit.overridden} title="Remove the typed text and show the template text again">
-                    Reset to template text
-                  </button>
-                  <button type="button" onClick={() => setTextEdit(null)}>
-                    Cancel
-                  </button>
-                </div>
-              )}
-              <div className="mep-schematic-main">
-                <SheetBlockCanvas<string>
-                  ariaLabel={`Schematic of panel ${panel.name}`}
-                  sheetWidthMm={sheetTemplate.sheet.widthMm}
-                  sheetHeightMm={sheetTemplate.sheet.heightMm}
-                  sheetView={sheetView}
-                  blocks={generated?.blocks ?? []}
-                  grid={grid}
-                  loadShapesFor={loadShapesFor}
-                  symbolShapesFor={symbolShapesFor}
-                  targetOf={(block) => block.extraId}
-                  sameTarget={(a, b) => a === b}
-                  targetKey={(id) => id}
-                  selected={selectedExtra ? selectedExtra.id : null}
-                  instanceId={instanceId}
-                  onSelect={selectExtra}
-                  readOrigin={(id) => {
-                    const extra = schematicRef.current?.extras.find((e) => e.id === id);
-                    return extra ? { x: extra.x, y: extra.y } : undefined;
-                  }}
-                  onMove={(id, x, y) => updateExtra(id, { x, y })}
-                  onRotate={(id, rotation) => updateExtra(id, { rotation })}
-                  onResize={(id, patch) => updateExtra(id, patch)}
-                  onGestureEnd={() => {}}
-                  draw={draw.pointer}
-                  overlay={draw.overlay}
-                  onDoubleClick={openTextEdit}
-                  onFocusRequest={() => rootRef.current?.focus({ preventScroll: true })}
-                  topOverlay={overriddenBlocks.map((block) => (
-                    <circle key={`override-${block.id}`} className="mep-schematic-override-mark" cx={block.x} cy={block.y} r={mmPerPixel * 3} fill="#d9822b" pointerEvents="none">
-                      <title>Text typed over the template</title>
-                    </circle>
-                  ))}
-                />
-                <div className="mep-schematic-side">
-                  {selectedExtra && (
-                    <SchematicExtraProperties
-                      extra={selectedExtra}
-                      circuitLabel={selectedExtra.circuitId !== undefined ? circuitLabelOf(selectedExtra.circuitId) : undefined}
-                      symbolName={selectedExtra.symbolId !== undefined ? schematic?.symbols.find((sym) => sym.id === selectedExtra.symbolId)?.name : undefined}
-                      onChange={(patch) => updateExtra(selectedExtra.id, patch)}
-                      onEditDrawing={() => setDrawingExtraId(selectedExtra.id)}
-                      onDuplicate={duplicateSelectedExtra}
-                      onDelete={deleteSelectedExtra}
-                    />
-                  )}
-                  <SchematicFieldsForm fields={generated?.fields ?? []} onChange={changeField} />
-                </div>
-              </div>
-            </>
-          )}
+      </div>
+    );
+  } else if (!panel) {
+    body = (
+      <div className="mep-ws-page">
+        <p className="mep-schematic-empty">This panel no longer exists.</p>
+      </div>
+    );
+  } else if (showCreateForm) {
+    body = (
+      <div className="mep-ws-page">
+        <div className="mep-section mep-schematic-create">
+          <h4>{schematic ? 'New schematic' : `No schematic for ${panel.name} yet`}</h4>
+          <div className="mep-schematic-field">
+            <label htmlFor="sch-create-name">Name</label>
+            <input id="sch-create-name" type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} />
+          </div>
+          <div className="mep-schematic-field">
+            <label htmlFor="sch-create-template">Template</label>
+            <select id="sch-create-template" value={createTemplateId} onChange={(e) => setCreateTemplateId(e.target.value)}>
+              <TemplateOptions customTemplates={customTemplates} />
+            </select>
+            <span className="mep-schematic-hint">{allTemplates.find((t) => t.id === createTemplateId)?.description}</span>
+          </div>
+          <div className="mep-schematic-create-actions">
+            <button type="button" onClick={create}>
+              Create schematic
+            </button>
+            {schematic && (
+              <button type="button" onClick={() => setCreating(false)}>
+                Cancel
+              </button>
+            )}
+          </div>
+          {!schematic && <p className="mep-schematic-hint">The schematic keeps its own copy of the template. Later template edits reach it when you choose "Update from template".</p>}
         </div>
-      )}
+      </div>
+    );
+  } else {
+    body = (
+      <div className="mep-schematic-editor mep-ws-body mep-ws-body--schematic" ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown}>
+        <SheetToolRail draw={draw} />
+
+        <div className="mep-ws-stage">
+          <SheetToolOptions draw={draw} onChooseSymbol={() => setSymbolLibraryOpen(true)}>
+            <label>
+              Attach to
+              <select value={attachValid ? attachTo : 'sheet'} onChange={(e) => setAttachTo(e.target.value)} title="A shape attached to a circuit moves with that circuit">
+                <option value="sheet">Sheet</option>
+                {(generated?.circuitOrder ?? []).map((circuitId) => (
+                  <option key={circuitId} value={circuitId}>
+                    Circuit {circuitLabelOf(circuitId)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </SheetToolOptions>
+
+          {status === 'changed' && sourceTemplate && (
+            <p className="mep-schematic-note" role="status">
+              The template "{sourceTemplate.name}" has changed since this schematic copied it.{' '}
+              <button type="button" onClick={() => updateFromTemplate(sourceTemplate)}>
+                Update from template
+              </button>
+            </p>
+          )}
+          {(status === 'missing-source' || switching) && (
+            <p className="mep-schematic-note" role="status">
+              {status === 'missing-source' ? 'The template that this schematic copied no longer exists. The schematic keeps its own copy. Switch to another template:' : 'Draw this schematic with another template. Entered values, typed texts and added items stay.'}{' '}
+              <select aria-label="Template to switch to" value={switchTemplateId} onChange={(e) => setSwitchTemplateId(e.target.value)}>
+                <TemplateOptions customTemplates={customTemplates} />
+              </select>{' '}
+              <button type="button" onClick={() => updateFromTemplate(allTemplates.find((t) => t.id === switchTemplateId))}>
+                Switch template
+              </button>
+              {switching && (
+                <>
+                  {' '}
+                  <button type="button" onClick={() => setSwitching(false)}>
+                    Cancel
+                  </button>
+                </>
+              )}
+            </p>
+          )}
+          {memberCount === 0 && <p className="mep-schematic-note">This panel has no circuits yet, so only the panel-level blocks are shown.</p>}
+          {notes.map((note, i) => (
+            <p key={i} className="mep-schematic-note" role="status">
+              {note}
+            </p>
+          ))}
+          {orphanOverrides.length > 0 && (
+            <p className="mep-schematic-note" role="status">
+              {orphanOverrides.length} typed text{orphanOverrides.length === 1 ? ' has' : 's have'} no block in the template any more.{' '}
+              <button type="button" onClick={removeOrphanOverrides}>
+                Remove them
+              </button>
+            </p>
+          )}
+          {orphanExtras.length > 0 && (
+            <p className="mep-schematic-note" role="status">
+              {orphanExtras.length} added item{orphanExtras.length === 1 ? ' follows' : 's follow'} a circuit that is not drawn and {orphanExtras.length === 1 ? 'is' : 'are'} hidden.{' '}
+              <button type="button" onClick={removeOrphanExtras}>
+                Remove them
+              </button>
+            </p>
+          )}
+          {textEdit && (
+            <div className="mep-schematic-textedit">
+              <label htmlFor="sch-text-edit">Text of {textEdit.label.toLowerCase()}</label>
+              <textarea
+                id="sch-text-edit"
+                autoFocus
+                rows={2}
+                value={textEdit.draft}
+                onChange={(e) => setTextEdit({ ...textEdit, draft: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    applyTextEdit();
+                  }
+                }}
+              />
+              <button type="button" onClick={applyTextEdit}>
+                Apply
+              </button>
+              <button type="button" onClick={resetTextEdit} disabled={!textEdit.overridden} title="Remove the typed text and show the template text again">
+                Reset to template text
+              </button>
+              <button type="button" onClick={() => setTextEdit(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
+          <SheetBlockCanvas<string>
+            ariaLabel={`Schematic of panel ${panel.name}`}
+            sheetWidthMm={sheetTemplate.sheet.widthMm}
+            sheetHeightMm={sheetTemplate.sheet.heightMm}
+            sheetView={sheetView}
+            blocks={generated?.blocks ?? []}
+            grid={grid}
+            loadShapesFor={loadShapesFor}
+            symbolShapesFor={symbolShapesFor}
+            targetOf={(block) => block.extraId}
+            sameTarget={(a, b) => a === b}
+            targetKey={(id) => id}
+            selected={selectedExtra ? selectedExtra.id : null}
+            instanceId={instanceId}
+            onSelect={selectExtra}
+            readOrigin={(id) => {
+              const extra = schematicRef.current?.extras.find((e) => e.id === id);
+              return extra ? { x: extra.x, y: extra.y } : undefined;
+            }}
+            onMove={(id, x, y) => updateExtra(id, { x, y })}
+            onRotate={(id, rotation) => updateExtra(id, { rotation })}
+            onResize={(id, patch) => updateExtra(id, patch)}
+            onGestureEnd={() => {}}
+            draw={draw.pointer}
+            overlay={draw.overlay}
+            onDoubleClick={openTextEdit}
+            onFocusRequest={() => rootRef.current?.focus({ preventScroll: true })}
+            topOverlay={overriddenBlocks.map((block) => (
+              <circle key={`override-${block.id}`} className="mep-schematic-override-mark" cx={block.x} cy={block.y} r={mmPerPixel * 3} fill="#d9822b" pointerEvents="none">
+                <title>Text typed over the template</title>
+              </circle>
+            ))}
+          />
+          <SheetViewBar
+            sheetView={sheetView}
+            onZoomToContent={zoomBounds ? () => zoomTo(zoomBounds) : undefined}
+            status={sheetStatusText(draw, 'Click an item you added to select it, drag to move it. Double-click a text to type over it. Scroll to zoom, drag empty space to pan.')}
+          >
+            <label>
+              Grid
+              <select value={grid} onChange={(e) => setGrid(Number(e.target.value))} title="Added items snap to this grid. Hold Alt to turn it off for one move.">
+                {[0, 0.5, 1, 2, 5].map((g) => (
+                  <option key={g} value={g}>
+                    {g === 0 ? 'Off' : `${g} mm`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </SheetViewBar>
+        </div>
+
+        <aside className="mep-schematic-side mep-ws-right">
+          <div className="mep-subtabs" role="tablist" aria-label="Side panel">
+            <button type="button" role="tab" aria-selected={sideTab === 'fields'} className={sideTab === 'fields' ? 'on' : undefined} onClick={() => setSideTab('fields')}>
+              Fields
+            </button>
+            <button type="button" role="tab" aria-selected={sideTab === 'selection'} className={sideTab === 'selection' ? 'on' : undefined} onClick={() => setSideTab('selection')}>
+              Selection
+            </button>
+          </div>
+          {sideTab === 'fields' ? (
+            <SchematicFieldsForm fields={generated?.fields ?? []} onChange={changeField} />
+          ) : selectedExtra ? (
+            <SchematicExtraProperties
+              extra={selectedExtra}
+              circuitLabel={selectedExtra.circuitId !== undefined ? circuitLabelOf(selectedExtra.circuitId) : undefined}
+              symbolName={selectedExtra.symbolId !== undefined ? schematic?.symbols.find((sym) => sym.id === selectedExtra.symbolId)?.name : undefined}
+              onChange={(patch) => updateExtra(selectedExtra.id, patch)}
+              onEditDrawing={() => setDrawingExtraId(selectedExtra.id)}
+              onDuplicate={duplicateSelectedExtra}
+              onDelete={deleteSelectedExtra}
+            />
+          ) : (
+            <p className="mep-schematic-hint mep-ws-empty">Nothing is selected. Click a shape or text that you added to the schematic. Blocks that the template draws change in the template; double-click a text to type over it.</p>
+          )}
+        </aside>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog title={editingTemplate ? `Schematic template ${editingTemplate.name}` : 'Schematic'} onClose={onClose} className="mep-modal--workspace" closeOnBackdropClick={false} header={header}>
+      {body}
     </Dialog>
   );
 }

@@ -88,6 +88,19 @@ export function useSheetView({ sheetWidthMm, sheetHeightMm, resetKey }: SheetVie
   /** Sheet millimetres per screen pixel at the current zoom. Multiply a size in pixels by it to keep a handle the same size on screen. */
   const scale = Math.min(canvasSize.w / view.w, canvasSize.h / view.h);
   const mmPerPixel = scale > 0 ? 1 / scale : 0.5;
+  const fitted = fitBox();
+  const fitScale = Math.min(canvasSize.w / fitted.w, canvasSize.h / fitted.h);
+  /** The zoom as a percentage of "fit to sheet". */
+  const zoomPercent = fitScale > 0 && scale > 0 ? Math.round((scale / fitScale) * 100) : 100;
+
+  /** Zooms in (factor > 1) or out around the middle of the view. */
+  const zoomBy = useCallback((factor: number) => {
+    setView((v) => {
+      const w = Math.max(v.w / factor, sheetWidthRef.current * MAX_ZOOM_IN);
+      const h = v.h * (w / v.w);
+      return { x: v.x + v.w / 2 - w / 2, y: v.y + v.h / 2 - h / 2, w, h };
+    });
+  }, []);
 
   const startPan = (event: ReactPointerEvent<SVGSVGElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -114,6 +127,8 @@ export function useSheetView({ sheetWidthMm, sheetHeightMm, resetKey }: SheetVie
     setSvg,
     fit,
     zoomTo,
+    zoomBy,
+    zoomPercent,
     clientToSheet,
     mmPerPixel,
     startPan,

@@ -1,10 +1,11 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { SchematicSymbol, SheetSize, SymbolShape } from '@mepapp/core';
 import type { SheetDrawPointer } from './components/SheetBlockCanvas.js';
 import {
   DEFAULT_LINE_WIDTH_MM,
   addCorner,
   drawStyle,
+  SHEET_DRAW_TOOLS,
   finishShape,
   growDraft,
   isDragTool,
@@ -30,13 +31,22 @@ export interface UseSheetDrawOptions {
   /** Grid in mm for the points of a shape. Alt turns it off for one pointer event. */
   grid: number;
   onFinish: (item: DrawnItem) => void;
+  /** Whether the tool keys (V, L, R, ...) work. False while another view covers the sheet. */
+  shortcutsEnabled: boolean;
+  /** Opens the symbol library, for the Symbol tool when no symbol is chosen yet. */
+  onChooseSymbol: () => void;
 }
 
 const DEFAULT_TEXT = 'Text';
 const OVERLAY_MIN_STROKE_MM = 0.05;
 const GHOST_INK = '#175a8a';
 
-export function useSheetDraw({ sheet, grid, onFinish }: UseSheetDrawOptions) {
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable;
+}
+
+export function useSheetDraw({ sheet, grid, onFinish, shortcutsEnabled, onChooseSymbol }: UseSheetDrawOptions) {
   const [tool, setToolState] = useState<SheetDrawTool>('select');
   const [lineWidthMm, setLineWidthMm] = useState(DEFAULT_LINE_WIDTH_MM);
   const [fill, setFill] = useState(false);
@@ -60,6 +70,28 @@ export function useSheetDraw({ sheet, grid, onFinish }: UseSheetDrawOptions) {
     clearActivity();
     setToolState(next);
   }
+
+  /** Picks a tool as the user does: the Symbol tool opens the library when no symbol is chosen yet. */
+  function chooseTool(next: SheetDrawTool) {
+    setTool(next);
+    if (next === 'symbol' && !symbol) onChooseSymbol();
+  }
+
+  const chooseToolRef = useRef(chooseTool);
+  chooseToolRef.current = chooseTool;
+  const shortcutsRef = useRef(shortcutsEnabled);
+  shortcutsRef.current = shortcutsEnabled;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!shortcutsRef.current || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || isTypingTarget(event.target)) return;
+      const tool = SHEET_DRAW_TOOLS.find((t) => t.key === event.key.toUpperCase());
+      if (!tool) return;
+      event.preventDefault();
+      chooseToolRef.current(tool.id);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   function finish(item: DrawnItem, keep: boolean) {
     clearActivity();
@@ -160,6 +192,8 @@ export function useSheetDraw({ sheet, grid, onFinish }: UseSheetDrawOptions) {
   return {
     tool,
     setTool,
+    chooseTool,
+    cornerCount: corners.length,
     lineWidthMm,
     setLineWidthMm,
     fill,

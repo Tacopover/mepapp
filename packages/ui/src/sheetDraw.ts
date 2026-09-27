@@ -23,18 +23,21 @@ import {
 export type SheetDrawTool = 'select' | 'line' | 'arrow' | 'rect' | 'circle' | 'ellipse' | 'arc' | 'polygon' | 'text' | 'symbol';
 export type SheetDragTool = 'line' | 'arrow' | 'rect' | 'circle' | 'ellipse' | 'arc';
 
-export const SHEET_DRAW_TOOLS: { id: SheetDrawTool; label: string; hint: string }[] = [
-  { id: 'select', label: 'Select', hint: 'Select, move, rotate and resize blocks' },
-  { id: 'line', label: 'Line', hint: 'Drag to draw a line' },
-  { id: 'arrow', label: 'Arrow', hint: 'Drag to draw an arrow' },
-  { id: 'rect', label: 'Rectangle', hint: 'Drag from corner to corner' },
-  { id: 'circle', label: 'Circle', hint: 'Drag from the centre outwards' },
-  { id: 'ellipse', label: 'Ellipse', hint: 'Drag from corner to corner of the box' },
-  { id: 'arc', label: 'Arc', hint: 'Drag from the centre outwards. The arc sweeps 270 degrees; change it in Edit drawing' },
-  { id: 'polygon', label: 'Polygon', hint: 'Click the corners. Double-click or press Enter to finish, Backspace removes the last corner' },
-  { id: 'text', label: 'Text', hint: 'Click where the text goes, then type it' },
-  { id: 'symbol', label: 'Symbol', hint: 'Choose a symbol from the library, then click where it goes' },
+export const SHEET_DRAW_TOOLS: { id: SheetDrawTool; label: string; key: string; hint: string }[] = [
+  { id: 'select', label: 'Select', key: 'V', hint: 'Select, move, rotate and resize blocks' },
+  { id: 'line', label: 'Line', key: 'L', hint: 'Drag to draw a line' },
+  { id: 'arrow', label: 'Arrow', key: 'A', hint: 'Drag to draw an arrow' },
+  { id: 'rect', label: 'Rectangle', key: 'R', hint: 'Drag from corner to corner' },
+  { id: 'circle', label: 'Circle', key: 'C', hint: 'Drag from the centre outwards' },
+  { id: 'ellipse', label: 'Ellipse', key: 'E', hint: 'Drag from corner to corner of the box' },
+  { id: 'arc', label: 'Arc', key: 'U', hint: 'Drag from the centre outwards. The arc sweeps 270 degrees; change it in Edit drawing' },
+  { id: 'polygon', label: 'Polygon', key: 'P', hint: 'Click the corners. Double-click or press Enter to finish, Backspace removes the last corner' },
+  { id: 'text', label: 'Text', key: 'T', hint: 'Click where the text goes, then type it' },
+  { id: 'symbol', label: 'Symbol', key: 'S', hint: 'Choose a symbol from the library, then click where it goes' },
 ];
+
+/** The tools whose shape can be filled. */
+export const FILLABLE_TOOLS: SheetDrawTool[] = ['rect', 'circle', 'ellipse', 'arc', 'polygon'];
 
 export const LINE_WIDTHS_MM = [0.25, 0.35, 0.5, 0.7];
 export const DEFAULT_LINE_WIDTH_MM = 0.35;
