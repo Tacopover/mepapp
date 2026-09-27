@@ -1,6 +1,6 @@
 # Electrical schematic templates — plan
 
-Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 5b and the Phase 5c design pass done 2026-09-25 and 2026-09-27; Phase 6 not started; Phase 7 round 1 (multi-select) done 2026-09-27, round 2 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
+Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 5b and the Phase 5c design pass done 2026-09-25 and 2026-09-27; Phase 7 (multi-select and movable generated blocks) done 2026-09-27; Phase 6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
 ## 1. Goal
 
@@ -448,7 +448,7 @@ Status per round:
 
 Storage in the project file moved into Phase 5b. What is left: export (open question 2), and loading and saving a template as a file to share between projects. Custom templates and symbols stay in localStorage until then.
 
-### Phase 7 — Multi-select and movable generated blocks — round 1 done, round 2 not started
+### Phase 7 — Multi-select and movable generated blocks — **done** 2026-09-27 (both rounds, browser-verified)
 
 Three requests from the user after trying the workspace (2026-09-27):
 
@@ -461,7 +461,7 @@ Round 1 — multi-select: **done** 2026-09-27, commit `0ad11eb`. Browser-verifie
 - Move (drag or arrow keys), delete and duplicate work on the whole selection at once, in both `SchematicTemplateEditor` (blocks/groups) and `SchematicDialog` (extras, and generated blocks once round 2 lands). Group rotate/resize stays single-target for now.
 - `TemplateOutlinePanel` highlights every selected row. The Properties/Fields panel shows a plain "N selected" state (with Delete/Duplicate) instead of trying to edit mixed block types at once.
 
-Round 2 — movable generated blocks in the schematic: not started.
+Round 2 — movable generated blocks in the schematic: **done** 2026-09-27, commit `7e19b68`. New `Schematic.blockOverrides: Record<string, SchematicBlockOverride>` (x/y/rotation/width/height, each key optional), keyed the same way as `textOverrides` by the block's resolved per-instance id, with core helper `setBlockOverride` mirroring `updateSchematicExtra`'s merge/delete-key convention; `generateSchematic` lets an override win over the template-computed position/size/rotation and sets a new `ResolvedBlock.moved` flag; a new `orphan-block-override` diagnostic mirrors `orphan-override`. `refreshSchematicFromTemplate` keeps `blockOverrides` across "Update from template" for free, the same way it already keeps `textOverrides` (neither is touched by that function's object spread). In Schematic mode, a generated block (any type except the frame, title block and totals table, which stay fixed sheet furniture) is now a selectable, draggable, rotatable, resizable target alongside the extras the user adds, with its own Selection-panel fields and a "Reset to template position" action; a second marker (green diamond) shows next to the existing orange text-override circle, both visible at once on the same block. Round 1's multi-select carries over: a mixed selection of extras and blocks moves/nudges together in one commit; Delete/Duplicate only ever act on the extras in the selection, with a note when blocks are also selected. Browser-verified (headless Chromium), 9 points, all pass, no console errors: select/drag a generated block; a move affects only that one circuit's copy, not the group's other repeats; "Reset to template position" snaps it back and disables itself once there is nothing to reset; a moved block's position survives "Update from template" while the rest of the schematic still picks up the template change (confirmed exact mm values before/after); rotate/resize a single block; the frame/title block/totals table stay non-draggable; a block that is both text-editable and draggable does the right thing for a double-click (text editor) vs. a plain drag (move), and its hover hint mentions both; a mixed extra+block selection nudges together, and Duplicate/Delete only touch the extra; existing extra behavior (drag/rotate/resize/duplicate/delete) and text overrides are unaffected, with both markers visible and clearly separated on one block carrying both kinds of override. Core tests 424 → 428, ui tests 67 → 68.
 
 Round 2 — movable generated blocks in the schematic:
 - New `Schematic.blockOverrides: Record<string, { x: number; y: number; rotation?: number; width?: number; height?: number }>`, keyed the same way as `textOverrides` (the block's resolved, per-instance id) — so one circuit's copy of a block can move without moving another circuit's copy of the same template block.
