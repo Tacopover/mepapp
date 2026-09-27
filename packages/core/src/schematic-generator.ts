@@ -35,6 +35,7 @@ import {
   type CircuitGroupDefinition,
   type CircuitGroupRule,
   type SchematicBlock,
+  type SchematicBlockOverride,
   type SchematicBlockScope,
   type SchematicBlockStyle,
   type SchematicBlockType,
@@ -95,6 +96,8 @@ export interface ResolvedBlock {
   sectionId?: string;
   /** The text was typed over by the user (`GenerateOptions.textOverrides`). */
   overridden?: boolean;
+  /** The position, rotation or size was patched by the user (`GenerateOptions.blockOverrides`). */
+  moved?: boolean;
   /** Set on a block that comes from a schematic extra, not from the template. */
   extraId?: string;
 }
@@ -104,6 +107,8 @@ export type SchematicDiagnostic =
   | { kind: 'binding-error'; blockId: string; message: string }
   /** A typed-over text whose block is no longer generated, for example after the template changed. */
   | { kind: 'orphan-override'; blockId: string }
+  /** A moved/resized/rotated block whose block is no longer generated, for example after the template changed. */
+  | { kind: 'orphan-block-override'; blockId: string }
   /** An extra that follows a circuit that is not laid out. It is not drawn. */
   | { kind: 'orphan-extra'; extraId: string };
 
@@ -125,6 +130,8 @@ export interface GenerateOptions {
   fieldSources?: FieldValueSources;
   /** Text typed over a generated block, by the block's resolved id. Replaces the block's text as it is, without reading {expressions}. */
   textOverrides?: Record<string, string>;
+  /** Position/rotation/size patched by the user, by the block's resolved id. Wins over the template-computed values. */
+  blockOverrides?: Record<string, SchematicBlockOverride>;
   /** Blocks that the user added to this schematic. Drawn after the template's blocks. */
   extras?: SchematicExtra[];
 }
@@ -303,19 +310,21 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
   ): ResolvedBlock => {
     const id = `${panel.id}/${ids.scopeId}/${block.id}`;
     const override = block.type === 'totalsTable' ? undefined : options.textOverrides?.[id];
+    const moved = options.blockOverrides?.[id];
     const resolved: ResolvedBlock = {
       id,
       templateBlockId: block.id,
       groupId: ids.groupId,
       type: block.type,
       scope,
-      x: at.x + block.x,
-      y: at.y + block.y,
-      width: size?.width ?? getBlockWidth(block),
-      height: size?.height ?? getBlockHeight(block),
-      rotation: block.rotation,
+      x: moved?.x ?? at.x + block.x,
+      y: moved?.y ?? at.y + block.y,
+      width: moved?.width ?? size?.width ?? getBlockWidth(block),
+      height: moved?.height ?? size?.height ?? getBlockHeight(block),
+      rotation: moved?.rotation ?? block.rotation,
       text: override ?? resolveText(block, context),
       overridden: override !== undefined ? true : undefined,
+      moved: moved !== undefined ? true : undefined,
       style: block.style,
       symbolId: block.symbolId,
       shapes: block.shapes,
@@ -402,6 +411,9 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
   const emitted = new Set(blocks.map((b) => b.id));
   for (const blockId of Object.keys(options.textOverrides ?? {})) {
     if (!emitted.has(blockId)) diagnostics.push({ kind: 'orphan-override', blockId });
+  }
+  for (const blockId of Object.keys(options.blockOverrides ?? {})) {
+    if (!emitted.has(blockId)) diagnostics.push({ kind: 'orphan-block-override', blockId });
   }
 
   return { blocks, circuitOrder: placed.map((p) => p.facts.circuit.id), circuitOrigins, diagnostics, fields };

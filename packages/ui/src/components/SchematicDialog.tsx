@@ -16,6 +16,7 @@ import {
   getStampDefinition,
   refreshSchematicFromTemplate,
   removeSchematicExtra,
+  setBlockOverride,
   setSchematicFieldValue,
   setTextOverride,
   todayIso,
@@ -28,6 +29,7 @@ import {
   type ResolvedBlock,
   type ResolvedField,
   type Schematic,
+  type SchematicBlockOverride,
   type SchematicSymbol,
   type SchematicTemplate,
   type StampDefinition,
@@ -35,11 +37,12 @@ import {
 import type { StampInfo } from '@mepapp/render';
 import { describeDiagnostics } from '../schematicDiagnostics.js';
 import { buildSchematicTerminals } from '../schematicTerminals.js';
-import { findExtraBlockAt, findTextBlockAt, isTextEditableType } from '../schematicTextEdit.js';
+import { findExtraBlockAt, findTextBlockAt, isMovableBlockType, isTextEditableType } from '../schematicTextEdit.js';
 import { roundMm, textBlockSize, type DrawnItem } from '../sheetDraw.js';
 import { useSheetDraw } from '../useSheetDraw.js';
 import { useSheetView } from '../useSheetView.js';
 import { Dialog } from './Dialog.js';
+import { SchematicBlockOverrideProperties } from './SchematicBlockOverrideProperties.js';
 import { SchematicDrawingEditor } from './SchematicDrawingEditor.js';
 import { SchematicExtraProperties } from './SchematicExtraProperties.js';
 import { SchematicFieldsForm } from './SchematicFieldsForm.js';
@@ -86,6 +89,12 @@ interface TextEdit {
   draft: string;
   overridden: boolean;
 }
+
+/** What one selected thing on the schematic sheet is: an item the user added, or a generated block the template drew (a "block" target's id is the block's own resolved id, `<panelId>/<circuitId|sectionId|->/<templateBlockId>`, not the template block id alone). */
+type SchematicTarget = { kind: 'extra'; id: string } | { kind: 'block'; id: string };
+
+const sameSchematicTarget = (a: SchematicTarget, b: SchematicTarget) => a.kind === b.kind && a.id === b.id;
+const extraTarget = (id: string): SchematicTarget => ({ kind: 'extra', id });
 
 function TemplateOptions({ customTemplates }: { customTemplates: SchematicTemplate[] }) {
   return (
@@ -146,7 +155,7 @@ export function SchematicDialog({
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [switchTemplateId, setSwitchTemplateId] = useState(SCHEMATIC_TEMPLATE_LIBRARY[0].id);
   const [textEdit, setTextEdit] = useState<TextEdit | null>(null);
-  const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);
+  const [selection, setSelection] = useState<SchematicTarget[]>([]);
   const [instanceId, setInstanceId] = useState<string | null>(null);
   const [grid, setGrid] = useState(1);
   /** Where a drawn shape goes: the sheet, or the id of a circuit that it follows. */
@@ -182,9 +191,13 @@ export function SchematicDialog({
   const rootRef = useRef<HTMLDivElement>(null);
   const schematicRef = useRef(schematic);
   schematicRef.current = schematic;
-  /** `selectedExtraIds`, but with ids of extras that no longer exist dropped. */
-  const liveSelectedExtraIds = schematic ? selectedExtraIds.filter((id) => schematic.extras.some((e) => e.id === id)) : [];
-  const selectedExtra = schematic && liveSelectedExtraIds.length === 1 ? schematic.extras.find((e) => e.id === liveSelectedExtraIds[0]) : undefined;
+  /** `selection`, but with targets whose extra/block no longer exists dropped. */
+  const liveSelection: SchematicTarget[] = schematic
+    ? selection.filter((target) => (target.kind === 'extra' ? schematic.extras.some((e) => e.id === target.id) : (generated?.blocks.some((b) => b.id === target.id) ?? false)))
+    : [];
+  const singleSelection = liveSelection.length === 1 ? liveSelection[0] : undefined;
+  const selectedExtra = schematic && singleSelection?.kind === 'extra' ? schematic.extras.find((e) => e.id === singleSelection.id) : undefined;
+  const selectedBlock = singleSelection?.kind === 'block' ? generated?.blocks.find((b) => b.id === singleSelection.id) : undefined;
   const drawingExtra = schematic && drawingExtraId !== null ? schematic.extras.find((e) => e.id === drawingExtraId) : undefined;
   const attachValid = attachTo === 'sheet' || generated?.circuitOrigins[attachTo] !== undefined;
 
@@ -199,14 +212,23 @@ export function SchematicDialog({
     if (current) commitSchematic(updateSchematicExtra(current, extraId, patch));
   }
 
-  function selectExtras(extraIds: string[], instance: string | null = null) {
-    setSelectedExtraIds(extraIds);
+  function updateBlockOverride(blockId: string, patch: Partial<SchematicBlockOverride> | undefined) {
+    const current = schematicRef.current;
+    if (current) commitSchematic(setBlockOverride(current, blockId, patch));
+  }
+
+  function selectTargets(targets: SchematicTarget[], instance: string | null = null) {
+    setSelection(targets);
     setInstanceId(instance);
-    if (extraIds.length > 0) setSideTab('selection');
+    if (targets.length > 0) setSideTab('selection');
+  }
+
+  function selectTarget(target: SchematicTarget | null, instance: string | null = null) {
+    selectTargets(target !== null ? [target] : [], instance);
   }
 
   function selectExtra(extraId: string | null, instance: string | null = null) {
-    selectExtras(extraId !== null ? [extraId] : [], instance);
+    selectTarget(extraId !== null ? extraTarget(extraId) : null, instance);
   }
 
   function onDrawFinish(item: DrawnItem) {
@@ -243,15 +265,15 @@ export function SchematicDialog({
 
   const textEditOpenRef = useRef(false);
   const drawEscapeRef = useRef<() => boolean>(() => false);
-  const selectedExtraIdsRef = useRef<string[]>([]);
+  const selectionRef = useRef<SchematicTarget[]>([]);
   const subviewOpenRef = useRef(false);
   textEditOpenRef.current = textEdit !== null;
   drawEscapeRef.current = draw.escape;
-  selectedExtraIdsRef.current = liveSelectedExtraIds;
+  selectionRef.current = liveSelection;
   subviewOpenRef.current = editingTemplateId !== null || drawingExtraId !== null || symbolLibraryOpen;
 
   useEffect(() => {
-    setSelectedExtraIds([]);
+    setSelection([]);
     setInstanceId(null);
     setAttachTo('sheet');
     setDrawingExtraId(null);
@@ -267,9 +289,9 @@ export function SchematicDialog({
         setTextEdit(null);
       } else if (drawEscapeRef.current()) {
         event.stopPropagation();
-      } else if (selectedExtraIdsRef.current.length > 0) {
+      } else if (selectionRef.current.length > 0) {
         event.stopPropagation();
-        setSelectedExtraIds([]);
+        setSelection([]);
         setInstanceId(null);
       }
     };
@@ -392,27 +414,32 @@ export function SchematicDialog({
     onUpdateSchematic({ ...schematic, extras: schematic.extras.filter((e) => !gone.has(e.id)) });
   }
 
+  /** The extra-kind ids of the live selection. Delete and duplicate only make sense for items the user added, never for a generated block. */
+  const liveExtraIds = () => liveSelection.filter((t): t is { kind: 'extra'; id: string } => t.kind === 'extra').map((t) => t.id);
+
   function deleteSelectedExtra() {
     const current = schematicRef.current;
-    if (!current || liveSelectedExtraIds.length === 0) return;
-    commitSchematic(liveSelectedExtraIds.reduce((acc, id) => removeSchematicExtra(acc, id), current));
-    selectExtras([]);
+    const extraIds = liveExtraIds();
+    if (!current || extraIds.length === 0) return;
+    commitSchematic(extraIds.reduce((acc, id) => removeSchematicExtra(acc, id), current));
+    selectTargets(liveSelection.filter((t) => t.kind !== 'extra'));
   }
 
   function duplicateSelectedExtra() {
     const current = schematicRef.current;
-    if (!current || liveSelectedExtraIds.length === 0) return;
+    const extraIds = liveExtraIds();
+    if (!current || extraIds.length === 0) return;
     let next = current;
-    const newIds: string[] = [];
-    for (const id of liveSelectedExtraIds) {
+    const newTargets: SchematicTarget[] = [];
+    for (const id of extraIds) {
       const result = duplicateSchematicExtra(next, id);
       if (!result) continue;
       next = result.schematic;
-      newIds.push(result.extraId);
+      newTargets.push(extraTarget(result.extraId));
     }
-    if (newIds.length === 0) return;
+    if (newTargets.length === 0) return;
     commitSchematic(next);
-    selectExtras(newIds);
+    selectTargets(newTargets);
   }
 
   function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -422,7 +449,7 @@ export function SchematicDialog({
       event.preventDefault();
       return;
     }
-    if (liveSelectedExtraIds.length === 0) return;
+    if (liveSelection.length === 0) return;
     const key = event.key.toLowerCase();
     if ((event.ctrlKey || event.metaKey) && key === 'd') {
       event.preventDefault();
@@ -437,10 +464,16 @@ export function SchematicDialog({
       const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
       const current = schematicRef.current;
       if (!current) return;
+      // A mixed selection (extras and generated blocks) nudges in one commit, not one step per target.
       let next = current;
-      for (const id of liveSelectedExtraIds) {
-        const extra = next.extras.find((e) => e.id === id);
-        if (extra) next = updateSchematicExtra(next, id, { x: extra.x + dx, y: extra.y + dy });
+      for (const target of liveSelection) {
+        if (target.kind === 'extra') {
+          const extra = next.extras.find((e) => e.id === target.id);
+          if (extra) next = updateSchematicExtra(next, target.id, { x: extra.x + dx, y: extra.y + dy });
+        } else {
+          const block = generated?.blocks.find((b) => b.id === target.id);
+          if (block) next = setBlockOverride(next, target.id, { x: block.x + dx, y: block.y + dy });
+        }
       }
       commitSchematic(next);
     }
@@ -458,6 +491,8 @@ export function SchematicDialog({
   }
 
   const overriddenBlocks: ResolvedBlock[] = generated?.blocks.filter((b) => b.overridden) ?? [];
+  const movedBlocks: ResolvedBlock[] = generated?.blocks.filter((b) => b.moved) ?? [];
+  const blockSelectionCount = liveSelection.filter((t) => t.kind === 'block').length;
   const zoomBounds = generated ? contentBounds(generated.blocks) : undefined;
   const subviewOpen = drawingExtra !== undefined || symbolLibraryOpen;
   /** Any drawing/symbol-library subview is open, in either mode — closing now would discard its in-progress edits. */
@@ -724,7 +759,7 @@ export function SchematicDialog({
               </button>
             </div>
           )}
-          <SheetBlockCanvas<string>
+          <SheetBlockCanvas<SchematicTarget>
             ariaLabel={`Schematic of panel ${panel.name}`}
             sheetWidthMm={sheetTemplate.sheet.widthMm}
             sheetHeightMm={sheetTemplate.sheet.heightMm}
@@ -733,35 +768,66 @@ export function SchematicDialog({
             grid={grid}
             loadShapesFor={loadShapesFor}
             symbolShapesFor={symbolShapesFor}
-            targetOf={(block) => block.extraId}
-            sameTarget={(a, b) => a === b}
-            targetKey={(id) => id}
-            selected={liveSelectedExtraIds}
+            targetOf={(block) => (block.extraId !== undefined ? extraTarget(block.extraId) : isMovableBlockType(block.type) ? { kind: 'block', id: block.id } : undefined)}
+            sameTarget={sameSchematicTarget}
+            targetKey={(target) => `${target.kind}:${target.id}`}
+            selected={liveSelection}
             instanceId={instanceId}
-            onSelect={selectExtras}
-            readOrigin={(id) => {
-              const extra = schematicRef.current?.extras.find((e) => e.id === id);
-              return extra ? { x: extra.x, y: extra.y } : undefined;
+            onSelect={selectTargets}
+            readOrigin={(target) => {
+              if (target.kind === 'extra') {
+                const extra = schematicRef.current?.extras.find((e) => e.id === target.id);
+                return extra ? { x: extra.x, y: extra.y } : undefined;
+              }
+              const block = generated?.blocks.find((b) => b.id === target.id);
+              return block ? { x: block.x, y: block.y } : undefined;
             }}
-            onMove={(id, x, y) => updateExtra(id, { x, y })}
-            onRotate={(id, rotation) => updateExtra(id, { rotation })}
-            onResize={(id, patch) => updateExtra(id, patch)}
+            onMove={(target, x, y) => (target.kind === 'extra' ? updateExtra(target.id, { x, y }) : updateBlockOverride(target.id, { x, y }))}
+            onRotate={(target, rotation) => (target.kind === 'extra' ? updateExtra(target.id, { rotation }) : updateBlockOverride(target.id, { rotation }))}
+            onResize={(target, patch) => (target.kind === 'extra' ? updateExtra(target.id, patch) : updateBlockOverride(target.id, patch))}
             onGestureEnd={() => {}}
             draw={draw.pointer}
             overlay={draw.overlay}
             onDoubleClick={openTextEdit}
-            hoverTitleOf={(block) => (block.extraId === undefined && isTextEditableType(block.type) ? (block.overridden ? 'Typed over the template text. Double-click to edit it.' : 'Double-click to type over') : undefined)}
+            hoverTitleOf={(block) => {
+              if (block.extraId !== undefined) return undefined;
+              const draggable = isMovableBlockType(block.type);
+              const textEditable = isTextEditableType(block.type);
+              if (textEditable && draggable) return block.overridden ? 'Typed over the template text and can be dragged. Double-click to edit the text.' : 'Double-click to type over. Can also be dragged.';
+              if (textEditable) return block.overridden ? 'Typed over the template text. Double-click to edit it.' : 'Double-click to type over';
+              if (draggable) return block.moved ? 'Moved from its template position. Drag to move it, or reset it in the Selection panel.' : 'Drag to move it.';
+              return undefined;
+            }}
             onFocusRequest={() => rootRef.current?.focus({ preventScroll: true })}
-            topOverlay={overriddenBlocks.map((block) => (
-              <circle key={`override-${block.id}`} className="mep-schematic-override-mark" cx={block.x} cy={block.y} r={mmPerPixel * 3} fill="#d9822b" pointerEvents="none">
-                <title>Text typed over the template</title>
-              </circle>
-            ))}
+            topOverlay={
+              <>
+                {overriddenBlocks.map((block) => (
+                  <circle key={`override-${block.id}`} className="mep-schematic-override-mark" cx={block.x} cy={block.y} r={mmPerPixel * 3} fill="#d9822b" pointerEvents="none">
+                    <title>Text typed over the template</title>
+                  </circle>
+                ))}
+                {movedBlocks.map((block) => (
+                  <rect
+                    key={`moved-${block.id}`}
+                    className="mep-schematic-moved-mark"
+                    x={block.x + block.width - mmPerPixel * 3}
+                    y={block.y + block.height - mmPerPixel * 3}
+                    width={mmPerPixel * 6}
+                    height={mmPerPixel * 6}
+                    transform={`rotate(45 ${block.x + block.width} ${block.y + block.height})`}
+                    fill="#2f9e44"
+                    pointerEvents="none"
+                  >
+                    <title>Moved from its template position</title>
+                  </rect>
+                ))}
+              </>
+            }
           />
           <SheetViewBar
             sheetView={sheetView}
             onZoomToContent={zoomBounds ? () => zoomTo(zoomBounds) : undefined}
-            status={sheetStatusText(draw, 'Click an item you added to select it, drag to move it. Double-click a text to type over it. Drag empty space to select, hold Shift to add or Shift-click to toggle one. Scroll to zoom, middle-drag to pan.')}
+            status={sheetStatusText(draw, 'Click an item to select it, drag to move it, whether you added it or the template drew it. Double-click a text to type over it. Drag empty space to select, hold Shift to add or Shift-click to toggle one. Scroll to zoom, middle-drag to pan.')}
           >
             <label>
               Grid
@@ -787,8 +853,17 @@ export function SchematicDialog({
           </div>
           {sideTab === 'fields' ? (
             <SchematicFieldsForm fields={generated?.fields ?? []} dateFormat={sheetTemplate.dateFormat} onChange={changeField} />
-          ) : liveSelectedExtraIds.length > 1 ? (
-            <MultiSelectionProperties count={liveSelectedExtraIds.length} onDuplicateBlock={duplicateSelectedExtra} onDeleteBlock={deleteSelectedExtra} />
+          ) : liveSelection.length > 1 ? (
+            <MultiSelectionProperties
+              count={liveSelection.length}
+              onDuplicateBlock={duplicateSelectedExtra}
+              onDeleteBlock={deleteSelectedExtra}
+              note={
+                blockSelectionCount > 0
+                  ? `${blockSelectionCount} of ${liveSelection.length} selected ${blockSelectionCount === 1 ? 'is a template block' : 'are template blocks'}. Duplicate and Delete only affect the items you added; move template blocks together, or reset one at a time.`
+                  : undefined
+              }
+            />
           ) : selectedExtra ? (
             <SchematicExtraProperties
               extra={selectedExtra}
@@ -799,8 +874,15 @@ export function SchematicDialog({
               onDuplicate={duplicateSelectedExtra}
               onDelete={deleteSelectedExtra}
             />
+          ) : selectedBlock ? (
+            <SchematicBlockOverrideProperties
+              block={selectedBlock}
+              circuitLabel={selectedBlock.circuitId !== undefined ? circuitLabelOf(selectedBlock.circuitId) : undefined}
+              onChange={(patch) => updateBlockOverride(selectedBlock.id, patch)}
+              onReset={() => updateBlockOverride(selectedBlock.id, undefined)}
+            />
           ) : (
-            <p className="mep-schematic-hint mep-ws-empty">Nothing is selected. Click a shape or text that you added to the schematic. Blocks that the template draws change in the template; double-click a text to type over it.</p>
+            <p className="mep-schematic-hint mep-ws-empty">Nothing is selected. Click a shape or text you added, or a block the template drew, to select it. Double-click a text to type over it.</p>
           )}
         </aside>
       </div>

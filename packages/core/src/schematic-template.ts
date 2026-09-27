@@ -171,6 +171,19 @@ export interface SchematicExtra extends SchematicBlock {
   circuitId?: string;
 }
 
+/**
+ * A user-moved/resized/rotated generated block, stored per resolved block id in `Schematic.blockOverrides`
+ * (electrical-schematic-templates.md Phase 7 round 2). A patch key left unset keeps the template's own
+ * value for that key, so a move (x/y only) does not clobber a separately-set rotation or size.
+ */
+export interface SchematicBlockOverride {
+  x?: number;
+  y?: number;
+  rotation?: number;
+  width?: number;
+  height?: number;
+}
+
 export interface SchematicTemplate {
   id: string;
   name: string;

@@ -7,6 +7,14 @@ export function isTextEditableType(type: SchematicBlockType): boolean {
   return !NOT_TEXT_TYPES.includes(type);
 }
 
+/** Page-level furniture, not per-circuit content: the frame, the title block and the totals table. Shared with `SheetDrawTools.tsx`'s "zoom to content" bounds. */
+export const NOT_MOVABLE_TYPES: SchematicBlockType[] = ['frame', 'titleBlock', 'totalsTable'];
+
+/** Whether the user can drag a generated block of this type in Schematic mode (electrical-schematic-templates.md Phase 7 round 2). */
+export function isMovableBlockType(type: SchematicBlockType): boolean {
+  return !NOT_MOVABLE_TYPES.includes(type);
+}
+
 /**
  * The top-most block that holds a sheet point and that `accept` allows, drawing order last = top. A rotated
  * block is tested in its own axes, so a point inside its drawn rectangle counts.

@@ -355,6 +355,7 @@ export function SheetBlockCanvas<T>({
           {blocks.map((block) => {
             if (targetOf(block) === undefined) return null;
             const outlineOnly = block.type === 'frame' || block.type === 'section';
+            const title = hoverTitleOf?.(block);
             return (
               <g key={block.id} transform={`translate(${block.x} ${block.y}) rotate(${block.rotation} ${block.width / 2} ${block.height / 2})`}>
                 <rect
@@ -366,7 +367,9 @@ export function SheetBlockCanvas<T>({
                   strokeWidth={outlineOnly ? Math.max(3, px * 6) : undefined}
                   pointerEvents={outlineOnly ? 'stroke' : 'all'}
                   cursor="move"
-                />
+                >
+                  {title !== undefined && <title>{title}</title>}
+                </rect>
               </g>
             );
           })}

@@ -203,10 +203,11 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
 }
 
 /** The Properties/Fields panel with 2+ things selected: no per-type fields (the selection may mix block types), just a count and the batch actions. */
-export function MultiSelectionProperties({ count, onDuplicateBlock, onDeleteBlock }: { count: number; onDuplicateBlock: () => void; onDeleteBlock: () => void }) {
+export function MultiSelectionProperties({ count, onDuplicateBlock, onDeleteBlock, note }: { count: number; onDuplicateBlock: () => void; onDeleteBlock: () => void; note?: string }) {
   return (
     <div className="mep-section">
       <h4>{count} selected</h4>
+      {note && <p className="mep-schematic-hint">{note}</p>}
       <div className="mep-schematic-buttons">
         <button type="button" onClick={onDuplicateBlock}>
           Duplicate

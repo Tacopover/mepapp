@@ -22,7 +22,7 @@ describe('createSchematic and updates', () => {
     expect(schematic.symbols.map((s) => s.id)).toEqual(['s2']);
     expect(schematic.symbols[0]).not.toBe(library[1]);
     expect(schematic.template).not.toBe(withSymbol);
-    expect(schematic).toMatchObject({ sourceTemplateId: base.id, fieldValues: {}, textOverrides: {}, extras: [] });
+    expect(schematic).toMatchObject({ sourceTemplateId: base.id, fieldValues: {}, textOverrides: {}, blockOverrides: {}, extras: [] });
   });
 
   it('leaves out a symbol that the library no longer has', () => {
@@ -55,12 +55,13 @@ describe('createSchematic and updates', () => {
   });
 
   it('refreshes the template and symbols and keeps the entered data', () => {
-    const schematic = { ...make(), fieldValues: { author: 'Kim' }, textOverrides: { k: 'v' } };
+    const schematic = { ...make(), fieldValues: { author: 'Kim' }, textOverrides: { k: 'v' }, blockOverrides: { m: { x: 5 } } };
     const edited = updateBlock(structuredClone(base), { blockId: 'bus' }, { x: 99 });
     const next = refreshSchematicFromTemplate(schematic, edited, library);
     expect(next.template.layoutBlocks.find((b) => b.id === 'bus')!.x).toBe(99);
     expect(next.fieldValues).toEqual({ author: 'Kim' });
     expect(next.textOverrides).toEqual({ k: 'v' });
+    expect(next.blockOverrides).toEqual({ m: { x: 5 } });
     expect(getSchematicTemplateStatus(next, edited, library)).toBe('current');
   });
 });
@@ -92,6 +93,29 @@ describe('generateFromSchematic', () => {
     expect(generated.diagnostics).toContainEqual({ kind: 'orphan-override', blockId: 'nope/-/gone' });
   });
 
+  it('moves a block by its override and marks it moved', () => {
+    const plain = generateFromSchematic(make(), input);
+    const target = plain.blocks.find((b) => b.templateBlockId === 'desc')!;
+    const generated = generateFromSchematic({ ...make(), blockOverrides: { [target.id]: { x: 5, y: 6 } } }, input);
+    const changed = generated.blocks.find((b) => b.id === target.id)!;
+    expect(changed).toMatchObject({ x: 5, y: 6, rotation: target.rotation, width: target.width, height: target.height, moved: true });
+    expect(generated.blocks.filter((b) => b.moved)).toHaveLength(1);
+    expect(generated.diagnostics.filter((d) => d.kind === 'orphan-block-override')).toEqual([]);
+  });
+
+  it('applies only the patched keys of a block override, leaving the others as the template computes them', () => {
+    const plain = generateFromSchematic(make(), input);
+    const target = plain.blocks.find((b) => b.templateBlockId === 'desc')!;
+    const generated = generateFromSchematic({ ...make(), blockOverrides: { [target.id]: { rotation: 45 } } }, input);
+    const changed = generated.blocks.find((b) => b.id === target.id)!;
+    expect(changed).toMatchObject({ x: target.x, y: target.y, width: target.width, height: target.height, rotation: 45, moved: true });
+  });
+
+  it('reports a moved block whose block is gone', () => {
+    const generated = generateFromSchematic({ ...make(), blockOverrides: { 'nope/-/gone': { x: 1 } } }, input);
+    expect(generated.diagnostics).toContainEqual({ kind: 'orphan-block-override', blockId: 'nope/-/gone' });
+  });
+
   it('draws a sheet extra at its sheet position', () => {
     const drawing = addBlock(structuredClone(base), 'drawing')!;
     const extra: SchematicExtra = { ...drawing.template.layoutBlocks.at(-1)!, id: 'e1', x: 50, y: 60, shapes: [] };
@@ -114,7 +138,7 @@ describe('generateFromSchematic', () => {
   });
 });
 
-import { addSchematicExtra, removeSchematicExtra, setSchematicFieldValue, setTextOverride, updateSchematicExtra } from './schematic.js';
+import { addSchematicExtra, removeSchematicExtra, setBlockOverride, setSchematicFieldValue, setTextOverride, updateSchematicExtra } from './schematic.js';
 
 describe('schematic edits', () => {
   it('sets and clears a field value and a text override without changing the input', () => {
@@ -125,6 +149,19 @@ describe('schematic edits', () => {
     expect(setSchematicFieldValue(withValue, 'author', undefined).fieldValues).toEqual({});
     expect(setSchematicFieldValue(schematic, 'author', '').fieldValues).toEqual({ author: '' });
     expect(setTextOverride(setTextOverride(schematic, 'b', 't'), 'b', undefined).textOverrides).toEqual({});
+  });
+
+  it('patches a block override without clobbering its other keys, and clears it', () => {
+    const schematic = make();
+    const withPos = setBlockOverride(schematic, 'b', { x: 5, y: 6 });
+    expect(withPos.blockOverrides).toEqual({ b: { x: 5, y: 6 } });
+    expect(schematic.blockOverrides).toEqual({});
+    const withRotation = setBlockOverride(withPos, 'b', { rotation: 90 });
+    expect(withRotation.blockOverrides).toEqual({ b: { x: 5, y: 6, rotation: 90 } });
+    const clearedX = setBlockOverride(withRotation, 'b', { x: undefined });
+    expect(clearedX.blockOverrides).toEqual({ b: { y: 6, rotation: 90 } });
+    expect(setBlockOverride(clearedX, 'b', undefined).blockOverrides).toEqual({});
+    expect(setBlockOverride(withPos, 'b', { x: undefined, y: undefined }).blockOverrides).toEqual({});
   });
 
   it('adds, updates and removes extras, and refuses a type that is not allowed', () => {

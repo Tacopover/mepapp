@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import { getBlocksBounds, type ResolvedBlock } from '@mepapp/core';
 import { FILLABLE_TOOLS, LINE_WIDTHS_MM, SHEET_DRAW_TOOLS, type SheetDrawTool } from '../sheetDraw.js';
+import { NOT_MOVABLE_TYPES } from '../schematicTextEdit.js';
 import type { SheetDraw } from '../useSheetDraw.js';
 import type { useSheetView } from '../useSheetView.js';
 import {
@@ -144,7 +145,7 @@ export function SheetToolOptions({ draw, onChooseSymbol, children }: SheetToolOp
   );
 }
 
-const SHEET_FURNITURE = new Set(['frame', 'titleBlock', 'totalsTable']);
+const SHEET_FURNITURE = new Set<string>(NOT_MOVABLE_TYPES);
 
 /** The bounds that "Zoom to content" shows: every block except the frame, title block and totals table, which sit at the sheet edges. */
 export function contentBounds(blocks: ResolvedBlock[]) {

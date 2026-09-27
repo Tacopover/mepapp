@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ResolvedBlock, ResolvedField } from '@mepapp/core';
-import { describeFieldDefault, findExtraBlockAt, findTextBlockAt, groupResolvedFields, isTextEditableType } from './schematicTextEdit.js';
+import { describeFieldDefault, findExtraBlockAt, findTextBlockAt, groupResolvedFields, isMovableBlockType, isTextEditableType } from './schematicTextEdit.js';
 
 const block = (id: string, type: ResolvedBlock['type'], x: number, y: number, width: number, height: number, rotation = 0): ResolvedBlock =>
   ({ id, templateBlockId: id, type, scope: 'once', x, y, width, height, rotation, panelId: 'p' }) as ResolvedBlock;
@@ -9,6 +9,13 @@ describe('isTextEditableType', () => {
   it('excludes blocks that draw no editable text', () => {
     for (const type of ['frame', 'busbar', 'drawing', 'totalsTable', 'loadSymbol'] as const) expect(isTextEditableType(type)).toBe(false);
     for (const type of ['titleBlock', 'description', 'cableText', 'circuitNumber', 'freeItem'] as const) expect(isTextEditableType(type)).toBe(true);
+  });
+});
+
+describe('isMovableBlockType', () => {
+  it('excludes only the page-level furniture', () => {
+    for (const type of ['frame', 'titleBlock', 'totalsTable'] as const) expect(isMovableBlockType(type)).toBe(false);
+    for (const type of ['busbar', 'section', 'description', 'cableText', 'circuitNumber', 'loadSymbol', 'drawing', 'freeItem'] as const) expect(isMovableBlockType(type)).toBe(true);
   });
 });
 

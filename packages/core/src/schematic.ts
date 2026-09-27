@@ -4,7 +4,7 @@
 
 import { generateSchematic, type GeneratedSchematic, type SchematicInput } from './schematic-generator.js';
 import type { SchematicSymbol } from './schematic-symbol.js';
-import type { SchematicBlockType, SchematicExtra, SchematicTemplate } from './schematic-template.js';
+import type { SchematicBlockOverride, SchematicBlockType, SchematicExtra, SchematicTemplate } from './schematic-template.js';
 
 export interface Schematic {
   id: string;
@@ -21,6 +21,8 @@ export interface Schematic {
   fieldValues: Record<string, string>;
   /** Text typed over a generated block, by the block's resolved id. */
   textOverrides: Record<string, string>;
+  /** Position/rotation/size patched by the user on a generated block, by the block's resolved id. */
+  blockOverrides: Record<string, SchematicBlockOverride>;
   /** Blocks added to this schematic only. */
   extras: SchematicExtra[];
 }
@@ -79,6 +81,7 @@ export function createSchematic(input: { id: string; name: string; panelId: stri
     symbols: bundleSymbols(input.source, input.library),
     fieldValues: {},
     textOverrides: {},
+    blockOverrides: {},
     extras: [],
   };
 }
@@ -124,6 +127,7 @@ export function generateFromSchematic(schematic: Schematic, input: SchematicGene
   return generateSchematic(schematicInput, schematic.template, {
     fieldSources: { projectValues: projectFieldValues, schematicValues: schematic.fieldValues, today },
     textOverrides: schematic.textOverrides,
+    blockOverrides: schematic.blockOverrides,
     extras: schematic.extras,
   });
 }
@@ -142,6 +146,24 @@ export function setTextOverride(schematic: Schematic, blockId: string, text: str
   if (text === undefined) delete textOverrides[blockId];
   else textOverrides[blockId] = text;
   return { ...schematic, textOverrides };
+}
+
+/**
+ * Patches a block's stored position/rotation/size override. `undefined` clears the whole override
+ * (reset to the template). A patch key set to undefined removes just that key, so a move (x/y only)
+ * does not clobber a rotation or size override already stored for the same block, and vice versa.
+ */
+export function setBlockOverride(schematic: Schematic, blockId: string, patch: Partial<SchematicBlockOverride> | undefined): Schematic {
+  const blockOverrides = { ...schematic.blockOverrides };
+  if (patch === undefined) {
+    delete blockOverrides[blockId];
+    return { ...schematic, blockOverrides };
+  }
+  const next: Record<string, unknown> = { ...blockOverrides[blockId], ...patch };
+  for (const key of Object.keys(patch)) if ((patch as Record<string, unknown>)[key] === undefined) delete next[key];
+  if (Object.keys(next).length === 0) delete blockOverrides[blockId];
+  else blockOverrides[blockId] = next as SchematicBlockOverride;
+  return { ...schematic, blockOverrides };
 }
 
 /** The block types that a schematic can hold as extras: free text and drawings. */
