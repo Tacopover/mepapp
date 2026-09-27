@@ -70,6 +70,8 @@ export interface SchematicTemplateEditorProps {
   /** Values of the fields shared by every schematic, so the preview shows realistic text. The editor never stores them. */
   projectFieldValues?: Record<string, string>;
   initialPanelId: string;
+  /** Reports whether a drawing block or the symbol library is open in place of the editor, so the caller's own close button can wait for it to finish. */
+  onSubviewOpenChange?: (open: boolean) => void;
 }
 
 const SAMPLE = 'sample';
@@ -77,7 +79,7 @@ const GRID_OPTIONS = [0, 0.5, 1, 2, 5];
 const ACCENT = '#175a8a';
 const sameRef = (a: BlockRef | null, b: BlockRef | null) => a !== null && b !== null && a.blockId === b.blockId && a.groupId === b.groupId;
 
-export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, symbols, onSymbolsChange, symbolUses, projectFieldValues, initialPanelId }: SchematicTemplateEditorProps) {
+export function SchematicTemplateEditor({ initialTemplate, onChange, panels, circuits, panelSections, circuitTypes, stamps, customStampDefinitions, symbols, onSymbolsChange, symbolUses, projectFieldValues, initialPanelId, onSubviewOpenChange }: SchematicTemplateEditorProps) {
   const [history, setHistoryState] = useState<History<SchematicTemplate>>(() => createHistory(initialTemplate));
   const historyRef = useRef(history);
   const onChangeRef = useRef(onChange);
@@ -106,6 +108,8 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const [drawTarget, setDrawTarget] = useState<string>('sheet');
   const drawingOpenRef = useRef(false);
   const [previewSource, setPreviewSource] = useState<string>(() => (circuits.some((c) => c.panelId === initialPanelId) ? initialPanelId : SAMPLE));
+  const [dropNotice, setDropNotice] = useState<string | null>(null);
+  const dropNoticeTimer = useRef<number | undefined>(undefined);
 
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -124,7 +128,14 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const activeGroupRef = useRef<string | null>(null);
   activeGroupRef.current = activeGroupId;
   const drawingBlock = drawingRef ? findBlock(template, drawingRef) : undefined;
-  drawingOpenRef.current = drawingBlock !== undefined || symbolLibrary !== null;
+  const templateSubviewOpen = drawingBlock !== undefined || symbolLibrary !== null;
+  drawingOpenRef.current = templateSubviewOpen;
+  const onSubviewOpenChangeRef = useRef(onSubviewOpenChange);
+  onSubviewOpenChangeRef.current = onSubviewOpenChange;
+  useEffect(() => {
+    onSubviewOpenChangeRef.current?.(templateSubviewOpen);
+    return () => onSubviewOpenChangeRef.current?.(false);
+  }, [templateSubviewOpen]);
 
   const terminals = useMemo(() => buildSchematicTerminals(stamps, customStampDefinitions), [stamps, customStampDefinitions]);
   const previewPanel = previewSource === SAMPLE ? undefined : panels.find((p) => p.id === previewSource);
@@ -137,6 +148,8 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
   const notes = useMemo(() => [...validateSchematicTemplate(template), ...describeDiagnostics(generated.diagnostics, input.circuits, input.panel)], [template, generated, input]);
   const groupOriginOf = (groupId: string) => firstCircuitOrigin(template, input, generated, groupId);
   const loadTypes = useMemo(() => [...new Set(Object.values(input.terminals).map((t) => t.loadType).filter((t): t is string => t !== undefined))], [input]);
+
+  useEffect(() => () => window.clearTimeout(dropNoticeTimer.current), []);
 
   useEffect(() => {
     // Dialog listens for Escape on the document; a capture listener on the window runs first and keeps a block selection from closing the dialog.
@@ -176,6 +189,12 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
     if (groupId) setRightTab('properties');
   }
 
+  function showDropNotice(message: string) {
+    setDropNotice(message);
+    window.clearTimeout(dropNoticeTimer.current);
+    dropNoticeTimer.current = window.setTimeout(() => setDropNotice(null), 4500);
+  }
+
   /** Adds a palette block: at the middle of the view, or where it was dropped on the sheet. */
   function addFromPalette(type: SchematicBlockType, drop?: { x: number; y: number }) {
     const info = SCHEMATIC_BLOCK_CATALOGUE[type];
@@ -186,9 +205,14 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
       const hit = drop ? repeatAtPoint(generated.blocks, generated.circuitOrigins, drop) : undefined;
       const groupId = hit?.groupId ?? activeGroupId ?? present.groups[0]?.id;
       if (groupId === undefined) return;
-      const origin = hit?.origin ?? (drop ? groupOriginOf(groupId) : undefined);
+      const groupOrigin = groupOriginOf(groupId);
+      const origin = hit?.origin ?? (drop ? groupOrigin : undefined);
       const at = drop && origin ? { x: snapToGrid(drop.x - origin.x - info.width / 2, grid), y: snapToGrid(drop.y - origin.y - info.height / 2, grid) } : undefined;
       result = addBlock(present, type, { groupId, at });
+      if (result && groupOrigin === undefined) {
+        const group = present.groups.find((g) => g.id === groupId);
+        showDropNotice(`Added to "${group?.name ?? groupId}" — not shown here, because the current preview has no circuit in that group yet.`);
+      }
     } else {
       const at = info.scope === 'section' ? { x: 0, y: 0 } : { x: snapToGrid(centre.x - info.width / 2, grid), y: snapToGrid(centre.y - info.height / 2, grid) };
       result = addBlock(present, type, { at });
@@ -479,7 +503,7 @@ export function SchematicTemplateEditor({ initialTemplate, onChange, panels, cir
         <SheetViewBar
           sheetView={sheetView}
           onZoomToContent={zoomBounds ? () => zoomTo(zoomBounds) : undefined}
-          status={sheetStatusText(draw, 'Click a block to select it, drag to move it. Scroll to zoom, drag empty space to pan. Hold Alt to turn off the grid.')}
+          status={dropNotice ?? sheetStatusText(draw, 'Click a block to select it, drag to move it. Scroll to zoom, drag empty space to pan. Hold Alt to turn off the grid.')}
         >
           <button type="button" className="mep-ws-textbtn" onClick={zoomToGroup} disabled={!activeGroupId || !generated.blocks.some((b) => b.groupId === activeGroupId)} title="Zoom to the first circuit drawn by the selected group">
             Zoom to group

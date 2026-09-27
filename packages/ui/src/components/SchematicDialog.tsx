@@ -155,6 +155,8 @@ export function SchematicDialog({
   const [sideTab, setSideTab] = useState<'fields' | 'selection'>('fields');
   /** The "Switch template" chooser is open. */
   const [switching, setSwitching] = useState(false);
+  /** A drawing block or the symbol library is open inside the template editor. */
+  const [templateSubviewOpen, setTemplateSubviewOpen] = useState(false);
   const today = useMemo(() => todayIso(), []);
 
   const allTemplates = [...SCHEMATIC_TEMPLATE_LIBRARY, ...customTemplates];
@@ -434,6 +436,8 @@ export function SchematicDialog({
   const overriddenBlocks: ResolvedBlock[] = generated?.blocks.filter((b) => b.overridden) ?? [];
   const zoomBounds = generated ? contentBounds(generated.blocks) : undefined;
   const subviewOpen = drawingExtra !== undefined || symbolLibraryOpen;
+  /** Any drawing/symbol-library subview is open, in either mode — closing now would discard its in-progress edits. */
+  const closeBlocked = subviewOpen || templateSubviewOpen;
 
   const header = (
     <div className="mep-ws-header">
@@ -506,7 +510,7 @@ export function SchematicDialog({
           Panel <b>{panel?.name ?? ''}</b>
         </span>
       )}
-      <button type="button" className="mep-rail-btn mep-ws-close" aria-label="Close" title="Close (Escape)" onClick={onClose}>
+      <button type="button" className="mep-rail-btn mep-ws-close" aria-label="Close" title={closeBlocked ? 'Finish or cancel the open drawing first' : 'Close (Escape)'} disabled={closeBlocked} onClick={onClose}>
         <IconClose size={18} />
       </button>
     </div>
@@ -530,6 +534,7 @@ export function SchematicDialog({
         symbolUses={(symbolId) => countSymbolUses(customTemplates, symbolId)}
         projectFieldValues={projectFields}
         initialPanelId={panelId}
+        onSubviewOpenChange={setTemplateSubviewOpen}
       />
     );
   } else if (drawingExtra) {
