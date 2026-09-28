@@ -61,7 +61,7 @@ describe('stamp library', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('the hand-typed fire-hose-reel carries its own Dutch label alongside the fixture-generated entries', () => {
+  it('fire-hose-reel carries its Dutch label, same as every other fixture-generated entry', () => {
     const pump = getStampDefinition('pump-plumbing');
     expect(pump?.labelNl).toBe('50 Pomp');
     expect(getStampDefinition('fire-hose-reel')?.labelNl).toBe('53 Brandslanghaspel');
