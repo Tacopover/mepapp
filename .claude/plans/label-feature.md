@@ -1,6 +1,6 @@
 # Canvas labels — plan and spec
 
-Status: **approved 2026-09-26; all recommendations in §11 accepted by the user. Phases 1–4 done 2026-09-26 on branch `worktree-label-feature-plan` (not on master yet, waiting for a Windows test). Phases 5–7 not started.** Written 2026-09-26. The "Label visibility controls" row in [[ui-atlas-layout-mapping]] §6 points here. The circuit label that [[electrical-circuits-model]] E8 moved out is part of this plan (Phase 1 and Phase 2).
+Status: **approved 2026-09-26; all recommendations in §11 accepted by the user. Phases 1–4 and feedback rounds 1–2 done, tested by the user on Windows, merged to master 2026-09-28. Phases 5–7 not started.** Written 2026-09-26. The "Label visibility controls" row in [[ui-atlas-layout-mapping]] §6 points here. The circuit label that [[electrical-circuits-model]] E8 moved out is part of this plan (Phase 1 and Phase 2).
 
 ## 1. Goal
 
