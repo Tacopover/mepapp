@@ -2116,6 +2116,42 @@
 .mep-schematic-canvas:active {
   cursor: grabbing;
 }
+.mep-schematic-main {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-height: 0;
+}
+.mep-schematic-side {
+  flex: 0 0 250px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.mep-schematic-side input[type='text'],
+.mep-schematic-side input[type='date'],
+.mep-schematic-side textarea,
+.mep-schematic-create input[type='text'],
+.mep-schematic-create select {
+  width: 100%;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.mep-schematic-create {
+  max-width: 420px;
+}
+.mep-schematic-create-actions {
+  display: flex;
+  gap: 8px;
+}
+.mep-schematic-textedit {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.mep-schematic-textedit textarea {
+  flex: 1 1 auto;
+  font-size: 12px;
+}
 
 /* Schematic template editor (electrical-schematic-templates.md Phase 5) */
 .mep-schematic-editor {
@@ -2352,4 +2388,657 @@
 }
 .mep-symbol-tile-actions button {
   font-size: 11px;
+}
+
+/* Template fields editor (electrical-schematic-templates.md Phase 5b) */
+.mep-schematic-fieldrow {
+  border-top: 1px solid var(--mep-border, #9aa3ad);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.mep-schematic-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+/* Schematic workspace (electrical-schematic-templates.md Phase 5c): one full-window dialog with a
+   thin header, a tool rail left of the sheet, a tool options bar above it and a view bar under it. */
+.mep-modal--workspace {
+  position: fixed;
+  inset: 8px;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+}
+.mep-modal--workspace .mep-modal-body {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+.mep-modal-header {
+  flex: none;
+}
+.mep-ws-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 2px solid var(--ink);
+  font-size: 12px;
+}
+.mep-ws-header .mep-schematic-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.mep-ws-modes {
+  display: flex;
+  flex: none;
+  overflow: hidden;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+}
+.mep-ws-modes button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.mep-ws-modes button + button {
+  border-left: 1.5px solid var(--ink);
+}
+.mep-ws-modes button.on {
+  background: var(--accent);
+  color: #fff;
+}
+.mep-ws-modes button:disabled {
+  opacity: 0.45;
+}
+.mep-ws-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mep-ws-title b {
+  color: var(--ink);
+}
+.mep-modal .mep-ws-header select.mep-ws-select {
+  width: auto;
+  max-width: 220px;
+  margin: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.mep-ws-sep {
+  align-self: stretch;
+  width: 1.5px;
+  margin: 4px 2px;
+  background: var(--line);
+}
+.mep-ws-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: #d9822b;
+  color: #fff;
+}
+.mep-ws-menu-btn {
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.mep-ws-close {
+  margin-left: auto;
+  flex: none;
+}
+.mep-ws-page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+.mep-ws-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+.mep-ws-body--schematic {
+  grid-template-columns: 44px minmax(0, 1fr) 300px;
+}
+.mep-ws-body--template {
+  grid-template-columns: 260px 44px minmax(0, 1fr) 300px;
+}
+.mep-ws-body--schematic > .mep-ws-rail {
+  grid-column: 1 / 2;
+}
+.mep-ws-body--schematic > .mep-ws-stage {
+  grid-column: 2 / 3;
+}
+.mep-ws-body--schematic > .mep-ws-right {
+  grid-column: 3 / 4;
+}
+.mep-ws-body--template > .mep-ws-left {
+  grid-column: 1 / 2;
+}
+.mep-ws-body--template > .mep-ws-rail {
+  grid-column: 2 / 3;
+}
+.mep-ws-body--template > .mep-ws-stage {
+  grid-column: 3 / 4;
+}
+.mep-ws-body--template > .mep-ws-right {
+  grid-column: 4 / 5;
+}
+.mep-ws-body > .mep-schematic-side {
+  border: none;
+  border-left: 1.5px solid var(--line);
+}
+.mep-ws-body > .mep-ws-left {
+  border-left: none;
+  border-right: 1.5px solid var(--line);
+}
+.mep-ws-right > .mep-subtabs {
+  margin: 10px 14px 4px;
+}
+.mep-ws-empty {
+  margin: 10px 14px;
+}
+.mep-ws-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 0;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 2px solid var(--ink);
+  overflow-y: auto;
+}
+.mep-ws-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px 8px;
+}
+.mep-ws-stage > .mep-schematic-canvas {
+  border-radius: 2px;
+}
+.mep-ws-options,
+.mep-ws-viewbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  min-height: 32px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.mep-ws-options {
+  flex-wrap: nowrap;
+  height: 34px;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+.mep-ws-options strong {
+  font-family: var(--font-display);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.mep-ws-options label,
+.mep-ws-viewbar label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mep-modal .mep-ws-options input[type='text'] {
+  width: 260px;
+  margin: 0;
+  padding: 3px 6px;
+}
+.mep-modal .mep-ws-options input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+}
+.mep-modal .mep-ws-options select,
+.mep-modal .mep-ws-viewbar select {
+  width: auto;
+  max-width: 260px;
+  margin: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.mep-ws-options-value {
+  font-weight: 600;
+}
+.mep-ws-options--idle {
+  background: transparent;
+  border-style: dashed;
+}
+.mep-ws-options-hint {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mep-ws-viewbar {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.mep-ws-textbtn {
+  padding: 4px 8px;
+  font-size: 11.5px;
+}
+.mep-ws-status {
+  /* Takes the rest of the row; below 320 px it moves to a row of its own, where it can use two lines. */
+  flex: 1 1 320px;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* Template editor panels (electrical-schematic-templates.md Phase 5c round 2) */
+.mep-ws-left > .mep-subtabs,
+.mep-schematic-props > .mep-subtabs {
+  margin: 10px 14px 4px;
+}
+.mep-ws-body > .mep-ws-left {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mep-ws-left > .mep-subtabs {
+  flex: none;
+}
+.mep-outline,
+.mep-palette {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 10px 12px;
+}
+.mep-schematic-props > .mep-subtabs {
+  position: sticky;
+  top: 10px;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: 0 -10px 0 var(--surface);
+}
+.mep-outline-node {
+  margin-bottom: 6px;
+}
+.mep-outline-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 26px;
+  font-size: 12px;
+}
+.mep-outline-title {
+  font-weight: 700;
+}
+.mep-outline-list {
+  list-style: none;
+  margin: 0 0 0 14px;
+  padding: 0 0 0 6px;
+  border-left: 1px solid var(--line);
+}
+.mep-outline-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 3px;
+}
+.mep-outline-row:hover {
+  background: var(--surface-2);
+}
+.mep-outline-row.on {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.mep-outline-head.current:not(.on) {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.mep-outline-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.mep-outline-row.on .mep-outline-main {
+  color: var(--accent-ink);
+}
+.mep-outline-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-outline-detail,
+.mep-outline-id {
+  color: var(--muted);
+  font-weight: 400;
+}
+.mep-outline-id {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.mep-outline-caret,
+.mep-outline-tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+.mep-outline-tool:hover:not(:disabled),
+.mep-outline-caret:hover {
+  border-color: var(--line);
+  background: var(--surface);
+}
+.mep-outline-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mep-outline-row.on > .mep-outline-main .mep-outline-id,
+.mep-outline-head.current > .mep-outline-main .mep-outline-detail {
+  display: none;
+}
+.mep-outline-tools {
+  flex: none;
+  display: flex;
+  gap: 1px;
+  padding-right: 2px;
+}
+.mep-outline-empty {
+  margin: 4px 0 6px;
+}
+.mep-outline-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+.mep-palette-group {
+  margin-bottom: 10px;
+}
+.mep-palette-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.mep-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: grab;
+}
+.mep-palette-item:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mep-palette-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mep-field-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mep-field-item {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.mep-field-item.on {
+  border-color: var(--accent);
+}
+.mep-field-summary {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 5px;
+  align-items: center;
+  padding: 5px 6px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mep-field-item.on .mep-field-summary {
+  background: var(--accent-soft);
+}
+.mep-field-summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-field-summary-meta {
+  grid-column: 2;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.mep-field-editor {
+  padding: 8px 8px 2px;
+  border-top: 1px solid var(--line);
+}
+
+/* Schematic workspace panels (Phase 5c item 8): one input look and one label style for every
+   panel in the workspace, readable section titles. Scoped to the workspace, the rest of the app
+   keeps its own look. */
+.mep-modal--workspace .mep-ws-left .mep-section h4,
+.mep-modal--workspace .mep-ws-right .mep-section h4 {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.mep-modal--workspace .mep-ws-left .mep-schematic-field label,
+.mep-modal--workspace .mep-ws-right .mep-schematic-field label,
+.mep-modal--workspace .mep-ws-left .mep-field-row label,
+.mep-modal--workspace .mep-ws-right .mep-field-row label,
+.mep-modal--workspace .mep-schematic-palette-heading {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+.mep-modal--workspace .mep-ws-left input:not([type='checkbox']):not([type='radio']),
+.mep-modal--workspace .mep-ws-right input:not([type='checkbox']):not([type='radio']),
+.mep-modal--workspace .mep-ws-left select,
+.mep-modal--workspace .mep-ws-right select,
+.mep-modal--workspace .mep-ws-left textarea,
+.mep-modal--workspace .mep-ws-right textarea {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--surface);
+  padding: 4px 7px;
+  margin-bottom: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+.mep-modal--workspace .mep-ws-left input:focus,
+.mep-modal--workspace .mep-ws-right input:focus,
+.mep-modal--workspace .mep-ws-left select:focus,
+.mep-modal--workspace .mep-ws-right select:focus,
+.mep-modal--workspace .mep-ws-left textarea:focus,
+.mep-modal--workspace .mep-ws-right textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.mep-modal--workspace .mep-ws-left .mep-field-row input,
+.mep-modal--workspace .mep-ws-right .mep-field-row input {
+  width: 96px;
+  text-align: right;
+}
+.mep-modal--workspace .mep-ws-right .mep-field-row input.mep-field-inherited {
+  border-style: dashed;
+  font-style: italic;
+  color: var(--muted);
+}
+.mep-modal--workspace .mep-subtabs button {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.mep-modal--workspace .mep-ws-modes button {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.mep-modal--workspace .mep-ws-options strong {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.mep-schematic-field-error {
+  font-size: 11.5px;
+  color: #b3261e;
+}
+.mep-date-input {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+.mep-date-input > input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mep-date-input-picker {
+  position: relative;
+  flex: none;
+  width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.mep-modal--workspace .mep-date-input-picker > input[type='date'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Generated text that the user can type over (Phase 5c item 16). */
+.mep-sheet-hover {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+  cursor: text;
+}
+.mep-sheet-hover:hover {
+  fill: rgba(23, 90, 138, 0.08);
+  stroke: #175a8a;
+  stroke-dasharray: 2 1.5;
+}
+.mep-sheet-hover--outline {
+  fill: none;
+  stroke: transparent;
+  pointer-events: stroke;
+  stroke-width: 3;
+}
+.mep-sheet-hover--outline:hover {
+  fill: none;
+  stroke: rgba(23, 90, 138, 0.25);
+  stroke-dasharray: none;
+}
+.mep-modal--workspace .mep-schematic-field > button {
+  align-self: flex-start;
 }

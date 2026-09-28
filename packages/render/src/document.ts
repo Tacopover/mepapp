@@ -14,6 +14,7 @@ import {
   type PanelSection,
   type PlacedStamp,
   type PortGroup,
+  type Schematic,
   type Segment,
   type StampDefinition,
   type Vec2,
@@ -102,6 +103,10 @@ export class SketchDocument {
   readonly customStampDefinitions: StampDefinition[] = [];
   /** Per-document editable copy of the circuit-type library (electrical-circuits-model.md §5) — starts empty, same as customStampDefinitions; a circuit references one by id, resolved against this list or CIRCUIT_TYPE_LIBRARY's built-ins. No "adopt on first use" mechanism yet (unlike networkTypes) — nothing in Phase C needs one. */
   readonly circuitTypes: CircuitType[] = [];
+  /** Saved schematics (electrical-schematic-templates.md Phase 5b). Edited directly and not undoable, like circuitTypes. */
+  readonly schematics: Schematic[] = [];
+  /** Entered values of template fields with scope 'project', by field id — shared by every schematic of this document. */
+  readonly schematicProjectFields: Record<string, string> = {};
   readonly terminalCapacities = new Map<string, number>();
   pdfSyncIds = new Set<string>();
   nextStampSeq = 1;

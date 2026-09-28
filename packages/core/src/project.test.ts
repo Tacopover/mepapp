@@ -33,6 +33,8 @@ describe('serializeProject / loadProject round trip', () => {
       panels: [],
       panelSections: [],
       circuitTypes: [],
+      schematics: [],
+      schematicProjectFields: {},
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -206,6 +208,8 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.panels).toEqual([]);
     expect(loaded.panelSections).toEqual([]);
     expect(loaded.circuitTypes).toEqual([]);
+    expect(loaded.schematics).toEqual([]); // v10->v11 runs after v8->v9
+    expect(loaded.schematicProjectFields).toEqual({});
   });
 
   it('migrates a pre-circuit-defaults (v9) save unchanged, since the new fields are all optional', () => {
@@ -228,6 +232,19 @@ describe('serializeProject / loadProject round trip', () => {
     const loaded = loadProject(legacyDoc);
     expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(loaded.panels).toEqual([]);
+    expect(loaded.schematics).toEqual([]);
+    expect(loaded.schematicProjectFields).toEqual({});
+  });
+
+  it('migrates a v10 save by adding empty schematics and shared project fields', () => {
+    const loaded = loadProject({
+      schemaVersion: 10,
+      networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [],
+      terminalCapacities: {}, circuits: [], panels: [], panelSections: [], circuitTypes: [],
+    });
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.schematics).toEqual([]);
+    expect(loaded.schematicProjectFields).toEqual({});
   });
 
   it('throws ProjectLoadError with the specific issue when a required array is missing', () => {
@@ -244,6 +261,8 @@ describe('serializeProject / loadProject round trip', () => {
       panels: [],
       panelSections: [],
       circuitTypes: [],
+      schematics: [],
+      schematicProjectFields: {},
     };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {

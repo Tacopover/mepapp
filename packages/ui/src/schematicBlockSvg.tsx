@@ -19,7 +19,7 @@ export interface SchematicBlockSvgProps {
   block: ResolvedBlock;
   /** The vector art of the block's load stamp, when its definition has any (custom stamps do; library stamps are raster art and draw a generic load mark). */
   loadShapes?: SymbolShape[];
-  /** The art of the library symbol a drawing block points at (`block.symbolId`). undefined when the symbol no longer exists; the block then draws a dashed box with a question mark. */
+  /** The art of the library symbol a block points at (`block.symbolId`). undefined when the symbol no longer exists. A drawing then draws a dashed box with a question mark; a device or load block draws its built-in mark. */
   symbolShapes?: SymbolShape[];
   /** Draw a faint dashed outline for a drawing block that has no shapes yet. The editor sets it; the read-only viewer does not. */
   showEmptyDrawings?: boolean;
@@ -53,6 +53,7 @@ export function SchematicBlockSvg({ block, loadShapes, symbolShapes, showEmptyDr
   const bold = style?.bold;
   const italic = style?.italic;
   const text = block.text ?? '';
+  const symbolArt = block.symbolId !== undefined && symbolShapes && symbolShapes.length > 0 ? symbolShapes : undefined;
   const line = { stroke, strokeWidth, strokeDasharray: dash, fill: 'none' } as const;
   const textAnchor = style?.align === 'right' ? 'end' : style?.align === 'center' ? 'middle' : 'start';
   const textX = textAnchor === 'end' ? w : textAnchor === 'middle' ? w / 2 : 0.5;
@@ -107,10 +108,16 @@ export function SchematicBlockSvg({ block, loadShapes, symbolShapes, showEmptyDr
       const symbolH = Math.max(h - fontSize - 1, h * 0.5);
       art = (
         <>
-          <line x1={w / 2} y1={0} x2={w / 2} y2={symbolH * 0.3} {...line} />
-          <rect x={w * 0.2} y={symbolH * 0.3} width={w * 0.6} height={symbolH * 0.5} {...line} />
-          <line x1={w * 0.2} y1={symbolH * 0.8} x2={w * 0.8} y2={symbolH * 0.3} {...line} />
-          <line x1={w / 2} y1={symbolH * 0.8} x2={w / 2} y2={symbolH} {...line} />
+          {symbolArt ? (
+            <SymbolShapesSvg shapes={symbolArt} widthPx={w} heightPx={symbolH} minStrokePx={DRAWING_MIN_STROKE_MM} />
+          ) : (
+            <>
+              <line x1={w / 2} y1={0} x2={w / 2} y2={symbolH * 0.3} {...line} />
+              <rect x={w * 0.2} y={symbolH * 0.3} width={w * 0.6} height={symbolH * 0.5} {...line} />
+              <line x1={w * 0.2} y1={symbolH * 0.8} x2={w * 0.8} y2={symbolH * 0.3} {...line} />
+              <line x1={w / 2} y1={symbolH * 0.8} x2={w / 2} y2={symbolH} {...line} />
+            </>
+          )}
           <Text x={w / 2} y={h - 0.4} size={fontSize * 0.85} bold fill={stroke}>
             {text}
           </Text>
@@ -121,7 +128,11 @@ export function SchematicBlockSvg({ block, loadShapes, symbolShapes, showEmptyDr
     case 'accessoryDevice':
       art = (
         <>
-          <circle cx={w / 2} cy={h * 0.38} r={Math.min(w, h) * 0.3} {...line} />
+          {symbolArt ? (
+            <SymbolShapesSvg shapes={symbolArt} widthPx={w} heightPx={Math.max(h - fontSize * 0.8 - 1, h * 0.5)} minStrokePx={DRAWING_MIN_STROKE_MM} />
+          ) : (
+            <circle cx={w / 2} cy={h * 0.38} r={Math.min(w, h) * 0.3} {...line} />
+          )}
           <Text x={w / 2} y={h - 0.4} size={fontSize * 0.8} fill={stroke}>
             {text}
           </Text>
@@ -164,7 +175,9 @@ export function SchematicBlockSvg({ block, loadShapes, symbolShapes, showEmptyDr
       break;
     }
     case 'loadSymbol':
-      art = loadShapes && loadShapes.length > 0 ? (
+      art = symbolArt ? (
+        <SymbolShapesSvg shapes={symbolArt} widthPx={w} heightPx={h} minStrokePx={DRAWING_MIN_STROKE_MM} />
+      ) : loadShapes && loadShapes.length > 0 ? (
         <SymbolShapesSvg shapes={loadShapes} widthPx={w} heightPx={h} />
       ) : (
         <>

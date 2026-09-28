@@ -31,19 +31,21 @@ export function SchematicDrawingEditor({ title, shapes, widthMm, heightMm, onDon
 
   // Dialog closes on Escape at the document level, which would throw away the drawing. A capture
   // listener on the document runs first. While a polygon or arc is half drawn, the hook cancels it.
-  const { polygonDraft, arcThreePointDraft, setSelectedShapeIds, setTool } = editor;
+  // Escape then clears the selection, then leaves the tool, and last acts as Cancel.
+  const { polygonDraft, arcThreePointDraft, selectedShapeIds, tool, setSelectedShapeIds, setTool } = editor;
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
       const tag = (event.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || polygonDraft || arcThreePointDraft) return;
       event.stopPropagation();
-      setSelectedShapeIds(new Set());
-      setTool('select');
+      if (selectedShapeIds.size > 0) setSelectedShapeIds(new Set());
+      else if (tool !== 'select') setTool('select');
+      else onCancel();
     }
     document.addEventListener('keydown', onKeyDown, { capture: true });
     return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [polygonDraft, arcThreePointDraft, setSelectedShapeIds, setTool]);
+  }, [polygonDraft, arcThreePointDraft, selectedShapeIds, tool, setSelectedShapeIds, setTool, onCancel]);
 
   return (
     <div className="mep-schematic mep-schematic-drawing">
@@ -51,7 +53,7 @@ export function SchematicDrawingEditor({ title, shapes, widthMm, heightMm, onDon
         <button type="button" onClick={() => onDone(editor.shapes)}>
           Done
         </button>
-        <button type="button" onClick={onCancel} title="Leave without keeping the changes made in this editor">
+        <button type="button" onClick={onCancel} title="Leave without keeping the changes made in this editor (Escape)">
           Cancel
         </button>
         <strong>{title}</strong>
@@ -64,7 +66,7 @@ export function SchematicDrawingEditor({ title, shapes, widthMm, heightMm, onDon
           <ShapeToolRail editor={editor} tools={BUILTIN_SHAPE_TOOL_DEFS} />
           <ShapeDrawSurface editor={editor} canvasWidthPx={widthPx} canvasHeightPx={heightPx} paperFill="#ffffff" />
         </div>
-        <ShapeStyleBar editor={editor} />
+        <ShapeStyleBar editor={editor} strokeMmPerUnit={Math.min(widthMm, heightMm)} />
       </div>
     </div>
   );

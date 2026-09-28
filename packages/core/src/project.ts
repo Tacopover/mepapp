@@ -7,11 +7,12 @@
 import type { Annotation } from './annotation.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
+import type { Schematic } from './schematic.js';
 import type { PlacedStamp } from './stamp.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -30,6 +31,10 @@ export interface ProjectDocument {
   panelSections: PanelSection[];
   /** Per-document editable copy of the circuit-type library, mirroring how networkTypes seeds from NETWORK_TYPE_LIBRARY (see circuit-type-library.ts). */
   circuitTypes: CircuitType[];
+  /** Saved schematics (electrical-schematic-templates.md Phase 5b), each a panel drawn with its own copy of a template. */
+  schematics: Schematic[];
+  /** Entered values of template fields with scope 'project', by field id, shared by every schematic. */
+  schematicProjectFields: Record<string, string>;
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -191,6 +196,18 @@ const migrationSteps: MigrationStep[] = [
       schemaVersion: 10,
     }),
   },
+  {
+    fromVersion: 10,
+    toVersion: 11,
+    // Version 10 predates saved schematics — no save before this could have any.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 11,
+      schematics: Array.isArray(data.schematics) ? data.schematics : [],
+      schematicProjectFields:
+        data.schematicProjectFields && typeof data.schematicProjectFields === 'object' && !Array.isArray(data.schematicProjectFields) ? data.schematicProjectFields : {},
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -215,6 +232,8 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'panels'),
   (data: JsonRecord) => requireArray(data, 'panelSections'),
   (data: JsonRecord) => requireArray(data, 'circuitTypes'),
+  (data: JsonRecord) => requireArray(data, 'schematics'),
+  (data: JsonRecord) => requireRecord(data, 'schematicProjectFields'),
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

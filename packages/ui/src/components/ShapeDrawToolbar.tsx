@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import { useState, type ComponentType } from 'react';
 import { ColorPicker } from './ColorPicker.js';
 import { ZOOM_STEP, type BuiltinShapeTool, type ShapeDrawEditor } from '../useShapeDrawEditor.js';
 import {
@@ -76,26 +76,54 @@ export function ShapeToolRail<TTool extends string>({ editor, tools }: { editor:
   );
 }
 
-/** Style, selection actions, zoom and snap controls under the canvas. */
-export function ShapeStyleBar<TTool extends string>({ editor }: { editor: ShapeDrawEditor<TTool> }) {
+function StrokeMmInput({ fraction, mmPerUnit, onChange }: { fraction: number; mmPerUnit: number; onChange: (fraction: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      type="number"
+      min={0.05}
+      step={0.05}
+      value={draft ?? String(Math.round(fraction * mmPerUnit * 1000) / 1000)}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        const mm = Number(e.target.value);
+        if (e.target.value.trim() !== '' && Number.isFinite(mm) && mm > 0) onChange(mm / mmPerUnit);
+      }}
+      onBlur={() => setDraft(null)}
+      style={{ width: 64 }}
+    />
+  );
+}
+
+/**
+ * Style, selection actions, zoom and snap controls under the canvas. A stroke width is stored as a
+ * fraction of the drawing's shorter side; `strokeMmPerUnit` (that side in mm) shows it in mm instead.
+ */
+export function ShapeStyleBar<TTool extends string>({ editor, strokeMmPerUnit }: { editor: ShapeDrawEditor<TTool>; strokeMmPerUnit?: number }) {
   return (
     <div className="mep-ee-bar">
       <div className="mep-ee-bar-cluster mep-shape-style-row">
         <label>
           Stroke <ColorPicker value={editor.activeStyle.stroke} onChange={(color) => editor.updateActiveStyle({ stroke: color })} />
         </label>
-        <label>
-          Width{' '}
-          <input
-            type="number"
-            min={0.002}
-            max={0.05}
-            step={0.002}
-            value={editor.activeStyle.strokeWidth}
-            onChange={(e) => editor.updateActiveStyle({ strokeWidth: Number(e.target.value) })}
-            style={{ width: 56 }}
-          />
-        </label>
+        {strokeMmPerUnit !== undefined && strokeMmPerUnit > 0 ? (
+          <label>
+            Width (mm) <StrokeMmInput fraction={editor.activeStyle.strokeWidth} mmPerUnit={strokeMmPerUnit} onChange={(fraction) => editor.updateActiveStyle({ strokeWidth: fraction })} />
+          </label>
+        ) : (
+          <label>
+            Width{' '}
+            <input
+              type="number"
+              min={0.002}
+              max={0.05}
+              step={0.002}
+              value={editor.activeStyle.strokeWidth}
+              onChange={(e) => editor.updateActiveStyle({ strokeWidth: Number(e.target.value) })}
+              style={{ width: 56 }}
+            />
+          </label>
+        )}
         <label>
           <input type="checkbox" checked={editor.activeStyle.fill !== null} onChange={(e) => editor.updateActiveStyle({ fill: e.target.checked ? editor.activeStyle.stroke : null })} /> Fill
         </label>

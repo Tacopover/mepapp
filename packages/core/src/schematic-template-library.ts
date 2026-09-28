@@ -6,7 +6,7 @@
 // is where they get tuned. Where a template will live once a user can edit it
 // (per installation or per document) is plan open question 1.
 
-import type { CircuitGroupDefinition, SchematicBlock, SchematicBlockType, SchematicTemplate, TotalsTableRow } from './schematic-template.js';
+import type { CircuitGroupDefinition, SchematicBlock, SchematicFieldDefinition, SchematicBlockType, SchematicTemplate, TotalsTableRow } from './schematic-template.js';
 
 function block(id: string, type: SchematicBlockType, x: number, y: number, extra: Partial<SchematicBlock> = {}): SchematicBlock {
   return { id, type, x, y, rotation: 0, ...extra };
@@ -22,6 +22,17 @@ const TOTALS_ROWS: TotalsTableRow[] = [
 ];
 
 const NL_NUMBER_FORMAT = { decimalSeparator: ',' } as const;
+
+const NL_FIELDS: SchematicFieldDefinition[] = [
+  { id: 'projectName', label: 'Project name', type: 'text', scope: 'project' },
+  { id: 'client', label: 'Client', type: 'text', scope: 'project' },
+  { id: 'title', label: 'Drawing title', type: 'text', scope: 'schematic', defaultBinding: 'Distribution board {panel.name}' },
+  { id: 'author', label: 'Drawn by', type: 'text', scope: 'schematic' },
+  { id: 'date', label: 'Date', type: 'date', scope: 'schematic', defaultToday: true },
+  { id: 'revision', label: 'Revision', type: 'text', scope: 'schematic', defaultBinding: '0' },
+];
+
+const TITLE_BINDING = '{field.projectName}\n{field.title}\n[Client: {field.client}\n][Drawn by: {field.author}   ][Date: {field.date}   ][Rev: {field.revision}]';
 
 /** Circuits as rows, like the E60 example: the busbar runs down the left and each circuit is one line to its right. */
 const ROWS_TEMPLATE: SchematicTemplate = (() => {
@@ -48,7 +59,7 @@ const ROWS_TEMPLATE: SchematicTemplate = (() => {
     numberFormat: NL_NUMBER_FORMAT,
     layoutBlocks: [
       block('frame', 'frame', 6, 6, { width: 829, height: 582, style: { strokeWidthMm: 0.5, dash: 'dashed' } }),
-      block('title', 'titleBlock', 735, 546),
+      block('title', 'titleBlock', 735, 546, { binding: TITLE_BINDING }),
       block('feed', 'feedCable', 12, 14),
       block('main', 'mainDevice', 14, 26),
       block('bus', 'busbar', 30, 40, { width: 2 }),
@@ -57,6 +68,7 @@ const ROWS_TEMPLATE: SchematicTemplate = (() => {
     ],
     groupAnchor: { x: 40, y: 44 },
     groups,
+    fields: NL_FIELDS.map((f) => ({ ...f })),
   };
 })();
 
@@ -87,7 +99,7 @@ const COLUMNS_TEMPLATE: SchematicTemplate = (() => {
     numberFormat: NL_NUMBER_FORMAT,
     layoutBlocks: [
       block('frame', 'frame', 6, 6, { width: 829, height: 582, style: { strokeWidthMm: 0.5, dash: 'dashed' } }),
-      block('title', 'titleBlock', 735, 546),
+      block('title', 'titleBlock', 735, 546, { binding: TITLE_BINDING }),
       block('feed', 'feedCable', 12, 14),
       block('main', 'mainDevice', 14, 26),
       block('bus', 'busbar', 30, 42, { height: 2 }),
@@ -96,6 +108,7 @@ const COLUMNS_TEMPLATE: SchematicTemplate = (() => {
     ],
     groupAnchor: { x: 34, y: 46 },
     groups,
+    fields: NL_FIELDS.map((f) => ({ ...f })),
   };
 })();
 

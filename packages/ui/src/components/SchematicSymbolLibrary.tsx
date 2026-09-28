@@ -14,6 +14,10 @@ export interface SchematicSymbolLibraryProps {
   onPick: (symbol: SchematicSymbol) => void;
   /** Leave the library without choosing. */
   onClose: () => void;
+  /** Text of the back button. Default "Back to template". */
+  backLabel?: string;
+  /** Hint next to the title. Default "Click a symbol to place it in the template." */
+  pickHint?: string;
 }
 
 const THUMB_MAX_PX = 64;
@@ -33,7 +37,7 @@ export function SymbolThumbnail({ symbol }: { symbol: SchematicSymbol }) {
  * and per-symbol edit, copy and delete. It fills the schematic dialog in place of the template
  * editor, like `SchematicDrawingEditor`. Choosing a symbol hands it to `onPick`.
  */
-export function SchematicSymbolLibrary({ symbols, onChange, usesOf, onPick, onClose }: SchematicSymbolLibraryProps) {
+export function SchematicSymbolLibrary({ symbols, onChange, usesOf, onPick, onClose, backLabel = 'Back to template', pickHint = 'Click a symbol to place it in the template.' }: SchematicSymbolLibraryProps) {
   const [editing, setEditing] = useState<{ symbol?: SchematicSymbol } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -76,13 +80,13 @@ export function SchematicSymbolLibrary({ symbols, onChange, usesOf, onPick, onCl
     <div className="mep-schematic mep-schematic-symbols">
       <div className="mep-schematic-bar">
         <button type="button" onClick={onClose}>
-          Back to template
+          {backLabel}
         </button>
         <button type="button" onClick={() => setEditing({})}>
           + Draw your own symbol…
         </button>
         <strong>Symbol library</strong>
-        <span className="mep-schematic-hint">Click a symbol to place it in the template.</span>
+        <span className="mep-schematic-hint">{pickHint}</span>
       </div>
       {symbols.length === 0 ? (
         <p className="mep-hint">No symbols yet. Draw your own to add one.</p>
@@ -101,7 +105,7 @@ export function SchematicSymbolLibrary({ symbols, onChange, usesOf, onPick, onCl
                 </button>
                 {pendingDeleteId === symbol.id ? (
                   <div className="mep-symbol-tile-actions">
-                    <span className="mep-schematic-hint">{uses > 0 ? (uses === 1 ? 'Used by 1 block. It shows a missing-symbol box.' : `Used by ${uses} blocks. They show a missing-symbol box.`) : 'Delete this symbol?'}</span>
+                    <span className="mep-schematic-hint">{uses > 0 ? (uses === 1 ? 'Used by 1 block. A drawing shows a missing-symbol box; a device block shows its built-in mark.' : `Used by ${uses} blocks. A drawing shows a missing-symbol box; a device block shows its built-in mark.`) : 'Delete this symbol?'}</span>
                     <button type="button" onClick={() => remove(symbol.id)}>
                       Delete
                     </button>

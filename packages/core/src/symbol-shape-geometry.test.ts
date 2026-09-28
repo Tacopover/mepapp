@@ -156,6 +156,25 @@ describe('applyHandleDrag', () => {
   });
 });
 
+describe('updateDraftShape on a canvas that is not square', () => {
+  const style = { stroke: '#000000', strokeWidth: 0.01, fill: null };
+  it('sizes a circle radius from the pixel distance, as a fraction of the shorter side', () => {
+    const draft = createDraftShape('circle', 'c', { fractionX: 0.5, fractionY: 0.5 }, style);
+    // 800 x 400 px: a drag of 0.25 of the width is 200 px, and the shorter side is 400 px.
+    const updated = updateDraftShape(draft, { fractionX: 0.5, fractionY: 0.5 }, { fractionX: 0.75, fractionY: 0.5 }, { widthPx: 800, heightPx: 400 });
+    expect(updated.kind === 'circle' && updated.radius).toBeCloseTo(0.5);
+    // The drawn radius is radius * min(w, h) = 200 px, which is the drag distance.
+    const vertical = updateDraftShape(draft, { fractionX: 0.5, fractionY: 0.5 }, { fractionX: 0.5, fractionY: 0.75 }, { widthPx: 800, heightPx: 400 });
+    expect(vertical.kind === 'circle' && vertical.radius * 400).toBeCloseTo(100);
+  });
+
+  it('keeps the old result when no size is given', () => {
+    const draft = createDraftShape('arc', 'a', { fractionX: 0.1, fractionY: 0.1 }, style);
+    const updated = updateDraftShape(draft, { fractionX: 0.1, fractionY: 0.1 }, { fractionX: 0.4, fractionY: 0.5 });
+    expect(updated.kind === 'arc' && updated.radius).toBeCloseTo(0.5);
+  });
+});
+
 describe('createDraftShape / updateDraftShape / isDraftLargeEnough', () => {
   it('creates a zero-size rect at the start point and grows it as the pointer moves', () => {
     const draft = createDraftShape('rect', 'draft-1', { fractionX: 0.1, fractionY: 0.1 }, style);

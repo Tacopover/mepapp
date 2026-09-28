@@ -77,6 +77,9 @@ export const SCHEMATIC_BLOCK_CATALOGUE: Record<SchematicBlockType, SchematicBloc
   totalsTable: { label: 'Totals table', scope: 'aggregate', width: 90, height: 30 },
 };
 
+/** The block types that can show a library symbol through `SchematicBlock.symbolId`. */
+export const SYMBOL_CAPABLE_BLOCK_TYPES: readonly SchematicBlockType[] = ['drawing', 'mainDevice', 'protectiveDevice', 'accessoryDevice', 'loadSymbol'];
+
 export interface SchematicBlockStyle {
   strokeWidthMm?: number;
   dash?: 'solid' | 'dashed' | 'dotted';
@@ -106,7 +109,7 @@ export interface SchematicBlock {
   /** Text with {expression} segments. undefined = the block type's default binding; '' = no text. */
   binding?: string;
   style?: SchematicBlockStyle;
-  /** drawing only. The id of a `SchematicSymbol` in the symbol library. The symbol's art replaces `shapes`. */
+  /** Only on a type in `SYMBOL_CAPABLE_BLOCK_TYPES`. The id of a `SchematicSymbol` in the symbol library. On a drawing the symbol's art replaces `shapes`. On a device or load block it replaces the built-in mark; the block keeps its text. */
   symbolId?: string;
   /** drawing only. Coordinates are fractions (0..1) of the block's width and height, the same convention as a custom stamp's shapes. */
   shapes?: SymbolShape[];
@@ -141,6 +144,46 @@ export interface CircuitGroupDefinition {
   blocks: SchematicBlock[];
 }
 
+export type SchematicFieldType = 'text' | 'multiline' | 'date' | 'number';
+
+/**
+ * A value that the user fills in per schematic, such as the project name or the revision. Blocks read
+ * it as `{field.<id>}`. The template only defines it; the value belongs to the project (scope
+ * `project`, entered once and shared by every schematic) or to one schematic (scope `schematic`).
+ */
+export interface SchematicFieldDefinition {
+  /** A name that starts with a letter or underscore and holds letters, digits and underscores. */
+  id: string;
+  label: string;
+  type: SchematicFieldType;
+  scope: 'project' | 'schematic';
+  /** Used while no value is entered: text with {expression} segments, evaluated on the panel, for example "Board {panel.name}". */
+  defaultBinding?: string;
+  /** A date field only: the default is the day the schematic is generated. */
+  defaultToday?: boolean;
+}
+
+/**
+ * A block that the user added to one schematic, not to the template. Its position is in sheet mm, or
+ * relative to the origin of circuit `circuitId` when that is set, so it follows that circuit.
+ */
+export interface SchematicExtra extends SchematicBlock {
+  circuitId?: string;
+}
+
+/**
+ * A user-moved/resized/rotated generated block, stored per resolved block id in `Schematic.blockOverrides`
+ * (electrical-schematic-templates.md Phase 7 round 2). A patch key left unset keeps the template's own
+ * value for that key, so a move (x/y only) does not clobber a separately-set rotation or size.
+ */
+export interface SchematicBlockOverride {
+  x?: number;
+  y?: number;
+  rotation?: number;
+  width?: number;
+  height?: number;
+}
+
 export interface SchematicTemplate {
   id: string;
   name: string;
@@ -155,6 +198,10 @@ export interface SchematicTemplate {
   groupAnchor: { x: number; y: number };
   /** Ordered: the first group whose rule matches a circuit is used for it. */
   groups: CircuitGroupDefinition[];
+  /** The fields the user fills in per schematic. Absent in templates saved before fields existed. */
+  fields?: SchematicFieldDefinition[];
+  /** How a date field shows in text. Default 'dd-mm-yyyy'. */
+  dateFormat?: 'dd-mm-yyyy' | 'yyyy-mm-dd';
 }
 
 export function getBlockWidth(block: SchematicBlock): number {
@@ -205,7 +252,10 @@ function validateBlock(block: SchematicBlock, where: string, expectedScopes: Sch
   }
   if (block.type !== 'totalsTable' && (block.tableRows || block.tableColumns)) issues.push(`${name} sets table fields but is not a totalsTable.`);
   if (block.shapes !== undefined && (block.type !== 'drawing' || !Array.isArray(block.shapes))) issues.push(`${name} sets shapes but is not a drawing.`);
-  if (block.symbolId !== undefined && (block.type !== 'drawing' || block.symbolId.trim() === '')) issues.push(`${name} sets a symbol but is not a drawing.`);
+  if (block.symbolId !== undefined) {
+    if (!SYMBOL_CAPABLE_BLOCK_TYPES.includes(block.type)) issues.push(`${name} sets a symbol but a ${block.type} block cannot show one.`);
+    else if (block.symbolId.trim() === '') issues.push(`${name} sets a symbol without an id.`);
+  }
 }
 
 /** The reasons a template cannot be generated from; an empty list means it is valid. Checks structure and that every binding parses. */
@@ -227,6 +277,21 @@ export function validateSchematicTemplate(template: SchematicTemplate): string[]
     if (group.direction !== template.groups[0]?.direction) issues.push(`Group "${group.id}" has direction "${group.direction}" but the first group has "${template.groups[0]?.direction}". All groups must have the same direction.`);
     const groupBlockIds = new Set<string>();
     for (const block of group.blocks) validateBlock(block, `group "${group.id}"`, block.type === 'drawing' ? ['circuit', 'once'] : ['circuit'], groupBlockIds, issues);
+  }
+  const fieldIds = new Set<string>();
+  for (const field of template.fields ?? []) {
+    const name = `Field "${field.id}"`;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(field.id)) issues.push(`${name} needs an id of letters, digits and underscores that does not start with a digit.`);
+    if (fieldIds.has(field.id)) issues.push(`${name} reuses an id.`);
+    fieldIds.add(field.id);
+    if (field.label.trim() === '') issues.push(`${name} needs a label.`);
+    if (!['text', 'multiline', 'date', 'number'].includes(field.type)) issues.push(`${name} has an unknown type "${String(field.type)}".`);
+    if (field.scope !== 'project' && field.scope !== 'schematic') issues.push(`${name} has an unknown scope "${String(field.scope)}".`);
+    if (field.defaultToday && field.type !== 'date') issues.push(`${name} uses "today" as its default but is not a date.`);
+    if (field.defaultBinding) {
+      const issue = bindingIssue(name, field.defaultBinding, 'binding');
+      if (issue) issues.push(issue);
+    }
   }
   return issues;
 }

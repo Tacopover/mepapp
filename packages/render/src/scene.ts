@@ -71,6 +71,7 @@ import {
   type PanelSection,
   type PlacedStamp,
   type PortGroup,
+  type Schematic,
   type PortSpec,
   type ProjectDocument,
   type ReconciliationReport,
@@ -1403,6 +1404,52 @@ export class SketchScene {
     return true;
   }
 
+  // --- Saved schematics (electrical-schematic-templates.md Phase 5b) -------
+  // Like the circuit type edits, these change the document directly and are not undoable. A schematic
+  // belongs to one panel; listSchematics and exportProject leave out a schematic whose panel no longer
+  // exists (a reverted panel can come back through undo, and its schematics come back with it, until the
+  // next save drops them).
+
+  /** The active document's schematics whose panel still exists. */
+  listSchematics(): Schematic[] {
+    const panels = this.doc.drawingHistory.getState().panels;
+    return this.doc.schematics.filter((s) => panels[s.panelId] !== undefined);
+  }
+
+  addSchematic(schematic: Schematic): void {
+    this.doc.schematics.push(schematic);
+    this.notifyCircuitsChanged();
+  }
+
+  /** Replaces the schematic that has the same id as `next`. Returns false when there is none. */
+  updateSchematic(next: Schematic): boolean {
+    const index = this.doc.schematics.findIndex((s) => s.id === next.id);
+    if (index < 0) return false;
+    this.doc.schematics[index] = next;
+    this.notifyCircuitsChanged();
+    return true;
+  }
+
+  removeSchematic(id: string): boolean {
+    const index = this.doc.schematics.findIndex((s) => s.id === id);
+    if (index < 0) return false;
+    this.doc.schematics.splice(index, 1);
+    this.notifyCircuitsChanged();
+    return true;
+  }
+
+  /** Values of template fields with scope 'project', by field id — shared by every schematic of the active document. */
+  getSchematicProjectFields(): Record<string, string> {
+    return { ...this.doc.schematicProjectFields };
+  }
+
+  /** Stores a shared field value; `undefined` removes it so the field's default applies again. */
+  setSchematicProjectField(fieldId: string, value: string | undefined): void {
+    if (value === undefined) delete this.doc.schematicProjectFields[fieldId];
+    else this.doc.schematicProjectFields[fieldId] = value;
+    this.notifyCircuitsChanged();
+  }
+
   /** The Panel already referencing this equipment stamp, if any — Properties panel's "Convert to panel"/"Revert to equipment" gating for a selected Equipment stamp. */
   getPanelForEquipmentStamp(equipmentStampId: string): Panel | undefined {
     return Object.values(this.doc.drawingHistory.getState().panels).find((p) => p.equipmentStampId === equipmentStampId);
@@ -2154,6 +2201,8 @@ export class SketchScene {
       panels: Object.values(state.panels),
       panelSections: Object.values(state.panelSections),
       circuitTypes: this.doc.circuitTypes,
+      schematics: this.listSchematics(),
+      schematicProjectFields: this.doc.schematicProjectFields,
     }) as unknown as ProjectDocument;
   }
 
@@ -2200,6 +2249,9 @@ export class SketchScene {
     target.portGroups.splice(0, target.portGroups.length, ...doc.portGroups);
     target.customStampDefinitions.splice(0, target.customStampDefinitions.length, ...doc.customStampDefinitions);
     target.circuitTypes.splice(0, target.circuitTypes.length, ...doc.circuitTypes);
+    target.schematics.splice(0, target.schematics.length, ...doc.schematics);
+    for (const key of Object.keys(target.schematicProjectFields)) delete target.schematicProjectFields[key];
+    Object.assign(target.schematicProjectFields, doc.schematicProjectFields);
     target.terminalCapacities.clear();
     for (const [elementId, capacity] of Object.entries(doc.terminalCapacities)) {
       target.terminalCapacities.set(elementId, capacity);

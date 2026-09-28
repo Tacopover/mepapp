@@ -327,8 +327,8 @@ export function PanelProperties({ sceneRef, panel, circuits, panelSections, circ
 
       <div className="mep-section">
         <CircuitLinesToggle show={showCircuitLines} onToggle={onToggleCircuitLines} />
-        <button type="button" onClick={onOpenSchematic} title="Show this panel's circuits as a distribution board schedule">
-          View schematic…
+        <button type="button" onClick={onOpenSchematic} title="Open the distribution board schedules of this panel, or create one">
+          Schematics…
         </button>
       </div>
 

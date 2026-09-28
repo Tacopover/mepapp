@@ -138,6 +138,8 @@ export function MepSketchApp({
     panels,
     panelSections,
     circuitTypes,
+    schematics,
+    schematicProjectFields,
     selectedCircuitId,
     setSelectedCircuitId,
     selectedPanelId,
@@ -938,13 +940,19 @@ export function MepSketchApp({
 
       {schematicPanelId && (
         <SchematicDialog
+          panelId={schematicPanelId}
           panels={panels}
           circuits={circuits}
           panelSections={panelSections}
           circuitTypes={circuitTypes}
           stamps={allStamps}
           customStampDefinitions={customStampDefinitions}
-          initialPanelId={schematicPanelId}
+          schematics={schematics}
+          projectFields={schematicProjectFields}
+          onAddSchematic={(schematic) => sceneRef.current?.addSchematic(schematic)}
+          onUpdateSchematic={(schematic) => sceneRef.current?.updateSchematic(schematic)}
+          onRemoveSchematic={(schematicId) => sceneRef.current?.removeSchematic(schematicId)}
+          onProjectFieldChange={(fieldId, value) => sceneRef.current?.setSchematicProjectField(fieldId, value)}
           customTemplates={customSchematicTemplates}
           onCustomTemplatesChange={setCustomSchematicTemplates}
           customSymbols={customSchematicSymbols}

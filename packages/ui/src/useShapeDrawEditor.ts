@@ -701,7 +701,7 @@ export function useShapeDrawEditor<TTool extends string = BuiltinShapeTool>(opti
           point = { x: gridSnap(point.x, GRID_SPACING_FRACTION), y: gridSnap(point.y, GRID_SPACING_FRACTION) };
         }
         current = { fractionX: point.x, fractionY: point.y };
-        draft = updateDraftShape(draft, start, current);
+        draft = updateDraftShape(draft, start, current, { widthPx: canvasWidthPx, heightPx: canvasHeightPx });
         setDraftShapes([draft]);
       };
       const up = () => {

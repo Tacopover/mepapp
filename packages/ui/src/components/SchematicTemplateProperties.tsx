@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ExpressionError,
   SCHEMATIC_BLOCK_CATALOGUE,
+  addField,
   findBlock,
+  findFieldUses,
   formatNumberList,
   getBindingFieldsForScope,
   getBlockHeight,
@@ -10,18 +12,24 @@ import {
   parseBinding,
   parseExpression,
   parseNumberList,
+  removeField,
+  reorderField,
   setTemplateDirection,
+  setBlockSymbol,
   updateBlock,
+  updateField,
   updateGroup,
   type BlockRef,
   type CircuitGroupRule,
   type CircuitType,
   type SchematicBlock,
   type SchematicBlockStyle,
+  type SchematicFieldDefinition,
   type SchematicSymbol,
   type SchematicTemplate,
   type TotalsTableRow,
 } from '@mepapp/core';
+import { IconChevDown, IconChevRight } from '../icons.js';
 
 export type EditTemplate = (change: (template: SchematicTemplate) => SchematicTemplate, gestureKey?: string | null) => void;
 
@@ -29,7 +37,8 @@ export interface SchematicTemplatePropertiesProps {
   template: SchematicTemplate;
   edit: EditTemplate;
   endGesture: () => void;
-  selection: BlockRef | null;
+  /** Every selected block. */
+  selection: BlockRef[];
   activeGroupId: string | null;
   circuitTypes: CircuitType[];
   /** Load types found on the preview data's terminals, offered when the user types a load type filter. */
@@ -43,6 +52,8 @@ export interface SchematicTemplatePropertiesProps {
   symbols: SchematicSymbol[];
   onChangeSymbol: () => void;
   onDetachSymbol: () => void;
+  tab: TemplatePanelTab;
+  onTabChange: (tab: TemplatePanelTab) => void;
 }
 
 const SHEET_SIZES = [
@@ -51,6 +62,9 @@ const SHEET_SIZES = [
   { label: 'A0', widthMm: 1189, heightMm: 841 },
 ];
 
+/** The types whose symbol is an optional visual override (a drawing has its own Symbol and Shapes rows). */
+const DEVICE_SYMBOL_TYPES: readonly string[] = ['mainDevice', 'protectiveDevice', 'accessoryDevice', 'loadSymbol'];
+const FIELD_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SCOPE_LABELS = { once: 'Sheet', panel: 'Panel', section: 'Section', circuit: 'Circuit', aggregate: 'Aggregate' } as const;
 
 function toHex(color: number): string {
@@ -70,7 +84,7 @@ interface NumberFieldProps {
 }
 
 /** Keeps its own text while it has focus, so the user can clear the box and type a new number. */
-function NumberField({ label, value, onCommit, onBlur, optional, placeholder, min, step = 1 }: NumberFieldProps) {
+export function NumberField({ label, value, onCommit, onBlur, optional, placeholder, min, step = 1 }: NumberFieldProps) {
   const format = (v: number | undefined) => (v === undefined ? '' : String(Math.round(v * 1000) / 1000));
   const [text, setText] = useState(format(value));
   const focused = useRef(false);
@@ -129,12 +143,29 @@ function formulaError(source: string): string | null {
   }
 }
 
-export function SchematicTemplateProperties({ template, edit, endGesture, selection, activeGroupId, circuitTypes, loadTypes, notes, onDuplicateBlock, onDeleteBlock, onEditDrawing, symbols, onChangeSymbol, onDetachSymbol }: SchematicTemplatePropertiesProps) {
+export type TemplatePanelTab = 'properties' | 'fields' | 'template';
+
+const TABS: { id: TemplatePanelTab; label: string }[] = [
+  { id: 'properties', label: 'Properties' },
+  { id: 'fields', label: 'Fields' },
+  { id: 'template', label: 'Settings' },
+];
+
+export function SchematicTemplateProperties({ template, edit, endGesture, selection, activeGroupId, circuitTypes, loadTypes, notes, onDuplicateBlock, onDeleteBlock, onEditDrawing, symbols, onChangeSymbol, onDetachSymbol, tab, onTabChange }: SchematicTemplatePropertiesProps) {
   const group = activeGroupId ? template.groups.find((g) => g.id === activeGroupId) : undefined;
-  const block = selection ? findBlock(template, selection) : undefined;
+  const singleSelection = selection.length === 1 ? selection[0] : undefined;
+  const block = singleSelection ? findBlock(template, singleSelection) : undefined;
 
   return (
     <div className="mep-schematic-props">
+      <div className="mep-subtabs" role="tablist" aria-label="Right panel">
+        {TABS.map(({ id, label }) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'on' : undefined} onClick={() => onTabChange(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       {notes.length > 0 && (
         <div className="mep-section">
           {notes.map((note, i) => (
@@ -145,61 +176,97 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
         </div>
       )}
 
-      {block && selection && (
-        <BlockProperties template={template} block={block} selection={selection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} onEditDrawing={onEditDrawing} symbols={symbols} onChangeSymbol={onChangeSymbol} onDetachSymbol={onDetachSymbol} />
+      {tab === 'properties' && (
+        <>
+          {selection.length > 1 && <MultiSelectionProperties count={selection.length} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} />}
+          {selection.length <= 1 && (
+            <>
+              {block && singleSelection && (
+                <BlockProperties template={template} block={block} selection={singleSelection} edit={edit} endGesture={endGesture} loadTypes={loadTypes} onDuplicateBlock={onDuplicateBlock} onDeleteBlock={onDeleteBlock} onEditDrawing={onEditDrawing} symbols={symbols} onChangeSymbol={onChangeSymbol} onDetachSymbol={onDetachSymbol} />
+              )}
+              {group && (!block || singleSelection?.groupId === group.id) && <GroupProperties group={group} edit={edit} endGesture={endGesture} circuitTypes={circuitTypes} />}
+              {!block && !group && (
+                <div className="mep-section">
+                  <p className="mep-schematic-hint">Nothing is selected. Click a block on the sheet or in the Outline to edit it, or select a group to edit its rule and pitch.</p>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
-      {!block && (
-        <div className="mep-section">
-          <p className="mep-schematic-hint">Select a block on the sheet or in the list to edit it.</p>
+
+      {tab === 'fields' && <FieldsSection template={template} edit={edit} endGesture={endGesture} />}
+
+      {tab === 'template' && <TemplateSettings template={template} edit={edit} endGesture={endGesture} />}
+    </div>
+  );
+}
+
+/** The Properties/Fields panel with 2+ things selected: no per-type fields (the selection may mix block types), just a count and the batch actions. */
+export function MultiSelectionProperties({ count, onDuplicateBlock, onDeleteBlock, note }: { count: number; onDuplicateBlock: () => void; onDeleteBlock: () => void; note?: string }) {
+  return (
+    <div className="mep-section">
+      <h4>{count} selected</h4>
+      {note && <p className="mep-schematic-hint">{note}</p>}
+      <div className="mep-schematic-buttons">
+        <button type="button" onClick={onDuplicateBlock}>
+          Duplicate
+        </button>
+        <button type="button" onClick={onDeleteBlock}>
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GroupProperties({ group, edit, endGesture, circuitTypes }: { group: SchematicTemplate['groups'][number]; edit: EditTemplate; endGesture: () => void; circuitTypes: CircuitType[] }) {
+  return (
+    <div className="mep-section">
+      <h4>Group · {group.name}</h4>
+      <div className="mep-schematic-field">
+        <label>Name</label>
+        <input type="text" value={group.name} onChange={(e) => edit((t) => updateGroup(t, group.id, { name: e.target.value }), `group:${group.id}:name`)} onBlur={endGesture} />
+      </div>
+      <div className="mep-schematic-field">
+        <label>Applies to</label>
+        <select value={group.rule.kind} onChange={(e) => edit((t) => updateGroup(t, group.id, { rule: ruleOfKind(e.target.value) }))}>
+          <option value="any">Any circuit</option>
+          <option value="spare">Spare circuits</option>
+          <option value="circuitType">Circuit type</option>
+          <option value="circuitNumber">Circuit number</option>
+        </select>
+      </div>
+      {group.rule.kind === 'circuitType' && (
+        <div className="mep-schematic-checks">
+          {circuitTypes.length === 0 && <span className="mep-schematic-hint">This document has no circuit types.</span>}
+          {circuitTypes.map((type) => {
+            const ids = group.rule.kind === 'circuitType' ? group.rule.circuitTypeIds : [];
+            return (
+              <label key={type.id}>
+                <input
+                  type="checkbox"
+                  checked={ids.includes(type.id)}
+                  onChange={(e) => edit((t) => updateGroup(t, group.id, { rule: { kind: 'circuitType', circuitTypeIds: e.target.checked ? [...ids, type.id] : ids.filter((id) => id !== type.id) } }))}
+                />
+                {type.name}
+              </label>
+            );
+          })}
         </div>
       )}
+      {group.rule.kind === 'circuitNumber' && <CircuitNumberRule key={group.id} numbers={group.rule.numbers} onChange={(numbers) => edit((t) => updateGroup(t, group.id, { rule: { kind: 'circuitNumber', numbers } }), `group:${group.id}:numbers`)} onBlur={endGesture} />}
+      <NumberField label="Pitch mm" value={group.pitch} min={0.1} step={0.5} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => updateGroup(t, group.id, { pitch: v }), `group:${group.id}:pitch`)} />
+      <p className="mep-schematic-hint">The first group whose rule matches a circuit is used for it. The pitch is the distance to the next circuit.</p>
+    </div>
+  );
+}
 
-      {group && (
-        <details open className="mep-section">
-          <summary>
-            <h4>Group · {group.name}</h4>
-          </summary>
-          <div className="mep-schematic-field">
-            <label>Name</label>
-            <input type="text" value={group.name} onChange={(e) => edit((t) => updateGroup(t, group.id, { name: e.target.value }), `group:${group.id}:name`)} onBlur={endGesture} />
-          </div>
-          <div className="mep-schematic-field">
-            <label>Applies to</label>
-            <select value={group.rule.kind} onChange={(e) => edit((t) => updateGroup(t, group.id, { rule: ruleOfKind(e.target.value) }))}>
-              <option value="any">Any circuit</option>
-              <option value="spare">Spare circuits</option>
-              <option value="circuitType">Circuit type</option>
-              <option value="circuitNumber">Circuit number</option>
-            </select>
-          </div>
-          {group.rule.kind === 'circuitType' && (
-            <div className="mep-schematic-checks">
-              {circuitTypes.length === 0 && <span className="mep-schematic-hint">This document has no circuit types.</span>}
-              {circuitTypes.map((type) => {
-                const ids = group.rule.kind === 'circuitType' ? group.rule.circuitTypeIds : [];
-                return (
-                  <label key={type.id}>
-                    <input
-                      type="checkbox"
-                      checked={ids.includes(type.id)}
-                      onChange={(e) => edit((t) => updateGroup(t, group.id, { rule: { kind: 'circuitType', circuitTypeIds: e.target.checked ? [...ids, type.id] : ids.filter((id) => id !== type.id) } }))}
-                    />
-                    {type.name}
-                  </label>
-                );
-              })}
-            </div>
-          )}
-          {group.rule.kind === 'circuitNumber' && <CircuitNumberRule key={group.id} numbers={group.rule.numbers} onChange={(numbers) => edit((t) => updateGroup(t, group.id, { rule: { kind: 'circuitNumber', numbers } }), `group:${group.id}:numbers`)} onBlur={endGesture} />}
-          <NumberField label="Pitch mm" value={group.pitch} min={0.1} step={0.5} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => updateGroup(t, group.id, { pitch: v }), `group:${group.id}:pitch`)} />
-          <p className="mep-schematic-hint">The first group whose rule matches a circuit is used for it. The pitch is the distance to the next circuit.</p>
-        </details>
-      )}
-
-      <details open className="mep-section">
-        <summary>
-          <h4>Template</h4>
-        </summary>
+function TemplateSettings({ template, edit, endGesture }: { template: SchematicTemplate; edit: EditTemplate; endGesture: () => void }) {
+  return (
+    <>
+      <div className="mep-section">
+        <h4>Template</h4>
         <div className="mep-schematic-field">
           <label>Name</label>
           <input type="text" value={template.name} onChange={(e) => edit((t) => ({ ...t, name: e.target.value }), 'template:name')} onBlur={endGesture} />
@@ -212,22 +279,27 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
           <label>Locale label</label>
           <input type="text" value={template.locale} onChange={(e) => edit((t) => ({ ...t, locale: e.target.value }), 'template:locale')} onBlur={endGesture} />
         </div>
-        <NumberField label="Sheet width mm" value={template.sheet.widthMm} min={1} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, sheet: { ...t.sheet, widthMm: v } }), 'template:sheetW')} />
-        <NumberField label="Sheet height mm" value={template.sheet.heightMm} min={1} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, sheet: { ...t.sheet, heightMm: v } }), 'template:sheetH')} />
+      </div>
+      <div className="mep-section">
+        <h4>Sheet</h4>
         <div className="mep-schematic-buttons">
           {SHEET_SIZES.map((size) => (
-            <button key={size.label} type="button" onClick={() => edit((t) => ({ ...t, sheet: { widthMm: size.widthMm, heightMm: size.heightMm } }))} title={`${size.widthMm} x ${size.heightMm} mm`}>
+            <button
+              key={size.label}
+              type="button"
+              className={template.sheet.widthMm === size.widthMm && template.sheet.heightMm === size.heightMm ? 'on' : undefined}
+              onClick={() => edit((t) => ({ ...t, sheet: { widthMm: size.widthMm, heightMm: size.heightMm } }))}
+              title={`${size.widthMm} x ${size.heightMm} mm, landscape`}
+            >
               {size.label}
             </button>
           ))}
         </div>
-        <div className="mep-schematic-field">
-          <label>Decimal separator</label>
-          <select value={template.numberFormat.decimalSeparator} onChange={(e) => edit((t) => ({ ...t, numberFormat: { decimalSeparator: e.target.value === ',' ? ',' : '.' } }))}>
-            <option value=",">Comma (1,5)</option>
-            <option value=".">Point (1.5)</option>
-          </select>
-        </div>
+        <NumberField label="Width mm" value={template.sheet.widthMm} min={1} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, sheet: { ...t.sheet, widthMm: v } }), 'template:sheetW')} />
+        <NumberField label="Height mm" value={template.sheet.heightMm} min={1} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, sheet: { ...t.sheet, heightMm: v } }), 'template:sheetH')} />
+      </div>
+      <div className="mep-section">
+        <h4>Circuits</h4>
         <div className="mep-schematic-field">
           <label>Circuits run</label>
           <select value={template.groups[0]?.direction ?? 'column'} onChange={(e) => edit((t) => setTemplateDirection(t, e.target.value === 'row' ? 'row' : 'column'))} disabled={template.groups.length === 0}>
@@ -237,7 +309,178 @@ export function SchematicTemplateProperties({ template, edit, endGesture, select
         </div>
         <NumberField label="Group anchor x" value={template.groupAnchor.x} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, groupAnchor: { ...t.groupAnchor, x: v } }), 'template:anchorX')} />
         <NumberField label="Group anchor y" value={template.groupAnchor.y} onBlur={endGesture} onCommit={(v) => v !== undefined && edit((t) => ({ ...t, groupAnchor: { ...t.groupAnchor, y: v } }), 'template:anchorY')} />
-      </details>
+        <p className="mep-schematic-hint">The first circuit starts at the group anchor. You can also drag the anchor on the sheet.</p>
+      </div>
+      <div className="mep-section">
+        <h4>Formats</h4>
+        <div className="mep-schematic-field">
+          <label>Decimal separator</label>
+          <select value={template.numberFormat.decimalSeparator} onChange={(e) => edit((t) => ({ ...t, numberFormat: { decimalSeparator: e.target.value === ',' ? ',' : '.' } }))}>
+            <option value=",">Comma (1,5)</option>
+            <option value=".">Point (1.5)</option>
+          </select>
+        </div>
+        <div className="mep-schematic-field">
+          <label>Date format</label>
+          <select value={template.dateFormat ?? 'dd-mm-yyyy'} onChange={(e) => edit((t) => ({ ...t, dateFormat: e.target.value === 'yyyy-mm-dd' ? 'yyyy-mm-dd' : 'dd-mm-yyyy' }))}>
+            <option value="dd-mm-yyyy">Day-month-year (25-09-2026)</option>
+            <option value="yyyy-mm-dd">Year-month-day (2026-09-25)</option>
+          </select>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const FIELD_TYPE_LABELS: Record<SchematicFieldDefinition['type'], string> = { text: 'Text', multiline: 'Multi-line text', date: 'Date', number: 'Number' };
+
+/** The id box keeps its own text while it has focus and commits, on Enter or when it loses focus, only an id that is valid and free, so the template never holds a bad or repeated id. */
+function FieldIdInput({ value, others, onCommit, onBlur }: { value: string; others: string[]; onCommit: (id: string) => void; onBlur: () => void }) {
+  const [text, setText] = useState(value);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(value);
+  }, [value]);
+  const problem = !FIELD_ID_PATTERN.test(text) ? 'Use letters, digits and underscores. Do not start with a digit.' : others.includes(text) ? 'Another field uses this id.' : null;
+  return (
+    <>
+      <input
+        type="text"
+        value={text}
+        onFocus={() => {
+          focused.current = true;
+        }}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
+        onBlur={() => {
+          focused.current = false;
+          if (text !== value && FIELD_ID_PATTERN.test(text) && !others.includes(text)) onCommit(text);
+          else setText(value);
+          onBlur();
+        }}
+      />
+      {problem && (
+        <p className="mep-schematic-note" role="alert">
+          {problem}
+        </p>
+      )}
+    </>
+  );
+}
+
+const SCOPE_TEXT: Record<SchematicFieldDefinition['scope'], string> = { project: 'shared by all schematics', schematic: 'each schematic' };
+
+function FieldsSection({ template, edit, endGesture }: { template: SchematicTemplate; edit: EditTemplate; endGesture: () => void }) {
+  const fields = template.fields ?? [];
+  const [open, setOpen] = useState<number | null>(null);
+  const remove = (field: SchematicFieldDefinition) => {
+    const uses = findFieldUses(template, field.id);
+    if (uses.length > 0 && !window.confirm(`The field "${field.label}" is read by ${uses.join(', ')}. That text goes blank if you delete the field. Delete it?`)) return;
+    edit((t) => removeField(t, field.id));
+    setOpen(null);
+  };
+  const move = (field: SchematicFieldDefinition, index: number, steps: number) => {
+    edit((t) => reorderField(t, field.id, steps));
+    setOpen(index + steps);
+  };
+  return (
+    <div className="mep-section">
+      <p className="mep-schematic-hint">A field is a value that the user fills in, such as the project name. A block shows it with {'{field.id}'}. Click a field to edit it.</p>
+      <ul className="mep-field-list">
+        {fields.map((field, index) => {
+          const key = (name: string) => `field:${index}:${name}`;
+          const defaultError = field.defaultBinding ? bindingError(field.defaultBinding) : null;
+          const isOpen = open === index;
+          return (
+            <li key={index} className={`mep-field-item${isOpen ? ' on' : ''}`}>
+              <button type="button" className="mep-field-summary" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : index)}>
+                {isOpen ? <IconChevDown size={13} /> : <IconChevRight size={13} />}
+                <span className="mep-field-summary-label">{field.label.trim() === '' ? field.id : field.label}</span>
+                <span className="mep-field-summary-meta">
+                  {FIELD_TYPE_LABELS[field.type]} · {SCOPE_TEXT[field.scope]}
+                </span>
+              </button>
+              {isOpen && (
+                <div className="mep-field-editor">
+                  <div className="mep-schematic-field">
+                    <label>Label</label>
+                    <input type="text" value={field.label} onChange={(e) => edit((t) => updateField(t, field.id, { label: e.target.value }), key('label'))} onBlur={endGesture} />
+                  </div>
+                  <div className="mep-schematic-field">
+                    <label>Id</label>
+                    <FieldIdInput value={field.id} others={fields.filter((_, i) => i !== index).map((f) => f.id)} onCommit={(id) => edit((t) => updateField(t, field.id, { id }), key('id'))} onBlur={endGesture} />
+                    <span className="mep-schematic-hint">Text that shows it: {`{field.${field.id}}`}. Changing the id does not change text that already reads the old id.</span>
+                  </div>
+                  <div className="mep-schematic-field">
+                    <label>Type</label>
+                    <select value={field.type} onChange={(e) => edit((t) => updateField(t, field.id, { type: e.target.value as SchematicFieldDefinition['type'] }))}>
+                      {(Object.keys(FIELD_TYPE_LABELS) as SchematicFieldDefinition['type'][]).map((type) => (
+                        <option key={type} value={type}>
+                          {FIELD_TYPE_LABELS[type]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mep-schematic-field">
+                    <label>Entered</label>
+                    <select value={field.scope} onChange={(e) => edit((t) => updateField(t, field.id, { scope: e.target.value === 'project' ? 'project' : 'schematic' }))}>
+                      <option value="project">Once, shared by all schematics</option>
+                      <option value="schematic">For each schematic</option>
+                    </select>
+                  </div>
+                  {field.type === 'date' ? (
+                    <label className="mep-schematic-check">
+                      <input type="checkbox" checked={field.defaultToday === true} onChange={(e) => edit((t) => updateField(t, field.id, { defaultToday: e.target.checked ? true : undefined }))} />
+                      Default to today
+                    </label>
+                  ) : (
+                    <div className="mep-schematic-field">
+                      <label>Default</label>
+                      <input
+                        type="text"
+                        value={field.defaultBinding ?? ''}
+                        placeholder="Text with {panel.name}"
+                        onChange={(e) => edit((t) => updateField(t, field.id, { defaultBinding: e.target.value === '' ? undefined : e.target.value }), key('default'))}
+                        onBlur={endGesture}
+                      />
+                      {defaultError && (
+                        <p className="mep-schematic-note" role="alert">
+                          {defaultError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div className="mep-schematic-buttons">
+                    <button type="button" onClick={() => move(field, index, -1)} disabled={index === 0} title="Move up">
+                      Up
+                    </button>
+                    <button type="button" onClick={() => move(field, index, 1)} disabled={index === fields.length - 1} title="Move down">
+                      Down
+                    </button>
+                    <button type="button" onClick={() => remove(field)}>
+                      Delete field
+                    </button>
+                  </div>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {fields.length === 0 && <p className="mep-schematic-hint">This template has no fields.</p>}
+      <div className="mep-schematic-buttons">
+        <button
+          type="button"
+          onClick={() => {
+            edit((t) => addField(t).template);
+            setOpen(fields.length);
+          }}
+        >
+          Add field
+        </button>
+      </div>
     </div>
   );
 }
@@ -299,6 +542,7 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
   const errorText = custom && bindingText !== '' ? bindingError(bindingText) : null;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fields = getBindingFieldsForScope(info.scope);
+  const templateFields = (template.fields ?? []).filter((f) => FIELD_ID_PATTERN.test(f.id));
   const insertField = (expression: string) => {
     if (expression === '') return;
     const source = block.binding ?? info.defaultBinding ?? '';
@@ -316,10 +560,8 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
 
   return (
     <>
-      <details open className="mep-section">
-        <summary>
-          <h4>Block · {info.label}</h4>
-        </summary>
+      <div className="mep-section">
+        <h4>Block · {info.label}</h4>
         <div className="mep-schematic-field">
           <label>Type and scope</label>
           <span className="mep-schematic-readonly">
@@ -348,6 +590,20 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             </button>
           </div>
         )}
+        {DEVICE_SYMBOL_TYPES.includes(block.type) && (
+          <div className="mep-schematic-field">
+            <label>Symbol</label>
+            <span className="mep-schematic-readonly">{block.symbolId === undefined ? 'Default' : (symbols.find((s) => s.id === block.symbolId)?.name ?? 'Missing symbol')}</span>
+            <button type="button" onClick={onChangeSymbol}>
+              Choose symbol…
+            </button>
+            {block.symbolId !== undefined && (
+              <button type="button" onClick={() => edit((t) => setBlockSymbol(t, selection, undefined))} title="Go back to the built-in mark">
+                Use default
+              </button>
+            )}
+          </div>
+        )}
         {block.type === 'drawing' && block.symbolId === undefined && (
           <div className="mep-schematic-field">
             <label>Shapes</label>
@@ -365,13 +621,11 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             Delete
           </button>
         </div>
-      </details>
+      </div>
 
       {block.type !== 'totalsTable' && block.type !== 'frame' && block.type !== 'busbar' && block.type !== 'drawing' && (
-        <details open className="mep-section">
-          <summary>
-            <h4>Text binding</h4>
-          </summary>
+        <div className="mep-section">
+          <h4>Text binding</h4>
           <div className="mep-schematic-radios">
             <label>
               <input type="radio" name={`binding-${block.id}`} checked={!custom} onChange={() => patch({ binding: undefined })} />
@@ -404,22 +658,31 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             <label>Insert field</label>
             <select value="" onChange={(e) => insertField(e.target.value)}>
               <option value="">Insert field…</option>
-              {fields.map((field) => (
-                <option key={field.expression} value={field.expression} title={field.description}>
-                  {field.expression} — {field.description}
-                </option>
-              ))}
+              {templateFields.length > 0 && (
+                <optgroup label="Template fields">
+                  {templateFields.map((field) => (
+                    <option key={`field.${field.id}`} value={`field.${field.id}`} title={`{field.${field.id}}`}>
+                      Field: {field.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Data">
+                {fields.map((field) => (
+                  <option key={field.expression} value={field.expression} title={field.description}>
+                    {field.expression} — {field.description}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <p className="mep-schematic-hint">Write {'{field}'} for a value. Put text in [square brackets] to show it only when a field inside has a value.</p>
-        </details>
+        </div>
       )}
 
       {block.type !== 'drawing' && (
-        <details open className="mep-section">
-          <summary>
-            <h4>Style</h4>
-          </summary>
+        <div className="mep-section">
+          <h4>Style</h4>
           <NumberField label="Font size mm" value={style.fontSizeMm} optional min={0.5} step={0.1} onBlur={endGesture} onCommit={(v) => setStyle({ fontSizeMm: v }, key('fontSize'))} />
           <NumberField label="Line width mm" value={style.strokeWidthMm} optional min={0.05} step={0.05} onBlur={endGesture} onCommit={(v) => setStyle({ strokeWidthMm: v }, key('strokeWidth'))} />
           <div className="mep-schematic-radios">
@@ -459,14 +722,12 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
               </button>
             </span>
           </div>
-        </details>
+        </div>
       )}
 
       {(info.scope === 'circuit' || info.scope === 'aggregate') && (
-        <details open className="mep-section">
-          <summary>
-            <h4>Load type</h4>
-          </summary>
+        <div className="mep-section">
+          <h4>Load type</h4>
           <div className="mep-schematic-field">
             <label>Load type filter</label>
             <input
@@ -483,7 +744,7 @@ function BlockProperties({ template, block, selection, edit, endGesture, loadTyp
             </datalist>
           </div>
           <p className="mep-schematic-hint">Only terminals of this load type count in {'{terminals}'} and {'{terminal.…}'}. Leave blank for all.</p>
-        </details>
+        </div>
       )}
 
       {block.type === 'totalsTable' && <TotalsTableEditor block={block} patch={patch} endGesture={endGesture} keyOf={key} />}
@@ -495,10 +756,8 @@ function TotalsTableEditor({ block, patch, endGesture, keyOf }: { block: Schemat
   const rows = block.tableRows ?? [];
   const setRow = (index: number, change: Partial<TotalsTableRow>, gestureKey?: string) => patch({ tableRows: rows.map((row, i) => (i === index ? { ...row, ...change } : row)) }, gestureKey);
   return (
-    <details open className="mep-section">
-      <summary>
-        <h4>Table rows</h4>
-      </summary>
+    <div className="mep-section">
+      <h4>Table rows</h4>
       <div className="mep-schematic-field">
         <label>Columns</label>
         <select value={block.tableColumns ?? 'panel'} onChange={(e) => patch({ tableColumns: e.target.value === 'circuits' ? 'circuits' : 'panel' })}>
@@ -529,6 +788,6 @@ function TotalsTableEditor({ block, patch, endGesture, keyOf }: { block: Schemat
         </button>
       </div>
       <p className="mep-schematic-hint">A formula has no braces, for example sum(circuit.capacityL1).</p>
-    </details>
+    </div>
   );
 }
