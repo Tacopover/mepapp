@@ -1,4 +1,4 @@
-import { Container, Graphics, type Sprite, type Texture } from 'pixi.js';
+import { Container, Graphics, type Sprite, type Text, type Texture } from 'pixi.js';
 import { destroyStampEntries } from './colorize.js';
 import {
   CommandManager,
@@ -17,6 +17,7 @@ import {
   type Schematic,
   type Segment,
   type StampDefinition,
+  type StampLabelLayouts,
   type Vec2,
 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
@@ -53,6 +54,14 @@ export const DEFAULT_NETWORK_TYPE: NetworkType = {
   linePattern: 'solid',
 };
 
+/** The PixiJS nodes for one drawn stamp label (label-feature.md §6.3), cached by `stampId:labelId` so an unchanged label keeps its Text texture across rebuilds. `styleKey` is the text plus every style field — the box and text are only redrawn when it changes. */
+export interface LabelNode {
+  container: Container;
+  box: Graphics;
+  text: Text;
+  styleKey: string;
+}
+
 /** Summary of one open document — the Drawings tab's read model. */
 export interface DocumentSummary {
   id: string;
@@ -84,6 +93,9 @@ export class SketchDocument {
   readonly annotationTextLayer = new Container();
   /** Per-segment solved-capacity labels + direction arrowheads — rebuilt on every flow recompute (see SketchScene.recomputeFlow/syncFlowLabels), but only actually populated while flowOverlayActive is true and a segment is selected. */
   readonly flowLabelLayer = new Container();
+  /** Stamp labels (label-feature.md §6.3) — kept in sync by SketchScene.syncLabels, which diffs against `labelNodes` rather than rebuilding every node. */
+  readonly labelLayer = new Container();
+  readonly labelNodes = new Map<string, LabelNode>();
   readonly stamps = new Map<string, StampEntry>();
   selectedIds = new Set<string>();
   calibration: Calibration | null = null;
@@ -103,6 +115,8 @@ export class SketchDocument {
   readonly customStampDefinitions: StampDefinition[] = [];
   /** Per-document editable copy of the circuit-type library (electrical-circuits-model.md §5) — starts empty, same as customStampDefinitions; a circuit references one by id, resolved against this list or CIRCUIT_TYPE_LIBRARY's built-ins. No "adopt on first use" mechanism yet (unlike networkTypes) — nothing in Phase C needs one. */
   readonly circuitTypes: CircuitType[] = [];
+  /** Canvas label layout per stamp definition id — plain per-document state with no undo history, same as customStampDefinitions. Set via SketchScene.setStampLabelLayout. */
+  stampLabelLayouts: StampLabelLayouts = {};
   /** Saved schematics (electrical-schematic-templates.md Phase 5b). Edited directly and not undoable, like circuitTypes. */
   readonly schematics: Schematic[] = [];
   /** Entered values of template fields with scope 'project', by field id — shared by every schematic of this document. */
@@ -151,5 +165,7 @@ export class SketchDocument {
     this.drawingLayer.destroy();
     this.annotationTextLayer.destroy({ children: true });
     this.flowLabelLayer.destroy({ children: true });
+    this.labelNodes.clear();
+    this.labelLayer.destroy({ children: true });
   }
 }

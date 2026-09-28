@@ -1,11 +1,11 @@
 import { useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampDefinition } from '@mepapp/core';
+import { isLibraryStampId, NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
 import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
-import { IconPencil, IconTrash } from '../icons.js';
+import { IconPencil, IconTrash, IconUndo } from '../icons.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 
@@ -72,14 +72,8 @@ export function getVisibleStampDefinitions(
   labelLanguage: StampLabelLanguage,
   searchQuery = '',
 ): StampDefinition[] {
-  const shadowedLibraryIds = new Set(
-    STAMP_LIBRARY.filter((lib) =>
-      customStampDefinitions.some((c) => {
-        const label = c.label.trim().toLowerCase();
-        return label === lib.label.toLowerCase() || (!!lib.labelNl && label === lib.labelNl.toLowerCase());
-      }),
-    ).map((lib) => lib.id),
-  );
+  // A custom definition with a library id is an edited library stamp (an override): it takes that tile's place.
+  const shadowedLibraryIds = new Set(customStampDefinitions.map((c) => c.id));
   const allDefinitions = [...STAMP_LIBRARY.filter((lib) => !shadowedLibraryIds.has(lib.id)), ...customStampDefinitions];
   const trimmedQuery = searchQuery.trim().toLowerCase();
   return allDefinitions
@@ -231,13 +225,13 @@ export function StampsPanel({
                     <button
                       type="button"
                       className="mep-stamp-tile-delete"
-                      title="Delete stamp…"
+                      title={isLibraryStampId(definition.id) ? 'Revert to library…' : 'Delete stamp…'}
                       onClick={(e) => {
                         e.stopPropagation();
                         onDeleteCustomStampDefinition(definition);
                       }}
                     >
-                      <IconTrash size={12} />
+                      {isLibraryStampId(definition.id) ? <IconUndo size={12} /> : <IconTrash size={12} />}
                     </button>
                   </>
                 )}

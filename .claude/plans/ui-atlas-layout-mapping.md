@@ -169,7 +169,7 @@ explicitly out of scope for now.
 | Network Tree panel | **Spec'd** | `networks-panel-spec.md` — Networks dock tab. |
 | Page navigation & zoom controls | New, low priority | Status bar. The engine already supports multi-page PDFs (`getPageCount`, `pageIndex`) — `SketchScene` just never uses it. Confirmed low priority, to be added after the other basic features (D4). |
 | Live coordinate readout | New | Status bar, next to the zoom chip. |
-| Label visibility controls | New | Status bar — toggle + per-type filter dropdown. **Scope added 2026-09-24:** the circuit label of a terminal (for example "L1.3", from `getCircuitLabel` in core) is one of the label kinds this feature must show and filter. Moved here from `electrical-circuits-model.md` E8. No detailed plan for the Label feature exists yet. |
+| Label visibility controls | New | Status bar — toggle + per-type filter dropdown. **Scope added 2026-09-24:** the circuit label of a terminal (for example "L1.3", from `getCircuitLabel` in core) is one of the label kinds this feature must show and filter. Moved here from `electrical-circuits-model.md` E8. **Spec'd 2026-09-26:** `label-feature.md` (Phase 4 covers this row). |
 
 **Removed in Rev B (D6):** Offline-mode indicator — see §10.
 

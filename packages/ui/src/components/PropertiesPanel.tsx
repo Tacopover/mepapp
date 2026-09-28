@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import type { FittingInfo, SegmentInfo, SketchScene, StampInfo } from '@mepapp/render';
 import {
+  buildStampPropertyContext,
   coerceDefaultValue,
   getStampDefinition,
   NETWORK_TYPE_LIBRARY,
@@ -77,6 +78,8 @@ export interface PropertiesPanelProps {
   onEditPorts: (definitionId: string) => void;
   /** Opens the generated schematic dialog for a panel (electrical-schematic-templates.md Phase 4). */
   onOpenSchematic: (panelId: string) => void;
+  /** Opens the label layout editor for the selected stamp's definition (label-feature.md §7). */
+  onEditLabels: (stampId: string) => void;
   /** Electrical Circuits branch (electrical-circuits-model.md §9) — takes precedence over the stamp/segment/fitting branches below when set, since a Circuit/Panel selection is app-level state, not a canvas selection (see useSketchScene's selectedCircuitId/selectedPanelId). */
   circuits: Circuit[];
   panels: Panel[];
@@ -105,6 +108,7 @@ export function PropertiesPanel({
   labelLanguage,
   onEditPorts,
   onOpenSchematic,
+  onEditLabels,
   circuits,
   panels,
   panelSections,
@@ -414,6 +418,15 @@ export function PropertiesPanel({
   if (selection.length === 0) {
     return <div className="mep-empty-panel">Select an element to see its properties.</div>;
   }
+  const propertyContext = buildStampPropertyContext({
+    customStampDefinitions,
+    terminalCapacities: Object.fromEntries(allStamps.map((s) => [s.id, s.capacity])),
+    circuits,
+    panels,
+    circuitTypes,
+    customPropertyDefs,
+    labelLanguage,
+  });
   if (selection.length > 1) {
     const editableCategories = [...new Set(selection.map((s) => s.category))].filter(
       (c): c is 'terminal' | 'equipment' => c === 'terminal' || c === 'equipment',
@@ -488,7 +501,7 @@ export function PropertiesPanel({
             />
           </div>
         </div>
-        <TerminalCircuitSection sceneRef={sceneRef} terminals={selectedTerminals} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} />
+        <TerminalCircuitSection sceneRef={sceneRef} terminals={selectedTerminals} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} propertyContext={propertyContext} />
         {commonCustomPropertyDefs.length > 0 && (
           <div className="mep-section">
             <h4>Custom</h4>
@@ -530,6 +543,11 @@ export function PropertiesPanel({
             Edit ports…
           </button>
         )}
+        {definition && (
+          <button type="button" onClick={() => onEditLabels(stamp.id)}>
+            Edit labels…
+          </button>
+        )}
         {stamp.category === 'equipment' && backingPanel && (
           <button type="button" onClick={() => setSelectedPanelId(backingPanel.id)}>
             Manage panel…
@@ -549,6 +567,12 @@ export function PropertiesPanel({
         )}
       </div>
       <div className="mep-section">
+        {backingPanel && (
+          <div className="mep-field-row">
+            <label>Panel name</label>
+            <input type="text" value={backingPanel.name} disabled />
+          </div>
+        )}
         <div className="mep-field-row">
           <label>X (pt)</label>
           <input
@@ -614,7 +638,7 @@ export function PropertiesPanel({
         </div>
       </div>
       {stamp.category === 'terminal' && (
-        <TerminalCircuitSection sceneRef={sceneRef} terminals={[stamp]} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} />
+        <TerminalCircuitSection sceneRef={sceneRef} terminals={[stamp]} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} propertyContext={propertyContext} />
       )}
       {(stamp.category === 'terminal' || stamp.category === 'equipment') && customPropertyDefs[stamp.category].length > 0 && (
         <div className="mep-section">

@@ -1,12 +1,8 @@
 import { useState } from 'react';
-import { isReservedCircuitPropertyName, isReservedPropertyName, type CustomPropertyDefinition, type CustomPropertyKind } from '@mepapp/core';
+import { isReservedCircuitPropertyName, isReservedPropertyName, type CustomPropertyDefinition, type CustomPropertyKind, type GlobalPropertyDefs } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 
-export interface GlobalPropertyDefs {
-  terminal: CustomPropertyDefinition[];
-  equipment: CustomPropertyDefinition[];
-  circuit: CustomPropertyDefinition[];
-}
+export type { GlobalPropertyDefs };
 
 export interface GlobalPropertiesDialogProps {
   definitions: GlobalPropertyDefs;

@@ -1,5 +1,6 @@
-import type { Calibration } from '@mepapp/core';
+import type { Calibration, StampLabelVisibility } from '@mepapp/core';
 import type { DrawingSummary } from '@mepapp/render';
+import { LabelVisibilityControl, type LabelFilterEntry } from './LabelVisibilityControl.js';
 
 export interface StatusBarProps {
   zoom: number;
@@ -12,6 +13,9 @@ export interface StatusBarProps {
   measurementMm: number | null;
   selectedCount: number;
   drawingSummary: DrawingSummary;
+  labelVisibility: StampLabelVisibility;
+  onLabelVisibilityChange: (next: StampLabelVisibility) => void;
+  labelFilterEntries: LabelFilterEntry[];
 }
 
 export function StatusBar({
@@ -25,6 +29,9 @@ export function StatusBar({
   measurementMm,
   selectedCount,
   drawingSummary,
+  labelVisibility,
+  onLabelVisibilityChange,
+  labelFilterEntries,
 }: StatusBarProps) {
   return (
     <div className="mep-status">
@@ -69,6 +76,7 @@ export function StatusBar({
         {drawingSummary.fittingCount === 1 ? '' : 's'}, {drawingSummary.annotationCount} annotation{drawingSummary.annotationCount === 1 ? '' : 's'},{' '}
         {drawingSummary.networkCount} network{drawingSummary.networkCount === 1 ? '' : 's'}
       </span>
+      <LabelVisibilityControl visibility={labelVisibility} onChange={onLabelVisibilityChange} entries={labelFilterEntries} />
       <span className="mep-scale-bar" aria-hidden="true">
         <i />
         <i />

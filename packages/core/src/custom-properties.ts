@@ -13,6 +13,13 @@ export interface CustomPropertyDefinition {
   defaultValue: string;
 }
 
+/** Every per-installation custom property definition, one list per scope — edited in the Global Properties dialog. */
+export interface GlobalPropertyDefs {
+  terminal: CustomPropertyDefinition[];
+  equipment: CustomPropertyDefinition[];
+  circuit: CustomPropertyDefinition[];
+}
+
 /** Custom property values stamped on one placed Terminal/Equipment. */
 export type CustomPropertyValues = Record<string, string | number>;
 

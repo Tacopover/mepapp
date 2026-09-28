@@ -33,6 +33,7 @@ describe('serializeProject / loadProject round trip', () => {
       panels: [],
       panelSections: [],
       circuitTypes: [],
+      stampLabelLayouts: { 'fire-hose-reel': [{ id: 'l1', propertyKey: 'stamp:name', anchorX: 0.5, anchorY: 1, fontSize: 9, textColor: '#282828' }] },
       schematics: [],
       schematicProjectFields: {},
     });
@@ -208,7 +209,8 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.panels).toEqual([]);
     expect(loaded.panelSections).toEqual([]);
     expect(loaded.circuitTypes).toEqual([]);
-    expect(loaded.schematics).toEqual([]); // v10->v11 runs after v8->v9
+    expect(loaded.stampLabelLayouts).toEqual({}); // later steps (v8->v9, v10->v11, v11->v12) all run in sequence
+    expect(loaded.schematics).toEqual([]);
     expect(loaded.schematicProjectFields).toEqual({});
   });
 
@@ -232,17 +234,56 @@ describe('serializeProject / loadProject round trip', () => {
     const loaded = loadProject(legacyDoc);
     expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(loaded.panels).toEqual([]);
+    expect(loaded.stampLabelLayouts).toEqual({});
     expect(loaded.schematics).toEqual([]);
     expect(loaded.schematicProjectFields).toEqual({});
   });
 
-  it('migrates a v10 save by adding empty schematics and shared project fields', () => {
-    const loaded = loadProject({
+  it('migrates a pre-labels (v10) save, defaulting stampLabelLayouts, schematics and shared project fields', () => {
+    const legacyDoc = {
       schemaVersion: 10,
-      networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [],
-      terminalCapacities: {}, circuits: [], panels: [], panelSections: [], circuitTypes: [],
-    });
+      networkTypes: [],
+      segments: [],
+      fittings: [],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [],
+      terminalCapacities: {},
+      circuits: [],
+      panels: [],
+      panelSections: [],
+      circuitTypes: [],
+    };
+
+    const loaded = loadProject(legacyDoc);
     expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.stampLabelLayouts).toEqual({});
+    expect(loaded.schematics).toEqual([]);
+    expect(loaded.schematicProjectFields).toEqual({});
+  });
+
+  it('migrates a v11 save (already has labels) by adding empty schematics and shared project fields', () => {
+    const legacyDoc = {
+      schemaVersion: 11,
+      networkTypes: [],
+      segments: [],
+      fittings: [],
+      stamps: [],
+      portGroups: [],
+      annotations: [],
+      customStampDefinitions: [],
+      terminalCapacities: {},
+      circuits: [],
+      panels: [],
+      panelSections: [],
+      circuitTypes: [],
+      stampLabelLayouts: { 'fire-hose-reel': [{ id: 'l1', propertyKey: 'stamp:name', anchorX: 0.5, anchorY: 1, fontSize: 9, textColor: '#282828' }] },
+    };
+
+    const loaded = loadProject(legacyDoc);
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.stampLabelLayouts).toEqual(legacyDoc.stampLabelLayouts); // untouched by the v11->v12 step
     expect(loaded.schematics).toEqual([]);
     expect(loaded.schematicProjectFields).toEqual({});
   });
@@ -261,6 +302,7 @@ describe('serializeProject / loadProject round trip', () => {
       panels: [],
       panelSections: [],
       circuitTypes: [],
+      stampLabelLayouts: {},
       schematics: [],
       schematicProjectFields: {},
     };

@@ -9,10 +9,11 @@ import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { Schematic } from './schematic.js';
 import type { PlacedStamp } from './stamp.js';
+import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 11;
+export const CURRENT_SCHEMA_VERSION = 12;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -31,6 +32,8 @@ export interface ProjectDocument {
   panelSections: PanelSection[];
   /** Per-document editable copy of the circuit-type library, mirroring how networkTypes seeds from NETWORK_TYPE_LIBRARY (see circuit-type-library.ts). */
   circuitTypes: CircuitType[];
+  /** Canvas label layout per stamp definition id (label-feature.md §6.2) — on the project rather than on StampDefinition, so a read-only library definition gets labels too. */
+  stampLabelLayouts: StampLabelLayouts;
   /** Saved schematics (electrical-schematic-templates.md Phase 5b), each a panel drawn with its own copy of a template. */
   schematics: Schematic[];
   /** Entered values of template fields with scope 'project', by field id, shared by every schematic. */
@@ -199,10 +202,22 @@ const migrationSteps: MigrationStep[] = [
   {
     fromVersion: 10,
     toVersion: 11,
-    // Version 10 predates saved schematics — no save before this could have any.
+    // Version 10 predates canvas labels (label-feature.md) — no save before
+    // this could have a label layout, so default to an empty object.
     migrate: (data) => ({
       ...data,
       schemaVersion: 11,
+      stampLabelLayouts:
+        data.stampLabelLayouts && typeof data.stampLabelLayouts === 'object' && !Array.isArray(data.stampLabelLayouts) ? data.stampLabelLayouts : {},
+    }),
+  },
+  {
+    fromVersion: 11,
+    toVersion: 12,
+    // Version 11 predates saved schematics — no save before this could have any.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 12,
       schematics: Array.isArray(data.schematics) ? data.schematics : [],
       schematicProjectFields:
         data.schematicProjectFields && typeof data.schematicProjectFields === 'object' && !Array.isArray(data.schematicProjectFields) ? data.schematicProjectFields : {},
@@ -232,6 +247,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'panels'),
   (data: JsonRecord) => requireArray(data, 'panelSections'),
   (data: JsonRecord) => requireArray(data, 'circuitTypes'),
+  (data: JsonRecord) => requireRecord(data, 'stampLabelLayouts'),
   (data: JsonRecord) => requireArray(data, 'schematics'),
   (data: JsonRecord) => requireRecord(data, 'schematicProjectFields'),
 ];

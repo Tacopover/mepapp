@@ -1241,6 +1241,44 @@
 .mep-chip b {
   color: var(--ink);
 }
+/* Status bar label toggle + drop-up filter (label-feature.md §8.1). */
+.mep-labels-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mep-labels-chip label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.mep-labels-chip > button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0 2px;
+  color: var(--ink);
+}
+.mep-menu-dropdown.mep-dropup {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.mep-label-filter {
+  min-width: 220px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+.mep-label-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.mep-label-filter-item {
+  padding-left: 18px;
+}
 .mep-zoom-chip,
 .mep-page-chip {
   display: flex;
@@ -1724,6 +1762,107 @@
 .mep-ee-sidebar .mep-section {
   border-bottom: none;
   padding: 0 0 10px;
+}
+/* Stamp label layout editor (label-feature.md §7) — StampLabelsEditor, used by the Element Editor's Labels tab and StampLabelsDialog. */
+.mep-lbl-grid {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mep-lbl-canvas-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-2);
+}
+.mep-lbl-viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.mep-lbl-bar {
+  margin-top: 0;
+  padding: 6px 8px;
+}
+.mep-lbl-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.mep-lbl-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  cursor: crosshair;
+  touch-action: none;
+}
+.mep-lbl-sheet {
+  fill: #fff;
+  stroke: var(--line);
+}
+.mep-lbl-stamp-box {
+  fill: none;
+  stroke: var(--line);
+  stroke-dasharray: 3 3;
+}
+.mep-lbl-item {
+  cursor: move;
+}
+.mep-lbl-anchor {
+  fill: #fff;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+.mep-lbl-anchor.on {
+  fill: var(--accent);
+  stroke: var(--accent-ink);
+}
+.mep-lbl-selection {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+.mep-lbl-sidebar {
+  min-width: 0;
+  padding: 10px;
+  overflow-y: auto;
+  border-left: 1.5px solid var(--line);
+}
+.mep-lbl-sidebar .mep-section {
+  border-bottom: none;
+  padding: 0 0 10px;
+}
+.mep-lbl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.mep-lbl-row.on {
+  background: var(--accent-soft);
+}
+.mep-lbl-toggle-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mep-lbl-undo {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
 }
 .mep-ee-bar {
   display: flex;

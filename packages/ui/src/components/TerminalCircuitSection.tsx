@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { findCircuitForTerminal, getCircuitLabel, type Circuit, type Panel } from '@mepapp/core';
+import { findCircuitForTerminal, getCircuitLabel, listStampPropertyKeys, resolveStampPropertyValue, type Circuit, type Panel, type StampPropertyContext } from '@mepapp/core';
 import type { SketchScene, StampInfo } from '@mepapp/render';
 
 const NONE = '';
@@ -12,6 +12,29 @@ export interface TerminalCircuitSectionProps {
   circuits: Circuit[];
   panels: Panel[];
   setSelectedCircuitId: (id: string | null) => void;
+  /** Resolves the read-only circuit values shown under the picker — see stamp-properties.ts. */
+  propertyContext: StampPropertyContext;
+}
+
+/** The circuit's values as read-only rows of the terminal (label-feature.md §5.4). The circuit label itself is left out: the picker above already shows it. A value that differs across several terminals shows "Varies". */
+function CircuitValueRows({ terminals, propertyContext }: { terminals: StampInfo[]; propertyContext: StampPropertyContext }) {
+  if (!terminals.some((t) => propertyContext.circuitByTerminalId.has(t.id))) return null;
+  const keys = listStampPropertyKeys(propertyContext, 'terminal').filter((k) => k.group === 'circuit' && k.key !== 'circuit:label');
+  return (
+    <>
+      {keys.map(({ key, label }) => {
+        const values = terminals.map((t) => resolveStampPropertyValue(propertyContext, t, key));
+        const same = values.every((v) => v.value === values[0].value);
+        const inherited = same && values.every((v) => v.inherited);
+        return (
+          <div className="mep-field-row" key={key}>
+            <label>{label}{inherited ? ' (panel default)' : ''}</label>
+            <input type="text" value={same ? values[0].value ?? '' : ''} placeholder={same ? undefined : 'Varies'} disabled />
+          </div>
+        );
+      })}
+    </>
+  );
 }
 
 /**
@@ -20,7 +43,7 @@ export interface TerminalCircuitSectionProps {
  * Phase E2). Picking a circuit for a terminal that already belongs to another one moves it; the
  * scene raises the toast that says so (SketchScene.assignTerminalToCircuit).
  */
-export function TerminalCircuitSection({ sceneRef, terminals, circuits, panels, setSelectedCircuitId }: TerminalCircuitSectionProps) {
+export function TerminalCircuitSection({ sceneRef, terminals, circuits, panels, setSelectedCircuitId, propertyContext }: TerminalCircuitSectionProps) {
   if (terminals.length === 0) return null;
   const panelOf = (circuit: Circuit) => (circuit.panelId ? panels.find((p) => p.id === circuit.panelId) : undefined);
 
@@ -70,6 +93,7 @@ export function TerminalCircuitSection({ sceneRef, terminals, circuits, panels, 
             {options}
           </select>
         </div>
+        <CircuitValueRows terminals={terminals} propertyContext={propertyContext} />
         <p className="mep-hint">{terminals.length} terminals selected. A terminal already in another circuit is moved.</p>
       </div>
     );
@@ -107,6 +131,7 @@ export function TerminalCircuitSection({ sceneRef, terminals, circuits, panels, 
           </button>
         </div>
       )}
+      <CircuitValueRows terminals={terminals} propertyContext={propertyContext} />
     </div>
   );
 }

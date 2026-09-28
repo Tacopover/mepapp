@@ -1,5 +1,20 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { STAMP_LIBRARY, SCHEMATIC_TEMPLATE_LIBRARY, type NetworkType, type ReconciliationReport, type SchematicSymbol, type SchematicTemplate, type StampCategory, type StampDefinition } from '@mepapp/core';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import {
+  buildStampPropertyContext,
+  DEFAULT_STAMP_LABEL_VISIBILITY,
+  getStampDefinition,
+  isLibraryStampId,
+  SCHEMATIC_TEMPLATE_LIBRARY,
+  STAMP_LIBRARY,
+  type NetworkType,
+  type ReconciliationReport,
+  type SchematicSymbol,
+  type SchematicTemplate,
+  type StampCategory,
+  type StampDefinition,
+  type StampLabel,
+  type StampLabelVisibility,
+} from '@mepapp/core';
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
@@ -24,6 +39,7 @@ import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
+import { StampLabelsDialog } from './components/StampLabelsDialog.js';
 import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
@@ -77,6 +93,7 @@ const ANGLE_SNAP_STORAGE_KEY = 'mepapp.settings.angleSnapDegrees.v1';
 const LABEL_LANGUAGE_STORAGE_KEY = 'mepapp.settings.labelLanguage.v1';
 const ONBOARDING_STORAGE_KEY = 'mepapp.onboarding.seen.v1';
 const CUSTOM_PROPERTIES_STORAGE_KEY = 'mepapp.customProperties.v1';
+const LABEL_VISIBILITY_STORAGE_KEY = 'mepapp.settings.labelVisibility.v1';
 const EMPTY_CUSTOM_PROPERTY_DEFS: GlobalPropertyDefs = { terminal: [], equipment: [], circuit: [] };
 
 function loadCustomPropertyDefs(): GlobalPropertyDefs {
@@ -91,6 +108,21 @@ function loadCustomPropertyDefs(): GlobalPropertyDefs {
     };
   } catch {
     return EMPTY_CUSTOM_PROPERTY_DEFS;
+  }
+}
+
+function loadLabelVisibility(): StampLabelVisibility {
+  try {
+    const raw = localStorage.getItem(LABEL_VISIBILITY_STORAGE_KEY);
+    if (!raw) return DEFAULT_STAMP_LABEL_VISIBILITY;
+    const parsed = JSON.parse(raw) as Partial<StampLabelVisibility>;
+    return {
+      enabled: parsed.enabled !== false,
+      hiddenDefinitionIds: Array.isArray(parsed.hiddenDefinitionIds) ? parsed.hiddenDefinitionIds : [],
+      hiddenGroups: Array.isArray(parsed.hiddenGroups) ? parsed.hiddenGroups : [],
+    };
+  } catch {
+    return DEFAULT_STAMP_LABEL_VISIBILITY;
   }
 }
 
@@ -134,6 +166,7 @@ export function MepSketchApp({
     networkSummaries,
     networkTypes,
     customStampDefinitions,
+    stampLabelLayouts,
     circuits,
     panels,
     panelSections,
@@ -188,12 +221,15 @@ export function MepSketchApp({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [globalPropertiesOpen, setGlobalPropertiesOpen] = useState(false);
   const [customPropertyDefs, setCustomPropertyDefs] = useState<GlobalPropertyDefs>(loadCustomPropertyDefs);
+  const [labelVisibility, setLabelVisibility] = useState<StampLabelVisibility>(loadLabelVisibility);
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
-  /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp copied into a new custom one via the Stamps tab's duplicate button (see handleDuplicateStampDefinition — `seed` always carries a fresh id and a self-contained iconRef, never the library entry's own id). */
+  /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp opened for editing via its Stamps tab tile (see handleDuplicateStampDefinition — `seed` keeps the library entry's own id, so the save is an override that every stamp placed from it follows, and carries a self-contained iconRef). */
   const [elementEditorTarget, setElementEditorTarget] = useState<
     { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | null
   >(null);
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
+  /** The placed stamp whose definition's label layout is open in StampLabelsDialog. */
+  const [labelEditorStampId, setLabelEditorStampId] = useState<string | null>(null);
   const [circuitTypesOpen, setCircuitTypesOpen] = useState(false);
   const [schematicPanelId, setSchematicPanelId] = useState<string | null>(null);
   const [customSchematicTemplates, setCustomSchematicTemplates] = useState<SchematicTemplate[]>(() => loadCustomTemplates(typeof localStorage === 'undefined' ? undefined : localStorage));
@@ -224,6 +260,16 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setAngleSnapDegrees(angleSnapDegrees);
   }, [ready, angleSnapDegrees, sceneRef]);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setLabelContext({ customPropertyDefs, labelLanguage });
+  }, [ready, customPropertyDefs, labelLanguage, sceneRef]);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setLabelVisibility(labelVisibility);
+  }, [ready, labelVisibility, sceneRef]);
+  const handleLabelVisibilityChange = useCallback((next: StampLabelVisibility) => {
+    setLabelVisibility(next);
+    localStorage.setItem(LABEL_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
+  }, []);
 
   const handleChangeSnapRadiusPx = useCallback((px: number) => {
     setSnapRadiusPx(px);
@@ -464,8 +510,8 @@ export function MepSketchApp({
   }, [customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage, resolveStampIconUrl, handleStampPick, sceneRef]);
 
   // Opens the Element Editor pre-filled from a read-only library stamp so the
-  // user can reposition ports / rename / recategorize and save as their own
-  // custom stamp. Its iconRef is a fixture-relative asset key (see
+  // user can reposition ports / rename / recategorize and save an override of
+  // it under the same id. Its iconRef is a fixture-relative asset key (see
   // StampDefinition's doc comment), not the self-contained `data:` URL the
   // dialog's Import mode expects, so it's fetched and re-embedded here — same
   // fetch-then-blob approach as resolveStampIconBitmap above. Ports are
@@ -486,7 +532,6 @@ export function MepSketchApp({
           mode: 'duplicate',
           seed: {
             ...definition,
-            id: crypto.randomUUID(),
             // Keeps the library original's exact name rather than auto-appending "Copy" — most of
             // the time the user is just re-authoring this stamp in place and saving under the same
             // name, and ElementEditorDialog's own Name-collision check (against both
@@ -512,8 +557,51 @@ export function MepSketchApp({
     [resolveStampIconUrl],
   );
 
-  const handleSaveElementDefinition = useCallback(
+  const labelPropertyContext = useMemo(
+    () =>
+      buildStampPropertyContext({
+        customStampDefinitions,
+        terminalCapacities: Object.fromEntries(allStamps.map((s) => [s.id, s.capacity])),
+        circuits,
+        panels,
+        circuitTypes,
+        customPropertyDefs,
+        labelLanguage,
+      }),
+    [customStampDefinitions, allStamps, circuits, panels, circuitTypes, customPropertyDefs, labelLanguage],
+  );
+  const labelFilterEntries = useMemo(() => {
+    const seen = new Set<string>();
+    const entries: Array<{ definitionId: string; name: string; category: StampCategory }> = [];
+    for (const stamp of allStamps) {
+      const id = stamp.definitionId;
+      if (!id || seen.has(id) || !stampLabelLayouts[id]) continue;
+      seen.add(id);
+      const def = getStampDefinition(id, customStampDefinitions);
+      entries.push({ definitionId: id, name: def ? (labelLanguage === 'nl' && def.labelNl ? def.labelNl : def.label) : id, category: stamp.category });
+    }
+    return entries.sort((a, b) => a.name.localeCompare(b.name));
+  }, [allStamps, stampLabelLayouts, customStampDefinitions, labelLanguage]);
+  const labelEditorStamp = labelEditorStampId ? allStamps.find((s) => s.id === labelEditorStampId) : undefined;
+  const labelEditorDefinition = labelEditorStamp?.definitionId ? getStampDefinition(labelEditorStamp.definitionId, customStampDefinitions) : undefined;
+
+  // An Element Editor save or a revert applies to the stamps already placed: ports and size at
+  // once, the artwork as soon as it is loaded.
+  const applyDefinitionToPlacedStamps = useCallback(
     (definition: StampDefinition) => {
+      const scene = sceneRef.current;
+      if (!scene) return;
+      scene.applyDefinitionToPlacedStamps(definition);
+      resolveStampIconBitmap(definition.iconRef)
+        .then((bitmap) => scene.setDefinitionArtwork(definition.id, bitmap))
+        .catch((err) => setStatus(`Could not load the artwork of ${definition.label}: ${err instanceof Error ? err.message : String(err)}`));
+    },
+    [sceneRef, resolveStampIconBitmap],
+  );
+
+  const handleSaveElementDefinition = useCallback(
+    (definition: StampDefinition, labels?: StampLabel[]) => {
+      if (labels) sceneRef.current?.setStampLabelLayout(definition.id, labels);
       // Whether this is an in-place update vs. a brand-new entry is decided by id membership, not
       // by elementEditorTarget.mode — the dialog's own overwrite-confirmation prompt (Name
       // collision) reassigns a create/duplicate save's id to an existing custom definition's id to
@@ -524,22 +612,36 @@ export function MepSketchApp({
         setStatus(`${definition.label} updated.`);
       } else {
         sceneRef.current?.addCustomStampDefinition(definition);
-        setStatus(`${definition.label} created — pick it from the Stamps tab to place it.`);
+        setStatus(isLibraryStampId(definition.id) ? `${definition.label} updated.` : `${definition.label} created — pick it from the Stamps tab to place it.`);
       }
+      applyDefinitionToPlacedStamps(definition);
       setElementEditorTarget(null);
     },
-    [customStampDefinitions, sceneRef],
+    [customStampDefinitions, sceneRef, applyDefinitionToPlacedStamps],
   );
 
   const handleDeleteCustomStampDefinition = useCallback(
     (definition: StampDefinition) => {
+      const library = STAMP_LIBRARY.find((def) => def.id === definition.id);
+      if (library) {
+        const count = allStamps.filter((s) => s.definitionId === definition.id).length;
+        const placed = count > 0 ? ` ${count} placed stamp${count === 1 ? '' : 's'} on this sheet go back to the library artwork, ports and size.` : '';
+        const lost = sceneRef.current?.countLostPortConnections(definition.id, library.ports) ?? 0;
+        const lostWarning = lost > 0 ? ` ${lost} segment connection${lost === 1 ? '' : 's'} to removed ports will be lost.` : '';
+        if (!window.confirm(`Revert "${definition.label}" to the library version? Your changes and its labels are removed.${placed}${lostWarning}`)) return;
+        sceneRef.current?.removeCustomStampDefinition(definition.id);
+        sceneRef.current?.setStampLabelLayout(definition.id, []);
+        applyDefinitionToPlacedStamps(library);
+        setStatus(`${library.label} reverted to the library version.`);
+        return;
+      }
       const placedCount = allStamps.filter((s) => s.definitionId === definition.id).length;
       const usageWarning = placedCount > 0 ? ` ${placedCount} placed element${placedCount === 1 ? '' : 's'} on this sheet use it and will keep their current look but lose their icon if this document is reopened later.` : '';
       if (!window.confirm(`Delete "${definition.label}"? This cannot be undone.${usageWarning}`)) return;
       sceneRef.current?.removeCustomStampDefinition(definition.id);
       setStatus(`${definition.label} deleted.`);
     },
-    [allStamps, sceneRef],
+    [allStamps, sceneRef, applyDefinitionToPlacedStamps],
   );
 
   const handleNetworkTypePick = useCallback(
@@ -665,6 +767,7 @@ export function MepSketchApp({
         labelLanguage={labelLanguage}
         onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
         onOpenSchematic={setSchematicPanelId}
+        onEditLabels={setLabelEditorStampId}
         circuits={circuits}
         panels={panels}
         panelSections={panelSections}
@@ -847,6 +950,9 @@ export function MepSketchApp({
         measurementMm={measurementMm}
         selectedCount={selection.length}
         drawingSummary={drawingSummary}
+        labelVisibility={labelVisibility}
+        onLabelVisibilityChange={handleLabelVisibilityChange}
+        labelFilterEntries={labelFilterEntries}
       />
 
       {calibrationPrompt && (
@@ -923,8 +1029,32 @@ export function MepSketchApp({
           }
           existingCustomDefinitions={customStampDefinitions}
           labelLanguage={labelLanguage}
+          initialLabels={
+            elementEditorTarget.mode === 'edit'
+              ? stampLabelLayouts[elementEditorTarget.definitionId]
+              : elementEditorTarget.mode === 'duplicate'
+                ? stampLabelLayouts[elementEditorTarget.seed.id]
+                : undefined
+          }
+          labelPropertyContext={labelPropertyContext}
+          countLostPortConnections={(def) => sceneRef.current?.countLostPortConnections(def.id, def.ports) ?? 0}
           onSave={handleSaveElementDefinition}
           onClose={() => setElementEditorTarget(null)}
+        />
+      )}
+
+      {labelEditorStamp && labelEditorDefinition && (
+        <StampLabelsDialog
+          definition={labelEditorDefinition}
+          iconUrl={labelEditorDefinition.iconRef.startsWith('data:') ? labelEditorDefinition.iconRef : resolveStampIconUrl(labelEditorDefinition.iconRef)}
+          stamp={labelEditorStamp}
+          initialLabels={sceneRef.current?.getStampLabelLayouts()[labelEditorDefinition.id] ?? []}
+          propertyContext={labelPropertyContext}
+          onSave={(labels) => {
+            sceneRef.current?.setStampLabelLayout(labelEditorDefinition.id, labels);
+            setLabelEditorStampId(null);
+          }}
+          onClose={() => setLabelEditorStampId(null)}
         />
       )}
 
