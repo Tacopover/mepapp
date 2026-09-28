@@ -19,7 +19,6 @@ import {
   coerceDefaultValue,
   DEFAULT_STAMP_LABEL_VISIBILITY,
   isStampLabelVisible,
-  labelLayoutDefinitionId,
   computeNetworks,
   distance,
   findCircuitForTerminal,
@@ -1325,27 +1324,13 @@ export class SketchScene {
     });
     const visibility = this.labelVisibility;
     const layouts = this.doc.stampLabelLayouts;
-    const customs = this.doc.customStampDefinitions;
-    const layoutIds = new Map<string, string>();
-    const layoutIdOf = (stamp: PlacedStamp): string | undefined => {
-      if (!stamp.definitionId) return undefined;
-      let id = layoutIds.get(stamp.definitionId);
-      if (id === undefined) {
-        id = labelLayoutDefinitionId(stamp.definitionId, customs);
-        layoutIds.set(stamp.definitionId, id);
-      }
-      return id;
-    };
     syncStampLabels(
       this.doc.labelLayer,
       this.doc.labelNodes,
       Object.values(state.stamps),
-      (stamp) => {
-        const id = layoutIdOf(stamp);
-        return id ? layouts[id] : undefined;
-      },
+      (stamp) => (stamp.definitionId ? layouts[stamp.definitionId] : undefined),
       ctx,
-      (stamp, label) => isStampLabelVisible(visibility, layoutIdOf(stamp), label),
+      (stamp, label) => isStampLabelVisible(visibility, stamp.definitionId, label),
     );
   }
 
@@ -2037,6 +2022,108 @@ export class SketchScene {
     this.markDirty();
     this.syncLabels();
     this.emitter.emit('customStampDefinitionsChanged', this.doc.customStampDefinitions);
+  }
+
+  /** Segment ends in the active document that connect to a port that stamps placed from `definitionId` lose when they take `ports` — what applyDefinitionToPlacedStamps would disconnect. */
+  countLostPortConnections(definitionId: string, ports: PortSpec[]): number {
+    const state = this.doc.drawingHistory.getState();
+    const lost = this.removedPortsByStamp(state, definitionId, ports);
+    if (lost.size === 0) return 0;
+    let count = 0;
+    for (const segment of Object.values(state.segments)) {
+      for (const end of [segment.endpointA, segment.endpointB]) {
+        if (end.kind === 'port' && lost.get(end.elementId)?.has(end.portId)) count++;
+      }
+    }
+    return count;
+  }
+
+  /** Per placed stamp of `definitionId`, the port ids (synthetic center port included, see getStampPorts) that `ports` does not keep. */
+  private removedPortsByStamp(state: DrawingState, definitionId: string, ports: PortSpec[]): Map<string, Set<string>> {
+    const keep = new Set(getStampPorts({ ports } as PlacedStamp).map((port) => port.id));
+    const result = new Map<string, Set<string>>();
+    for (const stamp of Object.values(state.stamps)) {
+      if (stamp.definitionId !== definitionId) continue;
+      const removed = getStampPorts(stamp).filter((port) => !keep.has(port.id)).map((port) => port.id);
+      if (removed.length > 0) result.set(stamp.id, new Set(removed));
+    }
+    return result;
+  }
+
+  /**
+   * Brings every stamp placed from `definition` in the active document in line
+   * with it after an Element Editor save or a revert to the library: ports,
+   * native size and the ends of connected segments, as one undo step. A
+   * segment end on a port that the definition no longer has moves to a new
+   * junction fitting at the same point. The artwork follows separately
+   * (setDefinitionArtwork), because the UI loads it asynchronously.
+   */
+  applyDefinitionToPlacedStamps(definition: StampDefinition): void {
+    const state = this.doc.drawingHistory.getState();
+    const stampIds = Object.values(state.stamps)
+      .filter((stamp) => stamp.definitionId === definition.id)
+      .map((stamp) => stamp.id);
+    if (stampIds.length === 0) return;
+    const removed = this.removedPortsByStamp(state, definition.id, definition.ports);
+    const tx = new Transaction(this.doc.drawingHistory, `Update ${definition.label} stamps`);
+    tx.update((s) => {
+      const stamps = { ...s.stamps };
+      for (const id of stampIds) {
+        stamps[id] = { ...stamps[id], ports: definition.ports.map((port) => ({ ...port })), nativeWidth: definition.nativeWidth, nativeHeight: definition.nativeHeight };
+      }
+      let segments = s.segments;
+      let fittings = s.fittings;
+      if (removed.size > 0) {
+        segments = { ...segments };
+        fittings = { ...fittings };
+        for (const segment of Object.values(s.segments)) {
+          const detach = (end: ConnectionPoint, at: Vec2 | undefined): ConnectionPoint => {
+            if (end.kind !== 'port' || !removed.get(end.elementId)?.has(end.portId) || !at) return end;
+            const fitting: Fitting = { id: `fitting-${this.doc.nextFittingSeq++}`, pageIndex: segment.pageIndex, position: at, kind: 'junction' };
+            fittings[fitting.id] = fitting;
+            return { kind: 'fitting', fittingId: fitting.id };
+          };
+          const endpointA = detach(segment.endpointA, segment.geometry[0]);
+          const endpointB = detach(segment.endpointB, segment.geometry[segment.geometry.length - 1]);
+          if (endpointA !== segment.endpointA || endpointB !== segment.endpointB) segments[segment.id] = { ...segment, endpointA, endpointB };
+        }
+      }
+      return this.applyConnectivityCascade({ ...s, stamps, segments, fittings }, this.stampPortConnectionPoints(stampIds, stamps));
+    });
+    tx.commit();
+    for (const group of this.doc.portGroups) {
+      const gone = removed.get(group.elementId);
+      if (gone) group.portIds = group.portIds.filter((portId) => !gone.has(portId));
+    }
+    for (let i = this.doc.portGroups.length - 1; i >= 0; i--) {
+      if (this.doc.portGroups[i].portIds.length < 2) this.doc.portGroups.splice(i, 1);
+    }
+    for (const id of stampIds) {
+      for (const portIds of definition.definitionPortGroups ?? []) {
+        const exists = this.doc.portGroups.some((g) => g.elementId === id && g.portIds.length === portIds.length && portIds.every((p) => g.portIds.includes(p)));
+        if (!exists) this.doc.portGroups.push({ elementId: id, portIds: [...portIds] });
+      }
+    }
+    this.syncDrawingLayer();
+    this.recomputeFlow();
+    this.redrawOverlay();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** Swaps the art of every stamp placed from `definitionId` in the active document — the artwork half of applyDefinitionToPlacedStamps. */
+  setDefinitionArtwork(definitionId: string, bitmap: ImageBitmap): void {
+    const state = this.doc.drawingHistory.getState();
+    let texture: Texture | null = null;
+    for (const [id, entry] of this.doc.stamps) {
+      const data = state.stamps[id];
+      if (data?.definitionId !== definitionId) continue;
+      texture ??= textureFromImageBitmap(bitmap);
+      entry.baseTexture = texture;
+      entry.sprite.texture = texture;
+    }
+    if (!texture) return;
+    this.syncDrawingLayer();
   }
 
   /** Current segment-endpoint snap radius, screen px at zoom 1 — see onDrawSegmentClick. */
@@ -3483,6 +3570,8 @@ export class SketchScene {
         if (entry.sprite.parent) this.doc.stampsLayer.removeChild(entry.sprite);
         continue;
       }
+      // Recomputed every time: an Element Editor save (applyDefinitionToPlacedStamps) or its undo can change the native size, and setDefinitionArtwork the texture.
+      entry.baseScale = computeStampBaseScale(data.nativeWidth, data.nativeHeight, entry.baseTexture);
       applyTransformToSprite(entry.sprite, data.transform, entry.baseScale);
       applyStampColor(entry.sprite, entry.baseTexture, data.color);
       if (!entry.sprite.parent) this.doc.stampsLayer.addChild(entry.sprite);

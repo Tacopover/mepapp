@@ -142,7 +142,7 @@ function readAsDataUrl(file: File): Promise<string> {
 }
 
 export interface ElementEditorDialogProps {
-  /** The definition being edited ("Edit ports…" from a placed custom instance's Properties panel), or undefined for "Create custom element". Editing changes the definition going forward — it does not retroactively touch instances already placed from it, same as a library definition's own fields were never live-linked to its placed instances. */
+  /** The definition being edited ("Edit ports…" from a placed custom instance's Properties panel, or a library stamp opened under its own id to save an override of it), or undefined for "Create custom element". The app applies a save to the stamps already placed from it (SketchScene.applyDefinitionToPlacedStamps). */
   definition?: StampDefinition;
   /** The active document's current custom elements — used only to detect a Name collision at save time (see handleSave's overwrite-confirmation prompt), never rendered directly. */
   existingCustomDefinitions: StampDefinition[];
@@ -152,6 +152,8 @@ export interface ElementEditorDialogProps {
   initialLabels?: StampLabel[];
   /** Resolves the Labels tab's property list; without it the tab stays disabled. */
   labelPropertyContext?: StampPropertyContext;
+  /** How many segment ends in the document would lose their connection if `definition` replaced the saved one (ports it removes) — a non-zero count asks the user before onSave. */
+  countLostPortConnections?: (definition: StampDefinition) => number;
   onSave: (definition: StampDefinition, labels?: StampLabel[]) => void;
   onClose: () => void;
 }
@@ -169,7 +171,7 @@ export interface ElementEditorDialogProps {
  * for grouping ports that are internally wired together (converted to a real
  * instance-level PortGroup at placement, see SketchScene.placeStamp).
  */
-export function ElementEditorDialog({ definition, existingCustomDefinitions, labelLanguage, initialLabels, labelPropertyContext, onSave, onClose }: ElementEditorDialogProps) {
+export function ElementEditorDialog({ definition, existingCustomDefinitions, labelLanguage, initialLabels, labelPropertyContext, countLostPortConnections, onSave, onClose }: ElementEditorDialogProps) {
   const [name, setName] = useState(definition ? stampLabelFor(definition, labelLanguage ?? 'en') : '');
   const [discipline, setDiscipline] = useState<Discipline>(definition?.discipline ?? 'ventilation');
   const [category, setCategory] = useState<StampCategory>(definition?.category === 'equipment' ? 'equipment' : 'terminal');
@@ -508,7 +510,8 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       document side to reuse yet), confirmOverwrite saves the built definition under its own fresh
       id, adding a new custom entry that then shadows the library one in StampsPanel's grid (see
       that component's shadowedLibraryIds). */
-  const [pendingOverwrite, setPendingOverwrite] = useState<{ built: StampDefinition; existingId: string | null; existingLabel: string; isLibrary: boolean } | null>(null);
+  const [pendingOverwrite, setPendingOverwrite] = useState<{ built: StampDefinition; existingId: string; existingLabel: string; isLibrary: boolean } | null>(null);
+  const [pendingPortLoss, setPendingPortLoss] = useState<{ definition: StampDefinition; count: number } | null>(null);
 
   async function buildDefinition(): Promise<StampDefinition | null> {
     if (!name.trim()) {
@@ -558,22 +561,31 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       setPendingOverwrite({ built, existingId: collision.id, existingLabel: collision.label, isLibrary: false });
       return;
     }
-    // The Name field can also match a read-only STAMP_LIBRARY entry's English or Dutch name (e.g.
-    // duplicating it without renaming). There's no document-side element to overwrite yet, only a
-    // hardcoded library entry — confirming here adds a new custom entry under its own id, which
-    // then shadows the library tile with the same name in StampsPanel's grid.
-    const libraryCollision = STAMP_LIBRARY.find((d) => labelMatches(d.label, d.labelNl));
+    // The Name field can also match a different read-only STAMP_LIBRARY entry's English or Dutch
+    // name. Confirming saves under that entry's id — an override that takes its place for every
+    // stamp placed from it (the library entry this element already overrides is a normal edit).
+    const libraryCollision = STAMP_LIBRARY.find((d) => d.id !== built.id && labelMatches(d.label, d.labelNl));
     if (libraryCollision) {
-      setPendingOverwrite({ built, existingId: null, existingLabel: libraryCollision.label, isLibrary: true });
+      setPendingOverwrite({ built, existingId: libraryCollision.id, existingLabel: libraryCollision.label, isLibrary: true });
       return;
     }
-    onSave(built, labelPropertyContext ? labels : undefined);
+    finishSave(built);
   }
 
   function confirmOverwrite() {
     if (!pendingOverwrite) return;
-    onSave(pendingOverwrite.existingId ? { ...pendingOverwrite.built, id: pendingOverwrite.existingId } : pendingOverwrite.built, labelPropertyContext ? labels : undefined);
+    finishSave({ ...pendingOverwrite.built, id: pendingOverwrite.existingId });
     setPendingOverwrite(null);
+  }
+
+  /** Last step of a save: placed stamps take the new ports, so first warn when that disconnects segments. */
+  function finishSave(built: StampDefinition) {
+    const count = countLostPortConnections?.(built) ?? 0;
+    if (count > 0) {
+      setPendingPortLoss({ definition: built, count });
+      return;
+    }
+    onSave(built, labelPropertyContext ? labels : undefined);
   }
 
   const editingTextShape = editor.editingTextShape;
@@ -602,6 +614,30 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
                 </button>
                 <button type="button" onClick={onClose}>
                   Discard
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {pendingPortLoss && (
+          <div className="mep-ee-confirm-close">
+            <div className="mep-ee-confirm-close-box">
+              <p>
+                You removed ports that have segments connected to them. {pendingPortLoss.count} segment connection{pendingPortLoss.count === 1 ? '' : 's'} will be lost; the
+                segment ends stay where they are.
+              </p>
+              <div className="mep-ee-confirm-close-actions">
+                <button type="button" onClick={() => setPendingPortLoss(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSave(pendingPortLoss.definition, labelPropertyContext ? labels : undefined);
+                    setPendingPortLoss(null);
+                  }}
+                >
+                  Save anyway
                 </button>
               </div>
             </div>

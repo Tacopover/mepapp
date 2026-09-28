@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlacedStamp } from './stamp.js';
-import { computeStampLabelPlacement, DEFAULT_STAMP_LABEL_VISIBILITY, isStampLabelVisible, labelLayoutDefinitionId, resolveStampLabelText } from './stamp-label.js';
-import { STAMP_LIBRARY, type StampDefinition } from './stamp-library.js';
+import { computeStampLabelPlacement, DEFAULT_STAMP_LABEL_VISIBILITY, isStampLabelVisible, resolveStampLabelText } from './stamp-label.js';
 import { buildStampPropertyContext } from './stamp-properties.js';
 
 function stamp(rotationDegrees: number, scale = { x: 1, y: 1 }): PlacedStamp {
@@ -82,17 +81,3 @@ describe('label visibility', () => {
   });
 });
 
-describe('label layout definition', () => {
-  const library = STAMP_LIBRARY[0]!;
-  const custom = (label: string): StampDefinition => ({ ...library, id: 'custom-1', label, labelNl: undefined, source: 'custom' });
-
-  it('uses the custom definition that replaced a library definition under the same name', () => {
-    expect(labelLayoutDefinitionId(library.id, [custom(library.label)])).toBe('custom-1');
-    if (library.labelNl) expect(labelLayoutDefinitionId(library.id, [custom(library.labelNl)])).toBe('custom-1');
-  });
-
-  it('keeps its own id when no custom definition has the name, or when it is custom itself', () => {
-    expect(labelLayoutDefinitionId(library.id, [custom('Something else')])).toBe(library.id);
-    expect(labelLayoutDefinitionId('custom-1', [custom(library.label)])).toBe('custom-1');
-  });
-});

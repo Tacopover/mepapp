@@ -56,16 +56,14 @@ export const STAMP_LIBRARY: StampDefinition[] = [
   ...GENERATED_STAMP_LIBRARY,
 ];
 
+/** The project's custom definitions come first: one with a library id is an edited library stamp (an override) and replaces that library entry for every stamp placed from it. */
 export function getStampDefinition(id: string, customDefinitions: StampDefinition[] = []): StampDefinition | undefined {
-  return STAMP_LIBRARY.find((def) => def.id === id) ?? customDefinitions.find((def) => def.id === id);
+  return customDefinitions.find((def) => def.id === id) ?? STAMP_LIBRARY.find((def) => def.id === id);
 }
 
-/** The custom definition that replaces a library definition in the Stamps tab: one saved under the library entry's English or Dutch name (Element Editor overwrite prompt). */
-export function findShadowingCustomDefinition(library: StampDefinition, customDefinitions: StampDefinition[]): StampDefinition | undefined {
-  return customDefinitions.find((c) => {
-    const label = c.label.trim().toLowerCase();
-    return label === library.label.toLowerCase() || (!!library.labelNl && label === library.labelNl.toLowerCase());
-  });
+/** True when `id` is a STAMP_LIBRARY entry — a custom definition with such an id is an override of it. */
+export function isLibraryStampId(id: string): boolean {
+  return STAMP_LIBRARY.some((def) => def.id === id);
 }
 
 export function stampDefinitionsForDiscipline(discipline: Discipline | null, customDefinitions: StampDefinition[] = []): StampDefinition[] {

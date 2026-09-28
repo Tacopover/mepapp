@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getStampDefinition, stampDefinitionsForDiscipline, STAMP_LIBRARY, type StampDefinition } from './stamp-library.js';
+import { getStampDefinition, isLibraryStampId, stampDefinitionsForDiscipline, STAMP_LIBRARY, type StampDefinition } from './stamp-library.js';
 
 const customDef: StampDefinition = {
   id: 'custom-1',
@@ -46,6 +46,14 @@ describe('stamp library', () => {
     expect(getStampDefinition('custom-1')).toBeUndefined(); // no custom list given — library-only, same as before
     expect(stampDefinitionsForDiscipline('plumbing', [customDef])).toContain(customDef);
     expect(stampDefinitionsForDiscipline(null, [customDef])).toEqual([...STAMP_LIBRARY, customDef]);
+  });
+
+  it('returns a custom definition with a library id (an override) in place of the library entry', () => {
+    const override: StampDefinition = { ...customDef, id: 'fire-hose-reel', label: 'My hose reel' };
+    expect(getStampDefinition('fire-hose-reel', [override])).toBe(override);
+    expect(getStampDefinition('fire-hose-reel', [])?.label).toBe('D4 Fire Hose Reel');
+    expect(isLibraryStampId('fire-hose-reel')).toBe(true);
+    expect(isLibraryStampId('custom-1')).toBe(false);
   });
 
   it('every id is unique across the merged library', () => {
