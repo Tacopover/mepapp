@@ -358,12 +358,14 @@ export interface FittingInfo {
 }
 
 /**
- * Resolves a stamp-library iconRef to loaded image bytes — `loadProjectFromJson`'s
- * way of rebuilding restored stamps' sprites without `SketchScene` itself owning a
- * fetch call, matching the layering that `StampsPanel`'s `resolveIconUrl` prop
- * already establishes (apps/web owns where stamp art actually lives on disk).
+ * Resolves a stamp definition to loaded image bytes — `loadProjectFromJson`'s way of rebuilding
+ * restored stamps' sprites without `SketchScene` itself owning a fetch call, matching the
+ * layering that `StampsPanel`'s `resolveIconUrl` prop already establishes (apps/web owns where
+ * stamp art actually lives on disk). Takes the whole definition, not just its iconRef, so the
+ * resolver can rasterize `shapes` directly when present instead of always fetching a file (see
+ * packages/ui's loadDefinitionBitmap).
  */
-export type IconBitmapResolver = (iconRef: string) => Promise<ImageBitmap>;
+export type IconBitmapResolver = (definition: StampDefinition) => Promise<ImageBitmap>;
 
 export interface DrawingSummary {
   segmentCount: number;
@@ -2460,7 +2462,7 @@ export class SketchScene {
       const definition = getStampDefinition(stampData.definitionId, target.customStampDefinitions);
       if (!definition) continue; // stamp library changed since this project was saved
 
-      const bitmap = await resolveIconBitmap(definition.iconRef);
+      const bitmap = await resolveIconBitmap(definition);
       const texture = textureFromImageBitmap(bitmap);
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5); // matches placeStamp's pivot convention

@@ -15,7 +15,7 @@ import {
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
-import { loadStampBitmap } from './stampBitmap.js';
+import { loadDefinitionBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
 import { CanvasContextMenu } from './components/CanvasContextMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
@@ -329,17 +329,19 @@ export function MepSketchApp({
   const fileHandlesRef = useRef(new Map<string, FileSystemFileHandle>());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Fetches a stamp-library icon's actual bytes for loadProjectFromJson/loadFromPdf to rebuild a restored stamp's sprite —
-  // SketchScene has no fetch of its own, same layering as resolveStampIconUrl/StampsPanel.
+  // Resolves a stamp definition's actual pixels for loadProjectFromJson/loadFromPdf to rebuild a
+  // restored stamp's sprite — SketchScene has no fetch of its own, same layering as
+  // resolveStampIconUrl/StampsPanel. loadDefinitionBitmap rasterizes `shapes` directly when
+  // present, only falling back to fetching iconRef for a shapeless raster-only custom stamp.
   const resolveStampIconBitmap = useCallback(
-    async (iconRef: string) => {
-      // A custom (Element Editor-authored) definition's iconRef is already a
-      // self-contained `data:` URL — fetch() handles those directly, so skip
-      // resolveStampIconUrl's fixture-relative `/stamps/` prefixing for it.
-      const res = await fetch(iconRef.startsWith('data:') ? iconRef : resolveStampIconUrl(iconRef));
-      const blob = await res.blob();
-      const definition = STAMP_LIBRARY.find((def) => def.iconRef === iconRef);
-      return loadStampBitmap(blob, definition && { widthPt: definition.nativeWidth, heightPt: definition.nativeHeight });
+    async (definition: StampDefinition) => {
+      return loadDefinitionBitmap(definition, async () => {
+        // A custom (Element Editor-authored) definition's iconRef is already a
+        // self-contained `data:` URL — fetch() handles those directly, so skip
+        // resolveStampIconUrl's fixture-relative `/stamps/` prefixing for it.
+        const res = await fetch(definition.iconRef.startsWith('data:') ? definition.iconRef : resolveStampIconUrl(definition.iconRef));
+        return res.blob();
+      });
     },
     [resolveStampIconUrl],
   );
@@ -578,7 +580,7 @@ export function MepSketchApp({
       const scene = sceneRef.current;
       if (!scene) return;
       scene.applyDefinitionToPlacedStamps(definition);
-      resolveStampIconBitmap(definition.iconRef)
+      resolveStampIconBitmap(definition)
         .then((bitmap) => scene.setDefinitionArtwork(definition.id, bitmap))
         .catch((err) => setStatus(`Could not load the artwork of ${definition.label}: ${err instanceof Error ? err.message : String(err)}`));
     },

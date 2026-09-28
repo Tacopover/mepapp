@@ -6,6 +6,9 @@
 // canvas drawImage() can paint an SVG-backed <img> even though
 // createImageBitmap() can't decode the same bytes directly.
 
+import type { SymbolShape } from '@mepapp/core';
+import { rasterizeSymbolShapesToBitmap } from './symbolShapeCanvas.js';
+
 /** Same 300 DPI convention as @mepapp/render's STAMP_SOURCE_DPI (scene.ts) — stamp art's pixel size at 300 DPI is expected to match its nominal size in PDF points. */
 const STAMP_SOURCE_DPI = 300;
 
@@ -21,6 +24,31 @@ export async function loadStampBitmap(blob: Blob, target?: StampBitmapTarget): P
     ? { width: (target.widthPt / 72) * STAMP_SOURCE_DPI, height: (target.heightPt / 72) * STAMP_SOURCE_DPI }
     : undefined;
   return rasterizeSvg(blob, px);
+}
+
+export interface StampArtSource {
+  iconRef: string;
+  nativeWidth: number;
+  nativeHeight: number;
+  /** See stamp-library.ts's StampDefinition.shapes doc comment — present on every library definition and every override; absent only for a raster-only custom import. */
+  shapes?: SymbolShape[];
+}
+
+/**
+ * The one place every render/placement/PDF-export call site gets a stamp definition's pixels
+ * from. `shapes` is authoritative whenever present — rasterizing it directly means canvas
+ * placement and PDF export can never again drift from what the Element Editor itself draws,
+ * closing the gap SVG-vs-shapes divergence used to open (see stamp-library.ts's `shapes` doc
+ * comment). Falls back to fetching+rasterizing `iconRef` only for a definition with no shapes
+ * at all. `fetchIconBlob` is lazy so that fallback fetch never runs when shapes already answer it.
+ */
+export async function loadDefinitionBitmap(definition: StampArtSource, fetchIconBlob: () => Promise<Blob>): Promise<ImageBitmap> {
+  if (definition.shapes && definition.shapes.length > 0) {
+    const widthPx = (definition.nativeWidth / 72) * STAMP_SOURCE_DPI;
+    const heightPx = (definition.nativeHeight / 72) * STAMP_SOURCE_DPI;
+    return rasterizeSymbolShapesToBitmap(definition.shapes, widthPx, heightPx);
+  }
+  return loadStampBitmap(await fetchIconBlob(), { widthPt: definition.nativeWidth, heightPt: definition.nativeHeight });
 }
 
 function rasterizeSvg(blob: Blob, px?: { width: number; height: number }): Promise<ImageBitmap> {
