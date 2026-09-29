@@ -5,12 +5,17 @@ import * as mupdf from 'mupdf';
 import type {
   AnnotationSpec,
   FlattenRequest,
+  LayerInfo,
   PageInfo,
   PdfDocumentHandle,
   PdfEngine,
   RasterOptions,
   StoredAnnotation,
+  TextRun,
+  VectorPageData,
+  VectorPathOptions,
 } from '@mepapp/pdf-engine';
+import { extractTextRuns, extractVectorPaths } from './vectors.js';
 
 const VALID_ROTATIONS = [0, 90, 180, 270] as const;
 
@@ -529,6 +534,36 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
       newContents.push(extraContents);
       pageObj.put('Contents', newContents);
     }
+  }
+
+  async getVectorPaths(pageIndex: number, opts?: VectorPathOptions): Promise<VectorPageData> {
+    const page = this.doc.loadPage(pageIndex);
+    try {
+      return extractVectorPaths(page, opts);
+    } finally {
+      page.destroy();
+    }
+  }
+
+  async getTextRuns(pageIndex: number): Promise<TextRun[]> {
+    const page = this.doc.loadPage(pageIndex);
+    try {
+      return extractTextRuns(page);
+    } finally {
+      page.destroy();
+    }
+  }
+
+  // Optional-content groups from the document's default configuration
+  // (mupdf countLayers/getLayerName/isLayerVisible). Documents without
+  // optional content return [].
+  async listLayers(): Promise<LayerInfo[]> {
+    const layers: LayerInfo[] = [];
+    const count = this.doc.countLayers();
+    for (let i = 0; i < count; i++) {
+      layers.push({ name: this.doc.getLayerName(i), visible: this.doc.isLayerVisible(i) });
+    }
+    return layers;
   }
 
   async save(): Promise<Uint8Array> {
