@@ -5,6 +5,7 @@
   "scripts": {
     "build": "turbo run build",
     "gen:stamps": "node scripts/generate-stamp-library.mjs",
+    "room-regression": "node scripts/room-regression.mjs",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck"

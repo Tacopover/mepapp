@@ -1,0 +1,290 @@
+{
+ "files": {
+  "Example_1": {
+   "scale": 200,
+   "rooms": [
+    {
+     "id": "Example_1#0",
+     "x": 1125,
+     "y": 581,
+     "labelAreaM2": 37,
+     "name": "Ee.01.08.10",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_1#1",
+     "x": 1203,
+     "y": 578,
+     "labelAreaM2": 55,
+     "name": "Ee.01.08.11",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_1#2",
+     "x": 1312,
+     "y": 592,
+     "labelAreaM2": 88,
+     "name": "Ee.01.03.04",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_1#3",
+     "x": 1412,
+     "y": 598,
+     "labelAreaM2": 17,
+     "name": "Ee.01.03.07",
+     "open": true,
+     "extra": false
+    }
+   ]
+  },
+  "Example_2": {
+   "scale": 100,
+   "rooms": [
+    {
+     "id": "Example_2#0",
+     "x": 924,
+     "y": 1042.5,
+     "labelAreaM2": 281,
+     "name": "281 m² 160 pers.",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_2#1",
+     "x": 2692.5,
+     "y": 670.5,
+     "labelAreaM2": 25,
+     "name": "25 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_2#2",
+     "x": 2018.5,
+     "y": 578.5,
+     "labelAreaM2": 63,
+     "name": "63 m²",
+     "open": true,
+     "extra": false
+    },
+    {
+     "id": "Example_2#3",
+     "x": 1166.5,
+     "y": 753.5,
+     "labelAreaM2": 18,
+     "name": "18 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_2#4",
+     "x": 637,
+     "y": 1332.5,
+     "labelAreaM2": 193,
+     "name": "193 m² 86 pers.",
+     "open": false,
+     "extra": false
+    }
+   ]
+  },
+  "Example_3": {
+   "scale": 100,
+   "rooms": [
+    {
+     "id": "Example_3#0",
+     "x": 2250,
+     "y": 411.5,
+     "labelAreaM2": 63,
+     "name": "63 m² 25 pers.",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_3#1",
+     "x": 2139.5,
+     "y": 611.5,
+     "labelAreaM2": 81,
+     "name": "81 m²",
+     "open": true,
+     "extra": false
+    },
+    {
+     "id": "Example_3#2",
+     "x": 1173.5,
+     "y": 444.5,
+     "labelAreaM2": 31,
+     "name": "31 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_3#3",
+     "x": 1216.5,
+     "y": 756.5,
+     "labelAreaM2": 46,
+     "name": "46 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "Example_3#4",
+     "x": 1842,
+     "y": 411.5,
+     "labelAreaM2": 63,
+     "name": "63 m² 25 pers.",
+     "open": false,
+     "extra": false
+    }
+   ]
+  },
+  "00_arch_ground_floor": {
+   "scale": 50,
+   "rooms": [
+    {
+     "id": "00_arch_ground_floor#0",
+     "x": 1328.5,
+     "y": 673,
+     "labelAreaM2": 36,
+     "name": "36 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "00_arch_ground_floor#1",
+     "x": 1830.5,
+     "y": 2249,
+     "labelAreaM2": 49,
+     "name": "49 m²",
+     "open": true,
+     "extra": false
+    },
+    {
+     "id": "00_arch_ground_floor#2",
+     "x": 1831.5,
+     "y": 1378,
+     "labelAreaM2": 19,
+     "name": "19 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "00_arch_ground_floor#3",
+     "x": 579.5,
+     "y": 2363,
+     "labelAreaM2": 26,
+     "name": "26 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "00_arch_ground_floor#4",
+     "x": 1225,
+     "y": 1963,
+     "labelAreaM2": 131,
+     "name": "131 m²",
+     "open": true,
+     "extra": false
+    },
+    {
+     "id": "00_arch_ground_floor#x0",
+     "x": 1462.5,
+     "y": 2157,
+     "labelAreaM2": 10,
+     "name": "0.25",
+     "open": false,
+     "extra": true
+    },
+    {
+     "id": "00_arch_ground_floor#x1",
+     "x": 1303,
+     "y": 2157,
+     "labelAreaM2": 3,
+     "name": "0.26",
+     "open": false,
+     "extra": true
+    },
+    {
+     "id": "00_arch_ground_floor#x2",
+     "x": 942,
+     "y": 2109,
+     "labelAreaM2": 11,
+     "name": "0.30",
+     "open": false,
+     "extra": true
+    },
+    {
+     "id": "00_arch_ground_floor#x3",
+     "x": 1100,
+     "y": 2109,
+     "labelAreaM2": 11,
+     "name": "0.31",
+     "open": false,
+     "extra": true
+    },
+    {
+     "id": "00_arch_ground_floor#x4",
+     "x": 1021.5,
+     "y": 1839,
+     "labelAreaM2": 26,
+     "name": "0.32",
+     "open": false,
+     "extra": true
+    }
+   ]
+  },
+  "01_arch_first_floor": {
+   "scale": 50,
+   "rooms": [
+    {
+     "id": "01_arch_first_floor#0",
+     "x": 828.5,
+     "y": 1153,
+     "labelAreaM2": 35,
+     "name": "35 m²",
+     "open": true,
+     "extra": false
+    },
+    {
+     "id": "01_arch_first_floor#1",
+     "x": 1024,
+     "y": 1569,
+     "labelAreaM2": 31.5,
+     "name": "31,50 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "01_arch_first_floor#2",
+     "x": 1024,
+     "y": 886,
+     "labelAreaM2": 21.52,
+     "name": "21,52 m²",
+     "open": false,
+     "extra": false
+    },
+    {
+     "id": "01_arch_first_floor#3",
+     "x": 618,
+     "y": 955,
+     "labelAreaM2": 49.2,
+     "name": "49,20 m²",
+     "open": true,
+     "extra": false
+    },
+    {
+     "id": "01_arch_first_floor#4",
+     "x": 597,
+     "y": 2308,
+     "labelAreaM2": 49.05,
+     "name": "49,05 m²",
+     "open": true,
+     "extra": false
+    }
+   ]
+  }
+ }
+}

@@ -30,3 +30,4 @@ export * from './segmentTool.js';
 export * from './segmentPaste.js';
 export * from './project.js';
 export * from './pdfSync.js';
+export * from './rooms/index.js';
