@@ -1,0 +1,79 @@
+{
+ "source": "00_arch_ground_floor.pdf (fixtures/pdfs)",
+ "scale": 50,
+ "minCompMm": 3578,
+ "rooms": [
+  {
+   "name": "ground_floor_2",
+   "id": "00_arch_ground_floor#2",
+   "label": "19 m²",
+   "seed": {
+    "x": 1831.5,
+    "y": 1378
+   },
+   "labelAreaM2": 19,
+   "bounds": [
+    1531.5,
+    1078,
+    2131.5,
+    1678
+   ],
+   "segmentCount": 3972,
+   "extra": false
+  },
+  {
+   "name": "ground_floor_3",
+   "id": "00_arch_ground_floor#3",
+   "label": "26 m²",
+   "seed": {
+    "x": 579.5,
+    "y": 2363
+   },
+   "labelAreaM2": 26,
+   "bounds": [
+    279.5,
+    2063,
+    879.5,
+    2663
+   ],
+   "segmentCount": 6689,
+   "extra": false
+  },
+  {
+   "name": "ground_floor_x2",
+   "id": "00_arch_ground_floor#x2",
+   "label": "0.30",
+   "seed": {
+    "x": 942,
+    "y": 2109
+   },
+   "labelAreaM2": 11,
+   "bounds": [
+    642,
+    1809,
+    1242,
+    2409
+   ],
+   "segmentCount": 4679,
+   "extra": true
+  },
+  {
+   "name": "ground_floor_x1",
+   "id": "00_arch_ground_floor#x1",
+   "label": "0.26",
+   "seed": {
+    "x": 1303,
+    "y": 2157
+   },
+   "labelAreaM2": 3,
+   "bounds": [
+    1003,
+    1857,
+    1603,
+    2457
+   ],
+   "segmentCount": 4284,
+   "extra": true
+  }
+ ]
+}

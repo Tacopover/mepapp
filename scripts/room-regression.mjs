@@ -8,7 +8,8 @@
 //   pnpm room-regression                       default parameters
 //   pnpm room-regression --grow 100            wallGrowMm=100 (study value)
 //   pnpm room-regression --params '{"gapMm":700}' --file 00_arch_ground_floor
-//   pnpm room-regression --overlay <dir>       write polygon overlay PNGs (needs pngjs in NODE_PATH)
+//   pnpm room-regression --overlay <dir>       write polygon overlay PNGs (pngjs is not a repo dependency:
+//                                              set PNGJS_FROM to a file next to a node_modules that has it)
 //
 // The room list (seed points, label areas, OPEN flags) was copied from the
 // prototype driver run.mjs. OPEN rooms have no closed wall in the drawing and
@@ -87,7 +88,8 @@ function median(a) {
 
 // Overlay: kept walls (black) and removed candidate lines (pink) in a crop around the room, polygon in blue.
 async function writeOverlay(dir, file, room, input, keep, res, mmPerPt) {
-  const { PNG } = await import('pngjs');
+  const { createRequire } = await import('node:module');
+  const { PNG } = createRequire(process.env.PNGJS_FROM ?? import.meta.url)('pngjs');
   const { mkdirSync, writeFileSync } = await import('node:fs');
   mkdirSync(dir, { recursive: true });
   const poly = res.polygon.outer;
