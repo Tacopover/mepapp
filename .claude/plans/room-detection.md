@@ -85,7 +85,7 @@ Not verified: bundle sizes, degenerate-input robustness of clipping libraries.
 
 ## 8. Phases
 
-1. **Fixtures + filter study.** Wait for the extra PDFs. Extract segments with a throwaway script. Decide the wall-line filter and wall-pair rules. Output: written findings, no app code.
+1. **Fixtures + filter study.** STATUS 2026-09-29: first pass done (throwaway scripts in the session scratchpad, not in the repo). Filter keeps walls, click-fill draws clean contours, but only 9 of 24 test rooms match the label area within 15%. Findings that change later phases: Example_1 draws walls as FILLS and text as outlines (no names readable); Example_2/3 have curved walls; no file has layers; furniture touching walls survives the filter. Phase 2 must return fill paths, fill colour and a curve flag. Still open: furniture rule, curve walls, scale detection, cause of each area mismatch. Wait for the extra PDFs. Extract segments with a throwaway script. Decide the wall-line filter and wall-pair rules. Output: written findings, no app code.
 2. **pdf-engine extraction API.** Add `getVectorPaths`, `getTextRuns`, `listLayers`. Implement in `pdf-engine-mupdf`. Test on fixtures.
 3. **Core geometry (headless, `@mepapp/core`).** Filtering, gap closing, click-to-fill (approach B), inner-face offset. Vitest tests on fixture data.
 4. **Polygonizer test and decision.** Build JSTS and own-code versions on the ground floor. Compare speed, bundle size, correctness. Record the decision.
