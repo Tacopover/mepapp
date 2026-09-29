@@ -4,9 +4,12 @@ import {
   DEFAULT_STAMP_LABEL_VISIBILITY,
   getStampDefinition,
   isLibraryStampId,
+  SCHEMATIC_TEMPLATE_LIBRARY,
   STAMP_LIBRARY,
   type NetworkType,
   type ReconciliationReport,
+  type SchematicSymbol,
+  type SchematicTemplate,
   type StampCategory,
   type StampDefinition,
   type StampLabel,
@@ -38,8 +41,11 @@ import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
 import { StampLabelsDialog } from './components/StampLabelsDialog.js';
 import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
+import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
+import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
+import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
@@ -165,6 +171,8 @@ export function MepSketchApp({
     panels,
     panelSections,
     circuitTypes,
+    schematics,
+    schematicProjectFields,
     selectedCircuitId,
     setSelectedCircuitId,
     selectedPanelId,
@@ -223,6 +231,12 @@ export function MepSketchApp({
   /** The placed stamp whose definition's label layout is open in StampLabelsDialog. */
   const [labelEditorStampId, setLabelEditorStampId] = useState<string | null>(null);
   const [circuitTypesOpen, setCircuitTypesOpen] = useState(false);
+  const [schematicPanelId, setSchematicPanelId] = useState<string | null>(null);
+  const [customSchematicTemplates, setCustomSchematicTemplates] = useState<SchematicTemplate[]>(() => loadCustomTemplates(typeof localStorage === 'undefined' ? undefined : localStorage));
+  const [schematicTemplateId, setSchematicTemplateId] = useState(SCHEMATIC_TEMPLATE_LIBRARY[0].id);
+  useEffect(() => saveCustomTemplates(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicTemplates), [customSchematicTemplates]);
+  const [customSchematicSymbols, setCustomSchematicSymbols] = useState<SchematicSymbol[]>(() => loadCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage));
+  useEffect(() => saveCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicSymbols), [customSchematicSymbols]);
   const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
@@ -754,6 +768,7 @@ export function MepSketchApp({
         customStampDefinitions={customStampDefinitions}
         labelLanguage={labelLanguage}
         onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
+        onOpenSchematic={setSchematicPanelId}
         onEditLabels={setLabelEditorStampId}
         circuits={circuits}
         panels={panels}
@@ -1055,6 +1070,30 @@ export function MepSketchApp({
         />
       )}
 
+      {schematicPanelId && (
+        <SchematicDialog
+          panelId={schematicPanelId}
+          panels={panels}
+          circuits={circuits}
+          panelSections={panelSections}
+          circuitTypes={circuitTypes}
+          stamps={allStamps}
+          customStampDefinitions={customStampDefinitions}
+          schematics={schematics}
+          projectFields={schematicProjectFields}
+          onAddSchematic={(schematic) => sceneRef.current?.addSchematic(schematic)}
+          onUpdateSchematic={(schematic) => sceneRef.current?.updateSchematic(schematic)}
+          onRemoveSchematic={(schematicId) => sceneRef.current?.removeSchematic(schematicId)}
+          onProjectFieldChange={(fieldId, value) => sceneRef.current?.setSchematicProjectField(fieldId, value)}
+          customTemplates={customSchematicTemplates}
+          onCustomTemplatesChange={setCustomSchematicTemplates}
+          customSymbols={customSchematicSymbols}
+          onCustomSymbolsChange={setCustomSchematicSymbols}
+          templateId={schematicTemplateId}
+          onTemplateIdChange={setSchematicTemplateId}
+          onClose={() => setSchematicPanelId(null)}
+        />
+      )}
       {circuitTypesOpen && (
         <CircuitTypesDialog sceneRef={sceneRef} circuitTypes={circuitTypes} circuits={circuits} panels={panels} onClose={() => setCircuitTypesOpen(false)} />
       )}

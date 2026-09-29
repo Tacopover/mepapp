@@ -14,6 +14,7 @@ import {
   type PanelSection,
   type PlacedStamp,
   type PortGroup,
+  type Schematic,
   type Segment,
   type StampDefinition,
   type StampLabelLayouts,
@@ -116,6 +117,10 @@ export class SketchDocument {
   readonly circuitTypes: CircuitType[] = [];
   /** Canvas label layout per stamp definition id — plain per-document state with no undo history, same as customStampDefinitions. Set via SketchScene.setStampLabelLayout. */
   stampLabelLayouts: StampLabelLayouts = {};
+  /** Saved schematics (electrical-schematic-templates.md Phase 5b). Edited directly and not undoable, like circuitTypes. */
+  readonly schematics: Schematic[] = [];
+  /** Entered values of template fields with scope 'project', by field id — shared by every schematic of this document. */
+  readonly schematicProjectFields: Record<string, string> = {};
   readonly terminalCapacities = new Map<string, number>();
   pdfSyncIds = new Set<string>();
   nextStampSeq = 1;

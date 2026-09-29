@@ -1,0 +1,297 @@
+// Schematic template schema (electrical-schematic-templates.md §8) — pure
+// data, no rendering, no I/O. Every property a template holds is saved; the
+// old app lost rotation, scale and colors on reload (plan §4).
+//
+// Coordinates are sheet millimetres. A block's x/y is its top-left corner and
+// its rotation (degrees, clockwise) pivots on the block's centre, the same
+// convention as the Phase 0 mockup.
+
+import type { SymbolShape } from './symbol-shapes.js';
+import { parseBinding, parseExpression, ExpressionError, type NumberFormat } from './schematic-expression.js';
+
+/**
+ * once = one instance on the sheet. panel = one per panel. section = one per
+ * panel section that has circuits. circuit = repeats in the circuit group.
+ * aggregate = sums or counts over the panel's circuits.
+ */
+export type SchematicBlockScope = 'once' | 'panel' | 'section' | 'circuit' | 'aggregate';
+
+export type SchematicBlockType =
+  | 'legend'
+  | 'titleBlock'
+  | 'freeItem'
+  | 'drawing'
+  | 'feedCable'
+  | 'mainDevice'
+  | 'accessoryDevice'
+  | 'busbar'
+  | 'section'
+  | 'frame'
+  | 'circuitNumber'
+  | 'protectiveDevice'
+  | 'phaseLabel'
+  | 'conductor'
+  | 'cableText'
+  | 'loadSymbol'
+  | 'description'
+  | 'customAnnotation'
+  | 'countCell'
+  | 'derivedCell'
+  | 'aggregateCell'
+  | 'totalsTable';
+
+export interface SchematicBlockTypeInfo {
+  label: string;
+  scope: SchematicBlockScope;
+  /** Default size in sheet mm, used when a block leaves width/height unset. */
+  width: number;
+  height: number;
+  /** Binding used when a block leaves `binding` undefined. An explicit '' means "no text". */
+  defaultBinding?: string;
+}
+
+export const SCHEMATIC_BLOCK_CATALOGUE: Record<SchematicBlockType, SchematicBlockTypeInfo> = {
+  legend: { label: 'Table header / legend symbol', scope: 'once', width: 30, height: 8 },
+  titleBlock: { label: 'Title block', scope: 'once', width: 100, height: 40 },
+  freeItem: { label: 'Free text', scope: 'once', width: 30, height: 6 },
+  /** Free-drawn shapes (`SchematicBlock.shapes`). The only type allowed in the layout and in a circuit group. */
+  drawing: { label: 'Drawing', scope: 'once', width: 40, height: 30, defaultBinding: '' },
+  feedCable: { label: 'Feed cable', scope: 'panel', width: 60, height: 8, defaultBinding: '[{panel.feederCable.type} {panel.feederCable.crossSectionMm2} mm²][  l={panel.feederCable.lengthM} m]' },
+  mainDevice: { label: 'Main device', scope: 'panel', width: 12, height: 14, defaultBinding: '{panel.mainDevice.label}' },
+  accessoryDevice: { label: 'Accessory device', scope: 'panel', width: 10, height: 10, defaultBinding: '{panel.accessories.label}' },
+  /** The generator stretches a busbar along the repeat direction to cover every circuit, unless its size is set on that axis. */
+  busbar: { label: 'Busbar', scope: 'panel', width: 250, height: 2 },
+  section: { label: 'Section box and label', scope: 'section', width: 60, height: 20, defaultBinding: '{section.name}' },
+  frame: { label: 'Frame', scope: 'panel', width: 400, height: 270 },
+  circuitNumber: { label: 'Circuit number label', scope: 'circuit', width: 10, height: 6, defaultBinding: '{circuit.prefix}{circuit.number}' },
+  protectiveDevice: { label: 'Protective device', scope: 'circuit', width: 10, height: 10, defaultBinding: '{device.label}' },
+  phaseLabel: { label: 'Phase label', scope: 'circuit', width: 8, height: 5, defaultBinding: '{circuit.phase}' },
+  conductor: { label: 'Cable line and conductor mark', scope: 'circuit', width: 12, height: 5, defaultBinding: '{cable.coreCount}x' },
+  cableText: { label: 'Cable text', scope: 'circuit', width: 45, height: 10, defaultBinding: '[{cable.type} {cable.coreCount}G{cable.crossSectionMm2} mm²][  l={cable.lengthM} m]' },
+  loadSymbol: { label: 'Load symbol', scope: 'circuit', width: 8, height: 8 },
+  description: { label: 'Description text', scope: 'circuit', width: 40, height: 6, defaultBinding: '{circuit.customName}' },
+  customAnnotation: { label: 'Custom annotation', scope: 'circuit', width: 32, height: 5, defaultBinding: '' },
+  countCell: { label: 'Table cell: count and VA', scope: 'circuit', width: 22, height: 7, defaultBinding: '{count(terminals)} ({sum(terminal.capacity)}VA)' },
+  derivedCell: { label: 'Table cell: derived value', scope: 'circuit', width: 22, height: 7, defaultBinding: '{circuit.diversifiedCapacity} · {circuit.diversityPercent}%' },
+  aggregateCell: { label: 'Aggregate cell (sum, count)', scope: 'aggregate', width: 24, height: 8, defaultBinding: 'Σ {sum(circuit.capacity)} VA' },
+  totalsTable: { label: 'Totals table', scope: 'aggregate', width: 90, height: 30 },
+};
+
+/** The block types that can show a library symbol through `SchematicBlock.symbolId`. */
+export const SYMBOL_CAPABLE_BLOCK_TYPES: readonly SchematicBlockType[] = ['drawing', 'mainDevice', 'protectiveDevice', 'accessoryDevice', 'loadSymbol'];
+
+export interface SchematicBlockStyle {
+  strokeWidthMm?: number;
+  dash?: 'solid' | 'dashed' | 'dotted';
+  /** 0xRRGGBB. */
+  color?: number;
+  fontFamily?: string;
+  fontSizeMm?: number;
+  bold?: boolean;
+  italic?: boolean;
+  align?: 'left' | 'center' | 'right';
+}
+
+export interface TotalsTableRow {
+  label: string;
+  /** A bare expression (no braces), evaluated in aggregate scope unless the table's `tableColumns` is 'circuits'. */
+  formula: string;
+}
+
+export interface SchematicBlock {
+  id: string;
+  type: SchematicBlockType;
+  x: number;
+  y: number;
+  rotation: number;
+  width?: number;
+  height?: number;
+  /** Text with {expression} segments. undefined = the block type's default binding; '' = no text. */
+  binding?: string;
+  style?: SchematicBlockStyle;
+  /** Only on a type in `SYMBOL_CAPABLE_BLOCK_TYPES`. The id of a `SchematicSymbol` in the symbol library. On a drawing the symbol's art replaces `shapes`. On a device or load block it replaces the built-in mark; the block keeps its text. */
+  symbolId?: string;
+  /** drawing only. Coordinates are fractions (0..1) of the block's width and height, the same convention as a custom stamp's shapes. */
+  shapes?: SymbolShape[];
+  /** totalsTable only. */
+  tableRows?: TotalsTableRow[];
+  /** totalsTable only. 'panel' = one value per row; 'circuits' = one value per row and circuit, in circuit order. Default 'panel'. */
+  tableColumns?: 'panel' | 'circuits';
+  /** Circuit and aggregate scope: narrows `terminals` and `terminal.*` to terminals of this load type (plan §3: count and VA per load type). */
+  loadTypeFilter?: string;
+}
+
+/**
+ * Which circuits a group definition applies to. A spare circuit matches only a
+ * `spare` or `any` rule. `circuitType` and `circuitNumber` never match a spare,
+ * and `any` matches every circuit, so it works as a fallback.
+ */
+export type CircuitGroupRule =
+  | { kind: 'any' }
+  | { kind: 'spare' }
+  | { kind: 'circuitType'; circuitTypeIds: string[] }
+  | { kind: 'circuitNumber'; numbers: number[] };
+
+export interface CircuitGroupDefinition {
+  id: string;
+  name: string;
+  rule: CircuitGroupRule;
+  /** row = each circuit sits to the right of the previous one; column = below it. */
+  direction: 'row' | 'column';
+  /** Distance in sheet mm from one circuit of this group to the next circuit. */
+  pitch: number;
+  /** Positions are relative to the group instance's origin. Every block here has circuit scope. */
+  blocks: SchematicBlock[];
+}
+
+export type SchematicFieldType = 'text' | 'multiline' | 'date' | 'number';
+
+/**
+ * A value that the user fills in per schematic, such as the project name or the revision. Blocks read
+ * it as `{field.<id>}`. The template only defines it; the value belongs to the project (scope
+ * `project`, entered once and shared by every schematic) or to one schematic (scope `schematic`).
+ */
+export interface SchematicFieldDefinition {
+  /** A name that starts with a letter or underscore and holds letters, digits and underscores. */
+  id: string;
+  label: string;
+  type: SchematicFieldType;
+  scope: 'project' | 'schematic';
+  /** Used while no value is entered: text with {expression} segments, evaluated on the panel, for example "Board {panel.name}". */
+  defaultBinding?: string;
+  /** A date field only: the default is the day the schematic is generated. */
+  defaultToday?: boolean;
+}
+
+/**
+ * A block that the user added to one schematic, not to the template. Its position is in sheet mm, or
+ * relative to the origin of circuit `circuitId` when that is set, so it follows that circuit.
+ */
+export interface SchematicExtra extends SchematicBlock {
+  circuitId?: string;
+}
+
+/**
+ * A user-moved/resized/rotated generated block, stored per resolved block id in `Schematic.blockOverrides`
+ * (electrical-schematic-templates.md Phase 7 round 2). A patch key left unset keeps the template's own
+ * value for that key, so a move (x/y only) does not clobber a separately-set rotation or size.
+ */
+export interface SchematicBlockOverride {
+  x?: number;
+  y?: number;
+  rotation?: number;
+  width?: number;
+  height?: number;
+}
+
+export interface SchematicTemplate {
+  id: string;
+  name: string;
+  description: string;
+  /** Free label such as "NL". Informational: the number format below is what the generator uses. */
+  locale: string;
+  sheet: { widthMm: number; heightMm: number };
+  numberFormat: NumberFormat;
+  /** Blocks of scope once, panel, section and aggregate, positioned on the sheet. */
+  layoutBlocks: SchematicBlock[];
+  /** Sheet position of the first circuit group instance. */
+  groupAnchor: { x: number; y: number };
+  /** Ordered: the first group whose rule matches a circuit is used for it. */
+  groups: CircuitGroupDefinition[];
+  /** The fields the user fills in per schematic. Absent in templates saved before fields existed. */
+  fields?: SchematicFieldDefinition[];
+  /** How a date field shows in text. Default 'dd-mm-yyyy'. */
+  dateFormat?: 'dd-mm-yyyy' | 'yyyy-mm-dd';
+}
+
+export function getBlockWidth(block: SchematicBlock): number {
+  return block.width ?? SCHEMATIC_BLOCK_CATALOGUE[block.type].width;
+}
+
+export function getBlockHeight(block: SchematicBlock): number {
+  return block.height ?? SCHEMATIC_BLOCK_CATALOGUE[block.type].height;
+}
+
+export function getBlockBindingSource(block: SchematicBlock): string | undefined {
+  return block.binding ?? SCHEMATIC_BLOCK_CATALOGUE[block.type].defaultBinding;
+}
+
+function bindingIssue(where: string, source: string, kind: 'binding' | 'formula'): string | null {
+  try {
+    if (kind === 'binding') parseBinding(source);
+    else parseExpression(source);
+    return null;
+  } catch (error) {
+    if (error instanceof ExpressionError) return `${where}: ${error.message}`;
+    throw error;
+  }
+}
+
+function validateBlock(block: SchematicBlock, where: string, expectedScopes: SchematicBlockScope[], seenIds: Set<string>, issues: string[]): void {
+  const info = SCHEMATIC_BLOCK_CATALOGUE[block.type];
+  const name = `${where} block "${block.id}"`;
+  if (!info) {
+    issues.push(`${name} has unknown type "${String(block.type)}".`);
+    return;
+  }
+  if (seenIds.has(block.id)) issues.push(`${name} reuses an id.`);
+  seenIds.add(block.id);
+  if (!expectedScopes.includes(info.scope)) issues.push(`${name} (${block.type}) has ${info.scope} scope and does not belong in ${where}.`);
+  if (![block.x, block.y, block.rotation].every(Number.isFinite)) issues.push(`${name} has a position or rotation that is not a number.`);
+  for (const [field, value] of [['width', block.width], ['height', block.height]] as const) {
+    if (value !== undefined && !(Number.isFinite(value) && value > 0)) issues.push(`${name} has a ${field} that is not a positive number.`);
+  }
+  const source = getBlockBindingSource(block);
+  if (source) {
+    const issue = bindingIssue(name, source, 'binding');
+    if (issue) issues.push(issue);
+  }
+  for (const row of block.tableRows ?? []) {
+    const issue = bindingIssue(`${name} row "${row.label}"`, row.formula, 'formula');
+    if (issue) issues.push(issue);
+  }
+  if (block.type !== 'totalsTable' && (block.tableRows || block.tableColumns)) issues.push(`${name} sets table fields but is not a totalsTable.`);
+  if (block.shapes !== undefined && (block.type !== 'drawing' || !Array.isArray(block.shapes))) issues.push(`${name} sets shapes but is not a drawing.`);
+  if (block.symbolId !== undefined) {
+    if (!SYMBOL_CAPABLE_BLOCK_TYPES.includes(block.type)) issues.push(`${name} sets a symbol but a ${block.type} block cannot show one.`);
+    else if (block.symbolId.trim() === '') issues.push(`${name} sets a symbol without an id.`);
+  }
+}
+
+/** The reasons a template cannot be generated from; an empty list means it is valid. Checks structure and that every binding parses. */
+export function validateSchematicTemplate(template: SchematicTemplate): string[] {
+  const issues: string[] = [];
+  if (template.id.trim() === '') issues.push('The template needs an id.');
+  if (template.name.trim() === '') issues.push('The template needs a name.');
+  if (!(template.sheet.widthMm > 0 && template.sheet.heightMm > 0)) issues.push('The sheet size must be positive.');
+  if (!Number.isFinite(template.groupAnchor.x) || !Number.isFinite(template.groupAnchor.y)) issues.push('The group anchor must be a position.');
+  const seenIds = new Set<string>();
+  for (const block of template.layoutBlocks) {
+    validateBlock(block, 'the layout', ['once', 'panel', 'section', 'aggregate'], seenIds, issues);
+  }
+  const groupIds = new Set<string>();
+  for (const group of template.groups) {
+    if (groupIds.has(group.id)) issues.push(`Group "${group.id}" reuses an id.`);
+    groupIds.add(group.id);
+    if (!(Number.isFinite(group.pitch) && group.pitch > 0)) issues.push(`Group "${group.id}" needs a pitch above zero.`);
+    if (group.direction !== template.groups[0]?.direction) issues.push(`Group "${group.id}" has direction "${group.direction}" but the first group has "${template.groups[0]?.direction}". All groups must have the same direction.`);
+    const groupBlockIds = new Set<string>();
+    for (const block of group.blocks) validateBlock(block, `group "${group.id}"`, block.type === 'drawing' ? ['circuit', 'once'] : ['circuit'], groupBlockIds, issues);
+  }
+  const fieldIds = new Set<string>();
+  for (const field of template.fields ?? []) {
+    const name = `Field "${field.id}"`;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(field.id)) issues.push(`${name} needs an id of letters, digits and underscores that does not start with a digit.`);
+    if (fieldIds.has(field.id)) issues.push(`${name} reuses an id.`);
+    fieldIds.add(field.id);
+    if (field.label.trim() === '') issues.push(`${name} needs a label.`);
+    if (!['text', 'multiline', 'date', 'number'].includes(field.type)) issues.push(`${name} has an unknown type "${String(field.type)}".`);
+    if (field.scope !== 'project' && field.scope !== 'schematic') issues.push(`${name} has an unknown scope "${String(field.scope)}".`);
+    if (field.defaultToday && field.type !== 'date') issues.push(`${name} uses "today" as its default but is not a date.`);
+    if (field.defaultBinding) {
+      const issue = bindingIssue(name, field.defaultBinding, 'binding');
+      if (issue) issues.push(issue);
+    }
+  }
+  return issues;
+}

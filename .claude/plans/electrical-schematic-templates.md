@@ -1,6 +1,6 @@
 # Electrical schematic templates — plan
 
-Status: **draft. No part is started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
+Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 5b and the Phase 5c design pass done 2026-09-25 and 2026-09-27; Phase 7 (multi-select and movable generated blocks) done 2026-09-27; Phase 6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
 ## 1. Goal
 
@@ -291,21 +291,185 @@ Full plan: [[electrical-circuits-model.md]] — all four of its phases (A–D) s
 
 Convert Equipment to panel, create circuit, assign terminals, edit circuit properties. Reuse the tree from `networks-panel-spec.md`. See [[electrical-circuits-model.md]] §9 and its Phase D done-block — terminal-assignment-from-the-terminal-side, a `Circuit.properties` editor, and `PanelAccessory` add/remove UI are explicitly called out there as not done yet.
 
-### Phase 3 — Template schema, built-in templates, generator — not started
+### Phase 3 — Template schema, built-in templates, generator — **Done**
 
 All in `@mepapp/core`. Tests use structures taken from the example schematics.
 
-### Phase 4 — Schematic view — not started
+**Done** — 2026-09-24, commit `7b23d7d` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Shipped (four new modules, all exported from `@mepapp/core`, plus three test files; no schema migration, since nothing is persisted yet):
+
+- `schematic-expression.ts` — binding language. A binding is text with `{expression}` segments. An expression is a dotted path (`cable.type`, `circuit.properties."Serial number"`), a number, `+ - * /`, parentheses, and `sum()` / `count()`. A path over a list maps over it, so `sum(terminal.capacity)` sums every terminal. A missing value gives blank text, never an error. `{expr:2}` forces two decimals. `{{` and `}}` are literal braces. Numbers show at most two decimals, with the template's decimal separator. Syntax errors throw `ExpressionError`.
+- `schematic-template.ts` — the schema: `SchematicTemplate` (sheet size in mm, number format, layout blocks, group anchor, ordered circuit groups), `SchematicBlock` (every property saved: position, rotation, size, binding, style, symbol id, table rows, load-type filter), the 21-type block catalogue with default size, scope and binding, and `validateSchematicTemplate` (structure, scope-per-collection, unique ids, positive pitch, one direction for all groups, every binding parses).
+- `schematic-template-library.ts` — two built-ins, "Rows (NL)" (like E60) and "Columns (NL)" (like OV, text rotated 90°), each a spare group plus a catch-all group. Sheet is A1 landscape (841 x 594 mm), the OV example's size.
+- `schematic-generator.ts` — `generateSchematic(input, template, { origin })`, a pure function returning flat `ResolvedBlock`s (position, size, rotation, resolved text, stable id `<panel>/<circuit | section | ->/<block>`), `circuitOrigins` (for user-drawn extras that follow their circuit), and diagnostics (`no-matching-group`, `binding-error`).
+
+Decisions made while building it (all reversible; the template editor in Phase 5 is where they meet a real user):
+
+- **Units and pivot.** Sheet mm. `x`/`y` is the top-left corner. Rotation is clockwise degrees about the block's centre (the mockup's convention).
+- **A fifth scope, `section`.** The catalogue in §6 said the section box is "per panel". It repeats once per section that has circuits, spanning that section's circuits along the repeat direction, so it got its own scope.
+- **Group selection.** First matching group wins; each group has its own pitch, and the cursor advances by the pitch of the group just placed. A spare matches only `spare` and `any` rules, so a `circuitType` group never swallows a spare. All groups must repeat in the same direction (validated), which narrows the mockup's per-group direction.
+- **Circuit order.** By section order (circuits with no section last), then number. `sortDirection: 'descending'` reverses the numbers inside each section, not the sections.
+- **Three-phase capacity.** `circuit.capacityL1/L2/L3` split a circuit's capacity across its phase letters equally (L1L2L3 gives a third to each; no phase gives none). This is a first answer to open question 3 for the per-phase VA cells.
+- **Totals table.** `tableColumns: 'panel'` (default) evaluates each row once over all non-spare circuits; `'circuits'` evaluates each row once per circuit in layout order.
+- **Load-type cells.** A block's `loadTypeFilter` narrows `terminals` and `terminal.*` to one load type. The generator only reads `loadType` from the caller's terminal info. Where a terminal's load type comes from is still open question 5.
+- **One panel per call.** Open question 4 (several boards on one sheet) is answered for the generator only: call it once per panel with a different `origin`.
+
+Not done:
+
+- **Not run against the real fixtures.** The tests use a synthetic panel shaped like the examples (sections, a spare, a three-phase circuit, an RCD breaker, a 40-circuit board that must fit the sheet). The two real PDFs are not committed (client data), so no test compares generated output to them. Compare visually once Phase 4 draws it.
+- **The built-in layouts are a first guess.** The positions were computed, not looked at, because nothing draws them yet. Expect to adjust them in Phase 4 and 5.
+- **No persistence.** Where templates are stored (open question 1) and how they are saved and loaded is Phase 6. No terminal-info builder exists yet (stamp plus `terminalCapacities` to `SchematicTerminalInfo`); Phase 4 writes it.
+- **Title block, legend and free items have no data.** They are static text or art. There is no project-data model to bind a title block to.
+- **Aggregate cells only see non-spare circuits** and there is no reserve-capacity function yet.
+- **`accessoryDevice` renders all accessories in one block** (joined text), not one block per accessory.
+
+Verified: `pnpm --filter @mepapp/core test` (22 files, 317 tests, all pass; 70 are new); `tsc --noEmit` and `pnpm --filter @mepapp/core build` clean. Nothing in `render`, `ui` or `apps/web` changed, so no browser run was needed.
+
+### Phase 4 — Schematic view — **Done**
 
 Draw the generated schematic. Regenerate on change.
 
-### Phase 5 — Template editor — not started
+**Done** — 2026-09-24, commit `e8e0d28` on `worktree-electrical-schematic-templates-plan` (not yet merged to `master`).
+
+Shipped:
+
+- **`SchematicDialog`** (`packages/ui`), opened by a new "View schematic…" button in a panel's Properties. It has a Panel select, a Template select (the two built-ins), "Fit to sheet", wheel zoom and drag pan. It is a modal: the page behind it cannot change while it is open. It regenerates from React props (circuits, sections, circuit types, stamps) on every render, so it always shows the current document when opened. It reports circuits that no group matches and invalid bindings above the sheet.
+- **`schematicBlockSvg.tsx`** draws one resolved block as SVG in sheet mm (all 21 block types). The sheet is fixed white paper with black ink, whatever the app theme. A load symbol draws the vector art of a custom stamp when its definition has shapes; otherwise a generic load mark.
+- **`schematicTerminals.ts`** builds the generator's terminal info from the placed stamps: label from the stamp definition, capacity from `terminalCapacities`, and **load type = the stamp's definition id** (category for an uploaded stamp with none). This is the working answer to open question 5.
+- **Generator and template changes found by the browser check** (core, with tests): section box offsets in the built-ins were sheet coordinates instead of offsets from the first circuit; a busbar with no size on the repeat axis now stretches over every circuit (both built-ins use this); a binding can hold optional `[...]` groups that only show when one of their `{...}` values exists (so a missing cable length no longer leaves "l= m"); no load symbol on a circuit without terminals.
+
+Not done:
+
+- **Read-only and modal.** No editing, no side-by-side dock. Phase 5 adds the template editor.
+- **The template choice is not saved.** The dialog opens on the first built-in every time.
+- **One panel per view.** A sheet with several panels (open question 4) is not drawn; the generator supports it through `origin`.
+- **Library stamps show a generic load mark.** Only custom stamps have vector shapes. Drawing the PNG art of library stamps needs the app's icon resolver and was not done.
+- **No export** (Phase 6, open question 2), and no title-block data (there is no project-data model).
+- **The circuit's custom name is not auto-filled from a terminal name.** `addTerminalToCircuit` takes a terminal name, but a placed stamp has none to give, so the description block is blank until the user types a name. This gap is older than Phase 4 (Phase C).
+- **No visual comparison with the real E60 and OV drawings.** The built-in layouts are still a first guess; the browser check only confirmed they are readable and consistent.
+
+Verified: `pnpm build` (9 of 9 tasks); `pnpm --filter @mepapp/core test` (327 tests) and `pnpm --filter @mepapp/ui test` (16 tests) pass. A real headless Chromium run (fork, on a preview build of this worktree) built a panel with 2 sections and 6 circuits (one spare, one with RCD, different phase, typed lengths, terminals of two kinds) through real clicks, then opened the dialog. Text in the SVG matched the entered data (labels A1 to A6, `B16/30mA`, `B2CA 3G2,5 mm²  l=27,5 m`, cells and totals). Both templates draw, zoom, pan, fit and Escape work, reopening after a change shows the new data, no console errors. The first run found the defects listed above; they were fixed and re-checked in the browser.
+
+### Phase 5 — Template editor — **Done** (block editor 2026-09-24, free-drawn shapes 2026-09-25)
 
 Place, rotate, and bind building blocks. Snap using ports. Edit a circuit group with sample data.
 
-### Phase 6 — Save and load templates, export — not started
+Design (decided 2026-09-24):
 
-Storage and export format depend on open questions 1 and 2.
+- **The editor canvas shows the generated schematic.** It calls `generateSchematic` on every change, so the user edits what the schematic view shows. Each generated block keeps `templateBlockId` and `groupId`, so a click selects the template block. A drag changes the template block's `x` and `y` by the drag distance, so every repeat moves together.
+- **Preview data.** A select picks a real panel or built-in sample data. The sample data has circuits in two sections, one spare, terminals with capacity, and one extra circuit for each `circuitType` or `circuitNumber` group rule.
+- **Where it lives.** Inside `SchematicDialog`, as an edit mode that replaces the view (no second modal). Built-in templates stay read-only: "Edit template" first makes a copy. Copies live in App state for the session. Saving them is Phase 6.
+- **Pure edit functions in `@mepapp/core`** (`schematic-template-edit.ts`), with vitest tests: add, remove, move, resize (rotation-aware), duplicate and reorder blocks; add, remove and reorder groups; set the direction of all groups; copy a template; a list of the fields a binding can use.
+- **Tools.** Select, drag, rotate handle, resize handle, grid snap (1 mm default), a draggable group anchor, undo and redo, a palette that adds a block by click, a properties panel (position, size, rotation, binding with an "insert field" list, style, load type filter, totals table rows), a group list (rule, pitch, name) and template settings (name, sheet size, decimal separator, direction).
+**Done (block editor)** — 2026-09-24, commits `ff1a386` (core), `03499f6` (UI) and `2722e80` (two fixes) on `worktree-electrical-schematic-templates-plan`.
+
+Shipped:
+- Core (`schematic-template-edit.ts`): pure edit functions, sample data and the binding field list. 36 tests. `validateSchematicTemplate` now accepts a template with no groups.
+- UI: `SchematicTemplateEditor` inside `SchematicDialog` (edit mode). The canvas shows the generated schematic. It has move, rotate and resize handles, a draggable group anchor, grid snap (Alt turns it off), undo and redo (one drag is one step), a palette, group and block lists, and keyboard shortcuts. `SchematicTemplateProperties` has template, group and block panels with an "Insert field" list and live binding errors. `useSheetView` is the zoom and pan shared with the viewer.
+- Built-in templates stay read-only. "Edit template…" makes a copy under "My templates". Duplicate and Delete template work.
+- Custom templates live in App state and in localStorage (`mepapp.schematicTemplates`, interim). Phase 6 replaces this.
+
+**Done (free-drawn shapes)** — 2026-09-25, commits `2d16143` (core) and `4178964` (UI) on `worktree-electrical-schematic-templates-plan`.
+
+Shipped:
+- A `drawing` block type. Its art is `shapes: SymbolShape[]`, in fractions of the block box. It can sit on the sheet or in a circuit group, where it repeats for every circuit. A drawn symbol in a group can stand in for the built-in protective device: delete that block and add "Drawing (each circuit)".
+- `SchematicDrawingEditor`: opens in place of the template editor body (double-click the block, "Edit drawing…", or on adding one). Done saves one undo step. Cancel discards.
+- The drawing surface and the tool and style bars now live in `ShapeDrawSurface` and `ShapeDrawToolbar`. The stamp editor uses them too (`ElementEditorDialog.tsx` 974 to 495 lines).
+- Strokes in the schematic are true millimetres (`minStrokePx` on `SymbolShapesSvg`, default unchanged for stamps).
+
+Not done:
+- ~~No symbol library and no symbol picker on a block (`symbolId` is still unused).~~ Done 2026-09-25 in shared-drawing-tool Phase 4: a `drawing` block can point at a library symbol through `symbolId`. Exporting a template (Phase 6 here) must bundle the symbols it uses, because a block stores only the id.
+- No bound text inside a drawing. Use a description or free text block beside it.
+- No image import and no ports tool in the drawing editor.
+- `loadSymbol` art still has a 1 mm minimum stroke.
+- Old defect, not caused by this work: on a non-square canvas a circle's radius follows the pointer too little (a 4:3 block gives about 0.75 of the dragged radius). The draft uses the width fraction, the drawing uses the shorter side. Code: `symbol-shape-geometry.ts` (draft creation) and `useShapeDrawEditor.ts`.
+
+Verified: core 367 tests; UI 33 tests; root `pnpm build` 9 of 9. Headless browser (Playwright, own port): the stamp editor regression (all shape tools, transform, mirror, undo, snap indicators, port tool, view, save and place) passed. Drawing blocks passed: 4-shape drawing at the right proportion with 0.300 mm strokes; move, resize, rotate; one undo step for a whole drawing session; Cancel; Escape keeps the dialog open; a group drawing on all 5 circuits changing together; the drawn symbol replacing the deleted protective device; empty drawings dashed only in the editor; reload keeps 1 layout and 2 group drawings and `validateSchematicTemplate` returns no issues. No page or console errors. Not checked: Windows, touch.
+
+### Phase 5b — Fields, saved schematics, drawing everywhere — **done** 2026-09-25
+
+Added after the user reviewed Phase 5 on 2026-09-25. A template generates about 80% of a schematic. The rest is filled in per schematic (project name, date, author, revision) or drawn on the schematic. Decisions by the user:
+
+1. Project-wide fields are entered once and shared by every schematic.
+2. The project file keeps a copy of the template (and of the symbols it uses). The user loads later template edits into the schematic by hand.
+3. A schematic covers exactly one panel.
+4. **Deferred, ask again later** with a concrete example: how the protective device symbol is chosen per circuit (per group, or from a mapping by device kind such as breaker, RCD, fuse).
+
+Design:
+- **Template fields.** `SchematicTemplate.fields?: SchematicFieldDefinition[]` (optional, so saved templates still load). A definition has `id` (a name usable in bindings as `{field.<id>}`), `label`, `type` (text, multiline, date, number), `scope` (`project` or `schematic`) and an optional default (a binding evaluated on the panel, or "today" for a date). Every block scope can read `field`. The built-in title block uses fields.
+- **Values.** A project-scope value is stored once in the project, by field id, so two templates that define the same id share it. A schematic-scope value is stored in the schematic. No value stored means the default applies.
+- **Schematic** (stored in the project document, schema version 11): `id`, `name`, `panelId`, a copy of the template, the source template id, a copy of the symbols the template uses, `fieldValues`, `textOverrides` (text typed over a generated block, keyed by the block's stable resolved id), and `extras` (items drawn on the schematic, step 5b-3).
+- **Update from template.** The schematic dialog shows a banner when the source template no longer matches the copy. "Update from template" replaces the copy and the symbol copies. Text overrides that no longer match a block are listed, not dropped.
+- **Dialog change.** The schematic dialog opens for one panel. It lists that panel's schematics, creates one from a template, has a Fields form, edits text in place, and has draw and symbol tools on the sheet.
+- **Drawing tools everywhere.** The same draw and symbol tools work on the template canvas and on the schematic sheet. The separate "Drawing" palette entries then go.
+
+Steps, in order:
+- 5b-1 Symbol property on device blocks (mainDevice, protectiveDevice, accessoryDevice, loadSymbol). **Done** 2026-09-25, commit `be55136`. `symbolId` is valid on `SYMBOL_CAPABLE_BLOCK_TYPES`. The symbol replaces the built-in mark; the label text stays; a deleted symbol falls back to the built-in mark. Not done: choosing a symbol from the device kind (deferred by the user, ask again with a concrete example).
+- 5b-2 Fields and the saved schematic. **Done** 2026-09-25, commits `7251d9c` (core, project schema v11), `de5053a` (saved schematics, dialog, fields form, text overrides) and `b2dda53` (template fields editor). Shipped: template fields with project or schematic scope, defaults (a binding, or today for a date), date format; the built-in templates define fields and their title block uses them; a `Schematic` per panel with its own template copy and symbol copies; the schematic dialog per panel (create, rename, delete, switch template, update from template); a fields form; typing over generated text (double-click); orphan reports; the template fields editor with a warning before removing a used field. Not done: changing a field id does not rewrite text that reads the old id; a schematic hides when its panel is reverted (undo brings it back, the next save drops it); circuit-number text is tiny to double-click at fit zoom; Duplicate template not browser-tested. Verified: core 411 tests, UI 49 tests, root build 9 of 9, and a headless browser pass (Playwright) over dialog flow, shared and per-schematic fields, text overrides, update-from-template and switch-template banners, the fields editor, symbols on device blocks, and Save then reopen of the PDF with the project JSON (schema 11). A small follow-up (id box commits on Enter or blur; symbol-delete warning wording) was tested by typecheck and unit tests only.
+- 5b-3 Drawing and symbol tools on the template canvas and on the schematic sheet. Status: done 2026-09-25 (commit a8e8f47), browser-verified in headless Chromium: all tools on the template sheet and in a group, extras on sheet and circuit (follow circuit after Update from template), move/rotate/resize/duplicate/delete, undo, reload persistence, no console errors. Known: edits to extras in the dialog are not undoable; text in a group becomes `customAnnotation`; Escape does not close the drawing editor. A draw tool bar (line, arrow, rectangle, circle, ellipse, arc, polygon, text, symbol) on both surfaces; each drawn shape becomes one small `drawing` block (template) or `drawing` extra (schematic), so the block tools work on it. The template editor adds to the sheet or to a group (repeats on every circuit); the schematic dialog attaches to the sheet or to a circuit and can select, move, rotate, resize, edit, duplicate and delete its extras. The two "Drawing" palette entries are gone. Shared code: `SheetBlockCanvas`, `SheetDrawTools`, `useSheetDraw`, `sheetDraw.ts`; core: `drawnShapeToBlock`, `duplicateSchematicExtra`, `addSchematicSymbolExtra`.
+
+### Phase 5c — Design pass on the schematic workspace — **done** 2026-09-27 (three rounds, all browser-verified)
+
+The user found the function good but the design weak (2026-09-27). The user approved all 19 review items, in three rounds, in this order.
+
+Round 1, layout:
+1. Full-window workspace with a thin header, not a fixed-size dialog.
+2. One workspace with a "Schematic | Template" mode switch in the header, replacing the second dialog and "Back to schematic". The header names the schematic and the template.
+3. Draw tools in a vertical icon bar left of the sheet, with the drawing editor's icons, tooltips and keyboard keys (V, L, A, R, C, E, T and so on).
+4. Tool options (line width, fill, keep tool, add to / attach to) in one short bar, shown only while a draw tool is active.
+5. Zoom controls under the sheet (−, %, +, fit sheet, zoom to content).
+6. A status line under the sheet that changes with the active tool, replacing the fixed help line.
+14. Schematic header: a schematic selector with a "⋯" menu (new, rename, delete) and a template menu (edit, duplicate, delete, switch, update).
+15. Right panel in the schematic mode: tabs "Fields" and "Selection"; Selection opens when something is selected.
+
+Round 2, template editor panels:
+9. Left panel with two tabs: Outline (tree of the sheet and each group with their blocks: select, reorder, delete) and Add (palette with an icon per block type, drag onto the sheet).
+10. Readable block names in the outline ("Main device"), id in grey.
+11. Right panel tabs: Properties, Fields (compact list, edit one field at a time), Template (sheet size, date and number format).
+12. The selected group shows as a box around its repeats on the sheet, with its rule.
+13. Remove the palette entries "Symbol…" and "Symbol (each circuit)…"; the Symbol tool replaces them.
+
+Round 3, small fixes:
+7. Draw the grid on the sheet when a grid size is set.
+8. One input style in all panels; readable section titles.
+16. Hover highlight and tooltip on generated text that can be typed over.
+17. The date input follows the template's date format.
+18. Line width in mm in the drawing editor (stored as a fraction of the box).
+19. The drawing editor loses the extra Close button; Escape acts as Cancel.
+
+Status per round:
+- Round 1: **done** 2026-09-27, commit `fc64e3f`. Browser-verified (headless Chromium): full-window workspace, mode switch both ways (built-in template copied on first switch), both header menus, all ten tools by click and key (keys ignored in inputs), options bar only with a draw tool, add to group / attach to circuit, view bar zoom and zoom to content/group, status line, Fields/Selection tabs, Escape order, drawing editor in both modes, text override, template undo, save and reopen; no console errors. Found: the scene's window key handler still gets keys behind the workspace (Ctrl+V pasted into the hidden scene, Delete removed it), fixed in round 2. Minor: Escape with only a group selected closes the workspace (older behaviour); the options bar pushes the sheet down about 44 px; the Select status line is cut off at 1280 px.
+- Round 2: **done** 2026-09-27, commits `b1f9002` and the focus fix after it. Browser-verified (headless Chromium): outline select sync, block and group reorder, duplicate, delete with undo; palette click and drag (sheet, repeat under the pointer, selected or first group); Symbol tool into a group; Properties, Fields (one open, delete warning) and Settings tabs; group boxes do not block clicks; the scene gets no keys (Ctrl+V, Delete, Backspace) in both modes; Escape order; the sheet does not move with a draw tool; no round 1 regressions; no console errors. The check found that Ctrl+Z, Ctrl+Y and Delete stopped after an outline button removed itself (focus fell to <body>); fixed with a document listener for the edit keys while focus is on <body>, re-verified in 9 cases. Minor, not fixed: a block dropped into a group with no circuits (Spare) shows nothing and gives no message. Left panel tabs Outline (tree of the sheet and groups with their blocks, readable names, block and group tools) and Add (palette with icons, click or drag onto the sheet; circuit blocks drop into the repeat under the pointer); right panel tabs Properties, Fields (compact list, one field open at a time) and Settings (named "Settings", not "Template", so it does not share a name with the mode switch); the selected group shows a dashed box around each repeat with its name and rule below them; the two Symbol palette entries are gone. Fixes from round 1: the workspace dialog stops key presses at the document, so the scene's window handler never sees them; Escape with only a group selected deselects it; the tool options bar keeps its height; the status line moves to its own row and wraps to two lines when the bar is narrow.
+- Round 3: **done** 2026-09-27, commit `ce17571`. Browser-verified (headless Chromium): grid follows the Grid select, minor lines only when zoomed in, no clicks caught, absent from the saved project and the main view; one input and title style in all six panels, number fields commit on Enter and blur; 24 hover targets with the tooltip, none on frame, busbar, totals, drawings and extras, pan still works; date typed in both formats (after Update from template), invalid text rejected, calendar and Reset; drawing editor width in mm and Escape order in both modes, stamp editor unchanged; no regressions from rounds 1 and 2; no console errors. Item 19 needed no code (round 1 already removed the Close button). Minor, not fixed: the header ✕ stays active while the drawing editor is open and closes the workspace without the drawing edits; the mode switch labels and the options bar tool name keep the small monospaced capitals (outside item 8). Grid on the sheet in both modes (minor lines hidden when closer than 6 screen px, a major line every 10 steps); one input style, readable labels and section titles in the workspace panels (scoped CSS), and the collapsible sections in the properties panels are plain sections; hover highlight and tooltip on generated text that can be typed over (section boxes react on their border only); date fields typed in the template's date format with a calendar button, invalid text shows an error and is not stored (`parseDateText` in core); stroke width in mm in the drawing editor of drawing blocks (the stamp editor keeps its own unit); Escape in the drawing editor clears the selection, then leaves the tool, then acts as Cancel.
+- Follow-up fix for the three minor items round 3 left open: **done** 2026-09-27, commit `048b603`. Browser-verified (headless Chromium) in both modes: the header ✕ button now disables (title "Finish or cancel the open drawing first") while a drawing editor or the symbol library is open, in either mode, and re-enables once it closes; a block added to a group with zero circuits in the active preview now shows `Added to "<group name>" — not shown here, because the current preview has no circuit in that group yet.` in the status line for a few seconds, instead of no feedback at all; the mode switch labels and the tool-options bar's tool-name label now use the same regular label style as the rest of the panels, scoped to `.mep-modal--workspace` like the rest of item 8. No regressions, no console errors. The template editor's own drawing/symbol-library open state is now reported to `SchematicDialog` through a new `onSubviewOpenChange` prop, since that state used to live only inside `SchematicTemplateEditor` and the header lives one level up.
+
+### Phase 6 — Export, and loading templates from a file — not started
+
+Storage in the project file moved into Phase 5b. What is left: export (open question 2), and loading and saving a template as a file to share between projects. Custom templates and symbols stay in localStorage until then.
+
+### Phase 7 — Multi-select and movable generated blocks — **done** 2026-09-27 (both rounds, browser-verified)
+
+Three requests from the user after trying the workspace (2026-09-27):
+
+1. A drag-rectangle (marquee) selection, like the main canvas already has (`ctx.doc.selectedIds`, `selectTool.ts`'s rubber-band case): drag over empty sheet space to select every block/extra it overlaps, Shift adds to the current selection, Shift-click toggles one target. Same overlap test as the main canvas (any overlap, not full containment).
+2. Already works, no code needed: in Template mode, a draw tool's "Add to" selector in the tool options bar can target a group instead of the sheet, and the drawn shape then repeats on every circuit the group matches.
+3. Let the user drag a template-generated block (not just an "extra") in Schematic mode, so the template only has to get the layout ~80% right. Decided with the user: a move applies to one circuit's copy only (not every repeat of the group), and it survives "Update from template" (matched by the block's resolved id, same rule as `textOverrides`).
+
+Round 1 — multi-select: **done** 2026-09-27, commit `0ad11eb`. Browser-verified (headless Chromium) in both modes: marquee drag selects every overlapping block/extra (any overlap, not full containment — confirmed in Template mode, where a marquee over 24 blocks correctly deduped to "8 selected" targets); Shift-drag adds to the existing selection; Shift-click toggles one target in or out; a plain click on a block outside the current selection replaces it; a plain click on empty space clears it; drag or arrow keys move the whole selection by one shared delta; Delete removes the whole selection as one undo step in Template mode (24 → 12 blocks, one Ctrl+Z restored all 12, not one at a time); Ctrl+D and the panel's own Duplicate button duplicate the whole selection with the same offset each; rotate/resize handles show only with exactly one thing selected; the Outline panel highlights every selected row; left-drag on empty space no longer pans (middle-drag does); no console errors; no regressions to single selection, its full properties view, undo/redo, or the Outline's click-to-select. One expected, not-a-bug nuance the check found: a plain click on an item that is already part of a multi-selection keeps the whole selection (so it can be dragged at once) rather than collapsing to just that one item — this matches the main canvas's own `selectTool.ts` convention; dropping to a single item works via Shift-click-toggle-down-to-one, or by clicking an item outside the current selection.
+- `SheetBlockCanvas<T>`: `selected`/`onSelect` become a list instead of one target. A drag that starts on empty sheet space (not a block, not a handle) starts a rubber band instead of panning; on release, every block whose bounds overlap it is selected (replaces the selection, or adds to it when Shift is held). Shift-click toggles one target.
+- Move (drag or arrow keys), delete and duplicate work on the whole selection at once, in both `SchematicTemplateEditor` (blocks/groups) and `SchematicDialog` (extras, and generated blocks once round 2 lands). Group rotate/resize stays single-target for now.
+- `TemplateOutlinePanel` highlights every selected row. The Properties/Fields panel shows a plain "N selected" state (with Delete/Duplicate) instead of trying to edit mixed block types at once.
+
+Round 2 — movable generated blocks in the schematic: **done** 2026-09-27, commit `7e19b68`. New `Schematic.blockOverrides: Record<string, SchematicBlockOverride>` (x/y/rotation/width/height, each key optional), keyed the same way as `textOverrides` by the block's resolved per-instance id, with core helper `setBlockOverride` mirroring `updateSchematicExtra`'s merge/delete-key convention; `generateSchematic` lets an override win over the template-computed position/size/rotation and sets a new `ResolvedBlock.moved` flag; a new `orphan-block-override` diagnostic mirrors `orphan-override`. `refreshSchematicFromTemplate` keeps `blockOverrides` across "Update from template" for free, the same way it already keeps `textOverrides` (neither is touched by that function's object spread). In Schematic mode, a generated block (any type except the frame, title block and totals table, which stay fixed sheet furniture) is now a selectable, draggable, rotatable, resizable target alongside the extras the user adds, with its own Selection-panel fields and a "Reset to template position" action; a second marker (green diamond) shows next to the existing orange text-override circle, both visible at once on the same block. Round 1's multi-select carries over: a mixed selection of extras and blocks moves/nudges together in one commit; Delete/Duplicate only ever act on the extras in the selection, with a note when blocks are also selected. Browser-verified (headless Chromium), 9 points, all pass, no console errors: select/drag a generated block; a move affects only that one circuit's copy, not the group's other repeats; "Reset to template position" snaps it back and disables itself once there is nothing to reset; a moved block's position survives "Update from template" while the rest of the schematic still picks up the template change (confirmed exact mm values before/after); rotate/resize a single block; the frame/title block/totals table stay non-draggable; a block that is both text-editable and draggable does the right thing for a double-click (text editor) vs. a plain drag (move), and its hover hint mentions both; a mixed extra+block selection nudges together, and Duplicate/Delete only touch the extra; existing extra behavior (drag/rotate/resize/duplicate/delete) and text overrides are unaffected, with both markers visible and clearly separated on one block carrying both kinds of override. Core tests 424 → 428, ui tests 67 → 68.
+
+Round 2 — movable generated blocks in the schematic:
+- New `Schematic.blockOverrides: Record<string, { x: number; y: number; rotation?: number; width?: number; height?: number }>`, keyed the same way as `textOverrides` (the block's resolved, per-instance id) — so one circuit's copy of a block can move without moving another circuit's copy of the same template block.
+- `generateFromSchematic`/`generateSchematic` (core) applies a block override the same way it already applies a text override. New core helpers mirroring `setTextOverride`, e.g. `setBlockOverride`.
+- `refreshSchematicFromTemplate` ("Update from template") keeps `blockOverrides` the same way it already keeps `textOverrides`.
+- `SchematicDialog`'s `SheetBlockCanvas`: `targetOf` currently resolves only an extra's id from a hit block. Extend it so a hit on a generated, non-extra block is also selectable and movable, writing to `blockOverrides` instead of an extra's fields.
+- A moved/resized generated block gets the same kind of visual cue an overridden text block already gets, so the user can tell it no longer sits where the template put it. A "Reset to template" action per block, alongside whatever the text-override reset already does.
+- Known limit, matching the existing gap for extras: a block override is not its own undo step unless this gets folded into the schematic's undo history, which round 2 does not attempt.
 
 ## 11. Non-goals for v1
 

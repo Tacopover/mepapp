@@ -30,6 +30,13 @@ describe('renderSymbolShapeSvg', () => {
     expect(el.props.strokeWidth).toBeGreaterThanOrEqual(1);
   });
 
+  it('lets a caller drawing in millimetres lower the minimum stroke width', () => {
+    const shape: SymbolShape = { id: '1', kind: 'line', x1: 0, y1: 0, x2: 1, y2: 1, style: { ...STYLE, strokeWidth: 0.01 } };
+    expect(renderSymbolShapeSvg(shape, 30, 40).props.strokeWidth).toBe(1);
+    expect(renderSymbolShapeSvg(shape, 30, 40, 0.05).props.strokeWidth).toBeCloseTo(0.3);
+    expect(renderSymbolShapeSvg({ ...shape, style: { ...STYLE, strokeWidth: 0.0001 } }, 30, 40, 0.05).props.strokeWidth).toBe(0.05);
+  });
+
   it('renders a rect shape with fill "none" when style.fill is null', () => {
     const shape: SymbolShape = { id: '1', kind: 'rect', x: 0.1, y: 0.1, width: 0.2, height: 0.3, style: STYLE };
     const el = renderSymbolShapeSvg(shape, W, H);

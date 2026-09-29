@@ -10,7 +10,7 @@ import {
   type SketchTool,
   type StampInfo,
 } from '@mepapp/render';
-import { CIRCUIT_TYPE_LIBRARY, type Calibration, type Circuit, type CircuitType, type FlowResult, type NetworkType, type Panel, type PanelSection, type StampDefinition, type StampLabelLayouts, type Vec2 } from '@mepapp/core';
+import { CIRCUIT_TYPE_LIBRARY, type Calibration, type Circuit, type CircuitType, type FlowResult, type NetworkType, type Panel, type PanelSection, type Schematic, type StampDefinition, type StampLabelLayouts, type Vec2 } from '@mepapp/core';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 
 export interface CalibrationPrompt {
@@ -58,6 +58,10 @@ export interface UseSketchScene {
   panels: Panel[];
   panelSections: PanelSection[];
   circuitTypes: CircuitType[];
+  /** Saved schematics of the active document whose panel still exists. */
+  schematics: Schematic[];
+  /** Entered values of template fields with scope 'project', by field id. */
+  schematicProjectFields: Record<string, string>;
   /** The Electrical Circuits tree's own selection concept — a Circuit/Panel has no canvas presence to select via the usual stamp-selection path (see SketchScene.clearSelection). Mutually exclusive with each other and with a stamp/segment/fitting selection; selecting one clears the others. */
   selectedCircuitId: string | null;
   setSelectedCircuitId: (id: string | null) => void;
@@ -111,6 +115,8 @@ export function useSketchScene(): UseSketchScene {
   const [panels, setPanels] = useState<Panel[]>([]);
   const [panelSections, setPanelSections] = useState<PanelSection[]>([]);
   const [circuitTypes, setCircuitTypes] = useState<CircuitType[]>(CIRCUIT_TYPE_LIBRARY);
+  const [schematics, setSchematics] = useState<Schematic[]>([]);
+  const [schematicProjectFields, setSchematicProjectFields] = useState<Record<string, string>>({});
   const [selectedCircuitId, setSelectedCircuitIdState] = useState<string | null>(null);
   const [selectedPanelId, setSelectedPanelIdState] = useState<string | null>(null);
   const [circuitToolTargetId, setCircuitToolTargetId] = useState<string | null>(null);
@@ -144,6 +150,8 @@ export function useSketchScene(): UseSketchScene {
     setPanels(scene.listPanels());
     setPanelSections(scene.listPanelSections());
     setCircuitTypes(scene.listCircuitTypes());
+    setSchematics(scene.listSchematics());
+    setSchematicProjectFields(scene.getSchematicProjectFields());
   }, []);
 
   /** Selecting a circuit clears any panel selection, and vice versa, and both clear the canvas's own stamp/segment/fitting selection (SketchScene.clearSelection) — a Circuit/Panel has no canvas presence to co-select alongside. */
@@ -222,6 +230,8 @@ export function useSketchScene(): UseSketchScene {
       setPanels(scene.listPanels());
       setPanelSections(scene.listPanelSections());
       setCircuitTypes(scene.listCircuitTypes());
+      setSchematics(scene.listSchematics());
+      setSchematicProjectFields(scene.getSchematicProjectFields());
     };
     const onFlowSolved = (result: FlowResult[]) => {
       setFlowResult(result);
@@ -255,6 +265,8 @@ export function useSketchScene(): UseSketchScene {
       setPanels(scene.listPanels());
       setPanelSections(scene.listPanelSections());
       setCircuitTypes(scene.listCircuitTypes());
+      setSchematics(scene.listSchematics());
+      setSchematicProjectFields(scene.getSchematicProjectFields());
       setSelectedCircuitIdState(null);
       setSelectedPanelIdState(null);
     };
@@ -300,6 +312,8 @@ export function useSketchScene(): UseSketchScene {
       setPanels(scene.listPanels());
       setPanelSections(scene.listPanelSections());
       setCircuitTypes(scene.listCircuitTypes());
+      setSchematics(scene.listSchematics());
+      setSchematicProjectFields(scene.getSchematicProjectFields());
       setSelectedCircuitIdState(null);
       setSelectedPanelIdState(null);
     };
@@ -387,6 +401,8 @@ export function useSketchScene(): UseSketchScene {
     panels,
     panelSections,
     circuitTypes,
+    schematics,
+    schematicProjectFields,
     selectedCircuitId,
     setSelectedCircuitId,
     selectedPanelId,
