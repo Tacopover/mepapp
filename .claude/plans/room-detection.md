@@ -97,6 +97,16 @@ Not verified: bundle sizes, degenerate-input robustness of clipping libraries.
 
 Scanned PDFs (raster, approach B on the raster or C) stay out of scope.
 
+## 8b. Filter improvement round (2026-09-29, after user review of overlays)
+
+User saw ignored walls and furniture kept as walls in the two arch files. Findings (scripts in the session scratchpad; overlays in the Obsidian hub `Room-Detection-Prototype/round4/`):
+- Rooms 0.25/0.26/0.30/0.31/0.32 (00_arch_ground_floor): the filter DID keep their walls (two 0.36 pt lines 127 mm apart with light ticks between). Real faults: (1) the auto-seed walked out of small rooms through door gaps; (2) table and chair lines pair up and look like a thin wall.
+- Kept fix `seedClosed` (seed search only through pixels with distance > gap radius): rooms 0.30 and 0.31 go from 338 m² to 9.1 and 5.3 m². 24-room set unchanged: 14 of 16 within 15%, median 0.023 (re-run by the parent).
+- Optional `hatchEvidence` (reject lines without hatch ticks): 5 of 5 extra rooms within 15%, but 01_arch_first_floor room 1 gets worse and its open rooms leak. Only the two arch files have hatched walls (share 40-42% vs 28% max elsewhere). Default OFF; overfits two files.
+- Option 7 research (learned symbol spotting): NOT usable. FloorPlanCAD data is CC BY-NC; SymPoint code is non-commercial research only and needs custom CUDA ops; CubiCasa5K code and data are CC BY-NC; CADTransformer weights are trained on NC data. Not verified: SymPoint-V2, CADSpotting, TextCAD licences.
+- Decision: keep hand-written rules as they are. If more wall/furniture accuracy is needed, build a small feature-based classifier (gradient-boosted trees, our own labels, `onnxruntime-web`) fed by the existing filter features, with user corrections from Phase 8 as labels. Estimated success about 60% (judgment).
+- Status: user is reviewing the round 4 overlays before deciding the next step (classifier prototype or Phase 3).
+
 ## 9. Open risks
 
 - The three current fixtures come from one office and one CAD source. The filter may over-fit.
