@@ -102,7 +102,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, detectRoomAt, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
+import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
@@ -2666,11 +2666,14 @@ export class SketchScene {
         const bounds: [number, number, number, number] = [0, 0, swap ? info.heightPt : info.widthPt, swap ? info.widthPt : info.heightPt];
         cached = this.roomFillCache = { doc, pageIndex, input: { segments: data.segments, segmentCount: data.segmentCount, bounds }, cache: {} };
       }
-      const fill = detectRoomAt(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}, cached.cache);
+      const labels = readRoomLabelsFromText(await handle.getTextRuns(pageIndex));
+      const { fill, method } = detectRoomAtWithLabels(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, labels, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}, cached.cache);
       if (this.doc !== doc || this.doc.pageIndex !== pageIndex) return;
       if (fill.flags.fillEmpty) return this.emitNotice('No room found at this point.', 'warning');
-      if (fill.flags.touchesRoiBorder) return this.emitNotice('The area is not closed: the fill leaks out. Close the gap in the walls, or draw the room by hand.', 'warning');
-      const [input] = await this.labelRooms([roomFromFill(fill, pageIndex, 'click')], pageIndex);
+      if (fill.flags.touchesRoiBorder && method === 'plain') return this.emitNotice('The area is not closed: the fill leaks out. Close the gap in the walls, or draw the room by hand.', 'warning');
+      const fromFill = roomFromFill(fill, pageIndex, 'click');
+      const [labelled] = withRoomLabels([method === 'bounded' ? { ...fromFill, open: true } : fromFill], labels, calibration);
+      const input = labelled;
       const room = this.addRoom(input!);
       const area = roomAreaM2(room, calibration).toFixed(1);
       this.emitNotice(room.open ? `Room of ${area} m² added, but the area looks open. Check the outline.` : `Room${room.name ? ` ${room.name}` : ''} of ${area} m² added.`, room.open ? 'warning' : 'info');

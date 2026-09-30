@@ -4,6 +4,9 @@ import type { Vec2 } from '../geometry.js';
 import { filterWallSegments } from './filter.js';
 import { fillRoomAt } from './fill.js';
 import { detectAllRooms } from './detect-all.js';
+import { resolveRoomAt, type ResolveMethod } from './resolve.js';
+import { polygonContainsPoint } from './room.js';
+import type { RoomLabel } from './labels.js';
 import { detectLabelledRooms, type LabelledOptions, type LabelledResult, type LabelTarget } from './labelled.js';
 import {
   DEFAULT_ROOM_DETECTION_PARAMS,
@@ -76,6 +79,45 @@ export function detectRoomAt(
 ): RoomFillResult {
   const P: RoomDetectionParams = { ...DEFAULT_ROOM_DETECTION_PARAMS, ...params };
   return fillRoomAt(cachedWalls(input, mmPerPt, P, cache), seedPt, mmPerPt, P);
+}
+
+export interface ClickFillResult {
+  fill: RoomFillResult;
+  method: 'plain' | ResolveMethod;
+  label: RoomLabel | null; // the room label whose printed area guided the fill
+}
+
+/**
+ * Click-to-fill guided by the room labels of the page. The plain fill is used when it matches
+ * the printed area of the label inside it, or when no label with an area applies. Otherwise the
+ * fill is repaired like in label-driven detection (furniture, wide openings, bounded fill,
+ * resolveRoomAt) and the repair is used when it matches the printed area. The label is the one
+ * inside the plain fill; without one, the nearest label with an area within 4 m of the click.
+ */
+export function detectRoomAtWithLabels(
+  input: WallCandidateSegments,
+  seedPt: Vec2,
+  mmPerPt: number,
+  labels: readonly RoomLabel[],
+  params: Partial<RoomDetectionParams> = {},
+  cache?: RoomDetectionCache,
+  tolerance = 0.15,
+): ClickFillResult {
+  const P: RoomDetectionParams = { ...DEFAULT_ROOM_DETECTION_PARAMS, ...params };
+  const walls = cachedWalls(input, mmPerPt, P, cache);
+  const plain = fillRoomAt(walls, seedPt, mmPerPt, P);
+  const usable = !plain.flags.fillEmpty;
+  const inside = usable ? labels.filter((l) => l.name !== null && polygonContainsPoint(plain.polygon, l.anchor)) : [];
+  const dist = (l: RoomLabel): number => Math.hypot(l.anchor.x - seedPt.x, l.anchor.y - seedPt.y);
+  const withArea = (list: readonly RoomLabel[]): RoomLabel | undefined => list.filter((l) => l.areaM2 !== null && l.areaM2 > 0).sort((x, y) => dist(x) - dist(y))[0];
+  const label = inside.length > 0 ? withArea(inside) : withArea(labels.filter((l) => dist(l) * mmPerPt <= 4000));
+  const printed = label?.areaM2 ?? null;
+  if (!label || printed === null) return { fill: plain, method: 'plain', label: null };
+  const matches = (f: RoomFillResult): boolean => !f.flags.fillEmpty && (Math.abs(f.areaM2 / printed - 1) <= tolerance || Math.abs(f.areaM2 - printed) <= 2);
+  if (usable && !plain.flags.touchesRoiBorder && matches(plain)) return { fill: plain, method: 'plain', label };
+  const r = resolveRoomAt(walls, seedPt, printed, mmPerPt, P, { tolerance });
+  if (matches(r.fill) && polygonContainsPoint(r.fill.polygon, seedPt)) return { fill: r.fill, method: r.method, label };
+  return { fill: plain, method: 'plain', label: null };
 }
 
 /**
