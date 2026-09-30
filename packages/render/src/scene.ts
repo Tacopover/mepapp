@@ -11,6 +11,10 @@ import {
 import {
   annotationBoundsWorld,
   centroid,
+  mergeDetectedRooms,
+  roomId,
+  updateRoom as updateRoomFields,
+  type Room,
   CIRCUIT_TYPE_LIBRARY,
   getCircuitTypeFromLibrary,
   getCircuitTypeUsage,
@@ -81,6 +85,8 @@ import {
   type Segment,
   type GlobalPropertyDefs,
   type StampCategory,
+  type RoomInput,
+  type RoomPatch,
   type StampDefinition,
   type StampLabel,
   type StampLabelLayouts,
@@ -94,6 +100,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
+import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import {
@@ -443,6 +450,8 @@ interface SketchSceneEvents {
    * Properties mid-edit whenever a stamp tool happens to still be armed.
    */
   circuitsChanged: [];
+  /** The active document's rooms changed: added, edited, deleted, replaced by detect-all, undone/redone or loaded. Re-read with listRooms(). */
+  roomsChanged: [];
   /** A transient message for the UI's toast — see SceneNotice. */
   notice: [SceneNotice];
   /**
@@ -1968,6 +1977,7 @@ export class SketchScene {
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
+    this.emitter.emit('roomsChanged');
     // drawingHistory covers circuits/panels/panelSections too (Phase C), so an
     // undo/redo can revert one even though this method has no way to know
     // whether it did — always notify rather than trying to detect it, same
@@ -1981,6 +1991,7 @@ export class SketchScene {
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
+    this.emitter.emit('roomsChanged');
     this.notifyCircuitsChanged();
   }
 
@@ -2366,6 +2377,57 @@ export class SketchScene {
     this.doc.flowLabelLayer.addChild(arrows);
   }
 
+  /** Every room of the active document, all pages. */
+  listRooms(): Room[] {
+    return Object.values(this.doc.drawingHistory.getState().rooms);
+  }
+
+  private notifyRoomsChanged(): void {
+    this.markDirty();
+    this.emitter.emit('roomsChanged');
+  }
+
+  /** Adds one room (a click-to-fill result or a hand-drawn polygon) as one undo step. */
+  addRoom(input: RoomInput): Room {
+    const room: Room = { ...input, id: roomId(this.doc.nextRoomSeq++) };
+    this.doc.drawingHistory.execute(createRoomCommand(room));
+    this.notifyRoomsChanged();
+    return room;
+  }
+
+  /** Changes a room's name, number, polygon or flags as one undo step. A change of name, number or polygon locks the room. Returns false for an unknown id. */
+  updateRoom(id: string, patch: RoomPatch): boolean {
+    const before = this.doc.drawingHistory.getState().rooms[id];
+    if (!before) return false;
+    this.doc.drawingHistory.execute(updateRoomCommand(before, updateRoomFields(before, patch)));
+    this.notifyRoomsChanged();
+    return true;
+  }
+
+  /** Deletes rooms as one undo step. Unknown ids are ignored. */
+  deleteRooms(ids: readonly string[]): void {
+    const rooms = this.doc.drawingHistory.getState().rooms;
+    const found = ids.map((id) => rooms[id]).filter((r): r is Room => r !== undefined);
+    if (found.length === 0) return;
+    this.doc.drawingHistory.execute(deleteRoomsCommand(found));
+    this.notifyRoomsChanged();
+  }
+
+  /**
+   * Stores the result of detect-all for one page as ONE undo step: rooms the user made or
+   * changed stay, the other detected rooms of the page are replaced (core's mergeDetectedRooms).
+   * Returns how many rooms were added and removed.
+   */
+  applyDetectedRooms(pageIndex: number, detected: readonly RoomInput[]): { added: number; removed: number } {
+    const rooms = this.doc.drawingHistory.getState().rooms;
+    const plan = mergeDetectedRooms(Object.values(rooms), detected, pageIndex, () => roomId(this.doc.nextRoomSeq++));
+    if (plan.add.length === 0 && plan.remove.length === 0) return { added: 0, removed: 0 };
+    const removed = plan.remove.map((id) => rooms[id]!);
+    this.doc.drawingHistory.execute(replaceRoomsCommand(`Detect rooms on page ${pageIndex + 1}`, removed, plan.add));
+    this.notifyRoomsChanged();
+    return { added: plan.add.length, removed: removed.length };
+  }
+
   exportProject(): ProjectDocument {
     const state = this.doc.drawingHistory.getState();
     return serializeProject({
@@ -2384,6 +2446,7 @@ export class SketchScene {
       stampLabelLayouts: this.doc.stampLabelLayouts,
       schematics: this.listSchematics(),
       schematicProjectFields: this.doc.schematicProjectFields,
+      rooms: Object.values(state.rooms),
     }) as unknown as ProjectDocument;
   }
 
@@ -2425,6 +2488,7 @@ export class SketchScene {
       circuits: Object.fromEntries(doc.circuits.map((c) => [c.id, c])),
       panels: Object.fromEntries(doc.panels.map((p) => [p.id, p])),
       panelSections: Object.fromEntries(doc.panelSections.map((s) => [s.id, s])),
+      rooms: Object.fromEntries(doc.rooms.map((r) => [r.id, r])),
     });
     target.networkTypes.splice(0, target.networkTypes.length, ...(doc.networkTypes.length > 0 ? doc.networkTypes : [DEFAULT_NETWORK_TYPE]));
     target.portGroups.splice(0, target.portGroups.length, ...doc.portGroups);
@@ -2447,6 +2511,13 @@ export class SketchScene {
     target.lastFlowResult = null;
     target.flowOverlayActive = false;
     for (const child of target.flowLabelLayer.removeChildren()) child.destroy();
+
+    let maxRoomSeq = 0;
+    for (const room of doc.rooms) {
+      const numericSuffix = /^room-(\d+)$/.exec(room.id)?.[1];
+      if (numericSuffix) maxRoomSeq = Math.max(maxRoomSeq, Number(numericSuffix));
+    }
+    target.nextRoomSeq = Math.max(target.nextRoomSeq, maxRoomSeq + 1);
 
     let maxAnnotationSeq = 0;
     for (const annotation of doc.annotations) {
@@ -2529,6 +2600,7 @@ export class SketchScene {
       this.syncDrawingLayer();
       this.emitter.emit('documentsChanged', this.getDocuments());
       this.emitter.emit('projectLoaded');
+      this.emitter.emit('roomsChanged');
     }
   }
 
