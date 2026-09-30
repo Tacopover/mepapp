@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { insertVertex, mergePolygons, moveVertex, nearestEdge, nearestVertex, polygonAreaPt2, removeVertex, splitPolygon } from './index.js';
+import { insertVertex, mergePolygons, moveVertex, moveVertices, nearestEdge, nearestVertex, polygonAreaPt2, removeVertex, removeVertices, splitPolygon, verticesInBox } from './index.js';
 
 const square = (x: number, y: number, s: number) => ({
   outer: [
@@ -42,6 +42,38 @@ describe('vertex edits', () => {
     expect(nearestVertex(withHole, { x: 60, y: 40 }, 3)).toEqual({ ring: 1, index: 1 });
     const moved = moveVertex(withHole, { ring: 1, index: 1 }, { x: 70, y: 40 });
     expect(moved.holes[0]![1]).toEqual({ x: 70, y: 40 });
+  });
+});
+
+describe('multi-vertex edits', () => {
+  const p = square(0, 0, 100);
+  const withHole = { outer: p.outer, holes: [square(40, 40, 20).outer] };
+
+  it('moves a set of vertices by one delta without changing the input', () => {
+    const moved = moveVertices(withHole, [{ ring: 0, index: 1 }, { ring: 0, index: 2 }, { ring: 1, index: 0 }], { x: 10, y: -5 });
+    expect(moved.outer).toEqual([{ x: 0, y: 0 }, { x: 110, y: -5 }, { x: 110, y: 95 }, { x: 0, y: 100 }]);
+    expect(moved.holes[0]![0]).toEqual({ x: 50, y: 35 });
+    expect(moved.holes[0]![1]).toEqual({ x: 60, y: 40 });
+    expect(withHole.outer[1]).toEqual({ x: 100, y: 0 });
+    expect(moveVertices(p, [{ ring: 0, index: 9 }], { x: 1, y: 1 }).outer).toEqual(p.outer);
+  });
+
+  it('finds the vertices in a box, holes included', () => {
+    expect(verticesInBox(withHole, { x: 90, y: -5 }, { x: 105, y: 105 })).toEqual([{ ring: 0, index: 1 }, { ring: 0, index: 2 }]);
+    expect(verticesInBox(withHole, { x: 35, y: 35 }, { x: 65, y: 65 })).toHaveLength(4);
+    expect(verticesInBox(withHole, { x: 10, y: 10 }, { x: 20, y: 20 })).toEqual([]);
+  });
+
+  it('removes a set of vertices and keeps at least 3 per ring', () => {
+    const six = insertVertex(insertVertex(p, 0, 0, { x: 50, y: -10 }), 0, 2, { x: 110, y: 50 });
+    expect(six.outer).toHaveLength(6);
+    const removed = removeVertices(six, [{ ring: 0, index: 1 }, { ring: 0, index: 3 }])!;
+    expect(removed.outer).toEqual(p.outer);
+    expect(removeVertices(p, [{ ring: 0, index: 0 }, { ring: 0, index: 1 }])).toBeNull();
+    expect(removeVertices(p, [])).toBeNull();
+    expect(removeVertices(withHole, [{ ring: 1, index: 0 }])!.holes[0]).toHaveLength(3);
+    expect(removeVertices(withHole, [{ ring: 1, index: 0 }, { ring: 1, index: 2 }])).toBeNull();
+    expect(removeVertices(withHole, [{ ring: 0, index: 0 }])!.outer).toHaveLength(3);
   });
 });
 

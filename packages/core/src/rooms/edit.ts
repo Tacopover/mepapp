@@ -73,6 +73,23 @@ export function moveVertex(polygon: RoomPolygon, ref: VertexRef, to: Vec2): Room
   return withRings(rings);
 }
 
+/** Moves every vertex in `refs` by the same delta. Refs outside the polygon are ignored. */
+export function moveVertices(polygon: RoomPolygon, refs: readonly VertexRef[], delta: Vec2): RoomPolygon {
+  const keys = new Set(refs.map((r) => `${r.ring}:${r.index}`));
+  return withRings(ringsOf(polygon).map((ring, r) => ring.map((v, i) => (keys.has(`${r}:${i}`) ? { x: v.x + delta.x, y: v.y + delta.y } : v))));
+}
+
+/** Every vertex of the polygon (outer ring and holes) inside the box, borders included. */
+export function verticesInBox(polygon: RoomPolygon, min: Vec2, max: Vec2): VertexRef[] {
+  const found: VertexRef[] = [];
+  ringsOf(polygon).forEach((ring, r) => {
+    ring.forEach((v, i) => {
+      if (v.x >= min.x && v.x <= max.x && v.y >= min.y && v.y <= max.y) found.push({ ring: r, index: i });
+    });
+  });
+  return found;
+}
+
 /** Inserts a vertex on the edge that starts at `afterIndex`. The new vertex gets index `afterIndex + 1`. */
 export function insertVertex(polygon: RoomPolygon, ring: number, afterIndex: number, at: Vec2): RoomPolygon {
   const rings = ringsOf(polygon).map((rg, r) => (r === ring ? [...rg.slice(0, afterIndex + 1), { ...at }, ...rg.slice(afterIndex + 1)] : rg));
@@ -85,6 +102,15 @@ export function removeVertex(polygon: RoomPolygon, ref: VertexRef): RoomPolygon 
   const target = rings[ref.ring];
   if (!target || target.length <= 3) return null;
   return withRings(rings.map((rg, r) => (r === ref.ring ? rg.filter((_, i) => i !== ref.index) : rg)));
+}
+
+/** Removes several vertices. Every ring keeps at least 3 vertices: returns null when a ring would get smaller, or when `refs` is empty. */
+export function removeVertices(polygon: RoomPolygon, refs: readonly VertexRef[]): RoomPolygon | null {
+  if (refs.length === 0) return null;
+  const keys = new Set(refs.map((r) => `${r.ring}:${r.index}`));
+  const rings = ringsOf(polygon).map((ring, r) => ring.filter((_, i) => !keys.has(`${r}:${i}`)));
+  if (rings.some((ring) => ring.length < 3)) return null;
+  return withRings(rings);
 }
 
 interface Crossing {

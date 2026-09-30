@@ -102,7 +102,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
+import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, removeVertices, verticesInBox, roomBounds, type VertexRef, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
@@ -196,6 +196,7 @@ function hexColorToPixi(hex: string): number {
 // through this sequence, issuing one stroke() call per "on" entry.
 const ROOM_HANDLE_RADIUS_PX = 5;
 const ROOM_EDGE_HIT_PX = 6;
+const ROOM_BOX_NEAR_PX = 16; // a box-select drag may start this far outside the selected room's bounds
 
 const DASH_PATTERN_WORLD: Record<Exclude<LinePattern, 'solid'>, number[]> = {
   dashed: [8, 5],
@@ -542,6 +543,8 @@ export class SketchScene {
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private roomsVisible = true;
   private selectedRoomIds = new Set<string>();
+  /** Selected vertices of the single selected room (edit-room tool). Cleared when the room selection, the tool, or the history (undo/redo) changes. */
+  private selectedRoomVertices: VertexRef[] = [];
   private roomPreview: { id: string; polygon: RoomPolygon } | null = null;
   private roomSettings: { gapMm?: number } = {};
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
@@ -621,10 +624,14 @@ export class SketchScene {
       fillRoomAtPoint: (point) => self.fillRoomAtPoint(point),
       selectRoomAtPoint: (point, additive) => self.selectRoomAtPoint(point, additive),
       clearRoomSelection: () => self.clearRoomSelection(),
+      getRoomVertexSelection: () => self.selectedRoomVertices,
+      setRoomVertexSelection: (refs) => self.setRoomVertexSelection(refs),
+      selectedRoomNear: (world) => self.selectedRoomNear(world),
+      selectRoomVerticesInBox: (id, min, max, additive) => self.selectRoomVerticesInBox(id, min, max, additive),
       hitRoomVertex: (world) => self.hitRoomVertex(world),
       hitRoomEdge: (world) => self.hitRoomEdge(world),
       previewRoomPolygon: (id, polygon) => self.previewRoomPolygon(id, polygon),
-      commitRoomPolygon: (id, polygon) => self.updateRoom(id, { polygon }),
+      commitRoomPolygon: (id, polygon) => self.commitRoomPolygon(id, polygon),
       splitRoomByLine: (a, b) => self.splitRoomByLine(a, b),
       markDirty: () => self.markDirty(),
       syncDrawingLayer: () => self.syncDrawingLayer(),
@@ -767,6 +774,7 @@ export class SketchScene {
       this.circuitToolReturn = 'select';
     }
     this.tool = tool;
+    this.selectedRoomVertices = [];
     this.pendingPoints = [];
     if (!isCircuitSubTool) {
       this.circuitToolTargetId = null;
@@ -2004,6 +2012,7 @@ export class SketchScene {
 
   undoDrawing(): void {
     this.doc.drawingHistory.undo();
+    this.selectedRoomVertices = [];
     this.syncDrawingLayer();
     this.redrawOverlay();
     this.markDirty();
@@ -2018,6 +2027,7 @@ export class SketchScene {
 
   redoDrawing(): void {
     this.doc.drawingHistory.redo();
+    this.selectedRoomVertices = [];
     this.syncDrawingLayer();
     this.redrawOverlay();
     this.markDirty();
@@ -2417,7 +2427,7 @@ export class SketchScene {
   private syncRoomLayer(): void {
     const preview = this.roomPreview;
     const rooms = this.roomsVisible ? this.listRooms().filter((r) => r.pageIndex === this.doc.pageIndex).map((r) => (preview && r.id === preview.id ? { ...r, polygon: preview.polygon } : r)) : [];
-    drawRooms(this.doc.roomLayer, rooms, this.doc.calibration, this.selectedRoomIds, this.tool === 'edit-room' ? ROOM_HANDLE_RADIUS_PX / this.world.scale.x : 0);
+    drawRooms(this.doc.roomLayer, rooms, this.doc.calibration, this.selectedRoomIds, this.tool === 'edit-room' ? ROOM_HANDLE_RADIUS_PX / this.world.scale.x : 0, this.selectedRoomVertices);
   }
 
   /** Detection settings from the UI: door gap width in mm. Used by detectRooms and click-to-fill. */
@@ -2432,6 +2442,7 @@ export class SketchScene {
 
   selectRooms(ids: readonly string[]): void {
     this.selectedRoomIds = new Set(ids);
+    this.selectedRoomVertices = [];
     this.emitter.emit('roomSelectionChanged');
   }
 
@@ -2451,6 +2462,55 @@ export class SketchScene {
     if (additive && next.has(hit.id)) next.delete(hit.id);
     else next.add(hit.id);
     this.selectRooms([...next]);
+  }
+
+  /** Stores a hand-edited outline. The vertex selection stays only while the stored rings keep the size of the edited ones (the overlap rule can trim the outline). */
+  private commitRoomPolygon(id: string, polygon: RoomPolygon): void {
+    this.updateRoom(id, { polygon });
+    const stored = this.doc.drawingHistory.getState().rooms[id]?.polygon;
+    const sizes = (p: RoomPolygon) => [p.outer.length, ...p.holes.map((h) => h.length)].join(',');
+    if (!stored || sizes(stored) !== sizes(polygon)) this.setRoomVertexSelection([]);
+  }
+
+  setRoomVertexSelection(refs: readonly VertexRef[]): void {
+    this.selectedRoomVertices = [...refs];
+    this.syncRoomLayer();
+  }
+
+  selectedRoomNear(world: Vec2): string | null {
+    const room = this.singleSelectedRoom();
+    if (!room) return null;
+    const b = roomBounds(room);
+    const margin = ROOM_BOX_NEAR_PX / this.world.scale.x;
+    return world.x >= b.minX - margin && world.x <= b.maxX + margin && world.y >= b.minY - margin && world.y <= b.maxY + margin ? room.id : null;
+  }
+
+  selectRoomVerticesInBox(roomId: string, min: Vec2, max: Vec2, additive: boolean): void {
+    const room = this.doc.drawingHistory.getState().rooms[roomId];
+    if (!room) return;
+    const found = verticesInBox(room.polygon, min, max);
+    const kept = additive ? this.selectedRoomVertices : [];
+    const merged = [...kept, ...found.filter((f) => !kept.some((k) => k.ring === f.ring && k.index === f.index))];
+    this.setRoomVertexSelection(merged);
+  }
+
+  /**
+   * Removes the selected vertices of the selected room as one undo step. Every ring keeps at least
+   * 3 vertices: otherwise nothing changes and a notice tells why. Returns true when it acted on a
+   * vertex selection, so the Delete key does not fall through to deleting the room.
+   */
+  deleteSelectedRoomVertices(): boolean {
+    const room = this.singleSelectedRoom();
+    if (!room || this.selectedRoomVertices.length === 0) return false;
+    const polygon = removeVertices(room.polygon, this.selectedRoomVertices);
+    if (!polygon) {
+      this.emitNotice('A room outline needs at least 3 vertices. Keep 3 vertices or more in each outline.', 'warning');
+      return true;
+    }
+    this.selectedRoomVertices = [];
+    this.updateRoom(room.id, { polygon });
+    this.syncRoomLayer();
+    return true;
   }
 
   private singleSelectedRoom(): Room | null {
@@ -3708,7 +3768,7 @@ export class SketchScene {
     const meta = event.ctrlKey || event.metaKey;
     if ((event.key === 'Delete' || event.key === 'Backspace') && this.tool === 'edit-room' && this.selectedRoomIds.size > 0) {
       event.preventDefault();
-      this.deleteSelectedRooms();
+      if (!this.deleteSelectedRoomVertices()) this.deleteSelectedRooms();
     } else if ((event.key === 'Delete' || event.key === 'Backspace') && this.doc.selectedIds.size > 0) {
       event.preventDefault();
       this.deleteSelection();
@@ -4208,7 +4268,7 @@ export class SketchScene {
       this.overlay.fill({ color: 0xffee58, alpha: 0.9 });
     }
 
-    if (this.drag.kind === 'rubber-band') {
+    if (this.drag.kind === 'rubber-band' || this.drag.kind === 'room-vertex-box') {
       const { startWorld, currentWorld } = this.drag;
       const x = Math.min(startWorld.x, currentWorld.x);
       const y = Math.min(startWorld.y, currentWorld.y);

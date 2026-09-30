@@ -1,5 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js';
-import { roomAreaM2, roomAreaWarning, roomBounds, roomLabelPoint, type Calibration, type Room, type Vec2 } from '@mepapp/core';
+import { roomAreaM2, roomAreaWarning, roomBounds, roomLabelPoint, type Calibration, type Room, type Vec2, type VertexRef } from '@mepapp/core';
 
 const ROOM_COLOR = 0x2e7d32;
 const REVIEW_COLOR = 0xef6c00; // open room, or an area far from the printed one
@@ -9,7 +9,7 @@ const MAX_FONT_PT = 14;
 const flat = (ring: readonly Vec2[]): number[] => ring.flatMap((p) => [p.x, p.y]);
 
 /** Redraws the room overlay of one page into `layer`: a tinted polygon with holes cut out, an outline, and a number / name / area label. Rooms that need review are orange. */
-export function drawRooms(layer: Container, rooms: readonly Room[], calibration: Calibration | null, selected: ReadonlySet<string> = new Set(), handleRadiusPt = 0): void {
+export function drawRooms(layer: Container, rooms: readonly Room[], calibration: Calibration | null, selected: ReadonlySet<string> = new Set(), handleRadiusPt = 0, selectedVertices: readonly VertexRef[] = []): void {
   for (const child of layer.removeChildren()) child.destroy();
   if (rooms.length === 0) return;
   const shapes = new Graphics();
@@ -25,9 +25,21 @@ export function drawRooms(layer: Container, rooms: readonly Room[], calibration:
 
     // A single selected room shows its vertices as handles (edit-room tool).
     if (isSelected && selected.size === 1 && handleRadiusPt > 0) {
-      for (const ring of [room.polygon.outer, ...room.polygon.holes]) {
-        for (const v of ring) shapes.rect(v.x - handleRadiusPt, v.y - handleRadiusPt, 2 * handleRadiusPt, 2 * handleRadiusPt).fill({ color: 0xffffff }).stroke({ width: handleRadiusPt / 4, color: 0x1565c0 });
-      }
+      // Selected vertices: larger, solid orange squares with a dark outline.
+      const picked = new Set(selectedVertices.map((r) => `${r.ring}:${r.index}`));
+      [room.polygon.outer, ...room.polygon.holes].forEach((ring, r) => {
+        ring.forEach((v, i) => {
+          if (picked.has(`${r}:${i}`)) return;
+          shapes.rect(v.x - handleRadiusPt, v.y - handleRadiusPt, 2 * handleRadiusPt, 2 * handleRadiusPt).fill({ color: 0xffffff }).stroke({ width: handleRadiusPt / 4, color: 0x1565c0 });
+        });
+      });
+      [room.polygon.outer, ...room.polygon.holes].forEach((ring, r) => {
+        ring.forEach((v, i) => {
+          if (!picked.has(`${r}:${i}`)) return;
+          const h = handleRadiusPt * 1.4;
+          shapes.rect(v.x - h, v.y - h, 2 * h, 2 * h).fill({ color: 0xff6d00 }).stroke({ width: handleRadiusPt / 3, color: 0x212121 });
+        });
+      });
     }
 
     const lines = [[room.number, room.name].filter(Boolean).join(' ')];
