@@ -102,7 +102,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, roomFromFill, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
+import { RoomDetectionClient, detectRoomAt, roomAreaM2, roomsAtPoint, roomFromFill, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
@@ -154,6 +154,7 @@ import { DrawTextboxTool } from './tools/drawTextboxTool.js';
 import { DrawStickyNoteTool } from './tools/drawStickyNoteTool.js';
 import { CalibrateTool } from './tools/calibrateTool.js';
 import { MeasureTool } from './tools/measureTool.js';
+import { FillRoomTool } from './tools/fillRoomTool.js';
 import { PlaceStampTool } from './tools/placeStampTool.js';
 import { AddToCircuitTool } from './tools/addToCircuitTool.js';
 import { AssignPanelTool } from './tools/assignPanelTool.js';
@@ -570,6 +571,7 @@ export class SketchScene {
       new DrawStickyNoteTool(),
       new CalibrateTool(),
       new MeasureTool(),
+      new FillRoomTool(),
       new PlaceStampTool('terminal'),
       new PlaceStampTool('equipment'),
       new AddToCircuitTool(),
@@ -604,6 +606,7 @@ export class SketchScene {
         self.drag = value;
       },
       setTool: (tool) => self.setTool(tool),
+      fillRoomAtPoint: (point) => self.fillRoomAtPoint(point),
       markDirty: () => self.markDirty(),
       syncDrawingLayer: () => self.syncDrawingLayer(),
       redrawOverlay: () => self.redrawOverlay(),
@@ -2449,6 +2452,54 @@ export class SketchScene {
       return { added, removed, found: inputs.length, leaks: result.leaks };
     } finally {
       options.signal?.removeEventListener('abort', abort);
+    }
+  }
+
+  /** Page vectors and the wall filter cache for click-to-fill: the filter runs once per page, later clicks reuse it. */
+  private roomFillCache: { doc: SketchDocument; pageIndex: number; input: WallCandidateSegments; cache: RoomDetectionCache } | null = null;
+  private roomFillBusy = false;
+
+  /**
+   * Click-to-fill: makes one room of the closed area around `point` (one undo step, name and
+   * number read from the PDF text). Runs on the main thread: the first click on a page also runs
+   * the wall filter (0.1 to 3 s), later clicks on the page are fast. A click inside an existing
+   * room only raises a notice.
+   */
+  fillRoomAtPoint(point: Vec2): void {
+    void this.fillRoomAtPointAsync(point);
+  }
+
+  private async fillRoomAtPointAsync(point: Vec2): Promise<void> {
+    if (this.roomFillBusy) return;
+    const doc = this.doc;
+    const handle = doc.pdfHandle;
+    if (!handle) return this.emitNotice('Open a PDF first.', 'warning');
+    const calibration = doc.calibration;
+    if (!calibration) return this.emitNotice('Calibrate the drawing first: room areas need the scale.', 'warning');
+    const pageIndex = doc.pageIndex;
+    const existing = roomsAtPoint(this.listRooms(), point, pageIndex)[0];
+    if (existing) return this.emitNotice(`There is already a room here${existing.name ? `: ${existing.name}` : ''}.`, 'info');
+    this.roomFillBusy = true;
+    try {
+      let cached = this.roomFillCache;
+      if (!cached || cached.doc !== doc || cached.pageIndex !== pageIndex) {
+        const info = handle.getPageInfo(pageIndex);
+        const swap = info.rotationDegrees === 90 || info.rotationDegrees === 270;
+        const data = await handle.getVectorPaths(pageIndex);
+        const bounds: [number, number, number, number] = [0, 0, swap ? info.heightPt : info.widthPt, swap ? info.widthPt : info.heightPt];
+        cached = this.roomFillCache = { doc, pageIndex, input: { segments: data.segments, segmentCount: data.segmentCount, bounds }, cache: {} };
+      }
+      const fill = detectRoomAt(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, {}, cached.cache);
+      if (this.doc !== doc || this.doc.pageIndex !== pageIndex) return;
+      if (fill.flags.fillEmpty) return this.emitNotice('No room found at this point.', 'warning');
+      const [input] = await this.labelRooms([roomFromFill(fill, pageIndex, 'click')], pageIndex);
+      const room = this.addRoom(input!);
+      const area = roomAreaM2(room, calibration).toFixed(1);
+      this.emitNotice(room.open ? `Room of ${area} m² added, but the area looks open. Check the outline.` : `Room${room.name ? ` ${room.name}` : ''} of ${area} m² added.`, room.open ? 'warning' : 'info');
+    } catch (err) {
+      this.emitNotice(`Room fill failed: ${(err as Error).message}`, 'warning');
+    } finally {
+      this.roomFillBusy = false;
     }
   }
 

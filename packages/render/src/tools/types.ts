@@ -19,6 +19,7 @@ export type SketchTool =
   | 'place-equipment'
   | 'calibrate'
   | 'measure'
+  | 'fill-room'
   | 'draw-segment'
   | 'draw-freehand'
   | 'draw-line'
@@ -107,6 +108,8 @@ export interface ToolContext {
   emit<K extends string>(event: K, ...args: unknown[]): void;
   /** Reopens the floating textarea for an already-placed textbox/stickyNote annotation — see SketchScene.openTextEditor. */
   openTextEditor(id: string): void;
+  /** Click-to-fill room detection at a page point — see SketchScene.fillRoomAtPoint. */
+  fillRoomAtPoint(point: Vec2): void;
 
   /** Current world scale (1 = 100%) — for converting screen-px thresholds (handle hit radius, min-drag distance) to world units. */
   getZoomScale(): number;
