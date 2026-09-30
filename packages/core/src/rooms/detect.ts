@@ -6,6 +6,7 @@ import { fillRoomAt } from './fill.js';
 import { detectAllRooms } from './detect-all.js';
 import { resolveRoomAt, type ResolveMethod } from './resolve.js';
 import { polygonContainsPoint } from './room.js';
+import { roomConfidence } from './overlap.js';
 import type { RoomLabel } from './labels.js';
 import { detectLabelledRooms, type LabelledOptions, type LabelledResult, type LabelTarget } from './labelled.js';
 import {
@@ -85,6 +86,7 @@ export interface ClickFillResult {
   fill: RoomFillResult;
   method: 'plain' | ResolveMethod;
   label: RoomLabel | null; // the room label whose printed area guided the fill
+  confidence: number; // 0 to 1, see roomConfidence
 }
 
 /**
@@ -112,12 +114,13 @@ export function detectRoomAtWithLabels(
   const withArea = (list: readonly RoomLabel[]): RoomLabel | undefined => list.filter((l) => l.areaM2 !== null && l.areaM2 > 0).sort((x, y) => dist(x) - dist(y))[0];
   const label = inside.length > 0 ? withArea(inside) : withArea(labels.filter((l) => dist(l) * mmPerPt <= 4000));
   const printed = label?.areaM2 ?? null;
-  if (!label || printed === null) return { fill: plain, method: 'plain', label: null };
+  const rate = (f: RoomFillResult, method: ClickFillResult['method']): number => roomConfidence(method, printed ? f.areaM2 / printed - 1 : null);
+  if (!label || printed === null) return { fill: plain, method: 'plain', label: null, confidence: roomConfidence('plain', null) };
   const matches = (f: RoomFillResult): boolean => !f.flags.fillEmpty && (Math.abs(f.areaM2 / printed - 1) <= tolerance || Math.abs(f.areaM2 - printed) <= 2);
-  if (usable && !plain.flags.touchesRoiBorder && matches(plain)) return { fill: plain, method: 'plain', label };
+  if (usable && !plain.flags.touchesRoiBorder && matches(plain)) return { fill: plain, method: 'plain', label, confidence: rate(plain, 'plain') };
   const r = resolveRoomAt(walls, seedPt, printed, mmPerPt, P, { tolerance });
-  if (matches(r.fill) && polygonContainsPoint(r.fill.polygon, seedPt)) return { fill: r.fill, method: r.method, label };
-  return { fill: plain, method: 'plain', label: null };
+  if (matches(r.fill) && polygonContainsPoint(r.fill.polygon, seedPt)) return { fill: r.fill, method: r.method, label, confidence: rate(r.fill, r.method) };
+  return { fill: plain, method: 'plain', label: null, confidence: roomConfidence('plain', null) };
 }
 
 /**

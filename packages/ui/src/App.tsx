@@ -238,7 +238,7 @@ export function MepSketchApp({
       if (result) {
         setStatus(`Placed ${result.found} rooms from ${result.labels} room names.`);
         pushToast({
-          message: `Placed ${result.found} rooms.${result.review > 0 ? ` ${result.review} need a check (orange).` : ''}${result.missing > 0 ? ` ${result.missing} names had no room.` : ''}`,
+          message: `Placed ${result.found} rooms.${result.review > 0 ? ` ${result.review} need a check (orange).` : ''}${result.missing > 0 ? ` ${result.missing} names had no room.` : ''}${result.adjusted > 0 ? ` ${result.adjusted} existing rooms were adjusted so rooms do not overlap.` : ''}`,
           kind: 'info',
         });
       } else setStatus('');

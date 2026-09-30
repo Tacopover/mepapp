@@ -102,7 +102,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
+import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
@@ -2529,9 +2529,13 @@ export class SketchScene {
       locked: true,
       open: false,
     };
-    this.doc.drawingHistory.execute(replaceRoomsCommand('Merge rooms', [first, second], [merged]));
+    const plan = this.planRoomOverlaps(merged.pageIndex, [merged], [first.id, second.id]);
+    const final = plan?.add[0] ?? merged;
+    const rooms = this.doc.drawingHistory.getState().rooms;
+    const updated = plan?.update ?? [];
+    this.doc.drawingHistory.execute(replaceRoomsCommand('Merge rooms', [first, second, ...updated.map((r) => rooms[r.id]!)], [final, ...updated]));
     this.notifyRoomsChanged();
-    this.selectRooms([merged.id]);
+    this.selectRooms([final.id]);
     return true;
   }
 
@@ -2567,7 +2571,7 @@ export class SketchScene {
   async detectRooms(
     client: RoomDetectionClient,
     options: { params?: Partial<RoomDetectionParams>; onProgress?: (fraction: number, phase: DetectAllPhase) => void; signal?: AbortSignal } = {},
-  ): Promise<{ added: number; removed: number; found: number; labels: number; missing: number; review: number } | null> {
+  ): Promise<{ added: number; removed: number; adjusted: number; found: number; labels: number; missing: number; review: number } | null> {
     const doc = this.doc;
     const handle = doc.pdfHandle;
     const calibration = doc.calibration;
@@ -2619,14 +2623,15 @@ export class SketchScene {
           source: 'detected',
           locked: false,
           open: lr.open,
+          confidence: lr.confidence,
           ...(label.areaM2 !== null ? { labelAreaM2: label.areaM2 } : {}),
           ...(label.details.length > 0 ? { details: label.details } : {}),
           ...(others.length > 0 ? { otherLabels: others } : {}),
         };
       });
-      const { added, removed } = this.applyDetectedRooms(pageIndex, inputs);
+      const { added, removed, adjusted, dropped } = this.applyDetectedRooms(pageIndex, inputs);
       const review = inputs.filter((r) => r.open || (r.labelAreaM2 !== undefined && roomAreaWarning(r, calibration) !== null)).length;
-      return { added, removed, found: inputs.length, labels: labels.length, missing: result.missing.length, review };
+      return { added, removed, adjusted, found: added, labels: labels.length, missing: result.missing.length + dropped, review };
     } finally {
       options.signal?.removeEventListener('abort', abort);
     }
@@ -2667,14 +2672,15 @@ export class SketchScene {
         cached = this.roomFillCache = { doc, pageIndex, input: { segments: data.segments, segmentCount: data.segmentCount, bounds }, cache: {} };
       }
       const labels = readRoomLabelsFromText(await handle.getTextRuns(pageIndex));
-      const { fill, method } = detectRoomAtWithLabels(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, labels, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}, cached.cache);
+      const { fill, method, confidence } = detectRoomAtWithLabels(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, labels, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}, cached.cache);
       if (this.doc !== doc || this.doc.pageIndex !== pageIndex) return;
       if (fill.flags.fillEmpty) return this.emitNotice('No room found at this point.', 'warning');
       if (fill.flags.touchesRoiBorder && method === 'plain') return this.emitNotice('The area is not closed: the fill leaks out. Close the gap in the walls, or draw the room by hand.', 'warning');
       const fromFill = roomFromFill(fill, pageIndex, 'click');
-      const [labelled] = withRoomLabels([method === 'bounded' ? { ...fromFill, open: true } : fromFill], labels, calibration);
+      const [labelled] = withRoomLabels([{ ...fromFill, confidence: confidence, ...(method === 'bounded' ? { open: true } : {}) }], labels, calibration);
       const input = labelled;
       const room = this.addRoom(input!);
+      if (!room) return this.emitNotice('Other rooms already cover this area.', 'warning');
       const area = roomAreaM2(room, calibration).toFixed(1);
       this.emitNotice(room.open ? `Room of ${area} m² added, but the area looks open. Check the outline.` : `Room${room.name ? ` ${room.name}` : ''} of ${area} m² added.`, room.open ? 'warning' : 'info');
     } catch (err) {
@@ -2701,20 +2707,63 @@ export class SketchScene {
     return withRoomLabels(rooms, labels, this.doc.calibration);
   }
 
-  /** Adds one room (a click-to-fill result or a hand-drawn polygon) as one undo step. */
-  addRoom(input: RoomInput): Room {
-    const room: Room = { ...input, id: roomId(this.doc.nextRoomSeq++) };
-    this.doc.drawingHistory.execute(createRoomCommand(room));
-    this.notifyRoomsChanged();
-    return room;
+  /**
+   * Overlap plan for rooms that join a page. Rooms never overlap: the room with the higher priority
+   * (locked or hand-made, then the detection confidence) keeps a shared area, an earlier room wins a
+   * tie. Rooms in `ignore` are left out. Null without a calibration.
+   */
+  private planRoomOverlaps(pageIndex: number, incoming: readonly Room[], ignore: readonly string[] = []): RoomOverlapPlan | null {
+    const calibration = this.doc.calibration;
+    if (!calibration) return null;
+    const skip = new Set([...ignore, ...incoming.map((r) => r.id)]);
+    const existing = Object.values(this.doc.drawingHistory.getState().rooms).filter((r) => r.pageIndex === pageIndex && !skip.has(r.id));
+    return planRoomOverlaps(existing, incoming, 1 / calibration.pageUnitsPerRealUnit);
   }
 
-  /** Changes a room's name, number, polygon or flags as one undo step. A change of name, number or polygon locks the room. Returns false for an unknown id. */
-  updateRoom(id: string, patch: RoomPatch): boolean {
-    const before = this.doc.drawingHistory.getState().rooms[id];
-    if (!before) return false;
-    this.doc.drawingHistory.execute(updateRoomCommand(before, updateRoomFields(before, patch)));
+  private noteAdjusted(count: number): void {
+    if (count > 0) this.emitNotice(count === 1 ? 'One neighbouring room was adjusted so rooms do not overlap.' : `${count} neighbouring rooms were adjusted so rooms do not overlap.`, 'info');
+  }
+
+  /**
+   * Adds one room (a click-to-fill result or a hand-drawn polygon) as one undo step. Rooms never
+   * overlap: the new room is trimmed by rooms that rank higher, and rooms that rank lower are trimmed
+   * by it (same undo step). Returns null when other rooms already cover the whole polygon.
+   */
+  addRoom(input: RoomInput): Room | null {
+    const room: Room = { ...input, id: roomId(this.doc.nextRoomSeq++) };
+    const plan = this.planRoomOverlaps(room.pageIndex, [room]);
+    if (plan && plan.dropped.length > 0) return null;
+    const final = plan?.add[0] ?? room;
+    const updated = plan?.update ?? [];
+    const rooms = this.doc.drawingHistory.getState().rooms;
+    this.doc.drawingHistory.execute(replaceRoomsCommand(`Create room ${room.id}`, updated.map((r) => rooms[r.id]!), [final, ...updated]));
     this.notifyRoomsChanged();
+    this.noteAdjusted(updated.length);
+    return final;
+  }
+
+  /**
+   * Changes a room's name, number, polygon or flags as one undo step. A change of name, number or
+   * polygon locks the room. A new polygon is trimmed by locked rooms and trims detected rooms it
+   * overlaps. Returns false for an unknown id, or when the change would leave nothing of the room.
+   */
+  updateRoom(id: string, patch: RoomPatch): boolean {
+    const rooms = this.doc.drawingHistory.getState().rooms;
+    const before = rooms[id];
+    if (!before) return false;
+    const after = updateRoomFields(before, patch);
+    const plan = patch.polygon !== undefined ? this.planRoomOverlaps(before.pageIndex, [after]) : null;
+    if (plan && plan.dropped.length > 0) {
+      this.emitNotice('Other rooms already cover this area.', 'warning');
+      return false;
+    }
+    if (!plan || (plan.update.length === 0 && plan.add[0] === after)) {
+      this.doc.drawingHistory.execute(updateRoomCommand(before, after));
+    } else {
+      this.doc.drawingHistory.execute(replaceRoomsCommand(`Edit room ${id}`, [before, ...plan.update.map((r) => rooms[r.id]!)], [plan.add[0]!, ...plan.update]));
+    }
+    this.notifyRoomsChanged();
+    this.noteAdjusted(plan?.update.length ?? 0);
     return true;
   }
 
@@ -2732,14 +2781,18 @@ export class SketchScene {
    * changed stay, the other detected rooms of the page are replaced (core's mergeDetectedRooms).
    * Returns how many rooms were added and removed.
    */
-  applyDetectedRooms(pageIndex: number, detected: readonly RoomInput[]): { added: number; removed: number } {
+  applyDetectedRooms(pageIndex: number, detected: readonly RoomInput[]): { added: number; removed: number; adjusted: number; dropped: number } {
     const rooms = this.doc.drawingHistory.getState().rooms;
     const plan = mergeDetectedRooms(Object.values(rooms), detected, pageIndex, () => roomId(this.doc.nextRoomSeq++));
-    if (plan.add.length === 0 && plan.remove.length === 0) return { added: 0, removed: 0 };
+    if (plan.add.length === 0 && plan.remove.length === 0) return { added: 0, removed: 0, adjusted: 0, dropped: 0 };
     const removed = plan.remove.map((id) => rooms[id]!);
-    this.doc.drawingHistory.execute(replaceRoomsCommand(`Detect rooms on page ${pageIndex + 1}`, removed, plan.add));
+    // The new rooms and the rooms that stay must not overlap: the more confident room keeps a shared area.
+    const overlap = this.planRoomOverlaps(pageIndex, plan.add, plan.remove);
+    const add = overlap?.add ?? plan.add;
+    const updated = overlap?.update ?? [];
+    this.doc.drawingHistory.execute(replaceRoomsCommand(`Detect rooms on page ${pageIndex + 1}`, [...removed, ...updated.map((r) => rooms[r.id]!)], [...add, ...updated]));
     this.notifyRoomsChanged();
-    return { added: plan.add.length, removed: removed.length };
+    return { added: add.length, removed: removed.length, adjusted: updated.length, dropped: overlap?.dropped.length ?? 0 };
   }
 
   exportProject(): ProjectDocument {

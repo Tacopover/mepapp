@@ -27,6 +27,8 @@ export interface Room {
   labelAreaM2?: number;
   /** Other text lines of the label the name came from, for example the function group ("Onderwijsruimten"). */
   details?: string[];
+  /** How sure detection is about this room, 0 to 1 (method and match with the printed area). In an overlap the room with the lower value gives way; a locked or hand-made room always wins. */
+  confidence?: number;
   /** Labels found inside the same polygon that were not chosen. A non-empty list means the polygon may hold more than one room. */
   otherLabels?: string[];
 }

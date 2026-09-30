@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectLabelledRooms, polygonAreaPt2, resolveRoomAt, splitByTargets, wallComponents, type FilteredWalls } from './index.js';
+import { detectLabelledRooms, overlapAreaPt2, polygonAreaPt2, resolveRoomAt, splitByTargets, wallComponents, type FilteredWalls } from './index.js';
 
 const MM_PER_PT = 25; // 1 pt = 25 mm: 40 pt = 1 m
 const M = 40; // points per metre
@@ -105,6 +105,25 @@ describe('detectLabelledRooms', () => {
     expect(r.rooms).toHaveLength(2);
     expect(r.rooms.every((x) => x.method === 'split')).toBe(true);
     expect(r.rooms[1]!.areaM2 / r.rooms[0]!.areaM2).toBeGreaterThan(2.2);
+  });
+
+  it('cuts three labels in one closed room into rectangles that do not overlap', () => {
+    const w = walls(rect(0, 0, 12 * M, 4 * M), [-40, -40, 600, 300]); // 48 m2, no walls between the labels
+    const targets = [
+      { anchor: { x: 2 * M, y: 2 * M }, printedM2: 12 },
+      { anchor: { x: 6 * M, y: 2 * M }, printedM2: 24 },
+      { anchor: { x: 10.5 * M, y: 2 * M }, printedM2: 12 },
+    ];
+    const r = detectLabelledRooms(w, targets, MM_PER_PT);
+    expect(r.rooms).toHaveLength(3);
+    for (const room of r.rooms) {
+      expect(room.method).toBe('split');
+      expect(room.polygon.outer).toHaveLength(4);
+      expect(Math.abs(room.deviation!)).toBeLessThan(0.1);
+      expect(room.confidence).toBeGreaterThan(0.5);
+    }
+    expect(overlapAreaPt2(r.rooms[0]!.polygon, r.rooms[1]!.polygon)).toBeLessThan(1);
+    expect(overlapAreaPt2(r.rooms[1]!.polygon, r.rooms[2]!.polygon)).toBeLessThan(1);
   });
 
   it('reports a label that lies where no free space exists', () => {
