@@ -236,7 +236,7 @@ export interface RoomDetectionCache {
 }
 
 // Detect all rooms on a page (detect-all.ts).
-export type DetectAllPhase = 'filter' | 'raster' | 'distance' | 'rooms' | 'done';
+export type DetectAllPhase = 'filter' | 'raster' | 'distance' | 'rooms' | 'labels' | 'done';
 
 export interface DetectAllOptions {
   minRoomM2?: number; // rooms with a smaller area are dropped, default 1.5

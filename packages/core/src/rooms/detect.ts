@@ -4,6 +4,7 @@ import type { Vec2 } from '../geometry.js';
 import { filterWallSegments } from './filter.js';
 import { fillRoomAt } from './fill.js';
 import { detectAllRooms } from './detect-all.js';
+import { detectLabelledRooms, type LabelledOptions, type LabelledResult, type LabelTarget } from './labelled.js';
 import {
   DEFAULT_ROOM_DETECTION_PARAMS,
   type DetectAllOptions,
@@ -92,4 +93,18 @@ export function detectAllRoomsOnPage(
   const P: RoomDetectionParams = { ...DEFAULT_ROOM_DETECTION_PARAMS, ...params };
   options.onProgress?.(0, 'filter');
   return detectAllRooms(cachedWalls(input, mmPerPt, P, cache), mmPerPt, P, options);
+}
+
+/** Filter (or cache) plus label-driven detection: one room per label. See labelled.ts. */
+export function detectLabelledRoomsOnPage(
+  input: WallCandidateSegments,
+  targets: readonly LabelTarget[],
+  mmPerPt: number,
+  params: Partial<RoomDetectionParams> = {},
+  options: LabelledOptions = {},
+  cache?: RoomDetectionCache,
+): LabelledResult {
+  const P: RoomDetectionParams = { ...DEFAULT_ROOM_DETECTION_PARAMS, ...params };
+  options.onProgress?.(0, 'filter');
+  return detectLabelledRooms(cachedWalls(input, mmPerPt, P, cache), targets, mmPerPt, P, options);
 }

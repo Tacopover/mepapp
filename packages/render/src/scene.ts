@@ -102,7 +102,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, polygonAreaPt2, detectRoomAt, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
+import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, detectRoomAt, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
@@ -543,7 +543,7 @@ export class SketchScene {
   private roomsVisible = true;
   private selectedRoomIds = new Set<string>();
   private roomPreview: { id: string; polygon: RoomPolygon } | null = null;
-  private roomSettings: { gapMm?: number; minRoomM2?: number } = {};
+  private roomSettings: { gapMm?: number } = {};
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
   private angleSnapDegrees = DEFAULT_ANGLE_SNAP_DEGREES;
   private resizeObserver: ResizeObserver | null = null;
@@ -2420,8 +2420,8 @@ export class SketchScene {
     drawRooms(this.doc.roomLayer, rooms, this.doc.calibration, this.selectedRoomIds, this.tool === 'edit-room' ? ROOM_HANDLE_RADIUS_PX / this.world.scale.x : 0);
   }
 
-  /** Detection settings from the UI: door gap width in mm and the smallest room area in m2. Used by detectRooms and click-to-fill. */
-  setRoomSettings(settings: { gapMm?: number; minRoomM2?: number }): void {
+  /** Detection settings from the UI: door gap width in mm. Used by detectRooms and click-to-fill. */
+  setRoomSettings(settings: { gapMm?: number }): void {
     this.roomSettings = { ...settings };
   }
 
@@ -2559,14 +2559,15 @@ export class SketchScene {
   }
 
   /**
-   * Detects every room of the current page in the worker behind `client`, reads names and numbers
-   * from the PDF text, and stores the result as ONE undo step (locked and hand-made rooms stay).
-   * Needs a PDF and a calibration. `signal` cancels the job (rejects with RoomDetectionCancelled).
+   * Detects the rooms of the current page in the worker behind `client`: one room per room label
+   * with a name in the PDF text (label-driven detection, core's detectLabelledRooms). Regions
+   * without a label are not rooms. The result is stored as ONE undo step (locked and hand-made
+   * rooms stay). Needs a PDF and a calibration. `signal` cancels the job (rejects with RoomDetectionCancelled).
    */
   async detectRooms(
     client: RoomDetectionClient,
-    options: { params?: Partial<RoomDetectionParams>; minRoomM2?: number; onProgress?: (fraction: number, phase: DetectAllPhase) => void; signal?: AbortSignal } = {},
-  ): Promise<{ added: number; removed: number; found: number; leaks: LeakRegion[] } | null> {
+    options: { params?: Partial<RoomDetectionParams>; onProgress?: (fraction: number, phase: DetectAllPhase) => void; signal?: AbortSignal } = {},
+  ): Promise<{ added: number; removed: number; found: number; labels: number; missing: number; review: number } | null> {
     const doc = this.doc;
     const handle = doc.pdfHandle;
     const calibration = doc.calibration;
@@ -2579,12 +2580,24 @@ export class SketchScene {
       return null;
     }
     const pageIndex = doc.pageIndex;
+    const labels = readRoomLabelsFromText(await handle.getTextRuns(pageIndex)).filter((l) => l.name !== null);
+    if (labels.length === 0) {
+      this.emitNotice('No room names found in the text of this page. Use Fill room to place rooms by hand.', 'warning');
+      return null;
+    }
     const info = handle.getPageInfo(pageIndex);
     const swap = info.rotationDegrees === 90 || info.rotationDegrees === 270;
     const bounds: [number, number, number, number] = [0, 0, swap ? info.heightPt : info.widthPt, swap ? info.widthPt : info.heightPt];
     const data = await handle.getVectorPaths(pageIndex);
-    const job = client.detect(
-      { segments: data.segments, segmentCount: data.segmentCount, bounds, mmPerPt: 1 / calibration.pageUnitsPerRealUnit, params: { ...(this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}), ...options.params }, minRoomM2: options.minRoomM2 ?? this.roomSettings.minRoomM2 },
+    const job = client.detectLabelled(
+      {
+        segments: data.segments,
+        segmentCount: data.segmentCount,
+        bounds,
+        mmPerPt: 1 / calibration.pageUnitsPerRealUnit,
+        params: { ...(this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}), ...options.params },
+        targets: labels.map((l) => ({ anchor: l.anchor, printedM2: l.areaM2 })),
+      },
       { onProgress: options.onProgress },
     );
     const abort = (): void => job.cancel();
@@ -2595,9 +2608,25 @@ export class SketchScene {
         this.emitNotice('The page changed while rooms were detected. The result was dropped.', 'warning');
         return null;
       }
-      const inputs = await this.labelRooms(result.rooms.map((r) => roomFromFill(r, pageIndex, 'detected')), pageIndex);
+      const inputs: RoomInput[] = result.rooms.map((lr) => {
+        const label = labels[lr.target]!;
+        const others = [...lr.sharedWith].map((t) => labels[t]!).map((l) => [l.number, l.name].filter(Boolean).join(' '));
+        return {
+          pageIndex,
+          polygon: lr.polygon,
+          name: label.name,
+          number: label.number,
+          source: 'detected',
+          locked: false,
+          open: lr.open,
+          ...(label.areaM2 !== null ? { labelAreaM2: label.areaM2 } : {}),
+          ...(label.details.length > 0 ? { details: label.details } : {}),
+          ...(others.length > 0 ? { otherLabels: others } : {}),
+        };
+      });
       const { added, removed } = this.applyDetectedRooms(pageIndex, inputs);
-      return { added, removed, found: inputs.length, leaks: result.leaks };
+      const review = inputs.filter((r) => r.open || (r.labelAreaM2 !== undefined && roomAreaWarning(r, calibration) !== null)).length;
+      return { added, removed, found: inputs.length, labels: labels.length, missing: result.missing.length, review };
     } finally {
       options.signal?.removeEventListener('abort', abort);
     }

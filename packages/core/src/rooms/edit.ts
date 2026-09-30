@@ -268,3 +268,114 @@ export function mergePolygons(a: RoomPolygon, b: RoomPolygon, mmPerPt: number, o
   if (outer.length < 3) return null;
   return { outer, holes };
 }
+
+export interface SplitTarget {
+  anchor: Vec2; // a point of the room, page points (the label position)
+  targetM2: number | null; // the wanted area, null when unknown
+}
+
+/**
+ * Divides one region among several labels: each label grows from its anchor, one pixel at a time,
+ * and the label that is furthest below its wanted area grows next. The pieces have about the wanted
+ * areas; the borders between them are not wall lines, so the user must check them. Labels without a
+ * wanted area share what the others leave. Returns null when a piece would be empty.
+ */
+export function splitByTargets(polygon: RoomPolygon, targets: readonly SplitTarget[], mmPerPt: number, pxMm = 50): RoomPolygon[] | null {
+  const k = targets.length;
+  if (k < 2) return null;
+  const xs = polygon.outer.map((p) => p.x);
+  const ys = polygon.outer.map((p) => p.y);
+  const bx0 = Math.min(...xs);
+  const by0 = Math.min(...ys);
+  const spanMm = Math.max(Math.max(...xs) - bx0, Math.max(...ys) - by0) * mmPerPt;
+  const px = Math.max(pxMm, spanMm / 3000);
+  const cell = px / mmPerPt;
+  const pad = 2;
+  const x0 = bx0 - pad * cell;
+  const y0 = by0 - pad * cell;
+  const w = Math.ceil((Math.max(...xs) - bx0) / cell) + 2 * pad;
+  const h = Math.ceil((Math.max(...ys) - by0) / cell) + 2 * pad;
+  const mask = new Uint8Array(w * h);
+  fillPolygon(mask, w, h, polygon, x0, y0, cell);
+  let total = 0;
+  for (let i = 0; i < mask.length; i++) total += mask[i]!;
+  const pxM2 = (px * px) / 1e6;
+  const known = targets.reduce((s, t) => s + (t.targetM2 ?? 0), 0);
+  const unknown = targets.filter((t) => t.targetM2 === null).length;
+  const rest = Math.max(total * pxM2 - known, 0.1 * total * pxM2);
+  const goal = targets.map((t) => Math.max(1, (t.targetM2 ?? rest / unknown) / pxM2));
+
+  const owner = new Int16Array(w * h).fill(-1);
+  const queues: number[][] = targets.map(() => []);
+  const heads = new Array<number>(k).fill(0);
+  const counts = new Array<number>(k).fill(0);
+  const claim = (i: number, pixel: number): void => {
+    owner[pixel] = i;
+    counts[i]!++;
+    const x = pixel % w;
+    const y = (pixel / w) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const n = ny * w + nx;
+      if (mask[n] && owner[n] === -1) queues[i]!.push(n);
+    }
+  };
+  // Seeds: the mask pixel nearest to each anchor that no other label has taken.
+  targets.forEach((t, i) => {
+    const sx = Math.round((t.anchor.x - x0) / cell - 0.5);
+    const sy = Math.round((t.anchor.y - y0) / cell - 0.5);
+    for (let r = 0; r < Math.max(w, h); r++) {
+      let hit = -1;
+      for (let dy = -r; dy <= r && hit < 0; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = sx + dx;
+          const y = sy + dy;
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const p = y * w + x;
+          if (mask[p] && owner[p] === -1) {
+            hit = p;
+            break;
+          }
+        }
+      }
+      if (hit >= 0) {
+        claim(i, hit);
+        return;
+      }
+    }
+  });
+  if (counts.some((c) => c === 0)) return null;
+  for (;;) {
+    let pick = -1;
+    let ratio = Infinity;
+    for (let i = 0; i < k; i++) {
+      while (heads[i]! < queues[i]!.length && owner[queues[i]![heads[i]!]!] !== -1) heads[i]!++;
+      if (heads[i]! >= queues[i]!.length) continue;
+      const r = counts[i]! / goal[i]!;
+      if (r < ratio) {
+        ratio = r;
+        pick = i;
+      }
+    }
+    if (pick < 0) break;
+    claim(pick, queues[pick]![heads[pick]!++]!);
+  }
+  const pieces: RoomPolygon[] = [];
+  for (let i = 0; i < k; i++) {
+    const m = new Uint8Array(w * h);
+    for (let p = 0; p < m.length; p++) if (owner[p] === i) m[p] = 1;
+    const outers = traceMaskBoundaries(m, w, h)
+      .filter((r) => signedRingArea(r) > 0)
+      .sort((a, b) => signedRingArea(b) - signedRingArea(a));
+    if (outers.length === 0) return null;
+    const s = simplifyRing(outers[0]!, 1);
+    const pts: Vec2[] = [];
+    for (let j = 0; j + 1 < s.length; j += 2) pts.push({ x: x0 + s[j]! * cell, y: y0 + s[j + 1]! * cell });
+    if (pts.length < 3) return null;
+    pieces.push({ outer: pts, holes: [] });
+  }
+  return pieces;
+}

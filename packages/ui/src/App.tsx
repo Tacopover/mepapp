@@ -93,7 +93,6 @@ function supportsFileSystemAccess(): boolean {
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
 
 const ROOM_GAP_STORAGE_KEY = 'mepapp.settings.roomGapMm.v1';
-const MIN_ROOM_STORAGE_KEY = 'mepapp.settings.minRoomM2.v1';
 
 function readStoredNumber(key: string, fallback: number): number {
   try {
@@ -237,9 +236,11 @@ export function MepSketchApp({
     try {
       const result = await scene.detectRooms(client, { onProgress: (fraction, phase) => setStatus(`Detecting rooms: ${phase} ${Math.round(fraction * 100)}%`), signal: abort.signal });
       if (result) {
-        const review = result.leaks.length;
-        setStatus(`Detected ${result.found} rooms.`);
-        pushToast({ message: `Detected ${result.found} rooms (${result.added} new).${review > 0 ? ` ${review} open area${review === 1 ? '' : 's'} not filled.` : ''}`, kind: 'info' });
+        setStatus(`Placed ${result.found} rooms from ${result.labels} room names.`);
+        pushToast({
+          message: `Placed ${result.found} rooms.${result.review > 0 ? ` ${result.review} need a check (orange).` : ''}${result.missing > 0 ? ` ${result.missing} names had no room.` : ''}`,
+          kind: 'info',
+        });
       } else setStatus('');
     } catch (err) {
       const cancelled = (err as Error).name === 'RoomDetectionCancelled';
@@ -262,11 +263,10 @@ export function MepSketchApp({
   const roomAbortRef = useRef<AbortController | null>(null);
   const [roomsDetecting, setRoomsDetecting] = useState(false);
   const [roomGapMm, setRoomGapMm] = useState(() => readStoredNumber(ROOM_GAP_STORAGE_KEY, 1000));
-  const [minRoomM2, setMinRoomM2] = useState(() => readStoredNumber(MIN_ROOM_STORAGE_KEY, 1.5));
   const selectedRooms = useRoomSelection(sceneRef, ready);
   useEffect(() => {
-    if (ready) sceneRef.current?.setRoomSettings({ gapMm: roomGapMm, minRoomM2 });
-  }, [ready, roomGapMm, minRoomM2, sceneRef]);
+    if (ready) sceneRef.current?.setRoomSettings({ gapMm: roomGapMm });
+  }, [ready, roomGapMm, sceneRef]);
   const [roomsVisible, setRoomsVisible] = useState(true);
   useEffect(() => () => roomClientRef.current?.dispose(), []);
   const networkTreeState = useNetworkTreeState();
@@ -1077,11 +1077,6 @@ export function MepSketchApp({
           onChangeRoomGapMm={(mm) => {
             setRoomGapMm(mm);
             storeNumber(ROOM_GAP_STORAGE_KEY, mm);
-          }}
-          minRoomM2={minRoomM2}
-          onChangeMinRoomM2={(m2) => {
-            setMinRoomM2(m2);
-            storeNumber(MIN_ROOM_STORAGE_KEY, m2);
           }}
           onClose={() => setSettingsOpen(false)}
         />

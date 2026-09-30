@@ -144,7 +144,7 @@ const emptyResult = (seedPt: Vec2, touches: boolean): RoomFillResult => ({
  * segments plus the keep flags from filterWallSegments. The result polygon is
  * in page points. Open rooms (no closed wall) are flagged, not fixed.
  */
-export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, params: Partial<RoomDetectionParams> = {}): RoomFillResult {
+export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, params: Partial<RoomDetectionParams> = {}, boundM2?: number): RoomFillResult {
   const F: RoomDetectionParams = { ...DEFAULT_ROOM_DETECTION_PARAMS, ...params };
   const mm = mmPerPt;
   const segs = walls.walls.segments;
@@ -229,6 +229,80 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
     found = f2;
   }
   const seedOut: Vec2 = { x: R.x0 + (found % w) / R.s, y: R.y0 + ((found / w) | 0) / R.s };
+
+  if (boundM2 !== undefined && boundM2 > 0) {
+    // Bounded fill: flood from the seed by cost (cheap far from walls) and stop at the wanted area, so a room with a wide opening is filled before the flood leaves through the opening.
+    const targetPx = (boundM2 * 1e6) / (F.pxMm * F.pxMm);
+    let limit = targetPx * 0.5;
+    let best: RoomFillResult | null = null;
+    for (let iter = 0; iter < 5; iter++) {
+      const Fb = new Uint8Array(w * h);
+      const qb = new Int32Array(w * h);
+      let qtb = 0;
+      let touchesB = false;
+      // Dijkstra from the seed: a pixel far from the walls is cheap, a pixel near a wall or in a narrow opening is expensive. The flood fills the room around the seed before it crosses an opening.
+      const dist = new Float32Array(w * h).fill(Infinity);
+      const heap: number[] = [];
+      const wide = 1300 / F.pxMm;
+      const cost = (k: number): number => 1 + 6 * Math.max(0, Math.min(1, 1 - (d[k]! - r) / wide));
+      const push = (k: number): void => {
+        let i = heap.length;
+        heap.push(k);
+        while (i > 0) {
+          const up = (i - 1) >> 1;
+          if (dist[heap[up]!]! <= dist[k]!) break;
+          heap[i] = heap[up]!;
+          i = up;
+        }
+        heap[i] = k;
+      };
+      const pop = (): number => {
+        const top = heap[0]!;
+        const last = heap.pop()!;
+        if (heap.length > 0) {
+          let i = 0;
+          for (;;) {
+            let c = 2 * i + 1;
+            if (c >= heap.length) break;
+            if (c + 1 < heap.length && dist[heap[c + 1]!]! < dist[heap[c]!]!) c++;
+            if (dist[heap[c]!]! >= dist[last]!) break;
+            heap[i] = heap[c]!;
+            i = c;
+          }
+          heap[i] = last;
+        }
+        return top;
+      };
+      dist[found] = 0;
+      push(found);
+      while (heap.length > 0 && qtb < limit) {
+        const p = pop();
+        if (Fb[p]) continue;
+        Fb[p] = 1;
+        qb[qtb++] = p;
+        const x = p % w;
+        const y = (p / w) | 0;
+        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) touchesB = true;
+        for (const [dx, dy] of N4) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const k = ny * w + nx;
+          if (Fb[k] || d[k]! <= r) continue;
+          const nd = dist[p]! + cost(k);
+          if (nd < dist[k]!) {
+            dist[k] = nd;
+            push(k);
+          }
+        }
+      }
+      const res = finishRoom({ mask, d, w, h, R, r, Fm: Fb, q: qb, qt: qtb, touches: touchesB, seedOut }, walls, mm, F);
+      if (!best || Math.abs(res.areaM2 / boundM2 - 1) < Math.abs(best.areaM2 / boundM2 - 1)) best = res;
+      if (res.areaM2 <= 0 || Math.abs(res.areaM2 / boundM2 - 1) < 0.04) break;
+      limit = Math.max(50, limit * Math.pow(boundM2 / res.areaM2, 0.7));
+    }
+    return best!;
+  }
 
   // 3. Flood fill (4-neighbour) over pixels wider than the gap radius.
   const Fm = new Uint8Array(w * h);

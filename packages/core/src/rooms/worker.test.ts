@@ -52,6 +52,27 @@ describe('createRoomWorkerHandler', () => {
     if (last.type === 'result') expect(last.result.rooms).toHaveLength(1);
   });
 
+  it('answers a request with targets with one labelled room per label', () => {
+    const out: RoomWorkerResponse[] = [];
+    const input = roomInput();
+    createRoomWorkerHandler((m) => out.push(m))({ type: 'detect', id: 3, ...input, targets: [{ anchor: { x: 200, y: 180 }, printedM2: 24 }] });
+    const last = out[out.length - 1]!;
+    expect(last.type).toBe('labelled');
+    if (last.type === 'labelled') {
+      expect(last.result.rooms).toHaveLength(1);
+      expect(last.result.rooms[0]!.target).toBe(0);
+    }
+    expect(out.some((m) => m.type === 'progress' && m.phase === 'labels')).toBe(true);
+  });
+
+  it('client detectLabelled resolves with the labelled result', async () => {
+    const client = new RoomDetectionClient(() => new FakeWorker());
+    const input = roomInput();
+    const result = await client.detectLabelled({ ...input, targets: [{ anchor: { x: 200, y: 180 }, printedM2: null }] }).promise;
+    expect(result.rooms).toHaveLength(1);
+    client.dispose();
+  });
+
   it('posts an error message when detection throws', () => {
     const out: RoomWorkerResponse[] = [];
     const input = roomInput();
