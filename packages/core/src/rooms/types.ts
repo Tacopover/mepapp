@@ -67,8 +67,9 @@ export interface WallFilterParams {
   dashMinRun: number;
   minCompMm: number; // free-standing components smaller than this are dropped ...
   compFrac: number; // ... or smaller than this fraction of the largest component
-  // Optional rule, OFF by default: reject paired lines that have no hatch ticks
-  // between them. Tuned on two files only.
+  // Reject paired lines that have no hatch ticks between them (furniture next
+  // to hatched walls). Acts only on a drawing in hatch style (hatchStyleFrac);
+  // on the other fixtures it rejects nothing.
   hatchEvidence: boolean;
   hatchTickMaxMm: number;
   hatchMinAngDeg: number;
@@ -140,7 +141,7 @@ export const DEFAULT_ROOM_DETECTION_PARAMS: RoomDetectionParams = {
   dashMinRun: 3,
   minCompMm: 1500,
   compFrac: 0.05,
-  hatchEvidence: false,
+  hatchEvidence: true,
   hatchTickMaxMm: 900,
   hatchMinAngDeg: 20,
   hatchMinDens: 15,

@@ -8,6 +8,7 @@ import type { Vec2 } from '../geometry.js';
 import { detectAllRooms } from './detect-all.js';
 import { splitByTargets } from './edit.js';
 import { overlapAreaPt2, polygonUnion } from './clip.js';
+import { orthogonalizeOutline } from './ortho.js';
 import { resolveRoomOverlaps, roomConfidence } from './overlap.js';
 import { splitRectangular } from './rect-split.js';
 import { polygonAreaPt2, polygonContainsPoint } from './room.js';
@@ -230,6 +231,15 @@ export function detectLabelledRooms(
         out.push({ target: c.target, polygon: c.polygon, areaM2: c.areaM2, method: c.method, deviation: printed ? c.areaM2 / printed - 1 : null, open: c.open || (printed ? c.areaM2 / printed > 1.3 : false), sharedWith: group.filter((o) => o !== c).map((o) => o.target) });
       }
     }
+  }
+  // Orthogonal preference: square the outlines before the rooms are compared.
+  for (const r of out) {
+    const polygon = orthogonalizeOutline(r.polygon, walls, mmPerPt);
+    if (polygon === r.polygon) continue;
+    const printed = targets[r.target]!.printedM2;
+    r.polygon = polygon;
+    r.areaM2 = (polygonAreaPt2(polygon) * mmPerPt * mmPerPt) / 1e6;
+    r.deviation = printed ? r.areaM2 / printed - 1 : null;
   }
   // Rooms never overlap: the more confident room keeps a shared area, the other room loses it.
   const rated = out.map((r) => ({ ...r, confidence: roomConfidence(r.method, r.deviation) }));

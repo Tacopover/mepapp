@@ -14,4 +14,5 @@ export { polygonUnion, polygonDifference, polygonIntersection, overlapAreaPt2, r
 export { splitRectangular, type RectSplitTarget } from './rect-split.js';
 export { roomConfidence, roomPriority, resolveRoomOverlaps, planRoomOverlaps, type OverlapItem, type OverlapOptions, type OverlapResult, type RoomOverlapPlan } from './overlap.js';
 export { snapOutlineToWalls, type OutlineSnapOptions } from './outline-snap.js';
+export { orthogonalizeOutline, type OrthoOptions } from './ortho.js';
 export { detectLabelledRooms, type LabelTarget, type LabelledRoom, type LabelledResult, type LabelledOptions, type LabelledMethod } from './labelled.js';

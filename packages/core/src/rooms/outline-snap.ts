@@ -25,7 +25,7 @@ function resample(ring: readonly Vec2[], stepPt: number): Vec2[] {
   return out;
 }
 
-function simplifyRing(ring: Vec2[], tolPt: number): Vec2[] {
+export function simplifyRing(ring: Vec2[], tolPt: number): Vec2[] {
   let pts = ring;
   for (let pass = 0; pass < 3; pass++) {
     const next: Vec2[] = [];
@@ -45,18 +45,13 @@ function simplifyRing(ring: Vec2[], tolPt: number): Vec2[] {
   return pts;
 }
 
-/** Moves the outer outline onto nearby wall lines. Holes stay. Returns the polygon unchanged when snapping changes the area too much. */
-export function snapOutlineToWalls(polygon: RoomPolygon, walls: FilteredWalls, mmPerPt: number, options: OutlineSnapOptions = {}): RoomPolygon {
-  const radius = (options.radiusMm ?? 600) / mmPerPt;
-  const step = (options.stepMm ?? 150) / mmPerPt;
-  const cosMin = Math.cos(((options.maxAngleDeg ?? 30) * Math.PI) / 180);
-  const outer = polygon.outer;
-  if (outer.length < 3) return polygon;
+/** Kept wall segments (x0, y0, x1, y1 per segment) whose bounding box comes within radiusPt of the box of the ring. */
+export function nearKeptSegments(ring: readonly Vec2[], walls: FilteredWalls, radiusPt: number): number[] {
   let x0 = Infinity;
   let y0 = Infinity;
   let x1 = -Infinity;
   let y1 = -Infinity;
-  for (const p of outer) {
+  for (const p of ring) {
     x0 = Math.min(x0, p.x);
     y0 = Math.min(y0, p.y);
     x1 = Math.max(x1, p.x);
@@ -71,9 +66,20 @@ export function snapOutlineToWalls(polygon: RoomPolygon, walls: FilteredWalls, m
     const ay = segs[o + 1]!;
     const bx = segs[o + 2]!;
     const by = segs[o + 3]!;
-    if (Math.max(ax, bx) < x0 - radius || Math.min(ax, bx) > x1 + radius || Math.max(ay, by) < y0 - radius || Math.min(ay, by) > y1 + radius) continue;
+    if (Math.max(ax, bx) < x0 - radiusPt || Math.min(ax, bx) > x1 + radiusPt || Math.max(ay, by) < y0 - radiusPt || Math.min(ay, by) > y1 + radiusPt) continue;
     near.push(ax, ay, bx, by);
   }
+  return near;
+}
+
+/** Moves the outer outline onto nearby wall lines. Holes stay. Returns the polygon unchanged when snapping changes the area too much. */
+export function snapOutlineToWalls(polygon: RoomPolygon, walls: FilteredWalls, mmPerPt: number, options: OutlineSnapOptions = {}): RoomPolygon {
+  const radius = (options.radiusMm ?? 600) / mmPerPt;
+  const step = (options.stepMm ?? 150) / mmPerPt;
+  const cosMin = Math.cos(((options.maxAngleDeg ?? 30) * Math.PI) / 180);
+  const outer = polygon.outer;
+  if (outer.length < 3) return polygon;
+  const near = nearKeptSegments(outer, walls, radius);
   if (near.length === 0) return polygon;
 
   const pts = resample(outer, step);

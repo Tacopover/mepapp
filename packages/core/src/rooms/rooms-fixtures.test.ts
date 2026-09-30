@@ -26,7 +26,7 @@ interface Index {
 
 const index: Index = JSON.parse(readFileSync(`${DIR}index.json`, 'utf8'));
 const mmPerPt = (25.4 / 72) * index.scale;
-// partnerMinMm 0: a crop window cuts off the long partner lines of its wall lines, so the furniture rule of the full page does not apply to it.
+// partnerMinMm 0 and hatchEvidence false: a crop window cuts off the long partner lines of its wall lines and changes the hatch share, so the furniture rules of the full page do not apply to it.
 
 function load(room: RoomFixture): WallCandidateSegments {
   const buf = readFileSync(`${DIR}${room.name}.f32`);
@@ -58,7 +58,7 @@ describe('room fixtures (00_arch_ground_floor windows)', () => {
       it(`${room.id} (label ${room.labelAreaM2} m2), wallGrowMm ${wallGrowMm}: area matches the label, polygon is valid`, () => {
         const input = load(room);
         const cache: RoomDetectionCache = {};
-        const res = detectRoomAt(input, room.seed, mmPerPt, { wallGrowMm, minCompMm: index.minCompMm, labelAreaM2: room.labelAreaM2, partnerMinMm: 0 }, cache);
+        const res = detectRoomAt(input, room.seed, mmPerPt, { wallGrowMm, minCompMm: index.minCompMm, labelAreaM2: room.labelAreaM2, partnerMinMm: 0, hatchEvidence: false }, cache);
         expect(res.flags.fillEmpty).toBe(false);
         expect(res.flags.touchesRoiBorder).toBe(false);
         expect(res.flags.open).toBe(false);
@@ -73,7 +73,7 @@ describe('room fixtures (00_arch_ground_floor windows)', () => {
         for (const h of res.polygon.holes) expect(isSimpleRing(h)).toBe(true);
         expect(inside(res.polygon.outer, res.seedPt)).toBe(true);
         // A second click in the same room reuses the filter and gives the same polygon area.
-        const again = detectRoomAt(input, res.seedPt, mmPerPt, { wallGrowMm, minCompMm: index.minCompMm, labelAreaM2: room.labelAreaM2, partnerMinMm: 0 }, cache);
+        const again = detectRoomAt(input, res.seedPt, mmPerPt, { wallGrowMm, minCompMm: index.minCompMm, labelAreaM2: room.labelAreaM2, partnerMinMm: 0, hatchEvidence: false }, cache);
         expect(again.areaM2).toBeCloseTo(res.areaM2, 1);
       });
     }

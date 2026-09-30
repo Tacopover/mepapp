@@ -107,6 +107,33 @@ describe('detectLabelledRooms', () => {
     expect(r.rooms[1]!.areaM2 / r.rooms[0]!.areaM2).toBeGreaterThan(2.2);
   });
 
+  it('gives a room that is open to a hall an outline of axis-parallel edges', () => {
+    const room: Line[] = [
+      [0, 0, 200, 0],
+      [200, 0, 200, 40],
+      [200, 160, 200, 200],
+      [200, 200, 0, 200],
+      [0, 200, 0, 0],
+    ];
+    const hall: Line[] = [
+      [200, -300, 1000, -300],
+      [1000, -300, 1000, 500],
+      [1000, 500, 200, 500],
+      [200, 500, 200, 200],
+      [200, 0, 200, -300],
+    ];
+    const w = walls([...room, ...hall], [-40, -340, 1040, 540]);
+    const r = detectLabelledRooms(w, [{ anchor: { x: 100, y: 100 }, printedM2: 25 }], MM_PER_PT);
+    expect(r.rooms).toHaveLength(1);
+    expect(r.rooms[0]!.method).toBe('bounded');
+    const o = r.rooms[0]!.polygon.outer;
+    for (let i = 0; i < o.length; i++) {
+      const a = o[i]!;
+      const b = o[(i + 1) % o.length]!;
+      expect(Math.min(Math.abs(a.x - b.x), Math.abs(a.y - b.y))).toBeLessThan(1e-6);
+    }
+  });
+
   it('cuts three labels in one closed room into rectangles that do not overlap', () => {
     const w = walls(rect(0, 0, 12 * M, 4 * M), [-40, -40, 600, 300]); // 48 m2, no walls between the labels
     const targets = [

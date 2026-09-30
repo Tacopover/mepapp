@@ -5,7 +5,8 @@ import { filterWallSegments } from './filter.js';
 import { fillRoomAt } from './fill.js';
 import { detectAllRooms } from './detect-all.js';
 import { resolveRoomAt, type ResolveMethod } from './resolve.js';
-import { polygonContainsPoint } from './room.js';
+import { polygonAreaPt2, polygonContainsPoint } from './room.js';
+import { orthogonalizeOutline } from './ortho.js';
 import { roomConfidence } from './overlap.js';
 import type { RoomLabel } from './labels.js';
 import { detectLabelledRooms, type LabelledOptions, type LabelledResult, type LabelTarget } from './labelled.js';
@@ -107,6 +108,15 @@ export function detectRoomAtWithLabels(
 ): ClickFillResult {
   const P: RoomDetectionParams = { ...DEFAULT_ROOM_DETECTION_PARAMS, ...params };
   const walls = cachedWalls(input, mmPerPt, P, cache);
+  const r = labelGuidedFill(walls, seedPt, mmPerPt, labels, P, tolerance);
+  const f = r.fill;
+  if (f.flags.fillEmpty) return r;
+  const polygon = orthogonalizeOutline(f.polygon, walls, mmPerPt);
+  if (polygon === f.polygon || !polygonContainsPoint(polygon, seedPt)) return r;
+  return { ...r, fill: { ...f, polygon, areaM2: (polygonAreaPt2(polygon) * mmPerPt * mmPerPt) / 1e6 } };
+}
+
+function labelGuidedFill(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, labels: readonly RoomLabel[], P: RoomDetectionParams, tolerance: number): ClickFillResult {
   const plain = fillRoomAt(walls, seedPt, mmPerPt, P);
   const usable = !plain.flags.fillEmpty;
   const inside = usable ? labels.filter((l) => l.name !== null && polygonContainsPoint(plain.polygon, l.anchor)) : [];

@@ -97,7 +97,7 @@ describe('segment layout', () => {
 
   it('has the study defaults for the decided configuration', () => {
     const d = DEFAULT_ROOM_DETECTION_PARAMS;
-    expect([d.gapMm, d.wallGrowMm, d.seedClosed, d.hatchEvidence, d.stairMinSteps, d.coverFrac, d.stairBox]).toEqual([1000, 0, true, false, 4, 0.1, true]);
+    expect([d.gapMm, d.wallGrowMm, d.seedClosed, d.hatchEvidence, d.stairMinSteps, d.coverFrac, d.stairBox]).toEqual([1000, 0, true, true, 4, 0.1, true]);
   });
 });
 

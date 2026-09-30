@@ -15,6 +15,9 @@ const N4: readonly (readonly [number, number])[] = [
   [0, -1],
 ];
 
+// Neighbours of the bounded flood. The step cost is the same for a diagonal step, so equal cost forms squares along the axes (with 4 neighbours it forms diamonds).
+const NB: readonly (readonly [number, number])[] = [...N4, [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
 // Nearest pixel to (sx, sy) whose distance-to-wall is above r, by growing square rings. -1 when none.
 function nearestWide(d: Float32Array, w: number, h: number, sx: number, sy: number, r: number): number {
   for (let rr = 0; rr < 200; rr++) {
@@ -301,12 +304,14 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
         const x = p % w;
         const y = (p / w) | 0;
         if (x === 0 || y === 0 || x === w - 1 || y === h - 1) touchesB = true;
-        for (const [dx, dy] of N4) {
+        for (const [dx, dy] of NB) {
           const nx = x + dx;
           const ny = y + dy;
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const k = ny * w + nx;
           if (Fb[k] || d[k]! <= r) continue;
+          // A diagonal step needs both side pixels free, so the flood cannot slip through the corner of two wall pixels.
+          if (dx !== 0 && dy !== 0 && (d[y * w + nx]! <= r || d[ny * w + x]! <= r)) continue;
           const nd = dist[p]! + cost(k);
           if (nd < dist[k]!) {
             dist[k] = nd;
