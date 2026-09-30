@@ -102,8 +102,9 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
+import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams, filterWallSegments } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
+import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroupVisibility, type WallDebugGroup, type WallLineInfo } from './wallDebugLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
@@ -168,6 +169,16 @@ export { isCircuitsTool } from './tools/types.js';
 export type { DocumentSummary } from './document.js';
 
 /** A short, self-dismissing message for the user — the UI's toast. Raised for outcomes a click alone does not make obvious (a terminal moved between circuits, a rejected target), never for ones that need an answer. */
+/** State of the wall-line debug overlay, see setWallDebugVisible. `counts` is the number of lines per colour group on `pageIndex`, null while nothing is computed. */
+export interface WallDebugState {
+  visible: boolean;
+  busy: boolean;
+  message: string | null;
+  counts: Record<WallDebugGroup, number> | null;
+  hidden: WallDebugGroup[];
+  pageIndex: number | null;
+}
+
 export interface SceneNotice {
   message: string;
   kind: 'info' | 'warning';
@@ -195,6 +206,8 @@ function hexColorToPixi(hex: string): number {
 // dash option, so syncDrawingLayer's strokeDashedPolyline walks a segment cycling
 // through this sequence, issuing one stroke() call per "on" entry.
 const ROOM_HANDLE_RADIUS_PX = 5;
+const WALL_DEBUG_HOVER_PX = 6;
+const WALL_DEBUG_HIGHLIGHT_PX = 4;
 const ROOM_EDGE_HIT_PX = 6;
 
 const DASH_PATTERN_WORLD: Record<Exclude<LinePattern, 'solid'>, number[]> = {
@@ -464,6 +477,12 @@ interface SketchSceneEvents {
   roomsChanged: [];
   roomsVisibleChanged: [visible: boolean];
   roomSelectionChanged: [];
+  /** The wall-line debug overlay was shown, hidden, recomputed or filtered. Re-read with getWallDebugState(). */
+  wallDebugChanged: [WallDebugState];
+  /** The pointer moved onto a line of the wall-line debug overlay (info and container-relative screen position), or off it (null). */
+  wallLineHover: [info: WallLineInfo | null, screen: Vec2 | null];
+  /** The P key was pressed while the pointer was on a line of the wall-line debug overlay. */
+  wallLinePinned: [info: WallLineInfo];
   /** A transient message for the UI's toast — see SceneNotice. */
   notice: [SceneNotice];
   /**
@@ -541,6 +560,14 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private roomsVisible = true;
+  private readonly wallDebugLayer = new Container();
+  private wallDebugVisible = false;
+  private wallDebugData: WallDebugData | null = null;
+  private wallDebugHidden = new Set<WallDebugGroup>();
+  private wallDebugHover: number | null = null;
+  private wallDebugBusy = false;
+  private wallDebugMessage: string | null = null;
+  private wallDebugToken = 0;
   private selectedRoomIds = new Set<string>();
   private roomPreview: { id: string; polygon: RoomPolygon } | null = null;
   private roomSettings: { gapMm?: number } = {};
@@ -565,6 +592,8 @@ export class SketchScene {
     this.activeId = first.id;
     for (const event of ['roomsChanged', 'pageChanged', 'documentActivated', 'calibrationSet', 'roomSelectionChanged', 'zoomChanged', 'toolChanged'] as const) this.emitter.on(event, () => this.syncRoomLayer());
     this.emitter.on('roomsChanged', () => this.pruneRoomSelection());
+    for (const event of ['pageChanged', 'documentActivated', 'calibrationSet'] as const) this.emitter.on(event, () => void this.refreshWallDebug());
+    this.emitter.on('zoomChanged', () => drawWallDebugHighlight(this.wallDebugLayer, this.wallDebugData, this.wallDebugHover, WALL_DEBUG_HIGHLIGHT_PX / this.world.scale.x));
   }
 
   private buildToolMap(): Map<SketchTool, Tool> {
@@ -692,6 +721,7 @@ export class SketchScene {
     this.resizeObserver.observe(this.container);
 
     this.world.addChild(this.doc.roomLayer);
+    this.world.addChild(this.wallDebugLayer);
     this.world.addChild(this.doc.stampsLayer);
     this.world.addChild(this.doc.drawingLayer);
     this.world.addChild(this.doc.annotationTextLayer);
@@ -917,6 +947,7 @@ export class SketchScene {
     this.world.removeChildren();
     if (target.backdropSprite) this.world.addChild(target.backdropSprite);
     this.world.addChild(target.roomLayer);
+    this.world.addChild(this.wallDebugLayer);
     this.world.addChild(target.stampsLayer);
     this.world.addChild(target.drawingLayer);
     this.world.addChild(target.annotationTextLayer);
@@ -2562,6 +2593,83 @@ export class SketchScene {
     this.emitter.emit('roomsVisibleChanged', visible);
   }
 
+  getWallDebugState(): WallDebugState {
+    const data = this.wallDebugData;
+    return { visible: this.wallDebugVisible, busy: this.wallDebugBusy, message: this.wallDebugMessage, counts: data ? { ...data.counts } : null, hidden: [...this.wallDebugHidden], pageIndex: data ? data.pageIndex : null };
+  }
+
+  /**
+   * Shows or hides the wall-line debug overlay: every vector line of the current page, coloured by
+   * the wall filter rule that kept or dropped it (the same filter and parameters as Detect rooms and
+   * Fill room). The filter runs on the main thread (0.1 to 3 s on large pages). Needs a PDF and a calibration.
+   */
+  setWallDebugVisible(visible: boolean): void {
+    this.wallDebugVisible = visible;
+    void this.refreshWallDebug();
+  }
+
+  /** Hides the colour groups in `groups` and shows the others. Hidden lines are also skipped by the hover lookup. */
+  setWallDebugHidden(groups: readonly WallDebugGroup[]): void {
+    this.wallDebugHidden = new Set(groups);
+    setWallDebugGroupVisibility(this.wallDebugLayer, this.wallDebugHidden);
+    this.setWallDebugHover(null, null);
+    this.emitter.emit('wallDebugChanged', this.getWallDebugState());
+  }
+
+  private async refreshWallDebug(): Promise<void> {
+    const token = ++this.wallDebugToken;
+    const doc = this.doc;
+    const handle = doc.pdfHandle;
+    const calibration = doc.calibration;
+    this.wallDebugData = null;
+    this.wallDebugMessage = null;
+    this.setWallDebugHover(null, null);
+    drawWallDebug(this.wallDebugLayer, null, this.wallDebugHidden);
+    if (this.wallDebugVisible && !handle) this.wallDebugMessage = 'Open a PDF first.';
+    else if (this.wallDebugVisible && !calibration) this.wallDebugMessage = 'Calibrate the drawing first: the wall filter needs the scale.';
+    if (!this.wallDebugVisible || !handle || !calibration) {
+      this.wallDebugBusy = false;
+      this.emitter.emit('wallDebugChanged', this.getWallDebugState());
+      return;
+    }
+    this.wallDebugBusy = true;
+    this.emitter.emit('wallDebugChanged', this.getWallDebugState());
+    try {
+      const pageIndex = doc.pageIndex;
+      const info = handle.getPageInfo(pageIndex);
+      const swap = info.rotationDegrees === 90 || info.rotationDegrees === 270;
+      const bounds: [number, number, number, number] = [0, 0, swap ? info.heightPt : info.widthPt, swap ? info.widthPt : info.heightPt];
+      const vectors = await handle.getVectorPaths(pageIndex);
+      if (token !== this.wallDebugToken) return;
+      const mmPerPt = 1 / calibration.pageUnitsPerRealUnit;
+      const input = { segments: vectors.segments, segmentCount: vectors.segmentCount, bounds };
+      const { reason } = filterWallSegments(input, mmPerPt, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {});
+      this.wallDebugData = new WallDebugData(pageIndex, vectors.segments, vectors.segmentCount, reason, mmPerPt, bounds);
+      drawWallDebug(this.wallDebugLayer, this.wallDebugData, this.wallDebugHidden);
+      if (vectors.truncated) this.wallDebugMessage = 'The page has more lines than the extraction limit: not every line is shown.';
+    } catch (err) {
+      if (token !== this.wallDebugToken) return;
+      this.wallDebugMessage = `Wall lines failed: ${(err as Error).message}`;
+    }
+    this.wallDebugBusy = false;
+    this.emitter.emit('wallDebugChanged', this.getWallDebugState());
+  }
+
+  private hoverWallLine(world: Vec2, screen: Vec2): void {
+    const data = this.wallDebugData;
+    if (!data || data.pageIndex !== this.doc.pageIndex) return;
+    const index = data.nearest(world.x, world.y, WALL_DEBUG_HOVER_PX / this.world.scale.x, this.wallDebugHidden);
+    this.setWallDebugHover(index, index === null ? null : screen);
+  }
+
+  private setWallDebugHover(index: number | null, screen: Vec2 | null): void {
+    if (index === this.wallDebugHover && index === null) return;
+    const changed = index !== this.wallDebugHover;
+    this.wallDebugHover = index;
+    if (changed) drawWallDebugHighlight(this.wallDebugLayer, this.wallDebugData, index, WALL_DEBUG_HIGHLIGHT_PX / this.world.scale.x);
+    this.emitter.emit('wallLineHover', index !== null && this.wallDebugData ? this.wallDebugData.info(index) : null, screen);
+  }
+
   /**
    * Detects the rooms of the current page in the worker behind `client`: one room per room label
    * with a name in the PDF text (label-driven detection, core's detectLabelledRooms). Regions
@@ -3637,6 +3745,8 @@ export class SketchScene {
     this.toolMap.get(this.tool)?.onPointerMoveIdle?.(this.ctx, event, world, screen);
 
     this.dragHandlers.get(this.drag.kind)?.onMove(this.ctx, event, world);
+
+    if (this.wallDebugData && this.drag.kind === 'none') this.hoverWallLine(world, screen);
   };
 
   private readonly pointerUpImpl = (event: FederatedPointerEvent): void => {
@@ -3718,6 +3828,9 @@ export class SketchScene {
     } else if (meta && event.key.toLowerCase() === 'v' && this.clipboard !== null) {
       event.preventDefault();
       this.pasteClipboard();
+    } else if (!meta && event.key.toLowerCase() === 'p' && this.wallDebugData && this.wallDebugHover !== null) {
+      event.preventDefault();
+      this.emitter.emit('wallLinePinned', this.wallDebugData.info(this.wallDebugHover));
     }
   };
 
