@@ -26,6 +26,7 @@ import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { StampsPanel, getVisibleStampDefinitions, pickStampDefinition } from './components/StampsPanel.js';
 import type { StampLabelLanguage } from './components/LanguageToggle.js';
 import type { StampCategoryFilter } from './components/CategorySwitcher.js';
+import { useRoomSelection } from './useRoomSelection.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ToastStack, useToasts } from './components/Toasts.js';
@@ -90,6 +91,27 @@ function supportsFileSystemAccess(): boolean {
 }
 
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
+
+const ROOM_GAP_STORAGE_KEY = 'mepapp.settings.roomGapMm.v1';
+const MIN_ROOM_STORAGE_KEY = 'mepapp.settings.minRoomM2.v1';
+
+function readStoredNumber(key: string, fallback: number): number {
+  try {
+    const raw = window.localStorage.getItem(key);
+    const value = raw === null ? NaN : Number(raw);
+    return Number.isFinite(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function storeNumber(key: string, value: number): void {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // Storage can be blocked; the setting then lasts for this session only.
+  }
+}
 
 const SNAP_RADIUS_STORAGE_KEY = 'mepapp.settings.snapRadiusPx.v1';
 const ANGLE_SNAP_STORAGE_KEY = 'mepapp.settings.angleSnapDegrees.v1';
@@ -239,6 +261,12 @@ export function MepSketchApp({
   const roomClientRef = useRef<RoomDetectionClient | null>(null);
   const roomAbortRef = useRef<AbortController | null>(null);
   const [roomsDetecting, setRoomsDetecting] = useState(false);
+  const [roomGapMm, setRoomGapMm] = useState(() => readStoredNumber(ROOM_GAP_STORAGE_KEY, 1000));
+  const [minRoomM2, setMinRoomM2] = useState(() => readStoredNumber(MIN_ROOM_STORAGE_KEY, 1.5));
+  const selectedRooms = useRoomSelection(sceneRef, ready);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setRoomSettings({ gapMm: roomGapMm, minRoomM2 });
+  }, [ready, roomGapMm, minRoomM2, sceneRef]);
   const [roomsVisible, setRoomsVisible] = useState(true);
   useEffect(() => () => roomClientRef.current?.dispose(), []);
   const networkTreeState = useNetworkTreeState();
@@ -796,6 +824,8 @@ export function MepSketchApp({
     ),
     properties: (
       <PropertiesPanel
+        selectedRooms={selectedRooms}
+        calibration={calibration}
         sceneRef={sceneRef}
         selection={selection}
         selectedSegment={selectedSegment}
@@ -1043,6 +1073,16 @@ export function MepSketchApp({
           onChangeSnapRadiusPx={handleChangeSnapRadiusPx}
           angleSnapDegrees={angleSnapDegrees}
           onChangeAngleSnapDegrees={handleChangeAngleSnapDegrees}
+          roomGapMm={roomGapMm}
+          onChangeRoomGapMm={(mm) => {
+            setRoomGapMm(mm);
+            storeNumber(ROOM_GAP_STORAGE_KEY, mm);
+          }}
+          minRoomM2={minRoomM2}
+          onChangeMinRoomM2={(m2) => {
+            setMinRoomM2(m2);
+            storeNumber(MIN_ROOM_STORAGE_KEY, m2);
+          }}
           onClose={() => setSettingsOpen(false)}
         />
       )}

@@ -20,6 +20,8 @@ import {
   IconRuler,
   IconMeasure,
   IconFillRoom,
+  IconEditRoom,
+  IconSplitRoom,
   type IconProps,
 } from './icons.js';
 
@@ -82,8 +84,11 @@ export const RAIL_ROWS: RailRow[] = [
   },
   {
     id: 'rooms',
-    singleton: true,
-    members: [{ id: 'fill-room', label: 'Fill room', Icon: IconFillRoom, tool: 'fill-room' }],
+    members: [
+      { id: 'fill-room', label: 'Fill room', Icon: IconFillRoom, tool: 'fill-room' },
+      { id: 'edit-room', label: 'Edit rooms', Icon: IconEditRoom, tool: 'edit-room' },
+      { id: 'split-room', label: 'Split room', Icon: IconSplitRoom, tool: 'split-room' },
+    ],
   },
   {
     // Circuits mode (electrical-circuits-model.md Phase E4). Rail.tsx lights this row for every tool in the circuits family, not just 'circuits'.

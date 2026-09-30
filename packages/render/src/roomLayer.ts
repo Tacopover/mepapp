@@ -9,7 +9,7 @@ const MAX_FONT_PT = 14;
 const flat = (ring: readonly Vec2[]): number[] => ring.flatMap((p) => [p.x, p.y]);
 
 /** Redraws the room overlay of one page into `layer`: a tinted polygon with holes cut out, an outline, and a number / name / area label. Rooms that need review are orange. */
-export function drawRooms(layer: Container, rooms: readonly Room[], calibration: Calibration | null): void {
+export function drawRooms(layer: Container, rooms: readonly Room[], calibration: Calibration | null, selected: ReadonlySet<string> = new Set(), handleRadiusPt = 0): void {
   for (const child of layer.removeChildren()) child.destroy();
   if (rooms.length === 0) return;
   const shapes = new Graphics();
@@ -17,10 +17,18 @@ export function drawRooms(layer: Container, rooms: readonly Room[], calibration:
   for (const room of rooms) {
     const review = room.open || (calibration !== null && roomAreaWarning(room, calibration) !== null);
     const color = review ? REVIEW_COLOR : ROOM_COLOR;
-    shapes.poly(flat(room.polygon.outer)).fill({ color, alpha: 0.14 });
+    const isSelected = selected.has(room.id);
+    shapes.poly(flat(room.polygon.outer)).fill({ color, alpha: isSelected ? 0.32 : 0.14 });
     for (const hole of room.polygon.holes) shapes.poly(flat(hole)).cut();
-    shapes.poly(flat(room.polygon.outer)).stroke({ width: 1.2, color, alpha: 0.9 });
+    shapes.poly(flat(room.polygon.outer)).stroke({ width: isSelected ? 3 : 1.2, color: isSelected ? 0x1565c0 : color, alpha: 0.95 });
     for (const hole of room.polygon.holes) shapes.poly(flat(hole)).stroke({ width: 1, color, alpha: 0.6 });
+
+    // A single selected room shows its vertices as handles (edit-room tool).
+    if (isSelected && selected.size === 1 && handleRadiusPt > 0) {
+      for (const ring of [room.polygon.outer, ...room.polygon.holes]) {
+        for (const v of ring) shapes.rect(v.x - handleRadiusPt, v.y - handleRadiusPt, 2 * handleRadiusPt, 2 * handleRadiusPt).fill({ color: 0xffffff }).stroke({ width: handleRadiusPt / 4, color: 0x1565c0 });
+      }
+    }
 
     const lines = [[room.number, room.name].filter(Boolean).join(' ')];
     if (calibration) lines.push(`${roomAreaM2(room, calibration).toFixed(1)} m²`);

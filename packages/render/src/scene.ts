@@ -102,7 +102,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, detectRoomAt, roomAreaM2, roomsAtPoint, roomFromFill, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
+import { RoomDetectionClient, polygonAreaPt2, detectRoomAt, mergePolygons, splitPolygon, nearestVertex, nearestEdge, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
@@ -155,6 +155,8 @@ import { DrawStickyNoteTool } from './tools/drawStickyNoteTool.js';
 import { CalibrateTool } from './tools/calibrateTool.js';
 import { MeasureTool } from './tools/measureTool.js';
 import { FillRoomTool } from './tools/fillRoomTool.js';
+import { EditRoomTool } from './tools/editRoomTool.js';
+import { SplitRoomTool } from './tools/splitRoomTool.js';
 import { PlaceStampTool } from './tools/placeStampTool.js';
 import { AddToCircuitTool } from './tools/addToCircuitTool.js';
 import { AssignPanelTool } from './tools/assignPanelTool.js';
@@ -192,6 +194,9 @@ function hexColorToPixi(hex: string): number {
 // non-solid NetworkType.linePattern — PixiJS v8's Graphics.stroke() has no native
 // dash option, so syncDrawingLayer's strokeDashedPolyline walks a segment cycling
 // through this sequence, issuing one stroke() call per "on" entry.
+const ROOM_HANDLE_RADIUS_PX = 5;
+const ROOM_EDGE_HIT_PX = 6;
+
 const DASH_PATTERN_WORLD: Record<Exclude<LinePattern, 'solid'>, number[]> = {
   dashed: [8, 5],
   dotted: [1.5, 4],
@@ -458,6 +463,7 @@ interface SketchSceneEvents {
   /** The active document's rooms changed: added, edited, deleted, replaced by detect-all, undone/redone or loaded. Re-read with listRooms(). */
   roomsChanged: [];
   roomsVisibleChanged: [visible: boolean];
+  roomSelectionChanged: [];
   /** A transient message for the UI's toast — see SceneNotice. */
   notice: [SceneNotice];
   /**
@@ -535,6 +541,9 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private roomsVisible = true;
+  private selectedRoomIds = new Set<string>();
+  private roomPreview: { id: string; polygon: RoomPolygon } | null = null;
+  private roomSettings: { gapMm?: number; minRoomM2?: number } = {};
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
   private angleSnapDegrees = DEFAULT_ANGLE_SNAP_DEGREES;
   private resizeObserver: ResizeObserver | null = null;
@@ -554,7 +563,8 @@ export class SketchScene {
     const first = new SketchDocument();
     this.documents.push(first);
     this.activeId = first.id;
-    for (const event of ['roomsChanged', 'pageChanged', 'documentActivated', 'calibrationSet'] as const) this.emitter.on(event, () => this.syncRoomLayer());
+    for (const event of ['roomsChanged', 'pageChanged', 'documentActivated', 'calibrationSet', 'roomSelectionChanged', 'zoomChanged', 'toolChanged'] as const) this.emitter.on(event, () => this.syncRoomLayer());
+    this.emitter.on('roomsChanged', () => this.pruneRoomSelection());
   }
 
   private buildToolMap(): Map<SketchTool, Tool> {
@@ -572,6 +582,8 @@ export class SketchScene {
       new CalibrateTool(),
       new MeasureTool(),
       new FillRoomTool(),
+      new EditRoomTool(),
+      new SplitRoomTool(),
       new PlaceStampTool('terminal'),
       new PlaceStampTool('equipment'),
       new AddToCircuitTool(),
@@ -607,6 +619,13 @@ export class SketchScene {
       },
       setTool: (tool) => self.setTool(tool),
       fillRoomAtPoint: (point) => self.fillRoomAtPoint(point),
+      selectRoomAtPoint: (point, additive) => self.selectRoomAtPoint(point, additive),
+      clearRoomSelection: () => self.clearRoomSelection(),
+      hitRoomVertex: (world) => self.hitRoomVertex(world),
+      hitRoomEdge: (world) => self.hitRoomEdge(world),
+      previewRoomPolygon: (id, polygon) => self.previewRoomPolygon(id, polygon),
+      commitRoomPolygon: (id, polygon) => self.updateRoom(id, { polygon }),
+      splitRoomByLine: (a, b) => self.splitRoomByLine(a, b),
       markDirty: () => self.markDirty(),
       syncDrawingLayer: () => self.syncDrawingLayer(),
       redrawOverlay: () => self.redrawOverlay(),
@@ -2396,8 +2415,137 @@ export class SketchScene {
 
   /** Redraws the room overlay: the rooms of the current page, unless hidden. */
   private syncRoomLayer(): void {
-    const rooms = this.roomsVisible ? this.listRooms().filter((r) => r.pageIndex === this.doc.pageIndex) : [];
-    drawRooms(this.doc.roomLayer, rooms, this.doc.calibration);
+    const preview = this.roomPreview;
+    const rooms = this.roomsVisible ? this.listRooms().filter((r) => r.pageIndex === this.doc.pageIndex).map((r) => (preview && r.id === preview.id ? { ...r, polygon: preview.polygon } : r)) : [];
+    drawRooms(this.doc.roomLayer, rooms, this.doc.calibration, this.selectedRoomIds, this.tool === 'edit-room' ? ROOM_HANDLE_RADIUS_PX / this.world.scale.x : 0);
+  }
+
+  /** Detection settings from the UI: door gap width in mm and the smallest room area in m2. Used by detectRooms and click-to-fill. */
+  setRoomSettings(settings: { gapMm?: number; minRoomM2?: number }): void {
+    this.roomSettings = { ...settings };
+  }
+
+  /** The selected rooms of the edit-room tool, in the order of listRooms. */
+  getSelectedRooms(): Room[] {
+    return this.listRooms().filter((r) => this.selectedRoomIds.has(r.id));
+  }
+
+  selectRooms(ids: readonly string[]): void {
+    this.selectedRoomIds = new Set(ids);
+    this.emitter.emit('roomSelectionChanged');
+  }
+
+  clearRoomSelection(): void {
+    if (this.selectedRoomIds.size === 0) return;
+    this.selectRooms([]);
+  }
+
+  /** Selects the smallest room of the current page under the point; Shift toggles it in the selection; a click on nothing clears the selection (unless Shift). */
+  selectRoomAtPoint(point: Vec2, additive: boolean): void {
+    const hit = roomsAtPoint(this.listRooms(), point, this.doc.pageIndex)[0];
+    if (!hit) {
+      if (!additive) this.clearRoomSelection();
+      return;
+    }
+    const next = new Set(additive ? this.selectedRoomIds : []);
+    if (additive && next.has(hit.id)) next.delete(hit.id);
+    else next.add(hit.id);
+    this.selectRooms([...next]);
+  }
+
+  private singleSelectedRoom(): Room | null {
+    const selected = this.getSelectedRooms();
+    return selected.length === 1 && this.tool === 'edit-room' ? selected[0]! : null;
+  }
+
+  hitRoomVertex(world: Vec2): { roomId: string; ring: number; index: number; polygon: RoomPolygon } | null {
+    const room = this.singleSelectedRoom();
+    const hit = room ? nearestVertex(room.polygon, world, (ROOM_HANDLE_RADIUS_PX * 1.6) / this.world.scale.x) : null;
+    return room && hit ? { roomId: room.id, ring: hit.ring, index: hit.index, polygon: room.polygon } : null;
+  }
+
+  hitRoomEdge(world: Vec2): { roomId: string; ring: number; index: number; point: Vec2; polygon: RoomPolygon } | null {
+    const room = this.singleSelectedRoom();
+    const hit = room ? nearestEdge(room.polygon, world, (ROOM_EDGE_HIT_PX) / this.world.scale.x) : null;
+    return room && hit ? { roomId: room.id, ring: hit.ring, index: hit.index, point: hit.point, polygon: room.polygon } : null;
+  }
+
+  private previewRoomPolygon(roomId: string, polygon: RoomPolygon | null): void {
+    this.roomPreview = polygon ? { id: roomId, polygon } : null;
+    this.syncRoomLayer();
+  }
+
+  /**
+   * Splits the room on the current page under the cut line a-b in two, as one undo step. The larger
+   * piece keeps name and number. Both pieces are locked (the user made the change).
+   */
+  splitRoomByLine(a: Vec2, b: Vec2): void {
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const room = roomsAtPoint(this.listRooms(), mid, this.doc.pageIndex)[0] ?? roomsAtPoint(this.listRooms(), a, this.doc.pageIndex)[0];
+    if (!room) return this.emitNotice('Draw the cut line across a room.', 'warning');
+    const pieces = splitPolygon(room.polygon, a, b);
+    if (!pieces) return this.emitNotice('This cut does not divide the room. Draw it from wall to wall.', 'warning');
+    const [big, small] = polygonAreaPt2(pieces[0]) >= polygonAreaPt2(pieces[1]) ? pieces : [pieces[1], pieces[0]];
+    const base = { pageIndex: room.pageIndex, source: room.source, locked: true, open: room.open };
+    const added: Room[] = [
+      { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: big, name: room.name, number: room.number, ...(room.labelAreaM2 !== undefined ? { labelAreaM2: room.labelAreaM2 } : {}), ...(room.details ? { details: room.details } : {}) },
+      { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: small, name: null, number: null },
+    ];
+    this.doc.drawingHistory.execute(replaceRoomsCommand('Split room', [room], added));
+    this.notifyRoomsChanged();
+    this.selectRooms(added.map((r) => r.id));
+  }
+
+  /**
+   * Merges two selected rooms into one (raster closing over the wall between them), as one undo
+   * step. The larger room keeps name and number. Returns false with a notice when it cannot merge.
+   */
+  mergeSelectedRooms(): boolean {
+    const selected = this.getSelectedRooms();
+    if (selected.length !== 2) {
+      this.emitNotice('Select two rooms to merge.', 'warning');
+      return false;
+    }
+    const calibration = this.doc.calibration;
+    if (!calibration) {
+      this.emitNotice('Calibrate the drawing first: merging needs the scale.', 'warning');
+      return false;
+    }
+    const [first, second] = selected as [Room, Room];
+    if (first.pageIndex !== second.pageIndex) return false;
+    const polygon = mergePolygons(first.polygon, second.polygon, 1 / calibration.pageUnitsPerRealUnit);
+    if (!polygon) {
+      this.emitNotice('The two rooms do not touch. Only rooms with a wall between them can merge.', 'warning');
+      return false;
+    }
+    const [big, small] = polygonAreaPt2(first.polygon) >= polygonAreaPt2(second.polygon) ? [first, second] : [second, first];
+    const merged: Room = {
+      id: roomId(this.doc.nextRoomSeq++),
+      pageIndex: big.pageIndex,
+      polygon,
+      name: big.name ?? small.name,
+      number: big.number ?? small.number,
+      source: big.source,
+      locked: true,
+      open: false,
+    };
+    this.doc.drawingHistory.execute(replaceRoomsCommand('Merge rooms', [first, second], [merged]));
+    this.notifyRoomsChanged();
+    this.selectRooms([merged.id]);
+    return true;
+  }
+
+  /** Deletes the selected rooms as one undo step. */
+  deleteSelectedRooms(): void {
+    this.deleteRooms([...this.selectedRoomIds]);
+  }
+
+  private pruneRoomSelection(): void {
+    if (this.selectedRoomIds.size === 0) return;
+    const existing = new Set(this.listRooms().map((r) => r.id));
+    const kept = [...this.selectedRoomIds].filter((id) => existing.has(id));
+    if (kept.length !== this.selectedRoomIds.size) this.selectRooms(kept);
+    else this.emitter.emit('roomSelectionChanged');
   }
 
   isRoomsVisible(): boolean {
@@ -2436,7 +2584,7 @@ export class SketchScene {
     const bounds: [number, number, number, number] = [0, 0, swap ? info.heightPt : info.widthPt, swap ? info.widthPt : info.heightPt];
     const data = await handle.getVectorPaths(pageIndex);
     const job = client.detect(
-      { segments: data.segments, segmentCount: data.segmentCount, bounds, mmPerPt: 1 / calibration.pageUnitsPerRealUnit, params: options.params, minRoomM2: options.minRoomM2 },
+      { segments: data.segments, segmentCount: data.segmentCount, bounds, mmPerPt: 1 / calibration.pageUnitsPerRealUnit, params: { ...(this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}), ...options.params }, minRoomM2: options.minRoomM2 ?? this.roomSettings.minRoomM2 },
       { onProgress: options.onProgress },
     );
     const abort = (): void => job.cancel();
@@ -2489,9 +2637,10 @@ export class SketchScene {
         const bounds: [number, number, number, number] = [0, 0, swap ? info.heightPt : info.widthPt, swap ? info.widthPt : info.heightPt];
         cached = this.roomFillCache = { doc, pageIndex, input: { segments: data.segments, segmentCount: data.segmentCount, bounds }, cache: {} };
       }
-      const fill = detectRoomAt(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, {}, cached.cache);
+      const fill = detectRoomAt(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}, cached.cache);
       if (this.doc !== doc || this.doc.pageIndex !== pageIndex) return;
       if (fill.flags.fillEmpty) return this.emitNotice('No room found at this point.', 'warning');
+      if (fill.flags.touchesRoiBorder) return this.emitNotice('The area is not closed: the fill leaks out. Close the gap in the walls, or draw the room by hand.', 'warning');
       const [input] = await this.labelRooms([roomFromFill(fill, pageIndex, 'click')], pageIndex);
       const room = this.addRoom(input!);
       const area = roomAreaM2(room, calibration).toFixed(1);
@@ -3472,7 +3621,10 @@ export class SketchScene {
     }
 
     const meta = event.ctrlKey || event.metaKey;
-    if ((event.key === 'Delete' || event.key === 'Backspace') && this.doc.selectedIds.size > 0) {
+    if ((event.key === 'Delete' || event.key === 'Backspace') && this.tool === 'edit-room' && this.selectedRoomIds.size > 0) {
+      event.preventDefault();
+      this.deleteSelectedRooms();
+    } else if ((event.key === 'Delete' || event.key === 'Backspace') && this.doc.selectedIds.size > 0) {
       event.preventDefault();
       this.deleteSelection();
     } else if (meta && event.key.toLowerCase() === 'c' && this.doc.selectedIds.size > 0) {

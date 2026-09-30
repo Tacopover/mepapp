@@ -7,7 +7,9 @@ import {
   NETWORK_TYPE_LIBRARY,
   type Circuit,
   type CircuitType,
+  type Calibration,
   type CustomPropertyDefinition,
+  type Room,
   type FittingKind,
   type NetworkType,
   type Panel,
@@ -17,6 +19,7 @@ import {
 } from '@mepapp/core';
 import { IconRotate } from '../icons.js';
 import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
+import { RoomProperties } from './RoomProperties.js';
 import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
 import { ColorPicker } from './ColorPicker.js';
 import { stampLabelFor } from './StampsPanel.js';
@@ -94,6 +97,9 @@ export interface PropertiesPanelProps {
   /** The Show Circuits toggle — see SketchScene.setShowCircuitLines. */
   showCircuitLines: boolean;
   onToggleCircuitLines: () => void;
+  /** Rooms selected with the edit-room tool; shown before every other branch. */
+  selectedRooms?: Room[];
+  calibration?: Calibration | null;
 }
 
 export function PropertiesPanel({
@@ -120,7 +126,10 @@ export function PropertiesPanel({
   allStamps,
   showCircuitLines,
   onToggleCircuitLines,
+  selectedRooms = [],
+  calibration = null,
 }: PropertiesPanelProps) {
+  if (selectedRooms.length > 0) return <RoomProperties sceneRef={sceneRef} rooms={selectedRooms} calibration={calibration} />;
   if (selectedCircuitId) {
     const circuit = circuits.find((c) => c.id === selectedCircuitId);
     if (circuit) {
