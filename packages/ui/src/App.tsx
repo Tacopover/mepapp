@@ -7,6 +7,7 @@ import {
   SCHEMATIC_TEMPLATE_LIBRARY,
   STAMP_LIBRARY,
   type NetworkType,
+  type RoomDetectionClient,
   type ReconciliationReport,
   type SchematicSymbol,
   type SchematicTemplate,
@@ -70,6 +71,8 @@ export interface MepSketchAppProps {
   // app must offer the exact corresponding source. The app shell computes
   // this link (it knows the build's commit SHA); this component just shows it.
   correspondingSourceUrl?: string;
+  /** Creates the room detection client (a Web Worker behind it). Without it the room menu items are disabled. */
+  createRoomDetectionClient?: () => RoomDetectionClient;
   /** Resolves a stamp-library definition's iconRef to a fetchable URL. Defaults to apps/web's copy under /stamps/. */
   resolveStampIconUrl?: (iconRef: string) => string;
 }
@@ -150,6 +153,7 @@ export function MepSketchApp({
   onLoadPdfPage,
   onLoadPdfPageAt,
   correspondingSourceUrl,
+  createRoomDetectionClient,
   resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL,
 }: MepSketchAppProps) {
   const {
@@ -199,8 +203,44 @@ export function MepSketchApp({
     activePdfHandle,
   } = useSketchScene();
 
-  const [status, setStatus] = useState('');
   const { toasts, pushToast, dismissToast } = useToasts();
+  const [status, setStatus] = useState('');
+  const handleDetectRooms = useCallback(async () => {
+    const scene = sceneRef.current;
+    if (!scene || !createRoomDetectionClient || roomAbortRef.current) return;
+    const client = (roomClientRef.current ??= createRoomDetectionClient());
+    const abort = new AbortController();
+    roomAbortRef.current = abort;
+    setRoomsDetecting(true);
+    try {
+      const result = await scene.detectRooms(client, { onProgress: (fraction, phase) => setStatus(`Detecting rooms: ${phase} ${Math.round(fraction * 100)}%`), signal: abort.signal });
+      if (result) {
+        const review = result.leaks.length;
+        setStatus(`Detected ${result.found} rooms.`);
+        pushToast({ message: `Detected ${result.found} rooms (${result.added} new).${review > 0 ? ` ${review} open area${review === 1 ? '' : 's'} not filled.` : ''}`, kind: 'info' });
+      } else setStatus('');
+    } catch (err) {
+      const cancelled = (err as Error).name === 'RoomDetectionCancelled';
+      setStatus(cancelled ? 'Room detection cancelled.' : `Room detection failed: ${(err as Error).message}`);
+    } finally {
+      roomAbortRef.current = null;
+      setRoomsDetecting(false);
+    }
+  }, [createRoomDetectionClient, pushToast, sceneRef]);
+  const handleCancelRoomDetection = useCallback(() => roomAbortRef.current?.abort(), []);
+  const handleToggleRooms = useCallback(() => sceneRef.current?.setRoomsVisible(!sceneRef.current.isRoomsVisible()), [sceneRef]);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    setRoomsVisible(scene.isRoomsVisible());
+    scene.on('roomsVisibleChanged', setRoomsVisible);
+    return () => scene.off('roomsVisibleChanged', setRoomsVisible);
+  }, [ready, sceneRef]);
+  const roomClientRef = useRef<RoomDetectionClient | null>(null);
+  const roomAbortRef = useRef<AbortController | null>(null);
+  const [roomsDetecting, setRoomsDetecting] = useState(false);
+  const [roomsVisible, setRoomsVisible] = useState(true);
+  useEffect(() => () => roomClientRef.current?.dispose(), []);
   const networkTreeState = useNetworkTreeState();
   useEffect(() => {
     const scene = sceneRef.current;
@@ -850,6 +890,12 @@ export function MepSketchApp({
           onOpenGlobalProperties={() => setGlobalPropertiesOpen(true)}
           onOpenManageBuildings={() => setManageBuildingsOpen(true)}
           pdfLoaded={pdfHandle !== null}
+          roomsAvailable={createRoomDetectionClient !== undefined}
+          roomsDetecting={roomsDetecting}
+          roomsVisible={roomsVisible}
+          onDetectRooms={handleDetectRooms}
+          onCancelRoomDetection={handleCancelRoomDetection}
+          onToggleRooms={handleToggleRooms}
         />
         <DocumentSwitcher documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
         <div className="mep-fill" />

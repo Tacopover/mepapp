@@ -90,6 +90,8 @@ export class SketchDocument {
   backdropSprite: Sprite | null = null;
   /** Which page of pdfHandle the backdrop currently shows (status bar page navigation) — view-only: placed elements aren't page-scoped yet (they still all record pageIndex: 0), see atlas §6 D4. */
   pageIndex = 0;
+  /** Room polygons and labels of the current page, rebuilt by SketchScene.syncRoomLayer. Below the stamps so elements stay clickable-looking on top. */
+  readonly roomLayer = new Container();
   readonly stampsLayer = new Container();
   readonly drawingLayer = new Graphics();
   /** PixiJS Text nodes for placed textbox annotations — a Graphics object can't render text, so these live in their own container, fully rebuilt alongside drawingLayer on every syncDrawingLayer (see SketchScene.drawAnnotation). */
@@ -167,6 +169,7 @@ export class SketchDocument {
     this.backdropSprite?.destroy({ texture: true });
     destroyStampEntries(this.stamps.values());
     this.stamps.clear();
+    this.roomLayer.destroy({ children: true });
     this.stampsLayer.destroy();
     this.drawingLayer.destroy();
     this.annotationTextLayer.destroy({ children: true });

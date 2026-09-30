@@ -9,6 +9,12 @@ export interface MenuButtonProps {
   onOpenGlobalProperties: () => void;
   onOpenManageBuildings: () => void;
   pdfLoaded: boolean;
+  roomsAvailable: boolean;
+  roomsDetecting: boolean;
+  roomsVisible: boolean;
+  onDetectRooms: () => void;
+  onCancelRoomDetection: () => void;
+  onToggleRooms: () => void;
 }
 
 export function MenuButton({
@@ -19,6 +25,12 @@ export function MenuButton({
   onOpenGlobalProperties,
   onOpenManageBuildings,
   pdfLoaded,
+  roomsAvailable,
+  roomsDetecting,
+  roomsVisible,
+  onDetectRooms,
+  onCancelRoomDetection,
+  onToggleRooms,
 }: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -102,6 +114,29 @@ export function MenuButton({
             }}
           >
             Manage Buildings…
+          </button>
+          <div className="mep-menu-divider" />
+          <button
+            type="button"
+            className="mep-menu-item"
+            disabled={!pdfLoaded || !roomsAvailable}
+            onClick={() => {
+              if (roomsDetecting) onCancelRoomDetection();
+              else onDetectRooms();
+              setOpen(false);
+            }}
+          >
+            {roomsDetecting ? 'Cancel room detection' : 'Detect rooms'}
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            onClick={() => {
+              onToggleRooms();
+              setOpen(false);
+            }}
+          >
+            {roomsVisible ? 'Hide rooms' : 'Show rooms'}
           </button>
         </div>
       )}
