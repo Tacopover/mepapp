@@ -15,6 +15,8 @@ export interface MenuButtonProps {
   onDetectRooms: () => void;
   onCancelRoomDetection: () => void;
   onToggleRooms: () => void;
+  wallDebugVisible: boolean;
+  onToggleWallDebug: () => void;
 }
 
 export function MenuButton({
@@ -31,6 +33,8 @@ export function MenuButton({
   onDetectRooms,
   onCancelRoomDetection,
   onToggleRooms,
+  wallDebugVisible,
+  onToggleWallDebug,
 }: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -137,6 +141,17 @@ export function MenuButton({
             }}
           >
             {roomsVisible ? 'Hide rooms' : 'Show rooms'}
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            disabled={!pdfLoaded}
+            onClick={() => {
+              onToggleWallDebug();
+              setOpen(false);
+            }}
+          >
+            {wallDebugVisible ? 'Hide wall lines (debug)' : 'Show wall lines (debug)'}
           </button>
         </div>
       )}

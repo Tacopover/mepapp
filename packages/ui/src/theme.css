@@ -3181,3 +3181,89 @@
 .mep-modal--workspace .mep-schematic-field > button {
   align-self: flex-start;
 }
+
+/* ---------- Wall-line debug overlay: legend panel and hover tooltip ---------- */
+
+.mep-wall-debug-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  width: 300px;
+  max-width: calc(100% - 70px);
+  padding: 8px 10px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.mep-wall-debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.mep-wall-debug-close {
+  border: none;
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.mep-wall-debug-row,
+.mep-wall-debug-pin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.mep-wall-debug-swatch {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 4px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.mep-wall-debug-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-wall-debug-count,
+.mep-wall-debug-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.mep-wall-debug-note {
+  color: var(--muted);
+  margin: 6px 0 2px;
+}
+.mep-wall-debug-pinned {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  max-height: 200px;
+  overflow-y: auto;
+}
+.mep-wall-debug-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.mep-wall-debug-tooltip {
+  position: absolute;
+  z-index: 30;
+  pointer-events: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
