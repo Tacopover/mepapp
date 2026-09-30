@@ -3,8 +3,11 @@
 import type { Vec2 } from '../geometry.js';
 import { filterWallSegments } from './filter.js';
 import { fillRoomAt } from './fill.js';
+import { detectAllRooms } from './detect-all.js';
 import {
   DEFAULT_ROOM_DETECTION_PARAMS,
+  type DetectAllOptions,
+  type DetectAllResult,
   type FilteredWalls,
   type RoomDetectionCache,
   type RoomDetectionParams,
@@ -35,6 +38,28 @@ function filterKey(params: RoomDetectionParams): string {
     .join(',');
 }
 
+function cachedWalls(input: WallCandidateSegments, mmPerPt: number, P: RoomDetectionParams, cache?: RoomDetectionCache): FilteredWalls {
+  const key = filterKey(P);
+  if (
+    cache?.filtered &&
+    cache.segments === input.segments &&
+    cache.segmentCount === input.segmentCount &&
+    cache.mmPerPt === mmPerPt &&
+    cache.paramsKey === key
+  ) {
+    return cache.filtered;
+  }
+  const walls: FilteredWalls = { walls: input, keep: filterWallSegments(input, mmPerPt, P).keep };
+  if (cache) {
+    cache.segments = input.segments;
+    cache.segmentCount = input.segmentCount;
+    cache.mmPerPt = mmPerPt;
+    cache.paramsKey = key;
+    cache.filtered = walls;
+  }
+  return walls;
+}
+
 /**
  * Runs the wall filter (or reuses the result stored in `cache`) and fills the
  * room at `seedPt`. The cache is valid while the segment array, the segment
@@ -49,25 +74,22 @@ export function detectRoomAt(
   cache?: RoomDetectionCache,
 ): RoomFillResult {
   const P: RoomDetectionParams = { ...DEFAULT_ROOM_DETECTION_PARAMS, ...params };
-  const key = filterKey(P);
-  let walls: FilteredWalls;
-  if (
-    cache?.filtered &&
-    cache.segments === input.segments &&
-    cache.segmentCount === input.segmentCount &&
-    cache.mmPerPt === mmPerPt &&
-    cache.paramsKey === key
-  ) {
-    walls = cache.filtered;
-  } else {
-    walls = { walls: input, keep: filterWallSegments(input, mmPerPt, P).keep };
-    if (cache) {
-      cache.segments = input.segments;
-      cache.segmentCount = input.segmentCount;
-      cache.mmPerPt = mmPerPt;
-      cache.paramsKey = key;
-      cache.filtered = walls;
-    }
-  }
-  return fillRoomAt(walls, seedPt, mmPerPt, P);
+  return fillRoomAt(cachedWalls(input, mmPerPt, P, cache), seedPt, mmPerPt, P);
+}
+
+/**
+ * Runs the wall filter (or reuses the cache, shared with detectRoomAt) and
+ * detects every closed room on the page. Runs in one synchronous call; call it
+ * from a Web Worker and use options.onProgress / shouldCancel.
+ */
+export function detectAllRoomsOnPage(
+  input: WallCandidateSegments,
+  mmPerPt: number,
+  params: Partial<RoomDetectionParams> = {},
+  options: DetectAllOptions = {},
+  cache?: RoomDetectionCache,
+): DetectAllResult {
+  const P: RoomDetectionParams = { ...DEFAULT_ROOM_DETECTION_PARAMS, ...params };
+  options.onProgress?.(0, 'filter');
+  return detectAllRooms(cachedWalls(input, mmPerPt, P, cache), mmPerPt, P, options);
 }

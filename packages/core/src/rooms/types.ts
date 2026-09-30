@@ -215,6 +215,7 @@ export interface RoomFillFlags {
   touchesRoiBorder: boolean; // the fill reached the edge of the raster area: the room is not closed
   open: boolean; // touchesRoiBorder, or the fill area exceeds openRatio * labelAreaM2
   fillEmpty: boolean; // no free pixel near the seed: no polygon
+  enclosing?: boolean; // detect-all only: the region wraps other rooms (outside of a building), its holes were not filled
 }
 
 export interface RoomFillResult {
@@ -232,4 +233,32 @@ export interface RoomDetectionCache {
   mmPerPt?: number;
   paramsKey?: string;
   filtered?: FilteredWalls;
+}
+
+// Detect all rooms on a page (detect-all.ts).
+export type DetectAllPhase = 'filter' | 'raster' | 'distance' | 'rooms' | 'done';
+
+export interface DetectAllOptions {
+  minRoomM2?: number; // rooms with a smaller area are dropped, default 1.5
+  maxPixels?: number; // above this raster size the raster gets coarser, default 60 million
+  onProgress?: (fraction: number, phase: DetectAllPhase) => void;
+  shouldCancel?: () => boolean; // polled between components
+}
+
+// A free-space region that is not a room: it touches the page raster edge (the
+// outside of the building, or a room with no closed wall that leaks into it),
+// or it wraps other rooms (the outside inside a drawing frame).
+export interface LeakRegion {
+  kind: 'border' | 'enclosing'; // touches the raster edge, or wraps other rooms
+  bounds: [number, number, number, number]; // page points
+  coreAreaM2: number;
+  seedPt: Vec2; // widest point of the region, page points
+}
+
+export interface DetectAllResult {
+  rooms: RoomFillResult[];
+  leaks: LeakRegion[];
+  pxMm: number; // raster resolution used (coarser than requested for a very large page)
+  componentsDropped: number; // too small or empty
+  cancelled: boolean;
 }

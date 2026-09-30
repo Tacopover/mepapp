@@ -3,7 +3,7 @@
 // section B, plus polygon output (contour tracing, simplification, exact area).
 
 import type { Vec2 } from '../geometry.js';
-import { distanceTransform, rasterizeKept, segmentBounds } from './raster.js';
+import { distanceTransform, rasterizeKept, segmentBounds, type LineRaster } from './raster.js';
 import { snapRingToWalls } from './snap.js';
 import { pointInRing, signedRingArea, simplifyRing, traceMaskBoundaries, type Ring } from './polygon.js';
 import { DEFAULT_ROOM_DETECTION_PARAMS, type FilteredWalls, type RoomDetectionParams, type RoomFillResult, type RoomPolygon } from './types.js';
@@ -255,6 +255,30 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
     }
   }
 
+  return finishRoom({ mask, d, w, h, R, r, Fm, q, qt, touches, seedOut }, walls, mm, F);
+}
+
+// Stages 4 to 7 of the fill: grow back, corner pockets, wall grow, hole fill, contour, snap and area.
+// `Fm` is the flood fill (core) map and q[0..qt) its pixel list; both are indexed in the raster `R`.
+export interface FillStage {
+  mask: Uint8Array;
+  d: Float32Array;
+  w: number;
+  h: number;
+  R: LineRaster;
+  r: number;
+  Fm: Uint8Array;
+  q: Int32Array;
+  qt: number;
+  touches: boolean;
+  seedOut: Vec2;
+  detectEnclosing?: boolean; // detect-all: do not fill holes that contain the core of another region
+}
+
+export function finishRoom(st: FillStage, walls: FilteredWalls, mm: number, F: RoomDetectionParams): RoomFillResult {
+  const { mask, d, w, h, R, r, Fm, q, qt, touches, seedOut, detectEnclosing } = st;
+  const segs = walls.walls.segments;
+  const count = walls.walls.segmentCount;
   // 4. Grow back: r steps of dilation (4-, then 8-neighbour), only into non-wall pixels.
   const seedList = q.subarray(0, qt);
   const G = growBack(Fm, seedList, mask, w, h, Math.round(r), true);
@@ -299,6 +323,7 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
     }
   }
 
+  let enclosing = false;
   // 6. Fill holes: pixels not reachable from the raster border without crossing the fill are inside the room.
   if (F.fillHoles) {
     const O = new Uint8Array(w * h);
@@ -326,7 +351,11 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
       if (y > 0) push(p - w);
       if (y < h - 1) push(p + w);
     }
-    for (let i = 0; i < w * h; i++) if (!O[i]) G[i] = 1;
+    if (detectEnclosing) {
+      // Free core pixels of another region inside the holes: this region wraps other rooms (the outside of a building).
+      for (let i = 0; i < w * h && !enclosing; i++) if (!O[i] && !G[i] && d[i]! > r && !Fm[i]) enclosing = true;
+    }
+    if (!enclosing) for (let i = 0; i < w * h; i++) if (!O[i]) G[i] = 1;
   }
   let cnt = 0;
   for (let i = 0; i < w * h; i++) cnt += G[i]!;
@@ -381,6 +410,7 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
       touchesRoiBorder: touches,
       open: touches || (label !== undefined && label > 0 && pixelAreaM2 > F.openRatio * label),
       fillEmpty: cnt === 0,
+      ...(enclosing ? { enclosing } : {}),
     },
   };
 }
