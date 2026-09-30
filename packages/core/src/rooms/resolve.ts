@@ -8,6 +8,8 @@
 
 import type { Vec2 } from '../geometry.js';
 import { fillRoomAt } from './fill.js';
+import { polygonAreaPt2 } from './room.js';
+import { snapOutlineToWalls } from './outline-snap.js';
 import { DEFAULT_ROOM_DETECTION_PARAMS, SEGMENT_STRIDE, type FilteredWalls, type RoomDetectionParams, type RoomFillResult } from './types.js';
 
 export type ResolveMethod = 'direct' | 'dissolved' | 'gap' | 'bounded';
@@ -228,7 +230,14 @@ export function resolveRoomAt(
     if (consider({ fill: wider, method: 'gap', deviation: deviationOf(wider, printedM2), gapMm, dissolvedComponents: 0 })) return best;
   }
   // Still too large: flood the widest free space first and stop at the printed area.
-  const bounded = fillRoomAt(walls, anchor, mmPerPt, P, printedM2);
+  const raw = fillRoomAt(walls, anchor, mmPerPt, P, printedM2);
+  const snapped = raw.flags.fillEmpty ? raw.polygon : snapOutlineToWalls(raw.polygon, walls, mmPerPt);
+  let bounded: RoomFillResult = raw;
+  if (snapped !== raw.polygon) {
+    const candidate: RoomFillResult = { ...raw, polygon: snapped, areaM2: (polygonAreaPt2(snapped) * mmPerPt * mmPerPt) / 1e6 };
+    // Snapping must not move a fill that matches the printed area out of the tolerance.
+    if (Math.abs(candidate.areaM2 / printedM2 - 1) <= tol || Math.abs(raw.areaM2 / printedM2 - 1) > tol) bounded = candidate;
+  }
   consider({ fill: bounded, method: 'bounded', deviation: deviationOf(bounded, printedM2), gapMm: P.gapMm, dissolvedComponents: 0 });
   return best;
 }
