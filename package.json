@@ -7,6 +7,7 @@
     "gen:stamps": "node scripts/generate-stamp-library.mjs",
     "room-regression": "node scripts/room-regression.mjs",
     "room-detect-all": "node scripts/room-detect-all.mjs",
+    "room-labels": "node scripts/room-labels.mjs",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck"

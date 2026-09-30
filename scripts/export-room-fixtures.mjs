@@ -64,3 +64,12 @@ for (const suffix of wanted) {
 }
 writeFileSync(join(OUT, 'index.json'), JSON.stringify(index, null, 1) + '\n');
 console.log(`total ${(totalBytes / 1024).toFixed(0)} KiB, max Float32 coordinate error ${maxErr.toExponential(2)} pt`);
+
+// Text lines of the whole page for the label reading tests (rooms/labels.test.ts).
+const runs = await doc.getTextRuns(0);
+const r2 = (v) => Math.round(v * 100) / 100;
+writeFileSync(
+  join(OUT, 'ground_floor_text.json'),
+  JSON.stringify(runs.map((t) => ({ text: t.text, x: r2(t.x), y: r2(t.y), width: r2(t.width), height: r2(t.height), fontSizePt: r2(t.fontSizePt) }))) + '\n',
+);
+console.log(`text: ${runs.length} runs`);

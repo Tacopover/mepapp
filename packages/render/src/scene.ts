@@ -12,6 +12,8 @@ import {
   annotationBoundsWorld,
   centroid,
   mergeDetectedRooms,
+  readRoomLabels as readRoomLabelsFromText,
+  withRoomLabels,
   roomId,
   updateRoom as updateRoomFields,
   type Room,
@@ -2385,6 +2387,18 @@ export class SketchScene {
   private notifyRoomsChanged(): void {
     this.markDirty();
     this.emitter.emit('roomsChanged');
+  }
+
+  /**
+   * Reads room names and numbers from the PDF text of one page and copies them into freshly
+   * detected rooms (core's withRoomLabels). Without a PDF the rooms come back unchanged;
+   * without a calibration the label areas are not checked against the polygons.
+   */
+  async labelRooms(rooms: readonly RoomInput[], pageIndex: number = this.doc.pageIndex): Promise<RoomInput[]> {
+    const handle = this.doc.pdfHandle;
+    if (!handle || rooms.length === 0) return [...rooms];
+    const labels = readRoomLabelsFromText(await handle.getTextRuns(pageIndex));
+    return withRoomLabels(rooms, labels, this.doc.calibration);
   }
 
   /** Adds one room (a click-to-fill result or a hand-drawn polygon) as one undo step. */

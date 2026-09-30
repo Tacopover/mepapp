@@ -25,6 +25,10 @@ export interface Room {
   open: boolean;
   /** Area printed in the drawing, m2. Set when a label is read from the PDF text; used to warn about a large difference. */
   labelAreaM2?: number;
+  /** Other text lines of the label the name came from, for example the function group ("Onderwijsruimten"). */
+  details?: string[];
+  /** Labels found inside the same polygon that were not chosen. A non-empty list means the polygon may hold more than one room. */
+  otherLabels?: string[];
 }
 
 export type RoomInput = Omit<Room, 'id'>;
