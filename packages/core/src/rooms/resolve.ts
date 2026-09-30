@@ -188,7 +188,15 @@ export function resolveRoomAt(
   // The printed area limits the raster: a room fits in a window a few times its own size. A fill that leaks reaches the window edge and is flagged.
   const P: RoomDetectionParams = printedM2 !== null && printedM2 > 0 ? { ...base, roiMm: Math.min(base.roiMm, 4000 + 3500 * Math.sqrt(printedM2)) } : base;
   const tol = options.tolerance ?? 0.15;
-  const direct = fillRoomAt(walls, anchor, mmPerPt, P);
+  // Most rooms fit in a small window: fill there first (the cost grows with the window area). Use the full window only when the small fill touches the border and is not yet too large.
+  const smallRoiMm = printedM2 !== null && printedM2 > 0 ? 3000 + 2000 * Math.sqrt(printedM2) : Infinity;
+  const fill = (w: FilteredWalls, p: RoomDetectionParams, boundM2?: number): RoomFillResult => {
+    if (smallRoiMm >= p.roiMm) return fillRoomAt(w, anchor, mmPerPt, p, boundM2);
+    const small = fillRoomAt(w, anchor, mmPerPt, { ...p, roiMm: smallRoiMm }, boundM2);
+    if (!small.flags.touchesRoiBorder || small.flags.fillEmpty || small.areaM2 > printedM2! * (1 + tol)) return small;
+    return fillRoomAt(w, anchor, mmPerPt, p, boundM2);
+  };
+  const direct = fill(walls, P);
   let best: ResolveResult = { fill: direct, method: 'direct', deviation: deviationOf(direct, printedM2), gapMm: P.gapMm, dissolvedComponents: 0 };
   // Printed areas of small rooms often include the wall: allow 2 m2 next to the relative tolerance.
   const ok = (r: ResolveResult): boolean => r.deviation !== null && !r.fill.flags.fillEmpty && (Math.abs(r.deviation) <= tol || Math.abs(r.fill.areaM2 - printedM2!) <= 2);
@@ -216,7 +224,7 @@ export function resolveRoomAt(
       }
       if (added === 0) break;
       for (let i = 0; i < walls.walls.segmentCount; i++) if (dissolved.has(comps.comp[i]!)) keep[i] = 0;
-      const refill = fillRoomAt({ walls: walls.walls, keep }, anchor, mmPerPt, P);
+      const refill = fill({ walls: walls.walls, keep: new Uint8Array(keep) }, P);
       current = refill;
       if (consider({ fill: refill, method: 'dissolved', deviation: deviationOf(refill, printedM2), gapMm: P.gapMm, dissolvedComponents: dissolved.size })) return best;
       if (refill.areaM2 > printedM2 * (1 + tol)) break;
@@ -226,11 +234,11 @@ export function resolveRoomAt(
 
   for (const gapMm of options.gapsMm ?? [1500, 2000, 3000]) {
     if (gapMm <= P.gapMm) continue;
-    const wider = fillRoomAt(walls, anchor, mmPerPt, { ...P, gapMm });
+    const wider = fill(walls, { ...P, gapMm });
     if (consider({ fill: wider, method: 'gap', deviation: deviationOf(wider, printedM2), gapMm, dissolvedComponents: 0 })) return best;
   }
   // Still too large: flood the widest free space first and stop at the printed area.
-  const raw = fillRoomAt(walls, anchor, mmPerPt, P, printedM2);
+  const raw = fill(walls, P, printedM2);
   const snapped = raw.flags.fillEmpty ? raw.polygon : snapOutlineToWalls(raw.polygon, walls, mmPerPt);
   let bounded: RoomFillResult = raw;
   if (snapped !== raw.polygon) {

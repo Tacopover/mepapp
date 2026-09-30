@@ -139,6 +139,25 @@ const emptyResult = (seedPt: Vec2, touches: boolean): RoomFillResult => ({
   flags: { touchesRoiBorder: touches, open: false, fillEmpty: true },
 });
 
+interface RasterCache {
+  keep: Uint8Array;
+  segs: Float64Array;
+  key: string;
+  R: LineRaster;
+  d: Float32Array;
+}
+let rasterCache: RasterCache | null = null;
+
+// Repairs of one label fill the same window several times (gap widths, bounded fill): the wall raster and its distance transform are reused. fillRoomAt does not change them. The cache key holds the keep array by identity: pass a new array when the keep flags change.
+function rasterAndDistance(walls: FilteredWalls, roi: readonly number[], pxMm: number, mm: number): { R: LineRaster; d: Float32Array } {
+  const key = `${roi.join(',')}|${pxMm}|${mm}|${walls.walls.segmentCount}`;
+  if (rasterCache && rasterCache.keep === walls.keep && rasterCache.segs === walls.walls.segments && rasterCache.key === key) return rasterCache;
+  const R = rasterizeKept(walls.walls.segments, walls.walls.segmentCount, walls.keep, roi as [number, number, number, number], pxMm, mm);
+  const d = distanceTransform(R.mask, R.w, R.h);
+  rasterCache = { keep: walls.keep, segs: walls.walls.segments, key, R, d };
+  return rasterCache;
+}
+
 /**
  * Finds the room that contains `seedPt` (page points). `walls` is the input
  * segments plus the keep flags from filterWallSegments. The result polygon is
@@ -158,10 +177,9 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
     Math.min(b[3], seedPt.y + rad),
   ];
   if (roi[2] <= roi[0] || roi[3] <= roi[1]) return emptyResult(seedPt, false);
-  const R = rasterizeKept(segs, count, walls.keep, roi, F.pxMm, mm);
+  const { R, d } = rasterAndDistance(walls, roi, F.pxMm, mm);
   const { w, h, mask } = R;
   const r = F.gapMm / 2 / F.pxMm;
-  const d = distanceTransform(mask, w, h);
   const sx = Math.round((seedPt.x - R.x0) * R.s);
   const sy = Math.round((seedPt.y - R.y0) * R.s);
 
