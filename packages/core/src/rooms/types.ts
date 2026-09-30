@@ -40,6 +40,8 @@ export interface WallFilterParams {
   maxWallMm: number; // largest distance between the two faces of a wall
   minGapMm: number; // smallest distance between two lines of a pair (drops duplicates)
   minOverlapMm: number; // minimum overlap along the wall
+  partnerMinMm: number; // a line shorter than partnerLineMaxMm only counts partners at least this long (chair lines beside a table edge do not make it a wall); 0 = off
+  partnerLineMaxMm: number; // longer lines (walls, facades) count every partner
   angTolDeg: number;
   coverFrac: number; // partner overlaps must cover this fraction of a line
   hatchPartners: number; // this many partners and a short line means hatch
@@ -111,6 +113,8 @@ export const DEFAULT_ROOM_DETECTION_PARAMS: RoomDetectionParams = {
   maxWallMm: 500,
   minGapMm: 15,
   minOverlapMm: 400,
+  partnerMinMm: 800,
+  partnerLineMaxMm: 3000,
   angTolDeg: 1.0,
   coverFrac: 0.1,
   hatchPartners: 5,

@@ -101,6 +101,7 @@ function pairRule(segs: Float64Array, n: number, mm: number, P: RoomDetectionPar
         const k = arr[q]!;
         if (dd[k]! > dd[j]! + maxD) break;
         if (k === j) continue;
+        if (len[k]! * mm < P.partnerMinMm && len[j]! * mm >= P.partnerMinMm && len[j]! * mm < P.partnerLineMaxMm) continue;
         let da = Math.abs(ang[k]! - ang[j]!);
         da = Math.min(da, Math.PI - da);
         if (da > tol) continue;
