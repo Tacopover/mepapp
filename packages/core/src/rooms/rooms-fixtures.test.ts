@@ -63,8 +63,8 @@ describe('room fixtures (00_arch_ground_floor windows)', () => {
         expect(res.flags.open).toBe(false);
         const ratio = res.areaM2 / room.labelAreaM2;
         expect(Math.abs(ratio - 1)).toBeLessThanOrEqual(TOLERANCE[room.id]!);
-        // Exact polygon area agrees with the pixel count, and with the ring itself.
-        expect(Math.abs(res.areaM2 - res.pixelAreaM2) / res.pixelAreaM2).toBeLessThan(0.02);
+        // Exact polygon area agrees with the pixel count (snapping moves the boundary up to half a pixel per side), and with the ring itself.
+        expect(Math.abs(res.areaM2 - res.pixelAreaM2) / res.pixelAreaM2).toBeLessThan(0.05);
         expect(res.areaM2).toBeCloseTo((ringArea(res.polygon.outer) * mmPerPt * mmPerPt) / 1e6 - holesArea(res.polygon.holes), 4);
         // The polygon is closed (implicitly), simple, and contains the seed.
         expect(res.polygon.outer.length).toBeGreaterThanOrEqual(4);

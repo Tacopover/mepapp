@@ -91,6 +91,12 @@ export interface RoomFillParams {
   fillHoles: boolean; // islands (columns, furniture) inside the room become part of the fill
   seedClosed: boolean; // the auto seed walks only through pixels wider than the gap
   autoSeed: boolean; // move the seed to the widest point near the click
+  // Fill the rounded corners that the grow back leaves at room corners (dead-end pockets next to the fill). Door openings stay closed.
+  squareCorners: boolean;
+  // Snap the polygon edges to the kept wall lines and rebuild the corners as line intersections. Only with wallGrowMm 0.
+  snapToWalls: boolean;
+  snapTolPx: number; // largest move of an edge or corner vertex when snapping, in pixels
+  snapAngDeg: number; // largest direction difference between a polygon edge and the wall line it snaps to
   simplifyTolPx: number; // Douglas-Peucker tolerance of the polygon, in pixels
   openRatio: number; // fill area above this multiple of labelAreaM2 flags the room as open
   labelAreaM2?: number; // area printed in the drawing, when known
@@ -150,6 +156,10 @@ export const DEFAULT_ROOM_DETECTION_PARAMS: RoomDetectionParams = {
   fillHoles: true,
   seedClosed: true,
   autoSeed: true,
+  squareCorners: true,
+  snapToWalls: true,
+  snapTolPx: 2,
+  snapAngDeg: 3,
   simplifyTolPx: 1.5,
   openRatio: 1.3,
 };

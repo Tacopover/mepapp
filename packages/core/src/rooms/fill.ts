@@ -4,6 +4,7 @@
 
 import type { Vec2 } from '../geometry.js';
 import { distanceTransform, rasterizeKept, segmentBounds } from './raster.js';
+import { snapRingToWalls } from './snap.js';
 import { pointInRing, signedRingArea, simplifyRing, traceMaskBoundaries, type Ring } from './polygon.js';
 import { DEFAULT_ROOM_DETECTION_PARAMS, type FilteredWalls, type RoomDetectionParams, type RoomFillResult, type RoomPolygon } from './types.js';
 
@@ -28,6 +29,106 @@ function nearestWide(d: Float32Array, w: number, h: number, sx: number, sy: numb
     }
   }
   return -1;
+}
+
+// Geodesic dilation of the pixel set `seeds` (0/1 map `set`) by `steps` steps into non-wall pixels.
+// alternate: 4-neighbour and 8-neighbour steps take turns (octagon-shaped growth). Otherwise every step is 8-neighbour (square growth).
+function growBack(set: Uint8Array, seeds: ArrayLike<number>, mask: Uint8Array, w: number, h: number, steps: number, alternate: boolean): Uint8Array {
+  const G = set.slice();
+  // Only pixels of the set that touch a pixel outside the set can add anything.
+  let frontier: number[] = [];
+  for (let i = 0; i < seeds.length; i++) {
+    const p = seeds[i]!;
+    const x = p % w;
+    const y = (p / w) | 0;
+    if (x === 0 || y === 0 || x === w - 1 || y === h - 1 || !set[p - 1] || !set[p + 1] || !set[p - w] || !set[p + w] || !set[p - w - 1] || !set[p - w + 1] || !set[p + w - 1] || !set[p + w + 1]) frontier.push(p);
+  }
+  for (let s = 0; s < steps; s++) {
+    const next: number[] = [];
+    const eight = !alternate || s % 2 === 1;
+    for (const p of frontier) {
+      const x = p % w;
+      const y = (p / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          if (!eight && dx && dy) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const k = ny * w + nx;
+          if (!G[k] && !mask[k]) {
+            G[k] = 1;
+            next.push(k);
+          }
+        }
+      }
+    }
+    frontier = next;
+  }
+  return G;
+}
+
+// A pocket may touch free pixels outside S when they are this close to a wall (px): slivers between wall line pieces.
+const POCKET_LEAK_PX = 3;
+const POCKET_MIN_CONTACT = 2; // pixels of wall contact per axis
+
+// A room corner touches a wall on the left or right (a vertical wall) and a wall above or below (a horizontal wall).
+// A pocket beside a door jamb touches the two jamb lines only, so it is not a corner.
+function touchesBothAxes(comp: readonly number[], mask: Uint8Array, w: number): boolean {
+  let hc = 0;
+  let vc = 0;
+  for (const p of comp) {
+    if (mask[p - 1] || mask[p + 1]) hc++;
+    if (mask[p - w] || mask[p + w]) vc++;
+  }
+  return hc >= POCKET_MIN_CONTACT && vc >= POCKET_MIN_CONTACT;
+}
+
+// Corner pockets: the grow back rounds the room corners. A pocket is a 4-connected group of free pixels outside the
+// fill that lies completely inside the square growth `S`. Such a group is a dead end next to the fill (a room corner),
+// so it joins the fill when it also touches walls on both axes. A door opening or a neighbour room leads to free
+// pixels outside S, so it stays out. Free pixels outside S that lie within POCKET_LEAK_PX of a wall do not count.
+// Only the band S minus G is walked, inside the box x0..x1, y0..y1 (the box of S).
+function fillCornerPockets(G: Uint8Array, S: Uint8Array, d: Float32Array, mask: Uint8Array, w: number, h: number, box: readonly [number, number, number, number]): void {
+  const [x0, y0, x1, y1] = box;
+  const seen = new Uint8Array(w * h);
+  const comp: number[] = [];
+  const stack: number[] = [];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = y * w + x;
+      if (!S[i] || G[i] || mask[i] || seen[i]) continue;
+      comp.length = 0;
+      let inside = true;
+      stack.push(i);
+      seen[i] = 1;
+      while (stack.length) {
+        const p = stack.pop()!;
+        comp.push(p);
+        const px = p % w;
+        const py = (p / w) | 0;
+        for (const [dx, dy] of N4) {
+          const nx = px + dx;
+          const ny = py + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) {
+            inside = false;
+            continue;
+          }
+          const k = ny * w + nx;
+          if (G[k] || mask[k]) continue;
+          if (!S[k]) {
+            if (d[k]! > POCKET_LEAK_PX) inside = false;
+          }
+          else if (!seen[k]) {
+            seen[k] = 1;
+            stack.push(k);
+          }
+        }
+      }
+      if (inside && touchesBothAxes(comp, mask, w)) for (const p of comp) G[p] = 1;
+    }
+  }
 }
 
 const emptyResult = (seedPt: Vec2, touches: boolean): RoomFillResult => ({
@@ -155,15 +256,14 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
   }
 
   // 4. Grow back: r steps of dilation (4-, then 8-neighbour), only into non-wall pixels.
-  const G = Uint8Array.from(Fm);
-  let frontier: number[] = [];
+  const seedList = q.subarray(0, qt);
+  const G = growBack(Fm, seedList, mask, w, h, Math.round(r), true);
   let minx = w;
   let maxx = 0;
   let miny = h;
   let maxy = 0;
   for (let i = 0; i < qt; i++) {
     const p = q[i]!;
-    frontier.push(p);
     const x = p % w;
     const y = (p / w) | 0;
     if (x < minx) minx = x;
@@ -171,28 +271,10 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
     if (y < miny) miny = y;
     if (y > maxy) maxy = y;
   }
-  for (let s = 0, steps = Math.round(r); s < steps; s++) {
-    const next: number[] = [];
-    const eight = s % 2 === 1;
-    for (const p of frontier) {
-      const x = p % w;
-      const y = (p / w) | 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (!dx && !dy) continue;
-          if (!eight && dx && dy) continue;
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-          const k = ny * w + nx;
-          if (!G[k] && !mask[k]) {
-            G[k] = 1;
-            next.push(k);
-          }
-        }
-      }
-    }
-    frontier = next;
+  if (F.squareCorners) {
+    const steps = Math.round(r);
+    const pad = steps + 2;
+    fillCornerPockets(G, growBack(Fm, seedList, mask, w, h, steps, false), d, mask, w, h, [Math.max(0, minx - pad), Math.max(0, miny - pad), Math.min(w - 1, maxx + pad), Math.min(h - 1, maxy + pad)]);
   }
 
   // 5. Wall grow: steps of 4-neighbour dilation into wall pixels next to the fill.
@@ -257,7 +339,13 @@ export function fillRoomAt(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, 
     for (let i = 0; i < ring.length; i += 2) out.push(R.x0 + (ring[i]! - 0.5) / R.s, R.y0 + (ring[i + 1]! - 0.5) / R.s);
     return out;
   };
-  const simple = rings.map((rg) => toPt(simplifyRing(rg, F.simplifyTolPx)));
+  const snapOpt = { tolPt: F.snapTolPx / R.s, angTolDeg: F.snapAngDeg };
+  // Snapping puts the boundary on the drawn wall line. It does not run when wallGrowMm moves the boundary into the wall on purpose.
+  const snap = F.snapToWalls && growSteps === 0;
+  const simple = rings.map((rg) => {
+    const ring = toPt(simplifyRing(rg, F.simplifyTolPx));
+    return snap ? snapRingToWalls(ring, segs, count, walls.keep, snapOpt) : ring;
+  });
   let outer: Ring = [];
   let outerArea = 0;
   for (const rg of simple) {

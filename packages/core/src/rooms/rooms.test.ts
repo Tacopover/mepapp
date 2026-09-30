@@ -229,15 +229,109 @@ describe('fillRoomAt', () => {
   for (const pxMm of [20, 33.3, 50, 100]) {
     it(`polygon area matches the analytic area at ${pxMm} mm per pixel`, () => {
       const { res } = fill(build(rectWalls(), BIG), { pxMm });
-      // The line pixel of each wall (one pixel per side) and the rounded corners of the grow-back are the expected loss.
-      const tol = 0.012 + pxMm / 1200;
-      expect(Math.abs(res.areaM2 - ROOM_M2) / ROOM_M2).toBeLessThan(tol);
-      expect(Math.abs(res.areaM2 - res.pixelAreaM2) / res.pixelAreaM2).toBeLessThan(0.01);
+      // Snapping puts the polygon on the drawn wall lines, so the area is the analytic area.
+      expect(Math.abs(res.areaM2 - ROOM_M2) / ROOM_M2).toBeLessThan(0.01);
+      // Without snapping the boundary lies on the pixel edge: the loss is half a wall line pixel per side and the corners.
+      const raw = fill(build(rectWalls(), BIG), { pxMm, snapToWalls: false, squareCorners: false }).res;
+      expect(Math.abs(raw.areaM2 - ROOM_M2) / ROOM_M2).toBeLessThan(0.012 + pxMm / 1200);
+      expect(Math.abs(raw.areaM2 - raw.pixelAreaM2) / raw.pixelAreaM2).toBeLessThan(0.01);
       // The reported area is the shoelace area of the returned ring.
       expect(res.areaM2).toBeCloseTo((ringArea(res.polygon.outer) * MM * MM) / 1e6, 6);
       expect(isSimpleRing(res.polygon.outer)).toBe(true);
     });
   }
+
+  describe('exact corners', () => {
+    const insideRing = (ring: { x: number; y: number }[], x: number, y: number): boolean => {
+      let c = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const a = ring[i]!;
+        const b = ring[j]!;
+        if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) c = !c;
+      }
+      return c;
+    };
+    const dist = (a: { x: number; y: number }, b: [number, number]): number => Math.hypot(a.x - b[0], a.y - b[1]);
+    const RECT: [number, number][] = [[0, 0], [W, 0], [W, H], [0, H]];
+    const L_IN: [number, number][] = [[0, 0], [240, 0], [240, 80], [120, 80], [120, 160], [0, 160]];
+    const L_OUT: [number, number][] = [[-8, -8], [248, -8], [248, 88], [128, 88], [128, 168], [-8, 168]];
+    const lRoom = (): Seg[] => {
+      const list: Seg[] = [];
+      for (const ring of [L_IN, L_OUT]) {
+        for (let i = 0; i < ring.length; i++) list.push(line(ring[i]![0], ring[i]![1], ring[(i + 1) % ring.length]![0], ring[(i + 1) % ring.length]![1]));
+      }
+      return list;
+    };
+    // Inward diagonal of each corner: the direction from the corner into the room, for the 0.1 m (4 pt) probe points.
+    const probes = (ring: [number, number][]): { c: [number, number]; inn: [number, number]; out: [number, number] }[] =>
+      ring.map((c, i) => {
+        const p = ring[(i + ring.length - 1) % ring.length]!;
+        const n = ring[(i + 1) % ring.length]!;
+        // Unit steps along the two edges at the corner (axis-aligned rooms): the room lies inside the angle they span
+        // when the corner is convex, outside when it is concave.
+        const a: [number, number] = [Math.sign(p[0] - c[0]), Math.sign(p[1] - c[1])];
+        const b: [number, number] = [Math.sign(n[0] - c[0]), Math.sign(n[1] - c[1])];
+        const d: [number, number] = [a[0] + b[0], a[1] + b[1]];
+        const area = ring.reduce((sum, q, k) => sum + (q[0] * ring[(k + 1) % ring.length]![1] - ring[(k + 1) % ring.length]![0] * q[1]), 0);
+        const convex = (a[0] * b[1] - a[1] * b[0]) * Math.sign(area) < 0;
+        const sgn = convex ? 1 : -1; // toward the room
+        const step = 4; // 4 pt = 100 mm
+        return { c: [c[0], c[1]], inn: [c[0] + sgn * d[0] * step, c[1] + sgn * d[1] * step], out: [c[0] - sgn * d[0] * step, c[1] - sgn * d[1] * step] };
+      });
+    for (const pxMm of [20, 33.3, 50, 100]) {
+      const tolPt = (1.5 * pxMm) / MM;
+      for (const [name, list, ring, seed, exactM2] of [
+        ['rectangle', rectWalls(), RECT, CENTER, ROOM_M2],
+        ['L-shaped room', lRoom(), L_IN, { x: 60, y: 40 }, 18],
+      ] as const) {
+        it(`${name} at ${pxMm} mm per pixel: corners on the inner wall corners, area exact, point tests at the corners`, () => {
+          const { res } = fill(build(list, BIG), { pxMm }, seed);
+          const poly = res.polygon.outer;
+          expect(isSimpleRing(poly)).toBe(true);
+          expect(poly).toHaveLength(ring.length);
+          for (const c of ring) expect(Math.min(...poly.map((p) => dist(p, c)))).toBeLessThanOrEqual(tolPt);
+          expect(Math.abs(res.areaM2 - exactM2) / exactM2).toBeLessThan(0.01);
+          for (const { inn, out } of probes(ring)) {
+            expect(insideRing(poly, inn[0], inn[1])).toBe(true);
+            expect(insideRing(poly, out[0], out[1])).toBe(false);
+          }
+        });
+      }
+    }
+
+    it('keeps the door gap closed as before: the area inside the door opening does not grow', () => {
+      // Area of the polygon right of the wall face x = W, measured with the previous octagonal grow back
+      // (m2, by pixel size in mm, 800 mm door opening). At 100 mm pixels the simplified outline of the door bulge differs by 0.02 m2.
+      const before: Record<number, number> = { 20: 0.1365, 33.3: 0.1164, 50: 0.1309, 100: 0.1181 };
+      for (const pxMm of [20, 33.3, 50, 100]) {
+        const { res } = fill(build(rectWalls({ gap: 32, gapY: 60 }), BIG), { pxMm });
+        let area = 0;
+        const clip: { x: number; y: number }[] = [];
+        const ring = res.polygon.outer;
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i]!;
+          const b = ring[(i + 1) % ring.length]!;
+          if (a.x > W) clip.push(a);
+          if (a.x > W !== b.x > W) clip.push({ x: W, y: a.y + ((W - a.x) / (b.x - a.x)) * (b.y - a.y) });
+        }
+        for (let i = 0; i < clip.length; i++) {
+          const a = clip[i]!;
+          const b = clip[(i + 1) % clip.length]!;
+          area += a.x * b.y - b.x * a.y;
+        }
+        const m2 = (Math.abs(area / 2) * MM * MM) / 1e6;
+        expect(m2).toBeLessThanOrEqual(before[pxMm]! + 0.03);
+        expect(res.flags.open).toBe(false);
+      }
+    });
+
+    it('does not snap when snapToWalls is off and keeps the rounded corners when squareCorners is off', () => {
+      const off = fill(build(rectWalls(), BIG), { snapToWalls: false, squareCorners: false }).res;
+      expect(off.polygon.outer.length).toBeGreaterThan(4);
+      const on = fill(build(rectWalls(), BIG), {}).res;
+      expect(on.polygon.outer).toHaveLength(4);
+    });
+  });
 
   it('grows into the wall line with wallGrowMm', () => {
     const input = build(rectWalls(), BIG);
@@ -245,7 +339,8 @@ describe('fillRoomAt', () => {
     const a1 = fill(input, { wallGrowMm: 100 }).res.areaM2;
     expect(a1).toBeGreaterThan(a0);
     // 100 mm on each side: about (W + H) * 2 * 100 mm = 1 m2 more.
-    expect(a1 - a0).toBeGreaterThan(0.5);
+    // The boundary of a0 lies on the wall line, the grown boundary on the outer edge of the wall line pixel.
+    expect(a1 - a0).toBeGreaterThan(0.2);
     expect(a1 - a0).toBeLessThan(1.5);
   });
 
