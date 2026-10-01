@@ -65,6 +65,9 @@ export interface WallFilterParams {
   stairBoxMaxSpanMm: number;
   stairEndTolMm: number;
   dashMinRun: number;
+  dashMinPieceMm: number; // pieces shorter than this are ignored by the dash rule (ticks, dots)
+  dashEndTolMm: number; // another line ending this close to a dash end touches it ...
+  dashMaxContacts: number; // ... and a run whose pieces have more touching lines (median) is not dashed (windows between frames)
   minCompMm: number; // free-standing components smaller than this are dropped ...
   compFrac: number; // ... or smaller than this fraction of the largest component
   // Reject paired lines that have no hatch ticks between them (furniture next
@@ -139,6 +142,9 @@ export const DEFAULT_ROOM_DETECTION_PARAMS: RoomDetectionParams = {
   stairBoxMaxSpanMm: 3600,
   stairEndTolMm: 60,
   dashMinRun: 3,
+  dashMinPieceMm: 20,
+  dashEndTolMm: 20,
+  dashMaxContacts: 2,
   minCompMm: 1500,
   compFrac: 0.05,
   hatchEvidence: true,

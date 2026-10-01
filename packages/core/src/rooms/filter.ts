@@ -739,8 +739,56 @@ function stairRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, 
   return dropped;
 }
 
-// A8: dash rule. Runs of similar short pieces on one line are dashed grid lines.
+/**
+ * Returns a function that counts the segments with an end point within `tolPt` of an end point of segment i
+ * and a direction at least 20 degrees off (lines that end on it, not pieces of the same line).
+ */
+function endContactCounter(segs: Float64Array, n: number, tolPt: number): (i: number) => number {
+  const cell = Math.max(tolPt, 1e-6);
+  const grid = new Map<string, number[]>();
+  for (let j = 0; j < n; j++) {
+    for (const e of [0, 2]) {
+      const key = `${Math.floor(segs[j * S + e]! / cell)},${Math.floor(segs[j * S + e + 1]! / cell)}`;
+      const list = grid.get(key);
+      if (list) list.push(j);
+      else grid.set(key, [j]);
+    }
+  }
+  const sinMin = Math.sin((20 * Math.PI) / 180);
+  return (i: number): number => {
+    const o = i * S;
+    const ux = segs[o + 2]! - segs[o]!;
+    const uy = segs[o + 3]! - segs[o + 1]!;
+    const ul = Math.hypot(ux, uy);
+    const found = new Set<number>();
+    for (const e of [0, 2]) {
+      const px = segs[o + e]!;
+      const py = segs[o + e + 1]!;
+      for (let cx = Math.floor((px - tolPt) / cell); cx <= Math.floor((px + tolPt) / cell); cx++) {
+        for (let cy = Math.floor((py - tolPt) / cell); cy <= Math.floor((py + tolPt) / cell); cy++) {
+          for (const j of grid.get(`${cx},${cy}`) ?? []) {
+            if (j === i || found.has(j)) continue;
+            const q = j * S;
+            const vx = segs[q + 2]! - segs[q]!;
+            const vy = segs[q + 3]! - segs[q + 1]!;
+            const vl = Math.hypot(vx, vy);
+            if (vl === 0 || ul === 0 || Math.abs(ux * vy - uy * vx) / (ul * vl) < sinMin) continue;
+            const d = Math.min(Math.hypot(segs[q]! - px, segs[q + 1]! - py), Math.hypot(segs[q + 2]! - px, segs[q + 3]! - py));
+            if (d <= tolPt) found.add(j);
+          }
+        }
+      }
+    }
+    return found.size;
+  };
+}
+
+// A8: dash rule. Runs of similar short pieces on one line, with regular gaps and free ends, are dashed grid
+// lines. Every line piece counts for the pattern, also pieces that earlier rules dropped, so a dash whose
+// neighbours are already gone is still seen. A run whose piece ends touch other lines is not dashed: window
+// glass lines repeat like dashes, but the window frames end on them.
 function dashRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, P: RoomDetectionParams): number {
+  const contacts = endContactCounter(segs, n, P.dashEndTolMm / mm);
   interface Piece {
     i: number;
     t0: number;
@@ -749,12 +797,12 @@ function dashRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, P
   }
   const groups = new Map<string, Piece[]>();
   for (let i = 0; i < n; i++) {
-    if (!keep[i]) continue;
+    if (!isLineKind(segs[i * S + SEG_KIND]!)) continue;
     const o = i * S;
     const dx = segs[o + 2]! - segs[o]!;
     const dy = segs[o + 3]! - segs[o + 1]!;
     const L = Math.hypot(dx, dy);
-    if (L * mm > 3000) continue;
+    if (L * mm > 3000 || L * mm < P.dashMinPieceMm) continue;
     let a = Math.atan2(dy, dx);
     if (a < 0) a += Math.PI;
     if (a >= Math.PI - 1e-9) a = 0;
@@ -787,18 +835,33 @@ function dashRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, P
     }
     if (iv.length < P.dashMinRun) continue;
     let run: Interval[] = [iv[0]!];
+    const similar = (xs: number[]): boolean => {
+      const m = [...xs].sort((p, q) => p - q)[xs.length >> 1]!;
+      return xs.every((x) => x > 0.4 * m && x < 2.2 * m);
+    };
+    // Is the window run[a..b) a dashed pattern? Dash-dot lines alternate a long and a short piece: each of the
+    // two series is then regular on its own.
+    const regular = (w: Interval[]): boolean => {
+      const lens = w.map((r) => r.t1 - r.t0);
+      const med = [...lens].sort((p, q) => p - q)[lens.length >> 1]!;
+      const okLen = similar(lens) || (w.length >= 4 && similar(lens.filter((_, k) => k % 2 === 0)) && similar(lens.filter((_, k) => k % 2 === 1)));
+      const gaps: number[] = [];
+      for (let k = 1; k < w.length; k++) gaps.push(w[k]!.t0 - w[k - 1]!.t1);
+      const gm = [...gaps].sort((p, q) => p - q)[gaps.length >> 1]!;
+      const okGap = gm > 0.03 * med && gaps.every((x) => x > 0.4 * gm && x < 2.2 * gm + 0.5);
+      if (!okLen || !okGap) return false;
+      const touching = w.map((r) => contacts(r.members[0]!)).sort((p, q) => p - q);
+      return touching[touching.length >> 1]! <= P.dashMaxContacts;
+    };
+    // Every window of consecutive pieces is tested on its own, so one odd piece (a grid bubble, a crossing line)
+    // does not hide the dashes of the rest of the line.
     const flush = (): void => {
+      const size = Math.max(P.dashMinRun, Math.min(4, run.length));
       if (run.length >= P.dashMinRun) {
-        const ls = run.map((r) => r.t1 - r.t0).sort((p, q) => p - q);
-        const med = ls[ls.length >> 1]!;
-        const okLen = run.every((r) => r.t1 - r.t0 > 0.4 * med && r.t1 - r.t0 < 2.2 * med);
-        const gaps: number[] = [];
-        for (let k = 1; k < run.length; k++) gaps.push(run[k]!.t0 - run[k - 1]!.t1);
-        const gs = [...gaps].sort((p, q) => p - q);
-        const gm = gs[gs.length >> 1]!;
-        const okGap = gm > 0.03 * med && gaps.every((x) => x > 0.4 * gm && x < 2.2 * gm + 0.5);
-        if (okLen && okGap) {
-          for (const r of run) {
+        for (let a = 0; a + size <= run.length; a++) {
+          const w = run.slice(a, a + size);
+          if (!regular(w)) continue;
+          for (const r of w) {
             for (const i of r.members) {
               if (keep[i]) {
                 keep[i] = 0;
