@@ -1,12 +1,23 @@
 # Prompt for the next room detection session
 
-Copy the text below the line into a new session. Start it in the worktree `room-detection-plan` (branch `worktree-room-detection-plan`, last commit `e7764a2`, pushed).
+Copy the text below the line into a new session. Start it in the worktree `room-detection-plan` (branch `worktree-room-detection-plan`, at master `b3545ab`). Do not start it in a fresh worktree: the new PDF is untracked and exists only in this worktree.
 
 ---
 
-We continue the MepApp room detection work. Read `.claude/plans/room-detection.md` first. The STATUS entries 8e to 8j describe the latest state, the measurements, the rejected options and the "not verified" lists. Also read the memory notes for this project.
+We continue the MepApp room detection work. Read `.claude/plans/room-detection.md` first. The STATUS entries describe the latest state, the measurements, the rejected options and the "not verified" lists. Also read the memory notes for this project.
 
-Working pattern: implement one topic at a time, verify with evidence (tests, Node measurements on the fixtures, Playwright for UI), add a STATUS entry to the plan, commit, and ask before you push. I test on Windows after each push. The fixture PDFs are in `fixtures/pdfs/` (untracked). Run `pnpm install` and `pnpm build` at the repo root before you start.
+Working pattern: implement one topic at a time, verify with evidence (tests, Node measurements on the fixtures, Playwright for UI), add a STATUS entry to the plan, commit, and ask before you push. I test on Windows after each push. The fixture PDFs are in `fixtures/pdfs/` (some untracked). Run `pnpm install` and `pnpm build` at the repo root before you start.
+
+## Topic 4 (do this first): Detect rooms finds few rooms on a new drawing
+
+New fixture: `fixtures/pdfs/plattegrond begane grond 10A.pdf` (13 MB, untracked, added 2026-10-01). Detect rooms finds only a few rooms, but the floor plan has many more. The Fill room tool (click-to-fill) adds good rooms in the rooms that I click. So the walls close the rooms, and the problem is in the automatic step.
+
+Find the cause first, change nothing until you report it. Check which step loses the rooms, for example:
+- Are the room labels found (text runs, number/name/area pattern)? Compare the label count with the rooms on the plan.
+- Does Detect rooms use a different gap, scale or region than click-to-fill (calibration, page size, region of interest)?
+- Do the room seeds fail, or do the fills get rejected afterwards (overlap, misplaced-room rule, area checks)?
+- Is the drawing different from the other fixtures (layers, text as outlines, rotation, very large page)?
+Use Node scripts on the core package (like `scripts/room-labelled.mjs`) for the measurements. Then propose a fix and ask me before you build it.
 
 ## Topic 1: Keep improving the room detection
 
