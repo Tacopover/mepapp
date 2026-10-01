@@ -264,6 +264,8 @@ const STAMP_SOURCE_DPI = 300;
 
 // PDF lines shorter than this (hatching, dash fragments) are not offered as calibration snap targets.
 const MIN_SNAP_LINE_LENGTH_PT = 2;
+
+const MEASURE_DIMENSION_COLOR = 0xd81b60;
 /** Opacity of the stamp-placement ghost/preview sprite that follows the pointer before a click commits it. */
 const STAMP_GHOST_ALPHA = 0.5;
 
@@ -537,6 +539,9 @@ export class SketchScene {
   private readonly drawSegmentTool = new DrawSegmentTool();
   private readonly drawPolylineTool = new DrawPolylineTool();
   private readonly calibrateTool = new CalibrateTool();
+  private readonly measureTool = new MeasureTool();
+  /** The measure tool's temporary dimension text — scene-level like stampGhostLayer, created on first use. Positioned/shown by drawMeasureOverlay. */
+  private measureLabel: Text | null = null;
   /** The shown PDF page's vector lines for the calibrate tool's snapping, extracted on demand — see loadSnapLines. `key` names the document+page they belong to. */
   private snapLines: { key: string; lines: SnapLines | null } | null = null;
   private readonly ctx: ToolContext = this.buildToolContext();
@@ -562,7 +567,7 @@ export class SketchScene {
       new DrawTextboxTool(),
       new DrawStickyNoteTool(),
       this.calibrateTool,
-      new MeasureTool(),
+      this.measureTool,
       new PlaceStampTool('terminal'),
       new PlaceStampTool('equipment'),
       new AddToCircuitTool(),
@@ -739,7 +744,7 @@ export class SketchScene {
     }
     this.tool = tool;
     this.pendingPoints = [];
-    if (tool === 'calibrate') void this.loadSnapLines();
+    if (tool === 'calibrate' || tool === 'measure') void this.loadSnapLines();
     if (!isCircuitSubTool) {
       this.circuitToolTargetId = null;
       this.circuitToolHover = null;
@@ -813,7 +818,7 @@ export class SketchScene {
     this.doc.backdropSprite = sprite;
     this.world.addChildAt(sprite, 0);
     this.doc.pageIndex = pageIndex;
-    if (this.tool === 'calibrate') void this.loadSnapLines();
+    if (this.tool === 'calibrate' || this.tool === 'measure') void this.loadSnapLines();
     this.redrawOverlay();
     this.emitter.emit('pageChanged', pageIndex);
   }
@@ -3764,6 +3769,40 @@ export class SketchScene {
     this.doc.annotationTextLayer.addChild(text);
   }
 
+  /** Draws the measure tool's temporary dimension — a line between the two clicked points with end ticks and the distance as text — or hides its label when there is none. Sizes are screen-constant, like the other overlay marks. */
+  private drawMeasureDimension(): void {
+    const dimension = this.tool === 'measure' ? this.measureTool.getDimension() : null;
+    if (!dimension) {
+      if (this.measureLabel) this.measureLabel.visible = false;
+      return;
+    }
+    const px = 1 / this.world.scale.x;
+    const { from, to, distanceMm } = dimension;
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const tickX = -Math.sin(angle) * 6 * px;
+    const tickY = Math.cos(angle) * 6 * px;
+    this.overlay
+      .moveTo(from.x, from.y)
+      .lineTo(to.x, to.y)
+      .moveTo(from.x - tickX, from.y - tickY)
+      .lineTo(from.x + tickX, from.y + tickY)
+      .moveTo(to.x - tickX, to.y - tickY)
+      .lineTo(to.x + tickX, to.y + tickY)
+      .stroke({ width: 1.5 * px, color: MEASURE_DIMENSION_COLOR });
+
+    if (!this.measureLabel) {
+      this.measureLabel = new Text({ text: '', style: { fontSize: 12, fill: MEASURE_DIMENSION_COLOR, fontWeight: 'bold' } });
+      this.measureLabel.anchor.set(0.5, 1.2);
+      this.world.addChild(this.measureLabel);
+    }
+    this.measureLabel.text = distanceMm >= 1000 ? `${(distanceMm / 1000).toFixed(3)} m` : `${Math.round(distanceMm)} mm`;
+    this.measureLabel.position.set((from.x + to.x) / 2, (from.y + to.y) / 2);
+    // Keep the text upright: a line heading left would otherwise read upside down.
+    this.measureLabel.rotation = Math.abs(angle) > Math.PI / 2 ? angle + Math.PI : angle;
+    this.measureLabel.scale.set(px);
+    this.measureLabel.visible = true;
+  }
+
   private redrawOverlay(): void {
     this.overlay.clear();
     this.syncFlowLabels();
@@ -3831,12 +3870,13 @@ export class SketchScene {
       this.overlay.circle(p.x, p.y, 4 / this.world.scale.x).fill({ color: 0xffb300 });
     }
 
-    if (this.tool === 'calibrate') {
-      const snapLine = this.calibrateTool.getSnapLine();
+    const snapTool = this.tool === 'calibrate' ? this.calibrateTool : this.tool === 'measure' ? this.measureTool : null;
+    if (snapTool) {
+      const snapLine = snapTool.getSnapLine();
       if (snapLine) {
         this.overlay.moveTo(snapLine.from.x, snapLine.from.y).lineTo(snapLine.to.x, snapLine.to.y).stroke({ width: 3 / this.world.scale.x, color: 0xff4081, alpha: 0.8 });
       }
-      const preview = this.calibrateTool.getPreview();
+      const preview = snapTool.getPreview();
       if (preview) {
         const [anchor] = this.pendingPoints;
         if (anchor) {
@@ -3845,6 +3885,7 @@ export class SketchScene {
         this.overlay.circle(preview.x, preview.y, 5 / this.world.scale.x).fill({ color: 0xff4081 });
       }
     }
+    this.drawMeasureDimension();
 
     const pendingSegmentStart = this.drawSegmentTool.getPendingStart();
     if (pendingSegmentStart) {

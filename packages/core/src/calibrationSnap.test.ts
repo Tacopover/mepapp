@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calibrationFromScale, scaleDenominatorFromCalibration } from './calibration.js';
-import { snapOrthogonal, snapToNearestLine } from './calibrationSnap.js';
+import { snapAngle, snapOrthogonal, snapToNearestLine } from './calibrationSnap.js';
 
 // One horizontal line (0,0)-(100,0) and one vertical line (50,-50)-(50,50).
 const lines = new Float64Array([0, 0, 100, 0, 50, -50, 50, 50]);
@@ -39,6 +39,25 @@ describe('snapOrthogonal', () => {
     expect(snap.axis).toBe('y');
     expect(snap.point).toEqual({ x: 20, y: 0 });
     expect(snap.lineIndex).toBe(0);
+  });
+});
+
+describe('snapAngle', () => {
+  it('locks to the nearest 45 degree ray and snaps to a crossing line', () => {
+    const snap = snapAngle({ x: 0, y: 0 }, { x: 48, y: 52 }, lines, 5, 45);
+    expect(snap.point.x).toBeCloseTo(50, 9);
+    expect(snap.point.y).toBeCloseTo(50, 9);
+    expect(snap.lineIndex).toBe(1);
+  });
+  it('keeps the projected point when no line is close enough', () => {
+    const snap = snapAngle({ x: 0, y: 0 }, { x: 20, y: 24 }, lines, 5, 45);
+    expect(snap.point.x).toBeCloseTo(22, 9);
+    expect(snap.point.y).toBeCloseTo(22, 9);
+    expect(snap.lineIndex).toBeNull();
+  });
+  it('ignores a line parallel to the ray', () => {
+    const diagonal = new Float64Array([10, 10, 60, 60]);
+    expect(snapAngle({ x: 0, y: 0 }, { x: 30, y: 31 }, diagonal, 5, 45).lineIndex).toBeNull();
   });
 });
 

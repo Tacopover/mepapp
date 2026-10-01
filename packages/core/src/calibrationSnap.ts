@@ -93,3 +93,48 @@ export function snapOrthogonal(anchor: Vec2, raw: Vec2, lines: SnapLines | null,
   }
   return result;
 }
+
+export interface AngleSnap {
+  point: Vec2;
+  /** Set when the point also snapped to a line crossing the angle ray. */
+  lineIndex: number | null;
+}
+
+/**
+ * Like snapOrthogonal, for any angle step: constrains `raw` to the ray through `anchor` whose
+ * heading is the multiple of `incrementDegrees` nearest the pointer's, then snaps it to the
+ * nearest PDF line crossing that ray within `radius`.
+ */
+export function snapAngle(anchor: Vec2, raw: Vec2, lines: SnapLines | null, radius: number, incrementDegrees: number): AngleSnap {
+  const dx = raw.x - anchor.x;
+  const dy = raw.y - anchor.y;
+  if (incrementDegrees <= 0 || (dx === 0 && dy === 0)) return { point: raw, lineIndex: null };
+  const incrementRad = (incrementDegrees * Math.PI) / 180;
+  const angle = Math.round(Math.atan2(dy, dx) / incrementRad) * incrementRad;
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const along = dx * ux + dy * uy; // pointer's distance along the ray (negative: behind the anchor)
+  const result: AngleSnap = { point: { x: anchor.x + ux * along, y: anchor.y + uy * along }, lineIndex: null };
+  if (!lines) return result;
+
+  let bestDist = radius;
+  const count = lines.length / 4;
+  for (let i = 0; i < count; i++) {
+    const ex = lines[4 * i + 2] - lines[4 * i];
+    const ey = lines[4 * i + 3] - lines[4 * i + 1];
+    const denom = ux * ey - uy * ex; // u × e — zero when the line runs parallel to the ray
+    if (Math.abs(denom) < 1e-9 * Math.hypot(ex, ey)) continue;
+    const wx = lines[4 * i] - anchor.x;
+    const wy = lines[4 * i + 1] - anchor.y;
+    const s = (wx * ey - wy * ex) / denom; // distance along the ray at the crossing
+    const t = (wx * uy - wy * ux) / denom; // position along the line at the crossing
+    if (t < 0 || t > 1) continue;
+    const dist = Math.abs(s - along);
+    if (dist < bestDist) {
+      bestDist = dist;
+      result.point = { x: anchor.x + ux * s, y: anchor.y + uy * s };
+      result.lineIndex = i;
+    }
+  }
+  return result;
+}
