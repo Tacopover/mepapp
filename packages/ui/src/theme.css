@@ -3267,3 +3267,26 @@
   border-radius: 2px;
   box-shadow: 2px 2px 0 var(--ink);
 }
+.mep-wall-debug-panel:has(.mep-wall-debug-pinned) {
+  width: 380px;
+}
+.mep-wall-debug-expected {
+  flex: none;
+  width: 60px;
+  font-size: 11px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.mep-wall-debug-expected.is-wall {
+  background: #c8f2d6;
+}
+.mep-wall-debug-expected.is-not-wall {
+  background: #f8d0cf;
+}
+.mep-wall-debug-note-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 1px 4px;
+}

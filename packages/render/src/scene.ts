@@ -482,8 +482,8 @@ interface SketchSceneEvents {
   wallDebugChanged: [WallDebugState];
   /** The pointer moved onto a line of the wall-line debug overlay (info and container-relative screen position), or off it (null). */
   wallLineHover: [info: WallLineInfo | null, screen: Vec2 | null];
-  /** The P key was pressed while the pointer was on a line of the wall-line debug overlay. */
-  wallLinePinned: [info: WallLineInfo];
+  /** W (should be a wall) or N (should not be a wall) was pressed while the pointer was on a line of the wall-line debug overlay. */
+  wallLinePinned: [info: WallLineInfo, expected: 'wall' | 'not-wall'];
   /** A transient message for the UI's toast — see SceneNotice. */
   notice: [SceneNotice];
   /**
@@ -2704,7 +2704,7 @@ export class SketchScene {
       const mmPerPt = 1 / calibration.pageUnitsPerRealUnit;
       const input = { segments: vectors.segments, segmentCount: vectors.segmentCount, bounds };
       const { reason } = filterWallSegments(input, mmPerPt, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {});
-      this.wallDebugData = new WallDebugData(pageIndex, vectors.segments, vectors.segmentCount, reason, mmPerPt, bounds);
+      this.wallDebugData = new WallDebugData(doc.fileName, pageIndex, vectors.segments, vectors.segmentCount, reason, mmPerPt, bounds);
       drawWallDebug(this.wallDebugLayer, this.wallDebugData, this.wallDebugHidden);
       if (vectors.truncated) this.wallDebugMessage = 'The page has more lines than the extraction limit: not every line is shown.';
     } catch (err) {
@@ -3888,9 +3888,9 @@ export class SketchScene {
     } else if (meta && event.key.toLowerCase() === 'v' && this.clipboard !== null) {
       event.preventDefault();
       this.pasteClipboard();
-    } else if (!meta && event.key.toLowerCase() === 'p' && this.wallDebugData && this.wallDebugHover !== null) {
+    } else if (!meta && (event.key.toLowerCase() === 'w' || event.key.toLowerCase() === 'n') && this.wallDebugData && this.wallDebugHover !== null) {
       event.preventDefault();
-      this.emitter.emit('wallLinePinned', this.wallDebugData.info(this.wallDebugHover));
+      this.emitter.emit('wallLinePinned', this.wallDebugData.info(this.wallDebugHover), event.key.toLowerCase() === 'w' ? 'wall' : 'not-wall');
     }
   };
 

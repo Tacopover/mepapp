@@ -50,6 +50,7 @@ export function wallDebugGroup(reason: number): WallDebugGroup {
 /** The line under the pointer, as shown in the tooltip. `id` is the segment index in the page's getVectorPaths output: stable while the PDF and the extraction code do not change. */
 export interface WallLineInfo {
   id: string;
+  fileName: string;
   index: number;
   pageIndex: number;
   group: WallDebugGroup;
@@ -74,6 +75,7 @@ export class WallDebugData {
   private readonly cells: Map<number, number[]> = new Map();
 
   constructor(
+    readonly fileName: string,
     readonly pageIndex: number,
     readonly segments: Float64Array,
     readonly segmentCount: number,
@@ -156,6 +158,7 @@ export class WallDebugData {
     const r = this.reason[i]!;
     return {
       id: `P${this.pageIndex + 1}-L${i}`,
+      fileName: this.fileName,
       index: i,
       pageIndex: this.pageIndex,
       group: wallDebugGroup(r),
