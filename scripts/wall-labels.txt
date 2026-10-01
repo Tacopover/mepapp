@@ -1,0 +1,46 @@
+00_arch_ground_floor.pdf P1-L32744 expected=not-wall note="wall hatch" | now: kept as wall, 281 mm, stroked line, pen 0.36 pt, (924.2, 753.9) -> (913.0, 742.7) pt
+00_arch_ground_floor.pdf P1-L32929 expected=not-wall note="wall hatch" | now: kept as wall, 281 mm, stroked line, pen 0.36 pt, (867.6, 817.9) -> (878.9, 806.6) pt
+00_arch_ground_floor.pdf P1-L45412 expected=not-wall note="door swing" | now: kept as wall, 900 mm, stroked line, pen 0.36 pt, (778.9, 829.5) -> (727.9, 829.5) pt
+00_arch_ground_floor.pdf P1-L54016 expected=not-wall note="dashed grid line" | now: kept as wall, 601 mm, stroked line, pen 0.24 pt, (398.5, 1933.1) -> (398.5, 1899.0) pt
+00_arch_ground_floor.pdf P1-L23023 expected=not-wall note="floor hatch" | now: kept as wall, 722 mm, stroked line, pen 0.36 pt, (442.2, 1890.8) -> (401.3, 1890.8) pt
+00_arch_ground_floor.pdf P1-L41432 expected=not-wall note="chair" | now: kept as wall, 500 mm, stroked line, pen 0.36 pt, (462.7, 2529.2) -> (462.7, 2557.6) pt
+00_arch_ground_floor.pdf P1-L41430 expected=not-wall note="chair" | now: kept as wall, 500 mm, stroked line, pen 0.36 pt, (465.0, 2529.2) -> (465.0, 2557.6) pt
+00_arch_ground_floor.pdf P1-L41431 expected=not-wall note="chair" | now: kept as wall, 500 mm, stroked line, pen 0.36 pt, (465.5, 2557.6) -> (465.5, 2529.2) pt
+00_arch_ground_floor.pdf P1-L41409 expected=not-wall note="table" | now: kept as wall, 790 mm, stroked line, pen 0.36 pt, (450.6, 2495.4) -> (405.8, 2495.4) pt
+00_arch_ground_floor.pdf P1-L41413 expected=not-wall note="table" | now: kept as wall, 1590 mm, stroked line, pen 0.36 pt, (405.6, 2495.6) -> (405.6, 2585.8) pt
+00_arch_ground_floor.pdf P1-L55174 expected=not-wall note="dashed grid line" | now: kept as wall, 599 mm, stroked line, pen 0.24 pt, (1673.9, 1592.9) -> (1673.9, 1558.9) pt
+00_arch_ground_floor.pdf P1-L47006 expected=wall note="room bounding window" | now: dropped: dash rule, 1285 mm, stroked line, pen 0.36 pt, (465.8, 1276.0) -> (465.8, 1348.8) pt
+00_arch_ground_floor.pdf P1-L46994 expected=wall note="room bounding window" | now: dropped: dash rule, 1328 mm, stroked line, pen 0.36 pt, (465.8, 2293.8) -> (465.8, 2369.0) pt
+00_arch_ground_floor.pdf P1-L49088 expected=wall note="room bounding window" | now: dropped: dash rule, 1283 mm, stroked line, pen 0.36 pt, (1980.7, 634.4) -> (1980.7, 561.7) pt
+00_arch_ground_floor.pdf P1-L44321 expected=wall note="wall around column" | now: dropped: hatch line (many short partners), 250 mm, stroked line, pen 0.36 pt, (1588.1, 1676.5) -> (1588.1, 1662.4) pt
+00_arch_ground_floor.pdf P1-L44317 expected=wall note="wall around column" | now: dropped: hatch line (many short partners), 311 mm, stroked line, pen 0.36 pt, (1570.4, 1678.0) -> (1588.1, 1678.0) pt
+00_arch_ground_floor.pdf P1-L36407 expected=wall note="room bounding window" | now: dropped: hatch line (many short partners), 481 mm, stroked line, pen 0.36 pt, (402.2, 2508.4) -> (402.2, 2535.6) pt
+00_arch_ground_floor.pdf P1-L46638 expected=wall note="short piece of wall" | now: dropped: too short or not a line, 100 mm, stroked line, pen 0.36 pt, (458.0, 2405.3) -> (458.0, 2410.9) pt
+00_arch_ground_floor.pdf P1-L49244 expected=wall note="short piece of wall" | now: dropped: too short or not a line, 136 mm, stroked line, pen 0.36 pt, (458.0, 2397.6) -> (458.0, 2405.3) pt
+00_arch_ground_floor.pdf P1-L46636 expected=wall note="short piece of wall" | now: dropped: too short or not a line, 100 mm, stroked line, pen 0.36 pt, (465.1, 2410.9) -> (465.1, 2405.3) pt
+Example_2.pdf P1-L111701 expected=not-wall note="dimension line" | now: kept as wall, 14600 mm, stroked line, pen 0.24 pt, (133.9, 1988.5) -> (133.9, 2402.4) pt
+Example_2.pdf P1-L111097 expected=not-wall note="section line" | now: kept as wall, 10274 mm, stroked line, pen 0.24 pt, (367.0, 117.1) -> (75.7, 117.1) pt
+Example_2.pdf P1-L109755 expected=not-wall note="dashed grid line" | now: kept as wall, 635 mm, stroked line, pen 0.24 pt, (1194.1, 763.9) -> (1212.1, 763.9) pt
+Example_2.pdf P1-L109757 expected=not-wall note="dashed grid line" | now: kept as wall, 635 mm, stroked line, pen 0.24 pt, (1225.7, 763.9) -> (1243.7, 763.9) pt
+Example_2.pdf P1-L98207 expected=not-wall note="door swing" | now: kept as wall, 1003 mm, stroked line, pen 0.24 pt, (1273.2, 886.6) -> (1301.6, 886.6) pt
+Example_2.pdf P1-L38991 expected=not-wall note="stair line" | now: kept as wall, 1740 mm, stroked line, pen 0.24 pt, (1613.9, 143.3) -> (1613.9, 94.0) pt
+Example_2.pdf P1-L38964 expected=not-wall note="stair line" | now: kept as wall, 1740 mm, stroked line, pen 0.24 pt, (1591.2, 143.3) -> (1591.2, 94.0) pt
+Example_2.pdf P1-L204 expected=wall note="column" | now: dropped: no parallel partner line, 1177 mm, filled edge, pen 0.00 pt, (733.1, 1155.4) -> (699.7, 1155.4) pt
+Example_2.pdf P1-L203 expected=wall note="column" | now: dropped: no parallel partner line, 1181 mm, filled edge, pen 0.00 pt, (733.1, 1188.8) -> (733.1, 1155.4) pt
+Example_2.pdf P1-L177 expected=wall note="column" | now: dropped: no parallel partner line, 580 mm, filled edge, pen 0.00 pt, (529.1, 1180.3) -> (529.1, 1163.9) pt
+Example_1.pdf P1-L108910 expected=not-wall note="dashed grid line" | now: kept as wall, 1266 mm, stroked line, pen 0.24 pt, (1233.4, 529.0) -> (1251.4, 529.0) pt
+Example_1.pdf P1-L104653 expected=not-wall note="dashed grid line" | now: kept as wall, 1266 mm, stroked line, pen 0.24 pt, (1473.1, 572.9) -> (1473.1, 590.9) pt
+Example_1.pdf P1-L193762 expected=not-wall note="tag" | now: kept as wall, 793 mm, stroked line, pen 0.24 pt, (1286.6, 753.6) -> (1286.6, 742.3) pt
+Example_1.pdf P1-L193761 expected=not-wall note="tag" | now: kept as wall, 287 mm, stroked line, pen 0.24 pt, (1282.6, 742.3) -> (1286.6, 742.3) pt
+01_arch_first_floor.pdf P1-L33889 expected=wall note="room bounding window" | now: dropped: dash rule, 1286 mm, stroked line, pen 0.36 pt, (465.8, 663.7) -> (465.8, 736.6) pt
+01_arch_first_floor.pdf P1-L30151 expected=wall note="short wall between windows" | now: dropped: hatch line (many short partners), 515 mm, stroked line, pen 0.36 pt, (465.1, 736.6) -> (465.1, 765.7) pt
+01_arch_first_floor.pdf P1-L23041 expected=wall note="column" | now: dropped: hatch line (many short partners), 191 mm, stroked line, pen 0.36 pt, (472.8, 858.6) -> (472.8, 847.8) pt
+01_arch_first_floor.pdf P1-L33949 expected=wall note="room bounding window" | now: dropped: dash rule, 1285 mm, stroked line, pen 0.36 pt, (465.8, 867.7) -> (465.8, 940.5) pt
+01_arch_first_floor.pdf P1-L30156 expected=wall note="short wall between column and window" | now: dropped: too short or not a line, 146 mm, stroked line, pen 0.36 pt, (465.1, 859.4) -> (465.1, 867.7) pt
+01_arch_first_floor.pdf P1-L30152 expected=wall note="short wall between column and window" | now: dropped: too short or not a line, 148 mm, stroked line, pen 0.36 pt, (465.1, 838.6) -> (465.1, 847.0) pt
+01_arch_first_floor.pdf P1-L30157 expected=wall note="short wall between windows" | now: dropped: hatch line (many short partners), 517 mm, stroked line, pen 0.36 pt, (465.1, 940.5) -> (465.1, 969.8) pt
+01_arch_first_floor.pdf P1-L27353 expected=not-wall note="table" | now: kept as wall, 790 mm, stroked line, pen 0.36 pt, (450.6, 2502.7) -> (405.8, 2502.7) pt
+01_arch_first_floor.pdf P1-L27358 expected=not-wall note="table" | now: kept as wall, 1591 mm, stroked line, pen 0.36 pt, (405.6, 2503.0) -> (405.6, 2593.1) pt
+01_arch_first_floor.pdf P1-L31362 expected=not-wall note="door swing" | now: kept as wall, 902 mm, stroked line, pen 0.36 pt, (567.7, 2482.2) -> (567.7, 2533.3) pt
+01_arch_first_floor.pdf P1-L36894 expected=wall note="short wall between door and other wall" | now: dropped: too short or not a line, 66 mm, stroked line, pen 0.36 pt, (937.8, 2308.8) -> (941.5, 2308.8) pt
+01_arch_first_floor.pdf P1-L36890 expected=wall note="short wall between door and other wall" | now: dropped: too short or not a line, 68 mm, stroked line, pen 0.36 pt, (992.5, 2308.8) -> (996.4, 2308.8) pt

@@ -497,7 +497,7 @@ function curveRule(segs: Float64Array, n: number, mm: number, P: RoomDetectionPa
 }
 
 // A6: loop rule. Small compact closed loops are furniture, except columns that bridge two wall ends.
-function loopRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, P: RoomDetectionParams): { dropped: number; bridged: number } {
+function loopRule(segs: Float64Array, n: number, keep: Uint8Array, reason: Uint8Array, mm: number, P: RoomDetectionParams): { dropped: number; bridged: number } {
   const groups = new Map<number, number[]>();
   for (let i = 0; i < n; i++) {
     if (!(segs[i * S + SEG_KIND]! & KIND_CLOSED_FLAG)) continue;
@@ -603,7 +603,10 @@ function loopRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, P
     }
     if ((sides[0] && sides[1]) || (sides[2] && sides[3])) {
       bridged++;
-      for (const i of c.g) keep[i] = 1;
+      for (const i of c.g) {
+        keep[i] = 1;
+        reason[i] = REJECT_REASON.kept;
+      }
       continue;
     }
     for (const i of c.g) {
@@ -949,7 +952,7 @@ export function filterWallSegments(
   stats.chords = cr.nChords;
   stats.chordsPaired = cr.nTagged;
 
-  const lr = loopRule(segs, n, keep, mm, P);
+  const lr = loopRule(segs, n, keep, reason, mm, P);
   markRejected(REJECT_REASON.loop);
   stats.loopDropped = lr.dropped;
   stats.loopBridged = lr.bridged;

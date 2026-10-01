@@ -149,9 +149,14 @@ describe('filterWallSegments', () => {
       line(116, 0, 100, 0, { kind: 4, id: 900 }),
       line(100, 0, 100, -T, { kind: 4, id: 900 }),
     ];
-    const { stats } = filterWallSegments(build(list), MM);
+    const { stats, keep, reason } = filterWallSegments(build(list), MM);
     // The column is 16 x 8 pt = 400 x 200 mm: a loop candidate that touches wall ends on two opposite sides.
     expect(stats.loopBridged).toBe(1);
+    // The column edges are kept, and their reason says so (the debug overlay colours lines by reason).
+    for (let i = 4; i < 8; i++) {
+      expect(keep[i]).toBe(1);
+      expect(reason[i]).toBe(REJECT_REASON.kept);
+    }
   });
 
   it('removes a stair chain and reports the stair rule as the reason', () => {
