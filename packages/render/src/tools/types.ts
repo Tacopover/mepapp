@@ -1,5 +1,5 @@
 import type { FederatedPointerEvent, Sprite, Texture } from 'pixi.js';
-import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, RoomPolygon, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
+import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, RoomPolygon, SnapLines, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
 import type { AlignmentGuide } from './alignmentGuides.js';
 import type { DrawingState, SketchDocument } from '../document.js';
 import type { StampInfo, TerminalAssignmentResult } from '../scene.js';
@@ -168,6 +168,9 @@ export interface ToolContext {
   /** Shared two-click scratch used by calibrate/measure/draw-line — see the original's comment at their declaration site. */
   getPendingPoints(): Vec2[];
   setPendingPoints(points: Vec2[]): void;
+
+  /** The shown PDF page's vector lines, flat x0,y0,x1,y1 in world space — null until extracted (the calibrate tool triggers extraction on activation) or when the page has none. */
+  getSnapLines(): SnapLines | null;
 
   getActiveNetworkTypeId(): string;
   getSnapRadiusScreenPx(): number;

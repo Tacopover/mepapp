@@ -6,7 +6,7 @@ import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
 import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
 import { IconPencil, IconTrash, IconUndo } from '../icons.js';
-import { loadStampBitmap } from '../stampBitmap.js';
+import { loadDefinitionBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 
 export interface StampsPanelProps {
@@ -56,9 +56,11 @@ export function stampLabelFor(definition: StampDefinition, language: StampLabelL
 function loadBitmap(url: string, definition: StampDefinition): Promise<ImageBitmap> {
   let cached = bitmapCache.get(url);
   if (!cached) {
-    cached = fetch(url)
-      .then((res) => res.blob())
-      .then((blob) => loadStampBitmap(blob, { widthPt: definition.nativeWidth, heightPt: definition.nativeHeight }));
+    // Keyed by the resolved icon URL, not definition.id — an edited (overridden) library stamp
+    // keeps its library id but gets a fresh iconRef data: URL on every save (see
+    // ElementEditorDialog's buildDefinition), so this key still busts the cache correctly even
+    // though loadDefinitionBitmap below renders from `shapes`, not from this URL, whenever shapes exist.
+    cached = loadDefinitionBitmap(definition, () => fetch(url).then((res) => res.blob()));
     bitmapCache.set(url, cached);
   }
   return cached;

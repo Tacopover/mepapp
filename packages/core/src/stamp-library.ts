@@ -30,31 +30,16 @@ export interface StampDefinition {
   source: 'library' | 'custom';
   /** Groups of this definition's own port ids that should collapse into one connectivity node once placed (e.g. a unit's supply + return) — authored in the Element Editor dialog's link mode, converted into real instance-level PortGroup entries at placement time (see SketchScene.placeStamp). Only meaningful for 'custom' definitions; library entries never set it. */
   definitionPortGroups?: string[][];
-  /** Editable vector source for a 'custom' definition authored via the Element Editor dialog's Shapes mode (ports-custom-element-editor-spec.md §5.3) — reopening the dialog re-populates the drawing canvas from this list. `iconRef` still holds the rasterized `data:` URL produced from these shapes at save time, so every render/placement call site keeps treating artwork as "an image" and needs no vector-aware branch. Undefined for a raster-imported or library definition. */
+  /** Editable vector source for this definition's artwork, and — once present — the one thing every render/placement/PDF-export call site actually draws (see packages/ui's loadDefinitionBitmap, stampBitmap.ts): `iconRef` is rasterized from this instead of fetched whenever `shapes` exists, so canvas and PDF output can never drift from what the Element Editor shows. For a 'custom' definition, authored via the Element Editor dialog's Shapes mode (ports-custom-element-editor-spec.md §5.3) — reopening the dialog re-populates the drawing canvas from this list. For a 'library' definition, parsed directly from the fixture's own .svg (scripts/generate-stamp-library.mjs) — the SVG is the single source of truth for library art, so these match exactly. `iconRef` still holds a rasterized fallback (the fixture SVG itself for 'library', a `data:` PNG produced from `shapes` at save time for 'custom') for the one case shapes doesn't cover: a raster-imported custom definition with no shapes at all (an 'image'-kind shape still counts) — the only case `shapes` is left undefined. */
   shapes?: SymbolShape[];
 }
 
-export const STAMP_LIBRARY: StampDefinition[] = [
-  {
-    id: 'fire-hose-reel',
-    label: 'D4 Fire Hose Reel',
-    labelNl: '53 Brandslanghaspel',
-    discipline: 'fireProtection',
-    category: 'terminal',
-    nativeWidth: 48,
-    nativeHeight: 48,
-    ports: [],
-    iconRef: 'D4_Fire_hose_reel.png',
-    source: 'library',
-  },
-  // The other 3 original hand-typed entries (ventilation-grille-rh-supply,
-  // luminaire-rectangular, switch) are now generated below under the same
-  // ids, from the same fixture art plus authored port data — see
-  // generate-stamp-library.mjs's EXCLUDED_FILENAMES comment for why
-  // fire-hose-reel above is the one exception (its category is read by
-  // project.ts's v1->v2 migration step keyed on this exact definitionId).
-  ...GENERATED_STAMP_LIBRARY,
-];
+// The 4 original hand-typed entries (fire-hose-reel, ventilation-grille-rh-supply,
+// luminaire-rectangular, switch) are all now generated below under the same
+// ids, from the same fixture art plus authored port data (see
+// generate-stamp-library.mjs) — asserted by that script's own
+// "expectedId" check at generation time.
+export const STAMP_LIBRARY: StampDefinition[] = [...GENERATED_STAMP_LIBRARY];
 
 /** The project's custom definitions come first: one with a library id is an edited library stamp (an override) and replaces that library entry for every stamp placed from it. */
 export function getStampDefinition(id: string, customDefinitions: StampDefinition[] = []): StampDefinition | undefined {

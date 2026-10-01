@@ -1,5 +1,6 @@
 import type { Calibration, StampLabelVisibility } from '@mepapp/core';
 import type { DrawingSummary } from '@mepapp/render';
+import { ScaleControl } from './ScaleControl.js';
 import { LabelVisibilityControl, type LabelFilterEntry } from './LabelVisibilityControl.js';
 
 export interface StatusBarProps {
@@ -10,6 +11,7 @@ export interface StatusBarProps {
   pageCount: number;
   onChangePage: (pageIndex: number) => void;
   calibration: Calibration | null;
+  onSetScale: (denominator: number) => void;
   measurementMm: number | null;
   selectedCount: number;
   drawingSummary: DrawingSummary;
@@ -26,6 +28,7 @@ export function StatusBar({
   pageCount,
   onChangePage,
   calibration,
+  onSetScale,
   measurementMm,
   selectedCount,
   drawingSummary,
@@ -61,11 +64,7 @@ export function StatusBar({
       <span className="mep-chip">
         Units <b>{calibration ? 'mm' : 'pt (uncalibrated)'}</b>
       </span>
-      {calibration && (
-        <span className="mep-chip">
-          Scale <b>{calibration.pageUnitsPerRealUnit.toFixed(4)} pt/mm</b>
-        </span>
-      )}
+      <ScaleControl calibration={calibration} onSetScale={onSetScale} />
       {measurementMm !== null && (
         <span className="mep-chip">
           Last measurement <b>{measurementMm.toFixed(2)} mm</b>

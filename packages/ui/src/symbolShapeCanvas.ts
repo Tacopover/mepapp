@@ -179,8 +179,7 @@ export async function loadShapeImages(shapes: SymbolShape[], cache: Map<string, 
   );
 }
 
-/** Rasterizes to a flat PNG `data:` URL — awaits every 'image' shape's own art decoding first (see loadShapeImages) since the actual draw pass is synchronous. Called once at save time, so a fresh local cache (rather than a shared one) is fine. */
-export async function rasterizeSymbolShapes(shapes: SymbolShape[], widthPx: number, heightPx: number): Promise<string> {
+async function buildShapesCanvas(shapes: SymbolShape[], widthPx: number, heightPx: number): Promise<HTMLCanvasElement> {
   const cache = new Map<string, HTMLImageElement>();
   await loadShapeImages(shapes, cache);
   const canvas = document.createElement('canvas');
@@ -189,5 +188,17 @@ export async function rasterizeSymbolShapes(shapes: SymbolShape[], widthPx: numb
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context unavailable for shape rasterization');
   drawSymbolShapes(ctx, shapes, canvas.width, canvas.height, cache);
+  return canvas;
+}
+
+/** Rasterizes to a flat PNG `data:` URL — awaits every 'image' shape's own art decoding first (see loadShapeImages) since the actual draw pass is synchronous. Called once at save time, so a fresh local cache (rather than a shared one) is fine. */
+export async function rasterizeSymbolShapes(shapes: SymbolShape[], widthPx: number, heightPx: number): Promise<string> {
+  const canvas = await buildShapesCanvas(shapes, widthPx, heightPx);
   return canvas.toDataURL('image/png');
+}
+
+/** Same rasterization as rasterizeSymbolShapes, straight to an ImageBitmap instead of a data: URL — the placement/PDF-export path (see stampBitmap.ts's loadDefinitionBitmap) needs a decoded bitmap, not a string to re-decode. */
+export async function rasterizeSymbolShapesToBitmap(shapes: SymbolShape[], widthPx: number, heightPx: number): Promise<ImageBitmap> {
+  const canvas = await buildShapesCanvas(shapes, widthPx, heightPx);
+  return createImageBitmap(canvas);
 }

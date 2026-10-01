@@ -63,6 +63,7 @@ import {
   type Annotation,
   type AnnotationGeometry,
   type Calibration,
+  type SnapLines,
   type Circuit,
   type CircuitScope,
   type CircuitType,
@@ -98,7 +99,7 @@ import {
   type Transform2D,
   type Vec2,
 } from '@mepapp/core';
-import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, StoredAnnotation } from '@mepapp/pdf-engine';
+import { PATH_KIND, type AnnotationGeometry as PdfAnnotationGeometry, type PdfDocumentHandle, type StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
@@ -295,6 +296,9 @@ function domainAnnotationGeometry(g: AnnotationGeometry): Record<string, number>
 // fixtures README) — this converts a stamp texture's native pixel size into
 // world units (1 world unit = 1 PDF point) for its initial, unscaled size.
 const STAMP_SOURCE_DPI = 300;
+
+// PDF lines shorter than this (hatching, dash fragments) are not offered as calibration snap targets.
+const MIN_SNAP_LINE_LENGTH_PT = 2;
 /** Opacity of the stamp-placement ghost/preview sprite that follows the pointer before a click commits it. */
 const STAMP_GHOST_ALPHA = 0.5;
 
@@ -394,12 +398,14 @@ export interface FittingInfo {
 }
 
 /**
- * Resolves a stamp-library iconRef to loaded image bytes — `loadProjectFromJson`'s
- * way of rebuilding restored stamps' sprites without `SketchScene` itself owning a
- * fetch call, matching the layering that `StampsPanel`'s `resolveIconUrl` prop
- * already establishes (apps/web owns where stamp art actually lives on disk).
+ * Resolves a stamp definition to loaded image bytes — `loadProjectFromJson`'s way of rebuilding
+ * restored stamps' sprites without `SketchScene` itself owning a fetch call, matching the
+ * layering that `StampsPanel`'s `resolveIconUrl` prop already establishes (apps/web owns where
+ * stamp art actually lives on disk). Takes the whole definition, not just its iconRef, so the
+ * resolver can rasterize `shapes` directly when present instead of always fetching a file (see
+ * packages/ui's loadDefinitionBitmap).
  */
-export type IconBitmapResolver = (iconRef: string) => Promise<ImageBitmap>;
+export type IconBitmapResolver = (definition: StampDefinition) => Promise<ImageBitmap>;
 
 export interface DrawingSummary {
   segmentCount: number;
@@ -589,6 +595,9 @@ export class SketchScene {
   // tool-owned pending state directly.
   private readonly drawSegmentTool = new DrawSegmentTool();
   private readonly drawPolylineTool = new DrawPolylineTool();
+  private readonly calibrateTool = new CalibrateTool();
+  /** The shown PDF page's vector lines for the calibrate tool's snapping, extracted on demand — see loadSnapLines. `key` names the document+page they belong to. */
+  private snapLines: { key: string; lines: SnapLines | null } | null = null;
   private readonly ctx: ToolContext = this.buildToolContext();
   private readonly toolMap: Map<SketchTool, Tool> = this.buildToolMap();
   private readonly dragHandlers: Map<DragState['kind'], ToolDragHandlers> = this.buildDragHandlers();
@@ -615,7 +624,7 @@ export class SketchScene {
       new DrawHighlightTool(),
       new DrawTextboxTool(),
       new DrawStickyNoteTool(),
-      new CalibrateTool(),
+      this.calibrateTool,
       new MeasureTool(),
       new FillRoomTool(),
       new EditRoomTool(),
@@ -685,6 +694,7 @@ export class SketchScene {
       setPendingPoints: (points) => {
         self.pendingPoints = points;
       },
+      getSnapLines: () => self.currentSnapLines(),
       getActiveNetworkTypeId: () => self.activeNetworkTypeId,
       getSnapRadiusScreenPx: () => self.snapRadiusScreenPx,
       getAngleSnapDegrees: () => self.angleSnapDegrees,
@@ -813,6 +823,7 @@ export class SketchScene {
     // The room selection (shown in the Properties panel) lives while the user stays with the room tools.
     if (!ROOM_TOOLS.has(tool)) this.clearRoomSelection();
     this.pendingPoints = [];
+    if (tool === 'calibrate') void this.loadSnapLines();
     if (!isCircuitSubTool) {
       this.circuitToolTargetId = null;
       this.circuitToolHover = null;
@@ -886,6 +897,7 @@ export class SketchScene {
     this.doc.backdropSprite = sprite;
     this.world.addChildAt(sprite, 0);
     this.doc.pageIndex = pageIndex;
+    if (this.tool === 'calibrate') void this.loadSnapLines();
     this.redrawOverlay();
     this.emitter.emit('pageChanged', pageIndex);
   }
@@ -2031,6 +2043,43 @@ export class SketchScene {
     return this.doc.calibration;
   }
 
+  /** Sets the active document's calibration directly (e.g. from a chosen drawing scale), without the two-click calibrate tool. */
+  setCalibration(calibration: Calibration): void {
+    this.doc.calibration = calibration;
+    this.emitter.emit('calibrationSet', calibration);
+  }
+
+  private snapLinesKey(): string {
+    return `${this.doc.id}:${this.doc.pageIndex}`;
+  }
+
+  private currentSnapLines(): SnapLines | null {
+    return this.snapLines?.key === this.snapLinesKey() ? this.snapLines.lines : null;
+  }
+
+  /** Extracts the shown page's straight vector lines (curve pieces and sub-2pt hatch marks dropped) for the calibrate tool to snap to. Cached per document+page. */
+  private async loadSnapLines(): Promise<void> {
+    const handle = this.doc.pdfHandle;
+    const key = this.snapLinesKey();
+    if (!handle || this.snapLines?.key === key) return;
+    this.snapLines = { key, lines: null };
+    try {
+      const data = await handle.getVectorPaths(this.doc.pageIndex, { maxSegments: 2_000_000 });
+      const lines = new Float64Array(data.segmentCount * 4);
+      let count = 0;
+      for (let i = 0; i < data.segmentCount; i++) {
+        const o = i * 8;
+        if ((data.segments[o + 6] & 3) > PATH_KIND.filledEdge) continue; // curve pieces
+        if (Math.hypot(data.segments[o + 2] - data.segments[o], data.segments[o + 3] - data.segments[o + 1]) < MIN_SNAP_LINE_LENGTH_PT) continue;
+        lines.set(data.segments.subarray(o, o + 4), count * 4);
+        count++;
+      }
+      if (this.snapLines?.key === key) this.snapLines = { key, lines: lines.slice(0, count * 4) };
+    } catch (error) {
+      console.warn('[render] could not extract PDF lines for calibration snapping.', error);
+    }
+  }
+
   getDrawingSummary(): DrawingSummary {
     const state = this.doc.drawingHistory.getState();
     const networks = computeNetworks({
@@ -3151,7 +3200,7 @@ export class SketchScene {
       const definition = getStampDefinition(stampData.definitionId, target.customStampDefinitions);
       if (!definition) continue; // stamp library changed since this project was saved
 
-      const bitmap = await resolveIconBitmap(definition.iconRef);
+      const bitmap = await resolveIconBitmap(definition);
       const texture = textureFromImageBitmap(bitmap);
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5); // matches placeStamp's pivot convention
@@ -4428,6 +4477,21 @@ export class SketchScene {
 
     for (const p of this.pendingPoints) {
       this.overlay.circle(p.x, p.y, 4 / this.world.scale.x).fill({ color: 0xffb300 });
+    }
+
+    if (this.tool === 'calibrate') {
+      const snapLine = this.calibrateTool.getSnapLine();
+      if (snapLine) {
+        this.overlay.moveTo(snapLine.from.x, snapLine.from.y).lineTo(snapLine.to.x, snapLine.to.y).stroke({ width: 3 / this.world.scale.x, color: 0xff4081, alpha: 0.8 });
+      }
+      const preview = this.calibrateTool.getPreview();
+      if (preview) {
+        const [anchor] = this.pendingPoints;
+        if (anchor) {
+          this.overlay.moveTo(anchor.x, anchor.y).lineTo(preview.x, preview.y).stroke({ width: 1.5 / this.world.scale.x, color: 0xffb300 });
+        }
+        this.overlay.circle(preview.x, preview.y, 5 / this.world.scale.x).fill({ color: 0xff4081 });
+      }
     }
 
     const pendingSegmentStart = this.drawSegmentTool.getPendingStart();

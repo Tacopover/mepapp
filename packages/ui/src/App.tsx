@@ -5,6 +5,7 @@ import {
   getStampDefinition,
   isLibraryStampId,
   SCHEMATIC_TEMPLATE_LIBRARY,
+  calibrationFromScale,
   STAMP_LIBRARY,
   type NetworkType,
   type RoomDetectionClient,
@@ -20,7 +21,7 @@ import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTo
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { WallDebugPanel } from './components/WallDebugPanel.js';
-import { loadStampBitmap } from './stampBitmap.js';
+import { loadDefinitionBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
 import { CanvasContextMenu } from './components/CanvasContextMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
@@ -38,6 +39,7 @@ import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { Dialog } from './components/Dialog.js';
+import { CalibrationDialog } from './components/CalibrationDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
@@ -286,7 +288,6 @@ export function MepSketchApp({
     scene.on('notice', pushToast);
     return () => scene.off('notice', pushToast);
   }, [ready, sceneRef, pushToast]);
-  const [calibrationInput, setCalibrationInput] = useState('');
   const [textboxInput, setTextboxInput] = useState('');
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
@@ -421,17 +422,19 @@ export function MepSketchApp({
   const fileHandlesRef = useRef(new Map<string, FileSystemFileHandle>());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Fetches a stamp-library icon's actual bytes for loadProjectFromJson/loadFromPdf to rebuild a restored stamp's sprite —
-  // SketchScene has no fetch of its own, same layering as resolveStampIconUrl/StampsPanel.
+  // Resolves a stamp definition's actual pixels for loadProjectFromJson/loadFromPdf to rebuild a
+  // restored stamp's sprite — SketchScene has no fetch of its own, same layering as
+  // resolveStampIconUrl/StampsPanel. loadDefinitionBitmap rasterizes `shapes` directly when
+  // present, only falling back to fetching iconRef for a shapeless raster-only custom stamp.
   const resolveStampIconBitmap = useCallback(
-    async (iconRef: string) => {
-      // A custom (Element Editor-authored) definition's iconRef is already a
-      // self-contained `data:` URL — fetch() handles those directly, so skip
-      // resolveStampIconUrl's fixture-relative `/stamps/` prefixing for it.
-      const res = await fetch(iconRef.startsWith('data:') ? iconRef : resolveStampIconUrl(iconRef));
-      const blob = await res.blob();
-      const definition = STAMP_LIBRARY.find((def) => def.iconRef === iconRef);
-      return loadStampBitmap(blob, definition && { widthPt: definition.nativeWidth, heightPt: definition.nativeHeight });
+    async (definition: StampDefinition) => {
+      return loadDefinitionBitmap(definition, async () => {
+        // A custom (Element Editor-authored) definition's iconRef is already a
+        // self-contained `data:` URL — fetch() handles those directly, so skip
+        // resolveStampIconUrl's fixture-relative `/stamps/` prefixing for it.
+        const res = await fetch(definition.iconRef.startsWith('data:') ? definition.iconRef : resolveStampIconUrl(definition.iconRef));
+        return res.blob();
+      });
     },
     [resolveStampIconUrl],
   );
@@ -670,7 +673,7 @@ export function MepSketchApp({
       const scene = sceneRef.current;
       if (!scene) return;
       scene.applyDefinitionToPlacedStamps(definition);
-      resolveStampIconBitmap(definition.iconRef)
+      resolveStampIconBitmap(definition)
         .then((bitmap) => scene.setDefinitionArtwork(definition.id, bitmap))
         .catch((err) => setStatus(`Could not load the artwork of ${definition.label}: ${err instanceof Error ? err.message : String(err)}`));
     },
@@ -1044,6 +1047,7 @@ export function MepSketchApp({
         pageCount={pageCount}
         onChangePage={(next) => void handleChangePage(next)}
         calibration={calibration}
+        onSetScale={(denominator) => sceneRef.current?.setCalibration(calibrationFromScale(denominator))}
         measurementMm={measurementMm}
         selectedCount={selection.length}
         drawingSummary={drawingSummary}
@@ -1053,39 +1057,18 @@ export function MepSketchApp({
       />
 
       {calibrationPrompt && (
-        <Dialog
-          title="Calibration"
-          onClose={() => {
+        <CalibrationDialog
+          p1={calibrationPrompt.p1}
+          p2={calibrationPrompt.p2}
+          onCancel={() => {
             calibrationPrompt.resolve(null);
             setCalibrationPrompt(null);
-            setCalibrationInput('');
           }}
-          actions={
-            <>
-              <button
-                onClick={() => {
-                  calibrationPrompt.resolve(null);
-                  setCalibrationPrompt(null);
-                  setCalibrationInput('');
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  calibrationPrompt.resolve(Number(calibrationInput));
-                  setCalibrationPrompt(null);
-                  setCalibrationInput('');
-                }}
-              >
-                Set calibration
-              </button>
-            </>
-          }
-        >
-          <p>Known real-world distance between the two clicked points (mm):</p>
-          <input autoFocus type="number" value={calibrationInput} onChange={(e) => setCalibrationInput(e.target.value)} />
-        </Dialog>
+          onSubmit={(distanceMm) => {
+            calibrationPrompt.resolve(distanceMm);
+            setCalibrationPrompt(null);
+          }}
+        />
       )}
 
       {settingsOpen && (

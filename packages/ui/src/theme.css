@@ -1626,6 +1626,53 @@
   color: var(--ink);
 }
 
+/* Calibration / custom-scale dialogs: a fixed narrow width, and border-box inputs so the
+   100%-wide field no longer overflows the modal's right edge. */
+.mep-modal--calibration {
+  width: 340px;
+  max-width: 92vw;
+}
+.mep-calibration-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.mep-calibration-hint b {
+  color: var(--ink);
+}
+.mep-calibration-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mep-modal--calibration .mep-calibration-row input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  margin-bottom: 0;
+  box-sizing: border-box;
+}
+.mep-modal--calibration .mep-calibration-row select {
+  flex: none;
+  width: 72px;
+  margin-bottom: 0;
+  box-sizing: border-box;
+}
+.mep-calibration-prefix {
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+.mep-scale-select {
+  font-family: var(--font-mono);
+  font-size: inherit;
+  font-weight: bold;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
 /* ---------- Element Editor dialog (ports-custom-element-editor-spec.md §5.2,
    canvas-first redesign in element-editor-ui-redesign-spec.md §2) ---------- */
 
