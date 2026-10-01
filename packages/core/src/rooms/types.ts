@@ -68,6 +68,10 @@ export interface WallFilterParams {
   dashMinPieceMm: number; // pieces shorter than this are ignored by the dash rule (ticks, dots)
   dashEndTolMm: number; // another line ending this close to a dash end touches it ...
   dashMaxContacts: number; // ... and a run whose pieces have more touching lines (median) is not dashed (windows between frames)
+  doorMinRadiusMm: number; // 0 turns the door rule off; a door swing arc has a radius in this range ...
+  doorMaxRadiusMm: number;
+  doorBandMm: number; // ... and lines this close to the hinge-to-arc-end line, inside the door width, are door parts
+  doorKeepWallSide: boolean; // keep the door lines at the arc end that lies in the wall (they close the opening)
   minCompMm: number; // free-standing components smaller than this are dropped ...
   compFrac: number; // ... or smaller than this fraction of the largest component
   // Reject paired lines that have no hatch ticks between them (furniture next
@@ -145,6 +149,10 @@ export const DEFAULT_ROOM_DETECTION_PARAMS: RoomDetectionParams = {
   dashMinPieceMm: 20,
   dashEndTolMm: 20,
   dashMaxContacts: 2,
+  doorMinRadiusMm: 500,
+  doorMaxRadiusMm: 1300,
+  doorBandMm: 300,
+  doorKeepWallSide: true,
   minCompMm: 1500,
   compFrac: 0.05,
   hatchEvidence: true,
@@ -188,6 +196,7 @@ export const REJECT_REASON = {
   dash: 8,
   component: 9,
   noHatchEvidence: 10,
+  door: 11,
 } as const;
 
 export interface WallFilterStats {
@@ -199,6 +208,7 @@ export interface WallFilterStats {
   loopBridged: number;
   stairDropped: number;
   dashDropped: number;
+  doorDropped: number;
   compDropped: number;
   compLimMm: number;
   hatchShare?: number; // only with hatchEvidence

@@ -888,6 +888,198 @@ function dashRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, P
   return dropped;
 }
 
+// A8b: door rule. CAD exports draw a door swing arc as a chain of short straight pieces around the hinge. The
+// door leaf and the lines across the door opening run from the hinge to an arc end: they are not walls. The gap
+// fill closes the opening again, but the door lines no longer join free-standing partitions to the walls.
+function doorRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, P: RoomDetectionParams): number {
+  const minPiece = 5 / mm;
+  const maxPiece = 300 / mm;
+  const tol = 2 / mm;
+  const pieces: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const o = i * S;
+    const L = Math.hypot(segs[o + 2]! - segs[o]!, segs[o + 3]! - segs[o + 1]!);
+    if (L >= minPiece && L <= maxPiece) pieces.push(i);
+  }
+  const grid = new Map<number, number[]>();
+  for (const i of pieces) {
+    for (const e of [0, 2]) {
+      const key = cellKey(Math.floor(segs[i * S + e]! / tol), Math.floor(segs[i * S + e + 1]! / tol));
+      const g = grid.get(key);
+      if (g) g.push(i);
+      else grid.set(key, [i]);
+    }
+  }
+  // Union pieces that share an end, turn by 2 to 30 degrees and have similar lengths.
+  const parent = new Map<number, number>();
+  const find = (i: number): number => {
+    let r = i;
+    while (parent.get(r) !== r) r = parent.get(r)!;
+    parent.set(i, r);
+    return r;
+  };
+  for (const i of pieces) parent.set(i, i);
+  const minTurn = Math.sin((2 * Math.PI) / 180);
+  const maxTurn = Math.cos((30 * Math.PI) / 180);
+  for (const i of pieces) {
+    const o = i * S;
+    const ux = segs[o + 2]! - segs[o]!;
+    const uy = segs[o + 3]! - segs[o + 1]!;
+    const ul = Math.hypot(ux, uy);
+    for (const e of [0, 2]) {
+      const px = segs[o + e]!;
+      const py = segs[o + e + 1]!;
+      const cx = Math.floor(px / tol);
+      const cy = Math.floor(py / tol);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (const j of grid.get(cellKey(cx + dx, cy + dy)) ?? []) {
+            if (j <= i) continue;
+            const q = j * S;
+            const vx = segs[q + 2]! - segs[q]!;
+            const vy = segs[q + 3]! - segs[q + 1]!;
+            const vl = Math.hypot(vx, vy);
+            if (vl > 1.6 * ul || ul > 1.6 * vl) continue;
+            if (Math.min(Math.hypot(segs[q]! - px, segs[q + 1]! - py), Math.hypot(segs[q + 2]! - px, segs[q + 3]! - py)) > tol) continue;
+            const cos = Math.abs(ux * vx + uy * vy) / (ul * vl);
+            const sin = Math.abs(ux * vy - uy * vx) / (ul * vl);
+            if (sin < minTurn || cos < maxTurn) continue;
+            parent.set(find(j), find(i));
+          }
+        }
+      }
+    }
+  }
+  const chains = new Map<number, number[]>();
+  for (const i of pieces) {
+    const r = find(i);
+    const c = chains.get(r);
+    if (c) c.push(i);
+    else chains.set(r, [i]);
+  }
+  // Kept line pieces, for the search of door lines near a hinge.
+  const lineCell = P.doorMaxRadiusMm / mm;
+  const lines = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    if (!keep[i]) continue;
+    const key = cellKey(Math.floor((segs[i * S]! + segs[i * S + 2]!) / 2 / lineCell), Math.floor((segs[i * S + 1]! + segs[i * S + 3]!) / 2 / lineCell));
+    const g = lines.get(key);
+    if (g) g.push(i);
+    else lines.set(key, [i]);
+  }
+  const sinPar = Math.sin((5 * Math.PI) / 180);
+  let dropped = 0;
+  for (const chain of chains.values()) {
+    if (chain.length < 4) continue;
+    // Circle through the chain end points (algebraic least squares fit, coordinates relative to the first point).
+    const pts: [number, number][] = [];
+    for (const i of chain) pts.push([segs[i * S]!, segs[i * S + 1]!], [segs[i * S + 2]!, segs[i * S + 3]!]);
+    const [x0, y0] = pts[0]!;
+    let sxx = 0;
+    let sxy = 0;
+    let syy = 0;
+    let sx = 0;
+    let sy = 0;
+    let sz = 0;
+    let sxz = 0;
+    let syz = 0;
+    for (const [px, py] of pts) {
+      const x = px - x0;
+      const y = py - y0;
+      const z = x * x + y * y;
+      sxx += x * x;
+      sxy += x * y;
+      syy += y * y;
+      sx += x;
+      sy += y;
+      sz += z;
+      sxz += x * z;
+      syz += y * z;
+    }
+    const m = pts.length;
+    // Solve [sxx sxy sx; sxy syy sy; sx sy m] [a b c] = [-sxz -syz -sz] for x2 + y2 + a x + b y + c = 0.
+    const det = sxx * (syy * m - sy * sy) - sxy * (sxy * m - sy * sx) + sx * (sxy * sy - syy * sx);
+    if (Math.abs(det) < 1e-12) continue;
+    const r0 = -sxz;
+    const r1 = -syz;
+    const r2 = -sz;
+    const a = (r0 * (syy * m - sy * sy) - sxy * (r1 * m - sy * r2) + sx * (r1 * sy - syy * r2)) / det;
+    const b = (sxx * (r1 * m - r2 * sy) - r0 * (sxy * m - sy * sx) + sx * (sxy * r2 - r1 * sx)) / det;
+    const c = (sxx * (syy * r2 - sy * r1) - sxy * (sxy * r2 - r1 * sx) + r0 * (sxy * sy - syy * sx)) / det;
+    const hx = x0 - a / 2;
+    const hy = y0 - b / 2;
+    const R = Math.sqrt(Math.max(0, (a * a + b * b) / 4 - c));
+    if (R * mm < P.doorMinRadiusMm || R * mm > P.doorMaxRadiusMm) continue;
+    if (pts.some(([px, py]) => Math.abs(Math.hypot(px - hx, py - hy) - R) > 0.03 * R)) continue;
+    // Arc ends: the end points at both sides of the largest angle gap.
+    const ang = pts.map(([px, py]) => Math.atan2(py - hy, px - hx)).sort((p, q) => p - q);
+    let gap = ang[0]! + 2 * Math.PI - ang[ang.length - 1]!;
+    let endA = ang[0]!;
+    let endB = ang[ang.length - 1]!;
+    for (let k = 1; k < ang.length; k++) {
+      if (ang[k]! - ang[k - 1]! > gap) {
+        gap = ang[k]! - ang[k - 1]!;
+        endA = ang[k]!;
+        endB = ang[k - 1]!;
+      }
+    }
+    const sweep = 2 * Math.PI - gap;
+    if (sweep < Math.PI / 4 || sweep > (100 * Math.PI) / 180) continue;
+    const band = P.doorBandMm / mm;
+    const hcx = Math.floor(hx / lineCell);
+    const hcy = Math.floor(hy / lineCell);
+    const along = (e: number, i: number): { t0: number; t1: number; d0: number; d1: number } | null => {
+      const ux = Math.cos(e);
+      const uy = Math.sin(e);
+      const o = i * S;
+      const vx = segs[o + 2]! - segs[o]!;
+      const vy = segs[o + 3]! - segs[o + 1]!;
+      const vl = Math.hypot(vx, vy);
+      if (vl === 0 || Math.abs(ux * vy - uy * vx) / vl > sinPar) return null;
+      return {
+        t0: (segs[o]! - hx) * ux + (segs[o + 1]! - hy) * uy,
+        t1: (segs[o + 2]! - hx) * ux + (segs[o + 3]! - hy) * uy,
+        d0: -(segs[o]! - hx) * uy + (segs[o + 1]! - hy) * ux,
+        d1: -(segs[o + 2]! - hx) * uy + (segs[o + 3]! - hy) * ux,
+      };
+    };
+    const near: number[] = [];
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) near.push(...(lines.get(cellKey(hcx + dx, hcy + dy)) ?? []));
+    // The arc end in the wall: a wall line on that side runs on past the hinge or past the end. Its door lines close the opening and stay.
+    const inWall = (e: number): boolean =>
+      near.some((i) => {
+        const g = along(e, i);
+        return g !== null && Math.abs(g.d0) <= band && Math.abs(g.d1) <= band && (Math.min(g.t0, g.t1) < -0.2 * R || Math.max(g.t0, g.t1) > 1.2 * R);
+      });
+    for (const e of [endA, endB]) {
+      if (P.doorKeepWallSide && inWall(e)) continue;
+      const ux = Math.cos(e);
+      const uy = Math.sin(e);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (const i of lines.get(cellKey(hcx + dx, hcy + dy)) ?? []) {
+            if (!keep[i] || !isLineKind(segs[i * S + SEG_KIND]!)) continue;
+            const o = i * S;
+            const vx = segs[o + 2]! - segs[o]!;
+            const vy = segs[o + 3]! - segs[o + 1]!;
+            const vl = Math.hypot(vx, vy);
+            if (vl === 0 || Math.abs(ux * vy - uy * vx) / vl > sinPar) continue;
+            const t0 = (segs[o]! - hx) * ux + (segs[o + 1]! - hy) * uy;
+            const t1 = (segs[o + 2]! - hx) * ux + (segs[o + 3]! - hy) * uy;
+            const d0 = -(segs[o]! - hx) * uy + (segs[o + 1]! - hy) * ux;
+            const d1 = -(segs[o + 2]! - hx) * uy + (segs[o + 3]! - hy) * ux;
+            if (Math.abs(d0) > band || Math.abs(d1) > band) continue;
+            if (Math.min(t0, t1) < -0.1 * R || Math.max(t0, t1) > 1.1 * R || Math.abs(t1 - t0) < 0.8 * R) continue;
+            keep[i] = 0;
+            dropped++;
+          }
+        }
+      }
+    }
+  }
+  return dropped;
+}
+
 // A9: component rule. Small free-standing groups of kept lines are not walls.
 function componentRule(
   segs: Float64Array,
@@ -956,6 +1148,7 @@ export function filterWallSegments(
     loopBridged: 0,
     stairDropped: 0,
     dashDropped: 0,
+    doorDropped: 0,
     compDropped: 0,
     compLimMm: 0,
   };
@@ -1026,6 +1219,10 @@ export function filterWallSegments(
   }
   stats.dashDropped = dashRule(segs, n, keep, mm, P);
   markRejected(REJECT_REASON.dash);
+  if (P.doorMinRadiusMm > 0) {
+    stats.doorDropped = doorRule(segs, n, keep, mm, P);
+    markRejected(REJECT_REASON.door);
+  }
   const cp = componentRule(segs, n, keep, input.bounds ?? segmentBounds(segs, n), mm, P);
   markRejected(REJECT_REASON.component);
   stats.compDropped = cp.dropped;

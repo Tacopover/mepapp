@@ -2,7 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import { REJECT_REASON, SEGMENT_STRIDE, SEG_KIND, SEG_WIDTH, SEG_X0, SEG_X1, SEG_Y0, SEG_Y1, KIND_MASK } from '@mepapp/core';
 
 /** Colour groups of the wall-line debug overlay. Each wall filter reason code belongs to one group. */
-export type WallDebugGroup = 'kept' | 'noPartner' | 'noHatchEvidence' | 'stair' | 'dashOrHatch' | 'other';
+export type WallDebugGroup = 'kept' | 'noPartner' | 'noHatchEvidence' | 'stair' | 'dashOrHatch' | 'door' | 'other';
 
 export const WALL_DEBUG_GROUPS: readonly { group: WallDebugGroup; label: string; color: number }[] = [
   { group: 'kept', label: 'Kept as wall', color: 0x00c853 },
@@ -10,6 +10,7 @@ export const WALL_DEBUG_GROUPS: readonly { group: WallDebugGroup; label: string;
   { group: 'noHatchEvidence', label: 'Dropped: no hatch between the pair', color: 0xfb8c00 },
   { group: 'stair', label: 'Dropped: stair', color: 0x8e24aa },
   { group: 'dashOrHatch', label: 'Dropped: dash or hatch line', color: 0x1e88e5 },
+  { group: 'door', label: 'Dropped: door leaf or door opening line', color: 0x00acc1 },
   { group: 'other', label: 'Dropped: short, curve, loop or small part', color: 0x9e9e9e },
 ];
 
@@ -25,6 +26,7 @@ const REASON_TEXT: Record<number, string> = {
   [REJECT_REASON.dash]: 'dropped: dash rule',
   [REJECT_REASON.component]: 'dropped: small separate part (component rule)',
   [REJECT_REASON.noHatchEvidence]: 'dropped: paired, but no hatch between the lines',
+  [REJECT_REASON.door]: 'dropped: door leaf or door opening line (door rule)',
 };
 
 const KIND_TEXT = ['stroked line', 'filled edge', 'stroked curve piece', 'filled curve piece'];
@@ -42,6 +44,8 @@ export function wallDebugGroup(reason: number): WallDebugGroup {
     case REJECT_REASON.dash:
     case REJECT_REASON.hatch:
       return 'dashOrHatch';
+    case REJECT_REASON.door:
+      return 'door';
     default:
       return 'other';
   }
@@ -66,7 +70,7 @@ export interface WallLineInfo {
 
 /** Filter result of one page, with a uniform grid for the nearest-line lookup under the pointer. */
 export class WallDebugData {
-  readonly counts: Record<WallDebugGroup, number> = { kept: 0, noPartner: 0, noHatchEvidence: 0, stair: 0, dashOrHatch: 0, other: 0 };
+  readonly counts: Record<WallDebugGroup, number> = { kept: 0, noPartner: 0, noHatchEvidence: 0, stair: 0, dashOrHatch: 0, door: 0, other: 0 };
   private readonly cellPt: number;
   private readonly minX: number;
   private readonly minY: number;

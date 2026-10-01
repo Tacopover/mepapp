@@ -186,6 +186,30 @@ describe('filterWallSegments', () => {
     }
   });
 
+  it('drops an open door leaf found by its swing arc, keeps the walls', () => {
+    // A 900 mm door in the right wall, hinge at (W, 40). The leaf (two lines 50 mm apart) stands open into the room;
+    // the swing arc runs from the leaf end to the other side of the opening, in 12 straight pieces.
+    const R = 36;
+    const leaf: Seg[] = [line(W, 40, W - R, 40), line(W, 38, W - R, 38)];
+    const arc: Seg[] = [];
+    for (let k = 0; k < 12; k++) {
+      const a0 = Math.PI - (k * Math.PI) / 24;
+      const a1 = Math.PI - ((k + 1) * Math.PI) / 24;
+      arc.push(line(W + R * Math.cos(a0), 40 + R * Math.sin(a0), W + R * Math.cos(a1), 40 + R * Math.sin(a1), { width: 0.2 }));
+    }
+    const input = build([...rectWalls({ gapY: 40, gap: R }), ...leaf, ...arc], [-400, -400, 900, 600]);
+    const on = filterWallSegments(input, MM);
+    // rectWalls with a gap has 10 lines; the leaf lines are 10 and 11.
+    for (let i = 10; i < 12; i++) {
+      expect(on.keep[i]).toBe(0);
+      expect(on.reason[i]).toBe(REJECT_REASON.door);
+    }
+    expect(on.stats.doorDropped).toBe(2);
+    for (let i = 0; i < 10; i++) expect(on.keep[i]).toBe(1);
+    const off = filterWallSegments(input, MM, { doorMinRadiusMm: 0 });
+    for (let i = 10; i < 12; i++) expect(off.keep[i]).toBe(1);
+  });
+
   it('drops a small free-standing pair by the component rule', () => {
     const list = [...rectWalls(), line(400, 40, 440, 40), line(400, 44, 440, 44)];
     const { keep, reason } = filterWallSegments(build(list, [-400, -400, 900, 600]), MM);
