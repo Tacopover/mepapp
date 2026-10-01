@@ -2,7 +2,9 @@
 // split a room by a cut line, merge two rooms. Plan: .claude/plans/room-detection.md phase 8.
 
 import type { Vec2 } from '../geometry.js';
+import { polygonDifference } from './clip.js';
 import { pointInRing, simplifyRing, signedRingArea, traceMaskBoundaries } from './polygon.js';
+import { polygonAreaPt2, polygonContainsPoint } from './room.js';
 import type { RoomPolygon } from './types.js';
 
 /** A vertex of a polygon: ring 0 is the outer ring, ring k + 1 is holes[k]. */
@@ -77,6 +79,44 @@ export function moveVertex(polygon: RoomPolygon, ref: VertexRef, to: Vec2): Room
 export function moveVertices(polygon: RoomPolygon, refs: readonly VertexRef[], delta: Vec2): RoomPolygon {
   const keys = new Set(refs.map((r) => `${r.ring}:${r.index}`));
   return withRings(ringsOf(polygon).map((ring, r) => ring.map((v, i) => (keys.has(`${r}:${i}`) ? { x: v.x + delta.x, y: v.y + delta.y } : v))));
+}
+
+/**
+ * Moves every vertex in `refs` that lies inside one of the `others` polygons to the nearest point on that
+ * polygon's outline (outer ring or hole): a dragged corner stops at the edge of the room it entered.
+ */
+export function pushVerticesOut(polygon: RoomPolygon, refs: readonly VertexRef[], others: readonly RoomPolygon[]): RoomPolygon {
+  const keys = new Set(refs.map((r) => `${r.ring}:${r.index}`));
+  const out = (v: Vec2): Vec2 => {
+    const host = others.find((o) => polygonContainsPoint(o, v));
+    if (!host) return v;
+    let best = v;
+    let bestDist = Infinity;
+    for (const ring of ringsOf(host)) {
+      for (let i = 0; i < ring.length; i++) {
+        const hit = pointSegment(v, ring[i]!, ring[(i + 1) % ring.length]!);
+        if (hit.distance < bestDist) {
+          bestDist = hit.distance;
+          best = hit.point;
+        }
+      }
+    }
+    return best;
+  };
+  return withRings(ringsOf(polygon).map((ring, r) => ring.map((v, i) => (keys.has(`${r}:${i}`) ? out(v) : v))));
+}
+
+/**
+ * The polygon without the parts that the `others` polygons cover: the outline wraps around the rooms next to
+ * it and gets the vertices it needs for that. When the cut leaves several pieces, the largest stays. Null when
+ * nothing is left.
+ */
+export function wrapAroundRooms(polygon: RoomPolygon, others: readonly RoomPolygon[]): RoomPolygon | null {
+  if (others.length === 0) return polygon;
+  const pieces = polygonDifference(polygon, others);
+  const best = pieces[0];
+  if (!best || polygonAreaPt2(best) <= 0) return null;
+  return pieces.length === 1 && polygonAreaPt2(best) >= polygonAreaPt2(polygon) * (1 - 1e-9) ? polygon : best;
 }
 
 /** Every vertex of the polygon (outer ring and holes) inside the box, borders included. */

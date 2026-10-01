@@ -865,7 +865,15 @@ export function MepSketchApp({
 
   const [forcedTabId, setForcedTabId] = useState<string | null>(null);
   const [forcedTabNonce, setForcedTabNonce] = useState(0);
+  // Ids only: an edit of a selected room must not pull the dock back after the user picked another tab.
+  const selectedRoomKey = selectedRooms.map((r) => r.id).join(',');
   useEffect(() => {
+    // A room selected with a room tool (a click with Edit rooms, or the room Fill room just placed) shows its number and name in Properties.
+    if ((tool === 'edit-room' || tool === 'fill-room' || tool === 'split-room') && selectedRoomKey !== '') {
+      setForcedTabId('properties');
+      setForcedTabNonce((n) => n + 1);
+      return;
+    }
     if (tool === 'place-terminal' || tool === 'place-equipment') {
       // Jump to the MEP tab so the user sees which stamp is armed and can pick a different one.
       setForcedTabId('stamps');
@@ -888,7 +896,7 @@ export function MepSketchApp({
     // a canvas selection must keep resolving to 'properties', or that re-run would release the dock.
     setForcedTabId((tool === 'select' || tool === 'circuits') && canvasSelection ? 'properties' : null);
     setForcedTabNonce((n) => n + 1);
-  }, [selection, selectionFromCanvas, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool]);
+  }, [selection, selectionFromCanvas, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool, selectedRoomKey]);
 
   // A circuit or panel that disappears (delete, or Undo of its creation) cannot stay selected in the tree.
   useEffect(() => {

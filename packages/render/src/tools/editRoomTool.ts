@@ -74,7 +74,6 @@ export class EditRoomTool implements Tool {
 
   onDeactivate(ctx: ToolContext): void {
     ctx.setRoomVertexSelection([]);
-    ctx.clearRoomSelection();
   }
 
   dragKinds: Tool['dragKinds'] = {
@@ -82,7 +81,7 @@ export class EditRoomTool implements Tool {
       onMove: (ctx, _event, world) => {
         const drag = ctx.drag;
         if (drag.kind !== 'room-vertex') return;
-        drag.polygon = moveVertices(drag.base, drag.refs, { x: world.x - drag.origin.x, y: world.y - drag.origin.y });
+        drag.polygon = ctx.pushRoomVerticesOut(drag.roomId, moveVertices(drag.base, drag.refs, { x: world.x - drag.origin.x, y: world.y - drag.origin.y }), drag.refs);
         drag.changed = true;
         ctx.previewRoomPolygon(drag.roomId, drag.polygon);
       },

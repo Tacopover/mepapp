@@ -102,7 +102,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, removeVertices, verticesInBox, roomBounds, type VertexRef, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, polygonDifference, polygonContainsPoint, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams, filterWallSegments } from '@mepapp/core';
+import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, removeVertices, verticesInBox, roomBounds, type VertexRef, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, polygonDifference, polygonContainsPoint, rectPolygon, pushVerticesOut, wrapAroundRooms, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams, filterWallSegments } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroupVisibility, type WallDebugGroup, type WallLineInfo } from './wallDebugLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
@@ -206,6 +206,10 @@ function hexColorToPixi(hex: string): number {
 // dash option, so syncDrawingLayer's strokeDashedPolyline walks a segment cycling
 // through this sequence, issuing one stroke() call per "on" entry.
 const ROOM_HANDLE_RADIUS_PX = 5;
+/** Tools that keep the room selection when the user switches between them. */
+const ROOM_TOOLS: ReadonlySet<SketchTool> = new Set<SketchTool>(['fill-room', 'edit-room', 'split-room']);
+/** Side of the square room that click-to-fill places where no closed walls surround the click. */
+const CLICK_FILL_DEFAULT_ROOM_MM = 2000;
 const WALL_DEBUG_HOVER_PX = 6;
 const WALL_DEBUG_HIGHLIGHT_PX = 4;
 const ROOM_EDGE_HIT_PX = 6;
@@ -661,6 +665,7 @@ export class SketchScene {
       hitRoomEdge: (world) => self.hitRoomEdge(world),
       previewRoomPolygon: (id, polygon) => self.previewRoomPolygon(id, polygon),
       commitRoomPolygon: (id, polygon) => self.commitRoomPolygon(id, polygon),
+      pushRoomVerticesOut: (id, polygon, refs) => self.pushRoomVerticesOut(id, polygon, refs),
       splitRoomByLine: (a, b) => self.splitRoomByLine(a, b),
       markDirty: () => self.markDirty(),
       syncDrawingLayer: () => self.syncDrawingLayer(),
@@ -805,6 +810,8 @@ export class SketchScene {
     }
     this.tool = tool;
     this.selectedRoomVertices = [];
+    // The room selection (shown in the Properties panel) lives while the user stays with the room tools.
+    if (!ROOM_TOOLS.has(tool)) this.clearRoomSelection();
     this.pendingPoints = [];
     if (!isCircuitSubTool) {
       this.circuitToolTargetId = null;
@@ -2828,6 +2835,7 @@ export class SketchScene {
     if (!calibration) return this.emitNotice('Calibrate the drawing first: room areas need the scale.', 'warning');
     const pageIndex = doc.pageIndex;
     const existing = roomsAtPoint(this.listRooms(), point, pageIndex)[0];
+    if (existing) this.selectRooms([existing.id]);
     if (existing) return this.emitNotice(`There is already a room here${existing.name ? `: ${existing.name}` : ''}.`, 'info');
     this.roomFillBusy = true;
     try {
@@ -2843,21 +2851,26 @@ export class SketchScene {
       const labels = readRoomLabelsFromText(await handle.getTextRuns(pageIndex)).filter((l) => roomsAtPoint(this.listRooms(), l.anchor, pageIndex).length === 0);
       const { fill, method, confidence } = detectRoomAtWithLabels(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, labels, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}, cached.cache);
       if (this.doc !== doc || this.doc.pageIndex !== pageIndex) return;
-      if (fill.flags.fillEmpty) return this.emitNotice('No room found at this point.', 'warning');
-      if (fill.flags.touchesRoiBorder && method === 'plain') return this.emitNotice('The area is not closed: the fill leaks out. Close the gap in the walls, or draw the room by hand.', 'warning');
-      if (!polygonContainsPoint(fill.polygon, point)) return this.emitNotice('No room found at this point.', 'warning');
-      // Click-to-fill never takes area from a room that is already placed: the fill loses the parts that other
+      // No closed walls around the click (the fill leaks out, or finds no free space there): a default
+      // rectangle the user can drag into shape replaces the fill.
+      const leaks = fill.flags.fillEmpty || (fill.flags.touchesRoiBorder && method === 'plain') || !polygonContainsPoint(fill.polygon, point);
+      const half = CLICK_FILL_DEFAULT_ROOM_MM / 2 / (1 / calibration.pageUnitsPerRealUnit);
+      const outline = leaks ? rectPolygon(point.x - half, point.y - half, point.x + half, point.y + half) : fill.polygon;
+      // Click-to-fill never takes area from a room that is already placed: the outline loses the parts that other
       // rooms cover, and the new room is the piece under the click.
       const others = this.listRooms().filter((r) => r.pageIndex === pageIndex).map((r) => r.polygon);
-      const pieces = others.length > 0 ? polygonDifference(fill.polygon, others) : [fill.polygon];
+      const pieces = others.length > 0 ? polygonDifference(outline, others) : [outline];
       const piece = pieces.find((p) => polygonContainsPoint(p, point));
       if (!piece) return this.emitNotice('Other rooms already cover this area.', 'warning');
       const fromFill = roomFromFill({ ...fill, polygon: piece }, pageIndex, 'click');
-      const [labelled] = withRoomLabels([{ ...fromFill, confidence: confidence, ...(method === 'bounded' ? { open: true } : {}) }], labels, calibration);
+      const [labelled] = leaks ? [{ ...fromFill, open: true }] : withRoomLabels([{ ...fromFill, confidence: confidence, ...(method === 'bounded' ? { open: true } : {}) }], labels, calibration);
       const room = this.addRoom(labelled!, { keepOthers: true });
       if (!room) return this.emitNotice('Other rooms already cover this area.', 'warning');
+      // The new room is selected, so its number and name can be typed in the Properties panel.
+      this.selectRooms([room.id]);
       const area = roomAreaM2(room, calibration).toFixed(1);
-      this.emitNotice(room.open ? `Room of ${area} m² added, but the area looks open. Check the outline.` : `Room${room.name ? ` ${room.name}` : ''} of ${area} m² added.`, room.open ? 'warning' : 'info');
+      if (leaks) this.emitNotice(`No closed walls here: a room of ${area} m² was placed. Use Edit rooms to drag its corners into place.`, 'warning');
+      else this.emitNotice(room.open ? `Room of ${area} m² added, but the area looks open. Check the outline.` : `Room${room.name ? ` ${room.name}` : ''} of ${area} m² added.`, room.open ? 'warning' : 'info');
     } catch (err) {
       this.emitNotice(`Room fill failed: ${(err as Error).message}`, 'warning');
     } finally {
@@ -2920,27 +2933,39 @@ export class SketchScene {
 
   /**
    * Changes a room's name, number, polygon or flags as one undo step. A change of name, number or
-   * polygon locks the room. A new polygon is trimmed by locked rooms and trims detected rooms it
-   * overlaps. Returns false for an unknown id, or when the change would leave nothing of the room.
+   * polygon locks the room. Other rooms keep their shape: a new polygon loses the parts that other
+   * rooms of the page cover (it wraps around them). Returns false for an unknown id, or when the
+   * change would leave nothing of the room.
    */
   updateRoom(id: string, patch: RoomPatch): boolean {
     const rooms = this.doc.drawingHistory.getState().rooms;
     const before = rooms[id];
     if (!before) return false;
-    const after = updateRoomFields(before, patch);
-    const plan = patch.polygon !== undefined ? this.planRoomOverlaps(before.pageIndex, [after]) : null;
-    if (plan && plan.dropped.length > 0) {
-      this.emitNotice('Other rooms already cover this area.', 'warning');
-      return false;
+    let after = updateRoomFields(before, patch);
+    if (patch.polygon !== undefined) {
+      const wrapped = wrapAroundRooms(after.polygon, this.otherRoomPolygons(id, before.pageIndex));
+      if (!wrapped) {
+        this.emitNotice('Other rooms already cover this area.', 'warning');
+        return false;
+      }
+      if (wrapped !== after.polygon) after = { ...after, polygon: wrapped };
     }
-    if (!plan || (plan.update.length === 0 && plan.add[0] === after)) {
-      this.doc.drawingHistory.execute(updateRoomCommand(before, after));
-    } else {
-      this.doc.drawingHistory.execute(replaceRoomsCommand(`Edit room ${id}`, [before, ...plan.update.map((r) => rooms[r.id]!)], [plan.add[0]!, ...plan.update]));
-    }
+    this.doc.drawingHistory.execute(updateRoomCommand(before, after));
     this.notifyRoomsChanged();
-    this.noteAdjusted(plan?.update.length ?? 0);
     return true;
+  }
+
+  /** Polygons of the rooms on the page other than `id`. */
+  private otherRoomPolygons(id: string, pageIndex: number): RoomPolygon[] {
+    return this.listRooms()
+      .filter((r) => r.id !== id && r.pageIndex === pageIndex)
+      .map((r) => r.polygon);
+  }
+
+  /** Dragged vertices that enter another room jump to that room's nearest edge (edit-room tool preview and commit). */
+  private pushRoomVerticesOut(roomId: string, polygon: RoomPolygon, refs: readonly VertexRef[]): RoomPolygon {
+    const room = this.doc.drawingHistory.getState().rooms[roomId];
+    return room ? pushVerticesOut(polygon, refs, this.otherRoomPolygons(roomId, room.pageIndex)) : polygon;
   }
 
   /** Deletes rooms as one undo step. Unknown ids are ignored. */

@@ -145,6 +145,8 @@ export interface ToolContext {
   previewRoomPolygon(roomId: string, polygon: RoomPolygon | null): void;
   /** Stores a new outline for the room as one undo step. */
   commitRoomPolygon(roomId: string, polygon: RoomPolygon): void;
+  /** Moves the vertices in `refs` that lie inside another room to that room's nearest edge. */
+  pushRoomVerticesOut(roomId: string, polygon: RoomPolygon, refs: readonly VertexRef[]): RoomPolygon;
   /** Split-room tool: cuts the room under the line a-b in two. */
   splitRoomByLine(a: Vec2, b: Vec2): void;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { insertVertex, mergePolygons, moveVertex, moveVertices, nearestEdge, nearestVertex, polygonAreaPt2, removeVertex, removeVertices, splitPolygon, verticesInBox } from './index.js';
+import { insertVertex, mergePolygons, moveVertex, moveVertices, nearestEdge, nearestVertex, polygonAreaPt2, pushVerticesOut, removeVertex, removeVertices, splitPolygon, verticesInBox, wrapAroundRooms } from './index.js';
 
 const square = (x: number, y: number, s: number) => ({
   outer: [
@@ -74,6 +74,33 @@ describe('multi-vertex edits', () => {
     expect(removeVertices(withHole, [{ ring: 1, index: 0 }])!.holes[0]).toHaveLength(3);
     expect(removeVertices(withHole, [{ ring: 1, index: 0 }, { ring: 1, index: 2 }])).toBeNull();
     expect(removeVertices(withHole, [{ ring: 0, index: 0 }])!.outer).toHaveLength(3);
+  });
+});
+
+describe('editing next to other rooms', () => {
+  const neighbour = square(100, 0, 100); // shares the edge x = 100 with square(0, 0, 100)
+
+  it('moves a dragged vertex that entered another room to that room\'s nearest edge', () => {
+    const p = moveVertex(square(0, 0, 100), { ring: 0, index: 1 }, { x: 130, y: 10 });
+    const out = pushVerticesOut(p, [{ ring: 0, index: 1 }], [neighbour]);
+    expect(out.outer[1]).toEqual({ x: 130, y: 0 });
+    // A vertex outside every other room, or not dragged, stays.
+    expect(pushVerticesOut(p, [{ ring: 0, index: 2 }], [neighbour])).toEqual(p);
+  });
+
+  it('wraps an outline around a room it overlaps; the other room is not part of the result', () => {
+    // Pull the right edge of the left room 40 into its neighbour: the overlap is cut away again.
+    const p = moveVertices(square(0, 0, 100), [{ ring: 0, index: 1 }, { ring: 0, index: 2 }], { x: 40, y: 0 });
+    const w = wrapAroundRooms(p, [neighbour])!;
+    expect(area(w)).toBeCloseTo(10000, 6);
+    // An outline around a small room gets a hole for it.
+    const ring = wrapAroundRooms(square(0, 0, 300), [square(100, 100, 50)])!;
+    expect(ring.holes).toHaveLength(1);
+    expect(area(ring)).toBeCloseTo(90000 - 2500, 6);
+    // Nothing overlaps: the same object comes back. Fully covered: null.
+    const free = square(0, 0, 100);
+    expect(wrapAroundRooms(free, [square(500, 500, 10)])).toBe(free);
+    expect(wrapAroundRooms(square(110, 10, 20), [neighbour])).toBeNull();
   });
 });
 
