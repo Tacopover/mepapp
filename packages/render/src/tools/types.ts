@@ -1,5 +1,5 @@
 import type { FederatedPointerEvent, Sprite, Texture } from 'pixi.js';
-import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, SnapLines, Transaction, Transform2D, Vec2 } from '@mepapp/core';
+import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, RoomPolygon, SnapLines, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
 import type { AlignmentGuide } from './alignmentGuides.js';
 import type { DrawingState, SketchDocument } from '../document.js';
 import type { StampInfo, TerminalAssignmentResult } from '../scene.js';
@@ -19,6 +19,9 @@ export type SketchTool =
   | 'place-equipment'
   | 'calibrate'
   | 'measure'
+  | 'fill-room'
+  | 'edit-room'
+  | 'split-room'
   | 'draw-segment'
   | 'draw-freehand'
   | 'draw-line'
@@ -83,6 +86,22 @@ export type DragState =
     }
   | { kind: 'resize-rect'; id: string; corner: 'x0y0' | 'x1y0' | 'x1y1' | 'x0y1'; original: AnnotationGeometry; tx: Transaction<DrawingState>; moved: boolean }
   | { kind: 'resize-circle'; id: string; center: Vec2; tx: Transaction<DrawingState>; moved: boolean }
+  | {
+      kind: 'room-vertex';
+      roomId: string;
+      /** The vertices that move with the grabbed one: the whole vertex selection, or just the grabbed vertex. */
+      refs: VertexRef[];
+      /** The grabbed vertex's position at gesture start. The delta of the move is the pointer minus this. */
+      origin: Vec2;
+      /** The polygon at gesture start. */
+      base: RoomPolygon;
+      /** The moved polygon, shown as preview and stored on pointer up. */
+      polygon: RoomPolygon;
+      changed: boolean;
+      /** A click on a selected vertex, without a move, narrows the selection to it. */
+      narrowTo: VertexRef | null;
+    }
+  | { kind: 'room-vertex-box'; roomId: string; startWorld: Vec2; currentWorld: Vec2; additive: boolean }
   | { kind: 'rubber-band'; startWorld: Vec2; currentWorld: Vec2; additive: boolean }
   | { kind: 'draw-freehand'; points: Vec2[] }
   | { kind: 'draw-shape'; shapeKind: 'rectangle' | 'circle'; startWorld: Vec2; currentWorld: Vec2 }
@@ -107,6 +126,29 @@ export interface ToolContext {
   emit<K extends string>(event: K, ...args: unknown[]): void;
   /** Reopens the floating textarea for an already-placed textbox/stickyNote annotation — see SketchScene.openTextEditor. */
   openTextEditor(id: string): void;
+  /** Click-to-fill room detection at a page point — see SketchScene.fillRoomAtPoint. */
+  fillRoomAtPoint(point: Vec2): void;
+  /** Room selection for the edit-room tool — see SketchScene.selectRoomAtPoint. */
+  selectRoomAtPoint(point: Vec2, additive: boolean): void;
+  clearRoomSelection(): void;
+  /** The selected vertices of the single selected room (edit-room tool). */
+  getRoomVertexSelection(): readonly VertexRef[];
+  setRoomVertexSelection(refs: readonly VertexRef[]): void;
+  /** The id of the single selected room when the point is inside it or near it: a drag from here box-selects vertices. Null otherwise. */
+  selectedRoomNear(world: Vec2): string | null;
+  /** Selects the vertices of the room inside the box; `additive` keeps the current vertex selection. */
+  selectRoomVerticesInBox(roomId: string, min: Vec2, max: Vec2, additive: boolean): void;
+  /** Vertex and edge of the single selected room under the pointer (edit-room tool). */
+  hitRoomVertex(world: Vec2): { roomId: string; ring: number; index: number; polygon: RoomPolygon } | null;
+  hitRoomEdge(world: Vec2): { roomId: string; ring: number; index: number; point: Vec2; polygon: RoomPolygon } | null;
+  /** Shows `polygon` for the room while a vertex is dragged (null ends the preview). Nothing is stored. */
+  previewRoomPolygon(roomId: string, polygon: RoomPolygon | null): void;
+  /** Stores a new outline for the room as one undo step. */
+  commitRoomPolygon(roomId: string, polygon: RoomPolygon): void;
+  /** Moves the vertices in `refs` that lie inside another room to that room's nearest edge. */
+  pushRoomVerticesOut(roomId: string, polygon: RoomPolygon, refs: readonly VertexRef[]): RoomPolygon;
+  /** Split-room tool: cuts the room under the line a-b in two. */
+  splitRoomByLine(a: Vec2, b: Vec2): void;
 
   /** Current world scale (1 = 100%) — for converting screen-px thresholds (handle hit radius, min-drag distance) to world units. */
   getZoomScale(): number;

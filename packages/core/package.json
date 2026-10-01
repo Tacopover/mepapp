@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run"
   },
-  "dependencies": {},
+  "dependencies": {
+    "polygon-clipping": "^0.15.7"
+  },
   "devDependencies": {
     "vitest": "^2"
   }

@@ -11,3 +11,9 @@ src-tauri/target/
 # Real client project files used as schematic reference material — not for
 # the open-source repo (see .claude/plans/electrical-schematic-templates.md §2).
 fixtures/schematics/
+
+# Local-only test PDFs for room detection (copied by hand onto each machine).
+# The pdf-engine-mupdf tests skip a file that is absent.
+fixtures/pdfs/00_arch_ground_floor_edit.pdf
+fixtures/pdfs/Example_*.pdf
+fixtures/pdfs/Test_doc.pdf

@@ -83,6 +83,30 @@ export const IconMeasure = (props: IconProps) => (
   </Svg>
 );
 
+export const IconFillRoom = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 4h16v16H4z" />
+    <path d="M9 9h6v6H9z" fill="currentColor" />
+  </Svg>
+);
+
+export const IconEditRoom = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 4h16v16H4z" />
+    <circle cx="4" cy="4" r="1.6" fill="currentColor" />
+    <circle cx="20" cy="4" r="1.6" fill="currentColor" />
+    <circle cx="20" cy="20" r="1.6" fill="currentColor" />
+    <circle cx="4" cy="20" r="1.6" fill="currentColor" />
+  </Svg>
+);
+
+export const IconSplitRoom = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 4h16v16H4z" />
+    <path d="M12 2v20" strokeDasharray="3 2" />
+  </Svg>
+);
+
 export const IconChevDown = (props: IconProps) => (
   <Svg {...props}>
     <path d="M6 9l6 6 6-6" />

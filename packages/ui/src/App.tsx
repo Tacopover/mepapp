@@ -8,6 +8,7 @@ import {
   calibrationFromScale,
   STAMP_LIBRARY,
   type NetworkType,
+  type RoomDetectionClient,
   type ReconciliationReport,
   type SchematicSymbol,
   type SchematicTemplate,
@@ -16,9 +17,10 @@ import {
   type StampLabel,
   type StampLabelVisibility,
 } from '@mepapp/core';
-import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
+import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool, type WallDebugState } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
+import { WallDebugPanel } from './components/WallDebugPanel.js';
 import { loadDefinitionBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
 import { CanvasContextMenu } from './components/CanvasContextMenu.js';
@@ -26,6 +28,7 @@ import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { StampsPanel, getVisibleStampDefinitions, pickStampDefinition } from './components/StampsPanel.js';
 import type { StampLabelLanguage } from './components/LanguageToggle.js';
 import type { StampCategoryFilter } from './components/CategorySwitcher.js';
+import { useRoomSelection } from './useRoomSelection.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ToastStack, useToasts } from './components/Toasts.js';
@@ -72,6 +75,8 @@ export interface MepSketchAppProps {
   // app must offer the exact corresponding source. The app shell computes
   // this link (it knows the build's commit SHA); this component just shows it.
   correspondingSourceUrl?: string;
+  /** Creates the room detection client (a Web Worker behind it). Without it the room menu items are disabled. */
+  createRoomDetectionClient?: () => RoomDetectionClient;
   /** Resolves a stamp-library definition's iconRef to a fetchable URL. Defaults to apps/web's copy under /stamps/. */
   resolveStampIconUrl?: (iconRef: string) => string;
 }
@@ -89,6 +94,26 @@ function supportsFileSystemAccess(): boolean {
 }
 
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
+
+const ROOM_GAP_STORAGE_KEY = 'mepapp.settings.roomGapMm.v1';
+
+function readStoredNumber(key: string, fallback: number): number {
+  try {
+    const raw = window.localStorage.getItem(key);
+    const value = raw === null ? NaN : Number(raw);
+    return Number.isFinite(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function storeNumber(key: string, value: number): void {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // Storage can be blocked; the setting then lasts for this session only.
+  }
+}
 
 const SNAP_RADIUS_STORAGE_KEY = 'mepapp.settings.snapRadiusPx.v1';
 const ANGLE_SNAP_STORAGE_KEY = 'mepapp.settings.angleSnapDegrees.v1';
@@ -152,6 +177,7 @@ export function MepSketchApp({
   onLoadPdfPage,
   onLoadPdfPageAt,
   correspondingSourceUrl,
+  createRoomDetectionClient,
   resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL,
 }: MepSketchAppProps) {
   const {
@@ -201,8 +227,60 @@ export function MepSketchApp({
     activePdfHandle,
   } = useSketchScene();
 
-  const [status, setStatus] = useState('');
   const { toasts, pushToast, dismissToast } = useToasts();
+  const [status, setStatus] = useState('');
+  const handleDetectRooms = useCallback(async () => {
+    const scene = sceneRef.current;
+    if (!scene || !createRoomDetectionClient || roomAbortRef.current) return;
+    const client = (roomClientRef.current ??= createRoomDetectionClient());
+    const abort = new AbortController();
+    roomAbortRef.current = abort;
+    setRoomsDetecting(true);
+    try {
+      const result = await scene.detectRooms(client, { onProgress: (fraction, phase) => setStatus(`Detecting rooms: ${phase} ${Math.round(fraction * 100)}%`), signal: abort.signal });
+      if (result) {
+        setStatus(`Placed ${result.found} rooms from ${result.labels} room names.`);
+        pushToast({
+          message: `Placed ${result.found} rooms.${result.review > 0 ? ` ${result.review} need a check (orange).` : ''}${result.missing > 0 ? ` ${result.missing} names had no room.` : ''}${result.adjusted > 0 ? ` ${result.adjusted} existing rooms were adjusted so rooms do not overlap.` : ''}`,
+          kind: 'info',
+        });
+      } else setStatus('');
+    } catch (err) {
+      const cancelled = (err as Error).name === 'RoomDetectionCancelled';
+      setStatus(cancelled ? 'Room detection cancelled.' : `Room detection failed: ${(err as Error).message}`);
+    } finally {
+      roomAbortRef.current = null;
+      setRoomsDetecting(false);
+    }
+  }, [createRoomDetectionClient, pushToast, sceneRef]);
+  const handleCancelRoomDetection = useCallback(() => roomAbortRef.current?.abort(), []);
+  const handleToggleRooms = useCallback(() => sceneRef.current?.setRoomsVisible(!sceneRef.current.isRoomsVisible()), [sceneRef]);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    setRoomsVisible(scene.isRoomsVisible());
+    scene.on('roomsVisibleChanged', setRoomsVisible);
+    return () => scene.off('roomsVisibleChanged', setRoomsVisible);
+  }, [ready, sceneRef]);
+  const [wallDebugVisible, setWallDebugVisible] = useState(false);
+  const handleToggleWallDebug = useCallback(() => sceneRef.current?.setWallDebugVisible(!sceneRef.current.getWallDebugState().visible), [sceneRef]);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    const onChanged = (s: WallDebugState) => setWallDebugVisible(s.visible);
+    scene.on('wallDebugChanged', onChanged);
+    return () => scene.off('wallDebugChanged', onChanged);
+  }, [ready, sceneRef]);
+  const roomClientRef = useRef<RoomDetectionClient | null>(null);
+  const roomAbortRef = useRef<AbortController | null>(null);
+  const [roomsDetecting, setRoomsDetecting] = useState(false);
+  const [roomGapMm, setRoomGapMm] = useState(() => readStoredNumber(ROOM_GAP_STORAGE_KEY, 1000));
+  const selectedRooms = useRoomSelection(sceneRef, ready);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setRoomSettings({ gapMm: roomGapMm });
+  }, [ready, roomGapMm, sceneRef]);
+  const [roomsVisible, setRoomsVisible] = useState(true);
+  useEffect(() => () => roomClientRef.current?.dispose(), []);
   const networkTreeState = useNetworkTreeState();
   useEffect(() => {
     const scene = sceneRef.current;
@@ -759,6 +837,8 @@ export function MepSketchApp({
     ),
     properties: (
       <PropertiesPanel
+        selectedRooms={selectedRooms}
+        calibration={calibration}
         sceneRef={sceneRef}
         selection={selection}
         selectedSegment={selectedSegment}
@@ -788,7 +868,15 @@ export function MepSketchApp({
 
   const [forcedTabId, setForcedTabId] = useState<string | null>(null);
   const [forcedTabNonce, setForcedTabNonce] = useState(0);
+  // Ids only: an edit of a selected room must not pull the dock back after the user picked another tab.
+  const selectedRoomKey = selectedRooms.map((r) => r.id).join(',');
   useEffect(() => {
+    // A room selected with a room tool (a click with Edit rooms, or the room Fill room just placed) shows its number and name in Properties.
+    if ((tool === 'edit-room' || tool === 'fill-room' || tool === 'split-room') && selectedRoomKey !== '') {
+      setForcedTabId('properties');
+      setForcedTabNonce((n) => n + 1);
+      return;
+    }
     if (tool === 'place-terminal' || tool === 'place-equipment') {
       // Jump to the MEP tab so the user sees which stamp is armed and can pick a different one.
       setForcedTabId('stamps');
@@ -811,7 +899,7 @@ export function MepSketchApp({
     // a canvas selection must keep resolving to 'properties', or that re-run would release the dock.
     setForcedTabId((tool === 'select' || tool === 'circuits') && canvasSelection ? 'properties' : null);
     setForcedTabNonce((n) => n + 1);
-  }, [selection, selectionFromCanvas, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool]);
+  }, [selection, selectionFromCanvas, selectedSegment, selectedSegments, selectedFitting, selectedCircuitId, selectedPanelId, tool, selectedRoomKey]);
 
   // A circuit or panel that disappears (delete, or Undo of its creation) cannot stay selected in the tree.
   useEffect(() => {
@@ -853,6 +941,14 @@ export function MepSketchApp({
           onOpenGlobalProperties={() => setGlobalPropertiesOpen(true)}
           onOpenManageBuildings={() => setManageBuildingsOpen(true)}
           pdfLoaded={pdfHandle !== null}
+          roomsAvailable={createRoomDetectionClient !== undefined}
+          roomsDetecting={roomsDetecting}
+          roomsVisible={roomsVisible}
+          onDetectRooms={handleDetectRooms}
+          onCancelRoomDetection={handleCancelRoomDetection}
+          onToggleRooms={handleToggleRooms}
+          wallDebugVisible={wallDebugVisible}
+          onToggleWallDebug={handleToggleWallDebug}
         />
         <DocumentSwitcher documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
         <div className="mep-fill" />
@@ -890,6 +986,7 @@ export function MepSketchApp({
                 onOpenSettings={() => setSettingsOpen(true)}
                 onPickDefaultStamp={handlePickDefaultStamp}
               />
+              <WallDebugPanel sceneRef={sceneRef} ready={ready} />
               {textboxPrompt && (
                 <textarea
                   ref={textboxRef}
@@ -980,6 +1077,11 @@ export function MepSketchApp({
           onChangeSnapRadiusPx={handleChangeSnapRadiusPx}
           angleSnapDegrees={angleSnapDegrees}
           onChangeAngleSnapDegrees={handleChangeAngleSnapDegrees}
+          roomGapMm={roomGapMm}
+          onChangeRoomGapMm={(mm) => {
+            setRoomGapMm(mm);
+            storeNumber(ROOM_GAP_STORAGE_KEY, mm);
+          }}
           onClose={() => setSettingsOpen(false)}
         />
       )}

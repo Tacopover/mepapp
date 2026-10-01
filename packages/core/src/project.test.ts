@@ -36,6 +36,7 @@ describe('serializeProject / loadProject round trip', () => {
       stampLabelLayouts: { 'fire-hose-reel': [{ id: 'l1', propertyKey: 'stamp:name', anchorX: 0.5, anchorY: 1, fontSize: 9, textColor: '#282828' }] },
       schematics: [],
       schematicProjectFields: {},
+      rooms: [{ id: 'room-1', pageIndex: 0, polygon: { outer: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], holes: [] }, name: 'Kitchen', number: '0.12', source: 'click', locked: true, open: false }],
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -212,6 +213,7 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.stampLabelLayouts).toEqual({}); // later steps (v8->v9, v10->v11, v11->v12) all run in sequence
     expect(loaded.schematics).toEqual([]);
     expect(loaded.schematicProjectFields).toEqual({});
+    expect(loaded.rooms).toEqual([]); // v12->v13
   });
 
   it('migrates a pre-circuit-defaults (v9) save unchanged, since the new fields are all optional', () => {
@@ -305,6 +307,7 @@ describe('serializeProject / loadProject round trip', () => {
       stampLabelLayouts: {},
       schematics: [],
       schematicProjectFields: {},
+      rooms: [],
     };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {

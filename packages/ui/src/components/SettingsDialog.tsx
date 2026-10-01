@@ -5,6 +5,9 @@ export interface SettingsDialogProps {
   onChangeSnapRadiusPx: (px: number) => void;
   angleSnapDegrees: number;
   onChangeAngleSnapDegrees: (degrees: number) => void;
+  /** Room detection: door gaps up to this width (mm) count as wall. */
+  roomGapMm: number;
+  onChangeRoomGapMm: (mm: number) => void;
   onClose: () => void;
 }
 
@@ -14,7 +17,7 @@ export const MIN_ANGLE_SNAP_DEGREES = 1;
 export const MAX_ANGLE_SNAP_DEGREES = 90;
 
 /** First real Dialog consumer beyond the calibration prompt (ui-atlas-layout-mapping.md §5/§7 D2) — Menu → Settings. */
-export function SettingsDialog({ snapRadiusPx, onChangeSnapRadiusPx, angleSnapDegrees, onChangeAngleSnapDegrees, onClose }: SettingsDialogProps) {
+export function SettingsDialog({ snapRadiusPx, onChangeSnapRadiusPx, angleSnapDegrees, onChangeAngleSnapDegrees, roomGapMm, onChangeRoomGapMm, onClose }: SettingsDialogProps) {
   return (
     <Dialog title="Settings" onClose={onClose} actions={<button onClick={onClose}>Close</button>}>
       <div className="mep-section">
@@ -46,6 +49,13 @@ export function SettingsDialog({ snapRadiusPx, onChangeSnapRadiusPx, angleSnapDe
               onChangeAngleSnapDegrees(clamped);
             }}
           />
+        </div>
+      </div>
+      <div className="mep-section">
+        <h4>Rooms</h4>
+        <div className="mep-field-row">
+          <label>Door gap closed up to (mm)</label>
+          <input type="number" min={100} max={3000} step={100} value={roomGapMm} onChange={(e) => onChangeRoomGapMm(Math.min(3000, Math.max(100, Number(e.target.value) || 1000)))} />
         </div>
       </div>
       <p className="mep-settings-hint">

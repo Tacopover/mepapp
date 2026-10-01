@@ -14,6 +14,7 @@ import {
   type PanelSection,
   type PlacedStamp,
   type PortGroup,
+  type Room,
   type Schematic,
   type Segment,
   type StampDefinition,
@@ -32,6 +33,8 @@ export interface DrawingState {
   circuits: Record<string, Circuit>;
   panels: Record<string, Panel>;
   panelSections: Record<string, PanelSection>;
+  /** room-detection.md Phase 6 — detected and hand-drawn rooms, undo-tracked. */
+  rooms: Record<string, Room>;
 }
 
 /** The PixiJS-side render cache for one placed stamp — its actual data (position/transform/ports/etc.) lives in DrawingState.stamps instead, so this holds only what can't be derived from that: the sprite object and its base texture-to-world scale. A sprite is kept alive (detached, not destroyed) if its stamp is deleted, so an undo can re-attach it without re-fetching art — see SketchScene.syncStampSprites. */
@@ -87,6 +90,8 @@ export class SketchDocument {
   backdropSprite: Sprite | null = null;
   /** Which page of pdfHandle the backdrop currently shows (status bar page navigation) — view-only: placed elements aren't page-scoped yet (they still all record pageIndex: 0), see atlas §6 D4. */
   pageIndex = 0;
+  /** Room polygons and labels of the current page, rebuilt by SketchScene.syncRoomLayer. Below the stamps so elements stay clickable-looking on top. */
+  readonly roomLayer = new Container();
   readonly stampsLayer = new Container();
   readonly drawingLayer = new Graphics();
   /** PixiJS Text nodes for placed textbox annotations — a Graphics object can't render text, so these live in their own container, fully rebuilt alongside drawingLayer on every syncDrawingLayer (see SketchScene.drawAnnotation). */
@@ -107,6 +112,7 @@ export class SketchDocument {
     circuits: {},
     panels: {},
     panelSections: {},
+    rooms: {},
   });
   readonly networkTypes: NetworkType[] = [{ ...NETWORK_TYPE_LIBRARY[0] }];
   /** Ports on the same element linked into one connectivity node — e.g. an AHU's supply + return (see core's PortGroup doc comment). Set via SketchScene.setPortGroup. */
@@ -131,6 +137,7 @@ export class SketchDocument {
   nextPanelSeq = 1;
   nextPanelSectionSeq = 1;
   nextPanelAccessorySeq = 1;
+  nextRoomSeq = 1;
   lastFlowResult: FlowResult[] | null = null;
   /** Whether the on-canvas flow overlay (syncFlowLabels) should currently render — turned on by computeFlow() (the "Solve flow" button) and off whenever no segment stays selected, so the overlay reads as a deliberate, selection-scoped visualization rather than a permanent one. lastFlowResult itself is always kept live (see SketchScene.recomputeFlow) regardless of this flag, so Properties-panel capacity readouts never depend on it. */
   flowOverlayActive = false;
@@ -148,7 +155,8 @@ export class SketchDocument {
       Object.keys(state.fittings).length === 0 &&
       Object.keys(state.annotations).length === 0 &&
       Object.keys(state.circuits).length === 0 &&
-      Object.keys(state.panels).length === 0
+      Object.keys(state.panels).length === 0 &&
+      Object.keys(state.rooms).length === 0
     );
   }
 
@@ -161,6 +169,7 @@ export class SketchDocument {
     this.backdropSprite?.destroy({ texture: true });
     destroyStampEntries(this.stamps.values());
     this.stamps.clear();
+    this.roomLayer.destroy({ children: true });
     this.stampsLayer.destroy();
     this.drawingLayer.destroy();
     this.annotationTextLayer.destroy({ children: true });

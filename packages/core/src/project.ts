@@ -7,13 +7,14 @@
 import type { Annotation } from './annotation.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
+import type { Room } from './rooms/room.js';
 import type { Schematic } from './schematic.js';
 import type { PlacedStamp } from './stamp.js';
 import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 12;
+export const CURRENT_SCHEMA_VERSION = 13;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -38,6 +39,8 @@ export interface ProjectDocument {
   schematics: Schematic[];
   /** Entered values of template fields with scope 'project', by field id, shared by every schematic. */
   schematicProjectFields: Record<string, string>;
+  /** Rooms detected from the PDF or drawn by hand (room-detection.md Phase 6). Polygons are in displayed page space, per page; area is derived from the calibration and not saved. */
+  rooms: Room[];
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -223,6 +226,16 @@ const migrationSteps: MigrationStep[] = [
         data.schematicProjectFields && typeof data.schematicProjectFields === 'object' && !Array.isArray(data.schematicProjectFields) ? data.schematicProjectFields : {},
     }),
   },
+  {
+    fromVersion: 12,
+    toVersion: 13,
+    // Version 12 predates rooms (room-detection.md Phase 6) — no save before this could have any.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 13,
+      rooms: Array.isArray(data.rooms) ? data.rooms : [],
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -250,6 +263,7 @@ const validators = [
   (data: JsonRecord) => requireRecord(data, 'stampLabelLayouts'),
   (data: JsonRecord) => requireArray(data, 'schematics'),
   (data: JsonRecord) => requireRecord(data, 'schematicProjectFields'),
+  (data: JsonRecord) => requireArray(data, 'rooms'),
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

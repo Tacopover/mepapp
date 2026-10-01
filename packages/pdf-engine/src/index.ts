@@ -66,7 +66,7 @@ export interface FlattenRequest {
                  | { kind: 'vector'; svg: string; pageRect: PageRect };
 }
 
-// Vector/text extraction (read-only). These types use
+// Vector/text extraction (read-only), used by room detection. These types use
 // DISPLAYED page space: points, origin at the TOP-LEFT of the upright page,
 // y pointing DOWN, with the page's own /Rotate already applied. This is the
 // "display space" of packages/core/src/calibration.ts, so results feed the
@@ -117,6 +117,13 @@ export interface TextRun {
   fontSizePt: number;
 }
 
+// An optional-content group (a PDF "layer"). `visible` is the state in the
+// document's default configuration.
+export interface LayerInfo {
+  name: string;
+  visible: boolean;
+}
+
 export interface PdfDocumentHandle {
   getPageCount(): number;
   getPageInfo(pageIndex: number): PageInfo;
@@ -133,9 +140,12 @@ export interface PdfDocumentHandle {
   // carry one by that name (e.g. a PDF that was never saved from MepApp).
   getEmbeddedFile(name: string): Promise<Uint8Array | null>;
   save(): Promise<Uint8Array>;
-  // Read-only vector extraction; coordinates are in displayed page space
+  // Read-only vector/text extraction; coordinates are in displayed page space
   // (see the note above PATH_KIND).
   getVectorPaths(pageIndex: number, opts?: VectorPathOptions): Promise<VectorPageData>;
+  getTextRuns(pageIndex: number): Promise<TextRun[]>;
+  // Document-wide list (layers are not per page in PDF).
+  listLayers(): Promise<LayerInfo[]>;
 }
 
 export interface PdfEngine {

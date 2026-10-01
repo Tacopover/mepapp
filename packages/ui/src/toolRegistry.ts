@@ -19,6 +19,9 @@ import {
   IconPolyline,
   IconRuler,
   IconMeasure,
+  IconFillRoom,
+  IconEditRoom,
+  IconSplitRoom,
   type IconProps,
 } from './icons.js';
 
@@ -77,6 +80,14 @@ export const RAIL_ROWS: RailRow[] = [
     members: [
       { id: 'calibrate', label: 'Calibrate', Icon: IconRuler, tool: 'calibrate' },
       { id: 'measure', label: 'Measure', Icon: IconMeasure, tool: 'measure' },
+    ],
+  },
+  {
+    id: 'rooms',
+    members: [
+      { id: 'fill-room', label: 'Fill room', Icon: IconFillRoom, tool: 'fill-room' },
+      { id: 'edit-room', label: 'Edit rooms', Icon: IconEditRoom, tool: 'edit-room' },
+      { id: 'split-room', label: 'Split room', Icon: IconSplitRoom, tool: 'split-room' },
     ],
   },
   {
