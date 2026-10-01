@@ -207,6 +207,7 @@ function hexColorToPixi(hex: string): number {
 // dash option, so syncDrawingLayer's strokeDashedPolyline walks a segment cycling
 // through this sequence, issuing one stroke() call per "on" entry.
 const ROOM_HANDLE_RADIUS_PX = 5;
+const ROOM_TEXT_MAX_RESOLUTION = 8; // texture scale cap for the room labels at high zoom
 /** Tools that keep the room selection when the user switches between them. */
 const ROOM_TOOLS: ReadonlySet<SketchTool> = new Set<SketchTool>(['fill-room', 'edit-room', 'split-room']);
 /** Side of the square room that click-to-fill places where no closed walls surround the click. */
@@ -563,7 +564,7 @@ export class SketchScene {
   private showCircuitLines = false;
   /** App-level settings a stamp label's text depends on — pushed down by the UI (setLabelContext), since both live outside any document. */
   private labelContext: { customPropertyDefs: GlobalPropertyDefs; labelLanguage: 'en' | 'nl' } = {
-    customPropertyDefs: { terminal: [], equipment: [], circuit: [] },
+    customPropertyDefs: { terminal: [], equipment: [], circuit: [], room: [] },
     labelLanguage: 'en',
   };
   /** The status bar's label toggle and filter — a view setting, same for every document. */
@@ -2390,7 +2391,7 @@ export class SketchScene {
    * simplest first-pass behavior, no separate rename affordance in the dialog.
    */
   applyCustomPropertyCascade(
-    category: StampCategory | 'circuit',
+    category: StampCategory | 'circuit' | 'room',
     previous: CustomPropertyDefinition[],
     next: CustomPropertyDefinition[],
   ): void {
@@ -2412,6 +2413,11 @@ export class SketchScene {
         for (const [id, circuit] of Object.entries(circuits)) circuits[id] = { ...circuit, properties: applyTo(circuit.properties) };
         return { ...state, circuits };
       }
+      if (category === 'room') {
+        const rooms = { ...state.rooms };
+        for (const [id, room] of Object.entries(rooms)) rooms[id] = { ...room, properties: applyTo(room.properties) };
+        return { ...state, rooms };
+      }
       const stamps = { ...state.stamps };
       for (const [id, data] of Object.entries(stamps)) {
         if (data.category !== category) continue;
@@ -2422,6 +2428,10 @@ export class SketchScene {
     tx.commit();
     if (category === 'circuit') {
       this.notifyCircuitsChanged();
+      return;
+    }
+    if (category === 'room') {
+      this.notifyRoomsChanged();
       return;
     }
     this.markDirty();
@@ -2519,7 +2529,9 @@ export class SketchScene {
   private syncRoomLayer(): void {
     const preview = this.roomPreview;
     const rooms = this.roomsVisible ? this.listRooms().filter((r) => r.pageIndex === this.doc.pageIndex).map((r) => (preview && r.id === preview.id ? { ...r, polygon: preview.polygon } : r)) : [];
-    drawRooms(this.doc.roomLayer, rooms, this.doc.calibration, this.selectedRoomIds, this.tool === 'edit-room' ? ROOM_HANDLE_RADIUS_PX / this.world.scale.x : 0, this.selectedRoomVertices);
+    // The label text is a texture in world units: its resolution follows the zoom so it stays sharp when zoomed in.
+    const textResolution = Math.min(ROOM_TEXT_MAX_RESOLUTION, Math.max(1, Math.ceil(this.app.renderer.resolution * this.world.scale.x * 2) / 2));
+    drawRooms(this.doc.roomLayer, rooms, this.doc.calibration, this.selectedRoomIds, this.tool === 'edit-room' ? ROOM_HANDLE_RADIUS_PX / this.world.scale.x : 0, this.selectedRoomVertices, textResolution);
   }
 
   /** Detection settings from the UI: door gap width in mm. Used by detectRooms and click-to-fill. */

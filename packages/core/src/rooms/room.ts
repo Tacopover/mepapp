@@ -5,6 +5,7 @@
 
 import { pointInRing } from './polygon.js';
 import type { Calibration } from '../calibration.js';
+import type { CustomPropertyValues } from '../custom-properties.js';
 import type { Vec2 } from '../geometry.js';
 import type { RoomFillResult, RoomPolygon } from './types.js';
 
@@ -31,6 +32,8 @@ export interface Room {
   confidence?: number;
   /** Labels found inside the same polygon that were not chosen. A non-empty list means the polygon may hold more than one room. */
   otherLabels?: string[];
+  /** Values for the Room tab of Global Properties (per-installation custom fields) — see custom-properties.ts. */
+  properties?: CustomPropertyValues;
 }
 
 export type RoomInput = Omit<Room, 'id'>;
@@ -148,11 +151,11 @@ export function manualRoom(pageIndex: number, outer: readonly Vec2[]): RoomInput
   return { pageIndex, polygon: { outer: outer.map((p) => ({ ...p })), holes: [] }, name: null, number: null, source: 'manual', locked: true, open: false };
 }
 
-export type RoomPatch = Partial<Pick<Room, 'polygon' | 'name' | 'number' | 'open' | 'labelAreaM2'>>;
+export type RoomPatch = Partial<Pick<Room, 'polygon' | 'name' | 'number' | 'open' | 'labelAreaM2' | 'properties'>>;
 
-/** Applies a change to a room. A change of polygon, name or number locks the room. */
+/** Applies a change to a room. A change of polygon, name, number or custom properties locks the room (a re-run of Detect rooms keeps it). */
 export function updateRoom(room: Room, patch: RoomPatch): Room {
-  const userEdit = patch.polygon !== undefined || patch.name !== undefined || patch.number !== undefined;
+  const userEdit = patch.polygon !== undefined || patch.name !== undefined || patch.number !== undefined || patch.properties !== undefined;
   return { ...room, ...patch, locked: room.locked || userEdit };
 }
 

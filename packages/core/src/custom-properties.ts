@@ -18,6 +18,7 @@ export interface GlobalPropertyDefs {
   terminal: CustomPropertyDefinition[];
   equipment: CustomPropertyDefinition[];
   circuit: CustomPropertyDefinition[];
+  room: CustomPropertyDefinition[];
 }
 
 /** Custom property values stamped on one placed Terminal/Equipment. */
@@ -52,6 +53,13 @@ export const RESERVED_CIRCUIT_PROPERTY_NAMES = [
 
 export function isReservedCircuitPropertyName(name: string): boolean {
   return RESERVED_CIRCUIT_PROPERTY_NAMES.includes(name.trim().toLowerCase());
+}
+
+/** Field labels the Room Properties view and the Excel export already use — a custom room property can't reuse one of these. */
+export const RESERVED_ROOM_PROPERTY_NAMES = ['number', 'name', 'area', 'area (m²)', 'area in drawing', 'area in drawing (m²)', 'page', 'source', 'needs review', 'details'];
+
+export function isReservedRoomPropertyName(name: string): boolean {
+  return RESERVED_ROOM_PROPERTY_NAMES.includes(name.trim().toLowerCase());
 }
 
 export function coerceDefaultValue(definition: CustomPropertyDefinition): string | number {

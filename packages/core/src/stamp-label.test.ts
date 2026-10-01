@@ -53,7 +53,7 @@ describe('label text', () => {
     circuits: [],
     panels: [],
     circuitTypes: [],
-    customPropertyDefs: { terminal: [], equipment: [], circuit: [] },
+    customPropertyDefs: { terminal: [], equipment: [], circuit: [], room: [] },
     labelLanguage: 'en',
   });
 

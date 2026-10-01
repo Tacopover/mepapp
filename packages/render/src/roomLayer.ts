@@ -9,7 +9,7 @@ const MAX_FONT_PT = 14;
 const flat = (ring: readonly Vec2[]): number[] => ring.flatMap((p) => [p.x, p.y]);
 
 /** Redraws the room overlay of one page into `layer`: a tinted polygon with holes cut out, an outline, and a number / name / area label. Rooms that need review are orange. */
-export function drawRooms(layer: Container, rooms: readonly Room[], calibration: Calibration | null, selected: ReadonlySet<string> = new Set(), handleRadiusPt = 0, selectedVertices: readonly VertexRef[] = []): void {
+export function drawRooms(layer: Container, rooms: readonly Room[], calibration: Calibration | null, selected: ReadonlySet<string> = new Set(), handleRadiusPt = 0, selectedVertices: readonly VertexRef[] = [], textResolution = 1): void {
   for (const child of layer.removeChildren()) child.destroy();
   if (rooms.length === 0) return;
   const shapes = new Graphics();
@@ -48,7 +48,7 @@ export function drawRooms(layer: Container, rooms: readonly Room[], calibration:
     if (text === '') continue;
     const b = roomBounds(room);
     const fontSize = Math.min(MAX_FONT_PT, Math.max(MIN_FONT_PT, Math.sqrt((b.maxX - b.minX) * (b.maxY - b.minY)) / 10));
-    const label = new Text({ text, style: { fontSize, fill: color, align: 'center' } });
+    const label = new Text({ text, style: { fontSize, fill: color, align: 'center' }, resolution: textResolution });
     label.anchor.set(0.5);
     const p = roomLabelPoint(room);
     label.position.set(p.x, p.y);

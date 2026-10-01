@@ -16,3 +16,4 @@ export { roomConfidence, roomPriority, resolveRoomOverlaps, planRoomOverlaps, ty
 export { snapOutlineToWalls, type OutlineSnapOptions } from './outline-snap.js';
 export { orthogonalizeOutline, type OrthoOptions } from './ortho.js';
 export { detectLabelledRooms, type LabelTarget, type LabelledRoom, type LabelledResult, type LabelledOptions, type LabelledMethod } from './labelled.js';
+export * from './export.js';

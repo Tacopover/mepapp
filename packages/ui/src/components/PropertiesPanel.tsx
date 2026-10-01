@@ -73,7 +73,7 @@ export interface PropertiesPanelProps {
   /** The active document's adopted network types — the selected segment's "Network Type" dropdown. */
   networkTypes: NetworkType[];
   /** Global Properties definitions (Terminal, Equipment and Circuit) — see GlobalPropertiesDialog. */
-  customPropertyDefs: { terminal: CustomPropertyDefinition[]; equipment: CustomPropertyDefinition[]; circuit: CustomPropertyDefinition[] };
+  customPropertyDefs: { terminal: CustomPropertyDefinition[]; equipment: CustomPropertyDefinition[]; circuit: CustomPropertyDefinition[]; room: CustomPropertyDefinition[] };
   /** The active document's user-authored elements — looked up against the selected stamp's definitionId to gate the "Edit ports…" action to custom (source: 'custom') elements only; the four hardcoded STAMP_LIBRARY entries stay read-only. */
   customStampDefinitions: StampDefinition[];
   /** Resolves a stamp definition's display name the same way the Stamps tab does — see stampLabelFor. */
@@ -129,7 +129,7 @@ export function PropertiesPanel({
   selectedRooms = [],
   calibration = null,
 }: PropertiesPanelProps) {
-  if (selectedRooms.length > 0) return <RoomProperties sceneRef={sceneRef} rooms={selectedRooms} calibration={calibration} />;
+  if (selectedRooms.length > 0) return <RoomProperties sceneRef={sceneRef} rooms={selectedRooms} calibration={calibration} customPropertyDefinitions={customPropertyDefs.room} />;
   if (selectedCircuitId) {
     const circuit = circuits.find((c) => c.id === selectedCircuitId);
     if (circuit) {

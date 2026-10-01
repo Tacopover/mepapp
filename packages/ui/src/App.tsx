@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import {
+  buildRoomExportTable,
   buildStampPropertyContext,
   DEFAULT_STAMP_LABEL_VISIBILITY,
   getStampDefinition,
@@ -37,6 +38,7 @@ import { useNetworkTreeState } from './useNetworkTreeState.js';
 import { CircuitsToolbar } from './components/CircuitsToolbar.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
+import { roomTableToXlsx } from './roomExport.js';
 import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { Dialog } from './components/Dialog.js';
 import { CalibrationDialog } from './components/CalibrationDialog.js';
@@ -94,6 +96,7 @@ function supportsFileSystemAccess(): boolean {
 }
 
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
+const XLSX_PICKER_TYPES = [{ description: 'Excel workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }];
 
 const ROOM_GAP_STORAGE_KEY = 'mepapp.settings.roomGapMm.v1';
 
@@ -121,7 +124,7 @@ const LABEL_LANGUAGE_STORAGE_KEY = 'mepapp.settings.labelLanguage.v1';
 const ONBOARDING_STORAGE_KEY = 'mepapp.onboarding.seen.v1';
 const CUSTOM_PROPERTIES_STORAGE_KEY = 'mepapp.customProperties.v1';
 const LABEL_VISIBILITY_STORAGE_KEY = 'mepapp.settings.labelVisibility.v1';
-const EMPTY_CUSTOM_PROPERTY_DEFS: GlobalPropertyDefs = { terminal: [], equipment: [], circuit: [] };
+const EMPTY_CUSTOM_PROPERTY_DEFS: GlobalPropertyDefs = { terminal: [], equipment: [], circuit: [], room: [] };
 
 function loadCustomPropertyDefs(): GlobalPropertyDefs {
   try {
@@ -132,6 +135,7 @@ function loadCustomPropertyDefs(): GlobalPropertyDefs {
       terminal: Array.isArray(parsed.terminal) ? parsed.terminal : [],
       equipment: Array.isArray(parsed.equipment) ? parsed.equipment : [],
       circuit: Array.isArray(parsed.circuit) ? parsed.circuit : [],
+      room: Array.isArray(parsed.room) ? parsed.room : [],
     };
   } catch {
     return EMPTY_CUSTOM_PROPERTY_DEFS;
@@ -160,7 +164,10 @@ async function writeToFileHandle(fileHandle: FileSystemFileHandle, bytes: Uint8A
 }
 
 function downloadPdfBytes(bytes: Uint8Array<ArrayBuffer>, fileName: string): void {
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+  downloadBlob(new Blob([bytes], { type: 'application/pdf' }), fileName);
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -375,6 +382,7 @@ export function MepSketchApp({
       sceneRef.current?.applyCustomPropertyCascade('terminal', customPropertyDefs.terminal, next.terminal);
       sceneRef.current?.applyCustomPropertyCascade('equipment', customPropertyDefs.equipment, next.equipment);
       sceneRef.current?.applyCustomPropertyCascade('circuit', customPropertyDefs.circuit, next.circuit);
+      sceneRef.current?.applyCustomPropertyCascade('room', customPropertyDefs.room, next.room);
       setCustomPropertyDefs(next);
       localStorage.setItem(CUSTOM_PROPERTIES_STORAGE_KEY, JSON.stringify(next));
       setGlobalPropertiesOpen(false);
@@ -552,6 +560,30 @@ export function MepSketchApp({
     },
     [activeDoc, activeDocumentId, sceneRef],
   );
+
+  const handleExportRooms = useCallback(async () => {
+    const rooms = sceneRef.current?.listRooms() ?? [];
+    if (rooms.length === 0) {
+      setStatus('There are no rooms to export.');
+      return;
+    }
+    try {
+      const blob = await roomTableToXlsx(buildRoomExportTable(rooms, calibration, customPropertyDefs.room));
+      const suggestedName = `${(activeDoc?.fileName ?? 'rooms').replace(/\.pdf$/i, '')}-rooms.xlsx`;
+      if (!supportsFileSystemAccess()) {
+        downloadBlob(blob, suggestedName);
+        setStatus(`Downloaded ${suggestedName} (${rooms.length} rooms).`);
+        return;
+      }
+      const fileHandle = await window.showSaveFilePicker!({ suggestedName, types: XLSX_PICKER_TYPES });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      setStatus(`Exported ${rooms.length} rooms to ${fileHandle.name}.`);
+    } catch (err) {
+      if (!isAbortError(err)) setStatus(`Failed to export rooms: ${(err as Error).message}`);
+    }
+  }, [activeDoc, calibration, customPropertyDefs.room, sceneRef]);
 
   const handleSave = useCallback(async () => {
     const bytes = await syncAndGetPdfBytes();
@@ -947,6 +979,7 @@ export function MepSketchApp({
           onDetectRooms={handleDetectRooms}
           onCancelRoomDetection={handleCancelRoomDetection}
           onToggleRooms={handleToggleRooms}
+          onExportRooms={handleExportRooms}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
         />

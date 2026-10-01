@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { roomAreaM2, roomAreaWarning, type Calibration, type Room } from '@mepapp/core';
+import { coerceDefaultValue, roomAreaM2, roomAreaWarning, type Calibration, type CustomPropertyDefinition, type Room } from '@mepapp/core';
 
 /** Text input that commits on blur or Enter, not on every keystroke (one undo step per edit). */
 function CommitInput({ value, onCommit }: { value: string; onCommit: (value: string) => void }) {
@@ -16,10 +16,12 @@ export interface RoomPropertiesProps {
   sceneRef: RefObject<SketchScene | null>;
   rooms: Room[];
   calibration: Calibration | null;
+  /** The Room tab of Global Properties: the custom fields every room shows. */
+  customPropertyDefinitions: CustomPropertyDefinition[];
 }
 
 /** Properties of the rooms selected with the edit-room tool. */
-export function RoomProperties({ sceneRef, rooms, calibration }: RoomPropertiesProps) {
+export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDefinitions }: RoomPropertiesProps) {
   const remove = () => sceneRef.current?.deleteRooms(rooms.map((r) => r.id));
   if (rooms.length > 1) {
     const total = calibration ? rooms.reduce((sum, r) => sum + roomAreaM2(r, calibration), 0) : null;
@@ -82,6 +84,18 @@ export function RoomProperties({ sceneRef, rooms, calibration }: RoomPropertiesP
           <label>Source</label>
           <input type="text" value={`${room.source}${room.locked ? ' (locked)' : ''}`} disabled />
         </div>
+        {customPropertyDefinitions.map((def) => (
+          <div className="mep-field-row" key={def.name}>
+            <label>{def.name}</label>
+            <CommitInput
+              value={String(room.properties?.[def.name] ?? coerceDefaultValue(def))}
+              onCommit={(v) => {
+                const parsed = Number(v);
+                update({ properties: { ...room.properties, [def.name]: def.kind === 'numeric' ? (v.trim() !== '' && Number.isFinite(parsed) ? parsed : 0) : v } });
+              }}
+            />
+          </div>
+        ))}
         {room.otherLabels && room.otherLabels.length > 0 && <p className="mep-settings-hint">Other labels inside this outline: {room.otherLabels.join(', ')}. The outline may hold more than one room.</p>}
         <button type="button" onClick={() => sceneRef.current?.setTool('split-room')}>
           Split room…

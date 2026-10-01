@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { isReservedCircuitPropertyName, isReservedPropertyName, type CustomPropertyDefinition, type CustomPropertyKind, type GlobalPropertyDefs } from '@mepapp/core';
+import { isReservedCircuitPropertyName, isReservedPropertyName, isReservedRoomPropertyName, type CustomPropertyDefinition, type CustomPropertyKind, type GlobalPropertyDefs } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 
 export type { GlobalPropertyDefs };
@@ -12,7 +12,7 @@ export interface GlobalPropertiesDialogProps {
 
 type Category = keyof GlobalPropertyDefs;
 
-const CATEGORY_LABELS: Record<Category, string> = { terminal: 'Terminal', equipment: 'Equipment', circuit: 'Circuit' };
+const CATEGORY_LABELS: Record<Category, string> = { terminal: 'Terminal', equipment: 'Equipment', circuit: 'Circuit', room: 'Room' };
 
 function validate(defs: CustomPropertyDefinition[], category: Category): string | null {
   const seen = new Set<string>();
@@ -20,7 +20,8 @@ function validate(defs: CustomPropertyDefinition[], category: Category): string 
     const trimmed = def.name.trim();
     if (!trimmed) return 'Property name cannot be empty.';
     const lower = trimmed.toLowerCase();
-    if ((category === 'circuit' ? isReservedCircuitPropertyName(lower) : isReservedPropertyName(lower))) return `"${trimmed}" is already a built-in field.`;
+    const reserved = category === 'circuit' ? isReservedCircuitPropertyName(lower) : category === 'room' ? isReservedRoomPropertyName(lower) : isReservedPropertyName(lower);
+    if (reserved) return `"${trimmed}" is already a built-in field.`;
     if (seen.has(lower)) return `"${trimmed}" is used twice.`;
     seen.add(lower);
   }
@@ -30,7 +31,7 @@ function validate(defs: CustomPropertyDefinition[], category: Category): string 
 /**
  * Per-installation custom property editor (ui-atlas-layout-mapping.md §4's
  * "Global Properties" row) — Menu → Global Properties. Terminal, Equipment
- * and Circuit. Segment/Fitting need a new undo command first (their edits go
+ * Circuit and Room. Segment/Fitting need a new undo command first (their edits go
  * through SketchDocument's CommandManager) and are deferred.
  */
 export function GlobalPropertiesDialog({ definitions, onSave, onClose }: GlobalPropertiesDialogProps) {
