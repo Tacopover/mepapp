@@ -5,6 +5,7 @@ import {
   getStampDefinition,
   isLibraryStampId,
   SCHEMATIC_TEMPLATE_LIBRARY,
+  calibrationFromScale,
   STAMP_LIBRARY,
   type NetworkType,
   type ReconciliationReport,
@@ -35,6 +36,7 @@ import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { Dialog } from './components/Dialog.js';
+import { CalibrationDialog } from './components/CalibrationDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
@@ -208,7 +210,6 @@ export function MepSketchApp({
     scene.on('notice', pushToast);
     return () => scene.off('notice', pushToast);
   }, [ready, sceneRef, pushToast]);
-  const [calibrationInput, setCalibrationInput] = useState('');
   const [textboxInput, setTextboxInput] = useState('');
   const [reconciliation, setReconciliation] = useState<ReconciliationReport | null>(null);
   const [disciplineGroup, setDisciplineGroup] = useState<DisciplineGroup | null>(null);
@@ -949,6 +950,7 @@ export function MepSketchApp({
         pageCount={pageCount}
         onChangePage={(next) => void handleChangePage(next)}
         calibration={calibration}
+        onSetScale={(denominator) => sceneRef.current?.setCalibration(calibrationFromScale(denominator))}
         measurementMm={measurementMm}
         selectedCount={selection.length}
         drawingSummary={drawingSummary}
@@ -958,39 +960,18 @@ export function MepSketchApp({
       />
 
       {calibrationPrompt && (
-        <Dialog
-          title="Calibration"
-          onClose={() => {
+        <CalibrationDialog
+          p1={calibrationPrompt.p1}
+          p2={calibrationPrompt.p2}
+          onCancel={() => {
             calibrationPrompt.resolve(null);
             setCalibrationPrompt(null);
-            setCalibrationInput('');
           }}
-          actions={
-            <>
-              <button
-                onClick={() => {
-                  calibrationPrompt.resolve(null);
-                  setCalibrationPrompt(null);
-                  setCalibrationInput('');
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  calibrationPrompt.resolve(Number(calibrationInput));
-                  setCalibrationPrompt(null);
-                  setCalibrationInput('');
-                }}
-              >
-                Set calibration
-              </button>
-            </>
-          }
-        >
-          <p>Known real-world distance between the two clicked points (mm):</p>
-          <input autoFocus type="number" value={calibrationInput} onChange={(e) => setCalibrationInput(e.target.value)} />
-        </Dialog>
+          onSubmit={(distanceMm) => {
+            calibrationPrompt.resolve(distanceMm);
+            setCalibrationPrompt(null);
+          }}
+        />
       )}
 
       {settingsOpen && (

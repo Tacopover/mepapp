@@ -66,6 +66,57 @@ export interface FlattenRequest {
                  | { kind: 'vector'; svg: string; pageRect: PageRect };
 }
 
+// Vector/text extraction (read-only). These types use
+// DISPLAYED page space: points, origin at the TOP-LEFT of the upright page,
+// y pointing DOWN, with the page's own /Rotate already applied. This is the
+// "display space" of packages/core/src/calibration.ts, so results feed the
+// calibration math directly. It differs from the annotation geometry above
+// (PDF content space, origin bottom-left, y up, /Rotate not applied).
+
+// Values of a vector segment's `kind` field. Bit value 4 (PATH_CLOSED_FLAG) is
+// added to the kind when the segment belongs to a closed subpath.
+export const PATH_KIND = {
+  strokedLine: 0, // straight segment of a stroked path
+  filledEdge: 1, // edge of a filled polygon
+  strokedCurve: 2, // flattened piece of a stroked curve
+  filledCurve: 3, // flattened piece of a filled curve
+} as const;
+
+export const PATH_CLOSED_FLAG = 4;
+
+export interface VectorPathOptions {
+  flattenTolerancePt?: number; // max distance between a curve and its line pieces; default 0.25
+  lumMax?: number; // skip paint lighter than this luminance (0 black..1 white); default 0.94
+  alphaMin?: number; // skip paint with less opacity than this; default 0.35
+  maxSegments?: number; // safety cap: when reached, extraction stops and `truncated` is true
+}
+
+// Flat segment list. Segment i occupies 8 numbers at segments[8*i ..]:
+//   0 x0, 1 y0, 2 x1, 3 y1        end points, displayed page space
+//   4 strokeWidthPt               0 for fills
+//   5 colorRgb                    24-bit integer, 0xRRGGBB
+//   6 kind                        a PATH_KIND value, plus PATH_CLOSED_FLAG (4) if the subpath is closed
+//   7 subpathId                   segments of one subpath share an id; ids are unique per page
+// Segments are already clipped to the active clip rectangle. Skipped content:
+// dashed strokes, paint lighter than lumMax or below alphaMin, and anything
+// drawn inside soft masks or tiling patterns.
+export interface VectorPageData {
+  segments: Float64Array; // length is 8 * segmentCount
+  segmentCount: number;
+  truncated: boolean; // true when maxSegments stopped the extraction early
+}
+
+// One line of text. x,y is the top-left corner of the line's bounding box, in
+// displayed page space. Pages that draw text as outlines return no runs.
+export interface TextRun {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSizePt: number;
+}
+
 export interface PdfDocumentHandle {
   getPageCount(): number;
   getPageInfo(pageIndex: number): PageInfo;
@@ -82,6 +133,9 @@ export interface PdfDocumentHandle {
   // carry one by that name (e.g. a PDF that was never saved from MepApp).
   getEmbeddedFile(name: string): Promise<Uint8Array | null>;
   save(): Promise<Uint8Array>;
+  // Read-only vector extraction; coordinates are in displayed page space
+  // (see the note above PATH_KIND).
+  getVectorPaths(pageIndex: number, opts?: VectorPathOptions): Promise<VectorPageData>;
 }
 
 export interface PdfEngine {

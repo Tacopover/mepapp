@@ -65,6 +65,27 @@ export function calibrateFromKnownDistance(p1: Vec2, p2: Vec2, knownRealDistance
   return { pageUnitsPerRealUnit: pageDistance / knownRealDistance };
 }
 
+const PT_PER_MM = 72 / 25.4;
+
+/** Predefined drawing scales offered in the scale picker, as the N of "1:N". */
+export const PRESET_SCALE_DENOMINATORS = [10, 20, 50, 100, 200, 500] as const;
+
+/**
+ * Calibration for a drawing printed at "1:N" on paper: one paper millimeter stands for N real
+ * millimeters. Assumes the PDF page is at its true paper size (1 pt = 1/72 inch).
+ */
+export function calibrationFromScale(denominator: number): Calibration {
+  if (!(denominator > 0) || !Number.isFinite(denominator)) {
+    throw new Error('denominator must be a positive number');
+  }
+  return { pageUnitsPerRealUnit: PT_PER_MM / denominator };
+}
+
+/** The N of "1:N" that a calibration corresponds to — the inverse of calibrationFromScale. */
+export function scaleDenominatorFromCalibration(calibration: Calibration): number {
+  return PT_PER_MM / calibration.pageUnitsPerRealUnit;
+}
+
 export function measureRealDistance(p1: Vec2, p2: Vec2, calibration: Calibration): number {
   const pageDistance = Math.hypot(p2.x - p1.x, p2.y - p1.y);
   return pageDistance / calibration.pageUnitsPerRealUnit;

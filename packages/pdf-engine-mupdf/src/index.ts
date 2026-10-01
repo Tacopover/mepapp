@@ -10,7 +10,10 @@ import type {
   PdfEngine,
   RasterOptions,
   StoredAnnotation,
+  VectorPageData,
+  VectorPathOptions,
 } from '@mepapp/pdf-engine';
+import { extractVectorPaths } from './vectors.js';
 
 const VALID_ROTATIONS = [0, 90, 180, 270] as const;
 
@@ -528,6 +531,15 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
       newContents.push(existingContents);
       newContents.push(extraContents);
       pageObj.put('Contents', newContents);
+    }
+  }
+
+  async getVectorPaths(pageIndex: number, opts?: VectorPathOptions): Promise<VectorPageData> {
+    const page = this.doc.loadPage(pageIndex);
+    try {
+      return extractVectorPaths(page, opts);
+    } finally {
+      page.destroy();
     }
   }
 
