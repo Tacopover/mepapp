@@ -153,6 +153,28 @@ describe('detectLabelledRooms', () => {
     expect(overlapAreaPt2(r.rooms[1]!.polygon, r.rooms[2]!.polygon)).toBeLessThan(1);
   });
 
+  it('puts a rectangle around the label when the fill lies elsewhere', () => {
+    // A 1.5 m x 1.5 m room full of hatch lines 100 mm apart, next to a 6 m x 6 m room: the fill of the small
+    // room's label cannot start at the label.
+    const lines: Line[] = [...rect(0, 0, 6 * M, 6 * M), ...rect(6 * M + 8, 0, 60, 60)];
+    for (let x = 6 * M + 12; x < 6 * M + 68; x += 4) lines.push([x, 0, x, 60]);
+    const w = walls(lines, [-40, -40, 400, 300]);
+    const small = { anchor: { x: 6 * M + 38, y: 30 }, printedM2: 2.25, bounds: [6 * M + 30, 26, 6 * M + 46, 34] as [number, number, number, number] };
+    const r = detectLabelledRooms(w, [{ anchor: { x: 100, y: 100 }, printedM2: 36 }, small], MM_PER_PT);
+    const big = r.rooms.find((x) => x.target === 0)!;
+    const box = r.rooms.find((x) => x.target === 1)!;
+    expect(Math.abs(big.deviation!)).toBeLessThan(0.05);
+    expect(box.method).toBe('label');
+    expect(box.open).toBe(true);
+    // Text box plus 200 mm (8 pt) on each side.
+    expect(box.polygon.outer.map((p) => [p.x, p.y])).toEqual([
+      [6 * M + 22, 18],
+      [6 * M + 54, 18],
+      [6 * M + 54, 42],
+      [6 * M + 22, 42],
+    ]);
+  });
+
   it('reports a label that lies where no free space exists', () => {
     const w = walls(rect(0, 0, 6 * M, 6 * M), [-40, -40, 300, 300]);
     const r = detectLabelledRooms(w, [{ anchor: { x: 100, y: 100 }, printedM2: 36 }, { anchor: { x: 5000, y: 5000 }, printedM2: null }], MM_PER_PT);

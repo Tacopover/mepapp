@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectRoomAtWithLabels, type RoomLabel } from './index.js';
+import { detectRoomAtWithLabels, polygonContainsPoint, type RoomLabel } from './index.js';
 
 const MM_PER_PT = 25; // 40 pt = 1 m
 const M = 40;
@@ -38,6 +38,28 @@ describe('detectRoomAtWithLabels', () => {
     expect(detectRoomAtWithLabels(input(table), inTable, MM_PER_PT, [label(120, 120, null)]).method).toBe('plain');
     expect(detectRoomAtWithLabels(input(table), inTable, MM_PER_PT, []).method).toBe('plain');
     expect(detectRoomAtWithLabels(input(table), { x: 30, y: 30 }, MM_PER_PT, [label(30, 30, 36)]).method).toBe('plain');
+  });
+
+  it('fills a cubicle narrower than the door gap, not the room next to it', () => {
+    // A 0.8 m x 1.5 m cubicle in the corner of a 6 m x 6 m room, partitions of two lines 50 mm apart.
+    const lines: Line[] = [
+      [0, 0, 240, 0],
+      [-8, -8, 248, -8],
+      [240, 0, 240, 240],
+      [248, -8, 248, 248],
+      [240, 240, 0, 240],
+      [248, 248, -8, 248],
+      [0, 240, 0, 0],
+      [-8, 248, -8, -8],
+      [32, 0, 32, 60],
+      [34, 0, 34, 62],
+      [0, 60, 32, 60],
+      [0, 62, 34, 62],
+    ];
+    const click = { x: 16, y: 30 };
+    const r = detectRoomAtWithLabels(input(lines), click, MM_PER_PT, []);
+    expect(polygonContainsPoint(r.fill.polygon, click)).toBe(true);
+    expect(r.fill.areaM2).toBeCloseTo(1.2, 1);
   });
 
   it('keeps the plain fill when a repair cannot reach the printed area', () => {

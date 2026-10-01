@@ -102,7 +102,7 @@ import type { AnnotationGeometry as PdfAnnotationGeometry, PdfDocumentHandle, St
 import { textureFromImageBitmap } from './texture.js';
 import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
-import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, removeVertices, verticesInBox, roomBounds, type VertexRef, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams, filterWallSegments } from '@mepapp/core';
+import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, removeVertices, verticesInBox, roomBounds, type VertexRef, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, polygonDifference, polygonContainsPoint, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams, filterWallSegments } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroupVisibility, type WallDebugGroup, type WallLineInfo } from './wallDebugLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
@@ -2768,7 +2768,7 @@ export class SketchScene {
         bounds,
         mmPerPt: 1 / calibration.pageUnitsPerRealUnit,
         params: { ...(this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}), ...options.params },
-        targets: labels.map((l) => ({ anchor: l.anchor, printedM2: l.areaM2 })),
+        targets: labels.map((l) => ({ anchor: l.anchor, printedM2: l.areaM2, bounds: l.bounds })),
       },
       { onProgress: options.onProgress },
     );
@@ -2839,15 +2839,22 @@ export class SketchScene {
         const bounds: [number, number, number, number] = [0, 0, swap ? info.heightPt : info.widthPt, swap ? info.widthPt : info.heightPt];
         cached = this.roomFillCache = { doc, pageIndex, input: { segments: data.segments, segmentCount: data.segmentCount, bounds }, cache: {} };
       }
-      const labels = readRoomLabelsFromText(await handle.getTextRuns(pageIndex));
+      // A label inside a room that is already placed belongs to that room: it neither names nor sizes the new room.
+      const labels = readRoomLabelsFromText(await handle.getTextRuns(pageIndex)).filter((l) => roomsAtPoint(this.listRooms(), l.anchor, pageIndex).length === 0);
       const { fill, method, confidence } = detectRoomAtWithLabels(cached.input, point, 1 / calibration.pageUnitsPerRealUnit, labels, this.roomSettings.gapMm !== undefined ? { gapMm: this.roomSettings.gapMm } : {}, cached.cache);
       if (this.doc !== doc || this.doc.pageIndex !== pageIndex) return;
       if (fill.flags.fillEmpty) return this.emitNotice('No room found at this point.', 'warning');
       if (fill.flags.touchesRoiBorder && method === 'plain') return this.emitNotice('The area is not closed: the fill leaks out. Close the gap in the walls, or draw the room by hand.', 'warning');
-      const fromFill = roomFromFill(fill, pageIndex, 'click');
+      if (!polygonContainsPoint(fill.polygon, point)) return this.emitNotice('No room found at this point.', 'warning');
+      // Click-to-fill never takes area from a room that is already placed: the fill loses the parts that other
+      // rooms cover, and the new room is the piece under the click.
+      const others = this.listRooms().filter((r) => r.pageIndex === pageIndex).map((r) => r.polygon);
+      const pieces = others.length > 0 ? polygonDifference(fill.polygon, others) : [fill.polygon];
+      const piece = pieces.find((p) => polygonContainsPoint(p, point));
+      if (!piece) return this.emitNotice('Other rooms already cover this area.', 'warning');
+      const fromFill = roomFromFill({ ...fill, polygon: piece }, pageIndex, 'click');
       const [labelled] = withRoomLabels([{ ...fromFill, confidence: confidence, ...(method === 'bounded' ? { open: true } : {}) }], labels, calibration);
-      const input = labelled;
-      const room = this.addRoom(input!);
+      const room = this.addRoom(labelled!, { keepOthers: true });
       if (!room) return this.emitNotice('Other rooms already cover this area.', 'warning');
       const area = roomAreaM2(room, calibration).toFixed(1);
       this.emitNotice(room.open ? `Room of ${area} m² added, but the area looks open. Check the outline.` : `Room${room.name ? ` ${room.name}` : ''} of ${area} m² added.`, room.open ? 'warning' : 'info');
@@ -2896,10 +2903,11 @@ export class SketchScene {
    * Adds one room (a click-to-fill result or a hand-drawn polygon) as one undo step. Rooms never
    * overlap: the new room is trimmed by rooms that rank higher, and rooms that rank lower are trimmed
    * by it (same undo step). Returns null when other rooms already cover the whole polygon.
+   * With `keepOthers` the polygon is stored as it is and no other room changes: the caller has cut it free.
    */
-  addRoom(input: RoomInput): Room | null {
+  addRoom(input: RoomInput, options: { keepOthers?: boolean } = {}): Room | null {
     const room: Room = { ...input, id: roomId(this.doc.nextRoomSeq++) };
-    const plan = this.planRoomOverlaps(room.pageIndex, [room]);
+    const plan = options.keepOthers ? null : this.planRoomOverlaps(room.pageIndex, [room]);
     if (plan && plan.dropped.length > 0) return null;
     const final = plan?.add[0] ?? room;
     const updated = plan?.update ?? [];

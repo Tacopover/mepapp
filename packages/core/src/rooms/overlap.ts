@@ -10,7 +10,7 @@ import type { RoomPolygon } from './types.js';
 
 /** Confidence of a detected room from the way it was found and how well its area matches the printed one. */
 export function roomConfidence(method: string, deviation: number | null): number {
-  const base: Record<string, number> = { detected: 0.95, direct: 0.95, plain: 0.7, dissolved: 0.85, gap: 0.8, split: 0.7, bounded: 0.4 };
+  const base: Record<string, number> = { detected: 0.95, direct: 0.95, plain: 0.7, dissolved: 0.85, gap: 0.8, split: 0.7, bounded: 0.4, label: 0.2 };
   const b = base[method] ?? 0.5;
   return deviation === null ? b * 0.6 : b * (1 - Math.min(Math.abs(deviation), 0.6));
 }

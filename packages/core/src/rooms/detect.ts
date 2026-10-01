@@ -117,7 +117,14 @@ export function detectRoomAtWithLabels(
 }
 
 function labelGuidedFill(walls: FilteredWalls, seedPt: Vec2, mmPerPt: number, labels: readonly RoomLabel[], P: RoomDetectionParams, tolerance: number): ClickFillResult {
-  const plain = fillRoomAt(walls, seedPt, mmPerPt, P);
+  // A room narrower than the door gap (a toilet cubicle) has no point far enough from the walls: the fill then
+  // starts in the next wider room. A smaller gap lets the fill stay in the room that was clicked.
+  let plain = fillRoomAt(walls, seedPt, mmPerPt, P);
+  for (const factor of [0.5, 0.25]) {
+    if (!plain.flags.fillEmpty && polygonContainsPoint(plain.polygon, seedPt)) break;
+    const narrow = fillRoomAt(walls, seedPt, mmPerPt, { ...P, gapMm: P.gapMm * factor });
+    if (!narrow.flags.fillEmpty && !narrow.flags.touchesRoiBorder && polygonContainsPoint(narrow.polygon, seedPt)) plain = narrow;
+  }
   const usable = !plain.flags.fillEmpty;
   const inside = usable ? labels.filter((l) => l.name !== null && polygonContainsPoint(plain.polygon, l.anchor)) : [];
   const dist = (l: RoomLabel): number => Math.hypot(l.anchor.x - seedPt.x, l.anchor.y - seedPt.y);

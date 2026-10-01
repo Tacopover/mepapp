@@ -7,7 +7,7 @@
 import type { Vec2 } from '../geometry.js';
 import { detectAllRooms } from './detect-all.js';
 import { splitByTargets } from './edit.js';
-import { overlapAreaPt2, polygonUnion } from './clip.js';
+import { overlapAreaPt2, polygonUnion, rectPolygon } from './clip.js';
 import { orthogonalizeOutline } from './ortho.js';
 import { resolveRoomOverlaps, roomConfidence } from './overlap.js';
 import { splitRectangular } from './rect-split.js';
@@ -18,9 +18,10 @@ import { DEFAULT_ROOM_DETECTION_PARAMS, type DetectAllOptions, type FilteredWall
 export interface LabelTarget {
   anchor: Vec2; // centre of the label, page points
   printedM2: number | null; // area printed in the label, or null
+  bounds?: [number, number, number, number]; // text box of the label (x0, y0, x1, y1), page points: the outline of last resort
 }
 
-export type LabelledMethod = 'detected' | ResolveMethod | 'split';
+export type LabelledMethod = 'detected' | ResolveMethod | 'split' | 'label';
 
 export interface LabelledRoom {
   target: number; // index into the targets
@@ -51,6 +52,22 @@ interface Candidate {
   areaM2: number;
   method: LabelledMethod;
   open: boolean;
+}
+
+/** Distance from `p` to the nearest edge of the polygon's outer ring (page points). */
+function distanceToOutline(polygon: RoomPolygon, p: Vec2): number {
+  const ring = polygon.outer;
+  let best = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    best = Math.min(best, Math.hypot(a.x + t * dx - p.x, a.y + t * dy - p.y));
+  }
+  return best;
 }
 
 export function detectLabelledRooms(
@@ -240,6 +257,24 @@ export function detectLabelledRooms(
     r.polygon = polygon;
     r.areaM2 = (polygonAreaPt2(polygon) * mmPerPt * mmPerPt) / 1e6;
     r.deviation = printed ? r.areaM2 / printed - 1 : null;
+  }
+  // A room must lie at its label and must not be far larger than printed. Otherwise the fill found another
+  // room (a small room with hatch inside: the bounded fill reaches the printed area in a neighbour room), and a
+  // rectangle around the label text replaces it, so the wrong outline cannot cut a hole in the neighbour.
+  const nearPt = 300 / mmPerPt;
+  const marginPt = 200 / mmPerPt;
+  for (const r of out) {
+    const { anchor, printedM2, bounds } = targets[r.target]!;
+    const atLabel = polygonContainsPoint(r.polygon, anchor) || distanceToOutline(r.polygon, anchor) <= nearPt;
+    const tooLarge = printedM2 !== null && printedM2 > 0 && r.areaM2 > 2 * printedM2;
+    if (atLabel && !tooLarge) continue;
+    const [x0, y0, x1, y1] = bounds ?? [anchor.x, anchor.y, anchor.x, anchor.y];
+    r.polygon = rectPolygon(x0 - marginPt, y0 - marginPt, x1 + marginPt, y1 + marginPt);
+    r.areaM2 = (polygonAreaPt2(r.polygon) * mmPerPt * mmPerPt) / 1e6;
+    r.deviation = printedM2 ? r.areaM2 / printedM2 - 1 : null;
+    r.method = 'label';
+    r.open = true;
+    r.sharedWith = [];
   }
   // Rooms never overlap: the more confident room keeps a shared area, the other room loses it.
   const rated = out.map((r) => ({ ...r, confidence: roomConfidence(r.method, r.deviation) }));
