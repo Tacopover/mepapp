@@ -23,6 +23,7 @@ export interface LabelParams {
   maxCenterOffsetFs: number; // largest horizontal distance between the centres of two lines, in font sizes (label text is centred)
   maxLinePitchFs: number; // largest vertical distance between the centres of two lines, in font sizes
   minFontPt: number; // smaller text is not a room label (wall type tags, notes)
+  maxLinesAboveArea: number; // most lines of a label above its area line
   plausibleAreaError: number; // a label area within this fraction of the polygon area is plausible
   warnAreaError: number; // roomAreaWarning reports a difference above this fraction
 }
@@ -32,6 +33,7 @@ export const DEFAULT_LABEL_PARAMS: LabelParams = {
   maxCenterOffsetFs: 0.75,
   maxLinePitchFs: 2.2,
   minFontPt: 5,
+  maxLinesAboveArea: 5,
   plausibleAreaError: 0.35,
   warnAreaError: 0.15,
 };
@@ -52,6 +54,7 @@ export interface RoomLabel {
 const NUMBER = /^\d{1,2}\.\d+[A-Za-z]?(-\d+)?$/; // 0.17, 1.01A
 const NUMBER_PAREN = /^\(([A-Za-z]{1,3}(?:\.\d+){2,4})\)$/; // (Ec.02.02.01)
 const CODE = /^[A-Z][a-z]?-\d+[A-Za-z]*$/; // Ec-226, Fd-232T
+const NUMBER_GENERIC = /^(?=.*\d)(?=.*[A-Za-z])(?=.*[.-])[A-Za-z0-9][A-Za-z0-9.\-/]{2,23}$/; // any other code without spaces: 10A.00.030, B-2.14
 const AREA = /(\d+(?:[.,]\d+)?)\s*m\s*[²2](?![\d.])/;
 const PERSONS = /(\d+)\s*pers\b\.?/i;
 
@@ -98,7 +101,7 @@ export function clusterTextRuns(items: readonly TextItem[], params: Partial<Labe
  * Reads one block. Returns null unless the block is a room label: it has an area
  * line, or a room number and at least two lines (a lone number is a dimension or a grid label).
  */
-export function parseRoomLabel(block: readonly TextItem[]): RoomLabel | null {
+export function parseRoomLabel(block: readonly TextItem[], genericNumber = true): RoomLabel | null {
   const lines = block.map((t) => stripLine(t.text));
   let number: string | null = null;
   let plain: string | null = null;
@@ -106,6 +109,8 @@ export function parseRoomLabel(block: readonly TextItem[]): RoomLabel | null {
   let areaM2: number | null = null;
   let persons: number | null = null;
   const free: string[] = [];
+  // The generic number pattern is a fallback: a name such as "Lift-1" next to a number "0.6-1" is a name.
+  const hasStrictNumber = lines.some((line) => NUMBER_PAREN.test(line) || NUMBER.test(line));
   for (const line of lines) {
     const paren = NUMBER_PAREN.exec(line);
     if (paren) {
@@ -120,6 +125,10 @@ export function parseRoomLabel(block: readonly TextItem[]): RoomLabel | null {
       code ??= line;
       continue;
     }
+    if (genericNumber && !hasStrictNumber && plain === null && NUMBER_GENERIC.test(line)) {
+      plain = line;
+      continue;
+    }
     const area = AREA.exec(line);
     const pers = PERSONS.exec(line);
     if (area || pers) {
@@ -129,6 +138,7 @@ export function parseRoomLabel(block: readonly TextItem[]): RoomLabel | null {
       if (rest !== '') free.push(rest);
       continue;
     }
+    if (/^\d+$/.test(line)) continue; // a dimension value next to the label, not a name
     free.push(line);
   }
   number ??= plain;
@@ -154,12 +164,63 @@ export function parseRoomLabel(block: readonly TextItem[]): RoomLabel | null {
   };
 }
 
-/** Every room label on a page. */
+/**
+ * Label blocks found from the area line: a line with a number and "m²" is the last line of a
+ * label, and the lines directly above it (centred on it, one pitch apart, any font size) are the
+ * name and number. Works when the lines of one label use different font sizes. The block ends
+ * above the area line at the next area line, a line off-centre or a gap. Returns the blocks and
+ * the lines that they use.
+ */
+function areaAnchoredBlocks(items: readonly TextItem[], P: LabelParams): { blocks: TextItem[][]; used: Set<TextItem> } {
+  const cy = (t: TextItem): number => t.y + t.height / 2;
+  const cx = (t: TextItem): number => t.x + t.width / 2;
+  const runs = items.filter((t) => t.text.trim() !== '' && t.fontSizePt >= P.minFontPt);
+  const isArea = (t: TextItem): boolean => AREA.test(t.text);
+  const blocks: TextItem[][] = [];
+  const used = new Set<TextItem>();
+  for (const area of runs.filter(isArea)) {
+    if (used.has(area)) continue; // the same line drawn twice (overprint)
+    const block = [area];
+    used.add(area);
+    for (const other of runs) {
+      if (isArea(other) && Math.abs(cx(other) - cx(area)) < 1 && Math.abs(cy(other) - cy(area)) < 1) used.add(other);
+    }
+    let last = area;
+    for (;;) {
+      let best: TextItem | null = null;
+      for (const t of runs) {
+        const fs = Math.max(t.fontSizePt, last.fontSizePt);
+        if (used.has(t) && !isArea(t)) continue;
+        if (cy(t) >= cy(last) - 0.3 * fs || cy(last) - cy(t) > P.maxLinePitchFs * fs) continue;
+        if (Math.abs(cx(t) - cx(area)) > P.maxCenterOffsetFs * Math.max(t.fontSizePt, area.fontSizePt)) continue;
+        if (best === null || cy(t) > cy(best)) best = t;
+      }
+      if (best === null || isArea(best) || block.length > P.maxLinesAboveArea) break;
+      block.unshift(best);
+      used.add(best);
+      last = best;
+    }
+    blocks.push(block);
+  }
+  return { blocks, used };
+}
+
+/**
+ * Every room label on a page. Labels are first found from their area line (any font size per
+ * line, any number format); the remaining text is grouped by font size, which finds labels that
+ * have a number and a name but no area.
+ */
 export function readRoomLabels(items: readonly TextItem[], params: Partial<LabelParams> = {}): RoomLabel[] {
+  const P = { ...DEFAULT_LABEL_PARAMS, ...params };
   const labels: RoomLabel[] = [];
-  for (const block of clusterTextRuns(items, params)) {
+  const { blocks, used } = areaAnchoredBlocks(items, P);
+  for (const block of blocks) {
     const label = parseRoomLabel(block);
     if (label) labels.push(label);
+  }
+  for (const block of clusterTextRuns(items.filter((t) => !used.has(t)), params)) {
+    const label = parseRoomLabel(block, false); // without an area line only a strict number makes a label
+    if (label && label.areaM2 === null) labels.push(label);
   }
   return labels;
 }

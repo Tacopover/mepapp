@@ -75,6 +75,50 @@ describe('parseRoomLabel', () => {
   });
 });
 
+describe('labels found from the area line', () => {
+  // Layout of plattegrond begane grond 10A.pdf: number and name 11 pt, area line 8 pt, all centred.
+  const stack = (cx: number, top: number, lines: [string, number][]): TextItem[] => lines.map(([text, fs], i) => ({ text, x: cx - text.length * 2, y: top + i * 13, width: text.length * 4, height: fs * 1.09, fontSizePt: fs }));
+
+  it('reads a label whose area line has a smaller font than the number and name lines', () => {
+    const labels = readRoomLabels(stack(100, 100, [['10A.00.030', 11], ['NSA ruimte 1', 11], ['53.7 m²', 8]]));
+    expect(labels).toHaveLength(1);
+    expect(labels[0]).toMatchObject({ number: '10A.00.030', name: 'NSA ruimte 1', areaM2: 53.7 });
+  });
+
+  it('accepts letters with dots or hyphens as a room number, but not a plain name', () => {
+    const num = (n: string) => readRoomLabels(stack(100, 100, [[n, 11], ['Kantoor', 11], ['12 m²', 8]]))[0]?.number;
+    expect(num('10A.00.030')).toBe('10A.00.030');
+    expect(num('B-2.14')).toBe('B-2.14');
+    expect(num('gassen-ruimte')).toBeNull();
+  });
+
+  it('keeps a name that looks like a number when a strict number is present', () => {
+    const label = readRoomLabels(stack(100, 100, [['0.6-1', 8], ['Lift-1', 8], ['3 m²', 8]]))[0]!;
+    expect(label).toMatchObject({ number: '0.6-1', name: 'Lift-1' });
+  });
+
+  it('ignores a dimension value above the label and a drawn-twice area line', () => {
+    const items = [...stack(100, 100, [['4400', 6], ['10A.00.001', 11], ['entree', 11], ['22.0 m²', 8]]), ...stack(100, 139, [['22.0 m²', 8]])];
+    const labels = readRoomLabels(items);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]).toMatchObject({ number: '10A.00.001', name: 'entree', areaM2: 22 });
+  });
+
+  it('does not take the lines of the label above, and keeps two stacked labels apart', () => {
+    const items = [...stack(100, 100, [['1.01', 11], ['Kantoor', 11], ['20 m²', 8]]), ...stack(100, 148, [['1.02', 11], ['Archief', 11], ['9 m²', 8]])];
+    const labels = readRoomLabels(items);
+    expect(labels.map((l) => [l.number, l.name, l.areaM2])).toEqual([
+      ['1.01', 'Kantoor', 20],
+      ['1.02', 'Archief', 9],
+    ]);
+  });
+
+  it('only a strict number makes a label without an area line', () => {
+    expect(readRoomLabels(stack(100, 100, [['10A.00.030', 11], ['Kantoor', 11], ['Noord', 11]]))).toEqual([]);
+    expect(readRoomLabels(stack(100, 100, [['1.05', 11], ['Kantoor', 11], ['Noord', 11]]))).toHaveLength(1);
+  });
+});
+
 describe('matchRoomLabels and withRoomLabels', () => {
   const rooms = [manualRoom(0, square(0, 0, 200)), manualRoom(0, square(300, 0, 200))];
 
