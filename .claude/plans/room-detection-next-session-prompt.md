@@ -8,7 +8,9 @@ We continue the MepApp room detection work. Read `.claude/plans/room-detection.m
 
 Working pattern: implement one topic at a time, verify with evidence (tests, Node measurements on the fixtures, Playwright for UI), add a STATUS entry to the plan, commit, and ask before you push. I test on Windows after each push. The fixture PDFs are in `fixtures/pdfs/` (some untracked). Run `pnpm install` and `pnpm build` at the repo root before you start.
 
-## Topic 4 (do this first): Detect rooms finds few rooms on a new drawing
+## Topic 4: Detect rooms finds few rooms on a new drawing
+
+STATUS: DONE 2026-10-02 (merged to master `e7e7da8`). Cause: each label has three lines and the area line uses a smaller font, and numbers like `10A.00.030` matched no pattern, so only 2 labels had a name. Fix: labels are now found from the area line (`labels.ts` `areaAnchoredBlocks`) and any number format is accepted. The new drawing now gives 37 named labels and 34 rooms at 1:100 (13 within 15 % of the printed area). Remaining on this drawing: room shapes (for example `NSA ruimte 1` 15 m2 against 53.7 printed) and 4 labels without an area. See `room-detection.md` STATUS "Topic 4". The original task text follows.
 
 New fixture: `fixtures/pdfs/plattegrond begane grond 10A.pdf` (13 MB, untracked, added 2026-10-01). Detect rooms finds only a few rooms, but the floor plan has many more. The Fill room tool (click-to-fill) adds good rooms in the rooms that I click. So the walls close the rooms, and the problem is in the automatic step.
 
