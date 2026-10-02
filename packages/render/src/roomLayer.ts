@@ -42,7 +42,7 @@ export function drawRooms(layer: Container, rooms: readonly Room[], calibration:
       });
     }
 
-    const lines = [[room.number, room.name].filter(Boolean).join(' ')];
+    const lines = [room.number ?? '', room.name ?? ''];
     if (calibration) lines.push(`${roomAreaM2(room, calibration).toFixed(1)} m²`);
     const text = lines.filter((l) => l !== '').join('\n');
     if (text === '') continue;
