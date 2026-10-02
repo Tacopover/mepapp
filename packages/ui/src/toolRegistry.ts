@@ -83,12 +83,10 @@ export const RAIL_ROWS: RailRow[] = [
     ],
   },
   {
+    // One button: it enters the last used room tool (Fill room at first). The three tools are switched in the header (RoomToolBar.tsx).
     id: 'rooms',
-    members: [
-      { id: 'fill-room', label: 'Fill room', Icon: IconFillRoom, tool: 'fill-room' },
-      { id: 'edit-room', label: 'Edit rooms', Icon: IconEditRoom, tool: 'edit-room' },
-      { id: 'split-room', label: 'Split room', Icon: IconSplitRoom, tool: 'split-room' },
-    ],
+    singleton: true,
+    members: [{ id: 'rooms', label: 'Rooms', Icon: IconFillRoom, tool: 'fill-room' }],
   },
   {
     // Circuits mode (electrical-circuits-model.md Phase E4). Rail.tsx lights this row for every tool in the circuits family, not just 'circuits'.
@@ -97,3 +95,16 @@ export const RAIL_ROWS: RailRow[] = [
     members: [{ id: 'circuits', label: 'Circuits', Icon: IconBolt, tool: 'circuits' }],
   },
 ];
+
+/** The room tools, in the order of the header switcher (RoomToolBar.tsx). */
+export const ROOM_TOOL_ENTRIES: ToolEntry[] = [
+  { id: 'fill-room', label: 'Fill room', Icon: IconFillRoom, tool: 'fill-room' },
+  { id: 'edit-room', label: 'Edit rooms', Icon: IconEditRoom, tool: 'edit-room' },
+  { id: 'split-room', label: 'Split room', Icon: IconSplitRoom, tool: 'split-room' },
+];
+
+export type RoomToolId = 'fill-room' | 'edit-room' | 'split-room';
+
+export function isRoomTool(tool: SketchTool): tool is RoomToolId {
+  return tool === 'fill-room' || tool === 'edit-room' || tool === 'split-room';
+}

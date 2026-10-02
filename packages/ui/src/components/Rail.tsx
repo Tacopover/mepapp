@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { isCircuitsTool, type SketchScene, type SketchTool } from '@mepapp/render';
-import { RAIL_ROWS } from '../toolRegistry.js';
+import { RAIL_ROWS, isRoomTool, type RoomToolId } from '../toolRegistry.js';
 import { IconChevRight, IconCopy, IconRedo, IconSelect, IconTrash, IconUndo } from '../icons.js';
 
 export interface RailProps {
@@ -39,6 +39,11 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
   useEffect(() => {
     if (tool === 'place-terminal' || tool === 'place-equipment') setLastStampTool(tool);
   }, [tool]);
+  // The single 'Rooms' button re-enters the room tool that was used last (picked in the header's RoomToolBar).
+  const [lastRoomTool, setLastRoomTool] = useState<RoomToolId>('fill-room');
+  useEffect(() => {
+    if (isRoomTool(tool)) setLastRoomTool(tool);
+  }, [tool]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
@@ -57,19 +62,24 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
         const isOpen = openRow === row.id;
         const isStampRow = row.id === 'place';
         const stampRowActive = tool === 'place-terminal' || tool === 'place-equipment';
+        const isRoomsRow = row.id === 'rooms';
 
         return (
           <div key={row.id} className="mep-rail-row">
             <div className="mep-rail-row-main">
               <button
                 type="button"
-                className={`mep-rail-btn${(isStampRow ? stampRowActive : row.id === 'circuits' ? isCircuitsTool(tool) : tool === current.tool) ? ' active' : ''}`}
+                className={`mep-rail-btn${(isStampRow ? stampRowActive : isRoomsRow ? isRoomTool(tool) : row.id === 'circuits' ? isCircuitsTool(tool) : tool === current.tool) ? ' active' : ''}`}
                 title={current.tool === null ? `${current.label} — coming soon` : current.label}
                 disabled={isStampRow ? false : current.tool === null || (needsStamp(current.tool) && !stampReady)}
                 onClick={() => {
                   if (isStampRow) {
                     if (stampReady) sceneRef.current?.setTool(lastStampTool);
                     else onPickDefaultStamp();
+                    return;
+                  }
+                  if (isRoomsRow) {
+                    sceneRef.current?.setTool(lastRoomTool);
                     return;
                   }
                   current.tool && sceneRef.current?.setTool(current.tool);

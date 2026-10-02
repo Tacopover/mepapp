@@ -18,7 +18,7 @@ import {
   type StampLabel,
   type StampLabelVisibility,
 } from '@mepapp/core';
-import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool, type WallDebugState } from '@mepapp/render';
+import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { WallDebugPanel } from './components/WallDebugPanel.js';
@@ -40,6 +40,7 @@ import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { roomTableToXlsx } from './roomExport.js';
 import { DocumentSwitcher } from './components/DocumentSwitcher.js';
+import { RoomToolBar } from './components/RoomToolBar.js';
 import { Dialog } from './components/Dialog.js';
 import { CalibrationDialog } from './components/CalibrationDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
@@ -261,22 +262,12 @@ export function MepSketchApp({
     }
   }, [createRoomDetectionClient, pushToast, sceneRef]);
   const handleCancelRoomDetection = useCallback(() => roomAbortRef.current?.abort(), []);
-  const handleToggleRooms = useCallback(() => sceneRef.current?.setRoomsVisible(!sceneRef.current.isRoomsVisible()), [sceneRef]);
   useEffect(() => {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
     setRoomsVisible(scene.isRoomsVisible());
     scene.on('roomsVisibleChanged', setRoomsVisible);
     return () => scene.off('roomsVisibleChanged', setRoomsVisible);
-  }, [ready, sceneRef]);
-  const [wallDebugVisible, setWallDebugVisible] = useState(false);
-  const handleToggleWallDebug = useCallback(() => sceneRef.current?.setWallDebugVisible(!sceneRef.current.getWallDebugState().visible), [sceneRef]);
-  useEffect(() => {
-    const scene = sceneRef.current;
-    if (!ready || !scene) return;
-    const onChanged = (s: WallDebugState) => setWallDebugVisible(s.visible);
-    scene.on('wallDebugChanged', onChanged);
-    return () => scene.off('wallDebugChanged', onChanged);
   }, [ready, sceneRef]);
   const roomClientRef = useRef<RoomDetectionClient | null>(null);
   const roomAbortRef = useRef<AbortController | null>(null);
@@ -975,15 +966,12 @@ export function MepSketchApp({
           pdfLoaded={pdfHandle !== null}
           roomsAvailable={createRoomDetectionClient !== undefined}
           roomsDetecting={roomsDetecting}
-          roomsVisible={roomsVisible}
           onDetectRooms={handleDetectRooms}
           onCancelRoomDetection={handleCancelRoomDetection}
-          onToggleRooms={handleToggleRooms}
           onExportRooms={handleExportRooms}
-          wallDebugVisible={wallDebugVisible}
-          onToggleWallDebug={handleToggleWallDebug}
         />
         <DocumentSwitcher documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
+        <RoomToolBar tool={tool} sceneRef={sceneRef} />
         <div className="mep-fill" />
         {status && <span className="mep-header-status">{status}</span>}
       </div>
@@ -1087,6 +1075,8 @@ export function MepSketchApp({
         labelVisibility={labelVisibility}
         onLabelVisibilityChange={handleLabelVisibilityChange}
         labelFilterEntries={labelFilterEntries}
+        roomsVisible={roomsVisible}
+        onRoomsVisibleChange={(visible) => sceneRef.current?.setRoomsVisible(visible)}
       />
 
       {calibrationPrompt && (

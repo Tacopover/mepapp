@@ -18,6 +18,8 @@ export interface StatusBarProps {
   labelVisibility: StampLabelVisibility;
   onLabelVisibilityChange: (next: StampLabelVisibility) => void;
   labelFilterEntries: LabelFilterEntry[];
+  roomsVisible: boolean;
+  onRoomsVisibleChange: (visible: boolean) => void;
 }
 
 export function StatusBar({
@@ -35,6 +37,8 @@ export function StatusBar({
   labelVisibility,
   onLabelVisibilityChange,
   labelFilterEntries,
+  roomsVisible,
+  onRoomsVisibleChange,
 }: StatusBarProps) {
   return (
     <div className="mep-status">
@@ -76,6 +80,11 @@ export function StatusBar({
         {drawingSummary.networkCount} network{drawingSummary.networkCount === 1 ? '' : 's'}
       </span>
       <LabelVisibilityControl visibility={labelVisibility} onChange={onLabelVisibilityChange} entries={labelFilterEntries} />
+      <span className="mep-chip mep-labels-chip">
+        <label title="Show rooms on the canvas">
+          <input type="checkbox" checked={roomsVisible} onChange={(e) => onRoomsVisibleChange(e.target.checked)} /> Rooms
+        </label>
+      </span>
       <span className="mep-scale-bar" aria-hidden="true">
         <i />
         <i />
