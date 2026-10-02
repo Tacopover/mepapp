@@ -18,7 +18,7 @@ import {
   type StampLabel,
   type StampLabelVisibility,
 } from '@mepapp/core';
-import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool } from '@mepapp/render';
+import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool, type WallDebugState } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { WallDebugPanel } from './components/WallDebugPanel.js';
@@ -262,6 +262,15 @@ export function MepSketchApp({
     }
   }, [createRoomDetectionClient, pushToast, sceneRef]);
   const handleCancelRoomDetection = useCallback(() => roomAbortRef.current?.abort(), []);
+  const [wallDebugVisible, setWallDebugVisible] = useState(false);
+  const handleToggleWallDebug = useCallback(() => sceneRef.current?.setWallDebugVisible(!sceneRef.current.getWallDebugState().visible), [sceneRef]);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    const onChanged = (s: WallDebugState) => setWallDebugVisible(s.visible);
+    scene.on('wallDebugChanged', onChanged);
+    return () => scene.off('wallDebugChanged', onChanged);
+  }, [ready, sceneRef]);
   useEffect(() => {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
@@ -969,6 +978,8 @@ export function MepSketchApp({
           onDetectRooms={handleDetectRooms}
           onCancelRoomDetection={handleCancelRoomDetection}
           onExportRooms={handleExportRooms}
+          wallDebugVisible={wallDebugVisible}
+          onToggleWallDebug={handleToggleWallDebug}
         />
         <DocumentSwitcher documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
         <RoomToolBar tool={tool} sceneRef={sceneRef} />

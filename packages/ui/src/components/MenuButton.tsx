@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { IconFile, IconMenu } from '../icons.js';
+import { isDebugToolsEnabled } from '../debugTools.js';
 
 export interface MenuButtonProps {
   onOpenPdf: () => void;
@@ -14,6 +15,8 @@ export interface MenuButtonProps {
   onDetectRooms: () => void;
   onCancelRoomDetection: () => void;
   onExportRooms: () => void;
+  wallDebugVisible: boolean;
+  onToggleWallDebug: () => void;
 }
 
 export function MenuButton({
@@ -29,6 +32,8 @@ export function MenuButton({
   onDetectRooms,
   onCancelRoomDetection,
   onExportRooms,
+  wallDebugVisible,
+  onToggleWallDebug,
 }: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -137,6 +142,22 @@ export function MenuButton({
           >
             Export rooms to Excel…
           </button>
+          {isDebugToolsEnabled() && (
+            <>
+              <div className="mep-menu-divider" />
+              <button
+                type="button"
+                className="mep-menu-item"
+                disabled={!pdfLoaded}
+                onClick={() => {
+                  onToggleWallDebug();
+                  setOpen(false);
+                }}
+              >
+                {wallDebugVisible ? 'Hide wall lines (debug)' : 'Show wall lines (debug)'}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
