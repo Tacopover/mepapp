@@ -14,6 +14,10 @@ The user also asked that ports survive. The user can add ports to an imported st
 - **Image stamps only.** An SVG becomes a stamp with one `image` shape. MepApp does not convert SVG to editable vector shapes. PNG and JPEG work the same way. This is the same output as the Element Editor "Import image" path.
 - **Chromium only.** Firefox and Safari show the feature as unavailable, with a short message.
 - **No login, no backend.** Cloud sync is a later paid feature (see [[storage-interfaces]]).
+- **Raster size = a default (user answer 2026-10-02).** A PNG or JPEG gets a fixed default size. The user adjusts it later. A global scale property (as in MEPSketcher) may follow at some time. See §4.4.
+- **One load button per category (user answer 2026-10-02).** The Terminals view has a "Load custom terminals" button. The Equipment view has a "Load custom equipment" button. Each button opens the folder picker with the category already set. The user can press a button again to add another folder. The data model stays a list of sources (§4.1). Only the entry points are per category.
+- **Port edits update placed stamps (user answer 2026-10-02).** An edit in the library also updates the stamps already placed in the open project. The app already does this for custom stamps. It warns the user when removed ports have connected segments. See Phase 6.
+- **A backup of the port data is wanted (user answer 2026-10-02),** as a nice-to-have. See Phase 8.
 
 ## 3. Findings from the survey (2026-10-02)
 
@@ -29,7 +33,8 @@ These come from one read-only survey. The line numbers were not re-checked one b
 - `SVG_UNIT_TO_PT = 0.18` is in `scripts/generate-stamp-library.mjs` (about `:96`). The built-in SVGs use this scale.
 - The Stamps panel filters in `getVisibleStampDefinitions` (`StampsPanel.tsx:69-90`). It uses `discipline` and `category`. It has no notion of a source.
 - Label layouts, hidden-label lists and per-stamp appearance defaults are keyed by definition id. Stable ids keep them working.
-- Related open issue (memory note "Stamp DPI scaling issue"): placed PNG stamps are about 2.2 times too large. The code assumes 300 DPI. See §8 question 1.
+- Related open issue (memory note "Stamp DPI scaling issue"): placed PNG stamps are about 2.2 times too large. The code assumes 300 DPI. This plan avoids the issue for user stamps by using a default size (§4.4).
+- **Checked on 2026-10-02:** the app already applies a changed definition to placed stamps. `applyDefinitionToPlacedStamps` is in `App.tsx:703-713`. It updates ports and size at once, and loads the new art. `SketchScene.countLostPortConnections(definitionId, ports)` (`scene.ts:2220`) counts the segment ends that lose a port. The Element Editor calls it before a save (`ElementEditorDialog.tsx:308`, passed in at `App.tsx:1159`). `updateCustomStampDefinition` (`scene.ts:2200`) does nothing if the id is not in the project's custom list. This matters for Phase 6.
 - Typings for `showDirectoryPicker` do not exist in `packages/ui/src/file-system-access.d.ts`.
 
 ## 4. Data model
@@ -93,7 +98,7 @@ The image bytes live in the separate blob store. `listStamps` returns records wi
 ### 4.4 Size from the file
 
 - **SVG:** read `viewBox`, else `width` and `height` (strip the unit). Multiply by `SVG_UNIT_TO_PT` (0.18). Use a string/regex parse in `core` (no DOM dependency in `core`). If none of these exists, `ui` decodes the SVG with an `<img>` and uses the natural size.
-- **PNG and JPEG:** `ui` decodes the file and reads the pixel size. The point size is `pixels * 72 / RASTER_IMPORT_DPI`. Keep the DPI in one constant. See §8 question 1.
+- **PNG and JPEG:** `ui` decodes the file and reads the pixel size, only to get the aspect ratio. The stamp size is a default: the longer side is `USER_RASTER_DEFAULT_LONG_SIDE_PT`, and the other side follows the aspect ratio. Keep this value in one named constant. Start with **40 pt**. That is the median `nativeWidth` of the 167 built-in stamps (measured 2026-10-02: minimum 10.8, median 40.33, maximum 208.15). The user will adjust the value later. The user can also change the size of one stamp in the Element Editor (`edits.nativeWidth` and `edits.nativeHeight`). A global scale property is a possible later addition. It is not part of this plan.
 
 ## 5. Phases
 
@@ -133,36 +138,39 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. Then:
 
 ### Phase 4 — UI
 
-1. **A "Library folders" dialog.** Open it from a button in the Stamps panel header.
+1. **Load buttons, one per category.** The Terminals view of the Stamps panel has "Load custom terminals". The Equipment view has "Load custom equipment". Each opens the folder picker, then asks for a name and a discipline. The category is already set by the button.
+2. **A "Library folders" dialog** for management. Open it from a button in the Stamps panel header.
    - It lists the sources: name, category, discipline, stamp count, last sync time.
-   - Buttons: **Add folder** (picker, then name, category and discipline fields), **Sync**, **Remove** (asks for confirmation, removes the source and its stamps).
+   - Buttons: **Sync**, **Remove** (asks for confirmation, removes the source and its stamps). It can also add a folder, with the category as a field.
    - It starts with a short explanation: MepApp copies the files. Press Sync to pick up changes.
    - On Firefox and Safari it shows "Not available in this browser" and disables the buttons.
-2. **Stamps panel.** Merge the user stamps into the visible list.
+3. **Stamps panel.** Merge the user stamps into the visible list.
    - They follow the same discipline and category filters. Their category comes from the source.
    - The search box searches the label.
    - Show a small marker on a user tile.
    - A stamp whose file is missing keeps working. Show a small warning marker on the tile.
    - `getVisibleStampDefinitions` has no tests today. Add tests for the new merge.
-3. **A custom stamp with the same id in the project.** See Phase 5. The panel must show **one** tile per id.
+4. **A custom stamp with the same id in the project.** See Phase 5. The panel must show **one** tile per id.
 
 ### Phase 5 — Placement and the missing-definition risk
 
 1. **Copy on first placement.** When the user places a user stamp, and the project has no definition with that id, MepApp adds a copy of the full definition to `customStampDefinitions` with `source: 'user'`. The project and the PDF then carry the stamp art and ports. A colleague without the folder still sees the stamps.
 2. **No duplicate tile.** The project copy and the library entry share one id. The panel shows the library entry and skips project copies with `source: 'user'`.
 3. **A project from another machine** has a `source: 'user'` definition and no library entry. The panel shows it in the project's custom list, as it does today for custom stamps.
-4. `getStampDefinition` checks custom first. The project copy wins over the live library entry. This is the snapshot rule (see §6, point 2).
+4. `getStampDefinition` checks custom first. The project copy wins over the live library entry. A library edit still reaches the open project through Phase 6 point 3. A project that is not open keeps its copy (see §6, point 2).
 5. Check `placeStampTool.ts:54` and the category-to-tool mapping (`StampsPanel.tsx:97`) with `category` from the source.
 
 ### Phase 6 — Ports (editing)
 
 1. A "Edit stamp…" button on a user tile opens the Element Editor with the materialized definition.
-2. **On Save, write back to the `LibraryStore`.** Write `edits.ports`, `edits.label`, `edits.discipline`, `edits.nativeWidth` and `edits.nativeHeight`. Do not create a project copy. This differs from the built-in flow, which duplicates into the project.
-3. The Element Editor currently re-rasterizes the shapes to a PNG at save. For a user stamp, keep the original file as the source image. Check how `ElementEditorDialog.tsx` saves, and do not replace the user's SVG with a PNG.
-4. Placed stamps keep their old ports (snapshot rule). Changing the library does not move connections in an open project.
-5. The name collision check in the Element Editor must include the user stamps.
+2. **On Save, write to the `LibraryStore`.** Write `edits.ports`, `edits.label`, `edits.discipline`, `edits.nativeWidth` and `edits.nativeHeight`.
+3. **Then update the open project (user decision 2026-10-02).** If the project has a copy of this id in `customStampDefinitions` (Phase 5 makes one at first placement), call `updateCustomStampDefinition` and then `applyDefinitionToPlacedStamps`. This is the existing path in `handleSaveElementDefinition` (`App.tsx:715-734`). If the project has no copy, nothing is placed, so there is nothing to update.
+4. **Warn about lost connections.** The Element Editor already calls `countLostPortConnections` before the save and warns the user (`ElementEditorDialog.tsx:308`). Check that this warning still works when the saved stamp is a user stamp. The count reads the placed stamps by `definitionId`, so it should. Test it with a segment connected to a port that the user removes.
+5. The Element Editor currently re-rasterizes the shapes to a PNG at save. For a user stamp, keep the original file as the source image. Check how `ElementEditorDialog.tsx` saves, and do not replace the user's SVG with a PNG.
+6. The name collision check in the Element Editor must include the user stamps.
+7. **Other projects.** A PDF that was saved earlier holds its own copy of the definition. It does not update when the library changes. The user's decision covers the open project. Whether to refresh old copies when a PDF opens is not decided. Do not build it in this plan. See §8 question 3.
 
-### Phase 7 — Tests and verification
+### Phase 7 — Tests and verification (run after Phase 6; Phase 8 adds its own checks)
 
 - Core unit tests (Phase 1) and store contract tests (Phase 2).
 - A browser check of the whole flow. Playwright cannot drive the native directory picker. Follow the memory note "Playwright verification gotchas". Stub `showDirectoryPicker` with a fake directory handle that returns real files from `fixtures/stamps/`. The fixtures policy in CLAUDE.md says: use real files, never synthetic ones.
@@ -170,11 +178,26 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. Then:
 - A check by the user on Windows with their own folders of terminals and equipment: add both folders, sync, place a stamp, add ports, close the browser, open it again, check that the stamps and ports are still there with no prompt.
 - A check that a PDF saved with a placed user stamp opens on a browser profile without the library, and the stamp is still there.
 
+### Phase 8 — Port data backup (nice to have)
+
+The user wants a backup of the port data. The port edits exist only in IndexedDB, which the browser can clear. The images can be synced again from the folder. The port edits cannot.
+
+**Recommended route: a sidecar file next to each image.** The built-in library already uses a `.mepconfig.json` file per stamp for ports (read by `scripts/generate-stamp-library.mjs`). Check that format first and reuse it, so the old app and MepApp read the same file.
+
+1. After a port edit, if the folder handle has write permission, write `<file name>.mepconfig.json` into the source folder. If the handle has no write permission, ask for it in the Save click (a user gesture). If the user declines, skip the backup and say so in the status text.
+2. During a Sync, read a sidecar file when one exists and no `edits.ports` exist yet. This restores the ports on a new machine or after the browser data was cleared.
+3. A conflict rule is needed when the sidecar and `edits.ports` both exist and differ. Suggested rule: the newer modified time wins. Decide this in this phase, and write it here.
+4. The sidecar also travels with the folder if the user syncs it with OneDrive. That gives a simple cross-device route without a backend.
+
+**Alternative, if the folder write permission is a problem:** a "Download library backup" button that saves one JSON file with all `edits`. A "Restore from backup" button reads it back. This needs no folder write access.
+
+Tests: a round-trip of the sidecar (write, clear the store, sync, compare ports).
+
 ## 6. Risks and rules
 
 1. **Missing definition = silent loss.** The app drops placed stamps whose definition is missing. Phase 5 point 1 (copy on first placement) removes this risk for user stamps. Do not skip it.
-2. **Snapshot rule.** A project copy never updates itself from the library. This is simple and safe. The cost: a library port fix does not reach old projects. A later "Update from library" action could do it. It is out of scope here.
-3. **Browser eviction.** IndexedDB data can be cleared. `navigator.storage.persist()` helps. A library export for backup is out of scope for now. The files are still in the user's folder, so a new Sync restores the images. **The port edits would be lost.** This is the main argument for a later export, or for writing `.mepconfig.json` next to the files. Raise it with the user after the first version.
+2. **Old projects keep their copy.** A library edit updates the open project (Phase 6 point 3). A PDF that is not open keeps its embedded copy, so a library port fix does not reach it. This is safe. A later "Update from library" action on open could change it. It is out of scope here.
+3. **Browser eviction.** IndexedDB data can be cleared. `navigator.storage.persist()` helps. The files are still in the user's folder, so a new Sync restores the images. **The port edits would be lost.** Phase 8 (backup) removes this risk. Until Phase 8 is done, tell the user about it.
 4. **Large libraries.** The built-in library already has 166 stamps and no lazy thumbnail loading. A user folder can be larger. Use object URLs and avoid decoding every file at once. Decode in small batches during a sync.
 5. **JPEG has no transparency.** A JPEG stamp draws a white rectangle. Show a note in the Library dialog help text. A "make white transparent" option is out of scope.
 6. **Pure black art and recoloring.** Image stamps recolor through the luminance blend in `colorize.ts` (memory note "PixiJS tint/colorize fix"). Check that a user SVG with colors behaves the same as a built-in one.
@@ -186,20 +209,20 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. Then:
 
 - Converting SVG to editable vector shapes.
 - Reading subfolders.
-- Reading or writing `.mepconfig.json` sidecar files next to the images.
-- Library export, import and backup.
+- A global scale property (a possible later addition).
 - Cloud sync and shared team libraries (paid tier, later).
 - Firefox and Safari.
 - Dutch labels for user stamps.
 - Making white transparent in JPEG files.
-- An "Update from library" action for placed stamps.
+- An "Update from library" action that refreshes the embedded copies of stamps in PDFs that are not open.
 
-## 8. Open questions for the user
+## 8. Open questions
 
-1. **Raster size.** What size should a PNG or JPEG get when it has no physical size? The suggestion is 300 DPI, as in the current code. The existing PNG stamps come out about 2.2 times too large (open issue, fix direction undecided). Decide this together with that issue, or give raster imports a size field in the Library dialog.
-2. **Sources.** Is a list of sources enough (each with a category), or do you want exactly two fixed slots, "Terminals" and "Equipment"? The plan uses the list. The dialog can start with two suggested rows.
-3. **Library edit versus project copy.** After the user edits ports in the library, should the open project update its copy? The plan says no (snapshot rule).
-4. **Export of port edits.** Do you want a backup route for the port edits in the first version? The simplest route is a sidecar `.mepconfig.json` written next to each image. That needs write permission on the folder.
+Answered by the user on 2026-10-02: raster size (use a default, §4.4), sources (one load button per category, §2), library edit versus project copy (the edit updates placed stamps, Phase 6), backup (wanted, Phase 8).
+
+1. **Old projects.** Should a PDF refresh its embedded copy of a user stamp from the library when it opens? The plan says no. Decide after the first version.
+2. **Backup route.** Phase 8 offers two routes: a sidecar `.mepconfig.json` next to each image, or a backup file with a download button. The plan recommends the sidecar. Confirm when Phase 8 starts.
+3. **Default raster size.** 40 pt is a start value. Adjust it after the user tests it.
 
 ## 9. Phase status
 
@@ -212,5 +235,6 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. Then:
 | 5 Placement and copy on first placement | not started |
 | 6 Ports | not started |
 | 7 Tests and verification | not started |
+| 8 Port data backup (nice to have) | not started |
 
 When a phase finishes, mark it here with the commit hash and a verification summary. Do not delete this file on partial completion.
