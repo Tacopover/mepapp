@@ -1,2 +1,2 @@
 // Browser implementation of the platform interface.
-export {};
+export * from './indexeddb-library-store.js';
