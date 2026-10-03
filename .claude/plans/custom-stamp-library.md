@@ -125,7 +125,7 @@ Tests (vitest, in `core`): id rules, the `user-` prefix versus all built-in ids,
 
 Verify: `pnpm --filter @mepapp/core test` and a root `pnpm build`.
 
-**Done 2026-10-03 (commit: see Phase status).** The code is in `core/src/user-stamp.ts`, with tests in `user-stamp.test.ts` (28 tests). `platform/src/library-store-compat.test.ts` proves that the `platform` records match the `core` input types. `platform/tsconfig.test.json` type-checks the `platform` test files (`npx tsc -p tsconfig.test.json`). No script runs it yet. `buildUserStampDefinition` takes one `imageUrl` for `iconRef` and the image shape. Phase 3 decides if that URL is a `blob:` or a `data:` URL. Verified: `@mepapp/core` 656 tests pass, `@mepapp/platform` 32 tests pass, the test type-check passes, root `pnpm build` passes (9 tasks).
+**Done 2026-10-03 (`960f27f`).** The code is in `core/src/user-stamp.ts`, with tests in `user-stamp.test.ts` (28 tests). `platform/src/library-store-compat.test.ts` proves that the `platform` records match the `core` input types. `platform/tsconfig.test.json` type-checks the `platform` test files (`npx tsc -p tsconfig.test.json`). No script runs it yet. `buildUserStampDefinition` takes one `imageUrl` for `iconRef` and the image shape. Phase 3 decides if that URL is a `blob:` or a `data:` URL. Verified: `@mepapp/core` 656 tests pass, `@mepapp/platform` 32 tests pass, the test type-check passes, root `pnpm build` passes (9 tasks).
 
 Audit of the `StampDefinition.source` checks. None of them changes in Phase 1. A `'user'` stamp is neither `'library'` nor `'custom'` in all of them:
 
@@ -248,7 +248,7 @@ Answered by the user on 2026-10-02: raster size (use a default, §4.4), sources 
 
 | Phase | Status |
 |---|---|
-| 1 Core logic | done 2026-10-03 (see Phase 1 notes) |
+| 1 Core logic | done 2026-10-03 (`960f27f`) |
 | 2 Storage (shared with [[storage-interfaces]] Phase 2) | store done (`5226167`); app wiring moves to Phase 3 |
 | 3 Folder scan and sync | not started |
 | 4 UI | not started |
