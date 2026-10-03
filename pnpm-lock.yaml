@@ -89,7 +89,15 @@ importers:
         specifier: ^2
         version: 2.1.9(lightningcss@1.33.0)
 
-  packages/platform: {}
+  packages/platform:
+    dependencies:
+      '@mepapp/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      vitest:
+        specifier: ^2
+        version: 2.1.9(lightningcss@1.33.0)
 
   packages/platform-tauri:
     dependencies:
@@ -123,6 +131,9 @@ importers:
       '@mepapp/pdf-engine':
         specifier: workspace:*
         version: link:../pdf-engine
+      '@mepapp/platform':
+        specifier: workspace:*
+        version: link:../platform
       '@mepapp/render':
         specifier: workspace:*
         version: link:../render

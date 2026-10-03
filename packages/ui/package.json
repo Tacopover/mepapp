@@ -13,6 +13,7 @@
   "dependencies": {
     "@mepapp/core": "workspace:*",
     "@mepapp/pdf-engine": "workspace:*",
+    "@mepapp/platform": "workspace:*",
     "@mepapp/render": "workspace:*",
     "react": "latest",
     "react-dom": "latest",
