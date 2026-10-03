@@ -181,6 +181,15 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
    - `getVisibleStampDefinitions` has no tests today. Add tests for the new merge.
 4. **A custom stamp with the same id in the project.** See Phase 5. The panel must show **one** tile per id.
 
+**Design decisions for Phases 4 and 5 (2026-10-03):**
+
+- `getVisibleStampDefinitions` gets a new last parameter `userDefinitions: StampDefinition[] = []`. A project copy with `source: 'user'` is skipped when the library has the same id. A project copy with no library entry stays (Phase 5 point 3).
+- `StampsPanel` gets these props: `userStampDefinitions`, `missingUserStampIds`, `userLibraryAvailable`, `onLoadUserFolder(category)`, `onOpenLibraryFolders()`. The load button is a tile after "Create custom element…": "Load custom terminals…" or "Load custom equipment…", from the category view. The "Library folders" button sits in the filter row. A user tile gets a small "user" marker; a stamp with a missing file also gets a warning marker.
+- The load click calls `showDirectoryPicker` before any other `await` (a browser grants the picker only inside the click). Then a small dialog asks for the name (default: the folder name) and the discipline. Then `createLibrarySource`, `syncLibrarySource`, `reload`, and a status message with the counts. A picker cancel (`AbortError`) does nothing. Another picker error shows the browser message and suggests a subfolder.
+- New `LibraryFoldersDialog.tsx`: the help text, the list of sources, and the buttons Sync, Remove (with confirmation) and Add folder. Sync calls `ensureReadPermission` inside the click.
+- An orphan project copy (`source: 'user'` with no library entry) gets the delete button of a custom stamp, but no edit button (Phase 6).
+- Placement: `pickStampDefinition` takes an optional `materialize` function. For a `'user'` definition it materializes the stamp and passes the result to `setStampTexture` as a 4th argument, `adoptDefinition`. `placeStampTool.placeStamp` adds the definition to the document through a new `ToolContext.adoptStampDefinition` before it reads the ports, when the document does not have that id yet. Undo of the placement does not remove the adopted definition, the same as for a custom stamp.
+
 ### Phase 5 — Placement and the missing-definition risk
 
 1. **Copy on first placement.** When the user places a user stamp, and the project has no definition with that id, MepApp adds a copy of the full definition to `customStampDefinitions` with `source: 'user'`. The project and the PDF then carry the stamp art and ports. A colleague without the folder still sees the stamps.
