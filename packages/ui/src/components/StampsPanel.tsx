@@ -43,9 +43,9 @@ const bitmapCache = new Map<string, Promise<ImageBitmap>>();
 /** Matches @mepapp/render document.ts's DEFAULT_NETWORK_TYPE.id — an internal fallback for old/corrupt data, never a pickable tile. */
 const UNASSIGNED_NETWORK_TYPE_ID = 'default';
 
-/** A custom definition's iconRef is already a self-contained `data:` URL — resolve library entries through resolveIconUrl, but use a custom one verbatim. */
+/** A custom definition's iconRef is already a self-contained `data:` (or, for user-library stamps, `blob:`) URL — resolve library entries through resolveIconUrl, but use a custom one verbatim. */
 function iconUrlFor(definition: StampDefinition, resolveIconUrl: (iconRef: string) => string): string {
-  return definition.iconRef.startsWith('data:') ? definition.iconRef : resolveIconUrl(definition.iconRef);
+  return definition.iconRef.startsWith('data:') || definition.iconRef.startsWith('blob:') ? definition.iconRef : resolveIconUrl(definition.iconRef);
 }
 
 /** definition.labelNl when NL is active and a translation exists (fixture-generated entries only) — a custom stamp's fixed label always shows as-is regardless of the toggle. */

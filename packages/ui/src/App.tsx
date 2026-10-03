@@ -57,6 +57,8 @@ import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.j
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
+import { useUserStampLibrary } from './useUserStampLibrary.js';
+import type { LibraryStore } from '@mepapp/platform';
 import './theme.css';
 
 export interface PdfPageLoadResult {
@@ -82,6 +84,8 @@ export interface MepSketchAppProps {
   createRoomDetectionClient?: () => RoomDetectionClient;
   /** Resolves a stamp-library definition's iconRef to a fetchable URL. Defaults to apps/web's copy under /stamps/. */
   resolveStampIconUrl?: (iconRef: string) => string;
+  /** Storage for the user's custom stamp library folders. Without it the feature is unavailable. */
+  libraryStore?: LibraryStore;
 }
 
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
@@ -187,7 +191,10 @@ export function MepSketchApp({
   correspondingSourceUrl,
   createRoomDetectionClient,
   resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL,
+  libraryStore,
 }: MepSketchAppProps) {
+  const userStampLibrary = useUserStampLibrary(libraryStore);
+  void userStampLibrary;
   const {
     containerRef,
     sceneRef,
