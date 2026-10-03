@@ -190,6 +190,8 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
 - An orphan project copy (`source: 'user'` with no library entry) gets the delete button of a custom stamp, but no edit button (Phase 6).
 - Placement: `pickStampDefinition` takes an optional `materialize` function. For a `'user'` definition it materializes the stamp and passes the result to `setStampTexture` as a 4th argument, `adoptDefinition`. `placeStampTool.placeStamp` adds the definition to the document through a new `ToolContext.adoptStampDefinition` before it reads the ports, when the document does not have that id yet. Undo of the placement does not remove the adopted definition, the same as for a custom stamp.
 
+**Phases 4 and 5 done 2026-10-03 (`7d2a5cf`).** New files: `ui/src/stampVisibility.ts` (with tests), `LibrarySourceDialog.tsx`, `LibraryFoldersDialog.tsx`. The render package gets `adoptStampDefinition` on `ToolContext`. "Add folder…" in the Library folders dialog closes that dialog first, so two dialogs never stack. Verified: root `pnpm build` passes, `@mepapp/ui` 85 tests pass, `@mepapp/core` 656 tests pass. A headless Chromium run with a real OPFS folder (3 real fixture SVGs and a subfolder) passed all steps through the real DOM: load, "user" markers, subfolder skipped, placement copies the definition with a `data:` URL once, one tile per id, reload keeps the stamps without a prompt, Sync reports "0 added, 1 updated, 1 missing", the missing marker, Remove leaves an orphan tile with a delete button, and a saved PDF opened in a fresh profile still has the stamp. Placed size 45.36 x 29.04 pt against the definition's 45.25 x 29.07 pt (300 DPI rounding). No console errors. `packages/render` has no test setup, so the adoption has no unit test. **Open:** the first sync took about 5 s for 3 small SVGs in headless Chromium; the cause is not known. Check the speed on Windows with a real folder.
+
 ### Phase 5 — Placement and the missing-definition risk
 
 1. **Copy on first placement.** When the user places a user stamp, and the project has no definition with that id, MepApp adds a copy of the full definition to `customStampDefinitions` with `source: 'user'`. The project and the PDF then carry the stamp art and ports. A colleague without the folder still sees the stamps.
@@ -271,8 +273,8 @@ Answered by the user on 2026-10-02: raster size (use a default, §4.4), sources 
 | 1 Core logic | done 2026-10-03 (`960f27f`) |
 | 2 Storage (shared with [[storage-interfaces]] Phase 2) | done 2026-10-03 (store `5226167`, wiring `2933f4f`) |
 | 3 Folder scan and sync | done 2026-10-03 (`2933f4f`) |
-| 4 UI | not started |
-| 5 Placement and copy on first placement | not started |
+| 4 UI | done 2026-10-03 (`7d2a5cf`) |
+| 5 Placement and copy on first placement | done 2026-10-03 (`7d2a5cf`) |
 | 6 Ports | not started |
 | 7 Tests and verification | not started |
 | 8 Port data backup (nice to have) | not started |
