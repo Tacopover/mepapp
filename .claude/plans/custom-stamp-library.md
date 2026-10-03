@@ -106,20 +106,39 @@ The image bytes live in the separate blob store. `listStamps` returns records wi
 
 In `@mepapp/core`:
 
-1. The record types from §4.1 (or in `platform`, per the decision in [[storage-interfaces]] §3.1).
+1. The record types from §4.1 (or in `platform`, per the decision in [[storage-interfaces]] §3.1). **Already done:** the record types are in `platform/src/library-store.ts`. `platform` imports from `core`, so `core` cannot import these records. **Review note 2026-10-03:** the `core` functions below take small `core`-local input types (`UserStampEdits`, `UserStampRecordLike`, `UserStampSourceLike`, `ScannedLibraryFile`). The `platform` records match them by shape. A type check in `platform` proves the match.
 2. `userStampId(sourceId, fileName, takenIds)`.
 3. `parseSvgIntrinsicSize(svgText)` (string-based).
 4. `buildUserStampDefinition(record, imageDataUrl)`.
 5. `diffFolderScan(existingRecords, scannedFiles)`. It returns `added`, `updated` (modified time or size changed), `unchanged`, `missing`. Pure function.
 6. Add `source: 'user'` and fix all checks found by the audit.
 
+Rules fixed at the review (2026-10-03):
+
+- Id: `user-<sourceId>-<slug>`. The slug is the lower-case file name without extension, with diacritics removed, and with each run of other characters than `a-z0-9` replaced by `-`. An empty slug becomes `stamp`. If the id is taken, add `-<extension>`. If that is also taken, add `-2`, `-3`, and so on. The sync gives ids to new files in file-name order, so the result is the same on each run.
+- The sync diff matches a file to a record by the exact file name. It never computes the id again for a known file.
+- A record that was marked missing and is in the folder again counts as `updated`.
+- `applyScannedFile(record, file, nativeSize)` returns the updated record. It keeps `edits` and clears `missingFromFolder`.
+- The image shape needs an `id` and a `style`. The style is not used for an image. `core` uses a local constant with the same value as `DEFAULT_STYLE` in `ui/useShapeDrawEditor.ts`.
+
 Tests (vitest, in `core`): id rules, the `user-` prefix versus all built-in ids, SVG size parse (viewBox with an offset, width and height with units, none), the sync diff (rename, removal, edit survives update).
 
 Verify: `pnpm --filter @mepapp/core test` and a root `pnpm build`.
 
+**Done 2026-10-03 (commit: see Phase status).** The code is in `core/src/user-stamp.ts`, with tests in `user-stamp.test.ts` (28 tests). `platform/src/library-store-compat.test.ts` proves that the `platform` records match the `core` input types. `platform/tsconfig.test.json` type-checks the `platform` test files (`npx tsc -p tsconfig.test.json`). No script runs it yet. `buildUserStampDefinition` takes one `imageUrl` for `iconRef` and the image shape. Phase 3 decides if that URL is a `blob:` or a `data:` URL. Verified: `@mepapp/core` 656 tests pass, `@mepapp/platform` 32 tests pass, the test type-check passes, root `pnpm build` passes (9 tasks).
+
+Audit of the `StampDefinition.source` checks. None of them changes in Phase 1. A `'user'` stamp is neither `'library'` nor `'custom'` in all of them:
+
+- `ui/src/components/StampsPanel.tsx:201`: `'library'` shows the pencil that copies a library stamp into a custom stamp. Phase 6 adds the user-stamp edit button.
+- `ui/src/components/StampsPanel.tsx:214`: `'custom'` shows the edit and delete buttons for a custom stamp. Phase 5 point 3 needs these for a `'user'` project copy with no library entry.
+- `ui/src/components/PropertiesPanel.tsx:550`: `'custom'` shows "Edit ports…". Phase 6 decides this for `'user'`.
+- `ui/src/components/ElementEditorDialog.tsx:266` and `ui/src/App.tsx:657` write `source: 'custom'`. Phase 6 point 2 must not save a user stamp as `'custom'`.
+
 ### Phase 2 — Storage
 
 Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those two phases are done 2026-10-03 (`91deca8`, `5226167`).** The record types from §4.1 live in `@mepapp/platform` (`library-store.ts`). `IndexedDbLibraryStore` already calls `navigator.storage.persist()` on the first `putSource`, so point 2 below only needs a check. Then:
+
+**Review note 2026-10-03:** do points 1 and 2 together with Phase 3. Without a consumer, the store wiring is dead code.
 
 1. Create the `IndexedDbLibraryStore` instance in `apps/web` and give it to the UI through the same prop pattern the app already uses (see `resolveIconUrl` in `App.tsx:87`).
 2. Request persistent storage when the first source is added.
@@ -159,6 +178,7 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
 3. **A project from another machine** has a `source: 'user'` definition and no library entry. The panel shows it in the project's custom list, as it does today for custom stamps.
 4. `getStampDefinition` checks custom first. The project copy wins over the live library entry. A library edit still reaches the open project through Phase 6 point 3. A project that is not open keeps its copy (see §6, point 2).
 5. Check `placeStampTool.ts:54` and the category-to-tool mapping (`StampsPanel.tsx:97`) with `category` from the source.
+6. **Review note 2026-10-03: check the placed size.** The `nativeWidth` comment in `stamp-library.ts` says that the scene computes the placed size again from the pixel size of the loaded art, at 300 DPI. This can replace the 40 pt default of §4.4 (compare the memory note "Stamp DPI scaling issue"). Check that a placed user stamp gets the size from its definition.
 
 ### Phase 6 — Ports (editing)
 
@@ -203,7 +223,7 @@ Tests: a round-trip of the sidecar (write, clear the store, sync, compare ports)
 6. **Pure black art and recoloring.** Image stamps recolor through the luminance blend in `colorize.ts` (memory note "PixiJS tint/colorize fix"). Check that a user SVG with colors behaves the same as a built-in one.
 7. **Folder blocked by Chrome.** Chrome may refuse some system folders. Show the browser's error in plain words, and suggest a subfolder.
 8. **SVG safety.** Never insert user SVG into the page as markup. Load it only through `<img>`, `<canvas>` and data URLs.
-9. **License.** Only free dependencies. `fake-indexeddb` is MIT. Add dev dependencies by hand to `package.json` and run a plain `pnpm install`.
+9. **License.** Only free dependencies. `fake-indexeddb` is Apache-2.0. Add dev dependencies by hand to `package.json` and run a plain `pnpm install`.
 
 ## 7. Out of scope
 
@@ -228,8 +248,8 @@ Answered by the user on 2026-10-02: raster size (use a default, §4.4), sources 
 
 | Phase | Status |
 |---|---|
-| 1 Core logic | not started |
-| 2 Storage (shared with [[storage-interfaces]] Phase 2) | not started |
+| 1 Core logic | done 2026-10-03 (see Phase 1 notes) |
+| 2 Storage (shared with [[storage-interfaces]] Phase 2) | store done (`5226167`); app wiring moves to Phase 3 |
 | 3 Folder scan and sync | not started |
 | 4 UI | not started |
 | 5 Placement and copy on first placement | not started |
