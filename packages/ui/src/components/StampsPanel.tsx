@@ -1,13 +1,16 @@
 import { useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { isLibraryStampId, NETWORK_TYPE_LIBRARY, STAMP_LIBRARY, type NetworkType, type StampDefinition } from '@mepapp/core';
+import { isLibraryStampId, NETWORK_TYPE_LIBRARY, type NetworkType, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
 import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
-import { IconPencil, IconTrash, IconUndo } from '../icons.js';
+import { IconPencil, IconPlus, IconTrash, IconUndo } from '../icons.js';
 import { loadDefinitionBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
+import { getVisibleStampDefinitions, stampLabelFor } from '../stampVisibility.js';
+
+export { getVisibleStampDefinitions, stampLabelFor };
 
 export interface StampsPanelProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -36,6 +39,18 @@ export interface StampsPanelProps {
   onPickNetworkType: (type: NetworkType) => void;
   /** Opens the Network Type Editor dialog (name, color/thickness/pattern) for an adopted type — see App.tsx's networkTypeEditorTarget. */
   onEditNetworkType: (type: NetworkType) => void;
+  /** The stamps from the user's library folders (source: 'user'), with `blob:` iconRefs — merged into the grid; a project copy with the same id is hidden (see getVisibleStampDefinitions). */
+  userStampDefinitions: StampDefinition[];
+  /** Ids of user stamps whose file is no longer in its folder — their tile gets a warning marker; the stamp still works from the stored copy. */
+  missingUserStampIds: ReadonlySet<string>;
+  /** False in a browser with no directory picker (Firefox, Safari) — hides the "Load custom …" tile; the "Library folders…" dialog then explains why. */
+  userLibraryAvailable: boolean;
+  /** Starts loading a folder of stamp art for the shown category — App.tsx's handleLoadUserFolder opens the folder picker inside this click. */
+  onLoadUserFolder: (category: StampCategoryFilter) => void;
+  /** Opens the "Library folders" dialog (list, sync and remove the user's stamp folders). */
+  onOpenLibraryFolders: () => void;
+  /** Reads a user stamp back from the library store with a `data:` URL, for placing — see useUserStampLibrary's materialize. */
+  materializeUserStamp: (id: string) => Promise<StampDefinition | undefined>;
 }
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
@@ -46,11 +61,6 @@ const UNASSIGNED_NETWORK_TYPE_ID = 'default';
 /** A custom definition's iconRef is already a self-contained `data:` (or, for user-library stamps, `blob:`) URL — resolve library entries through resolveIconUrl, but use a custom one verbatim. */
 function iconUrlFor(definition: StampDefinition, resolveIconUrl: (iconRef: string) => string): string {
   return definition.iconRef.startsWith('data:') || definition.iconRef.startsWith('blob:') ? definition.iconRef : resolveIconUrl(definition.iconRef);
-}
-
-/** definition.labelNl when NL is active and a translation exists (fixture-generated entries only) — a custom stamp's fixed label always shows as-is regardless of the toggle. */
-export function stampLabelFor(definition: StampDefinition, language: StampLabelLanguage): string {
-  return language === 'nl' && definition.labelNl ? definition.labelNl : definition.label;
 }
 
 function loadBitmap(url: string, definition: StampDefinition): Promise<ImageBitmap> {
@@ -66,34 +76,25 @@ function loadBitmap(url: string, definition: StampDefinition): Promise<ImageBitm
   return cached;
 }
 
-/** The same library+custom, discipline/category/search-filtered, label-sorted list the grid below renders — shared so the left rail's Stamp button can auto-pick "the first stamp shown here" without duplicating this logic (see App.tsx's handlePickDefaultStamp). */
-export function getVisibleStampDefinitions(
-  customStampDefinitions: StampDefinition[],
-  disciplineGroup: DisciplineGroup | null,
-  categoryFilter: StampCategoryFilter,
-  labelLanguage: StampLabelLanguage,
-  searchQuery = '',
-): StampDefinition[] {
-  // A custom definition with a library id is an edited library stamp (an override): it takes that tile's place.
-  const shadowedLibraryIds = new Set(customStampDefinitions.map((c) => c.id));
-  const allDefinitions = [...STAMP_LIBRARY.filter((lib) => !shadowedLibraryIds.has(lib.id)), ...customStampDefinitions];
-  const trimmedQuery = searchQuery.trim().toLowerCase();
-  return allDefinitions
-    .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)
-    .filter((def) => def.category === categoryFilter)
-    .filter((def) => trimmedQuery === '' || stampLabelFor(def, labelLanguage).toLowerCase().includes(trimmedQuery))
-    .sort((a, b) => stampLabelFor(a, labelLanguage).localeCompare(stampLabelFor(b, labelLanguage)));
-}
-
-/** Loads the definition's art, arms the scene's placement tool, and reports the pick — shared between the grid's own tile click and the left rail's Stamp-button auto-pick fallback. */
+/** Loads the definition's art, arms the scene's placement tool, and reports the pick (a user-library stamp is materialized first, so placing it copies it into the project) — shared between the grid's own tile click and the left rail's Stamp-button auto-pick fallback. */
 export async function pickStampDefinition(
   sceneRef: RefObject<SketchScene | null>,
   definition: StampDefinition,
   resolveIconUrl: (iconRef: string) => string,
   onPick: (definition: StampDefinition) => void,
+  materialize?: (id: string) => Promise<StampDefinition | undefined>,
 ): Promise<void> {
+  let adopt: StampDefinition | undefined;
+  if (definition.source === 'user' && materialize) {
+    // The project copy needs the ports and a data: URL, so a stamp that cannot be materialized is not armed (it would place with no ports).
+    adopt = await materialize(definition.id);
+    if (!adopt) {
+      console.warn(`[mepapp] could not read the library stamp "${definition.id}"; it is not armed.`);
+      return;
+    }
+  }
   const bitmap = await loadBitmap(iconUrlFor(definition, resolveIconUrl), definition);
-  sceneRef.current?.setStampTexture(bitmap, definition.id, getStampAppearanceDefault(definition.id));
+  sceneRef.current?.setStampTexture(bitmap, definition.id, getStampAppearanceDefault(definition.id), adopt);
   sceneRef.current?.setTool(definition.category === 'equipment' ? 'place-equipment' : 'place-terminal');
   onPick(definition);
 }
@@ -118,13 +119,19 @@ export function StampsPanel({
   activeNetworkTypeId,
   onPickNetworkType,
   onEditNetworkType,
+  userStampDefinitions,
+  missingUserStampIds,
+  userLibraryAvailable,
+  onLoadUserFolder,
+  onOpenLibraryFolders,
+  materializeUserStamp,
 }: StampsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Sorted by displayed label rather than left in library-then-custom-append-order, so a newly
   // created/duplicated custom element lands in its correct alphabetical spot immediately instead
   // of always trailing at the bottom of the grid.
-  const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, categoryFilter, labelLanguage, searchQuery);
+  const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, categoryFilter, labelLanguage, searchQuery, userStampDefinitions);
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
   // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id
@@ -136,10 +143,11 @@ export function StampsPanel({
   const visibleCustomNetworkTypes =
     disciplineGroup === null ? customNetworkTypes : customNetworkTypes.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
 
+  const userStampIds = new Set(userStampDefinitions.map((u) => u.id));
   const [subTab, setSubTab] = useState<'stamps' | 'networkTypes'>('stamps');
 
   async function handlePick(definition: StampDefinition) {
-    await pickStampDefinition(sceneRef, definition, resolveIconUrl, onPick);
+    await pickStampDefinition(sceneRef, definition, resolveIconUrl, onPick, materializeUserStamp);
   }
 
   return (
@@ -170,6 +178,9 @@ export function StampsPanel({
           <div className="mep-stamps-filter-row2">
             <CategorySwitcher value={categoryFilter} onChange={onChangeCategoryFilter} />
             <LanguageToggle value={labelLanguage} onChange={onChangeLabelLanguage} />
+            <button type="button" className="mep-toggle-btn" title="Manage your stamp library folders" onClick={onOpenLibraryFolders}>
+              Library folders…
+            </button>
             <input
               type="search"
               className="mep-stamp-search"
@@ -198,6 +209,30 @@ export function StampsPanel({
                   <img src={iconUrlFor(definition, resolveIconUrl)} alt="" />
                   {stampLabelFor(definition, labelLanguage)}
                 </button>
+                {definition.source === 'user' && userStampIds.has(definition.id) && (
+                  <span className="mep-stamp-tile-badge" title="From your library folder">
+                    user
+                    {missingUserStampIds.has(definition.id) && (
+                      <span className="mep-stamp-tile-warning" title="The file is no longer in the folder. The stamp still works.">
+                        {' '}
+                        !
+                      </span>
+                    )}
+                  </span>
+                )}
+                {definition.source === 'user' && !userStampIds.has(definition.id) && (
+                  <button
+                    type="button"
+                    className="mep-stamp-tile-delete"
+                    title="Delete stamp…"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteCustomStampDefinition(definition);
+                    }}
+                  >
+                    <IconTrash size={12} />
+                  </button>
+                )}
                 {definition.source === 'library' && (
                   <button
                     type="button"
@@ -243,6 +278,12 @@ export function StampsPanel({
               <IconPencil size={20} />
               Create custom element…
             </button>
+            {userLibraryAvailable && (
+              <button type="button" className="mep-stamp-tile" onClick={() => onLoadUserFolder(categoryFilter)}>
+                <IconPlus size={20} />
+                {categoryFilter === 'equipment' ? 'Load custom equipment…' : 'Load custom terminals…'}
+              </button>
+            )}
           </div>
         </>
       ) : (

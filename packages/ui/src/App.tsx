@@ -8,6 +8,7 @@ import {
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
   STAMP_LIBRARY,
+  type Discipline,
   type NetworkType,
   type RoomDetectionClient,
   type ReconciliationReport,
@@ -58,7 +59,10 @@ import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
 import { useUserStampLibrary } from './useUserStampLibrary.js';
-import type { LibraryStore } from '@mepapp/platform';
+import { browserImageSizeDecoder, createLibrarySource, ensureReadPermission, syncLibrarySource } from './userStampLibrary.js';
+import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
+import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
+import type { LibrarySourceRecord, LibraryStore } from '@mepapp/platform';
 import './theme.css';
 
 export interface PdfPageLoadResult {
@@ -185,6 +189,22 @@ function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'AbortError';
 }
 
+/** The first discipline of a Stamps-panel discipline group — the default for a newly added stamp folder. */
+function defaultDisciplineFor(group: DisciplineGroup | null): Discipline {
+  switch (group) {
+    case 'hvac':
+      return 'ventilation';
+    case 'plumbing':
+      return 'plumbing';
+    case 'electrical':
+      return 'electrical';
+    case 'fire':
+      return 'fireProtection';
+    default:
+      return 'other';
+  }
+}
+
 export function MepSketchApp({
   onLoadPdfPage,
   onLoadPdfPageAt,
@@ -194,7 +214,10 @@ export function MepSketchApp({
   libraryStore,
 }: MepSketchAppProps) {
   const userStampLibrary = useUserStampLibrary(libraryStore);
-  void userStampLibrary;
+  const missingUserStampIds = useMemo(
+    () => new Set(userStampLibrary.records.filter((record) => record.missingFromFolder).map((record) => record.id)),
+    [userStampLibrary.records],
+  );
   const {
     containerRef,
     sceneRef,
@@ -624,10 +647,10 @@ export function MepSketchApp({
   // Left rail's Stamp button, clicked with nothing picked yet — arms the same
   // first stamp the MEP tab's grid itself would show (its current discipline/category filters).
   const handlePickDefaultStamp = useCallback(() => {
-    const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage);
+    const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage, '', userStampLibrary.definitions);
     const first = definitions[0];
-    if (first) void pickStampDefinition(sceneRef, first, resolveStampIconUrl, handleStampPick);
-  }, [customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage, resolveStampIconUrl, handleStampPick, sceneRef]);
+    if (first) void pickStampDefinition(sceneRef, first, resolveStampIconUrl, handleStampPick, userStampLibrary.materialize);
+  }, [customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage, userStampLibrary.definitions, userStampLibrary.materialize, resolveStampIconUrl, handleStampPick, sceneRef]);
 
   // Opens the Element Editor pre-filled from a read-only library stamp so the
   // user can reposition ports / rename / recategorize and save an override of
@@ -764,6 +787,83 @@ export function MepSketchApp({
     [allStamps, sceneRef, applyDefinitionToPlacedStamps],
   );
 
+  // A folder the user picked, waiting for its name and discipline in LibrarySourceDialog.
+  const [pendingLibraryFolder, setPendingLibraryFolder] = useState<{ dirHandle: FileSystemDirectoryHandle; category: StampCategoryFilter } | null>(null);
+  const [libraryFolderBusy, setLibraryFolderBusy] = useState(false);
+  const [libraryFoldersOpen, setLibraryFoldersOpen] = useState(false);
+  const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
+
+  // The folder picker must be the first call in the click handler: the browser grants it only to a click that has not awaited anything yet.
+  const handleLoadUserFolder = useCallback(async (category: StampCategoryFilter) => {
+    let dirHandle: FileSystemDirectoryHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker!({ id: 'mepapp-stamp-library', mode: 'read' });
+    } catch (err) {
+      if (isAbortError(err)) return;
+      setStatus(`The browser refused this folder (${err instanceof Error ? err.message : String(err)}). Pick a subfolder instead.`);
+      return;
+    }
+    setPendingLibraryFolder({ dirHandle, category });
+  }, []);
+
+  const handleConfirmLibraryFolder = useCallback(
+    async (name: string, discipline: Discipline) => {
+      if (!pendingLibraryFolder || !libraryStore) return;
+      setLibraryFolderBusy(true);
+      try {
+        const source = await createLibrarySource(libraryStore, { name, category: pendingLibraryFolder.category, discipline, dirHandle: pendingLibraryFolder.dirHandle });
+        const summary = await syncLibrarySource(libraryStore, source, { decode: browserImageSizeDecoder });
+        await userStampLibrary.reload();
+        const count = summary.added + summary.updated;
+        setStatus(`Loaded ${count} stamp${count === 1 ? '' : 's'} from "${name}".`);
+      } catch (err) {
+        await userStampLibrary.reload().catch(() => undefined);
+        setStatus(`Could not load the folder "${name}": ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setLibraryFolderBusy(false);
+        setPendingLibraryFolder(null);
+      }
+    },
+    [pendingLibraryFolder, libraryStore, userStampLibrary],
+  );
+
+  const handleSyncLibrarySource = useCallback(
+    async (source: LibrarySourceRecord) => {
+      if (!libraryStore || !source.dirHandle) return;
+      // Permission first: requestPermission needs the user gesture of this click.
+      if (!(await ensureReadPermission(source.dirHandle))) {
+        setStatus('Permission refused.');
+        return;
+      }
+      setSyncingSourceId(source.id);
+      try {
+        const summary = await syncLibrarySource(libraryStore, source, { decode: browserImageSizeDecoder });
+        await userStampLibrary.reload();
+        setStatus(`Synced "${source.name}": ${summary.added} added, ${summary.updated} updated, ${summary.missing} missing from the folder.`);
+      } catch (err) {
+        setStatus(`Could not sync "${source.name}": ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setSyncingSourceId(null);
+      }
+    },
+    [libraryStore, userStampLibrary],
+  );
+
+  const handleRemoveLibrarySource = useCallback(
+    async (source: LibrarySourceRecord) => {
+      if (!libraryStore) return;
+      if (!window.confirm(`Remove the folder "${source.name}" and its stamps from MepApp? The files in the folder stay. Stamps already placed in a project keep their own copy.`)) return;
+      try {
+        await libraryStore.removeSource(source.id);
+        await userStampLibrary.reload();
+        setStatus(`Removed "${source.name}".`);
+      } catch (err) {
+        setStatus(`Could not remove "${source.name}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [libraryStore, userStampLibrary],
+  );
+
   const handleNetworkTypePick = useCallback(
     (type: NetworkType) => {
       sceneRef.current?.setActiveNetworkType(type);
@@ -832,6 +932,12 @@ export function MepSketchApp({
         activeNetworkTypeId={activeNetworkTypeId}
         onPickNetworkType={handleNetworkTypePick}
         onEditNetworkType={setNetworkTypeEditorTarget}
+        userStampDefinitions={userStampLibrary.definitions}
+        missingUserStampIds={missingUserStampIds}
+        userLibraryAvailable={userStampLibrary.available}
+        onLoadUserFolder={(category) => void handleLoadUserFolder(category)}
+        onOpenLibraryFolders={() => setLibraryFoldersOpen(true)}
+        materializeUserStamp={userStampLibrary.materialize}
       />
     ),
     drawings: (
@@ -1132,6 +1238,35 @@ export function MepSketchApp({
           definitions={customPropertyDefs}
           onSave={handleSaveCustomPropertyDefs}
           onClose={() => setGlobalPropertiesOpen(false)}
+        />
+      )}
+
+      {pendingLibraryFolder && (
+        <LibrarySourceDialog
+          category={pendingLibraryFolder.category}
+          defaultName={pendingLibraryFolder.dirHandle.name}
+          defaultDiscipline={defaultDisciplineFor(disciplineGroup)}
+          busy={libraryFolderBusy}
+          onSubmit={(name, discipline) => void handleConfirmLibraryFolder(name, discipline)}
+          onCancel={() => {
+            if (!libraryFolderBusy) setPendingLibraryFolder(null);
+          }}
+        />
+      )}
+
+      {libraryFoldersOpen && (
+        <LibraryFoldersDialog
+          available={userStampLibrary.available}
+          sources={userStampLibrary.sources}
+          records={userStampLibrary.records}
+          busySourceId={syncingSourceId}
+          onSync={(source) => void handleSyncLibrarySource(source)}
+          onRemove={(source) => void handleRemoveLibrarySource(source)}
+          onAddFolder={(category) => {
+            setLibraryFoldersOpen(false);
+            void handleLoadUserFolder(category);
+          }}
+          onClose={() => setLibraryFoldersOpen(false)}
         />
       )}
 

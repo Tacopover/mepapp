@@ -20,7 +20,7 @@ const STAMP_SOURCE_DPI = 300;
 /** Cap on the Shapes-mode canvas's longer side, in drawing-buffer px — the shorter side is derived from the definition's own nativeWidth:nativeHeight aspect (see fitCanvasSize) so a wide/tall stamp doesn't get squished into a square, matching how it actually looks placed on the PDF. */
 const SHAPE_CANVAS_MAX_PX = 520;
 
-const DISCIPLINE_OPTIONS: Discipline[] = [
+export const DISCIPLINE_OPTIONS: Discipline[] = [
   'heatingAndCooling',
   'ventilation',
   'plumbing',
@@ -29,7 +29,7 @@ const DISCIPLINE_OPTIONS: Discipline[] = [
   'other',
 ];
 
-const DISCIPLINE_LABEL: Record<Discipline, string> = {
+export const DISCIPLINE_LABEL: Record<Discipline, string> = {
   heatingAndCooling: 'Heating & Cooling',
   ventilation: 'Ventilation',
   plumbing: 'Plumbing',

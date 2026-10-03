@@ -50,6 +50,7 @@ export class PlaceStampTool implements Tool {
   ): void {
     const { texture, nativeWidth, nativeHeight, definitionId, appearanceDefault } = pending;
     const id = `stamp-${ctx.doc.nextStampSeq++}`;
+    if (pending.adoptDefinition) ctx.adoptStampDefinition(pending.adoptDefinition);
     // Copy the definition's ports onto the placed instance so resolveSegmentEndpoint's port-snapping has something to snap to.
     const definition = definitionId ? getStampDefinition(definitionId, ctx.doc.customStampDefinitions) : undefined;
     const ports = definition ? [...definition.ports] : [];
