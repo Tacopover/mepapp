@@ -155,6 +155,14 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
 4. A list of `UserStampDefinition`s in React state, built from `listStamps()`. **Do not load all image bytes into memory as data URLs.** Use `URL.createObjectURL` for the panel thumbnails. Build the full definition with a data URL shape only when the stamp is placed or embedded (a `materializeUserStamp(id)` function). Check what `resolveIconBitmap` and `getStampDefinition` need, then decide the exact shape of this split. Write the decision into this file.
 5. Revoke object URLs when the list reloads.
 
+**Design decisions for Phases 2 and 3 (2026-10-03):**
+
+- `apps/web` creates one `IndexedDbLibraryStore` and passes it to `MepSketchApp` as the optional prop `libraryStore?: LibraryStore`. With no prop, the feature is unavailable.
+- The panel definitions use a `blob:` object URL (one per stamp) in `iconRef` and in the image shape. `loadShapeImages` (`symbolShapeCanvas.ts`) loads an image shape through `<img>`, so a `blob:` URL renders like a `data:` URL. `StampsPanel`'s `iconUrlFor` must pass a `blob:` URL through unchanged, as it does for `data:`.
+- A `blob:` URL must never reach the project document. `materializeUserStamp(id)` reads the blob as a `data:` URL and builds the definition again. Phase 5 uses it.
+- All folder code lives in `ui/src/userStampLibrary.ts` (scan, size, sync) and `ui/src/useUserStampLibrary.ts` (the React hook). The sync takes the image decoder as a parameter, so vitest can run it in Node with the real fixture files.
+- Phase 3 adds no visible change. Phase 4 adds the buttons and merges the user stamps into the panel.
+
 ### Phase 4 — UI
 
 1. **Load buttons, one per category.** The Terminals view of the Stamps panel has "Load custom terminals". The Equipment view has "Load custom equipment". Each opens the folder picker, then asks for a name and a discipline. The category is already set by the button.
@@ -178,7 +186,8 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
 3. **A project from another machine** has a `source: 'user'` definition and no library entry. The panel shows it in the project's custom list, as it does today for custom stamps.
 4. `getStampDefinition` checks custom first. The project copy wins over the live library entry. A library edit still reaches the open project through Phase 6 point 3. A project that is not open keeps its copy (see §6, point 2).
 5. Check `placeStampTool.ts:54` and the category-to-tool mapping (`StampsPanel.tsx:97`) with `category` from the source.
-6. **Review note 2026-10-03: check the placed size.** The `nativeWidth` comment in `stamp-library.ts` says that the scene computes the placed size again from the pixel size of the loaded art, at 300 DPI. This can replace the 40 pt default of §4.4 (compare the memory note "Stamp DPI scaling issue"). Check that a placed user stamp gets the size from its definition.
+7. **Placement design (2026-10-03).** `placeStampTool.ts` reads the ports from the document's definitions at placement. A user stamp that is not in the document gets no ports. Proposal: `pickStampDefinition` materializes the user stamp and gives the definition to `SketchScene.setStampTexture`. `placeStamp` adds it to `customStampDefinitions` when the document does not have it yet. This also works when the user picks in one document and places in another.
+6. **Review note 2026-10-03: check the placed size.** Later check: `loadDefinitionBitmap` draws `shapes` at `nativeWidth / 72 * 300` pixels, and the scene reads the size back at 300 DPI. So the size from the definition survives, apart from rounding. Check it once in the browser. The `nativeWidth` comment in `stamp-library.ts` says that the scene computes the placed size again from the pixel size of the loaded art, at 300 DPI. This can replace the 40 pt default of §4.4 (compare the memory note "Stamp DPI scaling issue"). Check that a placed user stamp gets the size from its definition.
 
 ### Phase 6 — Ports (editing)
 
