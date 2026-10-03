@@ -119,7 +119,7 @@ Verify: `pnpm --filter @mepapp/core test` and a root `pnpm build`.
 
 ### Phase 2 — Storage
 
-Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. Then:
+Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those two phases are done 2026-10-03 (`91deca8`, `5226167`).** The record types from §4.1 live in `@mepapp/platform` (`library-store.ts`). `IndexedDbLibraryStore` already calls `navigator.storage.persist()` on the first `putSource`, so point 2 below only needs a check. Then:
 
 1. Create the `IndexedDbLibraryStore` instance in `apps/web` and give it to the UI through the same prop pattern the app already uses (see `resolveIconUrl` in `App.tsx:87`).
 2. Request persistent storage when the first source is added.

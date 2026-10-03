@@ -1,6 +1,6 @@
 # Storage interfaces — plan
 
-Status: **planned 2026-10-02, not started.** Written after a feasibility discussion with the user (see §1). The first consumer is [[custom-stamp-library]]. The second consumer is a later plan for replacing a PDF (see §9). Nothing in this plan needs a login or a backend.
+Status: **Phase 1 and Phase 2 done 2026-10-03 (`91deca8`, `5226167`). Phase 3 is optional and not started.** Written after a feasibility discussion with the user (see §1). The first consumer is [[custom-stamp-library]]. The second consumer is a later plan for replacing a PDF (see §9). Nothing in this plan needs a login or a backend.
 
 ## 1. Goal
 
@@ -107,6 +107,8 @@ No UI. No user-visible change.
 
 Verify: `pnpm build` at the root, then the vitest run for `@mepapp/platform`. The CLAUDE.md note says `core` is the only package with real tests today. Check that vitest runs in `platform` and add the config if it does not.
 
+**Done 2026-10-03 (`91deca8`).** Decision for §3.1: `platform` imports `Discipline` and `PortSpec` from `core` with `import type`. `core` does not import `platform`. No cycle. The record types live in `platform/src/library-store.ts`. A record carries an optional `revision`. A put with no `revision` writes without a check. A put returns the new revision. The contract suites are `platform/src/contract/*.contract.ts`. The build excludes them, and other packages import them by relative path. Verified: root `pnpm build` passes (9 tasks). `@mepapp/platform` vitest: 31 tests pass. The test files also pass a `tsc --noEmit` check. `@mepapp/core`: 628 tests still pass.
+
 ### Phase 2 — IndexedDB `LibraryStore` (in `platform-web`)
 
 1. Add `IndexedDbLibraryStore`. Database name `mepapp-library`. Object stores: `sources`, `stamps` (metadata), `blobs` (the files).
@@ -115,6 +117,8 @@ Verify: `pnpm build` at the root, then the vitest run for `@mepapp/platform`. Th
 4. Handle the database version upgrade path from day one (an `onupgradeneeded` step list), because users will have data in it.
 
 This phase is the shared start of [[custom-stamp-library]] Phase 2. Whichever plan starts first does this phase. Mark it done in both files.
+
+**Done 2026-10-03 (`5226167`).** `IndexedDbLibraryStore` is in `platform-web/src/indexeddb-library-store.ts`. It also has a `meta` object store that holds the revision counter, so revisions do not repeat after a reopen. Blobs are stored as `{ type, bytes: ArrayBuffer }`, because `fake-indexeddb` in Node does not clone a `Blob` reliably. The option `indexedDB: null` means "no IndexedDB" (used by a test). `fake-indexeddb` is 6.2.5, licence **Apache-2.0** (not MIT), a dev dependency only. `platform-web/vitest.config.ts` aliases `@mepapp/platform` to its source, so the store and the contract suite share one `StoreConflictError` class. Lockfile diff: 13 lines. Verified: root `pnpm build` passes. `platform-web` vitest: 20 tests pass (14 contract tests, plus reopen, revision after reopen, three `persist()` cases, unavailable store). **Not verified:** the Windows browser check from §7 (close the browser, reopen, data still there). This check needs a UI, which arrives with [[custom-stamp-library]] Phase 2.
 
 ### Phase 3 — `SettingsStore` over `localStorage`
 
@@ -154,7 +158,7 @@ Not part of this plan. See §9. The directory-handle implementation and the Inde
 
 ## 8. Open questions
 
-1. Is `core` allowed to be a type dependency of `platform`? (Decision in Phase 1, §3.1.)
+1. ~~Is `core` allowed to be a type dependency of `platform`?~~ Yes. Decided in Phase 1: type-only imports, no cycle.
 2. Should `StoreCapabilities` include a `maxBlobBytes` field? IndexedDB has quota limits that differ per browser.
 
 ## 9. Consumers
