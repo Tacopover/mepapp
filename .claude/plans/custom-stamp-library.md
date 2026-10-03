@@ -163,7 +163,7 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
 - All folder code lives in `ui/src/userStampLibrary.ts` (scan, size, sync) and `ui/src/useUserStampLibrary.ts` (the React hook). The sync takes the image decoder as a parameter, so vitest can run it in Node with the real fixture files.
 - Phase 3 adds no visible change. Phase 4 adds the buttons and merges the user stamps into the panel.
 
-**Phases 2 and 3 done 2026-10-03 (HASH).** `apps/web/src/main.tsx` creates the store. `ui/src/userStampLibrary.ts` has `scanLibraryFolder`, `readNativeSize`, `ensureReadPermission`, `createLibrarySource`, `syncLibrarySource`, `materializeUserStamp`. `ui/src/useUserStampLibrary.ts` loads the definitions with `blob:` URLs. `App.tsx` calls the hook but does not use the result yet. The sync stores each blob with the type from the file extension, because `getFile()` can give an empty type. An SVG with no size at all gets the 40 pt square default. Tests: `ui/src/userStampLibrary.test.ts` (13 tests). `fixtures/stamps` has no PNG files, so the PNG tests use the real Tauri icons in `apps/desktop/src-tauri/icons/`. Verified: `@mepapp/ui` 79 tests pass, root `pnpm build` passes (9 tasks). A headless Chromium smoke test (before the last small fix to the sync) showed no console errors and the `mepapp-library` database. **Not verified:** a real folder sync in a browser. That needs the Phase 4 buttons.
+**Phases 2 and 3 done 2026-10-03 (`2933f4f`).** `apps/web/src/main.tsx` creates the store. `ui/src/userStampLibrary.ts` has `scanLibraryFolder`, `readNativeSize`, `ensureReadPermission`, `createLibrarySource`, `syncLibrarySource`, `materializeUserStamp`. `ui/src/useUserStampLibrary.ts` loads the definitions with `blob:` URLs. `App.tsx` calls the hook but does not use the result yet. The sync stores each blob with the type from the file extension, because `getFile()` can give an empty type. An SVG with no size at all gets the 40 pt square default. Tests: `ui/src/userStampLibrary.test.ts` (13 tests). `fixtures/stamps` has no PNG files, so the PNG tests use the real Tauri icons in `apps/desktop/src-tauri/icons/`. Verified: `@mepapp/ui` 79 tests pass, root `pnpm build` passes (9 tasks). A headless Chromium smoke test (before the last small fix to the sync) showed no console errors and the `mepapp-library` database. **Not verified:** a real folder sync in a browser. That needs the Phase 4 buttons.
 
 ### Phase 4 — UI
 
@@ -260,8 +260,8 @@ Answered by the user on 2026-10-02: raster size (use a default, §4.4), sources 
 | Phase | Status |
 |---|---|
 | 1 Core logic | done 2026-10-03 (`960f27f`) |
-| 2 Storage (shared with [[storage-interfaces]] Phase 2) | done 2026-10-03 (store `5226167`, wiring HASH) |
-| 3 Folder scan and sync | done 2026-10-03 (HASH) |
+| 2 Storage (shared with [[storage-interfaces]] Phase 2) | done 2026-10-03 (store `5226167`, wiring `2933f4f`) |
+| 3 Folder scan and sync | done 2026-10-03 (`2933f4f`) |
 | 4 UI | not started |
 | 5 Placement and copy on first placement | not started |
 | 6 Ports | not started |
