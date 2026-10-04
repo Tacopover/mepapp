@@ -13,7 +13,7 @@ export interface DialogProps {
   closeOnBackdropClick?: boolean;
   /** Replaces the title line with the caller's own header, for a workspace that needs controls up there. `title` then only names the dialog for assistive technology. */
   header?: ReactNode;
-  /** Keeps every key press inside the dialog: the scene's window key handler (Delete, Ctrl+C, Ctrl+V, tool keys) does not see it. For a full-window workspace that hides the scene. Listeners on the document still run. */
+  /** Keeps every key press inside the dialog: the scene's window key handler (Delete, Ctrl+C, Ctrl+V, tool keys) does not see it, so a Delete meant for the dialog never deletes the canvas selection behind it. Listeners on the document still run. Defaults to true. */
   isolateKeys?: boolean;
 }
 
@@ -22,7 +22,7 @@ export interface DialogProps {
  * and Escape both dismiss via onClose. Reuses the mep-modal / mep-modal-actions
  * classes the calibration prompt already established rather than a new look.
  */
-export function Dialog({ title, onClose, children, actions, className, closeOnBackdropClick = true, header, isolateKeys = false }: DialogProps) {
+export function Dialog({ title, onClose, children, actions, className, closeOnBackdropClick = true, header, isolateKeys = true }: DialogProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isolateKeys) event.stopPropagation();

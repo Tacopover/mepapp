@@ -3994,12 +3994,12 @@ export class SketchScene {
    * place-terminal/place-equipment, Escape switches to Select directly,
    * since that tool otherwise stays active across repeated placements (see
    * placeStamp). All of this is ignored while focus is in a text
-   * input/textarea so it doesn't fight typing in, e.g., the Properties
+   * input/textarea/select so it doesn't fight typing in, e.g., the Properties
    * panel or the textbox-annotation floating textarea.
    */
   private readonly keyDownImpl = (event: KeyboardEvent): void => {
     const target = event.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
 
     if (event.key === 'Escape') {
       this.toolMap.get(this.tool)?.onKeyDown?.(this.ctx, event);

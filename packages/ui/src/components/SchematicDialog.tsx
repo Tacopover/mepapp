@@ -497,11 +497,15 @@ export function SchematicDialog({
   const subviewOpen = drawingExtra !== undefined || symbolLibraryOpen;
   /** Any drawing/symbol-library subview is open, in either mode — closing now would discard its in-progress edits. */
   const closeBlocked = subviewOpen || templateSubviewOpen;
+  // An Escape that a subview leaves alone (one typed in its text inputs) still reaches the Dialog.
+  const closeUnlessBlocked = () => {
+    if (!closeBlocked) onClose();
+  };
 
   const header = (
     <div className="mep-ws-header">
       <div className="mep-ws-modes" role="tablist" aria-label="Mode">
-        <button type="button" role="tab" aria-selected={!editingTemplate} className={!editingTemplate ? 'on' : undefined} onClick={() => setEditingTemplateId(null)}>
+        <button type="button" role="tab" aria-selected={!editingTemplate} className={!editingTemplate ? 'on' : undefined} disabled={closeBlocked} onClick={() => setEditingTemplateId(null)}>
           Schematic
         </button>
         <button
@@ -530,7 +534,7 @@ export function SchematicDialog({
           </span>
           <span className="mep-ws-sep" />
           <span className="mep-ws-title">Schematic</span>
-          <select className="mep-ws-select" aria-label="Schematic" value={schematic.id} onChange={(event) => setSelectedId(event.target.value)}>
+          <select className="mep-ws-select" aria-label="Schematic" value={schematic.id} disabled={closeBlocked} onChange={(event) => setSelectedId(event.target.value)}>
             {panelSchematics.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -890,7 +894,7 @@ export function SchematicDialog({
   }
 
   return (
-    <Dialog title={editingTemplate ? `Schematic template ${editingTemplate.name}` : 'Schematic'} onClose={onClose} className="mep-modal--workspace" closeOnBackdropClick={false} header={header} isolateKeys>
+    <Dialog title={editingTemplate ? `Schematic template ${editingTemplate.name}` : 'Schematic'} onClose={closeUnlessBlocked} className="mep-modal--workspace" closeOnBackdropClick={false} header={header} isolateKeys>
       {body}
     </Dialog>
   );
