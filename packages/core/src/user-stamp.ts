@@ -6,7 +6,7 @@
 import type { PortSpec } from './geometry.js';
 import type { Discipline } from './network.js';
 import type { StampDefinition } from './stamp-library.js';
-import type { SymbolShapeStyle } from './symbol-shapes.js';
+import type { SymbolShape, SymbolShapeStyle } from './symbol-shapes.js';
 
 export const USER_STAMP_ID_PREFIX = 'user-';
 
@@ -24,7 +24,23 @@ export interface UserStampEdits {
   ports?: PortSpec[];
   nativeWidth?: number;
   nativeHeight?: number;
+  /** Overrides the source's category. */
+  category?: UserStampCategory;
+  definitionPortGroups?: string[][];
+  /** Edited artwork. An image shape with `dataUrl === USER_STAMP_FILE_REF` stands for the stamp's own file. */
+  shapes?: SymbolShape[];
+  /** The PNG preview made by the Element Editor at save. */
+  iconRef?: string;
 }
+
+/**
+ * Marker for `dataUrl` in an image shape of `UserStampEdits.shapes`: "this stamp's own file".
+ * buildUserStampDefinition swaps it for the current file URL, so the stored edits never hold a second copy of the file.
+ */
+export const USER_STAMP_FILE_REF = 'mepapp:user-file';
+
+/** Id of the library source that holds stamps saved with "Save as" (no folder, no file sync). */
+export const SAVED_STAMPS_SOURCE_ID = 'saved';
 
 export interface UserStampRecordLike {
   id: string;
@@ -32,6 +48,8 @@ export interface UserStampRecordLike {
   nativeWidth: number;
   nativeHeight: number;
   edits: UserStampEdits;
+  /** Set when the user deleted the stamp from the panel; the file stays in its folder. */
+  hidden?: boolean;
 }
 
 export interface UserStampSourceLike {
@@ -153,23 +171,66 @@ export function rasterNativeSize(pixelWidth: number, pixelHeight: number): { nat
   return { nativeWidth: round2((long * pixelWidth) / pixelHeight), nativeHeight: long };
 }
 
-/** The StampDefinition for one user-library stamp; `imageUrl` is the already-resolved URL of its file (blob: or data:). */
-export function buildUserStampDefinition(record: UserStampRecordLike, source: UserStampSourceLike, imageUrl: string): StampDefinition {
+/** True when the stamp's artwork includes its own file: no edited shapes, or a shape with the file marker. */
+export function usesUserStampFile(edits: UserStampEdits): boolean {
+  if (edits.shapes === undefined) return true;
+  return edits.shapes.some((shape) => shape.kind === 'image' && shape.dataUrl === USER_STAMP_FILE_REF);
+}
+
+/** The StampDefinition for one user-library stamp; `imageUrl` is the already-resolved URL of its file (blob: or data:), undefined when the file is missing. */
+export function buildUserStampDefinition(record: UserStampRecordLike, source: UserStampSourceLike, imageUrl: string | undefined): StampDefinition {
   const { edits } = record;
-  return {
+  let shapes: SymbolShape[];
+  if (edits.shapes !== undefined) {
+    shapes = [];
+    for (const shape of edits.shapes) {
+      if (shape.kind === 'image' && shape.dataUrl === USER_STAMP_FILE_REF) {
+        if (imageUrl !== undefined) shapes.push({ ...shape, dataUrl: imageUrl, style: { ...shape.style } });
+      } else {
+        shapes.push(structuredClone(shape));
+      }
+    }
+  } else if (imageUrl !== undefined) {
+    shapes = [
+      { id: `${record.id}-image`, kind: 'image', dataUrl: imageUrl, x: 0, y: 0, width: 1, height: 1, style: { ...IMAGE_SHAPE_STYLE } },
+    ];
+  } else {
+    shapes = [];
+  }
+  const definition: StampDefinition = {
     id: record.id,
     label: edits.label ?? humanizeFileName(record.fileName),
     discipline: edits.discipline ?? source.discipline,
-    category: source.category,
+    category: edits.category ?? source.category,
     nativeWidth: edits.nativeWidth ?? record.nativeWidth,
     nativeHeight: edits.nativeHeight ?? record.nativeHeight,
     ports: [...(edits.ports ?? [])],
-    iconRef: imageUrl,
+    iconRef: edits.iconRef ?? imageUrl ?? '',
     source: 'user',
-    shapes: [
-      { id: `${record.id}-image`, kind: 'image', dataUrl: imageUrl, x: 0, y: 0, width: 1, height: 1, style: { ...IMAGE_SHAPE_STYLE } },
-    ],
+    shapes,
   };
+  if (edits.definitionPortGroups !== undefined) definition.definitionPortGroups = edits.definitionPortGroups.map((group) => [...group]);
+  return definition;
+}
+
+/** The edits that a Save from the Element Editor stores: the inverse of buildUserStampDefinition. `fileDataUrl` is the stamp's own file as a data: URL, when it has one. */
+export function toUserStampEdits(definition: StampDefinition, fileDataUrl: string | undefined): UserStampEdits {
+  const edits: UserStampEdits = {
+    label: definition.label,
+    discipline: definition.discipline,
+    ports: [...definition.ports],
+    nativeWidth: definition.nativeWidth,
+    nativeHeight: definition.nativeHeight,
+    iconRef: definition.iconRef,
+    shapes: (definition.shapes ?? []).map((shape) =>
+      shape.kind === 'image' && fileDataUrl !== undefined && shape.dataUrl === fileDataUrl
+        ? { ...shape, dataUrl: USER_STAMP_FILE_REF, style: { ...shape.style } }
+        : structuredClone(shape),
+    ),
+  };
+  if (definition.category === 'terminal' || definition.category === 'equipment') edits.category = definition.category;
+  if (definition.definitionPortGroups !== undefined) edits.definitionPortGroups = definition.definitionPortGroups.map((group) => [...group]);
+  return edits;
 }
 
 export interface FolderScanDiff<R extends UserStampScanRecordLike> {

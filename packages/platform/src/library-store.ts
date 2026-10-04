@@ -1,4 +1,4 @@
-import type { Discipline, PortSpec } from '@mepapp/core';
+import type { Discipline, PortSpec, SymbolShape } from '@mepapp/core';
 import type { BaseStore } from './store.js';
 
 export type LibraryCategory = 'terminal' | 'equipment';
@@ -20,6 +20,10 @@ export interface LibraryStampEdits {
   ports?: PortSpec[];
   nativeWidth?: number;
   nativeHeight?: number;
+  category?: LibraryCategory;
+  definitionPortGroups?: string[][];
+  shapes?: SymbolShape[];
+  iconRef?: string;
 }
 
 export interface LibraryStampRecord {
@@ -33,6 +37,7 @@ export interface LibraryStampRecord {
   nativeWidth: number;
   nativeHeight: number;
   edits: LibraryStampEdits;
+  hidden?: boolean;
   revision?: string;
 }
 

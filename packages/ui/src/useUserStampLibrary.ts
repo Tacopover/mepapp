@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { buildUserStampDefinition, type StampDefinition } from '@mepapp/core';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { buildUserStampDefinition, usesUserStampFile, type StampDefinition } from '@mepapp/core';
 import type { LibrarySourceRecord, LibraryStampRecord, LibraryStore } from '@mepapp/platform';
 import { materializeUserStamp, supportsLibraryFolders } from './userStampLibrary.js';
 
@@ -9,6 +9,8 @@ export interface UserStampLibrary {
   records: LibraryStampRecord[];
   /** Panel definitions; iconRef and the image shape hold a `blob:` URL, so never put these in a project document. */
   definitions: StampDefinition[];
+  /** Ids of every record, hidden ones included: the panel skips project copies with these ids. */
+  allRecordIds: ReadonlySet<string>;
   reload(): Promise<void>;
   /** The definition with a `data:` URL, for placing or embedding. */
   materialize(stampId: string): Promise<StampDefinition | undefined>;
@@ -19,6 +21,7 @@ export function useUserStampLibrary(store: LibraryStore | undefined): UserStampL
   const [sources, setSources] = useState<LibrarySourceRecord[]>([]);
   const [records, setRecords] = useState<LibraryStampRecord[]>([]);
   const [definitions, setDefinitions] = useState<StampDefinition[]>([]);
+  const allRecordIds = useMemo<ReadonlySet<string>>(() => new Set(records.map((record) => record.id)), [records]);
   const urlsRef = useRef<string[]>([]);
   const sequenceRef = useRef(0);
   const unmountedRef = useRef(false);
@@ -33,8 +36,12 @@ export function useUserStampLibrary(store: LibraryStore | undefined): UserStampL
     const nextDefinitions: StampDefinition[] = [];
     for (const record of nextRecords) {
       const source = sourcesById.get(record.sourceId);
+      if (!source || record.hidden) continue;
       const blob = await store.getStampBlob(record.id);
-      if (!source || !blob) continue;
+      if (!blob) {
+        if (!usesUserStampFile(record.edits)) nextDefinitions.push(buildUserStampDefinition(record, source, undefined));
+        continue;
+      }
       const url = URL.createObjectURL(blob);
       urls.push(url);
       nextDefinitions.push(buildUserStampDefinition(record, source, url));
@@ -66,5 +73,5 @@ export function useUserStampLibrary(store: LibraryStore | undefined): UserStampL
     [store],
   );
 
-  return { available, sources, records, definitions, reload, materialize };
+  return { available, sources, records, definitions, allRecordIds, reload, materialize };
 }

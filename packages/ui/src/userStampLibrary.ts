@@ -7,12 +7,15 @@ import {
   diffFolderScan,
   parseSvgIntrinsicSize,
   rasterNativeSize,
+  SAVED_STAMPS_SOURCE_ID,
   svgNativeSize,
+  toUserStampEdits,
   userStampId,
+  usesUserStampFile,
   type Discipline,
   type StampDefinition,
 } from '@mepapp/core';
-import type { LibraryCategory, LibrarySourceRecord, LibraryStampMimeType, LibraryStore } from '@mepapp/platform';
+import type { LibraryCategory, LibrarySourceRecord, LibraryStampMimeType, LibraryStampRecord, LibraryStore } from '@mepapp/platform';
 
 export type ImageSizeDecoder = (file: Blob) => Promise<{ width: number; height: number }>;
 
@@ -177,6 +180,81 @@ export async function materializeUserStamp(store: LibraryStore, stampId: string)
   if (!record) return undefined;
   const source = (await store.listSources()).find((candidate) => candidate.id === record.sourceId);
   const blob = await store.getStampBlob(stampId);
-  if (!source || !blob) return undefined;
+  if (!source) return undefined;
+  if (!blob) return usesUserStampFile(record.edits) ? undefined : buildUserStampDefinition(record, source, undefined);
   return buildUserStampDefinition(record, source, await blobToDataUrl(blob));
+}
+
+async function findStampRecord(store: LibraryStore, stampId: string): Promise<LibraryStampRecord> {
+  const record = (await store.listStamps()).find((candidate) => candidate.id === stampId);
+  if (!record) throw new Error(`Unknown library stamp "${stampId}".`);
+  return record;
+}
+
+/** Hides (or unhides) a stamp in the panel. The file stays in its folder and a sync keeps the flag. */
+export async function setUserStampHidden(store: LibraryStore, stampId: string, hidden: boolean): Promise<void> {
+  const record = await findStampRecord(store, stampId);
+  const { hidden: _previous, ...rest } = record;
+  await store.putStamp(hidden ? { ...rest, hidden: true } : rest);
+}
+
+/** Clears the hidden flag on every stamp of one source. */
+export async function showHiddenStamps(store: LibraryStore, sourceId: string): Promise<void> {
+  for (const record of await store.listStamps(sourceId)) {
+    if (record.hidden) await setUserStampHidden(store, record.id, false);
+  }
+}
+
+/** Removes a "Saved stamps" stamp for good. A folder stamp can only be hidden. */
+export async function deleteSavedStamp(store: LibraryStore, stampId: string): Promise<void> {
+  const record = await findStampRecord(store, stampId);
+  if (record.sourceId !== SAVED_STAMPS_SOURCE_ID) {
+    throw new Error(`Stamp "${stampId}" comes from a library folder and can only be hidden, not deleted.`);
+  }
+  await store.removeStamp(stampId);
+}
+
+/** Save from the Element Editor: stores the edited definition in the record's edits. Returns the materialized definition. */
+export async function saveUserStampEdits(store: LibraryStore, stampId: string, definition: StampDefinition): Promise<StampDefinition | undefined> {
+  const record = await findStampRecord(store, stampId);
+  const blob = await store.getStampBlob(stampId);
+  const fileDataUrl = blob ? await blobToDataUrl(blob) : undefined;
+  await store.putStamp({ ...record, edits: toUserStampEdits(definition, fileDataUrl) });
+  return materializeUserStamp(store, stampId);
+}
+
+/** Save as: creates a new stamp in the "Saved stamps" source. Returns the materialized definition. */
+export async function saveUserStampAs(store: LibraryStore, fromStampId: string, definition: StampDefinition): Promise<StampDefinition | undefined> {
+  const category: LibraryCategory = definition.category === 'equipment' ? 'equipment' : 'terminal';
+  if (!(await store.listSources()).some((source) => source.id === SAVED_STAMPS_SOURCE_ID)) {
+    await store.putSource({ id: SAVED_STAMPS_SOURCE_ID, name: 'Saved stamps', category, discipline: definition.discipline });
+  }
+  const records = await store.listStamps();
+  const from = records.find((candidate) => candidate.id === fromStampId);
+  const blob = await store.getStampBlob(fromStampId);
+  const fileDataUrl = blob ? await blobToDataUrl(blob) : undefined;
+  const id = userStampId(SAVED_STAMPS_SOURCE_ID, definition.label, new Set(records.map((record) => record.id)));
+  const edits = { ...toUserStampEdits(definition, fileDataUrl), category };
+  await store.putStamp(
+    {
+      id,
+      sourceId: SAVED_STAMPS_SOURCE_ID,
+      fileName: definition.label,
+      mimeType: from?.mimeType ?? 'image/png',
+      fileSize: 0,
+      fileModified: Date.now(),
+      missingFromFolder: false,
+      nativeWidth: definition.nativeWidth,
+      nativeHeight: definition.nativeHeight,
+      edits,
+    },
+    usesUserStampFile(edits) ? blob : undefined,
+  );
+  return materializeUserStamp(store, id);
+}
+
+/** True when a library, custom or user definition already has this label (or Dutch label), ignoring case and outer spaces. */
+export function userStampLabelTaken(label: string, definitions: StampDefinition[]): boolean {
+  const wanted = label.trim().toLowerCase();
+  return definitions.some((definition) => definition.label.trim().toLowerCase() === wanted || definition.labelNl?.trim().toLowerCase() === wanted);
 }

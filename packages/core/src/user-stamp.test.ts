@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PortSpec } from './geometry.js';
+import type { SymbolShape } from './symbol-shapes.js';
 import { getStampDefinition, STAMP_LIBRARY } from './stamp-library.js';
 import {
   applyScannedFile,
@@ -8,11 +9,16 @@ import {
   humanizeFileName,
   parseSvgIntrinsicSize,
   rasterNativeSize,
+  SAVED_STAMPS_SOURCE_ID,
   svgNativeSize,
+  toUserStampEdits,
+  USER_STAMP_FILE_REF,
   USER_STAMP_ID_PREFIX,
+  usesUserStampFile,
   userStampId,
   userStampSlug,
   type ScannedLibraryFile,
+  type UserStampEdits,
   type UserStampScanRecordLike,
 } from './user-stamp.js';
 
@@ -233,5 +239,59 @@ describe('applyScannedFile', () => {
     expect(next.edits.ports).toEqual(ports);
     expect(next).not.toBe(record);
     expect(record.missingFromFolder).toBe(true);
+  });
+});
+
+describe('edited user stamps (shapes, marker, category)', () => {
+  const source = { category: 'terminal' as const, discipline: 'ventilation' as const };
+  const record = { id: 'user-s1-fan', fileName: 'big_fan.svg', nativeWidth: 12, nativeHeight: 6, edits: {} as UserStampEdits };
+  const style = { stroke: '#000', strokeWidth: 1, fill: null };
+  const line: SymbolShape = { id: 'l1', kind: 'line', x1: 0, y1: 0, x2: 1, y2: 1, style };
+  const markerImage: SymbolShape = { id: 'img', kind: 'image', dataUrl: USER_STAMP_FILE_REF, x: 0, y: 0, width: 1, height: 1, style };
+
+  it('replaces the marker with the file URL and keeps other shapes', () => {
+    const def = buildUserStampDefinition({ ...record, edits: { shapes: [markerImage, line], iconRef: 'data:image/png;base64,PREV' } }, source, 'blob:abc');
+    expect(def.shapes).toEqual([{ ...markerImage, dataUrl: 'blob:abc' }, line]);
+    expect(def.iconRef).toBe('data:image/png;base64,PREV');
+  });
+
+  it('drops the marker image when the file is missing and builds without a file', () => {
+    const def = buildUserStampDefinition({ ...record, edits: { shapes: [markerImage, line] } }, source, undefined);
+    expect(def.shapes).toEqual([line]);
+    expect(def.iconRef).toBe('');
+    expect(buildUserStampDefinition(record, source, undefined).shapes).toEqual([]);
+  });
+
+  it('applies the category override and port groups', () => {
+    const def = buildUserStampDefinition({ ...record, edits: { category: 'equipment', definitionPortGroups: [['a', 'b']] } }, source, 'blob:abc');
+    expect(def.category).toBe('equipment');
+    expect(def.definitionPortGroups).toEqual([['a', 'b']]);
+  });
+
+  it('round-trips through toUserStampEdits with the marker', () => {
+    const def = buildUserStampDefinition({ ...record, edits: { label: 'Fan', category: 'equipment', shapes: [markerImage, line], definitionPortGroups: [['a', 'b']] } }, source, 'data:image/svg+xml;base64,QQ==');
+    const edits = toUserStampEdits(def, 'data:image/svg+xml;base64,QQ==');
+    expect(edits.shapes).toEqual([markerImage, line]);
+    expect(edits.category).toBe('equipment');
+    expect(edits.label).toBe('Fan');
+    expect(edits.definitionPortGroups).toEqual([['a', 'b']]);
+    expect(usesUserStampFile(edits)).toBe(true);
+  });
+
+  it('keeps a foreign image shape and omits a fitting category', () => {
+    const other: SymbolShape = { ...markerImage, dataUrl: 'data:image/png;base64,OTHER' };
+    const def = { ...buildUserStampDefinition(record, source, 'blob:abc'), category: 'fitting' as const, shapes: [other] };
+    const edits = toUserStampEdits(def, 'data:image/png;base64,FILE');
+    expect(edits.shapes).toEqual([other]);
+    expect(edits.category).toBeUndefined();
+    expect(usesUserStampFile(edits)).toBe(false);
+    expect(toUserStampEdits(def, undefined).shapes).toEqual([other]);
+  });
+
+  it('usesUserStampFile is true without shapes and false for shapes without the marker', () => {
+    expect(usesUserStampFile({})).toBe(true);
+    expect(usesUserStampFile({ shapes: [line] })).toBe(false);
+    expect(usesUserStampFile({ shapes: [] })).toBe(false);
+    expect(SAVED_STAMPS_SOURCE_ID).toBe('saved');
   });
 });

@@ -16,13 +16,18 @@ export function getVisibleStampDefinitions(
   labelLanguage: StampLabelLanguage,
   searchQuery = '',
   userDefinitions: StampDefinition[] = [],
+  options: { showBuiltIn?: boolean; libraryRecordIds?: ReadonlySet<string> } = {},
 ): StampDefinition[] {
-  // A project copy of a user-library stamp (source 'user') is skipped while the library folder still has that id: one tile per id.
+  const { showBuiltIn = true, libraryRecordIds } = options;
+  // A project copy of a user-library stamp (source 'user') is skipped while the library has that id (shown, or hidden by the user): one tile per id.
   const userIds = new Set(userDefinitions.map((u) => u.id));
-  const projectDefinitions = customStampDefinitions.filter((c) => !(c.source === 'user' && userIds.has(c.id)));
+  const projectDefinitions = customStampDefinitions.filter(
+    (c) => !(c.source === 'user' && (userIds.has(c.id) || libraryRecordIds?.has(c.id) === true)),
+  );
   // A custom definition with a library id is an edited library stamp (an override): it takes that tile's place.
   const shadowedLibraryIds = new Set(projectDefinitions.map((c) => c.id));
-  const allDefinitions = [...STAMP_LIBRARY.filter((lib) => !shadowedLibraryIds.has(lib.id)), ...projectDefinitions, ...userDefinitions];
+  const builtInDefinitions = showBuiltIn ? STAMP_LIBRARY.filter((lib) => !shadowedLibraryIds.has(lib.id)) : [];
+  const allDefinitions = [...builtInDefinitions, ...projectDefinitions, ...userDefinitions];
   const trimmedQuery = searchQuery.trim().toLowerCase();
   return allDefinitions
     .filter((def) => disciplineGroup === null || disciplineGroupOf(def.discipline) === disciplineGroup)

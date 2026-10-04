@@ -3,12 +3,18 @@ import { readFileSync as nodeReadFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MemoryLibraryStore } from '@mepapp/platform';
 import type { LibrarySourceRecord } from '@mepapp/platform';
-import { parseSvgIntrinsicSize, SVG_UNIT_TO_PT } from '@mepapp/core';
+import { parseSvgIntrinsicSize, SAVED_STAMPS_SOURCE_ID, SVG_UNIT_TO_PT, USER_STAMP_FILE_REF, type StampDefinition, type SymbolShape } from '@mepapp/core';
 import {
   libraryMimeTypeFor,
+  deleteSavedStamp,
   materializeUserStamp,
+  saveUserStampAs,
+  saveUserStampEdits,
   scanLibraryFolder,
+  setUserStampHidden,
+  showHiddenStamps,
   syncLibrarySource,
+  userStampLabelTaken,
   type ImageSizeDecoder,
 } from './userStampLibrary.js';
 
@@ -188,5 +194,101 @@ describe('scanLibraryFolder', () => {
     } as unknown as FileSystemDirectoryHandle;
     const files = await scanLibraryFolder(dir);
     expect(files.map((f) => f.name)).toEqual([PNG_A, SVG_B]);
+  });
+});
+
+describe('hide, save and delete', () => {
+  const style = { stroke: '#000', strokeWidth: 1, fill: null };
+  const line: SymbolShape = { id: 'trace-1', kind: 'line', x1: 0, y1: 0, x2: 1, y2: 1, style };
+
+  async function syncedSetup() {
+    const { store, source } = await setup();
+    await syncLibrarySource(store, source, { decode: pngHeaderDecoder, files: makeFiles() });
+    const record = (await store.listStamps('src1')).find((r) => r.fileName === SVG_A)!;
+    return { store, source, id: record.id };
+  }
+
+  it('keeps hidden through a sync update and does not re-add the stamp; showHiddenStamps clears it', async () => {
+    const { store, source, id } = await syncedSetup();
+    await setUserStampHidden(store, id, true);
+    expect((await store.listStamps('src1')).find((r) => r.id === id)!.hidden).toBe(true);
+    const summary = await syncLibrarySource(store, source, { decode: pngHeaderDecoder, files: makeFiles(2000) });
+    expect(summary.added).toBe(0);
+    expect(summary.updated).toBe(4);
+    const records = await store.listStamps('src1');
+    expect(records).toHaveLength(4);
+    expect(records.find((r) => r.id === id)!.hidden).toBe(true);
+    await showHiddenStamps(store, 'src1');
+    expect((await store.listStamps('src1')).every((r) => r.hidden === undefined)).toBe(true);
+  });
+
+  it('saveUserStampEdits stores the marker instead of the file data URL and materializes the file back', async () => {
+    const { store, id } = await syncedSetup();
+    const def = (await materializeUserStamp(store, id))!;
+    const fileUrl = (def.shapes![0] as { dataUrl: string }).dataUrl;
+    const saved = (await saveUserStampEdits(store, id, { ...def, label: 'Traced', category: 'equipment', shapes: [...def.shapes!, line], iconRef: 'data:image/png;base64,PREVIEW' }))!;
+    const record = (await store.listStamps()).find((r) => r.id === id)!;
+    expect(record.edits.shapes!.map((s) => (s.kind === 'image' ? s.dataUrl : s.kind))).toEqual([USER_STAMP_FILE_REF, 'line']);
+    expect(JSON.stringify(record.edits)).not.toContain(fileUrl);
+    expect(saved.label).toBe('Traced');
+    expect(saved.category).toBe('equipment');
+    expect(saved.iconRef).toBe('data:image/png;base64,PREVIEW');
+    expect(saved.shapes).toHaveLength(2);
+    expect((saved.shapes![0] as { dataUrl: string }).dataUrl).toBe(fileUrl);
+  });
+
+  it('with the image deleted stores no marker, and a later file update keeps the edits', async () => {
+    const { store, source, id } = await syncedSetup();
+    const def = (await materializeUserStamp(store, id))!;
+    const saved = (await saveUserStampEdits(store, id, { ...def, shapes: [line] }))!;
+    expect(saved.shapes).toEqual([line]);
+    expect((await store.listStamps()).find((r) => r.id === id)!.edits.shapes).toEqual([line]);
+    await syncLibrarySource(store, source, { decode: pngHeaderDecoder, files: makeFiles(5000) });
+    const after = (await materializeUserStamp(store, id))!;
+    expect(after.shapes).toEqual([line]);
+  });
+
+  it('materializes a stamp whose blob is missing only when it does not use the file', async () => {
+    const { store } = await setup();
+    await store.putStamp({ id: 'user-src1-x', sourceId: 'src1', fileName: 'x.png', mimeType: 'image/png', fileSize: 0, fileModified: 1, missingFromFolder: false, nativeWidth: 10, nativeHeight: 10, edits: {} });
+    expect(await materializeUserStamp(store, 'user-src1-x')).toBeUndefined();
+    await store.putStamp({ id: 'user-src1-x', sourceId: 'src1', fileName: 'x.png', mimeType: 'image/png', fileSize: 0, fileModified: 1, missingFromFolder: false, nativeWidth: 10, nativeHeight: 10, edits: { shapes: [line] } });
+    expect((await materializeUserStamp(store, 'user-src1-x'))!.shapes).toEqual([line]);
+  });
+
+  it('saveUserStampAs creates the saved source once and copies the blob only when the marker is used', async () => {
+    const { store, id } = await syncedSetup();
+    const def = (await materializeUserStamp(store, id))!;
+    const first = (await saveUserStampAs(store, id, { ...def, label: 'My Copy' }))!;
+    expect(first.id).toBe('user-saved-my-copy');
+    expect(first.source).toBe('user');
+    expect(first.category).toBe('terminal');
+    expect(await store.getStampBlob('user-saved-my-copy')).toBeDefined();
+    const traced = (await saveUserStampAs(store, id, { ...def, label: 'Traced Only', category: 'equipment', shapes: [line] }))!;
+    expect(traced.id).toBe('user-saved-traced-only');
+    expect(traced.category).toBe('equipment');
+    expect(await store.getStampBlob('user-saved-traced-only')).toBeUndefined();
+    expect(traced.shapes).toEqual([line]);
+    expect((await store.listSources()).filter((s) => s.id === SAVED_STAMPS_SOURCE_ID)).toHaveLength(1);
+    const second = (await saveUserStampAs(store, id, { ...def, label: 'My Copy' }))!;
+    expect(second.id).not.toBe(first.id);
+  });
+
+  it('deleteSavedStamp removes a saved stamp and rejects a folder stamp', async () => {
+    const { store, id } = await syncedSetup();
+    const def = (await materializeUserStamp(store, id))!;
+    await saveUserStampAs(store, id, { ...def, label: 'Gone' });
+    await expect(deleteSavedStamp(store, id)).rejects.toThrow(/folder/);
+    await deleteSavedStamp(store, 'user-saved-gone');
+    expect((await store.listStamps()).some((r) => r.id === 'user-saved-gone')).toBe(false);
+  });
+});
+
+describe('userStampLabelTaken', () => {
+  const defs = [{ label: 'Fan Coil', labelNl: 'Ventilatorconvector' }] as StampDefinition[];
+  it('compares case-insensitively on trimmed label and labelNl', () => {
+    expect(userStampLabelTaken('  fan coil ', defs)).toBe(true);
+    expect(userStampLabelTaken('VENTILATORCONVECTOR', defs)).toBe(true);
+    expect(userStampLabelTaken('Fan', defs)).toBe(false);
   });
 });

@@ -59,3 +59,25 @@ describe('getVisibleStampDefinitions with user stamps', () => {
     expect(visible.filter((d) => d.id === library.id)).toEqual([override]);
   });
 });
+
+describe('getVisibleStampDefinitions options', () => {
+  const userTerminal = stamp({ id: 'user-src-zz', source: 'user', label: 'ZZ user terminal' });
+
+  it('drops the built-in library when showBuiltIn is false but keeps overrides, custom and user stamps', () => {
+    const library = STAMP_LIBRARY.find((def) => def.category === 'terminal')!;
+    const override = { ...library, source: 'custom' as const, label: 'ZZ override' };
+    const custom = stamp({ id: 'custom-1', source: 'custom', label: 'ZZ custom' });
+    const visible = getVisibleStampDefinitions([override, custom], null, 'terminal', 'en', '', [userTerminal], { showBuiltIn: false });
+    expect(ids(visible).sort()).toEqual([library.id, 'custom-1', userTerminal.id].sort());
+    expect(getVisibleStampDefinitions([], null, 'terminal', 'en', '', [], { showBuiltIn: false })).toEqual([]);
+    expect(getVisibleStampDefinitions([], null, 'terminal', 'en', '', [], {}).length).toBeGreaterThan(0);
+  });
+
+  it('skips a project copy whose id is in libraryRecordIds even when the stamp is hidden', () => {
+    const copy = stamp({ id: 'user-src-hidden', source: 'user', label: 'ZZ hidden copy' });
+    const orphan = stamp({ id: 'user-src-orphan', source: 'user', label: 'ZZ orphan' });
+    const visible = getVisibleStampDefinitions([copy, orphan], null, 'terminal', 'en', '', [], { libraryRecordIds: new Set(['user-src-hidden']) });
+    expect(ids(visible)).not.toContain(copy.id);
+    expect(ids(visible)).toContain(orphan.id);
+  });
+});
