@@ -910,6 +910,10 @@ export class SketchScene {
     this.doc.backdropSprite = sprite;
     this.world.addChildAt(sprite, 0);
     this.doc.pageIndex = pageIndex;
+    // Rooms are per page; a kept selection would let Delete or the Properties panel act on a room that is no longer shown.
+    this.clearRoomSelection();
+    this.selectedRoomVertices = [];
+    this.roomPreview = null;
     if (this.tool === 'calibrate' || this.tool === 'measure') void this.loadSnapLines();
     this.redrawOverlay();
     this.emitter.emit('pageChanged', pageIndex);
@@ -961,8 +965,19 @@ export class SketchScene {
       const next = this.documents[Math.min(idx, this.documents.length - 1)];
       this.activateInternal(next);
     }
-    removed.destroy();
+    removed.destroy(this.stampTexturesUsedOutside(removed));
     this.emitter.emit('documentsChanged', this.getDocuments());
+  }
+
+  /** Stamp base textures that a document other than `doc`, or the clipboard, still draws with — a paste shares the copied stamps' textures across documents. */
+  private stampTexturesUsedOutside(doc: SketchDocument): Set<Texture> {
+    const used = new Set<Texture>();
+    for (const other of this.documents) {
+      if (other === doc) continue;
+      for (const entry of other.stamps.values()) used.add(entry.baseTexture);
+    }
+    for (const copied of this.clipboard?.stamps ?? []) used.add(copied.baseTexture);
+    return used;
   }
 
   getDocuments(): DocumentSummary[] {
@@ -995,10 +1010,15 @@ export class SketchScene {
     this.world.addChild(target.flowLabelLayer);
     this.world.addChild(this.stampGhostLayer);
     this.world.addChild(this.overlay);
+    if (this.measureLabel) this.world.addChild(this.measureLabel); // created lazily on the first measurement, so not in the list above
     this.world.x = target.viewport.x;
     this.world.y = target.viewport.y;
     this.world.scale.set(target.viewport.scale);
 
+    // Room ids restart in every document, so a kept selection would name the other document's rooms.
+    this.clearRoomSelection();
+    this.selectedRoomVertices = [];
+    this.roomPreview = null;
     this.tool = 'select';
     this.circuitToolTargetId = null; // names a circuit of the outgoing document, same reset rule as `tool`
     this.circuitToolReturn = 'select';
@@ -1009,7 +1029,7 @@ export class SketchScene {
     this.stampGhostSprite = null;
     this.stampGhostRotationDegrees = 0;
     this.pendingPoints = [];
-    this.drawSegmentTool.onDeactivate();
+    for (const tool of this.toolMap.values()) tool.onDeactivate?.(this.ctx); // a pending polyline or measurement belongs to the outgoing document
     this.drag = { kind: 'none' };
 
     this.syncDrawingLayer(); // a project may have loaded, or the label context changed, while this document was inactive
@@ -3227,7 +3247,7 @@ export class SketchScene {
     }
     target.nextPanelAccessorySeq = Math.max(target.nextPanelAccessorySeq, maxPanelAccessorySeq + 1);
 
-    destroyStampEntries(target.stamps.values());
+    destroyStampEntries(target.stamps.values(), this.stampTexturesUsedOutside(target));
     target.stamps.clear();
     target.stampsLayer.removeChildren();
 
@@ -4100,7 +4120,7 @@ export class SketchScene {
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
-  /** Snapshot for pasteClipboard — each stamp's already-loaded base texture is kept by reference (cheap, and shared safely: deleteSelection already never destroys a texture, only its sprite). Always the pristine base texture, never a colorized variant (see colorize.ts) — pasteClipboard re-derives the right variant from `pasted.color` itself. */
+  /** Snapshot for pasteClipboard — each stamp's already-loaded base texture is kept by reference (cheap, and shared safely: deleteSelection never destroys a texture, only its sprite, and closing the source document keeps every texture the clipboard or another document still uses, see stampTexturesUsedOutside). Always the pristine base texture, never a colorized variant (see colorize.ts) — pasteClipboard re-derives the right variant from `pasted.color` itself. */
   private clipboard: {
     stamps: Array<{ data: PlacedStamp; baseTexture: Texture; baseScale: Vec2 }>;
     annotations: Annotation[];

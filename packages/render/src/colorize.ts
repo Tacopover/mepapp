@@ -90,13 +90,15 @@ export function releaseColorizedTextures(baseTexture: Texture): void {
  * share one base texture (set once by setStampTexture, reused by every
  * placeStamp call until the next pick), so a naive per-entry destroy would
  * double-free it. `Texture.WHITE` (debugPopulateForBenchmark's placeholder
- * art) is a shared PixiJS singleton and is never destroyed.
+ * art) is a shared PixiJS singleton and is never destroyed. `keepTextures`
+ * names base textures still drawn elsewhere (a paste into another document
+ * and the clipboard share them): their sprites go, the textures stay.
  */
-export function destroyStampEntries(entries: Iterable<{ sprite: Sprite; baseTexture: Texture }>): void {
+export function destroyStampEntries(entries: Iterable<{ sprite: Sprite; baseTexture: Texture }>, keepTextures?: ReadonlySet<Texture>): void {
   const released = new Set<Texture>();
   for (const entry of entries) {
     entry.sprite.destroy();
-    if (released.has(entry.baseTexture)) continue;
+    if (released.has(entry.baseTexture) || keepTextures?.has(entry.baseTexture)) continue;
     released.add(entry.baseTexture);
     releaseColorizedTextures(entry.baseTexture);
     if (entry.baseTexture !== Texture.WHITE) entry.baseTexture.destroy(true);

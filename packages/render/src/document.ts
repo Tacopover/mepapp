@@ -166,10 +166,10 @@ export class SketchDocument {
     return { id: this.id, fileName: this.fileName, isDirty: this.isDirty, hasPdf: this.pdfHandle !== null };
   }
 
-  /** Tears down this document's own PixiJS resources — used on close, not on a mere tab switch. */
-  destroy(): void {
+  /** Tears down this document's own PixiJS resources — used on close, not on a mere tab switch. Stamp base textures in `keepTextures` are still used by another document or the clipboard and survive. */
+  destroy(keepTextures?: ReadonlySet<Texture>): void {
     this.backdropSprite?.destroy({ texture: true });
-    destroyStampEntries(this.stamps.values());
+    destroyStampEntries(this.stamps.values(), keepTextures);
     this.stamps.clear();
     this.roomLayer.destroy({ children: true });
     this.stampsLayer.destroy();

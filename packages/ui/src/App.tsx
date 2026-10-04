@@ -397,14 +397,31 @@ export function MepSketchApp({
   }, []);
 
   /** Status bar's page nav — reuses the already-open PDF handle, no re-parse. View-only: see SketchScene.setBackdropPage. */
+  const pageRequestRef = useRef(0);
   const handleChangePage = useCallback(
     async (nextPageIndex: number) => {
       if (!activePdfHandle) return;
-      const { bitmap, pageWidthPt, pageHeightPt } = await onLoadPdfPageAt(activePdfHandle, nextPageIndex);
-      sceneRef.current?.setBackdropPage(bitmap, pageWidthPt, pageHeightPt, nextPageIndex);
+      const request = ++pageRequestRef.current;
+      try {
+        const { bitmap, pageWidthPt, pageHeightPt } = await onLoadPdfPageAt(activePdfHandle, nextPageIndex);
+        // setBackdropPage acts on the active document, so a result that a later page click or a document switch overtook is dropped.
+        if (request !== pageRequestRef.current || sceneRef.current?.getActiveDocumentId() !== activeDocumentId) {
+          bitmap.close();
+          return;
+        }
+        sceneRef.current?.setBackdropPage(bitmap, pageWidthPt, pageHeightPt, nextPageIndex);
+      } catch (err) {
+        setStatus(`Could not show page ${nextPageIndex + 1}: ${(err as Error).message}`);
+      }
     },
-    [activePdfHandle, onLoadPdfPageAt, sceneRef],
+    [activeDocumentId, activePdfHandle, onLoadPdfPageAt, sceneRef],
   );
+
+  // The scene resets its armed stamp and active network type on a document switch; the Stamps tab must not keep showing them.
+  useEffect(() => {
+    setActiveDefinitionId(null);
+    setActiveNetworkTypeId(null);
+  }, [activeDocumentId]);
 
   // Deferred, not `autoFocus`: the click that opens this prompt is the same
   // mousedown/mouseup the browser is still processing its own default focus
