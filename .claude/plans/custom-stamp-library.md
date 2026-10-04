@@ -219,6 +219,17 @@ The user tested Phases 1-5 on Windows: it works. The user asked for four changes
 
 **Feedback round 1 done 2026-10-04 (data layer `6a48449`, UI `3d278b4`).** Verified: root `pnpm build` passes; `@mepapp/core` 662, `@mepapp/platform` 32, `@mepapp/platform-web` 20, `@mepapp/ui` 94 tests pass. A headless Chromium run through the real DOM with a real OPFS folder passed all steps: folder icon button "Load user library"; the built-in checkbox hides and shows the built-in tiles and survives a reload; hide, Sync keeps it hidden, "1 hidden" and "Show hidden stamps"; Edit + rect + port + Save stores the `mepapp:user-file` marker and updates the project copy and the placed stamp (0 to 1 port); Save as with a taken name shows the error, with a new name makes `user-saved-traced-sink` with no blob, and Delete removes it. No console errors. After this round, Phase 6 points 1-6 are done for user stamps. Phase 6 point 7 (other projects) stays out of scope.
 
+### Feedback round 2 (2026-10-04): select several stamps and delete them in one action
+
+The user asked for a multi-select in the Stamps panel, to delete several user or custom stamps at once.
+
+- **Selectable tiles:** every tile that has a delete action today: a user stamp from a folder (hide), a saved stamp (delete), a custom stamp (delete), an edited built-in stamp (revert to the library version), and an orphan project copy (delete). Built-in stamps without edits are not selectable.
+- **Start:** Ctrl+click (Cmd+click on macOS) on a selectable tile starts the selection mode. The selection is the clicked tile plus the active (picked) tile, if that one is selectable. A Ctrl+click does not pick the stamp for placement.
+- **In the selection mode:** each selectable tile shows a checkbox. A click on the tile or on its checkbox toggles it. Tiles that are not selectable are dimmed and ignore clicks. A bar above the grid shows "N selected", a **Delete** button (disabled at 0) and a **Cancel** button. Escape also ends the mode.
+- **Filters:** only selected tiles that are still visible count and are deleted.
+- **Delete:** one confirmation that lists the effect per kind (how many are hidden, deleted for good, deleted from the project with their placed-element warning, reverted with the lost-connection count). Then all actions run, the library reloads once, and the status shows a summary. The selection mode ends.
+- The single-tile buttons keep their own confirmations. The per-kind actions move into shared functions, so the single and the bulk path do the same work.
+
 ### Phase 6 — Ports (editing)
 
 1. A "Edit stamp…" button on a user tile opens the Element Editor with the materialized definition.
