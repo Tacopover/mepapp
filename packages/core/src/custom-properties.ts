@@ -62,10 +62,17 @@ export function isReservedRoomPropertyName(name: string): boolean {
   return RESERVED_ROOM_PROPERTY_NAMES.includes(name.trim().toLowerCase());
 }
 
+/** A typed number with "." or "," as the decimal separator (the UI is used in Dutch and English). Null for empty text, or text that is not one finite number — including text with both separators, which is ambiguous. */
+export function parseDecimal(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === '') return null;
+  const parsed = Number(trimmed.includes('.') ? trimmed : trimmed.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function coerceDefaultValue(definition: CustomPropertyDefinition): string | number {
   if (definition.kind === 'numeric') {
-    const parsed = Number(definition.defaultValue);
-    return Number.isFinite(parsed) ? parsed : 0;
+    return parseDecimal(definition.defaultValue) ?? 0;
   }
   return definition.defaultValue;
 }

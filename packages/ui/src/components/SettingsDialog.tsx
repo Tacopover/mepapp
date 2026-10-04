@@ -1,4 +1,5 @@
 import { Dialog } from './Dialog.js';
+import { NumberDraftInput } from './NumberDraftInput.js';
 
 export interface SettingsDialogProps {
   snapRadiusPx: number;
@@ -24,30 +25,22 @@ export function SettingsDialog({ snapRadiusPx, onChangeSnapRadiusPx, angleSnapDe
         <h4>Drawing</h4>
         <div className="mep-field-row">
           <label>Segment snap radius (px)</label>
-          <input
-            type="number"
+          <NumberDraftInput
             min={MIN_SNAP_RADIUS_PX}
             max={MAX_SNAP_RADIUS_PX}
             value={snapRadiusPx}
-            onChange={(event) => {
-              const raw = Number(event.target.value);
-              const clamped = Math.min(MAX_SNAP_RADIUS_PX, Math.max(MIN_SNAP_RADIUS_PX, Number.isFinite(raw) ? raw : MIN_SNAP_RADIUS_PX));
-              onChangeSnapRadiusPx(clamped);
-            }}
+            allow={(px) => px >= MIN_SNAP_RADIUS_PX && px <= MAX_SNAP_RADIUS_PX}
+            onCommit={onChangeSnapRadiusPx}
           />
         </div>
         <div className="mep-field-row">
           <label>Angle snap (degrees)</label>
-          <input
-            type="number"
+          <NumberDraftInput
             min={MIN_ANGLE_SNAP_DEGREES}
             max={MAX_ANGLE_SNAP_DEGREES}
             value={angleSnapDegrees}
-            onChange={(event) => {
-              const raw = Number(event.target.value);
-              const clamped = Math.min(MAX_ANGLE_SNAP_DEGREES, Math.max(MIN_ANGLE_SNAP_DEGREES, Number.isFinite(raw) ? raw : MIN_ANGLE_SNAP_DEGREES));
-              onChangeAngleSnapDegrees(clamped);
-            }}
+            allow={(degrees) => degrees >= MIN_ANGLE_SNAP_DEGREES && degrees <= MAX_ANGLE_SNAP_DEGREES}
+            onCommit={onChangeAngleSnapDegrees}
           />
         </div>
       </div>
@@ -55,7 +48,7 @@ export function SettingsDialog({ snapRadiusPx, onChangeSnapRadiusPx, angleSnapDe
         <h4>Rooms</h4>
         <div className="mep-field-row">
           <label>Door gap closed up to (mm)</label>
-          <input type="number" min={100} max={3000} step={100} value={roomGapMm} onChange={(e) => onChangeRoomGapMm(Math.min(3000, Math.max(100, Number(e.target.value) || 1000)))} />
+          <NumberDraftInput min={100} max={3000} step={100} value={roomGapMm} allow={(mm) => mm >= 100 && mm <= 3000} onCommit={onChangeRoomGapMm} />
         </div>
       </div>
       <p className="mep-settings-hint">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { STAMP_LIBRARY, type Discipline, type StampCategory, type StampDefinition, type StampLabel, type StampPropertyContext } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
+import { NumberDraftInput } from './NumberDraftInput.js';
 import { StampLabelsEditor } from './StampLabelsEditor.js';
 import { loadStampBitmap } from '../stampBitmap.js';
 import { stampLabelFor } from './StampsPanel.js';
@@ -190,6 +191,8 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
   useEffect(() => {
     const prev = nativeSizeRef.current;
     if (prev.width === nativeWidth && prev.height === nativeHeight) return;
+    // A size of 0 would scale every shape and port by Infinity and then by 0 (NaN coordinates); rescale from the last usable size instead.
+    if (!(nativeWidth > 0 && nativeHeight > 0 && Number.isFinite(nativeWidth) && Number.isFinite(nativeHeight))) return;
     const sx = prev.width / nativeWidth;
     const sy = prev.height / nativeHeight;
     const sMin = Math.min(prev.width, prev.height) / Math.min(nativeWidth, nativeHeight);
@@ -403,10 +406,10 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
           </div>
           <div className="mep-ee-header-wh">
             <label>
-              W <input type="number" min={1} value={nativeWidth} onChange={(e) => setNativeWidth(Number(e.target.value))} />
+              W <NumberDraftInput min={1} value={nativeWidth} allow={(width) => width > 0} onCommit={setNativeWidth} />
             </label>
             <label>
-              H <input type="number" min={1} value={nativeHeight} onChange={(e) => setNativeHeight(Number(e.target.value))} />
+              H <NumberDraftInput min={1} value={nativeHeight} allow={(height) => height > 0} onCommit={setNativeHeight} />
             </label>
           </div>
           <label className="mep-stamp-tile mep-file-btn mep-ee-header-import">

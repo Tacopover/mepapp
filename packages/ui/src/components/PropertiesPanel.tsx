@@ -22,6 +22,7 @@ import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 import { RoomProperties } from './RoomProperties.js';
 import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
 import { ColorPicker } from './ColorPicker.js';
+import { NumberDraftInput } from './NumberDraftInput.js';
 import { stampLabelFor } from './StampsPanel.js';
 import { TerminalCircuitSection } from './TerminalCircuitSection.js';
 import type { StampLabelLanguage } from './LanguageToggle.js';
@@ -465,11 +466,10 @@ export function PropertiesPanel({
               <button type="button" onClick={() => sceneRef.current?.rotateSelectionBy(-90)} title="Rotate -90°">
                 <IconRotate size={13} />
               </button>
-              <input
-                type="number"
-                value={rotation !== undefined ? Math.round(rotation * 1000) / 1000 : ''}
+              <NumberDraftInput
+                value={rotation !== undefined ? Math.round(rotation * 1000) / 1000 : undefined}
                 placeholder={rotation === undefined ? VARIES : undefined}
-                onChange={(e) => sceneRef.current?.setRotationForSelection(Number(e.target.value))}
+                onCommit={(degrees) => sceneRef.current?.setRotationForSelection(degrees)}
               />
               <button type="button" className="flip" onClick={() => sceneRef.current?.rotateSelectionBy(90)} title="Rotate +90°">
                 <IconRotate size={13} />
@@ -488,13 +488,13 @@ export function PropertiesPanel({
           </div>
           <div className="mep-field-row">
             <label>Scale %</label>
-            <input
-              type="number"
+            <NumberDraftInput
               min={1}
-              value={scalePercent ?? ''}
+              value={scalePercent}
               placeholder={scalePercent === undefined ? VARIES : undefined}
-              onChange={(e) => {
-                const factor = Number(e.target.value) / 100;
+              allow={(percent) => percent > 0}
+              onCommit={(percent) => {
+                const factor = percent / 100;
                 sceneRef.current?.setScaleForSelection(factor);
                 rememberAppearance(selection, { scale: factor });
               }}
@@ -519,14 +519,20 @@ export function PropertiesPanel({
               return (
                 <div className="mep-field-row" key={def.name}>
                   <label>{def.name}</label>
-                  <input
-                    type={def.kind === 'numeric' ? 'number' : 'text'}
-                    value={value ?? ''}
-                    placeholder={value === undefined ? VARIES : undefined}
-                    onChange={(e) =>
-                      sceneRef.current?.setStampPropertyForSelection(def.name, def.kind === 'numeric' ? Number(e.target.value) : e.target.value)
-                    }
-                  />
+                  {def.kind === 'numeric' ? (
+                    <NumberDraftInput
+                      value={value === undefined ? undefined : Number(value)}
+                      placeholder={value === undefined ? VARIES : undefined}
+                      onCommit={(number) => sceneRef.current?.setStampPropertyForSelection(def.name, number)}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={value ?? ''}
+                      placeholder={value === undefined ? VARIES : undefined}
+                      onChange={(e) => sceneRef.current?.setStampPropertyForSelection(def.name, e.target.value)}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -584,18 +590,16 @@ export function PropertiesPanel({
         )}
         <div className="mep-field-row">
           <label>X (pt)</label>
-          <input
-            type="number"
+          <NumberDraftInput
             value={Math.round(stamp.transform.position.x * 100) / 100}
-            onChange={(e) => sceneRef.current?.setSelectedPosition({ x: Number(e.target.value), y: stamp.transform.position.y })}
+            onCommit={(x) => sceneRef.current?.setSelectedPosition({ x, y: stamp.transform.position.y })}
           />
         </div>
         <div className="mep-field-row">
           <label>Y (pt)</label>
-          <input
-            type="number"
+          <NumberDraftInput
             value={Math.round(stamp.transform.position.y * 100) / 100}
-            onChange={(e) => sceneRef.current?.setSelectedPosition({ x: stamp.transform.position.x, y: Number(e.target.value) })}
+            onCommit={(y) => sceneRef.current?.setSelectedPosition({ x: stamp.transform.position.x, y })}
           />
         </div>
         <div className="mep-field-row">
@@ -604,10 +608,9 @@ export function PropertiesPanel({
             <button type="button" onClick={() => sceneRef.current?.rotateSelectionBy(-90)} title="Rotate -90°">
               <IconRotate size={13} />
             </button>
-            <input
-              type="number"
+            <NumberDraftInput
               value={Math.round(stamp.transform.rotationDegrees * 1000) / 1000}
-              onChange={(e) => sceneRef.current?.setSelectedRotationDegrees(Number(e.target.value))}
+              onCommit={(degrees) => sceneRef.current?.setSelectedRotationDegrees(degrees)}
             />
             <button type="button" className="flip" onClick={() => sceneRef.current?.rotateSelectionBy(90)} title="Rotate +90°">
               <IconRotate size={13} />
@@ -626,12 +629,12 @@ export function PropertiesPanel({
         </div>
         <div className="mep-field-row">
           <label>Scale %</label>
-          <input
-            type="number"
+          <NumberDraftInput
             min={1}
             value={Math.round(stamp.transform.scale.x * 100)}
-            onChange={(e) => {
-              const factor = Number(e.target.value) / 100;
+            allow={(percent) => percent > 0}
+            onCommit={(percent) => {
+              const factor = percent / 100;
               sceneRef.current?.setScaleForSelection(factor);
               rememberAppearance([stamp], { scale: factor });
             }}
@@ -655,17 +658,18 @@ export function PropertiesPanel({
           {customPropertyDefs[stamp.category].map((def) => (
             <div className="mep-field-row" key={def.name}>
               <label>{def.name}</label>
-              <input
-                type={def.kind === 'numeric' ? 'number' : 'text'}
-                value={stamp.properties?.[def.name] ?? coerceDefaultValue(def)}
-                onChange={(e) =>
-                  sceneRef.current?.setStampProperty(
-                    stamp.id,
-                    def.name,
-                    def.kind === 'numeric' ? Number(e.target.value) : e.target.value,
-                  )
-                }
-              />
+              {def.kind === 'numeric' ? (
+                <NumberDraftInput
+                  value={Number(stamp.properties?.[def.name] ?? coerceDefaultValue(def))}
+                  onCommit={(number) => sceneRef.current?.setStampProperty(stamp.id, def.name, number)}
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={stamp.properties?.[def.name] ?? coerceDefaultValue(def)}
+                  onChange={(e) => sceneRef.current?.setStampProperty(stamp.id, def.name, e.target.value)}
+                />
+              )}
             </div>
           ))}
         </div>

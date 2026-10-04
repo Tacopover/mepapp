@@ -1,13 +1,13 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { coerceDefaultValue, roomAreaM2, roomAreaWarning, type Calibration, type CustomPropertyDefinition, type Room } from '@mepapp/core';
+import { coerceDefaultValue, parseDecimal, roomAreaM2, roomAreaWarning, type Calibration, type CustomPropertyDefinition, type Room } from '@mepapp/core';
 
-/** Text input that commits on blur or Enter, not on every keystroke (one undo step per edit). */
-function CommitInput({ value, onCommit }: { value: string; onCommit: (value: string) => void }) {
+/** Text input that commits on blur or Enter, not on every keystroke (one undo step per edit). An `onCommit` that returns false rejects the text, and the box shows the stored value again. */
+function CommitInput({ value, onCommit }: { value: string; onCommit: (value: string) => boolean | void }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
   const commit = () => {
-    if (draft !== value) onCommit(draft);
+    if (draft !== value && onCommit(draft) === false) setDraft(value);
   };
   return <input type="text" value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />;
 }
@@ -90,8 +90,13 @@ export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDef
             <CommitInput
               value={String(room.properties?.[def.name] ?? coerceDefaultValue(def))}
               onCommit={(v) => {
-                const parsed = Number(v);
-                update({ properties: { ...room.properties, [def.name]: def.kind === 'numeric' ? (v.trim() !== '' && Number.isFinite(parsed) ? parsed : 0) : v } });
+                if (def.kind !== 'numeric') {
+                  update({ properties: { ...room.properties, [def.name]: v } });
+                  return;
+                }
+                const parsed = v.trim() === '' ? 0 : parseDecimal(v);
+                if (parsed === null) return false;
+                update({ properties: { ...room.properties, [def.name]: parsed } });
               }}
             />
           </div>
