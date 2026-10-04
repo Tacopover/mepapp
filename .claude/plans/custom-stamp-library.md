@@ -230,6 +230,8 @@ The user asked for a multi-select in the Stamps panel, to delete several user or
 - **Delete:** one confirmation that lists the effect per kind (how many are hidden, deleted for good, deleted from the project with their placed-element warning, reverted with the lost-connection count). Then all actions run, the library reloads once, and the status shows a summary. The selection mode ends.
 - The single-tile buttons keep their own confirmations. The per-kind actions move into shared functions, so the single and the bulk path do the same work.
 
+**Done 2026-10-04 (`ff0dda0`).** `ui/src/stampBulkDelete.ts` classifies the stamps and builds the confirmation text (4 tests). The Escape listener runs on `window` in the capture phase and stops the event, so Escape ends only the selection and keeps the armed stamp tool; a second Escape works as before. Verified: root `pnpm build` passes, `@mepapp/ui` 98 tests pass. Headless Chromium through the real DOM: Ctrl+click starts the mode with the active tile, built-in tiles are dimmed and ignore clicks, the confirm text was "Delete 3 stamps? / 2 library stamps are hidden. The files stay in their folders. / 1 custom stamp is deleted from this project.", the status was "Deleted 1 stamp and hid 2.", Cancel deletes nothing, no console errors. **Not covered by the browser test:** the revert path, the saved-stamp delete, and the sentences about placed elements and lost connections (unit tests cover their text only).
+
 ### Phase 6 — Ports (editing)
 
 1. A "Edit stamp…" button on a user tile opens the Element Editor with the materialized definition.
