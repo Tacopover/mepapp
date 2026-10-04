@@ -1,4 +1,4 @@
-import { useState, type RefObject } from 'react';
+import { useEffect, useState, type MouseEvent, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import { isLibraryStampId, NETWORK_TYPE_LIBRARY, type NetworkType, type StampDefinition } from '@mepapp/core';
 import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js';
@@ -61,6 +61,15 @@ export interface StampsPanelProps {
   onEditUserStamp: (definitionId: string) => void;
   /** Hides a folder stamp or deletes a saved stamp (App.tsx decides by the record's source). */
   onDeleteUserStamp: (definition: StampDefinition) => void;
+  /** Hides, deletes or reverts all the given selectable stamps after one confirmation — see App.tsx's handleBulkDelete. Resolves true when the action ran, so the panel ends its selection mode; false when the user cancelled. */
+  onBulkDelete: (definitions: StampDefinition[]) => Promise<boolean>;
+}
+
+/** Which delete button a tile shows: 'user' a stamp from the user library, 'orphan' a project copy of a user stamp whose record is gone, 'custom' a project stamp (delete, or revert for an edited built-in). Null for a built-in stamp, which has no delete button and cannot be selected. */
+function deleteKindOf(definition: StampDefinition, userStampIds: ReadonlySet<string>): 'user' | 'orphan' | 'custom' | null {
+  if (definition.source === 'user') return userStampIds.has(definition.id) ? 'user' : 'orphan';
+  if (definition.source === 'custom') return 'custom';
+  return null;
 }
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
@@ -140,6 +149,7 @@ export function StampsPanel({
   savedUserStampIds,
   onEditUserStamp,
   onDeleteUserStamp,
+  onBulkDelete,
 }: StampsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -163,6 +173,62 @@ export function StampsPanel({
 
   const userStampIds = new Set(userStampDefinitions.map((u) => u.id));
   const [subTab, setSubTab] = useState<'stamps' | 'networkTypes'>('stamps');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const isSelectable = (definition: StampDefinition) => deleteKindOf(definition, userStampIds) !== null;
+  const visibleSelected = definitions.filter((d) => selectedIds.has(d.id) && isSelectable(d));
+
+  function exitSelection() {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (!selectionMode) return;
+    // Capture phase on window, so this Escape only ends the selection and does not reach the scene's window-level Escape handler (which would also drop the armed stamp tool).
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      exitSelection();
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [selectionMode]);
+
+  function handleTileClick(event: MouseEvent, definition: StampDefinition) {
+    const selectable = isSelectable(definition);
+    if ((event.ctrlKey || event.metaKey) && selectable) {
+      if (selectionMode) {
+        toggleSelected(definition.id);
+        return;
+      }
+      const initial = new Set([definition.id]);
+      const active = definitions.find((d) => d.id === activeDefinitionId);
+      if (active && isSelectable(active)) initial.add(active.id);
+      setSelectedIds(initial);
+      setSelectionMode(true);
+      return;
+    }
+    if (selectionMode) {
+      if (selectable) toggleSelected(definition.id);
+      return;
+    }
+    void handlePick(definition);
+  }
+
+  async function handleDeleteSelected() {
+    if (await onBulkDelete(visibleSelected)) exitSelection();
+  }
 
   async function handlePick(definition: StampDefinition) {
     await pickStampDefinition(sceneRef, definition, resolveIconUrl, onPick, materializeUserStamp);
@@ -185,7 +251,10 @@ export function StampsPanel({
           role="tab"
           aria-selected={subTab === 'networkTypes'}
           className={`mep-stamps-subtab-btn${subTab === 'networkTypes' ? ' on' : ''}`}
-          onClick={() => setSubTab('networkTypes')}
+          onClick={() => {
+            exitSelection();
+            setSubTab('networkTypes');
+          }}
         >
           Network Types
         </button>
@@ -216,18 +285,44 @@ export function StampsPanel({
           {definitions.length === 0 && (
             <div className="mep-empty-panel">{searchQuery.trim() === '' ? 'No stamp art available yet for this discipline.' : `No stamps match "${searchQuery.trim()}".`}</div>
           )}
+          {selectionMode && (
+            <div className="mep-stamp-select-bar">
+              <span>{visibleSelected.length} selected</span>
+              <button type="button" className="mep-toggle-btn" disabled={visibleSelected.length === 0} onClick={() => void handleDeleteSelected()}>
+                Delete
+              </button>
+              <button type="button" className="mep-toggle-btn" onClick={exitSelection}>
+                Cancel
+              </button>
+            </div>
+          )}
           <div className="mep-stamp-grid">
-            {definitions.map((definition) => (
+            {definitions.map((definition) => {
+              const kind = deleteKindOf(definition, userStampIds);
+              const selectable = kind !== null;
+              const checked = selectedIds.has(definition.id);
+              const label = stampLabelFor(definition, labelLanguage);
+              return (
               <div key={definition.id} className="mep-stamp-tile-wrap">
                 <button
                   type="button"
-                  className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}`}
-                  onClick={() => void handlePick(definition)}
+                  className={`mep-stamp-tile${activeDefinitionId === definition.id ? ' active' : ''}${selectionMode && selectable && checked ? ' selected' : ''}${selectionMode && !selectable ? ' mep-stamp-tile--dimmed' : ''}`}
+                  onClick={(e) => handleTileClick(e, definition)}
                 >
                   <img src={iconUrlFor(definition, resolveIconUrl)} alt="" />
-                  {stampLabelFor(definition, labelLanguage)}
+                  {label}
                 </button>
-                {definition.source === 'user' && userStampIds.has(definition.id) && (
+                {selectionMode && selectable && (
+                  <input
+                    type="checkbox"
+                    className="mep-stamp-tile-check"
+                    checked={checked}
+                    aria-label={`Select ${label}`}
+                    onChange={() => toggleSelected(definition.id)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+                {kind === 'user' && (
                   <span className="mep-stamp-tile-badge" title="From your library folder">
                     user
                     {missingUserStampIds.has(definition.id) && (
@@ -238,7 +333,7 @@ export function StampsPanel({
                     )}
                   </span>
                 )}
-                {definition.source === 'user' && userStampIds.has(definition.id) && (
+                {!selectionMode && kind === 'user' && (
                   <>
                     <button
                       type="button"
@@ -264,7 +359,7 @@ export function StampsPanel({
                     </button>
                   </>
                 )}
-                {definition.source === 'user' && !userStampIds.has(definition.id) && (
+                {!selectionMode && kind === 'orphan' && (
                   <button
                     type="button"
                     className="mep-stamp-tile-delete"
@@ -277,7 +372,7 @@ export function StampsPanel({
                     <IconTrash size={12} />
                   </button>
                 )}
-                {definition.source === 'library' && (
+                {!selectionMode && definition.source === 'library' && (
                   <button
                     type="button"
                     className="mep-stamp-tile-duplicate"
@@ -290,7 +385,7 @@ export function StampsPanel({
                     <IconPencil size={12} />
                   </button>
                 )}
-                {definition.source === 'custom' && (
+                {!selectionMode && kind === 'custom' && (
                   <>
                     <button
                       type="button"
@@ -317,7 +412,8 @@ export function StampsPanel({
                   </>
                 )}
               </div>
-            ))}
+              );
+            })}
             <button type="button" className="mep-stamp-tile" onClick={onCreateCustomElement}>
               <IconPencil size={20} />
               Create custom element…

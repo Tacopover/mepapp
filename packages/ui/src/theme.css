@@ -3362,6 +3362,35 @@
 }
 
 /* ---------- Custom stamp library (user folders) ---------- */
+.mep-stamp-tile-check {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.mep-stamp-tile.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mep-stamp-tile--dimmed {
+  opacity: 0.4;
+}
+.mep-stamp-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.mep-stamp-select-bar > span {
+  flex: 1;
+}
 .mep-stamp-tile-badge {
   position: absolute;
   top: 4px;

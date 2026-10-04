@@ -28,6 +28,7 @@ import { loadDefinitionBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
 import { CanvasContextMenu } from './components/CanvasContextMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
+import { classifyStampsForDelete, bulkDeleteMessage } from './stampBulkDelete.js';
 import { StampsPanel, getVisibleStampDefinitions, pickStampDefinition } from './components/StampsPanel.js';
 import type { StampLabelLanguage } from './components/LanguageToggle.js';
 import type { StampCategoryFilter } from './components/CategorySwitcher.js';
@@ -780,6 +781,24 @@ export function MepSketchApp({
     [customStampDefinitions, sceneRef, applyDefinitionToPlacedStamps],
   );
 
+  const revertCustomOverride = useCallback(
+    (definition: StampDefinition) => {
+      const library = STAMP_LIBRARY.find((def) => def.id === definition.id);
+      if (!library) return;
+      sceneRef.current?.removeCustomStampDefinition(definition.id);
+      sceneRef.current?.setStampLabelLayout(definition.id, []);
+      applyDefinitionToPlacedStamps(library);
+    },
+    [sceneRef, applyDefinitionToPlacedStamps],
+  );
+
+  const deleteCustomDefinition = useCallback(
+    (definition: StampDefinition) => {
+      sceneRef.current?.removeCustomStampDefinition(definition.id);
+    },
+    [sceneRef],
+  );
+
   const handleDeleteCustomStampDefinition = useCallback(
     (definition: StampDefinition) => {
       const library = STAMP_LIBRARY.find((def) => def.id === definition.id);
@@ -789,19 +808,17 @@ export function MepSketchApp({
         const lost = sceneRef.current?.countLostPortConnections(definition.id, library.ports) ?? 0;
         const lostWarning = lost > 0 ? ` ${lost} segment connection${lost === 1 ? '' : 's'} to removed ports will be lost.` : '';
         if (!window.confirm(`Revert "${definition.label}" to the library version? Your changes and its labels are removed.${placed}${lostWarning}`)) return;
-        sceneRef.current?.removeCustomStampDefinition(definition.id);
-        sceneRef.current?.setStampLabelLayout(definition.id, []);
-        applyDefinitionToPlacedStamps(library);
+        revertCustomOverride(definition);
         setStatus(`${library.label} reverted to the library version.`);
         return;
       }
       const placedCount = allStamps.filter((s) => s.definitionId === definition.id).length;
       const usageWarning = placedCount > 0 ? ` ${placedCount} placed element${placedCount === 1 ? '' : 's'} on this sheet use it and will keep their current look but lose their icon if this document is reopened later.` : '';
       if (!window.confirm(`Delete "${definition.label}"? This cannot be undone.${usageWarning}`)) return;
-      sceneRef.current?.removeCustomStampDefinition(definition.id);
+      deleteCustomDefinition(definition);
       setStatus(`${definition.label} deleted.`);
     },
-    [allStamps, sceneRef, applyDefinitionToPlacedStamps],
+    [allStamps, sceneRef, revertCustomOverride, deleteCustomDefinition],
   );
 
   const savedUserStampIds = useMemo(
@@ -821,6 +838,28 @@ export function MepSketchApp({
     [userStampLibrary],
   );
 
+  const hideOrDeleteUserStamps = useCallback(
+    async (definitions: StampDefinition[]): Promise<{ hidden: number; deleted: number }> => {
+      const result = { hidden: 0, deleted: 0 };
+      if (!libraryStore || definitions.length === 0) return result;
+      try {
+        for (const definition of definitions) {
+          if (savedUserStampIds.has(definition.id)) {
+            await deleteSavedStamp(libraryStore, definition.id);
+            result.deleted += 1;
+          } else {
+            await setUserStampHidden(libraryStore, definition.id, true);
+            result.hidden += 1;
+          }
+        }
+      } finally {
+        await userStampLibrary.reload();
+      }
+      return result;
+    },
+    [libraryStore, savedUserStampIds, userStampLibrary],
+  );
+
   const handleDeleteUserStamp = useCallback(
     async (definition: StampDefinition) => {
       if (!libraryStore) return;
@@ -830,15 +869,49 @@ export function MepSketchApp({
         : `Hide "${definition.label}"? The file stays in the folder. Show it again from the user library dialog.`;
       if (!window.confirm(message)) return;
       try {
-        if (saved) await deleteSavedStamp(libraryStore, definition.id);
-        else await setUserStampHidden(libraryStore, definition.id, true);
-        await userStampLibrary.reload();
+        await hideOrDeleteUserStamps([definition]);
         setStatus(saved ? `${definition.label} deleted.` : `${definition.label} hidden.`);
       } catch (err) {
         setStatus(`Could not ${saved ? 'delete' : 'hide'} "${definition.label}": ${err instanceof Error ? err.message : String(err)}`);
       }
     },
-    [libraryStore, savedUserStampIds, userStampLibrary],
+    [libraryStore, savedUserStampIds, hideOrDeleteUserStamps],
+  );
+
+  const handleBulkDelete = useCallback(
+    async (definitions: StampDefinition[]): Promise<boolean> => {
+      if (definitions.length === 0) return false;
+      const groups = classifyStampsForDelete(definitions, {
+        userStampIds: new Set(userStampLibrary.definitions.map((d) => d.id)),
+        savedUserStampIds,
+        isLibraryStampId,
+      });
+      const placed = groups.deleteCustom.reduce((sum, d) => sum + allStamps.filter((s) => s.definitionId === d.id).length, 0);
+      const lostConnections = groups.revert.reduce((sum, d) => {
+        const library = STAMP_LIBRARY.find((def) => def.id === d.id);
+        return sum + (library ? (sceneRef.current?.countLostPortConnections(d.id, library.ports) ?? 0) : 0);
+      }, 0);
+      if (!window.confirm(bulkDeleteMessage(groups, { placed, lostConnections }))) return false;
+      for (const definition of groups.revert) revertCustomOverride(definition);
+      for (const definition of groups.deleteCustom) deleteCustomDefinition(definition);
+      try {
+        const { hidden, deleted } = await hideOrDeleteUserStamps([...groups.hide, ...groups.deleteSaved]);
+        const reverted = groups.revert.length;
+        const removed = groups.deleteCustom.length + deleted;
+        const counts: Array<[string, number]> = [
+          ['deleted', removed],
+          ['hid', hidden],
+          ['reverted', reverted],
+        ];
+        const parts = counts.filter(([, n]) => n > 0).map(([verb, n], i) => (i === 0 ? `${verb} ${n} ${n === 1 ? 'stamp' : 'stamps'}` : `${verb} ${n}`));
+        const text = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+        setStatus(`${text.charAt(0).toUpperCase()}${text.slice(1)}.`);
+      } catch (err) {
+        setStatus(`Could not hide or delete the library stamps: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return true;
+    },
+    [userStampLibrary, savedUserStampIds, allStamps, sceneRef, revertCustomOverride, deleteCustomDefinition, hideOrDeleteUserStamps],
   );
 
   const handleShowHiddenStamps = useCallback(
@@ -1047,6 +1120,7 @@ export function MepSketchApp({
         savedUserStampIds={savedUserStampIds}
         onEditUserStamp={(stampId) => void handleEditUserStamp(stampId)}
         onDeleteUserStamp={(definition) => void handleDeleteUserStamp(definition)}
+        onBulkDelete={handleBulkDelete}
       />
     ),
     drawings: (
