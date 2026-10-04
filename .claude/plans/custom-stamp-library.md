@@ -217,6 +217,8 @@ The user tested Phases 1-5 on Windows: it works. The user asked for four changes
 
 **D. Built-in stamps.** A setting "Show the built-in MepApp stamps" (default on), stored in `localStorage`. A checkbox for it is in the Library dialog and in the Add folder dialog. When it is off, the panel hides the `STAMP_LIBRARY` entries. Custom overrides of library stamps, custom stamps, project copies and user stamps still show. Placed built-in stamps keep working.
 
+**Feedback round 1 done 2026-10-04 (data layer `6a48449`, UI `3d278b4`).** Verified: root `pnpm build` passes; `@mepapp/core` 662, `@mepapp/platform` 32, `@mepapp/platform-web` 20, `@mepapp/ui` 94 tests pass. A headless Chromium run through the real DOM with a real OPFS folder passed all steps: folder icon button "Load user library"; the built-in checkbox hides and shows the 145 built-in tiles and survives a reload; hide, Sync keeps it hidden, "1 hidden" and "Show hidden stamps"; Edit + rect + port + Save stores the `mepapp:user-file` marker and updates the project copy and the placed stamp (0 to 1 port); Save as with a taken name shows the error, with a new name makes `user-saved-traced-sink` with no blob, and Delete removes it. No console errors. After this round, Phase 6 points 1-6 are done for user stamps. Phase 6 point 7 (other projects) stays out of scope.
+
 ### Phase 6 — Ports (editing)
 
 1. A "Edit stamp…" button on a user tile opens the Element Editor with the materialized definition.
@@ -290,7 +292,7 @@ Answered by the user on 2026-10-02: raster size (use a default, §4.4), sources 
 | 3 Folder scan and sync | done 2026-10-03 (`2933f4f`) |
 | 4 UI | done 2026-10-03 (`7d2a5cf`) |
 | 5 Placement and copy on first placement | done 2026-10-03 (`7d2a5cf`) |
-| 6 Ports | not started |
+| 6 Ports | points 1-6 done in feedback round 1 (`3d278b4`); point 7 out of scope |
 | 7 Tests and verification | not started |
 | 8 Port data backup (nice to have) | not started |
 
