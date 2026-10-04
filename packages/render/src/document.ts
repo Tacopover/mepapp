@@ -143,6 +143,8 @@ export class SketchDocument {
   flowOverlayActive = false;
   viewport = { x: 0, y: 0, scale: 1 };
   isDirty = false;
+  /** Bumped by every SketchScene.markDirty — a save records it, so marking the save done can tell whether an edit landed after the saved snapshot. */
+  editSeq = 0;
 
   /** No backdrop, no handle, nothing drawn or placed — safe to reuse for the next "Open PDF" instead of leaving a permanent empty tab. */
   isEmpty(): boolean {

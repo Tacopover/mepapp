@@ -576,7 +576,12 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
     // away — before any further mupdf call gets a chance to grow the heap —
     // is the only way to keep both the reopened doc and the caller's bytes
     // valid afterward.
-    const liveBytes = this.doc.saveToBuffer('incremental').asUint8Array();
+    // MuPDF refuses an incremental write on a file it had to repair on open
+    // ("Can't do incremental writes on a repaired file"); such a file is
+    // rewritten in full instead, and the reopen below makes the next save
+    // incremental again.
+    const options = this.doc.canBeSavedIncrementally() ? 'incremental' : 'garbage=compact';
+    const liveBytes = this.doc.saveToBuffer(options).asUint8Array();
     const bytesForCaller = new Uint8Array(liveBytes);
     const bytesForReopen = new Uint8Array(liveBytes);
     // mupdf.PDFDocument.canBeSavedIncrementally() still reports true here, but

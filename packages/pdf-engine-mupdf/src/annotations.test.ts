@@ -327,6 +327,49 @@ describe('MupdfEngine save() called more than once per open session (round-trip 
   });
 });
 
+// A broken startxref offset — the kind of damage MuPDF silently repairs on
+// open, after which it refuses an incremental write.
+function withBrokenStartxref(bytes: Uint8Array): Uint8Array {
+  const marker = new TextEncoder().encode('startxref');
+  let at = -1;
+  for (let i = bytes.length - marker.length; i >= 0 && at < 0; i--) {
+    if (marker.every((b, j) => bytes[i + j] === b)) at = i;
+  }
+  const tail = new TextEncoder().encode('startxref\n999999\n%%EOF\n');
+  const out = new Uint8Array(at + tail.length);
+  out.set(bytes.subarray(0, at));
+  out.set(tail, at);
+  return out;
+}
+
+describe('MupdfEngine save() on a file MuPDF repaired on open', () => {
+  it('writes the file in full, and the next save works too', async () => {
+    const damaged = withBrokenStartxref(makeBlankPdfBytes());
+    const raw = new mupdf.PDFDocument(damaged);
+    expect(raw.wasRepaired()).toBe(true);
+    expect(raw.canBeSavedIncrementally()).toBe(false);
+    raw.destroy();
+
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(damaged);
+    await doc.addAnnotation({ kind: 'rectangle', pageIndex: 0, geometry: { kind: 'rectangle', rect: { x0: 0, y0: 0, x1: 10, y1: 10 } } });
+    await doc.setEmbeddedFile('project.json', new TextEncoder().encode('{"v":1}'));
+    const firstSave = await doc.save();
+
+    await doc.addAnnotation({ kind: 'rectangle', pageIndex: 0, geometry: { kind: 'rectangle', rect: { x0: 20, y0: 20, x1: 30, y1: 30 } } });
+    const secondSave = await doc.save();
+
+    for (const bytes of [firstSave, secondSave]) {
+      const check = new mupdf.PDFDocument(bytes);
+      expect(check.wasRepaired()).toBe(false);
+      check.destroy();
+    }
+    const reopened = await engine.openDocument(secondSave);
+    expect(await reopened.listAnnotations(0)).toHaveLength(2);
+    expect(new TextDecoder().decode((await reopened.getEmbeddedFile('project.json'))!)).toBe('{"v":1}');
+  });
+});
+
 describe('MupdfEngine embedded project JSON (Step 7)', () => {
   it('setEmbeddedFile then getEmbeddedFile round-trips through save+reopen', async () => {
     const engine = new MupdfEngine();

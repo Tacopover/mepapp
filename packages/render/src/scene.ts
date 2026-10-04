@@ -410,6 +410,12 @@ export interface FittingInfo {
  */
 export type IconBitmapResolver = (definition: StampDefinition) => Promise<ImageBitmap>;
 
+/** Which document exportToPdf wrote, and at which edit — hand it to markSaved once the bytes are on disk. */
+export interface PdfExportReceipt {
+  documentId: string;
+  editSeq: number;
+}
+
 export interface DrawingSummary {
   segmentCount: number;
   fittingCount: number;
@@ -874,6 +880,7 @@ export class SketchScene {
 
     if (target.id === this.activeId) {
       this.world.addChildAt(sprite, 0); // already the active, reused doc — just attach the backdrop
+      this.emitter.emit('documentActivated'); // its page count and PDF changed, which listeners only re-read on activation
     } else {
       this.doc.viewport = { x: this.world.x, y: this.world.y, scale: this.world.scale.x };
       this.activateInternal(target);
@@ -1005,7 +1012,7 @@ export class SketchScene {
     this.drawSegmentTool.onDeactivate();
     this.drag = { kind: 'none' };
 
-    this.syncLabels(); // the label context may have changed while this document was inactive
+    this.syncDrawingLayer(); // a project may have loaded, or the label context changed, while this document was inactive
     this.redrawOverlay();
     this.emitter.emit('toolChanged', this.tool);
     this.emitter.emit('networkTypesChanged', target.networkTypes);
@@ -1014,14 +1021,17 @@ export class SketchScene {
   }
 
   private markDirty(): void {
+    this.doc.editSeq++;
     if (this.doc.isDirty) return;
     this.doc.isDirty = true;
     this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
-  private markClean(): void {
-    if (!this.doc.isDirty) return;
-    this.doc.isDirty = false;
+  /** Clears a document's unsaved-changes marker once the caller has written exportToPdf's bytes to disk — not before, so a cancelled or failed write keeps the work marked unsaved. A no-op if the document was edited after the export took its snapshot. */
+  markSaved(receipt: PdfExportReceipt): void {
+    const target = this.documents.find((d) => d.id === receipt.documentId);
+    if (!target || !target.isDirty || target.editSeq !== receipt.editSeq) return;
+    target.isDirty = false;
     this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
@@ -1588,8 +1598,12 @@ export class SketchScene {
 
   /** The active document's schematics whose panel still exists. */
   listSchematics(): Schematic[] {
-    const panels = this.doc.drawingHistory.getState().panels;
-    return this.doc.schematics.filter((s) => panels[s.panelId] !== undefined);
+    return this.liveSchematics(this.doc);
+  }
+
+  private liveSchematics(doc: SketchDocument): Schematic[] {
+    const panels = doc.drawingHistory.getState().panels;
+    return doc.schematics.filter((s) => panels[s.panelId] !== undefined);
   }
 
   addSchematic(schematic: Schematic): void {
@@ -3063,23 +3077,27 @@ export class SketchScene {
   }
 
   exportProject(): ProjectDocument {
-    const state = this.doc.drawingHistory.getState();
+    return this.serializeDocument(this.doc);
+  }
+
+  private serializeDocument(doc: SketchDocument): ProjectDocument {
+    const state = doc.drawingHistory.getState();
     return serializeProject({
-      networkTypes: this.doc.networkTypes,
+      networkTypes: doc.networkTypes,
       segments: Object.values(state.segments),
       fittings: Object.values(state.fittings),
       stamps: Object.values(state.stamps),
-      portGroups: this.doc.portGroups,
+      portGroups: doc.portGroups,
       annotations: Object.values(state.annotations),
-      customStampDefinitions: this.doc.customStampDefinitions,
-      terminalCapacities: Object.fromEntries(this.doc.terminalCapacities),
+      customStampDefinitions: doc.customStampDefinitions,
+      terminalCapacities: Object.fromEntries(doc.terminalCapacities),
       circuits: Object.values(state.circuits),
       panels: Object.values(state.panels),
       panelSections: Object.values(state.panelSections),
-      circuitTypes: this.doc.circuitTypes,
-      stampLabelLayouts: this.doc.stampLabelLayouts,
-      schematics: this.listSchematics(),
-      schematicProjectFields: this.doc.schematicProjectFields,
+      circuitTypes: doc.circuitTypes,
+      stampLabelLayouts: doc.stampLabelLayouts,
+      schematics: this.liveSchematics(doc),
+      schematicProjectFields: doc.schematicProjectFields,
       rooms: Object.values(state.rooms),
     }) as unknown as ProjectDocument;
   }
@@ -3110,8 +3128,11 @@ export class SketchScene {
    * normally via `documentActivated` the next time the user switches back.
    */
   async loadProjectFromJson(raw: unknown, resolveIconBitmap?: IconBitmapResolver): Promise<void> {
+    await this.loadProjectInto(this.doc, raw, resolveIconBitmap);
+  }
+
+  private async loadProjectInto(target: SketchDocument, raw: unknown, resolveIconBitmap?: IconBitmapResolver): Promise<void> {
     const doc = loadProject(raw as Record<string, unknown>);
-    const target = this.doc;
 
     target.drawingHistory.clear();
     target.drawingHistory.setLiveState({
@@ -3247,29 +3268,36 @@ export class SketchScene {
    * planPdfSync). A domain object's own id is used verbatim as its
    * annotation's id, so it can be correlated again on the next open with no
    * separate mapping table (decisions log 2026-09-06).
+   *
+   * Writes the document that owns `handle`, whichever document is active —
+   * stamp extraction yields to the browser, so the user can switch tabs
+   * mid-save. Does not clear the unsaved-changes marker: pass the returned
+   * receipt to markSaved once the bytes are actually on disk.
    */
-  async exportToPdf(handle: PdfDocumentHandle): Promise<void> {
-    const domainEntries = this.domainSyncEntries();
+  async exportToPdf(handle: PdfDocumentHandle): Promise<PdfExportReceipt> {
+    const doc = this.documentOwning(handle);
+    const domainEntries = this.domainSyncEntries(doc);
     const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
-    const plan = planPdfSync(domainEntries, observed, this.doc.pdfSyncIds);
+    const plan = planPdfSync(domainEntries, observed, doc.pdfSyncIds);
 
     for (const id of plan.toDelete) {
       await handle.deleteAnnotation(id);
-      this.doc.pdfSyncIds.delete(id);
+      doc.pdfSyncIds.delete(id);
     }
     for (const id of plan.toUpdate) {
       // The interface has no "update in place" — an update is a delete then
       // recreate under the same id.
       await handle.deleteAnnotation(id);
-      await this.writeAnnotationForId(handle, id);
+      await this.writeAnnotationForId(handle, id, doc);
     }
     for (const id of plan.toCreate) {
-      await this.writeAnnotationForId(handle, id);
-      this.doc.pdfSyncIds.add(id);
+      await this.writeAnnotationForId(handle, id, doc);
+      doc.pdfSyncIds.add(id);
     }
 
-    await handle.setEmbeddedFile(EMBEDDED_PROJECT_FILENAME, new TextEncoder().encode(JSON.stringify(this.exportProject())));
-    this.markClean();
+    const editSeq = doc.editSeq;
+    await handle.setEmbeddedFile(EMBEDDED_PROJECT_FILENAME, new TextEncoder().encode(JSON.stringify(this.serializeDocument(doc))));
+    return { documentId: doc.id, editSeq };
   }
 
   /**
@@ -3282,22 +3310,30 @@ export class SketchScene {
    * annotations changed since last save" review panel).
    */
   async loadFromPdf(handle: PdfDocumentHandle, resolveIconBitmap?: IconBitmapResolver): Promise<ReconciliationReport> {
+    const doc = this.documentOwning(handle);
     const embedded = await handle.getEmbeddedFile(EMBEDDED_PROJECT_FILENAME);
     if (embedded) {
-      await this.loadProjectFromJson(JSON.parse(new TextDecoder().decode(embedded)), resolveIconBitmap);
+      await this.loadProjectInto(doc, JSON.parse(new TextDecoder().decode(embedded)), resolveIconBitmap);
     }
 
-    const domainEntries = this.domainSyncEntries();
+    const domainEntries = this.domainSyncEntries(doc);
     const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
     const report = reconcilePdfSync(domainEntries, observed);
 
-    this.doc.pdfSyncIds = new Set([...report.matchedIds, ...report.drifted.map((d) => d.id)]);
+    doc.pdfSyncIds = new Set([...report.matchedIds, ...report.drifted.map((d) => d.id)]);
     return report;
   }
 
+  /** The open document whose PDF is `handle` — exportToPdf/loadFromPdf span awaits, so they pin their document up front instead of reading the active one. */
+  private documentOwning(handle: PdfDocumentHandle): SketchDocument {
+    const owner = this.documents.find((d) => d.pdfHandle === handle);
+    if (!owner) throw new Error('This PDF is not open in any document.');
+    return owner;
+  }
+
   /** Fittings are deliberately excluded — they're editing-view-only (visible for the chain being drawn or selected, see computeVisibleFittingIds) and never written into the exported PDF. */
-  private domainSyncEntries(): SyncedGeometry[] {
-    const state = this.doc.drawingHistory.getState();
+  private domainSyncEntries(doc: SketchDocument): SyncedGeometry[] {
+    const state = doc.drawingHistory.getState();
     const entries: SyncedGeometry[] = [];
     for (const segment of Object.values(state.segments)) {
       const [a, b] = segment.geometry;
@@ -3337,12 +3373,12 @@ export class SketchScene {
     };
   }
 
-  private async writeAnnotationForId(handle: PdfDocumentHandle, id: string): Promise<void> {
-    const state = this.doc.drawingHistory.getState();
+  private async writeAnnotationForId(handle: PdfDocumentHandle, id: string, doc: SketchDocument): Promise<void> {
+    const state = doc.drawingHistory.getState();
     const segment = state.segments[id];
     if (segment) {
       const [a, b] = segment.geometry;
-      const visuals = this.resolveNetworkTypeVisuals(segment.networkTypeId);
+      const visuals = this.resolveNetworkTypeVisuals(segment.networkTypeId, doc);
       const colorRGBA: [number, number, number, number] = [
         ((visuals.color >> 16) & 0xff) / 255,
         ((visuals.color >> 8) & 0xff) / 255,
@@ -3358,7 +3394,7 @@ export class SketchScene {
       });
       return;
     }
-    const stampEntry = this.doc.stamps.get(id);
+    const stampEntry = doc.stamps.get(id);
     const stampData = state.stamps[id];
     if (stampEntry && stampData) {
       // Extracting the live sprite directly comes back fully blank whenever
@@ -4264,9 +4300,9 @@ export class SketchScene {
     this.recomputeFlow();
   }
 
-  /** A segment's stroke color/width/pattern, resolved from its networkTypeId against the active document's adopted network types — falls back field-by-field to DEFAULT_NETWORK_TYPE, which also covers a project saved before these fields existed. */
-  private resolveNetworkTypeVisuals(networkTypeId: string): { color: number; lineWidthPt: number; linePattern: LinePattern } {
-    const type = this.doc.networkTypes.find((t) => t.id === networkTypeId);
+  /** A segment's stroke color/width/pattern, resolved from its networkTypeId against a document's adopted network types (the active document unless given) — falls back field-by-field to DEFAULT_NETWORK_TYPE, which also covers a project saved before these fields existed. */
+  private resolveNetworkTypeVisuals(networkTypeId: string, doc: SketchDocument = this.doc): { color: number; lineWidthPt: number; linePattern: LinePattern } {
+    const type = doc.networkTypes.find((t) => t.id === networkTypeId);
     return {
       color: hexColorToPixi(type?.color ?? DEFAULT_NETWORK_TYPE.color),
       lineWidthPt: type?.lineWidthPt ?? DEFAULT_NETWORK_TYPE.lineWidthPt,

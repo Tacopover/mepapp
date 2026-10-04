@@ -18,7 +18,7 @@ import {
   type StampLabel,
   type StampLabelVisibility,
 } from '@mepapp/core';
-import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool, type WallDebugState } from '@mepapp/render';
+import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool, type PdfExportReceipt, type WallDebugState } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { WallDebugPanel } from './components/WallDebugPanel.js';
@@ -97,6 +97,7 @@ function supportsFileSystemAccess(): boolean {
 }
 
 const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
+const FILE_TASK_BUSY_STATUS = 'Wait until the current open or save has finished.';
 const XLSX_PICKER_TYPES = [{ description: 'Excel workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }];
 
 const ROOM_GAP_STORAGE_KEY = 'mepapp.settings.roomGapMm.v1';
@@ -429,6 +430,10 @@ export function MepSketchApp({
   // concern. A plain ref, not state: it's write-target bookkeeping, never rendered.
   const fileHandlesRef = useRef(new Map<string, FileSystemFileHandle>());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // The open/save running right now, if any. Only one runs at a time: two
+  // overlapping saves of one PDF both write the same new annotations, and
+  // closing a document mid-task destroys what the task still reads.
+  const fileTaskRef = useRef<{ documentId: string | null } | null>(null);
 
   // Resolves a stamp definition's actual pixels for loadProjectFromJson/loadFromPdf to rebuild a
   // restored stamp's sprite — SketchScene has no fetch of its own, same layering as
@@ -461,21 +466,38 @@ export function MepSketchApp({
         return;
       }
 
+      if (fileTaskRef.current) {
+        setStatus(FILE_TASK_BUSY_STATUS);
+        return;
+      }
+      const task: { documentId: string | null } = { documentId: null };
+      fileTaskRef.current = task;
       setStatus(`Loading ${file.name}...`);
       try {
         const { bitmap, pageWidthPt, pageHeightPt, handle } = await onLoadPdfPage(file);
-        const docId = sceneRef.current?.openDocument(bitmap, pageWidthPt, pageHeightPt, { fileKey, fileName: file.name, handle });
-        if (docId && fileHandle) fileHandlesRef.current.set(docId, fileHandle);
+        task.documentId = sceneRef.current?.openDocument(bitmap, pageWidthPt, pageHeightPt, { fileKey, fileName: file.name, handle }) ?? null;
+        if (task.documentId && fileHandle) fileHandlesRef.current.set(task.documentId, fileHandle);
         // Loads this PDF's own embedded project data (if any) and compares
         // its annotations against that domain model — see decisions log
         // 2026-09-06's reconciliation policy: flag drift/missing, never
         // silently resolve either way. The user never sees this as a separate
         // "project file" — Open/Save hide it entirely, it's just "the PDF."
         const report = sceneRef.current ? await sceneRef.current.loadFromPdf(handle, resolveStampIconBitmap) : null;
-        setReconciliation(report && (report.drifted.length > 0 || report.missingIds.length > 0) ? report : null);
+        if (sceneRef.current?.getActiveDocumentId() === task.documentId) {
+          setReconciliation(report && (report.drifted.length > 0 || report.missingIds.length > 0) ? report : null);
+        }
         setStatus(`Loaded ${file.name} (${pageWidthPt.toFixed(1)} x ${pageHeightPt.toFixed(1)} pt)`);
       } catch (err) {
-        setStatus(`Failed to load ${file.name}: ${(err as Error).message}`);
+        // Kept open, a document whose project failed to load (for example one
+        // saved by a newer MepApp) shows an empty drawing, and a Save would
+        // write that over the file's real project data.
+        if (task.documentId) {
+          fileHandlesRef.current.delete(task.documentId);
+          sceneRef.current?.closeDocument(task.documentId);
+        }
+        setStatus(`Could not open ${file.name}: ${(err as Error).message}. The file was not changed.`);
+      } finally {
+        fileTaskRef.current = null;
       }
     },
     [onLoadPdfPage, resolveStampIconBitmap, sceneRef],
@@ -516,6 +538,10 @@ export function MepSketchApp({
 
   const handleCloseDocument = useCallback(
     (id: string) => {
+      if (fileTaskRef.current?.documentId === id) {
+        setStatus(FILE_TASK_BUSY_STATUS);
+        return;
+      }
       const target = documents.find((d) => d.id === id);
       if (target?.isDirty && !window.confirm(`"${target.fileName}" has unsaved changes. Close anyway?`)) return;
       sceneRef.current?.closeDocument(id);
@@ -523,42 +549,96 @@ export function MepSketchApp({
     [documents, sceneRef],
   );
 
+  // The browser's own "Leave site?" prompt — the only guard when the tab
+  // itself is closed or reloaded with unsaved drawings open.
+  const hasUnsavedDocuments = documents.some((d) => d.isDirty);
+  useEffect(() => {
+    if (!hasUnsavedDocuments) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasUnsavedDocuments]);
+
   // Shared by Save and Save As: writes the current drawing into the open
   // PDF's annotations and embedded project data, then returns the resulting
   // file bytes. Always runs first — otherwise a placed stamp/segment never
   // reaches the file if the user saves without an explicit sync step first
   // (see decisions log: this was shipping PDFs with no stamps).
-  const syncAndGetPdfBytes = useCallback(async (): Promise<Uint8Array<ArrayBuffer> | null> => {
+  const syncAndGetPdfBytes = useCallback(async (): Promise<{ bytes: Uint8Array<ArrayBuffer>; receipt: PdfExportReceipt } | null> => {
     if (!sceneRef.current || !pdfHandle) return null;
-    await sceneRef.current.exportToPdf(pdfHandle);
+    const receipt = await sceneRef.current.exportToPdf(pdfHandle);
     setReconciliation(null);
-    return new Uint8Array(await pdfHandle.save());
+    return { bytes: new Uint8Array(await pdfHandle.save()), receipt };
   }, [pdfHandle, sceneRef]);
 
   // Prompts for a new file location (or downloads a copy, on browsers without
-  // the File System Access API) and remembers it as the active document's
-  // save target from here on.
+  // the File System Access API) and remembers it as the document's save
+  // target from here on. Resolves false when the user cancels the picker;
+  // a failed write throws.
   const saveAsNewFile = useCallback(
-    async (bytes: Uint8Array<ArrayBuffer>) => {
-      const suggestedName = activeDoc?.fileName ?? 'mepapp-drawing.pdf';
+    async (bytes: Uint8Array<ArrayBuffer>, documentId: string): Promise<boolean> => {
+      const suggestedName = documents.find((d) => d.id === documentId)?.fileName ?? 'mepapp-drawing.pdf';
       if (!supportsFileSystemAccess()) {
         downloadPdfBytes(bytes, suggestedName);
         setStatus(`Downloaded ${suggestedName}.`);
+        return true;
+      }
+      let fileHandle: FileSystemFileHandle;
+      try {
+        fileHandle = await window.showSaveFilePicker!({ suggestedName, types: PDF_PICKER_TYPES });
+      } catch (err) {
+        if (isAbortError(err)) return false;
+        throw err;
+      }
+      await writeToFileHandle(fileHandle, bytes);
+      fileHandlesRef.current.set(documentId, fileHandle);
+      sceneRef.current?.renameDocument(documentId, fileHandle.name);
+      setStatus(`Saved as ${fileHandle.name}.`);
+      return true;
+    },
+    [documents, sceneRef],
+  );
+
+  // The unsaved-changes marker is cleared only after the bytes reach the
+  // file, so a cancelled picker or a failed write keeps the close warning.
+  const saveDocument = useCallback(
+    async (asNewFile: boolean) => {
+      if (fileTaskRef.current) {
+        setStatus(FILE_TASK_BUSY_STATUS);
         return;
       }
+      fileTaskRef.current = { documentId: activeDocumentId };
+      setStatus('Saving...');
       try {
-        const fileHandle = await window.showSaveFilePicker!({ suggestedName, types: PDF_PICKER_TYPES });
-        await writeToFileHandle(fileHandle, bytes);
-        if (activeDocumentId) {
-          fileHandlesRef.current.set(activeDocumentId, fileHandle);
-          sceneRef.current?.renameDocument(activeDocumentId, fileHandle.name);
+        const result = await syncAndGetPdfBytes();
+        if (!result) {
+          setStatus('');
+          return;
         }
-        setStatus(`Saved as ${fileHandle.name}.`);
+        const documentId = result.receipt.documentId;
+        // Never saved to a real file yet (opened via the legacy file-picker
+        // fallback, or this is a brand new document) — first save behaves like Save As.
+        const fileHandle = asNewFile ? undefined : fileHandlesRef.current.get(documentId);
+        let saved = false;
+        if (fileHandle) {
+          await writeToFileHandle(fileHandle, result.bytes);
+          setStatus(`Saved ${fileHandle.name}.`);
+          saved = true;
+        } else {
+          saved = await saveAsNewFile(result.bytes, documentId);
+          if (!saved) setStatus('Save cancelled.');
+        }
+        if (saved) sceneRef.current?.markSaved(result.receipt);
       } catch (err) {
-        if (!isAbortError(err)) setStatus(`Failed to save: ${(err as Error).message}`);
+        setStatus(`Failed to save: ${(err as Error).message}`);
+      } finally {
+        fileTaskRef.current = null;
       }
     },
-    [activeDoc, activeDocumentId, sceneRef],
+    [activeDocumentId, saveAsNewFile, sceneRef, syncAndGetPdfBytes],
   );
 
   const handleExportRooms = useCallback(async () => {
@@ -585,29 +665,8 @@ export function MepSketchApp({
     }
   }, [activeDoc, calibration, customPropertyDefs.room, sceneRef]);
 
-  const handleSave = useCallback(async () => {
-    const bytes = await syncAndGetPdfBytes();
-    if (!bytes) return;
-    const fileHandle = activeDocumentId ? fileHandlesRef.current.get(activeDocumentId) : undefined;
-    if (fileHandle) {
-      try {
-        await writeToFileHandle(fileHandle, bytes);
-        setStatus(`Saved ${activeDoc?.fileName ?? 'the drawing'}.`);
-      } catch (err) {
-        setStatus(`Failed to save: ${(err as Error).message}`);
-      }
-      return;
-    }
-    // Never saved to a real file yet (opened via the legacy file-picker
-    // fallback, or this is a brand new document) — first save behaves like Save As.
-    await saveAsNewFile(bytes);
-  }, [activeDoc, activeDocumentId, saveAsNewFile, syncAndGetPdfBytes]);
-
-  const handleSaveAs = useCallback(async () => {
-    const bytes = await syncAndGetPdfBytes();
-    if (!bytes) return;
-    await saveAsNewFile(bytes);
-  }, [saveAsNewFile, syncAndGetPdfBytes]);
+  const handleSave = useCallback(() => saveDocument(false), [saveDocument]);
+  const handleSaveAs = useCallback(() => saveDocument(true), [saveDocument]);
 
   const handleStampPick = useCallback((definition: StampDefinition) => {
     setActiveDefinitionId(definition.id);
