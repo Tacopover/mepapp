@@ -5,7 +5,7 @@ import { disciplineGroupOf, type DisciplineGroup } from '../disciplineGroups.js'
 import { DisciplineSwitcher } from './DisciplineSwitcher.js';
 import { LanguageToggle, type StampLabelLanguage } from './LanguageToggle.js';
 import { CategorySwitcher, type StampCategoryFilter } from './CategorySwitcher.js';
-import { IconPencil, IconPlus, IconTrash, IconUndo } from '../icons.js';
+import { IconFolder, IconPencil, IconPlus, IconTrash, IconUndo } from '../icons.js';
 import { loadDefinitionBitmap } from '../stampBitmap.js';
 import { getStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 import { getVisibleStampDefinitions, stampLabelFor } from '../stampVisibility.js';
@@ -51,6 +51,16 @@ export interface StampsPanelProps {
   onOpenLibraryFolders: () => void;
   /** Reads a user stamp back from the library store with a `data:` URL, for placing — see useUserStampLibrary's materialize. */
   materializeUserStamp: (id: string) => Promise<StampDefinition | undefined>;
+  /** False hides the built-in MepApp stamps (the setting in the user library dialogs). */
+  showBuiltIn: boolean;
+  /** Ids of every library record, hidden ones included — the grid skips project copies with these ids. */
+  libraryRecordIds: ReadonlySet<string>;
+  /** Ids of user stamps in the "Saved stamps" source: their delete button removes them for good instead of hiding them. */
+  savedUserStampIds: ReadonlySet<string>;
+  /** Opens the Element Editor for a user-library stamp — see App.tsx's handleEditUserStamp. */
+  onEditUserStamp: (definitionId: string) => void;
+  /** Hides a folder stamp or deletes a saved stamp (App.tsx decides by the record's source). */
+  onDeleteUserStamp: (definition: StampDefinition) => void;
 }
 
 const bitmapCache = new Map<string, Promise<ImageBitmap>>();
@@ -125,13 +135,21 @@ export function StampsPanel({
   onLoadUserFolder,
   onOpenLibraryFolders,
   materializeUserStamp,
+  showBuiltIn,
+  libraryRecordIds,
+  savedUserStampIds,
+  onEditUserStamp,
+  onDeleteUserStamp,
 }: StampsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Sorted by displayed label rather than left in library-then-custom-append-order, so a newly
   // created/duplicated custom element lands in its correct alphabetical spot immediately instead
   // of always trailing at the bottom of the grid.
-  const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, categoryFilter, labelLanguage, searchQuery, userStampDefinitions);
+  const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, categoryFilter, labelLanguage, searchQuery, userStampDefinitions, {
+    showBuiltIn,
+    libraryRecordIds,
+  });
   const networkTypeDefs =
     disciplineGroup === null ? NETWORK_TYPE_LIBRARY : NETWORK_TYPE_LIBRARY.filter((t) => disciplineGroupOf(t.discipline) === disciplineGroup);
   // Duplicated network types (SketchScene.duplicateNetworkType) get a fresh id
@@ -178,8 +196,8 @@ export function StampsPanel({
           <div className="mep-stamps-filter-row2">
             <CategorySwitcher value={categoryFilter} onChange={onChangeCategoryFilter} />
             <LanguageToggle value={labelLanguage} onChange={onChangeLabelLanguage} />
-            <button type="button" className="mep-toggle-btn" title="Manage your stamp library folders" onClick={onOpenLibraryFolders}>
-              Library folders…
+            <button type="button" className="mep-toggle-btn" title="Load user library" aria-label="Load user library" onClick={onOpenLibraryFolders}>
+              <IconFolder size={14} />
             </button>
             <input
               type="search"
@@ -219,6 +237,32 @@ export function StampsPanel({
                       </span>
                     )}
                   </span>
+                )}
+                {definition.source === 'user' && userStampIds.has(definition.id) && (
+                  <>
+                    <button
+                      type="button"
+                      className="mep-stamp-tile-duplicate"
+                      title="Edit stamp…"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditUserStamp(definition.id);
+                      }}
+                    >
+                      <IconPencil size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      className="mep-stamp-tile-delete"
+                      title={savedUserStampIds.has(definition.id) ? 'Delete stamp…' : 'Hide stamp…'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteUserStamp(definition);
+                      }}
+                    >
+                      <IconTrash size={12} />
+                    </button>
+                  </>
                 )}
                 {definition.source === 'user' && !userStampIds.has(definition.id) && (
                   <button

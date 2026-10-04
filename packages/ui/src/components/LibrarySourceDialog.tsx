@@ -12,12 +12,14 @@ export interface LibrarySourceDialogProps {
   defaultDiscipline: Discipline;
   /** True while the folder is being added and synced — the buttons stay disabled. */
   busy: boolean;
+  showBuiltIn: boolean;
+  onChangeShowBuiltIn: (value: boolean) => void;
   onSubmit: (name: string, discipline: Discipline) => void;
   onCancel: () => void;
 }
 
 /** Asks for the name and discipline of a stamp folder the user just picked. */
-export function LibrarySourceDialog({ category, defaultName, defaultDiscipline, busy, onSubmit, onCancel }: LibrarySourceDialogProps) {
+export function LibrarySourceDialog({ category, defaultName, defaultDiscipline, busy, showBuiltIn, onChangeShowBuiltIn, onSubmit, onCancel }: LibrarySourceDialogProps) {
   const [name, setName] = useState(defaultName);
   const [discipline, setDiscipline] = useState<Discipline>(defaultDiscipline);
   const valid = name.trim() !== '';
@@ -66,6 +68,9 @@ export function LibrarySourceDialog({ category, defaultName, defaultDiscipline, 
           ))}
         </select>
       </div>
+      <label className="mep-hint">
+        <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MepApp stamps
+      </label>
     </Dialog>
   );
 }

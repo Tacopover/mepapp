@@ -297,6 +297,12 @@ export const IconPencil = (props: IconProps) => (
   </Svg>
 );
 
+export const IconFolder = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M3 7a2 2 0 0 1 2-2h4.2a1.5 1.5 0 0 1 1.2.6L12 7.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </Svg>
+);
+
 export const IconPlus = (props: IconProps) => (
   <Svg {...props}>
     <path d="M12 5v14M5 12h14" />
