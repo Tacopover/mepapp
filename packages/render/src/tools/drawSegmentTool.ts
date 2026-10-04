@@ -142,11 +142,12 @@ export class DrawSegmentTool implements Tool {
     ctx.redrawOverlay();
   }
 
-  /** Whether a just-placed segment endpoint continues the chain: a bare fitting always continues; a stamp's port continues only for Equipment (a pass-through node), not Terminal (an end-use device that should end the run). */
+  /** Whether a just-placed segment endpoint continues the chain: a bare fitting always continues; a stamp's port continues only for Equipment (a pass-through node), not Terminal (an end-use device that should end the run). The continuation never carries the endpoint's setupCommand — that already ran in the segment just committed, and running it again in the next segment's undo step would let that undo delete the shared fitting. */
   private chainContinuationFrom(resolved: DrawEndpointResolution, stamps: Record<string, PlacedStamp>): DrawEndpointResolution | null {
-    if (resolved.point.kind === 'fitting') return resolved;
+    const continuation = { point: resolved.point, worldPosition: resolved.worldPosition };
+    if (resolved.point.kind === 'fitting') return continuation;
     const stamp = stamps[resolved.point.elementId];
-    return stamp?.category === 'equipment' ? resolved : null;
+    return stamp?.category === 'equipment' ? continuation : null;
   }
 
   private resolveDrawTarget(ctx: ToolContext, target: ReturnType<typeof resolveSegmentEndpoint>): DrawEndpointResolution {

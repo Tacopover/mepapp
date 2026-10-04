@@ -2119,6 +2119,7 @@ export class SketchScene {
 
   undoDrawing(): void {
     this.doc.drawingHistory.undo();
+    this.drawSegmentTool.onDeactivate(); // a pending chain may start from a fitting or segment the undo just removed
     this.selectedRoomVertices = [];
     this.syncDrawingLayer();
     this.redrawOverlay();
@@ -2134,6 +2135,7 @@ export class SketchScene {
 
   redoDrawing(): void {
     this.doc.drawingHistory.redo();
+    this.drawSegmentTool.onDeactivate();
     this.selectedRoomVertices = [];
     this.syncDrawingLayer();
     this.redrawOverlay();
@@ -4011,6 +4013,10 @@ export class SketchScene {
     }
 
     const meta = event.ctrlKey || event.metaKey;
+    // A drag owns the drawing until pointerup: its Transaction writes its own snapshot back on every
+    // move, so an edit made now would vanish on the next move yet stay on the undo stack.
+    const editsDrawing = event.key === 'Delete' || event.key === 'Backspace' || (meta && event.key.toLowerCase() === 'v');
+    if (editsDrawing && this.drag.kind !== 'none') return;
     if ((event.key === 'Delete' || event.key === 'Backspace') && this.tool === 'edit-room' && this.selectedRoomIds.size > 0) {
       event.preventDefault();
       if (!this.deleteSelectedRoomVertices()) this.deleteSelectedRooms();
