@@ -2429,25 +2429,35 @@ export class SketchScene {
   /**
    * Applies a Global Properties definitions change to every already-placed
    * stamp of the given category (or, for 'circuit', to every circuit): a newly added definition gets its default
-   * value, a removed one is dropped. A rename is treated as remove+add (the
-   * value resets to the new definition's default) rather than carried over —
-   * simplest first-pass behavior, no separate rename affordance in the dialog.
+   * value, a removed one is dropped. `renamed` maps an old name to its new
+   * name; the value moves to the new name. The definitions have no stable id,
+   * so without it a rename would look like a remove plus an add and reset
+   * every value to the default.
    */
   applyCustomPropertyCascade(
     category: StampCategory | 'circuit' | 'room',
     previous: CustomPropertyDefinition[],
     next: CustomPropertyDefinition[],
+    renamed: Record<string, string> = {},
   ): void {
+    const renames = Object.entries(renamed);
+    const renamedTo = new Set(Object.values(renamed));
     const previousNames = new Set(previous.map((d) => d.name));
     const nextNames = new Set(next.map((d) => d.name));
-    const removedNames = previous.filter((d) => !nextNames.has(d.name)).map((d) => d.name);
-    const addedDefs = next.filter((d) => !previousNames.has(d.name));
-    if (removedNames.length === 0 && addedDefs.length === 0) return;
+    const removedNames = previous.filter((d) => !nextNames.has(d.name) && !(d.name in renamed)).map((d) => d.name);
+    const addedDefs = next.filter((d) => !previousNames.has(d.name) && !renamedTo.has(d.name));
+    if (removedNames.length === 0 && addedDefs.length === 0 && renames.length === 0) return;
     const tx = new Transaction(this.doc.drawingHistory, `Update ${category} properties`);
     tx.update((state) => {
       const applyTo = (properties: CustomPropertyValues | undefined): CustomPropertyValues => {
         const next = { ...properties };
         for (const name of removedNames) delete next[name];
+        for (const [from, to] of renames) {
+          delete next[from];
+          delete next[to];
+        }
+        // Read from `properties`, not `next`, so a swap (a to b, b to a) moves both values.
+        for (const [from, to] of renames) if (properties && from in properties) next[to] = properties[from];
         for (const def of addedDefs) next[def.name] = coerceDefaultValue(def);
         return next;
       };

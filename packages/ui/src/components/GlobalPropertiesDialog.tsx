@@ -4,13 +4,16 @@ import { Dialog } from './Dialog.js';
 
 export type { GlobalPropertyDefs };
 
+type Category = keyof GlobalPropertyDefs;
+
+/** Per category, old property name to new name, for each saved property the user renamed. */
+export type GlobalPropertyRenames = Record<Category, Record<string, string>>;
+
 export interface GlobalPropertiesDialogProps {
   definitions: GlobalPropertyDefs;
-  onSave: (next: GlobalPropertyDefs) => void;
+  onSave: (next: GlobalPropertyDefs, renamed: GlobalPropertyRenames) => void;
   onClose: () => void;
 }
-
-type Category = keyof GlobalPropertyDefs;
 
 const CATEGORY_LABELS: Record<Category, string> = { terminal: 'Terminal', equipment: 'Equipment', circuit: 'Circuit', room: 'Room' };
 
@@ -36,14 +39,22 @@ function validate(defs: CustomPropertyDefinition[], category: Category): string 
  */
 export function GlobalPropertiesDialog({ definitions, onSave, onClose }: GlobalPropertiesDialogProps) {
   const [draft, setDraft] = useState<GlobalPropertyDefs>(definitions);
+  // The saved name each row started from (null for an added row), index for index with draft — so a rename can carry the values over.
+  const [origins, setOrigins] = useState<Record<Category, (string | null)[]>>(() => ({
+    terminal: definitions.terminal.map((d) => d.name),
+    equipment: definitions.equipment.map((d) => d.name),
+    circuit: definitions.circuit.map((d) => d.name),
+    room: definitions.room.map((d) => d.name),
+  }));
   const [category, setCategory] = useState<Category>('terminal');
 
   const rows = draft[category];
   const error = validate(rows, category);
   const hasError = (Object.keys(CATEGORY_LABELS) as Category[]).some((c) => validate(draft[c], c) !== null);
 
-  function updateRows(next: CustomPropertyDefinition[]) {
+  function updateRows(next: CustomPropertyDefinition[], nextOrigins: (string | null)[] = origins[category]) {
     setDraft((prev) => ({ ...prev, [category]: next }));
+    setOrigins((prev) => ({ ...prev, [category]: nextOrigins }));
   }
 
   function updateRow(index: number, patch: Partial<CustomPropertyDefinition>) {
@@ -51,16 +62,28 @@ export function GlobalPropertiesDialog({ definitions, onSave, onClose }: GlobalP
   }
 
   function removeRow(index: number) {
-    updateRows(rows.filter((_, i) => i !== index));
+    updateRows(
+      rows.filter((_, i) => i !== index),
+      origins[category].filter((_, i) => i !== index),
+    );
   }
 
   function addRow() {
-    updateRows([...rows, { name: '', kind: 'text', defaultValue: '' }]);
+    updateRows([...rows, { name: '', kind: 'text', defaultValue: '' }], [...origins[category], null]);
   }
 
   function handleSave() {
     if (hasError) return;
-    onSave(draft);
+    const renamed = Object.fromEntries(
+      (Object.keys(CATEGORY_LABELS) as Category[]).map((c) => [
+        c,
+        Object.fromEntries(draft[c].flatMap((row, i) => {
+          const origin = origins[c][i];
+          return origin !== null && origin !== row.name ? [[origin, row.name]] : [];
+        })),
+      ]),
+    ) as GlobalPropertyRenames;
+    onSave(draft, renamed);
   }
 
   return (

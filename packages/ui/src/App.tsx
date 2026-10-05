@@ -47,7 +47,7 @@ import { RoomToolBar } from './components/RoomToolBar.js';
 import { Dialog } from './components/Dialog.js';
 import { CalibrationDialog } from './components/CalibrationDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
-import { GlobalPropertiesDialog, type GlobalPropertyDefs } from './components/GlobalPropertiesDialog.js';
+import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRenames } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
 import { StampLabelsDialog } from './components/StampLabelsDialog.js';
@@ -424,11 +424,11 @@ export function MepSketchApp({
   }, []);
 
   const handleSaveCustomPropertyDefs = useCallback(
-    (next: GlobalPropertyDefs) => {
-      sceneRef.current?.applyCustomPropertyCascade('terminal', customPropertyDefs.terminal, next.terminal);
-      sceneRef.current?.applyCustomPropertyCascade('equipment', customPropertyDefs.equipment, next.equipment);
-      sceneRef.current?.applyCustomPropertyCascade('circuit', customPropertyDefs.circuit, next.circuit);
-      sceneRef.current?.applyCustomPropertyCascade('room', customPropertyDefs.room, next.room);
+    (next: GlobalPropertyDefs, renamed: GlobalPropertyRenames) => {
+      sceneRef.current?.applyCustomPropertyCascade('terminal', customPropertyDefs.terminal, next.terminal, renamed.terminal);
+      sceneRef.current?.applyCustomPropertyCascade('equipment', customPropertyDefs.equipment, next.equipment, renamed.equipment);
+      sceneRef.current?.applyCustomPropertyCascade('circuit', customPropertyDefs.circuit, next.circuit, renamed.circuit);
+      sceneRef.current?.applyCustomPropertyCascade('room', customPropertyDefs.room, next.room, renamed.room);
       setCustomPropertyDefs(next);
       localStorage.setItem(CUSTOM_PROPERTIES_STORAGE_KEY, JSON.stringify(next));
       setGlobalPropertiesOpen(false);
