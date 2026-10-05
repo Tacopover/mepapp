@@ -30,9 +30,15 @@ export function loadCustomSymbols(storage: StorageLike | undefined): SchematicSy
   }
 }
 
+/** Writes the symbols, but never one that fails validation — it keeps its last valid stored version instead. See saveCustomTemplates. */
 export function saveCustomSymbols(storage: StorageLike | undefined, symbols: SchematicSymbol[]): void {
   try {
-    storage?.setItem(SCHEMATIC_SYMBOLS_STORAGE_KEY, JSON.stringify(symbols));
+    const stored = new Map(loadCustomSymbols(storage).map((s) => [s.id, s]));
+    const valid = symbols.flatMap((s) => {
+      const lastValid = stored.get(s.id);
+      return isUsableSymbol(s) ? [s] : (lastValid ?? []);
+    });
+    storage?.setItem(SCHEMATIC_SYMBOLS_STORAGE_KEY, JSON.stringify(valid));
   } catch {
     // Storage can be full or blocked; the symbols then last only for this session.
   }

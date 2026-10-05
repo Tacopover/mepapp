@@ -39,6 +39,23 @@ describe('custom template storage', () => {
     expect(loadCustomTemplates(storage).map((t) => t.id)).toEqual(['custom-1']);
   });
 
+  it('keeps the last valid version when an edit makes a template invalid', () => {
+    const storage = fakeStorage();
+    saveCustomTemplates(storage, [template]);
+    const midEdit = structuredClone(template);
+    midEdit.layoutBlocks[0].binding = '{oops';
+    saveCustomTemplates(storage, [midEdit]);
+    expect(loadCustomTemplates(storage)).toEqual([template]);
+  });
+
+  it('does not store a new template until it is valid', () => {
+    const storage = fakeStorage();
+    const midEdit = structuredClone(template);
+    midEdit.layoutBlocks[0].binding = '{oops';
+    saveCustomTemplates(storage, [midEdit]);
+    expect(storage.value).toBe('[]');
+  });
+
   it('does not throw when the storage does', () => {
     const throwing: StorageLike = {
       getItem() {

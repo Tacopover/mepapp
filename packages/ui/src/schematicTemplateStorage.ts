@@ -33,9 +33,20 @@ export function loadCustomTemplates(storage: StorageLike | undefined): Schematic
   }
 }
 
+/**
+ * Writes the templates, but never one that fails validation: the editor
+ * saves on each keystroke, also mid-edit, and loadCustomTemplates would
+ * then drop the whole template. Such a template keeps its last valid
+ * stored version instead (a new one is not stored until it is valid).
+ */
 export function saveCustomTemplates(storage: StorageLike | undefined, templates: SchematicTemplate[]): void {
   try {
-    storage?.setItem(SCHEMATIC_TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+    const stored = new Map(loadCustomTemplates(storage).map((t) => [t.id, t]));
+    const valid = templates.flatMap((t) => {
+      const lastValid = stored.get(t.id);
+      return isUsableTemplate(t) ? [t] : (lastValid ?? []);
+    });
+    storage?.setItem(SCHEMATIC_TEMPLATES_STORAGE_KEY, JSON.stringify(valid));
   } catch {
     // Storage can be full or blocked; the templates then last only for this session.
   }

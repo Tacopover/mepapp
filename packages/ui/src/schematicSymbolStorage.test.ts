@@ -43,4 +43,11 @@ describe('custom symbol storage', () => {
     const storage = fakeStorage(JSON.stringify([symbol, noShapes, { id: 'x' }, 5, null]));
     expect(loadCustomSymbols(storage).map((s) => s.id)).toEqual(['sym-1']);
   });
+
+  it('keeps the last valid version when an edit makes a symbol invalid', () => {
+    const storage = fakeStorage();
+    saveCustomSymbols(storage, [symbol]);
+    saveCustomSymbols(storage, [{ ...symbol, shapes: [] }]);
+    expect(loadCustomSymbols(storage)).toEqual([symbol]);
+  });
 });
