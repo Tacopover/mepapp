@@ -168,6 +168,7 @@ export class SketchDocument {
 
   /** Tears down this document's own PixiJS resources — used on close, not on a mere tab switch. Stamp base textures in `keepTextures` are still used by another document or the clipboard and survive. */
   destroy(keepTextures?: ReadonlySet<Texture>): void {
+    this.pdfHandle?.close();
     this.backdropSprite?.destroy({ texture: true });
     destroyStampEntries(this.stamps.values(), keepTextures);
     this.stamps.clear();

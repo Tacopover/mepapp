@@ -146,6 +146,8 @@ export interface PdfDocumentHandle {
   getTextRuns(pageIndex: number): Promise<TextRun[]>;
   // Document-wide list (layers are not per page in PDF).
   listLayers(): Promise<LayerInfo[]>;
+  // Frees the engine's memory for this document. Every later call on the handle throws.
+  close(): void;
 }
 
 export interface PdfEngine {

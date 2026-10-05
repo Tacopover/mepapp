@@ -168,7 +168,21 @@ function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): Annota
 }
 
 class MupdfDocumentHandle implements PdfDocumentHandle {
-  constructor(private doc: mupdf.PDFDocument) {}
+  private current: mupdf.PDFDocument | null;
+
+  constructor(doc: mupdf.PDFDocument) {
+    this.current = doc;
+  }
+
+  private get doc(): mupdf.PDFDocument {
+    if (!this.current) throw new Error('[pdf-engine-mupdf] the PDF document is closed');
+    return this.current;
+  }
+
+  close(): void {
+    this.current?.destroy();
+    this.current = null;
+  }
 
   getPageCount(): number {
     return this.doc.countPages();
@@ -489,9 +503,11 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
     // then ("Can't do incremental writes on a repaired file").
     const appendOnly = signaturesNeedAppendOnlySave(this.doc) && this.doc.canBeSavedIncrementally();
     const options = appendOnly ? 'incremental,compress' : 'garbage=compact,compress';
-    const liveBytes = this.doc.saveToBuffer(options).asUint8Array();
+    const buffer = this.doc.saveToBuffer(options);
+    const liveBytes = buffer.asUint8Array();
     const bytesForCaller = new Uint8Array(liveBytes);
     const bytesForReopen = new Uint8Array(liveBytes);
+    buffer.destroy();
     // mupdf.PDFDocument.canBeSavedIncrementally() still reports true here, but
     // calling saveToBuffer('incremental') a second time on this same instance
     // (the normal case: the user saves, keeps editing, then saves again in
@@ -501,7 +517,9 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
     // reproduced against this exact PDFDocument instance. Reopening from the
     // bytes we just handed the caller resets that bookkeeping so the next
     // save starts from a consistent, self-describing baseline.
-    this.doc = new mupdf.PDFDocument(bytesForReopen);
+    const reopened = new mupdf.PDFDocument(bytesForReopen);
+    this.doc.destroy();
+    this.current = reopened;
     return bytesForCaller;
   }
 }

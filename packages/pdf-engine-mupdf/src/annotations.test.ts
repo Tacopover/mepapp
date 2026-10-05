@@ -514,3 +514,17 @@ describe('MupdfEngine page info', () => {
     expect(info.heightPt).toBeGreaterThan(0);
   });
 });
+
+describe('MupdfEngine document lifetime', () => {
+  it('keeps working after two saves and throws a clear error after close', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+    await doc.save();
+    const bytes = await doc.save();
+    expect(doc.getPageInfo(0)).toEqual({ widthPt: 300, heightPt: 400, rotationDegrees: 0 });
+    expect((await engine.openDocument(bytes)).getPageCount()).toBe(1);
+    doc.close();
+    expect(() => doc.getPageCount()).toThrow(/closed/);
+    doc.close();
+  });
+});
