@@ -1,6 +1,6 @@
 # Whole-project code review — findings and fix status
 
-Status: **Review done 2026-10-04. Fix groups 1–5 done 2026-10-04 on branch `worktree-code-review-fixes`. Group 6 (the open highs and M34) done 2026-10-05 on branch `worktree-code-review-highs`, which is built on the first branch. Neither branch is merged; both wait for the Windows test.** Every finding without a Fixed mark is still open.
+Status: **Review done 2026-10-04. Fix groups 1–5 done 2026-10-04 on branch `worktree-code-review-fixes`. Group 6 (the open highs and M34) done 2026-10-05 on branch `worktree-code-review-highs`, which is built on the first branch. The user tested both on Windows, and both were merged to `master` by fast-forward at `095f0fa` on 2026-10-05 (build and 850 tests pass; the live site serves `095f0fa`).** Every finding without a Fixed mark is still open.
 
 This file is the reference list of every defect that the 2026-10-04 code review found. Each finding has an id, a location, a short description and a status. When a finding is fixed, its status gets the commit hash and the date. Do not delete a finding when it is fixed. Mark it instead.
 
