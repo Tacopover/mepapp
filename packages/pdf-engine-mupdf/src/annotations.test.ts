@@ -254,50 +254,86 @@ describe('MupdfEngine stamp annotation (Step 7)', () => {
   });
 });
 
+// A PNG drawn by mupdf from a content stream: lets a test pick which side of
+// the image is red and which is blue, to check the image's orientation.
+function makePngBytes(width: number, height: number, contents: string): Uint8Array {
+  const doc = new mupdf.PDFDocument();
+  doc.insertPage(-1, doc.addPage([0, 0, width, height], 0, {}, contents));
+  const png = new Uint8Array(doc.loadPage(0).toPixmap([1, 0, 0, 1, 0, 0], mupdf.ColorSpace.DeviceRGB, false, true).asPNG());
+  doc.destroy();
+  return png;
+}
+
+/** The pixel box [x0, y0, x1, y1] that `matches` covers on page 0 as MuPDF displays it (page /Rotate applied, 1 px per pt). */
+function renderedBox(pdfBytes: Uint8Array, matches: (r: number, g: number, b: number) => boolean): number[] | null {
+  const doc = new mupdf.PDFDocument(pdfBytes);
+  const pixmap = doc.loadPage(0).toPixmap([1, 0, 0, 1, 0, 0], mupdf.ColorSpace.DeviceRGB, false, true);
+  const width = pixmap.getWidth();
+  const pixels = pixmap.getPixels();
+  let box: number[] | null = null;
+  for (let i = 0; i < pixels.length; i += 3) {
+    if (!matches(pixels[i], pixels[i + 1], pixels[i + 2])) continue;
+    const x = (i / 3) % width;
+    const y = Math.floor(i / 3 / width);
+    box = box ? [Math.min(box[0], x), Math.min(box[1], y), Math.max(box[2], x + 1), Math.max(box[3], y + 1)] : [x, y, x + 1, y + 1];
+  }
+  doc.destroy();
+  return box;
+}
+
 describe('MupdfEngine stamp annotation on a rotated page (round-trip investigation, issue 3)', () => {
-  it('writes the Rect/rotation in the page\'s native content-stream space and reads back the original world-space geometry', async () => {
-    const engine = new MupdfEngine();
-    const rotatedDoc = new mupdf.PDFDocument();
-    rotatedDoc.insertPage(-1, rotatedDoc.addPage([0, 0, 300, 400], 90, {}, ''));
-    const bytes = rotatedDoc.saveToBuffer().asUint8Array();
-    rotatedDoc.destroy();
-    const doc = await engine.openDocument(bytes);
+  // The image is red on its left half and blue on its right half as it should
+  // show on screen. The caller hands it in turned back by the page's /Rotate
+  // (see @mepapp/render's writeAnnotationForId), drawn here directly.
+  // expectedRawRect is the world rect x 20..60, y 30..50 mapped into the
+  // unrotated 300x400 user space by hand from ISO 32000's /Rotate definition
+  // (clockwise for display), independent of MuPDF's own conversion.
+  const cases = [
+    { rotation: 90, png: makePngBytes(10, 20, '1 0 0 rg 0 0 10 10 re f 0 0 1 rg 0 10 10 10 re f'), expectedRawRect: [30, 20, 50, 60] },
+    { rotation: 180, png: makePngBytes(20, 10, '1 0 0 rg 10 0 10 10 re f 0 0 1 rg 0 0 10 10 re f'), expectedRawRect: [240, 30, 280, 50] },
+    { rotation: 270, png: makePngBytes(10, 20, '1 0 0 rg 0 10 10 10 re f 0 0 1 rg 0 0 10 10 re f'), expectedRawRect: [250, 340, 270, 380] },
+  ];
 
-    const tinyDoc = new mupdf.PDFDocument();
-    tinyDoc.insertPage(-1, tinyDoc.addPage([0, 0, 10, 10], 0, {}, ''));
-    const pngBytes = tinyDoc.loadPage(0).toPixmap([1, 0, 0, 1, 0, 0], mupdf.ColorSpace.DeviceRGB, false, true).asPNG();
-    tinyDoc.destroy();
+  for (const { rotation, png, expectedRawRect } of cases) {
+    it(`/Rotate ${rotation}: the saved stamp shows where it was placed, the right way up, and reads back unchanged`, async () => {
+      const engine = new MupdfEngine();
+      const rotatedDoc = new mupdf.PDFDocument();
+      rotatedDoc.insertPage(-1, rotatedDoc.addPage([0, 0, 300, 400], rotation, {}, ''));
+      const bytes = new Uint8Array(rotatedDoc.saveToBuffer().asUint8Array());
+      rotatedDoc.destroy();
+      const doc = await engine.openDocument(bytes);
 
-    await doc.addAnnotation({
-      id: 'stamp-rot',
-      kind: 'stamp',
-      pageIndex: 0,
-      geometry: { kind: 'stamp', position: { x: 20, y: 30 }, widthPt: 40, heightPt: 25, rotationDegrees: 0, pngBytes: new Uint8Array(pngBytes) },
+      await doc.addAnnotation({
+        id: 'stamp-rot',
+        kind: 'stamp',
+        pageIndex: 0,
+        geometry: { kind: 'stamp', position: { x: 20, y: 30 }, widthPt: 40, heightPt: 20, rotationDegrees: 0, pngBytes: png },
+      });
+      const saved = await doc.save();
+
+      const rawCheck = new mupdf.PDFDocument(saved);
+      expect(rawCheck.loadPage(0).getAnnotations()[0].getObject().get('Rect').asJS()).toEqual(expectedRawRect);
+      rawCheck.destroy();
+
+      // 1 px of tolerance for the anti-aliased edge where red meets blue.
+      const red = renderedBox(saved, (r, g, b) => r > 200 && g < 80 && b < 80);
+      const blue = renderedBox(saved, (r, g, b) => b > 200 && r < 80 && g < 80);
+      expect(red).not.toBeNull();
+      expect(blue).not.toBeNull();
+      [20, 30, 40, 50].forEach((value, i) => expect(Math.abs(red![i] - value)).toBeLessThanOrEqual(1));
+      [40, 30, 60, 50].forEach((value, i) => expect(Math.abs(blue![i] - value)).toBeLessThanOrEqual(1));
+
+      const reopened = await engine.openDocument(saved);
+      const listed = await reopened.listAnnotations(0);
+      expect(listed).toHaveLength(1);
+      if (listed[0].geometry.kind === 'stamp') {
+        expect(listed[0].geometry.position).toEqual({ x: 20, y: 30 });
+        expect(listed[0].geometry.widthPt).toBe(40);
+        expect(listed[0].geometry.heightPt).toBe(20);
+        expect(listed[0].geometry.rotationDegrees).toBe(0);
+      }
     });
-
-    // The stored Rect must be in the page's native (unrotated) content-stream
-    // space, not the world-space numbers passed in — for a 90° page, that
-    // means swapped width/height at a different position, matching
-    // worldPointToContent's hand-derived formula (verified against
-    // PDFPage.getTransform() ground truth in the round-trip investigation).
-    const saved = await doc.save();
-    const rawCheck = new mupdf.PDFDocument(saved);
-    const rawRect = rawCheck.loadPage(0).getAnnotations()[0].getRect();
-    expect(rawRect).toEqual([245, 20, 270, 60]);
-    rawCheck.destroy();
-
-    // But listAnnotations (the public, world-space-facing API) must undo that
-    // conversion and hand back exactly what was written in.
-    const reopened = await engine.openDocument(saved);
-    const listed = await reopened.listAnnotations(0);
-    expect(listed).toHaveLength(1);
-    if (listed[0].geometry.kind === 'stamp') {
-      expect(listed[0].geometry.position).toEqual({ x: 20, y: 30 });
-      expect(listed[0].geometry.widthPt).toBe(40);
-      expect(listed[0].geometry.heightPt).toBe(25);
-      expect(listed[0].geometry.rotationDegrees).toBe(0);
-    }
-  });
+  }
 });
 
 describe('MupdfEngine save() called more than once per open session (round-trip investigation, issue 4)', () => {

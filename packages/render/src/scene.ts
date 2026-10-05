@@ -3457,12 +3457,11 @@ export class SketchScene {
       const extractionSprite = new Sprite(stampEntry.sprite.texture);
       extractionSprite.anchor.set(0.5);
       // Also compensates for the destination page's own /Rotate (see issue 3:
-      // Test_doc.pdf's stamp came out deformed/misrotated) — the PDF adapter
-      // writes this annotation's Rect in the page's native, unrotated
-      // content-stream space, so the baked-in pixels need the same rotation
-      // added on top of the stamp's own world-space rotation for the two to
-      // still agree once a viewer re-applies /Rotate for display.
-      extractionSprite.rotation = stampEntry.sprite.rotation + (pageInfo.rotationDegrees * Math.PI) / 180;
+      // Test_doc.pdf's stamp came out deformed/misrotated) — the stamp image
+      // is drawn into the page's unrotated space, and a viewer then turns the
+      // whole page by /Rotate for display, so the baked-in pixels are turned
+      // back by that same amount here.
+      extractionSprite.rotation = stampEntry.sprite.rotation - (pageInfo.rotationDegrees * Math.PI) / 180;
       extractionSprite.scale.set(stampData.transform.scale.x, stampData.transform.scale.y);
       const extractionRoot = new Container();
       extractionRoot.addChild(extractionSprite);
