@@ -624,6 +624,22 @@ export function MepSketchApp({
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [hasUnsavedDocuments]);
 
+  // A canvas click changes the selection on pointerdown, and the browser
+  // blurs a focused side-panel input only after that — so an input that
+  // commits on blur (RoomProperties' CommitInput) wrote its text to the
+  // newly selected element. Blurring it first, in the capture phase before
+  // the scene sees the click, commits the text to the element it was typed for.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const blurSidePanelInput = () => {
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused !== document.body && !container.contains(focused)) focused.blur();
+    };
+    container.addEventListener('pointerdown', blurSidePanelInput, { capture: true });
+    return () => container.removeEventListener('pointerdown', blurSidePanelInput, { capture: true });
+  }, [containerRef]);
+
   // Shared by Save and Save As: writes the current drawing into the open
   // PDF's annotations and embedded project data, then returns the resulting
   // file bytes. Always runs first — otherwise a placed stamp/segment never
