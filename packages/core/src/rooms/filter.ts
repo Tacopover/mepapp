@@ -1080,6 +1080,9 @@ function doorRule(segs: Float64Array, n: number, keep: Uint8Array, mm: number, P
   return dropped;
 }
 
+// Above this raster size the component rule uses coarser pixels, so a large page at a small scale stays near 100 MB.
+const COMPONENT_MAX_PIXELS = 15e6;
+
 // A9: component rule. Small free-standing groups of kept lines are not walls.
 function componentRule(
   segs: Float64Array,
@@ -1089,7 +1092,9 @@ function componentRule(
   mm: number,
   P: RoomDetectionParams,
 ): { dropped: number; limMm: number } {
-  const pxMm = 50;
+  let pxMm = 50;
+  const pixels = ((bounds[2] - bounds[0]) * mm * (bounds[3] - bounds[1]) * mm) / (pxMm * pxMm);
+  if (pixels > COMPONENT_MAX_PIXELS) pxMm *= Math.sqrt(pixels / COMPONENT_MAX_PIXELS);
   const R = rasterizeKept(segs, n, keep, bounds, pxMm, mm);
   const { w, h, mask } = R;
   // Pixels within distance 1 px of a line pixel (the pixel itself and its 4 neighbours).

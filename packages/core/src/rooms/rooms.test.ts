@@ -110,6 +110,13 @@ describe('filterWallSegments', () => {
     expect(Array.from(reason)).toEqual(new Array(8).fill(REJECT_REASON.kept));
   });
 
+  it('keeps the walls of a room on a very large page (component raster is capped)', () => {
+    // 200 000 pt square at 25 mm/pt is 5 km; at a fixed 50 mm per pixel that is 10^10 pixels.
+    const input = build(rectWalls(), [-100_000, -100_000, 100_000, 100_000]);
+    const { keep } = filterWallSegments(input, MM);
+    expect(Array.from(keep)).toEqual(new Array(8).fill(1));
+  });
+
   it('drops a single line with no partner', () => {
     const input = build([...rectWalls(), line(20, 60, 100, 60)], BIG);
     const { keep, reason } = filterWallSegments(input, MM);
