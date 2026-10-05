@@ -546,6 +546,8 @@ export class SketchScene {
   private stampGhostRotationDegrees = 0;
   /** Alignment guide(s) matched at the ghost's current (snapped) position — see resolveSnappedPoint's 'place-stamp' case. Drawn in redrawOverlay while a place-* tool is active, same as move-selection's drag.guides. */
   private stampGhostGuides: AlignmentGuide[] = [];
+  /** Fitting visibility reused across the steps of one drag — see syncDrawingLayer's `live`. */
+  private liveVisibleFittingIds: Set<string> | null = null;
   // Every open document, kept fully resident (sprites/textures/undo history
   // and all) — see decisions log 2026-09-07's multi-document plan, D1.
   // SketchScene renders whichever one is active; switching just reparents
@@ -691,7 +693,7 @@ export class SketchScene {
       pushRoomVerticesOut: (id, polygon, refs) => self.pushRoomVerticesOut(id, polygon, refs),
       splitRoomByLine: (a, b) => self.splitRoomByLine(a, b),
       markDirty: () => self.markDirty(),
-      syncDrawingLayer: () => self.syncDrawingLayer(),
+      syncDrawingLayer: (live) => self.syncDrawingLayer(live),
       redrawOverlay: () => self.redrawOverlay(),
       emit: (event, ...args) => (self.emitter.emit as (event: string, ...args: unknown[]) => void)(event, ...args),
       openTextEditor: (id) => self.openTextEditor(id),
@@ -4317,7 +4319,13 @@ export class SketchScene {
     this.drawSegmentTool.armStartFromTarget(this.ctx, point, worldPosition);
   }
 
-  private syncDrawingLayer(): void {
+  /**
+   * `live`: one pointermove of a move, rotate or resize drag. A drag changes positions only, never which segments
+   * connect, so the fitting visibility from the drag's first step is reused, and the flow solve (topology only) and
+   * the 'drawingChanged' summary wait for the full sync when the drag ends.
+   */
+  private syncDrawingLayer(live = false): void {
+    if (!live) this.liveVisibleFittingIds = null;
     this.doc.drawingLayer.clear();
     // Textbox text is a PixiJS Text node (Graphics can't render text) — fully
     // rebuilt here alongside drawingLayer rather than diffed, same "clear and
@@ -4338,7 +4346,7 @@ export class SketchScene {
         this.strokeDashedPolyline(segment.geometry, visuals.lineWidthPt, visuals.color, DASH_PATTERN_WORLD[visuals.linePattern]);
       }
     }
-    const visibleFittingIds = this.computeVisibleFittingIds(state);
+    const visibleFittingIds = live ? (this.liveVisibleFittingIds ??= this.computeVisibleFittingIds(state)) : this.computeVisibleFittingIds(state);
     for (const fitting of Object.values(state.fittings)) {
       if (!visibleFittingIds.has(fitting.id)) continue;
       this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD).fill({ color: 0xffa726 });
@@ -4347,6 +4355,10 @@ export class SketchScene {
       this.drawAnnotation(annotation);
     }
     this.syncLabels();
+    if (live) {
+      this.syncFlowLabels();
+      return;
+    }
     this.emitter.emit('drawingChanged', this.getDrawingSummary());
     this.recomputeFlow();
   }

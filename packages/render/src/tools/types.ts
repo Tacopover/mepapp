@@ -121,7 +121,8 @@ export interface ToolContext {
 
   setTool(tool: SketchTool): void;
   markDirty(): void;
-  syncDrawingLayer(): void;
+  /** `live`: a drag step — see SketchScene.syncDrawingLayer. The drag's onEnd must then run a full sync. */
+  syncDrawingLayer(live?: boolean): void;
   redrawOverlay(): void;
   emit<K extends string>(event: K, ...args: unknown[]): void;
   /** Reopens the floating textarea for an already-placed textbox/stickyNote annotation — see SketchScene.openTextEditor. */

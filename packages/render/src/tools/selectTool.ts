@@ -195,7 +195,7 @@ export class SelectTool implements Tool {
             }
             return ctx.applyConnectivityCascade({ ...state, stamps, annotations, fittings }, changed);
           });
-          ctx.syncDrawingLayer();
+          ctx.syncDrawingLayer(true);
         }
         ctx.redrawOverlay();
         ctx.markDirty();
@@ -206,6 +206,7 @@ export class SelectTool implements Tool {
         if (drag.kind !== 'move-selection') return;
         if (drag.moved) {
           drag.drawingTx?.commit();
+          ctx.syncDrawingLayer();
         } else if (drag.reopenTextEditId) {
           ctx.openTextEditor(drag.reopenTextEditId);
         }
@@ -243,7 +244,7 @@ export class SelectTool implements Tool {
             }
             return ctx.applyConnectivityCascade({ ...state, stamps, annotations }, ctx.stampPortConnectionPoints(rotatedIds, stamps));
           });
-          ctx.syncDrawingLayer();
+          ctx.syncDrawingLayer(true);
         }
         ctx.redrawOverlay();
         ctx.markDirty();
@@ -252,7 +253,9 @@ export class SelectTool implements Tool {
       onEnd: (ctx) => {
         const drag = ctx.drag;
         if (drag.kind !== 'rotate-selection') return;
-        if (drag.moved) drag.drawingTx?.commit();
+        if (!drag.moved) return;
+        drag.drawingTx?.commit();
+        ctx.syncDrawingLayer();
       },
     },
     'resize-rect': {
@@ -277,14 +280,16 @@ export class SelectTool implements Tool {
           if (!annotation || (annotation.geometry.kind !== 'rectangle' && annotation.geometry.kind !== 'highlight')) return state;
           return { ...state, annotations: { ...state.annotations, [id]: { ...annotation, geometry: { ...annotation.geometry, rect } } } };
         });
-        ctx.syncDrawingLayer();
+        ctx.syncDrawingLayer(true);
         ctx.redrawOverlay();
         ctx.markDirty();
       },
       onEnd: (ctx) => {
         const drag = ctx.drag;
         if (drag.kind !== 'resize-rect') return;
-        if (drag.moved) drag.tx.commit();
+        if (!drag.moved) return;
+        drag.tx.commit();
+        ctx.syncDrawingLayer();
       },
     },
     'resize-circle': {
@@ -300,14 +305,16 @@ export class SelectTool implements Tool {
           if (!annotation || annotation.geometry.kind !== 'circle') return state;
           return { ...state, annotations: { ...state.annotations, [id]: { ...annotation, geometry: { ...annotation.geometry, radius } } } };
         });
-        ctx.syncDrawingLayer();
+        ctx.syncDrawingLayer(true);
         ctx.redrawOverlay();
         ctx.markDirty();
       },
       onEnd: (ctx) => {
         const drag = ctx.drag;
         if (drag.kind !== 'resize-circle') return;
-        if (drag.moved) drag.tx.commit();
+        if (!drag.moved) return;
+        drag.tx.commit();
+        ctx.syncDrawingLayer();
       },
     },
     'rubber-band': {
