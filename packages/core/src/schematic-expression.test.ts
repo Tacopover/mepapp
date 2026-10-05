@@ -150,5 +150,15 @@ describe('bindings', () => {
     expect(() => parseBinding('{circuit.number')).toThrow(ExpressionError);
     expect(() => parseBinding('a } b')).toThrow(ExpressionError);
     expect(() => parseBinding('{1 +}')).toThrow(ExpressionError);
+    expect(() => parseBinding('{circuit.number:101}')).toThrow(ExpressionError);
+    expect(() => parseBinding('{circuit.number:21}')).toThrow(ExpressionError);
+    expect(renderBinding(parseBinding('{x:20}'), { x: 1 }, DOT)).toBe((1).toFixed(20));
+  });
+
+  it('rejects expressions nested too deep instead of overflowing the stack', () => {
+    expect(() => parseExpression('('.repeat(100000) + '1' + ')'.repeat(100000))).toThrow(ExpressionError);
+    expect(() => parseExpression('-'.repeat(100000) + '1')).toThrow(ExpressionError);
+    expect(() => parseExpression(Array(100000).fill('1').join('+'))).toThrow(ExpressionError);
+    expect(evaluateExpression(parseExpression('((((1 + 2) * 3)))'), {})).toBe(9);
   });
 });

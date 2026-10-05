@@ -22,8 +22,14 @@ const isIdentStart = (ch: string) => /[A-Za-z_]/.test(ch);
 const isIdentChar = (ch: string) => /[A-Za-z0-9_]/.test(ch);
 const isDigit = (ch: string) => /[0-9]/.test(ch);
 
+/** Caps the nested nodes so a hostile template cannot overflow the recursive parser or evaluator. */
+const MAX_NESTED_NODES = 1000;
+/** `Number.prototype.toFixed` throws above 100; more than 20 decimals is never useful. */
+const MAX_DECIMALS = 20;
+
 class Parser {
   private pos = 0;
+  private nested = 0;
 
   constructor(private readonly src: string) {}
 
@@ -38,15 +44,21 @@ class Parser {
     while (this.pos < this.src.length && /\s/.test(this.src[this.pos])) this.pos++;
   }
 
+  private nest(): void {
+    if (++this.nested > MAX_NESTED_NODES) throw new ExpressionError(`Expression too complex in "${this.src}"`);
+  }
+
   private peek(): string {
     this.skipWs();
     return this.src[this.pos] ?? '';
   }
 
   private parseSum(): Node {
+    this.nest();
     let left = this.parseProduct();
     for (let op = this.peek(); op === '+' || op === '-'; op = this.peek()) {
       this.pos++;
+      this.nest();
       left = { kind: 'bin', op, left, right: this.parseProduct() };
     }
     return left;
@@ -56,6 +68,7 @@ class Parser {
     let left = this.parseUnary();
     for (let op = this.peek(); op === '*' || op === '/'; op = this.peek()) {
       this.pos++;
+      this.nest();
       left = { kind: 'bin', op, left, right: this.parseUnary() };
     }
     return left;
@@ -64,6 +77,7 @@ class Parser {
   private parseUnary(): Node {
     if (this.peek() === '-') {
       this.pos++;
+      this.nest();
       return { kind: 'neg', operand: this.parseUnary() };
     }
     return this.parseAtom();
@@ -256,6 +270,7 @@ export function parseBinding(source: string): ParsedBinding {
       const spec = /:(\d+)\s*$/.exec(body);
       if (spec) {
         decimals = Number(spec[1]);
+        if (decimals > MAX_DECIMALS) throw new ExpressionError(`More than ${MAX_DECIMALS} decimals in "${source}"`);
         body = body.slice(0, spec.index);
       }
       flush();
