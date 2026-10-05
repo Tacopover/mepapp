@@ -16,6 +16,7 @@ import type { AnnotationSnapshot, SelectableRef, Tool, ToolContext } from './typ
 
 const HANDLE_HIT_RADIUS_SCREEN_PX = 10;
 const ROTATE_SNAP_DEGREES = 45;
+const RUBBER_BAND_MIN_DRAG_PX = 4;
 
 function angleDegrees(from: Vec2, to: Vec2): number {
   return (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
@@ -319,6 +320,11 @@ export class SelectTool implements Tool {
         const drag = ctx.drag;
         if (drag.kind !== 'rubber-band') return;
         const { startWorld, currentWorld, additive } = drag;
+        // A drag that stays under the threshold is a plain click on empty
+        // canvas: onPointerDown already cleared the selection (or kept it,
+        // with Shift). As a box it would select everything whose bounds
+        // contain the click point.
+        if (Math.hypot(currentWorld.x - startWorld.x, currentWorld.y - startWorld.y) * ctx.getZoomScale() < RUBBER_BAND_MIN_DRAG_PX) return;
         const rectMin = { x: Math.min(startWorld.x, currentWorld.x), y: Math.min(startWorld.y, currentWorld.y) };
         const rectMax = { x: Math.max(startWorld.x, currentWorld.x), y: Math.max(startWorld.y, currentWorld.y) };
         const hits = new Set<string>();
