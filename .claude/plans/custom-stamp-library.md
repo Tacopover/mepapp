@@ -310,6 +310,7 @@ Answered by the user on 2026-10-02: raster size (use a default, §4.4), sources 
 | 4 UI | done 2026-10-03 (`7d2a5cf`) |
 | 5 Placement and copy on first placement | done 2026-10-03 (`7d2a5cf`) |
 | 6 Ports | points 1-6 done in feedback round 1 (`3d278b4`); point 7 out of scope |
+| Merge | Phases 1-5 and feedback rounds 1-3 merged to `master` 2026-10-05 (`d0ba7ab`, fast-forward) after the user tested on Windows |
 | 7 Tests and verification | not started |
 | 8 Port data backup (nice to have) | not started |
 
