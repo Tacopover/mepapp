@@ -58,10 +58,13 @@ export interface Calibration {
 }
 
 export function calibrateFromKnownDistance(p1: Vec2, p2: Vec2, knownRealDistance: number): Calibration {
-  if (knownRealDistance <= 0) {
+  if (!(knownRealDistance > 0) || !Number.isFinite(knownRealDistance)) {
     throw new Error('knownRealDistance must be positive');
   }
   const pageDistance = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  if (!(pageDistance > 0) || !Number.isFinite(pageDistance)) {
+    throw new Error('the two calibration points must be different');
+  }
   return { pageUnitsPerRealUnit: pageDistance / knownRealDistance };
 }
 

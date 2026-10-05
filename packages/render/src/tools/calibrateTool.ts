@@ -28,6 +28,7 @@ export class CalibrateTool implements Tool {
   onPointerDown(ctx: ToolContext, event: FederatedPointerEvent, world: Vec2): void {
     const { point } = resolveLineSnap(ctx, world, event.shiftKey, 'orthogonal');
     const pendingPoints = [...ctx.getPendingPoints(), point];
+    if (pendingPoints.length === 2 && pendingPoints[0].x === point.x && pendingPoints[0].y === point.y) return;
     ctx.setPendingPoints(pendingPoints);
     this.preview = null;
     this.snapLine = null;

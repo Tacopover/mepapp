@@ -95,5 +95,10 @@ describe('two-point scale calibration survives page rotation', () => {
 
   it('rejects a non-positive known distance', () => {
     expect(() => calibrateFromKnownDistance({ x: 0, y: 0 }, { x: 1, y: 0 }, 0)).toThrow();
+    expect(() => calibrateFromKnownDistance({ x: 0, y: 0 }, { x: 1, y: 0 }, Infinity)).toThrow();
+  });
+
+  it('rejects two identical points', () => {
+    expect(() => calibrateFromKnownDistance({ x: 3, y: 4 }, { x: 3, y: 4 }, 1000)).toThrow();
   });
 });
