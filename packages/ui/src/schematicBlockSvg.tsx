@@ -178,7 +178,7 @@ export function SchematicBlockSvg({ block, loadShapes, symbolShapes, showEmptyDr
       art = symbolArt ? (
         <SymbolShapesSvg shapes={symbolArt} widthPx={w} heightPx={h} minStrokePx={DRAWING_MIN_STROKE_MM} />
       ) : loadShapes && loadShapes.length > 0 ? (
-        <SymbolShapesSvg shapes={loadShapes} widthPx={w} heightPx={h} />
+        <SymbolShapesSvg shapes={loadShapes} widthPx={w} heightPx={h} minStrokePx={DRAWING_MIN_STROKE_MM} />
       ) : (
         <>
           <line x1={0} y1={h / 2} x2={w * 0.55} y2={h / 2} {...line} />
