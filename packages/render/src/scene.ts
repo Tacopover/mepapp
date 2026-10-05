@@ -3290,6 +3290,8 @@ export class SketchScene {
     target.stampsLayer.removeChildren();
 
     let maxStampSeq = 0;
+    // One texture per stamp definition, shared by every stamp placed from it (as setDefinitionArtwork does).
+    const texturesByDefinition = new Map<string, Texture>();
     for (const stampData of doc.stamps) {
       const numericSuffix = /^stamp-(\d+)$/.exec(stampData.id)?.[1];
       if (numericSuffix) maxStampSeq = Math.max(maxStampSeq, Number(numericSuffix));
@@ -3298,8 +3300,11 @@ export class SketchScene {
       const definition = getStampDefinition(stampData.definitionId, target.customStampDefinitions);
       if (!definition) continue; // stamp library changed since this project was saved
 
-      const bitmap = await resolveIconBitmap(definition);
-      const texture = textureFromImageBitmap(bitmap);
+      let texture = texturesByDefinition.get(definition.id);
+      if (!texture) {
+        texture = textureFromImageBitmap(await resolveIconBitmap(definition));
+        texturesByDefinition.set(definition.id, texture);
+      }
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5); // matches placeStamp's pivot convention
       const baseScale = computeStampBaseScale(stampData.nativeWidth, stampData.nativeHeight, texture);
