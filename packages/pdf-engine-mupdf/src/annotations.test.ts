@@ -485,3 +485,32 @@ describe('MupdfEngine embedded project JSON (Step 7)', () => {
     expect(new TextDecoder().decode(readBack!)).toBe('{"v":2}');
   });
 });
+
+describe('MupdfEngine page info', () => {
+  function makePageBytes(edit: (page: mupdf.PDFObject) => void, rotation = 0): Uint8Array {
+    const doc = new mupdf.PDFDocument();
+    doc.insertPage(-1, doc.addPage([0, 0, 600, 400], rotation, {}, ''));
+    edit(doc.loadPage(0).getObject());
+    return doc.saveToBuffer('').asUint8Array();
+  }
+
+  it('reports the CropBox size, which is the size of the raster', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makePageBytes((page) => page.put('CropBox', [100, 50, 400, 250])));
+    expect(doc.getPageInfo(0)).toEqual({ widthPt: 300, heightPt: 200, rotationDegrees: 0 });
+  });
+
+  it('reports the unrotated CropBox size on a page turned by a quarter', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makePageBytes((page) => page.put('CropBox', [100, 50, 400, 250]), 90));
+    expect(doc.getPageInfo(0)).toEqual({ widthPt: 300, heightPt: 200, rotationDegrees: 90 });
+  });
+
+  it('does not throw on a page with no MediaBox', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makePageBytes((page) => page.delete('MediaBox')));
+    const info = doc.getPageInfo(0);
+    expect(info.widthPt).toBeGreaterThan(0);
+    expect(info.heightPt).toBeGreaterThan(0);
+  });
+});

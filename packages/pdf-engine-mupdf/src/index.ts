@@ -43,12 +43,6 @@ function freeTextAppearanceContents(text: string, heightPt: number, fontSize: nu
   return ops.join('\n');
 }
 
-function readMediaBox(page: mupdf.PDFPage): [number, number, number, number] {
-  const box = page.getObject().getInheritable('MediaBox');
-  const values = box.asJS() as number[];
-  return [values[0], values[1], values[2], values[3]];
-}
-
 function readRotation(page: mupdf.PDFPage): PageInfo['rotationDegrees'] {
   const rotate = page.getObject().getInheritable('Rotate');
   if (rotate.isNull() || !rotate.isNumber()) {
@@ -182,11 +176,14 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
 
   getPageInfo(pageIndex: number): PageInfo {
     const page = this.doc.loadPage(pageIndex);
-    const [x0, y0, x1, y1] = readMediaBox(page);
+    // getBounds() is the area that toPixmap renders and that every MuPDF page coordinate is relative to:
+    // the CropBox (clipped to the MediaBox, Letter when the page has no MediaBox), already turned by /Rotate.
+    const [x0, y0, x1, y1] = page.getBounds();
     const rotationDegrees = readRotation(page);
+    const quarterTurn = rotationDegrees === 90 || rotationDegrees === 270;
     return {
-      widthPt: x1 - x0,
-      heightPt: y1 - y0,
+      widthPt: quarterTurn ? y1 - y0 : x1 - x0,
+      heightPt: quarterTurn ? x1 - x0 : y1 - y0,
       rotationDegrees,
     };
   }
