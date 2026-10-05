@@ -9,6 +9,7 @@
 
 import type { Fitting, Network, PortGroup, Segment } from './network.js';
 import { nodeKeyOf } from './network.js';
+import type { StampCategory } from './stamp-library.js';
 
 export interface FlowSolveInput {
   network: Network;
@@ -17,8 +18,10 @@ export interface FlowSolveInput {
   portGroups: PortGroup[];
   /** User-entered capacity per element (typically terminals only — equipment/fittings contribute 0 of their own, same as the old app). */
   terminalCapacities: Record<string, number>;
-  /** Optional explicit source; when omitted a degree-1 node is preferred, same heuristic family as the old app's FindRoot (NetworkFlowProcessor.cs:227-276), simplified since this layer has no Equipment/MainEquipment concept of its own. */
+  /** Optional explicit source; when omitted the root follows the old app's FindRoot order (NetworkFlowProcessor.cs:227-276) — see solveFlow — without its MainEquipment step, which this layer has no concept of. */
   rootElementId?: string;
+  /** The stamp category of each element whose ports are in the network — what tells an equipment (the source) apart from a terminal and a loose duct end. An element missing here counts as a terminal only when it has a capacity. */
+  elementCategories?: Record<string, StampCategory>;
 }
 
 export interface FlowResult {
@@ -37,12 +40,16 @@ interface Edge {
   segmentId: string;
 }
 
+function elementIdOf(nodeKey: string): string | null {
+  return /^port(?:-group)?:([^:]+)/.exec(nodeKey)?.[1] ?? null;
+}
+
 function ownCapacityOf(nodeKey: string, terminalCapacities: Record<string, number>): number {
-  const match = /^port(?:-group)?:([^:]+)/.exec(nodeKey);
-  if (!match) {
+  const elementId = elementIdOf(nodeKey);
+  if (elementId === null) {
     return 0; // fitting nodes contribute nothing of their own
   }
-  return terminalCapacities[match[1]] ?? 0;
+  return terminalCapacities[elementId] ?? 0;
 }
 
 export function solveFlow(input: FlowSolveInput): FlowResult {
@@ -72,11 +79,25 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     return { segmentCapacity, fittingCapacity, resolved: false, totalCapacity: null, segmentDirection };
   }
 
+  // Root order, as the old app's FindRoot: an equipment with one connection
+  // (a single-trunk AHU), then an open end that is not a terminal (a loose
+  // duct end, or a collector's discharge), then any equipment. Without the
+  // equipment steps a loose duct end won over the AHU, since `fitting:` keys
+  // sort before `port:` keys.
+  const degreeOf = (nodeKey: string): number => adjacency.get(nodeKey)?.length ?? 0;
+  const categoryOf = (nodeKey: string): StampCategory | undefined => {
+    const elementId = elementIdOf(nodeKey);
+    return elementId === null ? undefined : input.elementCategories?.[elementId];
+  };
+  const isTerminal = (nodeKey: string): boolean =>
+    categoryOf(nodeKey) === 'terminal' || ownCapacityOf(nodeKey, input.terminalCapacities) !== 0;
   const rootKey =
     (input.rootElementId &&
       nodeKeys.find((k) => k.includes(`:${input.rootElementId}`) || k.startsWith(`fitting:${input.rootElementId}`))) ||
-    nodeKeys.find((k) => (adjacency.get(k)?.length ?? 0) === 1 && ownCapacityOf(k, input.terminalCapacities) === 0) ||
-    nodeKeys.find((k) => (adjacency.get(k)?.length ?? 0) === 1) ||
+    nodeKeys.find((k) => degreeOf(k) === 1 && categoryOf(k) === 'equipment') ||
+    nodeKeys.find((k) => degreeOf(k) === 1 && !isTerminal(k)) ||
+    nodeKeys.find((k) => categoryOf(k) === 'equipment') ||
+    nodeKeys.find((k) => degreeOf(k) === 1) ||
     nodeKeys[0];
 
   // Post-order DFS: each node's demand = its own capacity + the sum of its children's subtree demand.

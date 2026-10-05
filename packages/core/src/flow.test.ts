@@ -123,4 +123,51 @@ describe('solveFlow — capacity accumulation (not physics)', () => {
     expect(capacities.filter((c) => c === null)).toHaveLength(1);
     expect(capacities.filter((c) => c !== null)).toHaveLength(2);
   });
+
+  it('roots at the equipment, not at a loose duct end whose key sorts first', () => {
+    const segments = [
+      segment('trunk', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+      segment('branchA', { kind: 'port', elementId: 'diffuserA', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('branchB', { kind: 'port', elementId: 'diffuserB', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('stub', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'end' }),
+    ];
+    const fittings = [fitting('tee'), fitting('end')];
+    const [network] = computeNetworks({ segments, fittings, portGroups: [] });
+
+    const result = solveFlow({
+      network,
+      segments,
+      fittings,
+      portGroups: [],
+      terminalCapacities: { diffuserA: 100, diffuserB: 75 },
+      elementCategories: { ahu: 'equipment', diffuserA: 'terminal', diffuserB: 'terminal' },
+    });
+
+    expect(result.segmentCapacity.trunk).toBe(175);
+    expect(result.segmentCapacity.stub).toBe(0);
+    expect(result.fittingCapacity.end).toBe(0);
+    expect(result.totalCapacity).toBe(175);
+  });
+
+  it('roots at an equipment with two connections when every open end is a terminal', () => {
+    const segments = [
+      segment('a', { kind: 'port', elementId: 'diffuserA', portId: 'p1' }, { kind: 'port', elementId: 'fcu', portId: 'in' }),
+      segment('b', { kind: 'port', elementId: 'diffuserB', portId: 'p1' }, { kind: 'port', elementId: 'fcu', portId: 'out' }),
+    ];
+    const portGroups = [{ elementId: 'fcu', portIds: ['in', 'out'] }];
+    const [network] = computeNetworks({ segments, fittings: [], portGroups });
+
+    const result = solveFlow({
+      network,
+      segments,
+      fittings: [],
+      portGroups,
+      terminalCapacities: { diffuserA: 100, diffuserB: 75 },
+      elementCategories: { fcu: 'equipment', diffuserA: 'terminal', diffuserB: 'terminal' },
+    });
+
+    expect(result.segmentCapacity.a).toBe(100);
+    expect(result.segmentCapacity.b).toBe(75);
+    expect(result.totalCapacity).toBe(175);
+  });
 });

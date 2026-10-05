@@ -2505,8 +2505,9 @@ export class SketchScene {
     const fittings = Object.values(state.fittings);
     const networks = computeNetworks({ segments, fittings, portGroups: this.doc.portGroups });
     const capacities = Object.fromEntries(this.doc.terminalCapacities);
+    const elementCategories = Object.fromEntries(Object.values(state.stamps).map((stamp) => [stamp.id, stamp.category]));
     this.doc.lastFlowResult = networks.map((network: Network) =>
-      solveFlow({ network, segments, fittings, portGroups: this.doc.portGroups, terminalCapacities: capacities }),
+      solveFlow({ network, segments, fittings, portGroups: this.doc.portGroups, terminalCapacities: capacities, elementCategories }),
     );
     this.syncFlowLabels();
     this.emitter.emit('flowSolved', this.doc.lastFlowResult);
