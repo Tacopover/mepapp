@@ -192,6 +192,12 @@ describe('copyTemplate', () => {
     expect(second.id).not.toBe(first.id);
   });
 
+  it('does not give a new copy the id of a deleted one', () => {
+    const deleted = copyTemplate(base, SCHEMATIC_TEMPLATE_LIBRARY);
+    const next = copyTemplate(base, SCHEMATIC_TEMPLATE_LIBRARY);
+    expect(next.id).not.toBe(deleted.id);
+  });
+
   it('is a deep copy', () => {
     const copy = copyTemplate(base, SCHEMATIC_TEMPLATE_LIBRARY);
     copy.layoutBlocks[0].x = 12345;

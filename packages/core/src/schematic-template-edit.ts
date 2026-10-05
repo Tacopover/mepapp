@@ -257,13 +257,19 @@ export function setTemplateDirection(template: SchematicTemplate, direction: 'ro
   return { ...template, groups: template.groups.map((g) => ({ ...g, direction })) };
 }
 
-/** A copy with a new id and a name that no other template uses. */
+/**
+ * A copy with a new id and a name that no other template uses. The id is
+ * random, never the lowest free number: schematics link to their template
+ * by id, so a reused id would link them to a different template after a
+ * delete, and templates are stored per browser, so two machines would
+ * give the same id to different templates.
+ */
 export function copyTemplate(template: SchematicTemplate, others: SchematicTemplate[]): SchematicTemplate {
   const names = new Set(others.map((t) => t.name.toLowerCase()));
   const base = template.name.replace(/ \(copy( \d+)?\)$/, '');
   let name = `${base} (copy)`;
   for (let n = 2; names.has(name.toLowerCase()); n++) name = `${base} (copy ${n})`;
-  return { ...structuredClone(template), id: nextId('custom', others.map((t) => t.id)), name };
+  return { ...structuredClone(template), id: `custom-${crypto.randomUUID()}`, name };
 }
 
 /** Text form of a rule's number list for an input box, for example "1, 2, 5". */
