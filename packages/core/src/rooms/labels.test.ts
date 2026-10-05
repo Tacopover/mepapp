@@ -70,6 +70,14 @@ describe('parseRoomLabel', () => {
     expect(parse(['indeling uitgifte/keuken/opslag', 'nader vast te stellen'])).toBeNull();
   });
 
+  it('reads thousands separators in the area', () => {
+    expect(parse(['Hal', '1.234,56 m²'])!.areaM2).toBe(1234.56);
+    expect(parse(['Hal', '1,234.56 m²'])!.areaM2).toBe(1234.56);
+    expect(parse(['Hal', '1.234.567 m²'])!.areaM2).toBe(1234567);
+    expect(parse(['Hal', '1.234 m²'])!.areaM2).toBe(1.234);
+    expect(parse(['Hal', '12,5 m²'])!.areaM2).toBe(12.5);
+  });
+
   it('does not read a number followed by digits as an area', () => {
     expect(parse(['Kelder', '2 m²0.5'])).toBeNull();
   });

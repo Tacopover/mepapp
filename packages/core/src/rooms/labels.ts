@@ -55,10 +55,21 @@ const NUMBER = /^\d{1,2}\.\d+[A-Za-z]?(-\d+)?$/; // 0.17, 1.01A
 const NUMBER_PAREN = /^\(([A-Za-z]{1,3}(?:\.\d+){2,4})\)$/; // (Ec.02.02.01)
 const CODE = /^[A-Z][a-z]?-\d+[A-Za-z]*$/; // Ec-226, Fd-232T
 const NUMBER_GENERIC = /^(?=.*\d)(?=.*[A-Za-z])(?=.*[.-])[A-Za-z0-9][A-Za-z0-9.\-/]{2,23}$/; // any other code without spaces: 10A.00.030, B-2.14
-const AREA = /(\d+(?:[.,]\d+)?)\s*m\s*[²2](?![\d.])/;
+const AREA = /(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*m\s*[²2](?![\d.])/;
 const PERSONS = /(\d+)\s*pers\b\.?/i;
 
 const stripLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
+
+/** "1.234,56" and "1,234.56": the last separator is the decimal one when both kinds appear. One separator used more than once groups thousands. One single separator is the decimal one. */
+function parseAreaNumber(text: string): number {
+  const last = Math.max(text.lastIndexOf('.'), text.lastIndexOf(','));
+  if (last < 0) return Number(text);
+  const sep = text[last]!;
+  const other = sep === '.' ? ',' : '.';
+  if (text.includes(other)) return Number(`${text.slice(0, last).replaceAll(other, '')}.${text.slice(last + 1)}`);
+  if (text.indexOf(sep) !== last) return Number(text.replaceAll(sep, ''));
+  return Number(text.replace(sep, '.'));
+}
 
 /** Groups text lines into blocks: same font size, centred on each other, one line below the next. Each block is sorted top to bottom. */
 export function clusterTextRuns(items: readonly TextItem[], params: Partial<LabelParams> = {}): TextItem[][] {
@@ -132,7 +143,7 @@ export function parseRoomLabel(block: readonly TextItem[], genericNumber = true)
     const area = AREA.exec(line);
     const pers = PERSONS.exec(line);
     if (area || pers) {
-      if (area && areaM2 === null) areaM2 = Number(area[1]!.replace(',', '.'));
+      if (area && areaM2 === null) areaM2 = parseAreaNumber(area[1]!);
       if (pers && persons === null) persons = Number(pers[1]);
       const rest = stripLine(line.replace(AREA, '').replace(PERSONS, ''));
       if (rest !== '') free.push(rest);
