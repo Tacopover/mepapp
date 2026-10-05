@@ -584,6 +584,8 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private roomsVisible = true;
+  /** The label text resolution the room layer was last drawn with — see zoomRoomLayer. */
+  private roomTextResolution = 0;
   private readonly wallDebugLayer = new Container();
   private wallDebugVisible = false;
   private wallDebugData: WallDebugData | null = null;
@@ -622,7 +624,8 @@ export class SketchScene {
     const first = new SketchDocument();
     this.documents.push(first);
     this.activeId = first.id;
-    for (const event of ['roomsChanged', 'pageChanged', 'documentActivated', 'calibrationSet', 'roomSelectionChanged', 'zoomChanged', 'toolChanged'] as const) this.emitter.on(event, () => this.syncRoomLayer());
+    for (const event of ['roomsChanged', 'pageChanged', 'documentActivated', 'calibrationSet', 'roomSelectionChanged', 'toolChanged'] as const) this.emitter.on(event, () => this.syncRoomLayer());
+    this.emitter.on('zoomChanged', () => this.zoomRoomLayer());
     this.emitter.on('roomsChanged', () => this.pruneRoomSelection());
     for (const event of ['pageChanged', 'documentActivated', 'calibrationSet'] as const) this.emitter.on(event, () => void this.refreshWallDebug());
     this.emitter.on('zoomChanged', () => drawWallDebugHighlight(this.wallDebugLayer, this.wallDebugData, this.wallDebugHover, WALL_DEBUG_HIGHLIGHT_PX / this.world.scale.x));
@@ -2586,9 +2589,23 @@ export class SketchScene {
   private syncRoomLayer(): void {
     const preview = this.roomPreview;
     const rooms = this.roomsVisible ? this.listRooms().filter((r) => r.pageIndex === this.doc.pageIndex).map((r) => (preview && r.id === preview.id ? { ...r, polygon: preview.polygon } : r)) : [];
-    // The label text is a texture in world units: its resolution follows the zoom so it stays sharp when zoomed in.
-    const textResolution = Math.min(ROOM_TEXT_MAX_RESOLUTION, Math.max(1, Math.ceil(this.app.renderer.resolution * this.world.scale.x * 2) / 2));
+    const textResolution = this.roomTextResolutionForZoom();
+    this.roomTextResolution = textResolution;
     drawRooms(this.doc.roomLayer, rooms, this.doc.calibration, this.selectedRoomIds, this.tool === 'edit-room' ? ROOM_HANDLE_RADIUS_PX / this.world.scale.x : 0, this.selectedRoomVertices, textResolution);
+  }
+
+  /** The label text is a texture in world units: its resolution follows the zoom so it stays sharp when zoomed in. */
+  private roomTextResolutionForZoom(): number {
+    return Math.min(ROOM_TEXT_MAX_RESOLUTION, Math.max(1, Math.ceil(this.app.renderer.resolution * this.world.scale.x * 2) / 2));
+  }
+
+  /** A zoom step changes only the label resolution (in steps of 0.5) and the edit-room handle size, so the rooms are not rebuilt for each wheel step. */
+  private zoomRoomLayer(): void {
+    if (this.tool === 'edit-room') return this.syncRoomLayer();
+    const textResolution = this.roomTextResolutionForZoom();
+    if (textResolution === this.roomTextResolution) return;
+    this.roomTextResolution = textResolution;
+    for (const child of this.doc.roomLayer.children) if (child instanceof Text) child.resolution = textResolution;
   }
 
   /** Detection settings from the UI: door gap width in mm. Used by detectRooms and click-to-fill. */
