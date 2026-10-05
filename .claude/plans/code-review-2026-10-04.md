@@ -177,3 +177,12 @@ The review recommended five fix groups, in this order. The user asked for all fi
 - **Not verified in a browser:** H12 and H13 (unit tests only).
 - **Changes that users can see:** Save writes the whole file again, so its size no longer grows with each save. A PDF whose signatures need append-only saves (SigFlags bit 2) is still appended to. A signed PDF without that flag gets rewritten, and its signature then no longer verifies. A file saved before the H17 fix shows the "moved in another viewer" banner one time for its stamps on a rotated page; Save then fixes them.
 - **Still open, found on the way:** a stamp label that shows a custom property by name (`custom:<name>`) still points at the old name after a rename, so the label shows nothing (H16 moves only the values).
+
+## 11. File size check through the real Save path (2026-10-05)
+
+The user reported after a test on Windows: each Save adds about 1 KB with no change, and a stamp that is deleted after a Save does not make the file smaller. The section 10 check called `exportToPdf` and `save()` directly. This check uses Menu > Open and Menu > Save with a real file handle (OPFS), on the fixed build and on `61a092c`.
+
+- **Built-in stamp, `arch_simple_A4.pdf`:** fixed build 2,687 → 3,331 (first Save adds the project data) → 3,331 → 3,331 → 13,598 (stamp) → 3,340 (stamp deleted) → 3,340. Old build 2,687 → 3,807 → 4,927 → 6,047 (+1,120 B on each Save with no change) → 322,159 (stamp) → 323,451 (stamp deleted) → 324,575. The user's report matches the old build, not the fixed build. The 9 B left after the delete are an empty `/Annots []` array on the page.
+- **`Test_doc.pdf` (3.2 MB), fixed build:** 3,265,206 → 3,265,727 → 3,265,727 → 3,265,727 → 3,275,992 (stamp) → 3,265,736 (stamp deleted).
+- **Files that the old build made too big** get small on their first Save with the fixed build: 324,575 → 3,340 B, and 2,319,830 → 88,616 B.
+- **Still open, new:** a stamp from the user's own library folder (`source: 'user'`) leaves its document copy in the saved file after the last placed stamp is deleted. With a real 44 KB PNG: 3,331 → 131,113 (stamp) → 88,615 (stamp deleted, 85 KB too big). The copy also holds the file two times (`iconRef` and the image shape). Old build: +120 KB on each Save, also with no change. The prompt for a new session, with the cause, the requirements and a check script, is `.claude/plans/library-stamp-copy-prompt.md`.
