@@ -12,8 +12,8 @@ src-tauri/target/
 # the open-source repo (see .claude/plans/electrical-schematic-templates.md §2).
 fixtures/schematics/
 
-# Local-only test PDFs for room detection (copied by hand onto each machine).
-# The pdf-engine-mupdf tests skip a file that is absent.
-fixtures/pdfs/00_arch_ground_floor_edit.pdf
-fixtures/pdfs/Example_*.pdf
-fixtures/pdfs/Test_doc.pdf
+# Local-only test PDFs (copied by hand onto each machine). Files that were
+# already tracked stay tracked. The pdf-engine-mupdf tests skip a file that is absent.
+fixtures/pdfs/*
+!fixtures/pdfs/.gitkeep
+!fixtures/pdfs/README.md
