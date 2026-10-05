@@ -1,6 +1,8 @@
 # Plan: drop unused library-stamp copies at Save
 
-Status: PLAN — waiting for user check (written 2026-10-05). Source prompt: `library-stamp-copy-prompt.md`.
+Status: DONE 2026-10-05 — implemented on branch `worktree-code-review-highs`, pushed for a Windows test, not merged to `master`. User approved the plan; requirement 4 dropped by the user (not done).
+Verification: core tests 673/673 pass (5 new); full `pnpm build` passes. Browser size check: old code FAIL (85,284 B left after the delete), fixed code PASS (9 B, the empty `/Annots []`). Real-DOM check on the fixed build: rail Undo after Save brings the stamp back, and the next Save writes the copy again (131,113 B). A reopen restores the placed stamp with the right art (screenshot). Not verified: the Stamps panel with a real library folder (the folder picker closes the headless page). A project-copy tile whose stamp is not in a library folder is not armed ("could not read the library stamp"). That is existing behavior in `pickStampDefinition`, not changed here.
+Source prompt: `library-stamp-copy-prompt.md`.
 Branch: `worktree-code-review-highs` (worktree `.claude/worktrees/code-review-fixes`), base `a7363b0`.
 
 ## Problem

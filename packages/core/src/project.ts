@@ -270,6 +270,12 @@ export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): J
   return { ...doc, schemaVersion: CURRENT_SCHEMA_VERSION };
 }
 
+/** The custom stamp definitions a Save writes: every entry except a user-library copy (source 'user') that no placed stamp uses. The input is not changed, so a copy kept in memory for undo is written again once a stamp uses it. */
+export function customStampDefinitionsToSave(definitions: readonly StampDefinition[], stamps: readonly PlacedStamp[]): StampDefinition[] {
+  const usedIds = new Set(stamps.map((stamp) => stamp.definitionId));
+  return definitions.filter((definition) => definition.source !== 'user' || usedIds.has(definition.id));
+}
+
 export class ProjectLoadError extends Error {
   constructor(
     message: string,

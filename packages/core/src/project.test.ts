@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_SCHEMA_VERSION, loadProject, ProjectLoadError, serializeProject } from './project.js';
+import { CURRENT_SCHEMA_VERSION, customStampDefinitionsToSave, loadProject, ProjectLoadError, serializeProject } from './project.js';
 import type { Annotation } from './annotation.js';
 import type { Fitting, NetworkType, Segment } from './network.js';
+import type { PlacedStamp } from './stamp.js';
+import type { StampDefinition } from './stamp-library.js';
 
 const networkType: NetworkType = { id: 'supply-air', name: 'Supply Air', discipline: 'ventilation', units: 'CFM', defaultCapacity: 0 };
 const segment: Segment = {
@@ -317,5 +319,46 @@ describe('serializeProject / loadProject round trip', () => {
       expect(error).toBeInstanceOf(ProjectLoadError);
       expect((error as ProjectLoadError).issues).toEqual([{ path: 'segments', message: 'expected an array' }]);
     }
+  });
+});
+
+describe('customStampDefinitionsToSave', () => {
+  const definition = (id: string, source: StampDefinition['source']): StampDefinition => ({
+    id, label: id, discipline: 'other', category: 'terminal', nativeWidth: 40, nativeHeight: 40, ports: [], iconRef: 'data:image/png;base64,AAAA', source,
+  });
+  const stamp = (id: string, definitionId?: string): PlacedStamp => ({
+    id, category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 40, nativeHeight: 40, ports: [], definitionId,
+  });
+
+  it('drops a user-library copy that no placed stamp uses', () => {
+    expect(customStampDefinitionsToSave([definition('user-a', 'user')], [stamp('stamp-1', 'other-id'), stamp('stamp-2')])).toEqual([]);
+  });
+
+  it('keeps a user-library copy that a placed stamp uses', () => {
+    const copy = definition('user-a', 'user');
+    expect(customStampDefinitionsToSave([copy], [stamp('stamp-1', 'user-a')])).toEqual([copy]);
+  });
+
+  it('keeps custom elements, edited library stamps and entries with no source when no stamp uses them', () => {
+    const custom = definition('custom-1', 'custom');
+    const edited = definition('fire-hose-reel', 'library');
+    const legacy = { ...definition('old-1', 'custom'), source: undefined } as unknown as StampDefinition;
+    expect(customStampDefinitionsToSave([custom, edited, legacy], [])).toEqual([custom, edited, legacy]);
+  });
+
+  it('does not change the list in memory, so the copy is saved again after an undo brings its stamp back', () => {
+    const copy = definition('user-a', 'user');
+    const definitions = [copy];
+    expect(customStampDefinitionsToSave(definitions, [])).toEqual([]);
+    expect(definitions).toEqual([copy]);
+    expect(customStampDefinitionsToSave(definitions, [stamp('stamp-1', 'user-a')])).toEqual([copy]);
+  });
+
+  it('keeps the input order', () => {
+    const a = definition('custom-a', 'custom');
+    const b = definition('user-b', 'user');
+    const c = definition('custom-c', 'custom');
+    const d = definition('user-d', 'user');
+    expect(customStampDefinitionsToSave([a, b, c, d], [stamp('stamp-1', 'user-b')])).toEqual([a, b, c]);
   });
 });
