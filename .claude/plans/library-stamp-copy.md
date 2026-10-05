@@ -73,6 +73,7 @@ This changes the project format: a schema version, a migration, and an older Mep
 5. Real-DOM check: the Stamps panel still lists and places library stamps; a reopened file shows its placed library stamps with the right art; undo after Save brings the stamp back, and the next Save size grows again.
 6. Commit, push the branch, mark this plan done. Do not merge to `master`.
 
-## Out of scope (mention only)
+## Follow-up: paste into another document — DONE 2026-10-05
 
-- Paste of a user-library stamp into another document does not copy the definition, so that stamp has no art after a reopen of the target document. Existing gap, not changed here.
+User asked to fix this gap too. `copySelection` now puts the definitions of the copied stamps on the clipboard (`source` `user` or `custom`; an edited built-in stamp, `library`, is not copied because in the target document it would replace that stamp's art for every instance). `pasteClipboard` adds each one that the target document does not have, the same way it adds network types.
+Verification: browser check (copy in a.pdf, paste in b.pdf, Save, reopen b.pdf). Old code: the reopened stamp has no sprite and no definition. Fixed code: ALL PASS, the reopened stamp shows its art (screenshot). All package tests pass.

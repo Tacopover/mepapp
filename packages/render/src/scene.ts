@@ -4147,6 +4147,8 @@ export class SketchScene {
     fittings: Record<string, Fitting>;
     /** The copied segments' network types, so a paste into a document that never adopted one still resolves its visuals (see setNetworkTypeForSegmentsNetworks). */
     networkTypes: NetworkType[];
+    /** The copied stamps' project-only definitions (a user-library copy or an Element Editor element), so a paste into another document keeps their art and ports after a reopen. An edited built-in stamp is not copied: in the target document it would replace that stamp's art for every instance. */
+    stampDefinitions: StampDefinition[];
   } | null = null;
 
   /** Copies the current selection (stamps, annotations and segments) — the rail's Copy flyout action / Ctrl+C. */
@@ -4170,7 +4172,9 @@ export class SketchScene {
     }
     const networkTypeIds = new Set(segments.map((segment) => segment.networkTypeId));
     const networkTypes = this.doc.networkTypes.filter((type) => networkTypeIds.has(type.id)).map((type) => ({ ...type }));
-    this.clipboard = { stamps, annotations, segments, fittings, networkTypes };
+    const definitionIds = new Set(stamps.map((stamp) => stamp.data.definitionId));
+    const stampDefinitions = this.doc.customStampDefinitions.filter((def) => def.source !== 'library' && definitionIds.has(def.id));
+    this.clipboard = { stamps, annotations, segments, fittings, networkTypes, stampDefinitions };
   }
 
   /**
@@ -4221,6 +4225,9 @@ export class SketchScene {
       adoptedNetworkType = true;
     }
     if (adoptedNetworkType) this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+    for (const definition of this.clipboard.stampDefinitions) {
+      if (!this.doc.customStampDefinitions.some((d) => d.id === definition.id)) this.addCustomStampDefinition(definition);
+    }
     for (const segment of pastedRun.segments) newSelection.add(segment.id);
 
     if (pastedStamps.length > 0 || pastedAnnotations.length > 0 || pastedRun.segments.length > 0) {
