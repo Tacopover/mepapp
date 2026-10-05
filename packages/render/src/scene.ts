@@ -1322,7 +1322,7 @@ export class SketchScene {
     if (!this.doc.networkTypes.some((t) => t.id === networkTypeId)) {
       const type = getNetworkTypeFromLibrary(networkTypeId);
       if (type) {
-        this.doc.networkTypes.push(type);
+        this.doc.networkTypes.push({ ...type });
         this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
       }
     }
@@ -2181,11 +2181,13 @@ export class SketchScene {
    * list the first time it's picked — `getNetworkSummaries`/`exportProject`
    * both read from that per-document list, not the static library, so a type
    * has to actually be adopted by a document before it can be resolved or
-   * saved, same as how a stamp definition isn't "real" until placed.
+   * saved, same as how a stamp definition isn't "real" until placed. The
+   * document keeps its own copy: renameNetworkType/updateNetworkType edit it
+   * in place, and `type` can be the shared NETWORK_TYPE_LIBRARY entry.
    */
   setActiveNetworkType(type: NetworkType): void {
     if (!this.doc.networkTypes.some((t) => t.id === type.id)) {
-      this.doc.networkTypes.push(type);
+      this.doc.networkTypes.push({ ...type });
     }
     this.activeNetworkTypeId = type.id;
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
