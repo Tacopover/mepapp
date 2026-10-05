@@ -21,8 +21,30 @@ interface FileSystemAccessSaveOptions {
   suggestedName?: string;
 }
 
+interface FileSystemAccessDirectoryPickerOptions {
+  id?: string;
+  mode?: 'read' | 'readwrite';
+  startIn?: FileSystemHandle | 'desktop' | 'documents' | 'downloads' | 'music' | 'pictures' | 'videos';
+}
+
+interface FileSystemHandlePermissionDescriptor {
+  mode?: 'read' | 'readwrite';
+}
+
 declare global {
+  // queryPermission/requestPermission (Chromium-only) are missing from lib.dom.d.ts, and
+  // this package's tsconfig has no DOM.AsyncIterable lib, so values() is declared here.
+  interface FileSystemHandle {
+    queryPermission?(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>;
+    requestPermission?(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>;
+  }
+
+  interface FileSystemDirectoryHandle {
+    values(): AsyncIterable<FileSystemHandle>;
+  }
+
   interface Window {
+    showDirectoryPicker?(options?: FileSystemAccessDirectoryPickerOptions): Promise<FileSystemDirectoryHandle>;
     showOpenFilePicker?(options?: FileSystemAccessOpenOptions): Promise<FileSystemFileHandle[]>;
     showSaveFilePicker?(options?: FileSystemAccessSaveOptions): Promise<FileSystemFileHandle>;
   }

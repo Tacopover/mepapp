@@ -3360,3 +3360,127 @@
   font-size: 11px;
   padding: 1px 4px;
 }
+
+/* ---------- Custom stamp library (user folders) ---------- */
+.mep-stamp-tile-check {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  right: 4px;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.mep-stamp-tile.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mep-stamp-tile--dimmed {
+  opacity: 0.4;
+}
+.mep-stamp-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.mep-stamp-select-bar > span {
+  flex: 1;
+}
+.mep-stamp-tile-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 0 4px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  pointer-events: none;
+}
+.mep-stamp-tile-warning {
+  color: var(--accent-ink);
+}
+/* "User library" and "Add stamp folder" dialogs: one column, own width (not the Element Editor's .mep-modal--wide, whose body is a flex row). */
+.mep-modal--library {
+  width: 520px;
+  max-width: 92vw;
+}
+.mep-modal--library .mep-library-check {
+  margin: 0 0 12px;
+}
+.mep-modal--library .mep-field-row {
+  gap: 12px;
+}
+.mep-modal--library .mep-field-row label {
+  flex: none;
+  width: 80px;
+}
+.mep-modal.mep-modal--library .mep-field-row input,
+.mep-modal.mep-modal--library .mep-field-row select {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+  padding: 6px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 2px;
+}
+.mep-modal .mep-library-check input {
+  width: auto;
+  margin: 0;
+  flex: none;
+}
+.mep-library-heading {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.mep-library-list {
+  border-top: 1px solid var(--line);
+}
+.mep-library-list .mep-empty-panel {
+  padding: 12px 0;
+  margin: 0;
+}
+.mep-library-source {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.mep-library-source-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mep-library-source-info .mep-hint {
+  margin: 2px 0 0;
+}
+.mep-library-source-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+.mep-library-add {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+}

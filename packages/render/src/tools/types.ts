@@ -1,5 +1,5 @@
 import type { FederatedPointerEvent, Sprite, Texture } from 'pixi.js';
-import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, RoomPolygon, SnapLines, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
+import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, RoomPolygon, SnapLines, StampDefinition, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
 import type { AlignmentGuide } from './alignmentGuides.js';
 import type { DrawingState, SketchDocument } from '../document.js';
 import type { StampInfo, TerminalAssignmentResult } from '../scene.js';
@@ -184,7 +184,10 @@ export interface ToolContext {
     nativeHeight: number;
     definitionId?: string;
     appearanceDefault?: { color?: string; scale?: number };
+    adoptDefinition?: StampDefinition;
   } | null;
+  /** Adds a user-library stamp's definition to the document's customStampDefinitions when the document has no definition with that id yet. */
+  adoptStampDefinition(definition: StampDefinition): void;
   getStampGhostSprite(): Sprite | null;
   getStampGhostRotationDegrees(): number;
   setStampGhostRotationDegrees(degrees: number): void;

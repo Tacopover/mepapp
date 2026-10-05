@@ -106,20 +106,39 @@ The image bytes live in the separate blob store. `listStamps` returns records wi
 
 In `@mepapp/core`:
 
-1. The record types from §4.1 (or in `platform`, per the decision in [[storage-interfaces]] §3.1).
+1. The record types from §4.1 (or in `platform`, per the decision in [[storage-interfaces]] §3.1). **Already done:** the record types are in `platform/src/library-store.ts`. `platform` imports from `core`, so `core` cannot import these records. **Review note 2026-10-03:** the `core` functions below take small `core`-local input types (`UserStampEdits`, `UserStampRecordLike`, `UserStampSourceLike`, `ScannedLibraryFile`). The `platform` records match them by shape. A type check in `platform` proves the match.
 2. `userStampId(sourceId, fileName, takenIds)`.
 3. `parseSvgIntrinsicSize(svgText)` (string-based).
 4. `buildUserStampDefinition(record, imageDataUrl)`.
 5. `diffFolderScan(existingRecords, scannedFiles)`. It returns `added`, `updated` (modified time or size changed), `unchanged`, `missing`. Pure function.
 6. Add `source: 'user'` and fix all checks found by the audit.
 
+Rules fixed at the review (2026-10-03):
+
+- Id: `user-<sourceId>-<slug>`. The slug is the lower-case file name without extension, with diacritics removed, and with each run of other characters than `a-z0-9` replaced by `-`. An empty slug becomes `stamp`. If the id is taken, add `-<extension>`. If that is also taken, add `-2`, `-3`, and so on. The sync gives ids to new files in file-name order, so the result is the same on each run.
+- The sync diff matches a file to a record by the exact file name. It never computes the id again for a known file.
+- A record that was marked missing and is in the folder again counts as `updated`.
+- `applyScannedFile(record, file, nativeSize)` returns the updated record. It keeps `edits` and clears `missingFromFolder`.
+- The image shape needs an `id` and a `style`. The style is not used for an image. `core` uses a local constant with the same value as `DEFAULT_STYLE` in `ui/useShapeDrawEditor.ts`.
+
 Tests (vitest, in `core`): id rules, the `user-` prefix versus all built-in ids, SVG size parse (viewBox with an offset, width and height with units, none), the sync diff (rename, removal, edit survives update).
 
 Verify: `pnpm --filter @mepapp/core test` and a root `pnpm build`.
 
+**Done 2026-10-03 (`960f27f`).** The code is in `core/src/user-stamp.ts`, with tests in `user-stamp.test.ts` (28 tests). `platform/src/library-store-compat.test.ts` proves that the `platform` records match the `core` input types. `platform/tsconfig.test.json` type-checks the `platform` test files (`npx tsc -p tsconfig.test.json`). No script runs it yet. `buildUserStampDefinition` takes one `imageUrl` for `iconRef` and the image shape. Phase 3 decides if that URL is a `blob:` or a `data:` URL. Verified: `@mepapp/core` 656 tests pass, `@mepapp/platform` 32 tests pass, the test type-check passes, root `pnpm build` passes (9 tasks).
+
+Audit of the `StampDefinition.source` checks. None of them changes in Phase 1. A `'user'` stamp is neither `'library'` nor `'custom'` in all of them:
+
+- `ui/src/components/StampsPanel.tsx:201`: `'library'` shows the pencil that copies a library stamp into a custom stamp. Phase 6 adds the user-stamp edit button.
+- `ui/src/components/StampsPanel.tsx:214`: `'custom'` shows the edit and delete buttons for a custom stamp. Phase 5 point 3 needs these for a `'user'` project copy with no library entry.
+- `ui/src/components/PropertiesPanel.tsx:550`: `'custom'` shows "Edit ports…". Phase 6 decides this for `'user'`.
+- `ui/src/components/ElementEditorDialog.tsx:266` and `ui/src/App.tsx:657` write `source: 'custom'`. Phase 6 point 2 must not save a user stamp as `'custom'`.
+
 ### Phase 2 — Storage
 
 Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those two phases are done 2026-10-03 (`91deca8`, `5226167`).** The record types from §4.1 live in `@mepapp/platform` (`library-store.ts`). `IndexedDbLibraryStore` already calls `navigator.storage.persist()` on the first `putSource`, so point 2 below only needs a check. Then:
+
+**Review note 2026-10-03:** do points 1 and 2 together with Phase 3. Without a consumer, the store wiring is dead code.
 
 1. Create the `IndexedDbLibraryStore` instance in `apps/web` and give it to the UI through the same prop pattern the app already uses (see `resolveIconUrl` in `App.tsx:87`).
 2. Request persistent storage when the first source is added.
@@ -135,6 +154,16 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
    4. Return a summary: counts of added, updated, missing.
 4. A list of `UserStampDefinition`s in React state, built from `listStamps()`. **Do not load all image bytes into memory as data URLs.** Use `URL.createObjectURL` for the panel thumbnails. Build the full definition with a data URL shape only when the stamp is placed or embedded (a `materializeUserStamp(id)` function). Check what `resolveIconBitmap` and `getStampDefinition` need, then decide the exact shape of this split. Write the decision into this file.
 5. Revoke object URLs when the list reloads.
+
+**Design decisions for Phases 2 and 3 (2026-10-03):**
+
+- `apps/web` creates one `IndexedDbLibraryStore` and passes it to `MepSketchApp` as the optional prop `libraryStore?: LibraryStore`. With no prop, the feature is unavailable.
+- The panel definitions use a `blob:` object URL (one per stamp) in `iconRef` and in the image shape. `loadShapeImages` (`symbolShapeCanvas.ts`) loads an image shape through `<img>`, so a `blob:` URL renders like a `data:` URL. `StampsPanel`'s `iconUrlFor` must pass a `blob:` URL through unchanged, as it does for `data:`.
+- A `blob:` URL must never reach the project document. `materializeUserStamp(id)` reads the blob as a `data:` URL and builds the definition again. Phase 5 uses it.
+- All folder code lives in `ui/src/userStampLibrary.ts` (scan, size, sync) and `ui/src/useUserStampLibrary.ts` (the React hook). The sync takes the image decoder as a parameter, so vitest can run it in Node with the real fixture files.
+- Phase 3 adds no visible change. Phase 4 adds the buttons and merges the user stamps into the panel.
+
+**Phases 2 and 3 done 2026-10-03 (`2933f4f`).** `apps/web/src/main.tsx` creates the store. `ui/src/userStampLibrary.ts` has `scanLibraryFolder`, `readNativeSize`, `ensureReadPermission`, `createLibrarySource`, `syncLibrarySource`, `materializeUserStamp`. `ui/src/useUserStampLibrary.ts` loads the definitions with `blob:` URLs. `App.tsx` calls the hook but does not use the result yet. The sync stores each blob with the type from the file extension, because `getFile()` can give an empty type. An SVG with no size at all gets the 40 pt square default. Tests: `ui/src/userStampLibrary.test.ts` (13 tests). `fixtures/stamps` has no PNG files, so the PNG tests use the real Tauri icons in `apps/desktop/src-tauri/icons/`. Verified: `@mepapp/ui` 79 tests pass, root `pnpm build` passes (9 tasks). A headless Chromium smoke test (before the last small fix to the sync) showed no console errors and the `mepapp-library` database. **Not verified:** a real folder sync in a browser. That needs the Phase 4 buttons.
 
 ### Phase 4 — UI
 
@@ -152,6 +181,17 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
    - `getVisibleStampDefinitions` has no tests today. Add tests for the new merge.
 4. **A custom stamp with the same id in the project.** See Phase 5. The panel must show **one** tile per id.
 
+**Design decisions for Phases 4 and 5 (2026-10-03):**
+
+- `getVisibleStampDefinitions` gets a new last parameter `userDefinitions: StampDefinition[] = []`. A project copy with `source: 'user'` is skipped when the library has the same id. A project copy with no library entry stays (Phase 5 point 3).
+- `StampsPanel` gets these props: `userStampDefinitions`, `missingUserStampIds`, `userLibraryAvailable`, `onLoadUserFolder(category)`, `onOpenLibraryFolders()`. The load button is a tile after "Create custom element…": "Load custom terminals…" or "Load custom equipment…", from the category view. The "Library folders" button sits in the filter row. A user tile gets a small "user" marker; a stamp with a missing file also gets a warning marker.
+- The load click calls `showDirectoryPicker` before any other `await` (a browser grants the picker only inside the click). Then a small dialog asks for the name (default: the folder name) and the discipline. Then `createLibrarySource`, `syncLibrarySource`, `reload`, and a status message with the counts. A picker cancel (`AbortError`) does nothing. Another picker error shows the browser message and suggests a subfolder.
+- New `LibraryFoldersDialog.tsx`: the help text, the list of sources, and the buttons Sync, Remove (with confirmation) and Add folder. Sync calls `ensureReadPermission` inside the click.
+- An orphan project copy (`source: 'user'` with no library entry) gets the delete button of a custom stamp, but no edit button (Phase 6).
+- Placement: `pickStampDefinition` takes an optional `materialize` function. For a `'user'` definition it materializes the stamp and passes the result to `setStampTexture` as a 4th argument, `adoptDefinition`. `placeStampTool.placeStamp` adds the definition to the document through a new `ToolContext.adoptStampDefinition` before it reads the ports, when the document does not have that id yet. Undo of the placement does not remove the adopted definition, the same as for a custom stamp.
+
+**Phases 4 and 5 done 2026-10-03 (`7d2a5cf`).** New files: `ui/src/stampVisibility.ts` (with tests), `LibrarySourceDialog.tsx`, `LibraryFoldersDialog.tsx`. The render package gets `adoptStampDefinition` on `ToolContext`. "Add folder…" in the Library folders dialog closes that dialog first, so two dialogs never stack. Verified: root `pnpm build` passes, `@mepapp/ui` 85 tests pass, `@mepapp/core` 656 tests pass. A headless Chromium run with a real OPFS folder (3 real fixture SVGs and a subfolder) passed all steps through the real DOM: load, "user" markers, subfolder skipped, placement copies the definition with a `data:` URL once, one tile per id, reload keeps the stamps without a prompt, Sync reports "0 added, 1 updated, 1 missing", the missing marker, Remove leaves an orphan tile with a delete button, and a saved PDF opened in a fresh profile still has the stamp. Placed size 45.36 x 29.04 pt against the definition's 45.25 x 29.07 pt (300 DPI rounding). No console errors. `packages/render` has no test setup, so the adoption has no unit test. **Open:** the first sync took about 5 s for 3 small SVGs in headless Chromium; the cause is not known. Check the speed on Windows with a real folder.
+
 ### Phase 5 — Placement and the missing-definition risk
 
 1. **Copy on first placement.** When the user places a user stamp, and the project has no definition with that id, MepApp adds a copy of the full definition to `customStampDefinitions` with `source: 'user'`. The project and the PDF then carry the stamp art and ports. A colleague without the folder still sees the stamps.
@@ -159,6 +199,42 @@ Do [[storage-interfaces]] Phase 1 and Phase 2 first, or do them here. **Those tw
 3. **A project from another machine** has a `source: 'user'` definition and no library entry. The panel shows it in the project's custom list, as it does today for custom stamps.
 4. `getStampDefinition` checks custom first. The project copy wins over the live library entry. A library edit still reaches the open project through Phase 6 point 3. A project that is not open keeps its copy (see §6, point 2).
 5. Check `placeStampTool.ts:54` and the category-to-tool mapping (`StampsPanel.tsx:97`) with `category` from the source.
+6. **Review note 2026-10-03: check the placed size.** Later check: `loadDefinitionBitmap` draws `shapes` at `nativeWidth / 72 * 300` pixels, and the scene reads the size back at 300 DPI. So the size from the definition survives, apart from rounding. Check it once in the browser. The `nativeWidth` comment in `stamp-library.ts` says that the scene computes the placed size again from the pixel size of the loaded art, at 300 DPI. This can replace the 40 pt default of §4.4 (compare the memory note "Stamp DPI scaling issue"). Check that a placed user stamp gets the size from its definition.
+7. **Placement design (2026-10-03).** `placeStampTool.ts` reads the ports from the document's definitions at placement. A user stamp that is not in the document gets no ports. Proposal: `pickStampDefinition` materializes the user stamp and gives the definition to `SketchScene.setStampTexture`. `placeStamp` adds it to `customStampDefinitions` when the document does not have it yet. This also works when the user picks in one document and places in another.
+
+### Feedback round 1 (user test on Windows, 2026-10-04)
+
+The user tested Phases 1-5 on Windows: it works. The user asked for four changes. The user chose the recommended option for each open question. This round also does most of Phase 6.
+
+**A. Delete = hide.** A library stamp tile gets a delete button. It sets a new record field `hidden: true`. The file stays in the folder. A Sync does not bring the stamp back, because the diff still matches the record by file name. The Library dialog shows "N hidden" per source, with a "Show hidden stamps" button that clears the flag. A stamp in the "Saved stamps" source (point B) has no file, so its delete button removes it for real, after a confirmation. The panel also hides a project copy of a hidden stamp (it skips project copies whose id is in any library record, hidden or not). Placed stamps keep working.
+
+**B. Edit.** A library stamp tile gets an edit button. It opens the Element Editor with the materialized definition. The user can trace the image with shapes, delete the image, and press **Save** or **Save as…**.
+- **Save** writes to the library record's `edits`: `label`, `discipline`, `category` (terminal or equipment only), `ports`, `definitionPortGroups`, `nativeWidth`, `nativeHeight`, `shapes`, and `iconRef` (the PNG preview that the editor makes at save; the tile shows it). In `edits.shapes`, an image shape whose `dataUrl` equals the stamp's own file `data:` URL is stored with the marker `USER_STAMP_FILE_REF` instead. `buildUserStampDefinition` puts the current file URL back in place of the marker. So the stored edits do not hold a second copy of the file, and a Sync update of the file still reaches the traced stamp. The definition keeps `source: 'user'` and its id. No name-collision prompt for Save, because the id does not change. Then the open project is updated: if the document has a copy, `updateCustomStampDefinition` + `applyDefinitionToPlacedStamps`, with the newly materialized definition (Phase 6 point 3). The port-loss warning stays as it is.
+- **Save as…** makes a new library stamp in a source "Saved stamps" (fixed id `saved`, no folder handle, so no Sync). It is created on first use. Its stamps have ids `user-saved-<slug of the name>`, a record with no file (`fileName` = the label, `fileSize` 0), and all values in `edits`. If its shapes still use the file image (the marker), the original blob is copied to it. Without a blob, the stamp is built from `edits.shapes` and `edits.iconRef` only. The name must not match another library or custom stamp; the dialog shows an error instead of an overwrite prompt.
+- Known limit: after a Sync update of the file, the tile preview (`edits.iconRef`) of an edited stamp is old until the next Save. The placed art is current.
+
+**C. Folder button.** The "Library folders…" text button becomes an icon button with a folder icon, `title` and `aria-label` "Load user library". It opens the Library dialog.
+
+**D. Built-in stamps.** A setting "Show the built-in MepApp stamps" (default on), stored in `localStorage`. A checkbox for it is in the Library dialog and in the Add folder dialog. When it is off, the panel hides the `STAMP_LIBRARY` entries. Custom overrides of library stamps, custom stamps, project copies and user stamps still show. Placed built-in stamps keep working.
+
+**Feedback round 1 done 2026-10-04 (data layer `6a48449`, UI `3d278b4`).** Verified: root `pnpm build` passes; `@mepapp/core` 662, `@mepapp/platform` 32, `@mepapp/platform-web` 20, `@mepapp/ui` 94 tests pass. A headless Chromium run through the real DOM with a real OPFS folder passed all steps: folder icon button "Load user library"; the built-in checkbox hides and shows the built-in tiles and survives a reload; hide, Sync keeps it hidden, "1 hidden" and "Show hidden stamps"; Edit + rect + port + Save stores the `mepapp:user-file` marker and updates the project copy and the placed stamp (0 to 1 port); Save as with a taken name shows the error, with a new name makes `user-saved-traced-sink` with no blob, and Delete removes it. No console errors. After this round, Phase 6 points 1-6 are done for user stamps. Phase 6 point 7 (other projects) stays out of scope.
+
+### Feedback round 2 (2026-10-04): select several stamps and delete them in one action
+
+The user asked for a multi-select in the Stamps panel, to delete several user or custom stamps at once.
+
+- **Selectable tiles:** every tile that has a delete action today: a user stamp from a folder (hide), a saved stamp (delete), a custom stamp (delete), an edited built-in stamp (revert to the library version), and an orphan project copy (delete). Built-in stamps without edits are not selectable.
+- **Start:** Ctrl+click (Cmd+click on macOS) on a selectable tile starts the selection mode. The selection is the clicked tile plus the active (picked) tile, if that one is selectable. A Ctrl+click does not pick the stamp for placement.
+- **In the selection mode:** each selectable tile shows a checkbox. A click on the tile or on its checkbox toggles it. Tiles that are not selectable are dimmed and ignore clicks. A bar above the grid shows "N selected", a **Delete** button (disabled at 0) and a **Cancel** button. Escape also ends the mode.
+- **Filters:** only selected tiles that are still visible count and are deleted.
+- **Delete:** one confirmation that lists the effect per kind (how many are hidden, deleted for good, deleted from the project with their placed-element warning, reverted with the lost-connection count). Then all actions run, the library reloads once, and the status shows a summary. The selection mode ends.
+- The single-tile buttons keep their own confirmations. The per-kind actions move into shared functions, so the single and the bulk path do the same work.
+
+**Done 2026-10-04 (`ff0dda0`).** `ui/src/stampBulkDelete.ts` classifies the stamps and builds the confirmation text (4 tests). The Escape listener runs on `window` in the capture phase and stops the event, so Escape ends only the selection and keeps the armed stamp tool; a second Escape works as before. Verified: root `pnpm build` passes, `@mepapp/ui` 98 tests pass. Headless Chromium through the real DOM: Ctrl+click starts the mode with the active tile, built-in tiles are dimmed and ignore clicks, the confirm text was "Delete 3 stamps? / 2 library stamps are hidden. The files stay in their folders. / 1 custom stamp is deleted from this project.", the status was "Deleted 1 stamp and hid 2.", Cancel deletes nothing, no console errors. **Not covered by the browser test:** the revert path, the saved-stamp delete, and the sentences about placed elements and lost connections (unit tests cover their text only).
+
+### Feedback round 3 (2026-10-05)
+
+Done (`af4aaeb`): the selection checkbox moved to the top-right corner (the "user" badge covered it); an **All** button in the selection bar selects every selectable visible tile (it respects the search and filters); the user library dialog is one column (root cause: it used the Element Editor's `mep-modal--wide` shell, whose body is a flex row; it now has its own `mep-modal--library`). The Add folder dialog uses the same shell. Verified: root `pnpm build`, `@mepapp/ui` 98 tests, headless Chromium checks of the checkbox hit target, All with and without a search, and the dialog layout at 1500 and 1024 px wide. Not checked in the browser: the unavailable-browser state and the empty state of the dialog.
 
 ### Phase 6 — Ports (editing)
 
@@ -203,7 +279,7 @@ Tests: a round-trip of the sidecar (write, clear the store, sync, compare ports)
 6. **Pure black art and recoloring.** Image stamps recolor through the luminance blend in `colorize.ts` (memory note "PixiJS tint/colorize fix"). Check that a user SVG with colors behaves the same as a built-in one.
 7. **Folder blocked by Chrome.** Chrome may refuse some system folders. Show the browser's error in plain words, and suggest a subfolder.
 8. **SVG safety.** Never insert user SVG into the page as markup. Load it only through `<img>`, `<canvas>` and data URLs.
-9. **License.** Only free dependencies. `fake-indexeddb` is MIT. Add dev dependencies by hand to `package.json` and run a plain `pnpm install`.
+9. **License.** Only free dependencies. `fake-indexeddb` is Apache-2.0. Add dev dependencies by hand to `package.json` and run a plain `pnpm install`.
 
 ## 7. Out of scope
 
@@ -228,12 +304,13 @@ Answered by the user on 2026-10-02: raster size (use a default, §4.4), sources 
 
 | Phase | Status |
 |---|---|
-| 1 Core logic | not started |
-| 2 Storage (shared with [[storage-interfaces]] Phase 2) | not started |
-| 3 Folder scan and sync | not started |
-| 4 UI | not started |
-| 5 Placement and copy on first placement | not started |
-| 6 Ports | not started |
+| 1 Core logic | done 2026-10-03 (`960f27f`) |
+| 2 Storage (shared with [[storage-interfaces]] Phase 2) | done 2026-10-03 (store `5226167`, wiring `2933f4f`) |
+| 3 Folder scan and sync | done 2026-10-03 (`2933f4f`) |
+| 4 UI | done 2026-10-03 (`7d2a5cf`) |
+| 5 Placement and copy on first placement | done 2026-10-03 (`7d2a5cf`) |
+| 6 Ports | points 1-6 done in feedback round 1 (`3d278b4`); point 7 out of scope |
+| Merge | Phases 1-5 and feedback rounds 1-3 merged to `master` 2026-10-05 (`d0ba7ab`, fast-forward) after the user tested on Windows |
 | 7 Tests and verification | not started |
 | 8 Port data backup (nice to have) | not started |
 

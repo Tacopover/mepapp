@@ -21,7 +21,7 @@ const STAMP_SOURCE_DPI = 300;
 /** Cap on the Shapes-mode canvas's longer side, in drawing-buffer px — the shorter side is derived from the definition's own nativeWidth:nativeHeight aspect (see fitCanvasSize) so a wide/tall stamp doesn't get squished into a square, matching how it actually looks placed on the PDF. */
 const SHAPE_CANVAS_MAX_PX = 520;
 
-const DISCIPLINE_OPTIONS: Discipline[] = [
+export const DISCIPLINE_OPTIONS: Discipline[] = [
   'heatingAndCooling',
   'ventilation',
   'plumbing',
@@ -30,7 +30,7 @@ const DISCIPLINE_OPTIONS: Discipline[] = [
   'other',
 ];
 
-const DISCIPLINE_LABEL: Record<Discipline, string> = {
+export const DISCIPLINE_LABEL: Record<Discipline, string> = {
   heatingAndCooling: 'Heating & Cooling',
   ventilation: 'Ventilation',
   plumbing: 'Plumbing',
@@ -64,6 +64,10 @@ export interface ElementEditorDialogProps {
   /** How many segment ends in the document would lose their connection if `definition` replaced the saved one (ports it removes) — a non-zero count asks the user before onSave. */
   countLostPortConnections?: (definition: StampDefinition) => number;
   onSave: (definition: StampDefinition, labels?: StampLabel[]) => void;
+  /** Only for a user-library stamp: true when a library, custom or user stamp already has this name — blocks "Save as…". */
+  isNameTaken?: (label: string) => boolean;
+  /** Only for a user-library stamp: stores the built definition as a new stamp in the library ("Save as…"). */
+  onSaveAs?: (definition: StampDefinition, labels?: StampLabel[]) => void;
   onClose: () => void;
 }
 
@@ -80,7 +84,7 @@ export interface ElementEditorDialogProps {
  * for grouping ports that are internally wired together (converted to a real
  * instance-level PortGroup at placement, see SketchScene.placeStamp).
  */
-export function ElementEditorDialog({ definition, existingCustomDefinitions, labelLanguage, initialLabels, labelPropertyContext, countLostPortConnections, onSave, onClose }: ElementEditorDialogProps) {
+export function ElementEditorDialog({ definition, existingCustomDefinitions, labelLanguage, initialLabels, labelPropertyContext, countLostPortConnections, onSave, isNameTaken, onSaveAs, onClose }: ElementEditorDialogProps) {
   const [name, setName] = useState(definition ? stampLabelFor(definition, labelLanguage ?? 'en') : '');
   const [discipline, setDiscipline] = useState<Discipline>(definition?.discipline ?? 'ventilation');
   const [category, setCategory] = useState<StampCategory>(definition?.category === 'equipment' ? 'equipment' : 'terminal');
@@ -266,7 +270,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       nativeHeight,
       ports: portsEditor.ports,
       iconRef,
-      source: 'custom',
+      source: definition?.source === 'user' ? 'user' : 'custom',
       definitionPortGroups: portsEditor.groups.length > 0 ? portsEditor.groups : undefined,
       shapes: editor.shapes,
     };
@@ -276,6 +280,11 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     setError(null);
     const built = await buildDefinition();
     if (!built) return;
+    // A user-library stamp keeps its own id, so the name checks below do not apply.
+    if (definition?.source === 'user') {
+      finishSave(built);
+      return;
+    }
     const builtLabel = built.label.toLowerCase();
     const labelMatches = (label: string, labelNl?: string) => label.trim().toLowerCase() === builtLabel || labelNl?.trim().toLowerCase() === builtLabel;
     // A different existing custom element already has this Name (its English name or, for a
@@ -298,6 +307,17 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       return;
     }
     finishSave(built);
+  }
+
+  async function handleSaveAs() {
+    setError(null);
+    const built = await buildDefinition();
+    if (!built) return;
+    if (isNameTaken?.(built.label)) {
+      setError('A stamp with this name already exists. Choose another name.');
+      return;
+    }
+    onSaveAs?.(built, labelPropertyContext ? labels : undefined);
   }
 
   function confirmOverwrite() {
@@ -325,6 +345,7 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
       actions={
         <>
           <button onClick={requestClose}>Cancel</button>
+          {definition?.source === 'user' && onSaveAs && <button onClick={handleSaveAs}>Save as…</button>}
           <button onClick={handleSave}>{definition ? 'Save' : 'Create'}</button>
         </>
       }

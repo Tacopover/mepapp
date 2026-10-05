@@ -8,6 +8,8 @@ import {
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
   STAMP_LIBRARY,
+  SAVED_STAMPS_SOURCE_ID,
+  type Discipline,
   type NetworkType,
   type RoomDetectionClient,
   type ReconciliationReport,
@@ -26,6 +28,7 @@ import { loadDefinitionBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
 import { CanvasContextMenu } from './components/CanvasContextMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
+import { classifyStampsForDelete, bulkDeleteMessage } from './stampBulkDelete.js';
 import { StampsPanel, getVisibleStampDefinitions, pickStampDefinition } from './components/StampsPanel.js';
 import type { StampLabelLanguage } from './components/LanguageToggle.js';
 import type { StampCategoryFilter } from './components/CategorySwitcher.js';
@@ -57,6 +60,23 @@ import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.j
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
+import { useUserStampLibrary } from './useUserStampLibrary.js';
+import {
+  browserImageSizeDecoder,
+  createLibrarySource,
+  deleteSavedStamp,
+  ensureReadPermission,
+  saveUserStampAs,
+  saveUserStampEdits,
+  setUserStampHidden,
+  showHiddenStamps,
+  syncLibrarySource,
+  userStampLabelTaken,
+} from './userStampLibrary.js';
+import { useShowBuiltInStamps } from './builtInStampsSetting.js';
+import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
+import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
+import type { LibrarySourceRecord, LibraryStore } from '@mepapp/platform';
 import './theme.css';
 
 export interface PdfPageLoadResult {
@@ -82,6 +102,8 @@ export interface MepSketchAppProps {
   createRoomDetectionClient?: () => RoomDetectionClient;
   /** Resolves a stamp-library definition's iconRef to a fetchable URL. Defaults to apps/web's copy under /stamps/. */
   resolveStampIconUrl?: (iconRef: string) => string;
+  /** Storage for the user's custom stamp library folders. Without it the feature is unavailable. */
+  libraryStore?: LibraryStore;
 }
 
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
@@ -182,13 +204,36 @@ function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'AbortError';
 }
 
+/** The first discipline of a Stamps-panel discipline group — the default for a newly added stamp folder. */
+function defaultDisciplineFor(group: DisciplineGroup | null): Discipline {
+  switch (group) {
+    case 'hvac':
+      return 'ventilation';
+    case 'plumbing':
+      return 'plumbing';
+    case 'electrical':
+      return 'electrical';
+    case 'fire':
+      return 'fireProtection';
+    default:
+      return 'other';
+  }
+}
+
 export function MepSketchApp({
   onLoadPdfPage,
   onLoadPdfPageAt,
   correspondingSourceUrl,
   createRoomDetectionClient,
   resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL,
+  libraryStore,
 }: MepSketchAppProps) {
+  const userStampLibrary = useUserStampLibrary(libraryStore);
+  const [showBuiltInStamps, setShowBuiltInStamps] = useShowBuiltInStamps();
+  const missingUserStampIds = useMemo(
+    () => new Set(userStampLibrary.records.filter((record) => record.missingFromFolder).map((record) => record.id)),
+    [userStampLibrary.records],
+  );
   const {
     containerRef,
     sceneRef,
@@ -312,7 +357,7 @@ export function MepSketchApp({
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
   /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp opened for editing via its Stamps tab tile (see handleDuplicateStampDefinition — `seed` keeps the library entry's own id, so the save is an override that every stamp placed from it follows, and carries a self-contained iconRef). */
   const [elementEditorTarget, setElementEditorTarget] = useState<
-    { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | null
+    { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | { mode: 'edit-user'; definition: StampDefinition } | null
   >(null);
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
   /** The placed stamp whose definition's label layout is open in StampLabelsDialog. */
@@ -693,10 +738,13 @@ export function MepSketchApp({
   // Left rail's Stamp button, clicked with nothing picked yet — arms the same
   // first stamp the MEP tab's grid itself would show (its current discipline/category filters).
   const handlePickDefaultStamp = useCallback(() => {
-    const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage);
+    const definitions = getVisibleStampDefinitions(customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage, '', userStampLibrary.definitions, {
+      showBuiltIn: showBuiltInStamps,
+      libraryRecordIds: userStampLibrary.allRecordIds,
+    });
     const first = definitions[0];
-    if (first) void pickStampDefinition(sceneRef, first, resolveStampIconUrl, handleStampPick);
-  }, [customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage, resolveStampIconUrl, handleStampPick, sceneRef]);
+    if (first) void pickStampDefinition(sceneRef, first, resolveStampIconUrl, handleStampPick, userStampLibrary.materialize);
+  }, [customStampDefinitions, disciplineGroup, stampCategoryFilter, labelLanguage, userStampLibrary.definitions, userStampLibrary.allRecordIds, showBuiltInStamps, userStampLibrary.materialize, resolveStampIconUrl, handleStampPick, sceneRef]);
 
   // Opens the Element Editor pre-filled from a read-only library stamp so the
   // user can reposition ports / rename / recategorize and save an override of
@@ -809,6 +857,24 @@ export function MepSketchApp({
     [customStampDefinitions, sceneRef, applyDefinitionToPlacedStamps],
   );
 
+  const revertCustomOverride = useCallback(
+    (definition: StampDefinition) => {
+      const library = STAMP_LIBRARY.find((def) => def.id === definition.id);
+      if (!library) return;
+      sceneRef.current?.removeCustomStampDefinition(definition.id);
+      sceneRef.current?.setStampLabelLayout(definition.id, []);
+      applyDefinitionToPlacedStamps(library);
+    },
+    [sceneRef, applyDefinitionToPlacedStamps],
+  );
+
+  const deleteCustomDefinition = useCallback(
+    (definition: StampDefinition) => {
+      sceneRef.current?.removeCustomStampDefinition(definition.id);
+    },
+    [sceneRef],
+  );
+
   const handleDeleteCustomStampDefinition = useCallback(
     (definition: StampDefinition) => {
       const library = STAMP_LIBRARY.find((def) => def.id === definition.id);
@@ -818,19 +884,237 @@ export function MepSketchApp({
         const lost = sceneRef.current?.countLostPortConnections(definition.id, library.ports) ?? 0;
         const lostWarning = lost > 0 ? ` ${lost} segment connection${lost === 1 ? '' : 's'} to removed ports will be lost.` : '';
         if (!window.confirm(`Revert "${definition.label}" to the library version? Your changes and its labels are removed.${placed}${lostWarning}`)) return;
-        sceneRef.current?.removeCustomStampDefinition(definition.id);
-        sceneRef.current?.setStampLabelLayout(definition.id, []);
-        applyDefinitionToPlacedStamps(library);
+        revertCustomOverride(definition);
         setStatus(`${library.label} reverted to the library version.`);
         return;
       }
       const placedCount = allStamps.filter((s) => s.definitionId === definition.id).length;
       const usageWarning = placedCount > 0 ? ` ${placedCount} placed element${placedCount === 1 ? '' : 's'} on this sheet use it and will keep their current look but lose their icon if this document is reopened later.` : '';
       if (!window.confirm(`Delete "${definition.label}"? This cannot be undone.${usageWarning}`)) return;
-      sceneRef.current?.removeCustomStampDefinition(definition.id);
+      deleteCustomDefinition(definition);
       setStatus(`${definition.label} deleted.`);
     },
-    [allStamps, sceneRef, applyDefinitionToPlacedStamps],
+    [allStamps, sceneRef, revertCustomOverride, deleteCustomDefinition],
+  );
+
+  const savedUserStampIds = useMemo(
+    () => new Set(userStampLibrary.records.filter((record) => record.sourceId === SAVED_STAMPS_SOURCE_ID).map((record) => record.id)),
+    [userStampLibrary.records],
+  );
+
+  const handleEditUserStamp = useCallback(
+    async (stampId: string) => {
+      const definition = await userStampLibrary.materialize(stampId);
+      if (!definition) {
+        setStatus('Could not read this library stamp.');
+        return;
+      }
+      setElementEditorTarget({ mode: 'edit-user', definition });
+    },
+    [userStampLibrary],
+  );
+
+  const hideOrDeleteUserStamps = useCallback(
+    async (definitions: StampDefinition[]): Promise<{ hidden: number; deleted: number }> => {
+      const result = { hidden: 0, deleted: 0 };
+      if (!libraryStore || definitions.length === 0) return result;
+      try {
+        for (const definition of definitions) {
+          if (savedUserStampIds.has(definition.id)) {
+            await deleteSavedStamp(libraryStore, definition.id);
+            result.deleted += 1;
+          } else {
+            await setUserStampHidden(libraryStore, definition.id, true);
+            result.hidden += 1;
+          }
+        }
+      } finally {
+        await userStampLibrary.reload();
+      }
+      return result;
+    },
+    [libraryStore, savedUserStampIds, userStampLibrary],
+  );
+
+  const handleDeleteUserStamp = useCallback(
+    async (definition: StampDefinition) => {
+      if (!libraryStore) return;
+      const saved = savedUserStampIds.has(definition.id);
+      const message = saved
+        ? `Delete "${definition.label}"? This cannot be undone. Stamps already placed in a project keep their own copy.`
+        : `Hide "${definition.label}"? The file stays in the folder. Show it again from the user library dialog.`;
+      if (!window.confirm(message)) return;
+      try {
+        await hideOrDeleteUserStamps([definition]);
+        setStatus(saved ? `${definition.label} deleted.` : `${definition.label} hidden.`);
+      } catch (err) {
+        setStatus(`Could not ${saved ? 'delete' : 'hide'} "${definition.label}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [libraryStore, savedUserStampIds, hideOrDeleteUserStamps],
+  );
+
+  const handleBulkDelete = useCallback(
+    async (definitions: StampDefinition[]): Promise<boolean> => {
+      if (definitions.length === 0) return false;
+      const groups = classifyStampsForDelete(definitions, {
+        userStampIds: new Set(userStampLibrary.definitions.map((d) => d.id)),
+        savedUserStampIds,
+        isLibraryStampId,
+      });
+      const placed = groups.deleteCustom.reduce((sum, d) => sum + allStamps.filter((s) => s.definitionId === d.id).length, 0);
+      const lostConnections = groups.revert.reduce((sum, d) => {
+        const library = STAMP_LIBRARY.find((def) => def.id === d.id);
+        return sum + (library ? (sceneRef.current?.countLostPortConnections(d.id, library.ports) ?? 0) : 0);
+      }, 0);
+      if (!window.confirm(bulkDeleteMessage(groups, { placed, lostConnections }))) return false;
+      for (const definition of groups.revert) revertCustomOverride(definition);
+      for (const definition of groups.deleteCustom) deleteCustomDefinition(definition);
+      try {
+        const { hidden, deleted } = await hideOrDeleteUserStamps([...groups.hide, ...groups.deleteSaved]);
+        const reverted = groups.revert.length;
+        const removed = groups.deleteCustom.length + deleted;
+        const counts: Array<[string, number]> = [
+          ['deleted', removed],
+          ['hid', hidden],
+          ['reverted', reverted],
+        ];
+        const parts = counts.filter(([, n]) => n > 0).map(([verb, n], i) => (i === 0 ? `${verb} ${n} ${n === 1 ? 'stamp' : 'stamps'}` : `${verb} ${n}`));
+        const text = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+        setStatus(`${text.charAt(0).toUpperCase()}${text.slice(1)}.`);
+      } catch (err) {
+        setStatus(`Could not hide or delete the library stamps: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return true;
+    },
+    [userStampLibrary, savedUserStampIds, allStamps, sceneRef, revertCustomOverride, deleteCustomDefinition, hideOrDeleteUserStamps],
+  );
+
+  const handleShowHiddenStamps = useCallback(
+    async (source: LibrarySourceRecord) => {
+      if (!libraryStore) return;
+      try {
+        await showHiddenStamps(libraryStore, source.id);
+        await userStampLibrary.reload();
+        setStatus(`Showing the hidden stamps of "${source.name}" again.`);
+      } catch (err) {
+        setStatus(`Could not show the hidden stamps: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [libraryStore, userStampLibrary],
+  );
+
+  const handleSaveUserStamp = useCallback(
+    async (built: StampDefinition, labels?: StampLabel[]) => {
+      if (!libraryStore) return;
+      try {
+        const materialized = await saveUserStampEdits(libraryStore, built.id, built);
+        await userStampLibrary.reload();
+        if (labels) sceneRef.current?.setStampLabelLayout(built.id, labels);
+        if (materialized && customStampDefinitions.some((d) => d.id === built.id)) {
+          sceneRef.current?.updateCustomStampDefinition(built.id, materialized);
+          applyDefinitionToPlacedStamps(materialized);
+        }
+        setStatus(`${built.label} saved to your library.`);
+        setElementEditorTarget(null);
+      } catch (err) {
+        setStatus(`Could not save "${built.label}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [libraryStore, userStampLibrary, sceneRef, customStampDefinitions, applyDefinitionToPlacedStamps],
+  );
+
+  const handleSaveUserStampAs = useCallback(
+    async (built: StampDefinition, labels?: StampLabel[]) => {
+      if (!libraryStore) return;
+      try {
+        const created = await saveUserStampAs(libraryStore, built.id, built);
+        await userStampLibrary.reload();
+        if (created && labels) sceneRef.current?.setStampLabelLayout(created.id, labels);
+        setStatus(`${built.label} saved as a new stamp in your library.`);
+        setElementEditorTarget(null);
+      } catch (err) {
+        setStatus(`Could not save "${built.label}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [libraryStore, userStampLibrary, sceneRef],
+  );
+
+  // A folder the user picked, waiting for its name and discipline in LibrarySourceDialog.
+  const [pendingLibraryFolder, setPendingLibraryFolder] = useState<{ dirHandle: FileSystemDirectoryHandle; category: StampCategoryFilter } | null>(null);
+  const [libraryFolderBusy, setLibraryFolderBusy] = useState(false);
+  const [libraryFoldersOpen, setLibraryFoldersOpen] = useState(false);
+  const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
+
+  // The folder picker must be the first call in the click handler: the browser grants it only to a click that has not awaited anything yet.
+  const handleLoadUserFolder = useCallback(async (category: StampCategoryFilter) => {
+    let dirHandle: FileSystemDirectoryHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker!({ id: 'mepapp-stamp-library', mode: 'read' });
+    } catch (err) {
+      if (isAbortError(err)) return;
+      setStatus(`The browser refused this folder (${err instanceof Error ? err.message : String(err)}). Pick a subfolder instead.`);
+      return;
+    }
+    setPendingLibraryFolder({ dirHandle, category });
+  }, []);
+
+  const handleConfirmLibraryFolder = useCallback(
+    async (name: string, discipline: Discipline) => {
+      if (!pendingLibraryFolder || !libraryStore) return;
+      setLibraryFolderBusy(true);
+      try {
+        const source = await createLibrarySource(libraryStore, { name, category: pendingLibraryFolder.category, discipline, dirHandle: pendingLibraryFolder.dirHandle });
+        const summary = await syncLibrarySource(libraryStore, source, { decode: browserImageSizeDecoder });
+        await userStampLibrary.reload();
+        const count = summary.added + summary.updated;
+        setStatus(`Loaded ${count} stamp${count === 1 ? '' : 's'} from "${name}".`);
+      } catch (err) {
+        await userStampLibrary.reload().catch(() => undefined);
+        setStatus(`Could not load the folder "${name}": ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setLibraryFolderBusy(false);
+        setPendingLibraryFolder(null);
+      }
+    },
+    [pendingLibraryFolder, libraryStore, userStampLibrary],
+  );
+
+  const handleSyncLibrarySource = useCallback(
+    async (source: LibrarySourceRecord) => {
+      if (!libraryStore || !source.dirHandle) return;
+      // Permission first: requestPermission needs the user gesture of this click.
+      if (!(await ensureReadPermission(source.dirHandle))) {
+        setStatus('Permission refused.');
+        return;
+      }
+      setSyncingSourceId(source.id);
+      try {
+        const summary = await syncLibrarySource(libraryStore, source, { decode: browserImageSizeDecoder });
+        await userStampLibrary.reload();
+        setStatus(`Synced "${source.name}": ${summary.added} added, ${summary.updated} updated, ${summary.missing} missing from the folder.`);
+      } catch (err) {
+        setStatus(`Could not sync "${source.name}": ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setSyncingSourceId(null);
+      }
+    },
+    [libraryStore, userStampLibrary],
+  );
+
+  const handleRemoveLibrarySource = useCallback(
+    async (source: LibrarySourceRecord) => {
+      if (!libraryStore) return;
+      if (!window.confirm(`Remove the folder "${source.name}" and its stamps from MepApp? The files in the folder stay. Stamps already placed in a project keep their own copy.`)) return;
+      try {
+        await libraryStore.removeSource(source.id);
+        await userStampLibrary.reload();
+        setStatus(`Removed "${source.name}".`);
+      } catch (err) {
+        setStatus(`Could not remove "${source.name}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [libraryStore, userStampLibrary],
   );
 
   const handleNetworkTypePick = useCallback(
@@ -901,6 +1185,18 @@ export function MepSketchApp({
         activeNetworkTypeId={activeNetworkTypeId}
         onPickNetworkType={handleNetworkTypePick}
         onEditNetworkType={setNetworkTypeEditorTarget}
+        userStampDefinitions={userStampLibrary.definitions}
+        missingUserStampIds={missingUserStampIds}
+        userLibraryAvailable={userStampLibrary.available}
+        onLoadUserFolder={(category) => void handleLoadUserFolder(category)}
+        onOpenLibraryFolders={() => setLibraryFoldersOpen(true)}
+        materializeUserStamp={userStampLibrary.materialize}
+        showBuiltIn={showBuiltInStamps}
+        libraryRecordIds={userStampLibrary.allRecordIds}
+        savedUserStampIds={savedUserStampIds}
+        onEditUserStamp={(stampId) => void handleEditUserStamp(stampId)}
+        onDeleteUserStamp={(definition) => void handleDeleteUserStamp(definition)}
+        onBulkDelete={handleBulkDelete}
       />
     ),
     drawings: (
@@ -1204,6 +1500,40 @@ export function MepSketchApp({
         />
       )}
 
+      {pendingLibraryFolder && (
+        <LibrarySourceDialog
+          category={pendingLibraryFolder.category}
+          defaultName={pendingLibraryFolder.dirHandle.name}
+          defaultDiscipline={defaultDisciplineFor(disciplineGroup)}
+          busy={libraryFolderBusy}
+          showBuiltIn={showBuiltInStamps}
+          onChangeShowBuiltIn={setShowBuiltInStamps}
+          onSubmit={(name, discipline) => void handleConfirmLibraryFolder(name, discipline)}
+          onCancel={() => {
+            if (!libraryFolderBusy) setPendingLibraryFolder(null);
+          }}
+        />
+      )}
+
+      {libraryFoldersOpen && (
+        <LibraryFoldersDialog
+          available={userStampLibrary.available}
+          sources={userStampLibrary.sources}
+          records={userStampLibrary.records}
+          busySourceId={syncingSourceId}
+          onSync={(source) => void handleSyncLibrarySource(source)}
+          onRemove={(source) => void handleRemoveLibrarySource(source)}
+          onShowHidden={(source) => void handleShowHiddenStamps(source)}
+          showBuiltIn={showBuiltInStamps}
+          onChangeShowBuiltIn={setShowBuiltInStamps}
+          onAddFolder={(category) => {
+            setLibraryFoldersOpen(false);
+            void handleLoadUserFolder(category);
+          }}
+          onClose={() => setLibraryFoldersOpen(false)}
+        />
+      )}
+
       {manageBuildingsOpen && (
         <ManageBuildingsDialog
           buildings={buildings}
@@ -1220,7 +1550,9 @@ export function MepSketchApp({
               ? customStampDefinitions.find((d) => d.id === elementEditorTarget.definitionId)
               : elementEditorTarget.mode === 'duplicate'
                 ? elementEditorTarget.seed
-                : undefined
+                : elementEditorTarget.mode === 'edit-user'
+                  ? elementEditorTarget.definition
+                  : undefined
           }
           existingCustomDefinitions={customStampDefinitions}
           labelLanguage={labelLanguage}
@@ -1229,11 +1561,15 @@ export function MepSketchApp({
               ? stampLabelLayouts[elementEditorTarget.definitionId]
               : elementEditorTarget.mode === 'duplicate'
                 ? stampLabelLayouts[elementEditorTarget.seed.id]
-                : undefined
+                : elementEditorTarget.mode === 'edit-user'
+                  ? stampLabelLayouts[elementEditorTarget.definition.id]
+                  : undefined
           }
           labelPropertyContext={labelPropertyContext}
           countLostPortConnections={(def) => sceneRef.current?.countLostPortConnections(def.id, def.ports) ?? 0}
-          onSave={handleSaveElementDefinition}
+          onSave={elementEditorTarget.mode === 'edit-user' ? (built, labels) => void handleSaveUserStamp(built, labels) : handleSaveElementDefinition}
+          isNameTaken={(label) => userStampLabelTaken(label, [...STAMP_LIBRARY, ...customStampDefinitions, ...userStampLibrary.definitions])}
+          onSaveAs={(built, labels) => void handleSaveUserStampAs(built, labels)}
           onClose={() => setElementEditorTarget(null)}
         />
       )}

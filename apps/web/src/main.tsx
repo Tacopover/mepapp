@@ -3,11 +3,13 @@ import { MepSketchApp, type PdfPageLoadResult } from '@mepapp/ui';
 import { displayDimensions } from '@mepapp/core';
 import { MupdfEngine } from '@mepapp/pdf-engine-mupdf';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
+import { IndexedDbLibraryStore } from '@mepapp/platform-web';
 import { createRoomDetectionClient } from './roomDetectionClient';
 
 const BACKDROP_DPI = 150;
 
 const engine = new MupdfEngine();
+const libraryStore = new IndexedDbLibraryStore();
 
 async function loadPdfPage(file: File): Promise<PdfPageLoadResult> {
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -29,7 +31,7 @@ const correspondingSourceUrl = `${REPO_URL}/tree/${__MEPAPP_COMMIT_SHA__}`;
 const container = document.getElementById('root');
 if (container) {
   createRoot(container).render(
-    <MepSketchApp onLoadPdfPage={loadPdfPage} onLoadPdfPageAt={loadPdfPageAt} correspondingSourceUrl={correspondingSourceUrl} createRoomDetectionClient={createRoomDetectionClient} />,
+    <MepSketchApp onLoadPdfPage={loadPdfPage} onLoadPdfPageAt={loadPdfPageAt} correspondingSourceUrl={correspondingSourceUrl} createRoomDetectionClient={createRoomDetectionClient} libraryStore={libraryStore} />,
   );
 }
 

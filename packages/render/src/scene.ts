@@ -559,6 +559,7 @@ export class SketchScene {
     nativeHeight: number;
     definitionId?: string;
     appearanceDefault?: { color?: string; scale?: number };
+    adoptDefinition?: StampDefinition;
   } | null = null;
   /** The circuit the 'circuit-add-terminals' tool is filling, and the terminal its pointer is over — both cleared by setTool() on leaving that tool. See beginAddTerminalsToCircuit. */
   private canvasInteraction = false;
@@ -711,6 +712,9 @@ export class SketchScene {
       getSnapRadiusScreenPx: () => self.snapRadiusScreenPx,
       getAngleSnapDegrees: () => self.angleSnapDegrees,
       getPendingStampTexture: () => self.pendingStampTexture,
+      adoptStampDefinition: (definition) => {
+        if (!self.doc.customStampDefinitions.some((d) => d.id === definition.id)) self.addCustomStampDefinition(definition);
+      },
       getStampGhostSprite: () => self.stampGhostSprite,
       getStampGhostRotationDegrees: () => self.stampGhostRotationDegrees,
       setStampGhostRotationDegrees: (degrees) => {
@@ -1055,8 +1059,8 @@ export class SketchScene {
     this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
-  /** Sets the stamp art the next 'place-terminal'/'place-equipment' click will place. definitionId, when given (the stamp palette's case, vs. an ad hoc uploaded PNG), is carried onto the resulting PlacedStamp. appearanceDefault, when given, seeds the next placement's color/scale (the per-stamp-definition "remembered appearance", looked up by the UI layer — see @mepapp/ui's stampAppearanceDefaults.ts). */
-  setStampTexture(bitmap: ImageBitmap, definitionId?: string, appearanceDefault?: { color?: string; scale?: number }): void {
+  /** Sets the stamp art the next 'place-terminal'/'place-equipment' click will place. definitionId, when given (the stamp palette's case, vs. an ad hoc uploaded PNG), is carried onto the resulting PlacedStamp. appearanceDefault, when given, seeds the next placement's color/scale (the per-stamp-definition "remembered appearance", looked up by the UI layer — see @mepapp/ui's stampAppearanceDefaults.ts). adoptDefinition, when given (a user-library stamp), is added to the document's customStampDefinitions at first placement so the project keeps the art and ports. */
+  setStampTexture(bitmap: ImageBitmap, definitionId?: string, appearanceDefault?: { color?: string; scale?: number }, adoptDefinition?: StampDefinition): void {
     const texture = textureFromImageBitmap(bitmap);
     this.pendingStampTexture = {
       texture,
@@ -1064,6 +1068,7 @@ export class SketchScene {
       nativeHeight: (texture.height * 72) / STAMP_SOURCE_DPI,
       definitionId,
       appearanceDefault,
+      adoptDefinition,
     };
     this.stampGhostRotationDegrees = 0; // a new stamp pick (even re-picking the same one) resets the preview's rotation
     this.rebuildStampGhost();
