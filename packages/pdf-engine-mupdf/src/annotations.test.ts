@@ -406,6 +406,54 @@ describe('MupdfEngine save() on a file MuPDF repaired on open', () => {
   });
 });
 
+describe('MupdfEngine save() file size', () => {
+  it('does not grow when a stamp moves and the file is saved again', async () => {
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(makeBlankPdfBytes());
+    // 200x200 px: about 117 KB per save when the image is stored raw.
+    const png = makePngBytes(200, 200, '0 0 1 rg 20 20 160 160 re f');
+    const sizes: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      // A moved stamp is deleted and written again, as @mepapp/render's exportToPdf does.
+      if (i > 0) await doc.deleteAnnotation('stamp-1');
+      await doc.addAnnotation({
+        id: 'stamp-1',
+        kind: 'stamp',
+        pageIndex: 0,
+        geometry: { kind: 'stamp', position: { x: 20 + i * 10, y: 30 }, widthPt: 40, heightPt: 40, rotationDegrees: 0, pngBytes: png },
+      });
+      await doc.setEmbeddedFile('project.json', new TextEncoder().encode(`{"v":${i}}`));
+      sizes.push((await doc.save()).length);
+    }
+    expect(sizes[3]).toBeLessThanOrEqual(sizes[0] + 512);
+  });
+
+  it('appends to a file whose signatures need append-only saves, and keeps its original bytes', async () => {
+    const signed = new mupdf.PDFDocument();
+    signed.insertPage(-1, signed.addPage([0, 0, 300, 400], 0, {}, ''));
+    const acroForm = signed.newDictionary();
+    acroForm.put('Fields', signed.newArray());
+    acroForm.put('SigFlags', 3);
+    signed.getTrailer().get('Root').put('AcroForm', acroForm);
+    const original = new Uint8Array(signed.saveToBuffer().asUint8Array());
+    signed.destroy();
+
+    const engine = new MupdfEngine();
+    const doc = await engine.openDocument(original);
+    await doc.addAnnotation({ kind: 'rectangle', pageIndex: 0, geometry: { kind: 'rectangle', rect: { x0: 0, y0: 0, x1: 10, y1: 10 } } });
+    const firstSave = await doc.save();
+    await doc.addAnnotation({ kind: 'rectangle', pageIndex: 0, geometry: { kind: 'rectangle', rect: { x0: 20, y0: 20, x1: 30, y1: 30 } } });
+    const secondSave = await doc.save();
+
+    expect(firstSave.subarray(0, original.length)).toEqual(original);
+    expect(secondSave.subarray(0, firstSave.length)).toEqual(firstSave);
+    const check = new mupdf.PDFDocument(secondSave);
+    expect(check.wasRepaired()).toBe(false);
+    check.destroy();
+    expect(await (await engine.openDocument(secondSave)).listAnnotations(0)).toHaveLength(2);
+  });
+});
+
 describe('MupdfEngine embedded project JSON (Step 7)', () => {
   it('setEmbeddedFile then getEmbeddedFile round-trips through save+reopen', async () => {
     const engine = new MupdfEngine();

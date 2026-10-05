@@ -67,6 +67,12 @@ function readRotation(page: mupdf.PDFPage): PageInfo['rotationDegrees'] {
 // itself (pdf_set_annot_rect applies the inverse page transform), so world
 // coordinates go in and come out unchanged on every page rotation.
 
+/** ISO 32000 §12.7.5.2: SigFlags bit 2 (AppendOnly) says a rewrite of the file would invalidate its signatures. */
+function signaturesNeedAppendOnlySave(doc: mupdf.PDFDocument): boolean {
+  const sigFlags = doc.getTrailer().get('Root', 'AcroForm', 'SigFlags');
+  return sigFlags.isNumber() && (sigFlags.asNumber() & 2) !== 0;
+}
+
 function annotationToSpec(annot: mupdf.PDFAnnotation, pageIndex: number): AnnotationSpec | null {
   const type = annot.getType();
   switch (type) {
@@ -478,11 +484,14 @@ class MupdfDocumentHandle implements PdfDocumentHandle {
     // away — before any further mupdf call gets a chance to grow the heap —
     // is the only way to keep both the reopened doc and the caller's bytes
     // valid afterward.
-    // MuPDF refuses an incremental write on a file it had to repair on open
-    // ("Can't do incremental writes on a repaired file"); such a file is
-    // rewritten in full instead, and the reopen below makes the next save
-    // incremental again.
-    const options = this.doc.canBeSavedIncrementally() ? 'incremental' : 'garbage=compact';
+    // A full rewrite drops the objects that earlier saves replaced (an
+    // incremental save keeps every old stamp image), and 'compress' deflates
+    // the stamp images, which MuPDF otherwise stores raw. Only a file whose
+    // signatures need append-only saves is appended to instead — unless
+    // MuPDF had to repair it on open, since it refuses an incremental write
+    // then ("Can't do incremental writes on a repaired file").
+    const appendOnly = signaturesNeedAppendOnlySave(this.doc) && this.doc.canBeSavedIncrementally();
+    const options = appendOnly ? 'incremental,compress' : 'garbage=compact,compress';
     const liveBytes = this.doc.saveToBuffer(options).asUint8Array();
     const bytesForCaller = new Uint8Array(liveBytes);
     const bytesForReopen = new Uint8Array(liveBytes);
