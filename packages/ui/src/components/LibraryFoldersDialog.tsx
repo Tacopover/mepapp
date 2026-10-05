@@ -26,58 +26,65 @@ export interface LibraryFoldersDialogProps {
 /** Lists the user's stamp folders and offers Sync, Remove and Add (Stamps tab → Library folders…). */
 export function LibraryFoldersDialog({ available, sources, records, busySourceId, onSync, onRemove, onAddFolder, onShowHidden, showBuiltIn, onChangeShowBuiltIn, onClose }: LibraryFoldersDialogProps) {
   return (
-    <Dialog title="Library folders" className="mep-modal--wide" onClose={onClose} actions={<button onClick={onClose}>Close</button>}>
-      <label className="mep-hint">
+    <Dialog title="User library" className="mep-modal--library" onClose={onClose} actions={<button onClick={onClose}>Close</button>}>
+      {available && (
+        <p className="mep-hint">
+          MepApp copies the files from your folders into browser storage. Press Sync to pick up changes in a folder. A renamed file becomes a new stamp. A JPEG file
+          has no transparency. Port edits are kept only in this browser.
+        </p>
+      )}
+      <label className="mep-checkbox-row mep-library-check">
         <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MepApp stamps
       </label>
       {!available ? (
         <p className="mep-hint">Custom stamp folders need Chrome or Edge. They are not available in this browser.</p>
       ) : (
         <>
-          <p className="mep-hint">
-            MepApp copies the files from your folders into browser storage. Press Sync to pick up changes in a folder. A renamed file becomes a new stamp. A JPEG file
-            has no transparency. Port edits are kept only in this browser.
-          </p>
-          {sources.length === 0 && <p className="mep-empty-panel">No folders yet.</p>}
-          {sources.map((source) => {
-            const own = records.filter((record) => record.sourceId === source.id);
-            const missing = own.filter((record) => record.missingFromFolder).length;
-            const hidden = own.filter((record) => record.hidden).length;
-            const saved = source.id === SAVED_STAMPS_SOURCE_ID;
-            const busy = busySourceId === source.id;
-            return (
-              <div key={source.id} className="mep-library-source">
-                <div className="mep-library-source-info">
-                  <b>{saved ? 'Saved stamps (no folder)' : source.name}</b>
-                  <span className="mep-hint">
-                    {source.category === 'equipment' ? 'Equipment' : 'Terminals'} · {DISCIPLINE_LABEL[source.discipline]} · {own.length} stamp
-                    {own.length === 1 ? '' : 's'}
-                    {missing > 0 ? ` · ${missing} missing from the folder` : ''}
-                    {hidden > 0 ? ` · ${hidden} hidden` : ''}
-                    {saved ? '' : ` · Last sync: ${source.lastSyncedAt ? new Date(source.lastSyncedAt).toLocaleString() : 'never'}`}
-                  </span>
+          <h4 className="mep-library-heading">Folders</h4>
+          <div className="mep-library-list">
+            {sources.length === 0 && <p className="mep-empty-panel">No folders yet.</p>}
+            {sources.map((source) => {
+              const own = records.filter((record) => record.sourceId === source.id);
+              const missing = own.filter((record) => record.missingFromFolder).length;
+              const hidden = own.filter((record) => record.hidden).length;
+              const saved = source.id === SAVED_STAMPS_SOURCE_ID;
+              const busy = busySourceId === source.id;
+              return (
+                <div key={source.id} className="mep-library-source">
+                  <div className="mep-library-source-info">
+                    <b>{saved ? 'Saved stamps (no folder)' : source.name}</b>
+                    <span className="mep-hint">
+                      {source.category === 'equipment' ? 'Equipment' : 'Terminals'} · {DISCIPLINE_LABEL[source.discipline]} · {own.length} stamp
+                      {own.length === 1 ? '' : 's'}
+                      {missing > 0 ? ` · ${missing} missing` : ''}
+                      {hidden > 0 ? ` · ${hidden} hidden` : ''}
+                      {saved ? '' : ` · Last sync: ${source.lastSyncedAt ? new Date(source.lastSyncedAt).toLocaleString() : 'never'}`}
+                    </span>
+                  </div>
+                  <div className="mep-library-source-actions">
+                    {!saved && (
+                      <button
+                        type="button"
+                        disabled={!source.dirHandle || busy}
+                        title={source.dirHandle ? 'Read the folder again' : 'This folder has no saved handle'}
+                        onClick={() => onSync(source)}
+                      >
+                        {busy ? 'Syncing…' : 'Sync'}
+                      </button>
+                    )}
+                    {hidden > 0 && (
+                      <button type="button" disabled={busy} onClick={() => onShowHidden(source)}>
+                        Show hidden
+                      </button>
+                    )}
+                    <button type="button" disabled={busy} onClick={() => onRemove(source)}>
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                {hidden > 0 && (
-                  <button type="button" disabled={busy} onClick={() => onShowHidden(source)}>
-                    Show hidden stamps
-                  </button>
-                )}
-                {!saved && (
-                <button
-                  type="button"
-                  disabled={!source.dirHandle || busy}
-                  title={source.dirHandle ? 'Read the folder again' : 'This folder has no saved handle'}
-                  onClick={() => onSync(source)}
-                >
-                  {busy ? 'Syncing…' : 'Sync'}
-                </button>
-                )}
-                <button type="button" disabled={busy} onClick={() => onRemove(source)}>
-                  Remove
-                </button>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
           <div className="mep-library-add">
             <button type="button" onClick={() => onAddFolder('terminal')}>
               Add terminals folder…

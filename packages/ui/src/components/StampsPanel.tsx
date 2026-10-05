@@ -226,6 +226,14 @@ export function StampsPanel({
     void handlePick(definition);
   }
 
+  function handleSelectAll() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const definition of definitions) if (isSelectable(definition)) next.add(definition.id);
+      return next;
+    });
+  }
+
   async function handleDeleteSelected() {
     if (await onBulkDelete(visibleSelected)) exitSelection();
   }
@@ -288,6 +296,9 @@ export function StampsPanel({
           {selectionMode && (
             <div className="mep-stamp-select-bar">
               <span>{visibleSelected.length} selected</span>
+              <button type="button" className="mep-toggle-btn" onClick={handleSelectAll}>
+                All
+              </button>
               <button type="button" className="mep-toggle-btn" disabled={visibleSelected.length === 0} onClick={() => void handleDeleteSelected()}>
                 Delete
               </button>

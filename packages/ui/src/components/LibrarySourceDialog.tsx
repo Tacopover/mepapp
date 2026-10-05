@@ -31,7 +31,7 @@ export function LibrarySourceDialog({ category, defaultName, defaultDiscipline, 
   return (
     <Dialog
       title="Add stamp folder"
-      className="mep-modal--calibration"
+      className="mep-modal--library"
       onClose={onCancel}
       actions={
         <>
@@ -68,7 +68,7 @@ export function LibrarySourceDialog({ category, defaultName, defaultDiscipline, 
           ))}
         </select>
       </div>
-      <label className="mep-hint">
+      <label className="mep-checkbox-row mep-library-check">
         <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MepApp stamps
       </label>
     </Dialog>
