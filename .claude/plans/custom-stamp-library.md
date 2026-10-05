@@ -232,6 +232,10 @@ The user asked for a multi-select in the Stamps panel, to delete several user or
 
 **Done 2026-10-04 (`ff0dda0`).** `ui/src/stampBulkDelete.ts` classifies the stamps and builds the confirmation text (4 tests). The Escape listener runs on `window` in the capture phase and stops the event, so Escape ends only the selection and keeps the armed stamp tool; a second Escape works as before. Verified: root `pnpm build` passes, `@mepapp/ui` 98 tests pass. Headless Chromium through the real DOM: Ctrl+click starts the mode with the active tile, built-in tiles are dimmed and ignore clicks, the confirm text was "Delete 3 stamps? / 2 library stamps are hidden. The files stay in their folders. / 1 custom stamp is deleted from this project.", the status was "Deleted 1 stamp and hid 2.", Cancel deletes nothing, no console errors. **Not covered by the browser test:** the revert path, the saved-stamp delete, and the sentences about placed elements and lost connections (unit tests cover their text only).
 
+### Feedback round 3 (2026-10-05)
+
+Done (`af4aaeb`): the selection checkbox moved to the top-right corner (the "user" badge covered it); an **All** button in the selection bar selects every selectable visible tile (it respects the search and filters); the user library dialog is one column (root cause: it used the Element Editor's `mep-modal--wide` shell, whose body is a flex row; it now has its own `mep-modal--library`). The Add folder dialog uses the same shell. Verified: root `pnpm build`, `@mepapp/ui` 98 tests, headless Chromium checks of the checkbox hit target, All with and without a search, and the dialog layout at 1500 and 1024 px wide. Not checked in the browser: the unavailable-browser state and the empty state of the dialog.
+
 ### Phase 6 — Ports (editing)
 
 1. A "Edit stamp…" button on a user tile opens the Element Editor with the materialized definition.
