@@ -43,6 +43,8 @@ export interface StampEntry {
   baseScale: Vec2; // converts texture pixels -> world units at transform.scale = 1
   /** The pristine (uncolored) texture — a colored stamp's sprite.texture is a colorized variant of this, never this itself (see colorize.ts). */
   baseTexture: Texture;
+  /** Art per definition id this stamp has shown, once replaced (SketchScene.replaceSelectedStamps) — lets an undo or redo bring back the matching texture. The key '' is a stamp with no definitionId. */
+  texturesByDefinition?: Map<string, Texture>;
 }
 
 export const DEFAULT_NETWORK_TYPE: NetworkType = {

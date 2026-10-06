@@ -84,6 +84,8 @@ export interface PropertiesPanelProps {
   onOpenSchematic: (panelId: string) => void;
   /** Opens the label layout editor for the selected stamp's definition (label-feature.md §7). */
   onEditLabels: (stampId: string) => void;
+  /** Opens the stamp chooser; the pick replaces every selected stamp — see SketchScene.replaceSelectedStamps. */
+  onReplaceStamps: () => void;
   /** Electrical Circuits branch (electrical-circuits-model.md §9) — takes precedence over the stamp/segment/fitting branches below when set, since a Circuit/Panel selection is app-level state, not a canvas selection (see useSketchScene's selectedCircuitId/selectedPanelId). */
   circuits: Circuit[];
   panels: Panel[];
@@ -116,6 +118,7 @@ export function PropertiesPanel({
   onEditPorts,
   onOpenSchematic,
   onEditLabels,
+  onReplaceStamps,
   circuits,
   panels,
   panelSections,
@@ -458,6 +461,9 @@ export function PropertiesPanel({
           <div style={{ flex: 1 }}>
             <b>{selection.length} elements selected</b>
           </div>
+          <button type="button" onClick={onReplaceStamps}>
+            Replace stamp…
+          </button>
         </div>
         <div className="mep-section">
           <div className="mep-field-row">
@@ -558,6 +564,9 @@ export function PropertiesPanel({
             Edit ports…
           </button>
         )}
+        <button type="button" onClick={onReplaceStamps}>
+          Replace stamp…
+        </button>
         {definition && (
           <button type="button" onClick={() => onEditLabels(stamp.id)}>
             Edit labels…
