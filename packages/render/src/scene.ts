@@ -2405,6 +2405,12 @@ export class SketchScene {
     return result;
   }
 
+  /** How many selected stamps back a Panel (see convertStampToPanel) that a replacement with `definition` would orphan — a Panel needs an equipment stamp, so only a non-equipment definition does that. */
+  countPanelStampsBlockingReplace(definition: StampDefinition): number {
+    if (definition.category === 'equipment') return 0;
+    return [...this.doc.selectedIds].filter((id) => this.getPanelForEquipmentStamp(id)).length;
+  }
+
   /** What replacing the selected stamps with `definition` would break: how many have a different port count, and how many segment ends sit on ports they would lose. The UI warns on a non-zero `stamps`. */
   getReplacePortMismatch(definition: StampDefinition): { stamps: number; connectedEnds: number } {
     const state = this.doc.drawingHistory.getState();
@@ -2429,7 +2435,7 @@ export class SketchScene {
   replaceSelectedStamps(definition: StampDefinition, bitmap: ImageBitmap): void {
     const state = this.doc.drawingHistory.getState();
     const stampIds = [...this.doc.selectedIds].filter((id) => state.stamps[id]);
-    if (stampIds.length === 0) return;
+    if (stampIds.length === 0 || this.countPanelStampsBlockingReplace(definition) > 0) return;
     if (!this.doc.customStampDefinitions.some((d) => d.id === definition.id) && definition.source === 'user') this.addCustomStampDefinition(definition);
     const { remaps, removed } = this.planPortReplacement(state, stampIds, definition);
     const texture = textureFromImageBitmap(bitmap);

@@ -846,6 +846,11 @@ export function MepSketchApp({
         console.warn(`[mepapp] could not read the library stamp "${picked.id}"; the selection is not replaced.`);
         return;
       }
+      const panelStamps = sceneRef.current?.countPanelStampsBlockingReplace(definition) ?? 0;
+      if (panelStamps > 0) {
+        window.alert(`${panelStamps} of the selected stamps are the equipment of a panel, so they can only be replaced with another equipment stamp. Nothing was changed.`);
+        return;
+      }
       const mismatch = sceneRef.current?.getReplacePortMismatch(definition);
       if (mismatch && mismatch.stamps > 0) {
         const lost = mismatch.connectedEnds > 0 ? ` ${mismatch.connectedEnds} connected segment end(s) will be detached onto junction fittings.` : '';
