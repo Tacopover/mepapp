@@ -261,8 +261,10 @@ export function ElementEditorDialog({ definition, existingCustomDefinitions, lab
     const widthPx = (nativeWidth / 72) * STAMP_SOURCE_DPI;
     const heightPx = (nativeHeight / 72) * STAMP_SOURCE_DPI;
     const iconRef = await rasterizeSymbolShapes(editor.shapes, widthPx, heightPx);
+    // A changed Name saves a new stamp and leaves the original as it was; an unchanged Name updates it in place. A user-library stamp keeps its id and has "Save as…" for a copy.
+    const renamed = definition !== undefined && name.trim() !== stampLabelFor(definition, labelLanguage ?? 'en').trim();
     return {
-      id: definition?.id ?? crypto.randomUUID(),
+      id: definition && (definition.source === 'user' || !renamed) ? definition.id : crypto.randomUUID(),
       label: name.trim(),
       discipline,
       category,
