@@ -79,11 +79,10 @@ export interface PropertiesPanelProps {
   customStampDefinitions: StampDefinition[];
   /** Resolves a stamp definition's display name the same way the Stamps tab does — see stampLabelFor. */
   labelLanguage: StampLabelLanguage;
-  onEditPorts: (definitionId: string) => void;
   /** Opens the generated schematic dialog for a panel (electrical-schematic-templates.md Phase 4). */
   onOpenSchematic: (panelId: string) => void;
-  /** Opens the label layout editor for the selected stamp's definition (label-feature.md §7). */
-  onEditLabels: (stampId: string) => void;
+  /** Opens the Element Editor for the stamp's definition — the same dialog as the pencil on its Stamps tab tile. */
+  onEditStamp: (stampId: string) => void;
   /** Opens the stamp chooser; the pick replaces every selected stamp — see SketchScene.replaceSelectedStamps. */
   onReplaceStamps: () => void;
   /** Electrical Circuits branch (electrical-circuits-model.md §9) — takes precedence over the stamp/segment/fitting branches below when set, since a Circuit/Panel selection is app-level state, not a canvas selection (see useSketchScene's selectedCircuitId/selectedPanelId). */
@@ -115,9 +114,8 @@ export function PropertiesPanel({
   customPropertyDefs,
   customStampDefinitions,
   labelLanguage,
-  onEditPorts,
   onOpenSchematic,
-  onEditLabels,
+  onEditStamp,
   onReplaceStamps,
   circuits,
   panels,
@@ -559,19 +557,14 @@ export function PropertiesPanel({
           <b>{definition ? stampLabelFor(definition, labelLanguage) : stamp.id}</b>
           <span>{Math.round(stamp.nativeWidth)} × {Math.round(stamp.nativeHeight)} pt</span>
         </div>
-        {definition?.source === 'custom' && (
-          <button type="button" onClick={() => onEditPorts(definition.id)}>
-            Edit ports…
+        {definition && (
+          <button type="button" onClick={() => onEditStamp(stamp.id)}>
+            Edit
           </button>
         )}
         <button type="button" onClick={onReplaceStamps}>
           Replace stamp…
         </button>
-        {definition && (
-          <button type="button" onClick={() => onEditLabels(stamp.id)}>
-            Edit labels…
-          </button>
-        )}
         {stamp.category === 'equipment' && backingPanel && (
           <button type="button" onClick={() => setSelectedPanelId(backingPanel.id)}>
             Manage panel…

@@ -952,6 +952,20 @@ export function MepSketchApp({
     [userStampLibrary],
   );
 
+  // Opens the Element Editor for a placed stamp's definition the same way the Stamps tab's pencil on that definition's tile does.
+  const handleEditPlacedStamp = useCallback(
+    (stampId: string) => {
+      const stamp = allStamps.find((s) => s.id === stampId);
+      const definition = stamp?.definitionId ? getStampDefinition(stamp.definitionId, customStampDefinitions) : undefined;
+      if (!definition) return;
+      if (definition.source === 'library') void handleDuplicateStampDefinition(definition);
+      else if (definition.source === 'custom') setElementEditorTarget({ mode: 'edit', definitionId: definition.id });
+      else if (userStampLibrary.allRecordIds.has(definition.id)) void handleEditUserStamp(definition.id);
+      else setStatus('This stamp is no longer in a library folder, so it cannot be edited.');
+    },
+    [allStamps, customStampDefinitions, handleDuplicateStampDefinition, handleEditUserStamp, userStampLibrary.allRecordIds],
+  );
+
   const hideOrDeleteUserStamps = useCallback(
     async (definitions: StampDefinition[]): Promise<{ hidden: number; deleted: number }> => {
       const result = { hidden: 0, deleted: 0 };
@@ -1290,9 +1304,8 @@ export function MepSketchApp({
         customPropertyDefs={customPropertyDefs}
         customStampDefinitions={customStampDefinitions}
         labelLanguage={labelLanguage}
-        onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
         onOpenSchematic={setSchematicPanelId}
-        onEditLabels={setLabelEditorStampId}
+        onEditStamp={handleEditPlacedStamp}
         onReplaceStamps={() => setReplacePickerOpen(true)}
         circuits={circuits}
         panels={panels}
