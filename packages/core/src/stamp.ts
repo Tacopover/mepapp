@@ -60,3 +60,28 @@ export function getStampWorldPorts(stamp: PlacedStamp): Array<PortSpec & { world
     world: getWorldPortPosition(port, stamp.transform, stamp.nativeWidth, stamp.nativeHeight),
   }));
 }
+
+/**
+ * Pairs each old port with one new port by location (fractionX/fractionY, so a size
+ * difference between the two stamps does not matter): repeatedly takes the closest
+ * unpaired old/new pair. Returns old port id -> new port id, or null when the two
+ * lists differ in length.
+ */
+export function matchPortsByLocation(oldPorts: PortSpec[], newPorts: PortSpec[]): Map<string, string> | null {
+  if (oldPorts.length !== newPorts.length) return null;
+  const pairs: Array<{ oldId: string; newId: string; distance: number }> = [];
+  for (const o of oldPorts) {
+    for (const n of newPorts) {
+      pairs.push({ oldId: o.id, newId: n.id, distance: Math.hypot(o.fractionX - n.fractionX, o.fractionY - n.fractionY) });
+    }
+  }
+  pairs.sort((a, b) => a.distance - b.distance);
+  const result = new Map<string, string>();
+  const usedNew = new Set<string>();
+  for (const pair of pairs) {
+    if (result.has(pair.oldId) || usedNew.has(pair.newId)) continue;
+    result.set(pair.oldId, pair.newId);
+    usedNew.add(pair.newId);
+  }
+  return result;
+}

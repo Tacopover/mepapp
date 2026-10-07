@@ -78,7 +78,7 @@ const bitmapCache = new Map<string, Promise<ImageBitmap>>();
 const UNASSIGNED_NETWORK_TYPE_ID = 'default';
 
 /** A custom definition's iconRef is already a self-contained `data:` (or, for user-library stamps, `blob:`) URL — resolve library entries through resolveIconUrl, but use a custom one verbatim. */
-function iconUrlFor(definition: StampDefinition, resolveIconUrl: (iconRef: string) => string): string {
+export function iconUrlFor(definition: StampDefinition, resolveIconUrl: (iconRef: string) => string): string {
   return definition.iconRef.startsWith('data:') || definition.iconRef.startsWith('blob:') ? definition.iconRef : resolveIconUrl(definition.iconRef);
 }
 

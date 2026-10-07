@@ -51,6 +51,7 @@ import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRen
 import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
 import { StampLabelsDialog } from './components/StampLabelsDialog.js';
+import { StampPickerDialog } from './components/StampPickerDialog.js';
 import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
@@ -362,6 +363,7 @@ export function MepSketchApp({
   const [networkTypeEditorTarget, setNetworkTypeEditorTarget] = useState<NetworkType | null>(null);
   /** The placed stamp whose definition's label layout is open in StampLabelsDialog. */
   const [labelEditorStampId, setLabelEditorStampId] = useState<string | null>(null);
+  const [replacePickerOpen, setReplacePickerOpen] = useState(false);
   const [circuitTypesOpen, setCircuitTypesOpen] = useState(false);
   const [schematicPanelId, setSchematicPanelId] = useState<string | null>(null);
   const [customSchematicTemplates, setCustomSchematicTemplates] = useState<SchematicTemplate[]>(() => loadCustomTemplates(typeof localStorage === 'undefined' ? undefined : localStorage));
@@ -835,6 +837,31 @@ export function MepSketchApp({
     }
     return entries.sort((a, b) => a.name.localeCompare(b.name));
   }, [allStamps, stampLabelLayouts, customStampDefinitions, labelLanguage]);
+  const handleReplaceStamps = useCallback(
+    async (picked: StampDefinition) => {
+      setReplacePickerOpen(false);
+      // A user-library stamp is read back with a data: URL and ports first, so the project gets a self-contained copy — same as placing it.
+      const definition = picked.source === 'user' ? await userStampLibrary.materialize(picked.id) : picked;
+      if (!definition) {
+        console.warn(`[mepapp] could not read the library stamp "${picked.id}"; the selection is not replaced.`);
+        return;
+      }
+      const panelStamps = sceneRef.current?.countPanelStampsBlockingReplace(definition) ?? 0;
+      if (panelStamps > 0) {
+        window.alert(`${panelStamps} of the selected stamps are the equipment of a panel, so they can only be replaced with another equipment stamp. Nothing was changed.`);
+        return;
+      }
+      const mismatch = sceneRef.current?.getReplacePortMismatch(definition);
+      if (mismatch && mismatch.stamps > 0) {
+        const lost = mismatch.connectedEnds > 0 ? ` ${mismatch.connectedEnds} connected segment end(s) will be detached onto junction fittings.` : '';
+        const message = `${mismatch.stamps} of the selected stamps do not have the same number of ports as "${definition.label}", so their ports cannot be matched by location. Ports that share an id are kept.${lost} Replace anyway?`;
+        if (!window.confirm(message)) return;
+      }
+      const bitmap = await resolveStampIconBitmap(definition);
+      sceneRef.current?.replaceSelectedStamps(definition, bitmap);
+    },
+    [userStampLibrary.materialize, resolveStampIconBitmap, sceneRef],
+  );
   const labelEditorStamp = labelEditorStampId ? allStamps.find((s) => s.id === labelEditorStampId) : undefined;
   const labelEditorDefinition = labelEditorStamp?.definitionId ? getStampDefinition(labelEditorStamp.definitionId, customStampDefinitions) : undefined;
 
@@ -928,6 +955,20 @@ export function MepSketchApp({
       setElementEditorTarget({ mode: 'edit-user', definition });
     },
     [userStampLibrary],
+  );
+
+  // Opens the Element Editor for a placed stamp's definition the same way the Stamps tab's pencil on that definition's tile does.
+  const handleEditPlacedStamp = useCallback(
+    (stampId: string) => {
+      const stamp = allStamps.find((s) => s.id === stampId);
+      const definition = stamp?.definitionId ? getStampDefinition(stamp.definitionId, customStampDefinitions) : undefined;
+      if (!definition) return;
+      if (definition.source === 'library') void handleDuplicateStampDefinition(definition);
+      else if (definition.source === 'custom') setElementEditorTarget({ mode: 'edit', definitionId: definition.id });
+      else if (userStampLibrary.allRecordIds.has(definition.id)) void handleEditUserStamp(definition.id);
+      else setStatus('This stamp is no longer in a library folder, so it cannot be edited.');
+    },
+    [allStamps, customStampDefinitions, handleDuplicateStampDefinition, handleEditUserStamp, userStampLibrary.allRecordIds],
   );
 
   const hideOrDeleteUserStamps = useCallback(
@@ -1268,9 +1309,9 @@ export function MepSketchApp({
         customPropertyDefs={customPropertyDefs}
         customStampDefinitions={customStampDefinitions}
         labelLanguage={labelLanguage}
-        onEditPorts={(definitionId) => setElementEditorTarget({ mode: 'edit', definitionId })}
         onOpenSchematic={setSchematicPanelId}
-        onEditLabels={setLabelEditorStampId}
+        onEditStamp={handleEditPlacedStamp}
+        onReplaceStamps={() => setReplacePickerOpen(true)}
         circuits={circuits}
         panels={panels}
         panelSections={panelSections}
@@ -1587,6 +1628,22 @@ export function MepSketchApp({
           isNameTaken={(label) => userStampLabelTaken(label, [...STAMP_LIBRARY, ...customStampDefinitions, ...userStampLibrary.definitions])}
           onSaveAs={(built, labels) => void handleSaveUserStampAs(built, labels)}
           onClose={() => setElementEditorTarget(null)}
+        />
+      )}
+
+      {replacePickerOpen && (
+        <StampPickerDialog
+          title="Replace stamp"
+          initialCategory={selection[0]?.category === 'equipment' ? 'equipment' : 'terminal'}
+          initialDisciplineGroup={disciplineGroup}
+          labelLanguage={labelLanguage}
+          customStampDefinitions={customStampDefinitions}
+          userStampDefinitions={userStampLibrary.definitions}
+          showBuiltIn={showBuiltInStamps}
+          libraryRecordIds={userStampLibrary.allRecordIds}
+          resolveIconUrl={resolveStampIconUrl}
+          onPick={(definition) => void handleReplaceStamps(definition)}
+          onClose={() => setReplacePickerOpen(false)}
         />
       )}
 

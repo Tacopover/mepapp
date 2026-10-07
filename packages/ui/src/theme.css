@@ -3484,3 +3484,9 @@
   gap: 8px;
   margin-top: 12px;
 }
+
+.mep-stamp-picker-grid {
+  grid-template-columns: repeat(4, 1fr);
+  max-height: 55vh;
+  overflow-y: auto;
+}

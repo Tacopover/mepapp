@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getStampHalfExtents, getStampPorts, getStampWorldPorts, SYNTHETIC_CENTER_PORT_ID, type PlacedStamp } from './stamp.js';
+import { getStampHalfExtents, getStampPorts, getStampWorldPorts, matchPortsByLocation, SYNTHETIC_CENTER_PORT_ID, type PlacedStamp } from './stamp.js';
 
 describe('PlacedStamp helpers', () => {
   const stamp: PlacedStamp = {
@@ -39,5 +39,25 @@ describe('PlacedStamp helpers', () => {
     const [port] = getStampWorldPorts(portlessStamp);
     expect(port.id).toBe(SYNTHETIC_CENTER_PORT_ID);
     expect(port.world).toEqual(portlessStamp.transform.position);
+  });
+});
+
+describe('matchPortsByLocation', () => {
+  const port = (id: string, fractionX: number, fractionY: number) => ({ id, name: id, fractionX, fractionY });
+
+  it('pairs ports by position even when the ids are swapped', () => {
+    const oldPorts = [port('a', 0, 0.5), port('b', 1, 0.5)];
+    const newPorts = [port('x', 1, 0.5), port('y', 0, 0.5)];
+    expect(matchPortsByLocation(oldPorts, newPorts)).toEqual(new Map([['a', 'y'], ['b', 'x']]));
+  });
+
+  it('gives each new port to one old port only', () => {
+    const oldPorts = [port('a', 0.1, 0.5), port('b', 0.2, 0.5)];
+    const newPorts = [port('x', 0, 0.5), port('y', 1, 0.5)];
+    expect(matchPortsByLocation(oldPorts, newPorts)).toEqual(new Map([['a', 'x'], ['b', 'y']]));
+  });
+
+  it('returns null when the port counts differ', () => {
+    expect(matchPortsByLocation([port('a', 0, 0)], [port('x', 0, 0), port('y', 1, 1)])).toBeNull();
   });
 });

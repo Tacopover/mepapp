@@ -38,6 +38,7 @@ import {
   getStampDefinition,
   getStampPorts,
   loadProject,
+  matchPortsByLocation,
   mergeSegmentsAtFitting,
   multiRotate,
   NETWORK_TYPE_LIBRARY,
@@ -2291,6 +2292,42 @@ export class SketchScene {
     return result;
   }
 
+  /** Moves every segment end that sits on a lost port (see removedPortsByStamp) onto a new junction fitting at the same point. */
+  private detachLostPortEnds(s: DrawingState, removed: Map<string, Set<string>>): Pick<DrawingState, 'segments' | 'fittings'> {
+    if (removed.size === 0) return { segments: s.segments, fittings: s.fittings };
+    const segments = { ...s.segments };
+    const fittings = { ...s.fittings };
+    for (const segment of Object.values(s.segments)) {
+      const detach = (end: ConnectionPoint, at: Vec2 | undefined): ConnectionPoint => {
+        if (end.kind !== 'port' || !removed.get(end.elementId)?.has(end.portId) || !at) return end;
+        const fitting: Fitting = { id: `fitting-${this.doc.nextFittingSeq++}`, pageIndex: segment.pageIndex, position: at, kind: 'junction' };
+        fittings[fitting.id] = fitting;
+        return { kind: 'fitting', fittingId: fitting.id };
+      };
+      const endpointA = detach(segment.endpointA, segment.geometry[0]);
+      const endpointB = detach(segment.endpointB, segment.geometry[segment.geometry.length - 1]);
+      if (endpointA !== segment.endpointA || endpointB !== segment.endpointB) segments[segment.id] = { ...segment, endpointA, endpointB };
+    }
+    return { segments, fittings };
+  }
+
+  /** Drops lost ports from the instance port groups, then adds the definition's authoring-time groups to each stamp in `stampIds` that lacks them. */
+  private syncPortGroups(removed: Map<string, Set<string>>, stampIds: string[], definition: StampDefinition): void {
+    for (const group of this.doc.portGroups) {
+      const gone = removed.get(group.elementId);
+      if (gone) group.portIds = group.portIds.filter((portId) => !gone.has(portId));
+    }
+    for (let i = this.doc.portGroups.length - 1; i >= 0; i--) {
+      if (this.doc.portGroups[i].portIds.length < 2) this.doc.portGroups.splice(i, 1);
+    }
+    for (const id of stampIds) {
+      for (const portIds of definition.definitionPortGroups ?? []) {
+        const exists = this.doc.portGroups.some((g) => g.elementId === id && g.portIds.length === portIds.length && portIds.every((p) => g.portIds.includes(p)));
+        if (!exists) this.doc.portGroups.push({ elementId: id, portIds: [...portIds] });
+      }
+    }
+  }
+
   /**
    * Brings every stamp placed from `definition` in the active document in line
    * with it after an Element Editor save or a revert to the library: ports,
@@ -2312,40 +2349,129 @@ export class SketchScene {
       for (const id of stampIds) {
         stamps[id] = { ...stamps[id], ports: definition.ports.map((port) => ({ ...port })), nativeWidth: definition.nativeWidth, nativeHeight: definition.nativeHeight };
       }
-      let segments = s.segments;
-      let fittings = s.fittings;
-      if (removed.size > 0) {
-        segments = { ...segments };
-        fittings = { ...fittings };
-        for (const segment of Object.values(s.segments)) {
-          const detach = (end: ConnectionPoint, at: Vec2 | undefined): ConnectionPoint => {
-            if (end.kind !== 'port' || !removed.get(end.elementId)?.has(end.portId) || !at) return end;
-            const fitting: Fitting = { id: `fitting-${this.doc.nextFittingSeq++}`, pageIndex: segment.pageIndex, position: at, kind: 'junction' };
-            fittings[fitting.id] = fitting;
-            return { kind: 'fitting', fittingId: fitting.id };
-          };
-          const endpointA = detach(segment.endpointA, segment.geometry[0]);
-          const endpointB = detach(segment.endpointB, segment.geometry[segment.geometry.length - 1]);
-          if (endpointA !== segment.endpointA || endpointB !== segment.endpointB) segments[segment.id] = { ...segment, endpointA, endpointB };
-        }
-      }
+      const { segments, fittings } = this.detachLostPortEnds(s, removed);
       return this.applyConnectivityCascade({ ...s, stamps, segments, fittings }, this.stampPortConnectionPoints(stampIds, stamps));
     });
     tx.commit();
-    for (const group of this.doc.portGroups) {
-      const gone = removed.get(group.elementId);
-      if (gone) group.portIds = group.portIds.filter((portId) => !gone.has(portId));
-    }
-    for (let i = this.doc.portGroups.length - 1; i >= 0; i--) {
-      if (this.doc.portGroups[i].portIds.length < 2) this.doc.portGroups.splice(i, 1);
-    }
+    this.syncPortGroups(removed, stampIds, definition);
+    this.syncDrawingLayer();
+    this.recomputeFlow();
+    this.redrawOverlay();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /**
+   * How each of `stampIds` carries its ports over to `definition`. A stamp with the same number
+   * of ports gets an old-id -> new-id map by port location (`remaps`). Any other stamp keeps the
+   * ports whose ids the definition also has, and `removed` lists the rest, like removedPortsByStamp.
+   */
+  private planPortReplacement(
+    state: DrawingState,
+    stampIds: string[],
+    definition: StampDefinition,
+  ): { remaps: Map<string, Map<string, string>>; removed: Map<string, Set<string>> } {
+    const newPorts = getStampPorts({ ports: definition.ports } as PlacedStamp);
+    const keep = new Set(newPorts.map((port) => port.id));
+    const remaps = new Map<string, Map<string, string>>();
+    const removed = new Map<string, Set<string>>();
     for (const id of stampIds) {
-      for (const portIds of definition.definitionPortGroups ?? []) {
-        const exists = this.doc.portGroups.some((g) => g.elementId === id && g.portIds.length === portIds.length && portIds.every((p) => g.portIds.includes(p)));
-        if (!exists) this.doc.portGroups.push({ elementId: id, portIds: [...portIds] });
+      const oldPorts = getStampPorts(state.stamps[id]);
+      const remap = matchPortsByLocation(oldPorts, newPorts);
+      if (remap) {
+        remaps.set(id, remap);
+        continue;
+      }
+      const lost = oldPorts.filter((port) => !keep.has(port.id)).map((port) => port.id);
+      if (lost.length > 0) removed.set(id, new Set(lost));
+    }
+    return { remaps, removed };
+  }
+
+  /** Re-points every segment end on a stamp port through that stamp's old-id -> new-id map, reading all ends from the original ids so swapped ids stay correct. */
+  private remapPortEnds(segments: DrawingState['segments'], remaps: Map<string, Map<string, string>>): DrawingState['segments'] {
+    if (remaps.size === 0) return segments;
+    const result = { ...segments };
+    for (const segment of Object.values(segments)) {
+      const remap = (end: ConnectionPoint): ConnectionPoint => {
+        if (end.kind !== 'port') return end;
+        const next = remaps.get(end.elementId)?.get(end.portId);
+        return next && next !== end.portId ? { ...end, portId: next } : end;
+      };
+      const endpointA = remap(segment.endpointA);
+      const endpointB = remap(segment.endpointB);
+      if (endpointA !== segment.endpointA || endpointB !== segment.endpointB) result[segment.id] = { ...segment, endpointA, endpointB };
+    }
+    return result;
+  }
+
+  /** How many selected stamps back a Panel (see convertStampToPanel) that a replacement with `definition` would orphan — a Panel needs an equipment stamp, so only a non-equipment definition does that. */
+  countPanelStampsBlockingReplace(definition: StampDefinition): number {
+    if (definition.category === 'equipment') return 0;
+    return [...this.doc.selectedIds].filter((id) => this.getPanelForEquipmentStamp(id)).length;
+  }
+
+  /** What replacing the selected stamps with `definition` would break: how many have a different port count, and how many segment ends sit on ports they would lose. The UI warns on a non-zero `stamps`. */
+  getReplacePortMismatch(definition: StampDefinition): { stamps: number; connectedEnds: number } {
+    const state = this.doc.drawingHistory.getState();
+    const stampIds = [...this.doc.selectedIds].filter((id) => state.stamps[id]);
+    const { remaps, removed } = this.planPortReplacement(state, stampIds, definition);
+    let connectedEnds = 0;
+    for (const segment of Object.values(state.segments)) {
+      for (const end of [segment.endpointA, segment.endpointB]) {
+        if (end.kind === 'port' && removed.get(end.elementId)?.has(end.portId)) connectedEnds++;
       }
     }
+    return { stamps: stampIds.length - remaps.size, connectedEnds };
+  }
+
+  /**
+   * Swaps the selected placed stamps over to `definition` — as one undo step, keeping each
+   * stamp's position, rotation, scale, color, properties and capacity. Ports, native size and
+   * category follow the new definition. Connected segment ends follow the ports by location when
+   * the port count matches (see planPortReplacement); otherwise an end on a port the new
+   * definition lacks moves to a junction fitting (see detachLostPortEnds). `bitmap` is the new art, loaded by the UI.
+   */
+  replaceSelectedStamps(definition: StampDefinition, bitmap: ImageBitmap): void {
+    const state = this.doc.drawingHistory.getState();
+    const stampIds = [...this.doc.selectedIds].filter((id) => state.stamps[id]);
+    if (stampIds.length === 0 || this.countPanelStampsBlockingReplace(definition) > 0) return;
+    if (!this.doc.customStampDefinitions.some((d) => d.id === definition.id) && definition.source === 'user') this.addCustomStampDefinition(definition);
+    const { remaps, removed } = this.planPortReplacement(state, stampIds, definition);
+    const texture = textureFromImageBitmap(bitmap);
+    for (const id of stampIds) {
+      const entry = this.doc.stamps.get(id);
+      if (!entry) continue;
+      entry.texturesByDefinition ??= new Map();
+      entry.texturesByDefinition.set(state.stamps[id].definitionId ?? '', entry.baseTexture);
+      entry.texturesByDefinition.set(definition.id, texture);
+      entry.baseTexture = texture;
+    }
+    const tx = new Transaction(this.doc.drawingHistory, `Replace stamp with ${definition.label}`);
+    tx.update((s) => {
+      const stamps = { ...s.stamps };
+      for (const id of stampIds) {
+        stamps[id] = {
+          ...stamps[id],
+          category: definition.category,
+          definitionId: definition.id,
+          ports: definition.ports.map((port) => ({ ...port })),
+          nativeWidth: definition.nativeWidth,
+          nativeHeight: definition.nativeHeight,
+        };
+      }
+      const detached = this.detachLostPortEnds(s, removed);
+      const segments = this.remapPortEnds(detached.segments, remaps);
+      return this.applyConnectivityCascade({ ...s, stamps, segments, fittings: detached.fittings }, this.stampPortConnectionPoints(stampIds, stamps));
+    });
+    tx.commit();
+    for (const group of this.doc.portGroups) {
+      const remap = remaps.get(group.elementId);
+      if (remap) group.portIds = group.portIds.map((portId) => remap.get(portId) ?? portId);
+    }
+    this.syncPortGroups(removed, stampIds, definition);
     this.syncDrawingLayer();
+    this.syncLabels();
     this.recomputeFlow();
     this.redrawOverlay();
     this.markDirty();
@@ -2362,6 +2488,7 @@ export class SketchScene {
       texture ??= textureFromImageBitmap(bitmap);
       entry.baseTexture = texture;
       entry.sprite.texture = texture;
+      entry.texturesByDefinition?.set(definitionId, texture);
     }
     if (!texture) return;
     this.syncDrawingLayer();
@@ -4457,6 +4584,9 @@ export class SketchScene {
         if (entry.sprite.parent) this.doc.stampsLayer.removeChild(entry.sprite);
         continue;
       }
+      // An undo or redo of replaceSelectedStamps changes the definition without touching the entry: re-point it at that definition's art.
+      const art = entry.texturesByDefinition?.get(data.definitionId ?? '');
+      if (art) entry.baseTexture = art;
       // Recomputed every time: an Element Editor save (applyDefinitionToPlacedStamps) or its undo can change the native size, and setDefinitionArtwork the texture.
       entry.baseScale = computeStampBaseScale(data.nativeWidth, data.nativeHeight, entry.baseTexture);
       applyTransformToSprite(entry.sprite, data.transform, entry.baseScale);
