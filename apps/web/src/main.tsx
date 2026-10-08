@@ -38,7 +38,9 @@ if (container) {
 // Step 5 (offline caching, browser case) — see public/sw.js for the caching
 // strategy. Registered from the app shell, not @mepapp/ui, so the ui package
 // stays free of any assumption about how (or whether) it's deployed.
-if ('serviceWorker' in navigator) {
+// The desktop (Tauri) build serves every file locally, so it needs no service worker.
+const isTauri = '__TAURI_INTERNALS__' in window;
+if ('serviceWorker' in navigator && !isTauri) {
   const registerSw = () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
       console.warn('[mepapp] service worker registration failed:', err);

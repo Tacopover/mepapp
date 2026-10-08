@@ -6,15 +6,18 @@
   "build": {
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm --filter @mepapp/web dev",
-    "beforeBuildCommand": "pnpm --filter @mepapp/web build"
+    "beforeDevCommand": "pnpm -w exec turbo run build --filter=@mepapp/web^... && pnpm --filter @mepapp/web dev",
+    "beforeBuildCommand": "pnpm -w exec turbo run build --filter=@mepapp/web..."
   },
   "app": {
     "windows": [
       {
         "title": "MepApp",
-        "width": 800,
-        "height": 600,
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "maximized": true,
         "resizable": true,
         "fullscreen": false
       }

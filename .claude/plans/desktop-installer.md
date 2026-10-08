@@ -1,6 +1,6 @@
 # Desktop installer (Tauri) — plan
 
-Status: **planned 2026-10-08, not started.** Open decisions are in §3. Phase 0 can start before the user answers them.
+Status: **Phase 0 done 2026-10-08 (branch `worktree-desktop-installer-plan`, not merged to `master`). Phases 1-5 not started.** Open decisions are in §3.
 
 ## 1. Goal
 
@@ -54,6 +54,10 @@ Each decision has a recommendation. Phase 0 does not depend on any of them.
 ## 4. Phases
 
 ### Phase 0 — Revive the scaffold (container, no decisions needed)
+
+**Done 2026-10-08.** Changes: both `before*Command`s build the workspace packages through turbo first. The Cargo package is `mepapp-desktop` (lib `mepapp_desktop_lib`), license `AGPL-3.0-only`, window 1400 x 900, maximized, minimum 900 x 600. `apps/web/src/main.tsx` skips the service worker when `__TAURI_INTERNALS__` is present. README and root `CLAUDE.md` are updated. `productName` and `identifier` are not changed (they wait for D3). The SPDX id `AGPL-3.0-only` is a guess: no file in the repo says "or later". Confirm it with the user.
+
+Verification: `pnpm exec tauri build` in `apps/desktop` passed and produced `.deb`, `.rpm` and `.AppImage`. The dev pre-build (`turbo ... --filter=@mepapp/web^... --force`) built 7/7 packages with no cache. A WebDriver run (`tauri-driver` + `webkit2gtk-driver`, both installed into this container) of the release binary under Xvfb showed: origin `tauri://localhost`, `__TAURI_INTERNALS__` present, no `showOpenFilePicker`, 0 service worker registrations. The run opened `fixtures/pdfs/arch_simple_A4.pdf` through the file input ("Loaded arch_simple_A4.pdf (842.0 x 595.0 pt)") and placed a "D2 Bath" stamp (screenshot shows it, status bar "1 selected"). Not verified: `tauri dev` (the dev window), and anything on Windows. Driver script pattern: plain `fetch` calls to `http://127.0.0.1:4444`, capability `tauri:options.application`, unhide `input[type=file]` with a script before Element Send Keys.
 
 1. Run `pnpm install` and `pnpm build` at the repo root. Then run `pnpm --filter @mepapp/desktop tauri build` in this container. Record whether the Linux build still passes.
 2. Change `beforeBuildCommand` so that it builds the workspace packages first (for example `pnpm turbo run build --filter=@mepapp/web...`). The current command builds only `apps/web` and fails on a fresh checkout with no `dist/` in the packages.

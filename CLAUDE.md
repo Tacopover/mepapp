@@ -48,7 +48,7 @@ Stack: TypeScript, PixiJS v8 (interactive overlay), MuPDF.js behind a swappable 
 - `@mepapp/platform` — abstract interface for file access, secure storage, window chrome (the layer that differs web vs. desktop).
 - `@mepapp/platform-web` / `@mepapp/platform-tauri` — concrete implementations. `platform-tauri` is currently a stub, not wired to a real Tauri project yet.
 - `apps/web` — Vite + React app, wires everything together. **The only real running app right now.**
-- `apps/desktop` — placeholder only (README, no code). Blocked on scaffolding via `pnpm create tauri-app` pointed at `../web` — dev environment doesn't have Rust/Cargo/Tauri CLI yet.
+- `apps/desktop` — real Tauri 2 project wrapping the `apps/web` build (`src-tauri/tauri.conf.json`). This container has Rust/Cargo + webkit2gtk and can do a Linux build; the Windows installer is not built yet. Plan: `.claude/plans/desktop-installer.md`.
 
 ## Fixtures policy
 
