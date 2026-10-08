@@ -1,6 +1,6 @@
 # Desktop installer (Tauri) — plan
 
-Status: **Phase 0 done 2026-10-08 (branch `worktree-desktop-installer-plan`, not merged to `master`). Phases 1-5 not started.** Open decisions are in §3.
+Status: **Phase 0 done 2026-10-08 (branch `worktree-desktop-installer-plan`, not merged to `master`). Phase 1 in progress: workflow and config committed, waiting for the first Windows run and the user's checklist. Phases 2-5 not started.** Open decisions are in §3.
 
 ## 1. Goal
 
@@ -45,11 +45,11 @@ The survey was read-only. Check each line number before you depend on it.
 Each decision has a recommendation. Phase 0 does not depend on any of them.
 
 - **D1 — Operating systems.** Recommendation: Windows only for the first release. macOS needs an Apple Developer account (paid, yearly) for notarization (Apple's malware check that lets the app open without a warning). Linux can come later at low cost.
-- **D2 — Where to build the Windows installer.** Recommendation: GitHub Actions on a `windows-latest` runner with `tauri-apps/tauri-action`. Alternative: cross-compile from this Linux container with `cargo-xwin`. The Tauri docs list that path, but it is less tested and it cannot sign the installer with a Windows tool. Note: the `gh` CLI here has no `workflow` scope. The user must push `.github/workflows/*` files through the GitHub web UI (see memory "Subdomain deploy").
-- **D3 — Product name and identifier.** Example: product name `MEPSketcher`, identifier `com.mepsketcher.app`. Decide before the first installer goes to anyone. A later identifier change makes Windows treat it as a different program. It also moves the app data folder and breaks the update chain.
+- **D2 — Where to build the Windows installer.** **Taken 2026-10-08 (recommendation, user said "continue with phase 1"):** GitHub Actions. Original note: recommendation GitHub Actions on a `windows-latest` runner with `tauri-apps/tauri-action`. Alternative: cross-compile from this Linux container with `cargo-xwin`. The Tauri docs list that path, but it is less tested and it cannot sign the installer with a Windows tool. Note: the `gh` CLI here has no `workflow` scope. The user must push `.github/workflows/*` files through the GitHub web UI (see memory "Subdomain deploy").
+- **D3 — Product name and identifier.** **Decided 2026-10-08:** product name `mepsketcher-desktop`, identifier `com.mepsketcher.desktop`. Original note: example product name `MEPSketcher`, identifier `com.mepsketcher.app`. Decide before the first installer goes to anyone. A later identifier change makes Windows treat it as a different program. It also moves the app data folder and breaks the update chain.
 - **D4 — Code signing.** An unsigned installer shows a Windows SmartScreen warning ("Windows protected your PC"). Options: (a) unsigned, for own testing only; (b) Azure Trusted Signing (a paid monthly Microsoft service); (c) a bought OV code-signing certificate. Recommendation: (a) now, decide (b) or (c) before a public release. Signing is a service, not a dependency, so it does not conflict with AGPLv3.
 - **D5 — File access on desktop.** Recommendation: a new `FileAccess` interface in `@mepapp/platform`, with a Tauri implementation that uses `@tauri-apps/plugin-dialog` and `@tauri-apps/plugin-fs`. This gives real file paths, "Open with" and file association support, and works on every OS. Alternative: keep the browser API and depend on WebView2. That works on Windows only, and only if Phase 1 confirms the support.
-- **D6 — Installer type.** Recommendation: NSIS (a `-setup.exe`). NSIS can install per user without admin rights. MSI is better for company-wide deployment through IT. Tauri can build both.
+- **D6 — Installer type.** **Taken 2026-10-08 (recommendation):** NSIS, `installMode: currentUser`. Original note: recommendation NSIS (a `-setup.exe`). NSIS can install per user without admin rights. MSI is better for company-wide deployment through IT. Tauri can build both.
 
 ## 4. Phases
 
@@ -76,6 +76,25 @@ Verification: the Linux release build passes. `pnpm tauri dev` opens a window in
 5. The checklist also records which browser file APIs WebView2 supports. That result feeds D5.
 
 Verification: the user's checklist result on Windows. The container cannot run the Windows installer.
+
+**Progress 2026-10-08.** Done in the container: `productName` `mepsketcher-desktop`, `identifier` `com.mepsketcher.desktop`; Cargo package `mepsketcher-desktop` (lib `mepsketcher_desktop_lib`); `bundle.license` + `bundle.licenseFile` (`../../../LICENSE`, used by the NSIS license page); `bundle.windows.nsis.installMode: currentUser`. `.github/workflows/build-desktop.yml` runs `pnpm exec tauri build --bundles nsis` on `windows-latest` and uploads the `.exe` as the artifact `mepsketcher-desktop-windows-nsis`. It uses no `tauri-action` (no release yet). Verified here: a Linux `--bundles deb` build with the new config passed (package `mepsketcher-desktop`). Not verified: the workflow itself, the NSIS build, the license page. `workflow_dispatch` shows in the Actions UI only when the file is on `master`.
+
+**Windows test checklist** (the user fills in the result):
+
+- [ ] The installer starts. Record the SmartScreen warning text (expected, the installer is unsigned).
+- [ ] The installer shows the AGPLv3 license page and installs without an admin prompt.
+- [ ] A Start menu entry exists. The app opens maximized.
+- [ ] Open a PDF (Menu > Open…). Record which dialog appears: the Windows file dialog through `showOpenFilePicker`, or the plain file input.
+- [ ] Place a stamp, draw a segment, then Save. Record: does Save write back to the same file with no dialog?
+- [ ] Save As writes a new file.
+- [ ] Room detection runs (it uses a Web Worker).
+- [ ] Export Excel produces a file.
+- [ ] Custom stamp library: add a folder (Record: does the folder dialog appear? This needs `showDirectoryPicker`.)
+- [ ] Close the app with unsaved changes. Record: does a warning appear?
+- [ ] Restart the app. Settings and the custom stamp library are still there.
+- [ ] Start the app with no network. It opens and loads a PDF.
+- [ ] The "View the source code" link opens the correct commit in a browser.
+- [ ] Uninstall through Windows Settings removes the app.
 
 ### Phase 2 — Native file access (needs D5)
 

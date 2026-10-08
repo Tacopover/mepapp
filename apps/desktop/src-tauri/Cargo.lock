@@ -1817,7 +1817,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mepapp-desktop"
+name = "mepsketcher-desktop"
 version = "0.1.0"
 dependencies = [
  "log",

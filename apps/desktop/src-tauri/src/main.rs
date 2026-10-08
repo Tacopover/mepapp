@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  mepapp_desktop_lib::run();
+  mepsketcher_desktop_lib::run();
 }

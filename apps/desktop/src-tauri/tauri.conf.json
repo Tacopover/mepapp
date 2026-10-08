@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "mepapp-desktop",
+  "productName": "mepsketcher-desktop",
   "version": "0.1.0",
-  "identifier": "com.mepapp.desktop",
+  "identifier": "com.mepsketcher.desktop",
   "build": {
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:5173",
@@ -29,6 +29,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "license": "AGPL-3.0-only",
+    "licenseFile": "../../../LICENSE",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
