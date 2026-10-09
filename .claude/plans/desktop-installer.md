@@ -1,6 +1,6 @@
 # Desktop installer (Tauri) — plan
 
-Status: **Phases 0, 1 and 2 done and merged to `master` 2026-10-09 (branch `worktree-desktop-installer-plan`). Phase 2 passed the user's Windows checks, including the confirm fix. Phases 3-5 not started.** Open decisions are in §3.
+Status: **Phases 0, 1 and 2 done and merged to `master` 2026-10-09 (branch `worktree-desktop-installer-plan`). Phase 2 passed the user's Windows checks, including the confirm fix. Phase 2 step 6 ("Open with", single instance) is also merged. Phases 3-5 not started.** Open decisions are in §3.
 
 ## 1. Goal
 
@@ -128,7 +128,7 @@ Verification: `pnpm build`, `pnpm typecheck` (17/17), `pnpm test` (all pass: cor
 
 Verification: build, typecheck, tests pass. Desktop (Linux, WebDriver + Xvfb): closing a dirty PDF from the Drawings tab showed `"copy.pdf" has unsaved changes. Close anyway?`; Cancel kept it, OK closed it; Remove folder showed its question and Cancel kept the folder. Web (Playwright): the same close showed the browser confirm; dismiss kept the document, accept closed it. The header switcher's close calls the same handler; not driven separately. Windows installer: tag `desktop-v0.1.0-test.3` (`d3c3628`), run `37926213643`, passed; the user confirmed both checks on Windows 2026-10-09.
 
-**Step 6 and small items, 2026-10-09 (branch `desktop-small-items`; not yet tested on Windows).**
+**Step 6 and small items, 2026-10-09 (branch `desktop-small-items`). The user confirmed them on Windows; merged to `master` 2026-10-09 together with the rename of MepApp to MEPSketcher in the browser tab title, the Welcome screen and the license line in Settings (`084218a`).**
 
 - File association: `bundle.fileAssociations` for `.pdf` (name `MEPSketcher.pdf`, role `Editor`). The installer adds MEPSketcher to "Open with" for PDF files.
 - `tauri-plugin-single-instance` (registered first, desktop targets only). `src-tauri/src/lib.rs` takes the existing `.pdf` paths from the command line (at start, and from a second start that the plugin stops), adds each to the fs scope with `allow_file` (persisted-scope keeps it, so Save writes back after a restart), queues it in `OpenRequests`, and emits `open-requests`. The command `take_open_requests` empties the queue. A second start also unminimizes and focuses the window.
