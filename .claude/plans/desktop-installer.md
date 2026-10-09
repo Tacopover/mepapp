@@ -79,6 +79,8 @@ Verification: the user's checklist result on Windows. The container cannot run t
 
 **Progress 2026-10-08.** Done in the container: `productName` `mepsketcher-desktop`, `identifier` `com.mepsketcher.desktop`; Cargo package `mepsketcher-desktop` (lib `mepsketcher_desktop_lib`); `bundle.license` + `bundle.licenseFile` (`../../../LICENSE`, used by the NSIS license page); `bundle.windows.nsis.installMode: currentUser`. `.github/workflows/build-desktop.yml` runs `pnpm exec tauri build --bundles nsis` on `windows-latest` and uploads the `.exe` as the artifact `mepsketcher-desktop-windows-nsis`. It uses no `tauri-action` (no release yet). Verified here: a Linux `--bundles deb` build with the new config passed (package `mepsketcher-desktop`). Not verified: the workflow itself, the NSIS build, the license page. `workflow_dispatch` shows in the Actions UI only when the file is on `master`.
 
+**First Windows run 2026-10-09:** the user committed the workflow through the web UI (`243db19`). Tag `desktop-v0.1.0-test.1` started run `37913699823`. It passed in 4 min 54 s and produced `mepsketcher-desktop_0.1.0_x64-setup.exe` (artifact `mepsketcher-desktop-windows-nsis`, 6.6 MB zip). Only warning: actions `checkout@v4`, `setup-node@v4`, `upload-artifact@v4`, `pnpm/action-setup@v4` target Node.js 20 (deprecated, forced to Node.js 24). The deploy workflow uses the same versions. Next: the user runs the checklist below.
+
 **Windows test checklist** (the user fills in the result):
 
 - [ ] The installer starts. Record the SmartScreen warning text (expected, the installer is unsigned).
