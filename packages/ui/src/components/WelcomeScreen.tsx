@@ -12,9 +12,9 @@ export function WelcomeScreen({ onDismiss }: WelcomeScreenProps) {
   return (
     <div className="mep-onboarding">
       <div className="mep-onboarding-card">
-        <h1>MepApp</h1>
+        <h1>MEPSketcher</h1>
         <p>
-          MepApp is an open-source CAD (computer-aided design) tool for drawing annotated HVAC, electrical, plumbing, and fire-protection elements onto PDF
+          MEPSketcher is an open-source CAD (computer-aided design) tool for drawing annotated HVAC, electrical, plumbing, and fire-protection elements onto PDF
           architectural drawings.
         </p>
         <p className="mep-onboarding-license">

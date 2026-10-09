@@ -1651,7 +1651,7 @@ export function MepSketchApp({
 
       {correspondingSourceUrl && (
         <div className="mep-source-footer">
-          MepApp is AGPLv3 licensed.{' '}
+          MEPSketcher is AGPLv3 licensed.{' '}
           <a href={correspondingSourceUrl} target="_blank" rel="noreferrer">
             View the source code for this exact version
           </a>
