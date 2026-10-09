@@ -62,6 +62,7 @@ import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
 import type { DisciplineGroup } from './disciplineGroups.js';
 import { useUserStampLibrary } from './useUserStampLibrary.js';
+import { confirmDialog, setAppDialogs } from './confirmDialog.js';
 import {
   browserImageSizeDecoder,
   createLibrarySource,
@@ -76,7 +77,7 @@ import {
 import { useShowBuiltInStamps } from './builtInStampsSetting.js';
 import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
 import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
-import { libraryFolderOf, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore } from '@mepapp/platform';
+import { libraryFolderOf, type AppDialogs, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore } from '@mepapp/platform';
 import './theme.css';
 
 export interface PdfPageLoadResult {
@@ -108,6 +109,8 @@ export interface MepSketchAppProps {
   fileAccess: FileAccess;
   /** Warns before the tab or window closes with unsaved changes. */
   closeGuard: CloseGuard;
+  /** Yes/no questions: window.confirm on the web, a native dialog on desktop. */
+  dialogs: AppDialogs;
 }
 
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
@@ -204,7 +207,9 @@ export function MepSketchApp({
   libraryStore,
   fileAccess,
   closeGuard,
+  dialogs,
 }: MepSketchAppProps) {
+  useEffect(() => setAppDialogs(dialogs), [dialogs]);
   const userStampLibrary = useUserStampLibrary(libraryStore, fileAccess.capabilities.folders);
   const [showBuiltInStamps, setShowBuiltInStamps] = useShowBuiltInStamps();
   const missingUserStampIds = useMemo(
@@ -560,13 +565,13 @@ export function MepSketchApp({
   );
 
   const handleCloseDocument = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (fileTaskRef.current?.documentId === id) {
         setStatus(FILE_TASK_BUSY_STATUS);
         return;
       }
       const target = documents.find((d) => d.id === id);
-      if (target?.isDirty && !window.confirm(`"${target.fileName}" has unsaved changes. Close anyway?`)) return;
+      if (target?.isDirty && !(await confirmDialog(`"${target.fileName}" has unsaved changes. Close anyway?`))) return;
       sceneRef.current?.closeDocument(id);
     },
     [documents, sceneRef],
@@ -794,7 +799,7 @@ export function MepSketchApp({
       if (mismatch && mismatch.stamps > 0) {
         const lost = mismatch.connectedEnds > 0 ? ` ${mismatch.connectedEnds} connected segment end(s) will be detached onto junction fittings.` : '';
         const message = `${mismatch.stamps} of the selected stamps do not have the same number of ports as "${definition.label}", so their ports cannot be matched by location. Ports that share an id are kept.${lost} Replace anyway?`;
-        if (!window.confirm(message)) return;
+        if (!(await confirmDialog(message))) return;
       }
       const bitmap = await resolveStampIconBitmap(definition);
       sceneRef.current?.replaceSelectedStamps(definition, bitmap);
@@ -858,21 +863,21 @@ export function MepSketchApp({
   );
 
   const handleDeleteCustomStampDefinition = useCallback(
-    (definition: StampDefinition) => {
+    async (definition: StampDefinition) => {
       const library = STAMP_LIBRARY.find((def) => def.id === definition.id);
       if (library) {
         const count = allStamps.filter((s) => s.definitionId === definition.id).length;
         const placed = count > 0 ? ` ${count} placed stamp${count === 1 ? '' : 's'} on this sheet go back to the library artwork, ports and size.` : '';
         const lost = sceneRef.current?.countLostPortConnections(definition.id, library.ports) ?? 0;
         const lostWarning = lost > 0 ? ` ${lost} segment connection${lost === 1 ? '' : 's'} to removed ports will be lost.` : '';
-        if (!window.confirm(`Revert "${definition.label}" to the library version? Your changes and its labels are removed.${placed}${lostWarning}`)) return;
+        if (!(await confirmDialog(`Revert "${definition.label}" to the library version? Your changes and its labels are removed.${placed}${lostWarning}`))) return;
         revertCustomOverride(definition);
         setStatus(`${library.label} reverted to the library version.`);
         return;
       }
       const placedCount = allStamps.filter((s) => s.definitionId === definition.id).length;
       const usageWarning = placedCount > 0 ? ` ${placedCount} placed element${placedCount === 1 ? '' : 's'} on this sheet use it and will keep their current look but lose their icon if this document is reopened later.` : '';
-      if (!window.confirm(`Delete "${definition.label}"? This cannot be undone.${usageWarning}`)) return;
+      if (!(await confirmDialog(`Delete "${definition.label}"? This cannot be undone.${usageWarning}`))) return;
       deleteCustomDefinition(definition);
       setStatus(`${definition.label} deleted.`);
     },
@@ -939,7 +944,7 @@ export function MepSketchApp({
       const message = saved
         ? `Delete "${definition.label}"? This cannot be undone. Stamps already placed in a project keep their own copy.`
         : `Hide "${definition.label}"? The file stays in the folder. Show it again from the user library dialog.`;
-      if (!window.confirm(message)) return;
+      if (!(await confirmDialog(message))) return;
       try {
         await hideOrDeleteUserStamps([definition]);
         setStatus(saved ? `${definition.label} deleted.` : `${definition.label} hidden.`);
@@ -963,7 +968,7 @@ export function MepSketchApp({
         const library = STAMP_LIBRARY.find((def) => def.id === d.id);
         return sum + (library ? (sceneRef.current?.countLostPortConnections(d.id, library.ports) ?? 0) : 0);
       }, 0);
-      if (!window.confirm(bulkDeleteMessage(groups, { placed, lostConnections }))) return false;
+      if (!(await confirmDialog(bulkDeleteMessage(groups, { placed, lostConnections })))) return false;
       for (const definition of groups.revert) revertCustomOverride(definition);
       for (const definition of groups.deleteCustom) deleteCustomDefinition(definition);
       try {
@@ -1102,7 +1107,7 @@ export function MepSketchApp({
   const handleRemoveLibrarySource = useCallback(
     async (source: LibrarySourceRecord) => {
       if (!libraryStore) return;
-      if (!window.confirm(`Remove the folder "${source.name}" and its stamps from MepApp? The files in the folder stay. Stamps already placed in a project keep their own copy.`)) return;
+      if (!(await confirmDialog(`Remove the folder "${source.name}" and its stamps from MepApp? The files in the folder stay. Stamps already placed in a project keep their own copy.`))) return;
       try {
         await libraryStore.removeSource(source.id);
         await userStampLibrary.reload();

@@ -53,6 +53,7 @@ import { SheetBlockCanvas } from './SheetBlockCanvas.js';
 import { SheetToolOptions, SheetToolRail, SheetViewBar, contentBounds, sheetStatusText } from './SheetDrawTools.js';
 import { WorkspaceMenu } from './WorkspaceMenu.js';
 import { IconClose } from '../icons.js';
+import { confirmDialog } from '../confirmDialog.js';
 
 export interface SchematicDialogProps {
   /** The panel this dialog is about. A schematic covers exactly one panel. */
@@ -338,8 +339,8 @@ export function SchematicDialog({
     onUpdateSchematic({ ...schematic, name: next.trim() });
   }
 
-  function remove() {
-    if (!schematic || !window.confirm(`Delete the schematic "${schematic.name}"? Its entered values and typed texts are deleted too.`)) return;
+  async function remove() {
+    if (!schematic || !(await confirmDialog(`Delete the schematic "${schematic.name}"? Its entered values and typed texts are deleted too.`))) return;
     onRemoveSchematic(schematic.id);
     setSelectedId(undefined);
   }
@@ -359,8 +360,8 @@ export function SchematicDialog({
     if (sourceTemplate) onCustomTemplatesChange([...customTemplates, copyTemplate(sourceTemplate, allTemplates)]);
   }
 
-  function deleteTemplate() {
-    if (!sourceTemplate || !sourceIsCustom || !window.confirm(`Delete the template "${sourceTemplate.name}"? Schematics that copied it keep their own copy.`)) return;
+  async function deleteTemplate() {
+    if (!sourceTemplate || !sourceIsCustom || !(await confirmDialog(`Delete the template "${sourceTemplate.name}"? Schematics that copied it keep their own copy.`))) return;
     onCustomTemplatesChange(customTemplates.filter((t) => t.id !== sourceTemplate.id));
   }
 

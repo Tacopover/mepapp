@@ -48,6 +48,11 @@ export interface FileAccess {
   readFolder(folder: LibraryFolderRef, extensions: string[]): Promise<File[]>;
 }
 
+/** Yes/no questions to the user. Async, because a desktop dialog cannot block the page the way window.confirm does. */
+export interface AppDialogs {
+  confirm(message: string): Promise<boolean>;
+}
+
 /** Warns before the app window or browser tab closes while there are unsaved changes. */
 export interface CloseGuard {
   setUnsavedChanges(unsaved: boolean): void;

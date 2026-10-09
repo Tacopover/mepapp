@@ -3,8 +3,8 @@ import { MepSketchApp, type PdfPageLoadResult } from '@mepapp/ui';
 import { displayDimensions } from '@mepapp/core';
 import { MupdfEngine } from '@mepapp/pdf-engine-mupdf';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
-import type { CloseGuard, FileAccess } from '@mepapp/platform';
-import { IndexedDbLibraryStore, WebCloseGuard, WebFileAccess } from '@mepapp/platform-web';
+import type { AppDialogs, CloseGuard, FileAccess } from '@mepapp/platform';
+import { IndexedDbLibraryStore, WebAppDialogs, WebCloseGuard, WebFileAccess } from '@mepapp/platform-web';
 import { createRoomDetectionClient } from './roomDetectionClient';
 
 const BACKDROP_DPI = 150;
@@ -32,17 +32,17 @@ const correspondingSourceUrl = `${REPO_URL}/tree/${__MEPAPP_COMMIT_SHA__}`;
 const isTauri = '__TAURI_INTERNALS__' in window;
 
 // The desktop build loads the Tauri platform as its own chunk, so the web build never runs Tauri code.
-async function createPlatform(): Promise<{ fileAccess: FileAccess; closeGuard: CloseGuard }> {
+async function createPlatform(): Promise<{ fileAccess: FileAccess; closeGuard: CloseGuard; dialogs: AppDialogs }> {
   if (isTauri) {
-    const { TauriCloseGuard, TauriFileAccess } = await import('@mepapp/platform-tauri');
-    return { fileAccess: new TauriFileAccess(), closeGuard: new TauriCloseGuard() };
+    const { TauriAppDialogs, TauriCloseGuard, TauriFileAccess } = await import('@mepapp/platform-tauri');
+    return { fileAccess: new TauriFileAccess(), closeGuard: new TauriCloseGuard(), dialogs: new TauriAppDialogs() };
   }
-  return { fileAccess: new WebFileAccess(), closeGuard: new WebCloseGuard() };
+  return { fileAccess: new WebFileAccess(), closeGuard: new WebCloseGuard(), dialogs: new WebAppDialogs() };
 }
 
 const container = document.getElementById('root');
 if (container) {
-  void createPlatform().then(({ fileAccess, closeGuard }) => {
+  void createPlatform().then(({ fileAccess, closeGuard, dialogs }) => {
     createRoot(container).render(
       <MepSketchApp
         onLoadPdfPage={loadPdfPage}
@@ -52,6 +52,7 @@ if (container) {
         libraryStore={libraryStore}
         fileAccess={fileAccess}
         closeGuard={closeGuard}
+        dialogs={dialogs}
       />,
     );
   });
