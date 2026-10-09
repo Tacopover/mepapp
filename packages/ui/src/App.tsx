@@ -12,6 +12,7 @@ import {
   SAVED_STAMPS_SOURCE_ID,
   type Discipline,
   type RoomType,
+  type PlacementRule,
   type NetworkType,
   type RoomDetectionClient,
   type ReconciliationReport,
@@ -62,6 +63,10 @@ import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateSto
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
 import { RoomTypesDialog } from './components/RoomTypesDialog.js';
 import { CeilingHeightsDialog } from './components/CeilingHeightsDialog.js';
+import { PlacementRulesDialog } from './components/PlacementRulesDialog.js';
+import { RoomCalculationsDialog } from './components/RoomCalculationsDialog.js';
+import { loadPlacementRules, savePlacementRules } from './placementRuleStorage.js';
+import { stampLabelFor } from './stampVisibility.js';
 import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
@@ -417,6 +422,13 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setRoomTypeLibrary(roomTypes);
   }, [ready, roomTypes, sceneRef]);
+  const [placementRules, setPlacementRules] = useState<PlacementRule[]>(() => loadPlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage));
+  const [placementRulesOpen, setPlacementRulesOpen] = useState(false);
+  const [roomCalculationsOpen, setRoomCalculationsOpen] = useState(false);
+  /** Set while the stamp picker chooses the stamp of a placement rule. */
+  const [ruleStampPick, setRuleStampPick] = useState<{ onPick: (definitionId: string) => void } | null>(null);
+  useEffect(() => savePlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage, placementRules), [placementRules]);
+  const handleExportPlacementRules = useCallback((rules: PlacementRule[]) => downloadBlob(new Blob([JSON.stringify(rules, null, 2)], { type: 'application/json' }), 'placement-rules.json'), []);
   const handleExportRoomTypes = useCallback((types: RoomType[]) => downloadBlob(new Blob([JSON.stringify(types, null, 2)], { type: 'application/json' }), 'room-types.json'), []);
   const handleLabelVisibilityChange = useCallback((next: StampLabelVisibility) => {
     setLabelVisibility(next);
@@ -1434,6 +1446,8 @@ export function MepSketchApp({
           onExportRooms={handleExportRooms}
           onOpenRoomTypes={() => setRoomTypesOpen(true)}
           onOpenCeilingHeights={() => setCeilingHeightsOpen(true)}
+          onOpenPlacementRules={() => setPlacementRulesOpen(true)}
+          onOpenRoomCalculations={() => setRoomCalculationsOpen(true)}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
         />
@@ -1596,6 +1610,54 @@ export function MepSketchApp({
       )}
 
       {ceilingHeightsOpen && <CeilingHeightsDialog sceneRef={sceneRef} drawingName={activeDoc?.fileName ?? null} language={labelLanguage} onClose={() => setCeilingHeightsOpen(false)} />}
+
+      {placementRulesOpen && (
+        <PlacementRulesDialog
+          rules={placementRules}
+          roomTypes={roomTypes}
+          language={labelLanguage}
+          onChange={setPlacementRules}
+          stampName={(id) => {
+            const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
+            return definition ? stampLabelFor(definition, labelLanguage) : null;
+          }}
+          onChooseStamp={(onPick) => setRuleStampPick({ onPick })}
+          onExport={handleExportPlacementRules}
+          onClose={ruleStampPick ? () => {} : () => setPlacementRulesOpen(false)}
+        />
+      )}
+
+      {ruleStampPick && (
+        <StampPickerDialog
+          title="Stamp for the rule"
+          initialCategory="terminal"
+          initialDisciplineGroup={disciplineGroup}
+          labelLanguage={labelLanguage}
+          customStampDefinitions={customStampDefinitions}
+          userStampDefinitions={userStampLibrary.definitions}
+          showBuiltIn={showBuiltInStamps}
+          libraryRecordIds={userStampLibrary.allRecordIds}
+          resolveIconUrl={resolveStampIconUrl}
+          onPick={(definition) => {
+            ruleStampPick.onPick(definition.id);
+            setRuleStampPick(null);
+          }}
+          onClose={() => setRuleStampPick(null)}
+        />
+      )}
+
+      {roomCalculationsOpen && (
+        <RoomCalculationsDialog
+          sceneRef={sceneRef}
+          rules={placementRules}
+          language={labelLanguage}
+          onOpenRules={() => {
+            setRoomCalculationsOpen(false);
+            setPlacementRulesOpen(true);
+          }}
+          onClose={() => setRoomCalculationsOpen(false)}
+        />
+      )}
 
       {globalPropertiesOpen && (
         <GlobalPropertiesDialog
