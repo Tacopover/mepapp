@@ -16,7 +16,10 @@ import {
   withRoomLabels,
   roomId,
   updateRoom as updateRoomFields,
+  applyRoomTypeMatch,
+  ROOM_TYPE_LIBRARY,
   type Room,
+  type RoomType,
   CIRCUIT_TYPE_LIBRARY,
   getCircuitTypeFromLibrary,
   getCircuitTypeUsage,
@@ -536,6 +539,11 @@ class TypedEmitter<Events extends Record<string, unknown[]>> {
   }
 }
 
+/** The room type fields of a room, to carry over to a room made from it (split, merge). */
+function roomTypeFields(room: Room): Pick<Room, 'roomTypeId' | 'roomTypeSource'> {
+  return { ...(room.roomTypeId !== undefined ? { roomTypeId: room.roomTypeId } : {}), ...(room.roomTypeSource !== undefined ? { roomTypeSource: room.roomTypeSource } : {}) };
+}
+
 export class SketchScene {
   private readonly app = new Application();
   private readonly world = new Container();
@@ -600,6 +608,8 @@ export class SketchScene {
   private selectedRoomVertices: VertexRef[] = [];
   private roomPreview: { id: string; polygon: RoomPolygon } | null = null;
   private roomSettings: { gapMm?: number } = {};
+  /** The user library of room types (set by the UI with setRoomTypeLibrary). Name matching uses it. */
+  private roomTypeLibrary: RoomType[] = ROOM_TYPE_LIBRARY.map((t) => ({ ...t, keywords: [...t.keywords] }));
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
   private angleSnapDegrees = DEFAULT_ANGLE_SNAP_DEGREES;
   private resizeObserver: ResizeObserver | null = null;
@@ -2742,6 +2752,61 @@ export class SketchScene {
     this.roomSettings = { ...settings };
   }
 
+  /** Sets the user library of room types. Rooms keep their type until matchRoomTypesAgain runs. A type that leaves the library while rooms of an open document use it is kept as that document's copy, so those rooms still show it. */
+  setRoomTypeLibrary(types: readonly RoomType[]): void {
+    const kept = new Set(types.map((t) => t.id));
+    for (const doc of this.documents) {
+      const used = new Set(Object.values(doc.drawingHistory.getState().rooms).flatMap((r) => (r.roomTypeId ? [r.roomTypeId] : [])));
+      for (const type of this.roomTypeLibrary) {
+        if (kept.has(type.id) || !used.has(type.id) || doc.roomTypes.some((t) => t.id === type.id)) continue;
+        doc.roomTypes.push(type);
+      }
+    }
+    this.roomTypeLibrary = types.map((t) => ({ ...t, keywords: [...t.keywords] }));
+  }
+
+  /** The room types to offer: the user library, then the types of the active document's file that the library lacks (`inLibrary: false`). */
+  getRoomTypes(): (RoomType & { inLibrary: boolean })[] {
+    const libraryIds = new Set(this.roomTypeLibrary.map((t) => t.id));
+    return [...this.roomTypeLibrary.map((t) => ({ ...t, inLibrary: true })), ...this.doc.roomTypes.filter((t) => !libraryIds.has(t.id)).map((t) => ({ ...t, inLibrary: false }))];
+  }
+
+  /** A room type by id: the user library first, then the copy in the document's file. */
+  private resolveRoomType(doc: SketchDocument, id: string): RoomType | undefined {
+    return this.roomTypeLibrary.find((t) => t.id === id) ?? doc.roomTypes.find((t) => t.id === id);
+  }
+
+  /**
+   * Sets the room type of rooms as ONE undo step. A type id or null ("no type") is the user's
+   * choice: name matching does not change it, and the room is locked. 'auto' gives the room back
+   * to name matching. Returns false when no room changed.
+   */
+  setRoomType(ids: readonly string[], choice: string | null | 'auto'): boolean {
+    const rooms = this.doc.drawingHistory.getState().rooms;
+    const before = ids.map((id) => rooms[id]).filter((r): r is Room => r !== undefined);
+    const after = before.map((room) =>
+      choice === 'auto'
+        ? applyRoomTypeMatch(updateRoomFields(room, { roomTypeSource: 'matched' }), this.roomTypeLibrary)
+        : updateRoomFields(room, { roomTypeId: choice ?? undefined, roomTypeSource: 'user' }),
+    );
+    const changed = after.filter((r, i) => JSON.stringify(r) !== JSON.stringify(before[i]));
+    if (changed.length === 0) return false;
+    const changedIds = new Set(changed.map((r) => r.id));
+    this.doc.drawingHistory.execute(replaceRoomsCommand(changed.length === 1 ? `Set room type of ${changed[0]!.id}` : `Set room type of ${changed.length} rooms`, before.filter((r) => changedIds.has(r.id)), changed));
+    this.notifyRoomsChanged();
+    return true;
+  }
+
+  /** Runs name matching again on every room of the active document whose type the user did not choose, as ONE undo step. Returns how many rooms changed. */
+  matchRoomTypesAgain(): number {
+    const rooms = Object.values(this.doc.drawingHistory.getState().rooms);
+    const pairs = rooms.map((room) => [room, applyRoomTypeMatch(room, this.roomTypeLibrary)] as const).filter(([before, after]) => before !== after);
+    if (pairs.length === 0) return 0;
+    this.doc.drawingHistory.execute(replaceRoomsCommand(`Match room types of ${pairs.length} rooms`, pairs.map(([before]) => before), pairs.map(([, after]) => after)));
+    this.notifyRoomsChanged();
+    return pairs.length;
+  }
+
   /** The selected rooms of the edit-room tool, in the order of listRooms. */
   getSelectedRooms(): Room[] {
     return this.listRooms().filter((r) => this.selectedRoomIds.has(r.id));
@@ -2855,7 +2920,7 @@ export class SketchScene {
     const [big, small] = polygonAreaPt2(pieces[0]) >= polygonAreaPt2(pieces[1]) ? pieces : [pieces[1], pieces[0]];
     const base = { pageIndex: room.pageIndex, source: room.source, locked: true, open: room.open };
     const added: Room[] = [
-      { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: big, name: room.name, number: room.number, ...(room.labelAreaM2 !== undefined ? { labelAreaM2: room.labelAreaM2 } : {}), ...(room.details ? { details: room.details } : {}) },
+      { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: big, name: room.name, number: room.number, ...(room.labelAreaM2 !== undefined ? { labelAreaM2: room.labelAreaM2 } : {}), ...(room.details ? { details: room.details } : {}), ...roomTypeFields(room) },
       { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: small, name: null, number: null },
     ];
     this.doc.drawingHistory.execute(replaceRoomsCommand('Split room', [room], added));
@@ -2895,6 +2960,7 @@ export class SketchScene {
       source: big.source,
       locked: true,
       open: false,
+      ...roomTypeFields(big.name !== null || small.name === null ? big : small),
     };
     const plan = this.planRoomOverlaps(merged.pageIndex, [merged], [first.id, second.id]);
     const final = plan?.add[0] ?? merged;
@@ -3188,7 +3254,7 @@ export class SketchScene {
    * With `keepOthers` the polygon is stored as it is and no other room changes: the caller has cut it free.
    */
   addRoom(input: RoomInput, options: { keepOthers?: boolean } = {}): Room | null {
-    const room: Room = { ...input, id: roomId(this.doc.nextRoomSeq++) };
+    const room: Room = applyRoomTypeMatch({ ...input, id: roomId(this.doc.nextRoomSeq++) }, this.roomTypeLibrary);
     const plan = options.keepOthers ? null : this.planRoomOverlaps(room.pageIndex, [room]);
     if (plan && plan.dropped.length > 0) return null;
     const final = plan?.add[0] ?? room;
@@ -3211,6 +3277,7 @@ export class SketchScene {
     const before = rooms[id];
     if (!before) return false;
     let after = updateRoomFields(before, patch);
+    if ('name' in patch) after = applyRoomTypeMatch(after, this.roomTypeLibrary);
     if (patch.polygon !== undefined) {
       const wrapped = wrapAroundRooms(after.polygon, this.otherRoomPolygons(id, before.pageIndex));
       if (!wrapped) {
@@ -3254,6 +3321,7 @@ export class SketchScene {
   applyDetectedRooms(pageIndex: number, detected: readonly RoomInput[]): { added: number; removed: number; adjusted: number; dropped: number } {
     const rooms = this.doc.drawingHistory.getState().rooms;
     const plan = mergeDetectedRooms(Object.values(rooms), detected, pageIndex, () => roomId(this.doc.nextRoomSeq++));
+    plan.add = plan.add.map((room) => applyRoomTypeMatch(room, this.roomTypeLibrary));
     if (plan.add.length === 0 && plan.remove.length === 0) return { added: 0, removed: 0, adjusted: 0, dropped: 0 };
     const removed = plan.remove.map((id) => rooms[id]!);
     // The new rooms and the rooms that stay must not overlap: the more confident room keeps a shared area.
@@ -3289,7 +3357,17 @@ export class SketchScene {
       schematicProjectFields: doc.schematicProjectFields,
       rooms: Object.values(state.rooms),
       calibrations: Object.fromEntries([...doc.calibrations].map(([pageIndex, calibration]) => [String(pageIndex), calibration])),
+      roomTypes: this.usedRoomTypes(doc, Object.values(state.rooms)),
     }) as unknown as ProjectDocument;
+  }
+
+  /** The room types the rooms use, as the user library has them now (or the file's copy when the library lacks one), for the save file. */
+  private usedRoomTypes(doc: SketchDocument, rooms: readonly Room[]): RoomType[] {
+    const ids = [...new Set(rooms.flatMap((r) => (r.roomTypeId ? [r.roomTypeId] : [])))];
+    return ids.flatMap((id) => {
+      const type = this.resolveRoomType(doc, id);
+      return type ? [type] : [];
+    });
   }
 
   /**
@@ -3344,6 +3422,7 @@ export class SketchScene {
     target.schematics.splice(0, target.schematics.length, ...doc.schematics);
     for (const key of Object.keys(target.schematicProjectFields)) delete target.schematicProjectFields[key];
     Object.assign(target.schematicProjectFields, doc.schematicProjectFields);
+    target.roomTypes.splice(0, target.roomTypes.length, ...doc.roomTypes);
     target.calibrations.clear();
     for (const [pageIndex, calibration] of Object.entries(doc.calibrations)) target.calibrations.set(Number(pageIndex), calibration);
     target.terminalCapacities.clear();

@@ -40,6 +40,7 @@ describe('serializeProject / loadProject round trip', () => {
       schematicProjectFields: {},
       rooms: [{ id: 'room-1', pageIndex: 0, polygon: { outer: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], holes: [] }, name: 'Kitchen', number: '0.12', source: 'click', locked: true, open: false }],
       calibrations: { '0': { pageUnitsPerRealUnit: 0.0283 }, '2': { pageUnitsPerRealUnit: 0.0567 } },
+      roomTypes: [{ id: 'kitchen', name: 'Kitchen', keywords: ['keuken'] }],
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -218,6 +219,7 @@ describe('serializeProject / loadProject round trip', () => {
     expect(loaded.schematicProjectFields).toEqual({});
     expect(loaded.rooms).toEqual([]); // v12->v13
     expect(loaded.calibrations).toEqual({}); // v13->v14
+    expect(loaded.roomTypes).toEqual([]); // v14->v15
   });
 
   it('migrates a pre-circuit-defaults (v9) save unchanged, since the new fields are all optional', () => {
@@ -313,6 +315,7 @@ describe('serializeProject / loadProject round trip', () => {
       schematicProjectFields: {},
       rooms: [],
       calibrations: {},
+      roomTypes: [],
     };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {
@@ -336,7 +339,7 @@ describe('calibrations in the save format', () => {
   });
 
   it('rejects a calibration that is not a positive number or a key that is not a page index', () => {
-    const bad = { ...v13, schemaVersion: CURRENT_SCHEMA_VERSION, calibrations: { '0': { pageUnitsPerRealUnit: 0 }, page1: { pageUnitsPerRealUnit: 1 }, '3': null } };
+    const bad = { ...v13, schemaVersion: CURRENT_SCHEMA_VERSION, roomTypes: [], calibrations: { '0': { pageUnitsPerRealUnit: 0 }, page1: { pageUnitsPerRealUnit: 1 }, '3': null } };
     try {
       loadProject(bad);
       expect.unreachable();

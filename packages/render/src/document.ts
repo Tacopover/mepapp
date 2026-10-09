@@ -5,6 +5,7 @@ import {
   NETWORK_TYPE_LIBRARY,
   type Annotation,
   type Calibration,
+  type RoomType,
   type Circuit,
   type CircuitType,
   type Fitting,
@@ -138,6 +139,8 @@ export class SketchDocument {
   readonly schematics: Schematic[] = [];
   /** Entered values of template fields with scope 'project', by field id — shared by every schematic of this document. */
   readonly schematicProjectFields: Record<string, string> = {};
+  /** Copies of the room types this document's rooms use, from the saved file (ProjectDocument.roomTypes). The user library comes first; these fill in a type the library lacks. */
+  readonly roomTypes: RoomType[] = [];
   readonly terminalCapacities = new Map<string, number>();
   pdfSyncIds = new Set<string>();
   nextStampSeq = 1;

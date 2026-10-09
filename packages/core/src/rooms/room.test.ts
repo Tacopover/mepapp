@@ -118,6 +118,16 @@ describe('room creation and editing', () => {
     expect(updateRoom(r, { open: true }).locked).toBe(false);
     expect(updateRoom(updateRoom(r, { name: 'A' }), { open: false }).locked).toBe(true);
   });
+
+  it('locks a room for a room type the user chose, not for a matched one, and removes a field set to undefined', () => {
+    const r = withId(inputRoom(0, 0, 10), 'r');
+    expect(updateRoom(r, { roomTypeId: 'toilet', roomTypeSource: 'matched' }).locked).toBe(false);
+    const chosen = updateRoom(r, { roomTypeId: 'toilet', roomTypeSource: 'user' });
+    expect(chosen.locked).toBe(true);
+    const none = updateRoom(chosen, { roomTypeId: undefined });
+    expect('roomTypeId' in none).toBe(false);
+    expect(none.roomTypeSource).toBe('user');
+  });
 });
 
 describe('mergeDetectedRooms', () => {
@@ -152,7 +162,7 @@ describe('mergeDetectedRooms', () => {
 describe('room save format', () => {
   it('round-trips rooms through serializeProject and loadProject', () => {
     const room = withId(inputRoom(0, 0, 10, { name: 'WC', number: '0.03', locked: true, labelAreaM2: 3.2 }), 'room-1');
-    const empty = { networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {}, circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, calibrations: {} };
+    const empty = { networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {}, circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, calibrations: {}, roomTypes: [] };
     const loaded = loadProject(JSON.parse(JSON.stringify(serializeProject({ ...empty, rooms: [room] }))));
     expect(loaded.rooms).toEqual([room]);
   });

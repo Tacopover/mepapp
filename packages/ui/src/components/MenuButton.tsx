@@ -15,6 +15,7 @@ export interface MenuButtonProps {
   onDetectRooms: () => void;
   onCancelRoomDetection: () => void;
   onExportRooms: () => void;
+  onOpenRoomTypes: () => void;
   wallDebugVisible: boolean;
   onToggleWallDebug: () => void;
 }
@@ -32,6 +33,7 @@ export function MenuButton({
   onDetectRooms,
   onCancelRoomDetection,
   onExportRooms,
+  onOpenRoomTypes,
   wallDebugVisible,
   onToggleWallDebug,
 }: MenuButtonProps) {
@@ -141,6 +143,16 @@ export function MenuButton({
             }}
           >
             Export rooms to Excel…
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            onClick={() => {
+              onOpenRoomTypes();
+              setOpen(false);
+            }}
+          >
+            Room types…
           </button>
           {isDebugToolsEnabled() && (
             <>

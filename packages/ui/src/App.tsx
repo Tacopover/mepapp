@@ -10,6 +10,7 @@ import {
   STAMP_LIBRARY,
   SAVED_STAMPS_SOURCE_ID,
   type Discipline,
+  type RoomType,
   type NetworkType,
   type RoomDetectionClient,
   type ReconciliationReport,
@@ -57,6 +58,8 @@ import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
+import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
+import { RoomTypesDialog } from './components/RoomTypesDialog.js';
 import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
@@ -400,6 +403,13 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setLabelVisibility(labelVisibility);
   }, [ready, labelVisibility, sceneRef]);
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>(() => loadRoomTypes(typeof localStorage === 'undefined' ? undefined : localStorage));
+  const [roomTypesOpen, setRoomTypesOpen] = useState(false);
+  useEffect(() => saveRoomTypes(typeof localStorage === 'undefined' ? undefined : localStorage, roomTypes), [roomTypes]);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setRoomTypeLibrary(roomTypes);
+  }, [ready, roomTypes, sceneRef]);
+  const handleExportRoomTypes = useCallback((types: RoomType[]) => downloadBlob(new Blob([JSON.stringify(types, null, 2)], { type: 'application/json' }), 'room-types.json'), []);
   const handleLabelVisibilityChange = useCallback((next: StampLabelVisibility) => {
     setLabelVisibility(next);
     localStorage.setItem(LABEL_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
@@ -728,7 +738,12 @@ export function MepSketchApp({
       return;
     }
     try {
-      const blob = await roomTableToXlsx(buildRoomExportTable(rooms, (pageIndex) => sceneRef.current?.getCalibration(pageIndex) ?? null, customPropertyDefs.room));
+      const blob = await roomTableToXlsx(buildRoomExportTable(
+          rooms,
+          (pageIndex) => sceneRef.current?.getCalibration(pageIndex) ?? null,
+          customPropertyDefs.room,
+          (id) => sceneRef.current?.getRoomTypes().find((t) => t.id === id)?.name ?? null,
+        ));
       const suggestedName = `${(activeDoc?.fileName ?? 'rooms').replace(/\.pdf$/i, '')}-rooms.xlsx`;
       if (!supportsFileSystemAccess()) {
         downloadBlob(blob, suggestedName);
@@ -1299,6 +1314,7 @@ export function MepSketchApp({
     properties: (
       <PropertiesPanel
         selectedRooms={selectedRooms}
+        roomTypes={selectedRooms.length > 0 ? (sceneRef.current?.getRoomTypes() ?? []) : []}
         calibration={calibration}
         sceneRef={sceneRef}
         selection={selection}
@@ -1407,6 +1423,7 @@ export function MepSketchApp({
           onDetectRooms={handleDetectRooms}
           onCancelRoomDetection={handleCancelRoomDetection}
           onExportRooms={handleExportRooms}
+          onOpenRoomTypes={() => setRoomTypesOpen(true)}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
         />
@@ -1546,6 +1563,20 @@ export function MepSketchApp({
             storeNumber(ROOM_GAP_STORAGE_KEY, mm);
           }}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {roomTypesOpen && (
+        <RoomTypesDialog
+          types={roomTypes}
+          fileOnlyTypes={(sceneRef.current?.getRoomTypes() ?? []).filter((t) => !t.inLibrary).map(({ inLibrary, ...type }) => type)}
+          onChange={(next) => {
+            sceneRef.current?.setRoomTypeLibrary(next);
+            setRoomTypes(next);
+          }}
+          onMatchAgain={() => sceneRef.current?.matchRoomTypesAgain() ?? 0}
+          onExport={handleExportRoomTypes}
+          onClose={() => setRoomTypesOpen(false)}
         />
       )}
 

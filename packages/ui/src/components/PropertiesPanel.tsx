@@ -10,6 +10,7 @@ import {
   type Calibration,
   type CustomPropertyDefinition,
   type Room,
+  type RoomType,
   type FittingKind,
   type NetworkType,
   type Panel,
@@ -102,6 +103,8 @@ export interface PropertiesPanelProps {
   /** Rooms selected with the edit-room tool; shown before every other branch. */
   selectedRooms?: Room[];
   calibration?: Calibration | null;
+  /** Room types for the room type choice (SketchScene.getRoomTypes). */
+  roomTypes?: (RoomType & { inLibrary: boolean })[];
 }
 
 export function PropertiesPanel({
@@ -130,8 +133,10 @@ export function PropertiesPanel({
   onToggleCircuitLines,
   selectedRooms = [],
   calibration = null,
+  roomTypes = [],
 }: PropertiesPanelProps) {
-  if (selectedRooms.length > 0) return <RoomProperties sceneRef={sceneRef} rooms={selectedRooms} calibration={calibration} customPropertyDefinitions={customPropertyDefs.room} />;
+  if (selectedRooms.length > 0)
+    return <RoomProperties sceneRef={sceneRef} rooms={selectedRooms} calibration={calibration} customPropertyDefinitions={customPropertyDefs.room} roomTypes={roomTypes} language={labelLanguage} />;
   if (selectedCircuitId) {
     const circuit = circuits.find((c) => c.id === selectedCircuitId);
     if (circuit) {

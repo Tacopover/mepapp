@@ -34,6 +34,10 @@ export interface Room {
   otherLabels?: string[];
   /** Values for the Room tab of Global Properties (per-installation custom fields) — see custom-properties.ts. */
   properties?: CustomPropertyValues;
+  /** RoomType['id'] (room-type.ts): what the room is used for. Absent = no type. */
+  roomTypeId?: string;
+  /** 'matched' = name matching set the type and may change it; 'user' = the user chose it (also "no type"), matching never changes it. */
+  roomTypeSource?: 'matched' | 'user';
 }
 
 export type RoomInput = Omit<Room, 'id'>;
@@ -151,12 +155,14 @@ export function manualRoom(pageIndex: number, outer: readonly Vec2[]): RoomInput
   return { pageIndex, polygon: { outer: outer.map((p) => ({ ...p })), holes: [] }, name: null, number: null, source: 'manual', locked: true, open: false };
 }
 
-export type RoomPatch = Partial<Pick<Room, 'polygon' | 'name' | 'number' | 'open' | 'labelAreaM2' | 'properties'>>;
+export type RoomPatch = Partial<Pick<Room, 'polygon' | 'name' | 'number' | 'open' | 'labelAreaM2' | 'properties' | 'roomTypeId' | 'roomTypeSource'>>;
 
-/** Applies a change to a room. A change of polygon, name, number or custom properties locks the room (a re-run of Detect rooms keeps it). */
+/** Applies a change to a room. A change of polygon, name, number or custom properties, or a room type the user chose, locks the room (a re-run of Detect rooms keeps it). A patch key with the value undefined removes that field. */
 export function updateRoom(room: Room, patch: RoomPatch): Room {
-  const userEdit = patch.polygon !== undefined || patch.name !== undefined || patch.number !== undefined || patch.properties !== undefined;
-  return { ...room, ...patch, locked: room.locked || userEdit };
+  const userEdit = patch.polygon !== undefined || patch.name !== undefined || patch.number !== undefined || patch.properties !== undefined || patch.roomTypeSource === 'user';
+  const next: Room = { ...room, ...patch, locked: room.locked || userEdit };
+  for (const key of Object.keys(patch) as (keyof RoomPatch)[]) if (patch[key] === undefined) delete next[key];
+  return next;
 }
 
 export function translateRoom(room: Room, dx: number, dy: number): Room {

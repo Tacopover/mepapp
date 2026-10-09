@@ -18,24 +18,30 @@ const DEFS: CustomPropertyDefinition[] = [
 describe('buildRoomExportTable', () => {
   it('writes the fixed columns, then one column per custom property', () => {
     const table = buildRoomExportTable([room('a', { number: '0.1', name: 'Lobby', labelAreaM2: 24, details: ['Circulation'] })], CAL, DEFS);
-    expect(table.headers).toEqual(['Page', 'Number', 'Name', 'Area (m²)', 'Area in drawing (m²)', 'Needs review', 'Source', 'Details', 'Fire rating', 'Occupants']);
-    expect(table.customColumnStart).toBe(8);
-    expect(table.rows[0]).toEqual([1, '0.1', 'Lobby', 25, 24, false, 'manual', 'Circulation', 'none', 0]);
+    expect(table.headers).toEqual(['Page', 'Number', 'Name', 'Room type', 'Area (m²)', 'Area in drawing (m²)', 'Needs review', 'Source', 'Details', 'Fire rating', 'Occupants']);
+    expect(table.customColumnStart).toBe(9);
+    expect(table.rows[0]).toEqual([1, '0.1', 'Lobby', null, 25, 24, false, 'manual', 'Circulation', 'none', 0]);
   });
 
   it('uses the saved custom value, and the default when the room has none', () => {
     const table = buildRoomExportTable([room('a', { properties: { 'Fire rating': 'REI 60', Occupants: 12 } }), room('b')], CAL, DEFS);
-    expect(table.rows.map((r) => r.slice(8))).toEqual([['REI 60', 12], ['none', 0]]);
+    expect(table.rows.map((r) => r.slice(9))).toEqual([['REI 60', 12], ['none', 0]]);
   });
 
   it('leaves the area empty without a calibration', () => {
-    expect(buildRoomExportTable([room('a')], null, []).rows[0]![3]).toBeNull();
+    expect(buildRoomExportTable([room('a')], null, []).rows[0]![4]).toBeNull();
   });
 
   it('uses the calibration of each room\'s own page', () => {
     const rooms = [room('a'), room('b', { pageIndex: 1 }), room('c', { pageIndex: 2 })];
     const calibrations = new Map([[0, CAL], [1, { pageUnitsPerRealUnit: 0.08 }]]);
-    expect(buildRoomExportTable(rooms, (pageIndex) => calibrations.get(pageIndex) ?? null, []).rows.map((r) => r[3])).toEqual([25, 6.25, null]);
+    expect(buildRoomExportTable(rooms, (pageIndex) => calibrations.get(pageIndex) ?? null, []).rows.map((r) => r[4])).toEqual([25, 6.25, null]);
+  });
+
+  it('writes the room type name, or the id when the name is unknown', () => {
+    const rooms = [room('a', { number: '1', roomTypeId: 'toilet', roomTypeSource: 'matched' }), room('b', { number: '2', roomTypeId: 'gone', roomTypeSource: 'user' }), room('c', { number: '3' })];
+    const names: Record<string, string> = { toilet: 'Toilet' };
+    expect(buildRoomExportTable(rooms, CAL, [], (id) => names[id] ?? null).rows.map((r) => r[3])).toEqual(['Toilet', 'gone', null]);
   });
 
   it('sorts by page, then natural room number, rooms without a number last', () => {

@@ -14,7 +14,7 @@ export interface RoomExportTable {
   rows: RoomExportCell[][];
 }
 
-const FIXED_HEADERS = ['Page', 'Number', 'Name', 'Area (m²)', 'Area in drawing (m²)', 'Needs review', 'Source', 'Details'];
+const FIXED_HEADERS = ['Page', 'Number', 'Name', 'Room type', 'Area (m²)', 'Area in drawing (m²)', 'Needs review', 'Source', 'Details'];
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
@@ -23,12 +23,14 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
  * (natural order: 1.2 before 1.10), then by name; rooms without a number come last on their page.
  * The area is empty when the room's page has no calibration: `calibration` is one value for every
  * page, or a function that gives the calibration of a page. A room without a value for a custom
- * property gets the default of its definition, like the Properties panel shows.
+ * property gets the default of its definition, like the Properties panel shows. `roomTypeName`
+ * gives the name of a room type id; without it, or for an unknown id, the column shows the id.
  */
 export function buildRoomExportTable(
   rooms: readonly Room[],
   calibration: Calibration | null | ((pageIndex: number) => Calibration | null),
   customDefinitions: readonly CustomPropertyDefinition[],
+  roomTypeName: (roomTypeId: string) => string | null = () => null,
 ): RoomExportTable {
   const calibrationOf = typeof calibration === 'function' ? calibration : () => calibration;
   const sorted = [...rooms].sort((a, b) => {
@@ -42,6 +44,7 @@ export function buildRoomExportTable(
       room.pageIndex + 1,
       room.number,
       room.name,
+      room.roomTypeId ? (roomTypeName(room.roomTypeId) ?? room.roomTypeId) : null,
       pageCalibration ? Math.round(roomAreaM2(room, pageCalibration) * 100) / 100 : null,
       room.labelAreaM2 ?? null,
       room.open,

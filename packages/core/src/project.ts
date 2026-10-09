@@ -9,13 +9,14 @@ import type { Calibration } from './calibration.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { Room } from './rooms/room.js';
+import type { RoomType } from './rooms/room-type.js';
 import type { Schematic } from './schematic.js';
 import type { PlacedStamp } from './stamp.js';
 import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 14;
+export const CURRENT_SCHEMA_VERSION = 15;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -44,6 +45,8 @@ export interface ProjectDocument {
   rooms: Room[];
   /** The scale of each calibrated page, keyed by the 0-based page index as a decimal string. A page without an entry is not calibrated. */
   calibrations: Record<string, Calibration>;
+  /** A copy of each room type the rooms use (room-auto-placement.md Phase 1), so the file still shows them where the user library lacks them. */
+  roomTypes: RoomType[];
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -249,6 +252,16 @@ const migrationSteps: MigrationStep[] = [
       calibrations: {},
     }),
   },
+  {
+    fromVersion: 14,
+    toVersion: 15,
+    // Version 14 predates room types, so no room has one.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 15,
+      roomTypes: [],
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -289,6 +302,7 @@ const validators = [
   (data: JsonRecord) => requireRecord(data, 'schematicProjectFields'),
   (data: JsonRecord) => requireArray(data, 'rooms'),
   validateCalibrations,
+  (data: JsonRecord) => requireArray(data, 'roomTypes'),
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {
