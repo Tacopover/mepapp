@@ -21,25 +21,34 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 /**
  * Builds the export table for `rooms` (all pages). Rows are sorted by page, then by room number
  * (natural order: 1.2 before 1.10), then by name; rooms without a number come last on their page.
- * The area is empty without a calibration. A room without a value for a custom property gets the
- * default of its definition, like the Properties panel shows.
+ * The area is empty when the room's page has no calibration: `calibration` is one value for every
+ * page, or a function that gives the calibration of a page. A room without a value for a custom
+ * property gets the default of its definition, like the Properties panel shows.
  */
-export function buildRoomExportTable(rooms: readonly Room[], calibration: Calibration | null, customDefinitions: readonly CustomPropertyDefinition[]): RoomExportTable {
+export function buildRoomExportTable(
+  rooms: readonly Room[],
+  calibration: Calibration | null | ((pageIndex: number) => Calibration | null),
+  customDefinitions: readonly CustomPropertyDefinition[],
+): RoomExportTable {
+  const calibrationOf = typeof calibration === 'function' ? calibration : () => calibration;
   const sorted = [...rooms].sort((a, b) => {
     if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex;
     if ((a.number === null) !== (b.number === null)) return a.number === null ? 1 : -1;
     return collator.compare(a.number ?? '', b.number ?? '') || collator.compare(a.name ?? '', b.name ?? '');
   });
-  const rows = sorted.map((room): RoomExportCell[] => [
-    room.pageIndex + 1,
-    room.number,
-    room.name,
-    calibration ? Math.round(roomAreaM2(room, calibration) * 100) / 100 : null,
-    room.labelAreaM2 ?? null,
-    room.open,
-    room.source,
-    room.details && room.details.length > 0 ? room.details.join('; ') : null,
-    ...customDefinitions.map((def) => room.properties?.[def.name] ?? coerceDefaultValue(def)),
-  ]);
+  const rows = sorted.map((room): RoomExportCell[] => {
+    const pageCalibration = calibrationOf(room.pageIndex);
+    return [
+      room.pageIndex + 1,
+      room.number,
+      room.name,
+      pageCalibration ? Math.round(roomAreaM2(room, pageCalibration) * 100) / 100 : null,
+      room.labelAreaM2 ?? null,
+      room.open,
+      room.source,
+      room.details && room.details.length > 0 ? room.details.join('; ') : null,
+      ...customDefinitions.map((def) => room.properties?.[def.name] ?? coerceDefaultValue(def)),
+    ];
+  });
   return { headers: [...FIXED_HEADERS, ...customDefinitions.map((d) => d.name)], customColumnStart: FIXED_HEADERS.length, rows };
 }

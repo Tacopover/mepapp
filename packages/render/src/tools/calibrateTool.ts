@@ -38,6 +38,7 @@ export class CalibrateTool implements Tool {
       ctx.emit('calibrationNeeded', p1, p2, (mm: number | null) => {
         if (mm !== null && mm > 0) {
           ctx.doc.calibration = calibrateFromKnownDistance(p1, p2, mm);
+          ctx.markDirty();
           ctx.emit('calibrationSet', ctx.doc.calibration);
           ctx.setTool('select');
         }

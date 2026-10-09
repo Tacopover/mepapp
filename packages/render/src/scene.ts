@@ -2091,13 +2091,15 @@ export class SketchScene {
     this.notifyCircuitsChanged();
   }
 
-  getCalibration(): Calibration | null {
-    return this.doc.calibration;
+  /** The calibration of a page of the active document (default: the page that is shown now), or null when that page is not calibrated. */
+  getCalibration(pageIndex = this.doc.pageIndex): Calibration | null {
+    return this.doc.calibrations.get(pageIndex) ?? null;
   }
 
-  /** Sets the active document's calibration directly (e.g. from a chosen drawing scale), without the two-click calibrate tool. */
+  /** Sets the calibration of the shown page directly (e.g. from a chosen drawing scale), without the two-click calibrate tool. */
   setCalibration(calibration: Calibration): void {
     this.doc.calibration = calibration;
+    this.markDirty();
     this.emitter.emit('calibrationSet', calibration);
   }
 
@@ -3159,7 +3161,7 @@ export class SketchScene {
     const handle = this.doc.pdfHandle;
     if (!handle || rooms.length === 0) return [...rooms];
     const labels = readRoomLabelsFromText(await handle.getTextRuns(pageIndex));
-    return withRoomLabels(rooms, labels, this.doc.calibration);
+    return withRoomLabels(rooms, labels, this.getCalibration(pageIndex));
   }
 
   /**
@@ -3168,7 +3170,7 @@ export class SketchScene {
    * tie. Rooms in `ignore` are left out. Null without a calibration.
    */
   private planRoomOverlaps(pageIndex: number, incoming: readonly Room[], ignore: readonly string[] = []): RoomOverlapPlan | null {
-    const calibration = this.doc.calibration;
+    const calibration = this.getCalibration(pageIndex);
     if (!calibration) return null;
     const skip = new Set([...ignore, ...incoming.map((r) => r.id)]);
     const existing = Object.values(this.doc.drawingHistory.getState().rooms).filter((r) => r.pageIndex === pageIndex && !skip.has(r.id));
@@ -3286,6 +3288,7 @@ export class SketchScene {
       schematics: this.liveSchematics(doc),
       schematicProjectFields: doc.schematicProjectFields,
       rooms: Object.values(state.rooms),
+      calibrations: Object.fromEntries([...doc.calibrations].map(([pageIndex, calibration]) => [String(pageIndex), calibration])),
     }) as unknown as ProjectDocument;
   }
 
@@ -3341,6 +3344,8 @@ export class SketchScene {
     target.schematics.splice(0, target.schematics.length, ...doc.schematics);
     for (const key of Object.keys(target.schematicProjectFields)) delete target.schematicProjectFields[key];
     Object.assign(target.schematicProjectFields, doc.schematicProjectFields);
+    target.calibrations.clear();
+    for (const [pageIndex, calibration] of Object.entries(doc.calibrations)) target.calibrations.set(Number(pageIndex), calibration);
     target.terminalCapacities.clear();
     for (const [elementId, capacity] of Object.entries(doc.terminalCapacities)) {
       target.terminalCapacities.set(elementId, capacity);

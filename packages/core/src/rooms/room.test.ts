@@ -152,7 +152,7 @@ describe('mergeDetectedRooms', () => {
 describe('room save format', () => {
   it('round-trips rooms through serializeProject and loadProject', () => {
     const room = withId(inputRoom(0, 0, 10, { name: 'WC', number: '0.03', locked: true, labelAreaM2: 3.2 }), 'room-1');
-    const empty = { networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {}, circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {} };
+    const empty = { networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {}, circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, calibrations: {} };
     const loaded = loadProject(JSON.parse(JSON.stringify(serializeProject({ ...empty, rooms: [room] }))));
     expect(loaded.rooms).toEqual([room]);
   });

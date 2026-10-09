@@ -5,6 +5,7 @@
 // development; see decisions log 2026-09-06).
 
 import type { Annotation } from './annotation.js';
+import type { Calibration } from './calibration.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { Room } from './rooms/room.js';
@@ -14,7 +15,7 @@ import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 14;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -41,6 +42,8 @@ export interface ProjectDocument {
   schematicProjectFields: Record<string, string>;
   /** Rooms detected from the PDF or drawn by hand (room-detection.md Phase 6). Polygons are in displayed page space, per page; area is derived from the calibration and not saved. */
   rooms: Room[];
+  /** The scale of each calibrated page, keyed by the 0-based page index as a decimal string. A page without an entry is not calibrated. */
+  calibrations: Record<string, Calibration>;
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -236,6 +239,16 @@ const migrationSteps: MigrationStep[] = [
       rooms: Array.isArray(data.rooms) ? data.rooms : [],
     }),
   },
+  {
+    fromVersion: 13,
+    toVersion: 14,
+    // Version 13 did not save the calibration, so no page of an older save is calibrated.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 14,
+      calibrations: {},
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -245,6 +258,17 @@ function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
 function requireRecord(data: JsonRecord, field: string): ValidationIssue[] {
   const value = data[field];
   return value && typeof value === 'object' && !Array.isArray(value) ? [] : [{ path: field, message: `expected an object` }];
+}
+
+function validateCalibrations(data: JsonRecord): ValidationIssue[] {
+  const issues = requireRecord(data, 'calibrations');
+  if (issues.length > 0) return issues;
+  for (const [key, value] of Object.entries(data.calibrations as JsonRecord)) {
+    if (!/^(0|[1-9][0-9]*)$/.test(key)) issues.push({ path: `calibrations.${key}`, message: 'expected a page index' });
+    const factor = value && typeof value === 'object' ? (value as JsonRecord).pageUnitsPerRealUnit : undefined;
+    if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0) issues.push({ path: `calibrations.${key}.pageUnitsPerRealUnit`, message: 'expected a positive number' });
+  }
+  return issues;
 }
 
 const validators = [
@@ -264,6 +288,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'schematics'),
   (data: JsonRecord) => requireRecord(data, 'schematicProjectFields'),
   (data: JsonRecord) => requireArray(data, 'rooms'),
+  validateCalibrations,
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

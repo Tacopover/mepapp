@@ -256,6 +256,7 @@ export function useSketchScene(): UseSketchScene {
     };
     const onProjectLoaded = () => {
       setFlowResult(null);
+      setCalibration(scene.getCalibration());
       setAllStamps(scene.listStamps());
       setNetworkSummaries(scene.getNetworkSummaries());
       setNetworkTypes(scene.getNetworkTypes());
@@ -282,7 +283,10 @@ export function useSketchScene(): UseSketchScene {
     const onCustomStampDefinitionsChanged = (defs: StampDefinition[]) => setCustomStampDefinitions(defs);
     const onStampLabelLayoutsChanged = (layouts: StampLabelLayouts) => setStampLabelLayouts(layouts);
     const onZoomChanged = (z: number) => setZoom(z);
-    const onPageChanged = (p: number) => setPageIndex(p);
+    const onPageChanged = (p: number) => {
+      setPageIndex(p);
+      setCalibration(scene.getCalibration());
+    };
     const onDocumentsChanged = (docs: DocumentSummary[]) => {
       setDocuments(docs);
       setActiveDocumentId(scene.getActiveDocumentId());

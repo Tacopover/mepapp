@@ -32,6 +32,12 @@ describe('buildRoomExportTable', () => {
     expect(buildRoomExportTable([room('a')], null, []).rows[0]![3]).toBeNull();
   });
 
+  it('uses the calibration of each room\'s own page', () => {
+    const rooms = [room('a'), room('b', { pageIndex: 1 }), room('c', { pageIndex: 2 })];
+    const calibrations = new Map([[0, CAL], [1, { pageUnitsPerRealUnit: 0.08 }]]);
+    expect(buildRoomExportTable(rooms, (pageIndex) => calibrations.get(pageIndex) ?? null, []).rows.map((r) => r[3])).toEqual([25, 6.25, null]);
+  });
+
   it('sorts by page, then natural room number, rooms without a number last', () => {
     const rooms = [room('p2', { pageIndex: 1, number: '0.1' }), room('x', { number: null, name: 'Unnumbered' }), room('b', { number: '1.10' }), room('a', { number: '1.2' })];
     expect(buildRoomExportTable(rooms, CAL, []).rows.map((r) => [r[0], r[1]])).toEqual([[1, '1.2'], [1, '1.10'], [1, null], [2, '0.1']]);

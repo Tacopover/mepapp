@@ -105,7 +105,16 @@ export class SketchDocument {
   readonly labelNodes = new Map<string, LabelNode>();
   readonly stamps = new Map<string, StampEntry>();
   selectedIds = new Set<string>();
-  calibration: Calibration | null = null;
+  /** The scale of each calibrated page, by page index. Saved in the project (ProjectDocument.calibrations). */
+  readonly calibrations = new Map<number, Calibration>();
+  /** The calibration of the page that is shown now, or null when that page is not calibrated. */
+  get calibration(): Calibration | null {
+    return this.calibrations.get(this.pageIndex) ?? null;
+  }
+  set calibration(calibration: Calibration | null) {
+    if (calibration) this.calibrations.set(this.pageIndex, calibration);
+    else this.calibrations.delete(this.pageIndex);
+  }
   readonly drawingHistory = new CommandManager<DrawingState>({
     segments: {},
     fittings: {},

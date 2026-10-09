@@ -728,7 +728,7 @@ export function MepSketchApp({
       return;
     }
     try {
-      const blob = await roomTableToXlsx(buildRoomExportTable(rooms, calibration, customPropertyDefs.room));
+      const blob = await roomTableToXlsx(buildRoomExportTable(rooms, (pageIndex) => sceneRef.current?.getCalibration(pageIndex) ?? null, customPropertyDefs.room));
       const suggestedName = `${(activeDoc?.fileName ?? 'rooms').replace(/\.pdf$/i, '')}-rooms.xlsx`;
       if (!supportsFileSystemAccess()) {
         downloadBlob(blob, suggestedName);
@@ -743,7 +743,7 @@ export function MepSketchApp({
     } catch (err) {
       if (!isAbortError(err)) setStatus(`Failed to export rooms: ${(err as Error).message}`);
     }
-  }, [activeDoc, calibration, customPropertyDefs.room, sceneRef]);
+  }, [activeDoc, customPropertyDefs.room, sceneRef]);
 
   const handleSave = useCallback(() => saveDocument(false), [saveDocument]);
   const handleSaveAs = useCallback(() => saveDocument(true), [saveDocument]);
