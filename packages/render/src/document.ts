@@ -141,6 +141,10 @@ export class SketchDocument {
   readonly schematicProjectFields: Record<string, string> = {};
   /** Copies of the room types this document's rooms use, from the saved file (ProjectDocument.roomTypes). The user library comes first; these fill in a type the library lacks. */
   readonly roomTypes: RoomType[] = [];
+  /** Ceiling height of this drawing, mm (ProjectDocument.ceilingHeightMm). Undefined = the user's global value. Not undoable, like the calibration. */
+  ceilingHeightMm: number | undefined = undefined;
+  /** Ceiling height per room type id in this drawing, mm (ProjectDocument.roomTypeCeilingHeightsMm). */
+  readonly roomTypeCeilingHeightsMm: Record<string, number> = {};
   readonly terminalCapacities = new Map<string, number>();
   pdfSyncIds = new Set<string>();
   nextStampSeq = 1;

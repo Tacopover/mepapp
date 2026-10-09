@@ -38,6 +38,10 @@ export interface Room {
   roomTypeId?: string;
   /** 'matched' = name matching set the type and may change it; 'user' = the user chose it (also "no type"), matching never changes it. */
   roomTypeSource?: 'matched' | 'user';
+  /** Ceiling height of this room, mm (room-values.ts resolveCeilingHeight). Absent = the room type, drawing or global value. */
+  ceilingHeightMm?: number;
+  /** Number of people the user entered. Absent = area ÷ the room type's area per person (room-values.ts roomPeople). */
+  people?: number;
 }
 
 export type RoomInput = Omit<Room, 'id'>;
@@ -155,11 +159,12 @@ export function manualRoom(pageIndex: number, outer: readonly Vec2[]): RoomInput
   return { pageIndex, polygon: { outer: outer.map((p) => ({ ...p })), holes: [] }, name: null, number: null, source: 'manual', locked: true, open: false };
 }
 
-export type RoomPatch = Partial<Pick<Room, 'polygon' | 'name' | 'number' | 'open' | 'labelAreaM2' | 'properties' | 'roomTypeId' | 'roomTypeSource'>>;
+export type RoomPatch = Partial<Pick<Room, 'polygon' | 'name' | 'number' | 'open' | 'labelAreaM2' | 'properties' | 'roomTypeId' | 'roomTypeSource' | 'ceilingHeightMm' | 'people'>>;
 
-/** Applies a change to a room. A change of polygon, name, number or custom properties, or a room type the user chose, locks the room (a re-run of Detect rooms keeps it). A patch key with the value undefined removes that field. */
+/** Applies a change to a room. A change of polygon, name, number, custom properties, ceiling height or people, or a room type the user chose, locks the room (a re-run of Detect rooms keeps it). A patch key with the value undefined removes that field. */
 export function updateRoom(room: Room, patch: RoomPatch): Room {
-  const userEdit = patch.polygon !== undefined || patch.name !== undefined || patch.number !== undefined || patch.properties !== undefined || patch.roomTypeSource === 'user';
+  const userEdit =
+    patch.polygon !== undefined || patch.name !== undefined || patch.number !== undefined || patch.properties !== undefined || patch.roomTypeSource === 'user' || 'ceilingHeightMm' in patch || 'people' in patch;
   const next: Room = { ...room, ...patch, locked: room.locked || userEdit };
   for (const key of Object.keys(patch) as (keyof RoomPatch)[]) if (patch[key] === undefined) delete next[key];
   return next;

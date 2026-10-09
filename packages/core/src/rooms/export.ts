@@ -4,6 +4,7 @@
 import type { Calibration } from '../calibration.js';
 import { coerceDefaultValue, type CustomPropertyDefinition } from '../custom-properties.js';
 import { roomAreaM2, type Room } from './room.js';
+import { CEILING_HEIGHT_LEVEL_LABELS, type RoomValues } from './room-values.js';
 
 export type RoomExportCell = string | number | boolean | null;
 
@@ -14,7 +15,26 @@ export interface RoomExportTable {
   rows: RoomExportCell[][];
 }
 
-const FIXED_HEADERS = ['Page', 'Number', 'Name', 'Room type', 'Area (m²)', 'Area in drawing (m²)', 'Needs review', 'Source', 'Details'];
+const FIXED_HEADERS = [
+  'Page',
+  'Number',
+  'Name',
+  'Room type',
+  'Area (m²)',
+  'Perimeter (m)',
+  'Length (m)',
+  'Width (m)',
+  'Ceiling height (mm)',
+  'Ceiling height from',
+  'Volume (m³)',
+  'People',
+  'Area in drawing (m²)',
+  'Needs review',
+  'Source',
+  'Details',
+];
+
+const round2 = (value: number | null | undefined): number | null => (value === null || value === undefined ? null : Math.round(value * 100) / 100);
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
@@ -25,12 +45,15 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
  * page, or a function that gives the calibration of a page. A room without a value for a custom
  * property gets the default of its definition, like the Properties panel shows. `roomTypeName`
  * gives the name of a room type id; without it, or for an unknown id, the column shows the id.
+ * `roomValues` gives the other values of a room (room-values.ts computeRoomValues); without it,
+ * or when it gives null, those columns are empty.
  */
 export function buildRoomExportTable(
   rooms: readonly Room[],
   calibration: Calibration | null | ((pageIndex: number) => Calibration | null),
   customDefinitions: readonly CustomPropertyDefinition[],
   roomTypeName: (roomTypeId: string) => string | null = () => null,
+  roomValues: (room: Room) => RoomValues | null = () => null,
 ): RoomExportTable {
   const calibrationOf = typeof calibration === 'function' ? calibration : () => calibration;
   const sorted = [...rooms].sort((a, b) => {
@@ -40,12 +63,20 @@ export function buildRoomExportTable(
   });
   const rows = sorted.map((room): RoomExportCell[] => {
     const pageCalibration = calibrationOf(room.pageIndex);
+    const values = roomValues(room);
     return [
       room.pageIndex + 1,
       room.number,
       room.name,
       room.roomTypeId ? (roomTypeName(room.roomTypeId) ?? room.roomTypeId) : null,
-      pageCalibration ? Math.round(roomAreaM2(room, pageCalibration) * 100) / 100 : null,
+      pageCalibration ? round2(roomAreaM2(room, pageCalibration)) : null,
+      round2(values?.perimeterM),
+      round2(values?.lengthM),
+      round2(values?.widthM),
+      values ? Math.round(values.ceilingHeight.mm) : null,
+      values ? CEILING_HEIGHT_LEVEL_LABELS[values.ceilingHeight.level] : null,
+      round2(values?.volumeM3),
+      values?.people?.count ?? null,
       room.labelAreaM2 ?? null,
       room.open,
       room.source,

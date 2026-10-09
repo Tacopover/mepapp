@@ -7,6 +7,7 @@ import {
   isLibraryStampId,
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
+  DEFAULT_CEILING_HEIGHT_MM,
   STAMP_LIBRARY,
   SAVED_STAMPS_SOURCE_ID,
   type Discipline,
@@ -60,6 +61,7 @@ import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
 import { RoomTypesDialog } from './components/RoomTypesDialog.js';
+import { CeilingHeightsDialog } from './components/CeilingHeightsDialog.js';
 import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { IconFlow } from './icons.js';
@@ -127,6 +129,7 @@ const FILE_TASK_BUSY_STATUS = 'Wait until the current open or save has finished.
 const XLSX_PICKER_TYPES = [{ description: 'Excel workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }];
 
 const ROOM_GAP_STORAGE_KEY = 'mepapp.settings.roomGapMm.v1';
+const CEILING_HEIGHT_STORAGE_KEY = 'mepapp.settings.ceilingHeightMm.v1';
 
 function readStoredNumber(key: string, fallback: number): number {
   try {
@@ -336,6 +339,11 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setRoomSettings({ gapMm: roomGapMm });
   }, [ready, roomGapMm, sceneRef]);
+  const [ceilingHeightMm, setCeilingHeightMm] = useState(() => readStoredNumber(CEILING_HEIGHT_STORAGE_KEY, DEFAULT_CEILING_HEIGHT_MM));
+  useEffect(() => {
+    if (ready) sceneRef.current?.setGlobalCeilingHeight(ceilingHeightMm);
+  }, [ready, ceilingHeightMm, sceneRef]);
+  const [ceilingHeightsOpen, setCeilingHeightsOpen] = useState(false);
   const [roomsVisible, setRoomsVisible] = useState(true);
   useEffect(() => () => roomClientRef.current?.dispose(), []);
   const networkTreeState = useNetworkTreeState();
@@ -743,6 +751,7 @@ export function MepSketchApp({
           (pageIndex) => sceneRef.current?.getCalibration(pageIndex) ?? null,
           customPropertyDefs.room,
           (id) => sceneRef.current?.getRoomTypes().find((t) => t.id === id)?.name ?? null,
+          (room) => sceneRef.current?.getRoomValues(room) ?? null,
         ));
       const suggestedName = `${(activeDoc?.fileName ?? 'rooms').replace(/\.pdf$/i, '')}-rooms.xlsx`;
       if (!supportsFileSystemAccess()) {
@@ -1424,6 +1433,7 @@ export function MepSketchApp({
           onCancelRoomDetection={handleCancelRoomDetection}
           onExportRooms={handleExportRooms}
           onOpenRoomTypes={() => setRoomTypesOpen(true)}
+          onOpenCeilingHeights={() => setCeilingHeightsOpen(true)}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
         />
@@ -1562,6 +1572,11 @@ export function MepSketchApp({
             setRoomGapMm(mm);
             storeNumber(ROOM_GAP_STORAGE_KEY, mm);
           }}
+          ceilingHeightMm={ceilingHeightMm}
+          onChangeCeilingHeightMm={(mm) => {
+            setCeilingHeightMm(mm);
+            storeNumber(CEILING_HEIGHT_STORAGE_KEY, mm);
+          }}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -1579,6 +1594,8 @@ export function MepSketchApp({
           onClose={() => setRoomTypesOpen(false)}
         />
       )}
+
+      {ceilingHeightsOpen && <CeilingHeightsDialog sceneRef={sceneRef} drawingName={activeDoc?.fileName ?? null} language={labelLanguage} onClose={() => setCeilingHeightsOpen(false)} />}
 
       {globalPropertiesOpen && (
         <GlobalPropertiesDialog

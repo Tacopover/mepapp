@@ -38,9 +38,11 @@ describe('serializeProject / loadProject round trip', () => {
       stampLabelLayouts: { 'fire-hose-reel': [{ id: 'l1', propertyKey: 'stamp:name', anchorX: 0.5, anchorY: 1, fontSize: 9, textColor: '#282828' }] },
       schematics: [],
       schematicProjectFields: {},
-      rooms: [{ id: 'room-1', pageIndex: 0, polygon: { outer: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], holes: [] }, name: 'Kitchen', number: '0.12', source: 'click', locked: true, open: false }],
+      rooms: [{ id: 'room-1', pageIndex: 0, polygon: { outer: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], holes: [] }, name: 'Kitchen', number: '0.12', source: 'click', locked: true, open: false, ceilingHeightMm: 2500, people: 4 }],
       calibrations: { '0': { pageUnitsPerRealUnit: 0.0283 }, '2': { pageUnitsPerRealUnit: 0.0567 } },
       roomTypes: [{ id: 'kitchen', name: 'Kitchen', keywords: ['keuken'] }],
+      ceilingHeightMm: 2900,
+      roomTypeCeilingHeightsMm: { kitchen: 2600 },
     });
     expect(serialized.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -316,6 +318,7 @@ describe('serializeProject / loadProject round trip', () => {
       rooms: [],
       calibrations: {},
       roomTypes: [],
+      roomTypeCeilingHeightsMm: {},
     };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
     try {
@@ -339,7 +342,7 @@ describe('calibrations in the save format', () => {
   });
 
   it('rejects a calibration that is not a positive number or a key that is not a page index', () => {
-    const bad = { ...v13, schemaVersion: CURRENT_SCHEMA_VERSION, roomTypes: [], calibrations: { '0': { pageUnitsPerRealUnit: 0 }, page1: { pageUnitsPerRealUnit: 1 }, '3': null } };
+    const bad = { ...v13, schemaVersion: CURRENT_SCHEMA_VERSION, roomTypes: [], roomTypeCeilingHeightsMm: {}, calibrations: { '0': { pageUnitsPerRealUnit: 0 }, page1: { pageUnitsPerRealUnit: 1 }, '3': null } };
     try {
       loadProject(bad);
       expect.unreachable();
@@ -348,6 +351,38 @@ describe('calibrations in the save format', () => {
         { path: 'calibrations.0.pageUnitsPerRealUnit', message: 'expected a positive number' },
         { path: 'calibrations.3.pageUnitsPerRealUnit', message: 'expected a positive number' },
         { path: 'calibrations.page1', message: 'expected a page index' },
+      ]);
+    }
+  });
+});
+
+describe('ceiling heights in the save format', () => {
+  const v15 = {
+    schemaVersion: 15, networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {},
+    circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, rooms: [], calibrations: {}, roomTypes: [],
+  };
+
+  it('loads a version 15 save with no drawing or room type heights', () => {
+    const loaded = loadProject(v15);
+    expect(loaded.ceilingHeightMm).toBeUndefined();
+    expect(loaded.roomTypeCeilingHeightsMm).toEqual({});
+  });
+
+  it('keeps the drawing and room type heights', () => {
+    const loaded = loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, ceilingHeightMm: 3000, roomTypeCeilingHeightsMm: { toilet: 2400 } });
+    expect(loaded.ceilingHeightMm).toBe(3000);
+    expect(loaded.roomTypeCeilingHeightsMm).toEqual({ toilet: 2400 });
+  });
+
+  it('rejects a height that is not a positive number', () => {
+    try {
+      loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, ceilingHeightMm: -1, roomTypeCeilingHeightsMm: { toilet: 0, office: '2600' } });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as ProjectLoadError).issues).toEqual([
+        { path: 'ceilingHeightMm', message: 'expected a positive number' },
+        { path: 'roomTypeCeilingHeightsMm.toilet', message: 'expected a positive number' },
+        { path: 'roomTypeCeilingHeightsMm.office', message: 'expected a positive number' },
       ]);
     }
   });

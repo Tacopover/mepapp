@@ -1,6 +1,6 @@
 # Automatic stamp placement in rooms — plan
 
-Status: **Phase 0 done 2026-10-09 (branch `worktree-room-placement-phase0`, not merged). Phase 1 done 2026-10-09 (branch `worktree-room-placement-phase1`, built on Phase 0, not merged). Phases 2-8 not started.** Follows [[room-detection]] (its Phase 9 "Element-to-room assignment and per-room calculations" is replaced by this plan). The next plan after this one is routing from main equipment to the placed stamps. This plan does not cover routing.
+Status: **Phase 0 done 2026-10-09 (branch `worktree-room-placement-phase0`, not merged). Phase 1 done 2026-10-09 (branch `worktree-room-placement-phase1`, built on Phase 0, not merged). Phase 2 done 2026-10-09 (branch `worktree-room-placement-phase2`, built on Phase 1, not merged). Phases 3-8 not started.** Follows [[room-detection]] (its Phase 9 "Element-to-room assignment and per-room calculations" is replaced by this plan). The next plan after this one is routing from main equipment to the placed stamps. This plan does not cover routing.
 
 ## 1. Goal
 
@@ -160,6 +160,14 @@ Each phase ends with tests (core: vitest), `pnpm build`, `pnpm typecheck`, and a
    - Schema: `ProjectDocument.ceilingHeightMm?`, `roomTypeCeilingHeightsMm`, `Room.ceilingHeightMm?`, `Room.people?`.
    - UI: global height in Settings. PDF height and room-type heights in a "Building values" section (Rooms toolbar or Drawings panel — decide when building). Room Properties shows height with its level, volume, perimeter, length × width, people.
    - Excel export: new fixed columns.
+   - STATUS 2026-10-09: DONE (branch `worktree-room-placement-phase2`, not merged). What was built:
+     - Core `rooms/room-values.ts`: `resolveCeilingHeight` (room → room type → drawing → global, a value that is not a positive number is skipped), `roomPerimeterM` (outer ring plus holes), `roomMinBoundingRect` (convex hull + one candidate per hull edge; length, width, main axis in [0, 180) degrees, page space y down), `roomVolumeM3`, `roomPeople` (room value, else area ÷ area per person rounded up), `computeRoomValues` (scale values are null without a calibration), `CEILING_HEIGHT_LEVEL_LABELS`, `DEFAULT_CEILING_HEIGHT_MM` = 2700.
+     - Schema 16: `ProjectDocument.ceilingHeightMm?`, `roomTypeCeilingHeightsMm` (migration gives `{}`, validator: positive numbers), `Room.ceilingHeightMm?`, `Room.people?`. A ceiling height or people edit locks the room. Split gives both pieces the height; merge takes the height of the room that gives the name.
+     - Scene: `setGlobalCeilingHeight`, `getCeilingHeights`, `setDrawingCeilingHeight`, `setRoomTypeCeilingHeight` (not undoable, like the calibration; they mark the drawing unsaved), `getRoomValues(room)`, `setRoomValues(ids, patch)` (one undo step).
+     - UI: Settings › Rooms › "Default ceiling height (mm)" (`mepapp.settings.ceilingHeightMm.v1`, 1000-30000). Menu › Ceiling heights… (`CeilingHeightsDialog.tsx`): drawing height and one box per room type with its room count; an empty box uses the level above. Room Properties: perimeter, length × width, ceiling height box (placeholder = inherited value) with a level hint, volume, people box with a hint; for a multi-selection a shared height box, total volume and total people. `OptionalNumberInput.tsx`: an empty box removes the value.
+     - Excel: new columns after Area: Perimeter (m), Length (m), Width (m), Ceiling height (mm), Ceiling height from, Volume (m³), People. `RESERVED_ROOM_PROPERTY_NAMES` has the new names.
+   - Verified: core tests 746 pass (23 new: chain levels, perimeter with a hole, rotated and L-shaped bounding rectangles, people rounding, values without calibration, lock rule, schema 16 load/validate, export columns), all package tests pass, `pnpm build` 9/9, `pnpm typecheck` 16/16. Browser check (Playwright, real DOM, `01_arch_first_floor.pdf` at 1:50): Settings default 2700 → 2800 shows at once and is stored; drawing 3000 and toilet type 2400 in the dialog give the correct level per room; a room value 2500 wins, locks the room, changes the volume, and Undo removes it; people refuses 1.5; area per person 4 m² gives ceil(area ÷ 4); a two-room selection sets both heights in one undo step; save + reload keeps the drawing, type and room values. 22/22 checks, no page errors.
+   - Not done / open: the drawing and room-type heights have no undo; the Excel columns are checked by a unit test only (no browser export); the canvas label does not show the values.
 3. **Placement rules: model, editor and dry run.**
    - Core: `PlacementRule`, validation, `calculateRoomRequirement(rule, roomValues)` → `{ required, quantityCount }`. Tests for every preset with hand-calculated numbers.
    - UI: "Placement rules" dialog (list + form). Import and export JSON. Example rules.
@@ -176,7 +184,7 @@ Each phase ends with tests (core: vitest), `pnpm build`, `pnpm typecheck`, and a
 ## 6. Open points
 
 - ~~Phase 0: one calibration per document or per page.~~ Per page (user confirmed 2026-10-09).
-- Phase 2: where the PDF-level and room-type heights are edited in the UI.
+- ~~Phase 2: where the PDF-level and room-type heights are edited in the UI.~~ Menu › Ceiling heights… (one dialog per drawing).
 - Phase 4: what happens to a stamp that does not fit in a very small room (place it at the label point and warn, or skip it and warn). Proposal: place it at the label point and warn.
 - Rule and room-type storage moves from `localStorage` to `SettingsStore` when that store is wired up ([[storage-interfaces]] Phase 3). Use one small load/save module per library, so the move is one change.
 - Units: the rule's unit is free text. MepApp does not convert units. The capacity and the required amount must use the same unit.

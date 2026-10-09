@@ -1,6 +1,21 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { coerceDefaultValue, parseDecimal, roomAreaM2, roomAreaWarning, roomTypeLabel, type Calibration, type CustomPropertyDefinition, type Room, type RoomType } from '@mepapp/core';
+import {
+  coerceDefaultValue,
+  isValidPeopleCount,
+  parseDecimal,
+  resolveCeilingHeight,
+  roomAreaM2,
+  roomAreaWarning,
+  roomPeople,
+  roomTypeLabel,
+  type Calibration,
+  type CeilingHeightLevel,
+  type CustomPropertyDefinition,
+  type Room,
+  type RoomType,
+} from '@mepapp/core';
+import { OptionalNumberInput } from './OptionalNumberInput.js';
 
 /** Text input that commits on blur or Enter, not on every keystroke (one undo step per edit). An `onCommit` that returns false rejects the text, and the box shows the stored value again. */
 function CommitInput({ value, onCommit }: { value: string; onCommit: (value: string) => boolean | void }) {
@@ -71,6 +86,134 @@ function RoomTypeSelect({ sceneRef, rooms, roomTypes, language }: RoomTypeSelect
   );
 }
 
+export const MIN_CEILING_HEIGHT_MM = 1000;
+export const MAX_CEILING_HEIGHT_MM = 30000;
+const allowHeight = (mm: number) => mm >= MIN_CEILING_HEIGHT_MM && mm <= MAX_CEILING_HEIGHT_MM;
+const allowPeople = (n: number) => isValidPeopleCount(n) && n <= 100000;
+
+const m = (value: number | null, unit = 'm') => (value === null ? 'Not calibrated' : `${value.toFixed(2)} ${unit}`);
+
+function levelText(level: CeilingHeightLevel, typeName: string | null): string {
+  if (level === 'room') return 'Set for this room. Clear the box to use the value above it.';
+  if (level === 'roomType') return `From room type ${typeName ?? ''} in this drawing (Menu › Ceiling heights).`;
+  if (level === 'pdf') return 'From this drawing (Menu › Ceiling heights).';
+  return 'From Settings (the default ceiling height).';
+}
+
+interface RoomValueFieldsProps {
+  sceneRef: RefObject<SketchScene | null>;
+  room: Room;
+  roomTypes: (RoomType & { inLibrary: boolean })[];
+  language: 'en' | 'nl';
+}
+
+/** Perimeter, length × width, ceiling height with its level, volume and people of one room (room-auto-placement.md Phase 2). */
+function RoomValueFields({ sceneRef, room, roomTypes, language }: RoomValueFieldsProps) {
+  const scene = sceneRef.current;
+  if (!scene) return null;
+  const values = scene.getRoomValues(room);
+  const type = roomTypes.find((t) => t.id === room.roomTypeId);
+  const typeName = type ? roomTypeLabel(type, language) : (room.roomTypeId ?? null);
+  const inherited = resolveCeilingHeight({ ...(room.roomTypeId !== undefined ? { roomTypeId: room.roomTypeId } : {}) }, scene.getCeilingHeights());
+  const inheritedPeople = roomPeople({}, values.areaM2, type);
+  const set = (patch: Parameters<SketchScene['setRoomValues']>[1]) => scene.setRoomValues([room.id], patch);
+  const peopleHint =
+    values.people?.source === 'room'
+      ? 'Set for this room. Clear the box to use the area per person of the room type.'
+      : values.people
+        ? `Area ÷ ${type?.areaPerPersonM2} m² per person of room type ${typeName}, rounded up.`
+        : type
+          ? `Room type ${typeName} has no area per person (Menu › Room types).`
+          : 'Give the room a type with an area per person, or enter a number.';
+  return (
+    <>
+      <div className="mep-field-row">
+        <label>Perimeter</label>
+        <input type="text" value={m(values.perimeterM)} disabled />
+      </div>
+      <div className="mep-field-row">
+        <label>Length × width</label>
+        <input type="text" value={values.lengthM !== null && values.widthM !== null ? `${values.lengthM.toFixed(2)} × ${values.widthM.toFixed(2)} m` : 'Not calibrated'} disabled />
+      </div>
+      <div className="mep-field-row">
+        <label htmlFor="room-ceiling-height">Ceiling height (mm)</label>
+        <OptionalNumberInput
+          id="room-ceiling-height"
+          value={room.ceilingHeightMm}
+          placeholder={String(inherited.mm)}
+          allow={allowHeight}
+          onCommit={(mm) => set({ ceilingHeightMm: mm ?? undefined })}
+        />
+      </div>
+      <p className="mep-settings-hint" data-testid="room-ceiling-level">
+        {levelText(values.ceilingHeight.level, typeName)}
+      </p>
+      <div className="mep-field-row">
+        <label>Volume</label>
+        <input type="text" value={m(values.volumeM3, 'm³')} disabled />
+      </div>
+      <div className="mep-field-row">
+        <label htmlFor="room-people">People</label>
+        <OptionalNumberInput
+          id="room-people"
+          value={room.people}
+          placeholder={inheritedPeople ? String(inheritedPeople.count) : 'none'}
+          allow={allowPeople}
+          onCommit={(n) => set({ people: n ?? undefined })}
+        />
+      </div>
+      <p className="mep-settings-hint">{peopleHint}</p>
+    </>
+  );
+}
+
+function totalPeopleText(people: (number | undefined)[]): string {
+  const known = people.filter((n): n is number => n !== undefined);
+  if (known.length === 0) return 'Unknown';
+  const sum = known.reduce((a, b) => a + b, 0);
+  const unknown = people.length - known.length;
+  return unknown === 0 ? String(sum) : `${sum} (${unknown} room${unknown === 1 ? '' : 's'} unknown)`;
+}
+
+/** Ceiling height and volume of several rooms. The height box sets the room value of every selected room. */
+function MultiRoomValueFields({ sceneRef, rooms }: { sceneRef: RefObject<SketchScene | null>; rooms: Room[] }) {
+  const scene = sceneRef.current;
+  if (!scene) return null;
+  const values = rooms.map((r) => scene.getRoomValues(r));
+  const heights = new Set(values.map((v) => v.ceilingHeight.mm));
+  const own = new Set(rooms.map((r) => r.ceilingHeightMm));
+  const volumes = values.map((v) => v.volumeM3);
+  const totalVolume = volumes.every((v) => v !== null) ? volumes.reduce((sum, v) => sum + v!, 0) : null;
+  const people = values.map((v) => v.people?.count);
+  return (
+    <>
+      <div className="mep-field-row">
+        <label htmlFor="room-ceiling-height">Ceiling height (mm)</label>
+        <OptionalNumberInput
+          id="room-ceiling-height"
+          value={own.size === 1 ? [...own][0] : undefined}
+          placeholder={heights.size === 1 ? String([...heights][0]) : 'Mixed'}
+          allow={allowHeight}
+          onCommit={(mm) =>
+            scene.setRoomValues(
+              rooms.map((r) => r.id),
+              { ceilingHeightMm: mm ?? undefined },
+            )
+          }
+        />
+      </div>
+      <div className="mep-field-row">
+        <label>Total volume</label>
+        <input type="text" value={m(totalVolume, 'm³')} disabled />
+      </div>
+      <div className="mep-field-row">
+        <label>Total people</label>
+        <input type="text" value={totalPeopleText(people)} disabled />
+      </div>
+    </>
+  );
+}
+
 export interface RoomPropertiesProps {
   sceneRef: RefObject<SketchScene | null>;
   rooms: Room[];
@@ -98,6 +241,7 @@ export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDef
             <input type="text" value={total !== null ? `${total.toFixed(1)} m²` : 'Not calibrated'} disabled />
           </div>
           <RoomTypeSelect sceneRef={sceneRef} rooms={rooms} roomTypes={roomTypes} language={language} />
+          <MultiRoomValueFields sceneRef={sceneRef} rooms={rooms} />
           {rooms.length === 2 && (
             <button type="button" onClick={() => sceneRef.current?.mergeSelectedRooms()}>
               Merge rooms
@@ -141,6 +285,7 @@ export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDef
           </div>
         )}
         {warning && <p className="mep-settings-hint">The computed area differs {Math.round(warning.deviation * 100)}% from the area printed in the drawing. Check the outline.</p>}
+        <RoomValueFields sceneRef={sceneRef} room={room} roomTypes={roomTypes} language={language} />
         <div className="mep-field-row">
           <label>Needs review</label>
           <input type="checkbox" checked={room.open} onChange={(e) => update({ open: e.target.checked })} />

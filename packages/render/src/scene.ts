@@ -18,8 +18,13 @@ import {
   updateRoom as updateRoomFields,
   applyRoomTypeMatch,
   ROOM_TYPE_LIBRARY,
+  computeRoomValues,
+  DEFAULT_CEILING_HEIGHT_MM,
+  isValidCeilingHeightMm,
+  type CeilingHeightContext,
   type Room,
   type RoomType,
+  type RoomValues,
   CIRCUIT_TYPE_LIBRARY,
   getCircuitTypeFromLibrary,
   getCircuitTypeUsage,
@@ -539,6 +544,11 @@ class TypedEmitter<Events extends Record<string, unknown[]>> {
   }
 }
 
+/** The ceiling height of a room, to carry over to the rooms made from it (split, merge). */
+function ceilingHeightField(room: Room): Pick<Room, 'ceilingHeightMm'> {
+  return room.ceilingHeightMm !== undefined ? { ceilingHeightMm: room.ceilingHeightMm } : {};
+}
+
 /** The room type fields of a room, to carry over to a room made from it (split, merge). */
 function roomTypeFields(room: Room): Pick<Room, 'roomTypeId' | 'roomTypeSource'> {
   return { ...(room.roomTypeId !== undefined ? { roomTypeId: room.roomTypeId } : {}), ...(room.roomTypeSource !== undefined ? { roomTypeSource: room.roomTypeSource } : {}) };
@@ -610,6 +620,8 @@ export class SketchScene {
   private roomSettings: { gapMm?: number } = {};
   /** The user library of room types (set by the UI with setRoomTypeLibrary). Name matching uses it. */
   private roomTypeLibrary: RoomType[] = ROOM_TYPE_LIBRARY.map((t) => ({ ...t, keywords: [...t.keywords] }));
+  /** The user's global ceiling height (Settings), mm: the first level of the ceiling height chain. */
+  private globalCeilingHeightMm = DEFAULT_CEILING_HEIGHT_MM;
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
   private angleSnapDegrees = DEFAULT_ANGLE_SNAP_DEGREES;
   private resizeObserver: ResizeObserver | null = null;
@@ -2807,6 +2819,56 @@ export class SketchScene {
     return pairs.length;
   }
 
+  /** Sets the user's global ceiling height (Settings), mm. A value that is not a positive number is ignored. */
+  setGlobalCeilingHeight(mm: number): void {
+    if (!isValidCeilingHeightMm(mm) || mm === this.globalCeilingHeightMm) return;
+    this.globalCeilingHeightMm = mm;
+    this.emitter.emit('roomsChanged');
+  }
+
+  /** The levels of the ceiling height chain above the room, for the active document. */
+  getCeilingHeights(): CeilingHeightContext & { roomTypeMm: Record<string, number> } {
+    return { globalMm: this.globalCeilingHeightMm, ...(this.doc.ceilingHeightMm !== undefined ? { pdfMm: this.doc.ceilingHeightMm } : {}), roomTypeMm: { ...this.doc.roomTypeCeilingHeightsMm } };
+  }
+
+  /** Sets the ceiling height of the active document, mm; null removes it (the global value applies). Not undoable, like the calibration. */
+  setDrawingCeilingHeight(mm: number | null): void {
+    if (mm !== null && !isValidCeilingHeightMm(mm)) return;
+    const next = mm ?? undefined;
+    if (next === this.doc.ceilingHeightMm) return;
+    this.doc.ceilingHeightMm = next;
+    this.notifyRoomsChanged();
+  }
+
+  /** Sets the ceiling height of a room type in the active document, mm; null removes it (the drawing value applies). Not undoable. */
+  setRoomTypeCeilingHeight(roomTypeId: string, mm: number | null): void {
+    if (mm !== null && !isValidCeilingHeightMm(mm)) return;
+    const heights = this.doc.roomTypeCeilingHeightsMm;
+    if ((heights[roomTypeId] ?? null) === mm) return;
+    if (mm === null) delete heights[roomTypeId];
+    else heights[roomTypeId] = mm;
+    this.notifyRoomsChanged();
+  }
+
+  /** The values of a room of the active document: area, perimeter, length and width, ceiling height with its level, volume and people. A value that needs the scale is null when the room's page is not calibrated. */
+  getRoomValues(room: Room): RoomValues {
+    const type = room.roomTypeId !== undefined ? this.resolveRoomType(this.doc, room.roomTypeId) : undefined;
+    return computeRoomValues(room, this.getCalibration(room.pageIndex), this.getCeilingHeights(), type);
+  }
+
+  /** Sets the ceiling height or the number of people of rooms as ONE undo step. A value undefined removes the room's own value. The rooms are locked. Returns false when no room changed. */
+  setRoomValues(ids: readonly string[], patch: Pick<RoomPatch, 'ceilingHeightMm' | 'people'>): boolean {
+    const rooms = this.doc.drawingHistory.getState().rooms;
+    const before = ids.map((id) => rooms[id]).filter((r): r is Room => r !== undefined);
+    const after = before.map((room) => updateRoomFields(room, patch));
+    const changed = after.filter((r, i) => JSON.stringify(r) !== JSON.stringify(before[i]));
+    if (changed.length === 0) return false;
+    const changedIds = new Set(changed.map((r) => r.id));
+    this.doc.drawingHistory.execute(replaceRoomsCommand(changed.length === 1 ? `Set values of ${changed[0]!.id}` : `Set values of ${changed.length} rooms`, before.filter((r) => changedIds.has(r.id)), changed));
+    this.notifyRoomsChanged();
+    return true;
+  }
+
   /** The selected rooms of the edit-room tool, in the order of listRooms. */
   getSelectedRooms(): Room[] {
     return this.listRooms().filter((r) => this.selectedRoomIds.has(r.id));
@@ -2920,8 +2982,8 @@ export class SketchScene {
     const [big, small] = polygonAreaPt2(pieces[0]) >= polygonAreaPt2(pieces[1]) ? pieces : [pieces[1], pieces[0]];
     const base = { pageIndex: room.pageIndex, source: room.source, locked: true, open: room.open };
     const added: Room[] = [
-      { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: big, name: room.name, number: room.number, ...(room.labelAreaM2 !== undefined ? { labelAreaM2: room.labelAreaM2 } : {}), ...(room.details ? { details: room.details } : {}), ...roomTypeFields(room) },
-      { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: small, name: null, number: null },
+      { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: big, name: room.name, number: room.number, ...(room.labelAreaM2 !== undefined ? { labelAreaM2: room.labelAreaM2 } : {}), ...(room.details ? { details: room.details } : {}), ...roomTypeFields(room), ...ceilingHeightField(room) },
+      { ...base, id: roomId(this.doc.nextRoomSeq++), polygon: small, name: null, number: null, ...ceilingHeightField(room) },
     ];
     this.doc.drawingHistory.execute(replaceRoomsCommand('Split room', [room], added));
     this.notifyRoomsChanged();
@@ -2951,6 +3013,7 @@ export class SketchScene {
       return false;
     }
     const [big, small] = polygonAreaPt2(first.polygon) >= polygonAreaPt2(second.polygon) ? [first, second] : [second, first];
+    const named = big.name !== null || small.name === null ? big : small;
     const merged: Room = {
       id: roomId(this.doc.nextRoomSeq++),
       pageIndex: big.pageIndex,
@@ -2960,7 +3023,8 @@ export class SketchScene {
       source: big.source,
       locked: true,
       open: false,
-      ...roomTypeFields(big.name !== null || small.name === null ? big : small),
+      ...roomTypeFields(named),
+      ...ceilingHeightField(named),
     };
     const plan = this.planRoomOverlaps(merged.pageIndex, [merged], [first.id, second.id]);
     const final = plan?.add[0] ?? merged;
@@ -3358,6 +3422,8 @@ export class SketchScene {
       rooms: Object.values(state.rooms),
       calibrations: Object.fromEntries([...doc.calibrations].map(([pageIndex, calibration]) => [String(pageIndex), calibration])),
       roomTypes: this.usedRoomTypes(doc, Object.values(state.rooms)),
+      ...(doc.ceilingHeightMm !== undefined ? { ceilingHeightMm: doc.ceilingHeightMm } : {}),
+      roomTypeCeilingHeightsMm: { ...doc.roomTypeCeilingHeightsMm },
     }) as unknown as ProjectDocument;
   }
 
@@ -3423,6 +3489,9 @@ export class SketchScene {
     for (const key of Object.keys(target.schematicProjectFields)) delete target.schematicProjectFields[key];
     Object.assign(target.schematicProjectFields, doc.schematicProjectFields);
     target.roomTypes.splice(0, target.roomTypes.length, ...doc.roomTypes);
+    target.ceilingHeightMm = doc.ceilingHeightMm;
+    for (const key of Object.keys(target.roomTypeCeilingHeightsMm)) delete target.roomTypeCeilingHeightsMm[key];
+    Object.assign(target.roomTypeCeilingHeightsMm, doc.roomTypeCeilingHeightsMm);
     target.calibrations.clear();
     for (const [pageIndex, calibration] of Object.entries(doc.calibrations)) target.calibrations.set(Number(pageIndex), calibration);
     target.terminalCapacities.clear();

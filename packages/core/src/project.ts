@@ -16,7 +16,7 @@ import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 15;
+export const CURRENT_SCHEMA_VERSION = 16;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -47,6 +47,10 @@ export interface ProjectDocument {
   calibrations: Record<string, Calibration>;
   /** A copy of each room type the rooms use (room-auto-placement.md Phase 1), so the file still shows them where the user library lacks them. */
   roomTypes: RoomType[];
+  /** Ceiling height of this drawing, mm (room-auto-placement.md Phase 2). Absent = the user's global value. */
+  ceilingHeightMm?: number;
+  /** Ceiling height per room type id in this drawing, mm. A type without an entry uses the drawing value. */
+  roomTypeCeilingHeightsMm: Record<string, number>;
 }
 
 const migrationSteps: MigrationStep[] = [
@@ -262,6 +266,16 @@ const migrationSteps: MigrationStep[] = [
       roomTypes: [],
     }),
   },
+  {
+    fromVersion: 15,
+    toVersion: 16,
+    // Version 15 predates ceiling heights, so every room uses the global value.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 16,
+      roomTypeCeilingHeightsMm: {},
+    }),
+  },
 ];
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -280,6 +294,19 @@ function validateCalibrations(data: JsonRecord): ValidationIssue[] {
     if (!/^(0|[1-9][0-9]*)$/.test(key)) issues.push({ path: `calibrations.${key}`, message: 'expected a page index' });
     const factor = value && typeof value === 'object' ? (value as JsonRecord).pageUnitsPerRealUnit : undefined;
     if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0) issues.push({ path: `calibrations.${key}.pageUnitsPerRealUnit`, message: 'expected a positive number' });
+  }
+  return issues;
+}
+
+const isPositiveNumber = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+function validateCeilingHeights(data: JsonRecord): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (data.ceilingHeightMm !== undefined && !isPositiveNumber(data.ceilingHeightMm)) issues.push({ path: 'ceilingHeightMm', message: 'expected a positive number' });
+  const record = requireRecord(data, 'roomTypeCeilingHeightsMm');
+  if (record.length > 0) return [...issues, ...record];
+  for (const [key, value] of Object.entries(data.roomTypeCeilingHeightsMm as JsonRecord)) {
+    if (!isPositiveNumber(value)) issues.push({ path: `roomTypeCeilingHeightsMm.${key}`, message: 'expected a positive number' });
   }
   return issues;
 }
@@ -303,6 +330,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'rooms'),
   validateCalibrations,
   (data: JsonRecord) => requireArray(data, 'roomTypes'),
+  validateCeilingHeights,
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

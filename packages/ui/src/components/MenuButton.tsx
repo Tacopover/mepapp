@@ -16,6 +16,7 @@ export interface MenuButtonProps {
   onCancelRoomDetection: () => void;
   onExportRooms: () => void;
   onOpenRoomTypes: () => void;
+  onOpenCeilingHeights: () => void;
   wallDebugVisible: boolean;
   onToggleWallDebug: () => void;
 }
@@ -34,6 +35,7 @@ export function MenuButton({
   onCancelRoomDetection,
   onExportRooms,
   onOpenRoomTypes,
+  onOpenCeilingHeights,
   wallDebugVisible,
   onToggleWallDebug,
 }: MenuButtonProps) {
@@ -153,6 +155,16 @@ export function MenuButton({
             }}
           >
             Room types…
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            onClick={() => {
+              onOpenCeilingHeights();
+              setOpen(false);
+            }}
+          >
+            Ceiling heights…
           </button>
           {isDebugToolsEnabled() && (
             <>
