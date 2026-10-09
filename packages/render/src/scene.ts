@@ -46,6 +46,7 @@ import {
   getStampDefinition,
   getStampPorts,
   loadProject,
+  markAutoPlacedMoved,
   matchPortsByLocation,
   mergeSegmentsAtFitting,
   multiRotate,
@@ -561,7 +562,8 @@ export interface AutoPlaceGroup {
   bitmap: ImageBitmap;
   /** The remembered color and scale of the definition (the stamp tool's appearance default). */
   appearanceDefault?: { color?: string; scale?: number };
-  stamps: { position: Vec2; rotationDegrees: number; ruleId: string; roomId: string; capacity?: number }[];
+  /** `roomKey` = roomPlacementKey of the room, written on the stamp. */
+  stamps: { position: Vec2; rotationDegrees: number; ruleId: string; roomId: string; roomKey?: string; capacity?: number }[];
 }
 
 export class SketchScene {
@@ -574,6 +576,8 @@ export class SketchScene {
   /** Scene-level, like stampGhostLayer: the translucent sprites of the auto-placement preview (showAutoPlacePreview). */
   private readonly autoPlacePreviewLayer = new Container();
   private autoPlacePreviewTextures: Texture[] = [];
+  /** Placed stamps the auto-placement preview hides, because the placement replaces them. */
+  private autoPlacePreviewHidden: Sprite[] = [];
   /** The stamp-placement preview's current rotation (Space advances this by 45°) — persists across repeated placements of the same stamp until Escape, a tool switch, or a different stamp pick resets it to 0. Also becomes the next placed stamp's initial rotationDegrees (see placeStamp). */
   private stampGhostRotationDegrees = 0;
   /** Alignment guide(s) matched at the ghost's current (snapped) position — see resolveSnappedPoint's 'place-stamp' case. Drawn in redrawOverlay while a place-* tool is active, same as move-selection's drag.guides. */
@@ -2491,14 +2495,14 @@ export class SketchScene {
     tx.update((s) => {
       const stamps = { ...s.stamps };
       for (const id of stampIds) {
-        stamps[id] = {
+        stamps[id] = markAutoPlacedMoved({
           ...stamps[id],
           category: definition.category,
           definitionId: definition.id,
           ports: definition.ports.map((port) => ({ ...port })),
           nativeWidth: definition.nativeWidth,
           nativeHeight: definition.nativeHeight,
-        };
+        });
       }
       const detached = this.detachLostPortEnds(s, removed);
       const segments = this.remapPortEnds(detached.segments, remaps);
@@ -2554,9 +2558,18 @@ export class SketchScene {
     this.angleSnapDegrees = degrees;
   }
 
-  /** Shows translucent sprites where auto-placement would put stamps. Replaces an earlier preview. Nothing is added to the drawing. */
-  showAutoPlacePreview(groups: readonly AutoPlaceGroup[]): void {
+  /**
+   * Shows translucent sprites where auto-placement would put stamps, and hides the placed stamps in
+   * `replaceIds` (the stamps a re-run replaces). Replaces an earlier preview. Nothing is added to the drawing.
+   */
+  showAutoPlacePreview(groups: readonly AutoPlaceGroup[], replaceIds: readonly string[] = []): void {
     this.clearAutoPlacePreview();
+    for (const id of replaceIds) {
+      const sprite = this.doc.stamps.get(id)?.sprite;
+      if (!sprite || !sprite.visible) continue;
+      sprite.visible = false;
+      this.autoPlacePreviewHidden.push(sprite);
+    }
     for (const group of groups) {
       if (group.stamps.length === 0) continue;
       const texture = textureFromImageBitmap(group.bitmap);
@@ -2576,6 +2589,8 @@ export class SketchScene {
 
   /** Removes the auto-placement preview. */
   clearAutoPlacePreview(): void {
+    for (const sprite of this.autoPlacePreviewHidden) if (!sprite.destroyed) sprite.visible = true;
+    this.autoPlacePreviewHidden = [];
     for (const child of this.autoPlacePreviewLayer.removeChildren()) child.destroy();
     for (const texture of this.autoPlacePreviewTextures) texture.destroy();
     this.autoPlacePreviewTextures = [];
@@ -2586,9 +2601,10 @@ export class SketchScene {
    * the stamp tool places one: a new id, the definition's ports and port groups, the remembered
    * appearance. A user-library or custom definition is copied into the document first. Each stamp
    * records its rule and room (`autoPlaced`). A `capacity` is written to the stamp's flow-solve
-   * capacity. Returns the new stamp ids, which become the selection.
+   * capacity. The stamps in `replaceIds` (unmoved stamps of a re-run) are removed in the same undo
+   * step. Returns the new stamp ids, which become the selection.
    */
-  autoPlaceStamps(groups: readonly AutoPlaceGroup[]): string[] {
+  autoPlaceStamps(groups: readonly AutoPlaceGroup[], replaceIds: readonly string[] = []): string[] {
     this.clearAutoPlacePreview();
     const placed: PlacedStamp[] = [];
     for (const group of groups) {
@@ -2611,7 +2627,7 @@ export class SketchScene {
           ports: definition.ports.map((port) => ({ ...port })),
           definitionId: definition.id,
           ...(group.appearanceDefault?.color !== undefined ? { color: group.appearanceDefault.color } : {}),
-          autoPlaced: { ruleId: planned.ruleId, roomId: planned.roomId, moved: false },
+          autoPlaced: { ruleId: planned.ruleId, roomId: planned.roomId, moved: false, ...(planned.roomKey !== undefined ? { roomKey: planned.roomKey } : {}) },
         };
         const sprite = new Sprite(texture);
         sprite.anchor.set(0.5);
@@ -2624,14 +2640,17 @@ export class SketchScene {
         placed.push(data);
       }
     }
-    if (placed.length === 0) return [];
+    const removeIds = replaceIds.filter((id) => this.doc.drawingHistory.getState().stamps[id]);
+    if (placed.length === 0 && removeIds.length === 0) return [];
     const tx = new Transaction(this.doc.drawingHistory, `Auto-place ${placed.length} stamp${placed.length === 1 ? '' : 's'}`);
     tx.update((s) => {
-      const stamps = { ...s.stamps };
+      const next = this.withoutStamps(s, removeIds);
+      const stamps = { ...next.stamps };
       for (const stamp of placed) stamps[stamp.id] = stamp;
-      return { ...s, stamps };
+      return { ...next, stamps };
     });
     tx.commit();
+    if (removeIds.length > 0) this.notifyCircuitsChanged();
     this.doc.selectedIds = new Set(placed.map((p) => p.id));
     this.syncDrawingLayer();
     this.syncLabels();
@@ -2640,6 +2659,35 @@ export class SketchScene {
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
     return placed.map((p) => p.id);
+  }
+
+  /** Every placed stamp that auto-placement made (`autoPlaced` is set), for a re-run or a removal. */
+  listAutoPlacedStamps(): PlacedStamp[] {
+    return Object.values(this.doc.drawingHistory.getState().stamps).filter((stamp) => stamp.autoPlaced);
+  }
+
+  /**
+   * Removes the given auto-placed stamps as one undo step (Remove auto-placed stamps). A stamp that
+   * is not auto-placed is skipped. Their capacities stay, so an undo gives them back with the capacity.
+   * Returns the number of removed stamps.
+   */
+  removeAutoPlacedStamps(ids: readonly string[]): number {
+    const state = this.doc.drawingHistory.getState();
+    const removeIds = ids.filter((id) => state.stamps[id]?.autoPlaced);
+    if (removeIds.length === 0) return 0;
+    this.clearAutoPlacePreview();
+    const tx = new Transaction(this.doc.drawingHistory, `Remove ${removeIds.length} auto-placed stamp${removeIds.length === 1 ? '' : 's'}`);
+    tx.update((s) => this.withoutStamps(s, removeIds));
+    tx.commit();
+    this.notifyCircuitsChanged();
+    for (const id of removeIds) this.doc.selectedIds.delete(id);
+    this.syncDrawingLayer();
+    this.syncLabels();
+    this.recomputeFlow();
+    this.redrawOverlay();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+    return removeIds.length;
   }
 
   /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
@@ -2679,7 +2727,7 @@ export class SketchScene {
     tx.update((state) => {
       const data = state.stamps[elementId];
       if (!data) return state;
-      return { ...state, stamps: { ...state.stamps, [elementId]: { ...data, properties: { ...data.properties, [name]: value } } } };
+      return { ...state, stamps: { ...state.stamps, [elementId]: markAutoPlacedMoved({ ...data, properties: { ...data.properties, [name]: value } }) } };
     });
     tx.commit();
     this.markDirty();
@@ -3986,7 +4034,7 @@ export class SketchScene {
         const rotatedIds: string[] = [];
         stampSnapshot.forEach((item, i) => {
           if (!stamps[item.id]) return;
-          stamps[item.id] = { ...stamps[item.id], transform: rotated[i] };
+          stamps[item.id] = markAutoPlacedMoved({ ...stamps[item.id], transform: rotated[i] });
           rotatedIds.push(item.id);
         });
         const annotations = { ...s.annotations };
@@ -4040,7 +4088,7 @@ export class SketchScene {
     const tx = new Transaction(this.doc.drawingHistory, description);
     tx.update((s) => {
       const stamps = { ...s.stamps };
-      for (const id of stampIds) stamps[id] = mutate(stamps[id]);
+      for (const id of stampIds) stamps[id] = markAutoPlacedMoved(mutate(stamps[id]));
       return this.applyConnectivityCascade({ ...s, stamps }, this.stampPortConnectionPoints(stampIds, stamps));
     });
     tx.commit();
@@ -4093,7 +4141,7 @@ export class SketchScene {
     tx.update((state) => {
       const data = state.stamps[id];
       if (!data) return state;
-      const stamps = { ...state.stamps, [id]: { ...data, transform } };
+      const stamps = { ...state.stamps, [id]: markAutoPlacedMoved({ ...data, transform }) };
       return this.applyConnectivityCascade({ ...state, stamps }, this.stampPortConnectionPoints([id], stamps));
     });
     tx.commit();
@@ -4498,41 +4546,13 @@ export class SketchScene {
       tx.update((s) => {
         const annotations = { ...s.annotations };
         for (const id of annotationIds) delete annotations[id];
-        const stamps = { ...s.stamps };
-        for (const id of stampIds) delete stamps[id];
         const segments = { ...s.segments };
         for (const id of segmentIds) delete segments[id];
-        let next: DrawingState = { ...s, annotations, stamps, segments };
-        // Dangling-reference cleanup (electrical-circuits-model.md §4/§6): a
-        // deleted terminal can't be left in any circuit's terminalIds, and a
-        // deleted equipment stamp that backed a Panel takes that Panel (and
-        // its circuits, returned to the unassigned pool) down with it.
-        for (const id of stampIds) {
-          const stillReferenced = Object.values(next.circuits).some((c) => c.terminalIds.includes(id));
-          if (stillReferenced) {
-            next = {
-              ...next,
-              circuits: Object.fromEntries(
-                Object.entries(next.circuits).map(([circuitId, circuit]) => [
-                  circuitId,
-                  circuit.terminalIds.includes(id) ? { ...circuit, terminalIds: circuit.terminalIds.filter((t) => t !== id) } : circuit,
-                ]),
-              ),
-            };
-          }
-          const panel = Object.values(next.panels).find((p) => p.equipmentStampId === id);
-          if (panel) {
-            next = detachPanelCircuits(next, panel.id);
-            const panels = { ...next.panels };
-            delete panels[panel.id];
-            next = { ...next, panels };
-          }
-        }
-        return next;
+        return this.withoutStamps({ ...s, annotations, segments }, stampIds);
       });
       tx.commit();
       // Only a stamp deletion can touch circuits/panels (the dangling-reference
-      // cleanup above), but notifying unconditionally here is cheap and avoids
+      // cleanup in withoutStamps), but notifying unconditionally here is cheap and avoids
       // re-deriving which branch of that cleanup actually fired.
       if (stampIds.length > 0) this.notifyCircuitsChanged();
     }
@@ -4544,6 +4564,40 @@ export class SketchScene {
     this.markDirty();
     this.redrawOverlay();
     this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /** The state without the given stamps, plus the dangling-reference cleanup a stamp removal needs (deleteSelection, auto-placement). */
+  private withoutStamps(s: DrawingState, stampIds: readonly string[]): DrawingState {
+    if (stampIds.length === 0) return s;
+    const stamps = { ...s.stamps };
+    for (const id of stampIds) delete stamps[id];
+    let next: DrawingState = { ...s, stamps };
+    // Dangling-reference cleanup (electrical-circuits-model.md §4/§6): a
+    // deleted terminal can't be left in any circuit's terminalIds, and a
+    // deleted equipment stamp that backed a Panel takes that Panel (and
+    // its circuits, returned to the unassigned pool) down with it.
+    for (const id of stampIds) {
+      const stillReferenced = Object.values(next.circuits).some((c) => c.terminalIds.includes(id));
+      if (stillReferenced) {
+        next = {
+          ...next,
+          circuits: Object.fromEntries(
+            Object.entries(next.circuits).map(([circuitId, circuit]) => [
+              circuitId,
+              circuit.terminalIds.includes(id) ? { ...circuit, terminalIds: circuit.terminalIds.filter((t) => t !== id) } : circuit,
+            ]),
+          ),
+        };
+      }
+      const panel = Object.values(next.panels).find((p) => p.equipmentStampId === id);
+      if (panel) {
+        next = detachPanelCircuits(next, panel.id);
+        const panels = { ...next.panels };
+        delete panels[panel.id];
+        next = { ...next, panels };
+      }
+    }
+    return next;
   }
 
   /** Snapshot for pasteClipboard — each stamp's already-loaded base texture is kept by reference (cheap, and shared safely: deleteSelection never destroys a texture, only its sprite, and closing the source document keeps every texture the clipboard or another document still uses, see stampTexturesUsedOutside). Always the pristine base texture, never a colorized variant (see colorize.ts) — pasteClipboard re-derives the right variant from `pasted.color` itself. */

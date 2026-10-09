@@ -1676,7 +1676,14 @@ export function MepSketchApp({
             setAutoPlaceOpen(false);
             setPlacementRulesOpen(true);
           }}
-          onPlaced={(count) => setStatus(count === 0 ? 'No stamp was placed.' : `Placed ${count} stamp${count === 1 ? '' : 's'}. Undo removes them all.`)}
+          onPlaced={(count, replaced) =>
+            setStatus(
+              count === 0 && replaced === 0
+                ? 'No stamp was placed.'
+                : `Placed ${count} stamp${count === 1 ? '' : 's'}${replaced > 0 ? ` and removed ${replaced} earlier auto-placed stamp${replaced === 1 ? '' : 's'}` : ''}. Undo reverses this in one step.`,
+            )
+          }
+          onRemoved={(count) => setStatus(`Removed ${count} auto-placed stamp${count === 1 ? '' : 's'}. Undo gives them back.`)}
           onClose={() => setAutoPlaceOpen(false)}
         />
       )}

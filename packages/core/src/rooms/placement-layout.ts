@@ -4,6 +4,7 @@
 
 import type { Calibration } from '../calibration.js';
 import type { Vec2 } from '../geometry.js';
+import type { PlacedStamp } from '../stamp.js';
 import { polygonContainsPoint, roomBounds, roomLabelPoint, type Room } from './room.js';
 import { roomMinBoundingRect } from './room-values.js';
 import { calculateRooms, coverageGridShape, REQUIREMENT_WARNING_TEXT, type PlacementRule, type RoomCalculationRow, type RequirementWarning } from './placement-rule.js';
@@ -184,25 +185,77 @@ export function layoutRoomStamps(
   return { stamps: result.points.map((position) => ({ position, rotationDegrees })), warnings: [...warnings, ...result.warnings] };
 }
 
-export type PlacementRowWarning = RequirementWarning | LayoutWarning | 'noStamp' | 'stampNotFound';
+export type PlacementRowWarning = RequirementWarning | LayoutWarning | 'noStamp' | 'stampNotFound' | 'roomChanged';
 
 export const PLACEMENT_WARNING_TEXT: Record<PlacementRowWarning, string> = {
   ...REQUIREMENT_WARNING_TEXT,
   ...LAYOUT_WARNING_TEXT,
   noStamp: 'the rule has no stamp',
   stampNotFound: 'the stamp of the rule is not found',
+  roomChanged: 'the room changed after the last placement',
 };
 
+/**
+ * The shape and the type of a room, as one text: auto-placement writes it on each stamp, and a
+ * different text later means the room changed after the placement. Coordinates are rounded to 0.01 pt.
+ */
+export function roomPlacementKey(room: Pick<Room, 'polygon' | 'roomTypeId'>): string {
+  const ring = (points: readonly Vec2[]) => points.map((p) => `${Math.round(p.x * 100)},${Math.round(p.y * 100)}`).join(' ');
+  return [ring(room.polygon.outer), ...room.polygon.holes.map(ring), `type:${room.roomTypeId ?? ''}`].join('|');
+}
+
+/** The auto-placed stamps of a drawing that already belong to one row. */
+export interface ExistingRowStamps {
+  /** Moved by the user: they stay and count toward the row's count. */
+  keep: string[];
+  /** Not moved: a new placement removes them. */
+  replace: string[];
+}
+
 export interface PlacementRow extends RoomCalculationRow {
-  /** Where the stamps go. Empty when the row cannot be placed (see warnings). */
+  /** Where the new stamps go. Empty when the row cannot be placed (see warnings). */
   stamps: PlannedStamp[];
+  existing: ExistingRowStamps;
   warnings: PlacementRowWarning[];
+}
+
+/** The auto-placed stamps already in the drawing, for a re-run. */
+export interface ExistingAutoPlaced {
+  /** Every stamp of the drawing; only stamps with `autoPlaced` are used. */
+  stamps: readonly PlacedStamp[];
+  /** The ids of every room of the drawing. A stamp whose room id is not here (the room was detected again) belongs to the room that contains it. */
+  roomIds: ReadonlySet<string>;
+}
+
+/** Auto-placed stamps of a rule in a room that the rule no longer applies to (for example after a room type change). */
+export interface StaleAutoPlaced extends ExistingRowStamps {
+  room: Room;
+  ruleId: string;
+}
+
+/** The `count` planned stamps minus, for each kept stamp, the planned stamp nearest to it. */
+function withoutNearest(planned: readonly PlannedStamp[], kept: readonly Vec2[]): PlannedStamp[] {
+  const left = [...planned];
+  for (const k of kept) {
+    if (left.length === 0) break;
+    let best = 0;
+    for (let i = 1; i < left.length; i++) {
+      if (Math.hypot(left[i]!.position.x - k.x, left[i]!.position.y - k.y) < Math.hypot(left[best]!.position.x - k.x, left[best]!.position.y - k.y)) best = i;
+    }
+    left.splice(best, 1);
+  }
+  return left;
 }
 
 /**
  * The plan for auto-placement: the dry run (calculateRooms) plus the stamp positions of each row.
  * `stampSizeOf` gives the placed size of a stamp definition in page points, or null when the
  * definition is not found. A row without a stamp, a count or a calibration places nothing.
+ *
+ * With `existing` the plan is a re-run: each row finds its auto-placed stamps (same rule, same room).
+ * Moved stamps stay and count toward the row's count, so the row places the count minus the moved
+ * stamps, at the layout points that are not nearest to a moved stamp. The other stamps are replaced.
+ * `stale` lists the auto-placed stamps of a given rule in a given room that the rule no longer applies to.
  */
 export function planAutoPlacement(
   rules: readonly PlacementRule[],
@@ -210,23 +263,59 @@ export function planAutoPlacement(
   valuesOf: (room: Room) => RoomValues,
   calibrationOf: (pageIndex: number) => Calibration | null,
   stampSizeOf: (definitionId: string) => { width: number; height: number } | null,
-): { rows: PlacementRow[]; unmatched: Room[] } {
+  existing?: ExistingAutoPlaced,
+): { rows: PlacementRow[]; unmatched: Room[]; stale: StaleAutoPlaced[] } {
   const { rows, unmatched } = calculateRooms(rules, rooms, valuesOf);
+  const placedStamps = (existing?.stamps ?? []).filter((s) => s.autoPlaced);
+  const stampsOf = (ruleId: string, room: Room) =>
+    placedStamps.filter(
+      (s) =>
+        s.autoPlaced!.ruleId === ruleId &&
+        (s.autoPlaced!.roomId === room.id || (!existing!.roomIds.has(s.autoPlaced!.roomId) && polygonContainsPoint(room.polygon, s.transform.position))),
+    );
+  const split = (own: readonly PlacedStamp[]): ExistingRowStamps => ({
+    keep: own.filter((s) => s.autoPlaced!.moved).map((s) => s.id),
+    replace: own.filter((s) => !s.autoPlaced!.moved).map((s) => s.id),
+  });
+  const rowKeys = new Set(rows.map((row) => `${row.rule.id}\n${row.room.id}`));
+  const stale: StaleAutoPlaced[] = [];
+  if (placedStamps.length > 0) {
+    for (const room of rooms) {
+      for (const rule of rules) {
+        if (rowKeys.has(`${rule.id}\n${room.id}`)) continue;
+        const own = stampsOf(rule.id, room);
+        if (own.length > 0) stale.push({ room, ruleId: rule.id, ...split(own) });
+      }
+    }
+  }
   return {
     unmatched,
+    stale,
     rows: rows.map((row): PlacementRow => {
       const warnings: PlacementRowWarning[] = [...row.requirement.warnings];
+      const own = stampsOf(row.rule.id, row.room);
+      const kept = own.filter((s) => s.autoPlaced!.moved);
+      const ownExisting = split(own);
+      const key = roomPlacementKey(row.room);
+      if (own.some((s) => s.autoPlaced!.roomId !== row.room.id || (s.autoPlaced!.roomKey !== undefined && s.autoPlaced!.roomKey !== key))) warnings.push('roomChanged');
+      const base = { ...row, existing: ownExisting };
       const calibration = calibrationOf(row.room.pageIndex);
       const count = row.requirement.count;
-      if (!row.rule.stampDefinitionId) return { ...row, stamps: [], warnings: [...warnings, 'noStamp'] };
+      if (!row.rule.stampDefinitionId) return { ...base, stamps: [], warnings: [...warnings, 'noStamp'] };
       const size = stampSizeOf(row.rule.stampDefinitionId);
-      if (!size) return { ...row, stamps: [], warnings: [...warnings, 'stampNotFound'] };
+      if (!size) return { ...base, stamps: [], warnings: [...warnings, 'stampNotFound'] };
       if (count === null || count === 0 || !calibration) {
         if (!calibration && !warnings.includes('noCalibration')) warnings.push('noCalibration');
-        return { ...row, stamps: [], warnings };
+        return { ...base, stamps: [], warnings };
       }
       const layout = layoutRoomStamps(row.rule, row.room, row.values, count, calibration, size);
-      return { ...row, stamps: layout.stamps, warnings: [...warnings, ...layout.warnings] };
+      const stamps = withoutNearest(layout.stamps, kept.map((s) => s.transform.position));
+      return { ...base, stamps, warnings: [...warnings, ...layout.warnings] };
     }),
   };
+}
+
+/** The ids of every auto-placed stamp of the rows and of the stale entries, moved or not (Remove auto-placed stamps). */
+export function autoPlacedStampIds(rows: readonly Pick<PlacementRow, 'existing'>[], stale: readonly ExistingRowStamps[] = []): string[] {
+  return [...new Set([...rows.map((row) => row.existing), ...stale].flatMap((e) => [...e.keep, ...e.replace]))];
 }

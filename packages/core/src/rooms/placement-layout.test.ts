@@ -8,10 +8,13 @@ import {
   layoutRoomStamps,
   manualRoom,
   planAutoPlacement,
+  roomPlacementKey,
+  autoPlacedStampIds,
   type PlacementRule,
   type RoomPolygon,
 } from './index.js';
 import type { Vec2 } from '../geometry.js';
+import { markAutoPlacedMoved, type PlacedStamp } from '../stamp.js';
 
 const rect = (x: number, y: number, w: number, h: number): Vec2[] => [
   { x, y },
@@ -187,5 +190,75 @@ describe('planAutoPlacement', () => {
     const noCal = planAutoPlacement([base], [r], () => values, () => null, () => ({ width: 1, height: 1 })).rows[0]!;
     expect(noCal.stamps).toEqual([]);
     expect(noCal.warnings).toEqual(['noCalibration']);
+  });
+  const placedStamp = (id: string, position: Vec2, auto: PlacedStamp['autoPlaced']): PlacedStamp => ({
+    id, category: 'terminal', transform: { position, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, ports: [], definitionId: 'grille', ...(auto ? { autoPlaced: auto } : {}),
+  });
+  const plan = (stamps: PlacedStamp[], roomIds = new Set(['room-1'])) =>
+    planAutoPlacement([base], [r], () => values, () => CAL, () => ({ width: 10, height: 10 }), { stamps, roomIds }).rows[0]!;
+
+  it('replaces the unmoved stamps of the same rule and room on a re-run', () => {
+    const key = roomPlacementKey(r);
+    const row = plan([
+      placedStamp('a', { x: 50, y: 100 }, { ruleId: 'r', roomId: 'room-1', moved: false, roomKey: key }),
+      placedStamp('b', { x: 60, y: 100 }, { ruleId: 'other', roomId: 'room-1', moved: false }),
+      placedStamp('c', { x: 70, y: 100 }, { ruleId: 'r', roomId: 'room-2', moved: false }),
+      placedStamp('d', { x: 80, y: 100 }, undefined),
+    ], new Set(['room-1', 'room-2']));
+    expect(row.existing).toEqual({ keep: [], replace: ['a'] });
+    expect(row.stamps).toHaveLength(3);
+    expect(row.warnings).toEqual([]);
+  });
+
+  it('keeps moved stamps, counts them, and leaves out the planned point nearest to each', () => {
+    const full = plan([]).stamps.map((s) => s.position);
+    const nearFirst = { x: full[0]!.x + 5, y: full[0]!.y };
+    const row = plan([placedStamp('m', nearFirst, { ruleId: 'r', roomId: 'room-1', moved: true })]);
+    expect(row.existing).toEqual({ keep: ['m'], replace: [] });
+    expect(row.stamps.map((s) => s.position)).toEqual(full.slice(1));
+  });
+
+  it('places nothing when the moved stamps already reach the count', () => {
+    const moved = ['m1', 'm2', 'm3', 'm4'].map((id, i) => placedStamp(id, { x: 50 + i * 50, y: 100 }, { ruleId: 'r', roomId: 'room-1', moved: true }));
+    expect(plan(moved).stamps).toEqual([]);
+  });
+
+  it('warns when the room shape or type changed after the placement', () => {
+    const old = roomPlacementKey({ ...r, polygon: { outer: rect(0, 0, 300, 200), holes: [] } });
+    expect(plan([placedStamp('a', { x: 50, y: 100 }, { ruleId: 'r', roomId: 'room-1', moved: false, roomKey: old })]).warnings).toEqual(['roomChanged']);
+    expect(roomPlacementKey({ ...r, roomTypeId: 'office' })).not.toBe(roomPlacementKey(r));
+  });
+
+  it('gives a stamp of a room that no longer exists to the room that contains it, and warns', () => {
+    const row = plan([
+      placedStamp('inside', { x: 50, y: 100 }, { ruleId: 'r', roomId: 'gone', moved: false }),
+      placedStamp('outside', { x: 900, y: 900 }, { ruleId: 'r', roomId: 'gone', moved: false }),
+    ]);
+    expect(row.existing.replace).toEqual(['inside']);
+    expect(row.warnings).toEqual(['roomChanged']);
+  });
+
+  it('lists the stamps of a rule that no longer applies to the room as stale', () => {
+    const toiletOnly = { ...base, roomTypeIds: ['toilet'] };
+    const out = planAutoPlacement([toiletOnly], [{ ...r, roomTypeId: 'office' }], () => values, () => CAL, () => ({ width: 10, height: 10 }), {
+      stamps: [placedStamp('a', { x: 50, y: 100 }, { ruleId: 'r', roomId: 'room-1', moved: false }), placedStamp('m', { x: 90, y: 100 }, { ruleId: 'r', roomId: 'room-1', moved: true })],
+      roomIds: new Set(['room-1']),
+    });
+    expect(out.rows).toEqual([]);
+    expect(out.stale.map((e) => ({ room: e.room.id, rule: e.ruleId, keep: e.keep, replace: e.replace }))).toEqual([{ room: 'room-1', rule: 'r', keep: ['m'], replace: ['a'] }]);
+    expect(autoPlacedStampIds(out.rows, out.stale)).toEqual(['m', 'a']);
+  });
+
+  it('lists every auto-placed stamp of the rows for Remove', () => {
+    expect(autoPlacedStampIds([{ existing: { keep: ['m'], replace: ['a', 'b'] } }, { existing: { keep: [], replace: ['b', 'c'] } }])).toEqual(['m', 'a', 'b', 'c']);
+  });
+});
+
+describe('markAutoPlacedMoved', () => {
+  const stamp: PlacedStamp = { id: 's', category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 1, nativeHeight: 1, ports: [] };
+
+  it('sets moved on an auto-placed stamp and leaves other stamps alone', () => {
+    expect(markAutoPlacedMoved({ ...stamp, autoPlaced: { ruleId: 'r', roomId: 'x', moved: false } }).autoPlaced).toEqual({ ruleId: 'r', roomId: 'x', moved: true });
+    expect(markAutoPlacedMoved(stamp)).toBe(stamp);
   });
 });

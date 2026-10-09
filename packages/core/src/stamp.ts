@@ -19,8 +19,17 @@ export interface PlacedStamp {
   properties?: CustomPropertyValues;
   /** Per-instance tint, hex (e.g. '#2196f3'). Absent means no tint — render at the stamp art's own native colors. */
   color?: string;
-  /** Set when auto-placement made this stamp (room-auto-placement.md §4.5): the rule and the room it was placed for. `moved` = the user moved or rotated it, so a re-run keeps it. */
-  autoPlaced?: { ruleId: string; roomId: string; moved: boolean };
+  /**
+   * Set when auto-placement made this stamp (room-auto-placement.md §4.5): the rule and the room it was placed for.
+   * `moved` = the user moved, rotated or edited it, so a re-run keeps it. `roomKey` = roomPlacementKey of the room
+   * at placement, to tell when the room changed after the placement.
+   */
+  autoPlaced?: { ruleId: string; roomId: string; moved: boolean; roomKey?: string };
+}
+
+/** The stamp with `autoPlaced.moved` set, for a user edit of an auto-placed stamp. The same object when there is nothing to change. */
+export function markAutoPlacedMoved(stamp: PlacedStamp): PlacedStamp {
+  return stamp.autoPlaced && !stamp.autoPlaced.moved ? { ...stamp, autoPlaced: { ...stamp.autoPlaced, moved: true } } : stamp;
 }
 
 /** Half-extents in world units, scale applied — the shape pointInRotatedRect and rectIntersectsRotatedRect expect. */

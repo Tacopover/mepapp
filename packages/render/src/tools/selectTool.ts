@@ -7,6 +7,7 @@ import {
   translateAnnotationGeometry,
   rotateAnnotationGeometry,
   annotationBoundsWorld,
+  markAutoPlacedMoved,
   type Vec2,
 } from '@mepapp/core';
 import type { DrawingState } from '../document.js';
@@ -178,7 +179,7 @@ export class SelectTool implements Tool {
             const movedStampIds: string[] = [];
             for (const { id, position } of stampOriginals) {
               if (!stamps[id]) continue;
-              stamps[id] = { ...stamps[id], transform: { ...stamps[id].transform, position: { x: position.x + dx, y: position.y + dy } } };
+              stamps[id] = markAutoPlacedMoved({ ...stamps[id], transform: { ...stamps[id].transform, position: { x: position.x + dx, y: position.y + dy } } });
               movedStampIds.push(id);
             }
             const annotations = { ...state.annotations };
@@ -234,7 +235,7 @@ export class SelectTool implements Tool {
             const rotatedIds: string[] = [];
             stampSnapshot.forEach((s, i) => {
               if (!stamps[s.id]) return;
-              stamps[s.id] = { ...stamps[s.id], transform: rotated[i] };
+              stamps[s.id] = markAutoPlacedMoved({ ...stamps[s.id], transform: rotated[i] });
               rotatedIds.push(s.id);
             });
             const annotations = { ...state.annotations };
