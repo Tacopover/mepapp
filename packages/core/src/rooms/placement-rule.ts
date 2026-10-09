@@ -45,7 +45,7 @@ export interface CoverageLimits {
 }
 
 export interface PlacementLayout {
-  /** Phase 4 has 'center' and 'grid'; the other strategies come in Phase 6. */
+  /** How the stamps are spread over the room (placement-layout.ts). */
   strategy: LayoutStrategy;
   /** Distance from the walls to the stamps, m. */
   wallOffsetM: number;
@@ -427,7 +427,7 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     preset: 'fixed',
     amount: { unit: '' },
     coverage: { maxAreaPerElementM2: 60, maxSpacingM: 7.5, maxWallDistanceM: 3.5 },
-    layout: layout('grid'),
+    layout: layout('coverage'),
     writeCapacity: false,
   },
 ];

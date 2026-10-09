@@ -1,4 +1,5 @@
-// Stamp positions in a room (room-auto-placement.md Phase 4): the Center and Grid layouts. All
+// Stamp positions in a room (room-auto-placement.md Phases 4 and 6): the Center, Grid, Even spread,
+// Coverage and Along-the-walls layouts. All
 // geometry is in displayed page space (points, y down), the space of the room polygon and of placed
 // stamps. Pure functions, no I/O.
 
@@ -7,7 +8,16 @@ import type { Vec2 } from '../geometry.js';
 import type { PlacedStamp } from '../stamp.js';
 import { polygonContainsPoint, roomBounds, roomLabelPoint, type Room } from './room.js';
 import { roomMinBoundingRect } from './room-values.js';
-import { calculateRooms, coverageGridShape, REQUIREMENT_WARNING_TEXT, type PlacementRule, type RoomCalculationRow, type RequirementWarning } from './placement-rule.js';
+import {
+  calculateRooms,
+  coverageGridShape,
+  REQUIREMENT_WARNING_TEXT,
+  type CoverageLimits,
+  type PlacementRule,
+  type RoomCalculationRow,
+  type RoomRequirement,
+  type RequirementWarning,
+} from './placement-rule.js';
 import type { RoomValues } from './room-values.js';
 import type { RoomPolygon } from './types.js';
 
@@ -16,18 +26,23 @@ export type LayoutWarning =
   | 'noFit'
   /** Points of the grid fell outside the room (or too near a wall) and moved to the nearest valid point. */
   | 'movedInside'
-  /** The rule's layout is not available yet, or Center got more than one element: Grid was used. */
-  | 'layoutFallback';
+  /** Center got more than one element: Grid was used. */
+  | 'layoutFallback'
+  /** Coverage: part of the room is farther than the coverage radius from every stamp (the max count, or the wall offset, stops it). */
+  | 'coverageNotMet';
 
 export const LAYOUT_WARNING_TEXT: Record<LayoutWarning, string> = {
   noFit: 'does not fit: placed at the label point',
   movedInside: 'points moved inside the room',
   layoutFallback: 'grid layout used',
+  coverageNotMet: 'coverage not met in part of the room',
 };
 
 export interface LayoutResult {
   points: Vec2[];
   warnings: LayoutWarning[];
+  /** A rotation per point, in degrees, when the layout gives one (Along the walls). */
+  rotations?: number[];
 }
 
 function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
@@ -111,25 +126,9 @@ export function chooseGridShape(count: number, lengthPt: number, widthPt: number
  */
 export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, shape?: { along: number; across: number }): LayoutResult {
   if (count <= 0) return { points: [], warnings: [] };
-  const rect = roomMinBoundingRect(room);
-  if (!rect) return layoutCenter(room, offsetPt);
-  const grid = shape && shape.along * shape.across >= count ? shape : chooseGridShape(count, rect.lengthPt, rect.widthPt);
-  const a = (rect.angleDeg * Math.PI) / 180;
-  const u = { x: Math.cos(a), y: Math.sin(a) };
-  const v = { x: -Math.sin(a), y: Math.cos(a) };
-  const usableL = Math.max(0, rect.lengthPt - 2 * offsetPt);
-  const usableW = Math.max(0, rect.widthPt - 2 * offsetPt);
-  const rows = Math.ceil(count / grid.along);
-  const ideal: Vec2[] = [];
-  for (let row = 0; row < rows; row++) {
-    const inRow = row < rows - 1 ? grid.along : count - grid.along * (rows - 1);
-    const across = -usableW / 2 + ((row + 0.5) * usableW) / rows;
-    for (let col = 0; col < inRow; col++) {
-      const along = -usableL / 2 + ((col + 0.5) * usableL) / inRow;
-      ideal.push({ x: rect.center.x + u.x * along + v.x * across, y: rect.center.y + u.y * along + v.y * across });
-    }
-  }
-  const minGap = Math.min(usableL / grid.along, usableW / rows) / 2;
+  const cells = gridCells(room, count, offsetPt, shape);
+  if (!cells) return layoutCenter(room, offsetPt);
+  const { ideal, minGap } = cells;
   const points: Vec2[] = [];
   const warnings: LayoutWarning[] = [];
   const outside: Vec2[] = [];
@@ -147,42 +146,331 @@ export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt:
   return { points, warnings };
 }
 
+/** The cell centers of the grid (layoutGrid) before any point moves, and half the smaller cell side. Null for a room without a bounding rectangle. */
+function gridCells(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, shape?: { along: number; across: number }): { ideal: Vec2[]; minGap: number } | null {
+  const rect = roomMinBoundingRect(room);
+  if (!rect) return null;
+  const grid = shape && shape.along * shape.across >= count ? shape : chooseGridShape(count, rect.lengthPt, rect.widthPt);
+  const a = (rect.angleDeg * Math.PI) / 180;
+  const u = { x: Math.cos(a), y: Math.sin(a) };
+  const v = { x: -Math.sin(a), y: Math.cos(a) };
+  const usableL = Math.max(0, rect.lengthPt - 2 * offsetPt);
+  const usableW = Math.max(0, rect.widthPt - 2 * offsetPt);
+  const rows = Math.ceil(count / grid.along);
+  const ideal: Vec2[] = [];
+  for (let row = 0; row < rows; row++) {
+    const inRow = row < rows - 1 ? grid.along : count - grid.along * (rows - 1);
+    const across = -usableW / 2 + ((row + 0.5) * usableW) / rows;
+    for (let col = 0; col < inRow; col++) {
+      const along = -usableL / 2 + ((col + 0.5) * usableL) / inRow;
+      ideal.push({ x: rect.center.x + u.x * along + v.x * across, y: rect.center.y + u.y * along + v.y * across });
+    }
+  }
+  return { ideal, minGap: Math.min(usableL / grid.along, usableW / rows) / 2 };
+}
+
+/** Samples of a room on a square grid over its bounds: `all` inside the room, `valid` also at least the offset from every wall. */
+export interface RoomSamples {
+  all: Vec2[];
+  /** True for each sample of `all` that is also in `valid`. */
+  isValid: boolean[];
+  valid: Vec2[];
+  /** The distance between two samples, points. */
+  step: number;
+}
+
+const ROOM_SAMPLES = 1200;
+const RELAX_ITERATIONS = 30;
+/** The most stamps the Coverage layout puts in one room when the rule has no max count. */
+const MAX_COVERAGE_COUNT = 200;
+
+/** About `target` samples of the room, on a square grid over its bounds. */
+export function roomSamples(room: Pick<Room, 'polygon'>, offsetPt: number, target = ROOM_SAMPLES): RoomSamples {
+  const b = roomBounds(room);
+  const step = Math.sqrt(Math.max((b.maxX - b.minX) * (b.maxY - b.minY), 1e-9) / target);
+  const all: Vec2[] = [];
+  const isValid: boolean[] = [];
+  const valid: Vec2[] = [];
+  for (let x = b.minX + step / 2; x < b.maxX; x += step) {
+    for (let y = b.minY + step / 2; y < b.maxY; y += step) {
+      const p = { x, y };
+      if (!polygonContainsPoint(room.polygon, p)) continue;
+      const ok = distanceToWalls(room.polygon, p) >= offsetPt - 1e-9;
+      all.push(p);
+      isValid.push(ok);
+      if (ok) valid.push(p);
+    }
+  }
+  return { all, isValid, valid, step };
+}
+
+function nearestIndex(points: readonly Vec2[], p: Vec2): number {
+  let best = -1;
+  let bestD = Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const d = (points[i]!.x - p.x) ** 2 + (points[i]!.y - p.y) ** 2;
+    if (d < bestD) [best, bestD] = [i, d];
+  }
+  return best;
+}
+
+/**
+ * Lloyd relaxation: each point moves to the centroid of the room samples that are nearest to it
+ * (its own part of the room), repeated until the points stop moving. A centroid that is not a valid
+ * point goes to the nearest valid sample of the same part, so two points never share a position.
+ */
+export function relaxPoints(points: readonly Vec2[], samples: RoomSamples, room: Pick<Room, 'polygon'>, offsetPt: number, iterations = RELAX_ITERATIONS): Vec2[] {
+  let pts = points.map((p) => ({ ...p }));
+  if (pts.length === 0 || samples.all.length === 0) return pts;
+  for (let it = 0; it < iterations; it++) {
+    const parts: number[][] = pts.map(() => []);
+    samples.all.forEach((q, k) => parts[nearestIndex(pts, q)]!.push(k));
+    let maxMove = 0;
+    pts = pts.map((p, i) => {
+      const part = parts[i]!;
+      if (part.length === 0) return p;
+      let c = { x: part.reduce((sum, k) => sum + samples.all[k]!.x, 0) / part.length, y: part.reduce((sum, k) => sum + samples.all[k]!.y, 0) / part.length };
+      if (!isValidPlacementPoint(room.polygon, c, offsetPt)) {
+        const own = part.filter((k) => samples.isValid[k]).map((k) => samples.all[k]!);
+        const pool = own.length > 0 ? own : samples.valid;
+        const at = nearestIndex(pool, c);
+        c = at >= 0 ? pool[at]! : p;
+      }
+      maxMove = Math.max(maxMove, Math.hypot(c.x - p.x, c.y - p.y));
+      return c;
+    });
+    if (maxMove < samples.step / 20) break;
+  }
+  return pts;
+}
+
+/** `count` points spread evenly over the room: the grid, then Lloyd relaxation (relaxPoints). Works in L-shaped rooms and rooms with holes. */
+export function layoutEvenSpread(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, samples: RoomSamples = roomSamples(room, offsetPt)): LayoutResult {
+  if (count <= 0) return { points: [], warnings: [] };
+  const cells = gridCells(room, count, offsetPt);
+  if (!cells || samples.valid.length === 0) return layoutGrid(room, count, offsetPt);
+  return { points: relaxPoints(cells.ideal, samples, room, offsetPt), warnings: [] };
+}
+
+/**
+ * The coverage radius of the limits, m: every point of the room must be this near a stamp. A square
+ * grid with spacing s reaches s ÷ √2 (half the cell diagonal); a wall distance d reaches d × √2 in
+ * the corner; an area A per element reaches √(A ÷ 2) (half the diagonal of a square of area A).
+ * The smallest one wins. Null without limits.
+ */
+export function coverageRadiusM(coverage: CoverageLimits): number | null {
+  const radii: number[] = [];
+  if (coverage.maxSpacingM !== undefined) radii.push(coverage.maxSpacingM / Math.SQRT2);
+  if (coverage.maxWallDistanceM !== undefined) radii.push(coverage.maxWallDistanceM * Math.SQRT2);
+  if (coverage.maxAreaPerElementM2 !== undefined) radii.push(Math.sqrt(coverage.maxAreaPerElementM2 / 2));
+  return radii.length > 0 ? Math.min(...radii) : null;
+}
+
+/**
+ * Coverage: starts with `startCount` points (Even spread), then adds a point at the room sample
+ * farthest from every point and relaxes again, until every sample is within `radiusPt`. Samples
+ * that no valid point can reach (the wall offset is too large) do not count, and give a warning.
+ * `maxCount` stops it; `limited` tells that it stopped there.
+ */
+export function layoutCoverage(room: Pick<Room, 'polygon'>, startCount: number, offsetPt: number, radiusPt: number, maxCount?: number): LayoutResult & { limited: boolean } {
+  const first = Math.max(1, Math.min(startCount, maxCount ?? Infinity));
+  const samples = roomSamples(room, offsetPt);
+  if (samples.valid.length === 0) return { ...layoutGrid(room, first, offsetPt), limited: false };
+  const warnings: LayoutWarning[] = [];
+  // The corners are often the points farthest from every stamp, and the sample grid misses them.
+  const targets = [...samples.all, ...room.polygon.outer, ...room.polygon.holes.flat()];
+  const reachable = targets.filter((q) => samples.valid.some((v) => Math.hypot(v.x - q.x, v.y - q.y) <= radiusPt));
+  if (reachable.length < targets.length) warnings.push('coverageNotMet');
+  let points = layoutEvenSpread(room, first, offsetPt, samples).points;
+  const limit = Math.min(maxCount ?? MAX_COVERAGE_COUNT, MAX_COVERAGE_COUNT);
+  let limited = false;
+  for (;;) {
+    let worst: Vec2 | null = null;
+    let worstD = radiusPt;
+    for (const q of reachable) {
+      const i = nearestIndex(points, q);
+      const d = Math.hypot(points[i]!.x - q.x, points[i]!.y - q.y);
+      if (d > worstD + 1e-9) [worst, worstD] = [q, d];
+    }
+    if (!worst) break;
+    if (points.length >= limit) {
+      limited = maxCount !== undefined && points.length >= maxCount;
+      if (!warnings.includes('coverageNotMet')) warnings.push('coverageNotMet');
+      break;
+    }
+    points = relaxPoints([...points, samples.valid[nearestIndex(samples.valid, worst)]!], samples, room, offsetPt, 10);
+  }
+  return { points, warnings, limited };
+}
+
+/** One straight run of the Along-the-walls layout: a wall of the outer ring, moved into the room by the offset and shortened by the offset at each end. */
+export interface WallRun {
+  start: Vec2;
+  end: Vec2;
+  /** Unit vector from the wall into the room. */
+  inward: Vec2;
+  length: number;
+}
+
+/** The wall runs of the outer ring at `offsetPt`. A wall shorter than twice the offset gives no run. Holes are not used. */
+export function wallRuns(room: Pick<Room, 'polygon'>, offsetPt: number): WallRun[] {
+  const ring = room.polygon.outer;
+  let twiceArea = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    twiceArea += a.x * b.y - b.x * a.y;
+  }
+  const side = twiceArea >= 0 ? 1 : -1;
+  const runs: WallRun[] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len <= 2 * offsetPt + 1e-9) continue;
+    const u = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    const inward = { x: -u.y * side, y: u.x * side };
+    runs.push({
+      start: { x: a.x + u.x * offsetPt + inward.x * offsetPt, y: a.y + u.y * offsetPt + inward.y * offsetPt },
+      end: { x: b.x - u.x * offsetPt + inward.x * offsetPt, y: b.y - u.y * offsetPt + inward.y * offsetPt },
+      inward,
+      length: len - 2 * offsetPt,
+    });
+  }
+  return runs;
+}
+
+/** The total length of the wall runs, points. */
+export function wallRunLengthPt(room: Pick<Room, 'polygon'>, offsetPt: number): number {
+  return wallRuns(room, offsetPt).reduce((sum, run) => sum + run.length, 0);
+}
+
+/**
+ * Along the walls: `count` points at equal distances along the wall runs (the first and the last
+ * are half a distance from the ends). Each point faces into the room: its rotation turns the
+ * stamp's local +y axis to the inward direction. A point too near another wall moves to the
+ * nearest valid point.
+ */
+export function layoutPerimeter(room: Pick<Room, 'polygon'>, count: number, offsetPt: number): LayoutResult {
+  if (count <= 0) return { points: [], warnings: [] };
+  const runs = wallRuns(room, offsetPt);
+  const total = runs.reduce((sum, run) => sum + run.length, 0);
+  if (total <= 0) return layoutCenter(room, offsetPt);
+  const points: Vec2[] = [];
+  const rotations: number[] = [];
+  const warnings: LayoutWarning[] = [];
+  const gap = total / count / 2;
+  for (let i = 0; i < count; i++) {
+    let t = ((i + 0.5) * total) / count;
+    let k = 0;
+    while (k < runs.length - 1 && t > runs[k]!.length) t -= runs[k++]!.length;
+    const run = runs[k]!;
+    const f = Math.min(1, t / run.length);
+    let p: Vec2 = { x: run.start.x + (run.end.x - run.start.x) * f, y: run.start.y + (run.end.y - run.start.y) * f };
+    if (!isValidPlacementPoint(room.polygon, p, offsetPt)) {
+      const moved = nearestValidPoint(room, p, offsetPt, points, gap);
+      if (moved) {
+        p = moved;
+        if (!warnings.includes('movedInside')) warnings.push('movedInside');
+      } else {
+        p = roomLabelPoint(room);
+        if (!warnings.includes('noFit')) warnings.push('noFit');
+      }
+    }
+    points.push(p);
+    const deg = (Math.atan2(run.inward.y, run.inward.x) * 180) / Math.PI - 90;
+    rotations.push(((deg % 360) + 360) % 360);
+  }
+  return { points, warnings, rotations };
+}
+
 export interface PlannedStamp {
   position: Vec2;
   rotationDegrees: number;
 }
 
+/** What a layout that chooses its own count starts from. */
+export interface LayoutCountInput {
+  /** ceil(required ÷ capacity), or null without a capacity. */
+  quantityCount: number | null;
+  /** ceil(area ÷ max area per element), or null. */
+  areaCount?: number | null;
+}
+
 export interface RoomLayout {
   stamps: PlannedStamp[];
   warnings: LayoutWarning[];
+  /** Set when the layout chose the count itself (Coverage with limits, Along the walls with a max spacing). */
+  layoutCount?: { count: number; limited: boolean };
 }
 
 /**
- * The stamps of one rule in one room: `count` positions from the rule's layout, the wall offset
- * plus half the stamp size from every wall, and the rotation (the room's main axis, or the rule's
- * fixed angle). `stampSizePt` is the placed size of the stamp. Phase 4 has Center and Grid; another
- * layout uses Grid and says so.
+ * The stamps of one rule in one room: positions from the rule's layout, the wall offset plus half
+ * the stamp size from every wall, and the rotation (the room's main axis, the wall direction for
+ * Along the walls, or the rule's fixed angle). `stampSizePt` is the placed size of the stamp.
+ *
+ * Center, Grid and Even spread place `count` stamps. With `countInput`, Coverage (with coverage
+ * limits) and Along the walls (with a max spacing) choose the count themselves, from the amount
+ * count, the area count and the min count, at most the max count: Coverage adds stamps until the
+ * room is covered; Along the walls uses ceil(wall run length ÷ spacing).
  */
 export function layoutRoomStamps(
-  rule: Pick<PlacementRule, 'layout' | 'coverage'>,
+  rule: Pick<PlacementRule, 'layout' | 'coverage'> & Partial<Pick<PlacementRule, 'minCount' | 'maxCount'>>,
   room: Pick<Room, 'polygon'>,
   values: Pick<RoomValues, 'lengthM' | 'widthM'>,
   count: number,
   calibration: Calibration,
   stampSizePt: { width: number; height: number },
+  countInput?: LayoutCountInput,
 ): RoomLayout {
-  const offsetPt = rule.layout.wallOffsetM * 1000 * calibration.pageUnitsPerRealUnit + Math.max(stampSizePt.width, stampSizePt.height) / 2;
+  const ptPerM = 1000 * calibration.pageUnitsPerRealUnit;
+  const offsetPt = rule.layout.wallOffsetM * ptPerM + Math.max(stampSizePt.width, stampSizePt.height) / 2;
   const warnings: LayoutWarning[] = [];
+  const startCount = () => Math.max(countInput?.quantityCount ?? 0, countInput?.areaCount ?? 0, rule.minCount ?? 0, 1);
+  const strategy = rule.layout.strategy;
+  const radiusM = strategy === 'coverage' ? coverageRadiusM(rule.coverage) : null;
+  const spacingM = strategy === 'perimeter' ? rule.coverage.maxSpacingM : undefined;
   let result: LayoutResult;
-  if (rule.layout.strategy === 'center' && count <= 1) {
-    result = count === 1 ? layoutCenter(room, offsetPt) : { points: [], warnings: [] };
+  let layoutCount: RoomLayout['layoutCount'];
+  if (strategy === 'coverage' && radiusM !== null && countInput) {
+    const out = layoutCoverage(room, startCount(), offsetPt, radiusM * ptPerM, rule.maxCount);
+    result = out;
+    layoutCount = { count: out.points.length, limited: out.limited };
+  } else if (strategy === 'perimeter' && spacingM !== undefined && countInput) {
+    let n = Math.max(startCount(), Math.ceil(wallRunLengthPt(room, offsetPt) / (spacingM * ptPerM) - 1e-9));
+    const limited = rule.maxCount !== undefined && n > rule.maxCount;
+    if (limited) n = rule.maxCount!;
+    result = layoutPerimeter(room, n, offsetPt);
+    layoutCount = { count: n, limited };
+  } else if (count <= 0) {
+    result = { points: [], warnings: [] };
+  } else if (strategy === 'center' && count === 1) {
+    result = layoutCenter(room, offsetPt);
+  } else if (strategy === 'evenSpread' || strategy === 'coverage') {
+    result = layoutEvenSpread(room, count, offsetPt);
+  } else if (strategy === 'perimeter') {
+    result = layoutPerimeter(room, count, offsetPt);
   } else {
-    if (rule.layout.strategy !== 'grid') warnings.push('layoutFallback');
+    if (strategy === 'center') warnings.push('layoutFallback');
     const coverage = coverageGridShape(values, rule.coverage);
     result = layoutGrid(room, count, offsetPt, coverage && coverage.along * coverage.across === count ? coverage : undefined);
   }
-  const rotationDegrees = rule.layout.rotation === 'fixed' ? (rule.layout.fixedAngleDeg ?? 0) : (roomMinBoundingRect(room)?.angleDeg ?? 0);
-  return { stamps: result.points.map((position) => ({ position, rotationDegrees })), warnings: [...warnings, ...result.warnings] };
+  const axis = roomMinBoundingRect(room)?.angleDeg ?? 0;
+  const rotationOf = (i: number) => (rule.layout.rotation === 'fixed' ? (rule.layout.fixedAngleDeg ?? 0) : (result.rotations?.[i] ?? axis));
+  return {
+    stamps: result.points.map((position, i) => ({ position, rotationDegrees: rotationOf(i) })),
+    warnings: [...warnings, ...result.warnings],
+    ...(layoutCount ? { layoutCount } : {}),
+  };
+}
+
+/** The requirement with the count that the layout chose: the amount per element, the coverage count and the warnings follow it. */
+function withLayoutCount(requirement: RoomRequirement, layoutCount: { count: number; limited: boolean }): RoomRequirement {
+  const { count, limited } = layoutCount;
+  const warnings: RequirementWarning[] = requirement.warnings.filter((w) => w !== 'countByCoverage' && w !== 'maxCountReached');
+  if (requirement.quantityCount !== null && count > requirement.quantityCount && !limited) warnings.push('countByCoverage');
+  if (limited) warnings.push('maxCountReached');
+  return { ...requirement, count, coverageCount: count, perElement: requirement.required !== null && count > 0 ? requirement.required / count : null, warnings };
 }
 
 export type PlacementRowWarning = RequirementWarning | LayoutWarning | 'noStamp' | 'stampNotFound' | 'roomChanged';
@@ -308,9 +596,13 @@ export function planAutoPlacement(
         if (!calibration && !warnings.includes('noCalibration')) warnings.push('noCalibration');
         return { ...base, stamps: [], warnings };
       }
-      const layout = layoutRoomStamps(row.rule, row.room, row.values, count, calibration, size);
+      const areaCount =
+        row.rule.coverage.maxAreaPerElementM2 !== undefined && row.values.areaM2 !== null ? Math.ceil(row.values.areaM2 / row.rule.coverage.maxAreaPerElementM2 - 1e-9) : null;
+      const layout = layoutRoomStamps(row.rule, row.room, row.values, count, calibration, size, { quantityCount: row.requirement.quantityCount, areaCount });
       const stamps = withoutNearest(layout.stamps, kept.map((s) => s.transform.position));
-      return { ...base, stamps, warnings: [...warnings, ...layout.warnings] };
+      if (!layout.layoutCount) return { ...base, stamps, warnings: [...warnings, ...layout.warnings] };
+      const requirement = withLayoutCount(row.requirement, layout.layoutCount);
+      return { ...base, requirement, stamps, warnings: [...requirement.warnings, ...layout.warnings] };
     }),
   };
 }

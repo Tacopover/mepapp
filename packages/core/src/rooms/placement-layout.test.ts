@@ -10,6 +10,12 @@ import {
   planAutoPlacement,
   roomPlacementKey,
   autoPlacedStampIds,
+  coverageRadiusM,
+  layoutCoverage,
+  layoutEvenSpread,
+  layoutPerimeter,
+  roomSamples,
+  wallRuns,
   type PlacementRule,
   type RoomPolygon,
 } from './index.js';
@@ -149,10 +155,30 @@ describe('layoutRoomStamps', () => {
     expect(out.warnings).toEqual([]);
   });
 
-  it('uses the grid for a layout that is not available yet, and says so', () => {
-    const out = layoutRoomStamps(rule({ strategy: 'perimeter' }), room(rect(0, 0, 400, 200)), values, 3, CAL, { width: 10, height: 10 });
+  it('uses the grid for Center with more than one stamp, and says so', () => {
+    const out = layoutRoomStamps(rule({ strategy: 'center' }), room(rect(0, 0, 400, 200)), values, 3, CAL, { width: 10, height: 10 });
     expect(out.stamps).toHaveLength(3);
     expect(out.warnings).toEqual(['layoutFallback']);
+  });
+
+  it('Along the walls with a max spacing chooses the count from the wall run length', () => {
+    // 0.5 m = 20 pt + 5 pt half stamp = 25 pt offset. Runs: 2 × (400 − 50) + 2 × (200 − 50) = 1000 pt = 25 m. Spacing 3 m → ceil(25 ÷ 3) = 9.
+    const out = layoutRoomStamps(rule({ strategy: 'perimeter' }, { maxSpacingM: 3 }), room(rect(0, 0, 400, 200)), values, 1, CAL, { width: 10, height: 10 }, { quantityCount: null });
+    expect(out.layoutCount).toEqual({ count: 9, limited: false });
+    expect(out.stamps).toHaveLength(9);
+    const capped = layoutRoomStamps({ ...rule({ strategy: 'perimeter' }, { maxSpacingM: 3 }), maxCount: 4 }, room(rect(0, 0, 400, 200)), values, 1, CAL, { width: 10, height: 10 }, { quantityCount: null });
+    expect(capped.layoutCount).toEqual({ count: 4, limited: true });
+  });
+
+  it('Along the walls turns each stamp to face into the room, or uses the fixed angle', () => {
+    const out = layoutRoomStamps(rule({ strategy: 'perimeter', wallOffsetM: 0 }), room(rect(0, 0, 400, 200)), values, 4, CAL, { width: 0, height: 0 });
+    for (const s of out.stamps) {
+      const a = (s.rotationDegrees * Math.PI) / 180;
+      const localY = { x: -Math.sin(a), y: Math.cos(a) };
+      expect(isValidPlacementPoint(room(rect(0, 0, 400, 200)).polygon, { x: s.position.x + localY.x * 10, y: s.position.y + localY.y * 10 }, 9.99)).toBe(true);
+    }
+    const fixed = layoutRoomStamps(rule({ strategy: 'perimeter', rotation: 'fixed', fixedAngleDeg: 30 }), room(rect(0, 0, 400, 200)), values, 4, CAL, { width: 0, height: 0 });
+    expect(fixed.stamps.every((s) => s.rotationDegrees === 30)).toBe(true);
   });
 
   it('uses the coverage grid when it gave the count', () => {
@@ -249,6 +275,16 @@ describe('planAutoPlacement', () => {
     expect(autoPlacedStampIds(out.rows, out.stale)).toEqual(['m', 'a']);
   });
 
+  it('takes the count of a Coverage row from the layout, and the amount per stamp follows it', () => {
+    // 10 × 5 m room; the grid count for spacing 4 m is 3 × 2 = 6, but a radius of 4 ÷ √2 = 2.83 m needs fewer.
+    const coverageRule: PlacementRule = { ...base, capacityPerElement: undefined, coverage: { maxSpacingM: 4 }, layout: { strategy: 'coverage', wallOffsetM: 0, rotation: 'room' } };
+    const row = planAutoPlacement([coverageRule], [r], () => values, () => CAL, () => ({ width: 0, height: 0 })).rows[0]!;
+    expect(row.stamps.length).toBe(row.requirement.count);
+    expect(row.requirement.count).toBeLessThanOrEqual(8);
+    expect(row.requirement.perElement).toBeCloseTo(30 / row.requirement.count!, 9);
+    expect(worstDistance(r, row.stamps.map((s) => s.position))).toBeLessThanOrEqual((4 / Math.SQRT2) * 40 + 3);
+  });
+
   it('lists every auto-placed stamp of the rows for Remove', () => {
     expect(autoPlacedStampIds([{ existing: { keep: ['m'], replace: ['a', 'b'] } }, { existing: { keep: [], replace: ['b', 'c'] } }])).toEqual(['m', 'a', 'b', 'c']);
   });
@@ -260,5 +296,129 @@ describe('markAutoPlacedMoved', () => {
   it('sets moved on an auto-placed stamp and leaves other stamps alone', () => {
     expect(markAutoPlacedMoved({ ...stamp, autoPlaced: { ruleId: 'r', roomId: 'x', moved: false } }).autoPlaced).toEqual({ ruleId: 'r', roomId: 'x', moved: true });
     expect(markAutoPlacedMoved(stamp)).toBe(stamp);
+  });
+});
+
+/** The largest distance from a sample of the room to its nearest point: how well the points cover the room. */
+const worstDistance = (r: { polygon: RoomPolygon }, points: Vec2[]) =>
+  Math.max(...roomSamples(r, 0, 2000).all.map((q) => Math.min(...points.map((p) => Math.hypot(p.x - q.x, p.y - q.y)))));
+const minGap = (points: Vec2[]) => Math.min(...points.flatMap((p, i) => points.slice(i + 1).map((q) => Math.hypot(p.x - q.x, p.y - q.y))));
+const WITH_HOLE = room(rect(0, 0, 400, 400), [rect(150, 150, 100, 100)]);
+
+describe('layoutEvenSpread', () => {
+  it('spreads the points of a rectangle like the grid', () => {
+    const r = layoutEvenSpread(room(rect(0, 0, 400, 200)), 4, 10);
+    expect(r.points).toHaveLength(4);
+    for (const p of r.points) expect([100, 300].some((x) => Math.abs(p.x - x) < 8) && [50, 150].some((y) => Math.abs(p.y - y) < 8)).toBe(true);
+  });
+
+  it('covers an L-shaped room better than the grid, with every point valid', () => {
+    const l = room(L_SHAPE);
+    const even = layoutEvenSpread(l, 3, 20);
+    const grid = layoutGrid(l, 3, 20);
+    expect(even.points.every((p) => isValidPlacementPoint(l.polygon, p, 20))).toBe(true);
+    expect(worstDistance(l, even.points)).toBeLessThan(worstDistance(l, grid.points));
+    expect(minGap(even.points)).toBeGreaterThan(150);
+  });
+
+  it('puts the points around a hole, one on each side', () => {
+    const r = layoutEvenSpread(WITH_HOLE, 4, 10);
+    expect(r.points.every((p) => isValidPlacementPoint(WITH_HOLE.polygon, p, 10))).toBe(true);
+    const quadrants = new Set(r.points.map((p) => `${p.x < 200 ? 'w' : 'e'}${p.y < 200 ? 'n' : 's'}`));
+    expect(quadrants.size).toBe(4);
+  });
+
+  it('moves one point to the middle of the room, also in an L-shape', () => {
+    const l = room(L_SHAPE);
+    const r = layoutEvenSpread(l, 1, 20);
+    expect(r.points).toHaveLength(1);
+    expect(isValidPlacementPoint(l.polygon, r.points[0]!, 20)).toBe(true);
+  });
+});
+
+describe('coverageRadiusM', () => {
+  it('takes the smallest radius of the limits', () => {
+    expect(coverageRadiusM({})).toBeNull();
+    expect(coverageRadiusM({ maxSpacingM: 4 })).toBeCloseTo(2.828, 3);
+    expect(coverageRadiusM({ maxWallDistanceM: 1 })).toBeCloseTo(1.414, 3);
+    expect(coverageRadiusM({ maxAreaPerElementM2: 50 })).toBeCloseTo(5, 6);
+    expect(coverageRadiusM({ maxAreaPerElementM2: 60, maxSpacingM: 7.5, maxWallDistanceM: 3.5 })).toBeCloseTo(3.5 * Math.SQRT2, 6);
+  });
+});
+
+describe('layoutCoverage', () => {
+  it('adds points until every point of a rectangle is within the radius', () => {
+    const r = room(rect(0, 0, 400, 200));
+    const out = layoutCoverage(r, 1, 0, 80);
+    expect(worstDistance(r, out.points)).toBeLessThanOrEqual(80 + 3);
+    expect(out.limited).toBe(false);
+    expect(out.warnings).toEqual([]);
+    // A 3 × 2 grid of 133 × 100 cells reaches 83 pt, so a 4 × 2 grid (8) is enough; coverage needs no more.
+    expect(out.points.length).toBeLessThanOrEqual(8);
+  });
+
+  it('needs fewer points in an L-shape than a grid over its bounding rectangle', () => {
+    const l = room(L_SHAPE);
+    const out = layoutCoverage(l, 1, 10, 120);
+    expect(worstDistance(l, out.points)).toBeLessThanOrEqual(120 + 4);
+    expect(out.points.every((p) => isValidPlacementPoint(l.polygon, p, 10))).toBe(true);
+    // The bounding square 600 × 600 with spacing 120 × √2 = 170 needs a 4 × 4 grid.
+    expect(out.points.length).toBeLessThan(16);
+  });
+
+  it('covers a room with a hole and keeps the points out of the hole', () => {
+    const out = layoutCoverage(WITH_HOLE, 1, 10, 110);
+    expect(worstDistance(WITH_HOLE, out.points)).toBeLessThanOrEqual(110 + 3);
+    expect(out.points.every((p) => isValidPlacementPoint(WITH_HOLE.polygon, p, 10))).toBe(true);
+  });
+
+  it('stops at the max count and warns', () => {
+    const out = layoutCoverage(room(L_SHAPE), 1, 10, 60, 3);
+    expect(out.points).toHaveLength(3);
+    expect(out.limited).toBe(true);
+    expect(out.warnings).toEqual(['coverageNotMet']);
+  });
+
+  it('warns when the wall offset leaves the corners out of reach', () => {
+    const out = layoutCoverage(room(rect(0, 0, 400, 200)), 1, 90, 100);
+    expect(out.warnings).toContain('coverageNotMet');
+    expect(out.limited).toBe(false);
+  });
+});
+
+describe('layoutPerimeter', () => {
+  it('puts the points at the offset from the walls, at equal distances along them', () => {
+    const r = room(rect(0, 0, 400, 200));
+    const out = layoutPerimeter(r, 4, 20);
+    // Runs 360 + 160 + 360 + 160 = 1040 pt; points at 130, 390, 650, 910.
+    expect(sortPts(out.points)).toEqual(sortPts([{ x: 150, y: 20 }, { x: 380, y: 50 }, { x: 250, y: 180 }, { x: 20, y: 150 }]));
+    expect(out.warnings).toEqual([]);
+  });
+
+  it('gives the same runs for either ring direction', () => {
+    const forward = wallRuns(room(L_SHAPE), 20).map((run) => Math.round(run.length));
+    const backward = wallRuns(room([...L_SHAPE].reverse()), 20).map((run) => Math.round(run.length));
+    expect([...backward].sort()).toEqual([...forward].sort());
+    for (const run of wallRuns(room([...L_SHAPE].reverse()), 20)) {
+      expect(isValidPlacementPoint(room(L_SHAPE).polygon, { x: (run.start.x + run.end.x) / 2, y: (run.start.y + run.end.y) / 2 }, 19.99)).toBe(true);
+    }
+  });
+
+  it('keeps every point valid in an L-shaped room', () => {
+    const l = room(L_SHAPE);
+    const out = layoutPerimeter(l, 12, 20);
+    expect(out.points).toHaveLength(12);
+    expect(out.points.every((p) => isValidPlacementPoint(l.polygon, p, 20))).toBe(true);
+    expect(out.rotations).toHaveLength(12);
+  });
+
+  it('uses the outer walls only, and keeps the points out of a hole', () => {
+    const out = layoutPerimeter(WITH_HOLE, 8, 10);
+    expect(out.points.every((p) => isValidPlacementPoint(WITH_HOLE.polygon, p, 10))).toBe(true);
+    for (const p of out.points) expect(Math.min(p.x, p.y, 400 - p.x, 400 - p.y)).toBeCloseTo(10, 6);
+  });
+
+  it('falls back to the label point when the walls are too short for the offset', () => {
+    expect(layoutPerimeter(room(rect(0, 0, 40, 40)), 2, 30).warnings).toEqual(['noFit']);
   });
 });

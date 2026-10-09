@@ -33,8 +33,13 @@ export interface PlacementRulesDialogProps {
 
 const newRuleId = () => `rule-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-/** Strategies Phase 4 can place. The others are listed but cannot be chosen yet. */
-const READY_STRATEGIES: readonly LayoutStrategy[] = ['center', 'grid'];
+const LAYOUT_HINTS: Record<LayoutStrategy, string> = {
+  center: 'One element at the label point. More than one element uses the grid.',
+  grid: 'Rows along the long side of the room.',
+  evenSpread: 'The grid, then each element moves to the middle of its own part of the room. Use it for L-shaped rooms.',
+  coverage: 'With coverage limits: adds elements until every point of the room is near enough to one (radius = spacing ÷ √2, wall distance × √2 or √(area ÷ 2), the smallest). The count comes from the layout, at least the amount count and the min count.',
+  perimeter: 'Elements along the walls, turned to face into the room. With a max spacing the count is the wall length ÷ spacing, rounded up.',
+};
 
 const AMOUNT_FIELD_LABELS: Record<(typeof PRESET_AMOUNT_FIELDS)[PlacementPreset][number], string> = {
   fixed: 'Per room',
@@ -426,13 +431,15 @@ function PlacementRuleForm({ rule, others, roomTypes, language, stampName, onCho
         <label htmlFor="pr-strategy">Layout</label>
         <select id="pr-strategy" value={draft.strategy} onChange={(e) => update({ strategy: e.target.value as LayoutStrategy })}>
           {(Object.keys(LAYOUT_STRATEGY_LABELS) as LayoutStrategy[]).map((s) => (
-            <option key={s} value={s} disabled={!READY_STRATEGIES.includes(s) && s !== draft.strategy}>
+            <option key={s} value={s}>
               {LAYOUT_STRATEGY_LABELS[s]}
-              {READY_STRATEGIES.includes(s) ? '' : ' (later)'}
             </option>
           ))}
         </select>
       </div>
+      <p className="mep-settings-hint" data-testid="pr-strategy-hint">
+        {LAYOUT_HINTS[draft.strategy]}
+      </p>
       {numberRow('wallOffset', 'Offset from walls (m)', '0')}
       <div className="mep-field-row">
         <label htmlFor="pr-rotation">Rotation</label>
