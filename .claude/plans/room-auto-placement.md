@@ -1,0 +1,177 @@
+# Automatic stamp placement in rooms — plan
+
+Status: **planned 2026-10-09, not started.** Follows [[room-detection]] (its Phase 9 "Element-to-room assignment and per-room calculations" is replaced by this plan). The next plan after this one is routing from main equipment to the placed stamps. This plan does not cover routing.
+
+## 1. Goal
+
+The user selects rooms and one or more placement rules. MepApp calculates how many elements each room needs and places the stamps in the rooms. The user sees a preview first. The user can then apply the result as one undo step.
+
+MepApp does not build in the rules of a country. The user enters the numbers (airflow per m², lux, spacing) in form fields. MepApp supplies the room values and the geometry: counts, grids, spacing, wall offsets and orientation.
+
+All calculations follow the same four steps:
+
+1. **Room values:** area, height, volume, perimeter, length and width, room type, number of people.
+2. **Required amount:** for example an airflow, a light output or a fixed number of elements.
+3. **Count:** required amount ÷ capacity of one element, and a coverage limit (max spacing, max area per element). The larger count wins.
+4. **Layout:** the count is placed in the room polygon by a layout strategy (center, grid, even spread, coverage, perimeter).
+
+## 2. Decisions already made (user, 2026-10-09)
+
+- **Room type from name matching.** MepApp matches the room name (and the label `details`) against keywords of each room type. When no keyword matches, the room has no type, and the user selects one.
+- **Ceiling height has four levels.** Global → per PDF → per room type → per room. Each level overrides the level before it. The global value is required. The other levels are optional.
+- **Rules live in the user library,** not in the PDF. The same applies to the room types (see §4.1).
+- **Form fields, no formulas** in the first version. A formula field (with the expression engine) is a later option (Phase 8).
+
+## 3. Findings from the code survey (2026-10-09)
+
+Check each line number before you depend on it.
+
+- `Room` is at `packages/core/src/rooms/room.ts:15-37`. It has `name`, `number`, `details?`, `properties?` (custom room properties) and `pageIndex`. The area is derived (`roomAreaM2(room, calibration)`, `room.ts:61`). The area is not saved.
+- `roomsAtPoint`, `roomLabelPoint` and `polygonContainsPoint` are in `room.ts`. `roomLabelPoint` gives a good inside point for concave rooms. It is the starting point for the Center layout.
+- Room polygons and placed stamps use the same space (displayed page space, PDF points). Proof: the fill-room click passes the world point straight to `roomsAtPoint` (`packages/render/src/scene.ts:2761`).
+- `ProjectDocument` (`packages/core/src/project.ts:19-44`) is the data of one PDF. `CURRENT_SCHEMA_VERSION = 13` (`project.ts:17`). "Per PDF" values therefore go into `ProjectDocument`.
+- **The calibration is not saved.** `SketchDocument.calibration` (`packages/render/src/document.ts:108`) is not part of `ProjectDocument`. It is one value per document, not per page: `calibrateTool.ts:40` and `scene.ts:2100` are the only writers, and a page change does not reset it. After a reload the user must calibrate again. Auto-placement needs a calibration (metres to page points), so this gap blocks a good workflow. See Phase 0.
+- User-level data today lives in `localStorage` with a versioned key: custom property definitions (`mepapp.customProperties.v1`, `packages/ui/src/App.tsx:150-168`) and custom schematic templates (`loadCustomTemplates` / `saveCustomTemplates`, `App.tsx:369-373`). `SettingsStore` exists in `@mepapp/platform` but the app does not use it yet. The `LibraryStore` (IndexedDB) holds stamps only.
+- `StampDefinition` (`packages/core/src/stamp-library.ts:16-34`) has **no capacity field**. The capacity of a placed terminal is in `ProjectDocument.terminalCapacities` (by stamp id), set with `SketchScene.setTerminalCapacity` (`scene.ts:2519`). The flow solve reads it. A rule must therefore hold "capacity per element" itself.
+- `PlaceStampTool.placeStamp` (`packages/render/src/tools/placeStampTool.ts:46-90`) shows what one placement does: new id from `nextStampSeq`, adopt the definition, copy the ports, build the sprite, add the definition's port groups. `SketchScene.pasteClipboard` (`scene.ts:4338`) adds many stamps as **one** undo step with a `Transaction`. Auto-placement copies both patterns.
+- The scene takes art as an `ImageBitmap` from the UI (`replaceSelectedStamps(definition, bitmap)`, `scene.ts:2435`). The UI makes the bitmap with `loadDefinitionBitmap` (`packages/ui/src/stampBitmap.ts`).
+- `mergeDetectedRooms` (`room.ts`) keeps `locked` rooms when detect-all runs again. Re-running a rule uses the same idea (§4.5).
+- `packages/core/src/schematic-expression.ts` is an expression engine (paths, `+ - * /`, `sum()`, `count()`). It is not needed for the form fields. It is the base for Phase 8.
+- `buildRoomExportTable` (`packages/core/src/rooms/export.ts`) builds the Excel table. New room values go there as new fixed columns.
+- `RESERVED_ROOM_PROPERTY_NAMES` (`packages/core/src/custom-properties.ts:59`) must get the new field names (room type, ceiling height, volume, perimeter, people).
+- No room type exists anywhere in the code today.
+
+## 4. Data model
+
+### 4.1 Room types (user library)
+
+```ts
+interface RoomType {
+  id: string;               // stable slug or UUID
+  name: string;             // "Toilet"
+  nameNl?: string;          // "Toilet"
+  /** Lower-case keywords; a room matches when its name or details contain one as a whole word. */
+  keywords: string[];       // ["toilet", "wc", "invalidetoilet", "sanitair"]
+  /** Floor area per person, m². Used to calculate the number of people. Absent = no people. */
+  areaPerPersonM2?: number;
+  color?: string;           // overlay tint, later
+}
+```
+
+- MepApp ships a seed list (NL and EN keywords, because the test drawings are Dutch). Seed types: office, meeting room, classroom, corridor, entrance/hall, stairs, toilet, bathroom, kitchen/pantry, storage, technical room, meter cupboard, changing room, living room, bedroom. The user can edit, add and delete types.
+- Storage: `localStorage` key `mepapp.roomTypes.v1`, same pattern as `mepapp.customProperties.v1`. Import and export as a JSON file.
+- **The PDF keeps a copy of each room type it uses** (`ProjectDocument.roomTypes`), the same as `networkTypes` and `circuitTypes`. Reason: a PDF opened on another computer must still show the type names. On load, a type that is missing from the user library shows as "from this file". The user can add it to the library. Note the network-type trap ([[network-type-adoption-gotcha]]): the copy must be made at the moment a room gets the type, not later.
+
+### 4.2 New room fields (in the PDF)
+
+```ts
+interface Room {
+  // ...existing fields
+  roomTypeId?: string;
+  /** 'matched' = set by keyword matching, may change on a new match; 'user' = chosen by the user, never changed by matching. */
+  roomTypeSource?: 'matched' | 'user';
+  /** Room-level override, mm. */
+  ceilingHeightMm?: number;
+  /** Room-level override of the number of people. */
+  people?: number;
+}
+```
+
+### 4.3 Ceiling height chain
+
+| Level | Stored in | Field |
+|---|---|---|
+| Global (required) | user settings, `localStorage` `mepapp.settings.ceilingHeightMm.v1`, default 2700 | — |
+| Per PDF | `ProjectDocument` | `ceilingHeightMm?: number` |
+| Per room type | `ProjectDocument` | `roomTypeCeilingHeightsMm: Record<roomTypeId, number>` |
+| Per room | `Room` | `ceilingHeightMm?` |
+
+The room-type height is stored per PDF, not in the user library, because a ceiling height belongs to a building. The type "toilet" can have 2.4 m in one building and 2.6 m in another. If the user wants a library default per room type, that can be added later as an extra level between "global" and "per PDF".
+
+A core function returns the value **and** its level:
+
+```ts
+function resolveCeilingHeight(room, ctx): { mm: number; level: 'global' | 'pdf' | 'roomType' | 'room' }
+```
+
+The Properties panel shows the level next to the value ("2.40 m — from room type Toilet"). The user can then see which level to change.
+
+### 4.4 Placement rules (user library)
+
+A rule is one form. Fields:
+
+| Group | Field | Notes |
+|---|---|---|
+| General | name, discipline | |
+| Which rooms | room types (multi-select), optional "name contains" text | empty = all selected rooms |
+| Which stamp | stamp definition id | library, user or custom stamp |
+| Required amount | `fixed` + `perM2` × area + `perPerson` × people + `perM3` × volume | four number fields, each optional; one unit text field (for example "dm³/s", "W", "lm") |
+| | minimum amount per room | for example "at least 7 dm³/s" |
+| | calculation preset | fills the fields: "Per area", "Per person + per area" (EN 16798 / ASHRAE 62.1 shape), "Air changes per hour", "Fixed per room", "Lighting (lumen method)" |
+| Lighting preset only | design lux E, utilisation factor UF, maintenance factor MF | amount = E × area / (UF × MF), in lm |
+| Capacity | capacity per element (same unit) | empty = no quantity count |
+| Coverage | max spacing (m), max area per element (m²), max distance to a wall (m) | each optional |
+| Count limits | min count, max count per room | |
+| Layout | strategy: center / grid / even spread / coverage / perimeter | Phase 4 has center and grid only |
+| | offset from walls (m) | |
+| | rotation: align to the room / fixed angle | |
+| Output | write capacity to placed stamps | each stamp gets `required ÷ count` in `terminalCapacities`, so the flow solve and the later routing get correct values |
+
+Count = max(quantity count, coverage count), limited by min and max count. Quantity count = ceil(required ÷ capacity). Coverage count comes from the layout (the smallest grid that meets the spacing and wall-distance limits).
+
+Storage: `localStorage` key `mepapp.placementRules.v1`, import and export as JSON. MepApp ships a few example rules that say "example" in the name. They are not standards.
+
+### 4.5 Link between a placed stamp and its rule
+
+```ts
+interface PlacedStamp {
+  // ...existing fields
+  /** Set when auto-placement made this stamp. `moved` = the user moved, rotated or deleted-and-undid it; a re-run keeps it. */
+  autoPlaced?: { ruleId: string; roomId: string; moved: boolean };
+}
+```
+
+Re-running a rule on a room removes the stamps with the same `ruleId` + `roomId` and `moved: false`, and places new ones. Stamps with `moved: true` stay. They count toward the room's total. This is the same idea as `locked` rooms in `mergeDetectedRooms`.
+
+## 5. Phases
+
+Each phase ends with tests (core: vitest), `pnpm build`, `pnpm typecheck`, and a browser check of the UI wiring through real DOM inputs ([[verify-ui-wiring-via-real-dom-not-scene-api]]).
+
+0. **Save the calibration in the PDF.** Add `calibration?: Calibration` to `ProjectDocument` (schema 13 → 14). Load it back into `SketchDocument.calibration`. Small, but every later phase depends on it. Today there is one calibration per document. A PDF with plans at different scales needs one per page. Decide with the user: save one per page now (`calibrations: Record<pageIndex, Calibration>`), or save the one value and change it later.
+1. **Room types and name matching.**
+   - Core: `RoomType`, seed list, `matchRoomType(name, details, types)` (whole-word match, longest keyword wins, case- and accent-insensitive), tests with the room names of the 10A and w_rooms PDFs (local-only fixtures, [[fixture-pdfs-gitignored]]). Report the match rate.
+   - Schema: `Room.roomTypeId`, `roomTypeSource`; `ProjectDocument.roomTypes` (copy). Migration.
+   - Matching runs after detect-all, after click-fill, and after a rename. It only changes rooms with `roomTypeSource !== 'user'`.
+   - UI: room type dropdown in Room Properties ("No type" is visible as a warning). "Room types" manager dialog (list, keywords, m² per person, import/export). Room type column in the Excel export.
+2. **Room values and ceiling height.**
+   - Core: `roomPerimeterM`, `roomMinBoundingRect` (minimum-area rectangle: convex hull + rotating calipers; gives length, width and main axis), `resolveCeilingHeight`, `roomVolumeM3`, `roomPeople` (room override, else area ÷ `areaPerPersonM2`, rounded up).
+   - Schema: `ProjectDocument.ceilingHeightMm?`, `roomTypeCeilingHeightsMm`, `Room.ceilingHeightMm?`, `Room.people?`.
+   - UI: global height in Settings. PDF height and room-type heights in a "Building values" section (Rooms toolbar or Drawings panel — decide when building). Room Properties shows height with its level, volume, perimeter, length × width, people.
+   - Excel export: new fixed columns.
+3. **Placement rules: model, editor and dry run.**
+   - Core: `PlacementRule`, validation, `calculateRoomRequirement(rule, roomValues)` → `{ required, quantityCount }`. Tests for every preset with hand-calculated numbers.
+   - UI: "Placement rules" dialog (list + form). Import and export JSON. Example rules.
+   - Dry run: select rooms → table with room, type, area, volume, people, required amount, capacity, count. No stamps yet. The user can check the numbers before any geometry exists.
+4. **Placement v1: Center and Grid.**
+   - Core (pure, tested): `layoutCenter(room)`, `layoutGrid(room, count | spacing, wallOffset, axis)`. The grid uses the main axis from Phase 2, chooses rows × columns closest to the room's length/width ratio, clips points to the polygon minus holes minus the wall offset, and moves a point that falls outside to the nearest valid inside point. Coverage count for the grid. Tests on rectangles, rotated rectangles, L-shapes and rooms with holes.
+   - Render: `SketchScene.autoPlaceStamps(plan, bitmaps)` adds all stamps as one `Transaction` (pattern of `pasteClipboard`), copies the ports and port groups (pattern of `placeStamp`), adopts the definition, writes `autoPlaced` and the capacities. Preview: ghost sprites in a separate layer, removed on cancel.
+   - UI: "Auto-place" dialog: room selection (current selection, or all rooms of the page, filtered by type), rule selection (one or more), preview table with a warning column ("room is open", "no type", "count limited by coverage", "max count reached", "no calibration"), Apply.
+5. **Re-run and moved stamps.** Set `moved: true` on move, rotate and properties edits of an auto-placed stamp. Re-run replaces only unmoved stamps. "Remove auto-placed stamps" for a rule or a room. A warning when a room changed (polygon or type) after placement. Risk: moves happen in several places (drag, rotate, Properties panel, alignment snap). List all of them first.
+6. **More layouts.** Even spread (start from the grid, then Lloyd relaxation: move each point to the centre of its own part of the polygon, repeat), coverage (add points until every point of the room is within the max distance), perimeter (points at intervals along the walls, corner offset, rotated to face into the room). Holes and concave rooms in every test.
+7. **Doors and windows (separate investigation).** Door swing arcs and window symbols in the PDF vectors. Needed for "next to the door" (switches, call points) and "under the window" (radiators). Start with a short research note, not code.
+8. **Advanced: formula fields.** An optional formula field in the rule form, with the expression engine from `schematic-expression.ts` (add `ceil`, `floor`, `round`, `min`, `max`). Values per room type (for example design lux per type) as variables.
+
+## 6. Open points
+
+- Phase 0: save one calibration per document (as today) or one per page. Proposal: per page, because a schema change later costs another migration.
+- Phase 2: where the PDF-level and room-type heights are edited in the UI.
+- Phase 4: what happens to a stamp that does not fit in a very small room (place it at the label point and warn, or skip it and warn). Proposal: place it at the label point and warn.
+- Rule and room-type storage moves from `localStorage` to `SettingsStore` when that store is wired up ([[storage-interfaces]] Phase 3). Use one small load/save module per library, so the move is one change.
+- Units: the rule's unit is free text. MepApp does not convert units. The capacity and the required amount must use the same unit.
+
+## 7. Risks
+
+- **Name matching quality** depends on the drawings. Many Dutch drawings use function groups ("Onderwijsruimten") in `details`. Measure the match rate on the real fixtures in Phase 1 before the seed list is final.
+- **Irregular rooms.** Grid layout in L-shaped or open rooms gives uneven results. Phase 6 (even spread) fixes this. Until then, the preview must make the result clear before Apply.
+- **Room accuracy.** Room shapes on 10A are still wrong for part of the rooms (13 of 34 within 15 %, [[project-room-detection-phase8]]). Auto-placement makes a wrong room shape more visible. The "needs review" warning must show in the preview table.
+- **Stamp size.** PNG stamps are about 2.2 times too large ([[project-stamp-dpi-scaling-issue]]). The wall offset must use the real stamp size, so a wrong size gives stamps that touch walls.
