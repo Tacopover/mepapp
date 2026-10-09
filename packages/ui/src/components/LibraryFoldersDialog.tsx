@@ -29,12 +29,12 @@ export function LibraryFoldersDialog({ available, sources, records, busySourceId
     <Dialog title="User library" className="mep-modal--library" onClose={onClose} actions={<button onClick={onClose}>Close</button>}>
       {available && (
         <p className="mep-hint">
-          MepApp copies the files from your folders into browser storage. Press Sync to pick up changes in a folder. A renamed file becomes a new stamp. A JPEG file
-          has no transparency. Port edits are kept only in this browser.
+          MEPSketcher copies the files from your folders into its own storage. Press Sync to pick up changes in a folder. A renamed file becomes a new stamp. A JPEG file
+          has no transparency. Port edits are kept only in that storage, not in the folder.
         </p>
       )}
       <label className="mep-checkbox-row mep-library-check">
-        <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MepApp stamps
+        <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MEPSketcher stamps
       </label>
       {!available ? (
         <p className="mep-hint">Custom stamp folders need Chrome or Edge. They are not available in this browser.</p>

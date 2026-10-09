@@ -45,7 +45,7 @@ export function LibrarySourceDialog({ category, defaultName, defaultDiscipline, 
       }
     >
       <p className="mep-calibration-hint">
-        The images in this folder become {category === 'equipment' ? 'equipment' : 'terminal'} stamps. MepApp copies the files into browser storage.
+        The images in this folder become {category === 'equipment' ? 'equipment' : 'terminal'} stamps. MEPSketcher copies the files into its own storage.
       </p>
       <div className="mep-field-row">
         <label>Name</label>
@@ -69,7 +69,7 @@ export function LibrarySourceDialog({ category, defaultName, defaultDiscipline, 
         </select>
       </div>
       <label className="mep-checkbox-row mep-library-check">
-        <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MepApp stamps
+        <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MEPSketcher stamps
       </label>
     </Dialog>
   );

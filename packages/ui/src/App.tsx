@@ -556,6 +556,17 @@ export function MepSketchApp({
     }
   }, [fileAccess, openPdfFile]);
 
+  // Desktop "Open with": one file at a time, as openPdfFile refuses to start while another open runs.
+  const openPdfFileRef = useRef(openPdfFile);
+  openPdfFileRef.current = openPdfFile;
+  useEffect(() => {
+    if (!ready || !fileAccess.onOpenRequest) return;
+    let queue = Promise.resolve();
+    return fileAccess.onOpenRequest((files) => {
+      for (const opened of files) queue = queue.then(() => openPdfFileRef.current(opened.file, opened.target));
+    });
+  }, [fileAccess, ready]);
+
   const handleActivateDocument = useCallback(
     (id: string) => {
       sceneRef.current?.activateDocument(id);
@@ -1107,7 +1118,7 @@ export function MepSketchApp({
   const handleRemoveLibrarySource = useCallback(
     async (source: LibrarySourceRecord) => {
       if (!libraryStore) return;
-      if (!(await confirmDialog(`Remove the folder "${source.name}" and its stamps from MepApp? The files in the folder stay. Stamps already placed in a project keep their own copy.`))) return;
+      if (!(await confirmDialog(`Remove the folder "${source.name}" and its stamps from MEPSketcher? The files in the folder stay. Stamps already placed in a project keep their own copy.`))) return;
       try {
         await libraryStore.removeSource(source.id);
         await userStampLibrary.reload();

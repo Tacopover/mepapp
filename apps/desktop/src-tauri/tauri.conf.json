@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "MepApp",
+        "title": "MEPSketcher",
         "width": 1400,
         "height": 900,
         "minWidth": 900,
@@ -31,6 +31,15 @@
     "targets": "all",
     "license": "AGPL-3.0-only",
     "licenseFile": "../../../LICENSE",
+    "fileAssociations": [
+      {
+        "ext": ["pdf"],
+        "name": "MEPSketcher.pdf",
+        "description": "PDF drawing",
+        "mimeType": "application/pdf",
+        "role": "Editor"
+      }
+    ],
     "windows": {
       "nsis": {
         "installMode": "currentUser"

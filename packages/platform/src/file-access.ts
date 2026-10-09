@@ -46,6 +46,8 @@ export interface FileAccess {
   requestFolderAccess(folder: LibraryFolderRef): Promise<boolean>;
   /** Top level of the folder only: files with one of the extensions (no dot, any case), sorted by name. Subfolders are skipped. */
   readFolder(folder: LibraryFolderRef, extensions: string[]): Promise<File[]>;
+  /** Desktop only: files the OS asks the app to open ("Open with", a double-click in the file manager), the files passed at start included. Returns the unsubscribe. */
+  onOpenRequest?(handler: (files: OpenedFile[]) => void): () => void;
 }
 
 /** Yes/no questions to the user. Async, because a desktop dialog cannot block the page the way window.confirm does. */

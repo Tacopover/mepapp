@@ -1,4 +1,6 @@
 import type { FileAccess, FileAccessCapabilities, FileTarget, FileTypeFilter, LibraryFolderRef, OpenedFile, SavedFile } from '@mepapp/platform';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { dirname, join } from '@tauri-apps/api/path';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile, stat, writeFile } from '@tauri-apps/plugin-fs';
@@ -86,5 +88,33 @@ export class TauriFileAccess implements FileAccess {
     // The type stays empty, as getFile() can return on the web: the caller sets it from the extension.
     for (const name of names) files.push(await readAsFile(await join(dir, name), ''));
     return files;
+  }
+
+  // src-tauri/src/lib.rs queues the PDFs from the command line (at start, and from a second start that the
+  // single-instance plugin stops) and emits "open-requests". Taking the queue once at subscribe catches the files from the start.
+  // Files a stopped subscription took from the queue wait here for the next one.
+  private undelivered: OpenedFile[] = [];
+
+  onOpenRequest(handler: (files: OpenedFile[]) => void): () => void {
+    let stopped = false;
+    const take = async () => {
+      const paths = await invoke<string[]>('take_open_requests');
+      for (const path of paths) {
+        try {
+          this.lastDirectory = await dirname(path);
+          const target: PathTarget = { name: baseName(path), path };
+          this.undelivered.push({ file: await readAsFile(path, 'application/pdf'), target });
+        } catch (err) {
+          console.error(`Could not read ${path}:`, err);
+        }
+      }
+      if (!stopped && this.undelivered.length > 0) handler(this.undelivered.splice(0));
+    };
+    const unlisten = listen('open-requests', () => void take());
+    void take();
+    return () => {
+      stopped = true;
+      void unlisten.then((stop) => stop());
+    };
   }
 }

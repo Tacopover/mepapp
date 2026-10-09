@@ -128,6 +128,16 @@ Verification: `pnpm build`, `pnpm typecheck` (17/17), `pnpm test` (all pass: cor
 
 Verification: build, typecheck, tests pass. Desktop (Linux, WebDriver + Xvfb): closing a dirty PDF from the Drawings tab showed `"copy.pdf" has unsaved changes. Close anyway?`; Cancel kept it, OK closed it; Remove folder showed its question and Cancel kept the folder. Web (Playwright): the same close showed the browser confirm; dismiss kept the document, accept closed it. The header switcher's close calls the same handler; not driven separately. Windows installer: tag `desktop-v0.1.0-test.3` (`d3c3628`), run `37926213643`, passed; the user confirmed both checks on Windows 2026-10-09.
 
+**Step 6 and small items, 2026-10-09 (branch `desktop-small-items`; not yet tested on Windows).**
+
+- File association: `bundle.fileAssociations` for `.pdf` (name `MEPSketcher.pdf`, role `Editor`). The installer adds MEPSketcher to "Open with" for PDF files.
+- `tauri-plugin-single-instance` (registered first, desktop targets only). `src-tauri/src/lib.rs` takes the existing `.pdf` paths from the command line (at start, and from a second start that the plugin stops), adds each to the fs scope with `allow_file` (persisted-scope keeps it, so Save writes back after a restart), queues it in `OpenRequests`, and emits `open-requests`. The command `take_open_requests` empties the queue. A second start also unminimizes and focuses the window.
+- `FileAccess.onOpenRequest?(handler)` (optional; only `TauriFileAccess` has it). `MepSketchApp` subscribes when the scene is ready and opens the files one at a time through `openPdfFile`.
+- Window title `MEPSketcher` (was `MepApp`).
+- Library dialogs: "copies the files into its own storage" instead of "browser storage", and "MEPSketcher" instead of "MepApp" in the two library dialogs and the remove-folder question.
+
+Verification: build, typecheck (17/17), tests pass (core 680, ui 100, platform 32, platform-web 21, pdf-engine-mupdf 33); `cargo check --release` with no warnings. Desktop (Linux release build, WebDriver + Xvfb + a DBus session bus, which the plugin needs on Linux): a start with `open-a.pdf` as argument loaded it; a second start with the relative path `"open b.pdf"` plus `notes.txt` opened `open b.pdf` in the first window and ignored the `.txt`; a third start with `copy.pdf` exited with code 0 after 9 s and the first window had 3 documents; Save on `copy.pdf` wrote back with no dialog (21294 -> 63293 bytes); the visible X window title was `MEPSketcher`. Not verified: Windows (the registry entries and the Explorer double-click).
+
 ### Phase 3 — Desktop storage (optional, after Phase 2)
 
 IndexedDB keeps working in the webview, so this phase is not needed for a first release. It becomes useful when the user wants data in a visible folder (backup, sync through OneDrive).
