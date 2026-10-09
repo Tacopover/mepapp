@@ -1,6 +1,6 @@
 # Desktop installer (Tauri) — plan
 
-Status: **Phase 0 done 2026-10-08 (branch `worktree-desktop-installer-plan`, not merged to `master`). Phase 1 done 2026-10-09 (installer built by CI and installed by the user; checklist partly reported, see Phase 1). Phase 2 done in the container 2026-10-09, waiting for the user's Windows test. Phases 3-5 not started.** Open decisions are in §3.
+Status: **Phases 0, 1 and 2 done and merged to `master` 2026-10-09 (branch `worktree-desktop-installer-plan`). Phase 2 passed the user's Windows checks, including the confirm fix. Phases 3-5 not started.** Open decisions are in §3.
 
 ## 1. Goal
 
@@ -126,7 +126,7 @@ Verification: `pnpm build`, `pnpm typecheck` (17/17), `pnpm test` (all pass: cor
 
 **Fix 2026-10-09.** Cause: `tauri-plugin-dialog` 2.7.3 injects a script that replaces `window.confirm` with an async function calling `plugin:dialog|confirm`. No capability can allow that command (`allow-confirm` is now an alias of `allow-message`), so the call fails ("not allowed by ACL"), and `!window.confirm(...)` on a Promise is always false. Every `window.confirm` in the app was affected (close PDF, remove folder, delete/hide/revert stamps, replace stamps, schematic and template deletes). Fix: new `AppDialogs { confirm(message): Promise<boolean> }` in `@mepapp/platform`; `WebAppDialogs` (window.confirm) and `TauriAppDialogs` (plugin-dialog `confirm()`, which uses the `message` command); `MepSketchApp` takes a required `dialogs` prop and hands it to `packages/ui/src/confirmDialog.ts` (`setAppDialogs`); all 12 `window.confirm` calls in `ui` now `await confirmDialog(...)`. Rule from here on: never call `window.confirm` in `ui`. `window.alert` is still replaced by the plugin, but it uses the allowed `message` command and needs no answer.
 
-Verification: build, typecheck, tests pass. Desktop (Linux, WebDriver + Xvfb): closing a dirty PDF from the Drawings tab showed `"copy.pdf" has unsaved changes. Close anyway?`; Cancel kept it, OK closed it; Remove folder showed its question and Cancel kept the folder. Web (Playwright): the same close showed the browser confirm; dismiss kept the document, accept closed it. The header switcher's close calls the same handler; not driven separately. Windows installer: tag `desktop-v0.1.0-test.3` (`d3c3628`), run `37926213643`, passed; waiting for the user's Windows check.
+Verification: build, typecheck, tests pass. Desktop (Linux, WebDriver + Xvfb): closing a dirty PDF from the Drawings tab showed `"copy.pdf" has unsaved changes. Close anyway?`; Cancel kept it, OK closed it; Remove folder showed its question and Cancel kept the folder. Web (Playwright): the same close showed the browser confirm; dismiss kept the document, accept closed it. The header switcher's close calls the same handler; not driven separately. Windows installer: tag `desktop-v0.1.0-test.3` (`d3c3628`), run `37926213643`, passed; the user confirmed both checks on Windows 2026-10-09.
 
 ### Phase 3 — Desktop storage (optional, after Phase 2)
 
