@@ -1,0 +1,846 @@
+<title>Auto-place Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Chivo:wght@400;500;600;700&family=Martian+Mono:wght@400;500;600&family=Architects+Daughter&display=swap">
+<style>
+/* Layout: three columns. The step list, the current step, and the sample room that shows the result of the step. */
+:root {
+  --ink: #131b21;
+  --muted: #57676f;
+  --line: #c2ced4;
+  --paper: #eef2f4;
+  --surface: #ffffff;
+  --surface-2: #e7edf0;
+  --accent: #175a8a;
+  --accent-soft: #dbe9f2;
+  --accent-ink: #0f4267;
+  --hvac: #3f7cc9;
+  --warn: #9a5b00;
+  --warn-soft: #fbeed6;
+  --band: #efd3a0;
+  --bad: #b3261e;
+  --bad-soft: #f9dedc;
+  --ok: #2f7d4f;
+  --ok-soft: #dcefe3;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-ui: 'Chivo', system-ui, sans-serif;
+  --font-mono: 'Martian Mono', ui-monospace, Consolas, monospace;
+  --font-hand: 'Architects Daughter', 'Comic Sans MS', cursive;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { padding-inline: 16px; padding-block: 16px 40px; max-width: 1480px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { background: var(--surface); border: 2px solid var(--ink); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 14px; }
+.top h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: 0.01em; text-wrap: balance; }
+.top .rule { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.top .tag { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; border: 1.5px solid var(--ink); padding: 2px 8px; background: var(--warn-soft); }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+
+.grid { display: grid; grid-template-columns: 210px minmax(0, 1fr) minmax(0, 460px); gap: 14px; align-items: start; }
+@media (max-width: 1150px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Step list */
+.steps { display: flex; flex-direction: column; gap: 6px; position: sticky; top: env(safe-area-inset-top, 0px); }
+@media (max-width: 1150px) { .steps { position: static; flex-direction: row; overflow-x: auto; padding-bottom: 4px; } }
+.step-btn { display: grid; grid-template-columns: 26px 1fr; gap: 2px 8px; text-align: left; background: var(--surface); border: 1.5px solid var(--line); border-radius: 3px; padding: 8px 10px; cursor: pointer; min-width: 150px; }
+.step-btn:hover { border-color: var(--ink); }
+.step-btn.on { border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.step-btn .n { grid-row: span 2; width: 26px; height: 26px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; font-weight: 600; border: 1.5px solid var(--ink); border-radius: 50%; }
+.step-btn .t { font-weight: 600; font-size: 13.5px; }
+.step-btn .s { font-size: 11px; color: var(--muted); }
+.step-btn.ok .n { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.step-btn.warn .n { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.step-btn.warn .s { color: var(--warn); }
+.step-btn.bad .n { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+.step-btn.bad .s { color: var(--bad); }
+
+/* Step card */
+.card { background: var(--surface); border: 2px solid var(--ink); border-radius: 4px; box-shadow: 4px 4px 0 var(--ink); padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 26px; text-wrap: balance; }
+.card h3 { margin: 0; font-size: 12px; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lead { margin: 0; max-width: 64ch; color: var(--muted); }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.nav { display: flex; gap: 10px; justify-content: space-between; border-top: 1.5px dashed var(--line); padding-top: 14px; }
+.btn { border: 1.5px solid var(--ink); background: var(--surface); padding: 7px 14px; border-radius: 3px; cursor: pointer; font-weight: 600; }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent-ink); box-shadow: 2px 2px 0 var(--ink); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+.field { display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.field label { font-size: 13px; }
+.inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input.txt, select.txt { border: 1.5px solid var(--line); border-radius: 3px; padding: 6px 8px; background: var(--surface); font-family: var(--font-mono); font-size: 12.5px; width: 100%; max-width: 320px; }
+select.unit { border: 1.5px solid var(--accent); border-radius: 3px; padding: 3px 6px; background: var(--surface); font-family: var(--font-mono); font-size: 12px; color: var(--accent-ink); }
+input.num { border: 1.5px solid var(--accent); border-radius: 3px; padding: 3px 6px; width: 74px; font-family: var(--font-mono); font-size: 13px; background: var(--accent-soft); color: var(--accent-ink); text-align: right; }
+input.num::placeholder { color: var(--muted); opacity: 0.8; }
+input.txt:focus, input.num:focus, select.txt:focus, select.unit:focus { border-color: var(--ink); outline: none; }
+
+/* Choice cards */
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.choices.small { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+.choice { position: relative; border: 1.5px solid var(--line); border-radius: 3px; background: var(--surface); padding: 10px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.choice:hover { border-color: var(--ink); }
+.choice.on { border: 2px solid var(--accent); background: var(--accent-soft); }
+.choice .ct { font-weight: 600; font-size: 13px; padding-right: 22px; }
+.choice .cd { font-size: 11.5px; color: var(--muted); }
+.choice .cf { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent-ink); }
+.choice svg { width: 100%; height: auto; display: block; background: var(--paper); border-radius: 2px; }
+
+/* Tooltip */
+.tip { position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); background: var(--surface); font: 600 11px/15px var(--font-mono); text-align: center; cursor: help; }
+.tip .tt { display: none; position: absolute; z-index: 20; top: 24px; right: -9px; width: min(290px, 78vw); padding: 10px 12px; background: var(--ink); color: var(--surface); border-radius: 3px; font: 400 12px/1.5 var(--font-ui); text-align: left; box-shadow: 3px 3px 0 var(--accent); }
+.tip .tt b { color: #fff; }
+.tip .tt dl { margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; }
+.tip .tt dt { font-family: var(--font-mono); color: #9fc6e4; }
+.tip .tt dd { margin: 0; }
+.tip:hover .tt, .tip:focus .tt, .tip:focus-within .tt { display: block; }
+
+/* Chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1.5px solid var(--line); border-radius: 999px; padding: 4px 12px; background: var(--surface); cursor: pointer; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.chip .c { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.chip.on { background: var(--accent); border-color: var(--accent-ink); color: #fff; }
+.chip.on .c { color: var(--accent-soft); }
+
+/* Formula lines */
+.formula { display: flex; flex-direction: column; gap: 0; border: 1.5px solid var(--line); border-radius: 3px; }
+.term { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 9px 12px; border-bottom: 1px solid var(--surface-2); font-size: 13.5px; }
+.term:last-child { border-bottom: 0; }
+.term .op { font-family: var(--font-mono); color: var(--muted); }
+.term .sym { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 2px; padding: 0 4px; }
+.term .val { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); padding: 1px 6px; border-radius: 2px; }
+.term .res { margin-left: auto; font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.term.total { background: var(--surface-2); font-weight: 600; }
+.term.result { background: var(--accent-soft); }
+.missing { color: var(--warn); background: var(--warn-soft) !important; font-weight: 600; }
+
+/* Data checklist */
+.checks { display: flex; flex-direction: column; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px 10px; padding: 10px 12px; border-radius: 3px; border: 1.5px solid var(--line); }
+.check .ic { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; border: 1.5px solid currentColor; }
+.check.ok .ic { color: var(--ok); background: var(--ok-soft); }
+.check.warn { border-color: var(--warn); background: var(--warn-soft); }
+.check.warn .ic { color: var(--warn); }
+.check.bad { border-color: var(--bad); background: var(--bad-soft); }
+.check.bad .ic { color: var(--bad); }
+.check.off { opacity: 0.55; }
+.check.off .ic { color: var(--muted); }
+.check b { font-weight: 600; }
+.check .sub { font-size: 12px; color: var(--muted); }
+.check.bad .sub { color: var(--ink); }
+
+.callout { border-left: 4px solid var(--warn); background: var(--warn-soft); padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.callout.bad { border-left-color: var(--bad); background: var(--bad-soft); }
+.callout.info { border-left-color: var(--accent); background: var(--accent-soft); }
+
+/* Limit fields with small diagrams */
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.limit { border: 1.5px solid var(--line); border-radius: 3px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.limit svg { width: 100%; height: 70px; background: var(--paper); border-radius: 2px; }
+.limit .lt { font-weight: 600; font-size: 13px; }
+.limit .row { display: flex; gap: 6px; align-items: center; font-size: 12.5px; }
+
+/* Side panel */
+.side { display: flex; flex-direction: column; gap: 10px; position: sticky; top: env(safe-area-inset-top, 0px); min-width: 0; }
+@media (max-width: 1150px) { .side { position: static; } }
+.panel { background: var(--surface); border: 2px solid var(--ink); border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.panel-head .pt { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+.seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 2px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 3px 10px; cursor: pointer; font-size: 12px; }
+.seg button.on { background: var(--ink); color: var(--surface); }
+.facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.fact { font-family: var(--font-mono); font-size: 11px; background: var(--surface-2); border-radius: 2px; padding: 3px 7px; }
+.fact small { color: var(--muted); font-size: 10px; }
+.fact.missing { border: 1px solid var(--warn); }
+.plan { width: 100%; height: auto; display: block; background: var(--paper); border: 1.5px solid var(--line); border-radius: 2px; }
+.plan .room { cursor: pointer; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--muted); }
+.legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); background: var(--sw); }
+.legend span.plain::before { display: none; }
+
+.chain { display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: 3px; }
+.chain .cr { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 2px 10px; padding: 7px 10px; border-bottom: 1px solid var(--surface-2); align-items: center; }
+.chain .cr:last-child { border-bottom: 0; }
+.chain .cl { font-size: 12.5px; }
+.chain .cw { grid-column: 1; font-size: 11px; color: var(--muted); }
+.chain .cn { grid-row: 1 / span 2; grid-column: 2; font-family: var(--font-mono); font-weight: 600; font-size: 16px; text-align: right; font-variant-numeric: tabular-nums; }
+.chain .cr.win { background: var(--accent-soft); }
+.chain .cr.win .cn { color: var(--accent-ink); }
+.chain .cr.res { background: var(--ink); color: var(--surface); }
+.chain .cr.res .cw { color: var(--line); }
+.chain .cr.cap { background: var(--warn-soft); }
+.chain .cr.blocked { background: var(--warn-soft); color: var(--warn); }
+
+.tbl-wrap { overflow-x: auto; border: 1.5px solid var(--line); border-radius: 3px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--surface-2); white-space: nowrap; }
+th { font-family: var(--font-mono); font-weight: 500; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+td.n { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+tr.bad td { color: var(--warn); background: var(--warn-soft); }
+tr.err td { color: var(--bad); background: var(--bad-soft); }
+tr.sel td { background: var(--accent-soft); }
+.status { font-size: 13px; padding: 8px 12px; border-radius: 3px; background: var(--ok-soft); color: var(--ok); border: 1.5px solid var(--ok); }
+.hand { font-family: var(--font-hand); }
+@media (prefers-reduced-motion: no-preference) { .step-btn, .choice, .chip { transition: border-color .12s, background-color .12s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Place stamps in rooms</h1>
+    <span class="rule" id="rule-name"></span>
+    <span class="tag">Mockup v2</span>
+  </header>
+  <p class="note">This mockup shows one rule from start to end on a fixed sample floor. The numbers are examples, not a standard. Change any value: the sample room on the right shows the result at once.</p>
+  <div class="grid">
+    <nav class="steps" id="steps" aria-label="Steps"></nav>
+    <main class="card" id="step"></main>
+    <aside class="side" id="side"></aside>
+  </div>
+</div>
+
+<script>
+// ---------- Sample floor (m, y down) ----------
+const TYPES = [
+  { id: 'office', name: 'Office' },
+  { id: 'meeting', name: 'Meeting room' },
+  { id: 'classroom', name: 'Classroom' },
+  { id: 'storage', name: 'Storage' },
+  { id: 'toilet', name: 'Toilet' },
+  { id: 'technical', name: 'Technical room' },
+  { id: 'corridor', name: 'Corridor' },
+];
+const typeName = (id) => TYPES.find((t) => t.id === id)?.name ?? 'No type';
+const ROOMS = [
+  { id: 'r214', name: 'Office 2.14', type: 'office', poly: [[0, 0], [9.6, 0], [9.6, 4.2], [5.6, 4.2], [5.6, 7.2], [0, 7.2]] },
+  { id: 'r215', name: 'Copy room 2.15', type: 'storage', poly: [[5.6, 4.2], [9.6, 4.2], [9.6, 7.2], [5.6, 7.2]] },
+  { id: 'r212', name: 'Office 2.12', type: 'office', poly: [[9.6, 0], [15.6, 0], [15.6, 7.2], [9.6, 7.2]] },
+  { id: 'r210', name: 'Meeting 2.10', type: 'meeting', people: 12, poly: [[15.6, 0], [20.4, 0], [20.4, 7.2], [15.6, 7.2]] },
+  { id: 'r209', name: 'Toilets 2.09', type: 'toilet', poly: [[20.4, 0], [23.4, 0], [23.4, 3.6], [20.4, 3.6]] },
+  { id: 'r208', name: 'Technical 2.08', type: 'technical', poly: [[20.4, 3.6], [23.4, 3.6], [23.4, 7.2], [20.4, 7.2]] },
+  { id: 'r201', name: 'Corridor 2.01', type: 'corridor', poly: [[0, 7.2], [23.4, 7.2], [23.4, 9.2], [0, 9.2]] },
+  { id: 'r220', name: 'Classroom 2.20', type: 'classroom', poly: [[0, 9.2], [12, 9.2], [12, 16.4], [0, 16.4]] },
+  { id: 'r221', name: 'Room 2.21', type: null, poly: [[12, 9.2], [23.4, 9.2], [23.4, 16.4], [12, 16.4]] },
+];
+
+const STAMPS = [
+  { id: 'diffuser', name: 'Ceiling diffuser 600×600', note: 'Square supply diffuser' },
+  { id: 'swirl', name: 'Swirl diffuser Ø400', note: 'Round supply diffuser' },
+  { id: 'grille', name: 'Wall grille 400×150', note: 'Blows in one direction' },
+];
+
+// ---------- Units ----------
+const M2_PER_FT2 = 0.09290304, M_PER_FT = 0.3048;
+const FLOW_UNITS = ['dm³/s', 'l/s', 'm³/h', 'm³/s', 'cfm', 'W', 'kW'];
+// Air changes give m³/h first; MepApp converts to the chosen unit.
+const ACH_UNITS = { 'm³/h': 1, 'dm³/s': 1 / 3.6, 'l/s': 1 / 3.6, 'm³/s': 1 / 3600, cfm: 1 / 1.69901 };
+const AREA_UNITS = { m2: 'm²', ft2: 'ft²' };
+const LIGHT_UNITS = { lx: 'lx, floor area in m²', fc: 'fc (foot-candle), floor area in ft²' };
+const LEN_UNITS = { m: 'm, m²', ft: 'ft, ft²' };
+
+const METHODS = [
+  { id: 'perArea', name: 'Per area', f: 'a × floor area', fields: ['perM2', 'minimum'], unit: 'dm³/s', cap: '50',
+    tip: '<b>Amount = a × floor area</b><dl><dt>a</dt><dd>The amount for each m² (or ft²) of floor area, for example 1.2 dm³/s per m².</dd><dt>area</dt><dd>MepApp measures it from the room outline and the scale of the page.</dd></dl>' },
+  { id: 'perPerson', name: 'Per person', f: 'a × persons', fields: ['perPerson', 'minimum'], unit: 'dm³/s', cap: '50',
+    tip: '<b>Amount = a × persons</b><dl><dt>a</dt><dd>The amount for each person, for example 7 dm³/s per person.</dd><dt>persons</dt><dd>The number of the room, or floor area ÷ area per person of the room type, rounded down.</dd></dl>' },
+  { id: 'perPersonArea', name: 'Per person + per area', f: 'a × persons + b × floor area', fields: ['perPerson', 'perM2', 'minimum'], unit: 'dm³/s', cap: '50',
+    tip: '<b>Amount = a × persons + b × floor area</b><dl><dt>a</dt><dd>The amount for each person, for example 7 dm³/s per person.</dd><dt>b</dt><dd>The amount for each m² (or ft²) of floor area, for example 0.7 dm³/s per m². It removes the pollution from the building itself.</dd><dt>persons</dt><dd>The number of the room, or floor area ÷ area per person, rounded down.</dd></dl>' },
+  { id: 'airChanges', name: 'Air changes per hour', f: 'n × room volume', fields: ['perM3', 'minimum'], unit: 'm³/h', cap: '300',
+    tip: '<b>Amount = n × room volume</b><dl><dt>n</dt><dd>The air changes per hour: how many times in one hour the full air volume of the room is replaced.</dd><dt>volume</dt><dd>Floor area × ceiling height.</dd></dl>' },
+  { id: 'fixed', name: 'Fixed per room', f: 'a per room', fields: ['fixed'], unit: 'dm³/s', cap: '',
+    tip: '<b>Amount = a</b><dl><dt>a</dt><dd>The same amount for each room, for example 25 dm³/s for each toilet. Without a capacity per stamp, each room gets one stamp.</dd></dl>' },
+  { id: 'lighting', name: 'Lighting (lumen method)', f: 'E × floor area ÷ (UF × MF)', fields: [], unit: 'lm', cap: '3600',
+    tip: '<b>Light = E × floor area ÷ (UF × MF)</b>, in lumen (lm)<dl><dt>E</dt><dd>The illuminance on the work plane, in lux (lx) or foot-candle (fc).</dd><dt>UF</dt><dd>Utilisation factor: the part of the lamp light that reaches the work plane, from 0 to 1.</dd><dt>MF</dt><dd>Maintenance factor: the part of the light that stays after dirt and lamp ageing, from 0 to 1.</dd></dl>' },
+  { id: 'coverage', name: 'By coverage', f: 'stamps until circles of r cover the room', fields: [], unit: '', cap: '',
+    tip: '<b>Count = the stamps that cover each point of the room</b><dl><dt>r</dt><dd>Each stamp covers a circle with radius r. The smallest of these sets r: max spacing ÷ √2, max distance to a wall × √2, √(max area per stamp ÷ 2).</dd></dl>Use it for smoke detectors, sprinklers and loudspeakers.' },
+];
+
+const LAYOUTS = [
+  { id: 'center', name: 'Center', d: 'One stamp in the middle of the room. More than one stamp uses the grid.' },
+  { id: 'grid', name: 'Grid', d: 'Rows along the long side of the room. Three styles for the rows.' },
+  { id: 'evenSpread', name: 'Even spread', d: 'Each stamp moves to the middle of its own part of the room. Good for L-shaped rooms.' },
+  { id: 'perimeter', name: 'Along the walls', d: 'Stamps at equal distances along the walls, turned to face into the room.' },
+];
+const GRID_STYLES = [
+  { id: 'spread', name: 'Spread last row', d: 'An incomplete row spreads over the full width.' },
+  { id: 'aligned', name: 'Aligned columns', d: 'Every stamp stays in a column. A cell can stay empty.' },
+  { id: 'staggered', name: 'Staggered', d: 'Rows stay aligned. Each second row moves half a cell.' },
+];
+
+// ---------- State ----------
+const S = {
+  step: 1,
+  view: null,
+  sample: 'r214',
+  name: 'Supply air per person + area',
+  stamp: 'diffuser',
+  types: ['office', 'meeting', 'classroom'],
+  roomType: { r221: '' },
+  areaPerPerson: { office: '', classroom: '2.5', meeting: '' },
+  ceiling: '2.70',
+  method: 'perPersonArea',
+  flowUnit: 'dm³/s', areaUnit: 'm2', achUnit: 'm³/h', lightUnit: 'lx', lenUnit: 'm',
+  perPerson: '7', perM2: '0.7', perM3: '4', fixed: '25', minimum: '',
+  lux: '500', uf: '0.6', mf: '0.8',
+  capacity: '50',
+  covSpacing: '4', covWall: '', covArea: '',
+  minCount: '', maxCount: '',
+  offset: '0.5', minGap: '1.5',
+  layout: 'grid', gridStyle: 'spread',
+  rotation: 'room', angle: '0',
+  placed: false,
+};
+
+// ---------- Numbers ----------
+const num = (s) => { const t = String(s ?? '').trim().replace(',', '.'); if (!t) return undefined; const n = Number(t); return Number.isFinite(n) ? n : undefined; };
+const fmt = (n, d = 1) => n == null ? '–' : (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: 0 });
+const fmt2 = (n) => n.toFixed(2);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const ceilCount = (x) => Math.max(0, Math.ceil(x - 1e-9));
+const floorCount = (x) => Math.max(0, Math.floor(x + 1e-9));
+
+// ---------- Geometry ----------
+function signedArea(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
+const polyArea = (p) => Math.abs(signedArea(p));
+function bbox(p) { const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]); const minX = Math.min(...xs), minY = Math.min(...ys), maxX = Math.max(...xs), maxY = Math.max(...ys); return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY }; }
+function inside(p, [x, y]) { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const [xi, yi] = p[i], [xj, yj] = p[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; }
+function segDist([x, y], [ax, ay], [bx, by]) { const dx = bx - ax, dy = by - ay; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - ax - t * dx, y - ay - t * dy); }
+function wallDist(p, q) { let m = Infinity; for (let i = 0; i < p.length; i++) m = Math.min(m, segDist(q, p[i], p[(i + 1) % p.length])); return m; }
+const isValid = (p, q, off) => inside(p, q) && wallDist(p, q) >= off - 1e-9;
+function centroid(p) { let a = 0, cx = 0, cy = 0; for (let i = 0; i < p.length; i++) { const [x0, y0] = p[i], [x1, y1] = p[(i + 1) % p.length]; const f = x0 * y1 - x1 * y0; a += f; cx += (x0 + x1) * f; cy += (y0 + y1) * f; } a /= 2; return [cx / (6 * a), cy / (6 * a)]; }
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function nearestIndex(pts, q) { let k = 0, m = Infinity; pts.forEach((p, i) => { const d = dist(p, q); if (d < m) { m = d; k = i; } }); return k; }
+
+function samplesOf(poly, off, target = 700) {
+  const b = bbox(poly); const step = Math.sqrt(polyArea(poly) / target);
+  const all = [], ok = [], valid = [];
+  for (let x = b.minX + step / 2; x < b.maxX; x += step) for (let y = b.minY + step / 2; y < b.maxY; y += step) {
+    const q = [x, y]; if (!inside(poly, q)) continue;
+    const v = wallDist(poly, q) >= off - 1e-9; all.push(q); ok.push(v); if (v) valid.push(q);
+  }
+  return { all, ok, valid, step };
+}
+const nearestValid = (smp, q) => smp.valid.length ? smp.valid[nearestIndex(smp.valid, q)] : q;
+
+function layoutGrid(poly, n, off, smp, style = 'spread') {
+  if (n <= 0) return [];
+  const b = bbox(poly); const lx = Math.max(b.w - 2 * off, 0.01), ly = Math.max(b.h - 2 * off, 0.01);
+  const horiz = b.w >= b.h; const L = horiz ? lx : ly, Wd = horiz ? ly : lx;
+  let cols = Math.max(1, Math.min(n, Math.round(Math.sqrt((n * L) / Wd))));
+  const rows = Math.ceil(n / cols); cols = Math.ceil(n / rows);
+  const pts = [];
+  for (let r = 0; r < rows; r++) {
+    const inRow = r < rows - 1 ? cols : n - cols * (rows - 1);
+    for (let c = 0; c < inRow; c++) {
+      let a;
+      if (style === 'spread') a = ((c + 0.5) * L) / inRow;
+      else {
+        const cell = inRow === cols ? c : Math.round(((c + 0.5) * cols) / inRow - 0.5);
+        const shift = style === 'staggered' && rows > 1 ? (r % 2 ? 0.25 : -0.25) : 0;
+        a = ((cell + 0.5 + shift) * L) / cols;
+      }
+      const w = ((r + 0.5) * Wd) / rows;
+      pts.push(horiz ? [b.minX + off + a, b.minY + off + w] : [b.minX + off + w, b.minY + off + a]);
+    }
+  }
+  return pts.map((q) => (isValid(poly, q, off) ? q : nearestValid(smp, q)));
+}
+function relax(pts, smp, poly, off, iters = 30) {
+  for (let it = 0; it < iters; it++) {
+    const parts = pts.map(() => []);
+    smp.all.forEach((q, k) => parts[nearestIndex(pts, q)].push(k));
+    let maxMove = 0;
+    pts = pts.map((p, i) => {
+      const part = parts[i]; if (!part.length) return p;
+      let c = [part.reduce((s, k) => s + smp.all[k][0], 0) / part.length, part.reduce((s, k) => s + smp.all[k][1], 0) / part.length];
+      if (!isValid(poly, c, off)) { const own = part.filter((k) => smp.ok[k]).map((k) => smp.all[k]); c = own.length ? own[nearestIndex(own, c)] : nearestValid(smp, c); }
+      maxMove = Math.max(maxMove, dist(p, c)); return c;
+    });
+    if (maxMove < smp.step / 20) break;
+  }
+  return pts;
+}
+const layoutEven = (poly, n, off, smp) => (n <= 0 ? [] : relax(layoutGrid(poly, n, off, smp), smp, poly, off));
+function coverTargets(poly, smp, r) { return [...smp.all, ...poly].filter((t) => smp.valid.length && dist(nearestValid(smp, t), t) <= r + 1e-9); }
+function worstGap(pts, targets) { let wd = 0, worst = null; for (const t of targets) { const d = dist(pts[nearestIndex(pts, t)], t); if (d > wd) { wd = d; worst = t; } } return { wd, worst }; }
+function layoutCoverage(poly, start, off, r, maxCount, smp) {
+  const targets = coverTargets(poly, smp, r);
+  const unreachable = smp.all.length + poly.length - targets.length;
+  let pts = layoutEven(poly, Math.max(1, start), off, smp); let limited = false;
+  for (let guard = 0; guard < 60; guard++) {
+    const { wd, worst } = worstGap(pts, targets);
+    if (wd <= r + 1e-6) break;
+    if (pts.length >= (maxCount ?? 200)) { limited = true; break; }
+    pts = relax([...pts, nearestValid(smp, worst)], smp, poly, off, 10);
+  }
+  return { pts, limited, unreachable };
+}
+function wallRuns(poly, off) {
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length]; const len = dist(a, b); if (len <= 2 * off + 1e-9) continue;
+    const u = [(b[0] - a[0]) / len, (b[1] - a[1]) / len]; let n = [-u[1], u[0]];
+    const mid = [(a[0] + b[0]) / 2 + n[0] * 0.05, (a[1] + b[1]) / 2 + n[1] * 0.05]; if (!inside(poly, mid)) n = [-n[0], -n[1]];
+    out.push({ start: [a[0] + u[0] * off + n[0] * off, a[1] + u[1] * off + n[1] * off], u, n, len: len - 2 * off });
+  }
+  return out;
+}
+function layoutPerimeter(poly, n, off, smp) {
+  const runs = wallRuns(poly, off); const total = runs.reduce((s, r) => s + r.len, 0); const out = [];
+  if (!runs.length) return [];
+  for (let i = 0; i < n; i++) {
+    let s = ((i + 0.5) * total) / n; let run = runs[0];
+    for (const r of runs) { run = r; if (s <= r.len) break; s -= r.len; }
+    let q = [run.start[0] + run.u[0] * s, run.start[1] + run.u[1] * s];
+    if (!isValid(poly, q, off)) q = nearestValid(smp, q);
+    out.push({ p: q, rot: (Math.atan2(run.n[1], run.n[0]) * 180) / Math.PI - 90 });
+  }
+  return out;
+}
+/** About how many stamps fit with this distance between stamps: a greedy pass over the valid samples. */
+function fitCount(smp, gap) {
+  if (!gap) return Infinity;
+  const kept = [];
+  for (const q of smp.valid) if (kept.every((k) => dist(k, q) >= gap - 1e-9)) kept.push(q);
+  return kept.length;
+}
+
+// ---------- Rule and room values ----------
+const method = () => METHODS.find((m) => m.id === S.method);
+const lenToM = (x) => (x == null ? undefined : S.lenUnit === 'ft' ? x * M_PER_FT : x);
+const areaToM2 = (x) => (x == null ? undefined : S.lenUnit === 'ft' ? x * M2_PER_FT2 : x);
+const lenU = () => (S.lenUnit === 'ft' ? 'ft' : 'm');
+const areaU = () => (S.lenUnit === 'ft' ? 'ft²' : 'm²');
+function amountUnit() {
+  if (S.method === 'lighting') return 'lm';
+  if (S.method === 'airChanges') return S.achUnit;
+  if (S.method === 'coverage') return '';
+  return S.flowUnit;
+}
+function rule() {
+  const f = method().fields;
+  const a = (k) => (f.includes(k) ? num(S[k]) : undefined);
+  const r = {
+    perPerson: a('perPerson'), perM2: a('perM2'), perM3: a('perM3'), fixed: a('fixed'), minimum: a('minimum'),
+    lighting: S.method === 'lighting' ? { lux: num(S.lux), uf: num(S.uf), mf: num(S.mf) } : null,
+    capacity: S.method === 'coverage' ? undefined : num(S.capacity),
+    min: num(S.minCount), max: num(S.maxCount), off: num(S.offset) ?? 0, gap: num(S.minGap), unit: amountUnit(),
+  };
+  if (r.lighting && (r.lighting.lux == null || !r.lighting.uf || !r.lighting.mf)) r.lighting = null;
+  r.hasAmount = S.method !== 'coverage' && ([r.perPerson, r.perM2, r.perM3, r.fixed, r.minimum].some((x) => x !== undefined) || !!r.lighting);
+  r.needsPeople = r.perPerson !== undefined;
+  r.needsVolume = r.perM3 !== undefined;
+  r.needsArea = r.perM2 !== undefined || !!r.lighting || S.method === 'coverage';
+  if (S.method === 'coverage') {
+    const sp = lenToM(num(S.covSpacing)), wa = lenToM(num(S.covWall)), ar = areaToM2(num(S.covArea));
+    const c = [];
+    if (sp !== undefined) c.push([sp / Math.SQRT2, `max spacing ${fmt(num(S.covSpacing), 2)} ${lenU()} ÷ √2`]);
+    if (wa !== undefined) c.push([wa * Math.SQRT2, `max distance to a wall ${fmt(num(S.covWall), 2)} ${lenU()} × √2`]);
+    if (ar !== undefined) c.push([Math.sqrt(ar / 2), `√(${fmt(num(S.covArea))} ${areaU()} ÷ 2)`]);
+    c.sort((x, y) => x[0] - y[0]);
+    r.radius = c.length ? c[0][0] : null; r.radiusFrom = c.length ? c[0][1] : ''; r.covArea = ar;
+  } else r.radius = null;
+  return r;
+}
+const roomTypeOf = (room) => (room.type ?? (S.roomType[room.id] || null));
+const matches = (room) => { const t = roomTypeOf(room); return t !== null && S.types.includes(t); };
+function valuesOf(room) {
+  const A = polyArea(room.poly); const b = bbox(room.poly);
+  const t = roomTypeOf(room); const app = num(S.areaPerPerson[t]);
+  const people = room.people != null ? { count: room.people, src: 'room value' } : app ? { count: floorCount(A / app), src: `${fmt(A)} m² ÷ ${fmt(app)} m² per person, rounded down` } : null;
+  const h = num(S.ceiling) ?? 2.7;
+  return { A, L: Math.max(b.w, b.h), W: Math.min(b.w, b.h), people, h, V: A * h };
+}
+// The floor area in the unit that the rule uses for "per area".
+const areaIn = (A, unit) => (unit === 'ft2' ? A / M2_PER_FT2 : A);
+
+const cache = new Map();
+function calc(room) {
+  const key = room.id + JSON.stringify(S);
+  if (cache.has(key)) return cache.get(key);
+  const r = rule(); const v = valuesOf(room);
+  const res = { room, v, r, required: null, missing: [], qty: null, count: null, maxHit: false, minHit: false, problems: [] };
+  const smp = samplesOf(room.poly, r.off); res.smp = smp;
+  let coverPts = null;
+  if (S.method === 'coverage') {
+    if (r.radius) {
+      const start = Math.max(1, r.min ?? 0, r.covArea ? ceilCount(v.A / r.covArea) : 0);
+      const c = layoutCoverage(room.poly, start, r.off, r.radius, r.max, smp);
+      coverPts = c.pts; res.base = c.pts.length; res.count = c.pts.length; res.maxHit = c.limited; res.unreachable = c.unreachable;
+      if (r.min !== undefined && res.count < r.min) { res.count = r.min; res.minHit = true; coverPts = null; }
+    }
+  } else {
+    if (r.hasAmount) {
+      if (r.needsPeople && !v.people) res.missing.push('people');
+      if (!res.missing.length) {
+        let sum = (r.fixed ?? 0) + (r.perM2 ?? 0) * areaIn(v.A, S.areaUnit) + (r.perPerson ?? 0) * v.people?.count + (r.perM3 ?? 0) * v.V * ACH_UNITS[S.achUnit];
+        if (r.needsPeople === false) sum = (r.fixed ?? 0) + (r.perM2 ?? 0) * areaIn(v.A, S.areaUnit) + (r.perM3 ?? 0) * v.V * (ACH_UNITS[S.achUnit] ?? 1);
+        if (r.lighting) sum += (r.lighting.lux * areaIn(v.A, S.lightUnit === 'fc' ? 'ft2' : 'm2')) / (r.lighting.uf * r.lighting.mf);
+        res.sum = sum; res.required = Math.max(sum, r.minimum ?? 0);
+      }
+    }
+    const blocked = r.hasAmount && r.capacity !== undefined && res.required == null;
+    if (!blocked) {
+      res.qty = res.required != null && r.capacity > 0 ? ceilCount(res.required / r.capacity) : null;
+      res.base = res.qty ?? 1;
+      let count = res.base;
+      if (r.min !== undefined && count < r.min) { count = r.min; res.minHit = true; }
+      if (r.max !== undefined && count > r.max) { count = r.max; res.maxHit = true; }
+      res.count = count;
+    }
+  }
+  if (res.count != null) {
+    res.points = S.method === 'coverage' && coverPts && S.layout === 'evenSpread' ? coverPts.map((p) => ({ p, rot: roomRot(room.poly) })) : placePoints(room.poly, res.count, r.off, smp);
+    // spacing checks: these never change the count, they only report
+    if (!smp.valid.length) res.problems.push({ kind: 'noRoom', text: `The offset of ${fmt(r.off, 2)} m from the walls leaves no space for a stamp.` });
+    else {
+      const close = new Set();
+      if (r.gap) for (let i = 0; i < res.points.length; i++) for (let j = i + 1; j < res.points.length; j++) if (dist(res.points[i].p, res.points[j].p) < r.gap - 1e-6) { close.add(i); close.add(j); }
+      res.close = close;
+      if (close.size) {
+        const fit = fitCount(smp, r.gap);
+        res.problems.push({ kind: 'gap', text: `${close.size} stamps are closer than ${fmt(r.gap, 2)} m to each other.${fit < res.count ? ` About ${fit} stamp${fit === 1 ? '' : 's'} fit with this distance, but the room needs ${res.count}.` : ` About ${fit} stamps fit with this distance, so a different layout or grid style can fix this.`}` });
+      }
+    }
+    if (S.method === 'coverage' && r.radius && res.points.length) {
+      const { wd } = worstGap(res.points.map((x) => x.p), coverTargets(room.poly, smp, r.radius));
+      if (wd > r.radius + 0.05) res.problems.push({ kind: 'cover', text: `This layout leaves part of the room outside the coverage circles. Use Even spread for coverage.` });
+      if (res.maxHit || res.unreachable) res.problems.push({ kind: 'cover', text: res.maxHit ? `The max count stops the coverage before the full room is covered.` : `The offset from the walls keeps the stamps too far from some corners.` });
+    }
+  }
+  res.each = res.required != null && res.count ? res.required / res.count : null;
+  cache.set(key, res);
+  return res;
+}
+const roomRot = (poly) => (S.rotation === 'fixed' ? num(S.angle) ?? 0 : bbox(poly).h > bbox(poly).w ? 90 : 0);
+function placePoints(poly, n, off, smp) {
+  if (!n) return [];
+  const rot = roomRot(poly);
+  if (S.layout === 'perimeter') return layoutPerimeter(poly, n, off, smp).map((x) => (S.rotation === 'fixed' ? { p: x.p, rot } : x));
+  let pts;
+  if (S.layout === 'center' && n === 1) { const c = centroid(poly); pts = [isValid(poly, c, off) ? c : nearestValid(smp, c)]; }
+  else if (S.layout === 'evenSpread') pts = layoutEven(poly, n, off, smp);
+  else pts = layoutGrid(poly, n, off, smp, S.layout === 'grid' ? S.gridStyle : 'spread');
+  return pts.map((p) => ({ p, rot }));
+}
+
+// ---------- SVG pieces ----------
+function stampSvg(id, [x, y], rot = 0, opts = {}) {
+  const color = opts.color ?? 'var(--hvac)'; const sw = opts.sw ?? 1.6; const dash = opts.preview ? ' stroke-dasharray="3 2"' : '';
+  const a = `fill="${opts.fill ?? 'var(--surface)'}" stroke="${color}" stroke-width="${sw}" vector-effect="non-scaling-stroke"${dash}`;
+  const l = `stroke="${color}" stroke-width="${sw}" vector-effect="non-scaling-stroke"`;
+  const s = opts.size ?? 0.6, h = s / 2;
+  let body;
+  if (id === 'diffuser') body = `<rect x="${-h}" y="${-h}" width="${s}" height="${s}" ${a}/><line x1="${-h}" y1="${-h}" x2="${h}" y2="${h}" ${l}/><line x1="${h}" y1="${-h}" x2="${-h}" y2="${h}" ${l}/>`;
+  else if (id === 'swirl') body = `<circle r="${h * 0.85}" ${a}/><circle r="${h * 0.35}" fill="none" ${l}/><line x1="${-h * 0.85}" y1="0" x2="${h * 0.85}" y2="0" ${l}/>`;
+  else body = `<rect x="${-h * 0.75}" y="${-h * 0.25}" width="${s * 0.75}" height="${h * 0.5}" ${a}/><line x1="${-h * 0.4}" y1="${-h * 0.25}" x2="${-h * 0.4}" y2="${h * 0.25}" ${l}/><line x1="0" y1="${-h * 0.25}" x2="0" y2="${h * 0.25}" ${l}/><line x1="${h * 0.4}" y1="${-h * 0.25}" x2="${h * 0.4}" y2="${h * 0.25}" ${l}/><path d="M0 ${h * 0.4} L0 ${h * 1.1} M${-h * 0.25} ${h * 0.8} L0 ${h * 1.1} L${h * 0.25} ${h * 0.8}" fill="none" ${l}/>`;
+  return `<g transform="translate(${x} ${y}) rotate(${rot})">${body}</g>`;
+}
+const pts = (p) => p.map((q) => q.join(',')).join(' ');
+
+function planSvg(mode) {
+  const r = rule(); const sample = ROOMS.find((x) => x.id === S.sample);
+  const all = bbox(ROOMS.flatMap((x) => x.poly));
+  const box = mode === 'room' ? bbox(sample.poly) : all;
+  const pad = mode === 'room' ? 1.7 : 0.9;
+  const vb = [box.minX - pad, box.minY - pad, box.w + 2 * pad, box.h + 2 * pad];
+  const fs = mode === 'room' ? 0.32 : 0.5;
+  let out = `<svg class="plan" viewBox="${vb.join(' ')}" role="img" aria-label="${mode === 'room' ? 'Sample room ' + esc(sample.name) : 'Floor plan'}">`;
+  out += `<defs><pattern id="hatch" width="0.4" height="0.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="0.4" stroke="var(--warn)" stroke-width="0.06"/></pattern><clipPath id="clip-sample"><polygon points="${pts(sample.poly)}"/></clipPath></defs>`;
+  const state = (room) => { if (!matches(room) || S.step < 3) return ''; const c = calc(room); return c.count == null ? 'blocked' : c.problems.length ? 'problem' : ''; };
+  for (const room of ROOMS) {
+    const m = matches(room); const isSample = room.id === S.sample; const untyped = roomTypeOf(room) === null; const st = state(room);
+    const fill = untyped ? 'url(#hatch)' : st === 'blocked' ? 'var(--warn-soft)' : st === 'problem' && mode === 'floor' ? 'var(--bad-soft)' : m ? (mode === 'room' && !isSample ? 'var(--surface-2)' : 'var(--accent-soft)') : 'var(--surface)';
+    const op = mode === 'room' && !isSample ? 0.55 : 1;
+    out += `<g class="room" data-room="${room.id}" opacity="${op}"><polygon points="${pts(room.poly)}" fill="${fill}" stroke="var(--ink)" stroke-width="${isSample && mode === 'floor' ? 3 : 1.5}" vector-effect="non-scaling-stroke"/></g>`;
+  }
+  const showStamps = (room) => (mode === 'floor' ? S.step >= 5 && matches(room) : room.id === S.sample && S.step >= 3);
+  if (mode === 'room') {
+    const res = calc(sample);
+    if (r.off > 0) out += `<polygon points="${pts(sample.poly)}" fill="none" stroke="var(--band)" stroke-width="${2 * r.off}" clip-path="url(#clip-sample)"/>`;
+    const b = bbox(sample.poly); const dy = b.maxY + 0.8, dx = b.maxX + 0.8;
+    const dl = `stroke="var(--muted)" stroke-width="1" vector-effect="non-scaling-stroke"`;
+    out += `<line x1="${b.minX}" y1="${dy}" x2="${b.maxX}" y2="${dy}" ${dl}/><line x1="${b.minX}" y1="${dy - 0.2}" x2="${b.minX}" y2="${dy + 0.2}" ${dl}/><line x1="${b.maxX}" y1="${dy - 0.2}" x2="${b.maxX}" y2="${dy + 0.2}" ${dl}/>`;
+    out += `<text x="${(b.minX + b.maxX) / 2}" y="${dy + 0.55}" font-size="0.36" text-anchor="middle" class="hand" fill="var(--muted)">${fmt2(b.w)} m</text>`;
+    out += `<line x1="${dx}" y1="${b.minY}" x2="${dx}" y2="${b.maxY}" ${dl}/><line x1="${dx - 0.2}" y1="${b.minY}" x2="${dx + 0.2}" y2="${b.minY}" ${dl}/><line x1="${dx - 0.2}" y1="${b.maxY}" x2="${dx + 0.2}" y2="${b.maxY}" ${dl}/>`;
+    out += `<text transform="translate(${dx + 0.5} ${(b.minY + b.maxY) / 2}) rotate(90)" font-size="0.36" text-anchor="middle" class="hand" fill="var(--muted)">${fmt2(b.h)} m</text>`;
+    if (res.points) {
+      if (r.radius) for (const { p } of res.points) out += `<circle cx="${p[0]}" cy="${p[1]}" r="${r.radius}" fill="var(--accent)" fill-opacity="0.07" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" clip-path="url(#clip-sample)"/>`;
+      if (S.step === 4 && r.gap) res.points.forEach(({ p }, i) => { const bad = res.close?.has(i); out += `<circle cx="${p[0]}" cy="${p[1]}" r="${r.gap / 2}" fill="${bad ? 'var(--bad)' : 'var(--ok)'}" fill-opacity="${bad ? 0.22 : 0.12}" stroke="${bad ? 'var(--bad)' : 'var(--ok)'}" stroke-width="1" vector-effect="non-scaling-stroke"/>`; });
+    }
+    out += `<text x="${b.minX}" y="${b.minY - 0.7}" font-size="0.42" font-family="var(--font-ui)" font-weight="700" fill="var(--ink)">${esc(sample.name)}</text>`;
+  }
+  for (const room of ROOMS) {
+    if (!showStamps(room)) continue;
+    const res = calc(room); if (!res.points) continue;
+    res.points.forEach(({ p, rot }, i) => { out += stampSvg(S.stamp, p, rot, { preview: !S.placed, size: mode === 'room' ? 0.6 : 0.75, color: res.close?.has(i) ? 'var(--bad)' : undefined }); });
+  }
+  for (const room of ROOMS) {
+    if (mode === 'room' && room.id === S.sample) continue;
+    const untyped = roomTypeOf(room) === null; const st = state(room);
+    const c = room.id === 'r214' ? [2.8, 3.6] : centroid(room.poly);
+    const halo = `paint-order="stroke" stroke="var(--surface)" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
+    out += `<text x="${c[0]}" y="${c[1] - fs * 0.3}" font-size="${fs}" text-anchor="middle" font-family="var(--font-ui)" font-weight="600" fill="var(--ink)" ${halo}>${esc(room.name)}</text>`;
+    out += `<text x="${c[0]}" y="${c[1] + fs * 0.9}" font-size="${fs * 0.75}" text-anchor="middle" font-family="var(--font-mono)" fill="${st === 'problem' ? 'var(--bad)' : st || untyped ? 'var(--warn)' : 'var(--muted)'}" ${halo}>${untyped ? 'no type' : st === 'blocked' ? 'missing data' : st === 'problem' ? 'does not fit' : fmt(polyArea(room.poly)) + ' m²'}</text>`;
+  }
+  return out + `</svg>`;
+}
+
+function thumbSvg(layoutId, style) {
+  const rect = layoutId === 'grid';
+  const poly = rect ? [[0, 0], [6, 0], [6, 4.5], [0, 4.5]] : [[0, 0], [6, 0], [6, 2.6], [3.4, 2.6], [3.4, 4.5], [0, 4.5]];
+  const off = 0.5; const smp = samplesOf(poly, off, 260);
+  let p;
+  if (layoutId === 'center') { const c = centroid(poly); p = [{ p: isValid(poly, c, off) ? c : nearestValid(smp, c), rot: 0 }]; }
+  else if (layoutId === 'grid') p = layoutGrid(poly, 5, off, smp, style ?? S.gridStyle).map((q) => ({ p: q, rot: 0 }));
+  else if (layoutId === 'evenSpread') p = layoutEven(poly, 4, off, smp).map((q) => ({ p: q, rot: 0 }));
+  else p = layoutPerimeter(poly, 7, off, smp);
+  const id = layoutId === 'perimeter' ? 'grille' : 'diffuser';
+  let s = `<svg viewBox="-0.6 -0.6 7.2 5.7" aria-hidden="true"><polygon points="${pts(poly)}" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+  for (const { p: q, rot } of p) s += stampSvg(id, q, rot, { size: 0.6, sw: 1.3 });
+  return s + `</svg>`;
+}
+function stampCardSvg(id) { return `<svg viewBox="-1 -0.8 2 1.6" aria-hidden="true">${stampSvg(id, [0, 0], 0, { size: 1, sw: 2 })}</svg>`; }
+
+// ---------- Step status ----------
+const matched = () => ROOMS.filter(matches);
+const untypedRooms = () => ROOMS.filter((r) => roomTypeOf(r) === null);
+function stepStatus(n) {
+  const m = matched();
+  if (n === 1) return S.stamp ? ['ok', STAMPS.find((s) => s.id === S.stamp).name] : ['', 'Choose a stamp'];
+  if (n === 2) { const u = untypedRooms(); if (u.length) return ['warn', `${u.length} room has no type`]; return m.length ? ['ok', `${m.length} rooms`] : ['warn', 'No room matches']; }
+  if (n === 3) { const bad = m.filter((room) => calc(room).count == null); return bad.length ? ['warn', `${bad.length} rooms miss data`] : ['ok', method().name]; }
+  if (n === 4) { const bad = m.filter((room) => calc(room).problems.some((p) => p.kind !== 'cover')); return bad.length ? ['bad', `${bad.length} room${bad.length === 1 ? '' : 's'}: stamps do not fit`] : ['ok', `${fmt(rule().off, 2)} m from walls`]; }
+  if (n === 5) { const bad = m.filter((room) => calc(room).problems.some((p) => p.kind === 'cover')); const name = LAYOUTS.find((l) => l.id === S.layout).name + (S.layout === 'grid' ? `, ${GRID_STYLES.find((g) => g.id === S.gridStyle).name.toLowerCase()}` : ''); return bad.length ? ['bad', `${name}: room not covered`] : ['ok', name]; }
+  if (n === 6) { const total = m.reduce((s, room) => s + (calc(room).count ?? 0), 0); return [S.placed ? 'ok' : '', S.placed ? `${total} stamps placed` : `${total} stamps to place`]; }
+}
+const STEP_TITLES = ['Stamp', 'Rooms', 'Amount', 'Spacing', 'Layout', 'Check and place'];
+
+// ---------- Step views ----------
+const tip = (html) => `<span class="tip" tabindex="0" role="note" aria-label="Explanation">i<span class="tt">${html}</span></span>`;
+const unitSelect = (key, options, label) => `<select class="unit" data-k="${key}" id="u-${key}" aria-label="${label}">${Object.entries(options).map(([v, t]) => `<option value="${esc(v)}"${S[key] === v ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+const listToMap = (list) => Object.fromEntries(list.map((x) => [x, x]));
+
+function limitDiagram(k) {
+  const l = 'stroke="var(--muted)" stroke-width="1" vector-effect="non-scaling-stroke"';
+  const d = (x, y) => stampSvg('diffuser', [x, y], 0, { size: 0.5, sw: 1.2 });
+  if (k === 'sp') return `<svg viewBox="0 0 6 2" aria-hidden="true">${d(1.5, 0.9)}${d(4.5, 0.9)}<line x1="1.5" y1="1.6" x2="4.5" y2="1.6" ${l}/><text x="3" y="1.45" font-size="0.36" text-anchor="middle" class="hand" fill="var(--accent-ink)">spacing</text></svg>`;
+  if (k === 'wa') return `<svg viewBox="0 0 6 2" aria-hidden="true"><line x1="0.6" y1="0.1" x2="0.6" y2="1.9" stroke="var(--ink)" stroke-width="3" vector-effect="non-scaling-stroke"/>${d(3, 0.9)}<line x1="0.6" y1="1.6" x2="3" y2="1.6" ${l}/><text x="1.8" y="1.45" font-size="0.36" text-anchor="middle" class="hand" fill="var(--accent-ink)">to wall</text></svg>`;
+  if (k === 'ar') return `<svg viewBox="0 0 6 2" aria-hidden="true"><rect x="1.8" y="0.15" width="2.4" height="1.7" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="3 2" stroke-width="1" vector-effect="non-scaling-stroke"/>${d(3, 1)}<text x="3" y="0.5" font-size="0.32" text-anchor="middle" class="hand" fill="var(--accent-ink)">area</text></svg>`;
+  if (k === 'off') return `<svg viewBox="0 0 6 2" aria-hidden="true"><rect x="0.6" y="0" width="0.9" height="2" fill="var(--band)"/><line x1="0.6" y1="0" x2="0.6" y2="2" stroke="var(--ink)" stroke-width="3" vector-effect="non-scaling-stroke"/>${d(2.6, 0.9)}<line x1="0.6" y1="1.6" x2="1.5" y2="1.6" ${l}/><text x="2.3" y="1.75" font-size="0.32" class="hand" fill="var(--warn)">no stamp here</text></svg>`;
+  return `<svg viewBox="0 0 6 2" aria-hidden="true"><circle cx="1.9" cy="1" r="0.75" fill="var(--ok)" fill-opacity="0.12" stroke="var(--ok)" stroke-width="1" vector-effect="non-scaling-stroke"/><circle cx="4.1" cy="1" r="0.75" fill="var(--ok)" fill-opacity="0.12" stroke="var(--ok)" stroke-width="1" vector-effect="non-scaling-stroke"/>${d(1.9, 1)}${d(4.1, 1)}<text x="3" y="0.25" font-size="0.3" text-anchor="middle" class="hand" fill="var(--ok)">at least this far</text></svg>`;
+}
+
+function viewStep() {
+  const r = rule(); const sample = ROOMS.find((x) => x.id === S.sample);
+  const f = method().fields;
+  let h = '';
+  if (S.step === 1) {
+    h += `<h2>What do you want to place?</h2><p class="lead">MepApp places this stamp in each room that the rule applies to. The name helps you find the rule again later.</p>`;
+    h += `<div class="section"><div class="field"><label for="f-name">Rule name</label><input class="txt" id="f-name" data-k="name" value="${esc(S.name)}"></div>
+      <div class="field"><label for="f-disc">Discipline</label><select class="txt" id="f-disc"><option>Ventilation</option><option>Heating and cooling</option><option>Electrical</option><option>Fire protection</option></select></div></div>`;
+    h += `<div class="section"><h3>Stamp</h3><div class="choices">${STAMPS.map((s) => `<button type="button" class="choice${S.stamp === s.id ? ' on' : ''}" data-act="stamp" data-v="${s.id}">${stampCardSvg(s.id)}<span class="ct">${esc(s.name)}</span><span class="cd">${esc(s.note)}</span></button>`).join('')}</div></div>`;
+  }
+  if (S.step === 2) {
+    const u = untypedRooms();
+    h += `<h2>Which rooms get this stamp?</h2><p class="lead">Click the room types. The floor plan shows the rooms that match in blue. MepApp finds the room type from the room name in the drawing.</p>`;
+    if (u.length || S.roomType.r221) {
+      const room = ROOMS.find((x) => x.id === 'r221');
+      h += `<div class="callout"><span><b>${esc(room.name)}</b> has no room type, so no rule can find it.</span><label for="f-rt">Room type</label><select class="txt" id="f-rt" data-rt="r221" style="max-width:200px"><option value="">No type</option>${TYPES.map((t) => `<option value="${t.id}"${S.roomType.r221 === t.id ? ' selected' : ''}>${t.name}</option>`).join('')}</select></div>`;
+    }
+    h += `<div class="section"><h3>Room types in this drawing</h3><div class="chips">${TYPES.map((t) => { const n = ROOMS.filter((room) => roomTypeOf(room) === t.id).length; return `<button type="button" class="chip${S.types.includes(t.id) ? ' on' : ''}" data-act="type" data-v="${t.id}" aria-pressed="${S.types.includes(t.id)}">${t.name}<span class="c">${n}</span></button>`; }).join('')}</div></div>`;
+    h += `<div class="section"><h3>Rooms that match</h3><div data-live="matchlist"></div></div>`;
+  }
+  if (S.step === 3) {
+    h += `<h2>How many stamps does one room need?</h2><p class="lead">Choose how MepApp calculates the number of stamps. Point to <b>i</b> on a card for an explanation. The lines below calculate <b>${esc(sample.name)}</b> as an example. Click a room on the plan to calculate a different room.</p>`;
+    h += `<div class="section"><h3>Calculation</h3><div class="choices" role="radiogroup" aria-label="Calculation">${METHODS.map((m) => `<div class="choice${S.method === m.id ? ' on' : ''}" role="radio" tabindex="0" aria-checked="${S.method === m.id}" data-act="method" data-v="${m.id}"><span class="ct">${m.name}</span><span class="cf">${m.f}</span>${tip(m.tip)}</div>`).join('')}</div></div>`;
+    if (S.method === 'coverage') {
+      h += `<div class="section"><h3>Coverage limits</h3><div class="inline"><span style="font-size:13px">Units</span>${unitSelect('lenUnit', LEN_UNITS, 'Length unit')}</div>
+      <div class="limits">
+        <div class="limit">${limitDiagram('sp')}<span class="lt">Max spacing</span><div class="row"><input class="num" id="f-sp" data-k="covSpacing" value="${esc(S.covSpacing)}" placeholder="none"><span>${lenU()} between two stamps</span></div></div>
+        <div class="limit">${limitDiagram('wa')}<span class="lt">Max distance to a wall</span><div class="row"><input class="num" id="f-wa" data-k="covWall" value="${esc(S.covWall)}" placeholder="none"><span>${lenU()}</span></div></div>
+        <div class="limit">${limitDiagram('ar')}<span class="lt">Max area per stamp</span><div class="row"><input class="num" id="f-ar" data-k="covArea" value="${esc(S.covArea)}" placeholder="none"><span>${areaU()}</span></div></div>
+      </div><div data-live="radius"></div></div>`;
+    } else {
+      h += `<div class="section"><h3>Amount for ${esc(sample.name)}</h3>`;
+      h += `<div class="inline"><span style="font-size:13px">Units</span>`;
+      if (S.method === 'lighting') h += unitSelect('lightUnit', LIGHT_UNITS, 'Illuminance unit');
+      else if (S.method === 'airChanges') h += `<span class="note">result in</span>${unitSelect('achUnit', listToMap(Object.keys(ACH_UNITS)), 'Air flow unit')}`;
+      else { h += unitSelect('flowUnit', listToMap(FLOW_UNITS), 'Amount unit'); if (f.includes('perM2')) h += `<span class="note">per</span>${unitSelect('areaUnit', AREA_UNITS, 'Area unit')}<span class="note">floor area</span>`; }
+      h += `</div><div class="formula">`;
+      if (f.includes('fixed')) h += `<div class="term"><span class="sym">a</span><input class="num" id="f-fixed" data-k="fixed" value="${esc(S.fixed)}" aria-label="Amount per room"><span data-live="unit"></span><span>per room</span><span class="res" data-live="t-fixed"></span></div>`;
+      if (f.includes('perPerson')) h += `<div class="term"><span class="sym">a</span><input class="num" id="f-pp" data-k="perPerson" value="${esc(S.perPerson)}" aria-label="Amount per person"><span><span data-live="unit"></span> per person</span><span class="op">×</span><span class="val" data-live="people"></span><span class="res" data-live="t-perPerson"></span></div>`;
+      if (f.includes('perM2')) h += `<div class="term"><span class="sym">${f.includes('perPerson') ? 'b' : 'a'}</span><input class="num" id="f-pm2" data-k="perM2" value="${esc(S.perM2)}" aria-label="Amount per area"><span><span data-live="unit"></span> per ${AREA_UNITS[S.areaUnit]}</span><span class="op">×</span><span class="val" data-live="area"></span><span class="res" data-live="t-perM2"></span></div>`;
+      if (f.includes('perM3')) h += `<div class="term"><span class="sym">n</span><input class="num" id="f-pm3" data-k="perM3" value="${esc(S.perM3)}" aria-label="Air changes per hour"><span>air changes per hour</span><span class="op">×</span><span class="val" data-live="volume"></span><span class="res" data-live="t-perM3"></span></div>`;
+      if (S.method === 'lighting') h += `<div class="term"><span class="sym">E</span><input class="num" id="f-lux" data-k="lux" value="${esc(S.lux)}" aria-label="Illuminance"><span>${S.lightUnit}</span><span class="op">×</span><span class="val" data-live="area"></span><span class="op">÷ (</span><span class="sym">UF</span><input class="num" id="f-uf" data-k="uf" value="${esc(S.uf)}" aria-label="Utilisation factor" style="width:56px"><span class="op">×</span><span class="sym">MF</span><input class="num" id="f-mf" data-k="mf" value="${esc(S.mf)}" aria-label="Maintenance factor" style="width:56px"><span class="op">)</span><span class="res" data-live="t-light"></span></div>`;
+      if (f.includes('minimum')) h += `<div class="term"><span>At least</span><input class="num" id="f-min" data-k="minimum" value="${esc(S.minimum)}" placeholder="none" aria-label="Minimum per room"><span data-live="unit"></span><span class="res" data-live="t-min"></span></div>`;
+      h += `<div class="term total"><span>Required amount</span><span class="res" data-live="required"></span></div></div></div>`;
+      h += `<div class="section"><h3>What one stamp gives</h3><div class="formula"><div class="term"><span>One stamp gives</span><input class="num" id="f-cap" data-k="capacity" value="${esc(S.capacity)}" placeholder="none" aria-label="Capacity per stamp"><span data-live="unit"></span></div><div class="term result" data-live="qtyline"></div></div></div>`;
+    }
+    h += `<div class="section"><h3>Count limits per room</h3><div class="formula"><div class="term"><span>At least</span><input class="num" id="f-minc" data-k="minCount" value="${esc(S.minCount)}" placeholder="none"><span>stamps, at most</span><input class="num" id="f-maxc" data-k="maxCount" value="${esc(S.maxCount)}" placeholder="none"><span>stamps</span></div></div></div>`;
+    h += `<div class="section"><h3>Room data this calculation needs</h3><div class="checks" data-live="checks"></div>`;
+    const needTypes = [...new Set(matched().filter((room) => room.people == null).map(roomTypeOf))];
+    if (r.needsPeople && needTypes.length) h += `<div class="formula">${needTypes.map((t) => `<div class="term"><span style="min-width:120px"><b>${typeName(t)}</b></span><input class="num" data-app="${t}" id="f-app-${t}" value="${esc(S.areaPerPerson[t] ?? '')}" placeholder="?" aria-label="Area per person for ${typeName(t)}"><span>m² per person</span><span class="res" data-live="app-${t}"></span></div>`).join('')}</div><p class="note">MepApp keeps the area per person with the room type, so every room of that type gets it. It rounds down: a person who does not fit in the remaining area does not count. A room can also have its own number of persons.</p>`;
+    if (r.needsVolume) h += `<div class="formula"><div class="term"><span>Ceiling height of this drawing</span><input class="num" id="f-ceil" data-k="ceiling" value="${esc(S.ceiling)}" aria-label="Ceiling height"><span>m</span></div></div>`;
+    h += `</div>`;
+  }
+  if (S.step === 4) {
+    h += `<h2>How much space must the stamps keep?</h2><p class="lead">These distances change only <b>where</b> MepApp puts the stamps. They never change the number of stamps. When the stamps do not fit, MepApp tells you, and you change the distances or the count.</p>`;
+    h += `<div class="limits">
+      <div class="limit">${limitDiagram('off')}<span class="lt">Min distance to the walls</span><div class="row"><input class="num" id="f-off" data-k="offset" value="${esc(S.offset)}"><span>m</span></div><span class="note">The orange band on the plan.</span></div>
+      <div class="limit">${limitDiagram('gap')}<span class="lt">Min distance between stamps</span><div class="row"><input class="num" id="f-gap" data-k="minGap" value="${esc(S.minGap)}" placeholder="none"><span>m</span></div><span class="note">Circles on the plan. Red circles overlap.</span></div>
+    </div>`;
+    h += `<div class="section"><h3>Check of all rooms</h3><div class="checks" data-live="fitchecks"></div></div>`;
+  }
+  if (S.step === 5) {
+    h += `<h2>Where in the room do the stamps go?</h2><p class="lead">Each picture shows the layout in a sample room. The plan on the right shows the layout in <b>${esc(sample.name)}</b> with the count from step 3.</p>`;
+    h += `<div class="choices">${LAYOUTS.map((l) => `<button type="button" class="choice${S.layout === l.id ? ' on' : ''}" data-act="layout" data-v="${l.id}">${thumbSvg(l.id)}<span class="ct">${l.name}</span><span class="cd">${l.d}</span></button>`).join('')}</div>`;
+    if (S.layout === 'grid') h += `<div class="section"><h3>Grid style (5 stamps as an example)</h3><div class="choices small">${GRID_STYLES.map((g) => `<button type="button" class="choice${S.gridStyle === g.id ? ' on' : ''}" data-act="gridStyle" data-v="${g.id}">${thumbSvg('grid', g.id)}<span class="ct">${g.name}</span><span class="cd">${g.d}</span></button>`).join('')}</div></div>`;
+    h += `<div class="section"><h3>Rotation</h3>
+      <div class="field"><label for="f-rot">Rotation</label><select class="txt" id="f-rot" data-k="rotation" style="max-width:220px"><option value="room"${S.rotation === 'room' ? ' selected' : ''}>${S.layout === 'perimeter' ? 'Face into the room' : 'Align to the room'}</option><option value="fixed"${S.rotation === 'fixed' ? ' selected' : ''}>Fixed angle</option></select></div>
+      ${S.rotation === 'fixed' ? `<div class="field"><label for="f-ang">Angle</label><div class="inline"><input class="num" id="f-ang" data-k="angle" value="${esc(S.angle)}"><span>°</span></div></div>` : ''}</div>`;
+    h += `<div data-live="layoutnote"></div>`;
+  }
+  if (S.step === 6) {
+    h += `<h2>Check and place</h2><p class="lead">The table shows each room that the rule applies to. The plan shows the stamps before you place them. Click a row to see the room.</p>`;
+    h += `<div class="tbl-wrap" data-live="table"></div><div data-live="placebar"></div>`;
+  }
+  if (S.step >= 4 && S.step <= 5) h = h.replace('<h2>', '<div data-live="blocked"></div><h2>');
+  h += `<div class="nav"><button type="button" class="btn" data-act="go" data-v="${S.step - 1}"${S.step === 1 ? ' disabled' : ''}>Back</button>${S.step < 6 ? `<button type="button" class="btn primary" data-act="go" data-v="${S.step + 1}">Next: ${STEP_TITLES[S.step]}</button>` : ''}</div>`;
+  return h;
+}
+
+// ---------- Live values ----------
+function live() {
+  const r = rule(); const sample = ROOMS.find((x) => x.id === S.sample); const res = calc(sample); const v = res.v; const u = esc(r.unit);
+  const m = {};
+  m.unit = u;
+  m.people = v.people ? `${v.people.count} persons` : `<span class="missing">? persons</span>`;
+  m.area = S.method === 'lighting' ? (S.lightUnit === 'fc' ? `${fmt(areaIn(v.A, 'ft2'))} ft²` : `${fmt(v.A)} m²`) : `${fmt(areaIn(v.A, S.areaUnit))} ${AREA_UNITS[S.areaUnit]}`;
+  m.volume = `${fmt(v.V)} m³`;
+  const t = (x) => (x == null ? '' : `= ${fmt(x)} ${u}`);
+  m['t-fixed'] = t(r.fixed);
+  m['t-perPerson'] = r.perPerson !== undefined ? (v.people ? t(r.perPerson * v.people.count) : `<span class="missing">cannot calculate</span>`) : '';
+  m['t-perM2'] = r.perM2 !== undefined ? t(r.perM2 * areaIn(v.A, S.areaUnit)) : '';
+  m['t-perM3'] = r.perM3 !== undefined ? (S.achUnit === 'm³/h' ? t(r.perM3 * v.V) : `${fmt(r.perM3 * v.V)} m³/h ${t(r.perM3 * v.V * ACH_UNITS[S.achUnit])}`) : '';
+  m['t-light'] = r.lighting ? t((r.lighting.lux * areaIn(v.A, S.lightUnit === 'fc' ? 'ft2' : 'm2')) / (r.lighting.uf * r.lighting.mf)) : '';
+  m['t-min'] = r.minimum !== undefined && res.sum != null ? (res.sum < r.minimum ? `the minimum applies` : `not needed`) : '';
+  m.required = res.required != null ? `${fmt(res.required)} ${u}` : `<span class="missing">missing room data</span>`;
+  if (res.required == null && r.hasAmount) m.qtyline = `<span>Enter the missing room data first.</span>`;
+  else if (r.capacity > 0 && res.required != null) m.qtyline = `<span>${fmt(res.required)} ÷ ${fmt(r.capacity)} = ${fmt(res.required / r.capacity, 2)}, rounded up</span><span class="res">${res.qty} stamp${res.qty === 1 ? '' : 's'}</span>`;
+  else m.qtyline = `<span>No capacity: each room gets one stamp.</span><span class="res">1 stamp</span>`;
+  const chk = (state, title, sub) => `<div class="check ${state}"><span class="ic">${state === 'ok' ? '✓' : state === 'warn' || state === 'bad' ? '!' : '–'}</span><div><b>${title}</b><div class="sub">${sub}</div></div></div>`;
+  const ms = matched();
+  const noPeople = ms.filter((room) => !valuesOf(room).people);
+  m.checks = chk(r.needsArea ? 'ok' : 'off', 'Floor area', r.needsArea ? 'From the room outline and the scale 1:50 of page 1. All rooms have it.' : 'This calculation does not use it.') +
+    chk(r.needsPeople ? (noPeople.length ? 'warn' : 'ok') : 'off', 'Number of persons', r.needsPeople ? (noPeople.length ? `${noPeople.length} room${noPeople.length === 1 ? '' : 's'} have no number: ${noPeople.map((x) => esc(x.name)).join(', ')}. Enter an area per person below.` : 'Each room has a number of persons.') : 'This calculation does not use it.') +
+    chk(r.needsVolume ? 'ok' : 'off', 'Ceiling height (for the volume)', r.needsVolume ? `${S.ceiling} m from the drawing. A room or a room type can have its own height.` : 'This calculation does not use it.');
+  for (const ty of Object.keys(S.areaPerPerson)) { const a = num(S.areaPerPerson[ty]); const rs = ms.filter((x) => roomTypeOf(x) === ty && x.people == null); m['app-' + ty] = a && rs.length ? rs.map((x) => `${esc(x.name.split(' ').pop())}: ${floorCount(polyArea(x.poly) / a)} p`).join(' · ') : rs.length ? `<span class="missing">${rs.length} room${rs.length === 1 ? '' : 's'} wait for this</span>` : ''; }
+  m.radius = r.radius ? `<div class="formula"><div class="term result"><span>Each stamp covers a circle with a radius of</span><span class="val">${fmt(r.radius, 2)} m</span><span class="note">(${r.radiusFrom}, the smallest limit)</span></div><div class="term"><span>${esc(sample.name)} needs</span><span class="res">${res.base ?? '–'} stamps</span></div></div>` : `<div class="callout">Enter at least one coverage limit.</div>`;
+  m.matchlist = ms.length ? `<div class="chips">${ms.map((x) => `<span class="chip" style="cursor:default">${esc(x.name)}<span class="c">${fmt(polyArea(x.poly))} m²</span></span>`).join('')}</div>` : `<p class="note">No room matches. Click at least one room type.</p>`;
+  m.blocked = res.count == null && matches(sample) ? `<div class="callout"><span><b>${esc(sample.name)}</b> has missing data, so the plan shows no stamps.</span><button type="button" class="btn" data-act="go" data-v="3">Go to step 3</button></div>` : '';
+  // step 4: the fit check of every room
+  m.fitchecks = ms.map((x) => { const c = calc(x); if (c.count == null) return chk('off', esc(x.name), 'No count yet: missing data in step 3.'); const p = c.problems.filter((q) => q.kind !== 'cover'); return p.length ? chk('bad', `${esc(x.name)}: ${c.count} stamps do not fit`, p.map((q) => esc(q.text)).join(' ')) : chk('ok', `${esc(x.name)}: ${c.count} stamps fit`, r.gap ? `Each stamp is at least ${fmt(r.gap, 2)} m from the next one.` : 'No min distance between stamps.'); }).join('');
+  // step 5
+  const coverProblems = res.problems.filter((q) => q.kind === 'cover');
+  if (coverProblems.length) m.layoutnote = `<div class="callout bad">${coverProblems.map((q) => esc(q.text)).join(' ')}</div>`;
+  else if (S.layout === 'center' && (res.count ?? 0) > 1) m.layoutnote = `<div class="callout">This room needs ${res.count} stamps. Center places one stamp only, so MepApp uses the grid here.</div>`;
+  else if (S.method === 'coverage' && S.layout === 'evenSpread') m.layoutnote = `<div class="callout info">With By coverage, MepApp selects Even spread. It uses the positions that the coverage calculation found, so every point of the room stays covered.</div>`;
+  else m.layoutnote = '';
+  // step 6
+  const rows = ms.map((x) => { const c = calc(x); const bad = c.count == null; const err = c.problems.length > 0; const note = bad ? 'no number of persons' : err ? c.problems[0].kind === 'cover' ? 'not covered' : 'stamps do not fit' : c.maxHit ? 'max count reached' : c.minHit ? 'min count applies' : ''; return `<tr class="${bad ? 'bad' : err ? 'err' : x.id === S.sample ? 'sel' : ''}" data-act="sample" data-v="${x.id}" style="cursor:pointer"><td>${esc(x.name)}</td><td>${typeName(roomTypeOf(x))}</td><td class="n">${fmt(c.v.A)}</td>${r.needsPeople ? `<td class="n">${c.v.people ? c.v.people.count : '–'}</td>` : ''}${r.hasAmount ? `<td class="n">${c.required != null ? fmt(c.required) : '–'}</td>` : ''}<td class="n">${c.count ?? '–'}</td>${r.hasAmount ? `<td class="n">${c.each != null ? fmt(c.each) : '–'}</td>` : ''}<td>${note}</td></tr>`; }).join('');
+  m.table = `<table><thead><tr><th>Room</th><th>Type</th><th>m²</th>${r.needsPeople ? '<th>Persons</th>' : ''}${r.hasAmount ? `<th>Required ${u}</th>` : ''}<th>Stamps</th>${r.hasAmount ? `<th>Each ${u}</th>` : ''}<th>Note</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const total = ms.reduce((s, x) => s + (calc(x).count ?? 0), 0); const skipped = ms.filter((x) => calc(x).count == null).length; const errs = ms.filter((x) => calc(x).problems.length).length;
+  const others = ROOMS.length - ms.length;
+  m.placebar = S.placed
+    ? `<div class="status" role="status">MepApp placed ${total} stamps in ${ms.length - skipped} rooms. One Undo removes all of them. <button type="button" class="btn" data-act="undo" style="margin-left:8px">Undo</button></div>`
+    : `<div class="inline" style="gap:10px"><button type="button" class="btn primary" data-act="place"${total ? '' : ' disabled'}>Place ${total} stamps</button><span class="note">${skipped ? `${skipped} room${skipped === 1 ? '' : 's'} skipped: missing data (step 3). ` : ''}${errs ? `${errs} room${errs === 1 ? '' : 's'} with a spacing or coverage problem: MepApp places the stamps, but check them. ` : ''}${others} other rooms do not match this rule.</span></div>`;
+  return m;
+}
+
+// ---------- Side panel ----------
+function viewSide() {
+  const mode = S.view ?? (S.step >= 3 && S.step <= 5 ? 'room' : 'floor');
+  const sample = ROOMS.find((x) => x.id === S.sample); const res = calc(sample); const r = rule(); const v = res.v;
+  let h = `<div class="panel"><div class="panel-head"><span class="pt">${mode === 'room' ? 'Sample room' : 'Floor plan'}</span><div class="seg" role="group" aria-label="View"><button type="button" class="${mode === 'room' ? 'on' : ''}" data-act="view" data-v="room">This room</button><button type="button" class="${mode === 'floor' ? 'on' : ''}" data-act="view" data-v="floor">Whole floor</button></div></div>`;
+  if (mode === 'room') {
+    h += `<div class="facts"><span class="fact">${fmt(v.A)} m²</span><span class="fact">${fmt2(v.L)} × ${fmt2(v.W)} m</span>` +
+      (r.needsPeople ? `<span class="fact${v.people ? '' : ' missing'}">${v.people ? `${v.people.count} persons <small>${esc(v.people.src)}</small>` : '? persons'}</span>` : '') +
+      (r.needsVolume ? `<span class="fact">${fmt(v.V)} m³ <small>ceiling ${S.ceiling} m</small></span>` : '') + `</div>`;
+  }
+  h += planSvg(mode);
+  h += mode === 'room'
+    ? `<div class="legend"><span style="--sw:var(--accent-soft)">room</span><span style="--sw:var(--band)">min distance to walls</span>${r.radius ? '<span style="--sw:rgba(23,90,138,.12)">coverage circle</span>' : ''}${S.step === 4 && r.gap ? '<span style="--sw:rgba(47,125,79,.2)">min distance between stamps</span>' : ''}<span class="plain">click a room to use it</span></div>`
+    : `<div class="legend"><span style="--sw:var(--accent-soft)">matches the rule</span><span style="--sw:var(--surface)">does not match</span><span style="--sw:var(--warn-soft)">no room type or missing data</span>${S.step >= 3 ? '<span style="--sw:var(--bad-soft)">stamps do not fit</span>' : ''}<span class="plain">click a room to use it</span></div>`;
+  h += `</div>`;
+  if (S.step >= 3 && matches(sample)) {
+    const rowc = (cls, label, why, n) => `<div class="cr ${cls}"><span class="cl">${label}</span><span class="cw">${why}</span><span class="cn">${n}</span></div>`;
+    h += `<div class="panel"><div class="panel-head"><span class="pt">Why ${res.count ?? '?'} stamp${res.count === 1 ? '' : 's'}?</span><span class="note">${esc(sample.name)}</span></div><div class="chain">`;
+    if (S.method === 'coverage') h += r.radius ? rowc(res.minHit || res.maxHit ? '' : 'win', 'By coverage', `Circles of ${fmt(r.radius, 2)} m (${r.radiusFrom}) cover the room`, res.base) : rowc('blocked', 'By coverage', 'Enter a coverage limit (step 3)', '?');
+    else if (res.count == null) h += rowc('blocked', method().name, 'Room data is missing (step 3)', '?');
+    else h += rowc(res.minHit || res.maxHit ? '' : 'win', method().name, res.qty != null ? `${fmt(res.required)} ${esc(r.unit)} ÷ ${fmt(r.capacity)} per stamp, rounded up` : 'No capacity per stamp: one stamp per room', res.base);
+    if (r.min !== undefined) h += rowc(res.minHit ? 'cap' : '', 'Min count', res.minHit ? 'Raises the count' : 'Not needed here', r.min);
+    if (r.max !== undefined) h += rowc(res.maxHit ? 'cap' : '', 'Max count', res.maxHit ? 'Limits the count' : 'Not needed here', r.max);
+    h += rowc('res', 'Stamps in this room', res.count == null ? 'Cannot calculate yet' : 'Spacing and layout do not change this number', res.count ?? '?');
+    h += `</div>`;
+    if (res.each != null) h += `<p class="note">Each stamp gets ${fmt(res.each)} ${esc(r.unit)} (${fmt(res.required)} ÷ ${res.count}). MepApp writes this capacity to the stamp.</p>`;
+    if (res.problems.length) h += `<div class="callout bad">${res.problems.map((q) => esc(q.text)).join(' ')}</div>`;
+    h += `</div>`;
+  } else if (S.step >= 3) h += `<div class="panel"><p class="note">${esc(sample.name)} does not match this rule. Click a blue room on the plan.</p></div>`;
+  return h;
+}
+
+// ---------- Render ----------
+const $ = (id) => document.getElementById(id);
+function renderSteps() {
+  $('steps').innerHTML = STEP_TITLES.map((t, i) => { const n = i + 1; const [st, sub] = stepStatus(n); return `<button type="button" class="step-btn ${st}${S.step === n ? ' on' : ''}" data-act="go" data-v="${n}" aria-current="${S.step === n ? 'step' : 'false'}"><span class="n">${st === 'ok' && S.step !== n ? '✓' : n}</span><span class="t">${t}</span><span class="s">${esc(sub)}</span></button>`; }).join('');
+}
+function refresh() {
+  if (cache.size > 400) cache.clear();
+  renderSteps();
+  const m = live();
+  document.querySelectorAll('[data-live]').forEach((el) => { el.innerHTML = m[el.dataset.live] ?? ''; });
+  $('side').innerHTML = viewSide();
+  $('rule-name').textContent = `Rule: ${S.name}`;
+}
+function render() { $('step').innerHTML = viewStep(); refresh(); }
+
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.dataset.k) { S[el.dataset.k] = el.value; S.placed = false; if (el.tagName === 'SELECT') return render(); refresh(); }
+  else if (el.dataset.app) { S.areaPerPerson[el.dataset.app] = el.value; S.placed = false; refresh(); }
+});
+document.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.dataset.rt) { S.roomType[el.dataset.rt] = el.value; S.placed = false; render(); }
+});
+function act(el) {
+  const { act: a, v } = el.dataset;
+  if (a === 'go') { S.step = Number(v); S.view = null; window.scrollTo({ top: 0 }); }
+  if (a === 'stamp') S.stamp = v;
+  if (a === 'type') { S.types = S.types.includes(v) ? S.types.filter((x) => x !== v) : [...S.types, v]; if (!matches(ROOMS.find((x) => x.id === S.sample))) S.sample = matched()[0]?.id ?? S.sample; }
+  if (a === 'method' && S.method !== v) { const m = METHODS.find((x) => x.id === v); S.method = v; if (m.unit && v !== 'airChanges' && v !== 'lighting') S.flowUnit = m.unit; S.capacity = m.cap; if (v === 'coverage') S.layout = 'evenSpread'; }
+  if (a === 'layout') S.layout = v;
+  if (a === 'gridStyle') S.gridStyle = v;
+  if (a === 'view') S.view = v;
+  if (a === 'sample') S.sample = v;
+  if (a === 'place') S.placed = true;
+  if (a === 'undo') S.placed = false;
+  if (!['place', 'undo', 'view', 'sample', 'go'].includes(a)) S.placed = false;
+  render();
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.tip')) return;
+  const room = e.target.closest('[data-room]');
+  if (room) { S.sample = room.dataset.room; if (S.view === 'floor' && S.step >= 3 && S.step <= 5) S.view = null; return render(); }
+  const el = e.target.closest('[data-act]'); if (el) act(el);
+});
+document.addEventListener('keydown', (e) => {
+  const el = e.target.closest?.('[role="radio"][data-act]');
+  if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); act(el); }
+});
+render();
+</script>
