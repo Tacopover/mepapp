@@ -10,6 +10,7 @@ export * from './room.js';
 export * from './room-type.js';
 export * from './room-values.js';
 export * from './placement-rule.js';
+export * from './placement-layout.js';
 export * from './labels.js';
 export * from './edit.js';
 export { resolveRoomAt, wallComponents, type ResolveOptions, type ResolveResult, type ResolveMethod } from './resolve.js';

@@ -554,6 +554,16 @@ function roomTypeFields(room: Room): Pick<Room, 'roomTypeId' | 'roomTypeSource'>
   return { ...(room.roomTypeId !== undefined ? { roomTypeId: room.roomTypeId } : {}), ...(room.roomTypeSource !== undefined ? { roomTypeSource: room.roomTypeSource } : {}) };
 }
 
+/** The stamps auto-placement puts down for one stamp definition (SketchScene.showAutoPlacePreview / autoPlaceStamps). */
+export interface AutoPlaceGroup {
+  definition: StampDefinition;
+  /** The art, loaded by the UI (as for replaceSelectedStamps). */
+  bitmap: ImageBitmap;
+  /** The remembered color and scale of the definition (the stamp tool's appearance default). */
+  appearanceDefault?: { color?: string; scale?: number };
+  stamps: { position: Vec2; rotationDegrees: number; ruleId: string; roomId: string; capacity?: number }[];
+}
+
 export class SketchScene {
   private readonly app = new Application();
   private readonly world = new Container();
@@ -561,6 +571,9 @@ export class SketchScene {
   /** Scene-level (not per-document) — holds the translucent stamp-placement preview sprite, kept out of `overlay` (a Graphics node cleared every redrawOverlay()) so the ghost's own lifecycle isn't tangled with vector-overlay redraws. Reparented on every activateInternal alongside `overlay`. */
   private readonly stampGhostLayer = new Container();
   private stampGhostSprite: Sprite | null = null;
+  /** Scene-level, like stampGhostLayer: the translucent sprites of the auto-placement preview (showAutoPlacePreview). */
+  private readonly autoPlacePreviewLayer = new Container();
+  private autoPlacePreviewTextures: Texture[] = [];
   /** The stamp-placement preview's current rotation (Space advances this by 45°) — persists across repeated placements of the same stamp until Escape, a tool switch, or a different stamp pick resets it to 0. Also becomes the next placed stamp's initial rotationDegrees (see placeStamp). */
   private stampGhostRotationDegrees = 0;
   /** Alignment guide(s) matched at the ghost's current (snapped) position — see resolveSnappedPoint's 'place-stamp' case. Drawn in redrawOverlay while a place-* tool is active, same as move-selection's drag.guides. */
@@ -795,6 +808,7 @@ export class SketchScene {
     this.world.addChild(this.doc.labelLayer);
     this.world.addChild(this.doc.flowLabelLayer);
     this.world.addChild(this.stampGhostLayer);
+    this.world.addChild(this.autoPlacePreviewLayer);
     this.world.addChild(this.overlay);
     this.app.stage.addChild(this.world);
 
@@ -1042,6 +1056,7 @@ export class SketchScene {
     this.world.addChild(target.labelLayer);
     this.world.addChild(target.flowLabelLayer);
     this.world.addChild(this.stampGhostLayer);
+    this.world.addChild(this.autoPlacePreviewLayer);
     this.world.addChild(this.overlay);
     if (this.measureLabel) this.world.addChild(this.measureLabel); // created lazily on the first measurement, so not in the list above
     this.world.x = target.viewport.x;
@@ -1060,6 +1075,7 @@ export class SketchScene {
     this.pendingStampTexture = null;
     this.stampGhostSprite?.destroy();
     this.stampGhostSprite = null;
+    this.clearAutoPlacePreview();
     this.stampGhostRotationDegrees = 0;
     this.pendingPoints = [];
     for (const tool of this.toolMap.values()) tool.onDeactivate?.(this.ctx); // a pending polyline or measurement belongs to the outgoing document
@@ -2536,6 +2552,94 @@ export class SketchScene {
   /** Sets the segment-drawing angle-snap increment (Settings dialog). */
   setAngleSnapDegrees(degrees: number): void {
     this.angleSnapDegrees = degrees;
+  }
+
+  /** Shows translucent sprites where auto-placement would put stamps. Replaces an earlier preview. Nothing is added to the drawing. */
+  showAutoPlacePreview(groups: readonly AutoPlaceGroup[]): void {
+    this.clearAutoPlacePreview();
+    for (const group of groups) {
+      if (group.stamps.length === 0) continue;
+      const texture = textureFromImageBitmap(group.bitmap);
+      this.autoPlacePreviewTextures.push(texture);
+      const baseScale = computeStampBaseScale((texture.width * 72) / STAMP_SOURCE_DPI, (texture.height * 72) / STAMP_SOURCE_DPI, texture);
+      const scale = group.appearanceDefault?.scale ?? 1;
+      for (const planned of group.stamps) {
+        const sprite = new Sprite(texture);
+        sprite.anchor.set(0.5);
+        sprite.alpha = STAMP_GHOST_ALPHA;
+        sprite.eventMode = 'none';
+        applyTransformToSprite(sprite, { position: planned.position, rotationDegrees: planned.rotationDegrees, scale: { x: scale, y: scale } }, baseScale);
+        this.autoPlacePreviewLayer.addChild(sprite);
+      }
+    }
+  }
+
+  /** Removes the auto-placement preview. */
+  clearAutoPlacePreview(): void {
+    for (const child of this.autoPlacePreviewLayer.removeChildren()) child.destroy();
+    for (const texture of this.autoPlacePreviewTextures) texture.destroy();
+    this.autoPlacePreviewTextures = [];
+  }
+
+  /**
+   * Places the stamps of auto-placement (room-auto-placement.md Phase 4) as ONE undo step, the way
+   * the stamp tool places one: a new id, the definition's ports and port groups, the remembered
+   * appearance. A user-library or custom definition is copied into the document first. Each stamp
+   * records its rule and room (`autoPlaced`). A `capacity` is written to the stamp's flow-solve
+   * capacity. Returns the new stamp ids, which become the selection.
+   */
+  autoPlaceStamps(groups: readonly AutoPlaceGroup[]): string[] {
+    this.clearAutoPlacePreview();
+    const placed: PlacedStamp[] = [];
+    for (const group of groups) {
+      if (group.stamps.length === 0) continue;
+      const { definition } = group;
+      if (definition.source !== 'library' && !this.doc.customStampDefinitions.some((d) => d.id === definition.id)) this.addCustomStampDefinition(definition);
+      const texture = textureFromImageBitmap(group.bitmap);
+      const nativeWidth = (texture.width * 72) / STAMP_SOURCE_DPI;
+      const nativeHeight = (texture.height * 72) / STAMP_SOURCE_DPI;
+      const baseScale = computeStampBaseScale(nativeWidth, nativeHeight, texture);
+      const scale = group.appearanceDefault?.scale ?? 1;
+      for (const planned of group.stamps) {
+        const id = `stamp-${this.doc.nextStampSeq++}`;
+        const data: PlacedStamp = {
+          id,
+          category: definition.category,
+          transform: { position: { ...planned.position }, rotationDegrees: normalizeDegrees(planned.rotationDegrees), scale: { x: scale, y: scale } },
+          nativeWidth,
+          nativeHeight,
+          ports: definition.ports.map((port) => ({ ...port })),
+          definitionId: definition.id,
+          ...(group.appearanceDefault?.color !== undefined ? { color: group.appearanceDefault.color } : {}),
+          autoPlaced: { ruleId: planned.ruleId, roomId: planned.roomId, moved: false },
+        };
+        const sprite = new Sprite(texture);
+        sprite.anchor.set(0.5);
+        applyTransformToSprite(sprite, data.transform, baseScale);
+        applyStampColor(sprite, texture, data.color);
+        this.doc.stamps.set(id, { sprite, baseScale, baseTexture: texture });
+        this.doc.stampsLayer.addChild(sprite);
+        for (const portIds of definition.definitionPortGroups ?? []) this.doc.portGroups.push({ elementId: id, portIds });
+        if (planned.capacity !== undefined) this.doc.terminalCapacities.set(id, planned.capacity);
+        placed.push(data);
+      }
+    }
+    if (placed.length === 0) return [];
+    const tx = new Transaction(this.doc.drawingHistory, `Auto-place ${placed.length} stamp${placed.length === 1 ? '' : 's'}`);
+    tx.update((s) => {
+      const stamps = { ...s.stamps };
+      for (const stamp of placed) stamps[stamp.id] = stamp;
+      return { ...s, stamps };
+    });
+    tx.commit();
+    this.doc.selectedIds = new Set(placed.map((p) => p.id));
+    this.syncDrawingLayer();
+    this.syncLabels();
+    this.recomputeFlow();
+    this.redrawOverlay();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+    return placed.map((p) => p.id);
   }
 
   /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
@@ -4498,8 +4602,9 @@ export class SketchScene {
     for (const { data, baseTexture, baseScale } of this.clipboard.stamps) {
       const id = `stamp-${this.doc.nextStampSeq++}`;
       stampIdMap.set(data.id, id);
+      const { autoPlaced: _autoPlaced, ...copied } = data;
       const pasted: PlacedStamp = {
-        ...data,
+        ...copied,
         id,
         transform: { ...data.transform, position: { x: data.transform.position.x + OFFSET, y: data.transform.position.y + OFFSET } },
       };

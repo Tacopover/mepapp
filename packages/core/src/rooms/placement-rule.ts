@@ -140,11 +140,19 @@ export function coverageCount(values: Pick<RoomValues, 'areaM2' | 'lengthM' | 'w
     count = Math.max(count, ceilCount(values.areaM2 / coverage.maxAreaPerElementM2));
   }
   if (coverage.maxSpacingM !== undefined || coverage.maxWallDistanceM !== undefined) {
-    if (values.lengthM === null || values.widthM === null) return null;
-    const wall = coverage.maxWallDistanceM ?? coverage.maxSpacingM! / 2;
-    count = Math.max(count, countAlong(values.lengthM, coverage.maxSpacingM, wall) * countAlong(values.widthM, coverage.maxSpacingM, wall));
+    const grid = coverageGridShape(values, coverage);
+    if (!grid) return null;
+    count = Math.max(count, grid.along * grid.across);
   }
   return count;
+}
+
+/** The grid that the spacing and wall-distance limits need: elements along the length and across the width. Null without those limits or without length and width. */
+export function coverageGridShape(values: Pick<RoomValues, 'lengthM' | 'widthM'>, coverage: CoverageLimits): { along: number; across: number } | null {
+  if (coverage.maxSpacingM === undefined && coverage.maxWallDistanceM === undefined) return null;
+  if (values.lengthM === null || values.widthM === null) return null;
+  const wall = coverage.maxWallDistanceM ?? coverage.maxSpacingM! / 2;
+  return { along: countAlong(values.lengthM, coverage.maxSpacingM, wall), across: countAlong(values.widthM, coverage.maxSpacingM, wall) };
 }
 
 export type RequirementWarning =

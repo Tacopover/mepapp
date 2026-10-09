@@ -64,7 +64,8 @@ import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
 import { RoomTypesDialog } from './components/RoomTypesDialog.js';
 import { CeilingHeightsDialog } from './components/CeilingHeightsDialog.js';
 import { PlacementRulesDialog } from './components/PlacementRulesDialog.js';
-import { RoomCalculationsDialog } from './components/RoomCalculationsDialog.js';
+import { AutoPlaceDialog } from './components/AutoPlaceDialog.js';
+import { getStampAppearanceDefault } from './stampAppearanceDefaults.js';
 import { loadPlacementRules, savePlacementRules } from './placementRuleStorage.js';
 import { stampLabelFor } from './stampVisibility.js';
 import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.js';
@@ -424,7 +425,7 @@ export function MepSketchApp({
   }, [ready, roomTypes, sceneRef]);
   const [placementRules, setPlacementRules] = useState<PlacementRule[]>(() => loadPlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage));
   const [placementRulesOpen, setPlacementRulesOpen] = useState(false);
-  const [roomCalculationsOpen, setRoomCalculationsOpen] = useState(false);
+  const [autoPlaceOpen, setAutoPlaceOpen] = useState(false);
   /** Set while the stamp picker chooses the stamp of a placement rule. */
   const [ruleStampPick, setRuleStampPick] = useState<{ onPick: (definitionId: string) => void } | null>(null);
   useEffect(() => savePlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage, placementRules), [placementRules]);
@@ -897,6 +898,23 @@ export function MepSketchApp({
       sceneRef.current?.replaceSelectedStamps(definition, bitmap);
     },
     [userStampLibrary.materialize, resolveStampIconBitmap, sceneRef],
+  );
+  const findStampDefinition = useCallback(
+    (id: string) => getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]),
+    [customStampDefinitions, userStampLibrary.definitions],
+  );
+  const stampScaleOf = useCallback((id: string) => getStampAppearanceDefault(id)?.scale ?? 1, []);
+  // The art of a rule's stamp for auto-placement. A user-library stamp is read back with a data: URL and ports first, as for placing it by hand.
+  const loadAutoPlaceArt = useCallback(
+    async (id: string) => {
+      const found = findStampDefinition(id);
+      const definition = found?.source === 'user' ? await userStampLibrary.materialize(found.id) : found;
+      if (!definition) return null;
+      const bitmap = await resolveStampIconBitmap(definition);
+      const appearanceDefault = getStampAppearanceDefault(definition.id);
+      return { definition, bitmap, ...(appearanceDefault ? { appearanceDefault } : {}) };
+    },
+    [findStampDefinition, userStampLibrary.materialize, resolveStampIconBitmap],
   );
   const labelEditorStamp = labelEditorStampId ? allStamps.find((s) => s.id === labelEditorStampId) : undefined;
   const labelEditorDefinition = labelEditorStamp?.definitionId ? getStampDefinition(labelEditorStamp.definitionId, customStampDefinitions) : undefined;
@@ -1447,7 +1465,7 @@ export function MepSketchApp({
           onOpenRoomTypes={() => setRoomTypesOpen(true)}
           onOpenCeilingHeights={() => setCeilingHeightsOpen(true)}
           onOpenPlacementRules={() => setPlacementRulesOpen(true)}
-          onOpenRoomCalculations={() => setRoomCalculationsOpen(true)}
+          onOpenAutoPlace={() => setAutoPlaceOpen(true)}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
         />
@@ -1646,16 +1664,20 @@ export function MepSketchApp({
         />
       )}
 
-      {roomCalculationsOpen && (
-        <RoomCalculationsDialog
+      {autoPlaceOpen && (
+        <AutoPlaceDialog
           sceneRef={sceneRef}
           rules={placementRules}
           language={labelLanguage}
+          stampDefinition={findStampDefinition}
+          stampScale={stampScaleOf}
+          loadStampArt={loadAutoPlaceArt}
           onOpenRules={() => {
-            setRoomCalculationsOpen(false);
+            setAutoPlaceOpen(false);
             setPlacementRulesOpen(true);
           }}
-          onClose={() => setRoomCalculationsOpen(false)}
+          onPlaced={(count) => setStatus(count === 0 ? 'No stamp was placed.' : `Placed ${count} stamp${count === 1 ? '' : 's'}. Undo removes them all.`)}
+          onClose={() => setAutoPlaceOpen(false)}
         />
       )}
 

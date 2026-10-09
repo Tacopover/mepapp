@@ -3603,3 +3603,20 @@
   text-align: right;
   white-space: nowrap;
 }
+.mep-autoplace-bar {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  box-shadow: 0 4px 16px rgba(19, 27, 33, 0.2);
+  font-size: 12px;
+}

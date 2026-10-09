@@ -19,6 +19,8 @@ export interface PlacedStamp {
   properties?: CustomPropertyValues;
   /** Per-instance tint, hex (e.g. '#2196f3'). Absent means no tint — render at the stamp art's own native colors. */
   color?: string;
+  /** Set when auto-placement made this stamp (room-auto-placement.md §4.5): the rule and the room it was placed for. `moved` = the user moved or rotated it, so a re-run keeps it. */
+  autoPlaced?: { ruleId: string; roomId: string; moved: boolean };
 }
 
 /** Half-extents in world units, scale applied — the shape pointInRotatedRect and rectIntersectsRotatedRect expect. */
