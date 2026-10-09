@@ -71,7 +71,18 @@ Each phase ends with tests (core: vitest), `pnpm build`, `pnpm typecheck`, and a
 
 ### Phase A — Core: count model, units, spacing, grid styles
 
-STATUS: not started.
+STATUS: DONE 2026-10-09, commit 1602dcb. Verification: core 843 tests pass (placement-rule 35, placement-layout 61, room-values 20), all package tests pass, `pnpm build` and `pnpm typecheck` pass. A browser check on `01_arch_first_floor.pdf` at 1:50 drove the real rule form and passed 19 of 19 checks with no page errors:
+- an old Phase 6 library loads, and the smoke rule becomes By coverage with Even spread;
+- with 5 m² per person on Office, the table shows floor(area ÷ 5) persons in 15 rows;
+- a cfm air-changes rule shows 4 × volume ÷ 1.699;
+- By coverage covers each of 38 rooms (1 row has "coverage not met");
+- 4 m min distance gives "about N fit";
+- the three grid styles give different positions with the same 118 stamps.
+
+Changes made during the work (not in the steps below):
+- An old air-changes rule with a unit that is not a flow unit becomes Custom, so it still loads with the same numbers.
+- A new rule starts with the unit dm³/s.
+- A By coverage row with the max count reached now keeps its other row warnings. Before, the Phase 6 code dropped `roomChanged` on that path.
 
 - **A1. Persons rounded down.**
   - Change `roomPeople`: `floor(area ÷ areaPerPerson + 1e-9)`, at least 0.
