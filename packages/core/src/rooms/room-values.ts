@@ -138,20 +138,20 @@ export function roomVolumeM3(areaM2: number, ceilingHeightMm: number): number {
 
 export interface RoomPeople {
   count: number;
-  /** 'room' = the user entered the number on the room; 'roomType' = area ÷ the type's area per person, rounded up. */
+  /** 'room' = the user entered the number on the room; 'roomType' = area ÷ the type's area per person, rounded down. */
   source: 'room' | 'roomType';
 }
 
 /** A number of people is a whole number of 0 or more. */
 export const isValidPeopleCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
 
-/** The number of people in a room: the room's own value, else area ÷ the room type's area per person, rounded up. Null when neither is known. */
+/** The number of people in a room: the room's own value, else area ÷ the room type's area per person, rounded down (a person who does not fit in the rest of the area does not count). Null when neither is known. */
 export function roomPeople(room: Pick<Room, 'people'>, areaM2: number | null, roomType: Pick<RoomType, 'areaPerPersonM2'> | undefined): RoomPeople | null {
   if (isValidPeopleCount(room.people)) return { count: room.people, source: 'room' };
   const per = roomType?.areaPerPersonM2;
   if (areaM2 === null || per === undefined || !(per > 0)) return null;
-  // The small tolerance keeps 20 m² at 10 m² per person at 2 people, not 3 from a rounding error.
-  return { count: Math.max(0, Math.ceil(areaM2 / per - 1e-9)), source: 'roomType' };
+  // The small tolerance keeps 6.6 m² at 2.2 m² per person at 3 people, not 2 from a rounding error.
+  return { count: Math.max(0, Math.floor(areaM2 / per + 1e-9)), source: 'roomType' };
 }
 
 /** All values of one room. A value that needs the scale is null when the room's page is not calibrated. */

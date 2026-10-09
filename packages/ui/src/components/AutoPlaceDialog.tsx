@@ -34,9 +34,15 @@ type Scope = 'selected' | 'page' | 'all';
 const fmt = (n: number | null | undefined, digits = 1) => (n === null || n === undefined ? '–' : n.toLocaleString('en', { maximumFractionDigits: digits, minimumFractionDigits: 0 }));
 const roomLabel = (room: Room) => [room.number, room.name].filter(Boolean).join(' ') || room.id;
 
+const COUNT_SOURCE_TEXT: Record<PlacementRow['requirement']['countSource'], string> = {
+  amount: 'From the amount ÷ the capacity, rounded up, then the min and max count',
+  coverage: 'By coverage: the fewest stamps that cover the room',
+  onePerRoom: 'No capacity: one per room, then the min and max count',
+};
+
 /** Notes of one row: why it places nothing or what the layout changed, and whether the room needs a check. */
 function notesOf(row: PlacementRow, otherPage: boolean): string {
-  const notes = row.warnings.map((w) => PLACEMENT_WARNING_TEXT[w]);
+  const notes = row.warnings.map((w) => (w === 'tooClose' && row.fitEstimate !== undefined ? `${PLACEMENT_WARNING_TEXT[w]}: about ${row.fitEstimate} fit` : PLACEMENT_WARNING_TEXT[w]));
   if (otherPage) notes.push('on another page');
   if (row.existing.keep.length > 0) notes.push(`${row.existing.keep.length} moved stamp${row.existing.keep.length === 1 ? '' : 's'} kept`);
   if (row.room.open) notes.push('room needs review');
@@ -303,7 +309,7 @@ export function AutoPlaceDialog({ sceneRef, rules, language, stampDefinition, st
                 <td>{row.rule.name}</td>
                 <td className="num">{row.requirement.required === null ? '–' : `${fmt(row.requirement.required)} ${row.rule.amount.unit}`.trim()}</td>
                 <td className="num">{row.rule.capacityPerElement === undefined ? '–' : fmt(row.rule.capacityPerElement)}</td>
-                <td className="num" data-testid="count" title={`From the amount: ${row.requirement.quantityCount ?? '–'}; from coverage: ${row.requirement.coverageCount ?? '–'}`}>
+                <td className="num" data-testid="count" title={COUNT_SOURCE_TEXT[row.requirement.countSource]}>
                   {row.requirement.count ?? '–'}
                 </td>
                 <td className="num" data-testid="existing" title="Auto-placed stamps of this rule in this room: moved (kept) + not moved (replaced)">

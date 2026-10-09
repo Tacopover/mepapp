@@ -121,7 +121,7 @@ function RoomValueFields({ sceneRef, room, roomTypes, language }: RoomValueField
     values.people?.source === 'room'
       ? 'Set for this room. Clear the box to use the area per person of the room type.'
       : values.people
-        ? `Area ÷ ${type?.areaPerPersonM2} m² per person of room type ${typeName}, rounded up.`
+        ? `Area ÷ ${type?.areaPerPersonM2} m² per person of room type ${typeName}, rounded down.`
         : type
           ? `Room type ${typeName} has no area per person (Menu › Room types).`
           : 'Give the room a type with an area per person, or enter a number.';

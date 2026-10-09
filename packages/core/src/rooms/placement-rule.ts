@@ -1,15 +1,20 @@
-// Placement rules (room-auto-placement.md §4.4, Phase 3): one form per kind of element that says
-// which rooms get it, how much a room needs, what one element gives, and the coverage limits.
-// MepApp holds no national rules: the user enters the numbers. Pure functions, no I/O.
+// Placement rules (room-auto-placement.md §4.4, Phase 3; room-placement-guide.md Phase A): one form
+// per kind of element that says which rooms get it and how the count is calculated: from an amount
+// and the capacity of one element, or by coverage. MepApp holds no national rules: the user enters
+// the numbers. Pure functions, no I/O.
 
 import type { Discipline } from '../network.js';
 import type { Room } from './room.js';
 import type { RoomValues } from './room-values.js';
+import { areaInUnit, flowInUnit, isAirChangeUnit, type AreaUnit, type IlluminanceUnit, type LengthUnit } from './placement-units.js';
 
-/** A preset fills and shows the amount fields of one common calculation. 'custom' shows every field. */
-export type PlacementPreset = 'perArea' | 'perPersonArea' | 'airChanges' | 'fixed' | 'lighting' | 'custom';
+/** A preset fills and shows the amount fields of one common calculation. 'custom' shows every field. 'coverage' has no amount: the count comes from the coverage limits. */
+export type PlacementPreset = 'perArea' | 'perPerson' | 'perPersonArea' | 'airChanges' | 'fixed' | 'lighting' | 'coverage' | 'custom';
 
-export type LayoutStrategy = 'center' | 'grid' | 'evenSpread' | 'coverage' | 'perimeter';
+export type LayoutStrategy = 'center' | 'grid' | 'evenSpread' | 'perimeter';
+
+/** How the Grid layout fills a short row: spread over the full length, keep the columns, or keep the columns and move each second row half a cell. */
+export type GridStyle = 'spread' | 'aligned' | 'staggered';
 
 export interface PlacementAmount {
   /** Amount per room. */
@@ -22,8 +27,10 @@ export interface PlacementAmount {
   perM3?: number;
   /** The lowest amount a room gets. */
   minimum?: number;
-  /** Free text, for example "dm³/s", "m³/h", "W" or "lm". MepApp does not convert units. */
+  /** For example "dm³/s", "m³/h", "W" (AMOUNT_UNITS) or free text. The capacity uses the same unit. perM3 gives m³/h, converted to a flow unit (AIR_CHANGE_UNITS). */
   unit: string;
+  /** The area that perM2 uses. Absent = 'm2'. */
+  areaUnit?: AreaUnit;
 }
 
 export interface LightingInputs {
@@ -33,22 +40,31 @@ export interface LightingInputs {
   utilisationFactor: number;
   /** Maintenance factor MF, above 0 and at most 1. */
   maintenanceFactor: number;
+  /** The unit of `lux`: lx (with the area in m²) or fc (with the area in ft²). Absent = 'lx'. */
+  illuminanceUnit?: IlluminanceUnit;
 }
 
+/** The limits of the By coverage calculation. Only a rule with the preset 'coverage' uses them. */
 export interface CoverageLimits {
-  /** Largest distance between two elements, m. */
-  maxSpacingM?: number;
-  /** Largest floor area one element serves, m². */
-  maxAreaPerElementM2?: number;
-  /** Largest distance from an element to a wall, m. Absent = half the spacing. */
-  maxWallDistanceM?: number;
+  /** Largest distance between two elements, in the length unit. */
+  maxSpacing?: number;
+  /** Largest floor area one element serves, in m² or ft² (the length unit squared). */
+  maxAreaPerElement?: number;
+  /** Largest distance from an element to a wall, in the length unit. */
+  maxWallDistance?: number;
+  /** Absent = 'm'. */
+  lengthUnit?: LengthUnit;
 }
 
 export interface PlacementLayout {
   /** How the stamps are spread over the room (placement-layout.ts). */
   strategy: LayoutStrategy;
-  /** Distance from the walls to the stamps, m. */
+  /** Min distance from the walls to the stamps, m. */
   wallOffsetM: number;
+  /** Min distance between two stamp centers, m. A check only: it never changes the count or the positions. */
+  minSpacingM?: number;
+  /** Grid only. Absent = 'spread'. */
+  gridStyle?: GridStyle;
   /** 'room' = turn the stamps to the main axis of the room; 'fixed' = use fixedAngleDeg. */
   rotation: 'room' | 'fixed';
   fixedAngleDeg?: number;
@@ -68,8 +84,9 @@ export interface PlacementRule {
   amount: PlacementAmount;
   /** Lighting (lumen method): adds E × area ÷ (UF × MF) to the amount, in lm. */
   lighting?: LightingInputs;
-  /** What one element gives, in the unit of the amount. Absent = no count from the amount. */
+  /** What one element gives, in the unit of the amount. Absent = one element per room. */
   capacityPerElement?: number;
+  /** Used by the preset 'coverage' only. A rule of another preset keeps old limits here, and they change nothing. */
   coverage: CoverageLimits;
   minCount?: number;
   maxCount?: number;
@@ -80,29 +97,104 @@ export interface PlacementRule {
 
 export const PLACEMENT_PRESET_LABELS: Record<PlacementPreset, string> = {
   perArea: 'Per area',
+  perPerson: 'Per person',
   perPersonArea: 'Per person + per area',
   airChanges: 'Air changes per hour',
   fixed: 'Fixed per room',
   lighting: 'Lighting (lumen method)',
+  coverage: 'By coverage',
   custom: 'Custom',
 };
 
 /** The amount fields each preset shows. */
-export const PRESET_AMOUNT_FIELDS: Record<PlacementPreset, (keyof Omit<PlacementAmount, 'unit'>)[]> = {
+export const PRESET_AMOUNT_FIELDS: Record<PlacementPreset, (keyof Omit<PlacementAmount, 'unit' | 'areaUnit'>)[]> = {
   perArea: ['perM2', 'minimum'],
+  perPerson: ['perPerson', 'minimum'],
   perPersonArea: ['perPerson', 'perM2', 'minimum'],
   airChanges: ['perM3', 'minimum'],
   fixed: ['fixed'],
   lighting: [],
+  coverage: [],
   custom: ['fixed', 'perM2', 'perPerson', 'perM3', 'minimum'],
+};
+
+/** The explanation of one preset: the formula, and one line per symbol of the formula. */
+export interface PresetHelp {
+  formula: string;
+  symbols: { symbol: string; text: string }[];
+  note?: string;
+}
+
+export const PLACEMENT_PRESET_HELP: Record<PlacementPreset, PresetHelp> = {
+  perArea: {
+    formula: 'Amount = a × floor area',
+    symbols: [
+      { symbol: 'a', text: 'The amount for each m² (or ft²) of floor area, for example 1.2 dm³/s per m².' },
+      { symbol: 'area', text: 'MepApp measures it from the room outline and the scale of the page.' },
+    ],
+  },
+  perPerson: {
+    formula: 'Amount = a × persons',
+    symbols: [
+      { symbol: 'a', text: 'The amount for each person, for example 7 dm³/s per person.' },
+      { symbol: 'persons', text: 'The number of the room, or floor area ÷ area per person of the room type, rounded down.' },
+    ],
+  },
+  perPersonArea: {
+    formula: 'Amount = a × persons + b × floor area',
+    symbols: [
+      { symbol: 'a', text: 'The amount for each person, for example 7 dm³/s per person.' },
+      { symbol: 'b', text: 'The amount for each m² (or ft²) of floor area, for example 0.7 dm³/s per m². It removes the pollution from the building itself.' },
+      { symbol: 'persons', text: 'The number of the room, or floor area ÷ area per person of the room type, rounded down.' },
+    ],
+  },
+  airChanges: {
+    formula: 'Amount = n × room volume',
+    symbols: [
+      { symbol: 'n', text: 'The air changes per hour: how many times in one hour the full air volume of the room is replaced.' },
+      { symbol: 'volume', text: 'Floor area × ceiling height.' },
+    ],
+  },
+  fixed: {
+    formula: 'Amount = a',
+    symbols: [{ symbol: 'a', text: 'The same amount for each room, for example 25 dm³/s for each toilet. Without a capacity per stamp, each room gets one stamp.' }],
+  },
+  lighting: {
+    formula: 'Light = E × floor area ÷ (UF × MF), in lumen (lm)',
+    symbols: [
+      { symbol: 'E', text: 'The illuminance on the work plane, in lux (lx) or foot-candle (fc). With fc, MepApp uses the floor area in ft².' },
+      { symbol: 'UF', text: 'Utilisation factor: the part of the lamp light that reaches the work plane, from 0 to 1.' },
+      { symbol: 'MF', text: 'Maintenance factor: the part of the light that stays after dirt and lamp ageing, from 0 to 1.' },
+    ],
+  },
+  coverage: {
+    formula: 'Count = the stamps that cover each point of the room',
+    symbols: [{ symbol: 'r', text: 'Each stamp covers a circle with radius r. The smallest of these sets r: max spacing ÷ √2, max distance to a wall × √2, √(max area per stamp ÷ 2).' }],
+    note: 'Use it for smoke detectors, sprinklers and loudspeakers.',
+  },
+  custom: {
+    formula: 'Amount = fixed + a × floor area + b × persons + n × volume',
+    symbols: [
+      { symbol: 'fixed', text: 'The same amount for each room.' },
+      { symbol: 'a', text: 'The amount for each m² (or ft²) of floor area.' },
+      { symbol: 'b', text: 'The amount for each person.' },
+      { symbol: 'n', text: 'The air changes per hour. MepApp converts n × volume (m³/h) to the amount unit when it is a flow unit.' },
+    ],
+    note: 'The room gets at least the minimum amount.',
+  },
 };
 
 export const LAYOUT_STRATEGY_LABELS: Record<LayoutStrategy, string> = {
   center: 'Center',
   grid: 'Grid',
   evenSpread: 'Even spread',
-  coverage: 'Coverage',
   perimeter: 'Along the walls',
+};
+
+export const GRID_STYLE_LABELS: Record<GridStyle, string> = {
+  spread: 'Spread last row',
+  aligned: 'Aligned columns',
+  staggered: 'Staggered',
 };
 
 /** True when the rule applies to the room: its type is in the list (or the list is empty), and its name contains the text (when set). */
@@ -116,44 +208,9 @@ export function ruleAppliesToRoom(rule: Pick<PlacementRule, 'roomTypeIds' | 'nam
 // A count is a whole number: 2.0000000001 elements must not become 3.
 const ceilCount = (x: number): number => Math.max(0, Math.ceil(x - 1e-9));
 
-/** Elements along one side of length `lengthM`, so that two elements are at most `spacingM` apart and the outer ones at most `wallM` from a wall. */
-function countAlong(lengthM: number, spacingM: number | undefined, wallM: number): number {
-  if (lengthM <= 2 * wallM + 1e-9) return 1;
-  if (spacingM === undefined) return 2;
-  return ceilCount((lengthM - 2 * wallM) / spacingM) + 1;
-}
-
 /** True when the rule has a coverage limit. */
 export const hasCoverageLimit = (coverage: CoverageLimits): boolean =>
-  coverage.maxSpacingM !== undefined || coverage.maxAreaPerElementM2 !== undefined || coverage.maxWallDistanceM !== undefined;
-
-/**
- * The smallest count that meets the coverage limits: area ÷ max area per element, and a grid over
- * the room's bounding rectangle (length × width) with the max spacing and wall distance. The larger
- * one wins. Null when the room values that a limit needs are not known (no calibration).
- */
-export function coverageCount(values: Pick<RoomValues, 'areaM2' | 'lengthM' | 'widthM'>, coverage: CoverageLimits): number | null {
-  if (!hasCoverageLimit(coverage)) return null;
-  let count = 1;
-  if (coverage.maxAreaPerElementM2 !== undefined) {
-    if (values.areaM2 === null) return null;
-    count = Math.max(count, ceilCount(values.areaM2 / coverage.maxAreaPerElementM2));
-  }
-  if (coverage.maxSpacingM !== undefined || coverage.maxWallDistanceM !== undefined) {
-    const grid = coverageGridShape(values, coverage);
-    if (!grid) return null;
-    count = Math.max(count, grid.along * grid.across);
-  }
-  return count;
-}
-
-/** The grid that the spacing and wall-distance limits need: elements along the length and across the width. Null without those limits or without length and width. */
-export function coverageGridShape(values: Pick<RoomValues, 'lengthM' | 'widthM'>, coverage: CoverageLimits): { along: number; across: number } | null {
-  if (coverage.maxSpacingM === undefined && coverage.maxWallDistanceM === undefined) return null;
-  if (values.lengthM === null || values.widthM === null) return null;
-  const wall = coverage.maxWallDistanceM ?? coverage.maxSpacingM! / 2;
-  return { along: countAlong(values.lengthM, coverage.maxSpacingM, wall), across: countAlong(values.widthM, coverage.maxSpacingM, wall) };
-}
+  coverage.maxSpacing !== undefined || coverage.maxAreaPerElement !== undefined || coverage.maxWallDistance !== undefined;
 
 export type RequirementWarning =
   /** The room's page has no scale, and the rule needs area, volume, length or width. */
@@ -161,45 +218,50 @@ export type RequirementWarning =
   /** The rule needs a number of people, and the room has none (no type with an area per person, no value of its own). */
   | 'noPeople'
   /** The max count limited the count. */
-  | 'maxCountReached'
-  /** The coverage limits give more elements than the amount needs. */
-  | 'countByCoverage';
+  | 'maxCountReached';
 
 export const REQUIREMENT_WARNING_TEXT: Record<RequirementWarning, string> = {
   noCalibration: 'no calibration',
   noPeople: 'no number of people',
   maxCountReached: 'max count reached',
-  countByCoverage: 'count set by coverage',
 };
+
+/** Which calculation gave the count: the amount ÷ capacity, the coverage layout, or one element per room (no capacity). */
+export type CountSource = 'amount' | 'coverage' | 'onePerRoom';
 
 export interface RoomRequirement {
   /** Required amount in the rule's unit. Null when the rule has no amount, or an input is missing. */
   required: number | null;
   /** ceil(required ÷ capacity). Null without a capacity or a required amount. */
   quantityCount: number | null;
-  /** The count that the coverage limits need. Null without limits or without the room values. */
-  coverageCount: number | null;
-  /** The number of elements to place. Null when it cannot be calculated. */
+  /** The number of elements to place. Null when it cannot be calculated. By coverage: null here; the layout gives it (planAutoPlacement). */
   count: number | null;
+  countSource: CountSource;
   /** required ÷ count: the capacity each placed element gets. */
   perElement: number | null;
   warnings: RequirementWarning[];
 }
 
-/** True when the rule has an amount: an amount field or lighting inputs. */
-export function hasAmount(rule: Pick<PlacementRule, 'amount' | 'lighting'>): boolean {
+/** True when the rule has an amount: an amount field or lighting inputs. A By coverage rule has no amount. */
+export function hasAmount(rule: Pick<PlacementRule, 'amount' | 'lighting'> & Partial<Pick<PlacementRule, 'preset'>>): boolean {
+  if (rule.preset === 'coverage') return false;
   const a = rule.amount;
   return a.fixed !== undefined || a.perM2 !== undefined || a.perPerson !== undefined || a.perM3 !== undefined || a.minimum !== undefined || rule.lighting !== undefined;
 }
 
 /**
- * The required amount and the count of elements for one room (§4.4):
+ * The required amount and the count of elements for one room:
  * required = fixed + perM2 × area + perPerson × people + perM3 × volume + lighting, at least the minimum;
- * count = max(ceil(required ÷ capacity), coverage count, min count), at most the max count.
- * A rule without a capacity and without coverage limits places one element per room (or min count).
+ * count = ceil(required ÷ capacity), or 1 without a capacity; then at least the min count and at most the max count.
+ * The area is in the rule's area unit, perM3 × volume (m³/h) is converted to the amount unit, and
+ * lighting in fc uses ft². By coverage: the count needs the room geometry, so it is null here.
  */
 export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues): RoomRequirement {
   const warnings: RequirementWarning[] = [];
+  if (rule.preset === 'coverage') {
+    if (values.areaM2 === null) warnings.push('noCalibration');
+    return { required: null, quantityCount: null, count: null, countSource: 'coverage', perElement: null, warnings };
+  }
   const a = rule.amount;
   let required: number | null = null;
   if (hasAmount(rule)) {
@@ -215,29 +277,28 @@ export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues
     }
     if (!missing) {
       const area = values.areaM2 ?? 0;
-      let sum = (a.fixed ?? 0) + (a.perM2 ?? 0) * area + (a.perPerson ?? 0) * (values.people?.count ?? 0) + (a.perM3 ?? 0) * (values.volumeM3 ?? 0);
-      if (rule.lighting) sum += (rule.lighting.lux * area) / (rule.lighting.utilisationFactor * rule.lighting.maintenanceFactor);
+      let sum = (a.fixed ?? 0) + (a.perM2 ?? 0) * areaInUnit(area, a.areaUnit) + (a.perPerson ?? 0) * (values.people?.count ?? 0) + flowInUnit((a.perM3 ?? 0) * (values.volumeM3 ?? 0), a.unit);
+      if (rule.lighting) {
+        const lightingArea = areaInUnit(area, rule.lighting.illuminanceUnit === 'fc' ? 'ft2' : 'm2');
+        sum += (rule.lighting.lux * lightingArea) / (rule.lighting.utilisationFactor * rule.lighting.maintenanceFactor);
+      }
       required = Math.max(sum, a.minimum ?? 0);
     }
   }
-  const quantityCount = required !== null && rule.capacityPerElement !== undefined && rule.capacityPerElement > 0 ? ceilCount(required / rule.capacityPerElement) : null;
-  const limited = hasCoverageLimit(rule.coverage);
-  const coverage = limited ? coverageCount(values, rule.coverage) : null;
-  if (limited && coverage === null && !warnings.includes('noCalibration')) warnings.push('noCalibration');
+  const hasCapacity = rule.capacityPerElement !== undefined && rule.capacityPerElement > 0;
+  const quantityCount = required !== null && hasCapacity ? ceilCount(required / rule.capacityPerElement!) : null;
 
   let count: number | null = null;
-  const blocked = (hasAmount(rule) && rule.capacityPerElement !== undefined && required === null) || (limited && coverage === null);
+  const blocked = hasAmount(rule) && hasCapacity && required === null;
   if (!blocked) {
-    count = Math.max(quantityCount ?? 0, coverage ?? 0, rule.minCount ?? 0);
-    if (quantityCount === null && !limited) count = Math.max(count, 1);
-    if (coverage !== null && quantityCount !== null && coverage > quantityCount && count === coverage) warnings.push('countByCoverage');
+    count = Math.max(quantityCount ?? 1, rule.minCount ?? 0);
     if (rule.maxCount !== undefined && count > rule.maxCount) {
       count = rule.maxCount;
       warnings.push('maxCountReached');
     }
   }
   const perElement = required !== null && count !== null && count > 0 ? required / count : null;
-  return { required, quantityCount, coverageCount: coverage, count, perElement, warnings };
+  return { required, quantityCount, count, countSource: quantityCount !== null || blocked ? 'amount' : 'onePerRoom', perElement, warnings };
 }
 
 export interface RoomCalculationRow {
@@ -287,10 +348,13 @@ export function validatePlacementRule(rule: PlacementRule, others: readonly Plac
     if (!isFactor(rule.lighting.utilisationFactor) || !isFactor(rule.lighting.maintenanceFactor)) return 'The utilisation and maintenance factors must be above 0 and at most 1.';
   }
   if (!isPositive(rule.capacityPerElement)) return 'The capacity per element must be a number above 0.';
-  if (!isPositive(rule.coverage.maxSpacingM) || !isPositive(rule.coverage.maxAreaPerElementM2) || !isPositive(rule.coverage.maxWallDistanceM)) return 'A coverage limit must be a number above 0.';
+  if (!isPositive(rule.coverage.maxSpacing) || !isPositive(rule.coverage.maxAreaPerElement) || !isPositive(rule.coverage.maxWallDistance)) return 'A coverage limit must be a number above 0.';
+  if (rule.preset === 'coverage' && !hasCoverageLimit(rule.coverage)) return 'By coverage needs a max spacing, a max area per element or a max distance to a wall.';
+  if (rule.preset === 'airChanges' && !isAirChangeUnit(rule.amount.unit)) return 'Air changes need a flow unit: m³/h, dm³/s, l/s, m³/s or cfm.';
   if (!isCount(rule.minCount) || !isCount(rule.maxCount)) return 'A count must be a whole number of 0 or more.';
   if (rule.minCount !== undefined && rule.maxCount !== undefined && rule.minCount > rule.maxCount) return 'The min count is larger than the max count.';
-  if (!(Number.isFinite(rule.layout.wallOffsetM) && rule.layout.wallOffsetM >= 0)) return 'The offset from walls must be a number of 0 or more.';
+  if (!(Number.isFinite(rule.layout.wallOffsetM) && rule.layout.wallOffsetM >= 0)) return 'The min distance to the walls must be a number of 0 or more.';
+  if (!isNonNegative(rule.layout.minSpacingM)) return 'The min distance between stamps must be a number of 0 or more.';
   if (rule.layout.rotation === 'fixed' && !Number.isFinite(rule.layout.fixedAngleDeg ?? Number.NaN)) return 'Enter the fixed angle.';
   return null;
 }
@@ -298,6 +362,7 @@ export function validatePlacementRule(rule: PlacementRule, others: readonly Plac
 const DISCIPLINES: readonly Discipline[] = ['heatingAndCooling', 'ventilation', 'plumbing', 'fireProtection', 'electrical', 'other'];
 const PRESETS = Object.keys(PLACEMENT_PRESET_LABELS) as PlacementPreset[];
 const STRATEGIES = Object.keys(LAYOUT_STRATEGY_LABELS) as LayoutStrategy[];
+const GRID_STYLES = Object.keys(GRID_STYLE_LABELS) as GridStyle[];
 
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 const rec = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
@@ -310,12 +375,28 @@ function withNumbers<T extends object>(target: T, source: Record<string, unknown
   return target;
 }
 
+/** The coverage limits of a stored rule. Rules before room-placement-guide.md Phase A use the names maxSpacingM, maxAreaPerElementM2 and maxWallDistanceM. */
+function toCoverageLimits(value: unknown): CoverageLimits {
+  const c = rec(value);
+  const coverage: CoverageLimits = {};
+  const maxSpacing = num(c.maxSpacing) ?? num(c.maxSpacingM);
+  const maxAreaPerElement = num(c.maxAreaPerElement) ?? num(c.maxAreaPerElementM2);
+  const maxWallDistance = num(c.maxWallDistance) ?? num(c.maxWallDistanceM);
+  if (maxSpacing !== undefined) coverage.maxSpacing = maxSpacing;
+  if (maxAreaPerElement !== undefined) coverage.maxAreaPerElement = maxAreaPerElement;
+  if (maxWallDistance !== undefined) coverage.maxWallDistance = maxWallDistance;
+  if (c.lengthUnit === 'ft') coverage.lengthUnit = 'ft';
+  return coverage;
+}
+
 function toPlacementRule(value: unknown): PlacementRule | null {
   const v = rec(value);
   if (typeof v.id !== 'string' || !v.id || typeof v.name !== 'string') return null;
   const amount = rec(v.amount);
   const layout = rec(v.layout);
   const lighting = rec(v.lighting);
+  // The Coverage layout of Phase 6 is now the By coverage calculation with the Even spread layout.
+  const oldCoverageLayout = layout.strategy === 'coverage';
   const rule: PlacementRule = {
     id: v.id,
     name: v.name,
@@ -324,26 +405,39 @@ function toPlacementRule(value: unknown): PlacementRule | null {
     stampDefinitionId: typeof v.stampDefinitionId === 'string' && v.stampDefinitionId ? v.stampDefinitionId : null,
     preset: PRESETS.includes(v.preset as PlacementPreset) ? (v.preset as PlacementPreset) : 'custom',
     amount: withNumbers<PlacementAmount>({ unit: typeof amount.unit === 'string' ? amount.unit : '' }, amount, ['fixed', 'perM2', 'perPerson', 'perM3', 'minimum']),
-    coverage: withNumbers<CoverageLimits>({}, rec(v.coverage), ['maxSpacingM', 'maxAreaPerElementM2', 'maxWallDistanceM']),
+    coverage: toCoverageLimits(v.coverage),
     layout: {
-      strategy: STRATEGIES.includes(layout.strategy as LayoutStrategy) ? (layout.strategy as LayoutStrategy) : 'center',
+      strategy: oldCoverageLayout ? 'evenSpread' : STRATEGIES.includes(layout.strategy as LayoutStrategy) ? (layout.strategy as LayoutStrategy) : 'center',
       wallOffsetM: num(layout.wallOffsetM) ?? 0,
       rotation: layout.rotation === 'fixed' ? 'fixed' : 'room',
     },
     writeCapacity: v.writeCapacity === true,
   };
   if (typeof v.nameContains === 'string' && v.nameContains.trim()) rule.nameContains = v.nameContains;
+  if (amount.areaUnit === 'ft2') rule.amount.areaUnit = 'ft2';
   const angle = num(layout.fixedAngleDeg);
   if (angle !== undefined) rule.layout.fixedAngleDeg = angle;
+  const minSpacing = num(layout.minSpacingM);
+  if (minSpacing !== undefined) rule.layout.minSpacingM = minSpacing;
+  if (GRID_STYLES.includes(layout.gridStyle as GridStyle) && layout.gridStyle !== 'spread') rule.layout.gridStyle = layout.gridStyle as GridStyle;
   const lux = num(lighting.lux);
   const uf = num(lighting.utilisationFactor);
   const mf = num(lighting.maintenanceFactor);
-  if (lux !== undefined && uf !== undefined && mf !== undefined) rule.lighting = { lux, utilisationFactor: uf, maintenanceFactor: mf };
+  if (lux !== undefined && uf !== undefined && mf !== undefined) {
+    rule.lighting = { lux, utilisationFactor: uf, maintenanceFactor: mf };
+    if (lighting.illuminanceUnit === 'fc') rule.lighting.illuminanceUnit = 'fc';
+  }
   withNumbers(rule, v, ['capacityPerElement', 'minCount', 'maxCount']);
+  if (oldCoverageLayout && !hasAmount(rule) && hasCoverageLimit(rule.coverage)) rule.preset = 'coverage';
+  // An older air-changes rule with a unit that is not a flow unit keeps its numbers as a Custom rule.
+  if (rule.preset === 'airChanges' && !isAirChangeUnit(rule.amount.unit)) rule.preset = 'custom';
   return validatePlacementRule(rule, []) === null ? rule : null;
 }
 
-/** Reads a stored or imported list of rules. Unreadable or invalid entries and repeated ids are left out. Null when `raw` is not a list. */
+/**
+ * Reads a stored or imported list of rules. Unreadable or invalid entries and repeated ids are left out. Null when `raw` is not a list.
+ * Older rules are migrated: the old coverage field names, and the Coverage layout (now Even spread; By coverage when the rule has no amount).
+ */
 export function parsePlacementRules(raw: unknown): PlacementRule[] | null {
   if (!Array.isArray(raw)) return null;
   const ids = new Set<string>();
@@ -373,7 +467,7 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     preset: 'perPersonArea',
     amount: { perPerson: 7, perM2: 0.7, unit: 'dm³/s' },
     capacityPerElement: 50,
-    coverage: { maxSpacingM: 4 },
+    coverage: {},
     layout: layout('grid'),
     writeCapacity: true,
   },
@@ -414,7 +508,7 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     amount: { unit: 'lm' },
     lighting: { lux: 500, utilisationFactor: 0.6, maintenanceFactor: 0.8 },
     capacityPerElement: 3600,
-    coverage: { maxSpacingM: 3.6 },
+    coverage: {},
     layout: layout('grid', 0.6),
     writeCapacity: false,
   },
@@ -424,10 +518,10 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     discipline: 'fireProtection',
     roomTypeIds: [],
     stampDefinitionId: null,
-    preset: 'fixed',
+    preset: 'coverage',
     amount: { unit: '' },
-    coverage: { maxAreaPerElementM2: 60, maxSpacingM: 7.5, maxWallDistanceM: 3.5 },
-    layout: layout('coverage'),
+    coverage: { maxAreaPerElement: 60, maxSpacing: 7.5, maxWallDistance: 3.5 },
+    layout: layout('evenSpread'),
     writeCapacity: false,
   },
 ];

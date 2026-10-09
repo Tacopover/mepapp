@@ -98,10 +98,15 @@ describe('roomPeople', () => {
     expect(roomPeople({ people: 0 }, 50, { areaPerPersonM2: 10 })).toEqual({ count: 0, source: 'room' });
   });
 
-  it('divides the area by the area per person and rounds up', () => {
+  it('divides the area by the area per person and rounds down', () => {
     expect(roomPeople({}, 20, { areaPerPersonM2: 10 })).toEqual({ count: 2, source: 'roomType' });
-    expect(roomPeople({}, 20.0000000001, { areaPerPersonM2: 10 })).toEqual({ count: 2, source: 'roomType' });
-    expect(roomPeople({}, 21, { areaPerPersonM2: 10 })).toEqual({ count: 3, source: 'roomType' });
+    expect(roomPeople({}, 29.9, { areaPerPersonM2: 10 })).toEqual({ count: 2, source: 'roomType' });
+    expect(roomPeople({}, 6.6, { areaPerPersonM2: 2.2 })).toEqual({ count: 3, source: 'roomType' });
+    expect(roomPeople({}, 4, { areaPerPersonM2: 10 })).toEqual({ count: 0, source: 'roomType' });
+  });
+
+  it('gives 2 people for 12 m² at 5 m² per person: a third person does not fit in the remaining 2 m²', () => {
+    expect(roomPeople({}, 12, { areaPerPersonM2: 5 })).toEqual({ count: 2, source: 'roomType' });
   });
 
   it('is null without a type value or without an area', () => {
@@ -122,7 +127,7 @@ describe('computeRoomValues', () => {
     expect(v.axisDeg).toBeCloseTo(0);
     expect(v.ceilingHeight).toEqual({ mm: 3000, level: 'roomType' });
     expect(v.volumeM3).toBeCloseTo(37.5);
-    expect(v.people).toEqual({ count: 3, source: 'roomType' });
+    expect(v.people).toEqual({ count: 2, source: 'roomType' });
   });
 
   it('leaves the scale values empty without a calibration, but keeps the height', () => {

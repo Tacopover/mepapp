@@ -1,7 +1,7 @@
-// Stamp positions in a room (room-auto-placement.md Phases 4 and 6): the Center, Grid, Even spread,
-// Coverage and Along-the-walls layouts. All
-// geometry is in displayed page space (points, y down), the space of the room polygon and of placed
-// stamps. Pure functions, no I/O.
+// Stamp positions in a room (room-auto-placement.md Phases 4 and 6, room-placement-guide.md Phase A):
+// the Center, Grid, Even spread and Along-the-walls layouts, the By coverage count and the check of
+// the min distance between stamps. All geometry is in displayed page space (points, y down), the
+// space of the room polygon and of placed stamps. Pure functions, no I/O.
 
 import type { Calibration } from '../calibration.js';
 import type { Vec2 } from '../geometry.js';
@@ -10,14 +10,15 @@ import { polygonContainsPoint, roomBounds, roomLabelPoint, type Room } from './r
 import { roomMinBoundingRect } from './room-values.js';
 import {
   calculateRooms,
-  coverageGridShape,
   REQUIREMENT_WARNING_TEXT,
   type CoverageLimits,
+  type GridStyle,
   type PlacementRule,
   type RoomCalculationRow,
   type RoomRequirement,
   type RequirementWarning,
 } from './placement-rule.js';
+import { areaToM2, lengthToM } from './placement-units.js';
 import type { RoomValues } from './room-values.js';
 import type { RoomPolygon } from './types.js';
 
@@ -28,14 +29,17 @@ export type LayoutWarning =
   | 'movedInside'
   /** Center got more than one element: Grid was used. */
   | 'layoutFallback'
-  /** Coverage: part of the room is farther than the coverage radius from every stamp (the max count, or the wall offset, stops it). */
-  | 'coverageNotMet';
+  /** By coverage: part of the room is farther than the coverage radius from every stamp (the max count, the wall offset or the layout stops it). */
+  | 'coverageNotMet'
+  /** Two stamps are closer than the min distance between stamps. */
+  | 'tooClose';
 
 export const LAYOUT_WARNING_TEXT: Record<LayoutWarning, string> = {
   noFit: 'does not fit: placed at the label point',
   movedInside: 'points moved inside the room',
   layoutFallback: 'grid layout used',
   coverageNotMet: 'coverage not met in part of the room',
+  tooClose: 'stamps closer than the min distance',
 };
 
 export interface LayoutResult {
@@ -121,12 +125,12 @@ export function chooseGridShape(count: number, lengthPt: number, widthPt: number
 /**
  * `count` points in a grid along the main axis of the room (its smallest bounding rectangle). Each
  * point is the center of its cell in the rectangle minus `offsetPt` on every side. A point outside
- * the room, or nearer a wall than `offsetPt`, moves to the nearest valid point. `shape` sets the grid
- * (for example the grid the coverage limits need); without it chooseGridShape picks one.
+ * the room, or nearer a wall than `offsetPt`, moves to the nearest valid point. `style` sets how a
+ * short last row is filled (gridCells).
  */
-export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, shape?: { along: number; across: number }): LayoutResult {
+export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, style: GridStyle = 'spread'): LayoutResult {
   if (count <= 0) return { points: [], warnings: [] };
-  const cells = gridCells(room, count, offsetPt, shape);
+  const cells = gridCells(room, count, offsetPt, style);
   if (!cells) return layoutCenter(room, offsetPt);
   const { ideal, minGap } = cells;
   const points: Vec2[] = [];
@@ -146,27 +150,39 @@ export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt:
   return { points, warnings };
 }
 
-/** The cell centers of the grid (layoutGrid) before any point moves, and half the smaller cell side. Null for a room without a bounding rectangle. */
-function gridCells(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, shape?: { along: number; across: number }): { ideal: Vec2[]; minGap: number } | null {
+/**
+ * The cell centers of the grid (layoutGrid) before any point moves, and half the smaller cell side.
+ * Null for a room without a bounding rectangle. The style sets the columns of a short last row with
+ * k of the `cols` stamps: 'spread' spreads the k stamps over the full length; 'aligned' puts stamp i
+ * in column round((i + 0.5) × cols ÷ k − 0.5), so the columns stay in line and a cell can stay empty;
+ * 'staggered' uses the aligned columns and moves each row a quarter cell (even rows back, odd rows
+ * forward), so two rows are half a cell apart. All in the frame of the room's main axis.
+ */
+function gridCells(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, style: GridStyle = 'spread'): { ideal: Vec2[]; minGap: number } | null {
   const rect = roomMinBoundingRect(room);
   if (!rect) return null;
-  const grid = shape && shape.along * shape.across >= count ? shape : chooseGridShape(count, rect.lengthPt, rect.widthPt);
+  const grid = chooseGridShape(count, rect.lengthPt, rect.widthPt);
   const a = (rect.angleDeg * Math.PI) / 180;
   const u = { x: Math.cos(a), y: Math.sin(a) };
   const v = { x: -Math.sin(a), y: Math.cos(a) };
   const usableL = Math.max(0, rect.lengthPt - 2 * offsetPt);
   const usableW = Math.max(0, rect.widthPt - 2 * offsetPt);
-  const rows = Math.ceil(count / grid.along);
+  const cols = grid.along;
+  const cellL = usableL / cols;
+  const rows = Math.ceil(count / cols);
   const ideal: Vec2[] = [];
   for (let row = 0; row < rows; row++) {
-    const inRow = row < rows - 1 ? grid.along : count - grid.along * (rows - 1);
+    const inRow = row < rows - 1 ? cols : count - cols * (rows - 1);
     const across = -usableW / 2 + ((row + 0.5) * usableW) / rows;
-    for (let col = 0; col < inRow; col++) {
-      const along = -usableL / 2 + ((col + 0.5) * usableL) / inRow;
+    const shift = style === 'staggered' && rows > 1 ? (row % 2 === 0 ? -0.25 : 0.25) * cellL : 0;
+    for (let i = 0; i < inRow; i++) {
+      const at = ((i + 0.5) * cols) / inRow - 0.5;
+      const col = style === 'spread' ? at : Math.round(at);
+      const along = -usableL / 2 + (col + 0.5) * cellL + shift;
       ideal.push({ x: rect.center.x + u.x * along + v.x * across, y: rect.center.y + u.y * along + v.y * across });
     }
   }
-  return { ideal, minGap: Math.min(usableL / grid.along, usableW / rows) / 2 };
+  return { ideal, minGap: Math.min(cellL, usableW / rows) / 2 };
 }
 
 /** Samples of a room on a square grid over its bounds: `all` inside the room, `valid` also at least the offset from every wall. */
@@ -181,7 +197,7 @@ export interface RoomSamples {
 
 const ROOM_SAMPLES = 1200;
 const RELAX_ITERATIONS = 30;
-/** The most stamps the Coverage layout puts in one room when the rule has no max count. */
+/** The most stamps By coverage puts in one room when the rule has no max count. */
 const MAX_COVERAGE_COUNT = 200;
 
 /** About `target` samples of the room, on a square grid over its bounds. */
@@ -256,29 +272,54 @@ export function layoutEvenSpread(room: Pick<Room, 'polygon'>, count: number, off
  * The coverage radius of the limits, m: every point of the room must be this near a stamp. A square
  * grid with spacing s reaches s ÷ √2 (half the cell diagonal); a wall distance d reaches d × √2 in
  * the corner; an area A per element reaches √(A ÷ 2) (half the diagonal of a square of area A).
- * The smallest one wins. Null without limits.
+ * The smallest one wins. The limits are in the rule's length unit (m or ft). Null without limits.
  */
 export function coverageRadiusM(coverage: CoverageLimits): number | null {
   const radii: number[] = [];
-  if (coverage.maxSpacingM !== undefined) radii.push(coverage.maxSpacingM / Math.SQRT2);
-  if (coverage.maxWallDistanceM !== undefined) radii.push(coverage.maxWallDistanceM * Math.SQRT2);
-  if (coverage.maxAreaPerElementM2 !== undefined) radii.push(Math.sqrt(coverage.maxAreaPerElementM2 / 2));
+  const unit = coverage.lengthUnit;
+  if (coverage.maxSpacing !== undefined) radii.push(lengthToM(coverage.maxSpacing, unit) / Math.SQRT2);
+  if (coverage.maxWallDistance !== undefined) radii.push(lengthToM(coverage.maxWallDistance, unit) * Math.SQRT2);
+  if (coverage.maxAreaPerElement !== undefined) radii.push(Math.sqrt(areaToM2(coverage.maxAreaPerElement, unit) / 2));
   return radii.length > 0 ? Math.min(...radii) : null;
 }
 
+/** The count By coverage starts from: area ÷ max area per element (rounded up), at least the min count and 1. */
+export function coverageStartCount(rule: Pick<PlacementRule, 'coverage'> & Partial<Pick<PlacementRule, 'minCount'>>, areaM2: number): number {
+  const maxArea = rule.coverage.maxAreaPerElement;
+  const byArea = maxArea !== undefined ? Math.ceil(areaM2 / areaToM2(maxArea, rule.coverage.lengthUnit) - 1e-9) : 0;
+  return Math.max(byArea, rule.minCount ?? 0, 1);
+}
+
+/** The points that must be within the coverage radius: the room samples, and the corners (the sample grid misses them, and they are often the farthest points). */
+const coverageTargets = (room: Pick<Room, 'polygon'>, samples: RoomSamples): Vec2[] => [...samples.all, ...room.polygon.outer, ...room.polygon.holes.flat()];
+
+/** True when a coverage target of the room is farther than `radiusPt` from every point. */
+export function hasCoverageGap(room: Pick<Room, 'polygon'>, points: readonly Vec2[], radiusPt: number, samples: RoomSamples): boolean {
+  if (points.length === 0) return true;
+  return coverageTargets(room, samples).some((q) => {
+    const i = nearestIndex(points, q);
+    return Math.hypot(points[i]!.x - q.x, points[i]!.y - q.y) > radiusPt + 1e-6;
+  });
+}
+
 /**
- * Coverage: starts with `startCount` points (Even spread), then adds a point at the room sample
+ * By coverage: starts with `startCount` points (Even spread), then adds a point at the room sample
  * farthest from every point and relaxes again, until every sample is within `radiusPt`. Samples
  * that no valid point can reach (the wall offset is too large) do not count, and give a warning.
  * `maxCount` stops it; `limited` tells that it stopped there.
  */
-export function layoutCoverage(room: Pick<Room, 'polygon'>, startCount: number, offsetPt: number, radiusPt: number, maxCount?: number): LayoutResult & { limited: boolean } {
+export function layoutCoverage(
+  room: Pick<Room, 'polygon'>,
+  startCount: number,
+  offsetPt: number,
+  radiusPt: number,
+  maxCount?: number,
+  samples: RoomSamples = roomSamples(room, offsetPt),
+): LayoutResult & { limited: boolean } {
   const first = Math.max(1, Math.min(startCount, maxCount ?? Infinity));
-  const samples = roomSamples(room, offsetPt);
   if (samples.valid.length === 0) return { ...layoutGrid(room, first, offsetPt), limited: false };
   const warnings: LayoutWarning[] = [];
-  // The corners are often the points farthest from every stamp, and the sample grid misses them.
-  const targets = [...samples.all, ...room.polygon.outer, ...room.polygon.holes.flat()];
+  const targets = coverageTargets(room, samples);
   const reachable = targets.filter((q) => samples.valid.some((v) => Math.hypot(v.x - q.x, v.y - q.y) <= radiusPt));
   if (reachable.length < targets.length) warnings.push('coverageNotMet');
   let points = layoutEvenSpread(room, first, offsetPt, samples).points;
@@ -340,11 +381,6 @@ export function wallRuns(room: Pick<Room, 'polygon'>, offsetPt: number): WallRun
   return runs;
 }
 
-/** The total length of the wall runs, points. */
-export function wallRunLengthPt(room: Pick<Room, 'polygon'>, offsetPt: number): number {
-  return wallRuns(room, offsetPt).reduce((sum, run) => sum + run.length, 0);
-}
-
 /**
  * Along the walls: `count` points at equal distances along the wall runs (the first and the last
  * are half a distance from the ends). Each point faces into the room: its rotation turns the
@@ -389,19 +425,28 @@ export interface PlannedStamp {
   rotationDegrees: number;
 }
 
-/** What a layout that chooses its own count starts from. */
-export interface LayoutCountInput {
-  /** ceil(required ÷ capacity), or null without a capacity. */
-  quantityCount: number | null;
-  /** ceil(area ÷ max area per element), or null. */
-  areaCount?: number | null;
-}
-
 export interface RoomLayout {
   stamps: PlannedStamp[];
   warnings: LayoutWarning[];
-  /** Set when the layout chose the count itself (Coverage with limits, Along the walls with a max spacing). */
+  /** By coverage: the count that the coverage layout found, and whether the max count stopped it. */
   layoutCount?: { count: number; limited: boolean };
+  /** With 'tooClose': about how many stamps fit in the room at the min distance between stamps. */
+  fitEstimate?: number;
+}
+
+/** True when two of the points are closer than `minPt`. */
+function hasCloserPair(points: readonly Vec2[], minPt: number): boolean {
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) if (Math.hypot(points[i]!.x - points[j]!.x, points[i]!.y - points[j]!.y) < minPt - 1e-6) return true;
+  }
+  return false;
+}
+
+/** About how many stamps fit at `minPt` from each other: a greedy pass over the valid samples keeps a sample that is at least `minPt` from every kept sample. */
+export function estimateFitCount(samples: RoomSamples, minPt: number): number {
+  const kept: Vec2[] = [];
+  for (const q of samples.valid) if (kept.every((k) => Math.hypot(k.x - q.x, k.y - q.y) >= minPt - 1e-6)) kept.push(q);
+  return kept.length;
 }
 
 /**
@@ -409,68 +454,67 @@ export interface RoomLayout {
  * the stamp size from every wall, and the rotation (the room's main axis, the wall direction for
  * Along the walls, or the rule's fixed angle). `stampSizePt` is the placed size of the stamp.
  *
- * Center, Grid and Even spread place `count` stamps. With `countInput`, Coverage (with coverage
- * limits) and Along the walls (with a max spacing) choose the count themselves, from the amount
- * count, the area count and the min count, at most the max count: Coverage adds stamps until the
- * room is covered; Along the walls uses ceil(wall run length ÷ spacing).
+ * The layouts place `count` stamps. By coverage (preset 'coverage'): `count` is the start count
+ * (coverageStartCount), and layoutCoverage adds stamps until the room is covered, at most the max
+ * count. Even spread then uses the coverage positions; another layout places its own pattern with
+ * that count, and a part of the room out of reach gives 'coverageNotMet'.
+ *
+ * With a min distance between stamps, two stamps closer than it give 'tooClose' and a fit estimate.
+ * The check never changes the count or the positions.
  */
 export function layoutRoomStamps(
-  rule: Pick<PlacementRule, 'layout' | 'coverage'> & Partial<Pick<PlacementRule, 'minCount' | 'maxCount'>>,
+  rule: Pick<PlacementRule, 'layout' | 'coverage'> & Partial<Pick<PlacementRule, 'preset' | 'minCount' | 'maxCount'>>,
   room: Pick<Room, 'polygon'>,
-  values: Pick<RoomValues, 'lengthM' | 'widthM'>,
   count: number,
   calibration: Calibration,
   stampSizePt: { width: number; height: number },
-  countInput?: LayoutCountInput,
 ): RoomLayout {
   const ptPerM = 1000 * calibration.pageUnitsPerRealUnit;
   const offsetPt = rule.layout.wallOffsetM * ptPerM + Math.max(stampSizePt.width, stampSizePt.height) / 2;
   const warnings: LayoutWarning[] = [];
-  const startCount = () => Math.max(countInput?.quantityCount ?? 0, countInput?.areaCount ?? 0, rule.minCount ?? 0, 1);
   const strategy = rule.layout.strategy;
-  const radiusM = strategy === 'coverage' ? coverageRadiusM(rule.coverage) : null;
-  const spacingM = strategy === 'perimeter' ? rule.coverage.maxSpacingM : undefined;
-  let result: LayoutResult;
+  let samples: RoomSamples | undefined;
+  const samplesOf = () => (samples ??= roomSamples(room, offsetPt));
+  const radiusM = rule.preset === 'coverage' ? coverageRadiusM(rule.coverage) : null;
+  let n = count;
+  let result: LayoutResult | null = null;
   let layoutCount: RoomLayout['layoutCount'];
-  if (strategy === 'coverage' && radiusM !== null && countInput) {
-    const out = layoutCoverage(room, startCount(), offsetPt, radiusM * ptPerM, rule.maxCount);
-    result = out;
+  if (radiusM !== null) {
+    const out = layoutCoverage(room, count, offsetPt, radiusM * ptPerM, rule.maxCount, samplesOf());
     layoutCount = { count: out.points.length, limited: out.limited };
-  } else if (strategy === 'perimeter' && spacingM !== undefined && countInput) {
-    let n = Math.max(startCount(), Math.ceil(wallRunLengthPt(room, offsetPt) / (spacingM * ptPerM) - 1e-9));
-    const limited = rule.maxCount !== undefined && n > rule.maxCount;
-    if (limited) n = rule.maxCount!;
-    result = layoutPerimeter(room, n, offsetPt);
-    layoutCount = { count: n, limited };
-  } else if (count <= 0) {
-    result = { points: [], warnings: [] };
-  } else if (strategy === 'center' && count === 1) {
-    result = layoutCenter(room, offsetPt);
-  } else if (strategy === 'evenSpread' || strategy === 'coverage') {
-    result = layoutEvenSpread(room, count, offsetPt);
-  } else if (strategy === 'perimeter') {
-    result = layoutPerimeter(room, count, offsetPt);
-  } else {
-    if (strategy === 'center') warnings.push('layoutFallback');
-    const coverage = coverageGridShape(values, rule.coverage);
-    result = layoutGrid(room, count, offsetPt, coverage && coverage.along * coverage.across === count ? coverage : undefined);
+    n = out.points.length;
+    if (strategy === 'evenSpread') result = out;
+  }
+  if (!result) {
+    if (n <= 0) {
+      result = { points: [], warnings: [] };
+    } else if (strategy === 'center' && n === 1) {
+      result = layoutCenter(room, offsetPt);
+    } else if (strategy === 'evenSpread') {
+      result = layoutEvenSpread(room, n, offsetPt, samplesOf());
+    } else if (strategy === 'perimeter') {
+      result = layoutPerimeter(room, n, offsetPt);
+    } else {
+      if (strategy === 'center') warnings.push('layoutFallback');
+      result = layoutGrid(room, n, offsetPt, rule.layout.gridStyle);
+    }
+    if (radiusM !== null && !result.warnings.includes('coverageNotMet') && hasCoverageGap(room, result.points, radiusM * ptPerM, samplesOf())) warnings.push('coverageNotMet');
+  }
+  const minPt = (rule.layout.minSpacingM ?? 0) * ptPerM;
+  let fitEstimate: number | undefined;
+  if (minPt > 0 && hasCloserPair(result.points, minPt) && samplesOf().valid.length > 0) {
+    warnings.push('tooClose');
+    fitEstimate = estimateFitCount(samplesOf(), minPt);
   }
   const axis = roomMinBoundingRect(room)?.angleDeg ?? 0;
-  const rotationOf = (i: number) => (rule.layout.rotation === 'fixed' ? (rule.layout.fixedAngleDeg ?? 0) : (result.rotations?.[i] ?? axis));
+  const rotations = result.rotations;
+  const rotationOf = (i: number) => (rule.layout.rotation === 'fixed' ? (rule.layout.fixedAngleDeg ?? 0) : (rotations?.[i] ?? axis));
   return {
     stamps: result.points.map((position, i) => ({ position, rotationDegrees: rotationOf(i) })),
     warnings: [...warnings, ...result.warnings],
     ...(layoutCount ? { layoutCount } : {}),
+    ...(fitEstimate !== undefined ? { fitEstimate } : {}),
   };
-}
-
-/** The requirement with the count that the layout chose: the amount per element, the coverage count and the warnings follow it. */
-function withLayoutCount(requirement: RoomRequirement, layoutCount: { count: number; limited: boolean }): RoomRequirement {
-  const { count, limited } = layoutCount;
-  const warnings: RequirementWarning[] = requirement.warnings.filter((w) => w !== 'countByCoverage' && w !== 'maxCountReached');
-  if (requirement.quantityCount !== null && count > requirement.quantityCount && !limited) warnings.push('countByCoverage');
-  if (limited) warnings.push('maxCountReached');
-  return { ...requirement, count, coverageCount: count, perElement: requirement.required !== null && count > 0 ? requirement.required / count : null, warnings };
 }
 
 export type PlacementRowWarning = RequirementWarning | LayoutWarning | 'noStamp' | 'stampNotFound' | 'roomChanged';
@@ -505,6 +549,8 @@ export interface PlacementRow extends RoomCalculationRow {
   stamps: PlannedStamp[];
   existing: ExistingRowStamps;
   warnings: PlacementRowWarning[];
+  /** With 'tooClose': about how many stamps fit at the min distance between stamps. */
+  fitEstimate?: number;
 }
 
 /** The auto-placed stamps already in the drawing, for a re-run. */
@@ -533,6 +579,12 @@ function withoutNearest(planned: readonly PlannedStamp[], kept: readonly Vec2[])
     left.splice(best, 1);
   }
   return left;
+}
+
+/** A By coverage requirement with the count that the coverage layout found. */
+function withLayoutCount(requirement: RoomRequirement, layoutCount: { count: number; limited: boolean }): RoomRequirement {
+  const warnings: RequirementWarning[] = layoutCount.limited ? [...requirement.warnings, 'maxCountReached'] : requirement.warnings;
+  return { ...requirement, count: layoutCount.count, warnings };
 }
 
 /**
@@ -589,20 +641,21 @@ export function planAutoPlacement(
       const base = { ...row, existing: ownExisting };
       const calibration = calibrationOf(row.room.pageIndex);
       const count = row.requirement.count;
+      const byCoverage = row.requirement.countSource === 'coverage';
       if (!row.rule.stampDefinitionId) return { ...base, stamps: [], warnings: [...warnings, 'noStamp'] };
       const size = stampSizeOf(row.rule.stampDefinitionId);
       if (!size) return { ...base, stamps: [], warnings: [...warnings, 'stampNotFound'] };
-      if (count === null || count === 0 || !calibration) {
+      if (!calibration || (byCoverage ? row.values.areaM2 === null : count === null || count === 0)) {
         if (!calibration && !warnings.includes('noCalibration')) warnings.push('noCalibration');
         return { ...base, stamps: [], warnings };
       }
-      const areaCount =
-        row.rule.coverage.maxAreaPerElementM2 !== undefined && row.values.areaM2 !== null ? Math.ceil(row.values.areaM2 / row.rule.coverage.maxAreaPerElementM2 - 1e-9) : null;
-      const layout = layoutRoomStamps(row.rule, row.room, row.values, count, calibration, size, { quantityCount: row.requirement.quantityCount, areaCount });
+      const layout = layoutRoomStamps(row.rule, row.room, byCoverage ? coverageStartCount(row.rule, row.values.areaM2!) : count!, calibration, size);
       const stamps = withoutNearest(layout.stamps, kept.map((s) => s.transform.position));
-      if (!layout.layoutCount) return { ...base, stamps, warnings: [...warnings, ...layout.warnings] };
+      const fit = layout.fitEstimate !== undefined ? { fitEstimate: layout.fitEstimate } : {};
+      if (!layout.layoutCount) return { ...base, stamps, warnings: [...warnings, ...layout.warnings], ...fit };
       const requirement = withLayoutCount(row.requirement, layout.layoutCount);
-      return { ...base, requirement, stamps, warnings: [...requirement.warnings, ...layout.warnings] };
+      if (layout.layoutCount.limited) warnings.push('maxCountReached');
+      return { ...base, requirement, stamps, warnings: [...warnings, ...layout.warnings], ...fit };
     }),
   };
 }

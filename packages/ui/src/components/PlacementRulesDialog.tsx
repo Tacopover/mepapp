@@ -1,14 +1,27 @@
 import { useRef, useState } from 'react';
 import {
+  AIR_CHANGE_UNITS,
+  AMOUNT_UNITS,
+  AREA_UNIT_LABELS,
+  GRID_STYLE_LABELS,
+  hasCoverageLimit,
+  ILLUMINANCE_UNIT_LABELS,
+  isAirChangeUnit,
   LAYOUT_STRATEGY_LABELS,
+  LENGTH_UNIT_LABELS,
   parseDecimal,
   parsePlacementRules,
+  PLACEMENT_PRESET_HELP,
   PLACEMENT_PRESET_LABELS,
   PRESET_AMOUNT_FIELDS,
   roomTypeLabel,
   validatePlacementRule,
+  type AreaUnit,
   type Discipline,
+  type GridStyle,
+  type IlluminanceUnit,
   type LayoutStrategy,
+  type LengthUnit,
   type PlacementPreset,
   type PlacementRule,
   type RoomType,
@@ -35,10 +48,9 @@ const newRuleId = () => `rule-${Date.now().toString(36)}${Math.random().toString
 
 const LAYOUT_HINTS: Record<LayoutStrategy, string> = {
   center: 'One element at the label point. More than one element uses the grid.',
-  grid: 'Rows along the long side of the room.',
-  evenSpread: 'The grid, then each element moves to the middle of its own part of the room. Use it for L-shaped rooms.',
-  coverage: 'With coverage limits: adds elements until every point of the room is near enough to one (radius = spacing ÷ √2, wall distance × √2 or √(area ÷ 2), the smallest). The count comes from the layout, at least the amount count and the min count.',
-  perimeter: 'Elements along the walls, turned to face into the room. With a max spacing the count is the wall length ÷ spacing, rounded up.',
+  grid: 'Rows along the long side of the room. The grid style sets how a short last row is filled.',
+  evenSpread: 'The grid, then each element moves to the middle of its own part of the room. Use it for L-shaped rooms. With By coverage it uses the positions that the coverage calculation found.',
+  perimeter: 'Elements along the walls, turned to face into the room.',
 };
 
 const AMOUNT_FIELD_LABELS: Record<(typeof PRESET_AMOUNT_FIELDS)[PlacementPreset][number], string> = {
@@ -49,6 +61,14 @@ const AMOUNT_FIELD_LABELS: Record<(typeof PRESET_AMOUNT_FIELDS)[PlacementPreset]
   minimum: 'Minimum per room',
 };
 
+const OTHER_UNIT = '__other';
+
+/** The explanation of a preset as one text, for a tooltip. */
+const presetHelpText = (preset: PlacementPreset): string => {
+  const help = PLACEMENT_PRESET_HELP[preset];
+  return [help.formula, ...help.symbols.map((s) => `${s.symbol}: ${s.text}`), ...(help.note ? [help.note] : [])].join('\n');
+};
+
 function blankRule(name: string): PlacementRule {
   return {
     id: newRuleId(),
@@ -57,7 +77,7 @@ function blankRule(name: string): PlacementRule {
     roomTypeIds: [],
     stampDefinitionId: null,
     preset: 'perArea',
-    amount: { unit: '' },
+    amount: { unit: 'dm³/s' },
     coverage: {},
     layout: { strategy: 'center', wallOffsetM: 0.5, rotation: 'room' },
     writeCapacity: true,
@@ -203,17 +223,22 @@ function draftOf(rule: PlacementRule) {
     perM3: text(rule.amount.perM3),
     minimum: text(rule.amount.minimum),
     unit: rule.amount.unit,
+    areaUnit: (rule.amount.areaUnit ?? 'm2') as AreaUnit,
     lux: text(rule.lighting?.lux),
     uf: text(rule.lighting?.utilisationFactor),
     mf: text(rule.lighting?.maintenanceFactor),
+    illuminanceUnit: (rule.lighting?.illuminanceUnit ?? 'lx') as IlluminanceUnit,
     capacity: text(rule.capacityPerElement),
-    maxSpacing: text(rule.coverage.maxSpacingM),
-    maxArea: text(rule.coverage.maxAreaPerElementM2),
-    maxWall: text(rule.coverage.maxWallDistanceM),
+    maxSpacing: text(rule.coverage.maxSpacing),
+    maxArea: text(rule.coverage.maxAreaPerElement),
+    maxWall: text(rule.coverage.maxWallDistance),
+    lengthUnit: (rule.coverage.lengthUnit ?? 'm') as LengthUnit,
     minCount: text(rule.minCount),
     maxCount: text(rule.maxCount),
     strategy: rule.layout.strategy,
+    gridStyle: (rule.layout.gridStyle ?? 'spread') as GridStyle,
     wallOffset: String(rule.layout.wallOffsetM),
+    minSpacing: text(rule.layout.minSpacingM),
     rotation: rule.layout.rotation,
     fixedAngle: text(rule.layout.fixedAngleDeg),
     writeCapacity: rule.writeCapacity,
@@ -239,6 +264,7 @@ function ruleOf(id: string, d: Draft): PlacementRule {
     const value = shown.has(key) ? numberOf(d[key], AMOUNT_FIELD_LABELS[key]) : undefined;
     if (value !== undefined) amount[key] = value;
   }
+  if (shown.has('perM2') && d.areaUnit === 'ft2') amount.areaUnit = 'ft2';
   const rule: PlacementRule = {
     id,
     name: d.name.trim(),
@@ -248,24 +274,29 @@ function ruleOf(id: string, d: Draft): PlacementRule {
     preset: d.preset,
     amount,
     coverage: {},
-    layout: { strategy: d.strategy, wallOffsetM: numberOf(d.wallOffset, 'Offset from walls') ?? 0, rotation: d.rotation },
+    layout: { strategy: d.strategy, wallOffsetM: numberOf(d.wallOffset, 'Min distance to the walls') ?? 0, rotation: d.rotation },
     writeCapacity: d.writeCapacity,
   };
   if (d.nameContains.trim()) rule.nameContains = d.nameContains.trim();
+  const minSpacing = numberOf(d.minSpacing, 'Min distance between stamps');
+  if (minSpacing !== undefined) rule.layout.minSpacingM = minSpacing;
+  if (d.strategy === 'grid' && d.gridStyle !== 'spread') rule.layout.gridStyle = d.gridStyle;
+  if (d.lengthUnit === 'ft') rule.coverage.lengthUnit = 'ft';
   if (d.preset === 'lighting') {
     const lux = numberOf(d.lux, 'Illuminance');
     const uf = numberOf(d.uf, 'Utilisation factor');
     const mf = numberOf(d.mf, 'Maintenance factor');
     if (lux === undefined || uf === undefined || mf === undefined) throw new FieldError('Enter the illuminance, the utilisation factor and the maintenance factor.');
     rule.lighting = { lux, utilisationFactor: uf, maintenanceFactor: mf };
+    if (d.illuminanceUnit === 'fc') rule.lighting.illuminanceUnit = 'fc';
   }
   const optional: [keyof PlacementRule | keyof PlacementRule['coverage'], string, string, 'rule' | 'coverage'][] = [
     ['capacityPerElement', d.capacity, 'Capacity per element', 'rule'],
     ['minCount', d.minCount, 'Min count', 'rule'],
     ['maxCount', d.maxCount, 'Max count', 'rule'],
-    ['maxSpacingM', d.maxSpacing, 'Max spacing', 'coverage'],
-    ['maxAreaPerElementM2', d.maxArea, 'Max area per element', 'coverage'],
-    ['maxWallDistanceM', d.maxWall, 'Max distance to a wall', 'coverage'],
+    ['maxSpacing', d.maxSpacing, 'Max spacing', 'coverage'],
+    ['maxAreaPerElement', d.maxArea, 'Max area per element', 'coverage'],
+    ['maxWallDistance', d.maxWall, 'Max distance to a wall', 'coverage'],
   ];
   for (const [key, value, label, target] of optional) {
     const n = numberOf(value, label);
@@ -335,6 +366,24 @@ function PlacementRuleForm({ rule, others, roomTypes, language, stampName, onCho
   );
   const unit = draft.preset === 'lighting' ? 'lm' : draft.unit.trim() || 'unit';
   const knownStamp = draft.stampDefinitionId ? stampName(draft.stampDefinitionId) : null;
+  const byCoverage = draft.preset === 'coverage';
+  const unitChoices = draft.preset === 'airChanges' ? Object.keys(AIR_CHANGE_UNITS) : AMOUNT_UNITS;
+  const knownUnit = unitChoices.includes(draft.unit);
+  const areaLabel = AREA_UNIT_LABELS[draft.areaUnit];
+  const lengthLabel = LENGTH_UNIT_LABELS[draft.lengthUnit];
+  const oldCoverageLimits = !byCoverage && [draft.maxSpacing, draft.maxArea, draft.maxWall].some((v) => v.trim() !== '');
+  const unitSelect = <T extends string>(id: string, label: string, value: T, labels: Record<T, string>, onPick: (value: T) => void) => (
+    <div className="mep-field-row">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} value={value} onChange={(e) => onPick(e.target.value as T)}>
+        {(Object.keys(labels) as T[]).map((u) => (
+          <option key={u} value={u}>
+            {labels[u]}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <div className="mep-circuit-types-form mep-placement-rule-form">
@@ -391,40 +440,84 @@ function PlacementRuleForm({ rule, others, roomTypes, language, stampName, onCho
       <h4>Required amount</h4>
       <div className="mep-field-row">
         <label htmlFor="pr-preset">Calculation</label>
-        <select id="pr-preset" value={draft.preset} onChange={(e) => update({ preset: e.target.value as PlacementPreset, unit: e.target.value === 'airChanges' && !draft.unit.trim() ? 'm³/h' : draft.unit })}>
+        <select
+          id="pr-preset"
+          value={draft.preset}
+          title={presetHelpText(draft.preset)}
+          onChange={(e) => {
+            const preset = e.target.value as PlacementPreset;
+            update({ preset, unit: preset === 'airChanges' && !isAirChangeUnit(draft.unit) ? 'm³/h' : draft.unit, ...(preset === 'coverage' ? { strategy: 'evenSpread' as const } : {}) });
+          }}
+        >
           {(Object.keys(PLACEMENT_PRESET_LABELS) as PlacementPreset[]).map((p) => (
-            <option key={p} value={p}>
+            <option key={p} value={p} title={presetHelpText(p)}>
               {PLACEMENT_PRESET_LABELS[p]}
             </option>
           ))}
         </select>
       </div>
-      {draft.preset !== 'lighting' && (
+      <p className="mep-settings-hint" data-testid="pr-preset-help">
+        {PLACEMENT_PRESET_HELP[draft.preset].formula}
+        {PLACEMENT_PRESET_HELP[draft.preset].symbols.map((s) => (
+          <span key={s.symbol}>
+            <br />
+            <b>{s.symbol}</b>: {s.text}
+          </span>
+        ))}
+      </p>
+      {draft.preset !== 'lighting' && !byCoverage && (
         <div className="mep-field-row">
-          <label htmlFor="pr-unit">Unit</label>
-          <input id="pr-unit" type="text" placeholder="for example dm³/s" value={draft.unit} onChange={field('unit')} />
+          <label htmlFor="pr-unit-select">Unit</label>
+          <select id="pr-unit-select" value={knownUnit ? draft.unit : OTHER_UNIT} onChange={(e) => update({ unit: e.target.value === OTHER_UNIT ? '' : e.target.value })}>
+            {unitChoices.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+            {draft.preset !== 'airChanges' && <option value={OTHER_UNIT}>{draft.unit.trim() && !knownUnit ? `Other: ${draft.unit}` : 'Other…'}</option>}
+          </select>
+          {!knownUnit && draft.preset !== 'airChanges' && <input id="pr-unit" type="text" aria-label="Other unit" placeholder="for example lm" value={draft.unit} onChange={field('unit')} />}
         </div>
       )}
-      {PRESET_AMOUNT_FIELDS[draft.preset].map((key) => numberRow(key, `${AMOUNT_FIELD_LABELS[key]} (${unit})`))}
+      {PRESET_AMOUNT_FIELDS[draft.preset].includes('perM2') && unitSelect('pr-areaUnit', 'Floor area in', draft.areaUnit, AREA_UNIT_LABELS, (areaUnit) => update({ areaUnit }))}
+      {PRESET_AMOUNT_FIELDS[draft.preset].map((key) => numberRow(key, `${key === 'perM2' ? `Per ${areaLabel} floor area` : AMOUNT_FIELD_LABELS[key]} (${unit})`))}
       {draft.preset === 'lighting' && (
         <>
-          {numberRow('lux', 'Illuminance E (lx)', 'required')}
+          {unitSelect('pr-illuminanceUnit', 'Illuminance unit', draft.illuminanceUnit, ILLUMINANCE_UNIT_LABELS, (illuminanceUnit) => update({ illuminanceUnit }))}
+          {numberRow('lux', `Illuminance E (${ILLUMINANCE_UNIT_LABELS[draft.illuminanceUnit]})`, 'required')}
           {numberRow('uf', 'Utilisation factor UF', 'for example 0.6')}
           {numberRow('mf', 'Maintenance factor MF', 'for example 0.8')}
-          <p className="mep-settings-hint">Amount = E × area ÷ (UF × MF), in lm.</p>
+          <p className="mep-settings-hint">Amount = E × area ÷ (UF × MF), in lm. With fc, MepApp uses the floor area in ft².</p>
         </>
       )}
-      {numberRow('capacity', `Capacity per element (${unit})`)}
-      <p className="mep-settings-hint">Count = amount ÷ capacity, rounded up. Without a capacity and coverage limits the rule places one element per room.</p>
-
-      <h4>Coverage</h4>
-      {numberRow('maxSpacing', 'Max spacing (m)')}
-      {numberRow('maxArea', 'Max area per element (m²)')}
-      {numberRow('maxWall', 'Max distance to a wall (m)', 'half the spacing')}
+      {byCoverage ? (
+        <>
+          {unitSelect('pr-lengthUnit', 'Lengths in', draft.lengthUnit, LENGTH_UNIT_LABELS, (lengthUnit) => update({ lengthUnit }))}
+          {numberRow('maxSpacing', `Max spacing (${lengthLabel})`)}
+          {numberRow('maxArea', `Max area per element (${lengthLabel}²)`)}
+          {numberRow('maxWall', `Max distance to a wall (${lengthLabel})`)}
+          <p className="mep-settings-hint">Count = the fewest stamps that cover each point of the room. Each stamp covers a circle with radius r: max spacing ÷ √2, max distance to a wall × √2 or √(max area ÷ 2), the smallest.</p>
+        </>
+      ) : (
+        <>
+          {numberRow('capacity', `Capacity per element (${unit})`)}
+          <p className="mep-settings-hint">Count = amount ÷ capacity, rounded up. Without a capacity the rule places one element per room.</p>
+        </>
+      )}
+      {oldCoverageLimits && (
+        <p className="mep-settings-hint" data-testid="pr-old-coverage">
+          This rule has coverage limits from an older version. They no longer change the count. Choose By coverage to use them.
+        </p>
+      )}
 
       <h4>Count limits</h4>
       {numberRow('minCount', 'Min count per room')}
       {numberRow('maxCount', 'Max count per room')}
+
+      <h4>Spacing</h4>
+      {numberRow('wallOffset', 'Min distance to the walls (m)', '0')}
+      {numberRow('minSpacing', 'Min distance between stamps (m)', 'none')}
+      <p className="mep-settings-hint">These change only the positions, never the count. MepApp warns when two stamp centers are closer than the min distance.</p>
 
       <h4>Layout</h4>
       <div className="mep-field-row">
@@ -440,7 +533,7 @@ function PlacementRuleForm({ rule, others, roomTypes, language, stampName, onCho
       <p className="mep-settings-hint" data-testid="pr-strategy-hint">
         {LAYOUT_HINTS[draft.strategy]}
       </p>
-      {numberRow('wallOffset', 'Offset from walls (m)', '0')}
+      {draft.strategy === 'grid' && unitSelect('pr-gridStyle', 'Grid style', draft.gridStyle, GRID_STYLE_LABELS, (gridStyle) => update({ gridStyle }))}
       <div className="mep-field-row">
         <label htmlFor="pr-rotation">Rotation</label>
         <select id="pr-rotation" value={draft.rotation} onChange={(e) => update({ rotation: e.target.value as 'room' | 'fixed' })}>

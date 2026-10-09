@@ -40,7 +40,7 @@ export interface Room {
   roomTypeSource?: 'matched' | 'user';
   /** Ceiling height of this room, mm (room-values.ts resolveCeilingHeight). Absent = the room type, drawing or global value. */
   ceilingHeightMm?: number;
-  /** Number of people the user entered. Absent = area ÷ the room type's area per person (room-values.ts roomPeople). */
+  /** Number of people the user entered. Absent = area ÷ the room type's area per person, rounded down (room-values.ts roomPeople). */
   people?: number;
 }
 

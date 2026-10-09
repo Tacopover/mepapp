@@ -11,6 +11,8 @@ import {
   roomPlacementKey,
   autoPlacedStampIds,
   coverageRadiusM,
+  coverageStartCount,
+  estimateFitCount,
   layoutCoverage,
   layoutEvenSpread,
   layoutPerimeter,
@@ -104,6 +106,48 @@ describe('layoutGrid', () => {
   });
 });
 
+describe('layoutGrid styles', () => {
+  // 5 stamps in a 300 × 200 room: a 3 × 2 grid with one short row of 2.
+  const R = room(rect(0, 0, 300, 200));
+  const lastRow = (ps: Vec2[]) => sortPts(ps.filter((p) => Math.abs(p.y - 150) < 1e-6));
+
+  it('spread: the short row spreads over the full length', () => {
+    expect(lastRow(layoutGrid(R, 5, 0, 'spread').points)).toEqual([[75, 150], [225, 150]]);
+  });
+
+  it('aligned: the short row keeps the columns 1 and 3', () => {
+    const out = layoutGrid(R, 5, 0, 'aligned');
+    expect(sortPts(out.points)).toEqual([[50, 50], [50, 150], [150, 50], [250, 50], [250, 150]]);
+  });
+
+  it('staggered: each second row moves half a cell', () => {
+    const out = layoutGrid(R, 5, 0, 'staggered');
+    expect(sortPts(out.points)).toEqual([[25, 50], [75, 150], [125, 50], [225, 50], [275, 150]]);
+    expect(out.warnings).toEqual([]);
+  });
+
+  it('staggered with one row is the same as aligned', () => {
+    expect(sortPts(layoutGrid(room(rect(0, 0, 600, 100)), 3, 0, 'staggered').points)).toEqual(sortPts(layoutGrid(room(rect(0, 0, 600, 100)), 3, 0, 'aligned').points));
+  });
+
+  it('works in the frame of a rotated room', () => {
+    const gaps = (ps: Vec2[]) => ps.flatMap((p, i) => ps.slice(i + 1).map((q) => Math.round(Math.hypot(p.x - q.x, p.y - q.y) * 1000) / 1000)).sort((a, b) => a - b);
+    for (const style of ['aligned', 'staggered'] as const) {
+      expect(gaps(layoutGrid(room(rotate(rect(0, 0, 300, 200), 30)), 5, 0, style).points)).toEqual(gaps(layoutGrid(R, 5, 0, style).points));
+    }
+  });
+
+  it('moves a point of an L-shaped room inside, for each style', () => {
+    const l = room(L_SHAPE);
+    for (const style of ['spread', 'aligned', 'staggered'] as const) {
+      const out = layoutGrid(l, 5, 20, style);
+      expect(out.points).toHaveLength(5);
+      expect(out.points.every((p) => isValidPlacementPoint(l.polygon, p, 20))).toBe(true);
+      expect(out.warnings).toEqual(['movedInside']);
+    }
+  });
+});
+
 describe('layoutCenter', () => {
   it('uses the label point when it is far enough from the walls', () => {
     expect(layoutCenter(room(rect(0, 0, 400, 200)), 20).points).toEqual([{ x: 200, y: 100 }]);
@@ -135,62 +179,94 @@ describe('layoutRoomStamps', () => {
     layout: { strategy: 'grid', wallOffsetM: 0.5, rotation: 'room', ...layout },
     coverage,
   });
-  const values = { lengthM: 10, widthM: 5 };
 
   it('keeps the wall offset plus half the stamp from every wall', () => {
     // 0.5 m = 20 pt, stamp 20 pt → 30 pt from each wall: usable length 340 pt, cell centers at 30 + 85 and 30 + 255.
-    const out = layoutRoomStamps(rule(), room(rect(0, 0, 400, 200)), values, 2, CAL, { width: 20, height: 10 });
+    const out = layoutRoomStamps(rule(), room(rect(0, 0, 400, 200)), 2, CAL, { width: 20, height: 10 });
     expect(sortPts(out.stamps.map((s) => s.position))).toEqual([[115, 100], [285, 100]]);
   });
 
   it('turns the stamps to the main axis, or to the fixed angle', () => {
     const vertical = room(rect(0, 0, 200, 400));
-    expect(layoutRoomStamps(rule(), vertical, values, 1, CAL, { width: 0, height: 0 }).stamps[0]!.rotationDegrees).toBeCloseTo(90);
-    expect(layoutRoomStamps(rule({ rotation: 'fixed', fixedAngleDeg: 45 }), vertical, values, 1, CAL, { width: 0, height: 0 }).stamps[0]!.rotationDegrees).toBe(45);
+    expect(layoutRoomStamps(rule(), vertical, 1, CAL, { width: 0, height: 0 }).stamps[0]!.rotationDegrees).toBeCloseTo(90);
+    expect(layoutRoomStamps(rule({ rotation: 'fixed', fixedAngleDeg: 45 }), vertical, 1, CAL, { width: 0, height: 0 }).stamps[0]!.rotationDegrees).toBe(45);
   });
 
   it('places one stamp at the center for the Center layout', () => {
-    const out = layoutRoomStamps(rule({ strategy: 'center' }), room(rect(0, 0, 400, 200)), values, 1, CAL, { width: 10, height: 10 });
+    const out = layoutRoomStamps(rule({ strategy: 'center' }), room(rect(0, 0, 400, 200)), 1, CAL, { width: 10, height: 10 });
     expect(out.stamps.map((s) => s.position)).toEqual([{ x: 200, y: 100 }]);
     expect(out.warnings).toEqual([]);
   });
 
   it('uses the grid for Center with more than one stamp, and says so', () => {
-    const out = layoutRoomStamps(rule({ strategy: 'center' }), room(rect(0, 0, 400, 200)), values, 3, CAL, { width: 10, height: 10 });
+    const out = layoutRoomStamps(rule({ strategy: 'center' }), room(rect(0, 0, 400, 200)), 3, CAL, { width: 10, height: 10 });
     expect(out.stamps).toHaveLength(3);
     expect(out.warnings).toEqual(['layoutFallback']);
   });
 
-  it('Along the walls with a max spacing chooses the count from the wall run length', () => {
-    // 0.5 m = 20 pt + 5 pt half stamp = 25 pt offset. Runs: 2 × (400 − 50) + 2 × (200 − 50) = 1000 pt = 25 m. Spacing 3 m → ceil(25 ÷ 3) = 9.
-    const out = layoutRoomStamps(rule({ strategy: 'perimeter' }, { maxSpacingM: 3 }), room(rect(0, 0, 400, 200)), values, 1, CAL, { width: 10, height: 10 }, { quantityCount: null });
-    expect(out.layoutCount).toEqual({ count: 9, limited: false });
-    expect(out.stamps).toHaveLength(9);
-    const capped = layoutRoomStamps({ ...rule({ strategy: 'perimeter' }, { maxSpacingM: 3 }), maxCount: 4 }, room(rect(0, 0, 400, 200)), values, 1, CAL, { width: 10, height: 10 }, { quantityCount: null });
-    expect(capped.layoutCount).toEqual({ count: 4, limited: true });
+  it('Along the walls places the count; an old max spacing does not change it', () => {
+    const out = layoutRoomStamps({ ...rule({ strategy: 'perimeter' }, { maxSpacing: 3 }), preset: 'perArea' }, room(rect(0, 0, 400, 200)), 3, CAL, { width: 10, height: 10 });
+    expect(out.stamps).toHaveLength(3);
+    expect(out.layoutCount).toBeUndefined();
   });
 
   it('Along the walls turns each stamp to face into the room, or uses the fixed angle', () => {
-    const out = layoutRoomStamps(rule({ strategy: 'perimeter', wallOffsetM: 0 }), room(rect(0, 0, 400, 200)), values, 4, CAL, { width: 0, height: 0 });
+    const out = layoutRoomStamps(rule({ strategy: 'perimeter', wallOffsetM: 0 }), room(rect(0, 0, 400, 200)), 4, CAL, { width: 0, height: 0 });
     for (const s of out.stamps) {
       const a = (s.rotationDegrees * Math.PI) / 180;
       const localY = { x: -Math.sin(a), y: Math.cos(a) };
       expect(isValidPlacementPoint(room(rect(0, 0, 400, 200)).polygon, { x: s.position.x + localY.x * 10, y: s.position.y + localY.y * 10 }, 9.99)).toBe(true);
     }
-    const fixed = layoutRoomStamps(rule({ strategy: 'perimeter', rotation: 'fixed', fixedAngleDeg: 30 }), room(rect(0, 0, 400, 200)), values, 4, CAL, { width: 0, height: 0 });
+    const fixed = layoutRoomStamps(rule({ strategy: 'perimeter', rotation: 'fixed', fixedAngleDeg: 30 }), room(rect(0, 0, 400, 200)), 4, CAL, { width: 0, height: 0 });
     expect(fixed.stamps.every((s) => s.rotationDegrees === 30)).toBe(true);
   });
 
-  it('uses the coverage grid when it gave the count', () => {
-    // Coverage on 10 × 5 m: along ceil((10 − 5) ÷ 2) + 1 = 4, across 1 (5 m ≤ 2 × 2.5 m), so 4 × 1. chooseGridShape(4) alone gives 2 × 2.
-    expect(chooseGridShape(4, 400, 200)).toEqual({ along: 2, across: 2 });
-    const out = layoutRoomStamps(rule({ wallOffsetM: 0 }, { maxSpacingM: 2, maxWallDistanceM: 2.5 }), room(rect(0, 0, 400, 200)), { lengthM: 10, widthM: 5 }, 4, CAL, { width: 0, height: 0 });
-    expect(new Set(out.stamps.map((s) => Math.round(s.position.y))).size).toBe(1);
-    expect(out.stamps).toHaveLength(4);
+  it('uses the grid style of the rule', () => {
+    const at = (gridStyle: 'spread' | 'aligned' | 'staggered') => sortPts(layoutRoomStamps(rule({ wallOffsetM: 0, gridStyle }), room(rect(0, 0, 300, 200)), 5, CAL, { width: 0, height: 0 }).stamps.map((s) => s.position));
+    expect(at('aligned')).toEqual(sortPts(layoutGrid(room(rect(0, 0, 300, 200)), 5, 0, 'aligned').points));
+    expect(new Set([JSON.stringify(at('spread')), JSON.stringify(at('aligned')), JSON.stringify(at('staggered'))]).size).toBe(3);
   });
 
   it('places nothing for a count of 0', () => {
-    expect(layoutRoomStamps(rule({ strategy: 'center' }), room(rect(0, 0, 400, 200)), values, 0, CAL, { width: 0, height: 0 }).stamps).toEqual([]);
+    expect(layoutRoomStamps(rule({ strategy: 'center' }), room(rect(0, 0, 400, 200)), 0, CAL, { width: 0, height: 0 }).stamps).toEqual([]);
+  });
+
+  it('By coverage with Even spread: the coverage layout gives the count and the positions', () => {
+    // 10 × 5 m, spacing 4 m: radius 2.83 m = 113 pt.
+    const out = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 }), preset: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
+    expect(out.layoutCount?.count).toBe(out.stamps.length);
+    expect(out.warnings).toEqual([]);
+    expect(worstDistance(room(rect(0, 0, 400, 200)), out.stamps.map((s) => s.position))).toBeLessThanOrEqual((4 / Math.SQRT2) * 40 + 3);
+  });
+
+  it('By coverage with another layout: places that pattern with the coverage count, and warns when a part is not covered', () => {
+    const coverage = { ...rule({ strategy: 'perimeter', wallOffsetM: 0 }, { maxSpacing: 4 }), preset: 'coverage' as const };
+    const out = layoutRoomStamps(coverage, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
+    const even = layoutRoomStamps({ ...coverage, layout: { ...coverage.layout, strategy: 'evenSpread' } }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
+    expect(out.stamps).toHaveLength(even.stamps.length);
+    expect(out.warnings).toContain('coverageNotMet');
+  });
+
+  it('a coverage rule in ft uses the radius in metres', () => {
+    const ft = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 / 0.3048, lengthUnit: 'ft' }), preset: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
+    const m = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 }), preset: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
+    expect(ft.layoutCount).toEqual(m.layoutCount);
+  });
+
+  it('warns when stamps are closer than the min distance, with an estimate, and keeps the count and the points', () => {
+    // A 3 × 3 m room (120 pt), 0.5 m from the walls, with 2 stamps and 4 m min distance: the usable 2 × 2 m holds 1.
+    const small = room(rect(0, 0, 120, 120));
+    const plain = layoutRoomStamps(rule(), small, 2, CAL, { width: 0, height: 0 });
+    const checked = layoutRoomStamps(rule({ minSpacingM: 4 }), small, 2, CAL, { width: 0, height: 0 });
+    expect(checked.warnings).toEqual(['tooClose']);
+    expect(checked.fitEstimate).toBe(1);
+    expect(checked.stamps).toEqual(plain.stamps);
+  });
+
+  it('gives no spacing warning when the min distance is met', () => {
+    const out = layoutRoomStamps(rule({ wallOffsetM: 0, minSpacingM: 4 }), room(rect(0, 0, 400, 200)), 2, CAL, { width: 0, height: 0 });
+    expect(out.warnings).toEqual([]);
+    expect(out.fitEstimate).toBeUndefined();
   });
 });
 
@@ -275,14 +351,32 @@ describe('planAutoPlacement', () => {
     expect(autoPlacedStampIds(out.rows, out.stale)).toEqual(['m', 'a']);
   });
 
-  it('takes the count of a Coverage row from the layout, and the amount per stamp follows it', () => {
-    // 10 × 5 m room; the grid count for spacing 4 m is 3 × 2 = 6, but a radius of 4 ÷ √2 = 2.83 m needs fewer.
-    const coverageRule: PlacementRule = { ...base, capacityPerElement: undefined, coverage: { maxSpacingM: 4 }, layout: { strategy: 'coverage', wallOffsetM: 0, rotation: 'room' } };
+  it('takes the count of a By coverage row from the layout', () => {
+    // 10 × 5 m room: a radius of 4 ÷ √2 = 2.83 m.
+    const coverageRule: PlacementRule = { ...base, preset: 'coverage', capacityPerElement: undefined, coverage: { maxSpacing: 4 }, layout: { strategy: 'evenSpread', wallOffsetM: 0, rotation: 'room' } };
     const row = planAutoPlacement([coverageRule], [r], () => values, () => CAL, () => ({ width: 0, height: 0 })).rows[0]!;
     expect(row.stamps.length).toBe(row.requirement.count);
+    expect(row.requirement.countSource).toBe('coverage');
     expect(row.requirement.count).toBeLessThanOrEqual(8);
-    expect(row.requirement.perElement).toBeCloseTo(30 / row.requirement.count!, 9);
+    expect(row.requirement.perElement).toBeNull();
+    expect(row.warnings).toEqual([]);
     expect(worstDistance(r, row.stamps.map((s) => s.position))).toBeLessThanOrEqual((4 / Math.SQRT2) * 40 + 3);
+  });
+
+  it('starts By coverage from area ÷ max area, and stops at the max count', () => {
+    expect(coverageStartCount({ coverage: { maxAreaPerElement: 20 } }, 50)).toBe(3);
+    expect(coverageStartCount({ coverage: { maxSpacing: 4 }, minCount: 2 }, 50)).toBe(2);
+    const capped: PlacementRule = { ...base, preset: 'coverage', coverage: { maxSpacing: 1 }, maxCount: 2, layout: { strategy: 'evenSpread', wallOffsetM: 0, rotation: 'room' } };
+    const row = planAutoPlacement([capped], [r], () => values, () => CAL, () => ({ width: 0, height: 0 })).rows[0]!;
+    expect(row.requirement.count).toBe(2);
+    expect(row.warnings).toEqual(['maxCountReached', 'coverageNotMet']);
+  });
+
+  it('gives the fit estimate of a row with stamps too close', () => {
+    const row = planAutoPlacement([{ ...base, layout: { ...base.layout, minSpacingM: 4 } }], [r], () => values, () => CAL, () => ({ width: 10, height: 10 })).rows[0]!;
+    expect(row.warnings).toEqual(['tooClose']);
+    expect(row.fitEstimate).toBeGreaterThanOrEqual(1);
+    expect(row.stamps).toHaveLength(3);
   });
 
   it('lists every auto-placed stamp of the rows for Remove', () => {
@@ -339,10 +433,15 @@ describe('layoutEvenSpread', () => {
 describe('coverageRadiusM', () => {
   it('takes the smallest radius of the limits', () => {
     expect(coverageRadiusM({})).toBeNull();
-    expect(coverageRadiusM({ maxSpacingM: 4 })).toBeCloseTo(2.828, 3);
-    expect(coverageRadiusM({ maxWallDistanceM: 1 })).toBeCloseTo(1.414, 3);
-    expect(coverageRadiusM({ maxAreaPerElementM2: 50 })).toBeCloseTo(5, 6);
-    expect(coverageRadiusM({ maxAreaPerElementM2: 60, maxSpacingM: 7.5, maxWallDistanceM: 3.5 })).toBeCloseTo(3.5 * Math.SQRT2, 6);
+    expect(coverageRadiusM({ maxSpacing: 4 })).toBeCloseTo(2.828, 3);
+    expect(coverageRadiusM({ maxWallDistance: 1 })).toBeCloseTo(1.414, 3);
+    expect(coverageRadiusM({ maxAreaPerElement: 50 })).toBeCloseTo(5, 6);
+    expect(coverageRadiusM({ maxAreaPerElement: 60, maxSpacing: 7.5, maxWallDistance: 3.5 })).toBeCloseTo(3.5 * Math.SQRT2, 6);
+  });
+
+  it('converts limits in ft and ft² to metres', () => {
+    expect(coverageRadiusM({ maxSpacing: 10, lengthUnit: 'ft' })).toBeCloseTo((10 * 0.3048) / Math.SQRT2, 9);
+    expect(coverageRadiusM({ maxAreaPerElement: 100, lengthUnit: 'ft' })).toBeCloseTo(Math.sqrt((100 * 0.09290304) / 2), 9);
   });
 });
 
@@ -383,6 +482,15 @@ describe('layoutCoverage', () => {
     const out = layoutCoverage(room(rect(0, 0, 400, 200)), 1, 90, 100);
     expect(out.warnings).toContain('coverageNotMet');
     expect(out.limited).toBe(false);
+  });
+});
+
+describe('estimateFitCount', () => {
+  it('estimates the stamps that fit in a rectangle at a min distance', () => {
+    // 400 × 200 with 100 pt: a 5 × 3 lattice fits; the sample grid gives about that.
+    const n = estimateFitCount(roomSamples(room(rect(0, 0, 400, 200)), 0), 100);
+    expect(n).toBeGreaterThanOrEqual(8);
+    expect(n).toBeLessThanOrEqual(15);
   });
 });
 
