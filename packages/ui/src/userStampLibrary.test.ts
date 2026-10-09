@@ -10,7 +10,6 @@ import {
   materializeUserStamp,
   saveUserStampAs,
   saveUserStampEdits,
-  scanLibraryFolder,
   setUserStampHidden,
   showHiddenStamps,
   syncLibrarySource,
@@ -174,26 +173,6 @@ describe('materializeUserStamp', () => {
   it('returns undefined for an unknown stamp', async () => {
     const { store } = await setup();
     expect(await materializeUserStamp(store, 'nope')).toBeUndefined();
-  });
-});
-
-describe('scanLibraryFolder', () => {
-  it('keeps top-level supported files sorted by name and skips folders and other extensions', async () => {
-    const svg = realFile(SVG_DIR, SVG_B, 1);
-    const png = realFile(PNG_DIR, PNG_A, 2);
-    const entries = [
-      { kind: 'directory', name: 'sub.svg' },
-      { kind: 'file', name: 'notes.txt', getFile: async () => new File(['x'], 'notes.txt') },
-      { kind: 'file', name: PNG_A, getFile: async () => png },
-      { kind: 'file', name: SVG_B, getFile: async () => svg },
-    ];
-    const dir = {
-      async *values() {
-        yield* entries;
-      },
-    } as unknown as FileSystemDirectoryHandle;
-    const files = await scanLibraryFolder(dir);
-    expect(files.map((f) => f.name)).toEqual([PNG_A, SVG_B]);
   });
 });
 

@@ -46,7 +46,7 @@ Stack: TypeScript, PixiJS v8 (interactive overlay), MuPDF.js behind a swappable 
 - `@mepapp/render` — PixiJS scene graph, hit-testing, interactive tools. Depends on `core` and the `pdf-engine` interface (for PDF export/import sync — still never imports `mupdf` directly).
 - `@mepapp/ui` — React panels/dialogs. Depends on `core` + `render` + the `pdf-engine` interface.
 - `@mepapp/platform` — abstract interface for file access, secure storage, window chrome (the layer that differs web vs. desktop).
-- `@mepapp/platform-web` / `@mepapp/platform-tauri` — concrete implementations. `platform-tauri` is currently a stub, not wired to a real Tauri project yet.
+- `@mepapp/platform-web` / `@mepapp/platform-tauri` — concrete implementations. `FileAccess` + `CloseGuard` exist for both; `apps/web/src/main.tsx` picks the Tauri pair at runtime when it runs inside Tauri.
 - `apps/web` — Vite + React app, wires everything together. **The only real running app right now.**
 - `apps/desktop` — real Tauri 2 project wrapping the `apps/web` build (`src-tauri/tauri.conf.json`). This container has Rust/Cargo + webkit2gtk and can do a Linux build; the Windows installer is not built yet. Plan: `.claude/plans/desktop-installer.md`.
 

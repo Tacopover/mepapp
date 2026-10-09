@@ -1,5 +1,5 @@
 import { SAVED_STAMPS_SOURCE_ID } from '@mepapp/core';
-import type { LibrarySourceRecord, LibraryStampRecord } from '@mepapp/platform';
+import { libraryFolderOf, type LibrarySourceRecord, type LibraryStampRecord } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
 
@@ -65,8 +65,8 @@ export function LibraryFoldersDialog({ available, sources, records, busySourceId
                     {!saved && (
                       <button
                         type="button"
-                        disabled={!source.dirHandle || busy}
-                        title={source.dirHandle ? 'Read the folder again' : 'This folder has no saved handle'}
+                        disabled={!libraryFolderOf(source) || busy}
+                        title={libraryFolderOf(source) ? 'Read the folder again' : 'This folder has no saved handle'}
                         onClick={() => onSync(source)}
                       >
                         {busy ? 'Syncing…' : 'Sync'}

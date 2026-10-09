@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   buildRoomExportTable,
   buildStampPropertyContext,
@@ -66,7 +66,6 @@ import {
   browserImageSizeDecoder,
   createLibrarySource,
   deleteSavedStamp,
-  ensureReadPermission,
   saveUserStampAs,
   saveUserStampEdits,
   setUserStampHidden,
@@ -77,7 +76,7 @@ import {
 import { useShowBuiltInStamps } from './builtInStampsSetting.js';
 import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
 import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
-import type { LibrarySourceRecord, LibraryStore } from '@mepapp/platform';
+import { libraryFolderOf, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore } from '@mepapp/platform';
 import './theme.css';
 
 export interface PdfPageLoadResult {
@@ -105,23 +104,17 @@ export interface MepSketchAppProps {
   resolveStampIconUrl?: (iconRef: string) => string;
   /** Storage for the user's custom stamp library folders. Without it the feature is unavailable. */
   libraryStore?: LibraryStore;
+  /** File and folder pickers, reads and writes: the browser's on the web, native dialogs on desktop. */
+  fileAccess: FileAccess;
+  /** Warns before the tab or window closes with unsaved changes. */
+  closeGuard: CloseGuard;
 }
 
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
 
-// The File System Access API (showOpenFilePicker/showSaveFilePicker) is what
-// lets "Save" write straight back to the file the user opened, with no
-// download prompt — it's Chromium-only today (not in Firefox/Safari), so
-// every call site below feature-detects it and falls back to the old
-// download-a-copy behavior where it's missing. That fallback is never a
-// regression: it's exactly what this app already did before Save/Save As existed.
-function supportsFileSystemAccess(): boolean {
-  return typeof window !== 'undefined' && typeof window.showOpenFilePicker === 'function';
-}
-
-const PDF_PICKER_TYPES = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
+const PDF_FILE_TYPES: FileTypeFilter[] = [{ description: 'PDF', mimeType: 'application/pdf', extensions: ['pdf'] }];
 const FILE_TASK_BUSY_STATUS = 'Wait until the current open or save has finished.';
-const XLSX_PICKER_TYPES = [{ description: 'Excel workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }];
+const XLSX_FILE_TYPES: FileTypeFilter[] = [{ description: 'Excel workbook', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', extensions: ['xlsx'] }];
 
 const ROOM_GAP_STORAGE_KEY = 'mepapp.settings.roomGapMm.v1';
 
@@ -182,27 +175,8 @@ function loadLabelVisibility(): StampLabelVisibility {
   }
 }
 
-async function writeToFileHandle(fileHandle: FileSystemFileHandle, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
-  const writable = await fileHandle.createWritable();
-  await writable.write(bytes);
-  await writable.close();
-}
-
-function downloadPdfBytes(bytes: Uint8Array<ArrayBuffer>, fileName: string): void {
-  downloadBlob(new Blob([bytes], { type: 'application/pdf' }), fileName);
-}
-
-function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function isAbortError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === 'AbortError';
+function pdfBlob(bytes: Uint8Array<ArrayBuffer>): Blob {
+  return new Blob([bytes], { type: 'application/pdf' });
 }
 
 /** The first discipline of a Stamps-panel discipline group — the default for a newly added stamp folder. */
@@ -228,8 +202,10 @@ export function MepSketchApp({
   createRoomDetectionClient,
   resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL,
   libraryStore,
+  fileAccess,
+  closeGuard,
 }: MepSketchAppProps) {
-  const userStampLibrary = useUserStampLibrary(libraryStore);
+  const userStampLibrary = useUserStampLibrary(libraryStore, fileAccess.capabilities.folders);
   const [showBuiltInStamps, setShowBuiltInStamps] = useShowBuiltInStamps();
   const missingUserStampIds = useMemo(
     () => new Set(userStampLibrary.records.filter((record) => record.missingFromFolder).map((record) => record.id)),
@@ -487,13 +463,12 @@ export function MepSketchApp({
   const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
   const pdfHandle = activePdfHandle;
 
-  // A document's FileSystemFileHandle, when "Open"/"Save As" got one from the
-  // File System Access API — keyed by document id so "Save" knows which real
-  // file to write back to. Not scene state: @mepapp/render stays platform-
-  // agnostic (see its IconBitmapResolver layering), and this is a browser-only
-  // concern. A plain ref, not state: it's write-target bookkeeping, never rendered.
-  const fileHandlesRef = useRef(new Map<string, FileSystemFileHandle>());
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // A document's FileTarget, when "Open"/"Save As" got one from fileAccess —
+  // keyed by document id so "Save" knows which real file to write back to.
+  // Not scene state: @mepapp/render stays platform-agnostic (see its
+  // IconBitmapResolver layering). A plain ref, not state: it's write-target
+  // bookkeeping, never rendered.
+  const fileTargetsRef = useRef(new Map<string, FileTarget>());
   // The open/save running right now, if any. Only one runs at a time: two
   // overlapping saves of one PDF both write the same new annotations, and
   // closing a document mid-task destroys what the task still reads.
@@ -517,7 +492,7 @@ export function MepSketchApp({
   );
 
   const openPdfFile = useCallback(
-    async (file: File, fileHandle: FileSystemFileHandle | null) => {
+    async (file: File, fileTarget: FileTarget | undefined) => {
       // Reopening a file already open elsewhere in the document list just
       // switches to its tab — no re-parse, no duplicate — see decisions log
       // 2026-09-07's multi-document plan, D3.
@@ -525,7 +500,7 @@ export function MepSketchApp({
       const existingId = sceneRef.current?.findDocumentByFileKey(fileKey);
       if (existingId) {
         sceneRef.current?.activateDocument(existingId);
-        if (fileHandle) fileHandlesRef.current.set(existingId, fileHandle);
+        if (fileTarget) fileTargetsRef.current.set(existingId, fileTarget);
         setStatus(`Switched to already-open ${file.name}.`);
         return;
       }
@@ -540,7 +515,7 @@ export function MepSketchApp({
       try {
         const { bitmap, pageWidthPt, pageHeightPt, handle } = await onLoadPdfPage(file);
         task.documentId = sceneRef.current?.openDocument(bitmap, pageWidthPt, pageHeightPt, { fileKey, fileName: file.name, handle }) ?? null;
-        if (task.documentId && fileHandle) fileHandlesRef.current.set(task.documentId, fileHandle);
+        if (task.documentId && fileTarget) fileTargetsRef.current.set(task.documentId, fileTarget);
         // Loads this PDF's own embedded project data (if any) and compares
         // its annotations against that domain model — see decisions log
         // 2026-09-06's reconciliation policy: flag drift/missing, never
@@ -556,7 +531,7 @@ export function MepSketchApp({
         // saved by a newer MepApp) shows an empty drawing, and a Save would
         // write that over the file's real project data.
         if (task.documentId) {
-          fileHandlesRef.current.delete(task.documentId);
+          fileTargetsRef.current.delete(task.documentId);
           sceneRef.current?.closeDocument(task.documentId);
         }
         setStatus(`Could not open ${file.name}: ${(err as Error).message}. The file was not changed.`);
@@ -567,30 +542,14 @@ export function MepSketchApp({
     [onLoadPdfPage, resolveStampIconBitmap, sceneRef],
   );
 
-  // The hidden <input type="file"> below is the fallback path for browsers
-  // without the File System Access API — its onChange calls this directly.
-  const handleFileInputChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      event.target.value = ''; // so picking the same file twice in a row still fires onChange
-      if (file) void openPdfFile(file, null);
-    },
-    [openPdfFile],
-  );
-
   const handleOpenPdf = useCallback(async () => {
-    if (!supportsFileSystemAccess()) {
-      fileInputRef.current?.click();
-      return;
-    }
     try {
-      const [fileHandle] = await window.showOpenFilePicker!({ types: PDF_PICKER_TYPES });
-      const file = await fileHandle.getFile();
-      await openPdfFile(file, fileHandle);
+      const opened = await fileAccess.openFile(PDF_FILE_TYPES);
+      if (opened) await openPdfFile(opened.file, opened.target);
     } catch (err) {
-      if (!isAbortError(err)) setStatus(`Failed to open PDF: ${(err as Error).message}`);
+      setStatus(`Failed to open PDF: ${(err as Error).message}`);
     }
-  }, [openPdfFile]);
+  }, [fileAccess, openPdfFile]);
 
   const handleActivateDocument = useCallback(
     (id: string) => {
@@ -613,18 +572,12 @@ export function MepSketchApp({
     [documents, sceneRef],
   );
 
-  // The browser's own "Leave site?" prompt — the only guard when the tab
-  // itself is closed or reloaded with unsaved drawings open.
+  // The only guard when the tab or window itself is closed with unsaved drawings open.
   const hasUnsavedDocuments = documents.some((d) => d.isDirty);
   useEffect(() => {
-    if (!hasUnsavedDocuments) return;
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [hasUnsavedDocuments]);
+    closeGuard.setUnsavedChanges(hasUnsavedDocuments);
+  }, [closeGuard, hasUnsavedDocuments]);
+  useEffect(() => () => closeGuard.setUnsavedChanges(false), [closeGuard]);
 
   // A canvas click changes the selection on pointerdown, and the browser
   // blurs a focused side-panel input only after that — so an input that
@@ -661,25 +614,18 @@ export function MepSketchApp({
   const saveAsNewFile = useCallback(
     async (bytes: Uint8Array<ArrayBuffer>, documentId: string): Promise<boolean> => {
       const suggestedName = documents.find((d) => d.id === documentId)?.fileName ?? 'mepapp-drawing.pdf';
-      if (!supportsFileSystemAccess()) {
-        downloadPdfBytes(bytes, suggestedName);
-        setStatus(`Downloaded ${suggestedName}.`);
+      const saved = await fileAccess.saveFileAs(suggestedName, PDF_FILE_TYPES, pdfBlob(bytes));
+      if (!saved) return false;
+      if (!saved.target) {
+        setStatus(`Downloaded ${saved.name}.`);
         return true;
       }
-      let fileHandle: FileSystemFileHandle;
-      try {
-        fileHandle = await window.showSaveFilePicker!({ suggestedName, types: PDF_PICKER_TYPES });
-      } catch (err) {
-        if (isAbortError(err)) return false;
-        throw err;
-      }
-      await writeToFileHandle(fileHandle, bytes);
-      fileHandlesRef.current.set(documentId, fileHandle);
-      sceneRef.current?.renameDocument(documentId, fileHandle.name);
-      setStatus(`Saved as ${fileHandle.name}.`);
+      fileTargetsRef.current.set(documentId, saved.target);
+      sceneRef.current?.renameDocument(documentId, saved.name);
+      setStatus(`Saved as ${saved.name}.`);
       return true;
     },
-    [documents, sceneRef],
+    [documents, fileAccess, sceneRef],
   );
 
   // The unsaved-changes marker is cleared only after the bytes reach the
@@ -701,11 +647,11 @@ export function MepSketchApp({
         const documentId = result.receipt.documentId;
         // Never saved to a real file yet (opened via the legacy file-picker
         // fallback, or this is a brand new document) — first save behaves like Save As.
-        const fileHandle = asNewFile ? undefined : fileHandlesRef.current.get(documentId);
+        const fileTarget = asNewFile ? undefined : fileTargetsRef.current.get(documentId);
         let saved = false;
-        if (fileHandle) {
-          await writeToFileHandle(fileHandle, result.bytes);
-          setStatus(`Saved ${fileHandle.name}.`);
+        if (fileTarget) {
+          await fileAccess.writeFile(fileTarget, pdfBlob(result.bytes));
+          setStatus(`Saved ${fileTarget.name}.`);
           saved = true;
         } else {
           saved = await saveAsNewFile(result.bytes, documentId);
@@ -718,7 +664,7 @@ export function MepSketchApp({
         fileTaskRef.current = null;
       }
     },
-    [activeDocumentId, saveAsNewFile, sceneRef, syncAndGetPdfBytes],
+    [activeDocumentId, fileAccess, saveAsNewFile, sceneRef, syncAndGetPdfBytes],
   );
 
   const handleExportRooms = useCallback(async () => {
@@ -730,20 +676,13 @@ export function MepSketchApp({
     try {
       const blob = await roomTableToXlsx(buildRoomExportTable(rooms, calibration, customPropertyDefs.room));
       const suggestedName = `${(activeDoc?.fileName ?? 'rooms').replace(/\.pdf$/i, '')}-rooms.xlsx`;
-      if (!supportsFileSystemAccess()) {
-        downloadBlob(blob, suggestedName);
-        setStatus(`Downloaded ${suggestedName} (${rooms.length} rooms).`);
-        return;
-      }
-      const fileHandle = await window.showSaveFilePicker!({ suggestedName, types: XLSX_PICKER_TYPES });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      setStatus(`Exported ${rooms.length} rooms to ${fileHandle.name}.`);
+      const saved = await fileAccess.saveFileAs(suggestedName, XLSX_FILE_TYPES, blob);
+      if (!saved) return;
+      setStatus(saved.target ? `Exported ${rooms.length} rooms to ${saved.name}.` : `Downloaded ${saved.name} (${rooms.length} rooms).`);
     } catch (err) {
-      if (!isAbortError(err)) setStatus(`Failed to export rooms: ${(err as Error).message}`);
+      setStatus(`Failed to export rooms: ${(err as Error).message}`);
     }
-  }, [activeDoc, calibration, customPropertyDefs.room, sceneRef]);
+  }, [activeDoc, calibration, customPropertyDefs.room, fileAccess, sceneRef]);
 
   const handleSave = useCallback(() => saveDocument(false), [saveDocument]);
   const handleSaveAs = useCallback(() => saveDocument(true), [saveDocument]);
@@ -1098,31 +1037,31 @@ export function MepSketchApp({
   );
 
   // A folder the user picked, waiting for its name and discipline in LibrarySourceDialog.
-  const [pendingLibraryFolder, setPendingLibraryFolder] = useState<{ dirHandle: FileSystemDirectoryHandle; category: StampCategoryFilter } | null>(null);
+  const [pendingLibraryFolder, setPendingLibraryFolder] = useState<{ name: string; folder: LibraryFolderRef; category: StampCategoryFilter } | null>(null);
   const [libraryFolderBusy, setLibraryFolderBusy] = useState(false);
   const [libraryFoldersOpen, setLibraryFoldersOpen] = useState(false);
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
 
   // The folder picker must be the first call in the click handler: the browser grants it only to a click that has not awaited anything yet.
-  const handleLoadUserFolder = useCallback(async (category: StampCategoryFilter) => {
-    let dirHandle: FileSystemDirectoryHandle;
-    try {
-      dirHandle = await window.showDirectoryPicker!({ id: 'mepapp-stamp-library', mode: 'read' });
-    } catch (err) {
-      if (isAbortError(err)) return;
-      setStatus(`The browser refused this folder (${err instanceof Error ? err.message : String(err)}). Pick a subfolder instead.`);
-      return;
-    }
-    setPendingLibraryFolder({ dirHandle, category });
-  }, []);
+  const handleLoadUserFolder = useCallback(
+    async (category: StampCategoryFilter) => {
+      try {
+        const picked = await fileAccess.pickFolder();
+        if (picked) setPendingLibraryFolder({ ...picked, category });
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [fileAccess],
+  );
 
   const handleConfirmLibraryFolder = useCallback(
     async (name: string, discipline: Discipline) => {
       if (!pendingLibraryFolder || !libraryStore) return;
       setLibraryFolderBusy(true);
       try {
-        const source = await createLibrarySource(libraryStore, { name, category: pendingLibraryFolder.category, discipline, dirHandle: pendingLibraryFolder.dirHandle });
-        const summary = await syncLibrarySource(libraryStore, source, { decode: browserImageSizeDecoder });
+        const source = await createLibrarySource(libraryStore, { name, category: pendingLibraryFolder.category, discipline, folder: pendingLibraryFolder.folder });
+        const summary = await syncLibrarySource(libraryStore, source, { decode: browserImageSizeDecoder, fileAccess });
         await userStampLibrary.reload();
         const count = summary.added + summary.updated;
         setStatus(`Loaded ${count} stamp${count === 1 ? '' : 's'} from "${name}".`);
@@ -1134,20 +1073,21 @@ export function MepSketchApp({
         setPendingLibraryFolder(null);
       }
     },
-    [pendingLibraryFolder, libraryStore, userStampLibrary],
+    [pendingLibraryFolder, libraryStore, fileAccess, userStampLibrary],
   );
 
   const handleSyncLibrarySource = useCallback(
     async (source: LibrarySourceRecord) => {
-      if (!libraryStore || !source.dirHandle) return;
+      const folder = libraryFolderOf(source);
+      if (!libraryStore || !folder) return;
       // Permission first: requestPermission needs the user gesture of this click.
-      if (!(await ensureReadPermission(source.dirHandle))) {
+      if (!(await fileAccess.requestFolderAccess(folder))) {
         setStatus('Permission refused.');
         return;
       }
       setSyncingSourceId(source.id);
       try {
-        const summary = await syncLibrarySource(libraryStore, source, { decode: browserImageSizeDecoder });
+        const summary = await syncLibrarySource(libraryStore, source, { decode: browserImageSizeDecoder, fileAccess });
         await userStampLibrary.reload();
         setStatus(`Synced "${source.name}": ${summary.added} added, ${summary.updated} updated, ${summary.missing} missing from the folder.`);
       } catch (err) {
@@ -1156,7 +1096,7 @@ export function MepSketchApp({
         setSyncingSourceId(null);
       }
     },
-    [libraryStore, userStampLibrary],
+    [libraryStore, fileAccess, userStampLibrary],
   );
 
   const handleRemoveLibrarySource = useCallback(
@@ -1387,13 +1327,6 @@ export function MepSketchApp({
     <div className="mep-app">
       {!onboardingSeen && <WelcomeScreen onDismiss={handleDismissOnboarding} />}
       <div className="mep-header">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/pdf"
-          onChange={handleFileInputChange}
-          style={{ display: 'none' }}
-        />
         <MenuButton
           onOpenPdf={handleOpenPdf}
           onSave={handleSave}
@@ -1560,7 +1493,7 @@ export function MepSketchApp({
       {pendingLibraryFolder && (
         <LibrarySourceDialog
           category={pendingLibraryFolder.category}
-          defaultName={pendingLibraryFolder.dirHandle.name}
+          defaultName={pendingLibraryFolder.name}
           defaultDiscipline={defaultDisciplineFor(disciplineGroup)}
           busy={libraryFolderBusy}
           showBuiltIn={showBuiltInStamps}

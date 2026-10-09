@@ -15,7 +15,7 @@ import {
   type Discipline,
   type StampDefinition,
 } from '@mepapp/core';
-import type { LibraryCategory, LibrarySourceRecord, LibraryStampMimeType, LibraryStampRecord, LibraryStore } from '@mepapp/platform';
+import { libraryFolderOf, type FileAccess, type LibraryCategory, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStampMimeType, type LibraryStampRecord, type LibraryStore } from '@mepapp/platform';
 
 export type ImageSizeDecoder = (file: Blob) => Promise<{ width: number; height: number }>;
 
@@ -26,9 +26,8 @@ export interface LibrarySyncSummary {
   missing: number;
 }
 
-export function supportsLibraryFolders(): boolean {
-  return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
-}
+/** The extensions libraryMimeTypeFor accepts: what a folder scan keeps. */
+export const LIBRARY_FILE_EXTENSIONS = ['svg', 'png', 'jpg', 'jpeg'];
 
 export function libraryMimeTypeFor(fileName: string): LibraryStampMimeType | undefined {
   const dot = fileName.lastIndexOf('.');
@@ -44,16 +43,6 @@ export function libraryMimeTypeFor(fileName: string): LibraryStampMimeType | und
     default:
       return undefined;
   }
-}
-
-/** Top level of the folder only: files with a supported extension, sorted by name. Subfolders are skipped. */
-export async function scanLibraryFolder(dir: FileSystemDirectoryHandle): Promise<File[]> {
-  const files: File[] = [];
-  for await (const handle of dir.values()) {
-    if (handle.kind !== 'file' || libraryMimeTypeFor(handle.name) === undefined) continue;
-    files.push(await (handle as FileSystemFileHandle).getFile());
-  }
-  return files.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
 /** Decodes the pixel/intrinsic size in the browser. Never inserts an SVG as markup: it loads through an <img>. */
@@ -97,18 +86,12 @@ function typedBlob(file: File, mimeType: LibraryStampMimeType): Blob {
   return file.type === mimeType ? file : new Blob([file], { type: mimeType });
 }
 
-/** Must run inside a click handler: requestPermission needs a user gesture. */
-export async function ensureReadPermission(handle: FileSystemHandle): Promise<boolean> {
-  if (!handle.queryPermission || !handle.requestPermission) return true;
-  if ((await handle.queryPermission({ mode: 'read' })) === 'granted') return true;
-  return (await handle.requestPermission({ mode: 'read' })) === 'granted';
-}
-
 export async function createLibrarySource(
   store: LibraryStore,
-  input: { name: string; category: LibraryCategory; discipline: Discipline; dirHandle: FileSystemDirectoryHandle },
+  input: { name: string; category: LibraryCategory; discipline: Discipline; folder: LibraryFolderRef },
 ): Promise<LibrarySourceRecord> {
-  const source: LibrarySourceRecord = { id: crypto.randomUUID(), ...input };
+  const { folder, ...rest } = input;
+  const source: LibrarySourceRecord = { id: crypto.randomUUID(), ...rest, ...folder };
   const { revision } = await store.putSource(source);
   return { ...source, revision };
 }
@@ -117,12 +100,13 @@ export async function createLibrarySource(
 export async function syncLibrarySource(
   store: LibraryStore,
   source: LibrarySourceRecord,
-  opts: { decode: ImageSizeDecoder; files?: File[] },
+  opts: { decode: ImageSizeDecoder; files?: File[]; fileAccess?: FileAccess },
 ): Promise<LibrarySyncSummary> {
   let files = opts.files;
   if (!files) {
-    if (!source.dirHandle) throw new Error(`Library source "${source.name}" has no folder handle and no files were given.`);
-    files = await scanLibraryFolder(source.dirHandle);
+    const folder = libraryFolderOf(source);
+    if (!folder || !opts.fileAccess) throw new Error(`Library source "${source.name}" has no folder handle and no files were given.`);
+    files = await opts.fileAccess.readFolder(folder, LIBRARY_FILE_EXTENSIONS);
   }
   const filesByName = new Map(files.map((file) => [file.name, file]));
   const existing = await store.listStamps(source.id);

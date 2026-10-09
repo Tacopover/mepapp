@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildUserStampDefinition, usesUserStampFile, type StampDefinition } from '@mepapp/core';
 import type { LibrarySourceRecord, LibraryStampRecord, LibraryStore } from '@mepapp/platform';
-import { materializeUserStamp, supportsLibraryFolders } from './userStampLibrary.js';
+import { materializeUserStamp } from './userStampLibrary.js';
 
 export interface UserStampLibrary {
   available: boolean;
@@ -16,8 +16,8 @@ export interface UserStampLibrary {
   materialize(stampId: string): Promise<StampDefinition | undefined>;
 }
 
-export function useUserStampLibrary(store: LibraryStore | undefined): UserStampLibrary {
-  const available = store !== undefined && supportsLibraryFolders();
+export function useUserStampLibrary(store: LibraryStore | undefined, foldersSupported: boolean): UserStampLibrary {
+  const available = store !== undefined && foldersSupported;
   const [sources, setSources] = useState<LibrarySourceRecord[]>([]);
   const [records, setRecords] = useState<LibraryStampRecord[]>([]);
   const [definitions, setDefinitions] = useState<StampDefinition[]>([]);

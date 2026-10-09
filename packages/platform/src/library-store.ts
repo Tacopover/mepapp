@@ -1,4 +1,5 @@
 import type { Discipline, PortSpec, SymbolShape } from '@mepapp/core';
+import type { LibraryFolderRef } from './file-access.js';
 import type { BaseStore } from './store.js';
 
 export type LibraryCategory = 'terminal' | 'equipment';
@@ -9,9 +10,19 @@ export interface LibrarySourceRecord {
   name: string;
   category: LibraryCategory;
   discipline: Discipline;
+  /** The folder on the web (File System Access API). */
   dirHandle?: FileSystemDirectoryHandle;
+  /** The folder on desktop. */
+  folderPath?: string;
   lastSyncedAt?: number;
   revision?: string;
+}
+
+/** The source's folder, or undefined when it has none (for example "Saved stamps"). */
+export function libraryFolderOf(source: LibrarySourceRecord): LibraryFolderRef | undefined {
+  if (source.dirHandle) return { dirHandle: source.dirHandle };
+  if (source.folderPath) return { folderPath: source.folderPath };
+  return undefined;
 }
 
 export interface LibraryStampEdits {

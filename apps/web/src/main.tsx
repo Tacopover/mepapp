@@ -3,7 +3,8 @@ import { MepSketchApp, type PdfPageLoadResult } from '@mepapp/ui';
 import { displayDimensions } from '@mepapp/core';
 import { MupdfEngine } from '@mepapp/pdf-engine-mupdf';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
-import { IndexedDbLibraryStore } from '@mepapp/platform-web';
+import type { CloseGuard, FileAccess } from '@mepapp/platform';
+import { IndexedDbLibraryStore, WebCloseGuard, WebFileAccess } from '@mepapp/platform-web';
 import { createRoomDetectionClient } from './roomDetectionClient';
 
 const BACKDROP_DPI = 150;
@@ -28,18 +29,38 @@ async function loadPdfPageAt(handle: PdfDocumentHandle, pageIndex: number): Prom
 const REPO_URL = 'https://github.com/Tacopover/mepapp';
 const correspondingSourceUrl = `${REPO_URL}/tree/${__MEPAPP_COMMIT_SHA__}`;
 
+const isTauri = '__TAURI_INTERNALS__' in window;
+
+// The desktop build loads the Tauri platform as its own chunk, so the web build never runs Tauri code.
+async function createPlatform(): Promise<{ fileAccess: FileAccess; closeGuard: CloseGuard }> {
+  if (isTauri) {
+    const { TauriCloseGuard, TauriFileAccess } = await import('@mepapp/platform-tauri');
+    return { fileAccess: new TauriFileAccess(), closeGuard: new TauriCloseGuard() };
+  }
+  return { fileAccess: new WebFileAccess(), closeGuard: new WebCloseGuard() };
+}
+
 const container = document.getElementById('root');
 if (container) {
-  createRoot(container).render(
-    <MepSketchApp onLoadPdfPage={loadPdfPage} onLoadPdfPageAt={loadPdfPageAt} correspondingSourceUrl={correspondingSourceUrl} createRoomDetectionClient={createRoomDetectionClient} libraryStore={libraryStore} />,
-  );
+  void createPlatform().then(({ fileAccess, closeGuard }) => {
+    createRoot(container).render(
+      <MepSketchApp
+        onLoadPdfPage={loadPdfPage}
+        onLoadPdfPageAt={loadPdfPageAt}
+        correspondingSourceUrl={correspondingSourceUrl}
+        createRoomDetectionClient={createRoomDetectionClient}
+        libraryStore={libraryStore}
+        fileAccess={fileAccess}
+        closeGuard={closeGuard}
+      />,
+    );
+  });
 }
 
 // Step 5 (offline caching, browser case) — see public/sw.js for the caching
 // strategy. Registered from the app shell, not @mepapp/ui, so the ui package
 // stays free of any assumption about how (or whether) it's deployed.
 // The desktop (Tauri) build serves every file locally, so it needs no service worker.
-const isTauri = '__TAURI_INTERNALS__' in window;
 if ('serviceWorker' in navigator && !isTauri) {
   const registerSw = () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
