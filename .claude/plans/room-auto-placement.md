@@ -1,6 +1,6 @@
 # Automatic stamp placement in rooms — plan
 
-Status: **planned 2026-10-09, not started.** Follows [[room-detection]] (its Phase 9 "Element-to-room assignment and per-room calculations" is replaced by this plan). The next plan after this one is routing from main equipment to the placed stamps. This plan does not cover routing.
+Status: **Phase 0 done 2026-10-09 (branch `worktree-room-placement-phase0`, not merged). Phases 1-8 not started.** Follows [[room-detection]] (its Phase 9 "Element-to-room assignment and per-room calculations" is replaced by this plan). The next plan after this one is routing from main equipment to the placed stamps. This plan does not cover routing.
 
 ## 1. Goal
 
@@ -21,6 +21,8 @@ All calculations follow the same four steps:
 - **Ceiling height has four levels.** Global → per PDF → per room type → per room. Each level overrides the level before it. The global value is required. The other levels are optional.
 - **Rules live in the user library,** not in the PDF. The same applies to the room types (see §4.1).
 - **Form fields, no formulas** in the first version. A formula field (with the expression engine) is a later option (Phase 8).
+
+- **Confirmed plan choices (user, 2026-10-09):** room-type heights stored per PDF; the PDF keeps a copy of the room types it uses; a calibration per page; a stamp that does not fit goes at the label point with a warning.
 
 ## 3. Findings from the code survey (2026-10-09)
 
@@ -137,7 +139,7 @@ Re-running a rule on a room removes the stamps with the same `ruleId` + `roomId`
 
 Each phase ends with tests (core: vitest), `pnpm build`, `pnpm typecheck`, and a browser check of the UI wiring through real DOM inputs ([[verify-ui-wiring-via-real-dom-not-scene-api]]).
 
-0. **Save the calibration in the PDF.** Add `calibration?: Calibration` to `ProjectDocument` (schema 13 → 14). Load it back into `SketchDocument.calibration`. Small, but every later phase depends on it. Today there is one calibration per document. A PDF with plans at different scales needs one per page. Decide with the user: save one per page now (`calibrations: Record<pageIndex, Calibration>`), or save the one value and change it later.
+0. **Save the calibration in the PDF.** STATUS 2026-10-09: DONE (`bbc1498`, branch `worktree-room-placement-phase0`, not merged). One calibration per page (user confirmed 2026-10-09): `ProjectDocument.calibrations: Record<string, Calibration>` keyed by the 0-based page index, schema 13 → 14 (migration gives `{}`), validator rejects a key that is not a page index and a factor that is not a positive number. `SketchDocument.calibrations` (a `Map`) plus a `calibration` getter/setter for the shown page, so the existing readers did not change. `SketchScene.getCalibration(pageIndex?)`; `labelRooms` and `planRoomOverlaps` use the calibration of their own page. A scale change (scale picker or calibrate tool) now marks the document unsaved. The UI re-reads the calibration on page change and after a project load. `buildRoomExportTable` accepts a function per page; the Excel export uses it. Behaviour change: a page without its own calibration is now "Not set", also when another page of the same PDF is calibrated. Verified: core tests 683 pass (new: v13 load, bad calibrations, export per page), `pnpm build` 9/9, `pnpm typecheck` 16/16; browser check (Playwright, real scale picker, page buttons and Menu > Save on a two-page PDF made from `arch_simple_A4.pdf` + `01_arch_first_floor.pdf`): page 1 1:100 and page 2 1:50 stay separate, the document becomes unsaved, both values come back after a reload, all 12 checks pass, no page errors. Not verified in the browser: the two-point calibrate tool path (same setter, plus `markDirty`), and the Excel export per page (unit test only).
 1. **Room types and name matching.**
    - Core: `RoomType`, seed list, `matchRoomType(name, details, types)` (whole-word match, longest keyword wins, case- and accent-insensitive), tests with the room names of the 10A and w_rooms PDFs (local-only fixtures, [[fixture-pdfs-gitignored]]). Report the match rate.
    - Schema: `Room.roomTypeId`, `roomTypeSource`; `ProjectDocument.roomTypes` (copy). Migration.
@@ -163,7 +165,7 @@ Each phase ends with tests (core: vitest), `pnpm build`, `pnpm typecheck`, and a
 
 ## 6. Open points
 
-- Phase 0: save one calibration per document (as today) or one per page. Proposal: per page, because a schema change later costs another migration.
+- ~~Phase 0: one calibration per document or per page.~~ Per page (user confirmed 2026-10-09).
 - Phase 2: where the PDF-level and room-type heights are edited in the UI.
 - Phase 4: what happens to a stamp that does not fit in a very small room (place it at the label point and warn, or skip it and warn). Proposal: place it at the label point and warn.
 - Rule and room-type storage moves from `localStorage` to `SettingsStore` when that store is wired up ([[storage-interfaces]] Phase 3). Use one small load/save module per library, so the move is one change.
