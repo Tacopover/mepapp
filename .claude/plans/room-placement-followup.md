@@ -33,7 +33,28 @@ Source: user test feedback, 2026-10-10. The research for Phase F is in `room-dem
 
 ### Phase D — Performance: no freeze while typing
 
-STATUS: not started.
+STATUS: DONE 2026-10-10, commit 39c46e6. Verification:
+- All package tests pass (core 853, ui 101). `pnpm typecheck` and `pnpm build` pass.
+- New core tests:
+  - the point lookups give the same results as the old full scans;
+  - a room above 1000 stamps gets `tooMany` and no stamps;
+  - the worker client cancels a running job, falls back to the main thread without a worker, and reports a worker error.
+- Browser check of the lighting rule (dev server, 9 of 9 checks, no page errors):
+  - typing "3000" over "3600" in the capacity box: each key takes 18–110 ms (median about 20 ms) in the dev build; the "3" took 102 s before;
+  - "3" lm: the room needs 8259 stamps; the sample room shows no stamps, the note "more than 1000 stamps", and step 3 says "19 rooms: too many stamps";
+  - whole floor at 36 lm: 5790 stamps, drawn as simple marks; keys take 16–30 ms during the job; a CPU profile of the main thread shows 1–2 ms in the layout code;
+  - step 6 shows the table and "Save and place 118 stamps".
+- The Phase C browser check passes 33 of 33 (it now waits until "Calculating…" goes away), and the feedback round 1 check passes 9 of 9.
+- Production build: the bundled `placement.worker-*.js` loads under `vite preview` and answers a plan request (3 stamps).
+- In node (core only), an L-shaped room with Grid: 1000 stamps take 0.26 s, and 8259 stamps take 2.7 s.
+
+Changes made during the work (not in the steps below):
+- The worker protocol and the client are in core (`rooms/placement-worker.ts`), the same pattern as room detection. The app makes the worker (`apps/web/src/placement.worker.ts`) and passes the factory through `MepSketchApp` → `PlacementRulesDialog` → the guide.
+- The guide uses three clients: the sample room, the whole floor (steps 3–5) and step 6. Each has its own worker, so a floor job never cancels the sample job.
+- The guide keys the settled draft by its content: a value that comes back (36 → 360 → 36) starts no new job.
+- `nearestValidPoint` caches the valid grid samples per room polygon and offset. The preview caches the SVG path of each room.
+- Not changed: Menu › Auto-place stamps… still calculates on the main thread. The 1000-stamp limit also applies there.
+- Not tested: the Tauri desktop build.
 
 - **Wait for the typing to stop.** The guide keeps two values: the typed draft (the input boxes) and the settled draft (all calculations). The settled draft follows the typed draft 400 ms after the last key, or at once on Enter or a focus change. Save and Place use the typed draft and check it first.
 - **Background calculation.** A worker module (`packages/ui/src/placementWorker.ts`, or in core) runs `planAutoPlacement` for the sample room, for the whole floor (steps 4 and 5, Whole floor view) and for step 6. Each request has a number. MepApp ignores a result with an old number. Vite builds the worker with `new Worker(new URL(...), { type: 'module' })`. Check that the Tauri build loads it too.
