@@ -4077,6 +4077,15 @@
 .mep-guide-check.off .ic {
   color: var(--muted);
 }
+.mep-guide-check.pick {
+  cursor: pointer;
+}
+.mep-guide-check.pick:hover {
+  border-color: var(--accent);
+}
+.mep-guide-check.sel {
+  box-shadow: 0 0 0 2px var(--accent);
+}
 .mep-guide-check .sub {
   font-size: 12px;
   color: var(--muted);

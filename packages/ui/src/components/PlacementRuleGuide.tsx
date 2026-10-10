@@ -436,6 +436,7 @@ export function PlacementRuleGuide({
         return null;
       }
       onSave(next);
+      setDraft(draftOf(next));
       return next;
     } catch (err) {
       if (!(err instanceof FieldError)) throw err;
@@ -982,7 +983,7 @@ export function PlacementRuleGuide({
               <input className="mep-guide-num" id="pg-wallOffset" type="text" inputMode="decimal" placeholder="0" value={draft.wallOffset} onChange={field('wallOffset')} />
               <span>m</span>
             </div>
-            <span className="mep-guide-note">The orange band on the plan. The distance is from the wall to the edge of the stamp.</span>
+            <span className="mep-guide-note">The orange band on the plan. The distance is from the wall to the center of the stamp.</span>
           </div>
           <div className="mep-guide-limit">
             <SpacingDiagram kind="gap" />
@@ -998,6 +999,7 @@ export function PlacementRuleGuide({
         </div>
         <div className="mep-guide-section">
           <h3>Check of all rooms ({matched.length})</h3>
+          {matched.length > 0 && floorRows && <p className="mep-guide-note">Click a room to show it on the plan.</p>}
           {matched.length === 0 ? (
             <p className="mep-guide-note">No room matches. Choose the room types in step 2.</p>
           ) : !floorRows ? (
@@ -1008,9 +1010,10 @@ export function PlacementRuleGuide({
                 const name = roomLabel(row.room);
                 const count = row.requirement.count;
                 const testId = `pg-fit-${row.room.id}`;
-                if (count === null) return <Check key={row.room.id} state="off" title={`${name}: no count yet`} sub="Room data is missing (step 3)." testId={testId} />;
+                const pick = { selected: row.room.id === sample?.id, onPick: () => (setSampleId(row.room.id), setView(null)) };
+                if (count === null) return <Check key={row.room.id} state="off" title={`${name}: no count yet`} sub="Room data is missing (step 3)." testId={testId} {...pick} />;
                 if (row.warnings.includes('noFit'))
-                  return <Check key={row.room.id} state="bad" title={`${name}: the stamp does not fit`} sub="The min distance to the walls leaves no space for a stamp. MepApp puts it at the label point." testId={testId} />;
+                  return <Check key={row.room.id} state="bad" title={`${name}: the stamp does not fit`} sub="The min distance to the walls leaves no space for a stamp. MepApp puts it at the label point." testId={testId} {...pick} />;
                 if (row.warnings.includes('tooClose')) {
                   const fit = row.fitEstimate ?? 0;
                   return (
@@ -1020,6 +1023,7 @@ export function PlacementRuleGuide({
                       title={`${name}: ${plural(count, 'stamp')} do not fit`}
                       sub={`Some stamps are closer than ${fmt(minSpacing, 2)} m to each other. About ${fit} fit with this distance${fit >= count ? ', so a different layout or grid style can fix this.' : `, but the room needs ${count}.`}`}
                       testId={testId}
+                      {...pick}
                     />
                   );
                 }
@@ -1030,6 +1034,7 @@ export function PlacementRuleGuide({
                     title={`${name}: ${plural(count, 'stamp')} ${count === 1 ? 'fits' : 'fit'}`}
                     sub={count === 1 ? 'One stamp: no distance between stamps to check.' : minSpacing ? `Each stamp is at least ${fmt(minSpacing, 2)} m from the next one.` : 'No min distance between stamps.'}
                     testId={testId}
+                    {...pick}
                   />
                 );
               })}
@@ -1366,9 +1371,9 @@ export function PlacementRuleGuide({
   );
 }
 
-function Check({ state, title, sub, testId }: { state: 'ok' | 'warn' | 'bad' | 'off'; title: string; sub: string; testId: string }) {
+function Check({ state, title, sub, testId, selected, onPick }: { state: 'ok' | 'warn' | 'bad' | 'off'; title: string; sub: string; testId: string; selected?: boolean; onPick?: () => void }) {
   return (
-    <div className={`mep-guide-check ${state}`} data-testid={testId} data-state={state}>
+    <div className={`mep-guide-check ${state}${onPick ? ' pick' : ''}${selected ? ' sel' : ''}`} data-testid={testId} data-state={state} onClick={onPick}>
       <span className="ic">{state === 'ok' ? '✓' : state === 'off' ? '–' : '!'}</span>
       <div>
         <b>{title}</b>

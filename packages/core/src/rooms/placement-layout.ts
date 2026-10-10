@@ -450,9 +450,10 @@ export function estimateFitCount(samples: RoomSamples, minPt: number): number {
 }
 
 /**
- * The stamps of one rule in one room: positions from the rule's layout, the wall offset plus half
- * the stamp size from every wall, and the rotation (the room's main axis, the wall direction for
- * Along the walls, or the rule's fixed angle). `stampSizePt` is the placed size of the stamp.
+ * The stamps of one rule in one room: positions from the rule's layout, each stamp center at least
+ * the wall offset from every wall, and the rotation (the room's main axis, the wall direction for
+ * Along the walls, or the rule's fixed angle). `stampSizePt` is the placed size of the stamp; it
+ * does not change the positions.
  *
  * The layouts place `count` stamps. By coverage (preset 'coverage'): `count` is the start count
  * (coverageStartCount), and layoutCoverage adds stamps until the room is covered, at most the max
@@ -470,7 +471,7 @@ export function layoutRoomStamps(
   stampSizePt: { width: number; height: number },
 ): RoomLayout {
   const ptPerM = 1000 * calibration.pageUnitsPerRealUnit;
-  const offsetPt = rule.layout.wallOffsetM * ptPerM + Math.max(stampSizePt.width, stampSizePt.height) / 2;
+  const offsetPt = rule.layout.wallOffsetM * ptPerM;
   const warnings: LayoutWarning[] = [];
   const strategy = rule.layout.strategy;
   let samples: RoomSamples | undefined;

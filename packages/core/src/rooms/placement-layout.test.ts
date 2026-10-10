@@ -180,10 +180,10 @@ describe('layoutRoomStamps', () => {
     coverage,
   });
 
-  it('keeps the wall offset plus half the stamp from every wall', () => {
-    // 0.5 m = 20 pt, stamp 20 pt → 30 pt from each wall: usable length 340 pt, cell centers at 30 + 85 and 30 + 255.
+  it('keeps each stamp center the wall offset from every wall', () => {
+    // 0.5 m = 20 pt from each wall, the stamp size not added: usable length 360 pt, cell centers at 20 + 90 and 20 + 270.
     const out = layoutRoomStamps(rule(), room(rect(0, 0, 400, 200)), 2, CAL, { width: 20, height: 10 });
-    expect(sortPts(out.stamps.map((s) => s.position))).toEqual([[115, 100], [285, 100]]);
+    expect(sortPts(out.stamps.map((s) => s.position))).toEqual([[110, 100], [290, 100]]);
   });
 
   it('turns the stamps to the main axis, or to the fixed angle', () => {
