@@ -153,6 +153,17 @@ STATUS: DONE 2026-10-10, commit 4e2450a (see Phase F).
 - Example fixes (§ decisions). A stored copy of an old example stays as the user saved it.
 - Verification: core tests; a browser check of a lighting rule with a coverage limit in a corridor.
 
+### Review fixes (after Phases D–F)
+
+STATUS: DONE 2026-10-10, commit 3f56fdd. A review of feedback round 1 and Phases D–F found 10 problems. The user asked for fixes 1 to 5 and chose "grow the count" for fix 1.
+1. Coverage with Grid or the ceiling grid left rooms uncovered (23 of 38 fixture rooms). Now layoutRoomStamps lays out more stamps (steps of 10 %, then the smallest count of the last step that covers) until the final positions cover each part that a stamp of that layout can reach, the max count is reached, or the ceiling grid is full. Along the walls uses points on the wall runs as its reach. Step 5 explains it.
+2. The step 4 and 5 badges showed the rows of an older draft outside steps 4 and 5 (Phase D regression).
+3. A term source that did not fit a new unit was dropped without a message. Now Save refuses it with a note. Also: a term set back to Number saved an empty source that validation refused.
+4. The Why box line of the room-type numbers had the unit in the wrong place.
+5. A box that the room type replaces now shows as a dashed, struck fallback.
+- Verification: core 892 and ui 104 tests pass (new: 4 layout tests, 3 draft tests). `pnpm typecheck` and `pnpm build` pass. On the fixture floor (lighting example, max radius 1.5 m): rooms not covered 23 → 2 with Grid (the 2 are rooms that Even spread cannot cover either), 22 → 9 with the 600 mm grid (8 rooms have a full ceiling grid); a whole-floor plan takes about 2 s. The stamps go from 193 to 512 with outer stamps at half the spacing, and to 242 with "At the min distance to the walls". Browser checks: badge probe (step 4 badge clears after a step 3 change), unit change to W shows the note; Phase F 10/10, Phase E 12/12, Phase D 9/9, perf 9/9, Phase C 33/33 (one check changed: Along the walls with By coverage is now covered).
+- Not fixed (reported): the Why box text in step 3 for the old Grid, UF table layout, keyboard access to the room rows, the working-plane warning, unchecked room types from a file.
+
 ## 5. Risks
 
 - The worker gets plain data only. The room values (persons, ceiling height) must be computed on the main thread and sent with each job. A change of a room type must start a new job.
