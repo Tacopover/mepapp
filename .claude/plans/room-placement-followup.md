@@ -71,7 +71,20 @@ Changes made during the work (not in the steps below):
 
 ### Phase E — Wall distance mode and ceiling grid
 
-STATUS: not started.
+STATUS: DONE 2026-10-10, commit b37ab37. Verification:
+- All package tests pass (core 869, ui 101). `pnpm typecheck` and `pnpm build` pass.
+- New core tests: the edge positions at 0 and 40 pt, one column at the center, the three grid styles with 'wall', a rotated room; the tile center at the room center, the nearest tile, no shared tiles, the wall distance, `full`, a rotated grid; Grid only uses the edge; the snap keeps the count; Along the walls ignores the grid; `gridFull`; the parser and the validation.
+- Browser check (dev server, 12 of 12 checks, no page errors), Supply air example rule:
+  - Grid with "At the min distance to the walls" at 0 m: in each room with 2 or more stamps, the nearest stamp is 0 mm from the wall;
+  - a 600 mm grid at 0.3 m: all 22 placed stamps are at a tile center (1 mm tolerance), no two share a tile, and each is at least 0.3 m from the walls;
+  - the sample room draws the tile lines; Custom 1000 mm changes them; the rule summary shows both settings; the guide opens the saved rule with no changes.
+- The Phase C check (33 of 33), the feedback round 1 check (9 of 9) and the Phase D check (9 of 9) still pass.
+
+Changes made during the work (not in the steps below):
+- The grid has a tile center (not a tile line) at the center of the room's bounding rectangle.
+- With an offset of 0, a point on a wall is a valid placement point (`isValidPlacementPoint`). Before, the ray test called some wall points outside, so they moved.
+- With 'wall' and Staggered, the step is usable ÷ (n − 0.5), so the odd rows stay inside.
+- The stamps take their tiles in layout order.
 
 - **Data**, in `PlacementLayout`:
   - `edge?: 'halfSpacing' | 'wall'` (Grid only; absent = 'halfSpacing');
