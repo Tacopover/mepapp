@@ -14,6 +14,7 @@ import {
   type RoomType,
   type PlacementRule,
   type NetworkType,
+  type PlacementWorkerLike,
   type RoomDetectionClient,
   type ReconciliationReport,
   type SchematicSymbol,
@@ -112,6 +113,8 @@ export interface MepSketchAppProps {
   correspondingSourceUrl?: string;
   /** Creates the room detection client (a Web Worker behind it). Without it the room menu items are disabled. */
   createRoomDetectionClient?: () => RoomDetectionClient;
+  /** Creates the Web Worker that calculates the plans of the placement rule guide. Without it the guide calculates on the main thread. */
+  createPlacementWorker?: () => PlacementWorkerLike;
   /** Resolves a stamp-library definition's iconRef to a fetchable URL. Defaults to apps/web's copy under /stamps/. */
   resolveStampIconUrl?: (iconRef: string) => string;
   /** Storage for the user's custom stamp library folders. Without it the feature is unavailable. */
@@ -238,6 +241,7 @@ export function MepSketchApp({
   onLoadPdfPageAt,
   correspondingSourceUrl,
   createRoomDetectionClient,
+  createPlacementWorker,
   resolveStampIconUrl = DEFAULT_RESOLVE_ICON_URL,
   libraryStore,
 }: MepSketchAppProps) {
@@ -1660,6 +1664,7 @@ export function MepSketchApp({
           }}
           stampPickerOpen={ruleStampPick !== null}
           loadStampArt={loadAutoPlaceArt}
+          createPlacementWorker={createPlacementWorker}
           onPlaced={showPlacedStatus}
           onClose={ruleStampPick ? () => {} : () => setPlacementRulesOpen(false)}
         />

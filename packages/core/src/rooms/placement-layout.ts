@@ -74,26 +74,81 @@ export function isValidPlacementPoint(polygon: RoomPolygon, p: Vec2, offsetPt: n
 const SAMPLES = 48;
 
 /**
- * The valid point nearest to `p`: a sample of a grid over the room's bounds, at least `minGapPt`
- * from each point in `taken` when possible. Null when no sample is valid (the room is too small for the offset).
+ * Points in square cells of size `cell`, to find the points near a position without a scan of all
+ * points. A query radius must be at most the cell size.
  */
-export function nearestValidPoint(room: Pick<Room, 'polygon'>, p: Vec2, offsetPt: number, taken: readonly Vec2[] = [], minGapPt = 0): Vec2 | null {
+export class PointHash {
+  private readonly cells = new Map<string, Vec2[]>();
+  constructor(private readonly cell: number) {}
+  private key(ix: number, iy: number): string {
+    return `${ix},${iy}`;
+  }
+  add(p: Vec2): void {
+    const k = this.key(Math.floor(p.x / this.cell), Math.floor(p.y / this.cell));
+    const list = this.cells.get(k);
+    if (list) list.push(p);
+    else this.cells.set(k, [p]);
+  }
+  /** True when a point of the hash is closer than `r` to `q`. */
+  hasWithin(q: Vec2, r: number): boolean {
+    const ix = Math.floor(q.x / this.cell);
+    const iy = Math.floor(q.y / this.cell);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (const t of this.cells.get(this.key(ix + dx, iy + dy)) ?? []) if (Math.hypot(t.x - q.x, t.y - q.y) < r) return true;
+      }
+    }
+    return false;
+  }
+}
+
+// The valid samples of nearestValidPoint per room polygon and offset: a layout asks for many points of the same room.
+const validSampleCache = new WeakMap<RoomPolygon, Map<number, Vec2[]>>();
+
+/** The samples of a (SAMPLES + 1)² grid over the room's bounds that are valid placement points, in grid order. */
+function validGridSamples(room: Pick<Room, 'polygon'>, offsetPt: number): Vec2[] {
+  let byOffset = validSampleCache.get(room.polygon);
+  if (!byOffset) validSampleCache.set(room.polygon, (byOffset = new Map()));
+  const cached = byOffset.get(offsetPt);
+  if (cached) return cached;
   const b = roomBounds(room);
+  const out: Vec2[] = [];
+  for (let i = 0; i <= SAMPLES; i++) {
+    for (let j = 0; j <= SAMPLES; j++) {
+      const q = { x: b.minX + ((b.maxX - b.minX) * i) / SAMPLES, y: b.minY + ((b.maxY - b.minY) * j) / SAMPLES };
+      if (isValidPlacementPoint(room.polygon, q, offsetPt)) out.push(q);
+    }
+  }
+  byOffset.set(offsetPt, out);
+  return out;
+}
+
+/**
+ * The valid point nearest to `p`: a sample of a grid over the room's bounds, at least `minGapPt`
+ * from each point in `taken` when possible. Null when no sample is valid (the room is too small for
+ * the offset). A caller that asks for many points passes `taken` as a PointHash with cells of `minGapPt`.
+ */
+export function nearestValidPoint(room: Pick<Room, 'polygon'>, p: Vec2, offsetPt: number, taken: readonly Vec2[] | PointHash = [], minGapPt = 0): Vec2 | null {
+  let hash: PointHash | null = null;
+  if (minGapPt > 0) {
+    if (taken instanceof PointHash) hash = taken;
+    else if (taken.length > 0) {
+      hash = new PointHash(minGapPt);
+      for (const t of taken) hash.add(t);
+    }
+  }
   let best: Vec2 | null = null;
   let bestD = Infinity;
   let crowded: Vec2 | null = null;
   let crowdedD = Infinity;
-  for (let i = 0; i <= SAMPLES; i++) {
-    for (let j = 0; j <= SAMPLES; j++) {
-      const q = { x: b.minX + ((b.maxX - b.minX) * i) / SAMPLES, y: b.minY + ((b.maxY - b.minY) * j) / SAMPLES };
-      if (!isValidPlacementPoint(room.polygon, q, offsetPt)) continue;
-      const d = Math.hypot(q.x - p.x, q.y - p.y);
-      if (taken.some((t) => Math.hypot(t.x - q.x, t.y - q.y) < minGapPt)) {
-        if (d < crowdedD) [crowded, crowdedD] = [q, d];
-        continue;
-      }
-      if (d < bestD) [best, bestD] = [q, d];
+  for (const q of validGridSamples(room, offsetPt)) {
+    const d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (d >= bestD && d >= crowdedD) continue;
+    if (hash?.hasWithin(q, minGapPt)) {
+      if (d < crowdedD) [crowded, crowdedD] = [q, d];
+      continue;
     }
+    if (d < bestD) [best, bestD] = [q, d];
   }
   return best ?? crowded;
 }
@@ -137,10 +192,13 @@ export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt:
   const warnings: LayoutWarning[] = [];
   const outside: Vec2[] = [];
   for (const p of ideal) (isValidPlacementPoint(room.polygon, p, offsetPt) ? points : outside).push(p);
+  const taken = new PointHash(Math.max(minGap, 1e-6));
+  for (const p of points) taken.add(p);
   for (const p of outside) {
-    const moved = nearestValidPoint(room, p, offsetPt, points, minGap);
+    const moved = nearestValidPoint(room, p, offsetPt, taken, minGap);
     if (moved) {
       points.push(moved);
+      taken.add(moved);
       if (!warnings.includes('movedInside')) warnings.push('movedInside');
     } else {
       points.push(roomLabelPoint(room));
@@ -396,6 +454,7 @@ export function layoutPerimeter(room: Pick<Room, 'polygon'>, count: number, offs
   const rotations: number[] = [];
   const warnings: LayoutWarning[] = [];
   const gap = total / count / 2;
+  const taken = new PointHash(Math.max(gap, 1e-6));
   for (let i = 0; i < count; i++) {
     let t = ((i + 0.5) * total) / count;
     let k = 0;
@@ -404,7 +463,7 @@ export function layoutPerimeter(room: Pick<Room, 'polygon'>, count: number, offs
     const f = Math.min(1, t / run.length);
     let p: Vec2 = { x: run.start.x + (run.end.x - run.start.x) * f, y: run.start.y + (run.end.y - run.start.y) * f };
     if (!isValidPlacementPoint(room.polygon, p, offsetPt)) {
-      const moved = nearestValidPoint(room, p, offsetPt, points, gap);
+      const moved = nearestValidPoint(room, p, offsetPt, taken, gap);
       if (moved) {
         p = moved;
         if (!warnings.includes('movedInside')) warnings.push('movedInside');
@@ -414,6 +473,7 @@ export function layoutPerimeter(room: Pick<Room, 'polygon'>, count: number, offs
       }
     }
     points.push(p);
+    taken.add(p);
     const deg = (Math.atan2(run.inward.y, run.inward.x) * 180) / Math.PI - 90;
     rotations.push(((deg % 360) + 360) % 360);
   }
@@ -434,19 +494,50 @@ export interface RoomLayout {
   fitEstimate?: number;
 }
 
+/** The indexes of the points that have another point closer than `minPt`. */
+export function closePointIndexes(points: readonly Vec2[], minPt: number): Set<number> {
+  const close = new Set<number>();
+  if (!(minPt > 0)) return close;
+  const cell = minPt;
+  const cells = new Map<string, number[]>();
+  points.forEach((p, i) => {
+    const ix = Math.floor(p.x / cell);
+    const iy = Math.floor(p.y / cell);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (const j of cells.get(`${ix + dx},${iy + dy}`) ?? []) {
+          if (Math.hypot(points[j]!.x - p.x, points[j]!.y - p.y) < minPt - 1e-6) close.add(i).add(j);
+        }
+      }
+    }
+    const k = `${ix},${iy}`;
+    const list = cells.get(k);
+    if (list) list.push(i);
+    else cells.set(k, [i]);
+  });
+  return close;
+}
+
 /** True when two of the points are closer than `minPt`. */
 function hasCloserPair(points: readonly Vec2[], minPt: number): boolean {
-  for (let i = 0; i < points.length; i++) {
-    for (let j = i + 1; j < points.length; j++) if (Math.hypot(points[i]!.x - points[j]!.x, points[i]!.y - points[j]!.y) < minPt - 1e-6) return true;
+  const hash = new PointHash(minPt);
+  for (const p of points) {
+    if (hash.hasWithin(p, minPt - 1e-6)) return true;
+    hash.add(p);
   }
   return false;
 }
 
 /** About how many stamps fit at `minPt` from each other: a greedy pass over the valid samples keeps a sample that is at least `minPt` from every kept sample. */
 export function estimateFitCount(samples: RoomSamples, minPt: number): number {
-  const kept: Vec2[] = [];
-  for (const q of samples.valid) if (kept.every((k) => Math.hypot(k.x - q.x, k.y - q.y) >= minPt - 1e-6)) kept.push(q);
-  return kept.length;
+  const kept = new PointHash(minPt);
+  let n = 0;
+  for (const q of samples.valid) {
+    if (kept.hasWithin(q, minPt - 1e-6)) continue;
+    kept.add(q);
+    n++;
+  }
+  return n;
 }
 
 /**
@@ -518,7 +609,10 @@ export function layoutRoomStamps(
   };
 }
 
-export type PlacementRowWarning = RequirementWarning | LayoutWarning | 'noStamp' | 'stampNotFound' | 'roomChanged';
+export type PlacementRowWarning = RequirementWarning | LayoutWarning | 'noStamp' | 'stampNotFound' | 'roomChanged' | 'tooMany';
+
+/** The most stamps that auto-placement lays out in one room. A larger count gets 'tooMany' and no stamps: such a count is almost always a typing error, and its layout takes minutes. */
+export const MAX_ROOM_STAMPS = 1000;
 
 export const PLACEMENT_WARNING_TEXT: Record<PlacementRowWarning, string> = {
   ...REQUIREMENT_WARNING_TEXT,
@@ -526,6 +620,7 @@ export const PLACEMENT_WARNING_TEXT: Record<PlacementRowWarning, string> = {
   noStamp: 'the rule has no stamp',
   stampNotFound: 'the stamp of the rule is not found',
   roomChanged: 'the room changed after the last placement',
+  tooMany: `more than ${MAX_ROOM_STAMPS} stamps: too many to place, check the values`,
 };
 
 /**
@@ -650,6 +745,7 @@ export function planAutoPlacement(
         if (!calibration && !warnings.includes('noCalibration')) warnings.push('noCalibration');
         return { ...base, stamps: [], warnings };
       }
+      if (!byCoverage && count! > MAX_ROOM_STAMPS) return { ...base, stamps: [], warnings: [...warnings, 'tooMany'] };
       const layout = layoutRoomStamps(row.rule, row.room, byCoverage ? coverageStartCount(row.rule, row.values.areaM2!) : count!, calibration, size);
       const stamps = withoutNearest(layout.stamps, kept.map((s) => s.transform.position));
       const fit = layout.fitEstimate !== undefined ? { fitEstimate: layout.fitEstimate } : {};

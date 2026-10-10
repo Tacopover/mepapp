@@ -4256,6 +4256,25 @@
   font-weight: 700;
   font-size: 17px;
 }
+.mep-guide-busy {
+  font-size: 12px;
+  color: var(--muted);
+  animation: mep-guide-busy 1.2s ease-in-out infinite alternate;
+}
+@keyframes mep-guide-busy {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+.mep-guide-plan[data-busy] .mep-guide-plan-stamps,
+.mep-guide-checks.busy,
+.mep-guide-table.busy {
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
 .mep-guide-seg {
   display: inline-flex;
   border: 1.5px solid var(--ink);

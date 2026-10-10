@@ -16,6 +16,11 @@ import {
   layoutCoverage,
   layoutEvenSpread,
   layoutPerimeter,
+  closePointIndexes,
+  nearestValidPoint,
+  PointHash,
+  MAX_ROOM_STAMPS,
+  roomBounds,
   roomSamples,
   wallRuns,
   type PlacementRule,
@@ -299,6 +304,17 @@ describe('planAutoPlacement', () => {
   const plan = (stamps: PlacedStamp[], roomIds = new Set(['room-1'])) =>
     planAutoPlacement([base], [r], () => values, () => CAL, () => ({ width: 10, height: 10 }), { stamps, roomIds }).rows[0]!;
 
+  it(`places nothing in a room that needs more than ${MAX_ROOM_STAMPS} stamps`, () => {
+    const count = (n: number) => planAutoPlacement([{ ...base, amount: { fixed: n * 10, unit: 'dm³/s' } }], [r], () => values, () => CAL, () => ({ width: 1, height: 1 })).rows[0]!;
+    const over = count(MAX_ROOM_STAMPS + 1);
+    expect(over.requirement.count).toBe(MAX_ROOM_STAMPS + 1);
+    expect(over.stamps).toEqual([]);
+    expect(over.warnings).toEqual(['tooMany']);
+    const at = count(MAX_ROOM_STAMPS);
+    expect(at.stamps).toHaveLength(MAX_ROOM_STAMPS);
+    expect(at.warnings).not.toContain('tooMany');
+  });
+
   it('replaces the unmoved stamps of the same rule and room on a re-run', () => {
     const key = roomPlacementKey(r);
     const row = plan([
@@ -528,5 +544,63 @@ describe('layoutPerimeter', () => {
 
   it('falls back to the label point when the walls are too short for the offset', () => {
     expect(layoutPerimeter(room(rect(0, 0, 40, 40)), 2, 30).warnings).toEqual(['noFit']);
+  });
+});
+
+describe('point lookups', () => {
+  // A fixed pseudo-random sequence, so the test is the same on each run.
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const points = Array.from({ length: 300 }, () => ({ x: rnd() * 500, y: rnd() * 500 }));
+
+  it('PointHash finds the same near points as a scan of all points', () => {
+    const hash = new PointHash(20);
+    for (const p of points) hash.add(p);
+    for (let i = 0; i < 200; i++) {
+      const q = { x: rnd() * 500, y: rnd() * 500 };
+      const r = rnd() * 20;
+      expect(hash.hasWithin(q, r)).toBe(points.some((p) => Math.hypot(p.x - q.x, p.y - q.y) < r));
+    }
+  });
+
+  it('closePointIndexes gives the same points as a scan of all pairs', () => {
+    const scan = new Set<number>();
+    for (let i = 0; i < points.length; i++) for (let j = i + 1; j < points.length; j++) if (Math.hypot(points[i]!.x - points[j]!.x, points[i]!.y - points[j]!.y) < 15 - 1e-6) scan.add(i).add(j);
+    expect([...closePointIndexes(points, 15)].sort((a, b) => a - b)).toEqual([...scan].sort((a, b) => a - b));
+    expect(closePointIndexes(points, 0).size).toBe(0);
+  });
+
+  it('nearestValidPoint gives the same point as the scan of the grid samples', () => {
+    const l = room(L_SHAPE);
+    const b = roomBounds(l);
+    const taken = points.slice(0, 40);
+    // The grid scan before the point lookups (49 × 49 samples of the bounds).
+    const scan = (p: Vec2, offset: number, gap: number) => {
+      let best: Vec2 | null = null;
+      let bestD = Infinity;
+      let crowded: Vec2 | null = null;
+      let crowdedD = Infinity;
+      for (let i = 0; i <= 48; i++) {
+        for (let j = 0; j <= 48; j++) {
+          const q = { x: b.minX + ((b.maxX - b.minX) * i) / 48, y: b.minY + ((b.maxY - b.minY) * j) / 48 };
+          if (!isValidPlacementPoint(l.polygon, q, offset)) continue;
+          const d = Math.hypot(q.x - p.x, q.y - p.y);
+          if (taken.some((t) => Math.hypot(t.x - q.x, t.y - q.y) < gap)) {
+            if (d < crowdedD) [crowded, crowdedD] = [q, d];
+            continue;
+          }
+          if (d < bestD) [best, bestD] = [q, d];
+        }
+      }
+      return best ?? crowded;
+    };
+    const hash = new PointHash(30);
+    for (const t of taken) hash.add(t);
+    for (let i = 0; i < 50; i++) {
+      const p = { x: rnd() * 700 - 50, y: rnd() * 700 - 50 };
+      expect(nearestValidPoint(l, p, 20, taken, 30)).toEqual(scan(p, 20, 30));
+      expect(nearestValidPoint(l, p, 20, hash, 30)).toEqual(scan(p, 20, 30));
+      expect(nearestValidPoint(l, p, 20)).toEqual(scan(p, 20, 0));
+    }
   });
 });

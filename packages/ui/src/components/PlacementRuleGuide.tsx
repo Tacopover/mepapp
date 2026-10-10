@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import {
   AIR_CHANGE_UNITS,
@@ -17,21 +17,27 @@ import {
   layoutRoomStamps,
   lengthToM,
   LENGTH_UNIT_LABELS,
+  MAX_ROOM_STAMPS,
   parseDecimal,
+  PlacementPlanCancelled,
+  PlacementPlanClient,
   PLACEMENT_PRESET_HELP,
   PLACEMENT_PRESET_LABELS,
   PLACEMENT_WARNING_TEXT,
-  planAutoPlacement,
   PRESET_AMOUNT_FIELDS,
   ruleAppliesToRoom,
   roomTypeLabel,
   validatePlacementRule,
+  type Calibration,
   type Discipline,
   type GridStyle,
   type LayoutStrategy,
+  type PlacementPlan,
+  type PlacementPlanInput,
   type PlacementPreset,
   type PlacementRow,
   type PlacementRule,
+  type PlacementWorkerLike,
   type Room,
   type RoomType,
   type RoomValues,
@@ -67,6 +73,8 @@ export interface PlacementRuleGuideProps {
   onChangeRoomTypes: (types: RoomType[]) => void;
   /** Loads the art of a stamp definition for Place; null when it cannot be loaded. */
   loadStampArt: (definitionId: string) => Promise<AutoPlaceArt | null>;
+  /** Creates the Web Worker that calculates the plans; without it the guide calculates on the main thread. */
+  createPlacementWorker?: () => PlacementWorkerLike;
   /** Called after Place with the number of placed stamps and of replaced stamps. */
   onPlaced: (count: number, replaced: number) => void;
   onSave: (rule: PlacementRule) => void;
@@ -89,6 +97,8 @@ const allowHeight = (mm: number) => mm >= MIN_CEILING_HEIGHT_MM && mm <= MAX_CEI
 const missingData = (row: Pick<PlacementRow, 'requirement'>) => row.requirement.warnings.some((w) => w === 'noPeople' || w === 'noCalibration');
 /** Step 4: the stamps do not fit with the spacing. */
 const spacingProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.some((w) => w === 'tooClose' || w === 'noFit');
+/** The room needs more stamps than auto-placement lays out (MAX_ROOM_STAMPS): almost always a typing error. */
+const tooManyStamps = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('tooMany');
 /** Step 5: the layout leaves part of the room outside the coverage circles. */
 const coverageProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('coverageNotMet');
 
@@ -210,6 +220,40 @@ function coverageRadiusOf(d: Draft): { radiusM: number; from: string } | null {
 
 type StepState = 'ok' | 'warn' | 'bad' | '';
 
+/** The calculations follow the typed boxes this long after the last key (or at once on Enter or a focus change). */
+const SETTLE_MS = 400;
+
+/**
+ * The plan of `input`, calculated by a PlacementPlanClient of its own: in a Web Worker with
+ * `createWorker`, else on the main thread. A new input cancels the running job. The last plan stays
+ * until the next one comes; `busy` is true while the plan is not the plan of `input`.
+ */
+function usePlacementPlan(createWorker: (() => PlacementWorkerLike) | undefined, input: PlacementPlanInput | null) {
+  const [client] = useState(() => new PlacementPlanClient(createWorker ?? null));
+  useEffect(() => () => client.dispose(), [client]);
+  const [done, setDone] = useState<{ input: PlacementPlanInput; plan: PlacementPlan } | null>(null);
+  const [failed, setFailed] = useState<{ input: PlacementPlanInput; message: string } | null>(null);
+  useEffect(() => {
+    if (!input) return;
+    const job = client.plan(input);
+    let live = true;
+    job.promise.then(
+      (plan) => {
+        if (live) setDone({ input, plan });
+      },
+      (err: unknown) => {
+        if (live && !(err instanceof PlacementPlanCancelled)) setFailed({ input, message: err instanceof Error ? err.message : String(err) });
+      },
+    );
+    return () => {
+      live = false;
+      job.cancel();
+    };
+  }, [client, input]);
+  const error = failed && failed.input === input ? failed.message : null;
+  return { plan: done?.plan ?? null, input: done?.input ?? null, fresh: input !== null && done?.input === input, busy: input !== null && done?.input !== input && error === null, error };
+}
+
 /**
  * The guide for one placement rule (room-placement-guide.md Phases B and C): a step list, the current
  * step, and a sample room of the shown page that shows the result of each change at once. Steps
@@ -231,12 +275,32 @@ export function PlacementRuleGuide({
   onChooseStamp,
   onChangeRoomTypes,
   loadStampArt,
+  createPlacementWorker,
   onPlaced,
   onSave,
   onClose,
 }: PlacementRuleGuideProps) {
   const initial = useMemo(() => draftOf(rule), [rule]);
   const [draft, setDraft] = useState(initial);
+  // The calculations use `settled`: it follows the typed draft SETTLE_MS after the last key, and at once after another change.
+  const [settled, setSettled] = useState(initial);
+  const typedRef = useRef(false);
+  useEffect(() => {
+    if (settled === draft) return;
+    if (!typedRef.current) {
+      setSettled(draft);
+      return;
+    }
+    const timer = setTimeout(() => setSettled(draft), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [draft, settled]);
+  const settle = () => {
+    if (settled !== draft) setSettled(draft);
+  };
+  const replaceDraft = (next: Draft) => {
+    typedRef.current = false;
+    setDraft(next);
+  };
   const [step, setStep] = useState(1);
   const [view, setView] = useState<'room' | 'floor' | null>(null);
   const [sampleId, setSampleId] = useState<string | null>(null);
@@ -260,21 +324,24 @@ export function PlacementRuleGuide({
     };
   }, [scene]);
 
-  const update = (patch: Partial<Draft>) => {
+  const update = (patch: Partial<Draft>, typed = false) => {
+    typedRef.current = typed;
     setDraft((d) => ({ ...d, ...patch }));
     setMessage(null);
     setPlaced(null);
   };
-  const field = (key: keyof Draft) => (e: { target: { value: string } }) => update({ [key]: e.target.value } as Partial<Draft>);
+  const field = (key: keyof Draft) => (e: { target: { value: string } }) => update({ [key]: e.target.value } as Partial<Draft>, true);
 
+  // By content: a settled draft with the same boxes (for example 36 → 360 → 36) starts no new calculation.
+  const settledKey = JSON.stringify(settled);
   const parsed = useMemo((): { rule: PlacementRule | null; error: string | null } => {
     try {
-      return { rule: ruleOf(rule.id, draft), error: null };
+      return { rule: ruleOf(rule.id, JSON.parse(settledKey) as Draft), error: null };
     } catch (err) {
       if (!(err instanceof FieldError)) throw err;
       return { rule: null, error: err.message };
     }
-  }, [rule.id, draft]);
+  }, [rule.id, settledKey]);
 
   const pageIndex = scene?.getPageIndex() ?? 0;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -297,44 +364,46 @@ export function PlacementRuleGuide({
 
   // The preview always has a stamp, so a rule without one still shows the positions.
   const previewRule = useMemo(() => (parsed.rule ? { ...parsed.rule, stampDefinitionId: PREVIEW_STAMP_ID } : null), [parsed.rule]);
-  const plan = useMemo(() => {
-    if (!scene || !previewRule) return null;
-    const valuesOf = (room: Room) => scene.getRoomValues(room);
-    return {
-      valuesOf,
-      calibrationOf: (page: number) => scene.getCalibration(page),
-      sizeOf: () => stampSizePt,
-    };
+  // The values of each room of the page, once per change of the rooms: the jobs and the dry run use them.
+  const valuesById = useMemo(
+    () => new Map(scene ? pageRooms.map((r) => [r.id, scene.getRoomValues(r)] as const) : []),
     // version: room values change with room types and ceiling heights.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene, previewRule, stampSizePt, version, roomTypes]);
+    [scene, pageRooms, version, roomTypes],
+  );
+  const valuesOf = useCallback((room: Room) => valuesById.get(room.id) ?? scene!.getRoomValues(room), [valuesById, scene]);
+  const calibrations = useMemo((): [number, Calibration | null][] => [[pageIndex, calibration]], [pageIndex, calibration]);
+  const jobOf = useCallback(
+    (r: PlacementRule, rooms: readonly Room[], sizes: PlacementPlanInput['sizes']): PlacementPlanInput => ({ rules: [r], rooms: [...rooms], values: rooms.map((room) => [room.id, valuesOf(room)]), calibrations, sizes }),
+    [valuesOf, calibrations],
+  );
 
   const matches = (room: Room) => ruleAppliesToRoom({ roomTypeIds: draft.roomTypeIds, nameContains: draft.nameContains }, room);
   const matched = pageRooms.filter(matches);
   // The dry run of every room of the page: no geometry, so it is fast enough for each key press.
-  const pageRows = useMemo(() => (plan && previewRule ? calculateRooms([previewRule], pageRooms, plan.valuesOf).rows : []), [plan, previewRule, pageRooms]);
+  const pageRows = useMemo(() => (scene && previewRule ? calculateRooms([previewRule], pageRooms, valuesOf).rows : []), [scene, previewRule, pageRooms, valuesOf]);
   const pageRowOf = useMemo(() => new Map(pageRows.map((row) => [row.room.id, row])), [pageRows]);
 
   const sample = pageRooms.find((r) => r.id === sampleId) ?? matched[0] ?? pageRooms[0] ?? null;
-  const sampleValues: RoomValues | null = useMemo(() => (scene && sample ? scene.getRoomValues(sample) : null), [scene, sample, plan]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sampleValues: RoomValues | null = useMemo(() => (scene && sample ? valuesOf(sample) : null), [scene, sample, valuesOf]);
   const sampleMatches = sample ? matches(sample) : false;
-  // One room only while the user types (room-placement-guide.md §6).
-  const sampleRow = useMemo(
-    () => (plan && previewRule && sample && sampleMatches ? (planAutoPlacement([previewRule], [sample], plan.valuesOf, plan.calibrationOf, plan.sizeOf).rows[0] ?? null) : null),
-    [plan, previewRule, sample, sampleMatches],
+  // The jobs run in the background (usePlacementPlan); the old result stays, dimmed, until the new one comes.
+  const sampleInput = useMemo(
+    () => (scene && previewRule && sample && sampleMatches ? jobOf(previewRule, [sample], [[PREVIEW_STAMP_ID, stampSizePt]]) : null),
+    [scene, previewRule, sample, sampleMatches, jobOf, stampSizePt],
   );
+  const sampleJob = usePlacementPlan(createPlacementWorker, sampleInput);
+  const sampleRow = sample && sampleMatches && sampleJob.input?.rooms[0]?.id === sample.id ? (sampleJob.plan?.rows[0] ?? null) : null;
 
   const mode = view ?? (step >= 3 && step <= 5 ? 'room' : 'floor');
-  // Every room of the page, after a pause in the typing: the whole floor, and the checks of steps 4 and 5.
-  const [floor, setFloor] = useState<{ rule: PlacementRule; rows: PlacementRow[] } | null>(null);
+  // Every room of the page: the whole floor, and the checks of steps 4 and 5.
   const needFloor = step !== 6 && (mode === 'floor' || step === 4 || step === 5);
-  useEffect(() => {
-    if (!needFloor || !plan || !previewRule) return;
-    const timer = setTimeout(() => setFloor({ rule: previewRule, rows: planAutoPlacement([previewRule], pageRooms, plan.valuesOf, plan.calibrationOf, plan.sizeOf).rows }), 300);
-    return () => clearTimeout(timer);
-  }, [needFloor, plan, previewRule, pageRooms]);
-  // In steps 4 and 5 the rows of the last pause stay until the new rows come; elsewhere only rows of this draft count.
-  const floorRows = floor && (floor.rule === previewRule || step === 4 || step === 5) ? floor.rows : null;
+  const floorInput = useMemo(
+    () => (scene && needFloor && previewRule ? jobOf(previewRule, pageRooms, [[PREVIEW_STAMP_ID, stampSizePt]]) : null),
+    [scene, needFloor, previewRule, pageRooms, jobOf, stampSizePt],
+  );
+  const floorJob = usePlacementPlan(createPlacementWorker, floorInput);
+  const floorRows = floorJob.plan?.rows ?? null;
 
   // Step 6: the real stamp, its art and the auto-placed stamps of the drawing (a re-run replaces them).
   const stampId = parsed.rule?.stampDefinitionId ?? null;
@@ -361,23 +430,30 @@ export function PlacementRuleGuide({
     },
     [stampDefinition, stampScale, artFailed],
   );
-  const placePlan = useMemo(
+  const placeInput = useMemo(
     () =>
-      step === 6 && scene && plan && parsed.rule
-        ? planAutoPlacement([parsed.rule], pageRooms, plan.valuesOf, plan.calibrationOf, realSizeOf, { stamps: scene.listAutoPlacedStamps(), roomIds: new Set(scene.listRooms().map((r) => r.id)) })
+      step === 6 && scene && parsed.rule
+        ? {
+            ...jobOf(parsed.rule, pageRooms, parsed.rule.stampDefinitionId ? [[parsed.rule.stampDefinitionId, realSizeOf(parsed.rule.stampDefinitionId)]] : []),
+            existing: { stamps: scene.listAutoPlacedStamps(), roomIds: scene.listRooms().map((r) => r.id) },
+          }
         : null,
     // version: the auto-placed stamps change with Place and Undo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [step, scene, plan, parsed.rule, pageRooms, realSizeOf, version],
+    [step, scene, parsed.rule, pageRooms, jobOf, realSizeOf, version],
   );
-  const shownRows = step === 6 ? (placePlan?.rows ?? null) : floorRows;
+  const placeJob = usePlacementPlan(createPlacementWorker, placeInput);
+  // Place uses only the plan of the current draft; the table shows the last plan while the next one comes.
+  const placePlan = placeJob.fresh && settled === draft ? placeJob.plan : null;
+  const placeShown = step === 6 ? placeJob.plan : null;
+  const shownRows = step === 6 ? (placeShown?.rows ?? null) : floorRows;
   const shownRowOf = useMemo(() => new Map((shownRows ?? []).map((row) => [row.room.id, row])), [shownRows]);
   const sampleShown = step === 6 ? (sample ? (shownRowOf.get(sample.id) ?? null) : null) : sampleRow;
 
   const roomState = (room: Room): PreviewRoomState => {
     const row = pageRowOf.get(room.id);
     const placedRow = step >= 4 ? shownRowOf.get(room.id) : undefined;
-    if (placedRow && (spacingProblem(placedRow) || coverageProblem(placedRow))) return 'problem';
+    if (placedRow && (spacingProblem(placedRow) || coverageProblem(placedRow) || tooManyStamps(placedRow))) return 'problem';
     if (row) return missingData(row) ? 'missing' : 'match';
     if (matches(room)) return 'match';
     return room.roomTypeId === undefined ? 'noType' : 'noMatch';
@@ -385,6 +461,12 @@ export function PlacementRuleGuide({
 
   const untyped = pageRooms.filter((r) => r.roomTypeId === undefined);
   const missingRows = pageRows.filter(missingData);
+  const tooManyRows = pageRows.filter((row) => (row.requirement.count ?? 0) > MAX_ROOM_STAMPS);
+  const pending = settled !== draft;
+  const floorBusy = floorJob.busy || (pending && needFloor);
+  const placeBusy = placeJob.busy || (pending && step === 6);
+  const planBusy = step === 6 ? placeBusy : mode === 'floor' ? floorBusy : sampleJob.busy || pending;
+  const jobError = (step === 6 ? placeJob.error : mode === 'floor' ? floorJob.error : sampleJob.error) ?? null;
   const preset = draft.preset;
   const byCoverage = preset === 'coverage';
   const coverage = byCoverage ? coverageRadiusOf(draft) : null;
@@ -398,6 +480,7 @@ export function PlacementRuleGuide({
     }
     if (n === 3) {
       if (parsed.error) return ['bad', 'A number is not correct'];
+      if (tooManyRows.length > 0) return ['bad', `${plural(tooManyRows.length, 'room')}: too many stamps`];
       if (byCoverage && !coverage) return ['warn', 'Enter a coverage limit'];
       if (missingRows.length > 0) return ['warn', `${plural(missingRows.length, 'room')}: data missing`];
       return ['ok', PLACEMENT_PRESET_LABELS[preset]];
@@ -406,15 +489,16 @@ export function PlacementRuleGuide({
       const text = `${fmt(valueOf(draft.wallOffset) ?? 0, 2)} m from the walls`;
       if (!floorRows) return ['', text];
       const bad = floorRows.filter(spacingProblem).length;
-      return bad > 0 ? ['bad', `${plural(bad, 'room')}: stamps do not fit`] : ['ok', text];
+      return bad > 0 ? ['bad', `${plural(bad, 'room')}: stamps do not fit${floorBusy ? ' …' : ''}`] : ['ok', text + (floorBusy ? ' …' : '')];
     }
     if (n === 5) {
       const text = LAYOUT_STRATEGY_LABELS[draft.strategy] + (draft.strategy === 'grid' ? `, ${GRID_STYLE_LABELS[draft.gridStyle].toLowerCase()}` : '');
       if (!floorRows) return ['', text];
       const bad = floorRows.filter(coverageProblem).length;
-      return bad > 0 ? ['bad', `${plural(bad, 'room')} not covered`] : ['ok', text];
+      return bad > 0 ? ['bad', `${plural(bad, 'room')} not covered${floorBusy ? ' …' : ''}`] : ['ok', text + (floorBusy ? ' …' : '')];
     }
     if (placed) return ['ok', `${plural(placed.count, 'stamp')} placed`];
+    if (step === 6 && placeBusy) return ['', 'Calculating…'];
     return ['', step === 6 && placePlan ? `${plural(placeTotal, 'stamp')} to place` : 'Place the stamps'];
   };
 
@@ -436,7 +520,7 @@ export function PlacementRuleGuide({
         return null;
       }
       onSave(next);
-      setDraft(draftOf(next));
+      replaceDraft(draftOf(next));
       return next;
     } catch (err) {
       if (!(err instanceof FieldError)) throw err;
@@ -1005,13 +1089,15 @@ export function PlacementRuleGuide({
           ) : !floorRows ? (
             <p className="mep-guide-note">MepApp checks the rooms…</p>
           ) : (
-            <div className="mep-guide-checks" data-testid="pg-fitchecks">
+            <div className={`mep-guide-checks${floorBusy ? ' busy' : ''}`} data-testid="pg-fitchecks" data-busy={floorBusy || undefined}>
               {rows.map((row) => {
                 const name = roomLabel(row.room);
                 const count = row.requirement.count;
                 const testId = `pg-fit-${row.room.id}`;
                 const pick = { selected: row.room.id === sample?.id, onPick: () => (setSampleId(row.room.id), setView(null)) };
                 if (count === null) return <Check key={row.room.id} state="off" title={`${name}: no count yet`} sub="Room data is missing (step 3)." testId={testId} {...pick} />;
+                if (tooManyStamps(row))
+                  return <Check key={row.room.id} state="bad" title={`${name}: ${plural(count, 'stamp')} is too many`} sub={`MepApp places at most ${MAX_ROOM_STAMPS} stamps in one room. Check the values in step 3.`} testId={testId} {...pick} />;
                 if (row.warnings.includes('noFit'))
                   return <Check key={row.room.id} state="bad" title={`${name}: the stamp does not fit`} sub="The min distance to the walls leaves no space for a stamp. MepApp puts it at the label point." testId={testId} {...pick} />;
                 if (row.warnings.includes('tooClose')) {
@@ -1125,12 +1211,13 @@ export function PlacementRuleGuide({
 
   // ---------- Step 6 ----------
   function stepPlace() {
-    const rows = placePlan?.rows ?? [];
+    const rows = placeShown?.rows ?? [];
     const showPeople = PRESET_AMOUNT_FIELDS[preset].includes('perPerson');
     const skipped = rows.filter((row) => row.requirement.count === null).length;
     const problems = rows.filter((row) => spacingProblem(row) || coverageProblem(row)).length;
+    const tooMany = rows.filter(tooManyStamps).length;
     const others = pageRooms.length - matched.length;
-    const label = !artReady && !artFailed ? 'Loading the stamp…' : `${dirty || isNew ? 'Save and place' : 'Place'} ${plural(placeTotal, 'stamp')}${replaceIds.length > 0 ? ` (replace ${replaceIds.length})` : ''}`;
+    const label = !artReady && !artFailed ? 'Loading the stamp…' : placeBusy ? 'Calculating…' : `${dirty || isNew ? 'Save and place' : 'Place'} ${plural(placeTotal, 'stamp')}${replaceIds.length > 0 ? ` (replace ${replaceIds.length})` : ''}`;
     return (
       <>
         <h2>Check and place</h2>
@@ -1147,9 +1234,9 @@ export function PlacementRuleGuide({
         )}
         {artFailed && <div className="mep-guide-callout bad">MepApp cannot load the stamp of this rule.</div>}
         {rows.length === 0 ? (
-          <p className="mep-guide-note">No room of this page matches the rule.</p>
+          <p className="mep-guide-note">{!placeShown && placeBusy ? 'MepApp calculates the rooms…' : 'No room of this page matches the rule.'}</p>
         ) : (
-          <div className="mep-room-calc-scroll mep-guide-table">
+          <div className={`mep-room-calc-scroll mep-guide-table${placeBusy ? ' busy' : ''}`}>
             <table className="mep-room-calc-table" data-testid="pg-place-table">
               <thead>
                 <tr>
@@ -1167,7 +1254,7 @@ export function PlacementRuleGuide({
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const cls = row.requirement.count === null ? 'bad' : spacingProblem(row) || coverageProblem(row) ? 'err' : row.room.id === sample?.id ? 'sel' : '';
+                  const cls = row.requirement.count === null ? 'bad' : spacingProblem(row) || coverageProblem(row) || tooManyStamps(row) ? 'err' : row.room.id === sample?.id ? 'sel' : '';
                   return (
                     <tr key={row.room.id} className={cls} data-room={row.room.id} onClick={() => setSampleId(row.room.id)}>
                       <td>{roomLabel(row.room)}</td>
@@ -1211,6 +1298,7 @@ export function PlacementRuleGuide({
             </button>
             <span className="mep-guide-note">
               {skipped > 0 ? `${plural(skipped, 'room')} skipped: missing data (step 3). ` : ''}
+              {tooMany > 0 ? `${plural(tooMany, 'room')} skipped: more than ${MAX_ROOM_STAMPS} stamps (step 3). ` : ''}
               {problems > 0 ? `${plural(problems, 'room')} with a spacing or coverage problem: MepApp places the stamps, but check them. ` : ''}
               {others > 0 ? `${plural(others, 'other room')} of this page do${others === 1 ? 'es' : ''} not match this rule.` : ''}
             </span>
@@ -1238,7 +1326,7 @@ export function PlacementRuleGuide({
           <button type="button" onClick={save} disabled={!dirty && !isNew}>
             Save
           </button>
-          <button type="button" onClick={() => (setDraft(initial), setMessage(null))} disabled={!dirty}>
+          <button type="button" onClick={() => (replaceDraft(initial), setMessage(null))} disabled={!dirty}>
             Revert
           </button>
           <button type="button" onClick={requestClose}>
@@ -1247,7 +1335,7 @@ export function PlacementRuleGuide({
         </>
       }
     >
-      <div className="mep-guide">
+      <div className="mep-guide" onKeyDown={(e) => e.key === 'Enter' && settle()} onBlur={settle}>
         <nav className="mep-guide-steps" aria-label="Steps">
           {STEP_TITLES.map((title, i) => {
             const n = i + 1;
@@ -1288,6 +1376,11 @@ export function PlacementRuleGuide({
           <div className="mep-guide-panel">
             <div className="mep-guide-panel-head">
               <span className="pt">{mode === 'room' ? 'Sample room' : 'Whole floor'}</span>
+              {planBusy && (
+                <span className="mep-guide-busy" role="status" data-testid="pg-busy">
+                  Calculating…
+                </span>
+              )}
               <div className="mep-guide-seg" role="group" aria-label="View">
                 <button type="button" className={mode === 'room' ? 'on' : ''} aria-pressed={mode === 'room'} onClick={() => setView('room')}>
                   This room
@@ -1322,8 +1415,10 @@ export function PlacementRuleGuide({
                     )}
                   </div>
                 )}
+                {jobError && <p className="mep-guide-callout bad">MepApp cannot calculate the stamps: {jobError}</p>}
                 <RulePreviewPlan
                   mode={mode}
+                  busy={planBusy}
                   rooms={pageRooms}
                   sample={sample}
                   calibration={calibration}

@@ -8,6 +8,7 @@ import {
   PLACEMENT_PRESET_LABELS,
   roomTypeLabel,
   type PlacementRule,
+  type PlacementWorkerLike,
   type RoomType,
   type StampDefinition,
 } from '@mepapp/core';
@@ -43,6 +44,8 @@ export interface PlacementRulesDialogProps {
   stampPickerOpen: boolean;
   /** Loads the art of a stamp definition for Place in the guide; null when it cannot be loaded. */
   loadStampArt: (definitionId: string) => Promise<AutoPlaceArt | null>;
+  /** Creates the Web Worker of the guide's plans; without it the guide calculates on the main thread. */
+  createPlacementWorker?: () => PlacementWorkerLike;
   /** Called after Place in the guide with the number of placed stamps and of replaced stamps. */
   onPlaced: (count: number, replaced: number) => void;
   onClose: () => void;
@@ -68,6 +71,7 @@ export function PlacementRulesDialog({
   onChangeRoomTypes,
   stampPickerOpen,
   loadStampArt,
+  createPlacementWorker,
   onPlaced,
   onClose,
 }: PlacementRulesDialogProps) {
@@ -119,6 +123,7 @@ export function PlacementRulesDialog({
           onChooseStamp={onChooseStamp}
           onChangeRoomTypes={onChangeRoomTypes}
           loadStampArt={loadStampArt}
+          createPlacementWorker={createPlacementWorker}
           onPlaced={onPlaced}
           onSave={(next) => {
             onChange(guide.isNew ? [...rules, next] : rules.map((r) => (r.id === next.id ? next : r)));

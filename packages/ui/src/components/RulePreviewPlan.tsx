@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { roomBounds, type Calibration, type PlannedStamp, type Room, type Vec2 } from '@mepapp/core';
+import { closePointIndexes, roomBounds, type Calibration, type PlannedStamp, type Room, type Vec2 } from '@mepapp/core';
 
 /** How the whole-floor view colours a room. */
 export type PreviewRoomState = 'match' | 'missing' | 'problem' | 'noMatch' | 'noType';
@@ -7,6 +7,8 @@ export type PreviewRoomState = 'match' | 'missing' | 'problem' | 'noMatch' | 'no
 export interface RulePreviewPlanProps {
   /** 'room' = the sample room with its neighbours dimmed; 'floor' = every room of the page. */
   mode: 'room' | 'floor';
+  /** The stamps are of an older draft: a new calculation runs. The stamps show dimmed. */
+  busy?: boolean;
   /** The rooms of the shown page. */
   rooms: readonly Room[];
   sample: Room | null;
@@ -26,7 +28,13 @@ export interface RulePreviewPlanProps {
 }
 
 const ringPath = (ring: readonly Vec2[]) => `M${ring.map((p) => `${p.x} ${p.y}`).join('L')}Z`;
-const roomPath = (room: Room) => [room.polygon.outer, ...room.polygon.holes].map(ringPath).join('');
+// The path of each room polygon, made once: the plan draws all rooms of the page on each key press.
+const pathCache = new WeakMap<Room['polygon'], string>();
+const roomPath = (room: Room) => {
+  let d = pathCache.get(room.polygon);
+  if (d === undefined) pathCache.set(room.polygon, (d = [room.polygon.outer, ...room.polygon.holes].map(ringPath).join('')));
+  return d;
+};
 
 const STATE_FILL: Record<PreviewRoomState, string> = {
   match: 'var(--accent-soft)',
@@ -36,23 +44,15 @@ const STATE_FILL: Record<PreviewRoomState, string> = {
   noType: 'var(--surface)',
 };
 
-/** The indexes of the stamps that have another stamp closer than `minPt`. */
-function closeStamps(stamps: readonly PlannedStamp[], minPt: number): Set<number> {
-  const close = new Set<number>();
-  for (let i = 0; i < stamps.length; i++) {
-    for (let j = i + 1; j < stamps.length; j++) {
-      if (Math.hypot(stamps[i]!.position.x - stamps[j]!.position.x, stamps[i]!.position.y - stamps[j]!.position.y) < minPt - 1e-6) close.add(i).add(j);
-    }
-  }
-  return close;
-}
+/** Above this number of stamps the plan draws one simple mark per stamp, in one path, instead of the stamp art. */
+const SIMPLE_MARKS_ABOVE = 300;
 
 /**
  * An SVG drawing of the rooms of the page in page points (room-placement-guide.md Phase B): the
  * sample room with its wall offset band, the dimensions of its bounding rectangle and the planned
  * stamps, or the whole floor coloured by how the rule sees each room. A click on a room picks it.
  */
-export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, onPickRoom }: RulePreviewPlanProps) {
+export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, onPickRoom }: RulePreviewPlanProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const focus = mode === 'room' && sample ? [sample] : rooms;
   if (focus.length === 0) return <p className="mep-settings-hint">This page has no rooms. Detect the rooms first.</p>;
@@ -67,14 +67,15 @@ export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, s
   const offsetPt = ptPerM !== null ? wallOffsetM * ptPerM : 0;
   const radiusPt = ptPerM !== null && coverageRadiusM !== null ? coverageRadiusM * ptPerM : null;
   const minPt = ptPerM !== null && minSpacingM ? minSpacingM * ptPerM : null;
-  const close = minPt !== null ? closeStamps(stamps, minPt) : new Set<number>();
+  const close = minPt !== null ? closePointIndexes(stamps.map((s) => s.position), minPt) : new Set<number>();
+  const simple = stamps.length > SIMPLE_MARKS_ABOVE;
   const metres = (pt: number) => (ptPerM !== null ? `${(pt / ptPerM).toFixed(2)} m` : `${Math.round(pt)} pt`);
   const fontSize = unit * 3;
   const sw = Math.max(stampSizePt.width, unit);
   const sh = Math.max(stampSizePt.height, unit);
 
   return (
-    <svg className="mep-guide-plan" viewBox={viewBox.join(' ')} role="img" aria-label={mode === 'room' && sample ? 'Sample room' : 'Rooms of the page'} data-testid="guide-plan" data-mode={mode}>
+    <svg className="mep-guide-plan" viewBox={viewBox.join(' ')} role="img" aria-label={mode === 'room' && sample ? 'Sample room' : 'Rooms of the page'} data-testid="guide-plan" data-mode={mode} data-busy={busy || undefined}>
       <defs>
         <pattern id={`hatch${uid}`} width={unit * 2} height={unit * 2} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2={unit * 2} stroke="var(--guide-warn)" strokeWidth={unit * 0.4} />
@@ -133,6 +134,7 @@ export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, s
               <circle key={`c${i}`} cx={s.position.x} cy={s.position.y} r={radiusPt} fill="var(--accent)" fillOpacity={0.07} stroke="var(--accent)" strokeDasharray="4 3" strokeWidth={1} vectorEffect="non-scaling-stroke" clipPath={`url(#clip${uid})`} pointerEvents="none" data-testid="guide-coverage-circle" />
             ))}
           {minPt !== null &&
+            !simple &&
             stamps.map((s, i) => {
               const color = close.has(i) ? 'var(--guide-bad)' : 'var(--guide-ok)';
               return (
@@ -141,8 +143,19 @@ export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, s
             })}
         </>
       )}
-      {stamps.map((s, i) => (
-        <g key={i} transform={`translate(${s.position.x} ${s.position.y}) rotate(${s.rotationDegrees})`} pointerEvents="none" data-testid="guide-stamp">
+      {simple && (
+        <path
+          className="mep-guide-plan-stamps"
+          d={stamps.map((s) => `M${s.position.x - sw / 2} ${s.position.y - sh / 2}h${sw}v${sh}h${-sw}Z`).join('')}
+          fill="var(--hvac)"
+          fillOpacity={0.5}
+          pointerEvents="none"
+          data-testid="guide-stamp-marks"
+          data-stamps={stamps.length}
+        />
+      )}
+      {!simple && stamps.map((s, i) => (
+        <g key={i} className="mep-guide-plan-stamps" transform={`translate(${s.position.x} ${s.position.y}) rotate(${s.rotationDegrees})`} pointerEvents="none" data-testid="guide-stamp">
           {stampIconUrl && <image href={stampIconUrl} x={-sw / 2} y={-sh / 2} width={sw} height={sh} preserveAspectRatio="xMidYMid meet" />}
           <rect x={-sw / 2} y={-sh / 2} width={sw} height={sh} fill={stampIconUrl ? 'none' : 'var(--surface)'} stroke={close.has(i) ? 'var(--guide-bad)' : 'var(--hvac)'} strokeWidth={1.2} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
           {!stampIconUrl && (
