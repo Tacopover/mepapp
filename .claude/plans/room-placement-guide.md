@@ -231,6 +231,17 @@ Verification: the full browser check from step 1 to Place on `01_arch_first_floo
 
 Check each count against a hand calculation, the spacing warning, the grid styles on the canvas, one Undo, and save and reload. Measure the time of one keystroke in step 3 with the fixture. The target is under 100 ms for the sample room.
 
+### Feedback round 1 (user test, 2026-10-10)
+
+STATUS: DONE 2026-10-10, commit be8e439. Verification: all package tests pass (core 843, ui 101), `pnpm typecheck` and `pnpm build` pass, the Phase C browser check passes 33 of 33 again, and a new browser check passes 9 of 9 with no page errors:
+- the min distance to the walls is from the wall to the stamp center: Along the walls at 1 m with 2 m between stamps puts each of 22 stamp centers 1.00–1.06 m from the nearest wall; only the 5 rooms with "the stamp does not fit" are closer (their stamp is at the label point);
+- a click on a room in "Check of all rooms" shows that room on the plan (also from the Whole floor view) and marks the line;
+- after Try Staggered, then Along the walls, then Save and place: Save and Revert are off and Close closes the guide. Without the fix, the same check fails (Save and Revert on, Close shows "Save or revert your changes first.").
+
+Changes:
+- Core `layoutRoomStamps` no longer adds half the stamp size to the wall offset. The min distance between stamps never moved the stamps; a grid row sits at the center of its cell, so in a narrow room one row is at the room center.
+- After Save (also Save and place), the guide sets its draft to the saved rule. Before, a field that the rule does not keep (for example a grid style for Along the walls) kept the guide "changed" forever.
+
 ## 6. Risks
 
 - **Speed.** Coverage on all rooms takes about 0.8 s (Phase 6 measurement). The guide must compute only the sample room while the user types (Phase B).
