@@ -41,7 +41,7 @@ const COUNT_SOURCE_TEXT: Record<PlacementRow['requirement']['countSource'], stri
 };
 
 /** Notes of one row: why it places nothing or what the layout changed, and whether the room needs a check. */
-function notesOf(row: PlacementRow, otherPage: boolean): string {
+export function notesOf(row: PlacementRow, otherPage: boolean): string {
   const notes = row.warnings.map((w) => (w === 'tooClose' && row.fitEstimate !== undefined ? `${PLACEMENT_WARNING_TEXT[w]}: about ${row.fitEstimate} fit` : PLACEMENT_WARNING_TEXT[w]));
   if (otherPage) notes.push('on another page');
   if (row.existing.keep.length > 0) notes.push(`${row.existing.keep.length} moved stamp${row.existing.keep.length === 1 ? '' : 's'} kept`);
@@ -51,7 +51,7 @@ function notesOf(row: PlacementRow, otherPage: boolean): string {
 }
 
 /** The stamps of the rows, one group per stamp definition, with the art from `art`. */
-function groupsOf(rows: readonly PlacementRow[], art: ReadonlyMap<string, AutoPlaceArt>): AutoPlaceGroup[] {
+export function groupsOf(rows: readonly PlacementRow[], art: ReadonlyMap<string, AutoPlaceArt>): AutoPlaceGroup[] {
   const groups = new Map<string, AutoPlaceGroup>();
   for (const row of rows) {
     const id = row.rule.stampDefinitionId;
@@ -73,7 +73,7 @@ function groupsOf(rows: readonly PlacementRow[], art: ReadonlyMap<string, AutoPl
  * The unmoved stamps a placement of the row replaces: only when the row has a full plan (a stamp,
  * a calibration and a count). A row that cannot be calculated keeps its stamps.
  */
-function replaceIdsOf(row: PlacementRow): string[] {
+export function replaceIdsOf(row: PlacementRow): string[] {
   const blocked = row.warnings.some((w) => w === 'noStamp' || w === 'stampNotFound' || w === 'noCalibration');
   return blocked || row.requirement.count === null ? [] : row.existing.replace;
 }

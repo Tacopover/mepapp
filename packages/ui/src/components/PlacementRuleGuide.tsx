@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import {
   AIR_CHANGE_UNITS,
@@ -10,8 +10,11 @@ import {
   calculateRooms,
   coverageRadiusM,
   flowInUnit,
+  GRID_STYLE_LABELS,
   ILLUMINANCE_UNIT_LABELS,
   isAirChangeUnit,
+  LAYOUT_STRATEGY_LABELS,
+  layoutRoomStamps,
   lengthToM,
   LENGTH_UNIT_LABELS,
   parseDecimal,
@@ -24,6 +27,8 @@ import {
   roomTypeLabel,
   validatePlacementRule,
   type Discipline,
+  type GridStyle,
+  type LayoutStrategy,
   type PlacementPreset,
   type PlacementRow,
   type PlacementRule,
@@ -31,7 +36,9 @@ import {
   type RoomType,
   type RoomValues,
   type StampDefinition,
+  type Vec2,
 } from '@mepapp/core';
+import { groupsOf, notesOf, replaceIdsOf, type AutoPlaceArt } from './AutoPlaceDialog.js';
 import { Dialog } from './Dialog.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
 import { InfoTip } from './InfoTip.js';
@@ -58,14 +65,16 @@ export interface PlacementRuleGuideProps {
   stampPickerOpen: boolean;
   onChooseStamp: (onPick: (definitionId: string) => void) => void;
   onChangeRoomTypes: (types: RoomType[]) => void;
+  /** Loads the art of a stamp definition for Place; null when it cannot be loaded. */
+  loadStampArt: (definitionId: string) => Promise<AutoPlaceArt | null>;
+  /** Called after Place with the number of placed stamps and of replaced stamps. */
+  onPlaced: (count: number, replaced: number) => void;
   onSave: (rule: PlacementRule) => void;
   /** Back to the rule list. */
   onClose: () => void;
 }
 
 const STEP_TITLES = ['Stamp', 'Rooms', 'Amount', 'Spacing', 'Layout', 'Check and place'];
-/** The steps that the guide has. The rule form holds the fields of the other steps. */
-const GUIDE_STEPS = 3;
 /** The preview places a stamp also when the rule has none: this id gets the size of PREVIEW_STAMP_M. */
 const PREVIEW_STAMP_ID = '__guide-preview';
 const PREVIEW_STAMP_M = 0.6;
@@ -78,6 +87,105 @@ const valueOf = (text: string): number | undefined => (text.trim() === '' ? unde
 const allowPositive = (n: number) => n > 0;
 const allowHeight = (mm: number) => mm >= MIN_CEILING_HEIGHT_MM && mm <= MAX_CEILING_HEIGHT_MM;
 const missingData = (row: Pick<PlacementRow, 'requirement'>) => row.requirement.warnings.some((w) => w === 'noPeople' || w === 'noCalibration');
+/** Step 4: the stamps do not fit with the spacing. */
+const spacingProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.some((w) => w === 'tooClose' || w === 'noFit');
+/** Step 5: the layout leaves part of the room outside the coverage circles. */
+const coverageProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('coverageNotMet');
+
+const LAYOUT_HINTS: Record<LayoutStrategy, string> = {
+  center: 'One stamp at the label point of the room. More than one stamp uses the grid.',
+  grid: 'Rows along the long side of the room. The grid style sets how a short last row is filled.',
+  evenSpread: 'Each stamp moves to the middle of its own part of the room. Use it for L-shaped rooms.',
+  perimeter: 'Stamps at equal distances along the walls, turned to face into the room.',
+};
+const GRID_STYLE_HINTS: Record<GridStyle, string> = {
+  spread: 'A short last row spreads over the full length.',
+  aligned: 'Each stamp stays in a column. A cell can stay empty.',
+  staggered: 'Each second row moves half a cell.',
+};
+
+// The example rooms of the layout pictures, in m (1 page unit = 1 m): an L-shape, and a rectangle for the grid.
+const PICTURE_L: Vec2[] = [
+  { x: 0, y: 0 },
+  { x: 6, y: 0 },
+  { x: 6, y: 2.6 },
+  { x: 3.4, y: 2.6 },
+  { x: 3.4, y: 4.5 },
+  { x: 0, y: 4.5 },
+];
+const PICTURE_RECT: Vec2[] = [
+  { x: 0, y: 0 },
+  { x: 6, y: 0 },
+  { x: 6, y: 4.5 },
+  { x: 0, y: 4.5 },
+];
+const PICTURE_COUNT: Record<LayoutStrategy, number> = { center: 1, grid: 5, evenSpread: 4, perimeter: 7 };
+const PICTURE_CALIBRATION = { pageUnitsPerRealUnit: 0.001 };
+const PICTURE_STAMP = { width: 0.6, height: 0.6 };
+
+/** A small picture of a layout, made with the core layout of the placement on an example room. */
+function LayoutPicture({ strategy, gridStyle }: { strategy: LayoutStrategy; gridStyle?: GridStyle }) {
+  const outer = strategy === 'grid' ? PICTURE_RECT : PICTURE_L;
+  const stamps = useMemo(
+    () =>
+      layoutRoomStamps(
+        { layout: { strategy, wallOffsetM: 0.2, rotation: 'room', ...(gridStyle ? { gridStyle } : {}) }, coverage: {} },
+        { polygon: { outer, holes: [] } },
+        PICTURE_COUNT[strategy],
+        PICTURE_CALIBRATION,
+        PICTURE_STAMP,
+      ).stamps,
+    [strategy, gridStyle, outer],
+  );
+  const h = PICTURE_STAMP.width / 2;
+  return (
+    <svg className="mep-guide-picture" viewBox="-0.6 -0.6 7.2 5.7" aria-hidden="true" data-testid="pg-layout-picture" data-stamps={stamps.length}>
+      <polygon points={outer.map((p) => `${p.x},${p.y}`).join(' ')} fill="var(--surface)" stroke="var(--ink)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+      {stamps.map((st, i) => (
+        <g key={i} transform={`translate(${st.position.x} ${st.position.y}) rotate(${st.rotationDegrees})`}>
+          <rect x={-h} y={-h} width={2 * h} height={2 * h} fill="var(--surface)" stroke="var(--hvac)" strokeWidth={1.3} vectorEffect="non-scaling-stroke" />
+          <path d={`M${-h} ${-h}L${h} ${h}M${h} ${-h}L${-h} ${h}`} stroke="var(--hvac)" strokeWidth={1.3} vectorEffect="non-scaling-stroke" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/** The small diagrams of the two spacing boxes in step 4. */
+function SpacingDiagram({ kind }: { kind: 'wall' | 'gap' }) {
+  const line = { stroke: 'var(--muted)', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' as const };
+  const stamp = (x: number, y: number) => (
+    <g transform={`translate(${x} ${y})`}>
+      <rect x={-0.25} y={-0.25} width={0.5} height={0.5} fill="var(--surface)" stroke="var(--hvac)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+      <path d="M-0.25 -0.25L0.25 0.25M0.25 -0.25L-0.25 0.25" stroke="var(--hvac)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+    </g>
+  );
+  if (kind === 'wall') {
+    return (
+      <svg viewBox="0 0 6 2" aria-hidden="true">
+        <rect x={0.6} y={0} width={0.9} height={2} fill="var(--guide-band)" />
+        <line x1={0.6} y1={0} x2={0.6} y2={2} stroke="var(--ink)" strokeWidth={3} vectorEffect="non-scaling-stroke" />
+        {stamp(2.6, 0.9)}
+        <line x1={0.6} y1={1.6} x2={1.5} y2={1.6} {...line} />
+        <text x={2.3} y={1.75} fontSize={0.32} className="mep-guide-plan-dim" fill="var(--guide-warn)">
+          no stamp here
+        </text>
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 6 2" aria-hidden="true">
+      {[1.9, 4.1].map((x) => (
+        <circle key={x} cx={x} cy={1} r={0.75} fill="var(--guide-ok)" fillOpacity={0.12} stroke="var(--guide-ok)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      ))}
+      {stamp(1.9, 1)}
+      {stamp(4.1, 1)}
+      <text x={3} y={0.25} fontSize={0.3} textAnchor="middle" className="mep-guide-plan-dim" fill="var(--guide-ok)">
+        at least this far
+      </text>
+    </svg>
+  );
+}
 
 /** The symbol of an amount field in the formula of a preset, as in PLACEMENT_PRESET_HELP. */
 function fieldSymbol(preset: PlacementPreset, key: 'fixed' | 'perM2' | 'perPerson' | 'perM3'): string {
@@ -103,10 +211,10 @@ function coverageRadiusOf(d: Draft): { radiusM: number; from: string } | null {
 type StepState = 'ok' | 'warn' | 'bad' | '';
 
 /**
- * The guide for one placement rule (room-placement-guide.md Phase B): a step list, the current
+ * The guide for one placement rule (room-placement-guide.md Phases B and C): a step list, the current
  * step, and a sample room of the shown page that shows the result of each change at once. Steps
- * 1–3 (stamp, rooms, amount) are here; the rule form holds the spacing and the layout. Save and
- * Revert work on a draft of the rule, as in the rule form.
+ * 1–3 (stamp, rooms, amount) come from Phase B; steps 4–6 (spacing, layout, check and place) from
+ * Phase C. Save and Revert work on a draft of the rule. Place saves the draft first.
  */
 export function PlacementRuleGuide({
   rule,
@@ -122,6 +230,8 @@ export function PlacementRuleGuide({
   stampPickerOpen,
   onChooseStamp,
   onChangeRoomTypes,
+  loadStampArt,
+  onPlaced,
   onSave,
   onClose,
 }: PlacementRuleGuideProps) {
@@ -131,6 +241,7 @@ export function PlacementRuleGuide({
   const [view, setView] = useState<'room' | 'floor' | null>(null);
   const [sampleId, setSampleId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [placed, setPlaced] = useState<{ count: number; replaced: number } | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
 
   const scene = sceneRef.current;
@@ -152,6 +263,7 @@ export function PlacementRuleGuide({
   const update = (patch: Partial<Draft>) => {
     setDraft((d) => ({ ...d, ...patch }));
     setMessage(null);
+    setPlaced(null);
   };
   const field = (key: keyof Draft) => (e: { target: { value: string } }) => update({ [key]: e.target.value } as Partial<Draft>);
 
@@ -212,16 +324,60 @@ export function PlacementRuleGuide({
     [plan, previewRule, sample, sampleMatches],
   );
 
-  const mode = view ?? (step >= 3 ? 'room' : 'floor');
-  const [floorRows, setFloorRows] = useState<PlacementRow[]>([]);
+  const mode = view ?? (step >= 3 && step <= 5 ? 'room' : 'floor');
+  // Every room of the page, after a pause in the typing: the whole floor, and the checks of steps 4 and 5.
+  const [floor, setFloor] = useState<{ rule: PlacementRule; rows: PlacementRow[] } | null>(null);
+  const needFloor = step !== 6 && (mode === 'floor' || step === 4 || step === 5);
   useEffect(() => {
-    if (mode !== 'floor' || !plan || !previewRule) return;
-    const timer = setTimeout(() => setFloorRows(planAutoPlacement([previewRule], pageRooms, plan.valuesOf, plan.calibrationOf, plan.sizeOf).rows), 300);
+    if (!needFloor || !plan || !previewRule) return;
+    const timer = setTimeout(() => setFloor({ rule: previewRule, rows: planAutoPlacement([previewRule], pageRooms, plan.valuesOf, plan.calibrationOf, plan.sizeOf).rows }), 300);
     return () => clearTimeout(timer);
-  }, [mode, plan, previewRule, pageRooms]);
+  }, [needFloor, plan, previewRule, pageRooms]);
+  // In steps 4 and 5 the rows of the last pause stay until the new rows come; elsewhere only rows of this draft count.
+  const floorRows = floor && (floor.rule === previewRule || step === 4 || step === 5) ? floor.rows : null;
+
+  // Step 6: the real stamp, its art and the auto-placed stamps of the drawing (a re-run replaces them).
+  const stampId = parsed.rule?.stampDefinitionId ?? null;
+  const [art, setArt] = useState<{ id: string; art: AutoPlaceArt | null } | null>(null);
+  useEffect(() => {
+    if (step !== 6 || !stampId || art?.id === stampId) return;
+    let cancelled = false;
+    void loadStampArt(stampId)
+      .catch(() => null)
+      .then((loaded) => {
+        if (!cancelled) setArt({ id: stampId, art: loaded });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, stampId, art, loadStampArt]);
+  const artFailed = art !== null && art.id === stampId && art.art === null;
+  const realSizeOf = useCallback(
+    (id: string) => {
+      const found = stampDefinition(id);
+      if (!found || artFailed) return null;
+      const s = stampScale(id);
+      return { width: found.nativeWidth * s, height: found.nativeHeight * s };
+    },
+    [stampDefinition, stampScale, artFailed],
+  );
+  const placePlan = useMemo(
+    () =>
+      step === 6 && scene && plan && parsed.rule
+        ? planAutoPlacement([parsed.rule], pageRooms, plan.valuesOf, plan.calibrationOf, realSizeOf, { stamps: scene.listAutoPlacedStamps(), roomIds: new Set(scene.listRooms().map((r) => r.id)) })
+        : null,
+    // version: the auto-placed stamps change with Place and Undo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [step, scene, plan, parsed.rule, pageRooms, realSizeOf, version],
+  );
+  const shownRows = step === 6 ? (placePlan?.rows ?? null) : floorRows;
+  const shownRowOf = useMemo(() => new Map((shownRows ?? []).map((row) => [row.room.id, row])), [shownRows]);
+  const sampleShown = step === 6 ? (sample ? (shownRowOf.get(sample.id) ?? null) : null) : sampleRow;
 
   const roomState = (room: Room): PreviewRoomState => {
     const row = pageRowOf.get(room.id);
+    const placedRow = step >= 4 ? shownRowOf.get(room.id) : undefined;
+    if (placedRow && (spacingProblem(placedRow) || coverageProblem(placedRow))) return 'problem';
     if (row) return missingData(row) ? 'missing' : 'match';
     if (matches(room)) return 'match';
     return room.roomTypeId === undefined ? 'noType' : 'noMatch';
@@ -246,7 +402,20 @@ export function PlacementRuleGuide({
       if (missingRows.length > 0) return ['warn', `${plural(missingRows.length, 'room')}: data missing`];
       return ['ok', PLACEMENT_PRESET_LABELS[preset]];
     }
-    return ['', 'In the rule form'];
+    if (n === 4) {
+      const text = `${fmt(valueOf(draft.wallOffset) ?? 0, 2)} m from the walls`;
+      if (!floorRows) return ['', text];
+      const bad = floorRows.filter(spacingProblem).length;
+      return bad > 0 ? ['bad', `${plural(bad, 'room')}: stamps do not fit`] : ['ok', text];
+    }
+    if (n === 5) {
+      const text = LAYOUT_STRATEGY_LABELS[draft.strategy] + (draft.strategy === 'grid' ? `, ${GRID_STYLE_LABELS[draft.gridStyle].toLowerCase()}` : '');
+      if (!floorRows) return ['', text];
+      const bad = floorRows.filter(coverageProblem).length;
+      return bad > 0 ? ['bad', `${plural(bad, 'room')} not covered`] : ['ok', text];
+    }
+    if (placed) return ['ok', `${plural(placed.count, 'stamp')} placed`];
+    return ['', step === 6 && placePlan ? `${plural(placeTotal, 'stamp')} to place` : 'Place the stamps'];
   };
 
   const requestClose = () => {
@@ -257,19 +426,42 @@ export function PlacementRuleGuide({
     }
     onClose();
   };
-  const save = () => {
+  /** Saves the draft; null when it is not valid (the message says why). */
+  const saveRule = (): PlacementRule | null => {
     try {
       const next = ruleOf(rule.id, draft);
       const problem = validatePlacementRule(next, others);
       if (problem) {
         setMessage(problem);
-        return;
+        return null;
       }
       onSave(next);
+      return next;
     } catch (err) {
       if (!(err instanceof FieldError)) throw err;
       setMessage(err.message);
+      return null;
     }
+  };
+  const save = () => void saveRule();
+
+  const artReady = !stampId || (art?.id === stampId && art.art !== null);
+  const groups = useMemo(() => (placePlan && art?.art && art.id === stampId ? groupsOf(placePlan.rows, new Map([[art.id, art.art]])) : []), [placePlan, art, stampId]);
+  const replaceIds = useMemo(() => (placePlan ? [...placePlan.rows.flatMap(replaceIdsOf), ...placePlan.stale.flatMap((e) => e.replace)] : []), [placePlan]);
+  const placeTotal = (placePlan?.rows ?? []).reduce((sum, row) => sum + row.stamps.length, 0);
+  const canPlace = !!scene && !!placePlan && !!stampId && artReady && !artFailed && (placeTotal > 0 || replaceIds.length > 0);
+  const place = () => {
+    if (!scene || !canPlace) return;
+    if ((dirty || isNew) && !saveRule()) return;
+    const ids = scene.autoPlaceStamps(groups, replaceIds);
+    setPlaced({ count: ids.length, replaced: replaceIds.length });
+    setVersion((v) => v + 1);
+    onPlaced(ids.length, replaceIds.length);
+  };
+  const undoPlace = () => {
+    scene?.undoDrawing();
+    setPlaced(null);
+    setVersion((v) => v + 1);
   };
 
   const setAreaPerPerson = (type: RoomType, value: number | null) => {
@@ -283,7 +475,10 @@ export function PlacementRuleGuide({
   const stepView = () => {
     if (step === 1) return stepStamp();
     if (step === 2) return stepRooms();
-    return stepAmount();
+    if (step === 3) return stepAmount();
+    if (step === 4) return stepSpacing();
+    if (step === 5) return stepLayout();
+    return stepPlace();
   };
 
   // ---------- Step 1 ----------
@@ -640,6 +835,12 @@ export function PlacementRuleGuide({
           </div>
         )}
 
+        {!byCoverage && [draft.maxSpacing, draft.maxArea, draft.maxWall].some((x) => x.trim() !== '') && (
+          <p className="mep-guide-note" data-testid="pg-old-coverage">
+            This rule has coverage limits. Only By coverage uses them, so they do not change the count now. Choose By coverage to use them.
+          </p>
+        )}
+
         {!byCoverage && (
           <div className="mep-guide-section">
             <h3>What one stamp gives</h3>
@@ -761,7 +962,260 @@ export function PlacementRuleGuide({
     );
   }
 
-  const planStamps = mode === 'room' ? (sampleRow?.stamps ?? []) : floorRows.flatMap((row) => row.stamps);
+  // ---------- Step 4 ----------
+  function stepSpacing() {
+    const minSpacing = valueOf(draft.minSpacing);
+    const rows = floorRows ?? [];
+    return (
+      <>
+        <h2>How much space must the stamps keep?</h2>
+        <p className="mep-guide-lead">
+          These distances change only <b>where</b> MepApp puts the stamps. They never change the number of stamps. When the stamps do not fit, MepApp tells you. Then change the distances, the layout or the count.
+        </p>
+        <div className="mep-guide-limits">
+          <div className="mep-guide-limit">
+            <SpacingDiagram kind="wall" />
+            <label className="lt" htmlFor="pg-wallOffset">
+              Min distance to the walls
+            </label>
+            <div className="mep-guide-inline">
+              <input className="mep-guide-num" id="pg-wallOffset" type="text" inputMode="decimal" placeholder="0" value={draft.wallOffset} onChange={field('wallOffset')} />
+              <span>m</span>
+            </div>
+            <span className="mep-guide-note">The orange band on the plan. The distance is from the wall to the edge of the stamp.</span>
+          </div>
+          <div className="mep-guide-limit">
+            <SpacingDiagram kind="gap" />
+            <label className="lt" htmlFor="pg-minSpacing">
+              Min distance between stamps
+            </label>
+            <div className="mep-guide-inline">
+              <input className="mep-guide-num" id="pg-minSpacing" type="text" inputMode="decimal" placeholder="none" value={draft.minSpacing} onChange={field('minSpacing')} />
+              <span>m</span>
+            </div>
+            <span className="mep-guide-note">From stamp center to stamp center. Circles on the plan: red circles overlap.</span>
+          </div>
+        </div>
+        <div className="mep-guide-section">
+          <h3>Check of all rooms ({matched.length})</h3>
+          {matched.length === 0 ? (
+            <p className="mep-guide-note">No room matches. Choose the room types in step 2.</p>
+          ) : !floorRows ? (
+            <p className="mep-guide-note">MepApp checks the rooms…</p>
+          ) : (
+            <div className="mep-guide-checks" data-testid="pg-fitchecks">
+              {rows.map((row) => {
+                const name = roomLabel(row.room);
+                const count = row.requirement.count;
+                const testId = `pg-fit-${row.room.id}`;
+                if (count === null) return <Check key={row.room.id} state="off" title={`${name}: no count yet`} sub="Room data is missing (step 3)." testId={testId} />;
+                if (row.warnings.includes('noFit'))
+                  return <Check key={row.room.id} state="bad" title={`${name}: the stamp does not fit`} sub="The min distance to the walls leaves no space for a stamp. MepApp puts it at the label point." testId={testId} />;
+                if (row.warnings.includes('tooClose')) {
+                  const fit = row.fitEstimate ?? 0;
+                  return (
+                    <Check
+                      key={row.room.id}
+                      state="bad"
+                      title={`${name}: ${plural(count, 'stamp')} do not fit`}
+                      sub={`Some stamps are closer than ${fmt(minSpacing, 2)} m to each other. About ${fit} fit with this distance${fit >= count ? ', so a different layout or grid style can fix this.' : `, but the room needs ${count}.`}`}
+                      testId={testId}
+                    />
+                  );
+                }
+                return (
+                  <Check
+                    key={row.room.id}
+                    state="ok"
+                    title={`${name}: ${plural(count, 'stamp')} ${count === 1 ? 'fits' : 'fit'}`}
+                    sub={count === 1 ? 'One stamp: no distance between stamps to check.' : minSpacing ? `Each stamp is at least ${fmt(minSpacing, 2)} m from the next one.` : 'No min distance between stamps.'}
+                    testId={testId}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ---------- Step 5 ----------
+  function stepLayout() {
+    const row = sampleRow;
+    const name = sample ? roomLabel(sample) : 'this room';
+    return (
+      <>
+        <h2>Where in the room do the stamps go?</h2>
+        <p className="mep-guide-lead">
+          Each picture shows the layout in an example room. The plan on the right shows the layout in <b>{name}</b> with the count from step 3.
+        </p>
+        {row && coverageProblem(row) && (
+          <div className="mep-guide-callout bad" data-testid="pg-layout-note">
+            Part of {name} is outside the coverage circles.{' '}
+            {row.warnings.includes('maxCountReached')
+              ? 'The max count stops the coverage.'
+              : draft.strategy !== 'evenSpread'
+                ? 'Use Even spread for By coverage.'
+                : 'The min distance to the walls keeps the stamps too far from some corners.'}
+          </div>
+        )}
+        {row && row.warnings.includes('layoutFallback') && (
+          <div className="mep-guide-callout" data-testid="pg-layout-note">
+            {name} needs {row.requirement.count} stamps. Center places one stamp only, so MepApp uses the grid here.
+          </div>
+        )}
+        {byCoverage && draft.strategy === 'evenSpread' && (
+          <div className="mep-guide-callout info">With By coverage, Even spread uses the positions that the coverage calculation found. Each point of the room stays covered.</div>
+        )}
+        <div className="mep-guide-choices" role="radiogroup" aria-label="Layout">
+          {(Object.keys(LAYOUT_STRATEGY_LABELS) as LayoutStrategy[]).map((s) => (
+            <div key={s} className={`mep-guide-choice${draft.strategy === s ? ' on' : ''}`}>
+              <button type="button" role="radio" aria-checked={draft.strategy === s} data-layout={s} onClick={() => update({ strategy: s })}>
+                <LayoutPicture strategy={s} {...(s === 'grid' ? { gridStyle: draft.gridStyle } : {})} />
+                <span className="ct">{LAYOUT_STRATEGY_LABELS[s]}</span>
+                <span className="cd">{LAYOUT_HINTS[s]}</span>
+              </button>
+            </div>
+          ))}
+        </div>
+        {draft.strategy === 'grid' && (
+          <div className="mep-guide-section">
+            <h3>Grid style (5 stamps as an example)</h3>
+            <div className="mep-guide-choices small" role="radiogroup" aria-label="Grid style">
+              {(Object.keys(GRID_STYLE_LABELS) as GridStyle[]).map((g) => (
+                <div key={g} className={`mep-guide-choice${draft.gridStyle === g ? ' on' : ''}`}>
+                  <button type="button" role="radio" aria-checked={draft.gridStyle === g} data-grid-style={g} onClick={() => update({ gridStyle: g })}>
+                    <LayoutPicture strategy="grid" gridStyle={g} />
+                    <span className="ct">{GRID_STYLE_LABELS[g]}</span>
+                    <span className="cd">{GRID_STYLE_HINTS[g]}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="mep-guide-section">
+          <h3>Rotation</h3>
+          <div className="mep-guide-field">
+            <label htmlFor="pg-rotation">Rotation</label>
+            <select id="pg-rotation" value={draft.rotation} onChange={(e) => update({ rotation: e.target.value as 'room' | 'fixed' })}>
+              <option value="room">{draft.strategy === 'perimeter' ? 'Face into the room' : 'Align to the room'}</option>
+              <option value="fixed">Fixed angle</option>
+            </select>
+          </div>
+          {draft.rotation === 'fixed' && (
+            <div className="mep-guide-field">
+              <label htmlFor="pg-fixedAngle">Angle</label>
+              <div className="mep-guide-inline">
+                <input className="mep-guide-num" id="pg-fixedAngle" type="text" inputMode="decimal" placeholder="0" value={draft.fixedAngle} onChange={field('fixedAngle')} />
+                <span>° (clockwise)</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ---------- Step 6 ----------
+  function stepPlace() {
+    const rows = placePlan?.rows ?? [];
+    const showPeople = PRESET_AMOUNT_FIELDS[preset].includes('perPerson');
+    const skipped = rows.filter((row) => row.requirement.count === null).length;
+    const problems = rows.filter((row) => spacingProblem(row) || coverageProblem(row)).length;
+    const others = pageRooms.length - matched.length;
+    const label = !artReady && !artFailed ? 'Loading the stamp…' : `${dirty || isNew ? 'Save and place' : 'Place'} ${plural(placeTotal, 'stamp')}${replaceIds.length > 0 ? ` (replace ${replaceIds.length})` : ''}`;
+    return (
+      <>
+        <h2>Check and place</h2>
+        <p className="mep-guide-lead">
+          The table shows each room of this page that the rule applies to. Click a row to see the room on the plan. Place adds the stamps as one undo step. When you place again, MepApp replaces the auto-placed stamps that you did not move.
+        </p>
+        {!stampId && (
+          <div className="mep-guide-callout">
+            <span>The rule has no stamp. Choose a stamp in step 1 first.</span>
+            <button type="button" onClick={() => setStep(1)}>
+              Go to step 1
+            </button>
+          </div>
+        )}
+        {artFailed && <div className="mep-guide-callout bad">MepApp cannot load the stamp of this rule.</div>}
+        {rows.length === 0 ? (
+          <p className="mep-guide-note">No room of this page matches the rule.</p>
+        ) : (
+          <div className="mep-room-calc-scroll mep-guide-table">
+            <table className="mep-room-calc-table" data-testid="pg-place-table">
+              <thead>
+                <tr>
+                  <th>Room</th>
+                  <th>Type</th>
+                  <th>m²</th>
+                  {showPeople && <th>Persons</th>}
+                  {!byCoverage && <th>Required ({unit})</th>}
+                  <th>Stamps</th>
+                  {!byCoverage && <th>Each ({unit})</th>}
+                  <th>Existing</th>
+                  <th>Placed</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const cls = row.requirement.count === null ? 'bad' : spacingProblem(row) || coverageProblem(row) ? 'err' : row.room.id === sample?.id ? 'sel' : '';
+                  return (
+                    <tr key={row.room.id} className={cls} data-room={row.room.id} onClick={() => setSampleId(row.room.id)}>
+                      <td>{roomLabel(row.room)}</td>
+                      <td>{typeName(row.room.roomTypeId)}</td>
+                      <td className="num">{fmt(row.values.areaM2)}</td>
+                      {showPeople && <td className="num">{row.values.people ? row.values.people.count : '–'}</td>}
+                      {!byCoverage && <td className="num">{fmt(row.requirement.required)}</td>}
+                      <td className="num" data-testid="count">
+                        {row.requirement.count ?? '–'}
+                      </td>
+                      {!byCoverage && <td className="num">{fmt(row.requirement.perElement)}</td>}
+                      <td className="num" data-testid="existing">
+                        {row.existing.keep.length + row.existing.replace.length}
+                        {row.existing.keep.length > 0 && ` (${row.existing.keep.length} moved)`}
+                      </td>
+                      <td className="num" data-testid="placed">
+                        {row.stamps.length}
+                      </td>
+                      <td>{notesOf(row, false)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {placed ? (
+          <div className="mep-guide-status" role="status" data-testid="pg-placed">
+            <span>
+              MepApp placed {plural(placed.count, 'stamp')}
+              {placed.replaced > 0 ? ` and removed ${plural(placed.replaced, 'earlier auto-placed stamp')}` : ''}. One Undo removes all of them.
+            </span>
+            <button type="button" id="pg-undo" onClick={undoPlace}>
+              Undo
+            </button>
+          </div>
+        ) : (
+          <div className="mep-guide-inline mep-guide-placebar">
+            <button type="button" id="pg-place" className="primary" disabled={!canPlace} onClick={place}>
+              {label}
+            </button>
+            <span className="mep-guide-note">
+              {skipped > 0 ? `${plural(skipped, 'room')} skipped: missing data (step 3). ` : ''}
+              {problems > 0 ? `${plural(problems, 'room')} with a spacing or coverage problem: MepApp places the stamps, but check them. ` : ''}
+              {others > 0 ? `${plural(others, 'other room')} of this page do${others === 1 ? 'es' : ''} not match this rule.` : ''}
+            </span>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  const planStamps = mode === 'room' ? (sampleShown?.stamps ?? []) : (shownRows ?? []).flatMap((row) => row.stamps);
   const status = stepStatus;
 
   return (
@@ -793,15 +1247,12 @@ export function PlacementRuleGuide({
           {STEP_TITLES.map((title, i) => {
             const n = i + 1;
             const [state, sub] = status(n);
-            const off = n > GUIDE_STEPS;
             return (
               <button
                 key={title}
                 type="button"
                 className={`mep-guide-step ${state}${step === n ? ' on' : ''}`}
                 aria-current={step === n ? 'step' : undefined}
-                disabled={off}
-                title={off ? 'Set this in the rule form for now: Close, then edit the rule there.' : undefined}
                 data-step={n}
                 onClick={() => {
                   setStep(n);
@@ -818,15 +1269,13 @@ export function PlacementRuleGuide({
         <section className="mep-guide-card" data-testid="pg-step">
           {stepView()}
           <div className="mep-guide-nav">
-            <button type="button" disabled={step === 1} onClick={() => setStep(step - 1)}>
+            <button type="button" disabled={step === 1} onClick={() => (setStep(step - 1), setView(null))}>
               Back
             </button>
-            {step < GUIDE_STEPS ? (
+            {step < STEP_TITLES.length && (
               <button type="button" className="primary" onClick={() => (setStep(step + 1), setView(null))}>
                 Next: {STEP_TITLES[step]}
               </button>
-            ) : (
-              <span className="mep-guide-note">Save the rule. Set the spacing and the layout in the rule form for now.</span>
             )}
           </div>
         </section>
@@ -879,9 +1328,10 @@ export function PlacementRuleGuide({
                   stampIconUrl={iconUrl}
                   wallOffsetM={parsed.rule?.layout.wallOffsetM ?? 0}
                   coverageRadiusM={byCoverage && parsed.rule ? coverageRadiusM(parsed.rule.coverage) : null}
+                  minSpacingM={step === 4 ? (parsed.rule?.layout.minSpacingM ?? null) : null}
                   onPickRoom={(id) => {
                     setSampleId(id);
-                    if (view === 'floor' && step >= 3) setView(null);
+                    if (view === 'floor' && step >= 3 && step <= 5) setView(null);
                   }}
                 />
                 <div className="mep-guide-legend">
@@ -890,6 +1340,7 @@ export function PlacementRuleGuide({
                       <span style={{ ['--sw' as string]: 'var(--accent-soft)' }}>room that matches</span>
                       <span style={{ ['--sw' as string]: 'var(--guide-band)' }}>min distance to the walls</span>
                       {byCoverage && <span style={{ ['--sw' as string]: 'rgba(23, 90, 138, 0.15)' }}>coverage circle</span>}
+                      {step === 4 && draft.minSpacing.trim() !== '' && <span style={{ ['--sw' as string]: 'var(--guide-ok-soft)' }}>min distance between stamps</span>}
                       <span className="plain">click a room to use it</span>
                     </>
                   ) : (
@@ -897,6 +1348,7 @@ export function PlacementRuleGuide({
                       <span style={{ ['--sw' as string]: 'var(--accent-soft)' }}>matches the rule</span>
                       <span style={{ ['--sw' as string]: 'var(--surface)' }}>does not match</span>
                       <span style={{ ['--sw' as string]: 'var(--guide-warn-soft)' }}>missing data</span>
+                      {step >= 4 && <span style={{ ['--sw' as string]: 'var(--guide-bad-soft)' }}>stamps do not fit, or not covered</span>}
                       <span className="hatch">no room type</span>
                       <span className="plain">click a room to use it</span>
                     </>
@@ -906,7 +1358,7 @@ export function PlacementRuleGuide({
             )}
           </div>
           {scene && sample && step >= 3 && (
-            <WhyBox row={sampleRow} matches={sampleMatches} sampleName={roomLabel(sample)} unit={unit} rule={parsed.rule} coverage={coverage} error={parsed.error} />
+            <WhyBox row={sampleShown} matches={sampleMatches} sampleName={roomLabel(sample)} unit={unit} rule={parsed.rule} coverage={coverage} error={parsed.error} />
           )}
         </aside>
       </div>

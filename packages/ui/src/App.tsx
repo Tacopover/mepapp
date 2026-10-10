@@ -916,6 +916,12 @@ export function MepSketchApp({
     },
     [findStampDefinition, userStampLibrary.materialize, resolveStampIconBitmap],
   );
+  const showPlacedStatus = (count: number, replaced: number) =>
+    setStatus(
+      count === 0 && replaced === 0
+        ? 'No stamp was placed.'
+        : `Placed ${count} stamp${count === 1 ? '' : 's'}${replaced > 0 ? ` and removed ${replaced} earlier auto-placed stamp${replaced === 1 ? '' : 's'}` : ''}. Undo reverses this in one step.`,
+    );
   const labelEditorStamp = labelEditorStampId ? allStamps.find((s) => s.id === labelEditorStampId) : undefined;
   const labelEditorDefinition = labelEditorStamp?.definitionId ? getStampDefinition(labelEditorStamp.definitionId, customStampDefinitions) : undefined;
 
@@ -1653,6 +1659,8 @@ export function MepSketchApp({
             setRoomTypes(next);
           }}
           stampPickerOpen={ruleStampPick !== null}
+          loadStampArt={loadAutoPlaceArt}
+          onPlaced={showPlacedStatus}
           onClose={ruleStampPick ? () => {} : () => setPlacementRulesOpen(false)}
         />
       )}
@@ -1688,13 +1696,7 @@ export function MepSketchApp({
             setAutoPlaceOpen(false);
             setPlacementRulesOpen(true);
           }}
-          onPlaced={(count, replaced) =>
-            setStatus(
-              count === 0 && replaced === 0
-                ? 'No stamp was placed.'
-                : `Placed ${count} stamp${count === 1 ? '' : 's'}${replaced > 0 ? ` and removed ${replaced} earlier auto-placed stamp${replaced === 1 ? '' : 's'}` : ''}. Undo reverses this in one step.`,
-            )
-          }
+          onPlaced={showPlacedStatus}
           onRemoved={(count) => setStatus(`Removed ${count} auto-placed stamp${count === 1 ? '' : 's'}. Undo gives them back.`)}
           onClose={() => setAutoPlaceOpen(false)}
         />

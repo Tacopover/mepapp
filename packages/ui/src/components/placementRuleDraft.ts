@@ -1,7 +1,6 @@
 import {
   isAirChangeUnit,
   parseDecimal,
-  PLACEMENT_PRESET_HELP,
   PRESET_AMOUNT_FIELDS,
   type AreaUnit,
   type GridStyle,
@@ -11,8 +10,8 @@ import {
   type PlacementRule,
 } from '@mepapp/core';
 
-// The text draft of one placement rule, shared by the rule form (PlacementRulesDialog) and the
-// guide (PlacementRuleGuide): the boxes hold text, and ruleOf turns the draft into a rule.
+// The text draft of one placement rule in the guide (PlacementRuleGuide): the boxes hold text,
+// and ruleOf turns the draft into a rule.
 
 export const newRuleId = () => `rule-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -25,12 +24,6 @@ export const AMOUNT_FIELD_LABELS: Record<(typeof PRESET_AMOUNT_FIELDS)[Placement
 };
 
 export const OTHER_UNIT = '__other';
-
-/** The explanation of a preset as one text, for a tooltip. */
-export const presetHelpText = (preset: PlacementPreset): string => {
-  const help = PLACEMENT_PRESET_HELP[preset];
-  return [help.formula, ...help.symbols.map((s) => `${s.symbol}: ${s.text}`), ...(help.note ? [help.note] : [])].join('\n');
-};
 
 export function blankRule(name: string): PlacementRule {
   return {

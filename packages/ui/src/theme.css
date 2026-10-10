@@ -3519,18 +3519,26 @@
 .mep-modal--placement-rules .mep-circuit-types-list {
   max-height: 520px;
 }
-.mep-placement-rule-form h4 {
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin: 14px 0 8px;
-  font-weight: 600;
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 4px;
+.mep-placement-rule-summary h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
 }
-.mep-placement-rule-form .mep-field-row select,
+.mep-placement-rule-summary dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.mep-placement-rule-summary dl > div {
+  display: contents;
+}
+.mep-placement-rule-summary dt {
+  color: var(--muted);
+}
+.mep-placement-rule-summary dd {
+  margin: 0;
+}
 .mep-modal--room-calculations .mep-field-row select {
   flex: 0 1 260px;
   width: auto;
@@ -3538,34 +3546,17 @@
   margin-bottom: 0;
   padding: 3px 6px;
 }
-.mep-placement-rule-types input,
 .mep-room-calc-rules input {
   width: auto;
   margin: 0;
   padding: 0;
 }
-.mep-placement-rule-types {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 12px;
-  max-height: 140px;
-  overflow-y: auto;
-  font-size: 11.5px;
-}
-.mep-placement-rule-types label,
 .mep-room-calc-rules label {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
   text-align: left;
-}
-.mep-placement-rule-stamp {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .mep-modal--room-calculations {
   width: 1100px;
@@ -4102,6 +4093,76 @@
 .mep-guide-callout.bad {
   border-left-color: var(--guide-bad);
   background: var(--guide-bad-soft);
+}
+.mep-guide-callout.info {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mep-guide-choices.small {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+.mep-guide-choice .cd {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.mep-guide-picture {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--paper);
+  border-radius: 2px;
+}
+.mep-guide-limits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.mep-guide-limit {
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mep-guide-limit svg {
+  width: 100%;
+  height: 70px;
+  background: var(--paper);
+  border-radius: 2px;
+}
+.mep-guide-limit .lt {
+  font-weight: 600;
+}
+.mep-guide-table tbody tr {
+  cursor: pointer;
+}
+.mep-guide-table tr.bad td {
+  color: var(--guide-warn);
+  background: var(--guide-warn-soft);
+}
+.mep-guide-table tr.err td {
+  color: var(--guide-bad);
+  background: var(--guide-bad-soft);
+}
+.mep-guide-table tr.sel td {
+  background: var(--accent-soft);
+}
+.mep-guide-placebar button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent-ink);
+}
+.mep-guide-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 3px;
+  background: var(--guide-ok-soft);
+  color: var(--guide-ok);
+  border: 1.5px solid var(--guide-ok);
 }
 .mep-guide-untyped {
   display: flex;

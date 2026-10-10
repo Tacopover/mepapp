@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { roomBounds, type Calibration, type PlannedStamp, type Room, type Vec2 } from '@mepapp/core';
 
 /** How the whole-floor view colours a room. */
-export type PreviewRoomState = 'match' | 'missing' | 'noMatch' | 'noType';
+export type PreviewRoomState = 'match' | 'missing' | 'problem' | 'noMatch' | 'noType';
 
 export interface RulePreviewPlanProps {
   /** 'room' = the sample room with its neighbours dimmed; 'floor' = every room of the page. */
@@ -20,6 +20,8 @@ export interface RulePreviewPlanProps {
   wallOffsetM: number;
   /** By coverage: the radius of the circle each stamp covers, m. */
   coverageRadiusM: number | null;
+  /** Step 4: the min distance between stamps, m. Each stamp gets a circle of half this radius; circles that overlap are red. */
+  minSpacingM?: number | null;
   onPickRoom: (roomId: string) => void;
 }
 
@@ -29,16 +31,28 @@ const roomPath = (room: Room) => [room.polygon.outer, ...room.polygon.holes].map
 const STATE_FILL: Record<PreviewRoomState, string> = {
   match: 'var(--accent-soft)',
   missing: 'var(--guide-warn-soft)',
+  problem: 'var(--guide-bad-soft)',
   noMatch: 'var(--surface)',
   noType: 'var(--surface)',
 };
+
+/** The indexes of the stamps that have another stamp closer than `minPt`. */
+function closeStamps(stamps: readonly PlannedStamp[], minPt: number): Set<number> {
+  const close = new Set<number>();
+  for (let i = 0; i < stamps.length; i++) {
+    for (let j = i + 1; j < stamps.length; j++) {
+      if (Math.hypot(stamps[i]!.position.x - stamps[j]!.position.x, stamps[i]!.position.y - stamps[j]!.position.y) < minPt - 1e-6) close.add(i).add(j);
+    }
+  }
+  return close;
+}
 
 /**
  * An SVG drawing of the rooms of the page in page points (room-placement-guide.md Phase B): the
  * sample room with its wall offset band, the dimensions of its bounding rectangle and the planned
  * stamps, or the whole floor coloured by how the rule sees each room. A click on a room picks it.
  */
-export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, onPickRoom }: RulePreviewPlanProps) {
+export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, onPickRoom }: RulePreviewPlanProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const focus = mode === 'room' && sample ? [sample] : rooms;
   if (focus.length === 0) return <p className="mep-settings-hint">This page has no rooms. Detect the rooms first.</p>;
@@ -52,6 +66,8 @@ export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, s
   const ptPerM = calibration ? 1000 * calibration.pageUnitsPerRealUnit : null;
   const offsetPt = ptPerM !== null ? wallOffsetM * ptPerM : 0;
   const radiusPt = ptPerM !== null && coverageRadiusM !== null ? coverageRadiusM * ptPerM : null;
+  const minPt = ptPerM !== null && minSpacingM ? minSpacingM * ptPerM : null;
+  const close = minPt !== null ? closeStamps(stamps, minPt) : new Set<number>();
   const metres = (pt: number) => (ptPerM !== null ? `${(pt / ptPerM).toFixed(2)} m` : `${Math.round(pt)} pt`);
   const fontSize = unit * 3;
   const sw = Math.max(stampSizePt.width, unit);
@@ -78,7 +94,7 @@ export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, s
             key={room.id}
             d={roomPath(room)}
             fillRule="evenodd"
-            fill={state === 'noType' ? `url(#hatch${uid})` : dim && state === 'match' ? 'var(--surface-2)' : STATE_FILL[state]}
+            fill={state === 'noType' ? `url(#hatch${uid})` : dim && (state === 'match' || state === 'problem') ? 'var(--surface-2)' : STATE_FILL[mode === 'room' && state === 'problem' ? 'match' : state]}
             opacity={dim ? 0.55 : 1}
             stroke="var(--ink)"
             strokeWidth={isSample && mode === 'floor' ? 2.5 : 1}
@@ -116,12 +132,19 @@ export function RulePreviewPlan({ mode, rooms, sample, calibration, roomState, s
             stamps.map((s, i) => (
               <circle key={`c${i}`} cx={s.position.x} cy={s.position.y} r={radiusPt} fill="var(--accent)" fillOpacity={0.07} stroke="var(--accent)" strokeDasharray="4 3" strokeWidth={1} vectorEffect="non-scaling-stroke" clipPath={`url(#clip${uid})`} pointerEvents="none" data-testid="guide-coverage-circle" />
             ))}
+          {minPt !== null &&
+            stamps.map((s, i) => {
+              const color = close.has(i) ? 'var(--guide-bad)' : 'var(--guide-ok)';
+              return (
+                <circle key={`g${i}`} cx={s.position.x} cy={s.position.y} r={minPt / 2} fill={color} fillOpacity={close.has(i) ? 0.22 : 0.12} stroke={color} strokeWidth={1} vectorEffect="non-scaling-stroke" pointerEvents="none" data-testid="guide-gap-circle" data-close={close.has(i) || undefined} />
+              );
+            })}
         </>
       )}
       {stamps.map((s, i) => (
         <g key={i} transform={`translate(${s.position.x} ${s.position.y}) rotate(${s.rotationDegrees})`} pointerEvents="none" data-testid="guide-stamp">
           {stampIconUrl && <image href={stampIconUrl} x={-sw / 2} y={-sh / 2} width={sw} height={sh} preserveAspectRatio="xMidYMid meet" />}
-          <rect x={-sw / 2} y={-sh / 2} width={sw} height={sh} fill={stampIconUrl ? 'none' : 'var(--surface)'} stroke="var(--hvac)" strokeWidth={1.2} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
+          <rect x={-sw / 2} y={-sh / 2} width={sw} height={sh} fill={stampIconUrl ? 'none' : 'var(--surface)'} stroke={close.has(i) ? 'var(--guide-bad)' : 'var(--hvac)'} strokeWidth={1.2} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
           {!stampIconUrl && (
             <path d={`M${-sw / 2} ${-sh / 2}L${sw / 2} ${sh / 2}M${sw / 2} ${-sh / 2}L${-sw / 2} ${sh / 2}`} stroke="var(--hvac)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           )}
