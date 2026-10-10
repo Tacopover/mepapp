@@ -104,7 +104,22 @@ Changes made during the work (not in the steps below):
 
 ### Phase F — Room-type demands and better calculations
 
-STATUS: planned 2026-10-10 (details below). Source: `room-demands-research.md` §8–§9.
+STATUS: DONE 2026-10-10, commit 4e2450a (F1, F2 and F3 in one commit). Source: `room-demands-research.md` §8–§9. Verification:
+- All package tests pass (core 889, ui 101). `pnpm typecheck` and `pnpm build` pass.
+- New core tests: parse and validate the demands; the values copy them; each term source, the flow and power units, the fallback, a value of 0, `noDemand`; E from the room type (also for a rule in fc); k, h_m, the UF table and `noRoomIndex`; the max radius; amount + coverage (more stamps, same count, no limit); the fixed examples.
+- Browser check (dev server, 10 of 10 checks, no page errors):
+  - F1: the example button fills the Office and Meeting room demands; Save stores them; they come back after a reload;
+  - F2: one supply-air rule gives 6.5 dm³/s per person from the room type: 32.5 dm³/s for an office of 5 persons and 71.5 dm³/s for a meeting room of 11 persons; step 3 checks the room-type values; Save stores the sources;
+  - F2: lighting with E from the room type and the example UF table: the guide shows k = 1.83, UF 0.719 and 43,760 lm for the office, the same as the core calculation of the stored rule;
+  - F3: a max radius of 1 m raises the lighting count from 13 to 28; the Why box shows both counts; the plan draws 28 circles; the rule summaries show the new settings (smoke detector: circles of 5.48 m).
+- The Phase C check passes 33 of 33. One expected value changed: the smoke detector radius is now 5.48 m (was 4.95 m), because the example is fixed. The Phase D (9 of 9), feedback round 1 (9 of 9) and Phase E (12 of 12) checks pass.
+
+Changes made during the work (not in the steps below):
+- The demands travel in `RoomValues.demands`, so the worker gets them with the room values.
+- `LightingInputs.lux` is optional when E comes from the room type. With a UF table the fixed UF stays in the rule, but the calculation does not use it.
+- The bathroom example gets 14 dm³/s: the toilet exhaust example takes its number from the room type, with 7 dm³/s as the fallback.
+- The examples cover 9 types (the 8 of the research and the bathroom).
+- Not done: a room cannot override a demand; SHR spacing, coverage bands and the info and class fields (§ decisions) wait.
 
 Decisions made in this plan (the user can change them):
 - The room type gets **10 number demands** that a calculation uses: `illuminanceLx`, `workingPlaneHeightM`, `supplyPerPersonDm3s`, `supplyPerM2Dm3s`, `exhaustFixedDm3s`, `airChangesPerH`, `heatingLoadWm2`, `coolingLoadWm2`, `socketsPerPerson`, `socketsFixed`. The info fields and the class fields of research §8 (Uo, UGR, set points, CO2, emergency lighting, fire detector, sprinkler class) wait: no calculation uses them yet.
@@ -118,21 +133,21 @@ Decisions made in this plan (the user can change them):
 
 #### F1 — Room-type demands
 
-STATUS: not started.
+STATUS: DONE 2026-10-10, commit 4e2450a (see Phase F).
 - Core: `RoomDemands`, `ROOM_DEMAND_FIELDS` (label, unit, kind, the term it fits), `ROOM_TYPE_DEMAND_EXAMPLES`; `RoomType.demands`; parse and validate (each value a number of 0 or more); `RoomValues.demands` (a copy from the room type).
 - UI: the Room Types dialog shows a "Demands" group with a box per demand and the example button.
 - Verification: core tests for parse, validate and the values; a browser check that a saved demand comes back after a reload.
 
 #### F2 — Calculations that use the demands
 
-STATUS: not started.
+STATUS: DONE 2026-10-10, commit 4e2450a (see Phase F).
 - Core: `PlacementAmount.from` (term → demand key); `LightingInputs.luxFrom`, `ufTable`, `suspensionM`, `workingPlaneHeightM`; `RoomRequirement.terms` and `.lighting` (the values that the calculation used, for the guide); the warning `noDemand`.
 - UI step 3: a source list per term ("In this rule" or a demand), the room-type value of the sample room, and a box per room type without the demand (as for the area per person). Lighting: the Em source, "UF: fixed or from the room index" with an editable table, the suspension and the working-plane height. The Why box shows k and UF.
 - Verification: core tests for each source, the units, the fallback, `noDemand`, k and the UF table; a browser check with one supply-air rule over offices and meeting rooms that gives the two Bbl values.
 
 #### F3 — Coverage radius, amount + coverage, example fixes
 
-STATUS: not started.
+STATUS: DONE 2026-10-10, commit 4e2450a (see Phase F).
 - Core: `CoverageLimits.maxRadius`; `PlacementRule.alsoCoverage`; planAutoPlacement starts the coverage layout from the amount count; `countSource` says which one gave the count.
 - UI: the max radius box; for an amount preset a check box "Also cover each point of the room" with the coverage boxes; step 5 and the Why box explain the count.
 - Example fixes (§ decisions). A stored copy of an old example stays as the user saved it.
