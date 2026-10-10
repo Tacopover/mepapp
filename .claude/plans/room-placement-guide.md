@@ -198,7 +198,22 @@ Verification: browser check with real DOM inputs. The tip opens on hover and on 
 
 ### Phase C — The guide: steps 4–6
 
-STATUS: not started.
+STATUS: DONE 2026-10-10, commit b915fa1. Verification: all package tests pass (core 843, ui 101), `pnpm build` and `pnpm typecheck` pass. A browser check on `01_arch_first_floor.pdf` at 1:50 went from step 1 to Place for three rules and passed 33 of 33 checks with no page errors:
+- the rule list has no old form, keeps Import and Export, and shows a summary of the selected rule; a double-click opens the guide;
+- supply air (per person + per area, capacity 15): each of the 19 counts is ceil((7 × persons + 0.7 × area) ÷ 15); Save and place puts 43 stamps; one Undo removes all of them; Staggered and Aligned give the same count at other positions on the canvas; Place again shows 43 existing stamps and replaces them;
+- step 4: one check per matched room; 20 m min distance gives "N stamps do not fit, about K fit" and a red step 4; the sample room shows red circles; a key press takes 14–23 ms (step 3: 15–18 ms);
+- step 5: the pictures have 1, 5, 4 and 7 stamps, and the three grid style pictures differ;
+- smoke detector (By coverage): radius 4.95 m; each of 38 rooms gets at least ceil(area ÷ 60) stamps; Along the walls gives the "outside the coverage circles" note; 43 stamps placed;
+- wall grille (Fixed per room, min count 2, Along the walls, 0.1 m): 2 grilles in each of 15 offices, turned to their walls;
+- after a reload the three rules keep their values.
+
+Changes made during the work (not in the steps below):
+- Place saves the draft first ("Save and place N stamps"). The guide stays open after Save (its key is the rule id now), so the step and the placed state stay.
+- The rule list shows a short summary of the selected rule with Edit in the guide…, Duplicate and Delete.
+- The grid picture uses a rectangle, the other layout pictures the L-shaped room (as in the mockup).
+- Step 4 also shows rooms where the min distance to the walls leaves no space ("the stamp does not fit"). The step list counts them as rooms where the stamps do not fit.
+- Steps 4 and 5 judge all rooms of the page after the 300 ms pause, so their step-list state can be one pause late.
+- Still open: after a user tries By coverage and then chooses another calculation, the rule keeps the coverage limits (the note in step 3 says they do not change the count).
 
 - **Step 4 Spacing**:
   - min distance to the walls (`wallOffsetM`) and min distance between stamps (`minSpacingM`), each with a small diagram;
