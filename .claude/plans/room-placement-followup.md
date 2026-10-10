@@ -162,7 +162,7 @@ STATUS: DONE 2026-10-10, commit 3f56fdd. A review of feedback round 1 and Phases
 4. The Why box line of the room-type numbers had the unit in the wrong place.
 5. A box that the room type replaces now shows as a dashed, struck fallback.
 - Verification: core 892 and ui 104 tests pass (new: 4 layout tests, 3 draft tests). `pnpm typecheck` and `pnpm build` pass. On the fixture floor (lighting example, max radius 1.5 m): rooms not covered 23 → 2 with Grid (the 2 are rooms that Even spread cannot cover either), 22 → 9 with the 600 mm grid (8 rooms have a full ceiling grid); a whole-floor plan takes about 2 s. The stamps go from 193 to 512 with outer stamps at half the spacing, and to 242 with "At the min distance to the walls". Browser checks: badge probe (step 4 badge clears after a step 3 change), unit change to W shows the note; Phase F 10/10, Phase E 12/12, Phase D 9/9, perf 9/9, Phase C 33/33 (one check changed: Along the walls with By coverage is now covered).
-- Not fixed (reported): the Why box text in step 3 for the old Grid, UF table layout, keyboard access to the room rows, the working-plane warning, unchecked room types from a file.
+- Also fixed: finding 6 (the Why box now says that coverage can raise the count). Not fixed (reported): the UF table layout, keyboard access to the room rows, the working-plane warning, unchecked room types from a file.
 
 ## 5. Risks
 
