@@ -32,7 +32,7 @@ import { Rail } from './components/Rail.js';
 import { CanvasContextMenu } from './components/CanvasContextMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { classifyStampsForDelete, bulkDeleteMessage } from './stampBulkDelete.js';
-import { StampsPanel, getVisibleStampDefinitions, pickStampDefinition } from './components/StampsPanel.js';
+import { StampsPanel, getVisibleStampDefinitions, iconUrlFor, pickStampDefinition } from './components/StampsPanel.js';
 import type { StampLabelLanguage } from './components/LanguageToggle.js';
 import type { StampCategoryFilter } from './components/CategorySwitcher.js';
 import { useRoomSelection } from './useRoomSelection.js';
@@ -1641,6 +1641,18 @@ export function MepSketchApp({
           }}
           onChooseStamp={(onPick) => setRuleStampPick({ onPick })}
           onExport={handleExportPlacementRules}
+          sceneRef={sceneRef}
+          stampDefinition={findStampDefinition}
+          stampScale={stampScaleOf}
+          stampIconUrl={(id) => {
+            const definition = findStampDefinition(id);
+            return definition ? iconUrlFor(definition, resolveStampIconUrl) : null;
+          }}
+          onChangeRoomTypes={(next) => {
+            sceneRef.current?.setRoomTypeLibrary(next);
+            setRoomTypes(next);
+          }}
+          stampPickerOpen={ruleStampPick !== null}
           onClose={ruleStampPick ? () => {} : () => setPlacementRulesOpen(false)}
         />
       )}

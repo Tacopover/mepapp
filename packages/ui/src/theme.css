@@ -3620,3 +3620,701 @@
   box-shadow: 0 4px 16px rgba(19, 27, 33, 0.2);
   font-size: 12px;
 }
+
+/* Placement rule guide (room-placement-guide.md Phase B): the step list, the current step and the
+   sample room. Ported from the accepted mockup (room-placement-guide-mockup/mockup-v2.html). */
+.mep-modal--placement-guide {
+  --guide-warn: #9a5b00;
+  --guide-warn-soft: #fbeed6;
+  --guide-band: #efd3a0;
+  --guide-bad: #b3261e;
+  --guide-bad-soft: #f9dedc;
+  --guide-ok: #2f7d4f;
+  --guide-ok-soft: #dcefe3;
+  width: 1360px;
+  max-width: 97vw;
+  max-height: 92vh;
+}
+.mep-modal--placement-guide .mep-modal-actions {
+  align-items: center;
+}
+.mep-guide-message {
+  margin-right: auto;
+  color: var(--guide-bad);
+  font-size: 12px;
+}
+.mep-guide {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) minmax(0, 440px);
+  gap: 14px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.45;
+}
+@media (max-width: 1100px) {
+  .mep-guide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.mep-guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+}
+@media (max-width: 1100px) {
+  .mep-guide-steps {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+}
+.mep-guide-step {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 2px 8px;
+  text-align: left;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  padding: 8px 10px;
+  cursor: pointer;
+  min-width: 140px;
+  font: inherit;
+  color: var(--ink);
+}
+.mep-guide-step:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.mep-guide-step:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mep-guide-step.on {
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.mep-guide-step .n {
+  grid-row: span 2;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+}
+.mep-guide-step .t {
+  font-weight: 600;
+  font-size: 13px;
+}
+.mep-guide-step .s {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mep-guide-step.ok .n {
+  background: var(--guide-ok-soft);
+  border-color: var(--guide-ok);
+  color: var(--guide-ok);
+}
+.mep-guide-step.warn .n {
+  background: var(--guide-warn-soft);
+  border-color: var(--guide-warn);
+  color: var(--guide-warn);
+}
+.mep-guide-step.warn .s {
+  color: var(--guide-warn);
+}
+.mep-guide-step.bad .n {
+  background: var(--guide-bad-soft);
+  border-color: var(--guide-bad);
+  color: var(--guide-bad);
+}
+.mep-guide-step.bad .s {
+  color: var(--guide-bad);
+}
+.mep-guide-card {
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.mep-guide-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 24px;
+}
+.mep-guide-card h3,
+.mep-guide-card summary {
+  margin: 0;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mep-guide-card summary {
+  cursor: pointer;
+}
+.mep-guide-lead {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--muted);
+}
+.mep-guide-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+.mep-guide-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mep-guide-nav {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1.5px dashed var(--line);
+  padding-top: 12px;
+}
+.mep-guide-nav button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent-ink);
+}
+.mep-guide-field {
+  display: grid;
+  grid-template-columns: minmax(0, 170px) minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+}
+.mep-modal .mep-guide-field input,
+.mep-modal .mep-guide-field select {
+  margin-bottom: 0;
+  max-width: 320px;
+}
+.mep-guide-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.mep-modal select.mep-guide-unit {
+  width: auto;
+  margin-bottom: 0;
+  border: 1.5px solid var(--accent);
+  padding: 3px 6px;
+  font-size: 12px;
+  color: var(--accent-ink);
+}
+.mep-modal input.mep-guide-num,
+.mep-guide-term .mep-guide-num-host input,
+.mep-modal .mep-guide-term input[type='text'] {
+  width: 74px;
+  margin-bottom: 0;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  padding: 3px 6px;
+  font-size: 13px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  text-align: right;
+}
+.mep-modal input.mep-guide-num.short {
+  width: 56px;
+}
+.mep-modal input.mep-guide-num.wide {
+  width: 120px;
+  text-align: left;
+}
+.mep-guide-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.mep-guide-choice {
+  position: relative;
+}
+.mep-guide-choice > button {
+  width: 100%;
+  height: 100%;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  padding: 10px 30px 10px 10px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: inherit;
+  color: var(--ink);
+}
+.mep-guide-choice > button:hover {
+  border-color: var(--ink);
+}
+.mep-guide-choice.on > button {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+.mep-guide-choice .ct {
+  font-weight: 600;
+  font-size: 13px;
+}
+.mep-guide-choice .cf {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--accent-ink);
+}
+.mep-guide-choice .mep-infotip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.mep-infotip {
+  position: relative;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+  font: 600 11px/15px var(--font-mono);
+  text-align: center;
+  cursor: help;
+}
+.mep-infotip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mep-infotip-text {
+  position: absolute;
+  z-index: 20;
+  top: 24px;
+  right: -9px;
+  width: min(290px, 78vw);
+  padding: 10px 12px;
+  background: var(--ink);
+  color: var(--surface);
+  border-radius: 3px;
+  font: 400 12px/1.5 var(--font-ui);
+  text-align: left;
+  box-shadow: 3px 3px 0 var(--accent);
+}
+.mep-infotip-text b {
+  color: #fff;
+}
+.mep-infotip-text dl {
+  margin: 6px 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+}
+.mep-infotip-text dl > div {
+  display: contents;
+}
+.mep-infotip-text dt {
+  font-family: var(--font-mono);
+  color: #9fc6e4;
+}
+.mep-infotip-text dd {
+  margin: 0;
+}
+.mep-guide-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mep-guide-matchlist {
+  max-height: 150px;
+  overflow-y: auto;
+}
+.mep-guide-chip {
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.mep-guide-chip .c {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.mep-guide-chip.on {
+  background: var(--accent);
+  border-color: var(--accent-ink);
+  color: #fff;
+}
+.mep-guide-chip.on .c {
+  color: var(--accent-soft);
+}
+.mep-guide-chip.sel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mep-guide-formula {
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+}
+.mep-guide-term {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--surface-2);
+}
+.mep-guide-term:last-child {
+  border-bottom: 0;
+}
+.mep-guide-label {
+  min-width: 120px;
+}
+.mep-guide-op {
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.mep-guide-sym {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  padding: 0 4px;
+}
+.mep-guide-val {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--surface-2);
+  padding: 1px 6px;
+  border-radius: 2px;
+}
+.mep-guide-res {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mep-guide-term.total {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.mep-guide-term.result {
+  background: var(--accent-soft);
+}
+.mep-guide-missing {
+  color: var(--guide-warn);
+  background: var(--guide-warn-soft);
+  font-weight: 600;
+  padding: 0 4px;
+}
+.mep-guide-check-row {
+  cursor: pointer;
+}
+.mep-modal .mep-guide-check-row input {
+  width: auto;
+  margin: 0;
+}
+.mep-guide-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mep-guide-check {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 4px 10px;
+  padding: 9px 12px;
+  border-radius: 3px;
+  border: 1.5px solid var(--line);
+}
+.mep-guide-check .ic {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1.5px solid currentColor;
+}
+.mep-guide-check.ok .ic {
+  color: var(--guide-ok);
+  background: var(--guide-ok-soft);
+}
+.mep-guide-check.warn {
+  border-color: var(--guide-warn);
+  background: var(--guide-warn-soft);
+}
+.mep-guide-check.warn .ic {
+  color: var(--guide-warn);
+}
+.mep-guide-check.bad {
+  border-color: var(--guide-bad);
+  background: var(--guide-bad-soft);
+}
+.mep-guide-check.bad .ic {
+  color: var(--guide-bad);
+}
+.mep-guide-check.off {
+  opacity: 0.55;
+}
+.mep-guide-check.off .ic {
+  color: var(--muted);
+}
+.mep-guide-check .sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.mep-guide-callout {
+  border-left: 4px solid var(--guide-warn);
+  background: var(--guide-warn-soft);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.mep-guide-callout.bad {
+  border-left-color: var(--guide-bad);
+  background: var(--guide-bad-soft);
+}
+.mep-guide-untyped {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 170px;
+  overflow-y: auto;
+}
+.mep-guide-untyped-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.mep-modal .mep-guide-untyped-row select {
+  width: 200px;
+  margin-bottom: 0;
+  padding: 2px 6px;
+}
+.mep-guide-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  cursor: pointer;
+  text-align: left;
+}
+.mep-guide-stamp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  padding: 10px;
+}
+.mep-guide-stamp img,
+.mep-guide-stamp-empty {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  background: var(--paper);
+  border-radius: 2px;
+  flex: none;
+}
+.mep-guide-stamp-name {
+  flex: 1;
+  min-width: 0;
+}
+.mep-guide-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  min-width: 0;
+}
+@media (max-width: 1100px) {
+  .mep-guide-side {
+    position: static;
+  }
+}
+.mep-guide-panel {
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.mep-guide-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.mep-guide-panel-head .pt {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+}
+.mep-guide-seg {
+  display: inline-flex;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mep-guide-seg button {
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  padding: 3px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+}
+.mep-guide-seg button.on {
+  background: var(--ink);
+  color: var(--surface);
+}
+.mep-guide-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mep-guide-fact {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  padding: 3px 7px;
+}
+.mep-guide-fact small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.mep-guide-plan {
+  width: 100%;
+  height: auto;
+  max-height: 46vh;
+  display: block;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: 2px;
+}
+.mep-guide-plan-room {
+  cursor: pointer;
+}
+.mep-guide-plan-dim {
+  font-family: var(--font-hand);
+  fill: var(--muted);
+}
+.mep-guide-plan-name {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  fill: var(--ink);
+}
+.mep-guide-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mep-guide-legend span::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  border: 1px solid var(--line);
+  background: var(--sw);
+}
+.mep-guide-legend span.hatch::before {
+  background: repeating-linear-gradient(45deg, var(--guide-warn) 0 1px, var(--surface) 1px 4px);
+}
+.mep-guide-legend span.plain::before {
+  display: none;
+}
+.mep-guide-chain {
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+}
+.mep-guide-chain .cr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 2px 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--surface-2);
+  align-items: center;
+}
+.mep-guide-chain .cr:last-child {
+  border-bottom: 0;
+}
+.mep-guide-chain .cl {
+  font-size: 12.5px;
+}
+.mep-guide-chain .cw {
+  grid-column: 1;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mep-guide-chain .cn {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 16px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mep-guide-chain.source-wins .cr:first-child,
+.mep-guide-chain .cr.win {
+  background: var(--accent-soft);
+}
+.mep-guide-chain .cr.res {
+  background: var(--ink);
+  color: var(--surface);
+}
+.mep-guide-chain .cr.res .cw {
+  color: var(--line);
+}
+.mep-guide-chain .cr.cap,
+.mep-guide-chain .cr.blocked {
+  background: var(--guide-warn-soft);
+}
+.mep-guide-chain .cr.blocked {
+  color: var(--guide-warn);
+}

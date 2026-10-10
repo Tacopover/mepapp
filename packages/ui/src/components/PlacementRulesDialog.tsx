@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
+import type { SketchScene } from '@mepapp/render';
 import {
   AIR_CHANGE_UNITS,
   AMOUNT_UNITS,
@@ -6,28 +7,25 @@ import {
   GRID_STYLE_LABELS,
   hasCoverageLimit,
   ILLUMINANCE_UNIT_LABELS,
-  isAirChangeUnit,
   LAYOUT_STRATEGY_LABELS,
   LENGTH_UNIT_LABELS,
-  parseDecimal,
   parsePlacementRules,
   PLACEMENT_PRESET_HELP,
   PLACEMENT_PRESET_LABELS,
   PRESET_AMOUNT_FIELDS,
   roomTypeLabel,
   validatePlacementRule,
-  type AreaUnit,
   type Discipline,
-  type GridStyle,
-  type IlluminanceUnit,
   type LayoutStrategy,
-  type LengthUnit,
   type PlacementPreset,
   type PlacementRule,
   type RoomType,
+  type StampDefinition,
 } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
+import { PlacementRuleGuide } from './PlacementRuleGuide.js';
+import { AMOUNT_FIELD_LABELS, blankRule, draftOf, FieldError, newRuleId, OTHER_UNIT, presetHelpText, presetPatch, ruleOf, uniqueName, type Draft } from './placementRuleDraft.js';
 
 export interface PlacementRulesDialogProps {
   /** The user library. */
@@ -41,10 +39,20 @@ export interface PlacementRulesDialogProps {
   onChooseStamp: (onPick: (definitionId: string) => void) => void;
   /** Saves the list as a JSON file. */
   onExport: (rules: PlacementRule[]) => void;
+  /** The scene, for the rooms of the shown page in the guide. */
+  sceneRef: RefObject<SketchScene | null>;
+  /** A stamp definition by id, for its size; undefined when it is not found. */
+  stampDefinition: (definitionId: string) => StampDefinition | undefined;
+  /** The remembered scale of a stamp definition (the stamp tool's appearance default). */
+  stampScale: (definitionId: string) => number;
+  /** The thumbnail of a stamp definition, or null when the id is unknown. */
+  stampIconUrl: (definitionId: string) => string | null;
+  /** Saves the room-type library (the area per person in the guide). */
+  onChangeRoomTypes: (types: RoomType[]) => void;
+  /** True while the stamp picker of a rule is open on top of this dialog. */
+  stampPickerOpen: boolean;
   onClose: () => void;
 }
-
-const newRuleId = () => `rule-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 const LAYOUT_HINTS: Record<LayoutStrategy, string> = {
   center: 'One element at the label point. More than one element uses the grid.',
@@ -53,58 +61,23 @@ const LAYOUT_HINTS: Record<LayoutStrategy, string> = {
   perimeter: 'Elements along the walls, turned to face into the room.',
 };
 
-const AMOUNT_FIELD_LABELS: Record<(typeof PRESET_AMOUNT_FIELDS)[PlacementPreset][number], string> = {
-  fixed: 'Per room',
-  perM2: 'Per m² floor area',
-  perPerson: 'Per person',
-  perM3: 'Per m³ volume (air changes)',
-  minimum: 'Minimum per room',
-};
-
-const OTHER_UNIT = '__other';
-
-/** The explanation of a preset as one text, for a tooltip. */
-const presetHelpText = (preset: PlacementPreset): string => {
-  const help = PLACEMENT_PRESET_HELP[preset];
-  return [help.formula, ...help.symbols.map((s) => `${s.symbol}: ${s.text}`), ...(help.note ? [help.note] : [])].join('\n');
-};
-
-function blankRule(name: string): PlacementRule {
-  return {
-    id: newRuleId(),
-    name,
-    discipline: 'ventilation',
-    roomTypeIds: [],
-    stampDefinitionId: null,
-    preset: 'perArea',
-    amount: { unit: 'dm³/s' },
-    coverage: {},
-    layout: { strategy: 'center', wallOffsetM: 0.5, rotation: 'room' },
-    writeCapacity: true,
-  };
-}
-
-function uniqueName(base: string, rules: readonly PlacementRule[]): string {
-  const taken = new Set(rules.map((r) => r.name.trim().toLowerCase()));
-  if (!taken.has(base.toLowerCase())) return base;
-  for (let n = 2; ; n++) if (!taken.has(`${base} ${n}`.toLowerCase())) return `${base} ${n}`;
-}
-
 /**
  * Edits the user library of placement rules (room-auto-placement.md Phase 3): which rooms, which
  * stamp, the amount a room needs, the capacity of one element, coverage limits, count limits and
  * the layout. The rules are not part of a drawing.
  */
-export function PlacementRulesDialog({ rules, roomTypes, language, onChange, stampName, onChooseStamp, onExport, onClose }: PlacementRulesDialogProps) {
+export function PlacementRulesDialog({ rules, roomTypes, language, onChange, stampName, onChooseStamp, onExport, sceneRef, stampDefinition, stampScale, stampIconUrl, onChangeRoomTypes, stampPickerOpen, onClose }: PlacementRulesDialogProps) {
   const [selectedId, setSelectedId] = useState<string | null>(rules[0]?.id ?? null);
   const [dirty, setDirty] = useState(false);
+  // The guide edits one rule: a saved rule, or a new rule that the list gets on the first Save.
+  const [guide, setGuide] = useState<{ ruleId: string; isNew: boolean; blank?: PlacementRule } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const selected = rules.find((r) => r.id === selectedId) ?? null;
   const busy = dirty ? 'Save or revert your changes first' : undefined;
 
-  const addRule = (from?: PlacementRule) => {
-    const created = from ? { ...structuredClone(from), id: newRuleId(), name: uniqueName(`${from.name} copy`, rules) } : blankRule(uniqueName('New rule', rules));
+  const addRule = (from: PlacementRule) => {
+    const created = { ...structuredClone(from), id: newRuleId(), name: uniqueName(`${from.name} copy`, rules) };
     onChange([...rules, created]);
     setSelectedId(created.id);
   };
@@ -123,6 +96,36 @@ export function PlacementRulesDialog({ rules, roomTypes, language, onChange, sta
       setMessage(`Could not read ${file.name}.`);
     }
   };
+
+  if (guide) {
+    const guideRule = guide.isNew ? guide.blank! : rules.find((r) => r.id === guide.ruleId);
+    if (guideRule) {
+      return (
+        <PlacementRuleGuide
+          key={JSON.stringify(guideRule)}
+          rule={guideRule}
+          isNew={guide.isNew}
+          others={rules.filter((r) => r.id !== guideRule.id)}
+          roomTypes={roomTypes}
+          language={language}
+          sceneRef={sceneRef}
+          stampName={stampName}
+          stampDefinition={stampDefinition}
+          stampScale={stampScale}
+          stampIconUrl={stampIconUrl}
+          stampPickerOpen={stampPickerOpen}
+          onChooseStamp={onChooseStamp}
+          onChangeRoomTypes={onChangeRoomTypes}
+          onSave={(next) => {
+            onChange(guide.isNew ? [...rules, next] : rules.map((r) => (r.id === next.id ? next : r)));
+            setSelectedId(next.id);
+            setGuide({ ruleId: next.id, isNew: false });
+          }}
+          onClose={() => setGuide(null)}
+        />
+      );
+    }
+  }
 
   return (
     <Dialog
@@ -171,7 +174,7 @@ export function PlacementRulesDialog({ rules, roomTypes, language, onChange, sta
               <span>{rule.name}</span>
             </button>
           ))}
-          <button type="button" className="mep-circuit-types-new" disabled={dirty} title={busy} onClick={() => addRule()}>
+          <button type="button" className="mep-circuit-types-new" disabled={dirty} title={busy} onClick={() => setGuide({ ruleId: '', isNew: true, blank: blankRule(uniqueName('New rule', rules)) })}>
             + New rule
           </button>
         </div>
@@ -187,6 +190,7 @@ export function PlacementRulesDialog({ rules, roomTypes, language, onChange, sta
             onDirtyChange={setDirty}
             onSave={(next) => onChange(rules.map((r) => (r.id === next.id ? next : r)))}
             onDuplicate={() => addRule(selected)}
+            onOpenGuide={() => setGuide({ ruleId: selected.id, isNew: false })}
             onDelete={() => {
               onChange(rules.filter((r) => r.id !== selected.id));
               setSelectedId(null);
@@ -207,108 +211,6 @@ export function PlacementRulesDialog({ rules, roomTypes, language, onChange, sta
   );
 }
 
-const text = (n: number | undefined) => (n === undefined ? '' : String(n));
-
-function draftOf(rule: PlacementRule) {
-  return {
-    name: rule.name,
-    discipline: rule.discipline,
-    roomTypeIds: rule.roomTypeIds,
-    nameContains: rule.nameContains ?? '',
-    stampDefinitionId: rule.stampDefinitionId,
-    preset: rule.preset,
-    fixed: text(rule.amount.fixed),
-    perM2: text(rule.amount.perM2),
-    perPerson: text(rule.amount.perPerson),
-    perM3: text(rule.amount.perM3),
-    minimum: text(rule.amount.minimum),
-    unit: rule.amount.unit,
-    areaUnit: (rule.amount.areaUnit ?? 'm2') as AreaUnit,
-    lux: text(rule.lighting?.lux),
-    uf: text(rule.lighting?.utilisationFactor),
-    mf: text(rule.lighting?.maintenanceFactor),
-    illuminanceUnit: (rule.lighting?.illuminanceUnit ?? 'lx') as IlluminanceUnit,
-    capacity: text(rule.capacityPerElement),
-    maxSpacing: text(rule.coverage.maxSpacing),
-    maxArea: text(rule.coverage.maxAreaPerElement),
-    maxWall: text(rule.coverage.maxWallDistance),
-    lengthUnit: (rule.coverage.lengthUnit ?? 'm') as LengthUnit,
-    minCount: text(rule.minCount),
-    maxCount: text(rule.maxCount),
-    strategy: rule.layout.strategy,
-    gridStyle: (rule.layout.gridStyle ?? 'spread') as GridStyle,
-    wallOffset: String(rule.layout.wallOffsetM),
-    minSpacing: text(rule.layout.minSpacingM),
-    rotation: rule.layout.rotation,
-    fixedAngle: text(rule.layout.fixedAngleDeg),
-    writeCapacity: rule.writeCapacity,
-  };
-}
-
-type Draft = ReturnType<typeof draftOf>;
-
-class FieldError extends Error {}
-
-/** A typed number, or undefined for an empty box. Throws a FieldError for text that is not a number. */
-function numberOf(value: string, label: string): number | undefined {
-  if (value.trim() === '') return undefined;
-  const parsed = parseDecimal(value);
-  if (parsed === null) throw new FieldError(`${label}: "${value}" is not a number.`);
-  return parsed;
-}
-
-function ruleOf(id: string, d: Draft): PlacementRule {
-  const shown = new Set(PRESET_AMOUNT_FIELDS[d.preset]);
-  const amount: PlacementRule['amount'] = { unit: d.preset === 'lighting' ? 'lm' : d.unit.trim() };
-  for (const key of ['fixed', 'perM2', 'perPerson', 'perM3', 'minimum'] as const) {
-    const value = shown.has(key) ? numberOf(d[key], AMOUNT_FIELD_LABELS[key]) : undefined;
-    if (value !== undefined) amount[key] = value;
-  }
-  if (shown.has('perM2') && d.areaUnit === 'ft2') amount.areaUnit = 'ft2';
-  const rule: PlacementRule = {
-    id,
-    name: d.name.trim(),
-    discipline: d.discipline,
-    roomTypeIds: d.roomTypeIds,
-    stampDefinitionId: d.stampDefinitionId,
-    preset: d.preset,
-    amount,
-    coverage: {},
-    layout: { strategy: d.strategy, wallOffsetM: numberOf(d.wallOffset, 'Min distance to the walls') ?? 0, rotation: d.rotation },
-    writeCapacity: d.writeCapacity,
-  };
-  if (d.nameContains.trim()) rule.nameContains = d.nameContains.trim();
-  const minSpacing = numberOf(d.minSpacing, 'Min distance between stamps');
-  if (minSpacing !== undefined) rule.layout.minSpacingM = minSpacing;
-  if (d.strategy === 'grid' && d.gridStyle !== 'spread') rule.layout.gridStyle = d.gridStyle;
-  if (d.lengthUnit === 'ft') rule.coverage.lengthUnit = 'ft';
-  if (d.preset === 'lighting') {
-    const lux = numberOf(d.lux, 'Illuminance');
-    const uf = numberOf(d.uf, 'Utilisation factor');
-    const mf = numberOf(d.mf, 'Maintenance factor');
-    if (lux === undefined || uf === undefined || mf === undefined) throw new FieldError('Enter the illuminance, the utilisation factor and the maintenance factor.');
-    rule.lighting = { lux, utilisationFactor: uf, maintenanceFactor: mf };
-    if (d.illuminanceUnit === 'fc') rule.lighting.illuminanceUnit = 'fc';
-  }
-  const optional: [keyof PlacementRule | keyof PlacementRule['coverage'], string, string, 'rule' | 'coverage'][] = [
-    ['capacityPerElement', d.capacity, 'Capacity per element', 'rule'],
-    ['minCount', d.minCount, 'Min count', 'rule'],
-    ['maxCount', d.maxCount, 'Max count', 'rule'],
-    ['maxSpacing', d.maxSpacing, 'Max spacing', 'coverage'],
-    ['maxAreaPerElement', d.maxArea, 'Max area per element', 'coverage'],
-    ['maxWallDistance', d.maxWall, 'Max distance to a wall', 'coverage'],
-  ];
-  for (const [key, value, label, target] of optional) {
-    const n = numberOf(value, label);
-    if (n !== undefined) (target === 'rule' ? (rule as unknown as Record<string, unknown>) : (rule.coverage as Record<string, unknown>))[key] = n;
-  }
-  if (d.rotation === 'fixed') {
-    const angle = numberOf(d.fixedAngle, 'Fixed angle');
-    if (angle !== undefined) rule.layout.fixedAngleDeg = angle;
-  }
-  return rule;
-}
-
 interface PlacementRuleFormProps {
   rule: PlacementRule;
   others: PlacementRule[];
@@ -319,11 +221,12 @@ interface PlacementRuleFormProps {
   onDirtyChange: (dirty: boolean) => void;
   onSave: (rule: PlacementRule) => void;
   onDuplicate: () => void;
+  onOpenGuide: () => void;
   onDelete: () => void;
 }
 
 /** The fields of one rule. Local draft with explicit Save and Revert. Its parent gives it a `key` built from the saved values, so it re-seeds after a save. */
-function PlacementRuleForm({ rule, others, roomTypes, language, stampName, onChooseStamp, onDirtyChange, onSave, onDuplicate, onDelete }: PlacementRuleFormProps) {
+function PlacementRuleForm({ rule, others, roomTypes, language, stampName, onChooseStamp, onDirtyChange, onSave, onDuplicate, onOpenGuide, onDelete }: PlacementRuleFormProps) {
   const initial = draftOf(rule);
   const [draft, setDraft] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -446,7 +349,7 @@ function PlacementRuleForm({ rule, others, roomTypes, language, stampName, onCho
           title={presetHelpText(draft.preset)}
           onChange={(e) => {
             const preset = e.target.value as PlacementPreset;
-            update({ preset, unit: preset === 'airChanges' && !isAirChangeUnit(draft.unit) ? 'm³/h' : draft.unit, ...(preset === 'coverage' ? { strategy: 'evenSpread' as const } : {}) });
+            update(presetPatch(draft, preset));
           }}
         >
           {(Object.keys(PLACEMENT_PRESET_LABELS) as PlacementPreset[]).map((p) => (
@@ -561,6 +464,9 @@ function PlacementRuleForm({ rule, others, roomTypes, language, stampName, onCho
         </button>
         <button type="button" onClick={onDuplicate} disabled={dirty}>
           Duplicate
+        </button>
+        <button type="button" onClick={onOpenGuide} disabled={dirty}>
+          Edit in the guide…
         </button>
         <button type="button" onClick={onDelete} disabled={dirty}>
           Delete
