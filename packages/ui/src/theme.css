@@ -3838,6 +3838,13 @@
   width: 120px;
   text-align: left;
 }
+/* The room type gives the number: the box is only the fallback. */
+.mep-modal input.mep-guide-num.unused {
+  border-style: dashed;
+  background: var(--surface);
+  color: var(--muted);
+  text-decoration: line-through;
+}
 .mep-guide-choices {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

@@ -4,6 +4,7 @@ import {
   isAirChangeUnit,
   parseDecimal,
   PRESET_AMOUNT_FIELDS,
+  ROOM_DEMAND_FIELDS,
   type AmountTermKey,
   type AreaUnit,
   type GridEdge,
@@ -128,8 +129,13 @@ export function ruleOf(id: string, d: Draft): PlacementRule {
     if (value !== undefined) amount[key] = value;
   }
   if (shown.has('perM2') && d.areaUnit === 'ft2') amount.areaUnit = 'ft2';
-  for (const [key, demand] of Object.entries(d.from) as [AmountTermKey, RoomDemandKey][]) {
-    if (shown.has(key) && demandFitsUnit(demand, amount.unit)) (amount.from ??= {})[key] = demand;
+  for (const [key, demand] of Object.entries(d.from) as [AmountTermKey, RoomDemandKey | undefined][]) {
+    if (demand === undefined || !shown.has(key)) continue;
+    if (!demandFitsUnit(demand, amount.unit)) {
+      const f = ROOM_DEMAND_FIELDS.find((x) => x.key === demand)!;
+      throw new FieldError(`${AMOUNT_FIELD_LABELS[key]}: the room-type value "${f.label.toLowerCase()}" (${f.unit}) does not fit the unit ${amount.unit || '(none)'}. Choose another unit, or choose Number.`);
+    }
+    (amount.from ??= {})[key] = demand;
   }
   const rule: PlacementRule = {
     id,

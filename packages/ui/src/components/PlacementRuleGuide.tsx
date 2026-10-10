@@ -50,6 +50,7 @@ import {
   type Room,
   type RoomDemandKey,
   type RoomType,
+  type TermValue,
   type RoomValues,
   type StampDefinition,
   type Vec2,
@@ -423,7 +424,8 @@ export function PlacementRuleGuide({
     [scene, needFloor, previewRule, pageRooms, jobOf, stampSizePt],
   );
   const floorJob = usePlacementPlan(createPlacementWorker, floorInput);
-  const floorRows = floorJob.plan?.rows ?? null;
+  // In steps 4 and 5 the rows of the last plan stay until the new rows come; elsewhere only rows of this draft count.
+  const floorRows = floorJob.plan && (floorJob.input?.rules[0] === previewRule || step === 4 || step === 5) ? floorJob.plan.rows : null;
 
   // Step 6: the real stamp, its art and the auto-placed stamps of the drawing (a re-run replaces them).
   const stampId = parsed.rule?.stampDefinitionId ?? null;
@@ -738,15 +740,24 @@ export function PlacementRuleGuide({
     const sampleType = sample ? typeName(sample.roomTypeId) : 'the room type';
     const amountTerm = (key: AmountTermKey, label: string, input: string, after: ReactNode, result: ReactNode) => {
       const choices = demandsForTerm(key).filter((d) => demandFitsUnit(d, draft.unit.trim()));
-      const from = draft.from[key] !== undefined && choices.includes(draft.from[key]!) ? draft.from[key] : undefined;
+      const picked = draft.from[key];
+      const from = picked !== undefined && choices.includes(picked) ? picked : undefined;
+      // A source that the unit does not fit (the unit changed after the choice): ruleOf refuses it, so the user must choose.
+      const misfit = picked !== undefined && from === undefined ? picked : undefined;
       const raw = from !== undefined ? v?.demands?.[from] : undefined;
+      const boxUnused = from !== undefined && raw !== undefined;
       return (
         <Fragment key={key}>
           <div className="mep-guide-term">
             <span className="mep-guide-sym">{fieldSymbol(preset, key)}</span>
-            {choices.length > 0 && (
-              <select className="mep-guide-unit" id={`pg-from-${key}`} aria-label={`Source of: ${label}`} value={from ?? ''} onChange={(e) => update({ from: { ...draft.from, [key]: e.target.value || undefined } })}>
+            {(choices.length > 0 || misfit) && (
+              <select className="mep-guide-unit" id={`pg-from-${key}`} aria-label={`Source of: ${label}`} value={picked ?? ''} onChange={(e) => update({ from: { ...draft.from, [key]: e.target.value || undefined } })}>
                 <option value="">Number</option>
+                {misfit && (
+                  <option value={misfit}>
+                    Room type: {demandField(misfit).label.toLowerCase()} (does not fit the unit)
+                  </option>
+                )}
                 {choices.map((d) => (
                   <option key={d} value={d}>
                     Room type: {demandField(d).label.toLowerCase()}
@@ -754,12 +765,27 @@ export function PlacementRuleGuide({
                 ))}
               </select>
             )}
-            <input className="mep-guide-num" id={`pg-${key}`} type="text" inputMode="decimal" aria-label={label} placeholder={from ? 'fallback' : undefined} value={input} onChange={field(key)} />
+            <input
+              className={`mep-guide-num${boxUnused ? ' unused' : ''}`}
+              id={`pg-${key}`}
+              type="text"
+              inputMode="decimal"
+              aria-label={label}
+              placeholder={from ? 'fallback' : undefined}
+              title={boxUnused ? `Not used for ${sampleType}: the number comes from the room type. The box is the fallback.` : undefined}
+              value={input}
+              onChange={field(key)}
+            />
             {after}
             <span className="mep-guide-res" data-testid={`pg-t-${key}`}>
               {result}
             </span>
           </div>
+          {misfit && (
+            <div className="mep-guide-term sub" data-testid={`pg-from-misfit-${key}`}>
+              {missing(`${demandField(misfit).label} (${demandField(misfit).unit}) does not fit the unit ${draft.unit.trim() || '(none)'}. Choose another unit, or choose Number.`)}
+            </div>
+          )}
           {from && (
             <div className="mep-guide-term sub" data-testid={`pg-from-note-${key}`}>
               {raw !== undefined ? (
@@ -985,7 +1011,17 @@ export function PlacementRuleGuide({
                       <option value="">Number</option>
                       <option value="roomType">Room type: illuminance</option>
                     </select>
-                    <input className="mep-guide-num" id="pg-lux" type="text" inputMode="decimal" aria-label="Illuminance" placeholder={draft.luxFromRoomType ? 'fallback' : undefined} value={draft.lux} onChange={field('lux')} />
+                    <input
+                      className={`mep-guide-num${lightUsed?.luxSource === 'roomType' ? ' unused' : ''}`}
+                      id="pg-lux"
+                      type="text"
+                      inputMode="decimal"
+                      aria-label="Illuminance"
+                      placeholder={draft.luxFromRoomType ? 'fallback' : undefined}
+                      title={lightUsed?.luxSource === 'roomType' ? `Not used for ${sampleType}: the illuminance comes from the room type. The box is the fallback.` : undefined}
+                      value={draft.lux}
+                      onChange={field('lux')}
+                    />
                     <span>{ILLUMINANCE_UNIT_LABELS[draft.illuminanceUnit]}</span>
                     <span className="mep-guide-op">×</span>
                     <span className="mep-guide-val">
@@ -1410,6 +1446,12 @@ export function PlacementRuleGuide({
         {byCoverage && draft.strategy === 'evenSpread' && (
           <div className="mep-guide-callout info">With By coverage, Even spread uses the positions that the coverage calculation found. Each point of the room stays covered.</div>
         )}
+        {coverageOn && (draft.strategy !== 'evenSpread' || draft.ceilingGrid) && (
+          <div className="mep-guide-callout info" data-testid="pg-grow-note">
+            When this layout{draft.ceilingGrid && draft.strategy !== 'perimeter' ? ' or the ceiling grid' : ''} leaves part of the room outside the coverage circles, MepApp adds stamps until each point is covered.
+            {draft.strategy === 'grid' && draft.edge === 'halfSpacing' ? ' With the outer stamps at half the spacing from the wall, the corners need many stamps. "At the min distance to the walls" needs fewer.' : ''}
+          </div>
+        )}
         <div className="mep-guide-choices" role="radiogroup" aria-label="Layout">
           {(Object.keys(LAYOUT_STRATEGY_LABELS) as LayoutStrategy[]).map((s) => (
             <div key={s} className={`mep-guide-choice${draft.strategy === s ? ' on' : ''}`}>
@@ -1825,6 +1867,10 @@ function WhyBox({ row, matches, sampleName, unit, rule, coverage, error }: WhyBo
   );
   let first: ReactNode;
   let base: number | null = null;
+  const fromType = [
+    ...(Object.entries(req.terms ?? {}) as [AmountTermKey, TermValue][]).filter(([, t]) => t.source === 'roomType').map(([key, t]) => termText(key, t.value, unit)),
+    ...(req.lighting?.luxSource === 'roomType' ? [`${fmt(req.lighting.lux)} lx`] : []),
+  ];
   const amountLine = (cls: string) => line(cls, PLACEMENT_PRESET_LABELS[rule.preset], `${fmt(req.required)} ${unit} ÷ ${fmt(rule.capacityPerElement)} per stamp, rounded up`, req.quantityCount ?? '?', 'pg-why-source');
   if (req.countSource === 'coverage') {
     base = req.count;
@@ -1869,7 +1915,7 @@ function WhyBox({ row, matches, sampleName, unit, rule, coverage, error }: WhyBo
         {first}
         {rule.minCount !== undefined && line(minHit ? 'cap' : '', 'Min count', req.countSource === 'coverage' ? 'The coverage starts at this count' : minHit ? 'Raises the count' : 'Not needed here', rule.minCount, 'pg-why-min')}
         {rule.maxCount !== undefined && line(maxHit ? 'cap' : '', 'Max count', maxHit ? 'Limits the count' : 'Not needed here', rule.maxCount, 'pg-why-max')}
-        {line('res', 'Stamps in this room', req.count === null ? 'Cannot calculate yet' : 'Spacing and layout do not change this number', req.count ?? '?', 'pg-why-result')}
+        {line('res', 'Stamps in this room', req.count === null ? 'Cannot calculate yet' : coverage ? 'The coverage of the final positions can raise this number' : 'Spacing and layout do not change this number', req.count ?? '?', 'pg-why-result')}
       </div>
       {req.perElement !== null && req.count !== null && (
         <p className="mep-guide-note" data-testid="pg-why-each">
@@ -1881,19 +1927,9 @@ function WhyBox({ row, matches, sampleName, unit, rule, coverage, error }: WhyBo
           Room index k = {fmt(req.lighting.roomIndex.k, 2)} (h<sub>m</sub> {fmt(req.lighting.roomIndex.hmM, 2)} m): UF {fmt(req.lighting.uf, 3)}.
         </p>
       )}
-      {req.terms && Object.values(req.terms).some((t) => t?.source === 'roomType') && (
+      {fromType.length > 0 && (
         <p className="mep-guide-note" data-testid="pg-why-demands">
-          Numbers from the room type:{' '}
-          {(Object.entries(req.terms) as [AmountTermKey, { value: number; source: string }][])
-            .filter(([, t]) => t.source === 'roomType')
-            .map(([key, t]) => `${AMOUNT_TERM_TEXT[key]} ${fmt(t.value, 3)} ${unit}`)
-            .join(', ')}
-          {req.lighting?.luxSource === 'roomType' ? `, ${fmt(req.lighting.lux)} lx` : ''}.
-        </p>
-      )}
-      {!req.terms && req.lighting?.luxSource === 'roomType' && (
-        <p className="mep-guide-note" data-testid="pg-why-demands">
-          Numbers from the room type: {fmt(req.lighting.lux)} lx.
+          Numbers from the room type: {fromType.join(', ')}.
         </p>
       )}
       {notes.length > 0 && <div className="mep-guide-callout bad">{notes.join('; ')}</div>}
@@ -1901,4 +1937,8 @@ function WhyBox({ row, matches, sampleName, unit, rule, coverage, error }: WhyBo
   );
 }
 
-const AMOUNT_TERM_TEXT: Record<AmountTermKey, string> = { fixed: 'per room', perM2: 'per m²', perPerson: 'per person', perM3: 'air changes' };
+/** One term number with its unit, for example "6.5 dm³/s per person" or "2 air changes per hour". */
+function termText(key: AmountTermKey, value: number, unit: string): string {
+  if (key === 'perM3') return `${fmt(value, 3)} air changes per hour`;
+  return `${fmt(value, 3)} ${unit} ${key === 'fixed' ? 'per room' : key === 'perM2' ? 'per m²' : 'per person'}`;
+}

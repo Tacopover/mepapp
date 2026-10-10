@@ -390,6 +390,37 @@ export function hasCoverageGap(room: Pick<Room, 'polygon'>, points: readonly Vec
   });
 }
 
+/** The coverage targets of the room within `radiusPt` of a candidate position: the parts of the room that a stamp can cover. */
+function coverableTargets(room: Pick<Room, 'polygon'>, samples: RoomSamples, candidates: readonly Vec2[], radiusPt: number): Vec2[] {
+  const r = radiusPt + 1e-6;
+  const hash = new PointHash(r);
+  for (const c of candidates) hash.add(c);
+  return coverageTargets(room, samples).filter((q) => hash.hasWithin(q, r));
+}
+
+/** The number of targets farther than `radiusPt` from every point. */
+function uncoveredCount(points: readonly Vec2[], targets: readonly Vec2[], radiusPt: number): number {
+  const r = radiusPt + 1e-6;
+  const hash = new PointHash(r);
+  for (const p of points) hash.add(p);
+  let n = 0;
+  for (const q of targets) if (!hash.hasWithin(q, r)) n++;
+  return n;
+}
+
+/** layoutRoomStamps adds stamps for coverage in steps of this part of the count. */
+const GROW_STEP = 0.1;
+
+/** Points along the wall runs (wallRuns) at most `stepPt` apart: the positions that Along the walls can use. */
+function wallRunPoints(room: Pick<Room, 'polygon'>, offsetPt: number, stepPt: number): Vec2[] {
+  const out: Vec2[] = [];
+  for (const run of wallRuns(room, offsetPt)) {
+    const k = Math.max(1, Math.ceil(run.length / stepPt));
+    for (let i = 0; i <= k; i++) out.push({ x: run.start.x + ((run.end.x - run.start.x) * i) / k, y: run.start.y + ((run.end.y - run.start.y) * i) / k });
+  }
+  return out;
+}
+
 /**
  * By coverage: starts with `startCount` points (Even spread), then adds a point at the room sample
  * farthest from every point and relaxes again, until every sample is within `radiusPt`. Samples
@@ -532,6 +563,23 @@ export function ceilingGridOf(room: Pick<Room, 'polygon'>, sizePt: number): Ceil
   return { center: rect.center, u: { x: Math.cos(a), y: Math.sin(a) }, v: { x: -Math.sin(a), y: Math.cos(a) }, size: sizePt, halfLength: rect.lengthPt / 2, halfWidth: rect.widthPt / 2 };
 }
 
+/** The tile centers of the room's ceiling grid that are valid placement points. */
+function ceilingTileCenters(room: Pick<Room, 'polygon'>, sizePt: number, offsetPt: number): Vec2[] {
+  const grid = ceilingGridOf(room, sizePt);
+  if (!grid) return [];
+  const g = grid.size;
+  const maxI = Math.ceil(grid.halfLength / g);
+  const maxJ = Math.ceil(grid.halfWidth / g);
+  const out: Vec2[] = [];
+  for (let i = -maxI; i <= maxI; i++) {
+    for (let j = -maxJ; j <= maxJ; j++) {
+      const t = { x: grid.center.x + grid.u.x * i * g + grid.v.x * j * g, y: grid.center.y + grid.u.y * i * g + grid.v.y * j * g };
+      if (isValidPlacementPoint(room.polygon, t, offsetPt)) out.push(t);
+    }
+  }
+  return out;
+}
+
 /**
  * Moves each point to the nearest free tile center of the ceiling grid that is a valid placement
  * point (inside the room, at least `offsetPt` from every wall). The points take their tiles in order,
@@ -652,10 +700,14 @@ export function estimateFitCount(samples: RoomSamples, minPt: number): number {
  * does not change the positions. With a ceiling grid (not Along the walls) the stamps then move to
  * tile centers (snapToCeilingGrid); a full grid gives 'gridFull'.
  *
- * The layouts place `count` stamps. By coverage (preset 'coverage'): `count` is the start count
- * (coverageStartCount), and layoutCoverage adds stamps until the room is covered, at most the max
- * count. Even spread then uses the coverage positions; another layout places its own pattern with
- * that count, and a part of the room out of reach gives 'coverageNotMet'.
+ * The layouts place `count` stamps. With coverage (By coverage, or an amount rule with
+ * alsoCoverage): `count` is the start count, and layoutCoverage adds stamps until the room is
+ * covered, at most the max count. Even spread then uses the coverage positions. Another layout, or
+ * the ceiling-grid snap, places its own positions: when these leave part of the room uncovered,
+ * the layout runs again with more stamps (steps of GROW_STEP, then the smallest count of the last
+ * step that covers), until the final positions cover each part of the room that a stamp can reach
+ * (coverableTargets), the max count (or MAX_COVERAGE_COUNT) is reached, or the ceiling grid is
+ * full. A part out of reach gives 'coverageNotMet'.
  *
  * With a min distance between stamps, two stamps closer than it give 'tooClose' and a fit estimate.
  * The check never changes the count or the positions.
@@ -674,38 +726,70 @@ export function layoutRoomStamps(
   let samples: RoomSamples | undefined;
   const samplesOf = () => (samples ??= roomSamples(room, offsetPt));
   const radiusM = usesCoverage(rule) ? coverageRadiusM(rule.coverage) : null;
-  let n = count;
-  let result: LayoutResult | null = null;
-  let layoutCount: RoomLayout['layoutCount'];
-  let checkCoverage = radiusM !== null;
-  if (radiusM !== null) {
-    const out = layoutCoverage(room, count, offsetPt, radiusM * ptPerM, rule.maxCount, samplesOf());
-    layoutCount = { count: out.points.length, limited: out.limited };
-    n = out.points.length;
-    if (strategy === 'evenSpread') [result, checkCoverage] = [out, false];
-  }
-  if (!result) {
-    if (n <= 0) {
-      result = { points: [], warnings: [] };
-    } else if (strategy === 'center' && n === 1) {
-      result = layoutCenter(room, offsetPt);
-    } else if (strategy === 'evenSpread') {
-      result = layoutEvenSpread(room, n, offsetPt, samplesOf());
-    } else if (strategy === 'perimeter') {
-      result = layoutPerimeter(room, n, offsetPt);
-    } else {
-      if (strategy === 'center') warnings.push('layoutFallback');
-      result = layoutGrid(room, n, offsetPt, rule.layout.gridStyle, strategy === 'grid' ? rule.layout.edge : undefined);
-    }
-  }
   const gridPt = strategy !== 'perimeter' && rule.layout.ceilingGridMm ? (rule.layout.ceilingGridMm / 1000) * ptPerM : 0;
-  if (gridPt > 0 && result.points.length > 0) {
-    const snapped = snapToCeilingGrid(room, result.points, gridPt, offsetPt);
-    result = { ...result, points: snapped.points };
-    if (snapped.full) warnings.push('gridFull');
-    checkCoverage = radiusM !== null;
+  /** `n` stamps with the rule's layout (or the positions `given`), then snapped to the ceiling grid. */
+  const place = (n: number, given?: LayoutResult): { result: LayoutResult; warnings: LayoutWarning[]; full: boolean } => {
+    const own: LayoutWarning[] = [];
+    let r: LayoutResult;
+    if (given) r = given;
+    else if (n <= 0) r = { points: [], warnings: [] };
+    else if (strategy === 'center' && n === 1) r = layoutCenter(room, offsetPt);
+    else if (strategy === 'evenSpread') r = layoutEvenSpread(room, n, offsetPt, samplesOf());
+    else if (strategy === 'perimeter') r = layoutPerimeter(room, n, offsetPt);
+    else {
+      if (strategy === 'center') own.push('layoutFallback');
+      r = layoutGrid(room, n, offsetPt, rule.layout.gridStyle, strategy === 'grid' ? rule.layout.edge : undefined);
+    }
+    let full = false;
+    if (gridPt > 0 && r.points.length > 0) {
+      const snapped = snapToCeilingGrid(room, r.points, gridPt, offsetPt);
+      r = { ...r, points: snapped.points };
+      full = snapped.full;
+      if (full) own.push('gridFull');
+    }
+    return { result: r, warnings: own, full };
+  };
+  let placed: ReturnType<typeof place>;
+  let layoutCount: RoomLayout['layoutCount'];
+  if (radiusM !== null) {
+    const radiusPt = radiusM * ptPerM;
+    const out = layoutCoverage(room, count, offsetPt, radiusPt, rule.maxCount, samplesOf());
+    let n = out.points.length;
+    let limited = out.limited;
+    placed = place(n, strategy === 'evenSpread' ? out : undefined);
+    // Even spread without a ceiling grid keeps the coverage positions: they cover what a stamp can reach.
+    if (strategy !== 'evenSpread' || gridPt > 0) {
+      const candidates = gridPt > 0 ? ceilingTileCenters(room, gridPt, offsetPt) : strategy === 'perimeter' ? wallRunPoints(room, offsetPt, radiusPt / 4) : samplesOf().valid;
+      const targets = coverableTargets(room, samplesOf(), candidates, radiusPt);
+      const limit = Math.min(rule.maxCount ?? MAX_COVERAGE_COUNT, MAX_COVERAGE_COUNT);
+      const covers = (p: ReturnType<typeof place>) => uncoveredCount(p.result.points, targets, radiusPt) === 0;
+      // Steps of about 10 %, then the smallest count of the last step that covers the room.
+      let failed = n;
+      let ok = covers(placed);
+      while (!ok && n < limit && !placed.full) {
+        failed = n;
+        n = Math.min(limit, n + Math.max(1, Math.ceil(n * GROW_STEP)));
+        placed = place(n);
+        ok = covers(placed);
+      }
+      if (ok) {
+        for (let m = failed + 1; m < n; m++) {
+          const fewer = place(m);
+          if (covers(fewer)) {
+            [placed, n] = [fewer, m];
+            break;
+          }
+        }
+      }
+      limited = !ok && rule.maxCount !== undefined && n >= rule.maxCount;
+      if (!placed.result.warnings.includes('coverageNotMet') && hasCoverageGap(room, placed.result.points, radiusPt, samplesOf())) placed.warnings.push('coverageNotMet');
+    }
+    layoutCount = { count: placed.result.points.length, limited };
+  } else {
+    placed = place(count);
   }
-  if (checkCoverage && !result.warnings.includes('coverageNotMet') && hasCoverageGap(room, result.points, radiusM! * ptPerM, samplesOf())) warnings.push('coverageNotMet');
+  warnings.push(...placed.warnings);
+  const result = placed.result;
   const minPt = (rule.layout.minSpacingM ?? 0) * ptPerM;
   let fitEstimate: number | undefined;
   if (minPt > 0 && hasCloserPair(result.points, minPt) && samplesOf().valid.length > 0) {

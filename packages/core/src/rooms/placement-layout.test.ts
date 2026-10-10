@@ -358,11 +358,43 @@ describe('layoutRoomStamps', () => {
     expect(worstDistance(room(rect(0, 0, 400, 200)), out.stamps.map((s) => s.position))).toBeLessThanOrEqual((4 / Math.SQRT2) * 40 + 3);
   });
 
-  it('By coverage with another layout: places that pattern with the coverage count, and warns when a part is not covered', () => {
+  // True when each sample and corner of the room is within `radiusPt` of a point.
+  const coversRoom = (r: ReturnType<typeof room>, points: Vec2[], radiusPt: number) =>
+    [...roomSamples(r, 0).all, ...r.polygon.outer].every((q) => points.some((p) => Math.hypot(p.x - q.x, p.y - q.y) <= radiusPt + 1e-6));
+
+  it('By coverage with another layout: adds stamps until the final positions cover the room', () => {
+    const r = room(rect(0, 0, 400, 200));
     const coverage = { ...rule({ strategy: 'perimeter', wallOffsetM: 0 }, { maxSpacing: 4 }), preset: 'coverage' as const };
-    const out = layoutRoomStamps(coverage, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
-    const even = layoutRoomStamps({ ...coverage, layout: { ...coverage.layout, strategy: 'evenSpread' } }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
-    expect(out.stamps).toHaveLength(even.stamps.length);
+    const out = layoutRoomStamps(coverage, r, 1, CAL, { width: 0, height: 0 });
+    const even = layoutRoomStamps({ ...coverage, layout: { ...coverage.layout, strategy: 'evenSpread' } }, r, 1, CAL, { width: 0, height: 0 });
+    expect(out.stamps.length).toBeGreaterThan(even.stamps.length);
+    expect(out.layoutCount!.count).toBe(out.stamps.length);
+    expect(out.warnings).not.toContain('coverageNotMet');
+    expect(coversRoom(r, out.stamps.map((s) => s.position), (4 / Math.SQRT2) * 40)).toBe(true);
+  });
+
+  it('amount + coverage with the Grid layout and a ceiling grid: the final positions cover the room', () => {
+    const r = room(rect(0, 0, 400, 200));
+    const radiusPt = 1.5 * 40;
+    for (const layout of [{}, { ceilingGridMm: 600 }, { strategy: 'evenSpread' as const, ceilingGridMm: 600 }]) {
+      const out = layoutRoomStamps({ ...rule({ wallOffsetM: 0.6, ...layout }, { maxRadius: 1.5 }), preset: 'lighting', alsoCoverage: true }, r, 7, CAL, { width: 0, height: 0 });
+      expect(out.warnings).not.toContain('coverageNotMet');
+      expect(coversRoom(r, out.stamps.map((s) => s.position), radiusPt)).toBe(true);
+      expect(out.layoutCount!.count).toBe(out.stamps.length);
+    }
+  });
+
+  it('stops adding stamps when the layout cannot reach a part of the room, and warns', () => {
+    // A 20 × 20 m room: stamps along the walls cannot reach the center with a radius of 2 m.
+    const out = layoutRoomStamps({ ...rule({ strategy: 'perimeter', wallOffsetM: 0 }, { maxRadius: 2 }), preset: 'coverage' }, room(rect(0, 0, 800, 800)), 1, CAL, { width: 0, height: 0 });
+    expect(out.warnings).toContain('coverageNotMet');
+    expect(out.stamps.length).toBeLessThan(60);
+  });
+
+  it('stops at the max count, and says so', () => {
+    const out = layoutRoomStamps({ ...rule({}, { maxRadius: 1.5 }), preset: 'lighting', alsoCoverage: true, maxCount: 8 }, room(rect(0, 0, 400, 200)), 7, CAL, { width: 0, height: 0 });
+    expect(out.stamps).toHaveLength(8);
+    expect(out.layoutCount).toEqual({ count: 8, limited: true });
     expect(out.warnings).toContain('coverageNotMet');
   });
 
