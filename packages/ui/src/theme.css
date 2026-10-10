@@ -3996,7 +3996,7 @@
   border-bottom: 0;
 }
 .mep-guide-label {
-  min-width: 120px;
+  min-width: 160px;
 }
 .mep-guide-op {
   font-family: var(--font-mono);
@@ -4035,13 +4035,21 @@
   padding-top: 0;
   padding-left: 36px;
 }
-.mep-guide-uf {
+.mep-modal table.mep-guide-uf {
   width: auto;
+  align-self: flex-start;
   margin: 8px 0;
+  border-collapse: collapse;
 }
 .mep-guide-uf td,
 .mep-guide-uf th {
-  padding: 2px 8px 2px 0;
+  width: auto;
+  padding: 2px 12px 2px 0;
+  text-align: left;
+}
+.mep-guide-uf th {
+  font-weight: 600;
+  font-size: 12px;
 }
 .mep-guide-missing {
   color: var(--guide-warn);
@@ -4108,6 +4116,11 @@
 }
 .mep-guide-check.pick:hover {
   border-color: var(--accent);
+}
+.mep-guide-check.pick:focus-visible,
+.mep-guide-table tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .mep-guide-check.sel {
   box-shadow: 0 0 0 2px var(--accent);

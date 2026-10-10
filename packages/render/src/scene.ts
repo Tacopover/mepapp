@@ -18,6 +18,7 @@ import {
   updateRoom as updateRoomFields,
   applyRoomTypeMatch,
   ROOM_TYPE_LIBRARY,
+  parseRoomTypes,
   computeRoomValues,
   DEFAULT_CEILING_HEIGHT_MM,
   isValidCeilingHeightMm,
@@ -3640,7 +3641,8 @@ export class SketchScene {
     target.schematics.splice(0, target.schematics.length, ...doc.schematics);
     for (const key of Object.keys(target.schematicProjectFields)) delete target.schematicProjectFields[key];
     Object.assign(target.schematicProjectFields, doc.schematicProjectFields);
-    target.roomTypes.splice(0, target.roomTypes.length, ...doc.roomTypes);
+    // The file's copies get the checks of the user library: a bad area per person or demand is dropped.
+    target.roomTypes.splice(0, target.roomTypes.length, ...(parseRoomTypes(doc.roomTypes) ?? []));
     target.ceilingHeightMm = doc.ceilingHeightMm;
     for (const key of Object.keys(target.roomTypeCeilingHeightsMm)) delete target.roomTypeCeilingHeightsMm[key];
     Object.assign(target.roomTypeCeilingHeightsMm, doc.roomTypeCeilingHeightsMm);

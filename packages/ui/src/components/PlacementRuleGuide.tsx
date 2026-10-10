@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import {
   AIR_CHANGE_UNITS,
@@ -878,16 +878,34 @@ export function PlacementRuleGuide({
     const needsPeople = termOn('perPerson');
     const needsVolume = termOn('perM3');
     // The room-type demands this rule uses, and the matching rooms whose type has no value.
-    const usedDemands: { key: RoomDemandKey; fallback: boolean }[] = [
+    // optional: the rule always has a value (the working-plane height of the rule, or the default), so a missing value is not a problem.
+    const usedDemands: { key: RoomDemandKey; fallback: boolean; optional?: boolean }[] = [
       ...(Object.entries(draft.from) as [AmountTermKey, RoomDemandKey | undefined][])
         .filter(([key, d]) => d !== undefined && fields.includes(key) && demandFitsUnit(d, draft.unit.trim()))
         .map(([key, d]) => ({ key: d!, fallback: draft[key].trim() !== '' })),
       ...(preset === 'lighting' && draft.luxFromRoomType ? [{ key: 'illuminanceLx' as const, fallback: draft.lux.trim() !== '' }] : []),
-      ...(preset === 'lighting' && draft.ufMode === 'table' ? [{ key: 'workingPlaneHeightM' as const, fallback: true }] : []),
+      ...(preset === 'lighting' && draft.ufMode === 'table' ? [{ key: 'workingPlaneHeightM' as const, fallback: true, optional: true }] : []),
     ];
     const noDemand = usedDemands.flatMap((d) => matched.filter((room) => scene && scene.getRoomValues(room).demands?.[d.key] === undefined).map((room) => ({ room, ...d })));
     const noDemandTypes = [...new Set(noDemand.map((x) => x.room.roomTypeId))];
     const demandBlocks = noDemand.some((x) => !x.fallback);
+    const neededMissing = noDemand.filter((x) => !x.optional);
+    const optionalMissingTypes = [...new Set(noDemand.filter((x) => x.optional).map((x) => x.room.roomTypeId))];
+    const neededKeys = usedDemands.filter((d) => !d.optional).map((d) => demandField(d.key).label.toLowerCase());
+    const demandCheckText = [
+      neededMissing.length > 0
+        ? `${plural(new Set(neededMissing.map((x) => x.room.id)).size, 'room')} without a value: ${[...new Set(neededMissing.map((x) => x.room.roomTypeId))].map((id) => typeName(id)).join(', ')}. ${demandBlocks ? 'Without a fallback number these rooms get no count. ' : 'MepApp uses the fallback numbers. '}Enter the values below.`
+        : neededKeys.length > 0
+          ? `Each room that matches has ${neededKeys.join(', ')} from its room type.`
+          : '',
+      usedDemands.some((d) => d.optional)
+        ? optionalMissingTypes.length > 0
+          ? `${optionalMissingTypes.map((id) => typeName(id)).join(', ')}: no working-plane height, so MepApp uses ${fmt(valueOf(draft.workingPlane) ?? DEFAULT_WORKING_PLANE_HEIGHT_M, 2)} m (${draft.workingPlane.trim() !== '' ? 'this rule' : 'the default'}). You can enter a value below.`
+          : 'Each room that matches has a working-plane height from its room type.'
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
     const noPeople = matched.filter((room) => scene && !scene.getRoomValues(room).people);
     const noPeopleTypes = [...new Set(noPeople.map((r) => r.roomTypeId))];
     const heights = scene?.getCeilingHeights();
@@ -1108,7 +1126,7 @@ export function PlacementRuleGuide({
                 )}
               </div>
             </div>
-            <table className="mep-guide-table mep-guide-uf">
+            <table className="mep-guide-uf">
               <thead>
                 <tr>
                   <th>Room index k</th>
@@ -1237,14 +1255,10 @@ export function PlacementRuleGuide({
             />
             {usedDemands.length > 0 && (
               <Check
-                state={noDemand.length === 0 ? 'ok' : demandBlocks ? 'bad' : 'warn'}
+                state={neededMissing.length === 0 ? 'ok' : demandBlocks ? 'bad' : 'warn'}
                 title="Values of the room types"
                 testId="pg-check-demands"
-                sub={
-                  noDemand.length === 0
-                    ? `Each room that matches has ${usedDemands.map((d) => demandField(d.key).label.toLowerCase()).join(', ')} from its room type.`
-                    : `${plural(new Set(noDemand.map((x) => x.room.id)).size, 'room')} without a value: ${noDemandTypes.map((id) => typeName(id)).join(', ')}. ${demandBlocks ? 'Without a fallback number these rooms get no count. ' : 'MepApp uses the fallback numbers. '}Enter the values below.`
-                }
+                sub={demandCheckText}
               />
             )}
             <Check
@@ -1606,7 +1620,7 @@ export function PlacementRuleGuide({
                 {rows.map((row) => {
                   const cls = row.requirement.count === null ? 'bad' : spacingProblem(row) || coverageProblem(row) || tooManyStamps(row) ? 'err' : row.room.id === sample?.id ? 'sel' : '';
                   return (
-                    <tr key={row.room.id} className={cls} data-room={row.room.id} onClick={() => setSampleId(row.room.id)}>
+                    <tr key={row.room.id} className={cls} data-room={row.room.id} tabIndex={0} aria-selected={row.room.id === sample?.id} onClick={() => setSampleId(row.room.id)} onKeyDown={pickKeys(() => setSampleId(row.room.id))}>
                       <td>{roomLabel(row.room)}</td>
                       <td>{typeName(row.room.roomTypeId)}</td>
                       <td className="num">{fmt(row.values.areaM2)}</td>
@@ -1818,9 +1832,22 @@ export function PlacementRuleGuide({
   );
 }
 
+/** Enter or Space does the click of a row that picks a room. */
+const pickKeys = (onPick: () => void) => (e: KeyboardEvent) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  onPick();
+};
+
 function Check({ state, title, sub, testId, selected, onPick }: { state: 'ok' | 'warn' | 'bad' | 'off'; title: string; sub: string; testId: string; selected?: boolean; onPick?: () => void }) {
   return (
-    <div className={`mep-guide-check ${state}${onPick ? ' pick' : ''}${selected ? ' sel' : ''}`} data-testid={testId} data-state={state} onClick={onPick}>
+    <div
+      className={`mep-guide-check ${state}${onPick ? ' pick' : ''}${selected ? ' sel' : ''}`}
+      data-testid={testId}
+      data-state={state}
+      onClick={onPick}
+      {...(onPick ? { role: 'button', tabIndex: 0, 'aria-pressed': selected === true, onKeyDown: pickKeys(onPick) } : {})}
+    >
       <span className="ic">{state === 'ok' ? '✓' : state === 'off' ? '–' : '!'}</span>
       <div>
         <b>{title}</b>
