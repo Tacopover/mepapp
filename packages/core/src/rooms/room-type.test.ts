@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { applyRoomTypeMatch, matchRoomType, parseRoomTypeKeywords, parseRoomTypes, ROOM_TYPE_LIBRARY, roomTextWords, validateRoomTypeFields, type RoomType } from './room-type.js';
+import {
+  applyRoomTypeMatch,
+  matchRoomType,
+  parseRoomTypeKeywords,
+  parseRoomTypes,
+  ROOM_DEMAND_FIELDS,
+  ROOM_TYPE_DEMAND_EXAMPLES,
+  ROOM_TYPE_LIBRARY,
+  roomTextWords,
+  validateRoomTypeFields,
+  type RoomType,
+} from './room-type.js';
 
 const typeOf = (name: string | null, details?: string[]) => matchRoomType(name, details, ROOM_TYPE_LIBRARY)?.id ?? null;
 
@@ -104,6 +115,29 @@ describe('room type fields', () => {
     expect(validateRoomTypeFields({ name: 'toilet' }, ROOM_TYPE_LIBRARY)).toMatch(/already/);
     expect(validateRoomTypeFields({ name: 'Lab', areaPerPersonM2: 0 }, [])).toMatch(/per person/);
     expect(validateRoomTypeFields({ name: 'Lab', areaPerPersonM2: 10 }, ROOM_TYPE_LIBRARY)).toBeNull();
+  });
+
+  it('validates the demands: each a number of 0 or more', () => {
+    expect(validateRoomTypeFields({ name: 'Lab', demands: { illuminanceLx: 500, supplyPerM2Dm3s: 0 } }, [])).toBeNull();
+    expect(validateRoomTypeFields({ name: 'Lab', demands: { illuminanceLx: -1 } }, [])).toMatch(/Illuminance/);
+    expect(validateRoomTypeFields({ name: 'Lab', demands: { airChangesPerH: Number.NaN } }, [])).toMatch(/Air changes/);
+  });
+
+  it('reads the demands of a stored type: known keys with a number of 0 or more', () => {
+    const raw = [
+      { id: 'a', name: 'A', keywords: [], demands: { illuminanceLx: 500, supplyPerM2Dm3s: 0, unknown: 3, exhaustFixedDm3s: -2, socketsFixed: '4' } },
+      { id: 'b', name: 'B', keywords: [], demands: { unknown: 3 } },
+    ];
+    expect(parseRoomTypes(raw)).toEqual([{ id: 'a', name: 'A', keywords: [], demands: { illuminanceLx: 500, supplyPerM2Dm3s: 0 } }, { id: 'b', name: 'B', keywords: [] }]);
+  });
+
+  it('has example demands only for built-in types, with valid values', () => {
+    const ids = new Set(ROOM_TYPE_LIBRARY.map((t) => t.id));
+    for (const [id, example] of Object.entries(ROOM_TYPE_DEMAND_EXAMPLES)) {
+      expect(ids.has(id)).toBe(true);
+      expect(validateRoomTypeFields({ name: 'X', ...example }, [])).toBeNull();
+    }
+    expect(new Set(ROOM_DEMAND_FIELDS.map((f) => f.key)).size).toBe(ROOM_DEMAND_FIELDS.length);
   });
 
   it('reads a stored list and drops bad entries and repeated ids', () => {

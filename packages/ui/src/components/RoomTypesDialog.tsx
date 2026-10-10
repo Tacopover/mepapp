@@ -1,5 +1,15 @@
 import { useRef, useState } from 'react';
-import { parseDecimal, parseRoomTypeKeywords, parseRoomTypes, validateRoomTypeFields, type RoomType } from '@mepapp/core';
+import {
+  parseDecimal,
+  parseRoomTypeKeywords,
+  parseRoomTypes,
+  ROOM_DEMAND_FIELDS,
+  ROOM_TYPE_DEMAND_EXAMPLES,
+  validateRoomTypeFields,
+  type RoomDemandKey,
+  type RoomDemands,
+  type RoomType,
+} from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 
 export interface RoomTypesDialogProps {
@@ -15,11 +25,15 @@ export interface RoomTypesDialogProps {
   onClose: () => void;
 }
 
+/** The draft key of a demand box. */
+const demandField = (key: RoomDemandKey) => `demand.${key}`;
+
 const newTypeId = () => `room-type-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 /**
  * Edits the user library of room types (room-auto-placement.md Phase 1): name, Dutch name, the
- * keywords that name matching uses, and the floor area per person. The library is not part of a
+ * keywords that name matching uses, the floor area per person and the demands that placement rules
+ * use (room-placement-followup.md Phase F). The library is not part of a
  * drawing. A type that only the drawing's file holds can be added to the library.
  */
 export function RoomTypesDialog({ types, fileOnlyTypes, onChange, onMatchAgain, onExport, onClose }: RoomTypesDialogProps) {
@@ -174,12 +188,14 @@ function RoomTypeForm({ type, others, onDirtyChange, onSave, onDelete }: RoomTyp
     nameNl: type.nameNl ?? '',
     keywords: type.keywords.join(', '),
     areaPerPerson: type.areaPerPersonM2 !== undefined ? String(type.areaPerPersonM2) : '',
+    ...Object.fromEntries(ROOM_DEMAND_FIELDS.map((f) => [demandField(f.key), type.demands?.[f.key] !== undefined ? String(type.demands[f.key]) : ''])),
   };
+  const example = ROOM_TYPE_DEMAND_EXAMPLES[type.id];
   const [draft, setDraft] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
 
-  const set = (field: keyof typeof initial) => (value: string) => {
+  const set = (field: string) => (value: string) => {
     setDraft((d) => ({ ...d, [field]: value }));
     setError(null);
     onDirtyChange(true);
@@ -191,12 +207,34 @@ function RoomTypeForm({ type, others, onDirtyChange, onSave, onDelete }: RoomTyp
     onDirtyChange(false);
   };
 
+  /** Fills the empty boxes with the example values of the type. */
+  const fillExample = () => {
+    if (!example) return;
+    setDraft((d) => {
+      const next: Record<string, string> = { ...d };
+      if (example.areaPerPersonM2 !== undefined && !next.areaPerPerson!.trim()) next.areaPerPerson = String(example.areaPerPersonM2);
+      for (const f of ROOM_DEMAND_FIELDS) {
+        const value = example.demands[f.key];
+        if (value !== undefined && !next[demandField(f.key)]!.trim()) next[demandField(f.key)] = String(value);
+      }
+      return next as typeof d;
+    });
+    setError(null);
+    onDirtyChange(true);
+  };
+
   const save = () => {
-    const areaText = draft.areaPerPerson.trim();
-    const area = areaText === '' ? undefined : (parseDecimal(areaText) ?? Number.NaN);
+    const numberOf = (text: string) => (text.trim() === '' ? undefined : (parseDecimal(text.trim()) ?? Number.NaN));
+    const area = numberOf(draft.areaPerPerson);
     const next: RoomType = { id: type.id, name: draft.name.trim(), keywords: parseRoomTypeKeywords(draft.keywords) };
     if (draft.nameNl.trim()) next.nameNl = draft.nameNl.trim();
     if (area !== undefined) next.areaPerPersonM2 = area;
+    const demands: RoomDemands = {};
+    for (const f of ROOM_DEMAND_FIELDS) {
+      const value = numberOf((draft as Record<string, string>)[demandField(f.key)]!);
+      if (value !== undefined) demands[f.key] = value;
+    }
+    if (Object.keys(demands).length > 0) next.demands = demands;
     const problem = validateRoomTypeFields(next, others);
     if (problem) {
       setError(problem);
@@ -225,6 +263,24 @@ function RoomTypeForm({ type, others, onDirtyChange, onSave, onDelete }: RoomTyp
         <label htmlFor="rt-area">Area per person (m²)</label>
         <input id="rt-area" type="text" inputMode="decimal" placeholder="none" value={draft.areaPerPerson} onChange={(e) => set('areaPerPerson')(e.target.value)} />
       </div>
+      <h5 className="mep-room-types-group">Demands</h5>
+      <p className="mep-settings-hint">Placement rules can use these numbers, so one rule serves all room types. An empty box means: not known.</p>
+      {ROOM_DEMAND_FIELDS.map((f) => (
+        <div className="mep-field-row" key={f.key}>
+          <label htmlFor={`rt-${f.key}`}>
+            {f.label} ({f.unit})
+          </label>
+          <input id={`rt-${f.key}`} type="text" inputMode="decimal" placeholder="none" value={(draft as Record<string, string>)[demandField(f.key)]} onChange={(e) => set(demandField(f.key))(e.target.value)} />
+        </div>
+      ))}
+      {example && (
+        <p className="mep-settings-hint">
+          <button type="button" onClick={fillExample} data-testid="rt-fill-example">
+            Fill in the example values
+          </button>{' '}
+          Dutch new build (Bbl, NEN-EN 12464-1, practice). These are examples: check them against the rules of your project. The button fills only the empty boxes.
+        </p>
+      )}
       {error && (
         <div className="mep-circuit-types-error" role="alert">
           {error}

@@ -3499,6 +3499,13 @@
   color: var(--muted);
   text-transform: uppercase;
 }
+.mep-room-types-group {
+  margin: 14px 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
 .mep-circuit-types-form .mep-field-row .mep-room-types-keywords {
   flex: 1 1 auto;
   min-width: 0;
@@ -4016,6 +4023,18 @@
 }
 .mep-guide-term.result {
   background: var(--accent-soft);
+}
+.mep-guide-term.sub {
+  padding-top: 0;
+  padding-left: 36px;
+}
+.mep-guide-uf {
+  width: auto;
+  margin: 8px 0;
+}
+.mep-guide-uf td,
+.mep-guide-uf th {
+  padding: 2px 8px 2px 0;
 }
 .mep-guide-missing {
   color: var(--guide-warn);

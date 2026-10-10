@@ -3,11 +3,14 @@ import type { SketchScene } from '@mepapp/render';
 import {
   GRID_EDGE_LABELS,
   GRID_STYLE_LABELS,
+  coverageRadiusM,
   hasCoverageLimit,
   LAYOUT_STRATEGY_LABELS,
   parsePlacementRules,
   PLACEMENT_PRESET_LABELS,
+  ROOM_DEMAND_FIELDS,
   roomTypeLabel,
+  usesCoverage,
   type PlacementRule,
   type PlacementWorkerLike,
   type RoomType,
@@ -248,6 +251,14 @@ function PlacementRuleSummary({ rule, roomTypes, language, stampName, onEdit, on
     ['Spacing', `${rule.layout.wallOffsetM} m from the walls${rule.layout.minSpacingM !== undefined ? `, ${rule.layout.minSpacingM} m between stamps` : ''}`],
     ['Layout', `${layout}; ${rotation}`],
   ];
+  const fromType = [
+    ...Object.values(rule.amount.from ?? {}).map((key) => ROOM_DEMAND_FIELDS.find((f) => f.key === key)!.label.toLowerCase()),
+    ...(rule.lighting?.luxFromRoomType ? ['illuminance'] : []),
+  ];
+  if (fromType.length > 0) rows.splice(4, 0, ['From the room type', fromType.join(', ')]);
+  if (rule.lighting?.ufTable) rows.splice(4, 0, ['UF', `from the room index (${rule.lighting.ufTable.length} table rows)`]);
+  const radius = usesCoverage(rule) ? coverageRadiusM(rule.coverage) : null;
+  if (radius !== null) rows.splice(4, 0, ['Coverage', `${rule.preset === 'coverage' ? '' : 'also '}circles of ${radius.toFixed(2)} m`]);
   return (
     <div className="mep-circuit-types-form mep-placement-rule-summary" data-testid="rule-summary">
       <h4>{rule.name}</h4>
@@ -259,9 +270,9 @@ function PlacementRuleSummary({ rule, roomTypes, language, stampName, onEdit, on
           </div>
         ))}
       </dl>
-      {rule.preset !== 'coverage' && hasCoverageLimit(rule.coverage) && (
+      {!usesCoverage(rule) && hasCoverageLimit(rule.coverage) && (
         <p className="mep-settings-hint" data-testid="pr-old-coverage">
-          This rule has coverage limits. Only By coverage uses them, so they do not change the count now.
+          This rule has coverage limits. They do not change the count now: only By coverage, or "Also cover each point of the room", uses them.
         </p>
       )}
       <div className="mep-circuit-types-actions">

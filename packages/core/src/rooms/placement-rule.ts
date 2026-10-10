@@ -6,7 +6,8 @@
 import type { Discipline } from '../network.js';
 import type { Room } from './room.js';
 import type { RoomValues } from './room-values.js';
-import { areaInUnit, flowInUnit, isAirChangeUnit, type AreaUnit, type IlluminanceUnit, type LengthUnit } from './placement-units.js';
+import { ROOM_DEMAND_FIELDS, type RoomDemandKey, type RoomDemands } from './room-type.js';
+import { areaInUnit, flowInUnit, isAirChangeUnit, M3H_PER_DM3S, type AreaUnit, type IlluminanceUnit, type LengthUnit } from './placement-units.js';
 
 /** A preset fills and shows the amount fields of one common calculation. 'custom' shows every field. 'coverage' has no amount: the count comes from the coverage limits. */
 export type PlacementPreset = 'perArea' | 'perPerson' | 'perPersonArea' | 'airChanges' | 'fixed' | 'lighting' | 'coverage' | 'custom';
@@ -35,15 +36,37 @@ export interface PlacementAmount {
   minimum?: number;
   /** For example "dm³/s", "m³/h", "W" (AMOUNT_UNITS) or free text. The capacity uses the same unit. perM3 gives m³/h, converted to a flow unit (AIR_CHANGE_UNITS). */
   unit: string;
-  /** The area that perM2 uses. Absent = 'm2'. */
+  /** The area that perM2 uses. Absent = 'm2'. A term from a room-type demand always uses m². */
   areaUnit?: AreaUnit;
+  /**
+   * Terms that take their number from a demand of the room type (room-placement-followup.md Phase F).
+   * The number of the term in the rule is then the fallback for a room type without the demand.
+   */
+  from?: Partial<Record<AmountTermKey, RoomDemandKey>>;
+}
+
+/** The amount terms that a room-type demand can fill. */
+export type AmountTermKey = 'fixed' | 'perM2' | 'perPerson' | 'perM3';
+
+/** One point of a utilisation factor table: the UF of the luminaire at room index k. */
+export interface UfTablePoint {
+  k: number;
+  uf: number;
 }
 
 export interface LightingInputs {
-  /** Design illuminance E, lux. */
-  lux: number;
-  /** Utilisation factor UF, above 0 and at most 1. */
+  /** Design illuminance E, lux. With luxFromRoomType, the fallback for a room type without an illuminance. */
+  lux?: number;
+  /** E comes from the illuminance demand of the room type (in lx). */
+  luxFromRoomType?: boolean;
+  /** Utilisation factor UF, above 0 and at most 1. Not used with a UF table. */
   utilisationFactor: number;
+  /** UF from the room index k = 2 × area ÷ (h_m × perimeter): linear between the points, the end value outside them. Absent = the fixed UF. */
+  ufTable?: UfTablePoint[];
+  /** The length of the suspension below the ceiling, m. Absent = 0 (recessed or surface). */
+  suspensionM?: number;
+  /** The working-plane height when the room type has none, m. Absent = 0.75. */
+  workingPlaneHeightM?: number;
   /** Maintenance factor MF, above 0 and at most 1. */
   maintenanceFactor: number;
   /** The unit of `lux`: lx (with the area in m²) or fc (with the area in ft²). Absent = 'lx'. */
@@ -58,6 +81,8 @@ export interface CoverageLimits {
   maxAreaPerElement?: number;
   /** Largest distance from an element to a wall, in the length unit. */
   maxWallDistance?: number;
+  /** Largest distance from a point of the room to the nearest element, in the length unit (for example NEN 2535 D). */
+  maxRadius?: number;
   /** Absent = 'm'. */
   lengthUnit?: LengthUnit;
 }
@@ -96,8 +121,10 @@ export interface PlacementRule {
   lighting?: LightingInputs;
   /** What one element gives, in the unit of the amount. Absent = one element per room. */
   capacityPerElement?: number;
-  /** Used by the preset 'coverage' only. A rule of another preset keeps old limits here, and they change nothing. */
+  /** Used by the preset 'coverage', and by an amount rule with alsoCoverage. Another rule keeps old limits here, and they change nothing. */
   coverage: CoverageLimits;
+  /** An amount rule that also meets the coverage limits: the count is the larger of the amount count and the coverage count. */
+  alsoCoverage?: boolean;
   minCount?: number;
   maxCount?: number;
   layout: PlacementLayout;
@@ -117,7 +144,7 @@ export const PLACEMENT_PRESET_LABELS: Record<PlacementPreset, string> = {
 };
 
 /** The amount fields each preset shows. */
-export const PRESET_AMOUNT_FIELDS: Record<PlacementPreset, (keyof Omit<PlacementAmount, 'unit' | 'areaUnit'>)[]> = {
+export const PRESET_AMOUNT_FIELDS: Record<PlacementPreset, (keyof Omit<PlacementAmount, 'unit' | 'areaUnit' | 'from'>)[]> = {
   perArea: ['perM2', 'minimum'],
   perPerson: ['perPerson', 'minimum'],
   perPersonArea: ['perPerson', 'perM2', 'minimum'],
@@ -223,9 +250,62 @@ export function ruleAppliesToRoom(rule: Pick<PlacementRule, 'roomTypeIds' | 'nam
 // A count is a whole number: 2.0000000001 elements must not become 3.
 const ceilCount = (x: number): number => Math.max(0, Math.ceil(x - 1e-9));
 
+/** The working-plane height when the rule and the room type have none, m. */
+export const DEFAULT_WORKING_PLANE_HEIGHT_M = 0.75;
+
+/** An example UF table for a recessed LED panel, reflectances 0.7 / 0.5 / 0.2 (room-demands-research.md §1.1). Illustrative: use the table of the product. */
+export const EXAMPLE_UF_TABLE: readonly UfTablePoint[] = [
+  { k: 0.6, uf: 0.45 },
+  { k: 0.8, uf: 0.53 },
+  { k: 1, uf: 0.59 },
+  { k: 1.25, uf: 0.64 },
+  { k: 1.5, uf: 0.68 },
+  { k: 2, uf: 0.74 },
+  { k: 2.5, uf: 0.78 },
+  { k: 3, uf: 0.81 },
+  { k: 4, uf: 0.85 },
+  { k: 5, uf: 0.87 },
+];
+
+/** The UF at room index k: linear between two points of the table, the end value outside them. */
+export function ufAtRoomIndex(table: readonly UfTablePoint[], k: number): number {
+  const points = [...table].sort((a, b) => a.k - b.k);
+  if (k <= points[0]!.k) return points[0]!.uf;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!;
+    const b = points[i]!;
+    if (k <= b.k) return a.uf + ((b.uf - a.uf) * (k - a.k)) / (b.k - a.k);
+  }
+  return points[points.length - 1]!.uf;
+}
+
+/** A demand value in the unit of the rule: a flow (dm³/s) in the flow unit, a power (W) in W or kW. Other demands stay as they are. */
+export function demandInUnit(key: RoomDemandKey, value: number, unit: string): number {
+  const kind = ROOM_DEMAND_FIELDS.find((f) => f.key === key)?.kind;
+  if (kind === 'flow') return isAirChangeUnit(unit) ? flowInUnit(value * M3H_PER_DM3S, unit) : value;
+  if (kind === 'power') return unit === 'kW' ? value / 1000 : value;
+  return value;
+}
+
+/** True when the demand works with the unit of the rule (the guide lists only those). */
+export function demandFitsUnit(key: RoomDemandKey, unit: string): boolean {
+  const kind = ROOM_DEMAND_FIELDS.find((f) => f.key === key)?.kind;
+  if (kind === 'flow') return isAirChangeUnit(unit);
+  if (kind === 'power') return unit === 'W' || unit === 'kW';
+  if (kind === 'count') return !isAirChangeUnit(unit) && unit !== 'W' && unit !== 'kW';
+  return true;
+}
+
+/** The demands that can fill the term. */
+export const demandsForTerm = (term: AmountTermKey | 'lighting'): RoomDemandKey[] => ROOM_DEMAND_FIELDS.filter((f) => f.term === term).map((f) => f.key);
+
 /** True when the rule has a coverage limit. */
 export const hasCoverageLimit = (coverage: CoverageLimits): boolean =>
-  coverage.maxSpacing !== undefined || coverage.maxAreaPerElement !== undefined || coverage.maxWallDistance !== undefined;
+  coverage.maxSpacing !== undefined || coverage.maxAreaPerElement !== undefined || coverage.maxWallDistance !== undefined || coverage.maxRadius !== undefined;
+
+/** True when the coverage limits change the count of the rule: By coverage, or an amount rule with alsoCoverage and a limit. */
+export const usesCoverage = (rule: Pick<PlacementRule, 'coverage'> & Partial<Pick<PlacementRule, 'preset' | 'alsoCoverage'>>): boolean =>
+  rule.preset === 'coverage' || (rule.alsoCoverage === true && hasCoverageLimit(rule.coverage));
 
 export type RequirementWarning =
   /** The room's page has no scale, and the rule needs area, volume, length or width. */
@@ -233,13 +313,34 @@ export type RequirementWarning =
   /** The rule needs a number of people, and the room has none (no type with an area per person, no value of its own). */
   | 'noPeople'
   /** The max count limited the count. */
-  | 'maxCountReached';
+  | 'maxCountReached'
+  /** A term takes its number from the room type, and the room type has no value (and the rule no fallback). */
+  | 'noDemand'
+  /** The UF table needs the room index, and the luminaire is not above the working plane (or the room has no perimeter). */
+  | 'noRoomIndex';
 
 export const REQUIREMENT_WARNING_TEXT: Record<RequirementWarning, string> = {
   noCalibration: 'no calibration',
   noPeople: 'no number of people',
   maxCountReached: 'max count reached',
+  noDemand: 'the room type has no value',
+  noRoomIndex: 'no room index: the luminaire is not above the working plane',
 };
+
+/** The number one term of the amount used, and where it came from. */
+export interface TermValue {
+  value: number;
+  source: 'rule' | 'roomType';
+}
+
+/** The lighting numbers one room used. */
+export interface LightingUsed {
+  lux: number;
+  luxSource: 'rule' | 'roomType';
+  uf: number;
+  /** With a UF table: the room index, h_m and the working-plane height (m), and where the height came from. */
+  roomIndex?: { k: number; hmM: number; workingPlaneM: number; workingPlaneSource: 'rule' | 'roomType' | 'default' };
+}
 
 /** Which calculation gave the count: the amount ÷ capacity, the coverage layout, or one element per room (no capacity). */
 export type CountSource = 'amount' | 'coverage' | 'onePerRoom';
@@ -255,21 +356,46 @@ export interface RoomRequirement {
   /** required ÷ count: the capacity each placed element gets. */
   perElement: number | null;
   warnings: RequirementWarning[];
+  /** The number each term used, when it has one. */
+  terms?: Partial<Record<AmountTermKey, TermValue>>;
+  /** Lighting: the numbers the lumen method used. */
+  lighting?: LightingUsed;
+}
+
+/** The number of a term for a room: the room-type demand when the rule says so and the room type has it, else the rule's number. Undefined when neither has one. */
+export function amountTermValue(amount: PlacementAmount, key: AmountTermKey, demands: RoomDemands | undefined): TermValue | undefined {
+  const demand = amount.from?.[key];
+  const fromType = demand !== undefined ? demands?.[demand] : undefined;
+  if (demand !== undefined && fromType !== undefined) return { value: demandInUnit(demand, fromType, amount.unit), source: 'roomType' };
+  const own = amount[key];
+  return own !== undefined ? { value: own, source: 'rule' } : undefined;
+}
+
+/** The illuminance of a room: the room-type demand (lx) when the rule says so and the type has it, else the rule's number. */
+export function lightingLux(lighting: LightingInputs, demands: RoomDemands | undefined): { lux: number; source: 'rule' | 'roomType' } | undefined {
+  const fromType = lighting.luxFromRoomType ? demands?.illuminanceLx : undefined;
+  if (fromType !== undefined) return { lux: fromType, source: 'roomType' };
+  return lighting.lux !== undefined ? { lux: lighting.lux, source: 'rule' } : undefined;
 }
 
 /** True when the rule has an amount: an amount field or lighting inputs. A By coverage rule has no amount. */
 export function hasAmount(rule: Pick<PlacementRule, 'amount' | 'lighting'> & Partial<Pick<PlacementRule, 'preset'>>): boolean {
   if (rule.preset === 'coverage') return false;
   const a = rule.amount;
-  return a.fixed !== undefined || a.perM2 !== undefined || a.perPerson !== undefined || a.perM3 !== undefined || a.minimum !== undefined || rule.lighting !== undefined;
+  return termUsed(a, 'fixed') || termUsed(a, 'perM2') || termUsed(a, 'perPerson') || termUsed(a, 'perM3') || a.minimum !== undefined || rule.lighting !== undefined;
 }
+
+/** True when the term has a number in the rule or takes one from the room type. */
+const termUsed = (a: PlacementAmount, key: AmountTermKey) => a[key] !== undefined || a.from?.[key] !== undefined;
 
 /**
  * The required amount and the count of elements for one room:
  * required = fixed + perM2 × area + perPerson × people + perM3 × volume + lighting, at least the minimum;
  * count = ceil(required ÷ capacity), or 1 without a capacity; then at least the min count and at most the max count.
- * The area is in the rule's area unit, perM3 × volume (m³/h) is converted to the amount unit, and
- * lighting in fc uses ft². By coverage: the count needs the room geometry, so it is null here.
+ * The area is in the rule's area unit (m² for a term from the room type), perM3 × volume (m³/h) is
+ * converted to the amount unit, and lighting in fc uses ft². A term can take its number from the
+ * room type (amountTermValue). Lighting: E × area ÷ (UF × MF), with UF from the room index when the
+ * rule has a UF table. By coverage: the count needs the room geometry, so it is null here.
  */
 export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues): RoomRequirement {
   const warnings: RequirementWarning[] = [];
@@ -279,24 +405,61 @@ export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues
   }
   const a = rule.amount;
   let required: number | null = null;
+  const terms: Partial<Record<AmountTermKey, TermValue>> = {};
+  let lightingUsed: LightingUsed | undefined;
   if (hasAmount(rule)) {
-    const needsArea = a.perM2 !== undefined || rule.lighting !== undefined;
+    const needsArea = termUsed(a, 'perM2') || rule.lighting !== undefined;
     let missing = false;
-    if ((needsArea && values.areaM2 === null) || (a.perM3 !== undefined && values.volumeM3 === null)) {
+    if ((needsArea && values.areaM2 === null) || (termUsed(a, 'perM3') && values.volumeM3 === null)) {
       warnings.push('noCalibration');
       missing = true;
     }
-    if (a.perPerson !== undefined && values.people === null) {
+    if (termUsed(a, 'perPerson') && values.people === null) {
       warnings.push('noPeople');
       missing = true;
     }
-    if (!missing) {
-      const area = values.areaM2 ?? 0;
-      let sum = (a.fixed ?? 0) + (a.perM2 ?? 0) * areaInUnit(area, a.areaUnit) + (a.perPerson ?? 0) * (values.people?.count ?? 0) + flowInUnit((a.perM3 ?? 0) * (values.volumeM3 ?? 0), a.unit);
-      if (rule.lighting) {
-        const lightingArea = areaInUnit(area, rule.lighting.illuminanceUnit === 'fc' ? 'ft2' : 'm2');
-        sum += (rule.lighting.lux * lightingArea) / (rule.lighting.utilisationFactor * rule.lighting.maintenanceFactor);
+    for (const key of ['fixed', 'perM2', 'perPerson', 'perM3'] as const) {
+      if (!termUsed(a, key)) continue;
+      const term = amountTermValue(a, key, values.demands);
+      if (term) terms[key] = term;
+      else if (!warnings.includes('noDemand')) warnings.push('noDemand');
+    }
+    let light: number | null = 0;
+    if (rule.lighting) {
+      const L = rule.lighting;
+      const lux = lightingLux(L, values.demands);
+      let uf: number | null = L.utilisationFactor;
+      let roomIndex: LightingUsed['roomIndex'];
+      if (L.ufTable && L.ufTable.length > 0) {
+        const typeWp = values.demands?.workingPlaneHeightM;
+        const workingPlaneM = typeWp ?? L.workingPlaneHeightM ?? DEFAULT_WORKING_PLANE_HEIGHT_M;
+        const hmM = values.ceilingHeight.mm / 1000 - (L.suspensionM ?? 0) - workingPlaneM;
+        if (hmM > 0 && values.areaM2 !== null && values.perimeterM !== null && values.perimeterM > 0) {
+          const k = (2 * values.areaM2) / (hmM * values.perimeterM);
+          uf = ufAtRoomIndex(L.ufTable, k);
+          roomIndex = { k, hmM, workingPlaneM, workingPlaneSource: typeWp !== undefined ? 'roomType' : L.workingPlaneHeightM !== undefined ? 'rule' : 'default' };
+        } else {
+          uf = null;
+          if (values.areaM2 !== null) warnings.push('noRoomIndex');
+        }
       }
+      if (!lux) {
+        if (!warnings.includes('noDemand')) warnings.push('noDemand');
+        light = null;
+      } else if (uf === null) {
+        light = null;
+      } else {
+        // An illuminance from the room type is in lx, with the area in m².
+        const inFc = lux.source === 'rule' && L.illuminanceUnit === 'fc';
+        light = (lux.lux * areaInUnit(values.areaM2 ?? 0, inFc ? 'ft2' : 'm2')) / (uf * L.maintenanceFactor);
+        lightingUsed = { lux: lux.lux, luxSource: lux.source, uf, ...(roomIndex ? { roomIndex } : {}) };
+      }
+    }
+    if (!missing && light !== null && !warnings.includes('noDemand')) {
+      const area = values.areaM2 ?? 0;
+      const t = (key: AmountTermKey) => terms[key]?.value ?? 0;
+      const perM2Area = terms.perM2?.source === 'roomType' ? area : areaInUnit(area, a.areaUnit);
+      const sum = t('fixed') + t('perM2') * perM2Area + t('perPerson') * (values.people?.count ?? 0) + flowInUnit(t('perM3') * (values.volumeM3 ?? 0), a.unit) + light;
       required = Math.max(sum, a.minimum ?? 0);
     }
   }
@@ -313,7 +476,16 @@ export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues
     }
   }
   const perElement = required !== null && count !== null && count > 0 ? required / count : null;
-  return { required, quantityCount, count, countSource: quantityCount !== null || blocked ? 'amount' : 'onePerRoom', perElement, warnings };
+  return {
+    required,
+    quantityCount,
+    count,
+    countSource: quantityCount !== null || blocked ? 'amount' : 'onePerRoom',
+    perElement,
+    warnings,
+    ...(Object.keys(terms).length > 0 ? { terms } : {}),
+    ...(lightingUsed ? { lighting: lightingUsed } : {}),
+  };
 }
 
 export interface RoomCalculationRow {
@@ -358,13 +530,21 @@ export function validatePlacementRule(rule: PlacementRule, others: readonly Plac
   if (others.some((r) => r.name.trim().toLowerCase() === name.toLowerCase())) return `Another rule is already called "${name}".`;
   const a = rule.amount;
   if (![a.fixed, a.perM2, a.perPerson, a.perM3, a.minimum].every(isNonNegative)) return 'An amount must be a number of 0 or more.';
+  for (const [key, demand] of Object.entries(a.from ?? {}) as [AmountTermKey, RoomDemandKey][]) {
+    if (!demandsForTerm(key).includes(demand)) return 'A term takes a room-type value that does not fit it.';
+  }
   if (rule.lighting) {
-    if (!(Number.isFinite(rule.lighting.lux) && rule.lighting.lux > 0)) return 'The illuminance must be a number above 0.';
-    if (!isFactor(rule.lighting.utilisationFactor) || !isFactor(rule.lighting.maintenanceFactor)) return 'The utilisation and maintenance factors must be above 0 and at most 1.';
+    const L = rule.lighting;
+    if (L.lux === undefined ? !L.luxFromRoomType : !(Number.isFinite(L.lux) && L.lux > 0)) return 'The illuminance must be a number above 0.';
+    if (!isFactor(L.utilisationFactor) || !isFactor(L.maintenanceFactor)) return 'The utilisation and maintenance factors must be above 0 and at most 1.';
+    if (L.ufTable && (L.ufTable.length < 2 || L.ufTable.some((pt) => !(Number.isFinite(pt.k) && pt.k > 0) || !isFactor(pt.uf)) || new Set(L.ufTable.map((pt) => pt.k)).size < L.ufTable.length))
+      return 'The UF table needs 2 or more points, each with a different room index above 0 and a UF above 0 and at most 1.';
+    if (!isNonNegative(L.suspensionM) || !isNonNegative(L.workingPlaneHeightM)) return 'The suspension and the working-plane height must be numbers of 0 or more.';
   }
   if (!isPositive(rule.capacityPerElement)) return 'The capacity per element must be a number above 0.';
-  if (!isPositive(rule.coverage.maxSpacing) || !isPositive(rule.coverage.maxAreaPerElement) || !isPositive(rule.coverage.maxWallDistance)) return 'A coverage limit must be a number above 0.';
-  if (rule.preset === 'coverage' && !hasCoverageLimit(rule.coverage)) return 'By coverage needs a max spacing, a max area per element or a max distance to a wall.';
+  if (!isPositive(rule.coverage.maxSpacing) || !isPositive(rule.coverage.maxAreaPerElement) || !isPositive(rule.coverage.maxWallDistance) || !isPositive(rule.coverage.maxRadius)) return 'A coverage limit must be a number above 0.';
+  if (rule.preset === 'coverage' && !hasCoverageLimit(rule.coverage)) return 'By coverage needs a max radius, a max spacing, a max area per element or a max distance to a wall.';
+  if (rule.alsoCoverage && rule.preset !== 'coverage' && !hasCoverageLimit(rule.coverage)) return 'Enter a coverage limit, or turn off "Also cover each point of the room".';
   if (rule.preset === 'airChanges' && !isAirChangeUnit(rule.amount.unit)) return 'Air changes need a flow unit: m³/h, dm³/s, l/s, m³/s or cfm.';
   if (!isCount(rule.minCount) || !isCount(rule.maxCount)) return 'A count must be a whole number of 0 or more.';
   if (rule.minCount !== undefined && rule.maxCount !== undefined && rule.minCount > rule.maxCount) return 'The min count is larger than the max count.';
@@ -401,6 +581,8 @@ function toCoverageLimits(value: unknown): CoverageLimits {
   if (maxSpacing !== undefined) coverage.maxSpacing = maxSpacing;
   if (maxAreaPerElement !== undefined) coverage.maxAreaPerElement = maxAreaPerElement;
   if (maxWallDistance !== undefined) coverage.maxWallDistance = maxWallDistance;
+  const maxRadius = num(c.maxRadius);
+  if (maxRadius !== undefined) coverage.maxRadius = maxRadius;
   if (c.lengthUnit === 'ft') coverage.lengthUnit = 'ft';
   return coverage;
 }
@@ -430,6 +612,7 @@ function toPlacementRule(value: unknown): PlacementRule | null {
     writeCapacity: v.writeCapacity === true,
   };
   if (typeof v.nameContains === 'string' && v.nameContains.trim()) rule.nameContains = v.nameContains;
+  if (v.alsoCoverage === true && rule.preset !== 'coverage') rule.alsoCoverage = true;
   if (amount.areaUnit === 'ft2') rule.amount.areaUnit = 'ft2';
   const angle = num(layout.fixedAngleDeg);
   if (angle !== undefined) rule.layout.fixedAngleDeg = angle;
@@ -442,9 +625,20 @@ function toPlacementRule(value: unknown): PlacementRule | null {
   const lux = num(lighting.lux);
   const uf = num(lighting.utilisationFactor);
   const mf = num(lighting.maintenanceFactor);
-  if (lux !== undefined && uf !== undefined && mf !== undefined) {
-    rule.lighting = { lux, utilisationFactor: uf, maintenanceFactor: mf };
+  const luxFromRoomType = lighting.luxFromRoomType === true;
+  if ((lux !== undefined || luxFromRoomType) && uf !== undefined && mf !== undefined) {
+    rule.lighting = { utilisationFactor: uf, maintenanceFactor: mf };
+    if (lux !== undefined) rule.lighting.lux = lux;
+    if (luxFromRoomType) rule.lighting.luxFromRoomType = true;
     if (lighting.illuminanceUnit === 'fc') rule.lighting.illuminanceUnit = 'fc';
+    const table = Array.isArray(lighting.ufTable) ? lighting.ufTable.map((pt) => ({ k: num(rec(pt).k), uf: num(rec(pt).uf) })).filter((pt): pt is UfTablePoint => pt.k !== undefined && pt.uf !== undefined) : [];
+    if (table.length >= 2) rule.lighting.ufTable = table;
+    withNumbers(rule.lighting, lighting, ['suspensionM', 'workingPlaneHeightM']);
+  }
+  const from = rec(amount.from);
+  for (const key of ['fixed', 'perM2', 'perPerson', 'perM3'] as const) {
+    const demand = from[key];
+    if (typeof demand === 'string' && demandsForTerm(key).includes(demand as RoomDemandKey)) (rule.amount.from ??= {})[key] = demand as RoomDemandKey;
   }
   withNumbers(rule, v, ['capacityPerElement', 'minCount', 'maxCount']);
   if (oldCoverageLayout && !hasAmount(rule) && hasCoverageLimit(rule.coverage)) rule.preset = 'coverage';
@@ -497,7 +691,7 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     roomTypeIds: ['toilet', 'bathroom'],
     stampDefinitionId: null,
     preset: 'fixed',
-    amount: { fixed: 25, unit: 'dm³/s' },
+    amount: { fixed: 7, unit: 'dm³/s', from: { fixed: 'exhaustFixedDm3s' } },
     coverage: {},
     minCount: 1,
     maxCount: 1,
@@ -539,7 +733,7 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     stampDefinitionId: null,
     preset: 'coverage',
     amount: { unit: '' },
-    coverage: { maxAreaPerElement: 60, maxSpacing: 7.5, maxWallDistance: 3.5 },
+    coverage: { maxAreaPerElement: 60, maxRadius: 5.8 },
     layout: layout('evenSpread'),
     writeCapacity: false,
   },

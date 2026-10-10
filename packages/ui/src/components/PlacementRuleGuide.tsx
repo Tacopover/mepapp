@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import {
   AIR_CHANGE_UNITS,
@@ -10,6 +10,10 @@ import {
   calculateRooms,
   CEILING_GRID_SIZES_MM,
   coverageRadiusM,
+  DEFAULT_WORKING_PLANE_HEIGHT_M,
+  demandFitsUnit,
+  demandsForTerm,
+  EXAMPLE_UF_TABLE,
   flowInUnit,
   GRID_EDGE_LABELS,
   GRID_STYLE_LABELS,
@@ -27,9 +31,11 @@ import {
   PLACEMENT_PRESET_LABELS,
   PLACEMENT_WARNING_TEXT,
   PRESET_AMOUNT_FIELDS,
+  ROOM_DEMAND_FIELDS,
   ruleAppliesToRoom,
   roomTypeLabel,
   validatePlacementRule,
+  type AmountTermKey,
   type Calibration,
   type Discipline,
   type GridEdge,
@@ -42,6 +48,7 @@ import {
   type PlacementRule,
   type PlacementWorkerLike,
   type Room,
+  type RoomDemandKey,
   type RoomType,
   type RoomValues,
   type StampDefinition,
@@ -97,7 +104,9 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const valueOf = (text: string): number | undefined => (text.trim() === '' ? undefined : (parseDecimal(text) ?? Number.NaN));
 const allowPositive = (n: number) => n > 0;
 const allowHeight = (mm: number) => mm >= MIN_CEILING_HEIGHT_MM && mm <= MAX_CEILING_HEIGHT_MM;
-const missingData = (row: Pick<PlacementRow, 'requirement'>) => row.requirement.warnings.some((w) => w === 'noPeople' || w === 'noCalibration');
+const missingData = (row: Pick<PlacementRow, 'requirement'>) => row.requirement.warnings.some((w) => w === 'noPeople' || w === 'noCalibration' || w === 'noDemand' || w === 'noRoomIndex');
+const allowDemand = (n: number) => n >= 0;
+const demandField = (key: RoomDemandKey) => ROOM_DEMAND_FIELDS.find((f) => f.key === key)!;
 /** Step 4: the stamps do not fit with the spacing. */
 const spacingProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.some((w) => w === 'tooClose' || w === 'noFit');
 /** The room needs more stamps than auto-placement lays out (MAX_ROOM_STAMPS): almost always a typing error. */
@@ -213,13 +222,15 @@ function fieldSymbol(preset: PlacementPreset, key: 'fixed' | 'perM2' | 'perPerso
   return preset === 'perPersonArea' && key === 'perM2' ? 'b' : 'a';
 }
 
-/** By coverage: the radius in m and the limit that sets it (the smallest), from the draft boxes. */
+/** By coverage, or an amount rule that also meets coverage: the radius in m and the limit that sets it (the smallest), from the draft boxes. */
 function coverageRadiusOf(d: Draft): { radiusM: number; from: string } | null {
   const unit = LENGTH_UNIT_LABELS[d.lengthUnit];
   const parts: { radiusM: number; from: string }[] = [];
   const spacing = valueOf(d.maxSpacing);
   const wall = valueOf(d.maxWall);
   const area = valueOf(d.maxArea);
+  const radius = valueOf(d.maxRadius);
+  if (radius !== undefined && radius > 0) parts.push({ radiusM: lengthToM(radius, d.lengthUnit), from: `max radius ${fmt(radius, 2)} ${unit}` });
   if (spacing !== undefined && spacing > 0) parts.push({ radiusM: lengthToM(spacing, d.lengthUnit) / Math.SQRT2, from: `max spacing ${fmt(spacing, 2)} ${unit} ÷ √2` });
   if (wall !== undefined && wall > 0) parts.push({ radiusM: lengthToM(wall, d.lengthUnit) * Math.SQRT2, from: `max distance to a wall ${fmt(wall, 2)} ${unit} × √2` });
   if (area !== undefined && area > 0) parts.push({ radiusM: Math.sqrt(areaToM2(area, d.lengthUnit) / 2), from: `√(${fmt(area)} ${unit}² ÷ 2)` });
@@ -478,7 +489,10 @@ export function PlacementRuleGuide({
   const jobError = (step === 6 ? placeJob.error : mode === 'floor' ? floorJob.error : sampleJob.error) ?? null;
   const preset = draft.preset;
   const byCoverage = preset === 'coverage';
-  const coverage = byCoverage ? coverageRadiusOf(draft) : null;
+  const alsoCoverage = !byCoverage && draft.alsoCoverage;
+  const coverage = byCoverage || alsoCoverage ? coverageRadiusOf(draft) : null;
+  /** The coverage limits change the count: By coverage, or an amount rule that also meets coverage. */
+  const coverageOn = byCoverage || (alsoCoverage && coverage !== null);
 
   const stepStatus = (n: number): [StepState, string] => {
     if (n === 1) return draft.stampDefinitionId ? ['ok', stampName(draft.stampDefinitionId) ?? 'Stamp not found'] : ['', 'Choose a stamp'];
@@ -490,7 +504,7 @@ export function PlacementRuleGuide({
     if (n === 3) {
       if (parsed.error) return ['bad', 'A number is not correct'];
       if (tooManyRows.length > 0) return ['bad', `${plural(tooManyRows.length, 'room')}: too many stamps`];
-      if (byCoverage && !coverage) return ['warn', 'Enter a coverage limit'];
+      if ((byCoverage || alsoCoverage) && !coverage) return ['warn', 'Enter a coverage limit'];
       if (missingRows.length > 0) return ['warn', `${plural(missingRows.length, 'room')}: data missing`];
       return ['ok', PLACEMENT_PRESET_LABELS[preset]];
     }
@@ -566,6 +580,15 @@ export function PlacementRuleGuide({
   const setAreaPerPerson = (type: RoomType, value: number | null) => {
     const { areaPerPersonM2: _old, ...rest } = type;
     const next: RoomType = value === null ? rest : { ...rest, areaPerPersonM2: value };
+    onChangeRoomTypes(roomTypes.some((t) => t.id === type.id) ? roomTypes.map((t) => (t.id === type.id ? next : t)) : [...roomTypes, next]);
+  };
+
+  const setDemand = (type: RoomType, key: RoomDemandKey, value: number | null) => {
+    const demands = { ...type.demands };
+    if (value === null) delete demands[key];
+    else demands[key] = value;
+    const { demands: _old, ...rest } = type;
+    const next: RoomType = Object.keys(demands).length > 0 ? { ...rest, demands } : rest;
     onChangeRoomTypes(roomTypes.some((t) => t.id === type.id) ? roomTypes.map((t) => (t.id === type.id ? next : t)) : [...roomTypes, next]);
   };
 
@@ -712,18 +735,56 @@ export function PlacementRuleGuide({
     const knownUnit = unitChoices.includes(draft.unit);
     const requirement = parsed.rule && v ? calculateRoomRequirement(parsed.rule, v) : null;
     const res = (x: number | null | undefined, u = unit) => (x === null || x === undefined ? '' : `= ${fmt(x)} ${u}`);
-    const amountTerm = (key: 'fixed' | 'perPerson' | 'perM2' | 'perM3', label: string, input: string, after: ReactNode, result: ReactNode) => (
-      <div className="mep-guide-term" key={key}>
-        <span className="mep-guide-sym">{fieldSymbol(preset, key)}</span>
-        <input className="mep-guide-num" id={`pg-${key}`} type="text" inputMode="decimal" aria-label={label} value={input} onChange={field(key)} />
-        {after}
-        <span className="mep-guide-res" data-testid={`pg-t-${key}`}>
-          {result}
-        </span>
-      </div>
-    );
+    const sampleType = sample ? typeName(sample.roomTypeId) : 'the room type';
+    const amountTerm = (key: AmountTermKey, label: string, input: string, after: ReactNode, result: ReactNode) => {
+      const choices = demandsForTerm(key).filter((d) => demandFitsUnit(d, draft.unit.trim()));
+      const from = draft.from[key] !== undefined && choices.includes(draft.from[key]!) ? draft.from[key] : undefined;
+      const raw = from !== undefined ? v?.demands?.[from] : undefined;
+      return (
+        <Fragment key={key}>
+          <div className="mep-guide-term">
+            <span className="mep-guide-sym">{fieldSymbol(preset, key)}</span>
+            {choices.length > 0 && (
+              <select className="mep-guide-unit" id={`pg-from-${key}`} aria-label={`Source of: ${label}`} value={from ?? ''} onChange={(e) => update({ from: { ...draft.from, [key]: e.target.value || undefined } })}>
+                <option value="">Number</option>
+                {choices.map((d) => (
+                  <option key={d} value={d}>
+                    Room type: {demandField(d).label.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            )}
+            <input className="mep-guide-num" id={`pg-${key}`} type="text" inputMode="decimal" aria-label={label} placeholder={from ? 'fallback' : undefined} value={input} onChange={field(key)} />
+            {after}
+            <span className="mep-guide-res" data-testid={`pg-t-${key}`}>
+              {result}
+            </span>
+          </div>
+          {from && (
+            <div className="mep-guide-term sub" data-testid={`pg-from-note-${key}`}>
+              {raw !== undefined ? (
+                <span className="mep-guide-note">
+                  From {sampleType}: {fmt(raw, 3)} {demandField(from).unit}
+                  {requirement?.terms?.[key] && Math.abs(requirement.terms[key]!.value - raw) > 1e-9 ? ` = ${fmt(requirement.terms[key]!.value, 3)} ${unit}` : ''}. The box is the fallback for a room type without this value.
+                </span>
+              ) : input.trim() !== '' ? (
+                <span className="mep-guide-note">
+                  {sampleType} has no {demandField(from).label.toLowerCase()}: MepApp uses the number in the box.
+                </span>
+              ) : (
+                missing(`${sampleType} has no ${demandField(from).label.toLowerCase()}. Enter it below, or a fallback number in the box.`)
+              )}
+            </div>
+          )}
+        </Fragment>
+      );
+    };
     const a = (key: 'fixed' | 'perPerson' | 'perM2' | 'perM3' | 'minimum') => valueOf(draft[key]);
-    const sum = [a('fixed') ?? 0, (a('perPerson') ?? 0) * (v?.people?.count ?? 0), (a('perM2') ?? 0) * areaInUnit(area ?? 0, draft.areaUnit), flowInUnit((a('perM3') ?? 0) * (v?.volumeM3 ?? 0), draft.unit)].reduce((s, x) => s + x, 0);
+    // The number each term uses for the sample room: from the room type, or from the box.
+    const tv = (key: AmountTermKey) => requirement?.terms?.[key]?.value ?? a(key);
+    const perM2FromType = requirement?.terms?.perM2?.source === 'roomType';
+    const perM2Unit = perM2FromType ? 'm2' : draft.areaUnit;
+    const sum = [tv('fixed') ?? 0, (tv('perPerson') ?? 0) * (v?.people?.count ?? 0), (tv('perM2') ?? 0) * areaInUnit(area ?? 0, perM2Unit), flowInUnit((tv('perM3') ?? 0) * (v?.volumeM3 ?? 0), draft.unit)].reduce((s, x) => s + x, 0);
     const unitSelect = <T extends string>(id: string, label: string, value: T, labels: Record<T, string>, onPick: (value: T) => void) => (
       <select id={id} className="mep-guide-unit" aria-label={label} value={value} onChange={(e) => onPick(e.target.value as T)}>
         {(Object.keys(labels) as T[]).map((u) => (
@@ -746,15 +807,61 @@ export function PlacementRuleGuide({
         {!knownUnit && preset !== 'airChanges' && <input id="pg-unit" className="mep-guide-num wide" type="text" aria-label="Other unit" placeholder="for example lm" value={draft.unit} onChange={field('unit')} />}
       </>
     );
+    const coverageLimits = () => (
+      <>
+        <div className="mep-guide-inline">
+          <span>Lengths in</span>
+          {unitSelect('pg-lengthUnit', 'Length unit', draft.lengthUnit, LENGTH_UNIT_LABELS, (lengthUnit) => update({ lengthUnit }))}
+        </div>
+        <div className="mep-guide-formula">
+          {(
+            [
+              ['maxRadius', 'Max radius', `${LENGTH_UNIT_LABELS[draft.lengthUnit]} from a stamp to each point of the room`],
+              ['maxSpacing', 'Max spacing', `${LENGTH_UNIT_LABELS[draft.lengthUnit]} between two stamps`],
+              ['maxWall', 'Max distance to a wall', LENGTH_UNIT_LABELS[draft.lengthUnit]],
+              ['maxArea', 'Max area per stamp', `${LENGTH_UNIT_LABELS[draft.lengthUnit]}²`],
+            ] as const
+          ).map(([key, label, after]) => (
+            <div className="mep-guide-term" key={key}>
+              <span className="mep-guide-label">{label}</span>
+              <input className="mep-guide-num" id={`pg-${key}`} type="text" inputMode="decimal" placeholder="none" aria-label={label} value={draft[key]} onChange={field(key)} />
+              <span>{after}</span>
+            </div>
+          ))}
+          {coverage ? (
+            <div className="mep-guide-term result" data-testid="pg-radius">
+              <span>Each stamp covers a circle with a radius of</span>
+              <span className="mep-guide-val">{fmt(coverage.radiusM, 2)} m</span>
+              <span className="mep-guide-note">({coverage.from}, the smallest limit)</span>
+            </div>
+          ) : (
+            <div className="mep-guide-term result">{missing('Enter at least one coverage limit.')}</div>
+          )}
+        </div>
+      </>
+    );
     const peopleText = v?.people ? plural(v.people.count, 'person') : null;
     const missing = (text: string) => <span className="mep-guide-missing">{text}</span>;
     const lightingArea = areaInUnit(area ?? 0, draft.illuminanceUnit === 'fc' ? 'ft2' : 'm2');
     const lux = valueOf(draft.lux);
     const uf = valueOf(draft.uf);
     const mf = valueOf(draft.mf);
-    const needsArea = fields.includes('perM2') || preset === 'lighting' || byCoverage || (fields.includes('perM3') && draft.perM3.trim() !== '');
-    const needsPeople = fields.includes('perPerson') && draft.perPerson.trim() !== '';
-    const needsVolume = fields.includes('perM3') && draft.perM3.trim() !== '';
+    const lightUsed = requirement?.lighting;
+    const termOn = (key: AmountTermKey) => fields.includes(key) && (draft[key].trim() !== '' || draft.from[key] !== undefined);
+    const needsArea = fields.includes('perM2') || preset === 'lighting' || byCoverage || termOn('perM3');
+    const needsPeople = termOn('perPerson');
+    const needsVolume = termOn('perM3');
+    // The room-type demands this rule uses, and the matching rooms whose type has no value.
+    const usedDemands: { key: RoomDemandKey; fallback: boolean }[] = [
+      ...(Object.entries(draft.from) as [AmountTermKey, RoomDemandKey | undefined][])
+        .filter(([key, d]) => d !== undefined && fields.includes(key) && demandFitsUnit(d, draft.unit.trim()))
+        .map(([key, d]) => ({ key: d!, fallback: draft[key].trim() !== '' })),
+      ...(preset === 'lighting' && draft.luxFromRoomType ? [{ key: 'illuminanceLx' as const, fallback: draft.lux.trim() !== '' }] : []),
+      ...(preset === 'lighting' && draft.ufMode === 'table' ? [{ key: 'workingPlaneHeightM' as const, fallback: true }] : []),
+    ];
+    const noDemand = usedDemands.flatMap((d) => matched.filter((room) => scene && scene.getRoomValues(room).demands?.[d.key] === undefined).map((room) => ({ room, ...d })));
+    const noDemandTypes = [...new Set(noDemand.map((x) => x.room.roomTypeId))];
+    const demandBlocks = noDemand.some((x) => !x.fallback);
     const noPeople = matched.filter((room) => scene && !scene.getRoomValues(room).people);
     const noPeopleTypes = [...new Set(noPeople.map((r) => r.roomTypeId))];
     const heights = scene?.getCeilingHeights();
@@ -793,34 +900,7 @@ export function PlacementRuleGuide({
         {byCoverage ? (
           <div className="mep-guide-section">
             <h3>Coverage limits</h3>
-            <div className="mep-guide-inline">
-              <span>Lengths in</span>
-              {unitSelect('pg-lengthUnit', 'Length unit', draft.lengthUnit, LENGTH_UNIT_LABELS, (lengthUnit) => update({ lengthUnit }))}
-            </div>
-            <div className="mep-guide-formula">
-              {(
-                [
-                  ['maxSpacing', 'Max spacing', `${LENGTH_UNIT_LABELS[draft.lengthUnit]} between two stamps`],
-                  ['maxWall', 'Max distance to a wall', LENGTH_UNIT_LABELS[draft.lengthUnit]],
-                  ['maxArea', 'Max area per stamp', `${LENGTH_UNIT_LABELS[draft.lengthUnit]}²`],
-                ] as const
-              ).map(([key, label, after]) => (
-                <div className="mep-guide-term" key={key}>
-                  <span className="mep-guide-label">{label}</span>
-                  <input className="mep-guide-num" id={`pg-${key}`} type="text" inputMode="decimal" placeholder="none" aria-label={label} value={draft[key]} onChange={field(key)} />
-                  <span>{after}</span>
-                </div>
-              ))}
-              {coverage ? (
-                <div className="mep-guide-term result" data-testid="pg-radius">
-                  <span>Each stamp covers a circle with a radius of</span>
-                  <span className="mep-guide-val">{fmt(coverage.radiusM, 2)} m</span>
-                  <span className="mep-guide-note">({coverage.from}, the smallest limit)</span>
-                </div>
-              ) : (
-                <div className="mep-guide-term result">{missing('Enter at least one coverage limit.')}</div>
-              )}
-            </div>
+            {coverageLimits()}
           </div>
         ) : (
           <div className="mep-guide-section">
@@ -848,7 +928,7 @@ export function PlacementRuleGuide({
               )}
             </div>
             <div className="mep-guide-formula">
-              {fields.includes('fixed') && amountTerm('fixed', 'Amount per room', draft.fixed, <span>{unit} per room</span>, res(a('fixed')))}
+              {fields.includes('fixed') && amountTerm('fixed', 'Amount per room', draft.fixed, <span>{unit} per room</span>, res(tv('fixed')))}
               {fields.includes('perPerson') &&
                 amountTerm(
                   'perPerson',
@@ -861,7 +941,7 @@ export function PlacementRuleGuide({
                       {peopleText ?? missing('? persons')}
                     </span>
                   </>,
-                  a('perPerson') === undefined ? '' : v?.people ? res(a('perPerson')! * v.people.count) : missing('cannot calculate'),
+                  tv('perPerson') === undefined ? '' : v?.people ? res(tv('perPerson')! * v.people.count) : missing('cannot calculate'),
                 )}
               {fields.includes('perM2') &&
                 amountTerm(
@@ -870,14 +950,14 @@ export function PlacementRuleGuide({
                   draft.perM2,
                   <>
                     <span>
-                      {unit} per {AREA_UNIT_LABELS[draft.areaUnit]}
+                      {unit} per {AREA_UNIT_LABELS[perM2Unit]}
                     </span>
                     <span className="mep-guide-op">×</span>
                     <span className="mep-guide-val" data-testid="pg-area">
-                      {area === null ? missing('no scale') : `${fmt(areaInUnit(area, draft.areaUnit))} ${AREA_UNIT_LABELS[draft.areaUnit]}`}
+                      {area === null ? missing('no scale') : `${fmt(areaInUnit(area, perM2Unit))} ${AREA_UNIT_LABELS[perM2Unit]}`}
                     </span>
                   </>,
-                  a('perM2') === undefined || area === null ? '' : res(a('perM2')! * areaInUnit(area, draft.areaUnit)),
+                  tv('perM2') === undefined || area === null ? '' : res(tv('perM2')! * areaInUnit(area, perM2Unit)),
                 )}
               {fields.includes('perM3') &&
                 amountTerm(
@@ -891,30 +971,59 @@ export function PlacementRuleGuide({
                       {v?.volumeM3 == null ? missing('no scale') : `${fmt(v.volumeM3)} m³`}
                     </span>
                   </>,
-                  a('perM3') === undefined || v?.volumeM3 == null
+                  tv('perM3') === undefined || v?.volumeM3 == null
                     ? ''
                     : isAirChangeUnit(draft.unit) && draft.unit !== 'm³/h'
-                      ? `${fmt(a('perM3')! * v.volumeM3)} m³/h ${res(flowInUnit(a('perM3')! * v.volumeM3, draft.unit))}`
-                      : res(a('perM3')! * v.volumeM3, 'm³/h'),
+                      ? `${fmt(tv('perM3')! * v.volumeM3)} m³/h ${res(flowInUnit(tv('perM3')! * v.volumeM3, draft.unit))}`
+                      : res(tv('perM3')! * v.volumeM3, 'm³/h'),
                 )}
               {preset === 'lighting' && (
-                <div className="mep-guide-term">
-                  <span className="mep-guide-sym">E</span>
-                  <input className="mep-guide-num" id="pg-lux" type="text" inputMode="decimal" aria-label="Illuminance" value={draft.lux} onChange={field('lux')} />
-                  <span>{ILLUMINANCE_UNIT_LABELS[draft.illuminanceUnit]}</span>
-                  <span className="mep-guide-op">×</span>
-                  <span className="mep-guide-val">{area === null ? missing('no scale') : `${fmt(lightingArea)} ${draft.illuminanceUnit === 'fc' ? 'ft²' : 'm²'}`}</span>
-                  <span className="mep-guide-op">÷ (</span>
-                  <span className="mep-guide-sym">UF</span>
-                  <input className="mep-guide-num short" id="pg-uf" type="text" inputMode="decimal" aria-label="Utilisation factor" value={draft.uf} onChange={field('uf')} />
-                  <span className="mep-guide-op">×</span>
-                  <span className="mep-guide-sym">MF</span>
-                  <input className="mep-guide-num short" id="pg-mf" type="text" inputMode="decimal" aria-label="Maintenance factor" value={draft.mf} onChange={field('mf')} />
-                  <span className="mep-guide-op">)</span>
-                  <span className="mep-guide-res" data-testid="pg-t-light">
-                    {area !== null && lux !== undefined && uf && mf ? res((lux * lightingArea) / (uf * mf), 'lm') : ''}
-                  </span>
-                </div>
+                <>
+                  <div className="mep-guide-term">
+                    <span className="mep-guide-sym">E</span>
+                    <select className="mep-guide-unit" id="pg-luxFrom" aria-label="Source of the illuminance" value={draft.luxFromRoomType ? 'roomType' : ''} onChange={(e) => update({ luxFromRoomType: e.target.value === 'roomType' })}>
+                      <option value="">Number</option>
+                      <option value="roomType">Room type: illuminance</option>
+                    </select>
+                    <input className="mep-guide-num" id="pg-lux" type="text" inputMode="decimal" aria-label="Illuminance" placeholder={draft.luxFromRoomType ? 'fallback' : undefined} value={draft.lux} onChange={field('lux')} />
+                    <span>{ILLUMINANCE_UNIT_LABELS[draft.illuminanceUnit]}</span>
+                    <span className="mep-guide-op">×</span>
+                    <span className="mep-guide-val">
+                      {area === null ? missing('no scale') : lightUsed?.luxSource === 'roomType' ? `${fmt(area)} m²` : `${fmt(lightingArea)} ${draft.illuminanceUnit === 'fc' ? 'ft²' : 'm²'}`}
+                    </span>
+                    <span className="mep-guide-op">÷ (</span>
+                    <span className="mep-guide-sym">UF</span>
+                    <select className="mep-guide-unit" id="pg-ufMode" aria-label="Source of the utilisation factor" value={draft.ufMode} onChange={(e) => update(e.target.value === 'table' ? { ufMode: 'table', ...(draft.ufTable.length === 0 ? { ufTable: EXAMPLE_UF_TABLE.map((pt) => ({ k: String(pt.k), uf: String(pt.uf) })) } : {}) } : { ufMode: 'fixed' })}>
+                      <option value="fixed">Fixed</option>
+                      <option value="table">From the room index</option>
+                    </select>
+                    {draft.ufMode === 'fixed' ? (
+                      <input className="mep-guide-num short" id="pg-uf" type="text" inputMode="decimal" aria-label="Utilisation factor" value={draft.uf} onChange={field('uf')} />
+                    ) : (
+                      <span className="mep-guide-val" data-testid="pg-uf-value">
+                        {lightUsed ? fmt(lightUsed.uf, 3) : '?'}
+                      </span>
+                    )}
+                    <span className="mep-guide-op">×</span>
+                    <span className="mep-guide-sym">MF</span>
+                    <input className="mep-guide-num short" id="pg-mf" type="text" inputMode="decimal" aria-label="Maintenance factor" value={draft.mf} onChange={field('mf')} />
+                    <span className="mep-guide-op">)</span>
+                    <span className="mep-guide-res" data-testid="pg-t-light">
+                      {lightUsed && area !== null && mf ? res((lightUsed.lux * (lightUsed.luxSource === 'roomType' ? area : lightingArea)) / (lightUsed.uf * mf), 'lm') : draft.ufMode === 'fixed' && area !== null && lux !== undefined && uf && mf ? res((lux * lightingArea) / (uf * mf), 'lm') : ''}
+                    </span>
+                  </div>
+                  {draft.luxFromRoomType && (
+                    <div className="mep-guide-term sub" data-testid="pg-lux-note">
+                      {lightUsed?.luxSource === 'roomType' ? (
+                        <span className="mep-guide-note">From {sampleType}: {fmt(lightUsed.lux)} lx (with the area in m²). The box is the fallback for a room type without an illuminance.</span>
+                      ) : draft.lux.trim() !== '' ? (
+                        <span className="mep-guide-note">{sampleType} has no illuminance: MepApp uses the number in the box.</span>
+                      ) : (
+                        missing(`${sampleType} has no illuminance. Enter it below, or a fallback number in the box.`)
+                      )}
+                    </div>
+                  )}
+                </>
               )}
               {fields.includes('minimum') && (
                 <div className="mep-guide-term">
@@ -934,9 +1043,75 @@ export function PlacementRuleGuide({
           </div>
         )}
 
-        {!byCoverage && [draft.maxSpacing, draft.maxArea, draft.maxWall].some((x) => x.trim() !== '') && (
+        {preset === 'lighting' && draft.ufMode === 'table' && (
+          <div className="mep-guide-section" data-testid="pg-uf-table">
+            <h3>Utilisation factor from the room index</h3>
+            <p className="mep-guide-note">
+              k = 2 × floor area ÷ (h<sub>m</sub> × perimeter), with h<sub>m</sub> = ceiling height − suspension − working-plane height. MepApp reads the UF from the table of the luminaire: linear between two rows, the end value outside the table. The first table is an example for a recessed LED panel: use the table of your product.
+            </p>
+            <div className="mep-guide-formula">
+              <div className="mep-guide-term">
+                <span className="mep-guide-label">Suspension</span>
+                <input className="mep-guide-num" id="pg-suspension" type="text" inputMode="decimal" placeholder="0" aria-label="Suspension" value={draft.suspension} onChange={field('suspension')} />
+                <span>m below the ceiling</span>
+              </div>
+              <div className="mep-guide-term">
+                <span className="mep-guide-label">Working-plane height</span>
+                <input className="mep-guide-num" id="pg-workingPlane" type="text" inputMode="decimal" placeholder={String(DEFAULT_WORKING_PLANE_HEIGHT_M)} aria-label="Working-plane height" value={draft.workingPlane} onChange={field('workingPlane')} />
+                <span>m, when the room type has none</span>
+              </div>
+              <div className="mep-guide-term result" data-testid="pg-room-index">
+                {lightUsed?.roomIndex ? (
+                  <span>
+                    {sample ? roomLabel(sample) : 'This room'}: h<sub>m</sub> = {fmt(v?.ceilingHeight.mm ? v.ceilingHeight.mm / 1000 : null, 2)} − {fmt(valueOf(draft.suspension) ?? 0, 2)} − {fmt(lightUsed.roomIndex.workingPlaneM, 2)} ({lightUsed.roomIndex.workingPlaneSource === 'roomType' ? 'room type' : lightUsed.roomIndex.workingPlaneSource === 'rule' ? 'this rule' : 'default'}) = {fmt(lightUsed.roomIndex.hmM, 2)} m; k = {fmt(lightUsed.roomIndex.k, 2)}; UF = {fmt(lightUsed.uf, 3)}
+                  </span>
+                ) : requirement?.warnings.includes('noRoomIndex') ? (
+                  missing('No room index: the luminaire is not above the working plane.')
+                ) : (
+                  <span>Enter the room data first.</span>
+                )}
+              </div>
+            </div>
+            <table className="mep-guide-table mep-guide-uf">
+              <thead>
+                <tr>
+                  <th>Room index k</th>
+                  <th>UF</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {draft.ufTable.map((row, i) => (
+                  <tr key={i}>
+                    <td>
+                      <input className="mep-guide-num short" type="text" inputMode="decimal" aria-label={`Room index in row ${i + 1}`} data-testid={`pg-uf-k-${i}`} value={row.k} onChange={(e) => update({ ufTable: draft.ufTable.map((r, j) => (j === i ? { ...r, k: e.target.value } : r)) }, true)} />
+                    </td>
+                    <td>
+                      <input className="mep-guide-num short" type="text" inputMode="decimal" aria-label={`UF in row ${i + 1}`} data-testid={`pg-uf-uf-${i}`} value={row.uf} onChange={(e) => update({ ufTable: draft.ufTable.map((r, j) => (j === i ? { ...r, uf: e.target.value } : r)) }, true)} />
+                    </td>
+                    <td>
+                      <button type="button" aria-label={`Remove row ${i + 1}`} onClick={() => update({ ufTable: draft.ufTable.filter((_, j) => j !== i) })}>
+                        ×
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mep-guide-inline">
+              <button type="button" id="pg-uf-add" onClick={() => update({ ufTable: [...draft.ufTable, { k: '', uf: '' }] })}>
+                Add a row
+              </button>
+              <button type="button" id="pg-uf-example" onClick={() => update({ ufTable: EXAMPLE_UF_TABLE.map((pt) => ({ k: String(pt.k), uf: String(pt.uf) })) })}>
+                Use the example table
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!byCoverage && !draft.alsoCoverage && [draft.maxSpacing, draft.maxArea, draft.maxWall, draft.maxRadius].some((x) => x.trim() !== '') && (
           <p className="mep-guide-note" data-testid="pg-old-coverage">
-            This rule has coverage limits. Only By coverage uses them, so they do not change the count now. Choose By coverage to use them.
+            This rule has coverage limits. They do not change the count now. Turn on "Also cover each point of the room" below, or choose By coverage, to use them.
           </p>
         )}
 
@@ -974,6 +1149,22 @@ export function PlacementRuleGuide({
           </div>
         )}
 
+        {!byCoverage && (
+          <div className="mep-guide-section">
+            <h3>Coverage</h3>
+            <label className="mep-guide-term mep-guide-check-row">
+              <input type="checkbox" id="pg-alsoCoverage" checked={draft.alsoCoverage} onChange={(e) => update({ alsoCoverage: e.target.checked })} />
+              <span>Also cover each point of the room</span>
+            </label>
+            {draft.alsoCoverage && (
+              <>
+                <p className="mep-guide-note">MepApp places the larger of two counts: the amount count above, and the count that covers each point of the room. For example, a lumen count, and a max spacing of the luminaires.</p>
+                {coverageLimits()}
+              </>
+            )}
+          </div>
+        )}
+
         <div className="mep-guide-section">
           <h3>Count limits per room</h3>
           <div className="mep-guide-formula">
@@ -1008,6 +1199,18 @@ export function PlacementRuleGuide({
                     : 'Each room that matches has a number of persons.'
               }
             />
+            {usedDemands.length > 0 && (
+              <Check
+                state={noDemand.length === 0 ? 'ok' : demandBlocks ? 'bad' : 'warn'}
+                title="Values of the room types"
+                testId="pg-check-demands"
+                sub={
+                  noDemand.length === 0
+                    ? `Each room that matches has ${usedDemands.map((d) => demandField(d.key).label.toLowerCase()).join(', ')} from its room type.`
+                    : `${plural(new Set(noDemand.map((x) => x.room.id)).size, 'room')} without a value: ${noDemandTypes.map((id) => typeName(id)).join(', ')}. ${demandBlocks ? 'Without a fallback number these rooms get no count. ' : 'MepApp uses the fallback numbers. '}Enter the values below.`
+                }
+              />
+            )}
             <Check
               state={needsVolume ? 'ok' : 'off'}
               title="Ceiling height (for the volume)"
@@ -1039,6 +1242,35 @@ export function PlacementRuleGuide({
                 })}
               </div>
               <p className="mep-guide-note">MepApp keeps the area per person with the room type in your room-type library, so every room of that type gets it. It rounds down: a person who does not fit in the remaining area does not count.</p>
+            </>
+          )}
+          {noDemandTypes.length > 0 && (
+            <>
+              <div className="mep-guide-formula" data-testid="pg-demand-editors">
+                {noDemandTypes.flatMap((typeId) => {
+                  const type = typeId === undefined ? undefined : types.find((t) => t.id === typeId);
+                  const keys = [...new Set(noDemand.filter((x) => x.room.roomTypeId === typeId).map((x) => x.key))];
+                  if (!type)
+                    return [
+                      <div className="mep-guide-term" key="-">
+                        <span className="mep-guide-label">
+                          <b>No room type</b>
+                        </span>
+                        <span className="mep-guide-note">Give these rooms a room type in step 2.</span>
+                      </div>,
+                    ];
+                  return keys.map((key) => (
+                    <div className="mep-guide-term" key={`${type.id}-${key}`}>
+                      <span className="mep-guide-label">
+                        <b>{typeName(type.id)}</b>: {demandField(key).label.toLowerCase()}
+                      </span>
+                      <OptionalNumberInput id={`pg-demand-${type.id}-${key}`} value={type.demands?.[key]} placeholder="?" allow={allowDemand} onCommit={(value) => setDemand(type, key, value)} />
+                      <span>{demandField(key).unit}</span>
+                    </div>
+                  ));
+                })}
+              </div>
+              <p className="mep-guide-note">MepApp keeps these values with the room type in your room-type library (Menu › Room types…), so every room of that type gets them.</p>
             </>
           )}
           {needsVolume && heights && (
@@ -1503,7 +1735,7 @@ export function PlacementRuleGuide({
                   stampSizePt={stampSizePt}
                   stampIconUrl={iconUrl}
                   wallOffsetM={parsed.rule?.layout.wallOffsetM ?? 0}
-                  coverageRadiusM={byCoverage && parsed.rule ? coverageRadiusM(parsed.rule.coverage) : null}
+                  coverageRadiusM={coverageOn && parsed.rule ? coverageRadiusM(parsed.rule.coverage) : null}
                   minSpacingM={step === 4 ? (parsed.rule?.layout.minSpacingM ?? null) : null}
                   ceilingGridMm={step >= 3 && parsed.rule && parsed.rule.layout.strategy !== 'perimeter' ? (parsed.rule.layout.ceilingGridMm ?? null) : null}
                   onPickRoom={(id) => {
@@ -1516,7 +1748,7 @@ export function PlacementRuleGuide({
                     <>
                       <span style={{ ['--sw' as string]: 'var(--accent-soft)' }}>room that matches</span>
                       <span style={{ ['--sw' as string]: 'var(--guide-band)' }}>min distance to the walls</span>
-                      {byCoverage && <span style={{ ['--sw' as string]: 'rgba(23, 90, 138, 0.15)' }}>coverage circle</span>}
+                      {coverageOn && <span style={{ ['--sw' as string]: 'rgba(23, 90, 138, 0.15)' }}>coverage circle</span>}
                       {step === 4 && draft.minSpacing.trim() !== '' && <span style={{ ['--sw' as string]: 'var(--guide-ok-soft)' }}>min distance between stamps</span>}
                       {step >= 3 && parsed.rule?.layout.ceilingGridMm !== undefined && parsed.rule.layout.strategy !== 'perimeter' && <span className="line">ceiling grid</span>}
                       <span className="plain">click a room to use it</span>
@@ -1536,7 +1768,7 @@ export function PlacementRuleGuide({
             )}
           </div>
           {scene && sample && step >= 3 && (
-            <WhyBox row={sampleShown} matches={sampleMatches} sampleName={roomLabel(sample)} unit={unit} rule={parsed.rule} coverage={coverage} error={parsed.error} />
+            <WhyBox row={sampleShown} matches={sampleMatches} sampleName={roomLabel(sample)} unit={unit} rule={parsed.rule} coverage={coverageOn ? coverage : null} error={parsed.error} />
           )}
         </aside>
       </div>
@@ -1593,16 +1825,31 @@ function WhyBox({ row, matches, sampleName, unit, rule, coverage, error }: WhyBo
   );
   let first: ReactNode;
   let base: number | null = null;
+  const amountLine = (cls: string) => line(cls, PLACEMENT_PRESET_LABELS[rule.preset], `${fmt(req.required)} ${unit} ÷ ${fmt(rule.capacityPerElement)} per stamp, rounded up`, req.quantityCount ?? '?', 'pg-why-source');
   if (req.countSource === 'coverage') {
     base = req.count;
-    first = coverage
-      ? line(maxHit ? '' : 'win', 'By coverage', `Circles of ${fmt(coverage.radiusM, 2)} m (${coverage.from}) cover the room`, req.count ?? '?', 'pg-why-source')
+    const coverageLine = coverage
+      ? line(maxHit ? '' : 'win', rule.preset === 'coverage' ? 'By coverage' : 'Coverage', `Circles of ${fmt(coverage.radiusM, 2)} m (${coverage.from}) cover the room`, req.count ?? '?', rule.preset === 'coverage' ? 'pg-why-source' : 'pg-why-coverage')
       : line('blocked', 'By coverage', 'Enter a coverage limit (step 3)', '?', 'pg-why-source');
+    first =
+      rule.preset === 'coverage' ? (
+        coverageLine
+      ) : (
+        <>
+          {req.quantityCount !== null ? amountLine('') : line('', PLACEMENT_PRESET_LABELS[rule.preset], 'No capacity per stamp: one stamp per room', 1, 'pg-why-source')}
+          {coverageLine}
+        </>
+      );
   } else if (req.count === null) {
     first = line('blocked', PLACEMENT_PRESET_LABELS[rule.preset], 'Room data is missing (step 3)', '?', 'pg-why-source');
   } else if (req.countSource === 'amount') {
     base = req.quantityCount;
-    first = line('', PLACEMENT_PRESET_LABELS[rule.preset], `${fmt(req.required)} ${unit} ÷ ${fmt(rule.capacityPerElement)} per stamp, rounded up`, req.quantityCount ?? '?', 'pg-why-source');
+    first = (
+      <>
+        {amountLine('')}
+        {rule.alsoCoverage && coverage && line('', 'Coverage', `Circles of ${fmt(coverage.radiusM, 2)} m: this count covers the room`, req.count ?? '?', 'pg-why-coverage')}
+      </>
+    );
   } else {
     base = 1;
     first = line('', PLACEMENT_PRESET_LABELS[rule.preset], 'No capacity per stamp: one stamp per room', 1, 'pg-why-source');
@@ -1629,7 +1876,29 @@ function WhyBox({ row, matches, sampleName, unit, rule, coverage, error }: WhyBo
           Each stamp gets {fmt(req.perElement)} {unit} ({fmt(req.required)} ÷ {req.count}).{rule.writeCapacity ? ' MepApp writes this capacity to the stamp.' : ''}
         </p>
       )}
+      {req.lighting?.roomIndex && (
+        <p className="mep-guide-note" data-testid="pg-why-uf">
+          Room index k = {fmt(req.lighting.roomIndex.k, 2)} (h<sub>m</sub> {fmt(req.lighting.roomIndex.hmM, 2)} m): UF {fmt(req.lighting.uf, 3)}.
+        </p>
+      )}
+      {req.terms && Object.values(req.terms).some((t) => t?.source === 'roomType') && (
+        <p className="mep-guide-note" data-testid="pg-why-demands">
+          Numbers from the room type:{' '}
+          {(Object.entries(req.terms) as [AmountTermKey, { value: number; source: string }][])
+            .filter(([, t]) => t.source === 'roomType')
+            .map(([key, t]) => `${AMOUNT_TERM_TEXT[key]} ${fmt(t.value, 3)} ${unit}`)
+            .join(', ')}
+          {req.lighting?.luxSource === 'roomType' ? `, ${fmt(req.lighting.lux)} lx` : ''}.
+        </p>
+      )}
+      {!req.terms && req.lighting?.luxSource === 'roomType' && (
+        <p className="mep-guide-note" data-testid="pg-why-demands">
+          Numbers from the room type: {fmt(req.lighting.lux)} lx.
+        </p>
+      )}
       {notes.length > 0 && <div className="mep-guide-callout bad">{notes.join('; ')}</div>}
     </div>
   );
 }
+
+const AMOUNT_TERM_TEXT: Record<AmountTermKey, string> = { fixed: 'per room', perM2: 'per m²', perPerson: 'per person', perM3: 'air changes' };

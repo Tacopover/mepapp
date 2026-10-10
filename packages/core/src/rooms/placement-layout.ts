@@ -18,6 +18,7 @@ import {
   type RoomCalculationRow,
   type RoomRequirement,
   type RequirementWarning,
+  usesCoverage,
 } from './placement-rule.js';
 import { areaToM2, lengthToM } from './placement-units.js';
 import type { RoomValues } from './room-values.js';
@@ -363,6 +364,7 @@ export function layoutEvenSpread(room: Pick<Room, 'polygon'>, count: number, off
 export function coverageRadiusM(coverage: CoverageLimits): number | null {
   const radii: number[] = [];
   const unit = coverage.lengthUnit;
+  if (coverage.maxRadius !== undefined) radii.push(lengthToM(coverage.maxRadius, unit));
   if (coverage.maxSpacing !== undefined) radii.push(lengthToM(coverage.maxSpacing, unit) / Math.SQRT2);
   if (coverage.maxWallDistance !== undefined) radii.push(lengthToM(coverage.maxWallDistance, unit) * Math.SQRT2);
   if (coverage.maxAreaPerElement !== undefined) radii.push(Math.sqrt(areaToM2(coverage.maxAreaPerElement, unit) / 2));
@@ -659,7 +661,7 @@ export function estimateFitCount(samples: RoomSamples, minPt: number): number {
  * The check never changes the count or the positions.
  */
 export function layoutRoomStamps(
-  rule: Pick<PlacementRule, 'layout' | 'coverage'> & Partial<Pick<PlacementRule, 'preset' | 'minCount' | 'maxCount'>>,
+  rule: Pick<PlacementRule, 'layout' | 'coverage'> & Partial<Pick<PlacementRule, 'preset' | 'minCount' | 'maxCount' | 'alsoCoverage'>>,
   room: Pick<Room, 'polygon'>,
   count: number,
   calibration: Calibration,
@@ -671,7 +673,7 @@ export function layoutRoomStamps(
   const strategy = rule.layout.strategy;
   let samples: RoomSamples | undefined;
   const samplesOf = () => (samples ??= roomSamples(room, offsetPt));
-  const radiusM = rule.preset === 'coverage' ? coverageRadiusM(rule.coverage) : null;
+  const radiusM = usesCoverage(rule) ? coverageRadiusM(rule.coverage) : null;
   let n = count;
   let result: LayoutResult | null = null;
   let layoutCount: RoomLayout['layoutCount'];
@@ -789,10 +791,18 @@ function withoutNearest(planned: readonly PlannedStamp[], kept: readonly Vec2[])
   return left;
 }
 
-/** A By coverage requirement with the count that the coverage layout found. */
+/**
+ * A requirement with the count that the coverage layout found. By coverage takes that count. An
+ * amount rule that also meets coverage takes the larger count, and then each element gets a
+ * smaller part of the required amount.
+ */
 function withLayoutCount(requirement: RoomRequirement, layoutCount: { count: number; limited: boolean }): RoomRequirement {
-  const warnings: RequirementWarning[] = layoutCount.limited ? [...requirement.warnings, 'maxCountReached'] : requirement.warnings;
-  return { ...requirement, count: layoutCount.count, warnings };
+  const warnings: RequirementWarning[] = layoutCount.limited && !requirement.warnings.includes('maxCountReached') ? [...requirement.warnings, 'maxCountReached'] : requirement.warnings;
+  if (requirement.countSource === 'coverage') return { ...requirement, count: layoutCount.count, warnings };
+  const amountCount = requirement.count ?? 0;
+  const count = Math.max(amountCount, layoutCount.count);
+  const perElement = requirement.required !== null && count > 0 ? requirement.required / count : requirement.perElement;
+  return { ...requirement, count, countSource: count > amountCount ? 'coverage' : requirement.countSource, perElement, warnings };
 }
 
 /**
@@ -863,7 +873,7 @@ export function planAutoPlacement(
       const fit = layout.fitEstimate !== undefined ? { fitEstimate: layout.fitEstimate } : {};
       if (!layout.layoutCount) return { ...base, stamps, warnings: [...warnings, ...layout.warnings], ...fit };
       const requirement = withLayoutCount(row.requirement, layout.layoutCount);
-      if (layout.layoutCount.limited) warnings.push('maxCountReached');
+      if (layout.layoutCount.limited && !warnings.includes('maxCountReached')) warnings.push('maxCountReached');
       return { ...base, requirement, stamps, warnings: [...warnings, ...layout.warnings], ...fit };
     }),
   };

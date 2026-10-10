@@ -398,6 +398,32 @@ describe('planAutoPlacement', () => {
   const r = { ...manualRoom(0, rect(0, 0, 400, 200)), id: 'room-1', name: 'A' };
   const values = { areaM2: 50, perimeterM: 30, lengthM: 10, widthM: 5, axisDeg: 0, ceilingHeight: { mm: 2700, level: 'global' as const }, volumeM3: 135, people: null };
 
+  it('amount + coverage: the coverage limit adds stamps above the amount count, and each gets a smaller part', () => {
+    // 10 × 5 m; 30 dm³/s ÷ 10 = 3 stamps; a max radius of 1.5 m needs more.
+    const rule: PlacementRule = { ...base, alsoCoverage: true, coverage: { maxRadius: 1.5 }, layout: { strategy: 'evenSpread', wallOffsetM: 0, rotation: 'room' } };
+    const row = planAutoPlacement([rule], [r], () => values, () => CAL, () => ({ width: 10, height: 10 })).rows[0]!;
+    expect(row.requirement.count).toBeGreaterThan(3);
+    expect(row.stamps).toHaveLength(row.requirement.count!);
+    expect(row.requirement.countSource).toBe('coverage');
+    expect(row.requirement.perElement).toBeCloseTo(30 / row.requirement.count!);
+    expect(row.warnings).not.toContain('coverageNotMet');
+  });
+
+  it('amount + coverage: the amount count stays when it already covers the room', () => {
+    const rule: PlacementRule = { ...base, alsoCoverage: true, coverage: { maxRadius: 20 } };
+    const row = planAutoPlacement([rule], [r], () => values, () => CAL, () => ({ width: 10, height: 10 })).rows[0]!;
+    expect(row.requirement.count).toBe(3);
+    expect(row.requirement.countSource).toBe('amount');
+    expect(row.stamps).toHaveLength(3);
+  });
+
+  it('alsoCoverage without a coverage limit changes nothing', () => {
+    const rule: PlacementRule = { ...base, alsoCoverage: true };
+    const row = planAutoPlacement([rule], [r], () => values, () => CAL, () => ({ width: 10, height: 10 })).rows[0]!;
+    expect(row.requirement.count).toBe(3);
+    expect(row.stamps).toHaveLength(3);
+  });
+
   it('gives the stamp positions of each row', () => {
     const plan = planAutoPlacement([base], [r], () => values, () => CAL, () => ({ width: 10, height: 10 }));
     expect(plan.rows[0]!.stamps).toHaveLength(3);
@@ -563,6 +589,9 @@ describe('layoutEvenSpread', () => {
 describe('coverageRadiusM', () => {
   it('takes the smallest radius of the limits', () => {
     expect(coverageRadiusM({})).toBeNull();
+    expect(coverageRadiusM({ maxRadius: 5.8 })).toBeCloseTo(5.8);
+    expect(coverageRadiusM({ maxRadius: 5.8, maxAreaPerElement: 60 })).toBeCloseTo(5.477, 3);
+    expect(coverageRadiusM({ maxRadius: 10, lengthUnit: 'ft' })).toBeCloseTo(3.048);
     expect(coverageRadiusM({ maxSpacing: 4 })).toBeCloseTo(2.828, 3);
     expect(coverageRadiusM({ maxWallDistance: 1 })).toBeCloseTo(1.414, 3);
     expect(coverageRadiusM({ maxAreaPerElement: 50 })).toBeCloseTo(5, 6);

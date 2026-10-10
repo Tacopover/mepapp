@@ -5,7 +5,7 @@
 import type { Calibration } from '../calibration.js';
 import type { Vec2 } from '../geometry.js';
 import { roomAreaM2, type Room } from './room.js';
-import type { RoomType } from './room-type.js';
+import type { RoomDemands, RoomType } from './room-type.js';
 
 /** The ceiling height when no other level gives one, mm. */
 export const DEFAULT_CEILING_HEIGHT_MM = 2700;
@@ -165,6 +165,8 @@ export interface RoomValues {
   ceilingHeight: ResolvedCeilingHeight;
   volumeM3: number | null;
   people: RoomPeople | null;
+  /** The demands of the room type. Absent = the room has no type, or the type has no demands. */
+  demands?: RoomDemands;
 }
 
 export function computeRoomValues(room: Room, calibration: Calibration | null, heights: CeilingHeightContext, roomType: RoomType | undefined): RoomValues {
@@ -181,5 +183,6 @@ export function computeRoomValues(room: Room, calibration: Calibration | null, h
     ceilingHeight,
     volumeM3: areaM2 !== null ? roomVolumeM3(areaM2, ceilingHeight.mm) : null,
     people: roomPeople(room, areaM2, roomType),
+    ...(roomType?.demands ? { demands: { ...roomType.demands } } : {}),
   };
 }

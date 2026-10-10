@@ -116,6 +116,17 @@ describe('roomPeople', () => {
   });
 });
 
+describe('computeRoomValues demands', () => {
+  it('copies the demands of the room type, and has none without a type', () => {
+    const r = manualRoom(0, [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]);
+    const type = { id: 'office', name: 'Office', keywords: [], demands: { illuminanceLx: 500 } };
+    const v = computeRoomValues(r, null, { globalMm: 2700 }, type);
+    expect(v.demands).toEqual({ illuminanceLx: 500 });
+    expect(v.demands).not.toBe(type.demands);
+    expect(computeRoomValues(r, null, { globalMm: 2700 }, undefined).demands).toBeUndefined();
+  });
+});
+
 describe('computeRoomValues', () => {
   it('gives every value of a calibrated room', () => {
     // 200 x 100 pt = 5 x 2.5 m = 12.5 m².

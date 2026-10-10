@@ -11,6 +11,8 @@ import {
   PLACEMENT_PRESET_LABELS,
   PLACEMENT_RULE_EXAMPLES,
   ruleAppliesToRoom,
+  ufAtRoomIndex,
+  EXAMPLE_UF_TABLE,
   validatePlacementRule,
   type PlacementRule,
   type RoomValues,
@@ -204,6 +206,117 @@ describe('presets', () => {
       expect(PLACEMENT_PRESET_HELP[preset].symbols.length).toBeGreaterThan(0);
     }
     expect(PLACEMENT_PRESET_HELP.perPersonArea.symbols.map((s) => s.symbol)).toEqual(['a', 'b', 'persons']);
+  });
+});
+
+describe('calculateRoomRequirement with room-type demands', () => {
+  const office = { supplyPerPersonDm3s: 6.5, supplyPerM2Dm3s: 0, heatingLoadWm2: 40, illuminanceLx: 300, workingPlaneHeightM: 0 };
+
+  it('takes a term from the room type and converts the flow to the rule unit', () => {
+    const r = calculateRoomRequirement(rule({ amount: { unit: 'm³/h', from: { perPerson: 'supplyPerPersonDm3s' } }, capacityPerElement: 50 }), values({ demands: office }));
+    expect(r.required).toBeCloseTo(6.5 * 3.6 * 4);
+    expect(r.terms?.perPerson).toEqual({ value: expect.closeTo(23.4), source: 'roomType' });
+    expect(r.count).toBe(2);
+  });
+
+  it('one rule gives each room type its own number', () => {
+    const air = rule({ amount: { unit: 'dm³/s', from: { perPerson: 'supplyPerPersonDm3s' } } });
+    expect(calculateRoomRequirement(air, values({ demands: { supplyPerPersonDm3s: 6.5 } })).required).toBeCloseTo(26);
+    expect(calculateRoomRequirement(air, values({ demands: { supplyPerPersonDm3s: 8.5 } })).required).toBeCloseTo(34);
+  });
+
+  it('uses the rule number when the room type has no value', () => {
+    const r = calculateRoomRequirement(rule({ amount: { perPerson: 7, unit: 'dm³/s', from: { perPerson: 'supplyPerPersonDm3s' } } }), values());
+    expect(r.required).toBeCloseTo(28);
+    expect(r.terms?.perPerson?.source).toBe('rule');
+  });
+
+  it('warns noDemand and gives no count without a value and a fallback', () => {
+    const r = calculateRoomRequirement(rule({ amount: { unit: 'dm³/s', from: { fixed: 'exhaustFixedDm3s' } }, capacityPerElement: 10 }), values({ demands: { illuminanceLx: 500 } }));
+    expect(r.warnings).toContain('noDemand');
+    expect(r.required).toBeNull();
+    expect(r.count).toBeNull();
+  });
+
+  it('a power per m² from the room type: W/m² × m² in kW, also with a rule area in ft²', () => {
+    const r = calculateRoomRequirement(rule({ amount: { unit: 'kW', areaUnit: 'ft2', from: { perM2: 'heatingLoadWm2' } } }), values({ demands: office }));
+    expect(r.required).toBeCloseTo(1.6);
+  });
+
+  it('a value of 0 is a value, not a missing one', () => {
+    const r = calculateRoomRequirement(rule({ amount: { unit: 'dm³/s', perM2: 0.7, from: { perPerson: 'supplyPerPersonDm3s', perM2: 'supplyPerM2Dm3s' } } }), values({ demands: office }));
+    expect(r.required).toBeCloseTo(26);
+    expect(r.terms?.perM2).toEqual({ value: 0, source: 'roomType' });
+  });
+
+  it('lighting: E from the room type, in lx with the area in m², also for a rule in fc', () => {
+    const L = { lux: 50, luxFromRoomType: true, utilisationFactor: 0.6, maintenanceFactor: 0.8, illuminanceUnit: 'fc' as const };
+    const r = calculateRoomRequirement(rule({ preset: 'lighting', amount: { unit: 'lm' }, lighting: L }), values({ demands: office }));
+    expect(r.required).toBeCloseTo((300 * 40) / 0.48);
+    expect(r.lighting).toMatchObject({ lux: 300, luxSource: 'roomType', uf: 0.6 });
+    const fallback = calculateRoomRequirement(rule({ preset: 'lighting', amount: { unit: 'lm' }, lighting: L }), values());
+    expect(fallback.required).toBeCloseTo((50 * 40) / M2_PER_FT2 / 0.48);
+    expect(fallback.lighting?.luxSource).toBe('rule');
+    const none = calculateRoomRequirement(rule({ preset: 'lighting', amount: { unit: 'lm' }, lighting: { luxFromRoomType: true, utilisationFactor: 0.6, maintenanceFactor: 0.8 }, capacityPerElement: 3600 }), values());
+    expect(none.warnings).toContain('noDemand');
+    expect(none.count).toBeNull();
+  });
+
+  it('lighting: UF from the room index k = 2A ÷ (h_m × P)', () => {
+    // h_m = 2.7 − 0 − 0.75 = 1.95 m; k = 80 ÷ (1.95 × 26) = 1.578; UF between 0.68 (1.5) and 0.74 (2).
+    const L = { lux: 500, utilisationFactor: 0.6, maintenanceFactor: 0.8, ufTable: [...EXAMPLE_UF_TABLE] };
+    const r = calculateRoomRequirement(rule({ preset: 'lighting', amount: { unit: 'lm' }, lighting: L }), values());
+    const k = 80 / (1.95 * 26);
+    const uf = 0.68 + (0.06 * (k - 1.5)) / 0.5;
+    expect(r.lighting?.roomIndex).toMatchObject({ k: expect.closeTo(k, 6), hmM: expect.closeTo(1.95, 6), workingPlaneM: 0.75, workingPlaneSource: 'default' });
+    expect(r.lighting?.uf).toBeCloseTo(uf, 6);
+    expect(r.required).toBeCloseTo((500 * 40) / (uf * 0.8));
+    // The working plane of the room type (0 m) and a suspension of 0.5 m: h_m = 2.2 m.
+    const typed = calculateRoomRequirement(rule({ preset: 'lighting', amount: { unit: 'lm' }, lighting: { ...L, suspensionM: 0.5, workingPlaneHeightM: 0.85 } }), values({ demands: office }));
+    expect(typed.lighting?.roomIndex).toMatchObject({ hmM: expect.closeTo(2.2, 6), workingPlaneM: 0, workingPlaneSource: 'roomType' });
+  });
+
+  it('lighting: no room index when the luminaire is not above the working plane', () => {
+    const r = calculateRoomRequirement(rule({ preset: 'lighting', amount: { unit: 'lm' }, lighting: { lux: 500, utilisationFactor: 0.6, maintenanceFactor: 0.8, ufTable: [...EXAMPLE_UF_TABLE], suspensionM: 2 }, capacityPerElement: 3600 }), values());
+    expect(r.warnings).toContain('noRoomIndex');
+    expect(r.count).toBeNull();
+  });
+
+  it('ufAtRoomIndex: linear between the points, the end values outside them', () => {
+    const table = [{ k: 2, uf: 0.7 }, { k: 1, uf: 0.5 }];
+    expect(ufAtRoomIndex(table, 0.4)).toBe(0.5);
+    expect(ufAtRoomIndex(table, 1.5)).toBeCloseTo(0.6);
+    expect(ufAtRoomIndex(table, 9)).toBe(0.7);
+  });
+
+  it('reads and validates the new fields', () => {
+    const r = rule({
+      preset: 'lighting',
+      amount: { unit: 'lm', from: { perPerson: 'supplyPerPersonDm3s' } },
+      lighting: { luxFromRoomType: true, utilisationFactor: 0.6, maintenanceFactor: 0.8, ufTable: [{ k: 1, uf: 0.5 }, { k: 2, uf: 0.7 }], suspensionM: 0.3, workingPlaneHeightM: 0.8 },
+    });
+    expect(parsePlacementRules([JSON.parse(JSON.stringify(r))])).toEqual([r]);
+    const [dropped] = parsePlacementRules([{ ...JSON.parse(JSON.stringify(r)), amount: { unit: 'lm', from: { perPerson: 'heatingLoadWm2', fixed: 'nothing' } } }])!;
+    expect(dropped!.amount.from).toBeUndefined();
+    expect(validatePlacementRule(rule({ amount: { unit: 'W', from: { perM2: 'socketsFixed' } } }), [])).toMatch(/does not fit/);
+    expect(validatePlacementRule(rule({ lighting: { lux: 500, utilisationFactor: 0.6, maintenanceFactor: 0.8, ufTable: [{ k: 1, uf: 0.5 }] } }), [])).toMatch(/UF table/);
+    expect(validatePlacementRule(rule({ lighting: { utilisationFactor: 0.6, maintenanceFactor: 0.8 } }), [])).toMatch(/illuminance/);
+  });
+
+  it('reads the max radius and alsoCoverage, and validates them', () => {
+    const r = rule({ preset: 'fixed', amount: { fixed: 1, unit: 'x' }, coverage: { maxRadius: 5.8 }, alsoCoverage: true });
+    expect(parsePlacementRules([JSON.parse(JSON.stringify(r))])).toEqual([r]);
+    expect(validatePlacementRule(rule({ coverage: { maxRadius: 0 } }), [])).toMatch(/coverage limit/);
+    expect(validatePlacementRule(rule({ alsoCoverage: true }), [])).toMatch(/Also cover/);
+    expect(validatePlacementRule(rule({ preset: 'coverage', coverage: { maxRadius: 5.8 } }), [])).toBeNull();
+  });
+
+  it('the fixed examples: toilet exhaust 7 dm³/s (bathroom 14 from the room type), smoke detector radius 5.8 m', () => {
+    const toilet = PLACEMENT_RULE_EXAMPLES.find((x) => x.id === 'example-toilet-exhaust')!;
+    expect(calculateRoomRequirement(toilet, values()).required).toBe(7);
+    expect(calculateRoomRequirement(toilet, values({ demands: { exhaustFixedDm3s: 14 } })).required).toBe(14);
+    const smoke = PLACEMENT_RULE_EXAMPLES.find((x) => x.id === 'example-smoke-detector')!;
+    expect(smoke.coverage).toEqual({ maxAreaPerElement: 60, maxRadius: 5.8 });
   });
 });
 

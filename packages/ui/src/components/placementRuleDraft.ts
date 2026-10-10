@@ -1,8 +1,10 @@
 import {
   CEILING_GRID_SIZES_MM,
+  demandFitsUnit,
   isAirChangeUnit,
   parseDecimal,
   PRESET_AMOUNT_FIELDS,
+  type AmountTermKey,
   type AreaUnit,
   type GridEdge,
   type GridStyle,
@@ -10,6 +12,7 @@ import {
   type LengthUnit,
   type PlacementPreset,
   type PlacementRule,
+  type RoomDemandKey,
 } from '@mepapp/core';
 
 // The text draft of one placement rule in the guide (PlacementRuleGuide): the boxes hold text,
@@ -64,15 +67,24 @@ export function draftOf(rule: PlacementRule) {
     perM3: text(rule.amount.perM3),
     minimum: text(rule.amount.minimum),
     unit: rule.amount.unit,
+    /** The terms that take their number from a room-type demand. */
+    from: { ...rule.amount.from } as Partial<Record<AmountTermKey, RoomDemandKey>>,
     areaUnit: (rule.amount.areaUnit ?? 'm2') as AreaUnit,
     lux: text(rule.lighting?.lux),
     uf: text(rule.lighting?.utilisationFactor),
     mf: text(rule.lighting?.maintenanceFactor),
     illuminanceUnit: (rule.lighting?.illuminanceUnit ?? 'lx') as IlluminanceUnit,
+    luxFromRoomType: rule.lighting?.luxFromRoomType === true,
+    ufMode: (rule.lighting?.ufTable ? 'table' : 'fixed') as 'fixed' | 'table',
+    ufTable: (rule.lighting?.ufTable ?? []).map((pt) => ({ k: String(pt.k), uf: String(pt.uf) })),
+    suspension: text(rule.lighting?.suspensionM),
+    workingPlane: text(rule.lighting?.workingPlaneHeightM),
     capacity: text(rule.capacityPerElement),
     maxSpacing: text(rule.coverage.maxSpacing),
     maxArea: text(rule.coverage.maxAreaPerElement),
     maxWall: text(rule.coverage.maxWallDistance),
+    maxRadius: text(rule.coverage.maxRadius),
+    alsoCoverage: rule.alsoCoverage === true,
     lengthUnit: (rule.coverage.lengthUnit ?? 'm') as LengthUnit,
     minCount: text(rule.minCount),
     maxCount: text(rule.maxCount),
@@ -116,6 +128,9 @@ export function ruleOf(id: string, d: Draft): PlacementRule {
     if (value !== undefined) amount[key] = value;
   }
   if (shown.has('perM2') && d.areaUnit === 'ft2') amount.areaUnit = 'ft2';
+  for (const [key, demand] of Object.entries(d.from) as [AmountTermKey, RoomDemandKey][]) {
+    if (shown.has(key) && demandFitsUnit(demand, amount.unit)) (amount.from ??= {})[key] = demand;
+  }
   const rule: PlacementRule = {
     id,
     name: d.name.trim(),
@@ -141,11 +156,26 @@ export function ruleOf(id: string, d: Draft): PlacementRule {
   if (d.lengthUnit === 'ft') rule.coverage.lengthUnit = 'ft';
   if (d.preset === 'lighting') {
     const lux = numberOf(d.lux, 'Illuminance');
-    const uf = numberOf(d.uf, 'Utilisation factor');
+    const uf = d.ufMode === 'fixed' ? numberOf(d.uf, 'Utilisation factor') : (numberOf(d.uf, 'Utilisation factor') ?? 0.6);
     const mf = numberOf(d.mf, 'Maintenance factor');
-    if (lux === undefined || uf === undefined || mf === undefined) throw new FieldError('Enter the illuminance, the utilisation factor and the maintenance factor.');
-    rule.lighting = { lux, utilisationFactor: uf, maintenanceFactor: mf };
+    if ((lux === undefined && !d.luxFromRoomType) || uf === undefined || mf === undefined) throw new FieldError('Enter the illuminance, the utilisation factor and the maintenance factor.');
+    rule.lighting = { utilisationFactor: uf, maintenanceFactor: mf };
+    if (lux !== undefined) rule.lighting.lux = lux;
+    if (d.luxFromRoomType) rule.lighting.luxFromRoomType = true;
     if (d.illuminanceUnit === 'fc') rule.lighting.illuminanceUnit = 'fc';
+    if (d.ufMode === 'table') {
+      const rows = d.ufTable.filter((row) => row.k.trim() !== '' || row.uf.trim() !== '');
+      rule.lighting.ufTable = rows.map((row, i) => {
+        const k = numberOf(row.k, `Room index in row ${i + 1}`);
+        const value = numberOf(row.uf, `UF in row ${i + 1}`);
+        if (k === undefined || value === undefined) throw new FieldError(`Enter the room index and the UF in row ${i + 1} of the UF table.`);
+        return { k, uf: value };
+      });
+      const suspension = numberOf(d.suspension, 'Suspension');
+      const workingPlane = numberOf(d.workingPlane, 'Working-plane height');
+      if (suspension !== undefined) rule.lighting.suspensionM = suspension;
+      if (workingPlane !== undefined) rule.lighting.workingPlaneHeightM = workingPlane;
+    }
   }
   const optional: [keyof PlacementRule | keyof PlacementRule['coverage'], string, string, 'rule' | 'coverage'][] = [
     ['capacityPerElement', d.capacity, 'Capacity per element', 'rule'],
@@ -154,11 +184,13 @@ export function ruleOf(id: string, d: Draft): PlacementRule {
     ['maxSpacing', d.maxSpacing, 'Max spacing', 'coverage'],
     ['maxAreaPerElement', d.maxArea, 'Max area per element', 'coverage'],
     ['maxWallDistance', d.maxWall, 'Max distance to a wall', 'coverage'],
+    ['maxRadius', d.maxRadius, 'Max radius', 'coverage'],
   ];
   for (const [key, value, label, target] of optional) {
     const n = numberOf(value, label);
     if (n !== undefined) (target === 'rule' ? (rule as unknown as Record<string, unknown>) : (rule.coverage as Record<string, unknown>))[key] = n;
   }
+  if (d.alsoCoverage && d.preset !== 'coverage') rule.alsoCoverage = true;
   if (d.rotation === 'fixed') {
     const angle = numberOf(d.fixedAngle, 'Fixed angle');
     if (angle !== undefined) rule.layout.fixedAngleDeg = angle;

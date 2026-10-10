@@ -4,6 +4,66 @@
 
 import type { Room } from './room.js';
 
+/** The demands of a room type that a placement rule can use (room-placement-followup.md Phase F). */
+export type RoomDemandKey =
+  | 'illuminanceLx'
+  | 'workingPlaneHeightM'
+  | 'supplyPerPersonDm3s'
+  | 'supplyPerM2Dm3s'
+  | 'exhaustFixedDm3s'
+  | 'airChangesPerH'
+  | 'heatingLoadWm2'
+  | 'coolingLoadWm2'
+  | 'socketsPerPerson'
+  | 'socketsFixed';
+
+/** What a room type needs, independent of the product. Each value is a number of 0 or more. Absent = not known. */
+export type RoomDemands = Partial<Record<RoomDemandKey, number>>;
+
+/** The kind of a demand sets the units it works with: a flow (dm³/s) converts to each flow unit, a power (W) to W and kW, a count to any other unit. */
+export type RoomDemandKind = 'illuminance' | 'height' | 'flow' | 'airChanges' | 'power' | 'count';
+
+/** The amount term of a placement rule that a demand fills. 'lighting' = the lumen method. */
+export type RoomDemandTerm = 'fixed' | 'perM2' | 'perPerson' | 'perM3' | 'lighting';
+
+export interface RoomDemandField {
+  key: RoomDemandKey;
+  label: string;
+  unit: string;
+  kind: RoomDemandKind;
+  term: RoomDemandTerm;
+}
+
+export const ROOM_DEMAND_FIELDS: readonly RoomDemandField[] = [
+  { key: 'illuminanceLx', label: 'Illuminance (Em)', unit: 'lx', kind: 'illuminance', term: 'lighting' },
+  { key: 'workingPlaneHeightM', label: 'Working-plane height', unit: 'm', kind: 'height', term: 'lighting' },
+  { key: 'supplyPerPersonDm3s', label: 'Supply air per person', unit: 'dm³/s per person', kind: 'flow', term: 'perPerson' },
+  { key: 'supplyPerM2Dm3s', label: 'Supply air per m²', unit: 'dm³/s per m²', kind: 'flow', term: 'perM2' },
+  { key: 'exhaustFixedDm3s', label: 'Exhaust air per room', unit: 'dm³/s', kind: 'flow', term: 'fixed' },
+  { key: 'airChangesPerH', label: 'Air changes', unit: 'per hour', kind: 'airChanges', term: 'perM3' },
+  { key: 'heatingLoadWm2', label: 'Heating load', unit: 'W/m²', kind: 'power', term: 'perM2' },
+  { key: 'coolingLoadWm2', label: 'Cooling load', unit: 'W/m²', kind: 'power', term: 'perM2' },
+  { key: 'socketsPerPerson', label: 'Sockets per person', unit: 'per person', kind: 'count', term: 'perPerson' },
+  { key: 'socketsFixed', label: 'Sockets per room', unit: 'per room', kind: 'count', term: 'fixed' },
+];
+
+/**
+ * Example demands for some built-in room types (room-demands-research.md §8): Dutch new build, Bbl
+ * for the air, NEN-EN 12464-1 for the light, design practice for the rest. Examples only: the user
+ * must check them against the rules of the project. The area per person is included.
+ */
+export const ROOM_TYPE_DEMAND_EXAMPLES: Readonly<Record<string, { areaPerPersonM2?: number; demands: RoomDemands }>> = {
+  office: { areaPerPersonM2: 10, demands: { illuminanceLx: 500, workingPlaneHeightM: 0.75, supplyPerPersonDm3s: 6.5, supplyPerM2Dm3s: 0, heatingLoadWm2: 40, coolingLoadWm2: 70, socketsPerPerson: 4 } },
+  meeting: { areaPerPersonM2: 2, demands: { illuminanceLx: 500, workingPlaneHeightM: 0.75, supplyPerPersonDm3s: 6.5, supplyPerM2Dm3s: 0, heatingLoadWm2: 40, coolingLoadWm2: 100, socketsFixed: 6 } },
+  classroom: { areaPerPersonM2: 2, demands: { illuminanceLx: 500, workingPlaneHeightM: 0.75, supplyPerPersonDm3s: 8.5, supplyPerM2Dm3s: 0, heatingLoadWm2: 40, coolingLoadWm2: 80, socketsFixed: 8 } },
+  corridor: { demands: { illuminanceLx: 100, workingPlaneHeightM: 0, heatingLoadWm2: 30 } },
+  toilet: { demands: { illuminanceLx: 200, workingPlaneHeightM: 0, exhaustFixedDm3s: 7, heatingLoadWm2: 40, socketsFixed: 0 } },
+  bathroom: { demands: { illuminanceLx: 200, workingPlaneHeightM: 0, exhaustFixedDm3s: 14 } },
+  storage: { demands: { illuminanceLx: 100, workingPlaneHeightM: 0, airChangesPerH: 0.5, heatingLoadWm2: 20, socketsFixed: 1 } },
+  kitchen: { demands: { illuminanceLx: 200, workingPlaneHeightM: 0.85, exhaustFixedDm3s: 21, heatingLoadWm2: 30, coolingLoadWm2: 60, socketsFixed: 8 } },
+  technical: { demands: { illuminanceLx: 200, workingPlaneHeightM: 0, airChangesPerH: 2, heatingLoadWm2: 0, socketsFixed: 4 } },
+};
+
 export interface RoomType {
   id: string;
   name: string;
@@ -13,9 +73,11 @@ export interface RoomType {
   keywords: string[];
   /** Floor area per person, m². Used to calculate the number of people (Phase 2). Absent = no people. */
   areaPerPersonM2?: number;
+  /** What a room of this type needs. Absent = no demands. */
+  demands?: RoomDemands;
 }
 
-/** Built-in room types: the starting user library. Dutch and English keywords, because most test drawings are Dutch. No design values: those differ per country. */
+/** Built-in room types: the starting user library. Dutch and English keywords, because most test drawings are Dutch. No design values: those differ per country (see ROOM_TYPE_DEMAND_EXAMPLES). */
 export const ROOM_TYPE_LIBRARY: RoomType[] = [
   { id: 'office', name: 'Office', nameNl: 'Kantoor', keywords: ['kantoor', 'werkplek', 'werkplekken', 'concentratie', 'belplek', 'studielandschap', 'office', 'workplace'] },
   { id: 'meeting', name: 'Meeting room', nameNl: 'Vergaderruimte', keywords: ['vergader', 'overleg', 'brainstorm', 'spreekkamer', 'meeting'] },
@@ -123,12 +185,27 @@ export function parseRoomTypeKeywords(text: string): string[] {
 }
 
 /** Why the fields cannot be saved, or null when they can. `others` are the other types of the list. */
-export function validateRoomTypeFields(fields: Pick<RoomType, 'name' | 'areaPerPersonM2'>, others: readonly RoomType[]): string | null {
+export function validateRoomTypeFields(fields: Pick<RoomType, 'name' | 'areaPerPersonM2' | 'demands'>, others: readonly RoomType[]): string | null {
   const name = fields.name.trim();
   if (!name) return 'Enter a name.';
   if (others.some((t) => t.name.trim().toLowerCase() === name.toLowerCase())) return `Another room type is already called "${name}".`;
   if (fields.areaPerPersonM2 !== undefined && !(Number.isFinite(fields.areaPerPersonM2) && fields.areaPerPersonM2 > 0)) return 'The area per person must be a number above 0.';
+  for (const field of ROOM_DEMAND_FIELDS) {
+    const value = fields.demands?.[field.key];
+    if (value !== undefined && !isDemandValue(value)) return `${field.label} must be a number of 0 or more.`;
+  }
   return null;
+}
+
+const isDemandValue = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+/** The demands of a stored room type: known keys with a number of 0 or more. Null when none is left. */
+function toRoomDemands(value: unknown): RoomDemands | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  const demands: RoomDemands = {};
+  for (const field of ROOM_DEMAND_FIELDS) if (isDemandValue(v[field.key])) demands[field.key] = v[field.key] as number;
+  return Object.keys(demands).length > 0 ? demands : null;
 }
 
 function toRoomType(value: unknown): RoomType | null {
@@ -138,6 +215,8 @@ function toRoomType(value: unknown): RoomType | null {
   const type: RoomType = { id: v.id, name: v.name, keywords: v.keywords.filter((k): k is string => typeof k === 'string') };
   if (typeof v.nameNl === 'string' && v.nameNl) type.nameNl = v.nameNl;
   if (typeof v.areaPerPersonM2 === 'number' && Number.isFinite(v.areaPerPersonM2) && v.areaPerPersonM2 > 0) type.areaPerPersonM2 = v.areaPerPersonM2;
+  const demands = toRoomDemands(v.demands);
+  if (demands) type.demands = demands;
   return type;
 }
 
