@@ -154,7 +154,25 @@ Verification for Phase A: core tests (new and updated), all package tests, build
 
 ### Phase B — The guide: steps 1–3 and the sample room
 
-STATUS: not started.
+STATUS: DONE 2026-10-10, commit ef2da86. Verification: all package tests pass (core 843, ui 101), `pnpm build` and `pnpm typecheck` pass. A browser check on `01_arch_first_floor.pdf` at 1:50 drove the real guide and passed 29 of 29 checks with no page errors:
+- New rule opens the guide; steps 4–6 are disabled; Escape in the stamp picker keeps the guide open;
+- step 2: 8 rooms without a type in the callout, the office chip counts 15 rooms, the whole floor colours 15 matches and 8 rooms without a type; the room-type fix is one undo step;
+- a click on the plan sets the sample room (floor view and room view);
+- the tip opens on hover and on focus, and Escape closes the tip only;
+- each of the 8 calculations shows its own fields;
+- per area 1.2 × area, and ft² gives area ÷ 0.0929; Why N stamps = ceil(required ÷ 50); max count 1 limits it;
+- area per person 5 on Office gives floor(area ÷ 5) persons and is stored in the room-type library;
+- the drawing ceiling height 3000 mm gives the volume, and 4 air changes give 4 × volume ÷ 3.6 dm³/s;
+- By coverage: the count, the stamps and the circles agree; one key press takes 17–22 ms;
+- Close with changes asks for Save or Revert; Save stores the rule; Edit in the guide opens a saved rule.
+
+Changes made during the work (not in the steps below):
+- The rule form stays in the rule list until Phase C. "+ New rule" opens the guide, and the form has an "Edit in the guide…" button. Steps 4–6 show in the step list, disabled.
+- The draft code moved to `placementRuleDraft.ts`, shared by the form and the guide.
+- Without a stamp, the preview uses a 600 mm square.
+- The ceiling height fix is in mm, as in the Ceiling heights dialog.
+- Not checked: the stamps on the whole-floor view (computed after 300 ms).
+- Open: after a user tries By coverage and then chooses another calculation, the rule keeps the layout Even spread and the coverage limits (Phase A behaviour of the draft).
 
 - New `PlacementRuleGuide.tsx` (ui). Menu › Placement rules… keeps the rule list. Edit and New open the guide for one rule. The guide has the step list on the left and the step in the middle. The sample-room panel is on the right, and the layout stacks on a narrow window. Save and Revert stay (a draft rule, as today).
 - **Sample room panel** (`RulePreviewPlan.tsx`):
