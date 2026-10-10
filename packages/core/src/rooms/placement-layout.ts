@@ -12,6 +12,7 @@ import {
   calculateRooms,
   REQUIREMENT_WARNING_TEXT,
   type CoverageLimits,
+  type GridEdge,
   type GridStyle,
   type PlacementRule,
   type RoomCalculationRow,
@@ -32,7 +33,9 @@ export type LayoutWarning =
   /** By coverage: part of the room is farther than the coverage radius from every stamp (the max count, the wall offset or the layout stops it). */
   | 'coverageNotMet'
   /** Two stamps are closer than the min distance between stamps. */
-  | 'tooClose';
+  | 'tooClose'
+  /** The room has fewer free ceiling tiles than stamps: some stamps are not on a tile center. */
+  | 'gridFull';
 
 export const LAYOUT_WARNING_TEXT: Record<LayoutWarning, string> = {
   noFit: 'does not fit: placed at the label point',
@@ -40,6 +43,7 @@ export const LAYOUT_WARNING_TEXT: Record<LayoutWarning, string> = {
   layoutFallback: 'grid layout used',
   coverageNotMet: 'coverage not met in part of the room',
   tooClose: 'stamps closer than the min distance',
+  gridFull: 'not enough ceiling tiles: some stamps are not on the grid',
 };
 
 export interface LayoutResult {
@@ -66,9 +70,13 @@ export function distanceToWalls(polygon: RoomPolygon, p: Vec2): number {
   return best;
 }
 
-/** True when the point is inside the room and at least `offsetPt` from every wall. */
+/** The distance at which a point counts as on a wall, points. */
+const ON_WALL_PT = 1e-6;
+
+/** True when the point is inside the room and at least `offsetPt` from every wall. With an offset of 0, a point on a wall is valid too. */
 export function isValidPlacementPoint(polygon: RoomPolygon, p: Vec2, offsetPt: number): boolean {
-  return polygonContainsPoint(polygon, p) && distanceToWalls(polygon, p) >= offsetPt - 1e-9;
+  if (polygonContainsPoint(polygon, p)) return distanceToWalls(polygon, p) >= offsetPt - 1e-9;
+  return offsetPt <= ON_WALL_PT && distanceToWalls(polygon, p) <= ON_WALL_PT;
 }
 
 const SAMPLES = 48;
@@ -178,14 +186,15 @@ export function chooseGridShape(count: number, lengthPt: number, widthPt: number
 }
 
 /**
- * `count` points in a grid along the main axis of the room (its smallest bounding rectangle). Each
- * point is the center of its cell in the rectangle minus `offsetPt` on every side. A point outside
- * the room, or nearer a wall than `offsetPt`, moves to the nearest valid point. `style` sets how a
- * short last row is filled (gridCells).
+ * `count` points in a grid along the main axis of the room (its smallest bounding rectangle), in the
+ * rectangle minus `offsetPt` on every side. With the edge 'halfSpacing' each point is the center of
+ * its cell; with 'wall' the outer points are on the edge of that rectangle. A point outside the room,
+ * or nearer a wall than `offsetPt`, moves to the nearest valid point. `style` sets how a short last
+ * row is filled (gridCells).
  */
-export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, style: GridStyle = 'spread'): LayoutResult {
+export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, style: GridStyle = 'spread', edge: GridEdge = 'halfSpacing'): LayoutResult {
   if (count <= 0) return { points: [], warnings: [] };
-  const cells = gridCells(room, count, offsetPt, style);
+  const cells = gridCells(room, count, offsetPt, style, edge);
   if (!cells) return layoutCenter(room, offsetPt);
   const { ideal, minGap } = cells;
   const points: Vec2[] = [];
@@ -209,14 +218,18 @@ export function layoutGrid(room: Pick<Room, 'polygon'>, count: number, offsetPt:
 }
 
 /**
- * The cell centers of the grid (layoutGrid) before any point moves, and half the smaller cell side.
- * Null for a room without a bounding rectangle. The style sets the columns of a short last row with
- * k of the `cols` stamps: 'spread' spreads the k stamps over the full length; 'aligned' puts stamp i
- * in column round((i + 0.5) × cols ÷ k − 0.5), so the columns stay in line and a cell can stay empty;
- * 'staggered' uses the aligned columns and moves each row a quarter cell (even rows back, odd rows
- * forward), so two rows are half a cell apart. All in the frame of the room's main axis.
+ * The points of the grid (layoutGrid) before any point moves, and half the smaller distance between
+ * two points. Null for a room without a bounding rectangle. The style sets the columns of a short
+ * last row with k of the `cols` stamps: 'spread' spreads the k stamps over the full length; 'aligned'
+ * puts stamp i in column round((i + 0.5) × cols ÷ k − 0.5), so the columns stay in line and a cell
+ * can stay empty; 'staggered' uses the aligned columns and moves each row a quarter cell (even rows
+ * back, odd rows forward), so two rows are half a cell apart. All in the frame of the room's main axis.
+ *
+ * The edge 'wall' puts the outer columns and rows on the edge of the usable rectangle: n columns are
+ * usable ÷ (n − 1) apart, and one column is at the center. Staggered rows use usable ÷ (n − 0.5),
+ * and each odd row moves half that distance forward, so no point goes past the edge.
  */
-function gridCells(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, style: GridStyle = 'spread'): { ideal: Vec2[]; minGap: number } | null {
+function gridCells(room: Pick<Room, 'polygon'>, count: number, offsetPt: number, style: GridStyle = 'spread', edge: GridEdge = 'halfSpacing'): { ideal: Vec2[]; minGap: number } | null {
   const rect = roomMinBoundingRect(room);
   if (!rect) return null;
   const grid = chooseGridShape(count, rect.lengthPt, rect.widthPt);
@@ -229,6 +242,22 @@ function gridCells(room: Pick<Room, 'polygon'>, count: number, offsetPt: number,
   const cellL = usableL / cols;
   const rows = Math.ceil(count / cols);
   const ideal: Vec2[] = [];
+  const pointAt = (along: number, across: number): Vec2 => ({ x: rect.center.x + u.x * along + v.x * across, y: rect.center.y + u.y * along + v.y * across });
+  if (edge === 'wall') {
+    const stagger = style === 'staggered' && rows > 1;
+    const spans = cols - 1 + (stagger ? 0.5 : 0);
+    const stepL = spans > 0 ? usableL / spans : 0;
+    const stepW = rows > 1 ? usableW / (rows - 1) : 0;
+    for (let row = 0; row < rows; row++) {
+      const inRow = row < rows - 1 ? cols : count - cols * (rows - 1);
+      const across = rows > 1 ? -usableW / 2 + row * stepW : 0;
+      for (let i = 0; i < inRow; i++) {
+        const col = style === 'spread' ? (inRow > 1 ? (i * (cols - 1)) / (inRow - 1) : (cols - 1) / 2) : Math.round(((i + 0.5) * cols) / inRow - 0.5);
+        ideal.push(pointAt(spans > 0 ? -usableL / 2 + col * stepL + (stagger && row % 2 === 1 ? stepL / 2 : 0) : 0, across));
+      }
+    }
+    return { ideal, minGap: Math.min(stepL || usableL, stepW || usableW) / 2 };
+  }
   for (let row = 0; row < rows; row++) {
     const inRow = row < rows - 1 ? cols : count - cols * (rows - 1);
     const across = -usableW / 2 + ((row + 0.5) * usableW) / rows;
@@ -236,8 +265,7 @@ function gridCells(room: Pick<Room, 'polygon'>, count: number, offsetPt: number,
     for (let i = 0; i < inRow; i++) {
       const at = ((i + 0.5) * cols) / inRow - 0.5;
       const col = style === 'spread' ? at : Math.round(at);
-      const along = -usableL / 2 + (col + 0.5) * cellL + shift;
-      ideal.push({ x: rect.center.x + u.x * along + v.x * across, y: rect.center.y + u.y * along + v.y * across });
+      ideal.push(pointAt(-usableL / 2 + (col + 0.5) * cellL + shift, across));
     }
   }
   return { ideal, minGap: Math.min(cellL, usableW / rows) / 2 };
@@ -480,6 +508,81 @@ export function layoutPerimeter(room: Pick<Room, 'polygon'>, count: number, offs
   return { points, warnings, rotations };
 }
 
+/** A square ceiling grid along the main axis of a room: one tile center is at the center of the room's smallest bounding rectangle. */
+export interface CeilingGrid {
+  /** The center of the middle tile. */
+  center: Vec2;
+  /** Unit vectors along the length and across the width of the room. */
+  u: Vec2;
+  v: Vec2;
+  /** The tile size, points. */
+  size: number;
+  /** Half the length and half the width of the bounding rectangle, points. */
+  halfLength: number;
+  halfWidth: number;
+}
+
+/** The ceiling grid of the room with tiles of `sizePt`, or null for a room without a bounding rectangle. */
+export function ceilingGridOf(room: Pick<Room, 'polygon'>, sizePt: number): CeilingGrid | null {
+  const rect = roomMinBoundingRect(room);
+  if (!rect || !(sizePt > 0)) return null;
+  const a = (rect.angleDeg * Math.PI) / 180;
+  return { center: rect.center, u: { x: Math.cos(a), y: Math.sin(a) }, v: { x: -Math.sin(a), y: Math.cos(a) }, size: sizePt, halfLength: rect.lengthPt / 2, halfWidth: rect.widthPt / 2 };
+}
+
+/**
+ * Moves each point to the nearest free tile center of the ceiling grid that is a valid placement
+ * point (inside the room, at least `offsetPt` from every wall). The points take their tiles in order,
+ * so two points never share a tile. A point without a free valid tile keeps its position, and `full`
+ * is true. The count never changes.
+ */
+export function snapToCeilingGrid(room: Pick<Room, 'polygon'>, points: readonly Vec2[], sizePt: number, offsetPt: number): { points: Vec2[]; full: boolean } {
+  const grid = ceilingGridOf(room, sizePt);
+  if (!grid) return { points: [...points], full: false };
+  const g = grid.size;
+  const maxI = Math.ceil(grid.halfLength / g);
+  const maxJ = Math.ceil(grid.halfWidth / g);
+  const tile = (i: number, j: number): Vec2 => ({ x: grid.center.x + grid.u.x * i * g + grid.v.x * j * g, y: grid.center.y + grid.u.y * i * g + grid.v.y * j * g });
+  const valid = new Map<string, boolean>();
+  const taken = new Set<string>();
+  const isFree = (i: number, j: number) => {
+    const k = `${i},${j}`;
+    if (taken.has(k)) return false;
+    let ok = valid.get(k);
+    if (ok === undefined) valid.set(k, (ok = isValidPlacementPoint(room.polygon, tile(i, j), offsetPt)));
+    return ok;
+  };
+  let full = false;
+  const out = points.map((p) => {
+    const dx = p.x - grid.center.x;
+    const dy = p.y - grid.center.y;
+    const ci = Math.round((dx * grid.u.x + dy * grid.u.y) / g);
+    const cj = Math.round((dx * grid.v.x + dy * grid.v.y) / g);
+    let best: [number, number] | null = null;
+    let bestD = Infinity;
+    const maxRing = Math.max(maxI + Math.abs(ci), maxJ + Math.abs(cj));
+    // A tile in ring r (r steps from the nearest tile) is at least (r − 0.5) × g from the point.
+    for (let r = 0; r <= maxRing && (r - 0.5) * g <= bestD; r++) {
+      for (let i = ci - r; i <= ci + r; i++) {
+        const side = Math.abs(i - ci) === r;
+        for (let j = cj - r; j <= cj + r; j += side ? 1 : 2 * r) {
+          if (Math.abs(i) > maxI || Math.abs(j) > maxJ || !isFree(i, j)) continue;
+          const t = tile(i, j);
+          const d = Math.hypot(t.x - p.x, t.y - p.y);
+          if (d < bestD) [best, bestD] = [[i, j], d];
+        }
+      }
+    }
+    if (!best) {
+      full = true;
+      return p;
+    }
+    taken.add(`${best[0]},${best[1]}`);
+    return tile(best[0], best[1]);
+  });
+  return { points: out, full };
+}
+
 export interface PlannedStamp {
   position: Vec2;
   rotationDegrees: number;
@@ -544,7 +647,8 @@ export function estimateFitCount(samples: RoomSamples, minPt: number): number {
  * The stamps of one rule in one room: positions from the rule's layout, each stamp center at least
  * the wall offset from every wall, and the rotation (the room's main axis, the wall direction for
  * Along the walls, or the rule's fixed angle). `stampSizePt` is the placed size of the stamp; it
- * does not change the positions.
+ * does not change the positions. With a ceiling grid (not Along the walls) the stamps then move to
+ * tile centers (snapToCeilingGrid); a full grid gives 'gridFull'.
  *
  * The layouts place `count` stamps. By coverage (preset 'coverage'): `count` is the start count
  * (coverageStartCount), and layoutCoverage adds stamps until the room is covered, at most the max
@@ -571,11 +675,12 @@ export function layoutRoomStamps(
   let n = count;
   let result: LayoutResult | null = null;
   let layoutCount: RoomLayout['layoutCount'];
+  let checkCoverage = radiusM !== null;
   if (radiusM !== null) {
     const out = layoutCoverage(room, count, offsetPt, radiusM * ptPerM, rule.maxCount, samplesOf());
     layoutCount = { count: out.points.length, limited: out.limited };
     n = out.points.length;
-    if (strategy === 'evenSpread') result = out;
+    if (strategy === 'evenSpread') [result, checkCoverage] = [out, false];
   }
   if (!result) {
     if (n <= 0) {
@@ -588,10 +693,17 @@ export function layoutRoomStamps(
       result = layoutPerimeter(room, n, offsetPt);
     } else {
       if (strategy === 'center') warnings.push('layoutFallback');
-      result = layoutGrid(room, n, offsetPt, rule.layout.gridStyle);
+      result = layoutGrid(room, n, offsetPt, rule.layout.gridStyle, strategy === 'grid' ? rule.layout.edge : undefined);
     }
-    if (radiusM !== null && !result.warnings.includes('coverageNotMet') && hasCoverageGap(room, result.points, radiusM * ptPerM, samplesOf())) warnings.push('coverageNotMet');
   }
+  const gridPt = strategy !== 'perimeter' && rule.layout.ceilingGridMm ? (rule.layout.ceilingGridMm / 1000) * ptPerM : 0;
+  if (gridPt > 0 && result.points.length > 0) {
+    const snapped = snapToCeilingGrid(room, result.points, gridPt, offsetPt);
+    result = { ...result, points: snapped.points };
+    if (snapped.full) warnings.push('gridFull');
+    checkCoverage = radiusM !== null;
+  }
+  if (checkCoverage && !result.warnings.includes('coverageNotMet') && hasCoverageGap(room, result.points, radiusM! * ptPerM, samplesOf())) warnings.push('coverageNotMet');
   const minPt = (rule.layout.minSpacingM ?? 0) * ptPerM;
   let fitEstimate: number | undefined;
   if (minPt > 0 && hasCloserPair(result.points, minPt) && samplesOf().valid.length > 0) {

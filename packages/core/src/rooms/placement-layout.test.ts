@@ -19,6 +19,8 @@ import {
   closePointIndexes,
   nearestValidPoint,
   PointHash,
+  ceilingGridOf,
+  snapToCeilingGrid,
   MAX_ROOM_STAMPS,
   roomBounds,
   roomSamples,
@@ -153,6 +155,88 @@ describe('layoutGrid styles', () => {
   });
 });
 
+describe('layoutGrid edge', () => {
+  it("'wall' puts the outer stamps at the wall offset", () => {
+    expect(sortPts(layoutGrid(room(rect(0, 0, 400, 200)), 4, 0, 'spread', 'wall').points)).toEqual([[0, 0], [0, 200], [400, 0], [400, 200]]);
+    expect(sortPts(layoutGrid(room(rect(0, 0, 400, 200)), 4, 40, 'spread', 'wall').points)).toEqual([[40, 40], [40, 160], [360, 40], [360, 160]]);
+    expect(layoutGrid(room(rect(0, 0, 400, 200)), 4, 0, 'spread', 'wall').warnings).toEqual([]);
+  });
+
+  it("'halfSpacing' is the default: the cell centers", () => {
+    expect(sortPts(layoutGrid(room(rect(0, 0, 400, 200)), 4, 0, 'spread', 'halfSpacing').points)).toEqual(sortPts(layoutGrid(room(rect(0, 0, 400, 200)), 4, 0).points));
+  });
+
+  it("'wall' keeps one column or one row at the center", () => {
+    expect(sortPts(layoutGrid(room(rect(0, 0, 600, 100)), 3, 0, 'spread', 'wall').points)).toEqual([[0, 50], [300, 50], [600, 50]]);
+    expect(sortPts(layoutGrid(room(rect(0, 0, 400, 200)), 1, 0, 'spread', 'wall').points)).toEqual([[200, 100]]);
+  });
+
+  it("'wall' with the grid styles: a short row spreads to the walls or keeps the columns, and staggered rows stay inside", () => {
+    // 5 stamps in 300 × 200: 3 columns, 2 rows; the last row has 2.
+    const R = room(rect(0, 0, 300, 200));
+    expect(sortPts(layoutGrid(R, 5, 0, 'spread', 'wall').points)).toEqual([[0, 0], [0, 200], [150, 0], [300, 0], [300, 200]]);
+    expect(sortPts(layoutGrid(R, 5, 0, 'aligned', 'wall').points)).toEqual([[0, 0], [0, 200], [150, 0], [300, 0], [300, 200]]);
+    // Staggered: step 300 ÷ 2.5 = 120; the odd row moves 60 forward.
+    const staggered = layoutGrid(R, 5, 0, 'staggered', 'wall');
+    expect(sortPts(staggered.points)).toEqual([[0, 0], [60, 200], [120, 0], [240, 0], [300, 200]]);
+    expect(staggered.warnings).toEqual([]);
+  });
+
+  it("'wall' follows the main axis of a rotated room", () => {
+    const out = layoutGrid(room(rotate(rect(0, 0, 400, 200), 30)), 4, 20, 'spread', 'wall');
+    for (const p of out.points) expect(distanceToWalls(room(rotate(rect(0, 0, 400, 200), 30)).polygon, p)).toBeCloseTo(20, 6);
+  });
+});
+
+describe('ceiling grid', () => {
+  // 1 pt = 25 mm: a 600 mm tile is 24 pt.
+  const R = room(rect(0, 0, 400, 200));
+
+  it('has a tile center at the center of the room', () => {
+    const grid = ceilingGridOf(R, 24)!;
+    expect(grid.center.x).toBeCloseTo(200);
+    expect(grid.center.y).toBeCloseTo(100);
+    expect(grid.size).toBe(24);
+  });
+
+  it('moves each point to the nearest tile center', () => {
+    const out = snapToCeilingGrid(R, [{ x: 205, y: 95 }, { x: 145, y: 60 }], 24, 0);
+    expect(sortPts(out.points)).toEqual([[152, 52], [200, 100]]);
+    expect(out.full).toBe(false);
+  });
+
+  it('never puts two points on one tile', () => {
+    const out = snapToCeilingGrid(R, [{ x: 200, y: 100 }, { x: 201, y: 101 }, { x: 199, y: 99 }], 24, 0);
+    expect(new Set(out.points.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`)).size).toBe(3);
+    for (const p of out.points) expect(Math.hypot(p.x - 200, p.y - 100)).toBeLessThanOrEqual(24 * Math.SQRT2 + 1e-6);
+  });
+
+  it('uses only tile centers at the wall offset or more from the walls', () => {
+    const out = snapToCeilingGrid(R, [{ x: 2, y: 2 }], 24, 30);
+    expect(sortPts(out.points)).toEqual([[32, 52]]);
+    expect(distanceToWalls(R.polygon, out.points[0]!)).toBeGreaterThanOrEqual(30);
+  });
+
+  it('keeps a point and says full when no free tile is left', () => {
+    // 100 × 100 with 60 pt tiles and offset 0: only the tile center (50, 50) is inside.
+    const small = room(rect(0, 0, 100, 100));
+    const out = snapToCeilingGrid(small, [{ x: 40, y: 40 }, { x: 70, y: 70 }], 60, 0);
+    expect(out.points).toEqual([{ x: 50, y: 50 }, { x: 70, y: 70 }]);
+    expect(out.full).toBe(true);
+  });
+
+  it('follows the main axis of a rotated room', () => {
+    const rotated = room(rotate(rect(0, 0, 400, 200), 30));
+    const grid = ceilingGridOf(rotated, 24)!;
+    const out = snapToCeilingGrid(rotated, [{ x: 100, y: 150 }], 24, 0);
+    const d = { x: out.points[0]!.x - grid.center.x, y: out.points[0]!.y - grid.center.y };
+    const i = (d.x * grid.u.x + d.y * grid.u.y) / 24;
+    const j = (d.x * grid.v.x + d.y * grid.v.y) / 24;
+    expect(Math.abs(i - Math.round(i))).toBeLessThan(1e-9);
+    expect(Math.abs(j - Math.round(j))).toBeLessThan(1e-9);
+  });
+});
+
 describe('layoutCenter', () => {
   it('uses the label point when it is far enough from the walls', () => {
     expect(layoutCenter(room(rect(0, 0, 400, 200)), 20).points).toEqual([{ x: 200, y: 100 }]);
@@ -230,6 +314,36 @@ describe('layoutRoomStamps', () => {
     const at = (gridStyle: 'spread' | 'aligned' | 'staggered') => sortPts(layoutRoomStamps(rule({ wallOffsetM: 0, gridStyle }), room(rect(0, 0, 300, 200)), 5, CAL, { width: 0, height: 0 }).stamps.map((s) => s.position));
     expect(at('aligned')).toEqual(sortPts(layoutGrid(room(rect(0, 0, 300, 200)), 5, 0, 'aligned').points));
     expect(new Set([JSON.stringify(at('spread')), JSON.stringify(at('aligned')), JSON.stringify(at('staggered'))]).size).toBe(3);
+  });
+
+  it('uses the grid edge of the rule for Grid only', () => {
+    const at = (strategy: 'grid' | 'center') => sortPts(layoutRoomStamps(rule({ strategy, wallOffsetM: 0, edge: 'wall' }), room(rect(0, 0, 400, 200)), 4, CAL, { width: 0, height: 0 }).stamps.map((s) => s.position));
+    expect(at('grid')).toEqual([[0, 0], [0, 200], [400, 0], [400, 200]]);
+    expect(at('center')).toEqual([[100, 50], [100, 150], [300, 50], [300, 150]]);
+  });
+
+  it('snaps the stamps to a centered ceiling grid and keeps the count', () => {
+    // 600 mm = 24 pt; the tile centers are at 200 + 24i, 100 + 24j.
+    const out = layoutRoomStamps(rule({ ceilingGridMm: 600 }), room(rect(0, 0, 400, 200)), 4, CAL, { width: 0, height: 0 });
+    expect(out.stamps).toHaveLength(4);
+    for (const s of out.stamps) {
+      expect(((s.position.x - 200) / 24) % 1).toBeCloseTo(0, 9);
+      expect(((s.position.y - 100) / 24) % 1).toBeCloseTo(0, 9);
+    }
+    expect(out.warnings).toEqual([]);
+  });
+
+  it('Along the walls ignores the ceiling grid', () => {
+    const plain = layoutRoomStamps(rule({ strategy: 'perimeter' }), room(rect(0, 0, 400, 200)), 4, CAL, { width: 0, height: 0 });
+    const grid = layoutRoomStamps(rule({ strategy: 'perimeter', ceilingGridMm: 600 }), room(rect(0, 0, 400, 200)), 4, CAL, { width: 0, height: 0 });
+    expect(grid.stamps).toEqual(plain.stamps);
+  });
+
+  it('warns gridFull when the room has fewer free tiles than stamps', () => {
+    // 2400 mm = 96 pt tiles in 400 × 200 at 0.5 m (20 pt) from the walls: the valid tile centers are (104|200|296, 100), 3 tiles.
+    const out = layoutRoomStamps(rule({ ceilingGridMm: 2400 }), room(rect(0, 0, 400, 200)), 4, CAL, { width: 0, height: 0 });
+    expect(out.stamps).toHaveLength(4);
+    expect(out.warnings).toContain('gridFull');
   });
 
   it('places nothing for a count of 0', () => {

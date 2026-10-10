@@ -8,8 +8,10 @@ import {
   areaToM2,
   calculateRoomRequirement,
   calculateRooms,
+  CEILING_GRID_SIZES_MM,
   coverageRadiusM,
   flowInUnit,
+  GRID_EDGE_LABELS,
   GRID_STYLE_LABELS,
   ILLUMINANCE_UNIT_LABELS,
   isAirChangeUnit,
@@ -30,6 +32,7 @@ import {
   validatePlacementRule,
   type Calibration,
   type Discipline,
+  type GridEdge,
   type GridStyle,
   type LayoutStrategy,
   type PlacementPlan,
@@ -101,6 +104,8 @@ const spacingProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.som
 const tooManyStamps = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('tooMany');
 /** Step 5: the layout leaves part of the room outside the coverage circles. */
 const coverageProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('coverageNotMet');
+/** Step 5: the room has fewer free ceiling tiles than stamps. */
+const gridFull = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('gridFull');
 
 const LAYOUT_HINTS: Record<LayoutStrategy, string> = {
   center: 'One stamp at the label point of the room. More than one stamp uses the grid.',
@@ -112,6 +117,10 @@ const GRID_STYLE_HINTS: Record<GridStyle, string> = {
   spread: 'A short last row spreads over the full length.',
   aligned: 'Each stamp stays in a column. A cell can stay empty.',
   staggered: 'Each second row moves half a cell.',
+};
+const GRID_EDGE_HINTS: Record<GridEdge, string> = {
+  halfSpacing: 'Each stamp is at the center of its cell. The outer stamps are half the spacing from the wall.',
+  wall: 'The outer stamps are at the min distance to the walls (step 4). The other stamps are at equal distances between them.',
 };
 
 // The example rooms of the layout pictures, in m (1 page unit = 1 m): an L-shape, and a rectangle for the grid.
@@ -134,18 +143,18 @@ const PICTURE_CALIBRATION = { pageUnitsPerRealUnit: 0.001 };
 const PICTURE_STAMP = { width: 0.6, height: 0.6 };
 
 /** A small picture of a layout, made with the core layout of the placement on an example room. */
-function LayoutPicture({ strategy, gridStyle }: { strategy: LayoutStrategy; gridStyle?: GridStyle }) {
+function LayoutPicture({ strategy, gridStyle, edge }: { strategy: LayoutStrategy; gridStyle?: GridStyle; edge?: GridEdge }) {
   const outer = strategy === 'grid' ? PICTURE_RECT : PICTURE_L;
   const stamps = useMemo(
     () =>
       layoutRoomStamps(
-        { layout: { strategy, wallOffsetM: 0.2, rotation: 'room', ...(gridStyle ? { gridStyle } : {}) }, coverage: {} },
+        { layout: { strategy, wallOffsetM: 0.2, rotation: 'room', ...(gridStyle ? { gridStyle } : {}), ...(edge ? { edge } : {}) }, coverage: {} },
         { polygon: { outer, holes: [] } },
         PICTURE_COUNT[strategy],
         PICTURE_CALIBRATION,
         PICTURE_STAMP,
       ).stamps,
-    [strategy, gridStyle, outer],
+    [strategy, gridStyle, edge, outer],
   );
   const h = PICTURE_STAMP.width / 2;
   return (
@@ -492,10 +501,15 @@ export function PlacementRuleGuide({
       return bad > 0 ? ['bad', `${plural(bad, 'room')}: stamps do not fit${floorBusy ? ' …' : ''}`] : ['ok', text + (floorBusy ? ' …' : '')];
     }
     if (n === 5) {
-      const text = LAYOUT_STRATEGY_LABELS[draft.strategy] + (draft.strategy === 'grid' ? `, ${GRID_STYLE_LABELS[draft.gridStyle].toLowerCase()}` : '');
+      const text =
+        LAYOUT_STRATEGY_LABELS[draft.strategy] +
+        (draft.strategy === 'grid' ? `, ${GRID_STYLE_LABELS[draft.gridStyle].toLowerCase()}` : '') +
+        (draft.ceilingGrid && draft.strategy !== 'perimeter' ? `, grid ${draft.ceilingGridMm} mm` : '');
       if (!floorRows) return ['', text];
       const bad = floorRows.filter(coverageProblem).length;
-      return bad > 0 ? ['bad', `${plural(bad, 'room')} not covered${floorBusy ? ' …' : ''}`] : ['ok', text + (floorBusy ? ' …' : '')];
+      if (bad > 0) return ['bad', `${plural(bad, 'room')} not covered${floorBusy ? ' …' : ''}`];
+      const full = floorRows.filter(gridFull).length;
+      return full > 0 ? ['warn', `${plural(full, 'room')}: ceiling grid full${floorBusy ? ' …' : ''}`] : ['ok', text + (floorBusy ? ' …' : '')];
     }
     if (placed) return ['ok', `${plural(placed.count, 'stamp')} placed`];
     if (step === 6 && placeBusy) return ['', 'Calculating…'];
@@ -1067,7 +1081,7 @@ export function PlacementRuleGuide({
               <input className="mep-guide-num" id="pg-wallOffset" type="text" inputMode="decimal" placeholder="0" value={draft.wallOffset} onChange={field('wallOffset')} />
               <span>m</span>
             </div>
-            <span className="mep-guide-note">The orange band on the plan. The distance is from the wall to the center of the stamp.</span>
+            <span className="mep-guide-note">The orange band on the plan. The distance is from the wall to the center of the stamp. It is a minimum: for the Grid layout, step 5 sets if the outer stamps are at this distance or half the spacing from the wall.</span>
           </div>
           <div className="mep-guide-limit">
             <SpacingDiagram kind="gap" />
@@ -1156,6 +1170,11 @@ export function PlacementRuleGuide({
             {name} needs {row.requirement.count} stamps. Center places one stamp only, so MepApp uses the grid here.
           </div>
         )}
+        {row && gridFull(row) && (
+          <div className="mep-guide-callout" data-testid="pg-grid-note">
+            {name} has fewer free ceiling tiles than stamps. Some stamps are not at a tile center. Use a smaller ceiling grid or a smaller min distance to the walls.
+          </div>
+        )}
         {byCoverage && draft.strategy === 'evenSpread' && (
           <div className="mep-guide-callout info">With By coverage, Even spread uses the positions that the coverage calculation found. Each point of the room stays covered.</div>
         )}
@@ -1163,7 +1182,7 @@ export function PlacementRuleGuide({
           {(Object.keys(LAYOUT_STRATEGY_LABELS) as LayoutStrategy[]).map((s) => (
             <div key={s} className={`mep-guide-choice${draft.strategy === s ? ' on' : ''}`}>
               <button type="button" role="radio" aria-checked={draft.strategy === s} data-layout={s} onClick={() => update({ strategy: s })}>
-                <LayoutPicture strategy={s} {...(s === 'grid' ? { gridStyle: draft.gridStyle } : {})} />
+                <LayoutPicture strategy={s} {...(s === 'grid' ? { gridStyle: draft.gridStyle, edge: draft.edge } : {})} />
                 <span className="ct">{LAYOUT_STRATEGY_LABELS[s]}</span>
                 <span className="cd">{LAYOUT_HINTS[s]}</span>
               </button>
@@ -1177,7 +1196,7 @@ export function PlacementRuleGuide({
               {(Object.keys(GRID_STYLE_LABELS) as GridStyle[]).map((g) => (
                 <div key={g} className={`mep-guide-choice${draft.gridStyle === g ? ' on' : ''}`}>
                   <button type="button" role="radio" aria-checked={draft.gridStyle === g} data-grid-style={g} onClick={() => update({ gridStyle: g })}>
-                    <LayoutPicture strategy="grid" gridStyle={g} />
+                    <LayoutPicture strategy="grid" gridStyle={g} edge={draft.edge} />
                     <span className="ct">{GRID_STYLE_LABELS[g]}</span>
                     <span className="cd">{GRID_STYLE_HINTS[g]}</span>
                   </button>
@@ -1186,6 +1205,63 @@ export function PlacementRuleGuide({
             </div>
           </div>
         )}
+        {draft.strategy === 'grid' && (
+          <div className="mep-guide-section">
+            <h3>Outer stamps</h3>
+            <div className="mep-guide-choices small" role="radiogroup" aria-label="Outer stamps">
+              {(Object.keys(GRID_EDGE_LABELS) as GridEdge[]).map((g) => (
+                <div key={g} className={`mep-guide-choice${draft.edge === g ? ' on' : ''}`}>
+                  <button type="button" role="radio" aria-checked={draft.edge === g} data-grid-edge={g} onClick={() => update({ edge: g })}>
+                    <LayoutPicture strategy="grid" gridStyle={draft.gridStyle} edge={g} />
+                    <span className="ct">{GRID_EDGE_LABELS[g]}</span>
+                    <span className="cd">{GRID_EDGE_HINTS[g]}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="mep-guide-section">
+          <h3>Ceiling grid</h3>
+          {draft.strategy === 'perimeter' ? (
+            <p className="mep-guide-note">Along the walls does not use a ceiling grid.</p>
+          ) : (
+            <>
+              <label className="mep-guide-term mep-guide-check-row">
+                <input type="checkbox" id="pg-ceilingGrid" checked={draft.ceilingGrid} onChange={(e) => update({ ceilingGrid: e.target.checked })} />
+                <span>Snap the stamps to a ceiling grid</span>
+              </label>
+              {draft.ceilingGrid && (
+                <div className="mep-guide-field">
+                  <label htmlFor="pg-ceilingGridSize">Tile size</label>
+                  <div className="mep-guide-inline">
+                    <select
+                      id="pg-ceilingGridSize"
+                      value={draft.ceilingGridCustom ? OTHER_UNIT : draft.ceilingGridMm}
+                      onChange={(e) => update(e.target.value === OTHER_UNIT ? { ceilingGridCustom: true } : { ceilingGridCustom: false, ceilingGridMm: e.target.value })}
+                    >
+                      {CEILING_GRID_SIZES_MM.map((mm) => (
+                        <option key={mm} value={String(mm)}>
+                          {mm} × {mm} mm
+                        </option>
+                      ))}
+                      <option value={OTHER_UNIT}>Custom</option>
+                    </select>
+                    {draft.ceilingGridCustom && (
+                      <>
+                        <input className="mep-guide-num" id="pg-ceilingGridMm" type="text" inputMode="decimal" aria-label="Custom tile size" value={draft.ceilingGridMm} onChange={field('ceilingGridMm')} />
+                        <span>mm</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              <p className="mep-guide-note">
+                The grid is centered in the room and follows its long side. Each stamp moves to the center of the nearest free tile, at the min distance to the walls or more. The number of stamps does not change.
+              </p>
+            </>
+          )}
+        </div>
         <div className="mep-guide-section">
           <h3>Rotation</h3>
           <div className="mep-guide-field">
@@ -1429,6 +1505,7 @@ export function PlacementRuleGuide({
                   wallOffsetM={parsed.rule?.layout.wallOffsetM ?? 0}
                   coverageRadiusM={byCoverage && parsed.rule ? coverageRadiusM(parsed.rule.coverage) : null}
                   minSpacingM={step === 4 ? (parsed.rule?.layout.minSpacingM ?? null) : null}
+                  ceilingGridMm={step >= 3 && parsed.rule && parsed.rule.layout.strategy !== 'perimeter' ? (parsed.rule.layout.ceilingGridMm ?? null) : null}
                   onPickRoom={(id) => {
                     setSampleId(id);
                     if (view === 'floor' && step >= 3 && step <= 5) setView(null);
@@ -1441,6 +1518,7 @@ export function PlacementRuleGuide({
                       <span style={{ ['--sw' as string]: 'var(--guide-band)' }}>min distance to the walls</span>
                       {byCoverage && <span style={{ ['--sw' as string]: 'rgba(23, 90, 138, 0.15)' }}>coverage circle</span>}
                       {step === 4 && draft.minSpacing.trim() !== '' && <span style={{ ['--sw' as string]: 'var(--guide-ok-soft)' }}>min distance between stamps</span>}
+                      {step >= 3 && parsed.rule?.layout.ceilingGridMm !== undefined && parsed.rule.layout.strategy !== 'perimeter' && <span className="line">ceiling grid</span>}
                       <span className="plain">click a room to use it</span>
                     </>
                   ) : (

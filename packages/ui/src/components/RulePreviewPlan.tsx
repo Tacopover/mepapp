@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { closePointIndexes, roomBounds, type Calibration, type PlannedStamp, type Room, type Vec2 } from '@mepapp/core';
+import { ceilingGridOf, closePointIndexes, roomBounds, type Calibration, type PlannedStamp, type Room, type Vec2 } from '@mepapp/core';
 
 /** How the whole-floor view colours a room. */
 export type PreviewRoomState = 'match' | 'missing' | 'problem' | 'noMatch' | 'noType';
@@ -24,6 +24,8 @@ export interface RulePreviewPlanProps {
   coverageRadiusM: number | null;
   /** Step 4: the min distance between stamps, m. Each stamp gets a circle of half this radius; circles that overlap are red. */
   minSpacingM?: number | null;
+  /** The tile size of the rule's ceiling grid, mm: the sample room shows the tile lines. Null = no ceiling grid. */
+  ceilingGridMm?: number | null;
   onPickRoom: (roomId: string) => void;
 }
 
@@ -46,13 +48,30 @@ const STATE_FILL: Record<PreviewRoomState, string> = {
 
 /** Above this number of stamps the plan draws one simple mark per stamp, in one path, instead of the stamp art. */
 const SIMPLE_MARKS_ABOVE = 300;
+/** Above this number of tile lines the plan does not draw the ceiling grid: the lines are too close to see. */
+const MAX_GRID_LINES = 400;
+
+/** The tile lines of the ceiling grid of the room, as one SVG path, or null. */
+function ceilingGridPath(room: Room, sizePt: number): string | null {
+  const grid = ceilingGridOf(room, sizePt);
+  if (!grid) return null;
+  const g = grid.size;
+  const n = Math.ceil(grid.halfLength / g) + 1;
+  const m = Math.ceil(grid.halfWidth / g) + 1;
+  if (2 * (n + m) > MAX_GRID_LINES) return null;
+  const pt = (a: number, b: number) => `${grid.center.x + grid.u.x * a + grid.v.x * b} ${grid.center.y + grid.u.y * a + grid.v.y * b}`;
+  const parts: string[] = [];
+  for (let i = -n; i < n; i++) parts.push(`M${pt((i + 0.5) * g, -m * g)}L${pt((i + 0.5) * g, m * g)}`);
+  for (let j = -m; j < m; j++) parts.push(`M${pt(-n * g, (j + 0.5) * g)}L${pt(n * g, (j + 0.5) * g)}`);
+  return parts.join('');
+}
 
 /**
  * An SVG drawing of the rooms of the page in page points (room-placement-guide.md Phase B): the
  * sample room with its wall offset band, the dimensions of its bounding rectangle and the planned
  * stamps, or the whole floor coloured by how the rule sees each room. A click on a room picks it.
  */
-export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, onPickRoom }: RulePreviewPlanProps) {
+export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, ceilingGridMm = null, onPickRoom }: RulePreviewPlanProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const focus = mode === 'room' && sample ? [sample] : rooms;
   if (focus.length === 0) return <p className="mep-settings-hint">This page has no rooms. Detect the rooms first.</p>;
@@ -68,6 +87,7 @@ export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration
   const radiusPt = ptPerM !== null && coverageRadiusM !== null ? coverageRadiusM * ptPerM : null;
   const minPt = ptPerM !== null && minSpacingM ? minSpacingM * ptPerM : null;
   const close = minPt !== null ? closePointIndexes(stamps.map((s) => s.position), minPt) : new Set<number>();
+  const gridPath = mode === 'room' && sample && ptPerM !== null && ceilingGridMm ? ceilingGridPath(sample, (ceilingGridMm / 1000) * ptPerM) : null;
   const simple = stamps.length > SIMPLE_MARKS_ABOVE;
   const metres = (pt: number) => (ptPerM !== null ? `${(pt / ptPerM).toFixed(2)} m` : `${Math.round(pt)} pt`);
   const fontSize = unit * 3;
@@ -112,6 +132,7 @@ export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration
       {mode === 'room' && sample && (
         <>
           {offsetPt > 0 && <path d={roomPath(sample)} fill="none" stroke="var(--guide-band)" strokeWidth={2 * offsetPt} clipPath={`url(#clip${uid})`} pointerEvents="none" data-testid="guide-offset-band" />}
+          {gridPath && <path d={gridPath} fill="none" stroke="var(--muted)" strokeOpacity={0.6} strokeWidth={0.75} vectorEffect="non-scaling-stroke" clipPath={`url(#clip${uid})`} pointerEvents="none" data-testid="guide-ceiling-grid" data-size={ceilingGridMm} />}
           <line x1={box.minX} y1={box.maxY + unit * 5} x2={box.maxX} y2={box.maxY + unit * 5} stroke="var(--muted)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           <line x1={box.maxX + unit * 5} y1={box.minY} x2={box.maxX + unit * 5} y2={box.maxY} stroke="var(--muted)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           {[box.minX, box.maxX].map((x) => (

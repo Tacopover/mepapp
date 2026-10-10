@@ -16,6 +16,12 @@ export type LayoutStrategy = 'center' | 'grid' | 'evenSpread' | 'perimeter';
 /** How the Grid layout fills a short row: spread over the full length, keep the columns, or keep the columns and move each second row half a cell. */
 export type GridStyle = 'spread' | 'aligned' | 'staggered';
 
+/** Where the Grid layout puts the outer stamps: half the spacing from the wall (the cell centers), or at the min distance to the walls. */
+export type GridEdge = 'halfSpacing' | 'wall';
+
+/** The ceiling grid sizes that the guide lists, mm. */
+export const CEILING_GRID_SIZES_MM: readonly number[] = [300, 600, 900, 1200, 1500, 1800, 2100, 2400];
+
 export interface PlacementAmount {
   /** Amount per room. */
   fixed?: number;
@@ -65,6 +71,10 @@ export interface PlacementLayout {
   minSpacingM?: number;
   /** Grid only. Absent = 'spread'. */
   gridStyle?: GridStyle;
+  /** Grid only. Absent = 'halfSpacing'. */
+  edge?: GridEdge;
+  /** Each stamp moves to the center of a tile of a square ceiling grid of this size, mm. Not used by Along the walls. Absent = no ceiling grid. */
+  ceilingGridMm?: number;
   /** 'room' = turn the stamps to the main axis of the room; 'fixed' = use fixedAngleDeg. */
   rotation: 'room' | 'fixed';
   fixedAngleDeg?: number;
@@ -195,6 +205,11 @@ export const GRID_STYLE_LABELS: Record<GridStyle, string> = {
   spread: 'Spread last row',
   aligned: 'Aligned columns',
   staggered: 'Staggered',
+};
+
+export const GRID_EDGE_LABELS: Record<GridEdge, string> = {
+  halfSpacing: 'Half the spacing from the wall',
+  wall: 'At the min distance to the walls',
 };
 
 /** True when the rule applies to the room: its type is in the list (or the list is empty), and its name contains the text (when set). */
@@ -355,6 +370,7 @@ export function validatePlacementRule(rule: PlacementRule, others: readonly Plac
   if (rule.minCount !== undefined && rule.maxCount !== undefined && rule.minCount > rule.maxCount) return 'The min count is larger than the max count.';
   if (!(Number.isFinite(rule.layout.wallOffsetM) && rule.layout.wallOffsetM >= 0)) return 'The min distance to the walls must be a number of 0 or more.';
   if (!isNonNegative(rule.layout.minSpacingM)) return 'The min distance between stamps must be a number of 0 or more.';
+  if (!isPositive(rule.layout.ceilingGridMm)) return 'The ceiling grid size must be a number above 0.';
   if (rule.layout.rotation === 'fixed' && !Number.isFinite(rule.layout.fixedAngleDeg ?? Number.NaN)) return 'Enter the fixed angle.';
   return null;
 }
@@ -420,6 +436,9 @@ function toPlacementRule(value: unknown): PlacementRule | null {
   const minSpacing = num(layout.minSpacingM);
   if (minSpacing !== undefined) rule.layout.minSpacingM = minSpacing;
   if (GRID_STYLES.includes(layout.gridStyle as GridStyle) && layout.gridStyle !== 'spread') rule.layout.gridStyle = layout.gridStyle as GridStyle;
+  if (layout.edge === 'wall') rule.layout.edge = 'wall';
+  const ceilingGrid = num(layout.ceilingGridMm);
+  if (ceilingGrid !== undefined) rule.layout.ceilingGridMm = ceilingGrid;
   const lux = num(lighting.lux);
   const uf = num(lighting.utilisationFactor);
   const mf = num(lighting.maintenanceFactor);

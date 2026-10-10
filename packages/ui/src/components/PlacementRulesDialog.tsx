@@ -1,6 +1,7 @@
 import { useRef, useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import {
+  GRID_EDGE_LABELS,
   GRID_STYLE_LABELS,
   hasCoverageLimit,
   LAYOUT_STRATEGY_LABELS,
@@ -233,7 +234,10 @@ function PlacementRuleSummary({ rule, roomTypes, language, stampName, onEdit, on
   };
   const rooms = [rule.roomTypeIds.length === 0 ? 'Every room' : rule.roomTypeIds.map(typeName).join(', '), rule.nameContains ? `name contains "${rule.nameContains}"` : null].filter(Boolean).join('; ');
   const limits = [rule.minCount !== undefined ? `at least ${rule.minCount}` : null, rule.maxCount !== undefined ? `at most ${rule.maxCount}` : null].filter(Boolean).join(', ');
-  const layout = LAYOUT_STRATEGY_LABELS[rule.layout.strategy] + (rule.layout.strategy === 'grid' ? `, ${GRID_STYLE_LABELS[rule.layout.gridStyle ?? 'spread'].toLowerCase()}` : '');
+  const layout =
+    LAYOUT_STRATEGY_LABELS[rule.layout.strategy] +
+    (rule.layout.strategy === 'grid' ? `, ${GRID_STYLE_LABELS[rule.layout.gridStyle ?? 'spread'].toLowerCase()}, outer stamps ${GRID_EDGE_LABELS[rule.layout.edge ?? 'halfSpacing'].toLowerCase()}` : '') +
+    (rule.layout.ceilingGridMm !== undefined && rule.layout.strategy !== 'perimeter' ? `, ceiling grid ${rule.layout.ceilingGridMm} mm` : '');
   const rotation = rule.layout.rotation === 'fixed' ? `fixed angle ${rule.layout.fixedAngleDeg ?? 0}°` : rule.layout.strategy === 'perimeter' ? 'face into the room' : 'align to the room';
   const rows: [string, string][] = [
     ['Discipline', DISCIPLINE_LABEL[rule.discipline]],

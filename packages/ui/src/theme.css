@@ -4355,6 +4355,9 @@
 .mep-guide-legend span.plain::before {
   display: none;
 }
+.mep-guide-legend span.line::before {
+  background: linear-gradient(90deg, transparent 4px, var(--muted) 4px 5px, transparent 5px), linear-gradient(0deg, transparent 4px, var(--muted) 4px 5px, transparent 5px), var(--surface);
+}
 .mep-guide-chain {
   display: flex;
   flex-direction: column;

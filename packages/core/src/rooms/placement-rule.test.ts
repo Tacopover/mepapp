@@ -218,6 +218,7 @@ describe('validatePlacementRule', () => {
     expect(validatePlacementRule(rule({ preset: 'airChanges', amount: { perM3: 4, unit: 'W' } }), [])).toMatch(/flow unit/);
     expect(validatePlacementRule(rule({ preset: 'airChanges', amount: { perM3: 4, unit: 'cfm' } }), [])).toBeNull();
     expect(validatePlacementRule(rule({ layout: { strategy: 'grid', wallOffsetM: 0, minSpacingM: -1, rotation: 'room' } }), [])).toMatch(/between stamps/);
+    expect(validatePlacementRule(rule({ layout: { strategy: 'grid', wallOffsetM: 0, ceilingGridMm: 0, rotation: 'room' } }), [])).toMatch(/ceiling grid/);
   });
 
   it('rejects bad values', () => {
@@ -250,10 +251,18 @@ describe('parsePlacementRules', () => {
     const r = rule({
       amount: { perM2: 0.1, unit: 'cfm', areaUnit: 'ft2' },
       coverage: { maxSpacing: 20, lengthUnit: 'ft' },
-      layout: { strategy: 'grid', wallOffsetM: 0.5, minSpacingM: 1.5, gridStyle: 'staggered', rotation: 'room' },
+      layout: { strategy: 'grid', wallOffsetM: 0.5, minSpacingM: 1.5, gridStyle: 'staggered', edge: 'wall', ceilingGridMm: 600, rotation: 'room' },
       lighting: { lux: 50, utilisationFactor: 0.6, maintenanceFactor: 0.8, illuminanceUnit: 'fc' },
     });
     expect(parsePlacementRules([JSON.parse(JSON.stringify(r))])).toEqual([r]);
+  });
+
+  it('leaves out the default grid edge and an unknown edge', () => {
+    const r = rule({ layout: { strategy: 'grid', wallOffsetM: 0.5, rotation: 'room' } });
+    const [a] = parsePlacementRules([{ ...JSON.parse(JSON.stringify(r)), layout: { ...r.layout, edge: 'halfSpacing' } }])!;
+    const [b] = parsePlacementRules([{ ...JSON.parse(JSON.stringify(r)), layout: { ...r.layout, edge: 'side' } }])!;
+    expect(a!.layout).toEqual(r.layout);
+    expect(b!.layout).toEqual(r.layout);
   });
 });
 

@@ -1,8 +1,10 @@
 import {
+  CEILING_GRID_SIZES_MM,
   isAirChangeUnit,
   parseDecimal,
   PRESET_AMOUNT_FIELDS,
   type AreaUnit,
+  type GridEdge,
   type GridStyle,
   type IlluminanceUnit,
   type LengthUnit,
@@ -76,6 +78,11 @@ export function draftOf(rule: PlacementRule) {
     maxCount: text(rule.maxCount),
     strategy: rule.layout.strategy,
     gridStyle: (rule.layout.gridStyle ?? 'spread') as GridStyle,
+    edge: (rule.layout.edge ?? 'halfSpacing') as GridEdge,
+    ceilingGrid: rule.layout.ceilingGridMm !== undefined,
+    ceilingGridMm: String(rule.layout.ceilingGridMm ?? 600),
+    /** The size box shows instead of the list: the size is not in CEILING_GRID_SIZES_MM, or the user chose Custom. */
+    ceilingGridCustom: rule.layout.ceilingGridMm !== undefined && !CEILING_GRID_SIZES_MM.includes(rule.layout.ceilingGridMm),
     wallOffset: String(rule.layout.wallOffsetM),
     minSpacing: text(rule.layout.minSpacingM),
     rotation: rule.layout.rotation,
@@ -125,6 +132,12 @@ export function ruleOf(id: string, d: Draft): PlacementRule {
   const minSpacing = numberOf(d.minSpacing, 'Min distance between stamps');
   if (minSpacing !== undefined) rule.layout.minSpacingM = minSpacing;
   if (d.strategy === 'grid' && d.gridStyle !== 'spread') rule.layout.gridStyle = d.gridStyle;
+  if (d.strategy === 'grid' && d.edge === 'wall') rule.layout.edge = 'wall';
+  if (d.ceilingGrid && d.strategy !== 'perimeter') {
+    const size = numberOf(d.ceilingGridMm, 'Ceiling grid size');
+    if (size === undefined) throw new FieldError('Enter the size of the ceiling grid.');
+    rule.layout.ceilingGridMm = size;
+  }
   if (d.lengthUnit === 'ft') rule.coverage.lengthUnit = 'ft';
   if (d.preset === 'lighting') {
     const lux = numberOf(d.lux, 'Illuminance');
