@@ -1,0 +1,793 @@
+<title>Auto-place Stamps Dialog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Chivo:wght@400;500;600;700&family=Martian+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: the guide frame for the whole dialog. Left: one list with the input data, the rules (a rule opens into its six steps) and Place all. Middle: the card of the chosen item. Right: the floor plan that shows the result of that card. */
+:root {
+  --ink: #131b21;
+  --muted: #57676f;
+  --line: #c2ced4;
+  --paper: #eef2f4;
+  --surface: #ffffff;
+  --surface-2: #e7edf0;
+  --accent: #175a8a;
+  --accent-soft: #dbe9f2;
+  --accent-ink: #0f4267;
+  --on-accent: #ffffff;
+  --warn: #9a5b00;
+  --warn-soft: #fbeed6;
+  --band: #efd3a0;
+  --bad: #b3261e;
+  --bad-soft: #f9dedc;
+  --ok: #2f7d4f;
+  --ok-soft: #dcefe3;
+  --plan-wall: #3b4a52;
+  --hatch: #c98a2b;
+  --r1: #3f7cc9; --r2: #2f7d4f; --r3: #b3261e; --r4: #8a4fb0; --r5: #c26a00;
+  --t1: #dbe9f2; --t2: #dcefe3; --t3: #efe3f4; --t4: #fbeed6; --t5: #e2e7ea; --t6: #f4e1dc; --t7: #e0f0ef; --t8: #f1efd6;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-ui: 'Chivo', system-ui, sans-serif;
+  --font-mono: 'Martian Mono', ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #e3eaee; --muted: #9aabb3; --line: #3f4d55; --paper: #12191e; --surface: #1b242a; --surface-2: #243038;
+    --accent: #5aa2d6; --accent-soft: #1d3a50; --accent-ink: #a9d2ef; --on-accent: #0c1a24;
+    --warn: #e7a94a; --warn-soft: #3a2c14; --band: #6b5426; --bad: #f08a80; --bad-soft: #3d1d1b; --ok: #7cc79a; --ok-soft: #173326;
+    --plan-wall: #b8c6cd; --hatch: #d9a04a;
+    --r1: #6ea7e8; --r2: #7cc79a; --r3: #f08a80; --r4: #c79be0; --r5: #f0a650;
+    --t1: #1d3a50; --t2: #173326; --t3: #33233d; --t4: #3a2c14; --t5: #26313a; --t6: #3a2522; --t7: #163634; --t8: #34321a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #e3eaee; --muted: #9aabb3; --line: #3f4d55; --paper: #12191e; --surface: #1b242a; --surface-2: #243038;
+  --accent: #5aa2d6; --accent-soft: #1d3a50; --accent-ink: #a9d2ef; --on-accent: #0c1a24;
+  --warn: #e7a94a; --warn-soft: #3a2c14; --band: #6b5426; --bad: #f08a80; --bad-soft: #3d1d1b; --ok: #7cc79a; --ok-soft: #173326;
+  --plan-wall: #b8c6cd; --hatch: #d9a04a;
+  --r1: #6ea7e8; --r2: #7cc79a; --r3: #f08a80; --r4: #c79be0; --r5: #f0a650;
+  --t1: #1d3a50; --t2: #173326; --t3: #33233d; --t4: #3a2c14; --t5: #26313a; --t6: #3a2522; --t7: #163634; --t8: #34321a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { padding-inline: 16px; padding-block: 16px 40px; max-width: 1500px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { background: var(--surface); border: 2px solid var(--ink); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 14px; }
+.top h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: 0.01em; text-wrap: balance; }
+.top .facts { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.top .tag { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; border: 1.5px solid var(--ink); padding: 2px 8px; background: var(--warn-soft); }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; max-width: 110ch; }
+.demo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; }
+.demo b { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+
+.grid { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(0, 440px); gap: 14px; align-items: start; }
+@media (max-width: 1180px) { .grid { grid-template-columns: 230px minmax(0, 1fr); } .side { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Left list */
+.nav { display: flex; flex-direction: column; gap: 6px; position: sticky; top: env(safe-area-inset-top, 0px); }
+@media (max-width: 760px) { .nav { position: static; } }
+.nav h4 { margin: 8px 0 0; display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-weight: 500; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.nav h4:first-child { margin-top: 0; }
+.nav h4 button { border: 1.5px solid var(--line); background: var(--surface); border-radius: 3px; padding: 1px 8px; font-family: var(--font-ui); font-size: 11.5px; letter-spacing: 0; text-transform: none; cursor: pointer; color: var(--ink); }
+.item { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 1px 8px; align-items: center; text-align: left; background: var(--surface); border: 1.5px solid var(--line); border-radius: 3px; padding: 7px 9px; cursor: pointer; width: 100%; }
+.item:hover { border-color: var(--ink); }
+.item.on { border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.item .ic { grid-row: span 2; width: 22px; height: 22px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 11px; font-weight: 600; border: 1.5px solid var(--ink); border-radius: 50%; }
+.item .t { font-weight: 600; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.item .s { grid-column: 2 / span 2; font-size: 11px; color: var(--muted); }
+.item .x { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.item.ok .ic { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.item.warn .ic { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.item.warn .s { color: var(--warn); }
+.item.bad .ic { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+.item.bad .s { color: var(--bad); }
+.item.off { opacity: 0.55; }
+.rule-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px; align-items: start; }
+.rule-row > input { margin: 11px 0 0 3px; width: 16px; height: 16px; accent-color: var(--accent); }
+.rule-row .item .ic { border-radius: 3px; }
+.substeps { grid-column: 2; display: flex; flex-direction: column; gap: 3px; margin: 2px 0 4px 10px; border-left: 2px solid var(--line); padding-left: 8px; }
+.sub { display: flex; gap: 8px; align-items: baseline; text-align: left; background: none; border: 0; padding: 3px 6px; cursor: pointer; font-size: 12.5px; border-radius: 3px; }
+.sub .n { font-family: var(--font-mono); font-size: 11px; width: 16px; color: var(--muted); }
+.sub .d { font-size: 11px; color: var(--muted); margin-left: auto; text-align: right; }
+.sub.on { background: var(--ink); color: var(--surface); }
+.sub.on .n, .sub.on .d { color: var(--line); }
+.sub.warn .d { color: var(--warn); }
+.sub.bad .d { color: var(--bad); }
+.sub.on.warn .d, .sub.on.bad .d { color: var(--band); }
+.place-item { margin-top: 8px; }
+.place-item .item { background: var(--accent); color: var(--on-accent); border-color: var(--accent-ink); }
+.place-item .item .s, .place-item .item .x { color: var(--on-accent); opacity: 0.85; }
+.place-item .item .ic { border-color: var(--on-accent); }
+.place-item .item.on { box-shadow: 3px 3px 0 var(--ink); }
+
+/* Card */
+.card { background: var(--surface); border: 2px solid var(--ink); border-radius: 4px; box-shadow: 4px 4px 0 var(--ink); padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 26px; text-wrap: balance; }
+.card h3 { margin: 0; font-size: 11.5px; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.crumb { font-family: var(--font-mono); font-size: 11px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.crumb button { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
+.lead { margin: 0; max-width: 64ch; color: var(--muted); }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.cnav { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; border-top: 1.5px dashed var(--line); padding-top: 14px; }
+.btn { border: 1.5px solid var(--ink); background: var(--surface); padding: 6px 13px; border-radius: 3px; cursor: pointer; font-weight: 600; }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent-ink); box-shadow: 2px 2px 0 var(--ink); }
+.btn.small { padding: 2px 9px; font-size: 12px; font-weight: 500; }
+.btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
+.field { display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.field label { font-size: 13px; }
+@media (max-width: 520px) { .field { grid-template-columns: minmax(0, 1fr); } }
+.inline { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+input.txt, select.txt { border: 1.5px solid var(--line); border-radius: 3px; padding: 5px 8px; background: var(--surface); font-family: var(--font-mono); font-size: 12.5px; width: 100%; max-width: 320px; }
+input.num { border: 1.5px solid var(--accent); border-radius: 3px; padding: 3px 6px; width: 78px; font-family: var(--font-mono); font-size: 13px; background: var(--accent-soft); color: var(--accent-ink); text-align: right; }
+input.num::placeholder { color: var(--muted); opacity: 0.85; }
+select.mini { border: 1.5px solid var(--line); border-radius: 3px; padding: 2px 4px; background: var(--surface); font-size: 12px; max-width: 170px; }
+select.mini.need { border-color: var(--warn); background: var(--warn-soft); }
+
+.callout { border-left: 4px solid var(--warn); background: var(--warn-soft); padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; }
+.callout.bad { border-left-color: var(--bad); background: var(--bad-soft); }
+.callout.info { border-left-color: var(--accent); background: var(--accent-soft); }
+.callout.ok { border-left-color: var(--ok); background: var(--ok-soft); }
+.callout > span { flex: 1 1 260px; min-width: 0; }
+
+.checks { display: flex; flex-direction: column; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 2px 10px; padding: 9px 12px; border-radius: 3px; border: 1.5px solid var(--line); align-items: center; }
+.check .ic { grid-row: span 2; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; border: 1.5px solid currentColor; }
+.check .a { grid-row: span 2; }
+.check.ok .ic { color: var(--ok); background: var(--ok-soft); }
+.check.warn { border-color: var(--warn); background: var(--warn-soft); }
+.check.warn .ic { color: var(--warn); }
+.check.bad { border-color: var(--bad); background: var(--bad-soft); }
+.check.bad .ic { color: var(--bad); }
+.check b { font-weight: 600; }
+.check .sub2 { font-size: 12px; color: var(--muted); }
+
+.tabs { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 3px; overflow: hidden; align-self: flex-start; flex-wrap: wrap; }
+.tabs button { border: 0; background: var(--surface); padding: 4px 12px; cursor: pointer; font-size: 12.5px; }
+.tabs button.on { background: var(--ink); color: var(--surface); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1.5px solid var(--line); border-radius: 999px; padding: 3px 12px; background: var(--surface); cursor: pointer; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.chip .c { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.chip.on { background: var(--accent); border-color: var(--accent-ink); color: var(--on-accent); }
+.chip.on .c { color: var(--on-accent); opacity: 0.8; }
+
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.choice { border: 1.5px solid var(--line); border-radius: 3px; background: var(--surface); padding: 10px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+.choice:hover { border-color: var(--ink); }
+.choice.on { border: 2px solid var(--accent); background: var(--accent-soft); }
+.choice .ct { font-weight: 600; font-size: 13px; }
+.choice .cf { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent-ink); }
+.choice .cd { font-size: 11.5px; color: var(--muted); }
+
+.formula { display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: 3px; }
+.term { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 12px; border-bottom: 1px solid var(--surface-2); font-size: 13.5px; }
+.term:last-child { border-bottom: 0; }
+.term .sym { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 2px; padding: 0 4px; }
+.term .val { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); padding: 1px 6px; border-radius: 2px; }
+.term .res { margin-left: auto; font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.term.result { background: var(--accent-soft); }
+
+.chain { display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: 3px; }
+.chain .cr { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 12px; border-bottom: 1px solid var(--surface-2); align-items: center; }
+.chain .cr:last-child { border-bottom: 0; }
+.chain .lv { grid-row: span 2; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.chain .cl { font-size: 13px; font-weight: 600; }
+.chain .cw { grid-column: 2; font-size: 11.5px; color: var(--muted); }
+.chain .cv { grid-row: 1 / span 2; grid-column: 3; }
+
+.tbl-wrap { overflow-x: auto; border: 1.5px solid var(--line); border-radius: 3px; max-height: 420px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--surface-2); white-space: nowrap; }
+th { font-family: var(--font-mono); font-weight: 500; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); position: sticky; top: 0; z-index: 1; }
+td.n { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+tr.warn td { background: var(--warn-soft); }
+tr.bad td { color: var(--bad); background: var(--bad-soft); }
+tr.sel td { background: var(--accent-soft); }
+tr.click { cursor: pointer; }
+tr.rule-head td { font-weight: 600; background: var(--surface); border-top: 1.5px solid var(--line); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: 10.5px; padding: 1px 6px; border-radius: 2px; background: var(--surface-2); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.bigrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.status { font-size: 13px; padding: 8px 12px; border-radius: 3px; background: var(--ok-soft); color: var(--ok); border: 1.5px solid var(--ok); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.lib { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 620px) { .lib { grid-template-columns: minmax(0, 1fr); } }
+.lib-list { display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: 3px; max-height: 360px; overflow-y: auto; }
+.lib-list button { display: flex; justify-content: space-between; gap: 8px; text-align: left; border: 0; border-bottom: 1px solid var(--surface-2); background: var(--surface); padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.lib-list button.on { background: var(--accent-soft); font-weight: 600; }
+.lib-list button .c { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+details.more { border: 1.5px solid var(--line); border-radius: 3px; padding: 6px 10px; }
+details.more summary { cursor: pointer; font-size: 12.5px; font-weight: 600; }
+.empty { border: 1.5px dashed var(--line); border-radius: 3px; padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.pending { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; border: 1.5px solid var(--warn); background: var(--warn-soft); border-radius: 3px; font-size: 13px; }
+.pending span { flex: 1 1 200px; }
+
+/* Side */
+.side { display: flex; flex-direction: column; gap: 10px; position: sticky; top: env(safe-area-inset-top, 0px); min-width: 0; }
+@media (max-width: 1180px) { .side { position: static; } }
+.panel { background: var(--surface); border: 2px solid var(--ink); border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.panel-head .pt { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+.plan { width: 100%; max-width: 100%; height: auto; display: block; background: var(--paper); border: 1.5px solid var(--line); border-radius: 2px; }
+.plan .room { cursor: pointer; }
+.plan text { font-family: var(--font-mono); font-size: 7px; fill: var(--muted); pointer-events: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--muted); }
+.legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); background: var(--sw); }
+.legend span.plain::before { display: none; }
+.sidefacts { display: flex; flex-wrap: wrap; gap: 6px; }
+.fact { font-family: var(--font-mono); font-size: 11px; background: var(--surface-2); border-radius: 2px; padding: 3px 7px; }
+
+.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.changes .panel h3 { margin: 0; font-family: var(--font-display); font-size: 18px; }
+.changes ul { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
+.gone { text-decoration: line-through; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .item, .choice, .chip, .sub { transition: border-color .12s, background-color .12s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Auto-place stamps</h1>
+    <span class="facts" id="topfacts"></span>
+    <span class="tag">Mockup v1</span>
+  </header>
+  <p class="note">One dialog for the full job. The left list has the input data, the rules and Place all. A rule opens into the six steps of the placement rule guide. The floor plan on the right always shows the result of the open card. The floor and the numbers are examples.</p>
+  <div class="demo" role="group" aria-label="Mockup state">
+    <b>Try a start state</b>
+    <div class="tabs" id="demo"></div>
+  </div>
+  <div class="grid">
+    <nav class="nav" id="nav" aria-label="Auto-place"></nav>
+    <main class="card" id="card"></main>
+    <aside class="side" id="side"></aside>
+  </div>
+  <div class="changes">
+    <div class="panel">
+      <h3>Menu before</h3>
+      <ul><li>Detect rooms</li><li>Export rooms to Excel…</li><li class="gone">Room types…</li><li class="gone">Ceiling heights…</li><li class="gone">Placement rules…</li><li>Auto-place stamps…</li></ul>
+    </div>
+    <div class="panel">
+      <h3>Menu after</h3>
+      <ul><li>Detect rooms</li><li>Export rooms to Excel…</li><li>Auto-place stamps…</li></ul>
+      <p class="note">Room Properties keeps the room type, height and persons of one room. Its hints point to Auto-place stamps › Room types or › Ceiling heights.</p>
+    </div>
+    <div class="panel">
+      <h3>What the dialog opens on</h3>
+      <ul><li>The first input item that blocks placement (red).</li><li>Else Place all, when all rules are ready.</li><li>Else the first rule that needs a fix.</li></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- Example floor (plan units: 10 = 1 m) ----------
+const TYPES = [
+  { id: 'office', name: 'Office', kw: 'kantoor, werkplek, concentratie, belplek', app: '10', t: '--t1' },
+  { id: 'meeting', name: 'Meeting room', kw: 'overleg, vergader, brainstorm', app: '', t: '--t3' },
+  { id: 'canteen', name: 'Canteen', kw: 'ontmoeting, kantine', app: '1.5', t: '--t8' },
+  { id: 'corridor', name: 'Corridor', kw: 'verkeersruimte, gang', app: '', t: '--t5' },
+  { id: 'toilet', name: 'Toilet', kw: 'toilet, wc', app: '', t: '--t7' },
+  { id: 'stairs', name: 'Stairs', kw: 'trappenhuis, trap', app: '', t: '--t5' },
+  { id: 'lift', name: 'Lift', kw: 'lift', app: '', t: '--t5' },
+  { id: 'pantry', name: 'Kitchen and pantry', kw: 'pantry, keuken', app: '', t: '--t4' },
+  { id: 'storage', name: 'Storage', kw: 'opslag, berging', app: '', t: '--t6' },
+  { id: 'technical', name: 'Technical room', kw: 'technische ruimte, installatie', app: '', t: '--t2' },
+];
+const R = (id, name, type, x, y, w, h) => ({ id, name, type, x, y, w, h });
+const ROOMS0 = [
+  R('107', '1.07 Werkplek', 'office', 0, 0, 100, 50), R('108', '1.08 Werkplek', 'office', 100, 0, 70, 50),
+  R('109', '1.09 Concentratie', 'office', 170, 0, 30, 28), R('110', '1.10 Concentratie', 'office', 200, 0, 30, 28),
+  R('111', '1.11 Kast', null, 170, 28, 30, 22), R('112', '1.12 Toilet', 'toilet', 200, 28, 30, 22),
+  R('113', '1.13 Trappenhuis', 'stairs', 230, 0, 50, 50), R('114', '1.14 Overleg', 'meeting', 280, 0, 50, 50),
+  R('115', '1.15 Ontmoetingsruimte', 'canteen', 330, 0, 80, 50), R('116', '1.16 Belplek', 'office', 410, 0, 40, 30),
+  R('117', '1.17 Belplek', 'office', 450, 0, 40, 30), R('118', '1.18 Kast', null, 410, 30, 80, 20),
+  R('119', '1.19 Werkplek', 'office', 490, 0, 110, 50),
+  R('101', '1.01A Verkeersruimte', 'corridor', 0, 50, 600, 30),
+  R('120', '1.20 Werkplek', 'office', 0, 80, 100, 70), R('121', '1.21 Ankerpunt', null, 100, 80, 40, 40),
+  R('122', '1.22 Concentratie', 'office', 140, 80, 30, 40), R('123', '1.23 Concentratie', 'office', 170, 80, 30, 40),
+  R('124', '1.24 Repro', null, 200, 80, 40, 40), R('060', '0.6 Lift', 'lift', 240, 80, 30, 40),
+  R('125', '1.25 Pantry', 'pantry', 270, 80, 50, 40), R('126', '1.26 Technische ruimte', 'technical', 320, 80, 50, 40),
+  R('127', '1.27 Toilet', 'toilet', 370, 80, 30, 40), R('128', '1.28 Brainstorm', 'meeting', 400, 80, 60, 70),
+  R('129', '1.29 Werkplek', 'office', 460, 80, 140, 70), R('130', '1.30 Space', null, 100, 120, 300, 30),
+  R('102', '1.01B Verkeersruimte', 'corridor', 0, 150, 600, 20),
+  R('131', '1.31 Werkplek', 'office', 0, 170, 120, 70), R('132', '1.32 Overleg', 'meeting', 120, 170, 60, 40),
+  R('133', '1.33 Concentratie', 'office', 180, 170, 30, 40), R('134', '1.34 Opslag', 'storage', 210, 170, 40, 40),
+  R('135', '1.35 Toilet', 'toilet', 250, 170, 30, 40), R('136', '1.36 Overleg', 'meeting', 280, 170, 70, 70),
+  R('137', '1.37 Werkplek', 'office', 350, 170, 250, 70),
+];
+const STAMPS = ['Downlight LED 3600 lm', 'Smoke detector', 'Supply diffuser 600×600', 'Exhaust valve Ø125', 'Exhaust grille 300×150'];
+const RULE_COLORS = ['--r1', '--r3', '--r2', '--r4', '--r5'];
+const EXAMPLES = () => [
+  { id: 'light', name: 'Lighting 500 lx (example)', stamp: 0, types: ['office', 'meeting', 'canteen'], method: 'lighting', E: '500', uf: '0.6', mf: '0.8', cap: '3600', offset: '0.6', layout: 'grid', on: true },
+  { id: 'smoke', name: 'Smoke detector coverage (example)', stamp: 1, types: [], method: 'coverage', radius: '6.4', offset: '0.5', layout: 'evenSpread', on: true },
+  { id: 'supply', name: 'Supply air per person + area (example)', stamp: null, types: ['office', 'meeting'], method: 'perPersonArea', a: '7', b: '0.7', cap: '50', offset: '0.5', layout: 'grid', on: true },
+  { id: 'wc', name: 'Toilet exhaust fixed per room (example)', stamp: 3, types: ['toilet'], method: 'fixed', fixed: '25', cap: '25', offset: '0.3', layout: 'center', on: true },
+  { id: 'tech', name: 'Technical room 4 air changes per hour (example)', stamp: 4, types: ['technical'], method: 'airChanges', n: '4', cap: '200', offset: '0.3', layout: 'perimeter', on: false },
+];
+const METHODS = [
+  { id: 'perArea', name: 'Per area', f: 'a × floor area' },
+  { id: 'perPerson', name: 'Per person', f: 'a × persons' },
+  { id: 'perPersonArea', name: 'Per person + per area', f: 'a × persons + b × area' },
+  { id: 'airChanges', name: 'Air changes per hour', f: 'n × volume' },
+  { id: 'fixed', name: 'Fixed per room', f: 'a' },
+  { id: 'lighting', name: 'Lighting (lumen method)', f: 'E × area ÷ (UF × MF)' },
+  { id: 'coverage', name: 'By coverage', f: 'circles of r cover the room' },
+];
+const LAYOUTS = [
+  { id: 'center', name: 'Center', d: 'One stamp in the middle.' },
+  { id: 'grid', name: 'Grid', d: 'Rows along the long side.' },
+  { id: 'evenSpread', name: 'Even spread', d: 'Each stamp in the middle of its own part.' },
+  { id: 'perimeter', name: 'Along the walls', d: 'Equal distances along the walls.' },
+];
+const STEPS = ['Stamp', 'Rooms', 'Amount', 'Spacing', 'Layout', 'Check'];
+
+// ---------- State ----------
+const S = {
+  demo: 'ready',
+  scale: '50', rooms: ROOMS0.map((r) => ({ ...r })), rules: EXAMPLES(),
+  sel: { kind: 'place' }, // { kind: 'drawing' | 'types' | 'heights' | 'place' } or { kind: 'rule', id, step }
+  typesTab: 'rooms', typesFilter: 'untyped', libSel: 'office',
+  heights: { global: 2700, drawing: '', byType: { toilet: '2400' } },
+  showAllTypes: false,
+  dirty: null, // rule id with unsaved changes
+  saved: null, // copy of the rule before the edit
+  pendingNav: null,
+  scope: 'page',
+  placed: null,
+  sample: '114',
+};
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const num = (s) => { const n = Number(String(s ?? '').trim().replace(',', '.')); return String(s ?? '').trim() !== '' && Number.isFinite(n) ? n : undefined; };
+const fmt = (n, d = 1) => n == null ? '–' : (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('en-US', { maximumFractionDigits: d });
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const typeOf = (id) => TYPES.find((t) => t.id === id);
+const typeName = (id) => typeOf(id)?.name ?? 'No type';
+const ruleOf = (id) => S.rules.find((r) => r.id === id);
+const hasScale = () => S.scale !== '';
+const pageRooms = () => S.rooms;
+const untyped = () => pageRooms().filter((r) => !r.type);
+const areaOf = (r) => (r.w / 10) * (r.h / 10);
+const heightOf = (r) => {
+  if (r.own) return { mm: r.own, level: 'room' };
+  const t = r.type && num(S.heights.byType[r.type]);
+  if (t) return { mm: t, level: 'type' };
+  const d = num(S.heights.drawing);
+  if (d) return { mm: d, level: 'drawing' };
+  return { mm: S.heights.global, level: 'default' };
+};
+const personsOf = (r) => { const app = num(typeOf(r.type)?.app); return app ? Math.floor(areaOf(r) / app) : null; };
+
+// ---------- Rule math (simplified copy of the core rules) ----------
+function matches(rule, room) { return rule.types.length === 0 || (room.type && rule.types.includes(room.type)); }
+function countFor(rule, room) {
+  if (!hasScale()) return { count: null, why: 'no scale' };
+  const A = areaOf(room), cap = num(rule.cap);
+  let req = null;
+  if (rule.method === 'lighting') req = (num(rule.E) ?? 0) * A / ((num(rule.uf) ?? 1) * (num(rule.mf) ?? 1));
+  else if (rule.method === 'perPersonArea' || rule.method === 'perPerson') {
+    const p = personsOf(room);
+    if (p === null) return { count: null, why: 'no persons' };
+    req = (num(rule.a) ?? 0) * p + (rule.method === 'perPersonArea' ? (num(rule.b) ?? 0) * A : 0);
+  } else if (rule.method === 'perArea') req = (num(rule.b) ?? 0) * A;
+  else if (rule.method === 'airChanges') req = (num(rule.n) ?? 0) * A * (heightOf(room).mm / 1000) / 3.6;
+  else if (rule.method === 'fixed') req = num(rule.fixed) ?? 0;
+  else if (rule.method === 'coverage') { const rr = num(rule.radius) ?? 5; return { count: Math.max(1, Math.ceil(A / (2 * rr * rr))), req: null }; }
+  const count = cap ? Math.max(1, Math.ceil(req / cap - 1e-9)) : 1;
+  return { count, req };
+}
+function pointsFor(rule, room, n) {
+  const off = (num(rule.offset) ?? 0.5) * 10;
+  const x0 = room.x + off, y0 = room.y + off, w = Math.max(room.w - 2 * off, 2), h = Math.max(room.h - 2 * off, 2);
+  if (n <= 0) return [];
+  if (rule.layout === 'center' && n === 1) return [[room.x + room.w / 2, room.y + room.h / 2]];
+  if (rule.layout === 'perimeter') {
+    const per = 2 * (w + h), pts = [];
+    for (let i = 0; i < n; i++) {
+      let d = (i + 0.5) * per / n;
+      if (d < w) pts.push([x0 + d, y0]); else if ((d -= w) < h) pts.push([x0 + w, y0 + d]); else if ((d -= h) < w) pts.push([x0 + w - d, y0 + h]); else pts.push([x0, y0 + h - (d - w)]);
+    }
+    return pts;
+  }
+  let cols = Math.max(1, Math.round(Math.sqrt(n * w / h))); cols = Math.min(cols, n); const rows = Math.ceil(n / cols);
+  const pts = [];
+  for (let r = 0; r < rows; r++) {
+    const inRow = r === rows - 1 ? n - cols * (rows - 1) : cols;
+    for (let c = 0; c < inRow; c++) pts.push([x0 + (c + 0.5) * w / inRow, y0 + (r + 0.5) * h / rows]);
+  }
+  return pts;
+}
+function ruleProblems(rule) {
+  const p = [];
+  if (rule.stamp === null) p.push({ level: 'bad', text: 'No stamp', step: 1 });
+  if (!hasScale() || pageRooms().length === 0) { p.push({ level: 'warn', text: 'Waits for the scale and the rooms', step: 6 }); return p; }
+  const rooms = pageRooms().filter((r) => matches(rule, r));
+  if (rooms.length === 0) p.push({ level: 'warn', text: 'No room matches', step: 2 });
+  const noP = rooms.filter((r) => countFor(rule, r).why === 'no persons').length;
+  if (noP > 0) p.push({ level: 'warn', text: `${plural(noP, 'room')} without persons`, step: 3 });
+  return p;
+}
+function rulePlan(rule) {
+  const rows = pageRooms().filter((r) => matches(rule, r)).map((room) => {
+    const c = countFor(rule, room);
+    const pts = c.count && rule.stamp !== null ? pointsFor(rule, room, c.count) : [];
+    return { room, ...c, pts };
+  });
+  return { rows, total: rows.reduce((s, r) => s + r.pts.length, 0) };
+}
+
+// ---------- Input data status ----------
+function inputStatus() {
+  const noScale = !hasScale(), noRooms = pageRooms().length === 0;
+  const drawing = noScale ? { level: 'bad', s: 'Page 1 has no scale' } : noRooms ? { level: 'bad', s: 'No rooms on page 1' } : { level: 'ok', s: `Page 1 · 1:${S.scale} · ${plural(pageRooms().length, 'room')}` };
+  const u = untyped().length;
+  const types = noRooms ? { level: 'off', s: 'No rooms yet' } : u > 0 ? { level: 'warn', s: `${plural(u, 'room')} without a type` } : { level: 'ok', s: 'Each room has a type' };
+  const d = num(S.heights.drawing);
+  const nType = Object.values(S.heights.byType).filter((v) => num(v)).length;
+  const heights = { level: 'ok', s: `${d ?? S.heights.global} mm${d ? '' : ' (default)'}${nType ? ` · ${plural(nType, 'type')} own height` : ''}` };
+  return { drawing, types, heights };
+}
+const ICON = { ok: '✓', warn: '!', bad: '×', off: '·' };
+
+// ---------- Nav ----------
+function navItem(kind, title, st, extra = '') {
+  const on = S.sel.kind === kind ? ' on' : '';
+  return `<button type="button" class="item ${st.level}${on}" data-go="${kind}"><span class="ic">${ICON[st.level]}</span><span class="t">${title}</span>${extra}<span class="s">${esc(st.s)}</span></button>`;
+}
+function renderNav() {
+  const st = inputStatus();
+  let h = `<h4>Input data</h4>`;
+  h += navItem('drawing', 'Drawing and rooms', st.drawing);
+  h += navItem('types', 'Room types', st.types);
+  h += navItem('heights', 'Ceiling heights', st.heights);
+  h += `<h4>Placement rules <button type="button" data-act="new-rule">+ New</button></h4>`;
+  if (S.rules.length === 0) h += `<p class="note">No rules yet.</p>`;
+  for (const [i, rule] of S.rules.entries()) {
+    const probs = ruleProblems(rule);
+    const level = probs.some((p) => p.level === 'bad') ? 'bad' : probs.length ? 'warn' : 'ok';
+    const plan = rulePlan(rule);
+    const sub = probs.length ? probs[0].text : `${plural(plan.total, 'stamp')}`;
+    const open = S.sel.kind === 'rule' && S.sel.id === rule.id;
+    const dirty = S.dirty === rule.id ? ' •' : '';
+    h += `<div class="rule-row"><input type="checkbox" aria-label="Use ${esc(rule.name)} in Place all" data-check="${rule.id}" ${rule.on ? 'checked' : ''}>`;
+    h += `<button type="button" class="item ${rule.on ? level : 'off'}${open ? ' on' : ''}" data-rule="${rule.id}"><span class="ic">${ICON[level]}</span><span class="t"><span class="dot" style="background:var(${RULE_COLORS[i % 5]})"></span>${esc(rule.name)}${dirty}</span><span class="s">${esc(sub)}</span></button>`;
+    if (open) {
+      h += `<div class="substeps">`;
+      STEPS.forEach((name, k) => {
+        const n = k + 1, p = probs.find((q) => q.step === n);
+        h += `<button type="button" class="sub ${p ? p.level : ''}${S.sel.step === n ? ' on' : ''}" data-step="${n}"><span class="n">${n}</span>${name}<span class="d">${p ? esc(p.text) : stepSummary(rule, n)}</span></button>`;
+      });
+      h += `</div>`;
+    }
+    h += `</div>`;
+  }
+  const all = placeAllPlan();
+  h += `<div class="place-item">${`<button type="button" class="item${S.sel.kind === 'place' ? ' on' : ''}" data-go="place"><span class="ic">▶</span><span class="t">Place all</span><span class="x">${all.total}</span><span class="s">${all.blocked ? esc(all.blocked) : `${plural(all.total, 'stamp')} from ${plural(all.ready.length, 'rule')}`}</span></button>`}</div>`;
+  document.getElementById('nav').innerHTML = h;
+}
+function stepSummary(rule, n) {
+  if (n === 1) return rule.stamp === null ? '' : esc(STAMPS[rule.stamp].split(' ')[0]);
+  if (n === 2) return rule.types.length ? plural(rule.types.length, 'type') : 'every room';
+  if (n === 3) return esc(METHODS.find((m) => m.id === rule.method).name.split(' (')[0]);
+  if (n === 4) return `${rule.offset} m`;
+  if (n === 5) return esc(LAYOUTS.find((l) => l.id === rule.layout).name);
+  return plural(rulePlan(rule).total, 'stamp');
+}
+
+// ---------- Place all ----------
+function placeAllPlan() {
+  if (!hasScale()) return { ready: [], skipped: [], total: 0, blocked: 'Set the scale first' };
+  if (pageRooms().length === 0) return { ready: [], skipped: [], total: 0, blocked: 'Detect the rooms first' };
+  if (S.rules.length === 0) return { ready: [], skipped: [], total: 0, blocked: 'Add a rule first' };
+  const on = S.rules.filter((r) => r.on);
+  if (on.length === 0) return { ready: [], skipped: [], total: 0, blocked: 'Check at least one rule' };
+  const ready = [], skipped = [];
+  for (const rule of on) (rule.stamp === null ? skipped : ready).push(rule);
+  const total = ready.reduce((s, r) => s + rulePlan(r).total, 0);
+  return { ready, skipped, total, blocked: null };
+}
+
+// ---------- Cards ----------
+function cardDrawing() {
+  const noScale = !hasScale(), noRooms = pageRooms().length === 0;
+  return `
+    <h2>Drawing and rooms</h2>
+    <p class="lead">MepApp needs the scale of the page and the rooms on it. The scale gives the floor area. The rooms come from the room names in the drawing.</p>
+    <div class="checks">
+      <div class="check ${noScale ? 'bad' : 'ok'}"><span class="ic">${noScale ? '×' : '✓'}</span><b>Scale of page 1</b>
+        <span class="a inline"><select class="txt" id="scale" style="width:auto">${['', '20', '50', '100', '200'].map((v) => `<option value="${v}" ${S.scale === v ? 'selected' : ''}>${v ? '1:' + v : 'Not set'}</option>`).join('')}</select><button type="button" class="btn small" data-act="calibrate">Calibrate…</button></span>
+        <span class="sub2">${noScale ? 'Choose the scale, or calibrate on the drawing with two points.' : 'Calibrate… hides this dialog until you click two points.'}</span></div>
+      <div class="check ${noRooms ? 'bad' : 'ok'}"><span class="ic">${noRooms ? '×' : '✓'}</span><b>${noRooms ? 'No rooms on page 1' : `${plural(pageRooms().length, 'room')} on page 1`}</b>
+        <span class="a"><button type="button" class="btn small ${noRooms ? 'primary' : ''}" data-act="detect" ${noScale ? 'disabled' : ''}>${noRooms ? 'Detect rooms' : 'Detect again'}</button></span>
+        <span class="sub2">${noScale ? 'Detect rooms needs the scale.' : noRooms ? 'MepApp finds the rooms from the room names.' : 'Detect again keeps the rooms that you locked.'}</span></div>
+    </div>
+    <div class="callout info"><span>MepApp places stamps only on the page that the drawing shows now. Go to another page to place stamps there.</span></div>
+    ${navButtons('drawing')}`;
+}
+
+function cardTypes() {
+  const u = untyped();
+  const tabs = `<div class="tabs" role="tablist"><button type="button" role="tab" class="${S.typesTab === 'rooms' ? 'on' : ''}" data-tab="rooms">Rooms on this page</button><button type="button" role="tab" class="${S.typesTab === 'lib' ? 'on' : ''}" data-tab="lib">Room type library</button></div>`;
+  let body = '';
+  if (S.typesTab === 'rooms') {
+    const list = S.typesFilter === 'untyped' && u.length ? u : pageRooms();
+    body = `
+      ${u.length ? `<div class="callout"><span><b>${plural(u.length, 'room')}</b> ${u.length === 1 ? 'has' : 'have'} no type. A rule with room types does not find ${u.length === 1 ? 'it' : 'them'}. Choose a type, or add a keyword in the library.</span></div>` : `<div class="callout ok"><span>Each room on this page has a type.</span></div>`}
+      <div class="inline"><div class="tabs"><button type="button" class="${S.typesFilter === 'untyped' ? 'on' : ''}" data-filter="untyped">Without a type (${u.length})</button><button type="button" class="${S.typesFilter === 'all' ? 'on' : ''}" data-filter="all">All (${pageRooms().length})</button></div><button type="button" class="btn small" data-act="match">Match rooms again</button></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Room</th><th>Type</th><th>m²</th><th>Persons</th></tr></thead><tbody>
+      ${list.map((r) => `<tr class="click ${r.type ? '' : 'warn'} ${S.sample === r.id ? 'sel' : ''}" data-room="${r.id}"><td>${esc(r.name)}</td><td><select class="mini ${r.type ? '' : 'need'}" data-settype="${r.id}" aria-label="Room type of ${esc(r.name)}"><option value="">${r.type ? 'By name' : 'Choose a type…'}</option>${TYPES.map((t) => `<option value="${t.id}" ${r.type === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}</select></td><td class="n">${hasScale() ? fmt(areaOf(r)) : '–'}</td><td class="n">${personsOf(r) ?? '–'}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  } else {
+    const t = typeOf(S.libSel) ?? TYPES[0];
+    const used = pageRooms().filter((r) => r.type === t.id).length;
+    body = `
+      <p class="lead">The library is yours, not part of the drawing. Each drawing uses the same room types.</p>
+      <div class="lib">
+        <div class="lib-list" role="listbox" aria-label="Room types">${TYPES.map((x) => `<button type="button" role="option" class="${x.id === t.id ? 'on' : ''}" data-lib="${x.id}"><span>${x.name}</span><span class="c">${pageRooms().filter((r) => r.type === x.id).length}</span></button>`).join('')}<button type="button" data-act="noop"><span>+ New room type</span></button></div>
+        <div class="section">
+          <div class="field"><label for="lt-name">Name</label><input class="txt" id="lt-name" value="${esc(t.name)}"></div>
+          <div class="field"><label for="lt-kw">Keywords</label><input class="txt" id="lt-kw" value="${esc(t.kw)}"></div>
+          <div class="field"><label for="lt-app">Area per person (m²)</label><input class="num" id="lt-app" data-app="${t.id}" value="${esc(t.app)}" placeholder="none"></div>
+          <details class="more"><summary>Demands for rules (illuminance, airflow, …)</summary><p class="note">The ten demand boxes of today's Room types dialog. Rules can read them, so one rule serves all room types.</p></details>
+          <p class="note">${plural(used, 'room')} on this page use this type.</p>
+          <div class="inline"><button type="button" class="btn small">Import…</button><button type="button" class="btn small">Export…</button><button type="button" class="btn small">Delete</button></div>
+        </div>
+      </div>`;
+  }
+  return `<h2>Room types</h2><p class="lead">Rules choose rooms by type. MepApp finds the type from the room name. The type also gives the persons and the demands that a rule can use.</p>${tabs}${body}${navButtons('types')}`;
+}
+
+function cardHeights() {
+  const usedTypes = TYPES.filter((t) => pageRooms().some((r) => r.type === t.id));
+  const shown = S.showAllTypes ? TYPES : usedTypes;
+  const d = num(S.heights.drawing);
+  const own = pageRooms().filter((r) => r.own).length;
+  const air = S.rules.filter((r) => r.on && r.method === 'airChanges').length;
+  return `
+    <h2>Ceiling heights</h2>
+    <p class="lead">The height gives the room volume. Each level below uses the level above when you leave it empty. ${air ? `${plural(air, 'checked rule')} use${air === 1 ? 's' : ''} the volume.` : 'No checked rule uses the volume now.'}</p>
+    <div class="chain">
+      <div class="cr"><span class="lv">1</span><span class="cl">Default for all drawings</span><span class="cv"><input class="num" id="h-global" value="${S.heights.global}"> mm</span><span class="cw">Also in Settings › Rooms.</span></div>
+      <div class="cr"><span class="lv">2</span><span class="cl">This drawing</span><span class="cv"><input class="num" id="h-drawing" value="${esc(S.heights.drawing)}" placeholder="${S.heights.global}"> mm</span><span class="cw">Saved in the drawing.</span></div>
+      ${shown.map((t) => `<div class="cr"><span class="lv">3</span><span class="cl">${t.name} <span class="pill">${plural(pageRooms().filter((r) => r.type === t.id).length, 'room')}</span></span><span class="cv"><input class="num" data-htype="${t.id}" value="${esc(S.heights.byType[t.id] ?? '')}" placeholder="${d ?? S.heights.global}"> mm</span><span class="cw">Room type in this drawing.</span></div>`).join('')}
+      <div class="cr"><span class="lv">4</span><span class="cl">One room</span><span class="cv"><span class="pill">${plural(own, 'room')}</span></span><span class="cw">Set in Room Properties. Click a room on the plan to see its height.</span></div>
+    </div>
+    <button type="button" class="link" data-act="alltypes">${S.showAllTypes ? 'Show only the types on this page' : `Show all ${TYPES.length} room types`}</button>
+    ${navButtons('heights')}`;
+}
+
+function cardRule(rule) {
+  const step = S.sel.step;
+  const probs = ruleProblems(rule);
+  const crumb = `<div class="crumb"><button type="button" data-go="place">Auto-place stamps</button> › <span>${esc(rule.name)}</span> › <span>Step ${step} of 6</span></div>`;
+  const dirtyBar = S.dirty === rule.id ? `<div class="pending"><span>This rule has changes that are not saved.</span><button type="button" class="btn small primary" data-act="save">Save</button><button type="button" class="btn small" data-act="revert">Revert</button></div>` : '';
+  let body = '';
+  if (step === 1) {
+    body = `<h2>What do you want to place?</h2>
+      <div class="field"><label for="rn">Rule name</label><input class="txt" id="rn" data-f="name" value="${esc(rule.name)}"></div>
+      <div class="field"><label>Stamp</label><span class="inline"><span class="pill ${rule.stamp === null ? 'bad' : ''}">${rule.stamp === null ? 'No stamp chosen' : esc(STAMPS[rule.stamp])}</span><button type="button" class="btn small" data-act="stamp">Choose…</button></span></div>`;
+  } else if (step === 2) {
+    const u = untyped().length;
+    body = `<h2>Which rooms get this stamp?</h2>
+      ${u ? `<div class="callout"><span><b>${plural(u, 'room')}</b> on this page ${u === 1 ? 'has' : 'have'} no type.</span><button type="button" class="btn small" data-go="types">Give them a type</button></div>` : ''}
+      <div class="chips">${TYPES.map((t) => { const on = rule.types.includes(t.id); return `<button type="button" class="chip${on ? ' on' : ''}" data-chip="${t.id}">${t.name}<span class="c">${pageRooms().filter((r) => r.type === t.id).length}</span></button>`; }).join('')}</div>
+      <p class="note">${rule.types.length ? `${plural(pageRooms().filter((r) => matches(rule, r)).length, 'room')} on this page match.` : 'No type chosen: the rule applies to every room.'}</p>`;
+  } else if (step === 3) {
+    const m = rule.method;
+    const fields = m === 'lighting' ? [['E', 'E (lx)'], ['uf', 'UF'], ['mf', 'MF'], ['cap', 'One stamp gives (lm)']]
+      : m === 'perPersonArea' ? [['a', 'a (dm³/s per person)'], ['b', 'b (dm³/s per m²)'], ['cap', 'One stamp gives (dm³/s)']]
+      : m === 'perPerson' ? [['a', 'a (per person)'], ['cap', 'One stamp gives']]
+      : m === 'perArea' ? [['b', 'a (per m²)'], ['cap', 'One stamp gives']]
+      : m === 'airChanges' ? [['n', 'n (per hour)'], ['cap', 'One stamp gives (dm³/s)']]
+      : m === 'fixed' ? [['fixed', 'a (dm³/s)'], ['cap', 'One stamp gives (dm³/s)']]
+      : [['radius', 'r (m)']];
+    const sample = pageRooms().find((r) => r.id === S.sample && matches(rule, r)) ?? pageRooms().find((r) => matches(rule, r));
+    const c = sample ? countFor(rule, sample) : null;
+    const noP = probs.find((p) => p.step === 3);
+    body = `<h2>How many stamps does one room need?</h2>
+      <div class="choices">${METHODS.map((x) => `<button type="button" class="choice${x.id === m ? ' on' : ''}" data-method="${x.id}"><span class="ct">${x.name}</span><span class="cf">${x.f}</span></button>`).join('')}</div>
+      <div class="formula">${fields.map(([k, label]) => `<div class="term"><span class="sym">${label}</span><input class="num" data-f="${k}" value="${esc(rule[k] ?? '')}"></div>`).join('')}
+        <div class="term result"><span>${sample ? esc(sample.name) : 'No room'}</span><span class="res">${c && c.count ? plural(c.count, 'stamp') : c ? c.why : '–'}</span></div></div>
+      ${noP ? `<div class="callout"><span>${esc(noP.text)}: their room type has no area per person.</span><button type="button" class="btn small" data-go="types" data-tab2="lib">Open the room type library</button></div>` : ''}`;
+  } else if (step === 4) {
+    body = `<h2>How far from the walls?</h2><div class="field"><label for="off">Min distance to the walls (m)</label><input class="num" id="off" data-f="offset" value="${esc(rule.offset)}"></div><p class="note">The guide's spacing step, unchanged.</p>`;
+  } else if (step === 5) {
+    body = `<h2>How are the stamps set out?</h2><div class="choices">${LAYOUTS.map((l) => `<button type="button" class="choice${l.id === rule.layout ? ' on' : ''}" data-layout="${l.id}"><span class="ct">${l.name}</span><span class="cd">${l.d}</span></button>`).join('')}</div><p class="note">The guide's layout step, unchanged.</p>`;
+  } else {
+    const plan = rulePlan(rule);
+    body = `<h2>Check this rule</h2>
+      ${rule.stamp === null ? `<div class="callout bad"><span>The rule has no stamp. Place all skips it.</span><button type="button" class="btn small" data-step="1">Go to step 1</button></div>` : ''}
+      <div class="tbl-wrap"><table><thead><tr><th>Room</th><th>Type</th><th>m²</th><th>Stamps</th><th>Notes</th></tr></thead><tbody>
+      ${plan.rows.map((r) => `<tr class="click ${r.count === null ? 'warn' : ''} ${S.sample === r.room.id ? 'sel' : ''}" data-room="${r.room.id}"><td>${esc(r.room.name)}</td><td>${typeName(r.room.type)}</td><td class="n">${fmt(areaOf(r.room))}</td><td class="n">${r.count ?? '–'}</td><td>${r.why ?? ''}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="bigrow"><button type="button" class="btn" data-act="place-one" ${plan.total === 0 ? 'disabled' : ''}>Place only this rule (${plan.total})</button><span class="note">Or go back to Place all to place every checked rule.</span></div>`;
+  }
+  const prev = step > 1 ? `<button type="button" class="btn" data-step="${step - 1}">Back</button>` : `<button type="button" class="btn" data-go="place">All rules</button>`;
+  const next = step < 6 ? `<button type="button" class="btn primary" data-step="${step + 1}">Next: ${STEPS[step]}</button>` : `<button type="button" class="btn primary" data-go="place">Done: back to Place all</button>`;
+  return `${crumb}${dirtyBar}${body}<div class="cnav">${prev}${next}</div>`;
+}
+
+function cardPlace() {
+  const all = placeAllPlan();
+  if (all.blocked) {
+    const go = !hasScale() || pageRooms().length === 0 ? 'drawing' : null;
+    if (S.rules.length === 0 && hasScale() && pageRooms().length) {
+      return `<h2>Place all</h2>
+        <div class="empty"><b>There are no placement rules.</b><span class="note">A rule says which stamp goes in which rooms, and how many. Start from an example, or make a new rule.</span>
+        <div class="inline"><button type="button" class="btn primary" data-act="examples">Add the example rules</button><button type="button" class="btn" data-act="new-rule">+ New rule</button><button type="button" class="btn">Import…</button></div></div>`;
+    }
+    return `<h2>Place all</h2><div class="callout bad"><span>${esc(all.blocked)}.</span>${go ? `<button type="button" class="btn small" data-go="${go}">Open Drawing and rooms</button>` : ''}</div>`;
+  }
+  const u = untyped().length;
+  const rows = [];
+  for (const [i, rule] of S.rules.entries()) {
+    if (!rule.on) continue;
+    const plan = rulePlan(rule), probs = ruleProblems(rule);
+    const skip = rule.stamp === null;
+    rows.push(`<tr class="rule-head click ${skip ? 'bad' : ''}" data-rule="${rule.id}"><td><span class="dot" style="background:var(${RULE_COLORS[i % 5]})"></span>${esc(rule.name)}</td><td class="n">${plan.rows.length}</td><td class="n">${skip ? '–' : plan.total}</td><td>${skip ? '<span class="pill bad">skipped: no stamp</span>' : probs.length ? `<span class="pill warn">${esc(probs[0].text)}</span>` : '<span class="pill ok">ready</span>'}</td></tr>`);
+  }
+  const placed = S.placed ? `<div class="status"><span>MepApp placed ${plural(S.placed, 'stamp')}. One Undo removes all of them.</span><button type="button" class="btn small" data-act="undo">Undo</button></div>` : '';
+  return `
+    <h2>Place all</h2>
+    <p class="lead">Each checked rule places its stamps in the rooms that match. A new run replaces the auto-placed stamps that you did not move.</p>
+    <div class="field"><label for="scope">Rooms</label><select class="txt" id="scope"><option value="page">Rooms on this page (${pageRooms().length})</option><option value="selected">Selected rooms (0)</option></select></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Rule</th><th>Rooms</th><th>Stamps</th><th>State</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>
+    ${all.skipped.length ? `<div class="callout bad"><span>${plural(all.skipped.length, 'rule')} without a stamp: Place all skips ${all.skipped.length === 1 ? 'it' : 'them'}.</span><button type="button" class="btn small" data-rule="${all.skipped[0].id}" data-step="1">Choose a stamp</button></div>` : ''}
+    ${u ? `<div class="callout"><span>${plural(u, 'room')} without a type: a rule with room types does not find ${u === 1 ? 'it' : 'them'}.</span><button type="button" class="btn small" data-go="types">Room types</button></div>` : ''}
+    ${placed || `<div class="bigrow"><button type="button" class="btn primary" data-act="place" ${all.total ? '' : 'disabled'}>Place ${plural(all.total, 'stamp')}</button><button type="button" class="btn" data-act="noop">Preview on the drawing</button><button type="button" class="btn" data-act="noop">Remove auto-placed stamps</button></div>`}
+    <details class="more"><summary>Rows per room (the table of today's Auto-place dialog)</summary><p class="note">Room, type, area, volume, persons, rule, required, count, existing, placed, notes. Click a rule row above to open its step 6 instead.</p></details>`;
+}
+
+function navButtons(kind) {
+  const order = ['drawing', 'types', 'heights'];
+  const i = order.indexOf(kind);
+  const next = i < 2 ? `<button type="button" class="btn primary" data-go="${order[i + 1]}">Next: ${['Room types', 'Ceiling heights'][i]}</button>` : `<button type="button" class="btn primary" data-go="place">Next: Place all</button>`;
+  return `<div class="cnav">${i > 0 ? `<button type="button" class="btn" data-go="${order[i - 1]}">Back</button>` : '<span></span>'}${next}</div>`;
+}
+
+function renderCard() {
+  const el = document.getElementById('card');
+  let h = '';
+  if (S.pendingNav) {
+    const r = ruleOf(S.dirty);
+    h = `<h2>Save the changes?</h2><p class="lead">${esc(r?.name ?? 'The rule')} has changes that are not saved. Place all uses the saved rule.</p><div class="inline"><button type="button" class="btn primary" data-act="pend-save">Save and go on</button><button type="button" class="btn" data-act="pend-discard">Discard the changes</button><button type="button" class="btn" data-act="pend-stay">Stay on the rule</button></div>`;
+  } else if (S.sel.kind === 'drawing') h = cardDrawing();
+  else if (S.sel.kind === 'types') h = cardTypes();
+  else if (S.sel.kind === 'heights') h = cardHeights();
+  else if (S.sel.kind === 'rule') h = cardRule(ruleOf(S.sel.id));
+  else h = cardPlace();
+  el.innerHTML = h;
+}
+
+// ---------- Side: floor plan ----------
+function renderSide() {
+  const k = S.sel.kind;
+  const rooms = pageRooms();
+  let fill = () => 'var(--surface)', stamps = [], legend = '', title = 'Whole floor';
+  if (!hasScale() || rooms.length === 0) {
+    document.getElementById('side').innerHTML = `<div class="panel"><div class="panel-head"><span class="pt">Whole floor</span></div><div class="empty"><b>${!hasScale() ? 'No scale' : 'No rooms'}</b><span class="note">${!hasScale() ? 'The plan shows the rooms when the page has a scale and rooms.' : 'Detect the rooms to see them here.'}</span></div></div>`;
+    return;
+  }
+  if (k === 'types') {
+    fill = (r) => r.type ? `var(${typeOf(r.type).t})` : 'url(#hatch)';
+    legend = `<span style="--sw:var(--t1)">office</span><span style="--sw:var(--t3)">meeting room</span><span style="--sw:var(--t5)">corridor, stairs, lift</span><span class="plain">hatched: no type</span><span class="plain">click a room to find its row</span>`;
+    title = 'Room types';
+  } else if (k === 'heights') {
+    const lv = { default: 'var(--surface)', drawing: 'var(--t1)', type: 'var(--t4)', room: 'var(--t3)' };
+    fill = (r) => lv[heightOf(r).level];
+    legend = `<span style="--sw:var(--surface)">default</span><span style="--sw:var(--t1)">this drawing</span><span style="--sw:var(--t4)">room type</span><span style="--sw:var(--t3)">one room</span>`;
+    title = 'Ceiling heights';
+  } else if (k === 'rule') {
+    const rule = ruleOf(S.sel.id), i = S.rules.indexOf(rule);
+    fill = (r) => matches(rule, r) ? (countFor(rule, r).count === null ? 'var(--warn-soft)' : 'var(--accent-soft)') : (r.type ? 'var(--surface)' : 'url(#hatch)');
+    stamps = rulePlan(rule).rows.flatMap((row) => row.pts.map((p) => ({ p, c: RULE_COLORS[i % 5] })));
+    legend = `<span style="--sw:var(--accent-soft)">matches the rule</span><span style="--sw:var(--warn-soft)">missing data</span><span class="plain">hatched: no type</span>`;
+    title = esc(rule.name);
+  } else if (k === 'place') {
+    fill = (r) => r.type ? 'var(--surface)' : 'url(#hatch)';
+    for (const [i, rule] of S.rules.entries()) if (rule.on && rule.stamp !== null) stamps.push(...rulePlan(rule).rows.flatMap((row) => row.pts.map((p) => ({ p, c: RULE_COLORS[i % 5] }))));
+    legend = S.rules.filter((r) => r.on).map((r) => `<span style="--sw:var(${RULE_COLORS[S.rules.indexOf(r) % 5]})">${esc(r.name.replace(' (example)', ''))}${r.stamp === null ? ' (skipped)' : ''}</span>`).join('');
+    title = 'All checked rules';
+  } else {
+    fill = (r) => r.type ? 'var(--surface)' : 'url(#hatch)';
+    legend = `<span class="plain">hatched: no type</span>`;
+  }
+  const sel = rooms.find((r) => r.id === S.sample);
+  let svg = `<svg class="plan" viewBox="-6 -6 612 252" role="img" aria-label="Floor plan of page 1"><defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--warn-soft)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--hatch)" stroke-width="2"/></pattern></defs>`;
+  for (const r of rooms) {
+    const on = r.id === S.sample;
+    svg += `<rect class="room" data-room="${r.id}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${fill(r)}" stroke="var(--plan-wall)" stroke-width="${on ? 2.4 : 1}"><title>${esc(r.name)}</title></rect>`;
+    if (r.w >= 40 && r.h >= 28) svg += `<text x="${r.x + 3}" y="${r.y + 9}">${esc(r.name.split(' ')[0])}</text>`;
+  }
+  for (const s of stamps) svg += `<circle cx="${s.p[0]}" cy="${s.p[1]}" r="2.6" fill="var(${s.c})" stroke="var(--surface)" stroke-width="0.8"/>`;
+  svg += `</svg>`;
+  const facts = sel ? `<div class="sidefacts"><span class="fact">${esc(sel.name)}</span><span class="fact">${fmt(areaOf(sel))} m²</span><span class="fact">${typeName(sel.type)}</span><span class="fact">${heightOf(sel).mm} mm (${heightOf(sel).level})</span>${personsOf(sel) !== null ? `<span class="fact">${plural(personsOf(sel), 'person')}</span>` : ''}</div>` : '';
+  document.getElementById('side').innerHTML = `<div class="panel"><div class="panel-head"><span class="pt">${title}</span><span class="pill">${plural(stamps.length, 'stamp')}</span></div>${facts}${svg}<div class="legend">${legend}</div></div>`;
+}
+
+function renderTop() {
+  document.getElementById('topfacts').innerHTML = `<span>drawing.pdf</span><span>page 1</span><span>${hasScale() ? '1:' + S.scale : 'no scale'}</span><span>${plural(pageRooms().length, 'room')}</span>`;
+  const demos = [['ready', 'Normal'], ['noscale', 'No scale'], ['norooms', 'No rooms'], ['norules', 'No rules']];
+  document.getElementById('demo').innerHTML = demos.map(([id, name]) => `<button type="button" class="${S.demo === id ? 'on' : ''}" data-demo="${id}">${name}</button>`).join('');
+}
+function render() { renderTop(); renderNav(); renderCard(); renderSide(); }
+
+// ---------- Behaviour ----------
+function firstAttention() {
+  const st = inputStatus();
+  if (st.drawing.level === 'bad') return { kind: 'drawing' };
+  if (S.rules.length === 0) return { kind: 'place' };
+  const bad = S.rules.find((r) => r.on && ruleProblems(r).some((p) => p.level === 'bad'));
+  return bad && placeAllPlan().ready.length === 0 ? { kind: 'rule', id: bad.id, step: ruleProblems(bad)[0].step } : { kind: 'place' };
+}
+function go(sel) {
+  if (S.dirty && !(sel.kind === 'rule' && sel.id === S.dirty)) { S.pendingNav = sel; render(); return; }
+  S.sel = sel; S.placed = null; render();
+}
+function touch(rule) { if (S.dirty !== rule.id) { S.dirty = rule.id; S.saved = structuredClone(rule); } }
+function setDemo(id) {
+  S.demo = id; S.dirty = null; S.pendingNav = null; S.placed = null;
+  S.scale = id === 'noscale' ? '' : '50';
+  S.rooms = id === 'norooms' || id === 'noscale' ? [] : ROOMS0.map((r) => ({ ...r }));
+  S.rules = id === 'norules' ? [] : EXAMPLES();
+  S.sel = firstAttention();
+  render();
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('select, input')) return;
+  const t = e.target.closest('button, rect.room, tr.click');
+  if (!t) return;
+  const d = t.dataset;
+  if (d.demo) return setDemo(d.demo);
+  if (d.act === 'pend-save' || d.act === 'pend-discard') {
+    if (d.act === 'pend-discard') { const i = S.rules.findIndex((r) => r.id === S.dirty); if (i >= 0) S.rules[i] = S.saved; }
+    const to = S.pendingNav; S.dirty = null; S.saved = null; S.pendingNav = null; S.sel = to; return render();
+  }
+  if (d.act === 'pend-stay') { S.pendingNav = null; return render(); }
+  if (d.room) { S.sample = d.room; if (S.sel.kind === 'types' && S.typesTab === 'rooms') S.typesFilter = 'all'; return render(); }
+  if (d.rule && d.step) return go({ kind: 'rule', id: d.rule, step: +d.step });
+  if (d.rule) return go({ kind: 'rule', id: d.rule, step: S.sel.kind === 'rule' && S.sel.id === d.rule ? S.sel.step : (ruleProblems(ruleOf(d.rule))[0]?.step ?? 6) });
+  if (d.step) { S.sel = { ...S.sel, step: +d.step }; return render(); }
+  if (d.go) { if (d.tab2) S.typesTab = d.tab2; return go({ kind: d.go }); }
+  if (d.tab) { S.typesTab = d.tab; return render(); }
+  if (d.filter) { S.typesFilter = d.filter; return render(); }
+  if (d.lib) { S.libSel = d.lib; return render(); }
+  if (d.chip && S.sel.kind === 'rule') { const r = ruleOf(S.sel.id); touch(r); r.types = r.types.includes(d.chip) ? r.types.filter((x) => x !== d.chip) : [...r.types, d.chip]; return render(); }
+  if (d.method && S.sel.kind === 'rule') { const r = ruleOf(S.sel.id); touch(r); r.method = d.method; return render(); }
+  if (d.layout && S.sel.kind === 'rule') { const r = ruleOf(S.sel.id); touch(r); r.layout = d.layout; return render(); }
+  switch (d.act) {
+    case 'stamp': { const r = ruleOf(S.sel.id); touch(r); r.stamp = r.stamp === null ? 2 : (r.stamp + 1) % STAMPS.length; return render(); }
+    case 'save': S.dirty = null; S.saved = null; return render();
+    case 'revert': { const i = S.rules.findIndex((r) => r.id === S.dirty); if (i >= 0) S.rules[i] = S.saved; S.dirty = null; S.saved = null; return render(); }
+    case 'detect': S.rooms = ROOMS0.map((r) => ({ ...r })); return render();
+    case 'match': return render();
+    case 'alltypes': S.showAllTypes = !S.showAllTypes; return render();
+    case 'examples': S.rules = EXAMPLES(); return render();
+    case 'new-rule': { const id = 'new' + Date.now(); S.rules.push({ id, name: 'New rule', stamp: null, types: [], method: 'fixed', fixed: '1', cap: '', offset: '0.5', layout: 'center', on: true }); S.dirty = null; S.sel = { kind: 'rule', id, step: 1 }; return render(); }
+    case 'place': S.placed = placeAllPlan().total; return render();
+    case 'place-one': S.placed = null; return render();
+    case 'undo': S.placed = null; return render();
+  }
+});
+document.addEventListener('change', (e) => {
+  const t = e.target, d = t.dataset;
+  if (d.check) { ruleOf(d.check).on = t.checked; return render(); }
+  if (d.settype) { const r = S.rooms.find((x) => x.id === d.settype); r.type = t.value || ROOMS0.find((x) => x.id === r.id).type; return render(); }
+  if (t.id === 'scale') { S.scale = t.value; return render(); }
+  if (t.id === 'h-global') { S.heights.global = num(t.value) ?? 2700; return render(); }
+  if (t.id === 'h-drawing') { S.heights.drawing = t.value; return render(); }
+  if (d.htype) { S.heights.byType[d.htype] = t.value; return render(); }
+  if (d.app) { typeOf(d.app).app = t.value; return render(); }
+  if (d.f && S.sel.kind === 'rule') { const r = ruleOf(S.sel.id); touch(r); r[d.f] = t.value; return render(); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.closest('tr.click')) e.target.closest('tr.click').click();
+});
+setDemo('ready');
+</script>
