@@ -1,8 +1,13 @@
 # One Auto-place stamps dialog — assessment and plan
 
-Status: **proposal, waiting for the user's choice of direction (2026-10-10). No code changed.** Branch `worktree-auto-place-dialog`, made from `worktree-room-placement-guide` (2119ccb). This is a UI change. The core logic (`packages/core/src/rooms/*`) stays as it is.
+Status: **layout C accepted, decisions answered (2026-10-11). Mockup v2 has the user's comments. Phase 1 is next. No code changed yet.** Branch `worktree-auto-place-dialog`, made from `worktree-room-placement-guide` (2119ccb). This is a UI change. The core logic (`packages/core/src/rooms/*`) stays as it is.
 
-Mockup of the recommended layout (C): artifact https://claude.ai/artifact/E7Zng1kM3dbN38KdLUqsyU, copy in `.claude/plans/auto-place-dialog-mockup/mockup-v1.html`.
+Mockup of the recommended layout (C): artifact https://claude.ai/artifact/E7Zng1kM3dbN38KdLUqsyU (v2), copy in `.claude/plans/auto-place-dialog-mockup/mockup-v2.html`. `mockup-v1.html` is the first proposal.
+
+User comments on v1 (2026-10-11), all in v2:
+- Room type library: area per person moves into the "Demands for rules" section, as its first group (Persons). The section shows the 10 demand boxes in groups (Lighting, Air, Heating and cooling, Sockets) and "Fill in the example values".
+- Ceiling heights: each level has its own block with a number, a title and a line below it, and an arrow line between two levels ("an empty box uses level N"). Level 1 All drawings is the top level, then 2 This drawing, 3 Room types in this drawing, 4 One room.
+- Level 3 (one height per room type, saved in the drawing) is a clear block of its own. The data model already has it (`CeilingHeightsDialog` today). Level 4 lists the rooms with an own height; a click selects the room on the plan.
 
 ## 1. Assessment of the current UI
 
@@ -81,21 +86,21 @@ The middle column is the card of the chosen item: an input editor, a guide step,
 
 **Recommendation: Layout C.** It keeps the dialog that the user likes and puts everything else into its frame. It needs no new visual language. A and B both need two layouts that the user must learn.
 
-## 3. Decisions for the user (before Phase 1)
+## 3. Decisions (answered by the user 2026-10-11)
 
-1. Global default ceiling height: edit it also in the Ceiling heights card (mockup), or only in Settings (the card shows it read-only)?
-2. Rule checkboxes (use in Place all): remember them per user, or check all rules each time the dialog opens?
-3. Unsaved rule edits when the user leaves a rule: ask inline (mockup: Save and go on / Discard / Stay), or save at once?
-4. Keep "Place only this rule" in step 6?
+1. Global default ceiling height: **only in Settings.** The Ceiling heights card shows it read-only, with "Change it in Settings › Rooms".
+2. Rule checkboxes (use in Place all): **the app remembers them** (user storage, next to the rules).
+3. Rule edits: **save at once.** No prompt when the user leaves a rule. The card shows "Saved" and one button that reverts all changes since the user opened the rule.
+4. "Place only this rule" in step 6: **keep it.**
 
 ## 4. Phases
 
 Each phase ends with `pnpm build`, `pnpm typecheck`, the ui/core tests, and a browser check through real DOM inputs on `01_arch_first_floor.pdf` at 1:50 ([[verify-ui-wiring-via-real-dom-not-scene-api]]). Rebuild the ui package before a browser check (apps/web uses `@mepapp/ui` `dist`). No `window.confirm` in the ui package. No core change unless a phase says so.
 
-1. **Guide body without its own dialog.** Split `PlacementRuleGuide.tsx` into a body (step card + side panel) and the step list. The body takes `step` / `onStepChange` from its parent and gives the step status to the parent (for the left list). Save and Revert move into a bar at the top of the card. Keep `placementRuleDraft.ts`, `RulePreviewPlan.tsx`, the worker clients and step 6 as they are. For this phase, `PlacementRulesDialog` hosts the body, so nothing changes for the user yet. Check: the guide's browser checks of Phases B–F still pass.
+1. **Guide body without its own dialog.** Split `PlacementRuleGuide.tsx` into a body (step card + side panel) and the step list. The body takes `step` / `onStepChange` from its parent and gives the step status to the parent (for the left list). The body saves each change at once (decision 3); Save goes away, and Revert (to the rule as it was when the user opened it) moves into a bar at the top of the card. Keep `placementRuleDraft.ts`, `RulePreviewPlan.tsx`, the worker clients and step 6 as they are. For this phase, `PlacementRulesDialog` hosts the body, so nothing changes for the user yet. Check: the guide's browser checks of Phases B–F still pass.
 2. **The new Auto-place frame.** New `AutoPlaceDialog.tsx`: left list (Input data placeholders, rules with checkbox and status, Place all), middle card, right `RulePreviewPlan` in floor mode. A rule item opens the guide body from Phase 1. The Place all card: one row per checked rule (rooms, stamps, state), the room rows of today's table behind a disclosure, Preview, Place N stamps, Remove auto-placed stamps. The Place all plan moves to a `PlacementPlanClient` (Web Worker), the same as the guide; today it runs on the main thread (about 1 s for 5 rules). Scope: "Rooms on this page" and "Selected rooms" only. Rule status comes from the plan rows (no stamp, no room matches, rooms without persons, too many stamps).
-3. **Input data cards.** Drawing and rooms: scale select, Calibrate… (the dialog hides until the calibration ends), Detect rooms (the existing handler), the page note. Room types: tab "Rooms on this page" (rooms without a type first, a type select per room through `scene.setRoomType`, Match rooms again) and tab "Room type library" (the form of `RoomTypesDialog` as a component, with Import and Export). Ceiling heights: the chain global → drawing → types on this page → one room; "Show all room types". The plan colors rooms by type or by height level (new `RulePreviewPlan` fill modes). Guide step 2 replaces its untyped-room list with one line and a button to the Room types card.
-4. **One menu item and clean-up.** Remove Menu › Room types…, Ceiling heights… and Placement rules…. Move + New, Duplicate, Delete (inline confirm), Import… and Export… of rules into the Rules section. Delete `PlacementRulesDialog.tsx`, and keep only the parts of `RoomTypesDialog.tsx` and `CeilingHeightsDialog.tsx` that the cards use. Change the "Menu › Room types / Ceiling heights" hints in `RoomProperties.tsx`, `SettingsDialog.tsx` and the guide. Open on the first red input item, else on Place all. The inline prompt for unsaved rule edits (decision 3).
+3. **Input data cards.** Drawing and rooms: scale select, Calibrate… (the dialog hides until the calibration ends), Detect rooms (the existing handler), the page note. Room types: tab "Rooms on this page" (rooms without a type first, a type select per room through `scene.setRoomType`, Match rooms again) and tab "Room type library" (the form of `RoomTypesDialog` as a component, with Import and Export). Ceiling heights: four level blocks (1 All drawings, read-only from Settings; 2 This drawing; 3 Room types in this drawing; 4 One room, a list of rooms with an own height); "Show all room types". The room type library form puts area per person into the "Demands for rules" section. The plan colors rooms by type or by height level (new `RulePreviewPlan` fill modes). Guide step 2 replaces its untyped-room list with one line and a button to the Room types card.
+4. **One menu item and clean-up.** Remove Menu › Room types…, Ceiling heights… and Placement rules…. Move + New, Duplicate, Delete (inline confirm), Import… and Export… of rules into the Rules section. Store the rule checkboxes (decision 2). Delete `PlacementRulesDialog.tsx`, and keep only the parts of `RoomTypesDialog.tsx` and `CeilingHeightsDialog.tsx` that the cards use. Change the "Menu › Room types / Ceiling heights" hints in `RoomProperties.tsx`, `SettingsDialog.tsx` and the guide. Open on the first red input item, else on Place all.
 5. **Text and finish.** Shorten the hint texts (STE, one sentence where possible; the long texts go into the existing InfoTips). Narrow window (1024 × 700) and dark mode. A full browser check: no drawing → open → scale → detect → type 8 rooms → rule stamp → Place all → Undo → re-run with a moved stamp.
 
 ## 5. Risks
