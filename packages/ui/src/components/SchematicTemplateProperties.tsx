@@ -30,6 +30,7 @@ import {
   type TotalsTableRow,
 } from '@mepapp/core';
 import { IconChevDown, IconChevRight } from '../icons.js';
+import { confirmDialog } from '../confirmDialog.js';
 
 export type EditTemplate = (change: (template: SchematicTemplate) => SchematicTemplate, gestureKey?: string | null) => void;
 
@@ -375,9 +376,9 @@ const SCOPE_TEXT: Record<SchematicFieldDefinition['scope'], string> = { project:
 function FieldsSection({ template, edit, endGesture }: { template: SchematicTemplate; edit: EditTemplate; endGesture: () => void }) {
   const fields = template.fields ?? [];
   const [open, setOpen] = useState<number | null>(null);
-  const remove = (field: SchematicFieldDefinition) => {
+  const remove = async (field: SchematicFieldDefinition) => {
     const uses = findFieldUses(template, field.id);
-    if (uses.length > 0 && !window.confirm(`The field "${field.label}" is read by ${uses.join(', ')}. That text goes blank if you delete the field. Delete it?`)) return;
+    if (uses.length > 0 && !(await confirmDialog(`The field "${field.label}" is read by ${uses.join(', ')}. That text goes blank if you delete the field. Delete it?`))) return;
     edit((t) => removeField(t, field.id));
     setOpen(null);
   };

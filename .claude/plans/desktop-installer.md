@@ -1,6 +1,6 @@
 # Desktop installer (Tauri) — plan
 
-Status: **planned 2026-10-08, not started.** Open decisions are in §3. Phase 0 can start before the user answers them.
+Status: **Phases 0, 1 and 2 done and merged to `master` 2026-10-09 (branch `worktree-desktop-installer-plan`). Phase 2 passed the user's Windows checks, including the confirm fix. Phase 2 step 6 ("Open with", single instance) is also merged. Phases 3-5 not started.** Open decisions are in §3.
 
 ## 1. Goal
 
@@ -45,15 +45,19 @@ The survey was read-only. Check each line number before you depend on it.
 Each decision has a recommendation. Phase 0 does not depend on any of them.
 
 - **D1 — Operating systems.** Recommendation: Windows only for the first release. macOS needs an Apple Developer account (paid, yearly) for notarization (Apple's malware check that lets the app open without a warning). Linux can come later at low cost.
-- **D2 — Where to build the Windows installer.** Recommendation: GitHub Actions on a `windows-latest` runner with `tauri-apps/tauri-action`. Alternative: cross-compile from this Linux container with `cargo-xwin`. The Tauri docs list that path, but it is less tested and it cannot sign the installer with a Windows tool. Note: the `gh` CLI here has no `workflow` scope. The user must push `.github/workflows/*` files through the GitHub web UI (see memory "Subdomain deploy").
-- **D3 — Product name and identifier.** Example: product name `MEPSketcher`, identifier `com.mepsketcher.app`. Decide before the first installer goes to anyone. A later identifier change makes Windows treat it as a different program. It also moves the app data folder and breaks the update chain.
+- **D2 — Where to build the Windows installer.** **Taken 2026-10-08 (recommendation, user said "continue with phase 1"):** GitHub Actions. Original note: recommendation GitHub Actions on a `windows-latest` runner with `tauri-apps/tauri-action`. Alternative: cross-compile from this Linux container with `cargo-xwin`. The Tauri docs list that path, but it is less tested and it cannot sign the installer with a Windows tool. Note: the `gh` CLI here has no `workflow` scope. The user must push `.github/workflows/*` files through the GitHub web UI (see memory "Subdomain deploy").
+- **D3 — Product name and identifier.** **Decided 2026-10-08:** product name `mepsketcher-desktop`, identifier `com.mepsketcher.desktop`. Original note: example product name `MEPSketcher`, identifier `com.mepsketcher.app`. Decide before the first installer goes to anyone. A later identifier change makes Windows treat it as a different program. It also moves the app data folder and breaks the update chain.
 - **D4 — Code signing.** An unsigned installer shows a Windows SmartScreen warning ("Windows protected your PC"). Options: (a) unsigned, for own testing only; (b) Azure Trusted Signing (a paid monthly Microsoft service); (c) a bought OV code-signing certificate. Recommendation: (a) now, decide (b) or (c) before a public release. Signing is a service, not a dependency, so it does not conflict with AGPLv3.
-- **D5 — File access on desktop.** Recommendation: a new `FileAccess` interface in `@mepapp/platform`, with a Tauri implementation that uses `@tauri-apps/plugin-dialog` and `@tauri-apps/plugin-fs`. This gives real file paths, "Open with" and file association support, and works on every OS. Alternative: keep the browser API and depend on WebView2. That works on Windows only, and only if Phase 1 confirms the support.
-- **D6 — Installer type.** Recommendation: NSIS (a `-setup.exe`). NSIS can install per user without admin rights. MSI is better for company-wide deployment through IT. Tauri can build both.
+- **D5 — File access on desktop.** **Decided 2026-10-09: native Tauri dialogs (option B).** The user also asked to fix the missing warning on window close. Original note: recommendation a new `FileAccess` interface in `@mepapp/platform`, with a Tauri implementation that uses `@tauri-apps/plugin-dialog` and `@tauri-apps/plugin-fs`. This gives real file paths, "Open with" and file association support, and works on every OS. Alternative: keep the browser API and depend on WebView2. That works on Windows only, and only if Phase 1 confirms the support. **Phase 1 result (2026-10-09): WebView2 supports `showOpenFilePicker`, `showSaveFilePicker` and `showDirectoryPicker`. The cost of the alternative is the browser permission prompts (first Save, folder access) with "site" wording.**
+- **D6 — Installer type.** **Taken 2026-10-08 (recommendation):** NSIS, `installMode: currentUser`. Original note: recommendation NSIS (a `-setup.exe`). NSIS can install per user without admin rights. MSI is better for company-wide deployment through IT. Tauri can build both.
 
 ## 4. Phases
 
 ### Phase 0 — Revive the scaffold (container, no decisions needed)
+
+**Done 2026-10-08.** Changes: both `before*Command`s build the workspace packages through turbo first. The Cargo package is `mepapp-desktop` (lib `mepapp_desktop_lib`), license `AGPL-3.0-only`, window 1400 x 900, maximized, minimum 900 x 600. `apps/web/src/main.tsx` skips the service worker when `__TAURI_INTERNALS__` is present. README and root `CLAUDE.md` are updated. `productName` and `identifier` are not changed (they wait for D3). The SPDX id `AGPL-3.0-only` is a guess: no file in the repo says "or later". Confirm it with the user.
+
+Verification: `pnpm exec tauri build` in `apps/desktop` passed and produced `.deb`, `.rpm` and `.AppImage`. The dev pre-build (`turbo ... --filter=@mepapp/web^... --force`) built 7/7 packages with no cache. A WebDriver run (`tauri-driver` + `webkit2gtk-driver`, both installed into this container) of the release binary under Xvfb showed: origin `tauri://localhost`, `__TAURI_INTERNALS__` present, no `showOpenFilePicker`, 0 service worker registrations. The run opened `fixtures/pdfs/arch_simple_A4.pdf` through the file input ("Loaded arch_simple_A4.pdf (842.0 x 595.0 pt)") and placed a "D2 Bath" stamp (screenshot shows it, status bar "1 selected"). Not verified: `tauri dev` (the dev window), and anything on Windows. Driver script pattern: plain `fetch` calls to `http://127.0.0.1:4444`, capability `tauri:options.application`, unhide `input[type=file]` with a script before Element Send Keys.
 
 1. Run `pnpm install` and `pnpm build` at the repo root. Then run `pnpm --filter @mepapp/desktop tauri build` in this container. Record whether the Linux build still passes.
 2. Change `beforeBuildCommand` so that it builds the workspace packages first (for example `pnpm turbo run build --filter=@mepapp/web...`). The current command builds only `apps/web` and fails on a fresh checkout with no `dist/` in the packages.
@@ -73,6 +77,29 @@ Verification: the Linux release build passes. `pnpm tauri dev` opens a window in
 
 Verification: the user's checklist result on Windows. The container cannot run the Windows installer.
 
+**Progress 2026-10-08.** Done in the container: `productName` `mepsketcher-desktop`, `identifier` `com.mepsketcher.desktop`; Cargo package `mepsketcher-desktop` (lib `mepsketcher_desktop_lib`); `bundle.license` + `bundle.licenseFile` (`../../../LICENSE`, used by the NSIS license page); `bundle.windows.nsis.installMode: currentUser`. `.github/workflows/build-desktop.yml` runs `pnpm exec tauri build --bundles nsis` on `windows-latest` and uploads the `.exe` as the artifact `mepsketcher-desktop-windows-nsis`. It uses no `tauri-action` (no release yet). Verified here: a Linux `--bundles deb` build with the new config passed (package `mepsketcher-desktop`). Not verified: the workflow itself, the NSIS build, the license page. `workflow_dispatch` shows in the Actions UI only when the file is on `master`.
+
+**First Windows run 2026-10-09:** the user committed the workflow through the web UI (`243db19`). Tag `desktop-v0.1.0-test.1` started run `37913699823`. It passed in 4 min 54 s and produced `mepsketcher-desktop_0.1.0_x64-setup.exe` (artifact `mepsketcher-desktop-windows-nsis`, 6.6 MB zip). Only warning: actions `checkout@v4`, `setup-node@v4`, `upload-artifact@v4`, `pnpm/action-setup@v4` target Node.js 20 (deprecated, forced to Node.js 24). The deploy workflow uses the same versions. Next: the user runs the checklist below.
+
+**Windows test checklist** (the user fills in the result):
+
+Result 2026-10-09 (user report: "installer works fine"). Items with no mark were not reported one by one.
+
+- [x] The installer starts. Record the SmartScreen warning text (expected, the installer is unsigned).
+- [ ] The installer shows the AGPLv3 license page and installs without an admin prompt.
+- [ ] A Start menu entry exists. The app opens maximized.
+- [x] Open a PDF (Menu > Open…). Record which dialog appears: the Windows file dialog through `showOpenFilePicker`, or the plain file input. **Result: a file browser opens.**
+- [x] Place a stamp, draw a segment, then Save. Record: does Save write back to the same file with no dialog? **Result: Save writes back to the same file. The first Save shows the same browser permission prompt as the web version.**
+- [ ] Save As writes a new file.
+- [ ] Room detection runs (it uses a Web Worker).
+- [ ] Export Excel produces a file.
+- [x] Custom stamp library: add a folder (Record: does the folder dialog appear? This needs `showDirectoryPicker`.) **Result: the folder dialog appears. Then the browser prompt asks if "the site" may view and copy files, the same as the web version.**
+- [ ] Close the app with unsaved changes. Record: does a warning appear? **Result so far: closing a PDF document inside the app warns. Closing the whole window (the X button) is not reported yet.**
+- [ ] Restart the app. Settings and the custom stamp library are still there.
+- [ ] Start the app with no network. It opens and loads a PDF.
+- [ ] The "View the source code" link opens the correct commit in a browser.
+- [ ] Uninstall through Windows Settings removes the app.
+
 ### Phase 2 — Native file access (needs D5)
 
 1. Add a `FileAccess` interface to `@mepapp/platform`. Sketch (names are not final): `openPdf()`, `save(target, bytes)`, `saveAs(suggestedName, types, bytes)`, `pickFolder()`, `listFolder(folder)`, `readFile(folder, name)`. A file target is opaque to the UI: a `FileSystemFileHandle` on web, a path on desktop.
@@ -83,6 +110,33 @@ Verification: the user's checklist result on Windows. The container cannot run t
 6. Optional in this phase: file association for `.pdf` ("Open with MEPSketcher") plus `tauri-plugin-single-instance`, so a second open goes to the running window.
 
 Verification: web build has the same behavior as before (Playwright, real DOM). Desktop build: Save writes back to the opened path with no dialog. A custom stamp folder survives an app restart.
+
+**Done 2026-10-09 (container; not yet tested on Windows).**
+
+- `@mepapp/platform/src/file-access.ts`: `FileAccess` (`openFile`, `writeFile`, `saveFileAs`, `pickFolder`, `requestFolderAccess`, `readFolder`, `capabilities.writeBack/folders`), `FileTarget` (opaque, has `name`), `LibraryFolderRef` (`{ dirHandle }` or `{ folderPath }`), `CloseGuard` (`setUnsavedChanges`). `LibrarySourceRecord` has a new optional `folderPath`; `libraryFolderOf(source)` picks the one that is set.
+- `@mepapp/platform-web`: `WebFileAccess` holds the code that was in `App.tsx` and `userStampLibrary.ts` (pickers, fallback, permission). The fallback `<input type=file>` is now made per pick instead of living in the header JSX. `WebCloseGuard` holds the `beforeunload` listener. `file-system-access.d.ts` moved here from `ui`. `scanLibraryFolder` became `scanDirectoryHandle` with its test.
+- `@mepapp/platform-tauri`: `TauriFileAccess` (`plugin-dialog` + `plugin-fs`, remembers the last folder so Save As starts next to the open PDF) and `TauriCloseGuard` (`onCloseRequested` + `ask`). npm `@tauri-apps/api ~2.11.1`, `plugin-dialog ~2.7.3`, `plugin-fs ~2.5.2`, matched to the crates' minor versions.
+- `apps/desktop/src-tauri`: crates `tauri-plugin-dialog`, `tauri-plugin-fs`, `tauri-plugin-persisted-scope` (fs registered before persisted-scope). Capabilities: `core:window:allow-destroy`, `dialog:default`, `fs:allow-read-file/write-file/read-dir/stat`. No static fs scope: only dialog-picked paths are readable, kept across restarts by persisted-scope.
+- `MepSketchApp` takes required `fileAccess` and `closeGuard` props. `apps/web/src/main.tsx` picks the Tauri pair when `__TAURI_INTERNALS__` exists (dynamic import, a separate ~20 kB chunk in the web build), else the web pair.
+- Not done: file association / single instance (step 6, optional). The library dialog text still says "browser storage" on desktop.
+
+Verification: `pnpm build`, `pnpm typecheck` (17/17), `pnpm test` (all pass: core 680, ui 100, platform 32, platform-web 21, pdf-engine-mupdf 33). Web regression (Playwright, headless Chromium, `vite preview`): open through stubbed `showOpenFilePicker`, Save writes back (2687 -> 13623 bytes), Save As, `beforeunload` on a dirty document and none on a clean one, fallback file input open + removed after the pick, fallback Save downloads. Desktop (Linux release build, `tauri-driver` + Xvfb + xdotool/python-xlib for the native GTK dialogs): Open through the native dialog, Save wrote back with no dialog (2687 -> 12362 bytes), a WM close request with unsaved changes showed "Unsaved changes" with Close/Cancel and Cancel kept the window, a close with no unsaved changes exited at once, a picked library folder loaded 3 stamps, and after an app restart Sync read the folder again ("0 added, 1 updated") with no prompt, Save As opened in the PDF's folder and wrote `copy.pdf`. Not verified: Windows. Windows installer for this commit (`31c966f`): tag `desktop-v0.1.0-test.2`, run `37919664892`, passed.
+
+**Windows test 2026-10-09:** Open/Save/Save As with no prompts, write-back, folder add + Sync after restart, warning on app close, Excel export: all OK. One failure: closing one PDF with unsaved edits (Drawings tab or header switcher) gave no warning.
+
+**Fix 2026-10-09.** Cause: `tauri-plugin-dialog` 2.7.3 injects a script that replaces `window.confirm` with an async function calling `plugin:dialog|confirm`. No capability can allow that command (`allow-confirm` is now an alias of `allow-message`), so the call fails ("not allowed by ACL"), and `!window.confirm(...)` on a Promise is always false. Every `window.confirm` in the app was affected (close PDF, remove folder, delete/hide/revert stamps, replace stamps, schematic and template deletes). Fix: new `AppDialogs { confirm(message): Promise<boolean> }` in `@mepapp/platform`; `WebAppDialogs` (window.confirm) and `TauriAppDialogs` (plugin-dialog `confirm()`, which uses the `message` command); `MepSketchApp` takes a required `dialogs` prop and hands it to `packages/ui/src/confirmDialog.ts` (`setAppDialogs`); all 12 `window.confirm` calls in `ui` now `await confirmDialog(...)`. Rule from here on: never call `window.confirm` in `ui`. `window.alert` is still replaced by the plugin, but it uses the allowed `message` command and needs no answer.
+
+Verification: build, typecheck, tests pass. Desktop (Linux, WebDriver + Xvfb): closing a dirty PDF from the Drawings tab showed `"copy.pdf" has unsaved changes. Close anyway?`; Cancel kept it, OK closed it; Remove folder showed its question and Cancel kept the folder. Web (Playwright): the same close showed the browser confirm; dismiss kept the document, accept closed it. The header switcher's close calls the same handler; not driven separately. Windows installer: tag `desktop-v0.1.0-test.3` (`d3c3628`), run `37926213643`, passed; the user confirmed both checks on Windows 2026-10-09.
+
+**Step 6 and small items, 2026-10-09 (branch `desktop-small-items`). The user confirmed them on Windows; merged to `master` 2026-10-09 together with the rename of MepApp to MEPSketcher in the browser tab title, the Welcome screen and the license line in Settings (`084218a`).**
+
+- File association: `bundle.fileAssociations` for `.pdf` (name `MEPSketcher.pdf`, role `Editor`). The installer adds MEPSketcher to "Open with" for PDF files.
+- `tauri-plugin-single-instance` (registered first, desktop targets only). `src-tauri/src/lib.rs` takes the existing `.pdf` paths from the command line (at start, and from a second start that the plugin stops), adds each to the fs scope with `allow_file` (persisted-scope keeps it, so Save writes back after a restart), queues it in `OpenRequests`, and emits `open-requests`. The command `take_open_requests` empties the queue. A second start also unminimizes and focuses the window.
+- `FileAccess.onOpenRequest?(handler)` (optional; only `TauriFileAccess` has it). `MepSketchApp` subscribes when the scene is ready and opens the files one at a time through `openPdfFile`.
+- Window title `MEPSketcher` (was `MepApp`).
+- Library dialogs: "copies the files into its own storage" instead of "browser storage", and "MEPSketcher" instead of "MepApp" in the two library dialogs and the remove-folder question.
+
+Verification: build, typecheck (17/17), tests pass (core 680, ui 100, platform 32, platform-web 21, pdf-engine-mupdf 33); `cargo check --release` with no warnings. Desktop (Linux release build, WebDriver + Xvfb + a DBus session bus, which the plugin needs on Linux): a start with `open-a.pdf` as argument loaded it; a second start with the relative path `"open b.pdf"` plus `notes.txt` opened `open b.pdf` in the first window and ignored the `.txt`; a third start with `copy.pdf` exited with code 0 after 9 s and the first window had 3 documents; Save on `copy.pdf` wrote back with no dialog (21294 -> 63293 bytes); the visible X window title was `MEPSketcher`. Not verified: Windows (the registry entries and the Explorer double-click). Windows installer: tag `desktop-v0.1.0-test.4` (`2c06722`), run `37985711559`, passed.
 
 ### Phase 3 — Desktop storage (optional, after Phase 2)
 

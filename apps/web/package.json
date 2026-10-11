@@ -13,6 +13,8 @@
     "@mepapp/ui": "workspace:*",
     "@mepapp/pdf-engine": "workspace:*",
     "@mepapp/pdf-engine-mupdf": "workspace:*",
+    "@mepapp/platform": "workspace:*",
+    "@mepapp/platform-tauri": "workspace:*",
     "@mepapp/platform-web": "workspace:*",
     "react": "latest",
     "react-dom": "latest"

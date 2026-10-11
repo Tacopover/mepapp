@@ -2,7 +2,13 @@
 
 A real Tauri 2 project, wrapping the same React app `apps/web` builds —
 `src-tauri/tauri.conf.json` points `frontendDist` at `../web/dist` and
-`devUrl` at the web app's dev server.
+`devUrl` at the web app's dev server. `beforeBuildCommand` and
+`beforeDevCommand` build the workspace packages first (via turbo), so both
+work on a fresh checkout after `pnpm install`.
+
+The desktop build skips the web app's service worker (`apps/web/src/main.tsx`
+checks for `window.__TAURI_INTERNALS__`). Plan for the installer work:
+`.claude/plans/desktop-installer.md`.
 
 ## Prerequisites
 

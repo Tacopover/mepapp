@@ -1,5 +1,5 @@
 import { SAVED_STAMPS_SOURCE_ID } from '@mepapp/core';
-import type { LibrarySourceRecord, LibraryStampRecord } from '@mepapp/platform';
+import { libraryFolderOf, type LibrarySourceRecord, type LibraryStampRecord } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
 
@@ -29,12 +29,12 @@ export function LibraryFoldersDialog({ available, sources, records, busySourceId
     <Dialog title="User library" className="mep-modal--library" onClose={onClose} actions={<button onClick={onClose}>Close</button>}>
       {available && (
         <p className="mep-hint">
-          MepApp copies the files from your folders into browser storage. Press Sync to pick up changes in a folder. A renamed file becomes a new stamp. A JPEG file
-          has no transparency. Port edits are kept only in this browser.
+          MEPSketcher copies the files from your folders into its own storage. Press Sync to pick up changes in a folder. A renamed file becomes a new stamp. A JPEG file
+          has no transparency. Port edits are kept only in that storage, not in the folder.
         </p>
       )}
       <label className="mep-checkbox-row mep-library-check">
-        <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MepApp stamps
+        <input type="checkbox" checked={showBuiltIn} onChange={(e) => onChangeShowBuiltIn(e.target.checked)} /> Show the built-in MEPSketcher stamps
       </label>
       {!available ? (
         <p className="mep-hint">Custom stamp folders need Chrome or Edge. They are not available in this browser.</p>
@@ -65,8 +65,8 @@ export function LibraryFoldersDialog({ available, sources, records, busySourceId
                     {!saved && (
                       <button
                         type="button"
-                        disabled={!source.dirHandle || busy}
-                        title={source.dirHandle ? 'Read the folder again' : 'This folder has no saved handle'}
+                        disabled={!libraryFolderOf(source) || busy}
+                        title={libraryFolderOf(source) ? 'Read the folder again' : 'This folder has no saved handle'}
                         onClick={() => onSync(source)}
                       >
                         {busy ? 'Syncing…' : 'Sync'}
