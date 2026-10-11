@@ -88,6 +88,8 @@ export interface PlacementRuleGuideBodyProps {
   onStepChange: (step: number) => void;
   /** Gets the state and the short text of each step when they change, for the step list of the parent. */
   onStepStates: (states: StepStatus[]) => void;
+  /** Opens the Room types card of the parent: step 2 then shows one line for the rooms without a type, not a list. */
+  onOpenRoomTypes?: () => void;
 }
 
 export interface PlacementRuleGuideHandle {
@@ -336,6 +338,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
     step,
     onStepChange,
     onStepStates,
+    onOpenRoomTypes,
   },
   ref,
 ) {
@@ -711,7 +714,17 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       <>
         <h2>Which rooms get this stamp?</h2>
         <p className="mep-guide-lead">Click the room types. The plan shows the rooms that match in blue. MepApp finds the room type from the room name in the drawing.</p>
-        {untyped.length > 0 && (
+        {untyped.length > 0 && onOpenRoomTypes && (
+          <div className="mep-guide-callout" data-testid="pg-untyped">
+            <span>
+              <b>{plural(untyped.length, 'room')}</b> on this page {untyped.length === 1 ? 'has' : 'have'} no room type. A rule with room types does not find {untyped.length === 1 ? 'it' : 'them'}.
+            </span>
+            <button type="button" onClick={onOpenRoomTypes}>
+              Open Room types
+            </button>
+          </div>
+        )}
+        {untyped.length > 0 && !onOpenRoomTypes && (
           <div className="mep-guide-callout" data-testid="pg-untyped">
             <span>
               <b>{plural(untyped.length, 'room')}</b> on this page {untyped.length === 1 ? 'has' : 'have'} no room type. A rule with room types does not find {untyped.length === 1 ? 'it' : 'them'}. Each change is one undo step.

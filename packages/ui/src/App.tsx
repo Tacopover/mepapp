@@ -1695,6 +1695,9 @@ export function MepSketchApp({
             setRoomTypes(next);
           }}
           onChangeRules={setPlacementRules}
+          onExportRoomTypes={handleExportRoomTypes}
+          onDetectRooms={() => void handleDetectRooms()}
+          roomsDetecting={roomsDetecting}
           onOpenRules={() => {
             setAutoPlaceOpen(false);
             setPlacementRulesOpen(true);

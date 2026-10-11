@@ -28,6 +28,8 @@ export interface RulePreviewPlanProps {
   ceilingGridMm?: number | null;
   /** The stamps of more than one rule, each with its own size and thumbnail: the plan draws these in place of `stamps`. */
   stampLayers?: readonly PreviewStampLayer[];
+  /** The fill of a room in place of the fill of its state, for example by room type; null keeps the state fill. A room without a type stays hatched. */
+  roomFill?: (room: Room) => string | null;
   onPickRoom: (roomId: string) => void;
 }
 
@@ -80,7 +82,7 @@ function ceilingGridPath(room: Room, sizePt: number): string | null {
  * sample room with its wall offset band, the dimensions of its bounding rectangle and the planned
  * stamps, or the whole floor coloured by how the rule sees each room. A click on a room picks it.
  */
-export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, ceilingGridMm = null, stampLayers, onPickRoom }: RulePreviewPlanProps) {
+export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, ceilingGridMm = null, stampLayers, roomFill, onPickRoom }: RulePreviewPlanProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const focus = mode === 'room' && sample ? [sample] : rooms;
   if (focus.length === 0) return <p className="mep-settings-hint">This page has no rooms. Detect the rooms first.</p>;
@@ -120,12 +122,13 @@ export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration
         const state = roomState(room);
         const isSample = room.id === sample?.id;
         const dim = mode === 'room' && !isSample;
+        const ownFill = roomFill?.(room) ?? null;
         return (
           <path
             key={room.id}
             d={roomPath(room)}
             fillRule="evenodd"
-            fill={state === 'noType' ? `url(#hatch${uid})` : dim && (state === 'match' || state === 'problem') ? 'var(--surface-2)' : STATE_FILL[mode === 'room' && state === 'problem' ? 'match' : state]}
+            fill={state === 'noType' ? `url(#hatch${uid})` : ownFill !== null ? ownFill : dim && (state === 'match' || state === 'problem') ? 'var(--surface-2)' : STATE_FILL[mode === 'room' && state === 'problem' ? 'match' : state]}
             opacity={dim ? 0.55 : 1}
             stroke="var(--ink)"
             strokeWidth={isSample && mode === 'floor' ? 2.5 : 1}

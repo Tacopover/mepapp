@@ -25,8 +25,30 @@ export interface RoomTypesDialogProps {
   onClose: () => void;
 }
 
+export interface RoomTypeLibraryProps {
+  /** The user library. */
+  types: RoomType[];
+  /** Types in the active drawing's file that the library lacks. */
+  fileOnlyTypes: RoomType[];
+  onChange: (types: RoomType[]) => void;
+  /** Saves the list as a JSON file. */
+  onExport: (types: RoomType[]) => void;
+  /** Called when the form gets or loses changes that are not saved. */
+  onDirtyChange?: (dirty: boolean) => void;
+  /** The number of rooms of the shown page with a type; shown next to each type. */
+  roomCountOf?: (typeId: string) => number;
+}
+
 /** The draft key of a demand box. */
 const demandField = (key: RoomDemandKey) => `demand.${key}`;
+
+/** The demand boxes in groups, in the order of ROOM_DEMAND_FIELDS. */
+const DEMAND_GROUPS: readonly [string, readonly RoomDemandKey[]][] = [
+  ['Lighting', ['illuminanceLx', 'workingPlaneHeightM']],
+  ['Air', ['supplyPerPersonDm3s', 'supplyPerM2Dm3s', 'exhaustFixedDm3s', 'airChangesPerH']],
+  ['Heating and cooling', ['heatingLoadWm2', 'coolingLoadWm2']],
+  ['Sockets', ['socketsPerPerson', 'socketsFixed']],
+];
 
 const newTypeId = () => `room-type-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -37,12 +59,53 @@ const newTypeId = () => `room-type-${Date.now().toString(36)}${Math.random().toS
  * drawing. A type that only the drawing's file holds can be added to the library.
  */
 export function RoomTypesDialog({ types, fileOnlyTypes, onChange, onMatchAgain, onExport, onClose }: RoomTypesDialogProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(types[0]?.id ?? null);
   const [dirty, setDirty] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const matchAgain = () => {
+    const changed = onMatchAgain();
+    setMessage(changed === 0 ? 'No room changed.' : `${changed} room${changed === 1 ? '' : 's'} changed.`);
+  };
+
+  return (
+    <Dialog
+      title="Room types"
+      className="mep-modal--room-types"
+      onClose={onClose}
+      actions={
+        <>
+          <button type="button" disabled={dirty} title={dirty ? 'Save or revert your changes first' : 'Match the rooms of this drawing by name again. Rooms with a type you chose keep it.'} onClick={matchAgain}>
+            Match rooms again
+          </button>
+          <button type="button" onClick={onClose}>
+            Close
+          </button>
+        </>
+      }
+    >
+      <RoomTypeLibrary types={types} fileOnlyTypes={fileOnlyTypes} onChange={onChange} onExport={onExport} onDirtyChange={setDirty} />
+      {message && (
+        <p className="mep-settings-hint" role="status">
+          {message}
+        </p>
+      )}
+    </Dialog>
+  );
+}
+
+/** The list of the room-type library with the form of the selected type, Import and Export. */
+export function RoomTypeLibrary({ types, fileOnlyTypes, onChange, onExport, onDirtyChange, roomCountOf }: RoomTypeLibraryProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(types[0]?.id ?? null);
+  const [dirty, setDirtyState] = useState(false);
+  const [demandsOpen, setDemandsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const selected = types.find((t) => t.id === selectedId) ?? null;
   const busy = dirty ? 'Save or revert your changes first' : undefined;
+  const setDirty = (next: boolean) => {
+    setDirtyState(next);
+    onDirtyChange?.(next);
+  };
 
   const addType = () => {
     const created: RoomType = { id: newTypeId(), name: uniqueName('New room type', types), keywords: [] };
@@ -70,33 +133,8 @@ export function RoomTypesDialog({ types, fileOnlyTypes, onChange, onMatchAgain, 
     }
   };
 
-  const matchAgain = () => {
-    const changed = onMatchAgain();
-    setMessage(changed === 0 ? 'No room changed.' : `${changed} room${changed === 1 ? '' : 's'} changed.`);
-  };
-
   return (
-    <Dialog
-      title="Room types"
-      className="mep-modal--room-types"
-      onClose={onClose}
-      actions={
-        <>
-          <button type="button" disabled={dirty} title={busy ?? 'Match the rooms of this drawing by name again. Rooms with a type you chose keep it.'} onClick={matchAgain}>
-            Match rooms again
-          </button>
-          <button type="button" disabled={dirty} title={busy} onClick={() => fileInput.current?.click()}>
-            Import…
-          </button>
-          <button type="button" disabled={dirty} title={busy} onClick={() => onExport(types)}>
-            Export…
-          </button>
-          <button type="button" onClick={onClose}>
-            Close
-          </button>
-        </>
-      }
-    >
+    <>
       <input
         ref={fileInput}
         type="file"
@@ -118,11 +156,11 @@ export function RoomTypesDialog({ types, fileOnlyTypes, onChange, onMatchAgain, 
               aria-selected={type.id === selected?.id}
               className={`mep-circuit-types-item${type.id === selected?.id ? ' on' : ''}`}
               disabled={dirty && type.id !== selected?.id}
-              title={dirty && type.id !== selected?.id ? busy : undefined}
+              title={dirty && type.id !== selected?.id ? busy : roomCountOf ? 'Rooms of this type on this page' : 'Keywords'}
               onClick={() => setSelectedId(type.id)}
             >
               <span>{type.name}</span>
-              <span className="mep-circuit-types-abbr">{type.keywords.length}</span>
+              <span className="mep-circuit-types-abbr">{roomCountOf ? roomCountOf(type.id) : type.keywords.length}</span>
             </button>
           ))}
           <button type="button" className="mep-circuit-types-new" disabled={dirty} title={busy} onClick={addType}>
@@ -145,6 +183,8 @@ export function RoomTypesDialog({ types, fileOnlyTypes, onChange, onMatchAgain, 
             key={JSON.stringify(selected)}
             type={selected}
             others={types.filter((t) => t.id !== selected.id)}
+            demandsOpen={demandsOpen}
+            onDemandsOpenChange={setDemandsOpen}
             onDirtyChange={setDirty}
             onSave={(next) => onChange(types.map((t) => (t.id === next.id ? next : t)))}
             onDelete={() => {
@@ -158,12 +198,20 @@ export function RoomTypesDialog({ types, fileOnlyTypes, onChange, onMatchAgain, 
           </div>
         )}
       </div>
+      <div className="mep-circuit-types-actions">
+        <button type="button" disabled={dirty} title={busy} onClick={() => fileInput.current?.click()}>
+          Import…
+        </button>
+        <button type="button" disabled={dirty} title={busy} onClick={() => onExport(types)}>
+          Export…
+        </button>
+      </div>
       {message && (
         <p className="mep-settings-hint" role="status">
           {message}
         </p>
       )}
-    </Dialog>
+    </>
   );
 }
 
@@ -176,13 +224,16 @@ function uniqueName(base: string, types: readonly RoomType[]): string {
 interface RoomTypeFormProps {
   type: RoomType;
   others: RoomType[];
+  /** The demands section is open; the parent keeps it, because a save mounts the form again. */
+  demandsOpen: boolean;
+  onDemandsOpenChange: (open: boolean) => void;
   onDirtyChange: (dirty: boolean) => void;
   onSave: (type: RoomType) => void;
   onDelete: () => void;
 }
 
 /** The fields of one room type. Local draft with explicit Save and Revert. Its parent gives it a `key` built from the saved values, so it re-seeds after a save. */
-function RoomTypeForm({ type, others, onDirtyChange, onSave, onDelete }: RoomTypeFormProps) {
+function RoomTypeForm({ type, others, demandsOpen, onDemandsOpenChange, onDirtyChange, onSave, onDelete }: RoomTypeFormProps) {
   const initial = {
     name: type.name,
     nameNl: type.nameNl ?? '',
@@ -259,28 +310,39 @@ function RoomTypeForm({ type, others, onDirtyChange, onSave, onDelete }: RoomTyp
         <textarea id="rt-keywords" className="mep-room-types-keywords" rows={4} value={draft.keywords} onChange={(e) => set('keywords')(e.target.value)} />
       </div>
       <p className="mep-settings-hint">Separate keywords with commas. A keyword matches a word of the room name that starts or ends with it (“toilet” matches “toiletruimte”). A keyword of 3 letters or less must be the whole word.</p>
-      <div className="mep-field-row">
-        <label htmlFor="rt-area">Area per person (m²)</label>
-        <input id="rt-area" type="text" inputMode="decimal" placeholder="none" value={draft.areaPerPerson} onChange={(e) => set('areaPerPerson')(e.target.value)} />
-      </div>
-      <h5 className="mep-room-types-group">Demands</h5>
-      <p className="mep-settings-hint">Placement rules can use these numbers, so one rule serves all room types. An empty box means: not known.</p>
-      {ROOM_DEMAND_FIELDS.map((f) => (
-        <div className="mep-field-row" key={f.key}>
-          <label htmlFor={`rt-${f.key}`}>
-            {f.label} ({f.unit})
-          </label>
-          <input id={`rt-${f.key}`} type="text" inputMode="decimal" placeholder="none" value={(draft as Record<string, string>)[demandField(f.key)]} onChange={(e) => set(demandField(f.key))(e.target.value)} />
+      <details className="mep-room-types-demands" open={demandsOpen} onToggle={(e) => onDemandsOpenChange(e.currentTarget.open)} data-testid="rt-demands">
+        <summary>Demands for rules (area per person, illuminance, airflow, …)</summary>
+        <p className="mep-settings-hint">Placement rules can use these numbers, so one rule serves all room types. An empty box means: not known.</p>
+        <h5 className="mep-room-types-group">Persons</h5>
+        <div className="mep-field-row">
+          <label htmlFor="rt-area">Area per person (m²)</label>
+          <input id="rt-area" type="text" inputMode="decimal" placeholder="none" value={draft.areaPerPerson} onChange={(e) => set('areaPerPerson')(e.target.value)} />
         </div>
-      ))}
-      {example && (
-        <p className="mep-settings-hint">
-          <button type="button" onClick={fillExample} data-testid="rt-fill-example">
-            Fill in the example values
-          </button>{' '}
-          Dutch new build (Bbl, NEN-EN 12464-1, practice). These are examples: check them against the rules of your project. The button fills only the empty boxes.
-        </p>
-      )}
+        {DEMAND_GROUPS.map(([group, keys]) => (
+          <div key={group}>
+            <h5 className="mep-room-types-group">{group}</h5>
+            {keys.map((key) => {
+              const f = ROOM_DEMAND_FIELDS.find((x) => x.key === key)!;
+              return (
+                <div className="mep-field-row" key={f.key}>
+                  <label htmlFor={`rt-${f.key}`}>
+                    {f.label} ({f.unit})
+                  </label>
+                  <input id={`rt-${f.key}`} type="text" inputMode="decimal" placeholder="none" value={(draft as Record<string, string>)[demandField(f.key)]} onChange={(e) => set(demandField(f.key))(e.target.value)} />
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        {example && (
+          <p className="mep-settings-hint">
+            <button type="button" onClick={fillExample} data-testid="rt-fill-example">
+              Fill in the example values
+            </button>{' '}
+            Only the empty boxes. Dutch new build (Bbl, NEN-EN 12464-1, practice): check the values against the rules of your project.
+          </p>
+        )}
+      </details>
       {error && (
         <div className="mep-circuit-types-error" role="alert">
           {error}

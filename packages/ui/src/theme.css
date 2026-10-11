@@ -3692,22 +3692,83 @@
 .mep-autoplace-placeall {
   margin-top: 8px;
 }
+.mep-autoplace-check-actions {
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
 .mep-autoplace-levels {
-  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
-.mep-autoplace-levels div {
-  border-bottom: 1.5px solid var(--line);
-  padding-bottom: 6px;
+.mep-autoplace-level {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.mep-autoplace-levels dt {
-  font-weight: 600;
+.mep-autoplace-level-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 4px;
 }
-.mep-autoplace-levels dd {
-  margin: 2px 0 0;
+.mep-autoplace-level-head .ln {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+}
+.mep-autoplace-level-head .lt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.mep-autoplace-level-head .le {
+  margin-left: auto;
+  font-size: 12px;
   color: var(--muted);
+}
+.mep-autoplace-level-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 2px 0;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+.mep-autoplace-level-row input,
+.mep-modal--auto-place .mep-guide-table select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 3px 6px;
+}
+.mep-autoplace-level-row.pick {
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.mep-autoplace-level-row.pick.sel {
+  border-color: var(--ink);
+}
+.mep-autoplace-level-step {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 0 4px 14px;
+}
+.mep-room-types-demands {
+  margin-top: 10px;
+}
+.mep-room-types-demands summary {
+  cursor: pointer;
+  font-weight: 600;
 }
 @media (max-width: 1100px) {
   .mep-modal--auto-place .mep-guide {

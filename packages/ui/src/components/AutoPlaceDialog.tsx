@@ -3,7 +3,9 @@ import type { SketchScene } from '@mepapp/render';
 import {
   autoPlacedStampIds,
   calculateRooms,
+  calibrationFromScale,
   MAX_ROOM_STAMPS,
+  resolveCeilingHeight,
   roomTypeLabel,
   type PlacementPlanInput,
   type PlacementRow,
@@ -14,6 +16,7 @@ import {
   type StampDefinition,
 } from '@mepapp/core';
 import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, type AutoPlaceArt } from './autoPlacePlan.js';
+import { CeilingHeightsCard, DrawingCard, LEVEL_FILLS, LEVEL_NAMES, RoomTypesCard, TYPE_FILLS, typeFillOf } from './AutoPlaceInputCards.js';
 import { Dialog } from './Dialog.js';
 import { PlacementGuideSteps, PlacementRuleGuideBody, type PlacementRuleGuideHandle, type StepState, type StepStatus } from './PlacementRuleGuide.js';
 import { RulePreviewPlan, type PreviewRoomState, type PreviewStampLayer } from './RulePreviewPlan.js';
@@ -45,6 +48,12 @@ export interface AutoPlaceDialogProps {
   /** Saves the rule list: the guide saves each valid change of a rule at once. */
   onChangeRules: (rules: PlacementRule[]) => void;
   onOpenRules: () => void;
+  /** Saves the room-type library as a JSON file. */
+  onExportRoomTypes: (types: RoomType[]) => void;
+  /** Detects the rooms of the shown page (the handler of Menu › Detect rooms). */
+  onDetectRooms: () => void;
+  /** True while the room detection runs. */
+  roomsDetecting: boolean;
   /** Called after Place with the number of placed stamps and of replaced stamps. */
   onPlaced: (count: number, replaced: number) => void;
   /** Called after Remove auto-placed stamps with the number of removed stamps. */
@@ -101,22 +110,10 @@ const pickKeys = (onPick: () => void) => (e: KeyboardEvent) => {
   onPick();
 };
 
-function Check({ state, title, sub }: { state: StepState; title: string; sub: string }) {
-  return (
-    <div className={`mep-guide-check ${state || 'off'}`}>
-      <span className="ic">{state === 'ok' ? '✓' : state === '' ? '–' : '!'}</span>
-      <div>
-        <b>{title}</b>
-        <div className="sub">{sub}</div>
-      </div>
-    </div>
-  );
-}
-
 /**
- * Auto-place stamps (auto-place-dialog.md Phase 2): one dialog in the frame of the placement rule
- * guide. The left list has the input data, the rules (a rule opens into the six guide steps) and
- * Place all. Place all plans the checked rules in a Web Worker, shows the stamps on the floor plan,
+ * Auto-place stamps (auto-place-dialog.md Phases 2 and 3): one dialog in the frame of the placement rule
+ * guide. The left list has the input data (each with its editor), the rules (a rule opens into the
+ * six guide steps) and Place all. Place all plans the checked rules in a Web Worker, shows the stamps on the floor plan,
  * and places them as one undo step. Only rooms on the shown page get stamps. A re-run replaces the
  * unmoved auto-placed stamps of the same rule and room, and keeps the moved ones.
  */
@@ -136,6 +133,9 @@ export function AutoPlaceDialog({
   onChangeRoomTypes,
   onChangeRules,
   onOpenRules,
+  onExportRoomTypes,
+  onDetectRooms,
+  roomsDetecting,
   onPlaced,
   onRemoved,
   onClose,
@@ -149,10 +149,12 @@ export function AutoPlaceDialog({
     scene.on('roomsChanged', bump);
     scene.on('pageChanged', bump);
     scene.on('drawingChanged', bump);
+    scene.on('calibrationSet', bump);
     return () => {
       scene.off('roomsChanged', bump);
       scene.off('pageChanged', bump);
       scene.off('drawingChanged', bump);
+      scene.off('calibrationSet', bump);
     };
   }, [scene]);
 
@@ -188,10 +190,23 @@ export function AutoPlaceDialog({
   const [previewing, setPreviewing] = useState(false);
   const [placed, setPlaced] = useState<{ count: number; replaced: number } | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const [calibrating, setCalibrating] = useState(false);
+  // The room type form has changes that are not saved: the dialog stays on the card.
+  const libraryDirty = useRef(false);
+  const [blockMessage, setBlockMessage] = useState<string | null>(null);
+  /** False, with a message on the card, while a rule or a room type cannot be left. */
+  const canLeave = () => {
+    if (openRule && body.current && !body.current.flush()) return false;
+    if (libraryDirty.current) {
+      setBlockMessage('Save or revert the room type first.');
+      return false;
+    }
+    return true;
+  };
 
   /** Opens an item of the left list. A rule with a box that is not valid stays open (the guide says why). */
   const go = (next: Item, step = 1) => {
-    if (openRule && body.current && !body.current.flush()) return;
+    if (!canLeave()) return;
     if (next.kind === 'rule' && item.kind === 'rule' && next.id === item.id) {
       setRuleStep(step);
       return;
@@ -200,10 +215,11 @@ export function AutoPlaceDialog({
     setRuleStep(step);
     setStepStates([]);
     setPlaced(null);
+    setBlockMessage(null);
   };
   const requestClose = () => {
     if (stampPickerOpen) return;
-    if (openRule && body.current && !body.current.flush()) return;
+    if (!canLeave()) return;
     onClose();
   };
   const rulesRef = useRef(rules);
@@ -318,7 +334,32 @@ export function AutoPlaceDialog({
     [rowsByRule, realSizeOf, stampIconUrl],
   );
 
+  useEffect(() => {
+    if (!scene || !calibrating) return;
+    const done = () => setCalibrating(false);
+    const onTool = (tool: string) => {
+      if (tool !== 'calibrate') setCalibrating(false);
+    };
+    scene.on('calibrationSet', done);
+    scene.on('toolChanged', onTool);
+    return () => {
+      scene.off('calibrationSet', done);
+      scene.off('toolChanged', onTool);
+    };
+  }, [scene, calibrating]);
+
   if (!scene) return null;
+
+  if (calibrating) {
+    return (
+      <div className="mep-autoplace-bar" role="toolbar" aria-label="Calibrate">
+        <span>Calibrate: click two points on the drawing with a known distance between them.</span>
+        <button type="button" onClick={() => scene.setTool('select')}>
+          Back to the dialog
+        </button>
+      </div>
+    );
+  }
 
   const canPlace = !!plan && artReady && (total > 0 || replaceIds.length > 0);
   const place = () => {
@@ -368,7 +409,7 @@ export function AutoPlaceDialog({
   const inputStatus: Record<InputKind, StepStatus> = {
     drawing: !calibration ? ['bad', 'This page has no scale'] : pageRooms.length === 0 ? ['bad', 'No rooms on this page'] : ['ok', `${plural(pageRooms.length, 'room')} on page ${pageIndex + 1}`],
     types: pageRooms.length === 0 ? ['', 'No rooms yet'] : untyped.length > 0 ? ['warn', `${plural(untyped.length, 'room')} without a type`] : ['ok', 'Each room has a type'],
-    heights: ['ok', `${drawingMm ?? '–'} mm${heights?.pdfMm === undefined ? ' (default)' : ''}${typeHeights > 0 ? ` · ${plural(typeHeights, 'type')} own height` : ''}`],
+    heights: ['ok', `${drawingMm ?? '–'} mm${heights?.pdfMm === undefined ? ' (default)' : ''}${typeHeights > 0 ? ` · ${plural(typeHeights, 'type')} with an own height` : ''}`],
   };
   const blocked: { text: string; short: string; fix: InputKind | null } | null = !calibration
     ? { text: 'Set the scale of this page first.', short: 'Set the scale first', fix: 'drawing' }
@@ -452,71 +493,57 @@ export function AutoPlaceDialog({
     </div>
   );
 
-  function drawingCard() {
+  const fileOnlyTypes = types.filter((t) => !t.inLibrary).map(({ inLibrary: _inLibrary, ...type }) => type);
+  const volumeRules = checkedRules.filter((r) => r.amount.perM3 !== undefined || r.amount.from?.perM3 !== undefined).length;
+  function inputCard(kind: InputKind) {
+    if (kind === 'drawing')
+      return (
+        <DrawingCard
+          pageIndex={pageIndex}
+          calibration={calibration}
+          roomCount={pageRooms.length}
+          detecting={roomsDetecting}
+          onSetScale={(denominator) => scene!.setCalibration(calibrationFromScale(denominator))}
+          onCalibrate={() => {
+            setCalibrating(true);
+            scene!.setTool('calibrate');
+          }}
+          onDetectRooms={onDetectRooms}
+          footer={cardNav(null, { kind: 'types' }, 'Room types')}
+        />
+      );
+    if (kind === 'types')
+      return (
+        <RoomTypesCard
+          sceneRef={sceneRef}
+          pageRooms={pageRooms}
+          types={types}
+          language={language}
+          library={roomTypes}
+          fileOnlyTypes={fileOnlyTypes}
+          onChangeLibrary={onChangeRoomTypes}
+          onExportLibrary={onExportRoomTypes}
+          onLibraryDirtyChange={(dirty) => {
+            libraryDirty.current = dirty;
+            if (!dirty) setBlockMessage(null);
+          }}
+          pickedId={pickedId}
+          onPick={setPickedId}
+          footer={cardNav({ kind: 'drawing' }, { kind: 'heights' }, 'Ceiling heights')}
+        />
+      );
     return (
-      <>
-        <h2>Drawing and rooms</h2>
-        <p className="mep-guide-lead">MepApp needs the scale of the page and the rooms on it. The scale gives the floor area. The rooms come from the room names in the drawing.</p>
-        <div className="mep-guide-checks">
-          <Check state={calibration ? 'ok' : 'bad'} title={calibration ? `Page ${pageIndex + 1} has a scale` : `Page ${pageIndex + 1} has no scale`} sub="Set the scale with the scale box in the header, or calibrate the drawing." />
-          <Check state={pageRooms.length > 0 ? 'ok' : 'bad'} title={pageRooms.length > 0 ? `${plural(pageRooms.length, 'room')} on page ${pageIndex + 1}` : `No rooms on page ${pageIndex + 1}`} sub="Menu › Detect rooms finds the rooms. It needs the scale." />
-        </div>
-        <p className="mep-guide-note">MepApp places stamps only on the page that the drawing shows now. Go to another page to place stamps there.</p>
-        {cardNav(null, { kind: 'types' }, 'Room types')}
-      </>
-    );
-  }
-
-  function typesCard() {
-    return (
-      <>
-        <h2>Room types</h2>
-        <p className="mep-guide-lead">A rule finds its rooms by the room type. MepApp finds the type from the room name in the drawing.</p>
-        <div className="mep-guide-checks">
-          <Check state={inputStatus.types[0]} title={inputStatus.types[1]} sub="Change the room types in Menu › Room types…, or the type of one room in Room Properties." />
-        </div>
-        {untyped.length > 0 && (
-          <div className="mep-guide-chips" data-testid="ap-untyped">
-            {untyped.map((room) => (
-              <button key={room.id} type="button" className={`mep-guide-chip plain${pickedId === room.id ? ' sel' : ''}`} onClick={() => setPickedId(room.id)}>
-                {roomLabel(room)}
-              </button>
-            ))}
-          </div>
-        )}
-        {cardNav({ kind: 'drawing' }, { kind: 'heights' }, 'Ceiling heights')}
-      </>
-    );
-  }
-
-  function heightsCard() {
-    const own = pageRooms.filter((r) => r.ceilingHeightMm !== undefined);
-    const typeRows = Object.entries(heights?.roomTypeMm ?? {});
-    return (
-      <>
-        <h2>Ceiling heights</h2>
-        <p className="mep-guide-lead">The ceiling height gives the volume of a room. An empty value uses the level above it.</p>
-        <dl className="mep-autoplace-levels" data-testid="ap-heights">
-          <div>
-            <dt>1 All drawings (Settings)</dt>
-            <dd>{heights ? `${heights.globalMm} mm` : '–'}</dd>
-          </div>
-          <div>
-            <dt>2 This drawing</dt>
-            <dd>{heights?.pdfMm !== undefined ? `${heights.pdfMm} mm` : 'uses level 1'}</dd>
-          </div>
-          <div>
-            <dt>3 Room types in this drawing</dt>
-            <dd>{typeRows.length === 0 ? 'uses level 2' : typeRows.map(([id, mm]) => `${typeName(id)} ${mm} mm`).join(', ')}</dd>
-          </div>
-          <div>
-            <dt>4 One room</dt>
-            <dd>{own.length === 0 ? 'no room with an own height' : own.map((r) => `${roomLabel(r)} ${r.ceilingHeightMm} mm`).join(', ')}</dd>
-          </div>
-        </dl>
-        <p className="mep-guide-note">Change levels 2 and 3 in Menu › Ceiling heights…, and level 4 in Room Properties.</p>
-        {cardNav({ kind: 'types' }, { kind: 'place' }, 'Place all')}
-      </>
+      <CeilingHeightsCard
+        sceneRef={sceneRef}
+        heights={heights}
+        pageRooms={pageRooms}
+        types={types}
+        language={language}
+        volumeRules={volumeRules}
+        pickedId={pickedId}
+        onPick={setPickedId}
+        footer={cardNav({ kind: 'types' }, { kind: 'place' }, 'Place all')}
+      />
     );
   }
 
@@ -690,6 +717,11 @@ export function AutoPlaceDialog({
   const inputRoomState = (room: Room): PreviewRoomState => (room.roomTypeId === undefined ? 'noType' : 'noMatch');
   const placeShown = item.kind === 'place';
   const picked = pageRooms.find((r) => r.id === pickedId) ?? null;
+  const pickedValues = picked ? scene.getRoomValues(picked) : null;
+  const typeFill = typeFillOf(types);
+  const roomFill = item.kind === 'types' ? typeFill : item.kind === 'heights' && heights ? (room: Room) => LEVEL_FILLS[resolveCeilingHeight(room, heights).level] : undefined;
+  const pageTypes = types.filter((t) => pageRooms.some((r) => r.roomTypeId === t.id));
+  const planTitle = item.kind === 'types' ? 'Room types' : item.kind === 'heights' ? 'Ceiling heights' : 'Whole floor';
 
   return (
     <Dialog
@@ -740,35 +772,53 @@ export function AutoPlaceDialog({
             step={ruleStep}
             onStepChange={setRuleStep}
             onStepStates={setStepStates}
+            onOpenRoomTypes={() => go({ kind: 'types' })}
           />
         ) : (
           <>
             <section className="mep-guide-card" data-testid="ap-card" data-item={item.kind}>
-              {item.kind === 'drawing' ? drawingCard() : item.kind === 'types' ? typesCard() : item.kind === 'heights' ? heightsCard() : placeCard()}
+              {blockMessage && (
+                <div className="mep-guide-callout bad" role="alert" data-testid="ap-block">
+                  <span>{blockMessage}</span>
+                </div>
+              )}
+              {item.kind === 'place' || item.kind === 'rule' ? placeCard() : inputCard(item.kind)}
             </section>
             <aside className="mep-guide-side">
               <div className="mep-guide-panel">
                 <div className="mep-guide-panel-head">
-                  <span className="pt">Whole floor</span>
+                  <span className="pt">{planTitle}</span>
                   {placeShown && placeJob.busy && (
                     <span className="mep-guide-busy" role="status" data-testid="ap-busy">
                       Calculating…
                     </span>
                   )}
                 </div>
+                {picked && pickedValues && (
+                  <div className="mep-guide-facts" data-testid="ap-facts">
+                    <span className="mep-guide-fact">{roomLabel(picked)}</span>
+                    <span className="mep-guide-fact">{pickedValues.areaM2 === null ? 'no scale' : `${fmt(pickedValues.areaM2)} m²`}</span>
+                    <span className="mep-guide-fact">{picked.roomTypeId === undefined ? 'No type' : typeName(picked.roomTypeId)}</span>
+                    <span className="mep-guide-fact">
+                      {pickedValues.ceilingHeight.mm} mm <small>{LEVEL_NAMES[pickedValues.ceilingHeight.level]}</small>
+                    </span>
+                    {pickedValues.people && <span className="mep-guide-fact">{plural(pickedValues.people.count, 'person')}</span>}
+                  </div>
+                )}
                 <RulePreviewPlan
                   mode="floor"
                   busy={placeShown && placeJob.busy}
                   rooms={pageRooms}
                   sample={picked}
                   calibration={calibration}
-                  roomState={placeShown ? placeRoomState : inputRoomState}
+                  roomState={placeShown ? placeRoomState : item.kind === 'heights' ? () => 'noMatch' : inputRoomState}
                   stamps={[]}
                   stampSizePt={{ width: 0, height: 0 }}
                   stampIconUrl={null}
                   wallOffsetM={0}
                   coverageRadiusM={null}
                   stampLayers={placeShown ? layers : []}
+                  roomFill={roomFill}
                   onPickRoom={setPickedId}
                 />
                 <div className="mep-guide-legend">
@@ -780,8 +830,20 @@ export function AutoPlaceDialog({
                       <span style={{ ['--sw' as string]: 'var(--guide-bad-soft)' }}>stamps do not fit, or not covered</span>
                     </>
                   )}
-                  <span className="hatch">no room type</span>
-                  <span className="plain">click a room to mark it</span>
+                  {item.kind === 'types' &&
+                    pageTypes.slice(0, TYPE_FILLS.length).map((t) => (
+                      <span key={t.id} style={{ ['--sw' as string]: typeFill({ roomTypeId: t.id } as Room)! }}>
+                        {roomTypeLabel(t, language)}
+                      </span>
+                    ))}
+                  {item.kind === 'heights' &&
+                    (['global', 'pdf', 'roomType', 'room'] as const).map((level) => (
+                      <span key={level} style={{ ['--sw' as string]: LEVEL_FILLS[level] }}>
+                        {LEVEL_NAMES[level]}
+                      </span>
+                    ))}
+                  {item.kind !== 'heights' && <span className="hatch">no room type</span>}
+                  <span className="plain">click a room to see its data</span>
                 </div>
               </div>
             </aside>
