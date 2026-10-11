@@ -19,8 +19,11 @@ export const AREA_UNIT_LABELS: Record<AreaUnit, string> = { m2: 'm²', ft2: 'ft�
 export const LENGTH_UNIT_LABELS: Record<LengthUnit, string> = { m: 'm', ft: 'ft' };
 export const ILLUMINANCE_UNIT_LABELS: Record<IlluminanceUnit, string> = { lx: 'lx', fc: 'fc' };
 
+/** The amount unit that is a number of stamps: one stamp gives 1, so the rule needs no capacity. */
+export const STAMP_COUNT_UNIT = 'stamps';
+
 /** The amount units the UI lists. A rule can also hold free text (an older rule, or "Other"). */
-export const AMOUNT_UNITS: readonly string[] = ['dm³/s', 'l/s', 'm³/h', 'm³/s', 'cfm', 'W', 'kW'];
+export const AMOUNT_UNITS: readonly string[] = [STAMP_COUNT_UNIT, 'dm³/s', 'l/s', 'm³/h', 'm³/s', 'cfm', 'W', 'kW'];
 
 /** The flow units of an air-changes rule: one m³/h in each unit. */
 export const AIR_CHANGE_UNITS: Readonly<Record<string, number>> = {

@@ -3615,20 +3615,58 @@
 .mep-autoplace-nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
   min-width: 0;
 }
+.mep-autoplace-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 8px 8px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+}
 .mep-autoplace-nav h4 {
-  margin: 8px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -8px;
+  padding: 6px 8px;
   font-size: 11px;
   font-family: var(--font-mono);
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink);
+  border-bottom: 1.5px solid var(--line);
 }
-.mep-autoplace-nav h4:first-child {
-  margin-top: 0;
+.mep-autoplace-nav h4 .gn {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.mep-autoplace-group--place {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--accent-soft);
+  border: 2px solid var(--accent);
+}
+.mep-autoplace-group--place h4 {
+  color: var(--accent-ink);
+  border-bottom-color: var(--accent);
+}
+.mep-autoplace-group--place h4 .gn {
+  background: var(--accent);
 }
 .mep-autoplace-nav .mep-guide-note {
   margin: 0;
@@ -3657,13 +3695,23 @@
   min-width: 0;
   padding: 4px 8px;
 }
-.mep-autoplace-placeall {
-  margin-top: 8px;
+.mep-autoplace-nav .mep-autoplace-placeall {
+  background: var(--accent);
+  border-color: var(--accent-ink);
+  color: #fff;
 }
-.mep-autoplace-nav h4.mep-autoplace-rules-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.mep-autoplace-nav .mep-autoplace-placeall:hover {
+  border-color: var(--ink);
+}
+.mep-autoplace-nav .mep-autoplace-placeall .n {
+  border-color: #fff;
+}
+.mep-autoplace-nav .mep-autoplace-placeall .s {
+  color: var(--accent-soft);
+}
+.mep-autoplace-rules-head button {
+  margin-left: auto;
+  white-space: nowrap;
 }
 .mep-autoplace-rules-head button,
 .mep-autoplace-rule-actions button,

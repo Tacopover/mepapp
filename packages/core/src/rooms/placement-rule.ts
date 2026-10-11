@@ -7,7 +7,7 @@ import type { Discipline } from '../network.js';
 import type { Room } from './room.js';
 import type { RoomValues } from './room-values.js';
 import { ROOM_DEMAND_FIELDS, type RoomDemandKey, type RoomDemands } from './room-type.js';
-import { areaInUnit, flowInUnit, isAirChangeUnit, M3H_PER_DM3S, type AreaUnit, type IlluminanceUnit, type LengthUnit } from './placement-units.js';
+import { areaInUnit, flowInUnit, isAirChangeUnit, M3H_PER_DM3S, STAMP_COUNT_UNIT, type AreaUnit, type IlluminanceUnit, type LengthUnit } from './placement-units.js';
 
 /** A preset fills and shows the amount fields of one common calculation. 'custom' shows every field. 'coverage' has no amount: the count comes from the coverage limits. */
 export type PlacementPreset = 'perArea' | 'perPerson' | 'perPersonArea' | 'airChanges' | 'fixed' | 'lighting' | 'coverage' | 'custom';
@@ -385,13 +385,20 @@ export function hasAmount(rule: Pick<PlacementRule, 'amount' | 'lighting'> & Par
   return termUsed(a, 'fixed') || termUsed(a, 'perM2') || termUsed(a, 'perPerson') || termUsed(a, 'perM3') || a.minimum !== undefined || rule.lighting !== undefined;
 }
 
+/** The amount that one element gives: 1 when the amount unit is a number of stamps, else the capacity (absent = none). */
+export function capacityOf(rule: PlacementRule): number | undefined {
+  if (rule.amount.unit === STAMP_COUNT_UNIT) return 1;
+  return rule.capacityPerElement !== undefined && rule.capacityPerElement > 0 ? rule.capacityPerElement : undefined;
+}
+
 /** True when the term has a number in the rule or takes one from the room type. */
 const termUsed = (a: PlacementAmount, key: AmountTermKey) => a[key] !== undefined || a.from?.[key] !== undefined;
 
 /**
  * The required amount and the count of elements for one room:
  * required = fixed + perM2 × area + perPerson × people + perM3 × volume + lighting, at least the minimum;
- * count = ceil(required ÷ capacity), or 1 without a capacity; then at least the min count and at most the max count.
+ * count = ceil(required ÷ capacity), or 1 without a capacity (capacityOf: the unit "stamps" has capacity 1);
+ * then at least the min count and at most the max count.
  * The area is in the rule's area unit (m² for a term from the room type), perM3 × volume (m³/h) is
  * converted to the amount unit, and lighting in fc uses ft². A term can take its number from the
  * room type (amountTermValue). Lighting: E × area ÷ (UF × MF), with UF from the room index when the
@@ -463,8 +470,9 @@ export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues
       required = Math.max(sum, a.minimum ?? 0);
     }
   }
-  const hasCapacity = rule.capacityPerElement !== undefined && rule.capacityPerElement > 0;
-  const quantityCount = required !== null && hasCapacity ? ceilCount(required / rule.capacityPerElement!) : null;
+  const capacity = capacityOf(rule);
+  const hasCapacity = capacity !== undefined;
+  const quantityCount = required !== null && hasCapacity ? ceilCount(required / capacity) : null;
 
   let count: number | null = null;
   const blocked = hasAmount(rule) && hasCapacity && required === null;

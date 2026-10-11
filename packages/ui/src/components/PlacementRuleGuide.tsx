@@ -30,6 +30,7 @@ import {
   PLACEMENT_WARNING_TEXT,
   PRESET_AMOUNT_FIELDS,
   ROOM_DEMAND_FIELDS,
+  STAMP_COUNT_UNIT,
   ruleAppliesToRoom,
   roomTypeLabel,
   validatePlacementRule,
@@ -1179,7 +1180,25 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
           </p>
         )}
 
-        {!byCoverage && (
+        {!byCoverage && unit === STAMP_COUNT_UNIT && (
+          <div className="mep-guide-section">
+            <h3>Number of stamps</h3>
+            <div className="mep-guide-formula">
+              <div className="mep-guide-term result" data-testid="pg-quantity">
+                {requirement?.quantityCount != null ? (
+                  <>
+                    <span>The amount is a number of stamps: {fmt(requirement.required)}, rounded up</span>
+                    <span className="mep-guide-res">{plural(requirement.quantityCount, 'stamp')}</span>
+                  </>
+                ) : (
+                  <span>Enter the missing room data first.</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!byCoverage && unit !== STAMP_COUNT_UNIT && (
           <div className="mep-guide-section">
             <h3>What one stamp gives</h3>
             <div className="mep-guide-formula">
@@ -1566,7 +1585,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
           <h3>Rotation</h3>
           <div className="mep-guide-field">
             <label htmlFor="pg-rotation">Rotation</label>
-            <select id="pg-rotation" value={draft.rotation} onChange={(e) => update({ rotation: e.target.value as 'room' | 'fixed' })}>
+            <select id="pg-rotation" value={draft.rotation} onChange={(e) => update(e.target.value === 'fixed' ? { rotation: 'fixed', ...(draft.fixedAngle.trim() === '' ? { fixedAngle: '0' } : {}) } : { rotation: 'room' })}>
               <option value="room">{draft.strategy === 'perimeter' ? 'Face into the room' : 'Align to the room'}</option>
               <option value="fixed">Fixed angle</option>
             </select>
@@ -1894,7 +1913,9 @@ function WhyBox({ row, matches, sampleName, unit, rule, coverage, error }: WhyBo
     ...(Object.entries(req.terms ?? {}) as [AmountTermKey, TermValue][]).filter(([, t]) => t.source === 'roomType').map(([key, t]) => termText(key, t.value, unit)),
     ...(req.lighting?.luxSource === 'roomType' ? [`${fmt(req.lighting.lux)} lx`] : []),
   ];
-  const amountLine = (cls: string) => line(cls, PLACEMENT_PRESET_LABELS[rule.preset], `${fmt(req.required)} ${unit} ÷ ${fmt(rule.capacityPerElement)} per stamp, rounded up`, req.quantityCount ?? '?', 'pg-why-source');
+  const countUnit = rule.amount.unit === STAMP_COUNT_UNIT;
+  const amountLine = (cls: string) =>
+    line(cls, PLACEMENT_PRESET_LABELS[rule.preset], countUnit ? `${fmt(req.required)} stamps, rounded up` : `${fmt(req.required)} ${unit} ÷ ${fmt(rule.capacityPerElement)} per stamp, rounded up`, req.quantityCount ?? '?', 'pg-why-source');
   if (req.countSource === 'coverage') {
     base = req.count;
     const coverageLine = coverage
@@ -1940,7 +1961,7 @@ function WhyBox({ row, matches, sampleName, unit, rule, coverage, error }: WhyBo
         {rule.maxCount !== undefined && line(maxHit ? 'cap' : '', 'Max count', maxHit ? 'Limits the count' : 'Not needed here', rule.maxCount, 'pg-why-max')}
         {line('res', 'Stamps in this room', req.count === null ? 'Cannot calculate yet' : coverage ? 'The coverage of the final positions can raise this number' : 'Spacing and layout do not change this number', req.count ?? '?', 'pg-why-result')}
       </div>
-      {req.perElement !== null && req.count !== null && (
+      {req.perElement !== null && req.count !== null && !countUnit && (
         <p className="mep-guide-note" data-testid="pg-why-each">
           Each stamp gets {fmt(req.perElement)} {unit} ({fmt(req.required)} ÷ {req.count}).{rule.writeCapacity ? ' MepApp writes this capacity to the stamp.' : ''}
         </p>

@@ -105,6 +105,14 @@ describe('calculateRoomRequirement, one case per preset', () => {
     expect(r.count).toBe(1);
   });
 
+  it('a number of stamps needs no capacity: 0.2 × 35.8 = 7.16 gives 8', () => {
+    const r = calculateRoomRequirement(rule({ preset: 'perArea', amount: { perM2: 0.2, unit: 'stamps' } }), values({ areaM2: 35.8 }));
+    expect(r.required).toBeCloseTo(7.16);
+    expect(r.quantityCount).toBe(8);
+    expect(r.count).toBe(8);
+    expect(r.countSource).toBe('amount');
+  });
+
   it('does not round 2.0000001 elements up to 3', () => {
     const r = calculateRoomRequirement(rule({ amount: { perM2: 0.1 + 0.2, unit: 'x' }, capacityPerElement: 6 }), values({ areaM2: 40 }));
     expect(r.count).toBe(2);

@@ -5,6 +5,7 @@ import {
   parseDecimal,
   PRESET_AMOUNT_FIELDS,
   ROOM_DEMAND_FIELDS,
+  STAMP_COUNT_UNIT,
   type AmountTermKey,
   type AreaUnit,
   type GridEdge,
@@ -195,6 +196,10 @@ export function ruleOf(id: string, d: Draft): PlacementRule {
   for (const [key, value, label, target] of optional) {
     const n = numberOf(value, label);
     if (n !== undefined) (target === 'rule' ? (rule as unknown as Record<string, unknown>) : (rule.coverage as Record<string, unknown>))[key] = n;
+  }
+  if (amount.unit === STAMP_COUNT_UNIT) {
+    delete rule.capacityPerElement;
+    rule.writeCapacity = false;
   }
   if (d.alsoCoverage && d.preset !== 'coverage') rule.alsoCoverage = true;
   if (d.rotation === 'fixed') {

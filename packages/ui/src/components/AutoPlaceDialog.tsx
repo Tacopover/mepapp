@@ -518,99 +518,110 @@ export function AutoPlaceDialog({
 
   const nav = (
     <nav className="mep-autoplace-nav" aria-label="Auto-place" data-testid="ap-nav">
-      <h4>Input data</h4>
-      {(['drawing', 'types', 'heights'] as const).map(inputItem)}
-      <h4 className="mep-autoplace-rules-head">
-        Placement rules
-        <button type="button" data-act="new-rule" title="Add a new rule and open it at step 1" onClick={newRule}>
-          + New
-        </button>
-      </h4>
-      <p className="mep-guide-note">{rules.length === 0 ? 'No rules yet.' : 'A check puts the rule in Place all.'}</p>
-      {rules.map((rule) => {
-        const [state, sub] = ruleStatus.get(rule.id) ?? ['', ''];
-        const on = !unchecked.has(rule.id);
-        const open = openRule?.id === rule.id;
-        return (
-          <div key={rule.id} className="mep-autoplace-rule">
-            <input
-              type="checkbox"
-              aria-label={`Use ${rule.name} in Place all`}
-              data-check={rule.id}
-              checked={on}
-              onChange={(e) => {
-                const next = new Set(unchecked);
-                if (e.target.checked) next.delete(rule.id);
-                else next.add(rule.id);
-                setUnchecked(next);
-                setPlaced(null);
-              }}
-            />
-            <button type="button" className={`mep-guide-step ${on ? state : ''}${open ? ' on' : ''}`} data-rule={rule.id} aria-expanded={open} onClick={() => go({ kind: 'rule', id: rule.id })}>
-              <span className="n">{ICON[state]}</span>
-              <span className="t">{rule.name}</span>
-              <span className="s">{sub}</span>
-            </button>
-            {open && (
-              <div className="mep-autoplace-substeps">
-                <PlacementGuideSteps step={ruleStep} states={stepStates} onStepChange={setRuleStep} />
-                <div className="mep-autoplace-rule-actions" data-testid="ap-rule-actions">
-                  {confirmDelete === rule.id ? (
-                    <>
-                      <span>Delete this rule?</span>
-                      <button type="button" data-act="delete-yes" onClick={() => deleteRule(rule.id)}>
-                        Delete
-                      </button>
-                      <button type="button" onClick={() => setConfirmDelete(null)}>
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" data-act="duplicate" onClick={() => duplicateRule(rule.id)}>
-                        Duplicate
-                      </button>
-                      <button type="button" data-act="delete" onClick={() => setConfirmDelete(rule.id)}>
-                        Delete…
-                      </button>
-                    </>
-                  )}
+      <section className="mep-autoplace-group" data-testid="ap-group-input">
+        <h4>
+          <span className="gn">1</span>Input data
+        </h4>
+        {(['drawing', 'types', 'heights'] as const).map(inputItem)}
+      </section>
+      <section className="mep-autoplace-group" data-testid="ap-group-rules">
+        <h4 className="mep-autoplace-rules-head">
+          <span className="gn">2</span>Placement rules
+          <button type="button" data-act="new-rule" title="Add a new rule and open it at step 1" onClick={newRule}>
+            + New
+          </button>
+        </h4>
+        <p className="mep-guide-note">{rules.length === 0 ? 'No rules yet.' : 'A check puts the rule in Place all.'}</p>
+        {rules.map((rule) => {
+          const [state, sub] = ruleStatus.get(rule.id) ?? ['', ''];
+          const on = !unchecked.has(rule.id);
+          const open = openRule?.id === rule.id;
+          return (
+            <div key={rule.id} className="mep-autoplace-rule">
+              <input
+                type="checkbox"
+                aria-label={`Use ${rule.name} in Place all`}
+                data-check={rule.id}
+                checked={on}
+                onChange={(e) => {
+                  const next = new Set(unchecked);
+                  if (e.target.checked) next.delete(rule.id);
+                  else next.add(rule.id);
+                  setUnchecked(next);
+                  setPlaced(null);
+                }}
+              />
+              <button type="button" className={`mep-guide-step ${on ? state : ''}${open ? ' on' : ''}`} data-rule={rule.id} aria-expanded={open} onClick={() => go({ kind: 'rule', id: rule.id })}>
+                <span className="n">{ICON[state]}</span>
+                <span className="t">{rule.name}</span>
+                <span className="s">{sub}</span>
+              </button>
+              {open && (
+                <div className="mep-autoplace-substeps">
+                  <PlacementGuideSteps step={ruleStep} states={stepStates} onStepChange={setRuleStep} />
+                  <div className="mep-autoplace-rule-actions" data-testid="ap-rule-actions">
+                    {confirmDelete === rule.id ? (
+                      <>
+                        <span>Delete this rule?</span>
+                        <button type="button" data-act="delete-yes" onClick={() => deleteRule(rule.id)}>
+                          Delete
+                        </button>
+                        <button type="button" onClick={() => setConfirmDelete(null)}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" data-act="duplicate" onClick={() => duplicateRule(rule.id)}>
+                          Duplicate
+                        </button>
+                        <button type="button" data-act="delete" onClick={() => setConfirmDelete(rule.id)}>
+                          Delete…
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-      <div className="mep-autoplace-rule-tools">
-        <button type="button" data-act="import-rules" onClick={() => fileInput.current?.click()}>
-          Import…
+              )}
+            </div>
+          );
+        })}
+        <div className="mep-autoplace-rule-tools">
+          <button type="button" data-act="import-rules" onClick={() => fileInput.current?.click()}>
+            Import…
+          </button>
+          <button type="button" data-act="export-rules" disabled={rules.length === 0} onClick={() => onExportRules(rulesRef.current)}>
+            Export…
+          </button>
+        </div>
+        {rulesMessage && (
+          <p className="mep-guide-note" role="status" data-testid="ap-rules-message">
+            {rulesMessage}
+          </p>
+        )}
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: 'none' }}
+          data-testid="ap-rules-file"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void importFile(file);
+          }}
+        />
+      </section>
+      <section className="mep-autoplace-group mep-autoplace-group--place" data-testid="ap-group-place">
+        <h4>
+          <span className="gn">3</span>Place
+        </h4>
+        <button type="button" className={`mep-guide-step mep-autoplace-placeall${item.kind === 'place' ? ' on' : ''}`} data-item="place" onClick={() => go({ kind: 'place' })}>
+          <span className="n">▶</span>
+          <span className="t">Place all</span>
+          <span className="s">{placeSub}</span>
         </button>
-        <button type="button" data-act="export-rules" disabled={rules.length === 0} onClick={() => onExportRules(rulesRef.current)}>
-          Export…
-        </button>
-      </div>
-      {rulesMessage && (
-        <p className="mep-guide-note" role="status" data-testid="ap-rules-message">
-          {rulesMessage}
-        </p>
-      )}
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".json,application/json"
-        style={{ display: 'none' }}
-        data-testid="ap-rules-file"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (file) void importFile(file);
-        }}
-      />
-      <button type="button" className={`mep-guide-step mep-autoplace-placeall${item.kind === 'place' ? ' on' : ''}`} data-item="place" onClick={() => go({ kind: 'place' })}>
-        <span className="n">▶</span>
-        <span className="t">Place all</span>
-        <span className="s">{placeSub}</span>
-      </button>
+      </section>
     </nav>
   );
 
