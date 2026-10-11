@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import { isValidCeilingHeightMm, roomTypeLabel, type Calibration, type CeilingHeightContext, type CeilingHeightLevel, type Room, type RoomType } from '@mepapp/core';
+import { InfoTip } from './InfoTip.js';
 import type { StepState } from './PlacementRuleGuide.js';
 import { OptionalNumberInput } from './OptionalNumberInput.js';
 import { MAX_CEILING_HEIGHT_MM, MIN_CEILING_HEIGHT_MM } from './RoomProperties.js';
@@ -59,7 +60,10 @@ export function DrawingCard({ pageIndex, calibration, roomCount, detecting, onSe
   return (
     <>
       <h2>Drawing and rooms</h2>
-      <p className="mep-guide-lead">MepApp needs the scale of the page and the rooms on it. The scale gives the floor area. The rooms come from the room names in the drawing.</p>
+      <p className="mep-guide-lead">
+        MepApp needs the scale of this page and the rooms on it.
+        <InfoTip label="More about the drawing and the rooms">The scale gives the floor area of each room. Detect rooms finds the rooms from the room names in the drawing.</InfoTip>
+      </p>
       <div className="mep-guide-checks">
         <Check state={calibration ? 'ok' : 'bad'} title={calibration ? `Scale of ${page}` : `${page[0]!.toUpperCase()}${page.slice(1)} has no scale`} sub={calibration ? 'Calibrate… hides this dialog until you click two points.' : 'Choose the scale, or calibrate on the drawing with two points.'}>
           <ScaleControl calibration={calibration} onSetScale={onSetScale} />
@@ -73,7 +77,7 @@ export function DrawingCard({ pageIndex, calibration, roomCount, detecting, onSe
           </button>
         </Check>
       </div>
-      <p className="mep-guide-note">MepApp places stamps only on the page that the drawing shows now. Go to another page to place stamps there.</p>
+      <p className="mep-guide-note">MepApp places stamps only on the page that the drawing shows now.</p>
       {footer}
     </>
   );
@@ -115,7 +119,10 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
   return (
     <>
       <h2>Room types</h2>
-      <p className="mep-guide-lead">Rules choose rooms by type. MepApp finds the type from the room name. The type also gives the persons and the demands that a rule can use.</p>
+      <p className="mep-guide-lead">
+        Rules choose rooms by their type.
+        <InfoTip label="More about room types">MepApp finds the type from the room name. The type also gives the persons and the demands that a rule can use.</InfoTip>
+      </p>
       <div className="mep-guide-seg" role="tablist" aria-label="Room types">
         <button type="button" role="tab" className={tab === 'rooms' ? 'on' : ''} aria-selected={tab === 'rooms'} disabled={libraryDirty} title={libraryDirty ? 'Save or revert the room type first' : undefined} onClick={() => setTab('rooms')}>
           Rooms on this page
@@ -201,11 +208,11 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
               </table>
             </div>
           )}
-          <p className="mep-guide-note">Each change is one undo step. A type that you choose stays when the room name changes.</p>
+          <p className="mep-guide-note">Each change is one undo step. The type that you choose stays when the room name changes.</p>
         </>
       ) : (
         <>
-          <p className="mep-guide-note">The library is yours, not part of the drawing. Each drawing uses the same room types. The numbers count the rooms of this page.</p>
+          <p className="mep-guide-note">All drawings use this library. The numbers count the rooms of this page.</p>
           <RoomTypeLibrary
             types={library}
             fileOnlyTypes={fileOnlyTypes}
@@ -254,7 +261,8 @@ export function CeilingHeightsCard({ sceneRef, heights, pageRooms, types, langua
     <>
       <h2>Ceiling heights</h2>
       <p className="mep-guide-lead">
-        The height gives the room volume. A level uses the level above it when you leave its box empty. {volumeRules > 0 ? `${plural(volumeRules, 'checked rule')} use${volumeRules === 1 ? 's' : ''} the volume.` : 'No checked rule uses the volume now.'}
+        An empty box uses the level above it. {volumeRules > 0 ? `${plural(volumeRules, 'checked rule')} use${volumeRules === 1 ? 's' : ''} the volume.` : 'No checked rule uses the volume now.'}
+        <InfoTip label="More about ceiling heights">MepApp calculates the room volume from the floor area and the ceiling height. Rules with air changes per hour use the volume.</InfoTip>
       </p>
       <div className="mep-autoplace-levels" data-testid="ap-heights">
         <section className="mep-autoplace-level" aria-label="Level 1">
@@ -319,7 +327,7 @@ export function CeilingHeightsCard({ sceneRef, heights, pageRooms, types, langua
             </button>
           ))}
           {own.length === 0 && <p className="mep-guide-note">No room on this page has an own height.</p>}
-          <p className="mep-guide-note">Set the height of one room in Room Properties. Click a room on the plan to see its height and its level.</p>
+          <p className="mep-guide-note">Set the height of one room in Room Properties. Click a room on the plan to see its level.</p>
         </section>
       </div>
       {footer}

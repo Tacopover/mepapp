@@ -631,7 +631,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
     return (
       <>
         <h2>What do you want to place?</h2>
-        <p className="mep-guide-lead">MepApp places this stamp in each room that the rule applies to. The name helps you find the rule again later.</p>
+        <p className="mep-guide-lead">MepApp places this stamp in each room that the rule applies to.</p>
         <div className="mep-guide-section">
           <div className="mep-guide-field">
             <label htmlFor="pg-name">Rule name</label>
@@ -673,7 +673,10 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
     return (
       <>
         <h2>Which rooms get this stamp?</h2>
-        <p className="mep-guide-lead">Click the room types. The plan shows the rooms that match in blue. MepApp finds the room type from the room name in the drawing.</p>
+        <p className="mep-guide-lead">
+          Click the room types: the plan shows the rooms that match in blue.
+          <InfoTip label="More about room types">MepApp finds the room type from the room name in the drawing. A rule without room types applies to each room.</InfoTip>
+        </p>
         {untyped.length > 0 && (
           <div className="mep-guide-callout" data-testid="pg-untyped">
             <span>
@@ -917,7 +920,10 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       <>
         <h2>How many stamps does one room need?</h2>
         <p className="mep-guide-lead">
-          Choose how MepApp calculates the number of stamps. Point to <b>i</b> on a card for an explanation. The lines below calculate {sample ? <b>{roomLabel(sample)}</b> : 'a room'} as an example. Click a room on the plan to calculate a different room.
+          Choose how MepApp calculates the number of stamps.
+          <InfoTip label="More about the amount">
+            Point to <b>i</b> on a card for an explanation. The lines below calculate {sample ? <b>{roomLabel(sample)}</b> : 'a room'} as an example. Click a room on the plan to calculate a different room.
+          </InfoTip>
         </p>
         <div className="mep-guide-section">
           <h3>Calculation</h3>
@@ -1355,7 +1361,8 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       <>
         <h2>How much space must the stamps keep?</h2>
         <p className="mep-guide-lead">
-          These distances change only <b>where</b> MepApp puts the stamps. They never change the number of stamps. When the stamps do not fit, MepApp tells you. Then change the distances, the layout or the count.
+          These distances change only <b>where</b> MepApp puts the stamps, not the number of stamps.
+          <InfoTip label="More about the spacing">When the stamps do not fit, MepApp tells you. Then change the distances, the layout or the count.</InfoTip>
         </p>
         <div className="mep-guide-limits">
           <div className="mep-guide-limit">
@@ -1439,7 +1446,8 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       <>
         <h2>Where in the room do the stamps go?</h2>
         <p className="mep-guide-lead">
-          Each picture shows the layout in an example room. The plan on the right shows the layout in <b>{name}</b> with the count from step 3.
+          The plan shows the layout in <b>{name}</b> with the count from step 3.
+          <InfoTip label="More about the layout">Each picture shows the layout in an example room.</InfoTip>
         </p>
         {row && coverageProblem(row) && (
           <div className="mep-guide-callout bad" data-testid="pg-layout-note">
@@ -1590,7 +1598,10 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       <>
         <h2>Check and place</h2>
         <p className="mep-guide-lead">
-          The table shows each room of this page that the rule applies to. Click a row to see the room on the plan. Place adds the stamps as one undo step. When you place again, MepApp replaces the auto-placed stamps that you did not move.
+          Place adds the stamps of this rule as one undo step.
+          <InfoTip label="More about Place">
+            The table shows each room of this page that the rule applies to. Click a row to see the room on the plan. When you place again, MepApp replaces the auto-placed stamps that you did not move.
+          </InfoTip>
         </p>
         {!stampId && (
           <div className="mep-guide-callout">

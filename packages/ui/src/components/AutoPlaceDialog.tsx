@@ -20,6 +20,7 @@ import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingP
 import { CeilingHeightsCard, DrawingCard, LEVEL_FILLS, LEVEL_NAMES, RoomTypesCard, TYPE_FILLS, typeFillOf } from './AutoPlaceInputCards.js';
 import { examplePlacementRules } from '../placementRuleStorage.js';
 import { Dialog } from './Dialog.js';
+import { InfoTip } from './InfoTip.js';
 import { PlacementGuideSteps, PlacementRuleGuideBody, type PlacementRuleGuideHandle, type StepState, type StepStatus } from './PlacementRuleGuide.js';
 import { blankRule, newRuleId, uniqueName } from './placementRuleDraft.js';
 import { RulePreviewPlan, type PreviewRoomState, type PreviewStampLayer } from './RulePreviewPlan.js';
@@ -494,7 +495,15 @@ export function AutoPlaceDialog({
             ? { text: 'No room is selected. Choose Rooms on this page.', short: 'No room selected', fix: null }
             : null;
   const placingRules = [...rowsByRule.values()].filter((rows) => rows.some((row) => row.stamps.length > 0)).length;
-  const placeSub = blocked ? blocked.short : plan ? `${plural(total, 'stamp')} from ${plural(placingRules, 'rule')}` : placeJob.busy ? 'Calculating…' : '';
+  const placeSub = blocked
+    ? blocked.short
+    : checkedRules.every((r) => !r.stampDefinitionId)
+      ? 'Choose a stamp first'
+      : plan
+        ? `${plural(total, 'stamp')} from ${plural(placingRules, 'rule')}`
+        : placeJob.busy
+          ? 'Calculating…'
+          : '';
 
   const inputItem = (kind: InputKind) => {
     const [state, sub] = inputStatus[kind];
@@ -676,7 +685,10 @@ export function AutoPlaceDialog({
     return (
       <>
         <h2>Place all</h2>
-        <p className="mep-guide-lead">Each checked rule places its stamps in the rooms that match. Place adds all stamps as one undo step. When you place again, MepApp replaces the auto-placed stamps that you did not move.</p>
+        <p className="mep-guide-lead">
+          Place adds the stamps of all checked rules as one undo step.
+          <InfoTip label="More about Place all">Each checked rule places its stamps in the rooms that match. When you place again, MepApp replaces the auto-placed stamps that you did not move. It keeps the stamps that you moved.</InfoTip>
+        </p>
         {blocked ? (
           <div className="mep-guide-callout bad" data-testid="ap-blocked">
             <span>{blocked.text}</span>
