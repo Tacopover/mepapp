@@ -16,7 +16,7 @@ import {
   type RoomType,
   type StampDefinition,
 } from '@mepapp/core';
-import type { AutoPlaceArt } from './AutoPlaceDialog.js';
+import type { AutoPlaceArt } from './autoPlacePlan.js';
 import { Dialog } from './Dialog.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
 import { PlacementRuleGuide } from './PlacementRuleGuide.js';

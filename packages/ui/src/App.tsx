@@ -1670,6 +1670,41 @@ export function MepSketchApp({
         />
       )}
 
+      {autoPlaceOpen && (
+        <AutoPlaceDialog
+          sceneRef={sceneRef}
+          rules={placementRules}
+          roomTypes={roomTypes}
+          language={labelLanguage}
+          stampName={(id) => {
+            const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
+            return definition ? stampLabelFor(definition, labelLanguage) : null;
+          }}
+          stampDefinition={findStampDefinition}
+          stampScale={stampScaleOf}
+          stampIconUrl={(id) => {
+            const definition = findStampDefinition(id);
+            return definition ? iconUrlFor(definition, resolveStampIconUrl) : null;
+          }}
+          loadStampArt={loadAutoPlaceArt}
+          createPlacementWorker={createPlacementWorker}
+          onChooseStamp={(onPick) => setRuleStampPick({ onPick })}
+          stampPickerOpen={ruleStampPick !== null}
+          onChangeRoomTypes={(next) => {
+            sceneRef.current?.setRoomTypeLibrary(next);
+            setRoomTypes(next);
+          }}
+          onChangeRules={setPlacementRules}
+          onOpenRules={() => {
+            setAutoPlaceOpen(false);
+            setPlacementRulesOpen(true);
+          }}
+          onPlaced={showPlacedStatus}
+          onRemoved={(count) => setStatus(`Removed ${count} auto-placed stamp${count === 1 ? '' : 's'}. Undo gives them back.`)}
+          onClose={ruleStampPick ? () => {} : () => setAutoPlaceOpen(false)}
+        />
+      )}
+
       {ruleStampPick && (
         <StampPickerDialog
           title="Stamp for the rule"
@@ -1686,24 +1721,6 @@ export function MepSketchApp({
             setRuleStampPick(null);
           }}
           onClose={() => setRuleStampPick(null)}
-        />
-      )}
-
-      {autoPlaceOpen && (
-        <AutoPlaceDialog
-          sceneRef={sceneRef}
-          rules={placementRules}
-          language={labelLanguage}
-          stampDefinition={findStampDefinition}
-          stampScale={stampScaleOf}
-          loadStampArt={loadAutoPlaceArt}
-          onOpenRules={() => {
-            setAutoPlaceOpen(false);
-            setPlacementRulesOpen(true);
-          }}
-          onPlaced={showPlacedStatus}
-          onRemoved={(count) => setStatus(`Removed ${count} auto-placed stamp${count === 1 ? '' : 's'}. Undo gives them back.`)}
-          onClose={() => setAutoPlaceOpen(false)}
         />
       )}
 

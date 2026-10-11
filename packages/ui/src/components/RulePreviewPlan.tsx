@@ -26,7 +26,16 @@ export interface RulePreviewPlanProps {
   minSpacingM?: number | null;
   /** The tile size of the rule's ceiling grid, mm: the sample room shows the tile lines. Null = no ceiling grid. */
   ceilingGridMm?: number | null;
+  /** The stamps of more than one rule, each with its own size and thumbnail: the plan draws these in place of `stamps`. */
+  stampLayers?: readonly PreviewStampLayer[];
   onPickRoom: (roomId: string) => void;
+}
+
+/** The planned stamps of one rule, with the size and the thumbnail of its stamp. */
+export interface PreviewStampLayer {
+  stamps: readonly PlannedStamp[];
+  sizePt: { width: number; height: number };
+  iconUrl: string | null;
 }
 
 const ringPath = (ring: readonly Vec2[]) => `M${ring.map((p) => `${p.x} ${p.y}`).join('L')}Z`;
@@ -71,7 +80,7 @@ function ceilingGridPath(room: Room, sizePt: number): string | null {
  * sample room with its wall offset band, the dimensions of its bounding rectangle and the planned
  * stamps, or the whole floor coloured by how the rule sees each room. A click on a room picks it.
  */
-export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, ceilingGridMm = null, onPickRoom }: RulePreviewPlanProps) {
+export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration, roomState, stamps, stampSizePt, stampIconUrl, wallOffsetM, coverageRadiusM, minSpacingM = null, ceilingGridMm = null, stampLayers, onPickRoom }: RulePreviewPlanProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const focus = mode === 'room' && sample ? [sample] : rooms;
   if (focus.length === 0) return <p className="mep-settings-hint">This page has no rooms. Detect the rooms first.</p>;
@@ -88,11 +97,12 @@ export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration
   const minPt = ptPerM !== null && minSpacingM ? minSpacingM * ptPerM : null;
   const close = minPt !== null ? closePointIndexes(stamps.map((s) => s.position), minPt) : new Set<number>();
   const gridPath = mode === 'room' && sample && ptPerM !== null && ceilingGridMm ? ceilingGridPath(sample, (ceilingGridMm / 1000) * ptPerM) : null;
-  const simple = stamps.length > SIMPLE_MARKS_ABOVE;
+  const layers: readonly PreviewStampLayer[] = stampLayers ?? [{ stamps, sizePt: stampSizePt, iconUrl: stampIconUrl }];
+  const stampCount = layers.reduce((n, layer) => n + layer.stamps.length, 0);
+  const simple = stampCount > SIMPLE_MARKS_ABOVE;
   const metres = (pt: number) => (ptPerM !== null ? `${(pt / ptPerM).toFixed(2)} m` : `${Math.round(pt)} pt`);
   const fontSize = unit * 3;
-  const sw = Math.max(stampSizePt.width, unit);
-  const sh = Math.max(stampSizePt.height, unit);
+  const sizeOf = (layer: PreviewStampLayer) => [layer, Math.max(layer.sizePt.width, unit), Math.max(layer.sizePt.height, unit)] as const;
 
   return (
     <svg className="mep-guide-plan" viewBox={viewBox.join(' ')} role="img" aria-label={mode === 'room' && sample ? 'Sample room' : 'Rooms of the page'} data-testid="guide-plan" data-mode={mode} data-busy={busy || undefined}>
@@ -167,23 +177,26 @@ export function RulePreviewPlan({ mode, busy = false, rooms, sample, calibration
       {simple && (
         <path
           className="mep-guide-plan-stamps"
-          d={stamps.map((s) => `M${s.position.x - sw / 2} ${s.position.y - sh / 2}h${sw}v${sh}h${-sw}Z`).join('')}
+          d={layers.map((layer) => sizeOf(layer)).flatMap(([layer, sw, sh]) => layer.stamps.map((s) => `M${s.position.x - sw / 2} ${s.position.y - sh / 2}h${sw}v${sh}h${-sw}Z`)).join('')}
           fill="var(--hvac)"
           fillOpacity={0.5}
           pointerEvents="none"
           data-testid="guide-stamp-marks"
-          data-stamps={stamps.length}
+          data-stamps={stampCount}
         />
       )}
-      {!simple && stamps.map((s, i) => (
-        <g key={i} className="mep-guide-plan-stamps" transform={`translate(${s.position.x} ${s.position.y}) rotate(${s.rotationDegrees})`} pointerEvents="none" data-testid="guide-stamp">
-          {stampIconUrl && <image href={stampIconUrl} x={-sw / 2} y={-sh / 2} width={sw} height={sh} preserveAspectRatio="xMidYMid meet" />}
-          <rect x={-sw / 2} y={-sh / 2} width={sw} height={sh} fill={stampIconUrl ? 'none' : 'var(--surface)'} stroke={close.has(i) ? 'var(--guide-bad)' : 'var(--hvac)'} strokeWidth={1.2} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
-          {!stampIconUrl && (
-            <path d={`M${-sw / 2} ${-sh / 2}L${sw / 2} ${sh / 2}M${sw / 2} ${-sh / 2}L${-sw / 2} ${sh / 2}`} stroke="var(--hvac)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-          )}
-        </g>
-      ))}
+      {!simple &&
+        layers.map((layer) => sizeOf(layer)).map(([layer, sw, sh], li) =>
+          layer.stamps.map((s, i) => (
+            <g key={`${li}:${i}`} className="mep-guide-plan-stamps" transform={`translate(${s.position.x} ${s.position.y}) rotate(${s.rotationDegrees})`} pointerEvents="none" data-testid="guide-stamp">
+              {layer.iconUrl && <image href={layer.iconUrl} x={-sw / 2} y={-sh / 2} width={sw} height={sh} preserveAspectRatio="xMidYMid meet" />}
+              <rect x={-sw / 2} y={-sh / 2} width={sw} height={sh} fill={layer.iconUrl ? 'none' : 'var(--surface)'} stroke={li === 0 && close.has(i) ? 'var(--guide-bad)' : 'var(--hvac)'} strokeWidth={1.2} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
+              {!layer.iconUrl && (
+                <path d={`M${-sw / 2} ${-sh / 2}L${sw / 2} ${sh / 2}M${sw / 2} ${-sh / 2}L${-sw / 2} ${sh / 2}`} stroke="var(--hvac)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+              )}
+            </g>
+          )),
+        )}
     </svg>
   );
 }

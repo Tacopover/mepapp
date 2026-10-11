@@ -25,8 +25,6 @@ import {
   LENGTH_UNIT_LABELS,
   MAX_ROOM_STAMPS,
   parseDecimal,
-  PlacementPlanCancelled,
-  PlacementPlanClient,
   PLACEMENT_PRESET_HELP,
   PLACEMENT_PRESET_LABELS,
   PLACEMENT_WARNING_TEXT,
@@ -41,7 +39,6 @@ import {
   type GridEdge,
   type GridStyle,
   type LayoutStrategy,
-  type PlacementPlan,
   type PlacementPlanInput,
   type PlacementPreset,
   type PlacementRow,
@@ -55,7 +52,7 @@ import {
   type StampDefinition,
   type Vec2,
 } from '@mepapp/core';
-import { groupsOf, notesOf, replaceIdsOf, type AutoPlaceArt } from './AutoPlaceDialog.js';
+import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, type AutoPlaceArt } from './autoPlacePlan.js';
 import { Dialog } from './Dialog.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
 import { InfoTip } from './InfoTip.js';
@@ -117,15 +114,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const valueOf = (text: string): number | undefined => (text.trim() === '' ? undefined : (parseDecimal(text) ?? Number.NaN));
 const allowPositive = (n: number) => n > 0;
 const allowHeight = (mm: number) => mm >= MIN_CEILING_HEIGHT_MM && mm <= MAX_CEILING_HEIGHT_MM;
-const missingData = (row: Pick<PlacementRow, 'requirement'>) => row.requirement.warnings.some((w) => w === 'noPeople' || w === 'noCalibration' || w === 'noDemand' || w === 'noRoomIndex');
 const allowDemand = (n: number) => n >= 0;
 const demandField = (key: RoomDemandKey) => ROOM_DEMAND_FIELDS.find((f) => f.key === key)!;
-/** Step 4: the stamps do not fit with the spacing. */
-const spacingProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.some((w) => w === 'tooClose' || w === 'noFit');
-/** The room needs more stamps than auto-placement lays out (MAX_ROOM_STAMPS): almost always a typing error. */
-const tooManyStamps = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('tooMany');
-/** Step 5: the layout leaves part of the room outside the coverage circles. */
-const coverageProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('coverageNotMet');
 /** Step 5: the room has fewer free ceiling tiles than stamps. */
 const gridFull = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('gridFull');
 
@@ -257,37 +247,6 @@ export type StepStatus = [StepState, string];
 
 /** The calculations follow the typed boxes this long after the last key (or at once on Enter or a focus change). */
 const SETTLE_MS = 400;
-
-/**
- * The plan of `input`, calculated by a PlacementPlanClient of its own: in a Web Worker with
- * `createWorker`, else on the main thread. A new input cancels the running job. The last plan stays
- * until the next one comes; `busy` is true while the plan is not the plan of `input`.
- */
-function usePlacementPlan(createWorker: (() => PlacementWorkerLike) | undefined, input: PlacementPlanInput | null) {
-  const [client] = useState(() => new PlacementPlanClient(createWorker ?? null));
-  useEffect(() => () => client.dispose(), [client]);
-  const [done, setDone] = useState<{ input: PlacementPlanInput; plan: PlacementPlan } | null>(null);
-  const [failed, setFailed] = useState<{ input: PlacementPlanInput; message: string } | null>(null);
-  useEffect(() => {
-    if (!input) return;
-    const job = client.plan(input);
-    let live = true;
-    job.promise.then(
-      (plan) => {
-        if (live) setDone({ input, plan });
-      },
-      (err: unknown) => {
-        if (live && !(err instanceof PlacementPlanCancelled)) setFailed({ input, message: err instanceof Error ? err.message : String(err) });
-      },
-    );
-    return () => {
-      live = false;
-      job.cancel();
-    };
-  }, [client, input]);
-  const error = failed && failed.input === input ? failed.message : null;
-  return { plan: done?.plan ?? null, input: done?.input ?? null, fresh: input !== null && done?.input === input, busy: input !== null && done?.input !== input && error === null, error };
-}
 
 /** The rule of a draft as JSON, or null when a box is not correct: the auto-save compares these. */
 function ruleJsonOf(id: string, d: Draft): string | null {
