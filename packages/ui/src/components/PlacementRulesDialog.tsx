@@ -80,8 +80,8 @@ export function PlacementRulesDialog({
   onClose,
 }: PlacementRulesDialogProps) {
   const [selectedId, setSelectedId] = useState<string | null>(rules[0]?.id ?? null);
-  // The guide edits one rule: a saved rule, or a new rule that the list gets on the first Save.
-  const [guide, setGuide] = useState<{ ruleId: string; isNew: boolean; blank?: PlacementRule } | null>(null);
+  // The guide edits one rule: a saved rule, or a new rule that the list gets on its first change.
+  const [guide, setGuide] = useState<{ ruleId: string; blank?: PlacementRule } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const selected = rules.find((r) => r.id === selectedId) ?? null;
@@ -90,6 +90,11 @@ export function PlacementRulesDialog({
     const created = { ...structuredClone(from), id: newRuleId(), name: uniqueName(`${from.name} copy`, rules) };
     onChange([...rules, created]);
     setSelectedId(created.id);
+  };
+
+  const newRule = () => {
+    const blank = blankRule(uniqueName('New rule', rules));
+    setGuide({ ruleId: blank.id, blank });
   };
 
   const importFile = async (file: File) => {
@@ -108,13 +113,12 @@ export function PlacementRulesDialog({
   };
 
   if (guide) {
-    const guideRule = guide.isNew ? guide.blank! : rules.find((r) => r.id === guide.ruleId);
+    const guideRule = rules.find((r) => r.id === guide.ruleId) ?? guide.blank;
     if (guideRule) {
       return (
         <PlacementRuleGuide
           key={guideRule.id}
           rule={guideRule}
-          isNew={guide.isNew}
           others={rules.filter((r) => r.id !== guideRule.id)}
           roomTypes={roomTypes}
           language={language}
@@ -130,9 +134,8 @@ export function PlacementRulesDialog({
           createPlacementWorker={createPlacementWorker}
           onPlaced={onPlaced}
           onSave={(next) => {
-            onChange(guide.isNew ? [...rules, next] : rules.map((r) => (r.id === next.id ? next : r)));
+            onChange(rules.some((r) => r.id === next.id) ? rules.map((r) => (r.id === next.id ? next : r)) : [...rules, next]);
             setSelectedId(next.id);
-            setGuide({ ruleId: next.id, isNew: false });
           }}
           onClose={() => setGuide(null)}
         />
@@ -182,12 +185,12 @@ export function PlacementRulesDialog({
               className={`mep-circuit-types-item${rule.id === selected?.id ? ' on' : ''}`}
               title="Double-click to edit the rule in the guide"
               onClick={() => setSelectedId(rule.id)}
-              onDoubleClick={() => setGuide({ ruleId: rule.id, isNew: false })}
+              onDoubleClick={() => setGuide({ ruleId: rule.id })}
             >
               <span>{rule.name}</span>
             </button>
           ))}
-          <button type="button" className="mep-circuit-types-new" onClick={() => setGuide({ ruleId: '', isNew: true, blank: blankRule(uniqueName('New rule', rules)) })}>
+          <button type="button" className="mep-circuit-types-new" onClick={newRule}>
             + New rule
           </button>
         </div>
@@ -197,7 +200,7 @@ export function PlacementRulesDialog({
             roomTypes={roomTypes}
             language={language}
             stampName={stampName}
-            onEdit={() => setGuide({ ruleId: selected.id, isNew: false })}
+            onEdit={() => setGuide({ ruleId: selected.id })}
             onDuplicate={() => addRule(selected)}
             onDelete={() => {
               onChange(rules.filter((r) => r.id !== selected.id));

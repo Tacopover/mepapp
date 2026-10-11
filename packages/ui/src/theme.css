@@ -3636,10 +3636,8 @@
 .mep-modal--placement-guide .mep-modal-actions {
   align-items: center;
 }
-.mep-guide-message {
-  margin-right: auto;
-  color: var(--guide-bad);
-  font-size: 12px;
+.mep-guide-body {
+  display: contents;
 }
 .mep-guide {
   display: grid;

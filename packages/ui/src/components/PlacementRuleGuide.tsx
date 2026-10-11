@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { forwardRef, Fragment, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import {
   AIR_CHANGE_UNITS,
@@ -64,11 +64,9 @@ import { draftOf, FieldError, OTHER_UNIT, presetPatch, ruleOf, type Draft } from
 import { MAX_CEILING_HEIGHT_MM, MIN_CEILING_HEIGHT_MM } from './RoomProperties.js';
 import { RulePreviewPlan, type PreviewRoomState } from './RulePreviewPlan.js';
 
-export interface PlacementRuleGuideProps {
+export interface PlacementRuleGuideBodyProps {
   /** The saved rule, or the blank rule of a new one. */
   rule: PlacementRule;
-  /** A new rule: Save adds it to the list. */
-  isNew: boolean;
   /** The other rules of the list, for the name check. */
   others: PlacementRule[];
   roomTypes: RoomType[];
@@ -78,8 +76,6 @@ export interface PlacementRuleGuideProps {
   stampDefinition: (definitionId: string) => StampDefinition | undefined;
   stampScale: (definitionId: string) => number;
   stampIconUrl: (definitionId: string) => string | null;
-  /** True while the stamp picker is open on top of the guide: its Escape must not close the guide. */
-  stampPickerOpen: boolean;
   onChooseStamp: (onPick: (definitionId: string) => void) => void;
   onChangeRoomTypes: (types: RoomType[]) => void;
   /** Loads the art of a stamp definition for Place; null when it cannot be loaded. */
@@ -88,12 +84,28 @@ export interface PlacementRuleGuideProps {
   createPlacementWorker?: () => PlacementWorkerLike;
   /** Called after Place with the number of placed stamps and of replaced stamps. */
   onPlaced: (count: number, replaced: number) => void;
+  /** Called with each valid change of the rule: the guide saves at once. A new rule is added on its first change. */
   onSave: (rule: PlacementRule) => void;
+  /** The shown step, 1 to STEP_TITLES.length. */
+  step: number;
+  onStepChange: (step: number) => void;
+  /** Gets the state and the short text of each step when they change, for the step list of the parent. */
+  onStepStates: (states: StepStatus[]) => void;
+}
+
+export interface PlacementRuleGuideHandle {
+  /** Saves the last typed boxes. False, with a message in the card, when the changed rule is not valid. */
+  flush: () => boolean;
+}
+
+export interface PlacementRuleGuideProps extends Omit<PlacementRuleGuideBodyProps, 'step' | 'onStepChange' | 'onStepStates'> {
+  /** True while the stamp picker is open on top of the guide: its Escape must not close the guide. */
+  stampPickerOpen: boolean;
   /** Back to the rule list. */
   onClose: () => void;
 }
 
-const STEP_TITLES = ['Stamp', 'Rooms', 'Amount', 'Spacing', 'Layout', 'Check and place'];
+export const STEP_TITLES = ['Stamp', 'Rooms', 'Amount', 'Spacing', 'Layout', 'Check and place'];
 /** The preview places a stamp also when the rule has none: this id gets the size of PREVIEW_STAMP_M. */
 const PREVIEW_STAMP_ID = '__guide-preview';
 const PREVIEW_STAMP_M = 0.6;
@@ -239,7 +251,9 @@ function coverageRadiusOf(d: Draft): { radiusM: number; from: string } | null {
   return parts[0] ?? null;
 }
 
-type StepState = 'ok' | 'warn' | 'bad' | '';
+export type StepState = 'ok' | 'warn' | 'bad' | '';
+/** The state of a step and its short text. */
+export type StepStatus = [StepState, string];
 
 /** The calculations follow the typed boxes this long after the last key (or at once on Enter or a focus change). */
 const SETTLE_MS = 400;
@@ -275,33 +289,102 @@ function usePlacementPlan(createWorker: (() => PlacementWorkerLike) | undefined,
   return { plan: done?.plan ?? null, input: done?.input ?? null, fresh: input !== null && done?.input === input, busy: input !== null && done?.input !== input && error === null, error };
 }
 
+/** The rule of a draft as JSON, or null when a box is not correct: the auto-save compares these. */
+function ruleJsonOf(id: string, d: Draft): string | null {
+  try {
+    return JSON.stringify(ruleOf(id, d));
+  } catch (err) {
+    if (!(err instanceof FieldError)) throw err;
+    return null;
+  }
+}
+
+/** The step list of the guide: one button per step with its state. */
+export function PlacementGuideSteps({ step, states, onStepChange }: { step: number; states: readonly StepStatus[]; onStepChange: (step: number) => void }) {
+  return (
+    <nav className="mep-guide-steps" aria-label="Steps">
+      {STEP_TITLES.map((title, i) => {
+        const n = i + 1;
+        const [state, sub] = states[i] ?? ['', ''];
+        return (
+          <button key={title} type="button" className={`mep-guide-step ${state}${step === n ? ' on' : ''}`} aria-current={step === n ? 'step' : undefined} data-step={n} onClick={() => onStepChange(n)}>
+            <span className="n">{state === 'ok' && step !== n ? '✓' : n}</span>
+            <span className="t">{title}</span>
+            <span className="s">{sub}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 /**
- * The guide for one placement rule (room-placement-guide.md Phases B and C): a step list, the current
- * step, and a sample room of the shown page that shows the result of each change at once. Steps
- * 1–3 (stamp, rooms, amount) come from Phase B; steps 4–6 (spacing, layout, check and place) from
- * Phase C. Save and Revert work on a draft of the rule. Place saves the draft first.
+ * The guide for one placement rule in its own dialog (room-placement-guide.md Phases B and C): the
+ * step list and the body. Close saves the last typed boxes first.
  */
-export function PlacementRuleGuide({
-  rule,
-  isNew,
-  others,
-  roomTypes,
-  language,
-  sceneRef,
-  stampName,
-  stampDefinition,
-  stampScale,
-  stampIconUrl,
-  stampPickerOpen,
-  onChooseStamp,
-  onChangeRoomTypes,
-  loadStampArt,
-  createPlacementWorker,
-  onPlaced,
-  onSave,
-  onClose,
-}: PlacementRuleGuideProps) {
-  const initial = useMemo(() => draftOf(rule), [rule]);
+export function PlacementRuleGuide({ stampPickerOpen, onClose, ...props }: PlacementRuleGuideProps) {
+  const [step, setStep] = useState(1);
+  const [states, setStates] = useState<StepStatus[]>([]);
+  const body = useRef<PlacementRuleGuideHandle | null>(null);
+  const requestClose = () => {
+    if (stampPickerOpen) return;
+    if (body.current && !body.current.flush()) return;
+    onClose();
+  };
+  return (
+    <Dialog
+      title={`Placement rule guide: ${props.rule.name || 'new rule'}`}
+      className="mep-modal--placement-guide"
+      onClose={requestClose}
+      actions={
+        <button type="button" onClick={requestClose}>
+          Close
+        </button>
+      }
+    >
+      <div className="mep-guide">
+        <PlacementGuideSteps step={step} states={states} onStepChange={setStep} />
+        <PlacementRuleGuideBody ref={body} {...props} step={step} onStepChange={setStep} onStepStates={setStates} />
+      </div>
+    </Dialog>
+  );
+}
+
+/**
+ * The body of the guide for one placement rule: the current step, and a sample room of the shown
+ * page that shows the result of each change at once. Steps 1–3 (stamp, rooms, amount) come from
+ * Phase B; steps 4–6 (spacing, layout, check and place) from Phase C. The parent holds the step and
+ * shows the step list. The body saves each valid change at once; Revert goes back to the rule as it
+ * was when the body opened.
+ */
+export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, PlacementRuleGuideBodyProps>(function PlacementRuleGuideBody(
+  {
+    rule,
+    others,
+    roomTypes,
+    language,
+    sceneRef,
+    stampName,
+    stampDefinition,
+    stampScale,
+    stampIconUrl,
+    onChooseStamp,
+    onChangeRoomTypes,
+    loadStampArt,
+    createPlacementWorker,
+    onPlaced,
+    onSave,
+    step,
+    onStepChange,
+    onStepStates,
+  },
+  ref,
+) {
+  // The rule as it was when the body opened: Revert goes back to it. Later saves do not change it.
+  const [initial] = useState(() => draftOf(rule));
+  const [initialJson] = useState(() => JSON.stringify(initial));
+  // The last saved rule: a new rule that the user did not change is not saved.
+  const savedRef = useRef<string | null>(ruleJsonOf(rule.id, initial));
   const [draft, setDraft] = useState(initial);
   // The calculations use `settled`: it follows the typed draft SETTLE_MS after the last key, and at once after another change.
   const [settled, setSettled] = useState(initial);
@@ -322,12 +405,14 @@ export function PlacementRuleGuide({
     typedRef.current = false;
     setDraft(next);
   };
-  const [step, setStep] = useState(1);
-  const [view, setView] = useState<'room' | 'floor' | null>(null);
+  // The view that the user chose holds only for the step where they chose it.
+  const [chosenView, setChosenView] = useState<{ step: number; mode: 'room' | 'floor' } | null>(null);
+  const view = chosenView?.step === step ? chosenView.mode : null;
+  const setView = (mode: 'room' | 'floor' | null) => setChosenView(mode ? { step, mode } : null);
   const [sampleId, setSampleId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [placed, setPlaced] = useState<{ count: number; replaced: number } | null>(null);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const changed = JSON.stringify(draft) !== initialJson;
 
   const scene = sceneRef.current;
   // The preview follows room edits (room types, ceiling heights) and page changes.
@@ -532,33 +617,46 @@ export function PlacementRuleGuide({
     return ['', step === 6 && placePlan ? `${plural(placeTotal, 'stamp')} to place` : 'Place the stamps'];
   };
 
-  const requestClose = () => {
-    if (stampPickerOpen) return;
-    if (dirty) {
-      setMessage('Save or revert your changes first.');
-      return;
-    }
-    onClose();
-  };
-  /** Saves the draft; null when it is not valid (the message says why). */
-  const saveRule = (): PlacementRule | null => {
+  // Why the settled draft cannot be saved; null when it is valid.
+  const problem = useMemo(() => parsed.error ?? (parsed.rule ? validatePlacementRule(parsed.rule, others) : null), [parsed, others]);
+  // The guide saves each valid change at once.
+  useEffect(() => {
+    if (!parsed.rule || problem) return;
+    const json = JSON.stringify(parsed.rule);
+    if (json === savedRef.current) return;
+    savedRef.current = json;
+    onSave(parsed.rule);
+  }, [parsed.rule, problem, onSave]);
+  /** Saves the draft as it is now, also before it settles; false when a changed draft is not valid (the message says why). */
+  const saveNow = (): boolean => {
+    let next: PlacementRule;
     try {
-      const next = ruleOf(rule.id, draft);
-      const problem = validatePlacementRule(next, others);
-      if (problem) {
-        setMessage(problem);
-        return null;
-      }
-      onSave(next);
-      replaceDraft(draftOf(next));
-      return next;
+      next = ruleOf(rule.id, draft);
     } catch (err) {
       if (!(err instanceof FieldError)) throw err;
-      setMessage(err.message);
-      return null;
+      if (!changed) return true;
+      setMessage(`${err.message} Correct it, or click Revert.`);
+      return false;
     }
+    const invalid = validatePlacementRule(next, others);
+    if (invalid) {
+      if (!changed) return true;
+      setMessage(`${invalid} Correct it, or click Revert.`);
+      return false;
+    }
+    const json = JSON.stringify(next);
+    if (json !== savedRef.current) {
+      savedRef.current = json;
+      onSave(next);
+    }
+    return true;
   };
-  const save = () => void saveRule();
+  useImperativeHandle(ref, () => ({ flush: saveNow }));
+  const revert = () => {
+    replaceDraft(initial);
+    setMessage(null);
+    setPlaced(null);
+  };
 
   const artReady = !stampId || (art?.id === stampId && art.art !== null);
   const groups = useMemo(() => (placePlan && art?.art && art.id === stampId ? groupsOf(placePlan.rows, new Map([[art.id, art.art]])) : []), [placePlan, art, stampId]);
@@ -567,7 +665,7 @@ export function PlacementRuleGuide({
   const canPlace = !!scene && !!placePlan && !!stampId && artReady && !artFailed && (placeTotal > 0 || replaceIds.length > 0);
   const place = () => {
     if (!scene || !canPlace) return;
-    if ((dirty || isNew) && !saveRule()) return;
+    if (!saveNow()) return;
     const ids = scene.autoPlaceStamps(groups, replaceIds);
     setPlaced({ count: ids.length, replaced: replaceIds.length });
     setVersion((v) => v + 1);
@@ -1581,7 +1679,7 @@ export function PlacementRuleGuide({
     const problems = rows.filter((row) => spacingProblem(row) || coverageProblem(row)).length;
     const tooMany = rows.filter(tooManyStamps).length;
     const others = pageRooms.length - matched.length;
-    const label = !artReady && !artFailed ? 'Loading the stamp…' : placeBusy ? 'Calculating…' : `${dirty || isNew ? 'Save and place' : 'Place'} ${plural(placeTotal, 'stamp')}${replaceIds.length > 0 ? ` (replace ${replaceIds.length})` : ''}`;
+    const label = !artReady && !artFailed ? 'Loading the stamp…' : placeBusy ? 'Calculating…' : `Place ${plural(placeTotal, 'stamp')}${replaceIds.length > 0 ? ` (replace ${replaceIds.length})` : ''}`;
     return (
       <>
         <h2>Check and place</h2>
@@ -1591,7 +1689,7 @@ export function PlacementRuleGuide({
         {!stampId && (
           <div className="mep-guide-callout">
             <span>The rule has no stamp. Choose a stamp in step 1 first.</span>
-            <button type="button" onClick={() => setStep(1)}>
+            <button type="button" onClick={() => onStepChange(1)}>
               Go to step 1
             </button>
           </div>
@@ -1673,164 +1771,145 @@ export function PlacementRuleGuide({
   }
 
   const planStamps = mode === 'room' ? (sampleShown?.stamps ?? []) : (shownRows ?? []).flatMap((row) => row.stamps);
-  const status = stepStatus;
+  // The parent shows the step list: it gets the states only when they change.
+  const statesKey = JSON.stringify(STEP_TITLES.map((_, i) => stepStatus(i + 1)));
+  const onStepStatesRef = useRef(onStepStates);
+  onStepStatesRef.current = onStepStates;
+  useLayoutEffect(() => onStepStatesRef.current(JSON.parse(statesKey) as StepStatus[]), [statesKey]);
 
   return (
-    <Dialog
-      title={`Placement rule guide: ${draft.name || 'new rule'}`}
-      className="mep-modal--placement-guide"
-      onClose={requestClose}
-      actions={
-        <>
-          {message && (
-            <span className="mep-guide-message" role="alert">
-              {message}
-            </span>
-          )}
-          <button type="button" onClick={save} disabled={!dirty && !isNew}>
-            Save
-          </button>
-          <button type="button" onClick={() => (replaceDraft(initial), setMessage(null))} disabled={!dirty}>
-            Revert
-          </button>
-          <button type="button" onClick={requestClose}>
-            Close
-          </button>
-        </>
-      }
-    >
-      <div className="mep-guide" onKeyDown={(e) => e.key === 'Enter' && settle()} onBlur={settle}>
-        <nav className="mep-guide-steps" aria-label="Steps">
-          {STEP_TITLES.map((title, i) => {
-            const n = i + 1;
-            const [state, sub] = status(n);
-            return (
-              <button
-                key={title}
-                type="button"
-                className={`mep-guide-step ${state}${step === n ? ' on' : ''}`}
-                aria-current={step === n ? 'step' : undefined}
-                data-step={n}
-                onClick={() => {
-                  setStep(n);
-                  setView(null);
-                }}
-              >
-                <span className="n">{state === 'ok' && step !== n ? '✓' : n}</span>
-                <span className="t">{title}</span>
-                <span className="s">{sub}</span>
-              </button>
-            );
-          })}
-        </nav>
-        <section className="mep-guide-card" data-testid="pg-step">
-          {stepView()}
-          <div className="mep-guide-nav">
-            <button type="button" disabled={step === 1} onClick={() => (setStep(step - 1), setView(null))}>
-              Back
+    <div className="mep-guide-body" onKeyDown={(e) => e.key === 'Enter' && settle()} onBlur={settle}>
+      <section className="mep-guide-card" data-testid="pg-step">
+        {message ? (
+          <div className="mep-guide-callout bad" role="alert" data-testid="pg-save-state">
+            <span>{message}</span>
+            <button type="button" onClick={revert}>
+              Revert
             </button>
-            {step < STEP_TITLES.length && (
-              <button type="button" className="primary" onClick={() => (setStep(step + 1), setView(null))}>
-                Next: {STEP_TITLES[step]}
-              </button>
-            )}
           </div>
-        </section>
-        <aside className="mep-guide-side">
-          <div className="mep-guide-panel">
-            <div className="mep-guide-panel-head">
-              <span className="pt">{mode === 'room' ? 'Sample room' : 'Whole floor'}</span>
-              {planBusy && (
-                <span className="mep-guide-busy" role="status" data-testid="pg-busy">
-                  Calculating…
-                </span>
-              )}
-              <div className="mep-guide-seg" role="group" aria-label="View">
-                <button type="button" className={mode === 'room' ? 'on' : ''} aria-pressed={mode === 'room'} onClick={() => setView('room')}>
-                  This room
-                </button>
-                <button type="button" className={mode === 'floor' ? 'on' : ''} aria-pressed={mode === 'floor'} onClick={() => setView('floor')}>
-                  Whole floor
-                </button>
-              </div>
+        ) : problem && changed ? (
+          <div className="mep-guide-callout bad" data-testid="pg-save-state">
+            <span>Not saved: {problem}</span>
+            <button type="button" onClick={revert}>
+              Revert
+            </button>
+          </div>
+        ) : (
+          changed && (
+            <div className="mep-guide-status" role="status" data-testid="pg-save-state">
+              <span>Saved. MepApp saves each change at once.</span>
+              <button type="button" id="pg-revert" onClick={revert}>
+                Revert all changes since you opened the rule
+              </button>
             </div>
-            {!scene ? (
-              <p className="mep-guide-note">Open a drawing with rooms to see a sample room.</p>
-            ) : (
-              <>
-                {mode === 'room' && sampleValues && (
-                  <div className="mep-guide-facts" data-testid="pg-facts">
-                    <span className="mep-guide-fact">{sampleValues.areaM2 === null ? 'no scale' : `${fmt(sampleValues.areaM2)} m²`}</span>
-                    {sampleValues.lengthM !== null && sampleValues.widthM !== null && (
-                      <span className="mep-guide-fact">
-                        {sampleValues.lengthM.toFixed(2)} × {sampleValues.widthM.toFixed(2)} m
-                      </span>
-                    )}
-                    <span className="mep-guide-fact">{typeName(sample?.roomTypeId)}</span>
-                    {sampleValues.people && (
-                      <span className="mep-guide-fact">
-                        {plural(sampleValues.people.count, 'person')} <small>{sampleValues.people.source === 'room' ? 'room value' : 'from the room type, rounded down'}</small>
-                      </span>
-                    )}
-                    {sampleValues.volumeM3 !== null && (
-                      <span className="mep-guide-fact">
-                        {fmt(sampleValues.volumeM3)} m³ <small>ceiling {sampleValues.ceilingHeight.mm} mm</small>
-                      </span>
-                    )}
-                  </div>
-                )}
-                {jobError && <p className="mep-guide-callout bad">MepApp cannot calculate the stamps: {jobError}</p>}
-                <RulePreviewPlan
-                  mode={mode}
-                  busy={planBusy}
-                  rooms={pageRooms}
-                  sample={sample}
-                  calibration={calibration}
-                  roomState={roomState}
-                  stamps={step >= 3 || mode === 'floor' ? planStamps : []}
-                  stampSizePt={stampSizePt}
-                  stampIconUrl={iconUrl}
-                  wallOffsetM={parsed.rule?.layout.wallOffsetM ?? 0}
-                  coverageRadiusM={coverageOn && parsed.rule ? coverageRadiusM(parsed.rule.coverage) : null}
-                  minSpacingM={step === 4 ? (parsed.rule?.layout.minSpacingM ?? null) : null}
-                  ceilingGridMm={step >= 3 && parsed.rule && parsed.rule.layout.strategy !== 'perimeter' ? (parsed.rule.layout.ceilingGridMm ?? null) : null}
-                  onPickRoom={(id) => {
-                    setSampleId(id);
-                    if (view === 'floor' && step >= 3 && step <= 5) setView(null);
-                  }}
-                />
-                <div className="mep-guide-legend">
-                  {mode === 'room' ? (
-                    <>
-                      <span style={{ ['--sw' as string]: 'var(--accent-soft)' }}>room that matches</span>
-                      <span style={{ ['--sw' as string]: 'var(--guide-band)' }}>min distance to the walls</span>
-                      {coverageOn && <span style={{ ['--sw' as string]: 'rgba(23, 90, 138, 0.15)' }}>coverage circle</span>}
-                      {step === 4 && draft.minSpacing.trim() !== '' && <span style={{ ['--sw' as string]: 'var(--guide-ok-soft)' }}>min distance between stamps</span>}
-                      {step >= 3 && parsed.rule?.layout.ceilingGridMm !== undefined && parsed.rule.layout.strategy !== 'perimeter' && <span className="line">ceiling grid</span>}
-                      <span className="plain">click a room to use it</span>
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ ['--sw' as string]: 'var(--accent-soft)' }}>matches the rule</span>
-                      <span style={{ ['--sw' as string]: 'var(--surface)' }}>does not match</span>
-                      <span style={{ ['--sw' as string]: 'var(--guide-warn-soft)' }}>missing data</span>
-                      {step >= 4 && <span style={{ ['--sw' as string]: 'var(--guide-bad-soft)' }}>stamps do not fit, or not covered</span>}
-                      <span className="hatch">no room type</span>
-                      <span className="plain">click a room to use it</span>
-                    </>
+          )
+        )}
+        {stepView()}
+        <div className="mep-guide-nav">
+          <button type="button" disabled={step === 1} onClick={() => onStepChange(step - 1)}>
+            Back
+          </button>
+          {step < STEP_TITLES.length && (
+            <button type="button" className="primary" onClick={() => onStepChange(step + 1)}>
+              Next: {STEP_TITLES[step]}
+            </button>
+          )}
+        </div>
+      </section>
+      <aside className="mep-guide-side">
+        <div className="mep-guide-panel">
+          <div className="mep-guide-panel-head">
+            <span className="pt">{mode === 'room' ? 'Sample room' : 'Whole floor'}</span>
+            {planBusy && (
+              <span className="mep-guide-busy" role="status" data-testid="pg-busy">
+                Calculating…
+              </span>
+            )}
+            <div className="mep-guide-seg" role="group" aria-label="View">
+              <button type="button" className={mode === 'room' ? 'on' : ''} aria-pressed={mode === 'room'} onClick={() => setView('room')}>
+                This room
+              </button>
+              <button type="button" className={mode === 'floor' ? 'on' : ''} aria-pressed={mode === 'floor'} onClick={() => setView('floor')}>
+                Whole floor
+              </button>
+            </div>
+          </div>
+          {!scene ? (
+            <p className="mep-guide-note">Open a drawing with rooms to see a sample room.</p>
+          ) : (
+            <>
+              {mode === 'room' && sampleValues && (
+                <div className="mep-guide-facts" data-testid="pg-facts">
+                  <span className="mep-guide-fact">{sampleValues.areaM2 === null ? 'no scale' : `${fmt(sampleValues.areaM2)} m²`}</span>
+                  {sampleValues.lengthM !== null && sampleValues.widthM !== null && (
+                    <span className="mep-guide-fact">
+                      {sampleValues.lengthM.toFixed(2)} × {sampleValues.widthM.toFixed(2)} m
+                    </span>
+                  )}
+                  <span className="mep-guide-fact">{typeName(sample?.roomTypeId)}</span>
+                  {sampleValues.people && (
+                    <span className="mep-guide-fact">
+                      {plural(sampleValues.people.count, 'person')} <small>{sampleValues.people.source === 'room' ? 'room value' : 'from the room type, rounded down'}</small>
+                    </span>
+                  )}
+                  {sampleValues.volumeM3 !== null && (
+                    <span className="mep-guide-fact">
+                      {fmt(sampleValues.volumeM3)} m³ <small>ceiling {sampleValues.ceilingHeight.mm} mm</small>
+                    </span>
                   )}
                 </div>
-              </>
-            )}
-          </div>
-          {scene && sample && step >= 3 && (
-            <WhyBox row={sampleShown} matches={sampleMatches} sampleName={roomLabel(sample)} unit={unit} rule={parsed.rule} coverage={coverageOn ? coverage : null} error={parsed.error} />
+              )}
+              {jobError && <p className="mep-guide-callout bad">MepApp cannot calculate the stamps: {jobError}</p>}
+              <RulePreviewPlan
+                mode={mode}
+                busy={planBusy}
+                rooms={pageRooms}
+                sample={sample}
+                calibration={calibration}
+                roomState={roomState}
+                stamps={step >= 3 || mode === 'floor' ? planStamps : []}
+                stampSizePt={stampSizePt}
+                stampIconUrl={iconUrl}
+                wallOffsetM={parsed.rule?.layout.wallOffsetM ?? 0}
+                coverageRadiusM={coverageOn && parsed.rule ? coverageRadiusM(parsed.rule.coverage) : null}
+                minSpacingM={step === 4 ? (parsed.rule?.layout.minSpacingM ?? null) : null}
+                ceilingGridMm={step >= 3 && parsed.rule && parsed.rule.layout.strategy !== 'perimeter' ? (parsed.rule.layout.ceilingGridMm ?? null) : null}
+                onPickRoom={(id) => {
+                  setSampleId(id);
+                  if (view === 'floor' && step >= 3 && step <= 5) setView(null);
+                }}
+              />
+              <div className="mep-guide-legend">
+                {mode === 'room' ? (
+                  <>
+                    <span style={{ ['--sw' as string]: 'var(--accent-soft)' }}>room that matches</span>
+                    <span style={{ ['--sw' as string]: 'var(--guide-band)' }}>min distance to the walls</span>
+                    {coverageOn && <span style={{ ['--sw' as string]: 'rgba(23, 90, 138, 0.15)' }}>coverage circle</span>}
+                    {step === 4 && draft.minSpacing.trim() !== '' && <span style={{ ['--sw' as string]: 'var(--guide-ok-soft)' }}>min distance between stamps</span>}
+                    {step >= 3 && parsed.rule?.layout.ceilingGridMm !== undefined && parsed.rule.layout.strategy !== 'perimeter' && <span className="line">ceiling grid</span>}
+                    <span className="plain">click a room to use it</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ ['--sw' as string]: 'var(--accent-soft)' }}>matches the rule</span>
+                    <span style={{ ['--sw' as string]: 'var(--surface)' }}>does not match</span>
+                    <span style={{ ['--sw' as string]: 'var(--guide-warn-soft)' }}>missing data</span>
+                    {step >= 4 && <span style={{ ['--sw' as string]: 'var(--guide-bad-soft)' }}>stamps do not fit, or not covered</span>}
+                    <span className="hatch">no room type</span>
+                    <span className="plain">click a room to use it</span>
+                  </>
+                )}
+              </div>
+            </>
           )}
-        </aside>
-      </div>
-    </Dialog>
+        </div>
+        {scene && sample && step >= 3 && (
+          <WhyBox row={sampleShown} matches={sampleMatches} sampleName={roomLabel(sample)} unit={unit} rule={parsed.rule} coverage={coverageOn ? coverage : null} error={parsed.error} />
+        )}
+      </aside>
+    </div>
   );
-}
+});
 
 /** Enter or Space does the click of a row that picks a room. */
 const pickKeys = (onPick: () => void) => (e: KeyboardEvent) => {
