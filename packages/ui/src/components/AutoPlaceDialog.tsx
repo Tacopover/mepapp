@@ -5,6 +5,7 @@ import {
   calculateRooms,
   calibrationFromScale,
   MAX_ROOM_STAMPS,
+  parsePlacementRules,
   resolveCeilingHeight,
   roomTypeLabel,
   type PlacementPlanInput,
@@ -17,8 +18,10 @@ import {
 } from '@mepapp/core';
 import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, type AutoPlaceArt } from './autoPlacePlan.js';
 import { CeilingHeightsCard, DrawingCard, LEVEL_FILLS, LEVEL_NAMES, RoomTypesCard, TYPE_FILLS, typeFillOf } from './AutoPlaceInputCards.js';
+import { examplePlacementRules } from '../placementRuleStorage.js';
 import { Dialog } from './Dialog.js';
 import { PlacementGuideSteps, PlacementRuleGuideBody, type PlacementRuleGuideHandle, type StepState, type StepStatus } from './PlacementRuleGuide.js';
+import { blankRule, newRuleId, uniqueName } from './placementRuleDraft.js';
 import { RulePreviewPlan, type PreviewRoomState, type PreviewStampLayer } from './RulePreviewPlan.js';
 
 export interface AutoPlaceDialogProps {
@@ -47,7 +50,11 @@ export interface AutoPlaceDialogProps {
   onChangeRoomTypes: (types: RoomType[]) => void;
   /** Saves the rule list: the guide saves each valid change of a rule at once. */
   onChangeRules: (rules: PlacementRule[]) => void;
-  onOpenRules: () => void;
+  /** Saves the rule list as a JSON file. */
+  onExportRules: (rules: PlacementRule[]) => void;
+  /** The ids of the rules that Place all does not use (the rules without a check). */
+  uncheckedRuleIds: readonly string[];
+  onChangeUncheckedRuleIds: (ids: string[]) => void;
   /** Saves the room-type library as a JSON file. */
   onExportRoomTypes: (types: RoomType[]) => void;
   /** Detects the rooms of the shown page (the handler of Menu › Detect rooms). */
@@ -115,7 +122,8 @@ const pickKeys = (onPick: () => void) => (e: KeyboardEvent) => {
  * guide. The left list has the input data (each with its editor), the rules (a rule opens into the
  * six guide steps) and Place all. Place all plans the checked rules in a Web Worker, shows the stamps on the floor plan,
  * and places them as one undo step. Only rooms on the shown page get stamps. A re-run replaces the
- * unmoved auto-placed stamps of the same rule and room, and keeps the moved ones.
+ * unmoved auto-placed stamps of the same rule and room, and keeps the moved ones. The Rules section
+ * also adds, duplicates, deletes, imports and exports rules (Phase 4); the app stores the checks.
  */
 export function AutoPlaceDialog({
   sceneRef,
@@ -132,7 +140,9 @@ export function AutoPlaceDialog({
   stampPickerOpen,
   onChangeRoomTypes,
   onChangeRules,
-  onOpenRules,
+  onExportRules,
+  uncheckedRuleIds,
+  onChangeUncheckedRuleIds,
   onExportRoomTypes,
   onDetectRooms,
   roomsDetecting,
@@ -186,7 +196,7 @@ export function AutoPlaceDialog({
   const [stepStates, setStepStates] = useState<StepStatus[]>([]);
   const body = useRef<PlacementRuleGuideHandle | null>(null);
   const openRule = item.kind === 'rule' ? (rules.find((r) => r.id === item.id) ?? null) : null;
-  const [unchecked, setUnchecked] = useState<ReadonlySet<string>>(() => new Set());
+  const unchecked = useMemo(() => new Set(uncheckedRuleIds), [uncheckedRuleIds]);
   const [previewing, setPreviewing] = useState(false);
   const [placed, setPlaced] = useState<{ count: number; replaced: number } | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(null);
@@ -194,6 +204,9 @@ export function AutoPlaceDialog({
   // The room type form has changes that are not saved: the dialog stays on the card.
   const libraryDirty = useRef(false);
   const [blockMessage, setBlockMessage] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [rulesMessage, setRulesMessage] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
   /** False, with a message on the card, while a rule or a room type cannot be left. */
   const canLeave = () => {
     if (openRule && body.current && !body.current.flush()) return false;
@@ -204,9 +217,8 @@ export function AutoPlaceDialog({
     return true;
   };
 
-  /** Opens an item of the left list. A rule with a box that is not valid stays open (the guide says why). */
-  const go = (next: Item, step = 1) => {
-    if (!canLeave()) return;
+  const show = (next: Item, step = 1) => {
+    setConfirmDelete(null);
     if (next.kind === 'rule' && item.kind === 'rule' && next.id === item.id) {
       setRuleStep(step);
       return;
@@ -217,6 +229,10 @@ export function AutoPlaceDialog({
     setPlaced(null);
     setBlockMessage(null);
   };
+  /** Opens an item of the left list. A rule with a box that is not valid stays open (the guide says why). */
+  const go = (next: Item, step = 1) => {
+    if (canLeave()) show(next, step);
+  };
   const requestClose = () => {
     if (stampPickerOpen) return;
     if (!canLeave()) return;
@@ -224,13 +240,68 @@ export function AutoPlaceDialog({
   };
   const rulesRef = useRef(rules);
   rulesRef.current = rules;
-  const saveRule = useCallback(
-    (next: PlacementRule) => {
-      const list = rulesRef.current;
-      onChangeRules(list.some((r) => r.id === next.id) ? list.map((r) => (r.id === next.id ? next : r)) : [...list, next]);
+  /** Saves the list at once; rulesRef holds it until the parent renders the dialog again. */
+  const setRules = useCallback(
+    (list: PlacementRule[]) => {
+      rulesRef.current = list;
+      onChangeRules(list);
     },
     [onChangeRules],
   );
+  const saveRule = useCallback(
+    (next: PlacementRule) => {
+      const list = rulesRef.current;
+      setRules(list.some((r) => r.id === next.id) ? list.map((r) => (r.id === next.id ? next : r)) : [...list, next]);
+    },
+    [setRules],
+  );
+  const setUnchecked = (ids: ReadonlySet<string>) => onChangeUncheckedRuleIds([...ids].filter((id) => rulesRef.current.some((r) => r.id === id)));
+  /** Adds rules to the list and opens the first of them at step 1. */
+  const addRules = (added: PlacementRule[]) => {
+    if (!canLeave() || added.length === 0) return;
+    setRules([...rulesRef.current, ...added]);
+    setRulesMessage(null);
+    show({ kind: 'rule', id: added[0]!.id });
+  };
+  const newRule = () => addRules([blankRule(uniqueName('New rule', rulesRef.current))]);
+  const duplicateRule = (id: string) => {
+    if (!canLeave()) return;
+    const from = rulesRef.current.find((r) => r.id === id);
+    if (from) addRules([{ ...structuredClone(from), id: newRuleId(), name: uniqueName(`${from.name} copy`, rulesRef.current) }]);
+  };
+  /** Deletes a rule without a save of its boxes: the open rule can have a box that is not valid. */
+  const deleteRule = (id: string) => {
+    setRules(rulesRef.current.filter((r) => r.id !== id));
+    setUnchecked(new Set([...unchecked].filter((u) => u !== id)));
+    setRulesMessage(null);
+    show({ kind: 'place' });
+  };
+  const addExamples = () => {
+    const examples = examplePlacementRules().map((r) => (rulesRef.current.some((o) => o.id === r.id) ? { ...r, id: newRuleId() } : r));
+    if (!canLeave()) return;
+    setRules([...rulesRef.current, ...examples]);
+    setRulesMessage(`Added ${plural(examples.length, 'example rule')}.`);
+  };
+  const importFile = async (file: File) => {
+    let imported: PlacementRule[] | null;
+    try {
+      imported = parsePlacementRules(JSON.parse(await file.text()));
+    } catch {
+      setRulesMessage(`MepApp cannot read ${file.name}.`);
+      return;
+    }
+    if (!imported) {
+      setRulesMessage(`${file.name} does not hold a list of placement rules.`);
+      return;
+    }
+    if (!canLeave()) return;
+    const list = rulesRef.current;
+    const replaced = list.filter((r) => imported.some((i) => i.id === r.id)).length;
+    setRules([...list.map((r) => imported.find((i) => i.id === r.id) ?? r), ...imported.filter((i) => !list.some((r) => r.id === i.id))]);
+    setRulesMessage(`Imported ${plural(imported.length, 'rule')} (${replaced} replaced).`);
+    // The open rule shows the boxes of the old rule: show Place all when the import replaced it.
+    if (item.kind === 'rule' && imported.some((i) => i.id === item.id)) show({ kind: 'place' });
+  };
 
   // The left list: a dry run of every rule (no stamp positions), fast enough for each change of a rule.
   const dryRows = useMemo(() => (scene ? calculateRooms(rules, scopeRooms, valuesOf).rows : []), [scene, rules, scopeRooms, valuesOf]);
@@ -416,7 +487,7 @@ export function AutoPlaceDialog({
     : pageRooms.length === 0
       ? { text: 'Detect the rooms of this page first.', short: 'Detect the rooms first', fix: 'drawing' }
       : rules.length === 0
-        ? { text: 'There are no placement rules. Add one in Placement rules.', short: 'Add a rule first', fix: null }
+        ? { text: 'There are no placement rules.', short: 'Add a rule first', fix: null }
         : checkedRules.length === 0
           ? { text: 'Check at least one rule in the list.', short: 'Check at least one rule', fix: null }
           : scopeRooms.length === 0
@@ -440,8 +511,13 @@ export function AutoPlaceDialog({
     <nav className="mep-autoplace-nav" aria-label="Auto-place" data-testid="ap-nav">
       <h4>Input data</h4>
       {(['drawing', 'types', 'heights'] as const).map(inputItem)}
-      <h4>Placement rules</h4>
-      <p className="mep-guide-note">{rules.length === 0 ? 'No rules yet. Add one in Placement rules.' : 'A check puts the rule in Place all.'}</p>
+      <h4 className="mep-autoplace-rules-head">
+        Placement rules
+        <button type="button" data-act="new-rule" title="Add a new rule and open it at step 1" onClick={newRule}>
+          + New
+        </button>
+      </h4>
+      <p className="mep-guide-note">{rules.length === 0 ? 'No rules yet.' : 'A check puts the rule in Place all.'}</p>
       {rules.map((rule) => {
         const [state, sub] = ruleStatus.get(rule.id) ?? ['', ''];
         const on = !unchecked.has(rule.id);
@@ -469,11 +545,58 @@ export function AutoPlaceDialog({
             {open && (
               <div className="mep-autoplace-substeps">
                 <PlacementGuideSteps step={ruleStep} states={stepStates} onStepChange={setRuleStep} />
+                <div className="mep-autoplace-rule-actions" data-testid="ap-rule-actions">
+                  {confirmDelete === rule.id ? (
+                    <>
+                      <span>Delete this rule?</span>
+                      <button type="button" data-act="delete-yes" onClick={() => deleteRule(rule.id)}>
+                        Delete
+                      </button>
+                      <button type="button" onClick={() => setConfirmDelete(null)}>
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" data-act="duplicate" onClick={() => duplicateRule(rule.id)}>
+                        Duplicate
+                      </button>
+                      <button type="button" data-act="delete" onClick={() => setConfirmDelete(rule.id)}>
+                        Delete…
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
         );
       })}
+      <div className="mep-autoplace-rule-tools">
+        <button type="button" data-act="import-rules" onClick={() => fileInput.current?.click()}>
+          Import…
+        </button>
+        <button type="button" data-act="export-rules" disabled={rules.length === 0} onClick={() => onExportRules(rulesRef.current)}>
+          Export…
+        </button>
+      </div>
+      {rulesMessage && (
+        <p className="mep-guide-note" role="status" data-testid="ap-rules-message">
+          {rulesMessage}
+        </p>
+      )}
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: 'none' }}
+        data-testid="ap-rules-file"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void importFile(file);
+        }}
+      />
       <button type="button" className={`mep-guide-step mep-autoplace-placeall${item.kind === 'place' ? ' on' : ''}`} data-item="place" onClick={() => go({ kind: 'place' })}>
         <span className="n">▶</span>
         <span className="t">Place all</span>
@@ -561,6 +684,19 @@ export function AutoPlaceDialog({
               <button type="button" onClick={() => go({ kind: blocked.fix! })}>
                 Open {INPUT_TITLES[blocked.fix]}
               </button>
+            )}
+            {rules.length === 0 && blocked.fix === null && (
+              <div className="mep-guide-inline">
+                <button type="button" data-act="examples" onClick={addExamples}>
+                  Add the example rules
+                </button>
+                <button type="button" onClick={newRule}>
+                  + New rule
+                </button>
+                <button type="button" onClick={() => fileInput.current?.click()}>
+                  Import…
+                </button>
+              </div>
             )}
           </div>
         ) : null}
@@ -729,20 +865,9 @@ export function AutoPlaceDialog({
       className="mep-modal--placement-guide mep-modal--auto-place"
       onClose={requestClose}
       actions={
-        <>
-          <button
-            type="button"
-            onClick={() => {
-              if (openRule && body.current && !body.current.flush()) return;
-              onOpenRules();
-            }}
-          >
-            Placement rules…
-          </button>
-          <button type="button" onClick={requestClose}>
-            Close
-          </button>
-        </>
+        <button type="button" onClick={requestClose}>
+          Close
+        </button>
       }
     >
       <div className="mep-guide">

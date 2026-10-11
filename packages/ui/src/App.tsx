@@ -62,12 +62,9 @@ import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
-import { RoomTypesDialog } from './components/RoomTypesDialog.js';
-import { CeilingHeightsDialog } from './components/CeilingHeightsDialog.js';
-import { PlacementRulesDialog } from './components/PlacementRulesDialog.js';
 import { AutoPlaceDialog } from './components/AutoPlaceDialog.js';
 import { getStampAppearanceDefault } from './stampAppearanceDefaults.js';
-import { loadPlacementRules, savePlacementRules } from './placementRuleStorage.js';
+import { loadPlacementRules, loadUncheckedRuleIds, savePlacementRules, saveUncheckedRuleIds } from './placementRuleStorage.js';
 import { stampLabelFor } from './stampVisibility.js';
 import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
@@ -353,7 +350,6 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setGlobalCeilingHeight(ceilingHeightMm);
   }, [ready, ceilingHeightMm, sceneRef]);
-  const [ceilingHeightsOpen, setCeilingHeightsOpen] = useState(false);
   const [roomsVisible, setRoomsVisible] = useState(true);
   useEffect(() => () => roomClientRef.current?.dispose(), []);
   const networkTreeState = useNetworkTreeState();
@@ -422,13 +418,13 @@ export function MepSketchApp({
     if (ready) sceneRef.current?.setLabelVisibility(labelVisibility);
   }, [ready, labelVisibility, sceneRef]);
   const [roomTypes, setRoomTypes] = useState<RoomType[]>(() => loadRoomTypes(typeof localStorage === 'undefined' ? undefined : localStorage));
-  const [roomTypesOpen, setRoomTypesOpen] = useState(false);
   useEffect(() => saveRoomTypes(typeof localStorage === 'undefined' ? undefined : localStorage, roomTypes), [roomTypes]);
   useEffect(() => {
     if (ready) sceneRef.current?.setRoomTypeLibrary(roomTypes);
   }, [ready, roomTypes, sceneRef]);
   const [placementRules, setPlacementRules] = useState<PlacementRule[]>(() => loadPlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage));
-  const [placementRulesOpen, setPlacementRulesOpen] = useState(false);
+  const [uncheckedRuleIds, setUncheckedRuleIds] = useState<string[]>(() => loadUncheckedRuleIds(typeof localStorage === 'undefined' ? undefined : localStorage));
+  useEffect(() => saveUncheckedRuleIds(typeof localStorage === 'undefined' ? undefined : localStorage, uncheckedRuleIds), [uncheckedRuleIds]);
   const [autoPlaceOpen, setAutoPlaceOpen] = useState(false);
   /** Set while the stamp picker chooses the stamp of a placement rule. */
   const [ruleStampPick, setRuleStampPick] = useState<{ onPick: (definitionId: string) => void } | null>(null);
@@ -1472,9 +1468,6 @@ export function MepSketchApp({
           onDetectRooms={handleDetectRooms}
           onCancelRoomDetection={handleCancelRoomDetection}
           onExportRooms={handleExportRooms}
-          onOpenRoomTypes={() => setRoomTypesOpen(true)}
-          onOpenCeilingHeights={() => setCeilingHeightsOpen(true)}
-          onOpenPlacementRules={() => setPlacementRulesOpen(true)}
           onOpenAutoPlace={() => setAutoPlaceOpen(true)}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
@@ -1623,53 +1616,6 @@ export function MepSketchApp({
         />
       )}
 
-      {roomTypesOpen && (
-        <RoomTypesDialog
-          types={roomTypes}
-          fileOnlyTypes={(sceneRef.current?.getRoomTypes() ?? []).filter((t) => !t.inLibrary).map(({ inLibrary, ...type }) => type)}
-          onChange={(next) => {
-            sceneRef.current?.setRoomTypeLibrary(next);
-            setRoomTypes(next);
-          }}
-          onMatchAgain={() => sceneRef.current?.matchRoomTypesAgain() ?? 0}
-          onExport={handleExportRoomTypes}
-          onClose={() => setRoomTypesOpen(false)}
-        />
-      )}
-
-      {ceilingHeightsOpen && <CeilingHeightsDialog sceneRef={sceneRef} drawingName={activeDoc?.fileName ?? null} language={labelLanguage} onClose={() => setCeilingHeightsOpen(false)} />}
-
-      {placementRulesOpen && (
-        <PlacementRulesDialog
-          rules={placementRules}
-          roomTypes={roomTypes}
-          language={labelLanguage}
-          onChange={setPlacementRules}
-          stampName={(id) => {
-            const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
-            return definition ? stampLabelFor(definition, labelLanguage) : null;
-          }}
-          onChooseStamp={(onPick) => setRuleStampPick({ onPick })}
-          onExport={handleExportPlacementRules}
-          sceneRef={sceneRef}
-          stampDefinition={findStampDefinition}
-          stampScale={stampScaleOf}
-          stampIconUrl={(id) => {
-            const definition = findStampDefinition(id);
-            return definition ? iconUrlFor(definition, resolveStampIconUrl) : null;
-          }}
-          onChangeRoomTypes={(next) => {
-            sceneRef.current?.setRoomTypeLibrary(next);
-            setRoomTypes(next);
-          }}
-          stampPickerOpen={ruleStampPick !== null}
-          loadStampArt={loadAutoPlaceArt}
-          createPlacementWorker={createPlacementWorker}
-          onPlaced={showPlacedStatus}
-          onClose={ruleStampPick ? () => {} : () => setPlacementRulesOpen(false)}
-        />
-      )}
-
       {autoPlaceOpen && (
         <AutoPlaceDialog
           sceneRef={sceneRef}
@@ -1695,13 +1641,12 @@ export function MepSketchApp({
             setRoomTypes(next);
           }}
           onChangeRules={setPlacementRules}
+          onExportRules={handleExportPlacementRules}
+          uncheckedRuleIds={uncheckedRuleIds}
+          onChangeUncheckedRuleIds={setUncheckedRuleIds}
           onExportRoomTypes={handleExportRoomTypes}
           onDetectRooms={() => void handleDetectRooms()}
           roomsDetecting={roomsDetecting}
-          onOpenRules={() => {
-            setAutoPlaceOpen(false);
-            setPlacementRulesOpen(true);
-          }}
           onPlaced={showPlacedStatus}
           onRemoved={(count) => setStatus(`Removed ${count} auto-placed stamp${count === 1 ? '' : 's'}. Undo gives them back.`)}
           onClose={ruleStampPick ? () => {} : () => setAutoPlaceOpen(false)}

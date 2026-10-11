@@ -66,7 +66,7 @@ export function SettingsDialog({ snapRadiusPx, onChangeSnapRadiusPx, angleSnapDe
             onCommit={onChangeCeilingHeightMm}
           />
         </div>
-        <p className="mep-settings-hint">A drawing, a room type in a drawing (Menu › Ceiling heights) and a room (Room Properties) can each use another height.</p>
+        <p className="mep-settings-hint">A drawing, a room type in a drawing (Menu › Auto-place stamps › Ceiling heights) and a room (Room Properties) can each use another height.</p>
       </div>
       <p className="mep-settings-hint">
         How close a click needs to be to an existing stamp or segment endpoint, in screen pixels, before the Draw network tool snaps onto it instead of

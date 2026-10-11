@@ -10,20 +10,6 @@ import {
   type RoomDemands,
   type RoomType,
 } from '@mepapp/core';
-import { Dialog } from './Dialog.js';
-
-export interface RoomTypesDialogProps {
-  /** The user library. */
-  types: RoomType[];
-  /** Types in the active drawing's file that the library lacks. */
-  fileOnlyTypes: RoomType[];
-  onChange: (types: RoomType[]) => void;
-  /** Runs name matching again on the rooms of the active drawing; returns how many rooms changed. */
-  onMatchAgain: () => number;
-  /** Saves the list as a JSON file. */
-  onExport: (types: RoomType[]) => void;
-  onClose: () => void;
-}
 
 export interface RoomTypeLibraryProps {
   /** The user library. */
@@ -53,47 +39,12 @@ const DEMAND_GROUPS: readonly [string, readonly RoomDemandKey[]][] = [
 const newTypeId = () => `room-type-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 /**
- * Edits the user library of room types (room-auto-placement.md Phase 1): name, Dutch name, the
- * keywords that name matching uses, the floor area per person and the demands that placement rules
- * use (room-placement-followup.md Phase F). The library is not part of a
- * drawing. A type that only the drawing's file holds can be added to the library.
+ * Edits the user library of room types (room-auto-placement.md Phase 1): the list with the form of
+ * the selected type (name, Dutch name, the keywords that name matching uses, the floor area per
+ * person and the demands that placement rules use, room-placement-followup.md Phase F), Import and
+ * Export. The library is not part of a drawing. A type that only the drawing's file holds can be
+ * added to the library. The Room types card of Auto-place hosts it.
  */
-export function RoomTypesDialog({ types, fileOnlyTypes, onChange, onMatchAgain, onExport, onClose }: RoomTypesDialogProps) {
-  const [dirty, setDirty] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const matchAgain = () => {
-    const changed = onMatchAgain();
-    setMessage(changed === 0 ? 'No room changed.' : `${changed} room${changed === 1 ? '' : 's'} changed.`);
-  };
-
-  return (
-    <Dialog
-      title="Room types"
-      className="mep-modal--room-types"
-      onClose={onClose}
-      actions={
-        <>
-          <button type="button" disabled={dirty} title={dirty ? 'Save or revert your changes first' : 'Match the rooms of this drawing by name again. Rooms with a type you chose keep it.'} onClick={matchAgain}>
-            Match rooms again
-          </button>
-          <button type="button" onClick={onClose}>
-            Close
-          </button>
-        </>
-      }
-    >
-      <RoomTypeLibrary types={types} fileOnlyTypes={fileOnlyTypes} onChange={onChange} onExport={onExport} onDirtyChange={setDirty} />
-      {message && (
-        <p className="mep-settings-hint" role="status">
-          {message}
-        </p>
-      )}
-    </Dialog>
-  );
-}
-
-/** The list of the room-type library with the form of the selected type, Import and Export. */
 export function RoomTypeLibrary({ types, fileOnlyTypes, onChange, onExport, onDirtyChange, roomCountOf }: RoomTypeLibraryProps) {
   const [selectedId, setSelectedId] = useState<string | null>(types[0]?.id ?? null);
   const [dirty, setDirtyState] = useState(false);

@@ -95,8 +95,8 @@ const m = (value: number | null, unit = 'm') => (value === null ? 'Not calibrate
 
 function levelText(level: CeilingHeightLevel, typeName: string | null): string {
   if (level === 'room') return 'Set for this room. Clear the box to use the value above it.';
-  if (level === 'roomType') return `From room type ${typeName ?? ''} in this drawing (Menu › Ceiling heights).`;
-  if (level === 'pdf') return 'From this drawing (Menu › Ceiling heights).';
+  if (level === 'roomType') return `From room type ${typeName ?? ''} in this drawing (Menu › Auto-place stamps › Ceiling heights).`;
+  if (level === 'pdf') return 'From this drawing (Menu › Auto-place stamps › Ceiling heights).';
   return 'From Settings (the default ceiling height).';
 }
 
@@ -123,7 +123,7 @@ function RoomValueFields({ sceneRef, room, roomTypes, language }: RoomValueField
       : values.people
         ? `Area ÷ ${type?.areaPerPersonM2} m² per person of room type ${typeName}, rounded down.`
         : type
-          ? `Room type ${typeName} has no area per person (Menu › Room types).`
+          ? `Room type ${typeName} has no area per person (Menu › Auto-place stamps › Room types).`
           : 'Give the room a type with an area per person, or enter a number.';
   return (
     <>
@@ -273,7 +273,7 @@ export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDef
           <CommitInput value={room.name ?? ''} onCommit={(v) => update({ name: v.trim() === '' ? null : v.trim() })} />
         </div>
         <RoomTypeSelect sceneRef={sceneRef} rooms={rooms} roomTypes={roomTypes} language={language} />
-        {room.roomTypeId === undefined && <p className="mep-settings-hint">This room has no type. Choose one, or add a keyword in Menu › Room types.</p>}
+        {room.roomTypeId === undefined && <p className="mep-settings-hint">This room has no type. Choose one, or add a keyword in Menu › Auto-place stamps › Room types.</p>}
         <div className="mep-field-row">
           <label>Area</label>
           <input type="text" value={computed !== null ? `${computed.toFixed(2)} m²` : 'Not calibrated'} disabled />

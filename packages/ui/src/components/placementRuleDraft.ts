@@ -16,7 +16,7 @@ import {
   type RoomDemandKey,
 } from '@mepapp/core';
 
-// The text draft of one placement rule in the guide (PlacementRuleGuide): the boxes hold text,
+// The text draft of one placement rule in the guide (PlacementRuleGuideBody): the boxes hold text,
 // and ruleOf turns the draft into a rule.
 
 export const newRuleId = () => `rule-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

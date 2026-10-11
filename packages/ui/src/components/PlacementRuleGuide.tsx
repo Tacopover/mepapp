@@ -53,7 +53,6 @@ import {
   type Vec2,
 } from '@mepapp/core';
 import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, type AutoPlaceArt } from './autoPlacePlan.js';
-import { Dialog } from './Dialog.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
 import { InfoTip } from './InfoTip.js';
 import { OptionalNumberInput } from './OptionalNumberInput.js';
@@ -88,20 +87,13 @@ export interface PlacementRuleGuideBodyProps {
   onStepChange: (step: number) => void;
   /** Gets the state and the short text of each step when they change, for the step list of the parent. */
   onStepStates: (states: StepStatus[]) => void;
-  /** Opens the Room types card of the parent: step 2 then shows one line for the rooms without a type, not a list. */
-  onOpenRoomTypes?: () => void;
+  /** Opens the Room types card of the parent (step 2 shows one line for the rooms without a type). */
+  onOpenRoomTypes: () => void;
 }
 
 export interface PlacementRuleGuideHandle {
   /** Saves the last typed boxes. False, with a message in the card, when the changed rule is not valid. */
   flush: () => boolean;
-}
-
-export interface PlacementRuleGuideProps extends Omit<PlacementRuleGuideBodyProps, 'step' | 'onStepChange' | 'onStepStates'> {
-  /** True while the stamp picker is open on top of the guide: its Escape must not close the guide. */
-  stampPickerOpen: boolean;
-  /** Back to the rule list. */
-  onClose: () => void;
 }
 
 export const STEP_TITLES = ['Stamp', 'Rooms', 'Amount', 'Spacing', 'Layout', 'Check and place'];
@@ -276,38 +268,6 @@ export function PlacementGuideSteps({ step, states, onStepChange }: { step: numb
         );
       })}
     </nav>
-  );
-}
-
-/**
- * The guide for one placement rule in its own dialog (room-placement-guide.md Phases B and C): the
- * step list and the body. Close saves the last typed boxes first.
- */
-export function PlacementRuleGuide({ stampPickerOpen, onClose, ...props }: PlacementRuleGuideProps) {
-  const [step, setStep] = useState(1);
-  const [states, setStates] = useState<StepStatus[]>([]);
-  const body = useRef<PlacementRuleGuideHandle | null>(null);
-  const requestClose = () => {
-    if (stampPickerOpen) return;
-    if (body.current && !body.current.flush()) return;
-    onClose();
-  };
-  return (
-    <Dialog
-      title={`Placement rule guide: ${props.rule.name || 'new rule'}`}
-      className="mep-modal--placement-guide"
-      onClose={requestClose}
-      actions={
-        <button type="button" onClick={requestClose}>
-          Close
-        </button>
-      }
-    >
-      <div className="mep-guide">
-        <PlacementGuideSteps step={step} states={states} onStepChange={setStep} />
-        <PlacementRuleGuideBody ref={body} {...props} step={step} onStepChange={setStep} onStepStates={setStates} />
-      </div>
-    </Dialog>
   );
 }
 
@@ -714,7 +674,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       <>
         <h2>Which rooms get this stamp?</h2>
         <p className="mep-guide-lead">Click the room types. The plan shows the rooms that match in blue. MepApp finds the room type from the room name in the drawing.</p>
-        {untyped.length > 0 && onOpenRoomTypes && (
+        {untyped.length > 0 && (
           <div className="mep-guide-callout" data-testid="pg-untyped">
             <span>
               <b>{plural(untyped.length, 'room')}</b> on this page {untyped.length === 1 ? 'has' : 'have'} no room type. A rule with room types does not find {untyped.length === 1 ? 'it' : 'them'}.
@@ -722,32 +682,6 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
             <button type="button" onClick={onOpenRoomTypes}>
               Open Room types
             </button>
-          </div>
-        )}
-        {untyped.length > 0 && !onOpenRoomTypes && (
-          <div className="mep-guide-callout" data-testid="pg-untyped">
-            <span>
-              <b>{plural(untyped.length, 'room')}</b> on this page {untyped.length === 1 ? 'has' : 'have'} no room type. A rule with room types does not find {untyped.length === 1 ? 'it' : 'them'}. Each change is one undo step.
-            </span>
-            <div className="mep-guide-untyped">
-              {untyped.map((room) => (
-                <div key={room.id} className="mep-guide-untyped-row">
-                  <button type="button" className="mep-guide-link" onClick={() => setSampleId(room.id)}>
-                    {roomLabel(room)}
-                  </button>
-                  <select aria-label={`Room type of ${roomLabel(room)}`} data-room={room.id} value="" onChange={(e) => e.target.value && scene?.setRoomType([room.id], e.target.value)}>
-                    <option value="" disabled>
-                      Choose a type…
-                    </option>
-                    {types.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {roomTypeLabel(t, language)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
           </div>
         )}
         <div className="mep-guide-section">
@@ -1390,7 +1324,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                   ));
                 })}
               </div>
-              <p className="mep-guide-note">MepApp keeps these values with the room type in your room-type library (Menu › Room types…), so every room of that type gets them.</p>
+              <p className="mep-guide-note">MepApp keeps these values with the room type in your room-type library (Room types, in the list on the left), so every room of that type gets them.</p>
             </>
           )}
           {needsVolume && heights && (

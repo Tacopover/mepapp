@@ -3514,38 +3514,6 @@
   font-size: 11.5px;
   resize: vertical;
 }
-.mep-modal--room-types {
-  width: 700px;
-  max-width: 92vw;
-}
-
-.mep-modal--placement-rules {
-  width: 820px;
-  max-width: 94vw;
-}
-.mep-modal--placement-rules .mep-circuit-types-list {
-  max-height: 520px;
-}
-.mep-placement-rule-summary h4 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-.mep-placement-rule-summary dl {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 4px 12px;
-  margin: 0 0 10px;
-  font-size: 12px;
-}
-.mep-placement-rule-summary dl > div {
-  display: contents;
-}
-.mep-placement-rule-summary dt {
-  color: var(--muted);
-}
-.mep-placement-rule-summary dd {
-  margin: 0;
-}
 .mep-modal--room-calculations .mep-field-row select {
   flex: 0 1 260px;
   width: auto;
@@ -3691,6 +3659,30 @@
 }
 .mep-autoplace-placeall {
   margin-top: 8px;
+}
+.mep-autoplace-nav h4.mep-autoplace-rules-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mep-autoplace-rules-head button,
+.mep-autoplace-rule-actions button,
+.mep-autoplace-rule-tools button {
+  padding: 2px 8px;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.mep-autoplace-rule-actions,
+.mep-autoplace-rule-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+}
+.mep-autoplace-rule-actions {
+  margin-top: 6px;
 }
 .mep-autoplace-check-actions {
   margin-top: 6px;
@@ -4345,24 +4337,6 @@
   background: var(--guide-ok-soft);
   color: var(--guide-ok);
   border: 1.5px solid var(--guide-ok);
-}
-.mep-guide-untyped {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 170px;
-  overflow-y: auto;
-}
-.mep-guide-untyped-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-}
-.mep-modal .mep-guide-untyped-row select {
-  width: 200px;
-  margin-bottom: 0;
-  padding: 2px 6px;
 }
 .mep-guide-link {
   border: 0;

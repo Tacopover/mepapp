@@ -4,7 +4,7 @@ import { isValidCeilingHeightMm, roomTypeLabel, type Calibration, type CeilingHe
 import type { StepState } from './PlacementRuleGuide.js';
 import { OptionalNumberInput } from './OptionalNumberInput.js';
 import { MAX_CEILING_HEIGHT_MM, MIN_CEILING_HEIGHT_MM } from './RoomProperties.js';
-import { RoomTypeLibrary } from './RoomTypesDialog.js';
+import { RoomTypeLibrary } from './RoomTypeLibrary.js';
 import { ScaleControl } from './ScaleControl.js';
 
 const roomLabel = (room: Room) => [room.number, room.name].filter(Boolean).join(' ') || room.id;
