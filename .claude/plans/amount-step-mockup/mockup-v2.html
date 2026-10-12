@@ -1,0 +1,715 @@
+<meta charset="utf-8">
+<title>Amount Step v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Chivo:wght@400;500;600;700&family=Martian+Mono:wght@400;500;600&display=swap">
+<style>
+/* Mockup v2 of guide step 3: "need ÷ capacity", entered by the kind of stamp. A switch bar (view, example, sample room) above one card, with the "Why N stamps?" panel beside it. Same tokens and faces as mockup v1 and the Auto-place dialog. */
+:root {
+  --ink: #131b21; --muted: #57676f; --line: #c2ced4; --paper: #eef2f4; --surface: #ffffff; --surface-2: #e7edf0;
+  --accent: #175a8a; --accent-soft: #dbe9f2; --accent-ink: #0f4267; --on-accent: #ffffff;
+  --warn: #9a5b00; --warn-soft: #fbeed6; --bad: #b3261e; --bad-soft: #f9dedc; --ok: #2f7d4f; --ok-soft: #dcefe3;
+  --mine: #6a3d8f; --mine-soft: #efe4f7;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-ui: 'Chivo', system-ui, sans-serif;
+  --font-mono: 'Martian Mono', ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #e3eaee; --muted: #9aabb3; --line: #3f4d55; --paper: #12191e; --surface: #1b242a; --surface-2: #243038;
+    --accent: #5aa2d6; --accent-soft: #1d3a50; --accent-ink: #a9d2ef; --on-accent: #0c1a24;
+    --warn: #e7a94a; --warn-soft: #3a2c14; --bad: #f08a80; --bad-soft: #3d1d1b; --ok: #7cc79a; --ok-soft: #173326;
+    --mine: #c9a2e8; --mine-soft: #2f2240;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #e3eaee; --muted: #9aabb3; --line: #3f4d55; --paper: #12191e; --surface: #1b242a; --surface-2: #243038;
+  --accent: #5aa2d6; --accent-soft: #1d3a50; --accent-ink: #a9d2ef; --on-accent: #0c1a24;
+  --warn: #e7a94a; --warn-soft: #3a2c14; --bad: #f08a80; --bad-soft: #3d1d1b; --ok: #7cc79a; --ok-soft: #173326;
+  --mine: #c9a2e8; --mine-soft: #2f2240;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { padding-inline: 16px; padding-block: 16px 40px; max-width: 1260px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 26px; text-wrap: balance; }
+h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 24px; text-wrap: balance; }
+h3 { margin: 0 0 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+h4 { margin: 0; font-size: 14px; font-weight: 700; }
+.intro { max-width: 72ch; color: var(--muted); margin: 0; }
+code { font-family: var(--font-mono); font-size: 12px; }
+
+.bar { background: var(--surface); border: 2px solid var(--ink); padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+.seg { display: inline-flex; border: 1.5px solid var(--ink); flex-wrap: wrap; }
+.seg button { border: 0; background: var(--surface); padding: 5px 11px; cursor: pointer; font-size: 13px; }
+.seg button + button { border-left: 1.5px solid var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.bar .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-right: 6px; }
+.bar select { border: 1.5px solid var(--ink); background: var(--surface); padding: 4px 6px; font-size: 13px; max-width: 100%; }
+.layout-note { background: var(--accent-soft); color: var(--accent-ink); padding: 10px 14px; border-left: 4px solid var(--accent); }
+.layout-note b { color: var(--ink); }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
+.stage.single { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 2px solid var(--ink); padding: 18px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.lead { margin: 0; color: var(--muted); }
+.ctx { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; background: var(--surface-2); padding: 7px 10px; }
+.ctx b { font-weight: 600; }
+.section { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.box { border: 1px solid var(--line); background: var(--surface); min-width: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row .grow { flex: 1 1 auto; }
+.num { width: 74px; border: 1.5px solid var(--accent); background: var(--accent-soft); padding: 3px 6px; text-align: right; font-family: var(--font-mono); font-size: 13px; }
+.num.wide { width: 140px; text-align: left; font-family: var(--font-ui); }
+.num::placeholder { color: var(--muted); }
+select.u { border: 1.5px solid var(--accent); background: var(--surface); padding: 2px 4px; font-size: 13px; }
+.val { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); padding: 2px 6px; font-variant-numeric: tabular-nums; }
+.out { font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; margin-left: auto; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 12.5px; }
+.formula { margin: 0; padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); font-size: 13.5px; }
+.formula b { font-weight: 600; }
+.tag { font-size: 11px; padding: 0 6px; border: 1px solid currentColor; font-family: var(--font-mono); letter-spacing: 0.04em; white-space: nowrap; }
+.tag.sug { color: var(--ok); background: var(--ok-soft); }
+.tag.mine { color: var(--mine); background: var(--mine-soft); }
+
+.kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 640px) { .kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kind { text-align: left; border: 1.5px solid var(--line); background: var(--surface); padding: 9px 11px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kind .t { font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.kind .s { font-size: 12.5px; color: var(--muted); }
+.kind[aria-pressed="true"] { border: 2px solid var(--accent); background: var(--accent-soft); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1.5px solid var(--line); background: var(--surface); padding: 4px 10px; cursor: pointer; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.chip.new { border-style: dashed; }
+
+.srcs { display: flex; flex-direction: column; gap: 4px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.srcs label { display: flex; gap: 8px; align-items: baseline; }
+.tvwrap { overflow-x: auto; border-bottom: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.tv th, .tv td { text-align: left; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+.tv th { font-weight: 600; font-size: 12px; color: var(--muted); }
+.tv td.n { font-family: var(--font-mono); font-size: 12.5px; }
+.tv tr.own td { background: var(--accent-soft); white-space: normal; }
+.tv tr:last-child td { border-bottom: 0; }
+.tv.off td.n { color: var(--muted); text-decoration: line-through; }
+.tv td.none { color: var(--muted); }
+
+.res th, .res td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: top; }
+.res th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.res td.c { font-family: var(--font-mono); font-weight: 700; font-size: 16px; text-align: right; white-space: nowrap; }
+.res td.m { font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+.res tr { cursor: pointer; }
+.res tr.sel td { background: var(--accent-soft); }
+.res tr.prob td { color: var(--warn); }
+.res tr.prob td:first-child { color: var(--ink); }
+.reswrap { overflow-x: auto; border: 1px solid var(--line); }
+
+.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn); padding: 8px 12px; }
+.warn b { color: var(--ink); }
+details.limits { border: 1px solid var(--line); }
+details.limits > summary { padding: 8px 12px; cursor: pointer; font-weight: 600; }
+details.limits > summary .muted { font-weight: 400; }
+details.limits[open] > summary { border-bottom: 1px solid var(--line); }
+details.more { padding: 0; }
+details.more > summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: var(--accent); }
+.newneed { border: 2px dashed var(--mine); background: var(--mine-soft); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.newneed .row { border: 0; padding: 0; }
+.btn { border: 1.5px solid var(--ink); background: var(--surface); padding: 4px 12px; cursor: pointer; font-size: 13px; }
+.btn.primary { background: var(--ink); color: var(--paper); }
+
+.panel { background: var(--surface); border: 2px solid var(--ink); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel .pt { font-family: var(--font-display); font-weight: 700; font-size: 20px; }
+.chain { display: flex; flex-direction: column; }
+.cr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 10px; border: 1px solid var(--line); border-top: 0; }
+.cr:first-child { border-top: 1px solid var(--line); }
+.cr .cw { grid-column: 1; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.cr .cn { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-family: var(--font-mono); font-weight: 600; font-size: 15px; text-align: right; }
+.cr.res { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.cr.res .cw { color: var(--paper); opacity: 0.8; }
+.cr.warnrow { background: var(--warn-soft); }
+.cr.win .cn::after { content: ' ◄'; font-size: 11px; color: var(--accent); }
+
+/* Layout 2: the chain is the form. */
+.lr { border: 1.5px solid var(--line); border-top: 0; }
+.lr:first-child { border-top: 1.5px solid var(--line); }
+.lr-head { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto auto; gap: 4px 12px; align-items: center; padding: 10px 12px; }
+@media (max-width: 560px) { .lr-head { grid-template-columns: minmax(0, 1fr) auto; } .lr-head .lr-w { grid-column: 1 / -1; order: 3; } }
+.lr-k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.lr-w { font-size: 13px; overflow-wrap: anywhere; }
+.lr-n { font-family: var(--font-mono); font-weight: 700; font-size: 16px; text-align: right; white-space: nowrap; }
+.lr-body { border-top: 1px dashed var(--line); padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--paper); }
+.lr.open > .lr-head { background: var(--accent-soft); }
+.lr.result { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.lr.result .lr-k { color: var(--paper); opacity: 0.8; }
+.lr.warnrow > .lr-head { background: var(--warn-soft); }
+
+/* Room types view */
+.rt { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; }
+@media (max-width: 640px) { .rt { grid-template-columns: minmax(0, 1fr); } }
+.rt-list { display: flex; flex-direction: column; border: 1px solid var(--line); align-self: start; }
+.rt-list button { text-align: left; border: 0; border-bottom: 1px solid var(--line); background: var(--surface); padding: 7px 10px; cursor: pointer; }
+.rt-list button[aria-pressed="true"] { background: var(--accent-soft); font-weight: 600; }
+.rt-form { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rt-group { border: 1px solid var(--line); }
+.rt-group > .gh { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 7px 12px; background: var(--surface-2); font-weight: 600; font-size: 13px; }
+.rt-group.mine { border-color: var(--mine); }
+.rt-group.mine > .gh { background: var(--mine-soft); }
+.rt-group .row { padding: 6px 12px; }
+.rt-group .row label { min-width: 190px; font-size: 13px; }
+@media (max-width: 480px) { .rt-group .row label { min-width: 0; flex: 1 1 100%; } }
+.foot { font-size: 12.5px; color: var(--muted); max-width: 84ch; margin: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <h1>Step 3 "Amount", v2: need ÷ capacity</h1>
+    <p class="intro">Mockup of the chosen concept. The user picks what they place. The kind of stamp gives a short list of needs. The room types give the numbers of the need, and the rule gives what one stamp gives (the capacity). The numbers calculate live. The rooms and the room-type numbers are examples (Dutch new build), not a real drawing.</p>
+  </header>
+
+  <div class="bar">
+    <div><span class="k">View</span><span class="seg" id="view" role="group" aria-label="View">
+      <button type="button" data-view="form" aria-pressed="true">1 · Form</button><button type="button" data-view="chain" aria-pressed="false">2 · Chain is the form</button><button type="button" data-view="types" aria-pressed="false">Room types card</button>
+    </span></div>
+    <div><label class="k" for="example">Example</label><select id="example"></select></div>
+  </div>
+
+  <div class="layout-note" id="note"></div>
+
+  <div class="stage" id="stage">
+    <main class="card" id="card"></main>
+    <aside class="panel" id="why"></aside>
+  </div>
+
+  <p class="foot" id="foot">Things that are the same in both layouts: the stamp (step 1) suggests the kind of stamp, and for sockets and data points also the capacity ("Double" = 2). Each kind of stamp has its defaults. The Limits section is closed until the user needs it. Without a capacity, the step shows a warning. Spacing, layout and Place (steps 4 to 6) do not change.</p>
+</div>
+
+<script>
+(() => {
+  // ---------- data ----------
+  const ALL = ['office', 'meeting', 'corridor', 'toilet'];
+  const ROOMS = {
+    office: { name: '1.20 Office', type: 'office', area: 31.4, height: 2.7, persons: 3 },
+    meeting: { name: '1.05 Meeting room', type: 'meeting', area: 18.0, height: 2.7, persons: 9 },
+    corridor: { name: '1.01A Corridor', type: 'corridor', area: 23.7, height: 2.7, persons: null },
+    toilet: { name: '1.12 Toilet', type: 'toilet', area: 3.2, height: 2.7, persons: null },
+  };
+  // Room-type numbers from ROOM_TYPE_DEMAND_EXAMPLES; "data.*" are the numbers of the user's own need "Data outlets".
+  const TYPES = {
+    office: { name: 'Office', areaPerPerson: 10, v: { lux: 500, wp: 0.75, supPP: 6.5, supM2: 0, heat: 40, cool: 70, sockPP: 4, 'data.perPerson': 2 } },
+    meeting: { name: 'Meeting room', areaPerPerson: 2, v: { lux: 500, wp: 0.75, supPP: 6.5, supM2: 0, heat: 40, cool: 100, sockFixed: 6, 'data.fixed': 2 } },
+    corridor: { name: 'Corridor', v: { lux: 100, wp: 0, heat: 30 } },
+    toilet: { name: 'Toilet', v: { lux: 200, wp: 0, exhFixed: 7, heat: 40, sockFixed: 0 } },
+  };
+  // Coverage counts come from the room shape (placement-layout). Example numbers here.
+  const COV = { office: 1, meeting: 1, corridor: 2, toilet: 1 };
+  const TERM_ORDER = ['fixed', 'perM2', 'perPerson', 'perM3'];
+  const TERM = {
+    fixed: { col: 'per room', add: 'per room' },
+    perM2: { col: 'per m²', add: 'per m² floor area' },
+    perPerson: { col: 'per person', add: 'per person' },
+    perM3: { col: 'air changes per hour', add: 'air changes per hour (per m³ room volume)' },
+  };
+  const NEEDS = {
+    light: { name: 'Light', unit: 'lm', special: 'light' },
+    supplyAir: { name: 'Supply air', unit: 'flow', flow: 'dm3s', terms: [['perPerson', 'supPP'], ['perM2', 'supM2']], write: true },
+    exhaustAir: { name: 'Exhaust air', unit: 'flow', flow: 'dm3s', terms: [['fixed', 'exhFixed']], write: true },
+    airChanges: { name: 'Air changes', unit: 'flow', flow: 'm3h', terms: [['perM3', 'ach']], write: true },
+    heating: { name: 'Heating', unit: 'W', terms: [['perM2', 'heat']], write: true, word: 'heater' },
+    cooling: { name: 'Cooling', unit: 'W', terms: [['perM2', 'cool']], write: true, word: 'cooler' },
+    sockets: { name: 'Sockets', unit: 'sockets', terms: [['perPerson', 'sockPP'], ['fixed', 'sockFixed']], cap: '1', holds: true },
+    floorArea: { name: 'Floor area', unit: 'm²', special: 'area' },
+    persons: { name: 'Persons', unit: 'persons', special: 'persons' },
+    perRoom: { name: 'A number per room', unit: 'stamps', special: 'perRoom' },
+    coverage: { name: 'Cover each point', special: 'coverage' },
+    own: { name: 'Own calculation', special: 'own' },
+  };
+  const CUSTOM = { data: { name: 'Data outlets', unit: 'outlets', terms: [['perPerson', 'data.perPerson'], ['fixed', 'data.fixed']], mine: true, cap: '1', holds: true } };
+  const needOf = (id) => NEEDS[id] ?? CUSTOM[id];
+  const KINDS = [
+    { id: 'lum', name: 'Luminaire', hint: 'Light level in lux', needs: () => ['light'], word: 'luminaire' },
+    { id: 'air', name: 'Air grille', hint: 'Supply air, exhaust air, air changes', needs: () => ['supplyAir', 'exhaustAir', 'airChanges'], word: 'grille' },
+    { id: 'socket', name: 'Socket', hint: 'Sockets per person or per room, or per m²', needs: () => ['sockets', 'floorArea'], word: 'stamp' },
+    { id: 'heat', name: 'Heater or cooler', hint: 'Heating or cooling load in W/m²', needs: () => ['heating', 'cooling'], word: 'heater' },
+    { id: 'det', name: 'Detector, sprinkler, speaker', hint: 'Each point of the room in reach', needs: () => ['coverage'], word: 'detector' },
+    { id: 'other', name: 'Other', hint: 'Floor area, persons, per room, your own needs', needs: () => ['floorArea', 'persons', 'perRoom', ...Object.keys(CUSTOM), 'own'], word: 'stamp' },
+  ];
+  const kindOf = (id) => KINDS.find((k) => k.id === id);
+  const EXAMPLES = [
+    ['socket2', 'Double socket, numbers from the room types', { stamp: 'D5 Wall Socket Double', kind: 'socket', need: 'sockets', cap: '2', capHint: 'From “Double” in the stamp name.', rooms: ALL }],
+    ['socketArea', '1 socket per 5 m²', { stamp: 'D5 Wall Socket', kind: 'socket', need: 'floorArea', cap: '5', rooms: ALL }],
+    ['supply', 'Supply air grille, 50 dm³/s', { stamp: 'D3 Ventilation Grille Round Supply', kind: 'air', need: 'supplyAir', cap: '50', rooms: ['office', 'meeting'], write: true }],
+    ['supplyNoCap', 'Supply air grille, no capacity yet', { stamp: 'D3 Ventilation Grille Round Supply', kind: 'air', need: 'supplyAir', cap: '', rooms: ['office', 'meeting'], write: true }],
+    ['light', 'Luminaire 3600 lm, lux from the room types', { stamp: 'D5 Luminaire Rectangular', kind: 'lum', need: 'light', cap: '3600', rooms: ALL }],
+    ['heat', 'Radiator 1000 W', { stamp: 'D3 Radiator Type22', kind: 'heat', need: 'heating', cap: '1000', rooms: ALL, write: true }],
+    ['data', 'Data outlets: your own need', { stamp: 'D7 Data Point Double', kind: 'other', need: 'data', cap: '2', capHint: 'From “Double” in the stamp name.', rooms: ['office', 'meeting'] }],
+    ['detector', 'Smoke detector, by coverage', { stamp: 'D7 Optical Detector', kind: 'det', need: 'coverage', rooms: ALL }],
+    ['own', 'Own calculation (an older Custom rule)', { stamp: 'D3 Wall Grille', kind: 'other', need: 'own', cap: '50', rooms: ['office', 'meeting'], ownUnit: 'dm³/s', own: { fixed: '10', perPerson: '7', perM2: '0.7' } }],
+  ];
+  const SUGGEST = { 'D5 Wall Socket Double': 'socket', 'D5 Wall Socket': 'socket', 'D3 Ventilation Grille Round Supply': 'air', 'D3 Wall Grille': 'air', 'D5 Luminaire Rectangular': 'lum', 'D3 Radiator Type22': 'heat', 'D7 Data Point Double': 'other', 'D7 Optical Detector': 'det' };
+
+  // ---------- state ----------
+  let view = 'form';
+  let exampleId = 'socket2';
+  let sampleKey = 'office';
+  let rtSel = 'office';
+  let S;
+  function reset() {
+    const ex = EXAMPLES.find(([id]) => id === exampleId)[2];
+    S = {
+      stamp: ex.stamp, kind: ex.kind, need: ex.need, rooms: [...ex.rooms],
+      fromType: true, own: { fixed: '', perM2: '', perPerson: '', perM3: '', ...(ex.own ?? {}) }, ownUnit: ex.ownUnit ?? 'stamps',
+      ownLux: '', uf: '0.6', mf: '0.8', cap: ex.cap ?? '', capHint: ex.capHint ?? '', flowUnit: 'dm³/s', write: ex.write === true,
+      perRoomN: '', cov: { radius: '5.8', area: '60' }, minAmount: '', minCount: '', maxCount: '', alsoCover: false,
+      newNeed: null, open: { need: true, cap: false, lim: false },
+    };
+    if (!S.rooms.includes(sampleKey)) sampleKey = S.rooms[0];
+  }
+
+  // ---------- helpers ----------
+  const num = (s) => { if (s === undefined || s === null || String(s).trim() === '') return undefined; const n = Number(String(s).replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
+  const ok = (n) => n !== undefined && !Number.isNaN(n);
+  const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '–' : n.toLocaleString('en', { maximumFractionDigits: d }));
+  const fmtA = (n) => fmt(n, Math.abs(n) < 10 ? 2 : 1);
+  const ceilCount = (x) => Math.max(0, Math.ceil(x - 1e-9));
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const unitOf = (need) => (!need ? '' : need.unit === 'flow' ? S.flowUnit : need.special === 'own' ? S.ownUnit : need.unit ?? '');
+  const isFlowUnit = (u) => ['dm³/s', 'l/s', 'm³/h'].includes(u);
+  /** A flow in dm³/s (room-type numbers), or in m³/h (air changes × volume), in the flow unit u. */
+  const fromDm3s = (v, u) => (u === 'm³/h' ? v * 3.6 : v);
+  const fromM3h = (v, u) => (u === 'm³/h' ? v : isFlowUnit(u) ? v / 3.6 : v);
+  const stampWord = () => { const need = needOf(S.need); return need?.word ?? kindOf(S.kind).word; };
+  const ruleTypes = () => [...new Set(S.rooms.map((k) => ROOMS[k].type))];
+  const numInput = (f, value, label, ph = '', cls = 'num') => `<input class="${cls}" data-f="${f}" type="text" inputmode="decimal" aria-label="${label}" placeholder="${ph}" value="${value ?? ''}">`;
+
+  /** The need, the count and the reasons for one room: the same order as calculateRoomRequirement, with the need rules of v2. */
+  function calcRoom(key) {
+    const r = ROOMS[key], t = TYPES[r.type], need = needOf(S.need);
+    const vol = r.area * r.height;
+    const c = { key, r, t, text: '', req: null, unit: unitOf(need), src: '', problem: null, count: null, base: null, cap: null, noCap: false, direct: false, countUnit: false, minAmountHit: false, minHit: false, maxHit: false, covHit: false };
+    if (!need) { c.problem = 'Choose what the room needs.'; return c; }
+    const sp = need.special;
+    if (sp === 'coverage') { c.base = c.count = COV[key]; c.direct = true; c.text = 'from the room shape and the reach of one detector'; return limitCount(c); }
+    if (sp === 'perRoom') {
+      const n = num(S.perRoomN);
+      if (!ok(n)) { c.problem = 'Enter the number of stamps per room.'; return c; }
+      c.base = c.count = n; c.direct = true; c.text = `${fmt(n)} stamps per room`; return limitCount(c);
+    }
+    if (sp === 'area') { c.req = r.area; c.text = `${fmt(r.area)} m² floor area`; }
+    else if (sp === 'persons') {
+      if (r.persons == null) { c.problem = `${t.name} has no area per person, so the room has no number of persons.`; return c; }
+      c.req = r.persons; c.text = `${plural(r.persons, 'person')}`;
+    } else if (sp === 'light') {
+      const own = num(S.ownLux);
+      let lux;
+      if (S.fromType && t.v.lux !== undefined) { lux = t.v.lux; c.src = t.name; }
+      else if (ok(own)) { lux = own; c.src = 'own number'; }
+      if (lux === undefined) { c.problem = `${t.name} has no illuminance. Enter an own number, or leave ${t.name} out in step 2.`; return c; }
+      const uf = num(S.uf), mf = num(S.mf);
+      if (!(ok(uf) && ok(mf) && uf > 0 && mf > 0)) { c.problem = 'Enter UF and MF.'; return c; }
+      c.req = (lux * r.area) / (uf * mf);
+      c.text = `${fmt(lux)} lx × ${fmt(r.area)} m² ÷ (${fmt(uf, 2)} × ${fmt(mf, 2)})`;
+    } else {
+      let terms, vals;
+      if (sp === 'own') {
+        const countUnit = S.ownUnit === 'stamps';
+        terms = TERM_ORDER.map((k) => [k]);
+        vals = TERM_ORDER.map((k) => {
+          const x = num(S.own[k]);
+          if (!ok(x)) return undefined;
+          // With the unit "stamps", the area and person rows read "1 stamp per N": the stored rate is 1 ÷ N.
+          if (countUnit && (k === 'perM2' || k === 'perPerson')) return x > 0 ? 1 / x : undefined;
+          return x;
+        });
+        if (!vals.some((v) => v !== undefined)) { c.problem = 'Enter a number in at least one row.'; return c; }
+        c.src = 'this rule';
+      } else {
+        terms = need.terms;
+        const typeVals = terms.map(([, k]) => t.v[k]);
+        const ownVals = terms.map(([k]) => { const x = num(S.own[k]); return ok(x) ? x : undefined; });
+        if (S.fromType && typeVals.some((v) => v !== undefined)) { vals = typeVals; c.src = t.name; }
+        else if (ownVals.some((v) => v !== undefined)) { vals = ownVals; c.src = 'own numbers'; }
+        else { c.problem = `${t.name} has no numbers for ${need.name}. Enter own numbers, or leave ${t.name} out in step 2.`; return c; }
+      }
+      let sum = 0; const parts = [];
+      for (let i = 0; i < terms.length; i++) {
+        const k = terms[i][0], v = vals[i];
+        if (v === undefined || v === 0) continue;
+        let x;
+        if (k === 'fixed') { x = v; parts.push(`${fmtA(v)} per room`); }
+        else if (k === 'perM2') { x = v * r.area; parts.push(`${fmt(v, 3)} × ${fmt(r.area)} m²`); }
+        else if (k === 'perPerson') {
+          if (r.persons == null) { c.problem = `${t.name} has no area per person, so the room has no number of persons.`; return c; }
+          x = v * r.persons; parts.push(`${fmt(v, 3)} × ${plural(r.persons, 'person')}`);
+        } else { x = v * vol; parts.push(`${fmt(v, 2)} × ${fmt(vol)} m³`); }
+        if (k === 'perM3') x = fromM3h(x, c.unit);
+        else if (need.flow === 'dm3s') x = fromDm3s(x, c.unit);
+        sum += x;
+      }
+      c.req = sum;
+      c.text = parts.join(' + ') || '0';
+    }
+    const minA = num(S.minAmount);
+    if (ok(minA) && c.req < minA) { c.req = minA; c.minAmountHit = true; }
+    if (sp === 'own' && S.ownUnit === 'stamps') { c.countUnit = true; c.cap = 1; c.base = ceilCount(c.req); }
+    else {
+      const cap = num(S.cap);
+      if (ok(cap) && cap > 0) { c.cap = cap; c.base = ceilCount(c.req / cap); }
+      else { c.noCap = true; c.base = 1; }
+    }
+    c.count = c.base;
+    return limitCount(c);
+  }
+  function limitCount(c) {
+    const minC = num(S.minCount), maxC = num(S.maxCount);
+    if (S.alsoCover && S.need !== 'coverage' && COV[c.key] > c.count) { c.count = COV[c.key]; c.covHit = true; }
+    if (ok(minC) && c.count < minC) { c.count = minC; c.minHit = true; }
+    if (ok(maxC) && c.count > maxC) { c.count = maxC; c.maxHit = true; }
+    return c;
+  }
+
+  // ---------- pieces of the form ----------
+  function kindsHtml() {
+    const sug = SUGGEST[S.stamp];
+    return `<div class="kinds" role="group" aria-label="What do you place?">${KINDS.map((k) => `
+      <button type="button" class="kind" data-act="kind" data-v="${k.id}" aria-pressed="${k.id === S.kind}">
+        <span class="t">${k.name}${k.id === sug ? '<span class="tag sug">suggested</span>' : ''}</span><span class="s">${k.hint}</span>
+      </button>`).join('')}</div>
+      <p class="muted small" style="margin:0">MepApp suggests the kind from the stamp name “${S.stamp}”. The kind gives the list of needs and the defaults.</p>`;
+  }
+  function needChipsHtml() {
+    const ids = kindOf(S.kind).needs();
+    const chips = ids.map((id) => { const n = needOf(id); return `<button type="button" class="chip" data-act="need" data-v="${id}" aria-pressed="${id === S.need && !S.newNeed}">${n.name}${n.mine ? '<span class="tag mine">yours</span>' : ''}</button>`; });
+    if (S.kind === 'other') chips.splice(chips.length - 1, 0, `<button type="button" class="chip new" data-act="newneed" aria-pressed="${S.newNeed !== null}">+ New need…</button>`);
+    return `<div class="chips" role="group" aria-label="What does the room need?">${chips.join('')}</div>`;
+  }
+  function formulaOf(need) {
+    if (need.special === 'own') return '';
+    const u = unitOf(need);
+    const t = need.terms.map(([k]) => (k === 'fixed' ? '<b>per room</b>' : k === 'perM2' ? '<b>per m²</b> × floor area' : k === 'perPerson' ? '<b>per person</b> × persons' : '<b>air changes per hour</b> × room volume'));
+    return `<p class="formula">${need.name} (${u}) = ${t.join(' + ')}</p>`;
+  }
+  function colUnit(need, k) {
+    if (k === 'perM3') return 'per hour';
+    const base = need.unit === 'flow' ? 'dm³/s' : need.unit;
+    return `${base} ${TERM[k].col}`;
+  }
+  function typeTable(need) {
+    const types = ruleTypes();
+    const off = !S.fromType ? ' off' : '';
+    const head = need.terms.map(([k]) => `<th>${colUnit(need, k)}</th>`).join('');
+    const rows = types.map((id) => {
+      const t = TYPES[id];
+      const any = need.terms.some(([, key]) => t.v[key] !== undefined);
+      const cells = need.terms.map(([, key]) => (t.v[key] !== undefined ? `<td class="n">${fmt(t.v[key], 3)}</td>` : `<td class="none">${any ? '0 (empty)' : '–'}</td>`)).join('');
+      return `<tr><td>${t.name}${any ? '' : ' <span class="muted small">no numbers</span>'}</td>${cells}</tr>`;
+    }).join('');
+    const ownLabel = S.fromType ? 'Own numbers <span class="muted small">for room types without numbers</span>' : 'Own numbers <span class="muted small">for all rooms</span>';
+    const own = `<tr class="own"><td>${ownLabel}</td>${need.terms.map(([k]) => `<td>${numInput(`own.${k}`, S.own[k], `Own number ${TERM[k].col}`, 'none')}</td>`).join('')}</tr>`;
+    return `<div class="tvwrap"><table class="tv${off}"><thead><tr><th>Room type (step 2)</th>${head}</tr></thead><tbody>${rows}${own}</tbody></table></div>`;
+  }
+  const srcRadios = (what) => `<div class="srcs" role="radiogroup" aria-label="Where the numbers come from">
+      <label><input type="radio" name="src" data-act="src" value="type"${S.fromType ? ' checked' : ''}> <span>The room types give the ${what}. A room type without numbers uses the own numbers.</span></label>
+      <label><input type="radio" name="src" data-act="src" value="own"${S.fromType ? '' : ' checked'}> <span>Own numbers for all rooms</span></label>
+    </div>`;
+  function newNeedHtml() {
+    const N = S.newNeed;
+    return `<div class="newneed" data-testid="new-need">
+      <h4>New need</h4>
+      <div class="row"><span>Name</span><input class="num wide" data-f="newNeed.name" type="text" aria-label="Name of the need" placeholder="for example Data outlets" value="${N.name}">
+        <span>Unit</span><input class="num wide" style="width:110px" data-f="newNeed.unit" type="text" aria-label="Unit of the need" placeholder="for example outlets" value="${N.unit}"></div>
+      <div class="row" role="group" aria-label="The need grows with"><span>Grows with</span>${TERM_ORDER.map((k) => `<label class="small"><input type="checkbox" data-act="nnterm" data-k="${k}"${N.terms[k] ? ' checked' : ''}> ${TERM[k].add}</label>`).join('')}</div>
+      <p class="small" style="margin:0">MepApp saves the need with your room types. Each room type can then hold its numbers (Room types card). This rule can also use own numbers.</p>
+      <div class="row"><button type="button" class="btn primary" data-act="nnsave">Save need</button><button type="button" class="btn" data-act="nncancel">Cancel</button><span class="small" style="color:var(--warn)" data-out="nnerr"></span></div>
+    </div>`;
+  }
+  function needEditor() {
+    if (S.newNeed) return newNeedHtml();
+    const need = needOf(S.need);
+    if (!need) return '<div class="box"><div class="row muted">Choose what the room needs.</div></div>';
+    const sp = need.special;
+    if (sp === 'area') return `<div class="box"><div class="row">The need is the floor area of the room. MepApp measures it from the room outline and the scale of the page. You type nothing here.</div></div>`;
+    if (sp === 'persons') return `<div class="box"><div class="row">The need is the number of persons: floor area ÷ area per person of the room type, rounded down.</div>
+      <div class="tvwrap"><table class="tv"><thead><tr><th>Room type (step 2)</th><th>m² per person</th></tr></thead><tbody>${ruleTypes().map((id) => `<tr><td>${TYPES[id].name}</td>${TYPES[id].areaPerPerson ? `<td class="n">${TYPES[id].areaPerPerson}</td>` : '<td class="none">– no persons</td>'}</tr>`).join('')}</tbody></table></div></div>`;
+    if (sp === 'perRoom') return `<div class="box"><div class="row"><span>Each room gets</span>${numInput('perRoomN', S.perRoomN, 'Stamps per room', 'enter')}<span>stamps</span></div></div>`;
+    if (sp === 'coverage') return `<div class="box"><div class="row">Each point of the room must be in reach of a stamp. The count comes from the room shape and from what one detector covers (next section).</div></div>`;
+    if (sp === 'light') {
+      const types = ruleTypes();
+      return `<div class="box"><p class="formula">Light (lm) = <b>E</b> × floor area ÷ (<b>UF</b> × <b>MF</b>)</p>${srcRadios('illuminance E')}
+        <div class="tvwrap"><table class="tv${S.fromType ? '' : ' off'}"><thead><tr><th>Room type (step 2)</th><th>E (lx)</th></tr></thead><tbody>
+          ${types.map((id) => `<tr><td>${TYPES[id].name}</td>${TYPES[id].v.lux !== undefined ? `<td class="n">${TYPES[id].v.lux}</td>` : '<td class="none">–</td>'}</tr>`).join('')}
+          <tr class="own"><td>Own number <span class="muted small">${S.fromType ? 'for room types without E' : 'for all rooms'}</span></td><td>${numInput('ownLux', S.ownLux, 'Own illuminance', 'none')} lx</td></tr></tbody></table></div>
+        <div class="row"><span>UF</span>${numInput('uf', S.uf, 'Utilisation factor')}<span class="muted small">part of the lamp light that reaches the work plane, 0 to 1</span></div>
+        <div class="row"><span>MF</span>${numInput('mf', S.mf, 'Maintenance factor')}<span class="muted small">part of the light that stays after dirt and lamp ageing, 0 to 1</span></div>
+        <details class="more"><summary>More: UF table, suspension, working-plane height, foot-candles</summary><div class="row muted small">The same fields as now. Not drawn in this mockup.</div></details></div>`;
+    }
+    if (sp === 'own') {
+      const units = ['stamps', 'dm³/s', 'l/s', 'm³/h', 'W', 'kW', 'lm'];
+      const countUnit = S.ownUnit === 'stamps';
+      const rowOf = (k) => {
+        if (countUnit && k === 'perM3') return '';
+        if (countUnit && (k === 'perM2' || k === 'perPerson')) return `<div class="row"><span>1 stamp per</span>${numInput(`own.${k}`, S.own[k], k === 'perM2' ? 'Floor area per stamp' : 'Persons per stamp', 'none')}<span>${k === 'perM2' ? 'm² floor area' : 'persons'}</span></div>`;
+        if (k === 'fixed') return `<div class="row">${numInput('own.fixed', S.own.fixed, 'Per room', 'none')}<span>${S.ownUnit} per room</span></div>`;
+        if (k === 'perM3') return `<div class="row">${numInput('own.perM3', S.own.perM3, 'Air changes per hour', 'none')}<span>air changes per hour × room volume</span></div>`;
+        return `<div class="row">${numInput(`own.${k}`, S.own[k], TERM[k].add, 'none')}<span>${S.ownUnit} ${TERM[k].add}</span></div>`;
+      };
+      return `<div class="box"><div class="row"><span>Unit of the need</span><select class="u" data-f="ownUnit" aria-label="Unit">${units.map((u) => `<option${u === S.ownUnit ? ' selected' : ''}>${u}</option>`).join('')}</select><span class="muted small">Only this rule. No room-type numbers.</span></div>
+        ${TERM_ORDER.map(rowOf).join('')}
+        <div class="row small"><button type="button" class="link" data-act="promote">Make this a need, so the room types can hold its numbers</button></div></div>`;
+    }
+    return `<div class="box">${formulaOf(need)}${srcRadios('numbers')}${typeTable(need)}
+      <div class="row small"><span class="muted">A room type with one or more numbers uses them; an empty box counts as 0.</span><span class="grow"></span><button type="button" class="link" data-act="goTypes">Change the room-type numbers…</button></div></div>`;
+  }
+  function capEditor() {
+    const need = needOf(S.need);
+    if (!need || S.newNeed) return '';
+    const sp = need.special;
+    const w = stampWord();
+    if (sp === 'perRoom') return '<div class="box"><div class="row muted">Not needed: the need is already a number of stamps.</div></div>';
+    if (sp === 'own' && S.ownUnit === 'stamps') return '<div class="box"><div class="row muted">Not needed: the unit is stamps, so one stamp gives 1.</div></div>';
+    if (sp === 'coverage') return `<div class="box"><div class="row"><span>One detector reaches</span>${numInput('cov.radius', S.cov.radius, 'Max radius')}<span>m from its center to each point</span></div>
+      <div class="row"><span>One detector serves at most</span>${numInput('cov.area', S.cov.area, 'Max area per stamp')}<span>m² floor area</span></div>
+      <details class="more"><summary>More: max spacing, max distance to a wall, feet</summary><div class="row muted small">The same fields as now.</div></details></div>`;
+    let row;
+    const flowSel = `<select class="u" data-f="flowUnit" aria-label="Flow unit">${['dm³/s', 'l/s', 'm³/h'].map((u) => `<option${u === S.flowUnit ? ' selected' : ''}>${u}</option>`).join('')}</select>`;
+    if (sp === 'area') row = `<span>One stamp serves</span>${numInput('cap', S.cap, 'Floor area per stamp', 'enter')}<span>m² floor area</span>`;
+    else if (sp === 'persons') row = `<span>One stamp serves</span>${numInput('cap', S.cap, 'Persons per stamp', 'enter')}<span>persons</span>`;
+    else if (need.holds) row = `<span>One stamp holds</span>${numInput('cap', S.cap, `${need.unit} per stamp`, 'enter')}<span>${need.unit}</span>`;
+    else if (need.unit === 'flow') row = `<span>One ${w} gives</span>${numInput('cap', S.cap, 'Capacity per stamp', 'enter')}${flowSel}`;
+    else row = `<span>One ${w} gives</span>${numInput('cap', S.cap, 'Capacity per stamp', 'enter')}<span>${unitOf(need)}</span>`;
+    const hint = S.capHint && S.need !== 'floorArea' ? `<span class="tag sug">${S.capHint}</span>` : '';
+    const write = need.write || (sp === 'own' && S.ownUnit !== 'stamps') ? `<label class="row small"><input type="checkbox" data-act="write"${S.write ? ' checked' : ''}> Write the amount per stamp to each stamp as its capacity</label>` : '';
+    return `<div class="box"><div class="row">${row}${hint}</div>${write}</div><div data-out="capwarn"></div>`;
+  }
+  function limitsEditor() {
+    const need = needOf(S.need);
+    const amount = need && !['coverage', 'perRoom'].includes(need.special) && !(need.special === 'own' && S.ownUnit === 'stamps');
+    return `<div class="box" style="border:0">
+      ${amount ? `<div class="row"><span>The need is at least</span>${numInput('minAmount', S.minAmount, 'Minimum need', 'none')}<span>${unitOf(need)} per room</span></div>` : ''}
+      <div class="row"><span>Each room gets at least</span>${numInput('minCount', S.minCount, 'Min count', 'none')}<span>and at most</span>${numInput('maxCount', S.maxCount, 'Max count', 'none')}<span>stamps</span></div>
+      ${S.need !== 'coverage' ? `<label class="row"><input type="checkbox" data-act="alsoCover"${S.alsoCover ? ' checked' : ''}> Also cover each point of the room <span class="muted small">(radius 5.8 m in this mockup)</span></label>` : ''}
+    </div>`;
+  }
+  const ctxHtml = () => `<div class="ctx"><span>Stamp <b>${S.stamp}</b></span><span>Rooms <b>${ruleTypes().map((id) => TYPES[id].name).join(', ')}</b></span><span class="muted">(steps 1 and 2)</span></div>`;
+
+  // ---------- views ----------
+  function viewForm() {
+    return `<h2>How many stamps does one room need?</h2>${ctxHtml()}
+      <div class="section"><h3>1 · What do you place?</h3>${kindsHtml()}</div>
+      <div class="section"><h3>2 · What does the room need?</h3>${needChipsHtml()}${needEditor()}</div>
+      ${S.newNeed ? '' : `<div class="section"><h3>3 · What does one stamp give?</h3>${capEditor()}</div>
+      <div class="section"><h3>4 · Stamps per room</h3><div class="reswrap"><table class="res"><thead><tr><th>Room</th><th>Need</th><th>÷ one stamp</th><th style="text-align:right">Stamps</th></tr></thead><tbody data-out="restable"></tbody></table></div>
+        <p class="muted small" style="margin:0" data-out="notinrule"></p></div>
+      <details class="limits"${S.open.lim ? ' open' : ''} data-act="limdetails"><summary>Limits <span class="muted" data-out="limsum"></span></summary>${limitsEditor()}</details>`}`;
+  }
+  function viewChain() {
+    const blk = (id, k, body, cls = '') => `<div class="lr${S.open[id] ? ' open' : ''} ${cls}" data-blk="${id}"><div class="lr-head"><span class="lr-k">${k}</span><span class="lr-w" data-out="c-${id}-w"></span><span class="lr-n" data-out="c-${id}-n"></span>${body ? `<button type="button" class="link" data-act="open" data-k="${id}">${S.open[id] ? 'Close' : 'Change'}</button>` : '<span></span>'}</div>${body && S.open[id] ? `<div class="lr-body">${body}</div>` : ''}</div>`;
+    const need = needOf(S.need);
+    const sp = need?.special;
+    const direct = sp === 'coverage' || sp === 'perRoom';
+    const roomSel = `<select class="u" data-f="sample" aria-label="Sample room">${S.rooms.map((k) => `<option value="${k}"${k === sampleKey ? ' selected' : ''}>${ROOMS[k].name}</option>`).join('')}</select>`;
+    return `<h2>How many stamps does one room need?</h2>${ctxHtml()}
+      <div class="section"><h3>1 · What do you place?</h3>${kindsHtml()}</div>
+      <div class="section"><h3>2 · How MepApp counts the stamps in ${roomSel}</h3>
+        <div>
+          ${blk('need', 'Need', needChipsHtml() + needEditor())}
+          ${S.newNeed ? '' : `
+          ${sp === 'coverage' ? blk('cap', 'Reach', capEditor()) : direct ? '' : blk('cap', '÷ One stamp', capEditor())}
+          ${direct ? '' : blk('round', 'Round up', '')}
+          ${blk('lim', 'Limits', limitsEditor())}
+          <div class="lr result"><div class="lr-head"><span class="lr-k">Stamps</span><span class="lr-w" data-out="c-res-w"></span><span class="lr-n" data-out="c-res-n"></span><span></span></div></div>`}
+        </div>
+        <div data-out="capwarn2"></div>
+        <p class="small" style="margin:0" data-out="otherrooms"></p>
+      </div>`;
+  }
+  function viewTypes() {
+    const t = TYPES[rtSel];
+    const field = (label, key, unit) => `<div class="row"><label>${label}</label><input class="num" data-tv="${rtSel}|${key}" type="text" inputmode="decimal" placeholder="none" aria-label="${label}" value="${t.v[key] ?? ''}"><span class="small muted">${unit}</span></div>`;
+    const group = (title, rows, mine = false, extra = '') => `<div class="rt-group${mine ? ' mine' : ''}"><div class="gh">${title}${mine ? '<span class="tag mine">your need</span>' : ''}${extra}</div>${rows}</div>`;
+    const customGroups = Object.entries(CUSTOM).map(([id, n]) => group(`${n.name} (${n.unit})`, n.terms.map(([k, key]) => field(TERM[k].add, key, `${n.unit} ${TERM[k].col}`)).join(''), true, `<span class="grow"></span><button type="button" class="link">Change need</button><button type="button" class="link">Delete need</button>`)).join('');
+    return `<h2>Room types</h2>
+      <p class="lead">The Room types card of Auto-place. The demands become a list of needs. Your own needs live next to the built-in needs, and each room type holds its numbers for each need. An empty box means: this room type has no number.</p>
+      <div class="rt">
+        <div class="rt-list" role="group" aria-label="Room types">${Object.entries(TYPES).map(([id, x]) => `<button type="button" data-act="rtsel" data-v="${id}" aria-pressed="${id === rtSel}">${x.name}</button>`).join('')}</div>
+        <div class="rt-form">
+          <div class="row" style="border:1px solid var(--line)"><label for="rt-name" style="min-width:80px">Name</label><input id="rt-name" class="num wide" type="text" value="${t.name}" readonly></div>
+          <h3 style="margin:6px 0 0">Needs: the numbers that rules use</h3>
+          ${group('Persons', `<div class="row"><label>Area per person</label><input class="num" type="text" readonly value="${t.areaPerPerson ?? ''}" placeholder="none" aria-label="Area per person"><span class="small muted">m²</span></div>`)}
+          ${group('Light', field('Illuminance E', 'lux', 'lx') + field('Working-plane height', 'wp', 'm'))}
+          ${group('Supply air', field('per person', 'supPP', 'dm³/s per person') + field('per m² floor area', 'supM2', 'dm³/s per m²'))}
+          ${group('Exhaust air', field('per room', 'exhFixed', 'dm³/s'))}
+          ${group('Air changes', field('air changes', 'ach', 'per hour'))}
+          ${group('Heating', field('per m² floor area', 'heat', 'W/m²'))}
+          ${group('Cooling', field('per m² floor area', 'cool', 'W/m²'))}
+          ${group('Sockets', field('per person', 'sockPP', 'sockets per person') + field('per room', 'sockFixed', 'sockets per room'))}
+          ${customGroups}
+          ${S.newNeed ? newNeedHtml() : '<div><button type="button" class="btn" data-act="newneed">+ New need</button> <span class="muted small">A need of your own: a name, a unit and what it grows with.</span></div>'}
+        </div>
+      </div>`;
+  }
+
+  const NOTES = {
+    form: '<b>1 · Form.</b> Four short sections from top to bottom: what you place, what the room needs, what one stamp gives, and the stamps per room for every room of the rule. Click a room to see “Why N stamps?” on the right. Limits stay closed.',
+    chain: '<b>2 · Chain is the form.</b> The “Why N stamps?” chain is the step itself. Each link (Need, ÷ One stamp, Round up, Limits) shows its number for the sample room and opens with Change. The user sees at once which link sets the count. The chain is taller for Light.',
+    types: '<b>Room types card.</b> Where the numbers of the needs live, also the needs that the user adds. Change a number here, then go back to a layout: the rule uses the new number. This card is the same for both layouts.',
+  };
+
+  // ---------- render ----------
+  function render() {
+    document.getElementById('note').innerHTML = NOTES[view];
+    document.getElementById('stage').classList.toggle('single', view !== 'form');
+    document.getElementById('why').hidden = view !== 'form';
+    document.getElementById('card').innerHTML = view === 'form' ? viewForm() : view === 'chain' ? viewChain() : viewTypes();
+    update();
+  }
+  function chainLines(c) {
+    const need = needOf(S.need);
+    const lines = [];
+    const u = c.unit;
+    if (c.problem) { lines.push({ k: 'Need', w: c.problem, n: '?', cls: 'warnrow', id: 'need' }); return lines; }
+    if (need.special === 'coverage') {
+      lines.push({ k: 'Need', w: 'Cover each point of the room', n: '', id: 'need' });
+      lines.push({ k: 'Reach', w: `Radius ${S.cov.radius || '–'} m, at most ${S.cov.area || '–'} m² per detector. The room shape gives the count.`, n: String(c.base), id: 'cap' });
+    } else if (c.direct) lines.push({ k: 'Need', w: c.text, n: String(c.base), id: 'need' });
+    else {
+      lines.push({ k: `Need · ${need.name}`, w: `${c.text}${c.src ? ` (${c.src})` : ''}${c.minAmountHit ? ' → at least the minimum' : ''}`, n: `${fmtA(c.req)} ${u}`, id: 'need' });
+      if (c.countUnit) lines.push({ k: '÷ One stamp', w: 'The unit is stamps: one stamp gives 1', n: fmtA(c.req), id: 'cap' });
+      else if (c.noCap) lines.push({ k: '÷ One stamp', w: 'No capacity: one stamp per room', n: '1', cls: 'warnrow', id: 'cap' });
+      else lines.push({ k: '÷ One stamp', w: `÷ ${fmt(c.cap)} ${need.special === 'area' ? 'm²' : need.special === 'persons' ? 'persons' : u} per ${stampWord()}`, n: fmt(c.req / c.cap, 2), id: 'cap' });
+      lines.push({ k: 'Round up', w: c.noCap ? 'One stamp per room' : 'A count is a whole number', n: String(c.base), id: 'round' });
+    }
+    if (S.alsoCover && S.need !== 'coverage') lines.push({ k: 'Coverage', w: c.covHit ? 'Raises the count' : 'Not needed here', n: String(COV[c.key]), cls: c.covHit ? 'win' : '', id: 'lim' });
+    if (ok(num(S.minCount))) lines.push({ k: 'Min count', w: c.minHit ? 'Raises the count' : 'Not needed here', n: S.minCount, cls: c.minHit ? 'win' : '', id: 'lim' });
+    if (ok(num(S.maxCount))) lines.push({ k: 'Max count', w: c.maxHit ? 'Limits the count' : 'Not needed here', n: S.maxCount, cls: c.maxHit ? 'win' : '', id: 'lim' });
+    return lines;
+  }
+  function update() {
+    const card = document.getElementById('card');
+    const set = (k, html) => card.querySelectorAll(`[data-out="${k}"]`).forEach((el) => (el.innerHTML = html));
+    if (view === 'types' || S.newNeed) { renderWhy(null); return; }
+    const need = needOf(S.need);
+    const results = S.rooms.map(calcRoom);
+    const sample = results.find((c) => c.key === sampleKey) ?? results[0];
+    // Stamps per room table (layout 1)
+    set('restable', results.map((c) => {
+      const sel = c.key === sample.key ? ' sel' : '';
+      if (c.problem) return `<tr class="prob${sel}" data-act="sample" data-v="${c.key}"><td>${c.r.name}<div class="muted small">${c.t.name}</div></td><td colspan="2">${c.problem}</td><td class="c">?</td></tr>`;
+      const capCell = c.direct ? '<span class="muted">–</span>' : c.countUnit ? '1' : c.noCap ? '<span style="color:var(--warn)">none</span>' : fmt(c.cap);
+      const needCell = c.direct ? (S.need === 'coverage' ? 'from the room shape' : c.text) : `${fmtA(c.req)} ${c.unit}`;
+      const flags = [c.covHit ? 'coverage' : '', c.minHit ? 'min count' : '', c.maxHit ? 'max count' : ''].filter(Boolean);
+      return `<tr class="${sel}" data-act="sample" data-v="${c.key}"><td>${c.r.name}<div class="muted small">${c.t.name}</div></td><td class="m">${needCell}${c.src ? `<div class="muted small" style="font-family:var(--font-ui)">${c.src}</div>` : ''}</td><td class="m">${capCell}</td><td class="c">${c.count}${flags.length ? `<div class="muted small" style="font-family:var(--font-ui);font-weight:400">${flags.join(', ')}</div>` : ''}</td></tr>`;
+    }).join(''));
+    const outRooms = ALL.filter((k) => !S.rooms.includes(k)).map((k) => TYPES[ROOMS[k].type].name);
+    set('notinrule', outRooms.length ? `Not in this rule (step 2): ${outRooms.join(', ')}.` : 'This rule applies to every room type.');
+    // No capacity
+    const noCap = results.filter((c) => c.noCap);
+    const capWarn = noCap.length ? `<div class="warn">No capacity: <b>each room gets 1 ${stampWord()}</b>, also ${noCap.sort((a, b) => b.req - a.req)[0].r.name} that needs ${fmtA(noCap[0].req)} ${noCap[0].unit}. Enter what one ${stampWord()} gives.</div>` : '';
+    set('capwarn', view === 'form' ? capWarn : '');
+    set('capwarn2', view === 'chain' ? capWarn : '');
+    // Limits summary
+    const lim = [ok(num(S.minAmount)) ? `need at least ${S.minAmount} ${unitOf(need)}` : '', ok(num(S.minCount)) ? `at least ${S.minCount}` : '', ok(num(S.maxCount)) ? `at most ${S.maxCount}` : '', S.alsoCover ? 'also cover each point' : ''].filter(Boolean);
+    set('limsum', lim.length ? `(${lim.join(', ')})` : '(none: min need, min and max count, coverage)');
+    // Chain view
+    const lines = chainLines(sample);
+    const byId = (id) => lines.filter((l) => l.id === id);
+    for (const id of ['need', 'cap', 'round', 'lim']) {
+      const ls = byId(id);
+      set(`c-${id}-w`, ls.map((l) => (id === 'lim' ? `${l.k}: ${l.w}` : l.w)).join(' · ') || (id === 'lim' ? '<span class="muted">none</span>' : ''));
+      set(`c-${id}-n`, id === 'lim' ? (ls.length ? ls.filter((l) => l.cls === 'win').map((l) => l.n).join('') || '–' : '–') : ls.map((l) => l.n).join(' '));
+      card.querySelectorAll(`[data-blk="${id}"]`).forEach((el) => el.classList.toggle('warnrow', ls.some((l) => l.cls === 'warnrow')));
+    }
+    set('c-res-w', sample.problem ? 'Cannot calculate yet' : 'Spacing and layout do not change this number');
+    set('c-res-n', sample.problem ? '?' : `= ${sample.count}`);
+    set('otherrooms', S.rooms.length > 1 ? `Other rooms of this rule: ${results.filter((c) => c.key !== sample.key).map((c) => `${c.r.name} <b>${c.problem ? '?' : c.count}</b>`).join(' · ')}` : '');
+    renderWhy(sample, lines);
+  }
+  function renderWhy(c, lines) {
+    const why = document.getElementById('why');
+    if (!c || view !== 'form') { why.innerHTML = ''; return; }
+    const n = c.problem ? '?' : c.count;
+    const row = (l) => `<div class="cr ${l.cls ?? ''}"><span>${l.k}</span><span class="cw">${l.w}</span><span class="cn">${l.n}</span></div>`;
+    why.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><span class="pt">Why ${n} stamp${n === 1 ? '' : 's'}?</span><span class="muted small">${c.r.name}</span></div>
+      <div class="chain">${lines.map(row).join('')}${row({ k: 'Stamps in this room', w: c.problem ? 'Cannot calculate yet' : 'Spacing and layout do not change this number', n, cls: 'res' })}</div>
+      ${!c.problem && !c.direct && !c.countUnit && needOf(S.need)?.write && c.count ? `<p class="muted small" style="margin:0">Each ${stampWord()} gets ${fmtA(c.req / c.count)} ${c.unit}${S.write ? ' as its capacity' : ''}.</p>` : ''}
+      <p class="muted small" style="margin:0">Click a room in “Stamps per room” to see its chain.</p>`;
+  }
+
+  // ---------- events ----------
+  const sel = document.getElementById('example');
+  sel.innerHTML = EXAMPLES.map(([id, label]) => `<option value="${id}">${label}</option>`).join('');
+  sel.addEventListener('change', () => { exampleId = sel.value; reset(); render(); });
+  document.getElementById('view').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    view = b.dataset.view;
+    document.querySelectorAll('#view button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === view)));
+    render();
+  });
+  const card = document.getElementById('card');
+  const setPath = (path, value) => { const p = path.split('.'); let o = S; for (let i = 0; i < p.length - 1; i++) o = o[p[i]]; o[p[p.length - 1]] = value; };
+  card.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.dataset.tv) { const [id, key] = el.dataset.tv.split('|'); const x = num(el.value); if (ok(x)) TYPES[id].v[key] = x; else delete TYPES[id].v[key]; return; }
+    const f = el.dataset.f; if (!f || el.tagName === 'SELECT') return;
+    setPath(f, el.value);
+    if (f !== 'newNeed.name' && f !== 'newNeed.unit') update();
+  });
+  card.addEventListener('change', (e) => {
+    const el = e.target;
+    const f = el.dataset.f;
+    if (el.tagName === 'SELECT' && f) {
+      if (f === 'sample') sampleKey = el.value; else setPath(f, el.value);
+      render(); return;
+    }
+    const a = el.dataset.act;
+    if (a === 'src') { S.fromType = el.value === 'type'; render(); }
+    else if (a === 'write') { S.write = el.checked; update(); }
+    else if (a === 'alsoCover') { S.alsoCover = el.checked; update(); }
+    else if (a === 'nnterm') { S.newNeed.terms[el.dataset.k] = el.checked; }
+  });
+  card.addEventListener('toggle', (e) => { if (e.target.dataset?.act === 'limdetails') S.open.lim = e.target.open; }, true);
+  card.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]'); if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT' || b.tagName === 'DETAILS') return;
+    const a = b.dataset.act, v = b.dataset.v;
+    if (a === 'kind') {
+      S.kind = v; S.newNeed = null;
+      const first = kindOf(v).needs()[0];
+      S.need = first; S.cap = needOf(first).cap ?? ''; S.capHint = ''; S.write = needOf(first).write === true;
+      S.flowUnit = needOf(first).flow === 'm3h' ? 'm³/h' : 'dm³/s'; S.open.need = true;
+    } else if (a === 'need') {
+      S.newNeed = null; S.need = v;
+      const n = needOf(v);
+      S.cap = n.cap ?? ''; S.capHint = ''; S.write = n.write === true; S.flowUnit = n.flow === 'm3h' ? 'm³/h' : 'dm³/s';
+      if (n.special === 'own') S.ownUnit = 'stamps';
+    } else if (a === 'newneed') { S.newNeed = { name: '', unit: '', terms: { perPerson: true, fixed: true } }; S.open.need = true; }
+    else if (a === 'nncancel') S.newNeed = null;
+    else if (a === 'nnsave') {
+      const N = S.newNeed;
+      const terms = TERM_ORDER.filter((k) => N.terms[k]);
+      if (!N.name.trim() || !N.unit.trim() || terms.length === 0) { card.querySelectorAll('[data-out="nnerr"]').forEach((x) => (x.textContent = 'Enter a name and a unit, and choose what the need grows with.')); return; }
+      const id = `c${Object.keys(CUSTOM).length + 1}`;
+      CUSTOM[id] = { name: N.name.trim(), unit: N.unit.trim(), terms: terms.map((k) => [k, `${id}.${k}`]), mine: true, cap: '1', holds: true };
+      S.newNeed = null;
+      if (view !== 'types') { S.kind = 'other'; S.need = id; S.cap = '1'; S.capHint = ''; }
+    } else if (a === 'promote') { S.newNeed = { name: '', unit: S.ownUnit, terms: Object.fromEntries(TERM_ORDER.map((k) => [k, ok(num(S.own[k]))])) }; }
+    else if (a === 'goTypes') { view = 'types'; rtSel = ruleTypes()[0]; document.querySelectorAll('#view button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === view))); }
+    else if (a === 'open') S.open[b.dataset.k] = !S.open[b.dataset.k];
+    else if (a === 'sample') sampleKey = v;
+    else if (a === 'rtsel') rtSel = v;
+    else return;
+    render();
+  });
+  reset();
+  render();
+})();
+</script>

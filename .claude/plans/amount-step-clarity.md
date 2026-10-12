@@ -1,8 +1,10 @@
 # Step 3 "Amount" of a placement rule: assessment and layouts
 
-Status: **assessment and mockup done (2026-10-11). Waiting for the user to choose a layout.** No code change yet. Branch `worktree-amount-section-clarity`, made from `worktree-auto-place-dialog` (73f6c3a). Prompt: `amount-section-clarity-prompt.md`.
+Status: **assessment and mockup v1 done (2026-10-11). Concept chosen (2026-10-12, §8): "need ÷ capacity", entered by the kind of stamp. Mockup v2 done. Waiting for the user to choose layout 1 (Form) or 2 (Chain is the form).** No code change yet. Branch `worktree-amount-section-clarity`, made from `worktree-auto-place-dialog` (73f6c3a). Prompt: `amount-section-clarity-prompt.md`.
 
-Mockup: artifact https://claude.ai/artifact/32GqZbfRZcu9RC3r1zCvUd (v1), copy in `.claude/plans/amount-step-mockup/mockup-v1.html`. The mockup has three layouts (A, B, C), three example cases and two sample rooms. Its numbers use the model of `calculateRoomRequirement`.
+Mockup v1: artifact https://claude.ai/artifact/32GqZbfRZcu9RC3r1zCvUd, copy in `.claude/plans/amount-step-mockup/mockup-v1.html`. Three layouts (A, B, C) of the current fields. Superseded by v2.
+
+Mockup v2: artifact https://claude.ai/artifact/JX4GdVfea9witVLRHzYUiY, copy in `.claude/plans/amount-step-mockup/mockup-v2.html`. Two layouts of the chosen concept, the Room types card, 9 examples, 4 sample rooms. Checked in Chromium (Playwright): all examples, real typing, a new need, 400 px width (no horizontal scroll), dark theme, no page errors.
 
 ## 1. What was checked
 
@@ -74,6 +76,82 @@ The stored rule (`PlacementRule`) and `calculateRoomRequirement` stay the same i
 3. The default for a new rule: Stamps, or an amount in dm³/s?
 4. No capacity with an amount: warning only (recommended), or block the rule until the user enters a capacity?
 
+Sections 5 and 6 are superseded by §8.
+
 ## 7. Phases
 
-Written after the user chooses a layout.
+See §8.6. Final after the user chooses layout 1 or 2.
+
+## 8. Chosen concept (2026-10-12): need ÷ capacity
+
+The user asked for a step back: every room has an area and needs; the calculations differ (stamps per m², an average lux, fresh air per person …), but each one gives a number of stamps. Five options were given (one form "need ÷ capacity", start from the kind of stamp, needs in the room types, the chain as the form, a formula field). The user accepted the recommendation: **start from the kind of stamp, built on "need ÷ capacity", with the room-type numbers as the default source.** The user's answers:
+
+1. A user thinks "one per 5 m²", not "0.2 per m²".
+2. The capacity (what one stamp gives) stays in the rule, not in the stamp library.
+3. Users want to define their own needs.
+
+### 8.1 Terms
+
+- **Need**: what one room requires, as one total in one unit (19.5 dm³/s supply air, 32 708 lm light, 23.7 m² floor area, 12 sockets).
+- **Capacity**: what one stamp gives, in the unit of the need (one grille gives 50 dm³/s). The existing field `capacityPerElement`.
+- **Kind of stamp**: Luminaire, Air grille, Socket, Heater or cooler, Detector/sprinkler/speaker, Other. It gives the list of needs, the words of the form and the defaults. MepApp suggests it from the stamp name of step 1.
+- **Room-type numbers**: the numbers of a need that a room type holds (Office: 6.5 dm³/s per person). **Own numbers**: the numbers in the rule for room types without numbers (today: "fallback").
+- **Your need** (custom need): a need that the user adds: a name, a unit and the terms it grows with. The room types hold its numbers.
+
+The count is always: `N = max(ceil(need ÷ capacity), coverage count, min count)`, at most the max count. This is the chain that `calculateRoomRequirement` already uses.
+
+### 8.2 The needs
+
+| Kind of stamp | Need | Unit | Terms (room-type field) |
+|---|---|---|---|
+| Luminaire | Light | lm | E × area ÷ (UF × MF); E from `illuminanceLx` |
+| Air grille | Supply air | flow | per person (`supplyPerPersonDm3s`) + per m² (`supplyPerM2Dm3s`) |
+| Air grille | Exhaust air | flow | per room (`exhaustFixedDm3s`) |
+| Air grille | Air changes | flow | per m³ (`airChangesPerH`) |
+| Socket | Sockets | sockets | per person (`socketsPerPerson`) + per room (`socketsFixed`) |
+| Socket, Other | Floor area | m² | the floor area itself; capacity "one stamp serves N m²" |
+| Heater or cooler | Heating / Cooling | W | per m² (`heatingLoadWm2` / `coolingLoadWm2`) |
+| Detector … | Cover each point | – | coverage limits (radius, max area …) |
+| Other | Persons | persons | the persons itself; capacity "one stamp serves N persons" |
+| Other | A number per room | stamps | own number; no capacity |
+| Other | Your needs | user unit | the terms the user chose |
+| Other | Own calculation | any | today's Custom: own numbers only, no room types |
+
+"1 socket per 5 m²" becomes the need Floor area with "One stamp serves 5 m²". In Own calculation with the unit stamps, the area and person rows read "1 stamp per N m²" / "1 stamp per N persons" (answer 1).
+
+### 8.3 Rule for the room-type numbers (model change, with a reason)
+
+A need with more than one term (Supply air, Sockets, your needs) uses the numbers of a room type as one set: when the room type has one or more numbers of the need, an empty term counts as 0. When it has none, the rule's own numbers apply as a set. Today each term falls back on its own, so a socket rule with per person + per room from the room type gives Office (only `socketsPerPerson`) the warning `noDemand` and no count (checked 2026-10-12 with the built core: unit sockets, capacity 2, result `count: null`). The examples avoid this for supply air only because they hold `supplyPerM2Dm3s: 0`. Terms without a room-type field stay own numbers, as today.
+
+### 8.4 Model and data changes (planned)
+
+- `PlacementRule.need?: string`: the need the rule meets (a built-in id or the id of your need). Absent = Own calculation; old rules get a need when the mapping is lossless (`needOfRule`), else they open as Own calculation. `preset` stays and is set from the need, so the calculation, the layout and the coverage code keep working.
+- A new core module for the needs: the built-in list (§8.2) and your needs (`{ id, name, unit, terms }`), with parse and validate. Your needs are a user library (`mepapp.roomNeeds.v1`, like the rules and the room types).
+- The numbers of your needs go into `RoomType.demands` with the key `<needId>:<term>`, so the existing `amount.from` link, the project copy of the room types, import and export work for them. `ROOM_DEMAND_FIELDS` plus the fields of your needs; `demandInUnit`, `demandFitsUnit`, `validatePlacementRule`, `toPlacementRule` and `toRoomDemands` accept these keys.
+- `calculateRoomRequirement`: the set rule of §8.3. Floor area and Persons are the presets perArea / perPerson with the number 1 and the unit m² / persons, so they need no new calculation.
+- The Room types card groups the demands by need and lists your needs (add, rename, delete).
+
+### 8.5 Layouts (mockup v2)
+
+- **1 · Form.** Four sections: What do you place? (6 tiles, the suggested one marked), What does the room need? (need chips, then a table of the room types of step 2 with their numbers and a row for own numbers), What does one stamp give? (one row in the words of the kind; the stamp name can suggest the capacity: "Double" = 2), Stamps per room (one row per room of the rule; a click shows its "Why N stamps?" chain on the right). Limits closed.
+- **2 · Chain is the form.** The tiles, then the chain of one sample room: Need, ÷ One stamp, Round up, Limits, = N stamps. Each link shows its number and opens with Change. The other rooms show as one line below.
+- **Room types card** (both layouts): the demands grouped by need, your needs in their own groups, "+ New need".
+
+Recommendation: **1 · Form.** It shows all rooms of the rule at once, so a room type without numbers is visible before Place. Layout 2 shows one room at a time and is tall for Light.
+
+### 8.6 Phases (draft)
+
+Each phase ends with a browser check through real DOM inputs (`feedback-verify-ui-wiring-via-real-dom`), `@mepapp/ui` rebuilt first, and the core tests.
+
+1. **Core: needs.** Built-in needs, your needs (parse, validate), the custom demand keys, `PlacementRule.need` and its migration, the set rule of §8.3. Vitest for each.
+2. **Room types card.** Demands grouped by need; your needs: add, rename, delete; their numbers per room type; storage `mepapp.roomNeeds.v1`.
+3. **Step 3, top half.** Kind tiles with the suggestion from the stamp name, need chips, the need block (room-type table + own numbers; Light with UF/MF and More; Floor area, Persons, A number per room, Own calculation), "+ New need…". The 8 preset cards go away.
+4. **Step 3, bottom half.** Capacity row per kind (with the "Double" suggestion), the warning without a capacity, Stamps per room (all rooms of the rule), Limits closed, the Why panel in the new words.
+5. **Other places.** The rule list and summaries in Auto-place, and the Place step, name the need instead of the preset. Old rules open correctly (the example rules and an old Custom rule).
+
+### 8.7 Open decisions for the user
+
+1. Layout 1 (Form) or 2 (Chain is the form)?
+2. Does "Stamps per room" list every room of the rule (recommended), or only the sample room?
+3. No capacity with an amount: a warning (recommended), or block the rule?
+4. Your needs: only under Other (as in the mockup), or can the user give a need a kind of stamp, so it shows under that tile too?
