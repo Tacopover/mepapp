@@ -1,6 +1,6 @@
 # Step 3 "Amount" of a placement rule: assessment and layouts
 
-Status: **assessment and mockup v1 done (2026-10-11). Concept chosen (2026-10-12, §8): "need ÷ capacity", entered by the kind of stamp. Mockup v2 done. Waiting for the user to choose layout 1 (Form) or 2 (Chain is the form).** No code change yet. Branch `worktree-amount-section-clarity`, made from `worktree-auto-place-dialog` (73f6c3a). Prompt: `amount-section-clarity-prompt.md`.
+Status: **assessment and mockup v1 done (2026-10-11). Concept chosen (2026-10-12, §8): "need ÷ capacity", entered by the kind of stamp. Mockup v2 done. Stopped 2026-10-13 before the layout choice: the user wants the calculations in the room types, so that step 3 becomes simple. The next thread starts from `room-type-calculations-prompt.md`; this file is its input.** No code change. Branch `worktree-amount-section-clarity`, made from `worktree-auto-place-dialog` (73f6c3a). Prompt: `amount-section-clarity-prompt.md`.
 
 Mockup v1: artifact https://claude.ai/artifact/32GqZbfRZcu9RC3r1zCvUd, copy in `.claude/plans/amount-step-mockup/mockup-v1.html`. Three layouts (A, B, C) of the current fields. Superseded by v2.
 
