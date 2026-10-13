@@ -1,20 +1,23 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "mepapp-desktop",
+  "productName": "mepsketcher-desktop",
   "version": "0.1.0",
-  "identifier": "com.mepapp.desktop",
+  "identifier": "com.mepsketcher.desktop",
   "build": {
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm --filter @mepapp/web dev",
-    "beforeBuildCommand": "pnpm --filter @mepapp/web build"
+    "beforeDevCommand": "pnpm -w exec turbo run build --filter=@mepapp/web^... && pnpm --filter @mepapp/web dev",
+    "beforeBuildCommand": "pnpm -w exec turbo run build --filter=@mepapp/web..."
   },
   "app": {
     "windows": [
       {
-        "title": "MepApp",
-        "width": 800,
-        "height": 600,
+        "title": "MEPSketcher",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "maximized": true,
         "resizable": true,
         "fullscreen": false
       }
@@ -26,6 +29,22 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "license": "AGPL-3.0-only",
+    "licenseFile": "../../../LICENSE",
+    "fileAssociations": [
+      {
+        "ext": ["pdf"],
+        "name": "MEPSketcher.pdf",
+        "description": "PDF drawing",
+        "mimeType": "application/pdf",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

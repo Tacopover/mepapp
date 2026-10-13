@@ -1,7 +1,7 @@
 // showOpenFilePicker/showSaveFilePicker aren't in TS's lib.dom.d.ts yet, even
 // though the FileSystemFileHandle/FileSystemWritableFileStream types they
-// return already are. Only ever called behind a `'showOpenFilePicker' in
-// window` runtime check (Chromium-only today) — see App.tsx.
+// return already are. Only ever called behind a feature check (Chromium-only
+// today) — see web-file-access.ts.
 export {};
 
 interface FileSystemAccessPickerAcceptType {
