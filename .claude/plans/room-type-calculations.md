@@ -1,6 +1,6 @@
 # Room types carry the demand calculations
 
-Status: **assessment, model, answers and mockup done (2026-10-13). Stopped before product code: the user must accept the reading of the idea, the model and a layout of the Room types card (§9).** Branch `worktree-room-type-calculations`, made from `origin/worktree-amount-section-clarity` (d970ae8), with `origin/master` 4c31201 merged in. Prompt: `room-type-calculations-prompt.md`. Input: `amount-step-clarity.md` §8, `room-demands-research.md` §1.4, §2.6, §5.4, §8, §9.
+Status: **assessment, model, answers and mockup done (2026-10-13). The user accepted the reading and the model, renamed Exhaust air to Return air, and chose layout B (§9). Phases 1–4 (§7): open.** Branch `worktree-room-type-calculations`, made from `origin/worktree-amount-section-clarity` (d970ae8), with `origin/master` 4c31201 merged in. Prompt: `room-type-calculations-prompt.md`. Input: `amount-step-clarity.md` §8, `room-demands-research.md` §1.4, §2.6, §5.4, §8, §9.
 
 Mockup: artifact https://claude.ai/artifact/SnNSpj6x1yLJ7W5euGdf5t, copy in `.claude/plans/room-type-calculations-mockup/mockup.html`. Checked in Chromium (Playwright 1.63): 49 checks pass. The checks type into real inputs, use all 10 example rules, add, rename and delete a need, use a 400 px width (no horizontal page scroll in the 4 views) and the dark theme, and find no page errors.
 
@@ -96,7 +96,7 @@ export interface RoomNeed {
 export const BUILT_IN_NEEDS: readonly RoomNeed[] = [
   { id: 'light', name: 'Light', nameNl: 'Verlichting', kind: 'light', unit: 'lm' },
   { id: 'supplyAir', name: 'Supply air', nameNl: 'Toevoerlucht', kind: 'flow', unit: 'dm³/s' },
-  { id: 'exhaustAir', name: 'Exhaust air', nameNl: 'Afvoerlucht', kind: 'flow', unit: 'dm³/s' },
+  { id: 'returnAir', name: 'Return air', nameNl: 'Retourlucht', kind: 'flow', unit: 'dm³/s' },
   { id: 'heating', name: 'Heating', nameNl: 'Verwarming', kind: 'power', unit: 'W' },
   { id: 'cooling', name: 'Cooling', nameNl: 'Koeling', kind: 'power', unit: 'W' },
   { id: 'sockets', name: 'Sockets', nameNl: 'Wandcontactdozen', kind: 'count', unit: 'sockets', unitOne: 'socket' },
@@ -221,15 +221,15 @@ Old room-type demands (library, project copy, `ROOM_TYPE_DEMAND_EXAMPLES`):
 |---|---|
 | `illuminanceLx` (+ `workingPlaneHeightM`) | `light: { terms: [illuminance E], workingPlaneM }` |
 | `supplyPerPersonDm3s`, `supplyPerM2Dm3s` | `supplyAir: { terms: [person, area] }` |
-| `exhaustFixedDm3s` | `exhaustAir: { terms: [room] }` |
-| `airChangesPerH` | `exhaustAir: { terms: [volume] }` (added to the exhaust terms; see the note) |
+| `exhaustFixedDm3s` | `returnAir: { terms: [room] }` |
+| `airChangesPerH` | `returnAir: { terms: [volume] }` (added to the Return air terms; see the note) |
 | `heatingLoadWm2` | `heating: { terms: [area] }` |
 | `coolingLoadWm2` | `cooling: { terms: [area] }` |
 | `socketsPerPerson`, `socketsFixed` | `sockets: { terms: [person, room] }` |
 
 - A term with the number 0 is left out when the demand has another term. A demand with only 0 stays: it says "needs none" (Toilet: 0 sockets).
 - `workingPlaneHeightM` without `illuminanceLx` is dropped: without Em it has no use.
-- Note on `airChangesPerH`: the old field does not say supply or exhaust. The examples use it for Storage (0.5) and Technical room (2), which practice ventilates by exhaust. A room type with both `exhaustFixedDm3s` and `airChangesPerH` gets one Exhaust air demand with both terms, so its total is the sum. No example has both. §9 asks the user to confirm Exhaust air.
+- Note on `airChangesPerH`: the old field does not say supply or exhaust. The examples use it for Storage (0.5) and Technical room (2), which practice ventilates by exhaust. A room type with both `exhaustFixedDm3s` and `airChangesPerH` gets one Return air demand with both terms, so its total is the sum. No example has both. The user confirmed the move to the need, with the name Return air (§9, 2026-10-13).
 
 Old rules (`toPlacementRule`, and the import of a rules file):
 
@@ -242,18 +242,18 @@ Old rules (`toPlacementRule`, and the import of a rules file):
 | own numbers (with or without links) | `countBy: 'need'`; the own numbers move to the room types of the rule as a demand (§4, question 11) | room types that already hold the need keep their own numbers (reported); untyped rooms leave the rule (reported) |
 | a unit that no built-in need has ("stamps" with per m², free text) | a new own need, named after the unit, with the numbers moved as above | a new own need shows in the card |
 
-The need of an old rule: the need of its links; else Light for `preset: 'lighting'`; Heating for W or kW (Cooling when the rule name has "cool" or "koel"); Supply air for a flow unit (Exhaust air when the name has "exhaust", "extract", "afzuig", "afvoer" or "toilet"). The report names each guess, and the user can change the need in step 1. `areaUnit: 'ft2'` and `illuminanceUnit: 'fc'` convert to m² and lx (× 10.764).
+The need of an old rule: the need of its links; else Light for `preset: 'lighting'`; Heating for W or kW (Cooling when the rule name has "cool" or "koel"); Supply air for a flow unit (Return air when the name has "return", "retour", "exhaust", "extract", "afzuig", "afvoer" or "toilet"). The report names each guess, and the user can change the need in step 1. `areaUnit: 'ft2'` and `illuminanceUnit: 'fc'` convert to m² and lx (× 10.764).
 
 The core gives this as pure functions: `parsePlacementRules(raw)` returns `{ rules, oldNumbers }`, and `moveOldRuleNumbers(types, oldNumbers)` returns `{ types, report }`. The app runs both once when the stored rules are old, saves both libraries, and shows the report.
 
-Example sets: `ROOM_TYPE_DEMAND_EXAMPLES` and `PLACEMENT_RULE_EXAMPLES` are rewritten in the new shape (no migration at run time). The supply air example gets `roomTypeIds: []` (every room type with Supply air) and loses its own 7 + 0.7 (the room types give 6.5 per person, Bbl). The toilet exhaust example keeps `['toilet', 'bathroom']`, so storage and technical rooms do not get a toilet grille. The air-change example becomes an Exhaust air rule for `['technical']` with 300 m³/h per grille. The corridor example gets "Sockets: 1 per 15 m room length" (`room-demands-research.md` §8, `socketsPerM`).
+Example sets: `ROOM_TYPE_DEMAND_EXAMPLES` and `PLACEMENT_RULE_EXAMPLES` are rewritten in the new shape (no migration at run time). The supply air example gets `roomTypeIds: []` (every room type with Supply air) and loses its own 7 + 0.7 (the room types give 6.5 per person, Bbl). The toilet exhaust example keeps `['toilet', 'bathroom']`, so storage and technical rooms do not get a toilet grille. The air-change example becomes a Return air rule for `['technical']` with 300 m³/h per grille. The corridor example gets "Sockets: 1 per 15 m room length" (`room-demands-research.md` §8, `socketsPerM`).
 
 ## 4. Answers to the open questions
 
-1. **Calculations per need.** Built-in needs and their calculations: Light — illuminance; Supply air and Exhaust air — per person, per m², per room, air changes; Heating — per m², per room; Cooling — per m², per room, per person; Sockets and own count needs — per person, per room, per m², per m room length, and "1 per N" of persons, m² and m. **One demand = 1 or more terms that add up, then "at least" a minimum.** No "larger of two" mode. Reason: EN 16798-1 method 1 and ASHRAE 62.1 add per person and per m²; Bbl dwellings ("0.9 per m², at least 7 dm³/s") is the minimum; the research found no case that needs the larger of two terms that the minimum does not cover.
+1. **Calculations per need.** Built-in needs and their calculations: Light — illuminance; Supply air and Return air — per person, per m², per room, air changes; Heating — per m², per room; Cooling — per m², per room, per person; Sockets and own count needs — per person, per room, per m², per m room length, and "1 per N" of persons, m² and m. **One demand = 1 or more terms that add up, then "at least" a minimum.** No "larger of two" mode. Reason: EN 16798-1 method 1 and ASHRAE 62.1 add per person and per m²; Bbl dwellings ("0.9 per m², at least 7 dm³/s") is the minimum; the research found no case that needs the larger of two terms that the minimum does not cover.
 2. **"1 per N m²".** Count and amount needs offer "1 per N m² floor area", "1 per N m room length" and "1 per N persons". **Store `every: N`**, not 1 ÷ N. Reason: the card shows what the user typed (answer of 2026-10-12), and 1 ÷ 3 has no exact decimal.
 3. **Lighting.** **Need = Em × A in lm on the working plane; capacity = Φ × UF × MF of one luminaire.** The room type holds Em and the working-plane height; the rule holds Φ (the capacity), UF or the UF table, the suspension and MF. Reason: this is the split of `room-demands-research.md` §1.4, and the math does not change: N = ceil(Em·A ÷ (Φ·UF·MF)). With a UF table the capacity differs per room (corridor UF 0.45, office 0.67 in the mockup); the table of step 3 shows it per room. fc goes away from the rule; old fc rules convert to lx. Room types stay metric, as now.
-4. **No demand.** **No stamps, and a clear row.** A rule whose step 2 is empty skips rooms whose type has no demand for the need, and lists them in one line ("Not in this rule: 1.01A Corridor (Corridor has no Supply air)"). A room type that the user chose in step 2 without the need gets a row "Corridor has no Exhaust air. No stamps." with the link "Add Exhaust air to Corridor", which opens the card on that need. No default room type, and no own numbers in the rule: both bring back the double definition. A room without a type is not in a need rule. The override per room stays an open gap (question 12).
+4. **No demand.** **No stamps, and a clear row.** A rule whose step 2 is empty skips rooms whose type has no demand for the need, and lists them in one line ("Not in this rule: 1.01A Corridor (Corridor has no Supply air)"). A room type that the user chose in step 2 without the need gets a row "Corridor has no Return air. No stamps." with the link "Add Return air to Corridor", which opens the card on that need. No default room type, and no own numbers in the rule: both bring back the double definition. A room without a type is not in a need rule. The override per room stays an open gap (question 12).
 5. **Rooms of a rule.** **Yes: by default a need rule applies to every room type that has the need.** Step 2 becomes a filter: no chip chosen = all of them. Reason: the room type says which needs it has, so step 2 needs no work in most rules. A filter stays for two rules with the same need and different stamps (office luminaire, corridor downlight). Because step 2 depends on the need, **the need moves to step 1** ("This stamp serves [Supply air ▾]"), next to the stamp.
 6. **Two rules for one need in one room.** **Each rule serves the full need, as today. A split is out of scope.** A later "share of the need (%)" on the rule can add it. Phase 4 can add a warning in the Auto-place list when two checked rules with the same need place in the same room (§7, optional).
 7. **Coverage needs.** **Coverage stays a rule mode (`countBy: 'coverage'`), without a need.** The rule holds the reach, as today. Reason: the count comes from the room shape, not from a total, so nothing moves to the room type. Step 2 already chooses the rooms. A room-type class (smoke / heat / none, sprinkler hazard class, research §5.4) can come later as a filter; it is not part of this change.
@@ -272,19 +272,32 @@ https://claude.ai/artifact/SnNSpj6x1yLJ7W5euGdf5t — four views and 10 example 
 - **Card C · By need.** The needs on the left (with "3/8": the room types that have it), every room type with its calculation for the chosen need on the right. An own need has Rename and Delete here. This is how a norm table reads (Bbl per function, EN 12464-1 per room). The link from step 3 opens this view.
 - **Rule step 3.** The context box shows step 1 (stamp, "Serves") and step 2 (room-type chips; none = every type with the need). Then one section "What does one stamp give?" in the words of the need ("One grille gives [50] [dm³/s ▾]", "One stamp holds [2] sockets" with the suggestion from "Double", "One luminaire gives [3600] lm × UF × MF"), the table "Stamps per room" (room, what the room type gives, need, ÷ one stamp, stamps), the line "Not in this rule", and closed Limits. A click on a room shows "Why N stamps?": room type → calculation (grey: from the room type) → room values → need → ÷ one stamp → round up → limits → N.
 
-**Recommendation: A and C as two views of one library tab ("By room type" | "By need"), both with the same demand editor.** Reason: A has the place for the name, the keywords and the persons, and it shows one room type at a time, as the user sets one up. C is the view of one need over all room types: the view that step 3 links to, and the fastest way to fill a norm table or a new own need. B shows everything, but it is too wide for the dialog and for a phone.
+Recommendation of the assessment: A and C as two views. **The user chose B, the table (2026-10-13):** "This gives a direct overview of all room types and clicking on one shows its details."
+
+### 5.1 The chosen layout: B, the table, with the details of one room type below it
+
+The "Room type library" tab of the Room types card shows:
+
+1. **The table.** One row for each room type of the library. The first column has the name and the number of rooms of the page with the type. The next column has the area per person ("10 m²/p"). Then one column for each need (built-in, then own), with one short cell ("6.5/person", "500 lx", "1 per 15 m", "0.5 ACH", "– " for no demand). The first column stays in place when the table scrolls sideways. The table scrolls sideways in its own box at a narrow width, and the page does not.
+2. **The details.** A click on a row opens the details of that room type below the table: name, Dutch name, keywords, area per person, and the demand editor for each need that the type has (calculation, numbers, "+ Add a term", "+ At least…", "Remove", and the result in a room of the page). "Add a need [▾]" lists the needs that the type does not have. Save, Revert and Delete work as today: a draft with an explicit Save. While the draft has changes, the other rows are disabled.
+3. **A click on a cell** opens the details of that room type and scrolls to the editor of that need. When the type does not have the need, the details show "Corridor has no Return air" with "+ Add Return air".
+4. **Needs.** "+ New need…" above the table opens a small form: name, what it is (a number of things, an air flow, a power, another amount) and the unit. A click on the column head of an own need gives Rename and Delete. Delete asks in the page and names the room types that have numbers for the need.
+5. **Fill in the example values** above the table fills the empty demands of all room types that have example values, and reports what it filled. The details keep the button for one type.
+6. "+ New room type", "Only in this drawing", Import and Export stay as today.
+
+Step 3 links to the details of a room type with the need open ("Add Return air to Corridor").
 
 ## 6. Other findings (not in scope)
 
 - The built-in room types have no demands ("No design values", `room-type.ts:80`). With the new default of step 2, a need rule matches nothing until the room types have numbers. Phase 2 adds "Fill in the example values" for all room types at once in the card (today it is per type), and step 3 links to it when no room type has the need.
 - `room-demands-research.md` §0 findings 1 and 2 are fixed already: the toilet exhaust example uses 7 dm³/s, and the smoke detector example uses `maxRadius: 5.8`.
 
-## 7. Draft phases
+## 7. Phases
 
 Each phase ends with the core tests (`pnpm --filter @mepapp/core test`), `@mepapp/ui` rebuilt, and a browser check through real DOM inputs. Mark each phase done here with its commit hash.
 
 1. **Core: needs and room-type demands.** `room-need.ts` (built-in needs, kinds, bases, parse and validate of own needs). The new `RoomDemand` shape, `demandTotal`, the migration of the old fields in `parseRoomTypes`, `validateRoomTypeFields`, `ROOM_TYPE_DEMAND_EXAMPLES`. Schema 17 (`roomTypes[].demands`, `roomNeeds`). An adapter that reads and writes the old field names on the new shape, so the current card and guide keep working until phase 3. Vitest for each (also: "1 per 15 m", minimum, 0 terms, the ACH case, a v16 project).
-2. **Room types card.** The chosen layout (recommended: A and C), the demand editor, own needs (add, rename, delete with the confirmation in the page), `mepapp.roomNeeds.v1`, the own needs in the scene and in the project copy, "Fill in the example values" for all types. Browser check: type demands, "1 per N", add and delete a need, save and reload a project.
+2. **Room types card.** Layout B (§5.1): the table, the details below it, the demand editor, own needs (add, rename, delete with the confirmation in the page), `mepapp.roomNeeds.v1`, the own needs in the scene and in the project copy, "Fill in the example values" for all types. Browser check: type demands, "1 per N", add and delete a need, a 400 px width, save and reload a project.
 3. **Core rules and guide steps 1–3.** The new rule shape and `calculateRoomRequirement` (need ÷ capacity, Light with the capacity per room, perRoom, coverage), `ruleAppliesToRoom` with the need default, the parse of new and old rules (`oldNumbers`), `moveOldRuleNumbers`, `PLACEMENT_RULE_EXAMPLES`, `needs` in the worker input. Remove the adapter, `ROOM_DEMAND_FIELDS` and the presets. Guide: "Serves" in step 1, step 2 as a filter, the simple step 3 and the Why chain, `placementRuleDraft.ts` rewritten. Vitest, also the socket case of §2 (Office with only "4 per person" gives a count).
 4. **Auto-place and the old rules.** The rule list and summaries name the need; the results table uses the unit of the rule; the volume check reads the demands (`AutoPlaceDialog.tsx:640`). The one-time move at start with the backup and the report; the import of an old rules file. Optional: the warning for two rules with one need in one room. Browser check with stored old rules: the shipped examples of today, an old Custom rule with own numbers, and an old socket rule with two links.
 
@@ -292,9 +305,9 @@ Each phase ends with the core tests (`pnpm --filter @mepapp/core test`), `@mepap
 
 Spacing, layout, ceiling grid, Place and Undo (steps 4 to 6); room detection; the ceiling-height chain; the persons rule (room number first, then area ÷ area per person).
 
-## 9. Open decisions for the user
+## 9. Decisions of the user (2026-10-13)
 
-1. Is the reading of the idea in §1 correct?
-2. Do you accept the model of §3? It includes these choices: the need moves to step 1; step 2 is empty by default (every room type with the need); three ways of counting (need ÷ capacity, the same number in each room, coverage); the old field "air changes" becomes Exhaust air.
-3. Which layout of the Room types card: **A + C (recommended)**, A only, B, or C only?
-4. Old rules with own numbers: move the numbers to the room types once, with a report (recommended), or show them once and let the user type them in?
+1. The reading of the idea in §1: accepted ("I think this is better yes").
+2. The model of §3: accepted, with one change. The built-in need "Exhaust air" is "Return air" (id `returnAir`): "that and supply air are the most typical needs for rooms in terms of fresh air." The old fields `exhaustFixedDm3s` and `airChangesPerH` move to Return air.
+3. The layout of the Room types card: **B, the table**, with the details of one room type below it (§5.1).
+4. Old rules with own numbers: move the numbers to the room types once, with a report and a backup (the recommendation).
