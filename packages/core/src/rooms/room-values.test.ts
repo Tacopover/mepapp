@@ -119,9 +119,10 @@ describe('roomPeople', () => {
 describe('computeRoomValues demands', () => {
   it('copies the demands of the room type, and has none without a type', () => {
     const r = manualRoom(0, [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]);
-    const type = { id: 'office', name: 'Office', keywords: [], demands: { illuminanceLx: 500 } };
+    const type = { id: 'office', name: 'Office', keywords: [], demands: { light: { terms: [{ basis: 'illuminance' as const, value: 500 }] } } };
     const v = computeRoomValues(r, null, { globalMm: 2700 }, type);
-    expect(v.demands).toEqual({ illuminanceLx: 500 });
+    expect(v.demands).toEqual({ light: { terms: [{ basis: 'illuminance', value: 500 }] } });
+    expect(v.demands!.light!.terms).not.toBe(type.demands.light.terms);
     expect(v.demands).not.toBe(type.demands);
     expect(computeRoomValues(r, null, { globalMm: 2700 }, undefined).demands).toBeUndefined();
   });

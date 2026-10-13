@@ -9,14 +9,15 @@ import type { Calibration } from './calibration.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { Room } from './rooms/room.js';
-import type { RoomType } from './rooms/room-type.js';
+import type { RoomNeed } from './rooms/room-need.js';
+import { parseRoomDemands, type RoomType } from './rooms/room-type.js';
 import type { Schematic } from './schematic.js';
 import type { PlacedStamp } from './stamp.js';
 import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 16;
+export const CURRENT_SCHEMA_VERSION = 17;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -47,6 +48,8 @@ export interface ProjectDocument {
   calibrations: Record<string, Calibration>;
   /** A copy of each room type the rooms use (room-auto-placement.md Phase 1), so the file still shows them where the user library lacks them. */
   roomTypes: RoomType[];
+  /** A copy of each own need that the saved room types use (room-type-calculations.md §3.4). Built-in needs are not saved. */
+  roomNeeds: RoomNeed[];
   /** Ceiling height of this drawing, mm (room-auto-placement.md Phase 2). Absent = the user's global value. */
   ceilingHeightMm?: number;
   /** Ceiling height per room type id in this drawing, mm. A type without an entry uses the drawing value. */
@@ -276,7 +279,25 @@ const migrationSteps: MigrationStep[] = [
       roomTypeCeilingHeightsMm: {},
     }),
   },
+  {
+    fromVersion: 16,
+    toVersion: 17,
+    // Version 16 keeps the demands of a room type as number fields (supplyPerPersonDm3s, …), and has no own needs (room-type-calculations.md §3.5).
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 17,
+      roomTypes: Array.isArray(data.roomTypes) ? data.roomTypes.map(migrateRoomTypeDemands) : data.roomTypes,
+      roomNeeds: [],
+    }),
+  },
 ];
+
+function migrateRoomTypeDemands(type: unknown): unknown {
+  if (!type || typeof type !== 'object' || !('demands' in type)) return type;
+  const { demands, ...rest } = type as JsonRecord;
+  const next = parseRoomDemands(demands);
+  return next ? { ...rest, demands: next } : rest;
+}
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
   return Array.isArray(data[field]) ? [] : [{ path: field, message: `expected an array` }];
@@ -330,6 +351,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'rooms'),
   validateCalibrations,
   (data: JsonRecord) => requireArray(data, 'roomTypes'),
+  (data: JsonRecord) => requireArray(data, 'roomNeeds'),
   validateCeilingHeights,
 ];
 

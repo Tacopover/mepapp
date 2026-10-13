@@ -4,8 +4,10 @@ import {
   parseRoomTypeKeywords,
   parseRoomTypes,
   ROOM_DEMAND_FIELDS,
+  oldDemandValue,
   ROOM_TYPE_DEMAND_EXAMPLES,
   validateRoomTypeFields,
+  withOldDemandValue,
   type RoomDemandKey,
   type RoomDemands,
   type RoomType,
@@ -190,7 +192,7 @@ function RoomTypeForm({ type, others, demandsOpen, onDemandsOpenChange, onDirtyC
     nameNl: type.nameNl ?? '',
     keywords: type.keywords.join(', '),
     areaPerPerson: type.areaPerPersonM2 !== undefined ? String(type.areaPerPersonM2) : '',
-    ...Object.fromEntries(ROOM_DEMAND_FIELDS.map((f) => [demandField(f.key), type.demands?.[f.key] !== undefined ? String(type.demands[f.key]) : ''])),
+    ...Object.fromEntries(ROOM_DEMAND_FIELDS.map((f) => [demandField(f.key), String(oldDemandValue(type.demands, f.key) ?? '')])),
   };
   const example = ROOM_TYPE_DEMAND_EXAMPLES[type.id];
   const [draft, setDraft] = useState(initial);
@@ -216,7 +218,7 @@ function RoomTypeForm({ type, others, demandsOpen, onDemandsOpenChange, onDirtyC
       const next: Record<string, string> = { ...d };
       if (example.areaPerPersonM2 !== undefined && !next.areaPerPerson!.trim()) next.areaPerPerson = String(example.areaPerPersonM2);
       for (const f of ROOM_DEMAND_FIELDS) {
-        const value = example.demands[f.key];
+        const value = oldDemandValue(example.demands, f.key);
         if (value !== undefined && !next[demandField(f.key)]!.trim()) next[demandField(f.key)] = String(value);
       }
       return next as typeof d;
@@ -231,12 +233,14 @@ function RoomTypeForm({ type, others, demandsOpen, onDemandsOpenChange, onDirtyC
     const next: RoomType = { id: type.id, name: draft.name.trim(), keywords: parseRoomTypeKeywords(draft.keywords) };
     if (draft.nameNl.trim()) next.nameNl = draft.nameNl.trim();
     if (area !== undefined) next.areaPerPersonM2 = area;
-    const demands: RoomDemands = {};
+    // Only the changed boxes write their term, so the parts of a demand that this form does not show stay.
+    let demands: RoomDemands | undefined = type.demands;
     for (const f of ROOM_DEMAND_FIELDS) {
-      const value = numberOf((draft as Record<string, string>)[demandField(f.key)]!);
-      if (value !== undefined) demands[f.key] = value;
+      const field = demandField(f.key);
+      const text = (draft as Record<string, string>)[field]!;
+      if (text !== (initial as Record<string, string>)[field]) demands = withOldDemandValue(demands, f.key, numberOf(text) ?? null);
     }
-    if (Object.keys(demands).length > 0) next.demands = demands;
+    if (demands && Object.keys(demands).length > 0) next.demands = demands;
     const problem = validateRoomTypeFields(next, others);
     if (problem) {
       setError(problem);

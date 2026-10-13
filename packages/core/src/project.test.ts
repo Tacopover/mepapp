@@ -40,7 +40,8 @@ describe('serializeProject / loadProject round trip', () => {
       schematicProjectFields: {},
       rooms: [{ id: 'room-1', pageIndex: 0, polygon: { outer: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], holes: [] }, name: 'Kitchen', number: '0.12', source: 'click', locked: true, open: false, ceilingHeightMm: 2500, people: 4 }],
       calibrations: { '0': { pageUnitsPerRealUnit: 0.0283 }, '2': { pageUnitsPerRealUnit: 0.0567 } },
-      roomTypes: [{ id: 'kitchen', name: 'Kitchen', keywords: ['keuken'] }],
+      roomTypes: [{ id: 'kitchen', name: 'Kitchen', keywords: ['keuken'], demands: { returnAir: { terms: [{ basis: 'room', value: 21 }] }, 'need-data': { terms: [{ basis: 'area', every: 10 }], minimum: 1 } } }],
+      roomNeeds: [{ id: 'need-data', name: 'Data outlets', kind: 'count', unit: 'outlets', own: true }],
       ceilingHeightMm: 2900,
       roomTypeCeilingHeightsMm: { kitchen: 2600 },
     });
@@ -318,6 +319,7 @@ describe('serializeProject / loadProject round trip', () => {
       rooms: [],
       calibrations: {},
       roomTypes: [],
+      roomNeeds: [],
       roomTypeCeilingHeightsMm: {},
     };
     expect(() => loadProject(doc)).toThrow(ProjectLoadError);
@@ -342,7 +344,7 @@ describe('calibrations in the save format', () => {
   });
 
   it('rejects a calibration that is not a positive number or a key that is not a page index', () => {
-    const bad = { ...v13, schemaVersion: CURRENT_SCHEMA_VERSION, roomTypes: [], roomTypeCeilingHeightsMm: {}, calibrations: { '0': { pageUnitsPerRealUnit: 0 }, page1: { pageUnitsPerRealUnit: 1 }, '3': null } };
+    const bad = { ...v13, schemaVersion: CURRENT_SCHEMA_VERSION, roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {}, calibrations: { '0': { pageUnitsPerRealUnit: 0 }, page1: { pageUnitsPerRealUnit: 1 }, '3': null } };
     try {
       loadProject(bad);
       expect.unreachable();
@@ -369,14 +371,14 @@ describe('ceiling heights in the save format', () => {
   });
 
   it('keeps the drawing and room type heights', () => {
-    const loaded = loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, ceilingHeightMm: 3000, roomTypeCeilingHeightsMm: { toilet: 2400 } });
+    const loaded = loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, roomNeeds: [], ceilingHeightMm: 3000, roomTypeCeilingHeightsMm: { toilet: 2400 } });
     expect(loaded.ceilingHeightMm).toBe(3000);
     expect(loaded.roomTypeCeilingHeightsMm).toEqual({ toilet: 2400 });
   });
 
   it('rejects a height that is not a positive number', () => {
     try {
-      loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, ceilingHeightMm: -1, roomTypeCeilingHeightsMm: { toilet: 0, office: '2600' } });
+      loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, roomNeeds: [], ceilingHeightMm: -1, roomTypeCeilingHeightsMm: { toilet: 0, office: '2600' } });
       expect.unreachable();
     } catch (error) {
       expect((error as ProjectLoadError).issues).toEqual([
@@ -385,6 +387,40 @@ describe('ceiling heights in the save format', () => {
         { path: 'roomTypeCeilingHeightsMm.office', message: 'expected a positive number' },
       ]);
     }
+  });
+});
+
+describe('room-type demands in the save format', () => {
+  const v16 = {
+    schemaVersion: 16, networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {},
+    circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, rooms: [], calibrations: {}, roomTypeCeilingHeightsMm: {},
+  };
+
+  it('converts the old number fields of a version 16 save to demands, and adds no own needs', () => {
+    const loaded = loadProject({
+      ...v16,
+      roomTypes: [
+        { id: 'office', name: 'Office', keywords: [], areaPerPersonM2: 10, demands: { illuminanceLx: 500, workingPlaneHeightM: 0.75, supplyPerPersonDm3s: 6.5, supplyPerM2Dm3s: 0, socketsPerPerson: 4 } },
+        { id: 'store', name: 'Store', keywords: [], demands: { airChangesPerH: 0.5, workingPlaneHeightM: 0 } },
+        { id: 'hall', name: 'Hall', keywords: [], demands: { unknown: 3 } },
+        { id: 'plain', name: 'Plain', keywords: [] },
+      ],
+    });
+    expect(loaded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loaded.roomNeeds).toEqual([]);
+    expect(loaded.roomTypes).toEqual([
+      {
+        id: 'office', name: 'Office', keywords: [], areaPerPersonM2: 10,
+        demands: { light: { terms: [{ basis: 'illuminance', value: 500 }], workingPlaneM: 0.75 }, supplyAir: { terms: [{ basis: 'person', value: 6.5 }] }, sockets: { terms: [{ basis: 'person', value: 4 }] } },
+      },
+      { id: 'store', name: 'Store', keywords: [], demands: { returnAir: { terms: [{ basis: 'volume', value: 0.5 }] } } },
+      { id: 'hall', name: 'Hall', keywords: [] },
+      { id: 'plain', name: 'Plain', keywords: [] },
+    ]);
+  });
+
+  it('rejects a save of the current version without the own needs list', () => {
+    expect(() => loadProject({ ...v16, schemaVersion: CURRENT_SCHEMA_VERSION, roomTypes: [] })).toThrow(ProjectLoadError);
   });
 });
 

@@ -7,6 +7,7 @@ export { detectAllRooms } from './detect-all.js';
 export { signedRingArea, pointInRing } from './polygon.js';
 export * from './worker.js';
 export * from './room.js';
+export * from './room-need.js';
 export * from './room-type.js';
 export * from './room-values.js';
 export * from './placement-rule.js';

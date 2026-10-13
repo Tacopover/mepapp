@@ -7,6 +7,7 @@ import {
   M3H_PER_CFM,
   M_PER_FT,
   parsePlacementRules,
+  parseRoomDemands,
   PLACEMENT_PRESET_HELP,
   PLACEMENT_PRESET_LABELS,
   PLACEMENT_RULE_EXAMPLES,
@@ -218,7 +219,7 @@ describe('presets', () => {
 });
 
 describe('calculateRoomRequirement with room-type demands', () => {
-  const office = { supplyPerPersonDm3s: 6.5, supplyPerM2Dm3s: 0, heatingLoadWm2: 40, illuminanceLx: 300, workingPlaneHeightM: 0 };
+  const office = parseRoomDemands({ supplyPerPersonDm3s: 6.5, supplyPerM2Dm3s: 0, heatingLoadWm2: 40, illuminanceLx: 300, workingPlaneHeightM: 0 })!;
 
   it('takes a term from the room type and converts the flow to the rule unit', () => {
     const r = calculateRoomRequirement(rule({ amount: { unit: 'm³/h', from: { perPerson: 'supplyPerPersonDm3s' } }, capacityPerElement: 50 }), values({ demands: office }));
@@ -229,8 +230,8 @@ describe('calculateRoomRequirement with room-type demands', () => {
 
   it('one rule gives each room type its own number', () => {
     const air = rule({ amount: { unit: 'dm³/s', from: { perPerson: 'supplyPerPersonDm3s' } } });
-    expect(calculateRoomRequirement(air, values({ demands: { supplyPerPersonDm3s: 6.5 } })).required).toBeCloseTo(26);
-    expect(calculateRoomRequirement(air, values({ demands: { supplyPerPersonDm3s: 8.5 } })).required).toBeCloseTo(34);
+    expect(calculateRoomRequirement(air, values({ demands: parseRoomDemands({ supplyPerPersonDm3s: 6.5 })! })).required).toBeCloseTo(26);
+    expect(calculateRoomRequirement(air, values({ demands: parseRoomDemands({ supplyPerPersonDm3s: 8.5 })! })).required).toBeCloseTo(34);
   });
 
   it('uses the rule number when the room type has no value', () => {
@@ -240,7 +241,7 @@ describe('calculateRoomRequirement with room-type demands', () => {
   });
 
   it('warns noDemand and gives no count without a value and a fallback', () => {
-    const r = calculateRoomRequirement(rule({ amount: { unit: 'dm³/s', from: { fixed: 'exhaustFixedDm3s' } }, capacityPerElement: 10 }), values({ demands: { illuminanceLx: 500 } }));
+    const r = calculateRoomRequirement(rule({ amount: { unit: 'dm³/s', from: { fixed: 'exhaustFixedDm3s' } }, capacityPerElement: 10 }), values({ demands: parseRoomDemands({ illuminanceLx: 500 })! }));
     expect(r.warnings).toContain('noDemand');
     expect(r.required).toBeNull();
     expect(r.count).toBeNull();
@@ -322,7 +323,7 @@ describe('calculateRoomRequirement with room-type demands', () => {
   it('the fixed examples: toilet exhaust 7 dm³/s (bathroom 14 from the room type), smoke detector radius 5.8 m', () => {
     const toilet = PLACEMENT_RULE_EXAMPLES.find((x) => x.id === 'example-toilet-exhaust')!;
     expect(calculateRoomRequirement(toilet, values()).required).toBe(7);
-    expect(calculateRoomRequirement(toilet, values({ demands: { exhaustFixedDm3s: 14 } })).required).toBe(14);
+    expect(calculateRoomRequirement(toilet, values({ demands: parseRoomDemands({ exhaustFixedDm3s: 14 })! })).required).toBe(14);
     const smoke = PLACEMENT_RULE_EXAMPLES.find((x) => x.id === 'example-smoke-detector')!;
     expect(smoke.coverage).toEqual({ maxAreaPerElement: 60, maxRadius: 5.8 });
   });

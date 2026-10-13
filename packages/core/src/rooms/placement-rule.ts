@@ -6,7 +6,7 @@
 import type { Discipline } from '../network.js';
 import type { Room } from './room.js';
 import type { RoomValues } from './room-values.js';
-import { ROOM_DEMAND_FIELDS, type RoomDemandKey, type RoomDemands } from './room-type.js';
+import { oldDemandValue, ROOM_DEMAND_FIELDS, type RoomDemandKey, type RoomDemands } from './room-type.js';
 import { areaInUnit, flowInUnit, isAirChangeUnit, M3H_PER_DM3S, STAMP_COUNT_UNIT, type AreaUnit, type IlluminanceUnit, type LengthUnit } from './placement-units.js';
 
 /** A preset fills and shows the amount fields of one common calculation. 'custom' shows every field. 'coverage' has no amount: the count comes from the coverage limits. */
@@ -365,7 +365,7 @@ export interface RoomRequirement {
 /** The number of a term for a room: the room-type demand when the rule says so and the room type has it, else the rule's number. Undefined when neither has one. */
 export function amountTermValue(amount: PlacementAmount, key: AmountTermKey, demands: RoomDemands | undefined): TermValue | undefined {
   const demand = amount.from?.[key];
-  const fromType = demand !== undefined ? demands?.[demand] : undefined;
+  const fromType = demand !== undefined ? oldDemandValue(demands, demand, true) : undefined;
   if (demand !== undefined && fromType !== undefined) return { value: demandInUnit(demand, fromType, amount.unit), source: 'roomType' };
   const own = amount[key];
   return own !== undefined ? { value: own, source: 'rule' } : undefined;
@@ -373,7 +373,7 @@ export function amountTermValue(amount: PlacementAmount, key: AmountTermKey, dem
 
 /** The illuminance of a room: the room-type demand (lx) when the rule says so and the type has it, else the rule's number. */
 export function lightingLux(lighting: LightingInputs, demands: RoomDemands | undefined): { lux: number; source: 'rule' | 'roomType' } | undefined {
-  const fromType = lighting.luxFromRoomType ? demands?.illuminanceLx : undefined;
+  const fromType = lighting.luxFromRoomType ? oldDemandValue(demands, 'illuminanceLx') : undefined;
   if (fromType !== undefined) return { lux: fromType, source: 'roomType' };
   return lighting.lux !== undefined ? { lux: lighting.lux, source: 'rule' } : undefined;
 }
@@ -438,7 +438,7 @@ export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues
       let uf: number | null = L.utilisationFactor;
       let roomIndex: LightingUsed['roomIndex'];
       if (L.ufTable && L.ufTable.length > 0) {
-        const typeWp = values.demands?.workingPlaneHeightM;
+        const typeWp = oldDemandValue(values.demands, 'workingPlaneHeightM');
         const workingPlaneM = typeWp ?? L.workingPlaneHeightM ?? DEFAULT_WORKING_PLANE_HEIGHT_M;
         const hmM = values.ceilingHeight.mm / 1000 - (L.suspensionM ?? 0) - workingPlaneM;
         if (hmM > 0 && values.areaM2 !== null && values.perimeterM !== null && values.perimeterM > 0) {

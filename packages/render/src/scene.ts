@@ -3575,6 +3575,7 @@ export class SketchScene {
       rooms: Object.values(state.rooms),
       calibrations: Object.fromEntries([...doc.calibrations].map(([pageIndex, calibration]) => [String(pageIndex), calibration])),
       roomTypes: this.usedRoomTypes(doc, Object.values(state.rooms)),
+      roomNeeds: [],
       ...(doc.ceilingHeightMm !== undefined ? { ceilingHeightMm: doc.ceilingHeightMm } : {}),
       roomTypeCeilingHeightsMm: { ...doc.roomTypeCeilingHeightsMm },
     }) as unknown as ProjectDocument;

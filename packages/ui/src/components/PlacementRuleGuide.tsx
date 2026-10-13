@@ -21,6 +21,7 @@ import {
   isAirChangeUnit,
   LAYOUT_STRATEGY_LABELS,
   layoutRoomStamps,
+  oldDemandValue,
   lengthToM,
   LENGTH_UNIT_LABELS,
   MAX_ROOM_STAMPS,
@@ -34,6 +35,7 @@ import {
   ruleAppliesToRoom,
   roomTypeLabel,
   validatePlacementRule,
+  withOldDemandValue,
   type AmountTermKey,
   type Calibration,
   type Discipline,
@@ -607,9 +609,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
   };
 
   const setDemand = (type: RoomType, key: RoomDemandKey, value: number | null) => {
-    const demands = { ...type.demands };
-    if (value === null) delete demands[key];
-    else demands[key] = value;
+    const demands = withOldDemandValue(type.demands, key, value);
     const { demands: _old, ...rest } = type;
     const next: RoomType = Object.keys(demands).length > 0 ? { ...rest, demands } : rest;
     onChangeRoomTypes(roomTypes.some((t) => t.id === type.id) ? roomTypes.map((t) => (t.id === type.id ? next : t)) : [...roomTypes, next]);
@@ -752,7 +752,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       const from = picked !== undefined && choices.includes(picked) ? picked : undefined;
       // A source that the unit does not fit (the unit changed after the choice): ruleOf refuses it, so the user must choose.
       const misfit = picked !== undefined && from === undefined ? picked : undefined;
-      const raw = from !== undefined ? v?.demands?.[from] : undefined;
+      const raw = from !== undefined ? oldDemandValue(v?.demands, from, true) : undefined;
       const boxUnused = from !== undefined && raw !== undefined;
       return (
         <Fragment key={key}>
@@ -894,7 +894,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       ...(preset === 'lighting' && draft.luxFromRoomType ? [{ key: 'illuminanceLx' as const, fallback: draft.lux.trim() !== '' }] : []),
       ...(preset === 'lighting' && draft.ufMode === 'table' ? [{ key: 'workingPlaneHeightM' as const, fallback: true, optional: true }] : []),
     ];
-    const noDemand = usedDemands.flatMap((d) => matched.filter((room) => scene && scene.getRoomValues(room).demands?.[d.key] === undefined).map((room) => ({ room, ...d })));
+    const noDemand = usedDemands.flatMap((d) => matched.filter((room) => scene && oldDemandValue(scene.getRoomValues(room).demands, d.key, true) === undefined).map((room) => ({ room, ...d })));
     const noDemandTypes = [...new Set(noDemand.map((x) => x.room.roomTypeId))];
     const demandBlocks = noDemand.some((x) => !x.fallback);
     const neededMissing = noDemand.filter((x) => !x.optional);
@@ -1343,7 +1343,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                       <span className="mep-guide-label">
                         <b>{typeName(type.id)}</b>: {demandField(key).label.toLowerCase()}
                       </span>
-                      <OptionalNumberInput id={`pg-demand-${type.id}-${key}`} value={type.demands?.[key]} placeholder="?" allow={allowDemand} onCommit={(value) => setDemand(type, key, value)} />
+                      <OptionalNumberInput id={`pg-demand-${type.id}-${key}`} value={oldDemandValue(type.demands, key)} placeholder="?" allow={allowDemand} onCommit={(value) => setDemand(type, key, value)} />
                       <span>{demandField(key).unit}</span>
                     </div>
                   ));
