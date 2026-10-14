@@ -30,48 +30,12 @@ export interface RoomDemand {
 /** The demands of a room type, by need id. One demand for each need. */
 export type RoomDemands = Record<string, RoomDemand>;
 
-/** The demand fields of a room type before room-type-calculations.md (the library and project schema 16). The adapter below reads and writes them until the guide uses the needs (phase 3). */
-export type RoomDemandKey =
-  | 'illuminanceLx'
-  | 'workingPlaneHeightM'
-  | 'supplyPerPersonDm3s'
-  | 'supplyPerM2Dm3s'
-  | 'exhaustFixedDm3s'
-  | 'airChangesPerH'
-  | 'heatingLoadWm2'
-  | 'coolingLoadWm2'
-  | 'socketsPerPerson'
-  | 'socketsFixed';
-
-/** The kind of a demand sets the units it works with: a flow (dm³/s) converts to each flow unit, a power (W) to W and kW, a count to any other unit. */
-export type RoomDemandKind = 'illuminance' | 'height' | 'flow' | 'airChanges' | 'power' | 'count';
-
-/** The amount term of a placement rule that a demand fills. 'lighting' = the lumen method. */
-export type RoomDemandTerm = 'fixed' | 'perM2' | 'perPerson' | 'perM3' | 'lighting';
-
-export interface RoomDemandField {
-  key: RoomDemandKey;
-  label: string;
-  unit: string;
-  kind: RoomDemandKind;
-  term: RoomDemandTerm;
-}
-
-export const ROOM_DEMAND_FIELDS: readonly RoomDemandField[] = [
-  { key: 'illuminanceLx', label: 'Illuminance (Em)', unit: 'lx', kind: 'illuminance', term: 'lighting' },
-  { key: 'workingPlaneHeightM', label: 'Working-plane height', unit: 'm', kind: 'height', term: 'lighting' },
-  { key: 'supplyPerPersonDm3s', label: 'Supply air per person', unit: 'dm³/s per person', kind: 'flow', term: 'perPerson' },
-  { key: 'supplyPerM2Dm3s', label: 'Supply air per m²', unit: 'dm³/s per m²', kind: 'flow', term: 'perM2' },
-  { key: 'exhaustFixedDm3s', label: 'Return air per room', unit: 'dm³/s', kind: 'flow', term: 'fixed' },
-  { key: 'airChangesPerH', label: 'Air changes (return air)', unit: 'per hour', kind: 'airChanges', term: 'perM3' },
-  { key: 'heatingLoadWm2', label: 'Heating load', unit: 'W/m²', kind: 'power', term: 'perM2' },
-  { key: 'coolingLoadWm2', label: 'Cooling load', unit: 'W/m²', kind: 'power', term: 'perM2' },
-  { key: 'socketsPerPerson', label: 'Sockets per person', unit: 'per person', kind: 'count', term: 'perPerson' },
-  { key: 'socketsFixed', label: 'Sockets per room', unit: 'per room', kind: 'count', term: 'fixed' },
-];
-
-/** The need and the term that each old demand field became (room-type-calculations.md §3.5). The working-plane height became `light.workingPlaneM`. */
-const OLD_DEMAND_FIELDS: Readonly<Record<Exclude<RoomDemandKey, 'workingPlaneHeightM'>, { needId: string; basis: DemandBasis }>> = {
+/**
+ * The number fields of a room type before room-type-calculations.md (the library and project schema
+ * 16), and the need and the term that each became (§3.5). The working-plane height
+ * (workingPlaneHeightM) became `light.workingPlaneM`.
+ */
+const OLD_DEMAND_FIELDS: Readonly<Record<string, { needId: string; basis: DemandBasis }>> = {
   illuminanceLx: { needId: 'light', basis: 'illuminance' },
   supplyPerPersonDm3s: { needId: 'supplyAir', basis: 'person' },
   supplyPerM2Dm3s: { needId: 'supplyAir', basis: 'area' },
@@ -82,6 +46,10 @@ const OLD_DEMAND_FIELDS: Readonly<Record<Exclude<RoomDemandKey, 'workingPlaneHei
   socketsPerPerson: { needId: 'sockets', basis: 'person' },
   socketsFixed: { needId: 'sockets', basis: 'room' },
 };
+
+/** The need and the term of an old demand field, or undefined for another text. An old placement rule names these fields in `amount.from`. */
+export const oldDemandFieldTerm = (key: string): { needId: string; basis: DemandBasis } | undefined =>
+  Object.prototype.hasOwnProperty.call(OLD_DEMAND_FIELDS, key) ? OLD_DEMAND_FIELDS[key] : undefined;
 
 const light = (lux: number, workingPlaneM: number): RoomDemand => ({ terms: [{ basis: 'illuminance', value: lux }], workingPlaneM });
 const per = (basis: DemandBasis, value: number): RoomDemand => ({ terms: [{ basis, value }] });
@@ -176,42 +144,10 @@ export function demandTotal(need: Pick<RoomNeed, 'kind'>, demand: RoomDemand, va
   return { total: minimumApplied ? demand.minimum! : sum, parts, minimumApplied, problems };
 }
 
-/** The number of an old demand field on the demands, or undefined (phase 1 adapter). With `zeroForMissingTerm`, a demand of the need without the term gives 0: the term adds nothing. "1 per N" gives 1 ÷ N. */
-export function oldDemandValue(demands: RoomDemands | undefined, key: RoomDemandKey, zeroForMissingTerm = false): number | undefined {
-  if (key === 'workingPlaneHeightM') return demands?.light?.workingPlaneM;
-  const { needId, basis } = OLD_DEMAND_FIELDS[key];
-  const demand = demands?.[needId];
-  if (!demand) return undefined;
-  const term = demand.terms.find((t) => t.basis === basis);
-  if (!term) return zeroForMissingTerm ? 0 : undefined;
-  return term.every !== undefined ? 1 / term.every : term.value;
-}
-
 /** A term of 0 adds nothing: it goes when the demand has another term. A demand of only 0 keeps one term, because it says "needs none". */
 function withoutZeroTerms(terms: DemandTerm[]): DemandTerm[] {
   const kept = terms.filter((t) => t.every !== undefined || t.value !== 0);
   return kept.length > 0 ? kept : terms.slice(0, 1);
-}
-
-/** The demands with a new number for an old demand field (phase 1 adapter). Null removes the term, and a demand without terms goes. A working-plane height needs a Light demand. */
-export function withOldDemandValue(demands: RoomDemands | undefined, key: RoomDemandKey, value: number | null): RoomDemands {
-  const next = copyRoomDemands(demands ?? {});
-  if (key === 'workingPlaneHeightM') {
-    if (next.light && value === null) delete next.light.workingPlaneM;
-    else if (next.light && value !== null) next.light.workingPlaneM = value;
-    return next;
-  }
-  const { needId, basis } = OLD_DEMAND_FIELDS[key];
-  const demand = next[needId];
-  const terms = [...(demand?.terms ?? [])];
-  const at = terms.findIndex((t) => t.basis === basis);
-  if (value === null) {
-    if (at >= 0) terms.splice(at, 1);
-  } else if (at >= 0) terms[at] = { basis, value };
-  else terms.push({ basis, value });
-  if (terms.length === 0) delete next[needId];
-  else next[needId] = { ...demand, terms: withoutZeroTerms(terms) };
-  return next;
 }
 
 /** Built-in room types: the starting user library. Dutch and English keywords, because most test drawings are Dutch. No design values: those differ per country (see ROOM_TYPE_DEMAND_EXAMPLES). */

@@ -4,16 +4,14 @@ import {
   applyRoomTypeMatch,
   demandTotal,
   matchRoomType,
-  oldDemandValue,
+  oldDemandFieldTerm,
   parseRoomDemands,
   parseRoomTypeKeywords,
   parseRoomTypes,
-  ROOM_DEMAND_FIELDS,
   ROOM_TYPE_DEMAND_EXAMPLES,
   ROOM_TYPE_LIBRARY,
   roomTextWords,
   validateRoomTypeFields,
-  withOldDemandValue,
   type RoomDemand,
   type RoomType,
 } from './room-type.js';
@@ -200,7 +198,6 @@ describe('room type fields', () => {
     );
     expect(ROOM_TYPE_DEMAND_EXAMPLES.technical!.demands).toEqual(parseRoomDemands({ illuminanceLx: 200, workingPlaneHeightM: 0, airChangesPerH: 2, heatingLoadWm2: 0, socketsFixed: 4 }));
     expect(ROOM_TYPE_DEMAND_EXAMPLES.corridor!.demands.sockets).toEqual({ terms: [{ basis: 'length', every: 15 }] });
-    expect(new Set(ROOM_DEMAND_FIELDS.map((f) => f.key)).size).toBe(ROOM_DEMAND_FIELDS.length);
   });
 
   it('reads a stored list and drops bad entries and repeated ids', () => {
@@ -258,28 +255,11 @@ describe('demandTotal', () => {
   });
 });
 
-describe('the old demand fields on the new demands (phase 1 adapter)', () => {
-  const office = parseRoomDemands({ illuminanceLx: 500, workingPlaneHeightM: 0.75, supplyPerPersonDm3s: 6.5, supplyPerM2Dm3s: 0, socketsPerPerson: 4 })!;
-
-  it('reads a field; a demand without the term gives 0 only on request', () => {
-    expect(oldDemandValue(office, 'supplyPerPersonDm3s')).toBe(6.5);
-    expect(oldDemandValue(office, 'supplyPerM2Dm3s')).toBeUndefined();
-    expect(oldDemandValue(office, 'supplyPerM2Dm3s', true)).toBe(0);
-    expect(oldDemandValue(office, 'socketsFixed', true)).toBe(0);
-    expect(oldDemandValue(office, 'exhaustFixedDm3s', true)).toBeUndefined();
-    expect(oldDemandValue(office, 'workingPlaneHeightM')).toBe(0.75);
-    expect(oldDemandValue({ sockets: { terms: [{ basis: 'person', every: 4 }] } }, 'socketsPerPerson')).toBe(0.25);
-    expect(oldDemandValue(undefined, 'illuminanceLx')).toBeUndefined();
-  });
-
-  it('writes a field and keeps the rest of the demand', () => {
-    const withArea = withOldDemandValue({ ...office, supplyAir: { terms: [{ basis: 'person', value: 6.5 }], minimum: 10 } }, 'supplyPerM2Dm3s', 0.7);
-    expect(withArea.supplyAir).toEqual({ terms: [{ basis: 'person', value: 6.5 }, { basis: 'area', value: 0.7 }], minimum: 10 });
-    expect(withOldDemandValue(office, 'supplyPerM2Dm3s', 0).supplyAir).toEqual({ terms: [{ basis: 'person', value: 6.5 }] });
-    expect(withOldDemandValue(office, 'socketsPerPerson', null).sockets).toBeUndefined();
-    expect(withOldDemandValue(office, 'workingPlaneHeightM', null).light).toEqual({ terms: [{ basis: 'illuminance', value: 500 }] });
-    expect(withOldDemandValue({}, 'workingPlaneHeightM', 0.8)).toEqual({});
-    expect(withOldDemandValue(undefined, 'exhaustFixedDm3s', 7)).toEqual({ returnAir: { terms: [{ basis: 'room', value: 7 }] } });
-    expect(office.supplyAir).toEqual({ terms: [{ basis: 'person', value: 6.5 }] });
+describe('oldDemandFieldTerm', () => {
+  it('gives the need and the term of an old field, and nothing for another text', () => {
+    expect(oldDemandFieldTerm('airChangesPerH')).toEqual({ needId: 'returnAir', basis: 'volume' });
+    expect(oldDemandFieldTerm('socketsFixed')).toEqual({ needId: 'sockets', basis: 'room' });
+    expect(oldDemandFieldTerm('workingPlaneHeightM')).toBeUndefined();
+    expect(oldDemandFieldTerm('toString')).toBeUndefined();
   });
 });

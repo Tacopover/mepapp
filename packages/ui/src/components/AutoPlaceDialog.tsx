@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import {
+  allNeeds,
   autoPlacedStampIds,
   calculateRooms,
   calibrationFromScale,
@@ -8,6 +9,7 @@ import {
   parsePlacementRules,
   resolveCeilingHeight,
   roomTypeLabel,
+  ruleUnitOf,
   type PlacementPlanInput,
   type PlacementRow,
   type PlacementRule,
@@ -85,7 +87,8 @@ const ICON: Record<StepState, string> = { ok: '✓', warn: '!', bad: '×', '': '
 const INPUT_TITLES: Record<InputKind, string> = { drawing: 'Drawing and rooms', types: 'Room types', heights: 'Ceiling heights' };
 
 const COUNT_SOURCE_TEXT: Record<PlacementRow['requirement']['countSource'], string> = {
-  amount: 'From the amount ÷ the capacity, rounded up, then the min and max count',
+  amount: 'From the need of the room ÷ what one stamp gives, rounded up, then the min and max count',
+  perRoom: 'The same number in each room, then the min and max count',
   coverage: 'By coverage: the fewest stamps that cover the room',
   onePerRoom: 'No capacity: one per room, then the min and max count',
 };
@@ -184,8 +187,15 @@ export function AutoPlaceDialog({
   const calibration = useMemo(() => scene?.getCalibration(pageIndex) ?? null, [scene, pageIndex, version]);
   const heights = useMemo(() => scene?.getCeilingHeights() ?? null, [scene, version]);
   const types = useMemo(() => (scene ? scene.getRoomTypes() : roomTypes.map((t) => ({ ...t, inLibrary: true }))), [scene, roomTypes, version]);
-  const fileOnlyNeeds = useMemo(() => (scene ? scene.getRoomNeeds().filter((n) => !n.inLibrary).map(({ inLibrary: _inLibrary, ...need }) => need) : []), [scene, roomNeeds, version]);
+  const needList = useMemo(() => (scene ? scene.getRoomNeeds() : allNeeds(roomNeeds).map((n) => ({ ...n, inLibrary: true }))), [scene, roomNeeds, version]);
   /* eslint-enable react-hooks/exhaustive-deps */
+  const needs = useMemo(() => needList.map(({ inLibrary: _inLibrary, ...need }) => need), [needList]);
+  const fileOnlyNeeds = useMemo(() => needList.filter((n) => !n.inLibrary).map(({ inLibrary: _inLibrary, ...need }) => need), [needList]);
+  /** The unit of the need of a rule, for the tables. */
+  const unitOf = (rule: PlacementRule) => {
+    const need = rule.countBy === 'need' ? needs.find((n) => n.id === rule.needId) : undefined;
+    return need ? ruleUnitOf(rule, need) : '';
+  };
   const [scope, setScope] = useState<Scope>(() => (selectedRooms.length > 0 ? 'selected' : 'page'));
   const scopeRooms = scope === 'selected' ? selectedRooms : pageRooms;
   const valuesById = useMemo(
@@ -213,6 +223,8 @@ export function AutoPlaceDialog({
   // The room type form has changes that are not saved: the dialog stays on the card.
   const libraryDirty = useRef(false);
   const [blockMessage, setBlockMessage] = useState<string | null>(null);
+  /** The room type and the need that the Room types card opens at (a link of step 3). A new object opens it again. */
+  const [typesFocus, setTypesFocus] = useState<{ typeId: string; needId?: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [rulesMessage, setRulesMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -294,7 +306,7 @@ export function AutoPlaceDialog({
   const importFile = async (file: File) => {
     let imported: PlacementRule[] | null;
     try {
-      imported = parsePlacementRules(JSON.parse(await file.text()));
+      imported = parsePlacementRules(JSON.parse(await file.text()))?.rules ?? null;
     } catch {
       setRulesMessage(`MepApp cannot read ${file.name}.`);
       return;
@@ -313,7 +325,7 @@ export function AutoPlaceDialog({
   };
 
   // The left list: a dry run of every rule (no stamp positions), fast enough for each change of a rule.
-  const dryRows = useMemo(() => (scene ? calculateRooms(rules, scopeRooms, valuesOf).rows : []), [scene, rules, scopeRooms, valuesOf]);
+  const dryRows = useMemo(() => (scene ? calculateRooms(rules, scopeRooms, valuesOf, needs).rows : []), [scene, rules, scopeRooms, valuesOf, needs]);
   const ruleStatus = useMemo(
     () => new Map(rules.map((rule) => [rule.id, ruleStatusOf(rule, dryRows.filter((row) => row.rule.id === rule.id), (id) => stampDefinition(id) !== undefined)])),
     [rules, dryRows, stampDefinition],
@@ -342,10 +354,11 @@ export function AutoPlaceDialog({
       calibrations: [[pageIndex, calibration]],
       sizes: ids.map((id) => [id, realSizeOf(id)]),
       existing: { stamps: scene.listAutoPlacedStamps(), roomIds: scene.listRooms().map((r) => r.id) },
+      needs,
     };
     // version: the auto-placed stamps change with Place, Undo and Remove.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene, item.kind, checkedRules, scopeRooms, valuesOf, pageIndex, calibration, realSizeOf, version]);
+  }, [scene, item.kind, checkedRules, scopeRooms, valuesOf, pageIndex, calibration, realSizeOf, needs, version]);
   const placeJob = usePlacementPlan(createPlacementWorker, placeInput);
   // Place, Preview and Remove use only the plan of the current input; the table shows the last plan while the next one comes.
   const plan = placeJob.fresh ? placeJob.plan : null;
@@ -645,7 +658,8 @@ export function AutoPlaceDialog({
   );
 
   const fileOnlyTypes = types.filter((t) => !t.inLibrary).map(({ inLibrary: _inLibrary, ...type }) => type);
-  const volumeRules = checkedRules.filter((r) => r.amount.perM3 !== undefined || r.amount.from?.perM3 !== undefined).length;
+  // A rule uses the volume when a room type has air changes for its need.
+  const volumeRules = checkedRules.filter((r) => r.countBy === 'need' && r.needId !== undefined && types.some((t) => t.demands?.[r.needId!]?.terms.some((term) => term.basis === 'volume'))).length;
   function inputCard(kind: InputKind) {
     if (kind === 'drawing')
       return (
@@ -683,6 +697,7 @@ export function AutoPlaceDialog({
           }}
           pickedId={pickedId}
           onPick={setPickedId}
+          focus={typesFocus}
           footer={cardNav({ kind: 'drawing' }, { kind: 'heights' }, 'Ceiling heights')}
         />
       );
@@ -836,8 +851,8 @@ export function AutoPlaceDialog({
                     <th>Volume (m³)</th>
                     <th>People</th>
                     <th>Rule</th>
-                    <th>Required</th>
-                    <th>Capacity</th>
+                    <th>Need</th>
+                    <th>One stamp</th>
                     <th>Count</th>
                     <th>Existing</th>
                     <th>Placed</th>
@@ -853,8 +868,8 @@ export function AutoPlaceDialog({
                       <td className="num">{fmt(row.values.volumeM3)}</td>
                       <td className="num">{row.values.people ? row.values.people.count : '–'}</td>
                       <td>{row.rule.name}</td>
-                      <td className="num">{row.requirement.required === null ? '–' : `${fmt(row.requirement.required)} ${row.rule.amount.unit}`.trim()}</td>
-                      <td className="num">{row.rule.capacityPerElement === undefined ? '–' : fmt(row.rule.capacityPerElement)}</td>
+                      <td className="num">{row.requirement.required === null ? '–' : `${fmt(row.requirement.required)} ${unitOf(row.rule)}`.trim()}</td>
+                      <td className="num">{row.requirement.capacity === null ? '–' : `${fmt(row.requirement.capacity)} ${unitOf(row.rule)}`.trim()}</td>
                       <td className="num" data-testid="count" title={COUNT_SOURCE_TEXT[row.requirement.countSource]}>
                         {row.requirement.count ?? '–'}
                       </td>
@@ -913,6 +928,7 @@ export function AutoPlaceDialog({
             rule={openRule}
             others={rules.filter((r) => r.id !== openRule.id)}
             roomTypes={roomTypes}
+            needs={needs}
             language={language}
             sceneRef={sceneRef}
             stampName={stampName}
@@ -920,7 +936,6 @@ export function AutoPlaceDialog({
             stampScale={stampScale}
             stampIconUrl={stampIconUrl}
             onChooseStamp={onChooseStamp}
-            onChangeRoomTypes={onChangeRoomTypes}
             loadStampArt={loadStampArt}
             createPlacementWorker={createPlacementWorker}
             onPlaced={(count, replaced) => {
@@ -931,7 +946,10 @@ export function AutoPlaceDialog({
             step={ruleStep}
             onStepChange={setRuleStep}
             onStepStates={setStepStates}
-            onOpenRoomTypes={() => go({ kind: 'types' })}
+            onOpenRoomTypes={(focus) => {
+              setTypesFocus(focus ? { ...focus } : null);
+              go({ kind: 'types' });
+            }}
           />
         ) : (
           <>

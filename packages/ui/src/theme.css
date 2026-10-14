@@ -4296,6 +4296,11 @@
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+/* The room type does not have the need of the rule (room-type-calculations.md §4 question 5). */
+.mep-guide-chip.lacks:not(.on) {
+  border-style: dashed;
+  color: var(--muted);
+}
 .mep-guide-formula {
   display: flex;
   flex-direction: column;
@@ -4740,9 +4745,12 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.mep-guide-chain.source-wins .cr:first-child,
 .mep-guide-chain .cr.win {
   background: var(--accent-soft);
+}
+/* A number of the room type, not of the rule. */
+.mep-guide-chain .cr.from {
+  background: var(--surface-2);
 }
 .mep-guide-chain .cr.res {
   background: var(--ink);

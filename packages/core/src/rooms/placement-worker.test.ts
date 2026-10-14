@@ -15,11 +15,11 @@ import {
 
 const CAL = { pageUnitsPerRealUnit: 0.04 };
 const rule: PlacementRule = {
-  id: 'r', name: 'R', discipline: 'ventilation', roomTypeIds: [], stampDefinitionId: 'grille', preset: 'fixed', amount: { fixed: 30, unit: 'dm³/s' },
+  id: 'r', name: 'R', discipline: 'ventilation', roomTypeIds: [], stampDefinitionId: 'grille', countBy: 'need', needId: 'supplyAir',
   capacityPerElement: 10, coverage: {}, layout: { strategy: 'grid', wallOffsetM: 0.5, rotation: 'room' }, writeCapacity: true,
 };
 const room = { ...manualRoom(0, [{ x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 200 }, { x: 0, y: 200 }]), id: 'room-1', name: 'A' };
-const values = { areaM2: 50, perimeterM: 30, lengthM: 10, widthM: 5, axisDeg: 0, ceilingHeight: { mm: 2700, level: 'global' as const }, volumeM3: 135, people: null };
+const values = { areaM2: 50, perimeterM: 30, lengthM: 10, widthM: 5, axisDeg: 0, ceilingHeight: { mm: 2700, level: 'global' as const }, volumeM3: 135, people: null, demands: { supplyAir: { terms: [{ basis: 'room' as const, value: 30 }] } } };
 const input: PlacementPlanInput = { rules: [rule], rooms: [room], values: [[room.id, values]], calibrations: [[0, CAL]], sizes: [['grille', { width: 10, height: 10 }]] };
 
 // In-process stand-in for a Worker, as in worker.test.ts. With `hold`, requests wait until release().
@@ -68,7 +68,7 @@ describe('PlacementPlanClient', () => {
     const workers: FakeWorker[] = [];
     const client = new PlacementPlanClient(() => (workers.push(new FakeWorker(workers.length === 0)), workers[workers.length - 1]!));
     const first = client.plan(input);
-    const second = client.plan({ ...input, rules: [{ ...rule, amount: { fixed: 50, unit: 'dm³/s' } }] });
+    const second = client.plan({ ...input, rules: [{ ...rule, capacityPerElement: 6 }] });
     await expect(first.promise).rejects.toBeInstanceOf(PlacementPlanCancelled);
     expect(workers[0]!.terminated).toBe(true);
     expect((await second.promise).rows[0]!.stamps).toHaveLength(5);

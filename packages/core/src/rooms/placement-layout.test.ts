@@ -294,7 +294,7 @@ describe('layoutRoomStamps', () => {
   });
 
   it('Along the walls places the count; an old max spacing does not change it', () => {
-    const out = layoutRoomStamps({ ...rule({ strategy: 'perimeter' }, { maxSpacing: 3 }), preset: 'perArea' }, room(rect(0, 0, 400, 200)), 3, CAL, { width: 10, height: 10 });
+    const out = layoutRoomStamps({ ...rule({ strategy: 'perimeter' }, { maxSpacing: 3 }), countBy: 'need' }, room(rect(0, 0, 400, 200)), 3, CAL, { width: 10, height: 10 });
     expect(out.stamps).toHaveLength(3);
     expect(out.layoutCount).toBeUndefined();
   });
@@ -352,7 +352,7 @@ describe('layoutRoomStamps', () => {
 
   it('By coverage with Even spread: the coverage layout gives the count and the positions', () => {
     // 10 × 5 m, spacing 4 m: radius 2.83 m = 113 pt.
-    const out = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 }), preset: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
+    const out = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 }), countBy: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
     expect(out.layoutCount?.count).toBe(out.stamps.length);
     expect(out.warnings).toEqual([]);
     expect(worstDistance(room(rect(0, 0, 400, 200)), out.stamps.map((s) => s.position))).toBeLessThanOrEqual((4 / Math.SQRT2) * 40 + 3);
@@ -364,7 +364,7 @@ describe('layoutRoomStamps', () => {
 
   it('By coverage with another layout: adds stamps until the final positions cover the room', () => {
     const r = room(rect(0, 0, 400, 200));
-    const coverage = { ...rule({ strategy: 'perimeter', wallOffsetM: 0 }, { maxSpacing: 4 }), preset: 'coverage' as const };
+    const coverage = { ...rule({ strategy: 'perimeter', wallOffsetM: 0 }, { maxSpacing: 4 }), countBy: 'coverage' as const };
     const out = layoutRoomStamps(coverage, r, 1, CAL, { width: 0, height: 0 });
     const even = layoutRoomStamps({ ...coverage, layout: { ...coverage.layout, strategy: 'evenSpread' } }, r, 1, CAL, { width: 0, height: 0 });
     expect(out.stamps.length).toBeGreaterThan(even.stamps.length);
@@ -377,7 +377,7 @@ describe('layoutRoomStamps', () => {
     const r = room(rect(0, 0, 400, 200));
     const radiusPt = 1.5 * 40;
     for (const layout of [{}, { ceilingGridMm: 600 }, { strategy: 'evenSpread' as const, ceilingGridMm: 600 }]) {
-      const out = layoutRoomStamps({ ...rule({ wallOffsetM: 0.6, ...layout }, { maxRadius: 1.5 }), preset: 'lighting', alsoCoverage: true }, r, 7, CAL, { width: 0, height: 0 });
+      const out = layoutRoomStamps({ ...rule({ wallOffsetM: 0.6, ...layout }, { maxRadius: 1.5 }), countBy: 'need', alsoCoverage: true }, r, 7, CAL, { width: 0, height: 0 });
       expect(out.warnings).not.toContain('coverageNotMet');
       expect(coversRoom(r, out.stamps.map((s) => s.position), radiusPt)).toBe(true);
       expect(out.layoutCount!.count).toBe(out.stamps.length);
@@ -386,21 +386,21 @@ describe('layoutRoomStamps', () => {
 
   it('stops adding stamps when the layout cannot reach a part of the room, and warns', () => {
     // A 20 × 20 m room: stamps along the walls cannot reach the center with a radius of 2 m.
-    const out = layoutRoomStamps({ ...rule({ strategy: 'perimeter', wallOffsetM: 0 }, { maxRadius: 2 }), preset: 'coverage' }, room(rect(0, 0, 800, 800)), 1, CAL, { width: 0, height: 0 });
+    const out = layoutRoomStamps({ ...rule({ strategy: 'perimeter', wallOffsetM: 0 }, { maxRadius: 2 }), countBy: 'coverage' }, room(rect(0, 0, 800, 800)), 1, CAL, { width: 0, height: 0 });
     expect(out.warnings).toContain('coverageNotMet');
     expect(out.stamps.length).toBeLessThan(60);
   });
 
   it('stops at the max count, and says so', () => {
-    const out = layoutRoomStamps({ ...rule({}, { maxRadius: 1.5 }), preset: 'lighting', alsoCoverage: true, maxCount: 8 }, room(rect(0, 0, 400, 200)), 7, CAL, { width: 0, height: 0 });
+    const out = layoutRoomStamps({ ...rule({}, { maxRadius: 1.5 }), countBy: 'need', alsoCoverage: true, maxCount: 8 }, room(rect(0, 0, 400, 200)), 7, CAL, { width: 0, height: 0 });
     expect(out.stamps).toHaveLength(8);
     expect(out.layoutCount).toEqual({ count: 8, limited: true });
     expect(out.warnings).toContain('coverageNotMet');
   });
 
   it('a coverage rule in ft uses the radius in metres', () => {
-    const ft = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 / 0.3048, lengthUnit: 'ft' }), preset: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
-    const m = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 }), preset: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
+    const ft = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 / 0.3048, lengthUnit: 'ft' }), countBy: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
+    const m = layoutRoomStamps({ ...rule({ strategy: 'evenSpread', wallOffsetM: 0 }, { maxSpacing: 4 }), countBy: 'coverage' }, room(rect(0, 0, 400, 200)), 1, CAL, { width: 0, height: 0 });
     expect(ft.layoutCount).toEqual(m.layoutCount);
   });
 
@@ -424,11 +424,11 @@ describe('layoutRoomStamps', () => {
 describe('planAutoPlacement', () => {
   const CAL = { pageUnitsPerRealUnit: 0.04 };
   const base: PlacementRule = {
-    id: 'r', name: 'R', discipline: 'ventilation', roomTypeIds: [], stampDefinitionId: 'grille', preset: 'fixed', amount: { fixed: 30, unit: 'dm³/s' },
+    id: 'r', name: 'R', discipline: 'ventilation', roomTypeIds: [], stampDefinitionId: 'grille', countBy: 'need', needId: 'supplyAir',
     capacityPerElement: 10, coverage: {}, layout: { strategy: 'grid', wallOffsetM: 0.5, rotation: 'room' }, writeCapacity: true,
   };
   const r = { ...manualRoom(0, rect(0, 0, 400, 200)), id: 'room-1', name: 'A' };
-  const values = { areaM2: 50, perimeterM: 30, lengthM: 10, widthM: 5, axisDeg: 0, ceilingHeight: { mm: 2700, level: 'global' as const }, volumeM3: 135, people: null };
+  const values = { areaM2: 50, perimeterM: 30, lengthM: 10, widthM: 5, axisDeg: 0, ceilingHeight: { mm: 2700, level: 'global' as const }, volumeM3: 135, people: null, demands: { supplyAir: { terms: [{ basis: 'room' as const, value: 30 }] } } };
 
   it('amount + coverage: the coverage limit adds stamps above the amount count, and each gets a smaller part', () => {
     // 10 × 5 m; 30 dm³/s ÷ 10 = 3 stamps; a max radius of 1.5 m needs more.
@@ -477,7 +477,7 @@ describe('planAutoPlacement', () => {
     planAutoPlacement([base], [r], () => values, () => CAL, () => ({ width: 10, height: 10 }), { stamps, roomIds }).rows[0]!;
 
   it(`places nothing in a room that needs more than ${MAX_ROOM_STAMPS} stamps`, () => {
-    const count = (n: number) => planAutoPlacement([{ ...base, amount: { fixed: n * 10, unit: 'dm³/s' } }], [r], () => values, () => CAL, () => ({ width: 1, height: 1 })).rows[0]!;
+    const count = (n: number) => planAutoPlacement([base], [r], () => ({ ...values, demands: { supplyAir: { terms: [{ basis: 'room' as const, value: n * 10 }] } } }), () => CAL, () => ({ width: 1, height: 1 })).rows[0]!;
     const over = count(MAX_ROOM_STAMPS + 1);
     expect(over.requirement.count).toBe(MAX_ROOM_STAMPS + 1);
     expect(over.stamps).toEqual([]);
@@ -541,7 +541,7 @@ describe('planAutoPlacement', () => {
 
   it('takes the count of a By coverage row from the layout', () => {
     // 10 × 5 m room: a radius of 4 ÷ √2 = 2.83 m.
-    const coverageRule: PlacementRule = { ...base, preset: 'coverage', capacityPerElement: undefined, coverage: { maxSpacing: 4 }, layout: { strategy: 'evenSpread', wallOffsetM: 0, rotation: 'room' } };
+    const coverageRule: PlacementRule = { ...base, countBy: 'coverage', capacityPerElement: undefined, coverage: { maxSpacing: 4 }, layout: { strategy: 'evenSpread', wallOffsetM: 0, rotation: 'room' } };
     const row = planAutoPlacement([coverageRule], [r], () => values, () => CAL, () => ({ width: 0, height: 0 })).rows[0]!;
     expect(row.stamps.length).toBe(row.requirement.count);
     expect(row.requirement.countSource).toBe('coverage');
@@ -554,7 +554,7 @@ describe('planAutoPlacement', () => {
   it('starts By coverage from area ÷ max area, and stops at the max count', () => {
     expect(coverageStartCount({ coverage: { maxAreaPerElement: 20 } }, 50)).toBe(3);
     expect(coverageStartCount({ coverage: { maxSpacing: 4 }, minCount: 2 }, 50)).toBe(2);
-    const capped: PlacementRule = { ...base, preset: 'coverage', coverage: { maxSpacing: 1 }, maxCount: 2, layout: { strategy: 'evenSpread', wallOffsetM: 0, rotation: 'room' } };
+    const capped: PlacementRule = { ...base, countBy: 'coverage', coverage: { maxSpacing: 1 }, maxCount: 2, layout: { strategy: 'evenSpread', wallOffsetM: 0, rotation: 'room' } };
     const row = planAutoPlacement([capped], [r], () => values, () => CAL, () => ({ width: 0, height: 0 })).rows[0]!;
     expect(row.requirement.count).toBe(2);
     expect(row.warnings).toEqual(['maxCountReached', 'coverageNotMet']);

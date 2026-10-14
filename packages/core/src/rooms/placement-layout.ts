@@ -8,6 +8,7 @@ import type { Vec2 } from '../geometry.js';
 import type { PlacedStamp } from '../stamp.js';
 import { polygonContainsPoint, roomBounds, roomLabelPoint, type Room } from './room.js';
 import { roomMinBoundingRect } from './room-values.js';
+import { BUILT_IN_NEEDS, type RoomNeed } from './room-need.js';
 import {
   calculateRooms,
   REQUIREMENT_WARNING_TEXT,
@@ -713,7 +714,7 @@ export function estimateFitCount(samples: RoomSamples, minPt: number): number {
  * The check never changes the count or the positions.
  */
 export function layoutRoomStamps(
-  rule: Pick<PlacementRule, 'layout' | 'coverage'> & Partial<Pick<PlacementRule, 'preset' | 'minCount' | 'maxCount' | 'alsoCoverage'>>,
+  rule: Pick<PlacementRule, 'layout' | 'coverage'> & Partial<Pick<PlacementRule, 'countBy' | 'minCount' | 'maxCount' | 'alsoCoverage'>>,
   room: Pick<Room, 'polygon'>,
   count: number,
   calibration: Calibration,
@@ -906,8 +907,9 @@ export function planAutoPlacement(
   calibrationOf: (pageIndex: number) => Calibration | null,
   stampSizeOf: (definitionId: string) => { width: number; height: number } | null,
   existing?: ExistingAutoPlaced,
+  needs: readonly RoomNeed[] = BUILT_IN_NEEDS,
 ): { rows: PlacementRow[]; unmatched: Room[]; stale: StaleAutoPlaced[] } {
-  const { rows, unmatched } = calculateRooms(rules, rooms, valuesOf);
+  const { rows, unmatched } = calculateRooms(rules, rooms, valuesOf, needs);
   const placedStamps = (existing?.stamps ?? []).filter((s) => s.autoPlaced);
   const stampsOf = (ruleId: string, room: Room) =>
     placedStamps.filter(

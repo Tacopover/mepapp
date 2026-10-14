@@ -12,6 +12,7 @@ import type { PlacedStamp } from '../stamp.js';
 import { planAutoPlacement } from './placement-layout.js';
 import type { PlacementRule } from './placement-rule.js';
 import type { Room } from './room.js';
+import type { RoomNeed } from './room-need.js';
 import type { RoomValues } from './room-values.js';
 
 export interface PlacementPlanInput {
@@ -25,6 +26,8 @@ export interface PlacementPlanInput {
   sizes: [string, { width: number; height: number } | null][];
   /** A re-run: the stamps of the drawing and the ids of every room of the drawing. */
   existing?: { stamps: PlacedStamp[]; roomIds: string[] };
+  /** The built-in needs and the own needs. Absent = the built-in needs. */
+  needs?: RoomNeed[];
 }
 
 export type PlacementPlan = ReturnType<typeof planAutoPlacement>;
@@ -45,6 +48,7 @@ export function runPlacementPlan(input: PlacementPlanInput): PlacementPlan {
     (page) => calibrations.get(page) ?? null,
     (id) => sizes.get(id) ?? null,
     input.existing ? { stamps: input.existing.stamps, roomIds: new Set(input.existing.roomIds) } : undefined,
+    input.needs,
   );
 }
 

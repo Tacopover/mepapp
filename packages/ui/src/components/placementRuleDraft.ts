@@ -1,20 +1,14 @@
 import {
+  BUILT_IN_NEEDS,
+  CAPACITY_UNITS,
   CEILING_GRID_SIZES_MM,
-  demandFitsUnit,
-  isAirChangeUnit,
   parseDecimal,
-  PRESET_AMOUNT_FIELDS,
-  ROOM_DEMAND_FIELDS,
-  STAMP_COUNT_UNIT,
-  type AmountTermKey,
-  type AreaUnit,
   type GridEdge,
   type GridStyle,
-  type IlluminanceUnit,
   type LengthUnit,
-  type PlacementPreset,
+  type PlacementCountMode,
   type PlacementRule,
-  type RoomDemandKey,
+  type RoomNeed,
 } from '@mepapp/core';
 
 // The text draft of one placement rule in the guide (PlacementRuleGuideBody): the boxes hold text,
@@ -22,14 +16,7 @@ import {
 
 export const newRuleId = () => `rule-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-export const AMOUNT_FIELD_LABELS: Record<(typeof PRESET_AMOUNT_FIELDS)[PlacementPreset][number], string> = {
-  fixed: 'Per room',
-  perM2: 'Per m² floor area',
-  perPerson: 'Per person',
-  perM3: 'Per m³ volume (air changes)',
-  minimum: 'Minimum per room',
-};
-
+/** The value of the Custom item of a list, for example the ceiling grid size. */
 export const OTHER_UNIT = '__other';
 
 export function blankRule(name: string): PlacementRule {
@@ -39,8 +26,9 @@ export function blankRule(name: string): PlacementRule {
     discipline: 'ventilation',
     roomTypeIds: [],
     stampDefinitionId: null,
-    preset: 'perArea',
-    amount: { unit: 'dm³/s' },
+    countBy: 'need',
+    needId: 'supplyAir',
+    unit: 'dm³/s',
     coverage: {},
     layout: { strategy: 'center', wallOffsetM: 0.5, rotation: 'room' },
     writeCapacity: true,
@@ -62,26 +50,16 @@ export function draftOf(rule: PlacementRule) {
     roomTypeIds: rule.roomTypeIds,
     nameContains: rule.nameContains ?? '',
     stampDefinitionId: rule.stampDefinitionId,
-    preset: rule.preset,
-    fixed: text(rule.amount.fixed),
-    perM2: text(rule.amount.perM2),
-    perPerson: text(rule.amount.perPerson),
-    perM3: text(rule.amount.perM3),
-    minimum: text(rule.amount.minimum),
-    unit: rule.amount.unit,
-    /** The terms that take their number from a room-type demand. */
-    from: { ...rule.amount.from } as Partial<Record<AmountTermKey, RoomDemandKey>>,
-    areaUnit: (rule.amount.areaUnit ?? 'm2') as AreaUnit,
-    lux: text(rule.lighting?.lux),
-    uf: text(rule.lighting?.utilisationFactor),
-    mf: text(rule.lighting?.maintenanceFactor),
-    illuminanceUnit: (rule.lighting?.illuminanceUnit ?? 'lx') as IlluminanceUnit,
-    luxFromRoomType: rule.lighting?.luxFromRoomType === true,
-    ufMode: (rule.lighting?.ufTable ? 'table' : 'fixed') as 'fixed' | 'table',
-    ufTable: (rule.lighting?.ufTable ?? []).map((pt) => ({ k: String(pt.k), uf: String(pt.uf) })),
-    suspension: text(rule.lighting?.suspensionM),
-    workingPlane: text(rule.lighting?.workingPlaneHeightM),
+    countBy: rule.countBy,
+    needId: rule.needId ?? '',
     capacity: text(rule.capacityPerElement),
+    unit: rule.unit ?? '',
+    perRoomCount: String(rule.perRoomCount ?? 1),
+    uf: text(rule.luminaire?.utilisationFactor),
+    mf: text(rule.luminaire?.maintenanceFactor),
+    ufMode: (rule.luminaire?.ufTable ? 'table' : 'fixed') as 'fixed' | 'table',
+    ufTable: (rule.luminaire?.ufTable ?? []).map((pt) => ({ k: String(pt.k), uf: String(pt.uf) })),
+    suspension: text(rule.luminaire?.suspensionM),
     maxSpacing: text(rule.coverage.maxSpacing),
     maxArea: text(rule.coverage.maxAreaPerElement),
     maxWall: text(rule.coverage.maxWallDistance),
@@ -107,10 +85,24 @@ export function draftOf(rule: PlacementRule) {
 
 export type Draft = ReturnType<typeof draftOf>;
 
-/** The other draft fields that change with the preset: an air-changes rule needs a flow unit, and By coverage uses Even spread. */
-export function presetPatch(draft: Draft, preset: PlacementPreset): Partial<Draft> {
-  return { preset, unit: preset === 'airChanges' && !isAirChangeUnit(draft.unit) ? 'm³/h' : draft.unit, ...(preset === 'coverage' ? { strategy: 'evenSpread' as const } : {}) };
+/** The other draft fields that change with the way of counting: By coverage uses Even spread. */
+export function countByPatch(countBy: PlacementCountMode): Partial<Draft> {
+  return { countBy, ...(countBy === 'coverage' ? { strategy: 'evenSpread' as const } : {}) };
 }
+
+/** The other draft fields that change with the need: a unit that the need offers, and the factors of a luminaire. */
+export function needPatch(draft: Draft, need: RoomNeed): Partial<Draft> {
+  const units = CAPACITY_UNITS[need.kind];
+  return {
+    countBy: 'need',
+    needId: need.id,
+    unit: units.includes(draft.unit) ? draft.unit : (units[0] ?? ''),
+    ...(need.kind === 'light' ? { uf: draft.uf || '0.6', mf: draft.mf || '0.8' } : {}),
+  };
+}
+
+/** True when a stamp of the need can write the amount per stamp as its capacity: a flow, a power or another amount. */
+export const needWritesCapacity = (need: Pick<RoomNeed, 'kind'> | undefined) => need !== undefined && (need.kind === 'flow' || need.kind === 'power' || need.kind === 'amount');
 
 export class FieldError extends Error {}
 
@@ -122,35 +114,48 @@ export function numberOf(value: string, label: string): number | undefined {
   return parsed;
 }
 
-export function ruleOf(id: string, d: Draft): PlacementRule {
-  const shown = new Set(PRESET_AMOUNT_FIELDS[d.preset]);
-  const amount: PlacementRule['amount'] = { unit: d.preset === 'lighting' ? 'lm' : d.unit.trim() };
-  for (const key of ['fixed', 'perM2', 'perPerson', 'perM3', 'minimum'] as const) {
-    const value = shown.has(key) ? numberOf(d[key], AMOUNT_FIELD_LABELS[key]) : undefined;
-    if (value !== undefined) amount[key] = value;
-  }
-  if (shown.has('perM2') && d.areaUnit === 'ft2') amount.areaUnit = 'ft2';
-  for (const [key, demand] of Object.entries(d.from) as [AmountTermKey, RoomDemandKey | undefined][]) {
-    if (demand === undefined || !shown.has(key)) continue;
-    if (!demandFitsUnit(demand, amount.unit)) {
-      const f = ROOM_DEMAND_FIELDS.find((x) => x.key === demand)!;
-      throw new FieldError(`${AMOUNT_FIELD_LABELS[key]}: the room-type value "${f.label.toLowerCase()}" (${f.unit}) does not fit the unit ${amount.unit || '(none)'}. Choose another unit, or choose Number.`);
-    }
-    (amount.from ??= {})[key] = demand;
-  }
+/** The rule of the draft. `needs` are the built-in needs and the own needs: the kind of the need sets the unit and the luminaire. */
+export function ruleOf(id: string, d: Draft, needs: readonly RoomNeed[] = BUILT_IN_NEEDS): PlacementRule {
   const rule: PlacementRule = {
     id,
     name: d.name.trim(),
     discipline: d.discipline,
     roomTypeIds: d.roomTypeIds,
     stampDefinitionId: d.stampDefinitionId,
-    preset: d.preset,
-    amount,
+    countBy: d.countBy,
     coverage: {},
     layout: { strategy: d.strategy, wallOffsetM: numberOf(d.wallOffset, 'Min distance to the walls') ?? 0, rotation: d.rotation },
     writeCapacity: d.writeCapacity,
   };
   if (d.nameContains.trim()) rule.nameContains = d.nameContains.trim();
+  if (d.countBy === 'need') {
+    const need = needs.find((n) => n.id === d.needId);
+    if (d.needId) rule.needId = d.needId;
+    const capacity = numberOf(d.capacity, 'What one stamp gives');
+    if (capacity !== undefined) rule.capacityPerElement = capacity;
+    if (need && CAPACITY_UNITS[need.kind].includes(d.unit)) rule.unit = d.unit;
+    if (!needWritesCapacity(need)) rule.writeCapacity = false;
+    if (need?.kind === 'light') {
+      const uf = d.ufMode === 'fixed' ? numberOf(d.uf, 'Utilisation factor') : (numberOf(d.uf, 'Utilisation factor') ?? 0.6);
+      const mf = numberOf(d.mf, 'Maintenance factor');
+      if (uf === undefined || mf === undefined) throw new FieldError('Enter the utilisation factor and the maintenance factor.');
+      rule.luminaire = { utilisationFactor: uf, maintenanceFactor: mf };
+      if (d.ufMode === 'table') {
+        const rows = d.ufTable.filter((row) => row.k.trim() !== '' || row.uf.trim() !== '');
+        rule.luminaire.ufTable = rows.map((row, i) => {
+          const k = numberOf(row.k, `Room index in row ${i + 1}`);
+          const value = numberOf(row.uf, `UF in row ${i + 1}`);
+          if (k === undefined || value === undefined) throw new FieldError(`Enter the room index and the UF in row ${i + 1} of the UF table.`);
+          return { k, uf: value };
+        });
+        const suspension = numberOf(d.suspension, 'Suspension');
+        if (suspension !== undefined) rule.luminaire.suspensionM = suspension;
+      }
+    }
+  } else if (d.countBy === 'perRoom') {
+    rule.perRoomCount = numberOf(d.perRoomCount, 'Stamps in each room') ?? 1;
+    rule.writeCapacity = false;
+  } else rule.writeCapacity = false;
   const minSpacing = numberOf(d.minSpacing, 'Min distance between stamps');
   if (minSpacing !== undefined) rule.layout.minSpacingM = minSpacing;
   if (d.strategy === 'grid' && d.gridStyle !== 'spread') rule.layout.gridStyle = d.gridStyle;
@@ -161,31 +166,7 @@ export function ruleOf(id: string, d: Draft): PlacementRule {
     rule.layout.ceilingGridMm = size;
   }
   if (d.lengthUnit === 'ft') rule.coverage.lengthUnit = 'ft';
-  if (d.preset === 'lighting') {
-    const lux = numberOf(d.lux, 'Illuminance');
-    const uf = d.ufMode === 'fixed' ? numberOf(d.uf, 'Utilisation factor') : (numberOf(d.uf, 'Utilisation factor') ?? 0.6);
-    const mf = numberOf(d.mf, 'Maintenance factor');
-    if ((lux === undefined && !d.luxFromRoomType) || uf === undefined || mf === undefined) throw new FieldError('Enter the illuminance, the utilisation factor and the maintenance factor.');
-    rule.lighting = { utilisationFactor: uf, maintenanceFactor: mf };
-    if (lux !== undefined) rule.lighting.lux = lux;
-    if (d.luxFromRoomType) rule.lighting.luxFromRoomType = true;
-    if (d.illuminanceUnit === 'fc') rule.lighting.illuminanceUnit = 'fc';
-    if (d.ufMode === 'table') {
-      const rows = d.ufTable.filter((row) => row.k.trim() !== '' || row.uf.trim() !== '');
-      rule.lighting.ufTable = rows.map((row, i) => {
-        const k = numberOf(row.k, `Room index in row ${i + 1}`);
-        const value = numberOf(row.uf, `UF in row ${i + 1}`);
-        if (k === undefined || value === undefined) throw new FieldError(`Enter the room index and the UF in row ${i + 1} of the UF table.`);
-        return { k, uf: value };
-      });
-      const suspension = numberOf(d.suspension, 'Suspension');
-      const workingPlane = numberOf(d.workingPlane, 'Working-plane height');
-      if (suspension !== undefined) rule.lighting.suspensionM = suspension;
-      if (workingPlane !== undefined) rule.lighting.workingPlaneHeightM = workingPlane;
-    }
-  }
   const optional: [keyof PlacementRule | keyof PlacementRule['coverage'], string, string, 'rule' | 'coverage'][] = [
-    ['capacityPerElement', d.capacity, 'Capacity per element', 'rule'],
     ['minCount', d.minCount, 'Min count', 'rule'],
     ['maxCount', d.maxCount, 'Max count', 'rule'],
     ['maxSpacing', d.maxSpacing, 'Max spacing', 'coverage'],
@@ -197,11 +178,7 @@ export function ruleOf(id: string, d: Draft): PlacementRule {
     const n = numberOf(value, label);
     if (n !== undefined) (target === 'rule' ? (rule as unknown as Record<string, unknown>) : (rule.coverage as Record<string, unknown>))[key] = n;
   }
-  if (amount.unit === STAMP_COUNT_UNIT) {
-    delete rule.capacityPerElement;
-    rule.writeCapacity = false;
-  }
-  if (d.alsoCoverage && d.preset !== 'coverage') rule.alsoCoverage = true;
+  if (d.alsoCoverage && d.countBy !== 'coverage') rule.alsoCoverage = true;
   if (d.rotation === 'fixed') {
     const angle = numberOf(d.fixedAngle, 'Fixed angle');
     if (angle !== undefined) rule.layout.fixedAngleDeg = angle;

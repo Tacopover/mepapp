@@ -1,4 +1,4 @@
-import { parsePlacementRules, PLACEMENT_RULE_EXAMPLES, type PlacementRule } from '@mepapp/core';
+import { hasOldPlacementRules, parsePlacementRules, PLACEMENT_RULE_EXAMPLES, type PlacementRule } from '@mepapp/core';
 import type { StorageLike } from './schematicTemplateStorage.js';
 
 // Per-installation user library of placement rules (room-auto-placement.md Phase 3). Moves to SettingsStore when that store is wired up.
@@ -7,12 +7,17 @@ export const PLACEMENT_RULES_STORAGE_KEY = 'mepapp.placementRules.v1';
 
 const examplesCopy = (): PlacementRule[] => JSON.parse(JSON.stringify(PLACEMENT_RULE_EXAMPLES)) as PlacementRule[];
 
-/** The stored rules. The example rules when nothing is stored yet or the stored value is unreadable. An empty stored list stays empty. */
+/** The copy of the rules before room-type-calculations.md, written once before the first save in the new shape. */
+export const PLACEMENT_RULES_BACKUP_KEY = 'mepapp.placementRules.v1.before-needs';
+
+/** The stored rules. The example rules when nothing is stored yet or the stored value is unreadable. An empty stored list stays empty. A stored list of the old shape is copied once to PLACEMENT_RULES_BACKUP_KEY. */
 export function loadPlacementRules(storage: StorageLike | undefined): PlacementRule[] {
   try {
     const raw = storage?.getItem(PLACEMENT_RULES_STORAGE_KEY);
     if (!raw) return examplesCopy();
-    return parsePlacementRules(JSON.parse(raw)) ?? examplesCopy();
+    const value: unknown = JSON.parse(raw);
+    if (hasOldPlacementRules(value) && !storage?.getItem(PLACEMENT_RULES_BACKUP_KEY)) storage?.setItem(PLACEMENT_RULES_BACKUP_KEY, raw);
+    return parsePlacementRules(value)?.rules ?? examplesCopy();
   } catch {
     return examplesCopy();
   }
