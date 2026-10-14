@@ -1,0 +1,621 @@
+<title>Network Types on Stamps</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Chivo:wght@400;500;600;700&family=Martian+Mono:wght@400;500;600&display=swap">
+<style>
+/* Mockup for auto-routing.md part 1: a placement rule gives a network type to each port of the stamps it places. A switch bar (example stamp, guide layout) above the rule guide and the Properties dock; the drawing below shows the ports that wait for routing. Same tokens and faces as the earlier mockups (room-type-calculations, amount step). */
+:root {
+  --ink: #131b21; --muted: #57676f; --line: #c2ced4; --paper: #eef2f4; --surface: #ffffff; --surface-2: #e7edf0;
+  --accent: #175a8a; --accent-soft: #dbe9f2; --accent-ink: #0f4267; --on-accent: #ffffff;
+  --warn: #9a5b00; --warn-soft: #fbeed6; --bad: #b3261e; --bad-soft: #f9dedc; --ok: #2f7d4f; --ok-soft: #dcefe3;
+  --mine: #6a3d8f; --mine-soft: #efe4f7;
+  /* The PDF sheet stays light in both themes, as in MepApp. */
+  --sheet: #fbfcfd; --sheet-ink: #2a343a; --sheet-wall: #4a575e; --sheet-muted: #6b7a82; --sheet-mark: #c26a00;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-ui: 'Chivo', system-ui, sans-serif;
+  --font-mono: 'Martian Mono', ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #e3eaee; --muted: #9aabb3; --line: #3f4d55; --paper: #12191e; --surface: #1b242a; --surface-2: #243038;
+    --accent: #5aa2d6; --accent-soft: #1d3a50; --accent-ink: #a9d2ef; --on-accent: #0c1a24;
+    --warn: #e7a94a; --warn-soft: #3a2c14; --bad: #f08a80; --bad-soft: #3d1d1b; --ok: #7cc79a; --ok-soft: #173326;
+    --mine: #c9a2e8; --mine-soft: #2f2240;
+    --sheet: #e4eaed; --sheet-ink: #1e272c; --sheet-wall: #3d494f; --sheet-muted: #56656c; --sheet-mark: #a65a00;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #e3eaee; --muted: #9aabb3; --line: #3f4d55; --paper: #12191e; --surface: #1b242a; --surface-2: #243038;
+  --accent: #5aa2d6; --accent-soft: #1d3a50; --accent-ink: #a9d2ef; --on-accent: #0c1a24;
+  --warn: #e7a94a; --warn-soft: #3a2c14; --bad: #f08a80; --bad-soft: #3d1d1b; --ok: #7cc79a; --ok-soft: #173326;
+  --mine: #c9a2e8; --mine-soft: #2f2240;
+  --sheet: #e4eaed; --sheet-ink: #1e272c; --sheet-wall: #3d494f; --sheet-muted: #56656c; --sheet-mark: #a65a00;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 40px; max-width: 1260px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 26px; text-wrap: balance; }
+h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 24px; text-wrap: balance; }
+h3 { margin: 0 0 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+h4 { margin: 0; font-size: 14px; font-weight: 700; }
+.intro { max-width: 76ch; color: var(--muted); margin: 0; }
+
+.bar { background: var(--surface); border: 2px solid var(--ink); padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+.bar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.seg { display: inline-flex; border: 1.5px solid var(--ink); flex-wrap: wrap; }
+.seg button { border: 0; background: var(--surface); padding: 5px 11px; cursor: pointer; font-size: 13px; }
+.seg button + button { border-left: 1.5px solid var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.bar .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-right: 6px; }
+.layout-note { background: var(--accent-soft); color: var(--accent-ink); padding: 10px 14px; border-left: 4px solid var(--accent); margin: 0; }
+.layout-note b { color: var(--ink); }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+@media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 2px solid var(--ink); padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.lead { margin: 0; color: var(--muted); max-width: 80ch; }
+.section { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.field { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.field > label { min-width: 104px; }
+.text { border: 1.5px solid var(--accent); background: var(--accent-soft); padding: 3px 7px; min-width: 0; width: 280px; max-width: 100%; }
+.num { width: 74px; border: 1.5px solid var(--accent); background: var(--accent-soft); padding: 3px 6px; text-align: right; font-family: var(--font-mono); font-size: 13px; }
+select.pick { border: 1.5px solid var(--accent); background: var(--surface); padding: 3px 4px; font-size: 13px; max-width: 100%; min-width: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.note { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 70ch; }
+.note b { color: var(--ink); font-weight: 600; }
+.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 12.5px; }
+.tag { font-size: 11px; padding: 0 6px; border: 1px solid currentColor; font-family: var(--font-mono); letter-spacing: 0.04em; white-space: nowrap; }
+.tag.def { color: var(--ok); background: var(--ok-soft); }
+.tag.mine { color: var(--mine); background: var(--mine-soft); }
+.tag.new { color: var(--accent-ink); background: var(--accent-soft); }
+.btn { border: 1.5px solid var(--ink); background: var(--surface); padding: 3px 11px; cursor: pointer; font-size: 13px; }
+.btn[disabled] { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
+.check-row { display: flex; gap: 8px; align-items: flex-start; }
+.check-row input { margin-top: 3px; }
+
+/* Rule guide */
+.steps { display: flex; flex-wrap: wrap; gap: 0; border: 1.5px solid var(--ink); align-self: flex-start; max-width: 100%; }
+.steps span { padding: 4px 10px; font-size: 12.5px; border-right: 1.5px solid var(--ink); display: inline-flex; gap: 6px; align-items: baseline; }
+.steps span:last-child { border-right: 0; }
+.steps .n { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.steps .on { background: var(--ink); color: var(--paper); }
+.steps .on .n { color: var(--paper); }
+.stamp-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; border: 1px solid var(--line); padding: 8px 12px; }
+.stamp-pick svg { flex: none; }
+.stamp-pick .nm { font-weight: 600; flex: 1 1 160px; min-width: 0; }
+.netbox { border: 2px solid var(--accent); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; position: relative; }
+.netbox > .tag.new { position: absolute; top: -10px; right: 10px; background: var(--surface); }
+.netrow { display: grid; grid-template-columns: 26px minmax(0, 150px) minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+@media (max-width: 480px) { .netrow { grid-template-columns: 26px minmax(0, 1fr); } .netrow .ctl { grid-column: 1 / -1; } }
+.netrow .pn { font-weight: 600; overflow-wrap: anywhere; }
+.netrow .pn span { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.ctl { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; min-width: 0; }
+.badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--ink); background: var(--surface); border: 4px solid var(--line); }
+.badge.none { color: var(--muted); border-width: 2px; border-style: dashed; }
+.gets { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; background: var(--surface-2); padding: 7px 10px; font-size: 13px; }
+.gets .k { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.gets .it { display: inline-flex; gap: 6px; align-items: center; }
+.cap { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); padding: 10px 12px; }
+
+/* Properties dock */
+.dock { background: var(--surface); border: 2px solid var(--ink); display: flex; flex-direction: column; min-width: 0; }
+.dock-h { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.elem { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.elem .t { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; }
+.elem .t span { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.psec { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.psec:last-child { border-bottom: 0; }
+.psec.new { box-shadow: inset 3px 0 0 var(--accent); }
+.prow { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 6px; align-items: center; font-size: 13px; }
+.prow .ro { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); padding: 2px 6px; }
+.port { display: flex; flex-direction: column; gap: 4px; padding: 7px 0; border-top: 1px dashed var(--line); }
+.port:first-of-type { border-top: 0; }
+.port .ph { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 13px; }
+.port select { width: 100%; }
+.st { font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.st.ok { color: var(--ok); }
+.st.wait { color: var(--muted); }
+.st.bad { color: var(--bad); background: var(--bad-soft); padding: 4px 6px; }
+.auto { font-size: 12px; background: var(--surface-2); padding: 6px 8px; }
+
+/* Drawing */
+.sheet-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--sheet); }
+.sheet { display: block; width: 100%; min-width: 560px; max-width: 960px; margin: 0 auto; height: auto; }
+.sheet .wall { fill: none; stroke: var(--sheet-wall); stroke-width: 3; }
+.sheet .rname { fill: var(--sheet-muted); font-family: var(--font-mono); font-size: 10px; }
+.sheet .sym { fill: var(--sheet); stroke: var(--sheet-ink); stroke-width: 1.4; }
+.sheet .symline { stroke: var(--sheet-ink); stroke-width: 1; fill: none; }
+.sheet .symtxt { fill: var(--sheet-ink); font-family: var(--font-mono); font-size: 9px; }
+.sheet .hit { cursor: pointer; }
+.sheet .hit:focus { outline: none; }
+.sheet .hit:focus-visible .selbox { stroke: var(--accent); stroke-dasharray: none; }
+.sheet .selbox { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 4 3; }
+.sheet .dotring { stroke: var(--sheet); stroke-width: 2; }
+.sheet .badring { fill: none; stroke: var(--sheet-mark); stroke-width: 2.2; }
+.sheet .badtxt { fill: var(--sheet-mark); font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
+.statusbar { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; background: var(--surface-2); border: 1px solid var(--line); border-top: 0; padding: 6px 10px; font-size: 12.5px; }
+.statusbar .sum { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.statusbar .sum b { color: var(--ink); font-weight: 600; }
+.statusbar .bad { color: var(--bad); }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 16px; font-size: 12.5px; }
+.legend div { display: flex; gap: 8px; align-items: center; }
+.legend svg { flex: none; }
+.notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; max-width: 90ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="section">
+    <h1>Network types on stamps</h1>
+    <p class="intro">A placement rule gives a network type to each port of the stamps that it places. Routing (a later part) uses this network type to find the ports that it must connect. Choose an example stamp and a layout of the rule guide. Click a stamp in the drawing to see its Properties.</p>
+  </header>
+
+  <div class="bar" role="group" aria-label="Mockup controls">
+    <div class="bar-group">
+      <span class="k">Example stamp</span>
+      <div class="seg" id="exSeg">
+        <button type="button" data-ex="grille" aria-pressed="false">Supply grille · 1 port</button>
+        <button type="button" data-ex="fcu" aria-pressed="true">Fan coil unit · 2 ports</button>
+        <button type="button" data-ex="luminaire" aria-pressed="false">Luminaire · no network</button>
+      </div>
+    </div>
+    <div class="bar-group">
+      <span class="k">Guide layout</span>
+      <div class="seg" id="laySeg">
+        <button type="button" data-lay="A" aria-pressed="true">A · Step 1 Stamp</button>
+        <button type="button" data-lay="B" aria-pressed="false">B · Step 3 Count</button>
+      </div>
+    </div>
+  </div>
+  <p class="layout-note" id="layoutNote"></p>
+
+  <div class="stage">
+    <section class="card" aria-label="Placement rule guide">
+      <div class="steps" id="steps"></div>
+      <div id="guideBody" class="section" style="gap:16px"></div>
+    </section>
+
+    <aside class="dock" aria-label="Properties panel">
+      <div class="dock-h">Properties</div>
+      <div id="props"></div>
+    </aside>
+  </div>
+
+  <section class="card" aria-label="Drawing">
+    <div class="section" style="gap:4px">
+      <h2>The drawing after Auto-place</h2>
+      <p class="lead">A port with a network type and no segment shows a dot in the color of its network type. The dot shows in MepApp only, not in the PDF export.</p>
+    </div>
+    <div>
+      <div class="sheet-wrap"><svg class="sheet" id="sheet" viewBox="0 0 720 300" role="group" aria-label="Floor plan with placed stamps"></svg></div>
+      <div class="statusbar">
+        <label class="check-row" for="showOpen"><input type="checkbox" id="showOpen" checked> <span>Open ports</span></label>
+        <span class="sum" id="openSum"></span>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="card" aria-label="Decisions shown in this mockup">
+    <h2>What this mockup shows</h2>
+    <ul class="notes">
+      <li>The <b>rule</b> holds the network type. A room type does not hold one: a room type has no stamp and no ports, and a rule that counts by coverage or the same number in each room has no need of a room type.</li>
+      <li>Each built-in need gives a <b>default</b>: Supply air → Supply Air, Return air → Return Air, Heating → Heating Water, Cooling → Chilled Water. Light, Sockets and own needs give none.</li>
+      <li>A stamp with 2 or more ports can give <b>each port</b> its own network type. A stamp without ports of its own uses its center point.</li>
+      <li>The placed stamp keeps a network type for each port. <b>Properties</b> shows it and can change it. A change marks an auto-placed stamp as moved, so a new run of Auto-place keeps it.</li>
+      <li>A segment with another network type on a port gives a <b>mark</b> in the drawing and a line in Properties. MepApp does not change the segment or the port on its own.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(() => {
+  const TYPES = [
+    { id: 'supply-air', name: 'Supply Air', d: 'ventilation', color: '#2196f3', pattern: 'solid' },
+    { id: 'return-air', name: 'Return Air', d: 'ventilation', color: '#4fc3f7', pattern: 'dashed' },
+    { id: 'exhaust-air', name: 'Exhaust Air', d: 'ventilation', color: '#78909c', pattern: 'dotted' },
+    { id: 'chilled-water', name: 'Chilled Water', d: 'heatingAndCooling', color: '#00bcd4', pattern: 'solid' },
+    { id: 'heating-water', name: 'Heating Water', d: 'heatingAndCooling', color: '#f44336', pattern: 'solid' },
+    { id: 'domestic-cold-water', name: 'Domestic Cold Water', d: 'plumbing', color: '#2962ff', pattern: 'solid' },
+    { id: 'domestic-hot-water', name: 'Domestic Hot Water', d: 'plumbing', color: '#ff6f00', pattern: 'solid' },
+    { id: 'sanitary-waste', name: 'Sanitary Waste', d: 'plumbing', color: '#6d4c41', pattern: 'solid' },
+    { id: 'conduit', name: 'Conduit', d: 'electrical', color: '#757575', pattern: 'solid' },
+    { id: 'cable-tray', name: 'Cable Tray', d: 'electrical', color: '#9e9e9e', pattern: 'dashed' },
+    { id: 'branch-circuit', name: 'Branch Circuit', d: 'electrical', color: '#fdd835', pattern: 'solid' },
+    { id: 'feeder', name: 'Feeder', d: 'electrical', color: '#fbc02d', pattern: 'solid' },
+    { id: 'wet-standpipe', name: 'Wet Standpipe', d: 'fireProtection', color: '#d32f2f', pattern: 'solid' },
+    { id: 'dry-standpipe', name: 'Dry Standpipe', d: 'fireProtection', color: '#e57373', pattern: 'dashed' },
+    { id: 'nt-7f3a2c', name: 'Supply Air 2', d: 'ventilation', color: '#1565c0', pattern: 'solid', own: true },
+  ];
+  const DISC = { ventilation: 'Ventilation', heatingAndCooling: 'Heating and cooling', plumbing: 'Plumbing', electrical: 'Electrical', fireProtection: 'Fire protection' };
+  const NEEDS = [
+    { id: 'light', name: 'Light' }, { id: 'supplyAir', name: 'Supply air' }, { id: 'returnAir', name: 'Return air' },
+    { id: 'heating', name: 'Heating' }, { id: 'cooling', name: 'Cooling' }, { id: 'sockets', name: 'Sockets' },
+  ];
+  const NEED_DEFAULT = { supplyAir: 'supply-air', returnAir: 'return-air', heating: 'heating-water', cooling: 'chilled-water' };
+  const CENTER = '__center__';
+  const typeOf = (id) => TYPES.find((t) => t.id === id) || null;
+  const needName = (id) => (NEEDS.find((n) => n.id === id) || {}).name || (id === 'perRoom' ? 'The same number in each room' : 'By coverage');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  // The three example rules and their stamps. The fan coil unit has 2 ports of its own; the other stamps have none and use the center point.
+  const RULES = {
+    grille: { name: 'Supply air grille 50 dm³/s', discipline: 'Ventilation', need: 'supplyAir', stamp: 'Supply air grille 600 × 600', icon: 'grille', ports: [], networkTypeId: 'supply-air', perPort: false, portTypes: {}, capacity: '50', unit: 'dm³/s', write: true },
+    fcu: { name: 'Fan coil unit 4-pipe 2.4 kW', discipline: 'Heating and cooling', need: 'cooling', stamp: 'Fan coil unit 4-pipe', icon: 'fcu', ports: [{ id: 'p1', name: 'Chilled water', where: 'left, top' }, { id: 'p2', name: 'Heating water', where: 'left, bottom' }], networkTypeId: 'chilled-water', perPort: true, portTypes: { p1: 'chilled-water', p2: 'heating-water' }, capacity: '2.4', unit: 'kW', write: true },
+    luminaire: { name: 'Luminaire 3600 lm', discipline: 'Electrical', need: 'light', stamp: 'Recessed LED panel', icon: 'lum', ports: [], networkTypeId: null, perPort: false, portTypes: {}, capacity: '3600', unit: 'lm', write: false },
+  };
+  const EXTRA_RULE_NAMES = { toilet: 'Return air valve toilet' };
+
+  // The drawing: stamps with their ports (fx, fy as fractions of the box) and the network type of each port.
+  const STAMPS = [
+    { id: 'g1', rule: 'grille', kind: 'grille', x: 80, y: 62, w: 22, h: 22, room: 'Office 1.01', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: { [CENTER]: 'supply-air' }, moved: false, cap: 50 },
+    { id: 'g2', rule: 'grille', kind: 'grille', x: 210, y: 62, w: 22, h: 22, room: 'Office 1.01', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: { [CENTER]: 'supply-air' }, moved: false, cap: 50 },
+    { id: 'g3', rule: 'grille', kind: 'grille', x: 80, y: 148, w: 22, h: 22, room: 'Office 1.01', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: { [CENTER]: 'supply-air' }, moved: false, cap: 50 },
+    { id: 'g4', rule: 'grille', kind: 'grille', x: 210, y: 148, w: 22, h: 22, room: 'Office 1.01', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: { [CENTER]: 'supply-air' }, moved: false, cap: 50 },
+    { id: 'l1', rule: 'luminaire', kind: 'lum', x: 145, y: 62, w: 36, h: 14, room: 'Office 1.01', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: {}, moved: false, cap: 0 },
+    { id: 'l2', rule: 'luminaire', kind: 'lum', x: 145, y: 148, w: 36, h: 14, room: 'Office 1.01', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: {}, moved: false, cap: 0 },
+    { id: 'g5', rule: 'grille', kind: 'grille', x: 360, y: 62, w: 22, h: 22, room: 'Office 1.02', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: { [CENTER]: 'supply-air' }, moved: false, cap: 50 },
+    { id: 'g6', rule: 'grille', kind: 'grille', x: 470, y: 62, w: 22, h: 22, room: 'Office 1.02', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: { [CENTER]: 'supply-air' }, moved: false, cap: 50 },
+    { id: 'fcu1', rule: 'fcu', kind: 'fcu', x: 430, y: 148, w: 64, h: 28, room: 'Office 1.02', ports: [{ id: 'p1', name: 'Chilled water', fx: 0, fy: 0.3 }, { id: 'p2', name: 'Heating water', fx: 0, fy: 0.7 }], types: { p1: 'chilled-water', p2: 'heating-water' }, moved: false, cap: 2.4 },
+    { id: 'v1', rule: 'toilet', kind: 'valve', x: 628, y: 100, w: 18, h: 18, room: 'Toilet 1.03', ports: [{ id: CENTER, name: 'Center', fx: 0.5, fy: 0.5 }], types: { [CENTER]: 'exhaust-air' }, moved: false, cap: 15 },
+  ];
+  // Segments: `to` is the port at one end (the other end is a fitting on a main).
+  const SEGMENTS = [
+    { id: 's1', type: 'supply-air', pts: [[40, 228], [520, 228]] },
+    { id: 's2', type: 'supply-air', pts: [[80, 228], [80, 148]], to: { stamp: 'g3', port: CENTER } },
+    { id: 's3', type: 'return-air', pts: [[330, 246], [560, 246]] },
+    { id: 's4', type: 'return-air', pts: [[470, 246], [470, 62]], to: { stamp: 'g6', port: CENTER } },
+  ];
+
+  const state = { ex: 'fcu', lay: 'A', selected: 'fcu1', showOpen: true };
+
+  function swatch(type, w = 30) {
+    if (!type) return `<svg width="${w}" height="10" aria-hidden="true"><line x1="2" y1="5" x2="${w - 2}" y2="5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 3" opacity="0.5"/></svg>`;
+    const dash = type.pattern === 'dashed' ? ' stroke-dasharray="6 3"' : type.pattern === 'dotted' ? ' stroke-dasharray="1.5 3" stroke-linecap="round"' : '';
+    return `<svg width="${w}" height="10" aria-hidden="true"><line x1="2" y1="5" x2="${w - 2}" y2="5" stroke="${type.color}" stroke-width="3"${dash}/></svg>`;
+  }
+  function typeOptions(selected, extra = '') {
+    const groups = Object.keys(DISC).map((d) => {
+      const opts = TYPES.filter((t) => t.d === d && !t.own).map((t) => `<option value="${t.id}"${t.id === selected ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
+      return `<optgroup label="${DISC[d]}">${opts}</optgroup>`;
+    }).join('');
+    const own = TYPES.filter((t) => t.own).map((t) => `<option value="${t.id}"${t.id === selected ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
+    return `${extra}<option value=""${!selected ? ' selected' : ''}>None: no network</option>${groups}<optgroup label="Only in this drawing">${own}</optgroup>`;
+  }
+
+  // ---------- The stamp icon of the guide, with a badge for each port ----------
+  function stampIcon(rule) {
+    const types = portTypesOfRule(rule);
+    const dot = (cx, cy, id) => {
+      const t = typeOf(types[id]);
+      return t ? `<circle cx="${cx}" cy="${cy}" r="5" fill="${t.color}" stroke="var(--surface)" stroke-width="2"/>` : '';
+    };
+    if (rule.icon === 'grille') return `<svg width="64" height="44" viewBox="0 0 64 44" aria-hidden="true"><rect x="14" y="4" width="36" height="36" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5"/><path d="M14 4 L50 40 M50 4 L14 40" stroke="var(--ink)" stroke-width="1"/>${dot(32, 22, CENTER)}</svg>`;
+    if (rule.icon === 'lum') return `<svg width="64" height="44" viewBox="0 0 64 44" aria-hidden="true"><rect x="6" y="14" width="52" height="16" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5"/><line x1="10" y1="22" x2="54" y2="22" stroke="var(--ink)" stroke-width="1"/>${dot(32, 22, CENTER)}</svg>`;
+    return `<svg width="64" height="44" viewBox="0 0 64 44" aria-hidden="true"><rect x="14" y="8" width="46" height="28" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5"/><text x="38" y="26" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--ink)">FCU</text>${dot(14, 16.4, 'p1')}${dot(14, 27.6, 'p2')}<text x="1" y="19.5" font-family="var(--font-mono)" font-size="8" fill="var(--muted)">1</text><text x="1" y="30.7" font-family="var(--font-mono)" font-size="8" fill="var(--muted)">2</text></svg>`;
+  }
+  /** What each port of a placed stamp gets from the rule: its own choice, else the choice of the rule. */
+  function portTypesOfRule(rule) {
+    const ids = rule.ports.length > 0 ? rule.ports.map((p) => p.id) : [CENTER];
+    const out = {};
+    for (const id of ids) {
+      const v = rule.perPort && Object.prototype.hasOwnProperty.call(rule.portTypes, id) ? rule.portTypes[id] : rule.networkTypeId;
+      if (v) out[id] = v;
+    }
+    return out;
+  }
+
+  // ---------- The network section of the guide (the same in layout A and B) ----------
+  function networkSection() {
+    const rule = RULES[state.ex];
+    const def = NEED_DEFAULT[rule.need] || null;
+    const multi = rule.ports.length >= 2;
+    const t = typeOf(rule.networkTypeId);
+    let defNote = '';
+    if (rule.networkTypeId && rule.networkTypeId === def) defNote = `<span class="tag def">default</span> The default of the need ${esc(needName(rule.need))}.`;
+    else if (def) defNote = `The need ${esc(needName(rule.need))} usually goes to ${esc(typeOf(def).name)}. <button type="button" class="link" id="useDefault">Use ${esc(typeOf(def).name)}</button>`;
+    else if (rule.need === 'light' || rule.need === 'sockets') defNote = `The need ${esc(needName(rule.need))} has no default. Circuits group luminaires and sockets: that is a separate automation, not a drawn network.`;
+    else if (rule.need === 'perRoom' || rule.need === 'coverage') defNote = 'This rule does not serve a need, so it has no default.';
+    else defNote = 'An own need has no default.';
+    const ownNote = t && t.own && !rule.perPort ? `<p class="note"><span class="tag mine">only in this drawing</span> The rule keeps a copy of ${esc(t.name)}. Auto-place adds the copy to a drawing that does not have this network type.</p>` : '';
+    const rows = multi && rule.perPort
+      ? rule.ports.map((p, i) => {
+          const v = Object.prototype.hasOwnProperty.call(rule.portTypes, p.id) ? rule.portTypes[p.id] : rule.networkTypeId;
+          const pt = typeOf(v);
+          return `<div class="netrow"><span class="badge${pt ? '' : ' none'}" style="${pt ? `border-color:${pt.color}` : ''}">${i + 1}</span><span class="pn">${esc(p.name)}<span>port ${i + 1} · ${esc(p.where)}</span></span><span class="ctl"><select class="pick" id="g-port-${p.id}" data-port="${p.id}" aria-label="Network type of port ${i + 1}, ${esc(p.name)}">${typeOptions(v)}</select>${swatch(pt)}</span></div>`;
+        }).join('')
+      : '';
+    const gets = Object.entries(portTypesOfRule(rule));
+    const getsHtml = gets.length === 0
+      ? '<span class="muted">No network type. Routing leaves these stamps out.</span>'
+      : gets.map(([pid, tid]) => {
+          const pt = typeOf(tid);
+          const pi = rule.ports.findIndex((p) => p.id === pid);
+          return `<span class="it">${swatch(pt, 22)}${esc(pt.name)}${pi >= 0 ? ` <span class="muted small">port ${pi + 1}</span>` : ''}</span>`;
+        }).join('');
+    return `
+      <div class="netbox" data-testid="network-section">
+        <span class="tag new">new</span>
+        <div><h3 style="margin:0">Network</h3><div style="font-weight:700">Which network do the stamps join?</div></div>
+        ${!(multi && rule.perPort) ? `<div class="field"><label for="g-nt">Network type</label><span class="ctl"><select class="pick" id="g-nt">${typeOptions(rule.networkTypeId)}</select>${swatch(t)}</span></div>` : ''}
+        ${!(multi && rule.perPort) ? `<p class="note">${defNote}</p>${ownNote}` : ''}
+        ${multi ? `<label class="check-row small" for="g-perport"><input type="checkbox" id="g-perport"${rule.perPort ? ' checked' : ''}> <span>Give each port of the stamp its own network type (the stamp has ${rule.ports.length} ports)</span></label>` : `<p class="note">${rule.ports.length === 0 ? 'The stamp has no ports of its own. The network type goes to its center point, where a segment connects.' : ''}</p>`}
+        ${rows}
+        <div class="gets" data-testid="gets"><span class="k">Each placed stamp gets</span>${getsHtml}</div>
+      </div>`;
+  }
+
+  // ---------- The guide: layout A (step 1) or B (step 3) ----------
+  function renderSteps() {
+    const titles = ['Stamp', 'Rooms', 'Count', 'Spacing', 'Layout', 'Check and place'];
+    const on = state.lay === 'A' ? 1 : 3;
+    document.getElementById('steps').innerHTML = titles.map((t, i) => `<span class="${i + 1 === on ? 'on' : ''}"${i + 1 === on ? ' aria-current="step"' : ''}><span class="n">${i + 1}</span>${t}</span>`).join('');
+  }
+  function renderGuide() {
+    renderSteps();
+    const rule = RULES[state.ex];
+    const body = document.getElementById('guideBody');
+    if (state.lay === 'A') {
+      const serves = `${NEEDS.map((n) => `<option value="${n.id}"${n.id === rule.need ? ' selected' : ''}>${n.name}</option>`).join('')}`;
+      body.innerHTML = `
+        <h2>What do you want to place?</h2>
+        <p class="lead">MepApp places this stamp in each room that the rule applies to.</p>
+        <div class="section">
+          <div class="field"><label for="g-name">Rule name</label><input class="text" id="g-name" type="text" value="${esc(rule.name)}"></div>
+          <div class="field"><label for="g-disc">Discipline</label><select class="pick" id="g-disc"><option>${esc(rule.discipline)}</option></select></div>
+        </div>
+        <div class="section">
+          <h3>Stamp</h3>
+          <div class="stamp-pick">${stampIcon(rule)}<span class="nm">${esc(rule.stamp)}</span><button type="button" class="btn" id="chooseStamp">Choose…</button></div>
+        </div>
+        <div class="section">
+          <h3>What does the stamp serve?</h3>
+          <div class="field"><label for="g-serves">Serves</label><select class="pick" id="g-serves"><optgroup label="A need of the room types">${serves}</optgroup><optgroup label="Another way to count"><option value="perRoom"${rule.need === 'perRoom' ? ' selected' : ''}>The same number in each room</option><option value="coverage"${rule.need === 'coverage' ? ' selected' : ''}>Each point in reach (by coverage)</option></optgroup></select></div>
+        </div>
+        ${networkSection()}`;
+    } else {
+      const isLight = rule.need === 'light';
+      body.innerHTML = `
+        <h2>What does one stamp give?</h2>
+        <p class="lead">${esc(rule.name)} serves the need <b>${esc(needName(rule.need))}</b> (step 1).</p>
+        <div class="cap">
+          <h3 style="margin:0">One ${isLight ? 'luminaire' : 'stamp'}</h3>
+          <div class="field"><label for="g-cap">${isLight ? 'Luminous flux' : 'What one stamp gives'}</label><span class="ctl"><input class="num" id="g-cap" type="text" inputmode="decimal" value="${esc(rule.capacity)}"> <span>${esc(rule.unit)}</span></span></div>
+          ${rule.write || !isLight ? `<label class="check-row small" for="g-write"><input type="checkbox" id="g-write"${rule.write ? ' checked' : ''}> <span>Write the amount per stamp to each stamp as its capacity</span></label>` : ''}
+        </div>
+        ${networkSection()}`;
+    }
+    document.getElementById('layoutNote').innerHTML = state.lay === 'A'
+      ? '<b>Layout A (recommended):</b> the choice is in step 1, below the need. Step 1 has the stamp and its ports, and the need gives the default. The section is the same for each way to count.'
+      : '<b>Layout B:</b> the choice is in step 3, below "Write the amount per stamp". Both write a value to each placed stamp. But step 3 has a different form for each way to count, so the section must go into 3 forms, and the need is 2 steps away.';
+  }
+
+  // ---------- Properties of the selected stamp ----------
+  function connectedSegment(stampId, portId) {
+    return SEGMENTS.find((s) => s.to && s.to.stamp === stampId && s.to.port === portId) || null;
+  }
+  function ruleNameOf(stamp) {
+    return RULES[stamp.rule] ? RULES[stamp.rule].name : EXTRA_RULE_NAMES[stamp.rule];
+  }
+  function stampLabel(stamp) {
+    return stamp.kind === 'grille' ? 'Supply air grille 600 × 600' : stamp.kind === 'fcu' ? 'Fan coil unit 4-pipe' : stamp.kind === 'lum' ? 'Recessed LED panel' : 'Exhaust valve 125';
+  }
+  function renderProps() {
+    const stamp = STAMPS.find((s) => s.id === state.selected);
+    const host = document.getElementById('props');
+    if (!stamp) {
+      host.innerHTML = '<div class="psec"><p class="note">Click a stamp in the drawing.</p></div>';
+      return;
+    }
+    const own = stamp.ports.length > 0 && stamp.ports[0].id !== CENTER;
+    const ports = stamp.ports.map((p, i) => {
+      const t = typeOf(stamp.types[p.id]);
+      const seg = connectedSegment(stamp.id, p.id);
+      const segType = seg ? typeOf(seg.type) : null;
+      let status;
+      if (!seg) status = t ? `<div class="st wait">No segment yet. Routing will connect it.</div>` : `<div class="st wait">No network type: routing leaves this port out.</div>`;
+      else if (!t || seg.type === stamp.types[p.id]) status = `<div class="st ok">Connected: ${esc(segType.name)}</div>`;
+      else status = `<div class="st bad" role="status">A ${esc(segType.name)} segment connects to this port. It does not match. <button type="button" class="link" data-fix="${p.id}" data-type="${seg.type}">Use ${esc(segType.name)} for the port</button></div>`;
+      return `<div class="port">
+        <div class="ph">${own ? `<span class="badge${t ? '' : ' none'}" style="${t ? `border-color:${t.color}` : ''}">${i + 1}</span>` : ''}<span>${esc(own ? p.name : 'Center')}</span>${own ? '' : '<span class="muted small" style="font-weight:400">(no ports of its own)</span>'}</div>
+        <span class="ctl"><select class="pick" id="pp-${p.id}" data-pport="${p.id}" aria-label="Network type of ${esc(own ? p.name : 'the center point')}">${typeOptions(stamp.types[p.id])}</select>${swatch(t)}</span>
+        ${status}
+      </div>`;
+    }).join('');
+    const ruleName = ruleNameOf(stamp);
+    host.innerHTML = `
+      <div class="elem"><div class="t"><b>${esc(stampLabel(stamp))}</b><span>${stamp.w} × ${stamp.h} pt · ${esc(stamp.room)}</span></div><button type="button" class="btn" disabled title="Not part of this mockup">Edit</button><button type="button" class="btn" disabled title="Not part of this mockup">Replace stamp…</button></div>
+      <div class="psec">
+        <div class="prow"><span>X (pt)</span><span class="ro">${stamp.x}</span></div>
+        <div class="prow"><span>Y (pt)</span><span class="ro">${stamp.y}</span></div>
+        <div class="prow"><span>Rotation</span><span class="ro">0</span></div>
+        <div class="prow"><span>Capacity</span><span class="ro">${stamp.cap}</span></div>
+      </div>
+      <div class="psec new" data-testid="props-networks">
+        <h4>Networks <span class="tag new">new</span></h4>
+        <p class="note">The network that each port must join. Routing draws a segment of this network type to the port.</p>
+        ${ports}
+        ${ruleName ? `<div class="auto">Auto-placed by the rule <b>${esc(ruleName)}</b>. ${stamp.moved ? 'You changed this stamp, so a new run of Auto-place keeps it.' : 'A change here marks the stamp as moved: a new run of Auto-place then keeps it.'}</div>` : ''}
+      </div>`;
+  }
+
+  // ---------- The drawing ----------
+  function portPoint(stamp, port) {
+    return [stamp.x + (port.fx - 0.5) * stamp.w, stamp.y + (port.fy - 0.5) * stamp.h];
+  }
+  function symbol(s) {
+    const x0 = s.x - s.w / 2, y0 = s.y - s.h / 2;
+    if (s.kind === 'grille') return `<rect class="sym" x="${x0}" y="${y0}" width="${s.w}" height="${s.h}"/><path class="symline" d="M${x0} ${y0} L${x0 + s.w} ${y0 + s.h} M${x0 + s.w} ${y0} L${x0} ${y0 + s.h}"/>`;
+    if (s.kind === 'lum') return `<rect class="sym" x="${x0}" y="${y0}" width="${s.w}" height="${s.h}"/><line class="symline" x1="${x0 + 3}" y1="${s.y}" x2="${x0 + s.w - 3}" y2="${s.y}"/>`;
+    if (s.kind === 'fcu') return `<rect class="sym" x="${x0}" y="${y0}" width="${s.w}" height="${s.h}"/><text class="symtxt" x="${s.x + 4}" y="${s.y + 3}" text-anchor="middle">FCU</text>`;
+    return `<circle class="sym" cx="${s.x}" cy="${s.y}" r="${s.w / 2}"/><path class="symline" d="M${s.x - 5} ${s.y} L${s.x + 5} ${s.y} M${s.x} ${s.y - 5} L${s.x} ${s.y + 5}"/>`;
+  }
+  function segPath(seg) {
+    const t = typeOf(seg.type);
+    const dash = t.pattern === 'dashed' ? ' stroke-dasharray="9 5"' : t.pattern === 'dotted' ? ' stroke-dasharray="1.5 4" stroke-linecap="round"' : '';
+    return `<polyline points="${seg.pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="${t.color}" stroke-width="3"${dash}/>`;
+  }
+  function renderDrawing() {
+    const rooms = `
+      <rect class="wall" x="20" y="16" width="680" height="250"/>
+      <line class="wall" x1="20" y1="205" x2="700" y2="205"/>
+      <line class="wall" x1="290" y1="16" x2="290" y2="205"/>
+      <line class="wall" x1="570" y1="16" x2="570" y2="205"/>
+      <text class="rname" x="28" y="32">Office 1.01</text>
+      <text class="rname" x="298" y="32">Office 1.02</text>
+      <text class="rname" x="578" y="32">Toilet 1.03</text>
+      <text class="rname" x="28" y="258">Corridor 1.00</text>`;
+    const segs = SEGMENTS.map(segPath).join('');
+    const marks = [];
+    let open = {}, bad = 0;
+    const stamps = STAMPS.map((s) => {
+      const sel = s.id === state.selected;
+      for (const p of s.ports) {
+        const tid = s.types[p.id];
+        const seg = connectedSegment(s.id, p.id);
+        const [px, py] = portPoint(s, p);
+        if (tid && seg && seg.type !== tid) {
+          bad++;
+          marks.push(`<circle class="badring" cx="${px}" cy="${py}" r="8"/><text class="badtxt" x="${px + 9}" y="${py - 7}">!</text>`);
+        } else if (tid && !seg) {
+          open[tid] = (open[tid] || 0) + 1;
+          if (state.showOpen) marks.push(`<circle class="dotring" cx="${px}" cy="${py}" r="4.6" fill="${typeOf(tid).color}"/>`);
+        }
+      }
+      const pad = 5;
+      const box = `<rect class="selbox" x="${s.x - s.w / 2 - pad}" y="${s.y - s.h / 2 - pad}" width="${s.w + pad * 2}" height="${s.h + pad * 2}"${sel ? '' : ' visibility="hidden"'}/>`;
+      return `<g class="hit" tabindex="0" role="button" aria-pressed="${sel}" aria-label="${esc(stampLabel(s))} in ${esc(s.room)}" data-stamp="${s.id}">${symbol(s)}${box}</g>`;
+    }).join('');
+    document.getElementById('sheet').innerHTML = rooms + segs + stamps + `<g pointer-events="none">${marks.join('')}</g>`;
+    const total = Object.values(open).reduce((a, b) => a + b, 0);
+    const parts = Object.entries(open).map(([tid, n]) => `<span>${esc(typeOf(tid).name)} <b>${n}</b></span>`).join('');
+    document.getElementById('openSum').innerHTML = `<span><b>${total}</b> open port${total === 1 ? '' : 's'}</span>${parts}${bad > 0 ? `<span class="bad"><b>${bad}</b> port${bad === 1 ? '' : 's'} with another network type</span>` : ''}`;
+  }
+  function renderLegend() {
+    document.getElementById('legend').innerHTML = `
+      <div><svg width="26" height="20" aria-hidden="true"><rect x="2" y="2" width="16" height="16" fill="var(--sheet)" stroke="var(--sheet-ink)"/><circle cx="10" cy="10" r="4.6" fill="#2196f3" stroke="var(--sheet)" stroke-width="2"/></svg><span>A port with a network type and no segment yet (an open port)</span></div>
+      <div><svg width="26" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="var(--sheet-mark)" stroke-width="2.2"/><text x="18" y="9" font-size="10" font-weight="700" fill="var(--sheet-mark)" font-family="var(--font-mono)">!</text></svg><span>A segment of another network type connects to the port</span></div>
+      <div><svg width="26" height="20" aria-hidden="true"><rect x="2" y="2" width="16" height="16" fill="var(--sheet)" stroke="var(--sheet-ink)"/></svg><span>No mark: the port is connected, or it has no network type</span></div>`;
+  }
+
+  function renderAll() {
+    renderGuide();
+    renderProps();
+    renderDrawing();
+  }
+
+  // ---------- Events ----------
+  document.getElementById('exSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-ex]');
+    if (!b) return;
+    state.ex = b.dataset.ex;
+    for (const x of document.querySelectorAll('#exSeg button')) x.setAttribute('aria-pressed', String(x === b));
+    renderGuide();
+  });
+  document.getElementById('laySeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-lay]');
+    if (!b) return;
+    state.lay = b.dataset.lay;
+    for (const x of document.querySelectorAll('#laySeg button')) x.setAttribute('aria-pressed', String(x === b));
+    renderGuide();
+  });
+  const guide = document.getElementById('guideBody');
+  guide.addEventListener('input', (e) => {
+    const rule = RULES[state.ex];
+    if (e.target.id === 'g-name') {
+      rule.name = e.target.value;
+      renderProps();
+    } else if (e.target.id === 'g-cap') rule.capacity = e.target.value;
+  });
+  guide.addEventListener('change', (e) => {
+    const rule = RULES[state.ex];
+    const t = e.target;
+    if (t.id === 'g-nt') rule.networkTypeId = t.value || null;
+    else if (t.id === 'g-serves') {
+      const oldDef = NEED_DEFAULT[rule.need] || null;
+      if (rule.networkTypeId === oldDef) rule.networkTypeId = NEED_DEFAULT[t.value] || null;
+      rule.need = t.value;
+    } else if (t.id === 'g-perport') {
+      rule.perPort = t.checked;
+      if (t.checked) for (const p of rule.ports) if (!Object.prototype.hasOwnProperty.call(rule.portTypes, p.id)) rule.portTypes[p.id] = rule.networkTypeId;
+      if (!t.checked) rule.portTypes = {};
+    } else if (t.dataset.port) rule.portTypes[t.dataset.port] = t.value || null;
+    else if (t.id === 'g-write') rule.write = t.checked;
+    else return;
+    const focusId = t.id;
+    renderGuide();
+    const again = document.getElementById(focusId);
+    if (again) again.focus();
+  });
+  guide.addEventListener('click', (e) => {
+    const rule = RULES[state.ex];
+    if (e.target.id === 'useDefault') {
+      rule.networkTypeId = NEED_DEFAULT[rule.need] || null;
+      renderGuide();
+      const sel = document.getElementById('g-nt');
+      if (sel) sel.focus();
+    } else if (e.target.id === 'chooseStamp') {
+      const order = ['grille', 'fcu', 'luminaire'];
+      const next = order[(order.indexOf(state.ex) + 1) % order.length];
+      document.querySelector(`#exSeg button[data-ex="${next}"]`).click();
+      const again = document.getElementById('chooseStamp');
+      if (again) again.focus();
+    }
+  });
+  const props = document.getElementById('props');
+  props.addEventListener('change', (e) => {
+    const t = e.target;
+    if (!t.dataset.pport) return;
+    const stamp = STAMPS.find((s) => s.id === state.selected);
+    if (t.value) stamp.types[t.dataset.pport] = t.value;
+    else delete stamp.types[t.dataset.pport];
+    stamp.moved = true;
+    const id = t.id;
+    renderProps();
+    renderDrawing();
+    const again = document.getElementById(id);
+    if (again) again.focus();
+  });
+  props.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-fix]');
+    if (!b) return;
+    const stamp = STAMPS.find((s) => s.id === state.selected);
+    stamp.types[b.dataset.fix] = b.dataset.type;
+    stamp.moved = true;
+    renderProps();
+    renderDrawing();
+  });
+  const sheet = document.getElementById('sheet');
+  const pick = (e) => {
+    const g = e.target.closest('[data-stamp]');
+    if (!g) return;
+    state.selected = g.dataset.stamp;
+    renderProps();
+    renderDrawing();
+    const again = sheet.querySelector(`[data-stamp="${state.selected}"]`);
+    if (again && e.type === 'keydown') again.focus();
+  };
+  sheet.addEventListener('click', pick);
+  sheet.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      pick(e);
+    }
+  });
+  document.getElementById('showOpen').addEventListener('change', (e) => {
+    state.showOpen = e.target.checked;
+    renderDrawing();
+  });
+
+  renderLegend();
+  renderAll();
+})();
+</script>
