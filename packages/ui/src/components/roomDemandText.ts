@@ -57,12 +57,12 @@ export const fmtTotal = (n: number): string => fmtNum(n, Math.abs(n) < 10 ? 2 : 
 const plural = (n: number, word: string) => `${fmtNum(n)} ${word}${n === 1 ? '' : 's'}`;
 
 function shortTerm(term: DemandTerm): string {
-  if (term.every !== undefined) return `1 per ${fmtNum(term.every)} ${{ person: 'p', area: 'm²', length: 'm' }[term.basis as 'person' | 'area' | 'length']}`;
+  if (term.every !== undefined) return `1 per ${fmtNum(term.every)} ${{ person: 'persons', area: 'm²', length: 'm' }[term.basis as 'person' | 'area' | 'length']}`;
   const n = fmtNum(term.value ?? 0);
-  return { person: `${n}/person`, area: `${n}/m²`, room: `${n}/room`, length: `${n}/m`, volume: `${n} ACH`, illuminance: `${n} lx` }[term.basis];
+  return { person: `${n}/person`, area: `${n}/m²`, room: `${n}/room`, length: `${n}/m`, volume: `${n} air changes/h`, illuminance: `${n} lx` }[term.basis];
 }
 
-/** The short text of a demand for a cell of the table: "6.5/person", "1 per 15 m", "0.5 ACH", "500 lx", with "≥ 7" for a minimum. */
+/** The short text of a demand for a cell of the table: "6.5/person", "1 per 15 m", "0.5 air changes/h", "500 lx", with "≥ 7" for a minimum. */
 export function demandShort(demand: RoomDemand): string {
   const terms = demand.terms.map(shortTerm).join(' + ');
   return demand.minimum !== undefined ? `${terms} ≥ ${fmtNum(demand.minimum)}` : terms;
@@ -74,7 +74,8 @@ export const totalUnit = (need: Pick<RoomNeed, 'kind' | 'unit'>): string => (nee
 function partText(need: Pick<RoomNeed, 'unit' | 'unitOne'>, part: DemandResult['parts'][number]): string {
   const { term, base = 1 } = part;
   const value = term.value ?? 0;
-  const of = { person: plural(base, 'person'), area: `${fmtNum(base, 1)} m²`, length: `${fmtNum(base, 1)} m`, volume: `${fmtNum(base, 1)} m³`, illuminance: `${fmtNum(base, 1)} m²`, room: '' }[term.basis];
+  // The room values with 2 decimals, so the product of the shown numbers is close to the shown total.
+  const of = { person: plural(base, 'person'), area: `${fmtNum(base, 2)} m²`, length: `${fmtNum(base, 2)} m`, volume: `${fmtNum(base, 2)} m³`, illuminance: `${fmtNum(base, 2)} m²`, room: '' }[term.basis];
   if (term.basis === 'room') return `${fmtTotal(value)} ${need.unit} per room`;
   if (term.every !== undefined) return `${of} ÷ ${fmtNum(term.every)}`;
   if (term.basis === 'volume') return `${fmtNum(value)} × ${of} = ${fmtNum(value * base, 1)} m³/h`;

@@ -404,8 +404,7 @@ export function MepSketchApp({
   // Before the libraries load: stored rules of the old shape move their own numbers to the room types once (room-type-calculations.md §4 question 11).
   const [ruleMoveReport, setRuleMoveReport] = useState<string[] | null>(() => {
     const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
-    moveStoredOldRules(storage);
-    return loadRuleMoveReport(storage);
+    return moveStoredOldRules(storage) ?? loadRuleMoveReport(storage);
   });
   const [roomTypes, setRoomTypes] = useState<RoomType[]>(() => loadRoomTypes(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveRoomTypes(typeof localStorage === 'undefined' ? undefined : localStorage, roomTypes), [roomTypes]);

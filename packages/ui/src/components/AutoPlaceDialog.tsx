@@ -20,9 +20,9 @@ import {
   type RoomType,
   type StampDefinition,
 } from '@mepapp/core';
-import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, type AutoPlaceArt } from './autoPlacePlan.js';
+import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, zeroNeed, type AutoPlaceArt } from './autoPlacePlan.js';
 import { CeilingHeightsCard, DrawingCard, LEVEL_FILLS, LEVEL_NAMES, RoomTypesCard, TYPE_FILLS, typeFillOf } from './AutoPlaceInputCards.js';
-import { examplePlacementRules } from '../placementRuleStorage.js';
+import { examplePlacementRules, RULE_MOVE_FAILED } from '../placementRuleStorage.js';
 import { Dialog } from './Dialog.js';
 import { InfoTip } from './InfoTip.js';
 import { PlacementGuideSteps, PlacementRuleGuideBody, type PlacementRuleGuideHandle, type StepState, type StepStatus } from './PlacementRuleGuide.js';
@@ -97,7 +97,6 @@ const COUNT_SOURCE_TEXT: Record<PlacementRow['requirement']['countSource'], stri
   onePerRoom: 'No capacity: one per room, then the min and max count',
 };
 
-/** The state of a rule in the left list, from the dry run of its rows (no stamp positions). */
 /** What a rule serves, in a few words: the name of its need, or its way of counting. */
 export function servesText(rule: PlacementRule, needs: readonly RoomNeed[]): string {
   if (rule.countBy === 'perRoom') return `${rule.perRoomCount ?? 1} in each room`;
@@ -105,6 +104,7 @@ export function servesText(rule: PlacementRule, needs: readonly RoomNeed[]): str
   return needs.find((n) => n.id === rule.needId)?.name ?? 'A deleted need';
 }
 
+/** The state of a rule in the left list, from the dry run of its rows (no stamp positions). */
 function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 'requirement'>[], found: (definitionId: string) => boolean, serves: string): StepStatus {
   if (rule.countBy === 'need' && rows.some((row) => row.requirement.warnings.includes('needNotFound'))) return ['bad', 'The need was deleted'];
   if (!rule.stampDefinitionId) return ['bad', `${serves}: no stamp`];
@@ -114,6 +114,8 @@ function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 're
   if (tooMany > 0) return ['bad', `${plural(tooMany, 'room')}: too many stamps`];
   const missing = rows.filter(missingData).length;
   if (missing > 0) return ['warn', `${plural(missing, 'room')}: data missing`];
+  const zero = rows.filter(zeroNeed).length;
+  if (zero > 0) return ['warn', `${plural(zero, 'room')}: need 0, no stamp`];
   return ['ok', `${serves}: ${plural(rows.reduce((n, row) => n + (row.requirement.count ?? 0), 0), 'stamp')}`];
 }
 
@@ -126,6 +128,8 @@ function placeStateOf(rule: PlacementRule, rows: readonly PlacementRow[]): StepS
   if (tooMany > 0) return ['bad', `${plural(tooMany, 'room')} skipped: too many stamps`];
   const missing = rows.filter(missingData).length;
   if (missing > 0) return ['warn', `${plural(missing, 'room')} skipped: data missing`];
+  const zero = rows.filter(zeroNeed).length;
+  if (zero > 0) return ['warn', `${plural(zero, 'room')}: need 0, no stamp`];
   const problems = rows.filter((row) => spacingProblem(row) || coverageProblem(row)).length;
   if (problems > 0) return ['warn', `${plural(problems, 'room')}: check the spacing`];
   return ['ok', 'Ready'];
@@ -239,9 +243,23 @@ export function AutoPlaceDialog({
   const [blockMessage, setBlockMessage] = useState<string | null>(null);
   /** The room type and the need that the Room types card opens at (a link of step 3). A new object opens it again. */
   const [typesFocus, setTypesFocus] = useState<{ typeId: string; needId?: string } | null>(null);
+  const [typesTab, setTypesTab] = useState<'rooms' | 'library'>('rooms');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [rulesMessage, setRulesMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const guideRef = useRef<HTMLDivElement | null>(null);
+  // Another item or step: the top of its card comes into view. The left list can be long, and on a narrow screen it is above the card.
+  const shownKey = item.kind === 'rule' ? `rule:${item.id}:${ruleStep}` : item.kind;
+  const shownBefore = useRef(shownKey);
+  useEffect(() => {
+    if (shownBefore.current === shownKey) return;
+    shownBefore.current = shownKey;
+    const card = guideRef.current?.querySelector<HTMLElement>('.mep-guide-card');
+    const box = card?.closest<HTMLElement>('.mep-modal-body');
+    if (!card || !box) return;
+    const top = card.getBoundingClientRect().top - box.getBoundingClientRect().top;
+    if (top < 0 || top > box.clientHeight / 2) box.scrollTop += top;
+  }, [shownKey]);
   /** False, with a message on the card, while a rule or a room type cannot be left. */
   const canLeave = () => {
     if (openRule && body.current && !body.current.flush()) return false;
@@ -719,6 +737,7 @@ export function AutoPlaceDialog({
           pickedId={pickedId}
           onPick={setPickedId}
           focus={typesFocus}
+          onTabChange={setTypesTab}
           footer={cardNav({ kind: 'drawing' }, { kind: 'heights' }, 'Ceiling heights')}
         />
       );
@@ -761,6 +780,9 @@ export function AutoPlaceDialog({
       rooms: entry.rooms,
     }));
     const scopeUntyped = scopeRooms.filter((r) => r.roomTypeId === undefined).length;
+    const zeroShown = shownRows.filter(zeroNeed);
+    const zeroRooms = new Set(zeroShown.map((row) => row.room.id)).size;
+    const zeroRules = checkedRules.filter((rule) => zeroShown.some((row) => row.rule.id === rule.id));
     return (
       <>
         <h2>Place all</h2>
@@ -839,6 +861,16 @@ export function AutoPlaceDialog({
             </span>
           </div>
         )}
+        {zeroRules.length > 0 && (
+          <div className="mep-guide-callout" data-testid="ap-zero-need">
+            <span>
+              {plural(zeroRooms, 'room')} {zeroRooms === 1 ? 'gets' : 'get'} no stamp from {zeroRules.map((r) => r.name).join(', ')}, because the need of the room is 0. For example, a small room gets 0 persons. Step 3 of the rule lists the rooms.
+            </span>
+            <button type="button" onClick={() => go({ kind: 'rule', id: zeroRules[0]!.id }, 3)}>
+              Show the rooms
+            </button>
+          </div>
+        )}
         {noStamp.length > 0 && (
           <div className="mep-guide-callout bad" data-testid="ap-no-stamp">
             <span>
@@ -852,7 +884,7 @@ export function AutoPlaceDialog({
         {scopeUntyped > 0 && (
           <div className="mep-guide-callout" data-testid="ap-untyped-note">
             <span>
-              {plural(scopeUntyped, 'room')} without a type: a rule with room types does not find {scopeUntyped === 1 ? 'it' : 'them'}.
+              {plural(scopeUntyped, 'room')} without a type: a rule for a need does not find {scopeUntyped === 1 ? 'it' : 'them'}.
             </span>
             <button type="button" onClick={() => go({ kind: 'types' })}>
               Room types
@@ -970,7 +1002,7 @@ export function AutoPlaceDialog({
         </button>
       }
     >
-      <div className="mep-guide">
+      <div className={`mep-guide${!openRule && item.kind === 'types' && typesTab === 'library' ? ' mep-guide--wide' : ''}`} ref={guideRef}>
         {nav}
         {openRule ? (
           <PlacementRuleGuideBody
@@ -1006,8 +1038,8 @@ export function AutoPlaceDialog({
           <>
             <section className="mep-guide-card" data-testid="ap-card" data-item={item.kind}>
               {ruleMoveReport && (
-                <div className="mep-guide-callout info" role="status" data-testid="ap-move-report">
-                  <b>The placement rules changed</b>
+                <div className={`mep-guide-callout ${ruleMoveReport[0] === RULE_MOVE_FAILED ? 'bad' : 'info'}`} role="status" data-testid="ap-move-report">
+                  <b>{ruleMoveReport[0] === RULE_MOVE_FAILED ? 'The placement rules did not change' : 'The placement rules changed'}</b>
                   <ul className="mep-autoplace-report">
                     {ruleMoveReport.map((line, i) => (
                       <li key={i}>{line}</li>

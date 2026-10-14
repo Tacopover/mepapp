@@ -159,10 +159,11 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
       return result;
     });
     if (filled.length > 0) onChange(next);
+    const without = types.filter((type) => !ROOM_TYPE_DEMAND_EXAMPLES[type.id]).map((type) => type.name);
     setMessage(
-      filled.length > 0
+      (filled.length > 0
         ? `MepApp filled in the empty values of ${plural(filled.length, 'room type')}: ${filled.join(', ')}. Check them against the rules of your project.`
-        : 'Each room type with example values has them already.',
+        : 'Each room type with example values has them already.') + (without.length > 0 ? ` MepApp has no example values for ${without.join(', ')}.` : ''),
     );
   };
 
@@ -232,12 +233,14 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
             setPanel(null);
           }}
           onDelete={() => setPanel({ kind: 'delete', needId: panelNeed.id })}
+          busy={busy}
         />
       )}
       {panel?.kind === 'delete' && panelNeed && (
         <DeleteNeed
           need={panelNeed}
           users={types.filter((t) => t.demands?.[panelNeed.id])}
+          busy={busy}
           onCancel={() => setPanel(null)}
           onDelete={() => {
             onChange(
@@ -306,7 +309,7 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
                       <span className="mep-circuit-types-abbr">{roomCountOf ? roomCountOf(type.id) : type.keywords.length}</span>
                     </button>
                   </th>
-                  {cell(PERSONS, 'persons', type.areaPerPersonM2 !== undefined ? `${fmtNum(type.areaPerPersonM2)} m²/p` : null)}
+                  {cell(PERSONS, 'persons', type.areaPerPersonM2 !== undefined ? `${fmtNum(type.areaPerPersonM2)} m²/person` : null)}
                   {columns.map((need) => {
                     const demand = type.demands?.[need.id];
                     return cell(need.id, need.name, demand ? demandShort(demand) : null);
@@ -383,7 +386,7 @@ const KIND_UNIT_HINT: Record<NeedKind, string> = {
 };
 
 /** The form of a new own need, or of an own need to rename. Kind is fixed after the need exists. */
-function NeedForm({ need, others, onSave, onCancel, onDelete }: { need?: RoomNeed; others: RoomNeed[]; onSave: (need: RoomNeed) => void; onCancel: () => void; onDelete?: () => void }) {
+function NeedForm({ need, others, onSave, onCancel, onDelete, busy }: { need?: RoomNeed; others: RoomNeed[]; onSave: (need: RoomNeed) => void; onCancel: () => void; onDelete?: () => void; busy?: string }) {
   const [name, setName] = useState(need?.name ?? '');
   const [kind, setKind] = useState<NeedKind>(need?.kind ?? 'count');
   const [unit, setUnit] = useState(need && NEED_KIND_UNITS[need.kind] === null ? need.unit : '');
@@ -432,10 +435,10 @@ function NeedForm({ need, others, onSave, onCancel, onDelete }: { need?: RoomNee
       {kind === 'count' && (
         <div className="mep-guide-term">
           <label className="mep-guide-label" htmlFor="rt-need-one">
-            The word for one
+            Unit after 1
           </label>
           <input id="rt-need-one" className="mep-guide-num wide" type="text" placeholder={unit.trim() || 'for example outlet'} value={unitOne} onChange={(e) => setUnitOne(e.target.value)} />
-          <span className="mep-guide-note">For "1 outlet per 10 m²". Empty = the unit.</span>
+          <span className="mep-guide-note">For example "outlet" in "1 outlet per 10 m²". Empty: MepApp uses the unit.</span>
         </div>
       )}
       <div className="mep-guide-term">
@@ -454,7 +457,7 @@ function NeedForm({ need, others, onSave, onCancel, onDelete }: { need?: RoomNee
           Cancel
         </button>
         {onDelete && (
-          <button type="button" onClick={onDelete} data-testid="rt-need-delete">
+          <button type="button" onClick={onDelete} disabled={busy !== undefined} title={busy} data-testid="rt-need-delete">
             Delete…
           </button>
         )}
@@ -464,7 +467,7 @@ function NeedForm({ need, others, onSave, onCancel, onDelete }: { need?: RoomNee
 }
 
 /** Asks in the page before an own need goes (no window.confirm in the ui package). */
-function DeleteNeed({ need, users, onDelete, onCancel }: { need: RoomNeed; users: RoomType[]; onDelete: () => void; onCancel: () => void }) {
+function DeleteNeed({ need, users, busy, onDelete, onCancel }: { need: RoomNeed; users: RoomType[]; busy?: string; onDelete: () => void; onCancel: () => void }) {
   return (
     <div className="mep-guide-callout bad" role="alert" data-testid="rt-delete-need">
       <b>Delete the need {need.name}?</b>
@@ -473,7 +476,7 @@ function DeleteNeed({ need, users, onDelete, onCancel }: { need: RoomNeed; users
         need. You cannot undo this.
       </span>
       <div className="mep-guide-inline">
-        <button type="button" onClick={onDelete} data-testid="rt-delete-need-yes">
+        <button type="button" onClick={onDelete} disabled={busy !== undefined} title={busy} data-testid="rt-delete-need-yes">
           Delete
         </button>
         <button type="button" onClick={onCancel}>
@@ -522,6 +525,10 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const root = useRef<HTMLElement | null>(null);
+  // The form goes with its changes (another key, or no type selected): the library is not dirty then.
+  const dirtyChange = useRef(onDirtyChange);
+  dirtyChange.current = onDirtyChange;
+  useEffect(() => () => dirtyChange.current(false), []);
 
   useEffect(() => {
     if (!focusNeed) {

@@ -887,7 +887,7 @@ function withLayoutCount(requirement: RoomRequirement, layoutCount: { count: num
   const amountCount = requirement.count ?? 0;
   const count = Math.max(amountCount, layoutCount.count);
   const perElement = requirement.required !== null && count > 0 ? requirement.required / count : requirement.perElement;
-  return { ...requirement, count, countSource: count > amountCount ? 'coverage' : requirement.countSource, perElement, warnings };
+  return { ...requirement, count, countSource: count > amountCount ? 'coverage' : requirement.countSource, perElement, warnings: count > 0 ? warnings.filter((w) => w !== 'zeroNeed') : warnings };
 }
 
 /**

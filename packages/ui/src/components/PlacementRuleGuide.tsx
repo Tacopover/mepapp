@@ -39,11 +39,11 @@ import {
   type StampDefinition,
   type Vec2,
 } from '@mepapp/core';
-import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, type AutoPlaceArt } from './autoPlacePlan.js';
+import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, zeroNeed, zeroPersons, type AutoPlaceArt } from './autoPlacePlan.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
 import { InfoTip } from './InfoTip.js';
 import { countByPatch, draftOf, FieldError, needPatch, needWritesCapacity, OTHER_UNIT, ruleOf, type Draft } from './placementRuleDraft.js';
-import { demandShort, demandSumText } from './roomDemandText.js';
+import { demandShort, demandSumText, fmtTotal } from './roomDemandText.js';
 import { RulePreviewPlan, type PreviewRoomState } from './RulePreviewPlan.js';
 
 export interface PlacementRuleGuideBodyProps {
@@ -467,6 +467,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
 
   const untyped = pageRooms.filter((r) => r.roomTypeId === undefined);
   const missingRows = pageRows.filter(missingData);
+  const zeroRows = pageRows.filter(zeroNeed);
   const tooManyRows = pageRows.filter((row) => (row.requirement.count ?? 0) > MAX_ROOM_STAMPS);
   const pending = settled !== draft;
   const floorBusy = floorJob.busy || (pending && needFloor);
@@ -498,6 +499,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       if (tooManyRows.length > 0) return ['bad', `${plural(tooManyRows.length, 'room')}: too many stamps`];
       if ((byCoverage || alsoCoverage) && !coverage) return ['warn', 'Enter a coverage limit'];
       if (missingRows.length > 0) return ['warn', `${plural(missingRows.length, 'room')}: data missing`];
+      if (zeroRows.length > 0) return ['warn', `${plural(zeroRows.length, 'room')}: need 0, no stamp`];
       if (countBy === 'perRoom') return ['ok', `${draft.perRoomCount.trim() || '1'} in each room`];
       if (byCoverage) return ['ok', 'By coverage'];
       const capacity = valueOf(draft.capacity);
@@ -890,6 +892,8 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
     const outside = draft.roomTypeIds.length === 0 && need ? pageRooms.filter((r) => !matches(r)) : [];
     const outsideTypes = [...new Set(outside.flatMap((r) => (r.roomTypeId !== undefined ? [r.roomTypeId] : [])))];
     const outsideUntyped = outside.filter((r) => r.roomTypeId === undefined).length;
+    const zeroPersonRows = zeroRows.filter(zeroPersons).length;
+    const zeroTypeId = zeroRows.find((row) => row.room.roomTypeId !== undefined)?.room.roomTypeId;
     return (
       <>
         <h2>What does one stamp give?</h2>
@@ -1094,7 +1098,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                           </tr>
                         );
                       return (
-                        <tr key={row.room.id} className={req.count === null ? 'bad' : row.room.id === sample?.id ? 'sel' : ''} data-room={row.room.id} {...pick}>
+                        <tr key={row.room.id} className={req.count === null || zeroNeed(row) ? 'bad' : row.room.id === sample?.id ? 'sel' : ''} data-room={row.room.id} {...pick}>
                           <td>{roomLabel(row.room)}</td>
                           <td>
                             {typeName(typeId)}: {req.demand ? demandShort(req.demand.demand) : '–'}
@@ -1109,6 +1113,25 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {zeroRows.length > 0 && (
+              <div className="mep-guide-callout" data-testid="pg-zero-need">
+                <span>
+                  <b>
+                    {plural(zeroRows.length, 'room')} {zeroRows.length === 1 ? 'gets' : 'get'} no stamp
+                  </b>
+                  , because the need is 0: {zeroRows.slice(0, 8).map((row) => roomLabel(row.room)).join(', ')}
+                  {zeroRows.length > 8 ? ', …' : ''}.
+                  {zeroPersonRows > 0 &&
+                    ` ${zeroPersonRows === zeroRows.length ? (zeroRows.length === 1 ? 'This room has' : 'These rooms have') : `${plural(zeroPersonRows, 'room')} of them ${zeroPersonRows === 1 ? 'has' : 'have'}`} 0 persons: the room is smaller than the area per person of its room type.`}{' '}
+                  To give a stamp, enter a minimum ("At least") or a smaller area per person in Room types.
+                </span>
+                {zeroTypeId !== undefined && (
+                  <button type="button" onClick={() => onOpenRoomTypes({ typeId: zeroTypeId, needId: need.id })}>
+                    Open {typeName(zeroTypeId)}
+                  </button>
+                )}
               </div>
             )}
             {(outsideTypes.length > 0 || outsideUntyped > 0) && (
@@ -1682,7 +1705,9 @@ function WhyBox({ row, matches, sampleName, need, unit, typeName, rule, coverage
         {line(
           '',
           'Need of the room',
-          result.total === null ? 'Room data is missing (persons or the scale)' : `${demandSumText(need, result)}${result.minimumApplied ? ' → at least the minimum' : ''} = ${fmt(req.required)} ${unit}`,
+          result.total === null
+            ? 'Room data is missing (persons or the scale)'
+            : `${demandSumText(need, result)}${result.minimumApplied ? ' → at least the minimum' : ''} = ${fmtTotal(result.total)} ${need.unit}${unit !== need.unit ? ` = ${fmt(req.required)} ${unit}` : ''}`,
           '',
           'pg-why-need',
         )}

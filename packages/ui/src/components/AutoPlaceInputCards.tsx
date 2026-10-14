@@ -103,16 +103,19 @@ export interface RoomTypesCardProps {
   onPick: (roomId: string) => void;
   /** Opens the library at a room type and a need (a link of a rule). A new object opens it again. */
   focus?: { typeId: string; needId?: string } | null;
+  /** The shown tab: the library needs the full width for its table. */
+  onTabChange?: (tab: 'rooms' | 'library') => void;
   footer: ReactNode;
 }
 
 /** Room types: the type of each room of the page, and the room-type library with the needs of each type. */
-export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, fileOnlyTypes, needs, fileOnlyNeeds, onChangeLibrary, onChangeNeeds, onExportLibrary, onLibraryDirtyChange, pickedId, onPick, focus, footer }: RoomTypesCardProps) {
+export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, fileOnlyTypes, needs, fileOnlyNeeds, onChangeLibrary, onChangeNeeds, onExportLibrary, onLibraryDirtyChange, pickedId, onPick, focus, onTabChange, footer }: RoomTypesCardProps) {
   const untyped = pageRooms.filter((r) => r.roomTypeId === undefined);
   const [tab, setTab] = useState<'rooms' | 'library'>(focus ? 'library' : 'rooms');
   useEffect(() => {
     if (focus) setTab('library');
   }, [focus]);
+  useEffect(() => onTabChange?.(tab), [tab, onTabChange]);
   const [filter, setFilter] = useState<'untyped' | 'all'>(untyped.length > 0 ? 'untyped' : 'all');
   const [message, setMessage] = useState<string | null>(null);
   const [libraryDirty, setLibraryDirty] = useState(false);
@@ -146,7 +149,7 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
           {untyped.length > 0 ? (
             <div className="mep-guide-callout" data-testid="ap-untyped">
               <span>
-                <b>{plural(untyped.length, 'room')}</b> {untyped.length === 1 ? 'has' : 'have'} no type. A rule with room types does not find {untyped.length === 1 ? 'it' : 'them'}. Choose a type, or add a keyword in the library.
+                <b>{plural(untyped.length, 'room')}</b> {untyped.length === 1 ? 'has' : 'have'} no type. A rule for a need does not find {untyped.length === 1 ? 'it' : 'them'}. Choose a type, or add a keyword in the library.
               </span>
             </div>
           ) : (
@@ -222,7 +225,7 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
         </>
       ) : (
         <>
-          <p className="mep-guide-note">All drawings use this library. One row for each room type, one column for each need. Click a room type or a cell to see the details below the table.</p>
+          <p className="mep-guide-note">All drawings use this library. One row for each room type, one column for each need.</p>
           <RoomTypeLibrary
             types={library}
             fileOnlyTypes={fileOnlyTypes}

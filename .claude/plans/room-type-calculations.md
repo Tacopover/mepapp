@@ -315,3 +315,16 @@ Spacing, layout, ceiling grid, Place and Undo (steps 4 to 6); room detection; th
 2. The model of §3: accepted, with one change. The built-in need "Exhaust air" is "Return air" (id `returnAir`): "that and supply air are the most typical needs for rooms in terms of fresh air." The old fields `exhaustFixedDm3s` and `airChangesPerH` move to Return air.
 3. The layout of the Room types card: **B, the table**, with the details of one room type below it (§5.1).
 4. Old rules with own numbers: move the numbers to the room types once, with a report and a backup (the recommendation).
+
+## 10. Review round 1 (2026-10-14)
+
+A review of phases 1–4 (UI in Chromium at 1600 px and 400 px, code by two review agents) found the points below. The user asked to fix points 1, 2, 4, 5 and the readability points, and for point 3: "we should alert the user. For testing purposes though you can use 1 person per 5 square meters instead of 1 per 10".
+
+1. A delete of an own need while the details of a room type have unsaved changes threw away the changes and locked the dialog ("Save or revert the room type first.", Save and Revert off).
+2. The Why box mixed units: "6.5 × 3 persons = 70.2 m³/h" for a rule in m³/h.
+3. A room with 0 persons (smaller than the area per person) got a need of 0 and no stamp, and Place all said "Ready". With the example values, 8 small offices of `01_arch_first_floor` got no supply air grille.
+4. A full browser storage at the one-time move: the backup write failed, `loadPlacementRules` gave the example rules, and the app saved them over the rules of the user.
+5. `moveOldRuleNumbers` ignored `nameContains`: a rule without room types and with "Kantoor" gave its numbers to all 20 room types.
+6. Readability: the table hid the Sockets column at 1600 px (the plan took the right side); the boxes of the new-need form were too narrow; the sums showed the area with 1 decimal ("500 lx × 50.4 m² = 25,179.6 lm"); the cells mixed "m²/p", "/person" and "ACH"; two texts still said "a rule with room types does not find them"; "Click a room type or a cell" was on the card twice; the unit line of the column heads was 9.5 px; "Fill in the example values" left 11 of 20 types empty; a click on another rule or step kept the scroll position of the dialog (at 400 px the card was under the full left list).
+
+Not fixed (not asked): the count change of old rules without a capacity and the unit "sockets" or empty, `writeCapacity` of a moved Light rule, own needs of the file in "Add a need", the step 3 link to a type that only the file has, `typesFocus` that is never cleared, "The need was deleted" for a rule without rows, `onDirtyChange` inside the state updater, the focus after Add and Remove, parse and validate edge cases (negative old numbers, need ids such as `constructor`, kW on a flow rule), unused exports in `placement-units.ts`.

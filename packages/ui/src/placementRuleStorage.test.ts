@@ -8,6 +8,8 @@ import {
   moveStoredOldRules,
   PLACEMENT_RULES_BACKUP_KEY,
   PLACEMENT_RULES_STORAGE_KEY,
+  RULE_MOVE_FAILED,
+  savePlacementRules,
   saveUncheckedRuleIds,
 } from './placementRuleStorage.js';
 import { ROOM_TYPES_STORAGE_KEY } from './roomTypeStorage.js';
@@ -55,6 +57,26 @@ describe('the one-time move of old rules', () => {
     expect(moveStoredOldRules(storage)).toBeNull();
     clearRuleMoveReport(storage);
     expect(loadRuleMoveReport(storage)).toBeNull();
+  });
+
+  it('a full storage: the old rules stay, the report says so, and no save writes over them', () => {
+    const storage = memory({ [PLACEMENT_RULES_STORAGE_KEY]: JSON.stringify(oldRules), [ROOM_TYPES_STORAGE_KEY]: JSON.stringify(oldTypes) });
+    const full = {
+      getItem: storage.getItem,
+      setItem: (k: string, v: string) => {
+        if (k === PLACEMENT_RULES_BACKUP_KEY) throw new Error('QuotaExceededError');
+        storage.setItem(k, v);
+      },
+    };
+    expect(moveStoredOldRules(full)).toEqual([RULE_MOVE_FAILED]);
+    expect(storage.map.get(PLACEMENT_RULES_STORAGE_KEY)).toBe(JSON.stringify(oldRules));
+    expect(JSON.parse(storage.map.get(ROOM_TYPES_STORAGE_KEY)!)).toEqual(oldTypes);
+    const rules = loadPlacementRules(full);
+    expect(rules.map((r) => r.id)).toEqual(['example-supply-air', 'sockets']);
+    savePlacementRules(full, rules);
+    expect(storage.map.get(PLACEMENT_RULES_STORAGE_KEY)).toBe(JSON.stringify(oldRules));
+    // The next start, with space: the move runs.
+    expect(moveStoredOldRules(storage)).toHaveLength(2);
   });
 
   it('does nothing for rules of the new shape or no rules', () => {

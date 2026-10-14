@@ -55,12 +55,14 @@ const light = (lux: number, workingPlaneM: number): RoomDemand => ({ terms: [{ b
 const per = (basis: DemandBasis, value: number): RoomDemand => ({ terms: [{ basis, value }] });
 
 /**
- * Example demands for some built-in room types (room-demands-research.md §8): Dutch new build, Bbl
- * for the air, NEN-EN 12464-1 for the light, design practice for the rest. Examples only: the user
- * must check them against the rules of the project. The area per person is included.
+ * Example demands for some built-in room types (room-demands-research.md §8, and §1.4 and §2 for the
+ * canteen, the entrance, the stairs and the changing room): Dutch new build, Bbl for the air,
+ * NEN-EN 12464-1 for the light, design practice for the rest. Examples only: the user must check them
+ * against the rules of the project. The area per person is included. Office: 5 m² per person for the
+ * tests of the user (EN 16798-1 gives 10), so small offices get persons.
  */
 export const ROOM_TYPE_DEMAND_EXAMPLES: Readonly<Record<string, { areaPerPersonM2?: number; demands: RoomDemands }>> = {
-  office: { areaPerPersonM2: 10, demands: { light: light(500, 0.75), supplyAir: per('person', 6.5), heating: per('area', 40), cooling: per('area', 70), sockets: per('person', 4) } },
+  office: { areaPerPersonM2: 5, demands: { light: light(500, 0.75), supplyAir: per('person', 6.5), heating: per('area', 40), cooling: per('area', 70), sockets: per('person', 4) } },
   meeting: { areaPerPersonM2: 2, demands: { light: light(500, 0.75), supplyAir: per('person', 6.5), heating: per('area', 40), cooling: per('area', 100), sockets: per('room', 6) } },
   classroom: { areaPerPersonM2: 2, demands: { light: light(500, 0.75), supplyAir: per('person', 8.5), heating: per('area', 40), cooling: per('area', 80), sockets: per('room', 8) } },
   corridor: { demands: { light: light(100, 0), heating: per('area', 30), sockets: { terms: [{ basis: 'length', every: 15 }] } } },
@@ -69,6 +71,10 @@ export const ROOM_TYPE_DEMAND_EXAMPLES: Readonly<Record<string, { areaPerPersonM
   storage: { demands: { light: light(100, 0), returnAir: per('volume', 0.5), heating: per('area', 20), sockets: per('room', 1) } },
   kitchen: { demands: { light: light(200, 0.85), returnAir: per('room', 21), heating: per('area', 30), cooling: per('area', 60), sockets: per('room', 8) } },
   technical: { demands: { light: light(200, 0), returnAir: per('volume', 2), heating: per('area', 0), sockets: per('room', 4) } },
+  canteen: { areaPerPersonM2: 1.5, demands: { light: light(200, 0.75), supplyAir: per('person', 6.5), heating: per('area', 40), sockets: per('room', 4) } },
+  entrance: { demands: { light: light(100, 0), heating: per('area', 30) } },
+  stairs: { demands: { light: light(100, 0) } },
+  changing: { demands: { light: light(200, 0), heating: per('area', 40) } },
 };
 
 export interface RoomType {

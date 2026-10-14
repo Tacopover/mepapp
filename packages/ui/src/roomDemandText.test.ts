@@ -15,7 +15,8 @@ describe('room demand texts', () => {
   it('gives the short text of a cell', () => {
     expect(demandShort({ terms: [{ basis: 'person', value: 6.5 }, { basis: 'area', value: 0.7 }], minimum: 7 })).toBe('6.5/person + 0.7/m² ≥ 7');
     expect(demandShort({ terms: [{ basis: 'length', every: 15 }] })).toBe('1 per 15 m');
-    expect(demandShort({ terms: [{ basis: 'volume', value: 0.5 }] })).toBe('0.5 ACH');
+    expect(demandShort({ terms: [{ basis: 'person', every: 4 }] })).toBe('1 per 4 persons');
+    expect(demandShort({ terms: [{ basis: 'volume', value: 0.5 }] })).toBe('0.5 air changes/h');
     expect(demandShort({ terms: [{ basis: 'illuminance', value: 500 }], workingPlaneM: 0.75 })).toBe('500 lx');
   });
 
@@ -23,8 +24,9 @@ describe('room demand texts', () => {
     const values = { areaM2: 32.5, lengthM: 7.3, volumeM3: 87.75, people: { count: 3, source: 'roomType' as const } };
     expect(demandSumText(need('supplyAir'), demandTotal(need('supplyAir'), { terms: [{ basis: 'person', value: 6.5 }, { basis: 'room', value: 5 }] }, values))).toBe('6.5 × 3 persons + 5 dm³/s per room');
     expect(demandSumText(need('sockets'), demandTotal(need('sockets'), { terms: [{ basis: 'length', every: 15 }] }, values))).toBe('7.3 m ÷ 15');
-    expect(demandSumText(need('returnAir'), demandTotal(need('returnAir'), { terms: [{ basis: 'volume', value: 2 }] }, values))).toBe('2 × 87.8 m³ = 175.5 m³/h');
+    expect(demandSumText(need('returnAir'), demandTotal(need('returnAir'), { terms: [{ basis: 'volume', value: 2 }] }, values))).toBe('2 × 87.75 m³ = 175.5 m³/h');
     expect(demandSumText(need('light'), demandTotal(need('light'), { terms: [{ basis: 'illuminance', value: 500 }] }, values))).toBe('500 lx × 32.5 m²');
+    expect(demandSumText(need('light'), demandTotal(need('light'), { terms: [{ basis: 'illuminance', value: 500 }] }, { ...values, areaM2: 50.359 }))).toBe('500 lx × 50.36 m²');
   });
 
   it('turns a demand into boxes and back', () => {

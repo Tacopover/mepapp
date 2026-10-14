@@ -139,6 +139,13 @@ describe('calculateRoomRequirement: need ÷ capacity', () => {
     expect(capped.warnings).toEqual(['maxCountReached']);
   });
 
+  it('warns when a number above 0 gives a need of 0 (0 persons); a demand of only 0 says "needs none"', () => {
+    const nobody = { people: { count: 0, source: 'roomType' as const } };
+    expect(calculateRoomRequirement(rule({ capacityPerElement: 50 }), withDemands(supply7, nobody))).toMatchObject({ required: 0, count: 0, warnings: ['zeroNeed'] });
+    expect(calculateRoomRequirement(rule({ capacityPerElement: 50, minCount: 1 }), withDemands(supply7, nobody))).toMatchObject({ count: 1, warnings: [] });
+    expect(calculateRoomRequirement(rule({ needId: 'sockets' }), withDemands({ sockets: { terms: [{ basis: 'room', value: 0 }] } }))).toMatchObject({ count: 0, warnings: [] });
+  });
+
   it('ignores the coverage limits without alsoCoverage', () => {
     const r = calculateRoomRequirement(rule({ capacityPerElement: 40, coverage: { maxSpacing: 4 } }), withDemands(supply7));
     expect(r.count).toBe(1);
@@ -420,6 +427,27 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
     expect(moved.needs.map((n) => n.id)).toEqual(['need-from-b']);
     expect(moved.report[0]).toBe('Supply: now serves Supply air. Its numbers moved to Meeting room. Office kept its own numbers. MepApp chose the need Supply air from the unit dm³/s and the rule name.');
     expect(types[1]).toEqual({ id: 'meeting', name: 'Meeting room' });
+  });
+
+  it('moveOldRuleNumbers: a rule without room types that chose rooms by name gives its numbers only to the type that matches the text', () => {
+    const parsed = parsePlacementRules([
+      old({ id: 'a', name: 'Supply', nameContains: 'Kantoor', amount: { perPerson: 7, unit: 'dm³/s' } }),
+      old({ id: 'b', name: 'Supply attic', nameContains: 'Zolder', amount: { perPerson: 7, unit: 'dm³/s' } }),
+    ])!;
+    const types = [
+      { id: 'office', name: 'Office', keywords: ['kantoor'] },
+      { id: 'lift', name: 'Lift', keywords: ['lift'] },
+    ];
+    const moved = moveOldRuleNumbers(types, [], parsed.oldNumbers);
+    expect(moved.types.map((t) => [t.id, t.demands?.supplyAir !== undefined])).toEqual([
+      ['office', true],
+      ['lift', false],
+    ]);
+    expect(moved.report[0]).toBe(
+      'Supply: now serves Supply air. Its numbers moved to Office. The rule chose rooms with "Kantoor" in the name: only Office matches this text. Rooms without a room type no longer get stamps from this rule. MepApp chose the need Supply air from the unit dm³/s and the rule name.',
+    );
+    expect(moved.report[1]).toContain('Its numbers moved to no room type. The rule chose rooms with "Zolder" in the name, and no room type matches this text.');
+    expect(parsed.rules[0]!.nameContains).toBe('Kantoor');
   });
 });
 

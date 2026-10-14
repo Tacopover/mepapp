@@ -8,7 +8,7 @@
 import type { Discipline } from '../network.js';
 import type { Room } from './room.js';
 import type { RoomValues } from './room-values.js';
-import { demandTotal, oldDemandFieldTerm, type DemandResult, type DemandTerm, type RoomDemand, type RoomDemands } from './room-type.js';
+import { demandTotal, matchRoomType, oldDemandFieldTerm, type DemandResult, type DemandTerm, type RoomDemand, type RoomDemands } from './room-type.js';
 import { BUILT_IN_NEEDS, type NeedKind, type RoomNeed } from './room-need.js';
 import { AIR_CHANGE_UNITS, isAirChangeUnit, M2_PER_FT2, M3H_PER_DM3S, STAMP_COUNT_UNIT, type LengthUnit } from './placement-units.js';
 
@@ -219,7 +219,9 @@ export type RequirementWarning =
   /** The need of the rule is not found: an own need was deleted. */
   | 'needNotFound'
   /** The UF table needs the room index, and the luminaire is not above the working plane (or the room has no perimeter). */
-  | 'noRoomIndex';
+  | 'noRoomIndex'
+  /** The need of the room is 0, although the room type has a number above 0 (for example 0 persons in a small room): the room gets no stamp. */
+  | 'zeroNeed';
 
 export const REQUIREMENT_WARNING_TEXT: Record<RequirementWarning, string> = {
   noCalibration: 'no calibration',
@@ -228,6 +230,7 @@ export const REQUIREMENT_WARNING_TEXT: Record<RequirementWarning, string> = {
   noDemand: 'the room type does not have the need',
   needNotFound: 'the need of the rule was deleted',
   noRoomIndex: 'no room index: the luminaire is not above the working plane',
+  zeroNeed: 'no stamp: the need of the room is 0',
 };
 
 /** The UF that one room used. */
@@ -276,7 +279,8 @@ function limitCount(rule: Pick<PlacementRule, 'minCount' | 'maxCount'>, count: n
  * then at least the min count and at most the max count. Light: need = Em × floor area, and one
  * luminaire gives Φ × UF × MF, with UF from the room index when the rule has a UF table.
  * The same number in each room: perRoomCount. By coverage: the count needs the room geometry, so it
- * is null here. A room type without the need, or a deleted need, gives no count.
+ * is null here. A room type without the need, or a deleted need, gives no count. A count of 0
+ * from a demand with a number above 0 (0 persons) gives the warning 'zeroNeed'.
  */
 export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues, needs: readonly RoomNeed[] = BUILT_IN_NEEDS): RoomRequirement {
   const warnings: RequirementWarning[] = [];
@@ -324,6 +328,8 @@ export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues
   const blocked = warnings.includes('noDemand') || capacityMissing || (capacity !== null && required === null);
   const quantityCount = !blocked && capacity !== null && capacity > 0 && required !== null ? ceilCount(required / capacity) : null;
   const count = blocked ? null : limitCount(rule, quantityCount ?? 1, warnings);
+  // A demand of only 0 says "needs none"; a demand with a number above 0 that gives 0 (0 persons) is a surprise.
+  if (count === 0 && quantityCount === 0 && demand.terms.some((t) => t.every !== undefined || (t.value ?? 0) > 0)) warnings.push('zeroNeed');
   return {
     required,
     capacity,
@@ -457,6 +463,8 @@ export interface OldRuleNumbers {
   demand: RoomDemand;
   /** The room types of the old rule. Empty = every room type. */
   roomTypeIds: string[];
+  /** The text that the room names of the old rule contain, when it has one. */
+  nameContains?: string;
   /** What the conversion could not keep, and the guess of the need, for the report. */
   notes: string[];
 }
@@ -504,7 +512,7 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
     const demand: RoomDemand = { terms: [{ basis: 'illuminance', value: lx }] };
     const wp = num(lighting.workingPlaneHeightM);
     if (wp !== undefined) demand.workingPlaneM = wp;
-    return { rule, old: { ruleId: base.id, ruleName: base.name, need: needOf('light'), demand, roomTypeIds: base.roomTypeIds, notes } };
+    return { rule, old: { ruleId: base.id, ruleName: base.name, need: needOf('light'), demand, roomTypeIds: base.roomTypeIds, ...(base.nameContains ? { nameContains: base.nameContains } : {}), notes } };
   }
   if (!hasAmount) return { rule: { ...rule, countBy: 'perRoom', perRoomCount: 1 }, old: null };
   if (unit === STAMP_COUNT_UNIT && usedTerms.length === 1 && usedTerms[0] === 'fixed' && links.length === 0 && minimum === undefined) {
@@ -544,7 +552,7 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
   if (terms.length === 0 && minimum === undefined) return { rule, old: null };
   const demand: RoomDemand = { terms: terms.length > 0 ? terms : [{ basis: 'room', value: 0 }] };
   if (minimum !== undefined) demand.minimum = oldInNeedUnit(minimum, need.kind, unit);
-  return { rule, old: { ruleId: base.id, ruleName: base.name, need, demand, roomTypeIds: base.roomTypeIds, notes } };
+  return { rule, old: { ruleId: base.id, ruleName: base.name, need, demand, roomTypeIds: base.roomTypeIds, ...(base.nameContains ? { nameContains: base.nameContains } : {}), notes } };
 }
 
 function toPlacementRule(value: unknown): { rule: PlacementRule; old: OldRuleNumbers | null } | null {
@@ -618,10 +626,12 @@ export const hasOldPlacementRules = (raw: unknown): boolean => Array.isArray(raw
 /**
  * Moves the own numbers of old rules to the room types (room-type-calculations.md §4 question 11):
  * each room type of the rule (every type when the rule has none) that does not have the need yet
- * gets the numbers as its demand. A type that has the need keeps its own numbers. A new own need is
- * added to `needs`. The report says what happened, one line for each rule.
+ * gets the numbers as its demand. A rule without room types that chose rooms by a text of the name
+ * gives the numbers only to the room type whose keywords match that text. A type that has the need
+ * keeps its own numbers. A new own need is added to `needs`. The report says what happened, one
+ * line for each rule.
  */
-export function moveOldRuleNumbers<T extends { id: string; name: string; demands?: RoomDemands }>(
+export function moveOldRuleNumbers<T extends { id: string; name: string; keywords?: readonly string[]; demands?: RoomDemands }>(
   types: readonly T[],
   needs: readonly RoomNeed[],
   oldNumbers: readonly OldRuleNumbers[],
@@ -631,7 +641,9 @@ export function moveOldRuleNumbers<T extends { id: string; name: string; demands
   const report: string[] = [];
   for (const entry of oldNumbers) {
     if (entry.need.own && !nextNeeds.some((n) => n.id === entry.need.id)) nextNeeds.push(entry.need);
-    const targets = nextTypes.filter((t) => entry.roomTypeIds.length === 0 || entry.roomTypeIds.includes(t.id));
+    const nameText = entry.roomTypeIds.length === 0 ? entry.nameContains?.trim() : undefined;
+    const byName = nameText ? matchRoomType(nameText, undefined, nextTypes.map((t) => ({ id: t.id, name: t.name, keywords: [...(t.keywords ?? [])] }))) : null;
+    const targets = nextTypes.filter((t) => (nameText ? t.id === byName?.id : entry.roomTypeIds.length === 0 || entry.roomTypeIds.includes(t.id)));
     const moved: string[] = [];
     const kept: string[] = [];
     for (const type of targets) {
@@ -646,6 +658,8 @@ export function moveOldRuleNumbers<T extends { id: string; name: string; demands
       `${entry.ruleName}: now serves ${entry.need.name}${entry.need.own ? ' (a new own need)' : ''}.`,
       moved.length > 0 ? `Its numbers moved to ${moved.join(', ')}.` : 'Its numbers moved to no room type.',
       kept.length > 0 ? `${kept.join(', ')} kept ${kept.length === 1 ? 'its' : 'their'} own numbers.` : '',
+      nameText ? (byName ? `The rule chose rooms with "${nameText}" in the name: only ${byName.name} matches this text.` : `The rule chose rooms with "${nameText}" in the name, and no room type matches this text.`) : '',
+      entry.roomTypeIds.length === 0 ? 'Rooms without a room type no longer get stamps from this rule.' : '',
       ...entry.notes,
     ];
     report.push(parts.filter(Boolean).join(' '));

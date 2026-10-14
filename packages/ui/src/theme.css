@@ -3545,7 +3545,7 @@
 .mep-rt-table thead th span {
   display: block;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 400;
   color: var(--muted);
 }
@@ -3609,6 +3609,10 @@
 .mep-rt-need-form,
 .mep-rt-tools + .mep-guide-callout {
   margin-bottom: 8px;
+}
+.mep-modal .mep-rt-need-form input.mep-guide-num.wide {
+  width: 240px;
+  max-width: 100%;
 }
 .mep-rt-details {
   margin-top: 12px;
@@ -3943,6 +3947,21 @@
   font-size: 11px;
   color: var(--muted);
   padding: 4px 0 4px 14px;
+}
+/* The room-type library needs the width for its table: the plan goes under the card. */
+@media (min-width: 1101px) {
+  .mep-modal--auto-place .mep-guide.mep-guide--wide {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+  .mep-modal--auto-place .mep-guide--wide .mep-autoplace-nav {
+    grid-row: 1 / span 2;
+  }
+  .mep-modal--auto-place .mep-guide--wide .mep-guide-side {
+    grid-column: 2;
+    position: static;
+    width: 100%;
+    max-width: 440px;
+  }
 }
 @media (max-width: 1100px) {
   .mep-modal--auto-place .mep-guide {

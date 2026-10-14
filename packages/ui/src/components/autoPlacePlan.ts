@@ -11,6 +11,10 @@ export interface AutoPlaceArt {
 
 /** The row cannot be calculated: data of the room or of its type is missing. */
 export const missingData = (row: Pick<PlacementRow, 'requirement'>) => row.requirement.warnings.some((w) => w === 'noPeople' || w === 'noCalibration' || w === 'noDemand' || w === 'noRoomIndex');
+/** The need of the room is 0, although its room type has a number above 0 (for example 0 persons in a small room): no stamp. */
+export const zeroNeed = (row: Pick<PlacementRow, 'requirement'>) => row.requirement.warnings.includes('zeroNeed') && row.requirement.count === 0;
+/** No stamp because the room is smaller than the area per person of its type: 0 persons. */
+export const zeroPersons = (row: Pick<PlacementRow, 'requirement' | 'values'>) => zeroNeed(row) && row.values.people?.count === 0 && row.values.people.source === 'roomType';
 /** Step 4: the stamps do not fit with the spacing. */
 export const spacingProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.some((w) => w === 'tooClose' || w === 'noFit');
 /** The room needs more stamps than auto-placement lays out (MAX_ROOM_STAMPS): almost always a typing error. */
