@@ -66,7 +66,7 @@ import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
 import { AutoPlaceDialog } from './components/AutoPlaceDialog.js';
 import { getStampAppearanceDefault } from './stampAppearanceDefaults.js';
-import { loadPlacementRules, loadUncheckedRuleIds, savePlacementRules, saveUncheckedRuleIds } from './placementRuleStorage.js';
+import { clearRuleMoveReport, loadPlacementRules, loadRuleMoveReport, loadUncheckedRuleIds, moveStoredOldRules, savePlacementRules, saveUncheckedRuleIds } from './placementRuleStorage.js';
 import { stampLabelFor } from './stampVisibility.js';
 import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
@@ -401,6 +401,12 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setLabelVisibility(labelVisibility);
   }, [ready, labelVisibility, sceneRef]);
+  // Before the libraries load: stored rules of the old shape move their own numbers to the room types once (room-type-calculations.md §4 question 11).
+  const [ruleMoveReport, setRuleMoveReport] = useState<string[] | null>(() => {
+    const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
+    moveStoredOldRules(storage);
+    return loadRuleMoveReport(storage);
+  });
   const [roomTypes, setRoomTypes] = useState<RoomType[]>(() => loadRoomTypes(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveRoomTypes(typeof localStorage === 'undefined' ? undefined : localStorage, roomTypes), [roomTypes]);
   useEffect(() => {
@@ -1611,6 +1617,11 @@ export function MepSketchApp({
           onChangeRoomNeeds={(next) => {
             sceneRef.current?.setRoomNeedLibrary(next);
             setRoomNeeds(next);
+          }}
+          ruleMoveReport={ruleMoveReport}
+          onCloseRuleMoveReport={() => {
+            clearRuleMoveReport(typeof localStorage === 'undefined' ? undefined : localStorage);
+            setRuleMoveReport(null);
           }}
           onDetectRooms={() => void handleDetectRooms()}
           roomsDetecting={roomsDetecting}

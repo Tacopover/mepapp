@@ -372,6 +372,7 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
     const changes = one({ name: 'Technical room 4 air changes per hour', preset: 'airChanges', amount: { perM3: 4, unit: 'm³/h' }, capacityPerElement: 300 });
     expect(changes.rule).toMatchObject({ needId: 'returnAir', unit: 'm³/h', capacityPerElement: 300 });
     expect(changes.old!.demand).toEqual({ terms: [{ basis: 'volume', value: 4 }] });
+    expect(changes.old!.notes).toEqual(['MepApp chose Return air, because the rule has only air changes.']);
     expect(calculateRoomRequirement(changes.rule, withDemands({ returnAir: changes.old!.demand })).count).toBe(2);
     expect(one({ name: 'Exhaust kitchen', amount: { fixed: 72, unit: 'm³/h' } }).old!.demand.terms[0]!.value).toBeCloseTo(20);
     const heat = one({ name: 'Radiators', amount: { perM2: 0.04, unit: 'kW' }, capacityPerElement: 1 });
@@ -386,6 +387,7 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
     const boxes = one({ name: 'Floor boxes (example)', preset: 'perArea', amount: { perM2: 0.2, unit: 'stamps' } });
     expect(boxes.old!.need).toEqual({ id: 'need-from-old', name: 'Floor boxes', kind: 'count', unit: 'stamps', own: true });
     expect(boxes.rule.needId).toBe('need-from-old');
+    expect(boxes.old!.notes).toEqual([]);
     // 0.2 × 35.8 = 7.16, 8 stamps as before.
     expect(calculateRoomRequirement(boxes.rule, withDemands({ 'need-from-old': boxes.old!.demand }, { areaM2: 35.8 }), [...BUILT_IN_NEEDS, boxes.old!.need]).count).toBe(8);
     expect(one({ amount: { perM2: 1, unit: 'kg' } }).old!.need).toMatchObject({ kind: 'amount', unit: 'kg' });

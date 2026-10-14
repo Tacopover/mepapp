@@ -1,4 +1,6 @@
-import { hasOldPlacementRules, parsePlacementRules, PLACEMENT_RULE_EXAMPLES, type PlacementRule } from '@mepapp/core';
+import { hasOldPlacementRules, moveOldRuleNumbers, parsePlacementRules, PLACEMENT_RULE_EXAMPLES, type PlacementRule } from '@mepapp/core';
+import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
+import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
 import type { StorageLike } from './schematicTemplateStorage.js';
 
 // Per-installation user library of placement rules (room-auto-placement.md Phase 3). Moves to SettingsStore when that store is wired up.
@@ -20,6 +22,57 @@ export function loadPlacementRules(storage: StorageLike | undefined): PlacementR
     return parsePlacementRules(value)?.rules ?? examplesCopy();
   } catch {
     return examplesCopy();
+  }
+}
+
+/** The report of the one-time move of the old rule numbers, shown in Auto-place until the user closes it. */
+export const RULE_MOVE_REPORT_KEY = 'mepapp.placementRules.moveReport.v1';
+
+/**
+ * Moves the own numbers of stored rules of the old shape to the stored room types, once
+ * (room-type-calculations.md §4 question 11). It writes the backup of the old rules, the room types,
+ * the own needs, the rules in the new shape and the report. It does nothing when the stored rules
+ * are not old, so a second call is safe. Returns the report, or null.
+ */
+export function moveStoredOldRules(storage: StorageLike | undefined): string[] | null {
+  try {
+    const raw = storage?.getItem(PLACEMENT_RULES_STORAGE_KEY);
+    if (!storage || !raw) return null;
+    const value: unknown = JSON.parse(raw);
+    if (!hasOldPlacementRules(value)) return null;
+    const parsed = parsePlacementRules(value);
+    if (!parsed) return null;
+    if (!storage.getItem(PLACEMENT_RULES_BACKUP_KEY)) storage.setItem(PLACEMENT_RULES_BACKUP_KEY, raw);
+    const moved = moveOldRuleNumbers(loadRoomTypes(storage), loadRoomNeeds(storage), parsed.oldNumbers);
+    saveRoomTypes(storage, moved.types);
+    saveRoomNeeds(storage, moved.needs);
+    savePlacementRules(storage, parsed.rules);
+    const report = [
+      `MepApp changed ${parsed.rules.length === 1 ? 'your placement rule' : `your ${parsed.rules.length} placement rules`}: the room types now hold the calculations. A copy of the old rules is in this browser (${PLACEMENT_RULES_BACKUP_KEY}).`,
+      ...moved.report,
+    ];
+    storage.setItem(RULE_MOVE_REPORT_KEY, JSON.stringify(report));
+    return report;
+  } catch {
+    return null;
+  }
+}
+
+/** The report of the move, or null when there is none (or the user closed it). */
+export function loadRuleMoveReport(storage: StorageLike | undefined): string[] | null {
+  try {
+    const value: unknown = JSON.parse(storage?.getItem(RULE_MOVE_REPORT_KEY) ?? 'null');
+    return Array.isArray(value) && value.length > 0 ? value.filter((line): line is string => typeof line === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearRuleMoveReport(storage: StorageLike | undefined): void {
+  try {
+    storage?.setItem(RULE_MOVE_REPORT_KEY, '[]');
+  } catch {
+    // Storage can be blocked; the report then shows again at the next start.
   }
 }
 

@@ -6,6 +6,7 @@ import {
   calculateRooms,
   calibrationFromScale,
   MAX_ROOM_STAMPS,
+  moveOldRuleNumbers,
   parsePlacementRules,
   resolveCeilingHeight,
   roomTypeLabel,
@@ -65,6 +66,9 @@ export interface AutoPlaceDialogProps {
   onExportRoomTypes: (types: RoomType[], needs: RoomNeed[]) => void;
   /** Saves the own needs of the user library. */
   onChangeRoomNeeds: (needs: RoomNeed[]) => void;
+  /** The report of the one-time move of the numbers of old rules to the room types; null = none. */
+  ruleMoveReport: string[] | null;
+  onCloseRuleMoveReport: () => void;
   /** Detects the rooms of the shown page (the handler of Menu › Detect rooms). */
   onDetectRooms: () => void;
   /** True while the room detection runs. */
@@ -94,15 +98,23 @@ const COUNT_SOURCE_TEXT: Record<PlacementRow['requirement']['countSource'], stri
 };
 
 /** The state of a rule in the left list, from the dry run of its rows (no stamp positions). */
-function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 'requirement'>[], found: (definitionId: string) => boolean): StepStatus {
-  if (!rule.stampDefinitionId) return ['bad', 'No stamp'];
+/** What a rule serves, in a few words: the name of its need, or its way of counting. */
+export function servesText(rule: PlacementRule, needs: readonly RoomNeed[]): string {
+  if (rule.countBy === 'perRoom') return `${rule.perRoomCount ?? 1} in each room`;
+  if (rule.countBy === 'coverage') return 'By coverage';
+  return needs.find((n) => n.id === rule.needId)?.name ?? 'A deleted need';
+}
+
+function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 'requirement'>[], found: (definitionId: string) => boolean, serves: string): StepStatus {
+  if (rule.countBy === 'need' && rows.some((row) => row.requirement.warnings.includes('needNotFound'))) return ['bad', 'The need was deleted'];
+  if (!rule.stampDefinitionId) return ['bad', `${serves}: no stamp`];
   if (!found(rule.stampDefinitionId)) return ['bad', 'Stamp not found'];
   if (rows.length === 0) return ['warn', 'No room matches'];
   const tooMany = rows.filter((row) => (row.requirement.count ?? 0) > MAX_ROOM_STAMPS).length;
   if (tooMany > 0) return ['bad', `${plural(tooMany, 'room')}: too many stamps`];
   const missing = rows.filter(missingData).length;
   if (missing > 0) return ['warn', `${plural(missing, 'room')}: data missing`];
-  return ['ok', plural(rows.reduce((n, row) => n + (row.requirement.count ?? 0), 0), 'stamp')];
+  return ['ok', `${serves}: ${plural(rows.reduce((n, row) => n + (row.requirement.count ?? 0), 0), 'stamp')}`];
 }
 
 /** The state of a checked rule in the Place all table, from the rows of the plan. */
@@ -155,6 +167,8 @@ export function AutoPlaceDialog({
   onChangeUncheckedRuleIds,
   onExportRoomTypes,
   onChangeRoomNeeds,
+  ruleMoveReport,
+  onCloseRuleMoveReport,
   onDetectRooms,
   roomsDetecting,
   onPlaced,
@@ -304,22 +318,29 @@ export function AutoPlaceDialog({
     setRulesMessage(`Added ${plural(examples.length, 'example rule')}.`);
   };
   const importFile = async (file: File) => {
-    let imported: PlacementRule[] | null;
+    let parsed: ReturnType<typeof parsePlacementRules>;
     try {
-      imported = parsePlacementRules(JSON.parse(await file.text()))?.rules ?? null;
+      parsed = parsePlacementRules(JSON.parse(await file.text()));
     } catch {
       setRulesMessage(`MepApp cannot read ${file.name}.`);
       return;
     }
-    if (!imported) {
+    if (!parsed) {
       setRulesMessage(`${file.name} does not hold a list of placement rules.`);
       return;
     }
     if (!canLeave()) return;
+    const imported = parsed.rules;
+    // Rules of the old shape: their own numbers move to the room types (room-type-calculations.md §4 question 11).
+    const moved = parsed.oldNumbers.length > 0 ? moveOldRuleNumbers(roomTypes, roomNeeds, parsed.oldNumbers) : null;
+    if (moved) {
+      onChangeRoomTypes(moved.types);
+      onChangeRoomNeeds(moved.needs);
+    }
     const list = rulesRef.current;
     const replaced = list.filter((r) => imported.some((i) => i.id === r.id)).length;
     setRules([...list.map((r) => imported.find((i) => i.id === r.id) ?? r), ...imported.filter((i) => !list.some((r) => r.id === i.id))]);
-    setRulesMessage(`Imported ${plural(imported.length, 'rule')} (${replaced} replaced).`);
+    setRulesMessage(`Imported ${plural(imported.length, 'rule')} (${replaced} replaced).${moved ? ` The file had rules of the old shape. ${moved.report.join(' ')}` : ''}`);
     // The open rule shows the boxes of the old rule: show Place all when the import replaced it.
     if (item.kind === 'rule' && imported.some((i) => i.id === item.id)) show({ kind: 'place' });
   };
@@ -327,8 +348,8 @@ export function AutoPlaceDialog({
   // The left list: a dry run of every rule (no stamp positions), fast enough for each change of a rule.
   const dryRows = useMemo(() => (scene ? calculateRooms(rules, scopeRooms, valuesOf, needs).rows : []), [scene, rules, scopeRooms, valuesOf, needs]);
   const ruleStatus = useMemo(
-    () => new Map(rules.map((rule) => [rule.id, ruleStatusOf(rule, dryRows.filter((row) => row.rule.id === rule.id), (id) => stampDefinition(id) !== undefined)])),
-    [rules, dryRows, stampDefinition],
+    () => new Map(rules.map((rule) => [rule.id, ruleStatusOf(rule, dryRows.filter((row) => row.rule.id === rule.id), (id) => stampDefinition(id) !== undefined, servesText(rule, needs))])),
+    [rules, dryRows, stampDefinition, needs],
   );
   const checkedRules = useMemo(() => rules.filter((r) => !unchecked.has(r.id)), [rules, unchecked]);
 
@@ -658,8 +679,8 @@ export function AutoPlaceDialog({
   );
 
   const fileOnlyTypes = types.filter((t) => !t.inLibrary).map(({ inLibrary: _inLibrary, ...type }) => type);
-  // A rule uses the volume when a room type has air changes for its need.
-  const volumeRules = checkedRules.filter((r) => r.countBy === 'need' && r.needId !== undefined && types.some((t) => t.demands?.[r.needId!]?.terms.some((term) => term.basis === 'volume'))).length;
+  // A rule uses the volume when one of its room types has air changes for its need.
+  const volumeRules = checkedRules.filter((r) => r.countBy === 'need' && r.needId !== undefined && types.some((t) => (r.roomTypeIds.length === 0 || r.roomTypeIds.includes(t.id)) && t.demands?.[r.needId!]?.terms.some((term) => term.basis === 'volume'))).length;
   function inputCard(kind: InputKind) {
     if (kind === 'drawing')
       return (
@@ -718,6 +739,27 @@ export function AutoPlaceDialog({
 
   function placeCard() {
     const noStamp = checkedRules.filter((r) => !r.stampDefinitionId);
+    // Two or more checked rules that serve the same need in the same room (room-type-calculations.md §4 question 6).
+    const byRoomNeed = new Map<string, Set<string>>();
+    for (const row of shownRows) {
+      if (row.rule.countBy !== 'need' || !row.rule.needId || row.requirement.count === null) continue;
+      const key = `${row.rule.needId}\n${row.room.id}`;
+      byRoomNeed.set(key, (byRoomNeed.get(key) ?? new Set()).add(row.rule.id));
+    }
+    const sameNeedMap = new Map<string, { rules: Set<string>; rooms: number }>();
+    for (const [key, ids] of byRoomNeed) {
+      if (ids.size < 2) continue;
+      const needId = key.split('\n')[0]!;
+      const entry = sameNeedMap.get(needId) ?? { rules: new Set<string>(), rooms: 0 };
+      for (const id of ids) entry.rules.add(id);
+      entry.rooms++;
+      sameNeedMap.set(needId, entry);
+    }
+    const sameNeed = [...sameNeedMap].map(([needId, entry]) => ({
+      need: needs.find((n) => n.id === needId)?.name ?? needId,
+      rules: [...entry.rules].map((id) => rules.find((r) => r.id === id)?.name ?? id),
+      rooms: entry.rooms,
+    }));
     const scopeUntyped = scopeRooms.filter((r) => r.roomTypeId === undefined).length;
     return (
       <>
@@ -764,6 +806,7 @@ export function AutoPlaceDialog({
               <thead>
                 <tr>
                   <th>Rule</th>
+                  <th>Serves</th>
                   <th>Rooms</th>
                   <th>Stamps</th>
                   <th>State</th>
@@ -776,6 +819,7 @@ export function AutoPlaceDialog({
                   return (
                     <tr key={rule.id} className={state === 'bad' ? 'err' : state === 'warn' ? 'bad' : ''} data-rule={rule.id} data-state={state} tabIndex={0} title="Open the rule at step 6" onClick={() => go({ kind: 'rule', id: rule.id }, 6)} onKeyDown={pickKeys(() => go({ kind: 'rule', id: rule.id }, 6))}>
                       <td>{rule.name}</td>
+                      <td>{servesText(rule, needs)}</td>
                       <td className="num">{shown ? rows.length : '–'}</td>
                       <td className="num" data-testid="stamps">
                         {shown ? rows.reduce((n, row) => n + row.stamps.length, 0) : '–'}
@@ -786,6 +830,13 @@ export function AutoPlaceDialog({
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {sameNeed.length > 0 && (
+          <div className="mep-guide-callout" data-testid="ap-same-need">
+            <span>
+              {sameNeed.map(({ need, rules: names, rooms }) => `${need}: ${names.join(' and ')} serve it in ${plural(rooms, 'room')}.`).join(' ')} Each rule places stamps for the full need. Uncheck a rule, or give the rules other room types.
+            </span>
           </div>
         )}
         {noStamp.length > 0 && (
@@ -954,6 +1005,21 @@ export function AutoPlaceDialog({
         ) : (
           <>
             <section className="mep-guide-card" data-testid="ap-card" data-item={item.kind}>
+              {ruleMoveReport && (
+                <div className="mep-guide-callout info" role="status" data-testid="ap-move-report">
+                  <b>The placement rules changed</b>
+                  <ul className="mep-autoplace-report">
+                    {ruleMoveReport.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
+                  <div className="mep-guide-inline">
+                    <button type="button" onClick={onCloseRuleMoveReport}>
+                      Close this note
+                    </button>
+                  </div>
+                </div>
+              )}
               {blockMessage && (
                 <div className="mep-guide-callout bad" role="alert" data-testid="ap-block">
                   <span>{blockMessage}</span>

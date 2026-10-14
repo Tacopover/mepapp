@@ -513,19 +513,20 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
   // The need: the need of the links, else a guess from the unit and the rule name.
   const notes: string[] = [];
   const linkNeeds = [...new Set(links.map((l) => l.term.needId))];
+  const onlyAirChanges = usedTerms.length === 1 && usedTerms[0] === 'perM3';
   let need: RoomNeed;
   if (linkNeeds.length > 0) {
     need = needOf(linkNeeds[0]!);
     if (linkNeeds.length > 1) notes.push(`The rule took values of more than one need; it now serves ${need.name}.`);
   } else if (unit === 'W' || unit === 'kW') need = needOf(nameHas(base.name, ['cool', 'koel']) ? 'cooling' : 'heating');
   // Only air changes: the room types keep air changes as Return air too (airChangesPerH).
-  else if (isAirChangeUnit(unit)) need = needOf(nameHas(base.name, ['return', 'retour', 'exhaust', 'extract', 'afzuig', 'afvoer', 'toilet']) || (usedTerms.length === 1 && usedTerms[0] === 'perM3') ? 'returnAir' : 'supplyAir');
+  else if (isAirChangeUnit(unit)) need = needOf(nameHas(base.name, ['return', 'retour', 'exhaust', 'extract', 'afzuig', 'afvoer', 'toilet']) || onlyAirChanges ? 'returnAir' : 'supplyAir');
   else if (unit.toLowerCase() === 'sockets' || unit.toLowerCase() === 'socket') need = needOf('sockets');
   else {
     const name = base.name.replace(/\s*\(example\)\s*$/i, '').trim() || unit || 'Old rule';
     need = { id: `need-from-${base.id}`, name, kind: unit === STAMP_COUNT_UNIT || unit === '' ? 'count' : 'amount', unit: unit || STAMP_COUNT_UNIT, own: true };
   }
-  if (linkNeeds.length === 0) notes.push(`MepApp chose the need ${need.name} from the unit ${unit || '(none)'}${need.own ? '' : ' and the rule name'}.`);
+  if (linkNeeds.length === 0 && !need.own) notes.push(onlyAirChanges && need.id === 'returnAir' ? 'MepApp chose Return air, because the rule has only air changes.' : `MepApp chose the need ${need.name} from the unit ${unit || '(none)'} and the rule name.`);
   rule.countBy = 'need';
   rule.needId = need.id;
   if (CAPACITY_UNITS[need.kind].includes(unit)) rule.unit = unit;

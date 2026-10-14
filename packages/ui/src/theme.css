@@ -3932,6 +3932,13 @@
 .mep-autoplace-level-row.pick.sel {
   border-color: var(--ink);
 }
+.mep-autoplace-report {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .mep-autoplace-level-step {
   font-size: 11px;
   color: var(--muted);
