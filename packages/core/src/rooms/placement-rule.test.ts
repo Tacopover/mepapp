@@ -124,6 +124,9 @@ describe('calculateRoomRequirement: need ÷ capacity', () => {
   it('a room type without the need gives no count, also without a capacity', () => {
     expect(calculateRoomRequirement(rule({ capacityPerElement: 10 }), withDemands({ heating: { terms: [{ basis: 'area', value: 40 }] } }))).toMatchObject({ count: null, warnings: ['noDemand'] });
     expect(calculateRoomRequirement(rule(), values())).toMatchObject({ count: null, warnings: ['noDemand'] });
+    // A need id that every object has finds no demand (it does not read the prototype).
+    const odd: RoomNeed = { id: 'constructor', name: 'Odd', kind: 'count', unit: 'things', own: true };
+    expect(calculateRoomRequirement(rule({ needId: 'constructor' }), withDemands(supply7), [...BUILT_IN_NEEDS, odd])).toMatchObject({ count: null, warnings: ['noDemand'] });
   });
 
   it('cannot calculate without a calibration or persons; without a capacity it still places one', () => {
@@ -231,6 +234,7 @@ describe('ruleAppliesToRoom', () => {
     expect(ruleAppliesToRoom(rule(), { roomTypeId: 'office', name: 'x' }, supply7)).toBe(true);
     expect(ruleAppliesToRoom(rule(), { roomTypeId: 'corridor', name: 'x' }, { heating: { terms: [{ basis: 'area', value: 30 }] } })).toBe(false);
     expect(ruleAppliesToRoom(rule(), { name: 'x' })).toBe(false);
+    expect(ruleAppliesToRoom(rule({ needId: 'constructor' }), { roomTypeId: 'office', name: 'x' }, supply7)).toBe(false);
     expect(ruleAppliesToRoom(rule({ roomTypeIds: ['corridor'] }), { roomTypeId: 'corridor', name: 'x' })).toBe(true);
     expect(ruleAppliesToRoom(rule({ countBy: 'perRoom' }), { name: null })).toBe(true);
     expect(ruleAppliesToRoom(rule({ countBy: 'coverage' }), { name: null })).toBe(true);
@@ -262,6 +266,10 @@ describe('validatePlacementRule', () => {
     expect(validatePlacementRule(rule({ needId: undefined }), [])).toMatch(/Choose the need/);
     expect(validatePlacementRule(rule({ capacityPerElement: 0 }), [])).toMatch(/one stamp gives/);
     expect(validatePlacementRule(rule({ unit: 'lm' }), [])).toMatch(/not a unit of a flow or a power/);
+    expect(validatePlacementRule(rule({ unit: 'kW' }), [])).toBe('The unit kW is not a unit of Supply air.');
+    expect(validatePlacementRule(rule({ needId: 'heating', unit: 'kW' }), [])).toBeNull();
+    const own: RoomNeed = { id: 'need-x', name: 'Extract', kind: 'flow', unit: 'dm³/s', own: true };
+    expect(validatePlacementRule(rule({ needId: 'need-x', unit: 'W' }), [], [...BUILT_IN_NEEDS, own])).toBe('The unit W is not a unit of Extract.');
     expect(validatePlacementRule(rule({ luminaire: { utilisationFactor: 1.2, maintenanceFactor: 0.8 } }), [])).toMatch(/factors/);
     expect(validatePlacementRule(rule({ luminaire: { utilisationFactor: 0.6, maintenanceFactor: 0.8, ufTable: [{ k: 1, uf: 0.5 }] } }), [])).toMatch(/UF table/);
     expect(validatePlacementRule(rule({ countBy: 'perRoom', perRoomCount: 1.5 }), [])).toMatch(/each room/);
@@ -355,10 +363,32 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
 
   it('links to one need without own numbers convert without a loss (the socket rule of §2)', () => {
     const { rule: r, old: o } = one({ name: 'Double socket', amount: { unit: 'sockets', from: { perPerson: 'socketsPerPerson', fixed: 'socketsFixed' } }, capacityPerElement: 2 });
-    expect(r).toMatchObject({ countBy: 'need', needId: 'sockets', capacityPerElement: 2 });
+    expect(r).toMatchObject({ countBy: 'need', needId: 'sockets', capacityPerElement: 2, writeCapacity: false });
     expect(r.unit).toBeUndefined();
-    expect(o).toBeUndefined();
+    expect(o).toMatchObject({ demand: null, notes: ['The rule no longer writes a capacity to its stamps: a rule for Sockets does not write one.'] });
     expect(calculateRoomRequirement(r, withDemands(office)).count).toBe(8);
+    expect(one({ amount: { unit: 'sockets', from: { perPerson: 'socketsPerPerson' } }, capacityPerElement: 2, writeCapacity: false }).old).toBeUndefined();
+  });
+
+  it('the count of a rule without a capacity, and of a rule in stamps, is the same as before or the report says so', () => {
+    // Before: no capacity, so 1 stamp in each room. Now one stamp gives 1 socket: 4 × 4 persons = 16 stamps.
+    const sockets = one({ amount: { unit: 'sockets', from: { perPerson: 'socketsPerPerson' } }, writeCapacity: false });
+    expect(sockets.rule.capacityPerElement).toBeUndefined();
+    expect(sockets.old).toMatchObject({ demand: null, notes: [expect.stringMatching(/^The rule had no capacity, so it placed 1 stamp in each room\./)] });
+    expect(calculateRoomRequirement(sockets.rule, withDemands(office)).count).toBe(16);
+    // Before: the unit stamps gave each stamp 1, so 6.5 × 4 persons = 26 stamps. Now one stamp gives 1 dm³/s: still 26.
+    const stamps = one({ amount: { unit: 'stamps', from: { perPerson: 'supplyPerPersonDm3s' } }, writeCapacity: false });
+    expect(stamps.rule).toMatchObject({ needId: 'supplyAir', capacityPerElement: 1 });
+    expect(stamps.old!.notes).toEqual(['The unit of the rule was stamps, so one stamp now gives 1 dm³/s. The count stays the same.']);
+    expect(calculateRoomRequirement(stamps.rule, withDemands(office)).count).toBe(26);
+  });
+
+  it('leaves out the numbers that the old validator refused, and a link that does not fit its term', () => {
+    expect(parsePlacementRules([old({ amount: { perPerson: -5, unit: 'dm³/s' } })])!.rules).toEqual([]);
+    expect(parsePlacementRules([old({ amount: { fixed: 7, minimum: -1, unit: 'dm³/s' } })])!.rules).toEqual([]);
+    expect(parsePlacementRules([old({ preset: 'lighting', lighting: { lux: 0, utilisationFactor: 0.6, maintenanceFactor: 0.8 } })])!.rules).toEqual([]);
+    // perM2 cannot take the illuminance: the link goes, and the rule has no amount (1 in each room, as before).
+    expect(one({ amount: { unit: 'lm', from: { perM2: 'illuminanceLx' } } }).rule).toMatchObject({ countBy: 'perRoom', perRoomCount: 1 });
   });
 
   it('the old supply air example: own numbers move as a Supply air demand of its room types', () => {
@@ -393,8 +423,8 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
   it('a unit that no built-in need has becomes an own need named after the rule', () => {
     const boxes = one({ name: 'Floor boxes (example)', preset: 'perArea', amount: { perM2: 0.2, unit: 'stamps' } });
     expect(boxes.old!.need).toEqual({ id: 'need-from-old', name: 'Floor boxes', kind: 'count', unit: 'stamps', own: true });
-    expect(boxes.rule.needId).toBe('need-from-old');
-    expect(boxes.old!.notes).toEqual([]);
+    expect(boxes.rule).toMatchObject({ needId: 'need-from-old', writeCapacity: false });
+    expect(boxes.old!.notes).toEqual(['The rule no longer writes a capacity to its stamps: a rule for Floor boxes does not write one.']);
     // 0.2 × 35.8 = 7.16, 8 stamps as before.
     expect(calculateRoomRequirement(boxes.rule, withDemands({ 'need-from-old': boxes.old!.demand }, { areaM2: 35.8 }), [...BUILT_IN_NEEDS, boxes.old!.need]).count).toBe(8);
     expect(one({ amount: { perM2: 1, unit: 'kg' } }).old!.need).toMatchObject({ kind: 'amount', unit: 'kg' });
@@ -404,7 +434,9 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
   it('lighting: the luminaire stays with the rule, an own illuminance moves (fc in lx)', () => {
     const fromType = one({ preset: 'lighting', amount: { unit: 'lm' }, lighting: { luxFromRoomType: true, utilisationFactor: 0.6, maintenanceFactor: 0.8, ufTable: [{ k: 1, uf: 0.5 }, { k: 2, uf: 0.7 }], suspensionM: 0.3 }, capacityPerElement: 3600 });
     expect(fromType.rule).toMatchObject({ needId: 'light', capacityPerElement: 3600, luminaire: { utilisationFactor: 0.6, maintenanceFactor: 0.8, suspensionM: 0.3, ufTable: [{ k: 1, uf: 0.5 }, { k: 2, uf: 0.7 }] } });
-    expect(fromType.old).toBeUndefined();
+    expect(fromType.rule.writeCapacity).toBe(false);
+    expect(fromType.old).toMatchObject({ demand: null, notes: ['The rule no longer writes a capacity to its stamps: a rule for Light does not write one.'] });
+    expect(one({ preset: 'lighting', amount: { unit: 'lm' }, lighting: { luxFromRoomType: true, utilisationFactor: 0.6, maintenanceFactor: 0.8 }, writeCapacity: false }).old).toBeUndefined();
     const own = one({ preset: 'lighting', amount: { unit: 'lm' }, lighting: { lux: 50, illuminanceUnit: 'fc', workingPlaneHeightM: 0.8, utilisationFactor: 0.6, maintenanceFactor: 0.8 }, capacityPerElement: 3600 });
     expect(own.old!.demand.terms[0]!.value).toBeCloseTo(50 / M2_PER_FT2);
     expect(own.old!.demand.workingPlaneM).toBe(0.8);
@@ -448,6 +480,14 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
     );
     expect(moved.report[1]).toContain('Its numbers moved to no room type. The rule chose rooms with "Zolder" in the name, and no room type matches this text.');
     expect(parsed.rules[0]!.nameContains).toBe('Kantoor');
+  });
+
+  it('moveOldRuleNumbers: a rule without own numbers moves nothing, and its line gives the notes', () => {
+    const parsed = parsePlacementRules([old({ name: 'Light', preset: 'lighting', amount: { unit: 'lm' }, lighting: { luxFromRoomType: true, utilisationFactor: 0.6, maintenanceFactor: 0.8 } })])!;
+    const types = [{ id: 'office', name: 'Office' }];
+    const moved = moveOldRuleNumbers(types, [], parsed.oldNumbers);
+    expect(moved.types).toEqual(types);
+    expect(moved.report).toEqual(['Light: now serves Light. The rule no longer writes a capacity to its stamps: a rule for Light does not write one.']);
   });
 });
 

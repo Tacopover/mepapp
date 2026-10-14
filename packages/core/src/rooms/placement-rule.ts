@@ -9,7 +9,7 @@ import type { Discipline } from '../network.js';
 import type { Room } from './room.js';
 import type { RoomValues } from './room-values.js';
 import { demandTotal, matchRoomType, oldDemandFieldTerm, type DemandResult, type DemandTerm, type RoomDemand, type RoomDemands } from './room-type.js';
-import { BUILT_IN_NEEDS, type NeedKind, type RoomNeed } from './room-need.js';
+import { BUILT_IN_NEEDS, type DemandBasis, type NeedKind, type RoomNeed } from './room-need.js';
 import { AIR_CHANGE_UNITS, isAirChangeUnit, M2_PER_FT2, M3H_PER_DM3S, STAMP_COUNT_UNIT, type LengthUnit } from './placement-units.js';
 
 export type LayoutStrategy = 'center' | 'grid' | 'evenSpread' | 'perimeter';
@@ -153,6 +153,10 @@ export function inRuleUnit(value: number, need: Pick<RoomNeed, 'kind'>, unit: st
   return value;
 }
 
+/** The demand for the need, when the room type has one. An id such as "constructor" finds no demand. */
+const demandFor = (demands: RoomDemands | undefined, needId: string): RoomDemand | undefined =>
+  demands && Object.prototype.hasOwnProperty.call(demands, needId) ? demands[needId] : undefined;
+
 /** True when the rule applies to the room: its type is in the list (or the list is empty), and its name contains the text (when set). A need rule with an empty list applies to the rooms whose type has the need (`demands` of the room). */
 export function ruleAppliesToRoom(
   rule: Pick<PlacementRule, 'roomTypeIds' | 'nameContains'> & Partial<Pick<PlacementRule, 'countBy' | 'needId'>>,
@@ -161,7 +165,7 @@ export function ruleAppliesToRoom(
 ): boolean {
   if (rule.roomTypeIds.length > 0) {
     if (room.roomTypeId === undefined || !rule.roomTypeIds.includes(room.roomTypeId)) return false;
-  } else if (rule.countBy === 'need' && (rule.needId === undefined || demands?.[rule.needId] === undefined)) return false;
+  } else if (rule.countBy === 'need' && (rule.needId === undefined || demandFor(demands, rule.needId) === undefined)) return false;
   const text = rule.nameContains?.trim().toLowerCase();
   if (text && !(room.name ?? '').toLowerCase().includes(text)) return false;
   return true;
@@ -291,7 +295,7 @@ export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues
   }
   if (rule.countBy === 'perRoom') return { ...none, count: limitCount(rule, rule.perRoomCount ?? 1, warnings), countSource: 'perRoom', warnings };
   const need = needs.find((n) => n.id === rule.needId);
-  const demand = need ? values.demands?.[need.id] : undefined;
+  const demand = need ? demandFor(values.demands, need.id) : undefined;
   if (!need || !demand) return { ...none, count: null, countSource: 'amount', warnings: [need ? 'noDemand' : 'needNotFound'] };
   const result = demandTotal(need, demand, values);
   for (const p of result.problems) warnings.push(p === 'notFit' ? 'noDemand' : p);
@@ -379,14 +383,16 @@ const isCount = (n: number | undefined) => n === undefined || (Number.isInteger(
 const isFactor = (n: number) => Number.isFinite(n) && n > 0 && n <= 1;
 const CAPACITY_UNIT_LIST = [...CAPACITY_UNITS.flow, ...CAPACITY_UNITS.power];
 
-/** Why the rule cannot be saved, or null when it can. `others` are the other rules of the list. */
-export function validatePlacementRule(rule: PlacementRule, others: readonly PlacementRule[]): string | null {
+/** Why the rule cannot be saved, or null when it can. `others` are the other rules of the list. `needs`: the built-in needs and the own needs; the unit must fit the need when the list has it. */
+export function validatePlacementRule(rule: PlacementRule, others: readonly PlacementRule[], needs: readonly RoomNeed[] = BUILT_IN_NEEDS): string | null {
   const name = rule.name.trim();
   if (!name) return 'Enter a name.';
   if (others.some((r) => r.name.trim().toLowerCase() === name.toLowerCase())) return `Another rule is already called "${name}".`;
   if (rule.countBy === 'need' && !rule.needId) return 'Choose the need that the stamp serves.';
   if (!isPositive(rule.capacityPerElement)) return 'What one stamp gives must be a number above 0.';
   if (rule.unit !== undefined && !CAPACITY_UNIT_LIST.includes(rule.unit)) return `The unit ${rule.unit} is not a unit of a flow or a power.`;
+  const need = rule.countBy === 'need' ? needs.find((n) => n.id === rule.needId) : undefined;
+  if (rule.unit !== undefined && need && !CAPACITY_UNITS[need.kind].includes(rule.unit)) return `The unit ${rule.unit} is not a unit of ${need.name}.`;
   if (rule.luminaire) {
     const L = rule.luminaire;
     if (!isFactor(L.utilisationFactor) || !isFactor(L.maintenanceFactor)) return 'The utilisation and maintenance factors must be above 0 and at most 1.';
@@ -459,8 +465,8 @@ export interface OldRuleNumbers {
   ruleName: string;
   /** The need of the rule. When no built-in need fits, a new own need that is named after the rule. */
   need: RoomNeed;
-  /** The numbers of the old rule as a demand, in the unit of the need. */
-  demand: RoomDemand;
+  /** The numbers of the old rule as a demand, in the unit of the need. Null = the rule has no own numbers: only its notes go to the report. */
+  demand: RoomDemand | null;
   /** The room types of the old rule. Empty = every room type. */
   roomTypeIds: string[];
   /** The text that the room names of the old rule contain, when it has one. */
@@ -471,6 +477,10 @@ export interface OldRuleNumbers {
 
 const needOf = (id: string): RoomNeed => BUILT_IN_NEEDS.find((n) => n.id === id)!;
 const nameHas = (name: string, words: readonly string[]) => words.some((w) => name.toLowerCase().includes(w));
+/** The basis of the room-type value that each old term could take (the old demandsForTerm). */
+const OLD_TERM_BASIS: Record<'fixed' | 'perM2' | 'perPerson' | 'perM3', DemandBasis> = { fixed: 'room', perM2: 'area', perPerson: 'person', perM3: 'volume' };
+/** A rule for these needs writes the capacity to its stamps (the guide clears it for Light and a number of things). */
+const writesCapacity = (kind: NeedKind) => kind === 'flow' || kind === 'power' || kind === 'amount';
 
 /** An old amount in the unit of the rule, in the unit of the need: dm³/s for a flow, W for a power. */
 function oldInNeedUnit(value: number, kind: NeedKind, unit: string): number {
@@ -479,8 +489,11 @@ function oldInNeedUnit(value: number, kind: NeedKind, unit: string): number {
   return value;
 }
 
-/** The rule of an old stored rule (with `preset`, `amount` and `lighting`), and the own numbers that must move to the room types. */
-function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverageLayout: boolean): { rule: PlacementRule; old: OldRuleNumbers | null } {
+/**
+ * The rule of an old stored rule (with `preset`, `amount` and `lighting`), and the own numbers that must move to the room types.
+ * Null for numbers that the old validator refused (below 0, an illuminance of 0). A link to a room-type value that does not fit its term goes, as in the old parse.
+ */
+function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverageLayout: boolean): { rule: PlacementRule; old: OldRuleNumbers | null } | null {
   const amount = rec(v.amount);
   const lighting = rec(v.lighting);
   const unit = typeof amount.unit === 'string' ? amount.unit.trim() : '';
@@ -489,10 +502,11 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
   const from = rec(amount.from);
   const links = (['fixed', 'perM2', 'perPerson', 'perM3'] as const).flatMap((key) => {
     const term = typeof from[key] === 'string' ? oldDemandFieldTerm(from[key] as string) : undefined;
-    return term ? [{ key, term }] : [];
+    return term && term.basis === OLD_TERM_BASIS[key] ? [{ key, term }] : [];
   });
   const lux = num(lighting.lux);
   const luxFromRoomType = lighting.luxFromRoomType === true;
+  if ([own.fixed, own.perM2, own.perPerson, own.perM3, minimum, num(lighting.workingPlaneHeightM)].some((n) => n !== undefined && n < 0) || (lux !== undefined && lux <= 0)) return null;
   const luminaire = toLuminaire(lighting);
   const isLighting = luminaire !== undefined && (lux !== undefined || luxFromRoomType);
   const usedTerms = (['fixed', 'perM2', 'perPerson', 'perM3'] as const).filter((key) => own[key] !== undefined || links.some((l) => l.key === key));
@@ -500,6 +514,8 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
   const rule: PlacementRule = { ...base };
   if (v.preset === 'coverage' || (oldCoverageLayout && !hasAmount && hasCoverageLimit(base.coverage))) return { rule: { ...rule, countBy: 'coverage' }, old: null };
   const capacity = num(v.capacityPerElement);
+  const oldOf = (need: RoomNeed, demand: RoomDemand | null, notes: string[]): OldRuleNumbers | null =>
+    demand || notes.length > 0 ? { ruleId: base.id, ruleName: base.name, need, demand, roomTypeIds: base.roomTypeIds, ...(base.nameContains ? { nameContains: base.nameContains } : {}), notes } : null;
   if (isLighting) {
     rule.countBy = 'need';
     rule.needId = 'light';
@@ -507,12 +523,16 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
     if (capacity !== undefined) rule.capacityPerElement = capacity;
     const notes: string[] = [];
     if (num(lighting.workingPlaneHeightM) !== undefined && luxFromRoomType) notes.push('The working-plane height of the rule goes: a room type without one uses 0.75 m.');
-    if (lux === undefined) return { rule, old: null };
+    if (rule.writeCapacity) {
+      rule.writeCapacity = false;
+      notes.push('The rule no longer writes a capacity to its stamps: a rule for Light does not write one.');
+    }
+    if (lux === undefined) return { rule, old: oldOf(needOf('light'), null, notes) };
     const lx = lighting.illuminanceUnit === 'fc' ? lux / M2_PER_FT2 : lux;
     const demand: RoomDemand = { terms: [{ basis: 'illuminance', value: lx }] };
     const wp = num(lighting.workingPlaneHeightM);
     if (wp !== undefined) demand.workingPlaneM = wp;
-    return { rule, old: { ruleId: base.id, ruleName: base.name, need: needOf('light'), demand, roomTypeIds: base.roomTypeIds, ...(base.nameContains ? { nameContains: base.nameContains } : {}), notes } };
+    return { rule, old: oldOf(needOf('light'), demand, notes) };
   }
   if (!hasAmount) return { rule: { ...rule, countBy: 'perRoom', perRoomCount: 1 }, old: null };
   if (unit === STAMP_COUNT_UNIT && usedTerms.length === 1 && usedTerms[0] === 'fixed' && links.length === 0 && minimum === undefined) {
@@ -538,7 +558,19 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
   rule.countBy = 'need';
   rule.needId = need.id;
   if (CAPACITY_UNITS[need.kind].includes(unit)) rule.unit = unit;
-  if (capacity !== undefined && unit !== STAMP_COUNT_UNIT) rule.capacityPerElement = capacity;
+  // The old count: with the unit "stamps" one stamp gave 1, and without a capacity the rule placed 1 stamp in each room.
+  if (unit === STAMP_COUNT_UNIT) {
+    if (need.kind !== 'count') {
+      rule.capacityPerElement = 1;
+      notes.push(`The unit of the rule was stamps, so one stamp now gives 1 ${need.unit}. The count stays the same.`);
+    }
+  } else if (capacity !== undefined) rule.capacityPerElement = capacity;
+  else if (need.kind === 'count')
+    notes.push('The rule had no capacity, so it placed 1 stamp in each room. Now one stamp gives 1, so a room gets 1 stamp for each 1 of its need. To change this, enter what one stamp gives in step 3 of the rule.');
+  if (rule.writeCapacity && !writesCapacity(need.kind)) {
+    rule.writeCapacity = false;
+    notes.push(`The rule no longer writes a capacity to its stamps: a rule for ${need.name} does not write one.`);
+  }
   // The own numbers of the rule (also the fallbacks of the links) become a demand in the unit of the need.
   const terms: DemandTerm[] = [];
   const perM2 = own.perM2 !== undefined && amount.areaUnit === 'ft2' ? own.perM2 / M2_PER_FT2 : own.perM2;
@@ -549,10 +581,10 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
     if (need.kind === 'flow') terms.push({ basis: 'volume', value: own.perM3 });
     else notes.push(`The amount per m³ (${own.perM3}) goes: only an air flow has air changes.`);
   }
-  if (terms.length === 0 && minimum === undefined) return { rule, old: null };
+  if (terms.length === 0 && minimum === undefined) return { rule, old: oldOf(need, null, notes) };
   const demand: RoomDemand = { terms: terms.length > 0 ? terms : [{ basis: 'room', value: 0 }] };
   if (minimum !== undefined) demand.minimum = oldInNeedUnit(minimum, need.kind, unit);
-  return { rule, old: { ruleId: base.id, ruleName: base.name, need, demand, roomTypeIds: base.roomTypeIds, ...(base.nameContains ? { nameContains: base.nameContains } : {}), notes } };
+  return { rule, old: oldOf(need, demand, notes) };
 }
 
 function toPlacementRule(value: unknown): { rule: PlacementRule; old: OldRuleNumbers | null } | null {
@@ -586,7 +618,7 @@ function toPlacementRule(value: unknown): { rule: PlacementRule; old: OldRuleNum
   const ceilingGrid = num(layout.ceilingGridMm);
   if (ceilingGrid !== undefined) rule.layout.ceilingGridMm = ceilingGrid;
   withNumbers(rule, v, ['minCount', 'maxCount']);
-  let result: { rule: PlacementRule; old: OldRuleNumbers | null };
+  let result: { rule: PlacementRule; old: OldRuleNumbers | null } | null;
   if (COUNT_MODES.includes(v.countBy as PlacementCountMode)) {
     rule.countBy = v.countBy as PlacementCountMode;
     if (typeof v.needId === 'string' && v.needId && rule.countBy === 'need') rule.needId = v.needId;
@@ -596,6 +628,7 @@ function toPlacementRule(value: unknown): { rule: PlacementRule; old: OldRuleNum
     withNumbers(rule, v, ['capacityPerElement', 'perRoomCount']);
     result = { rule, old: null };
   } else result = fromOldRule(v, rule, oldCoverageLayout);
+  if (!result) return null;
   if (v.alsoCoverage === true && result.rule.countBy !== 'coverage') result.rule.alsoCoverage = true;
   return validatePlacementRule(result.rule, []) === null ? result : null;
 }
@@ -629,7 +662,7 @@ export const hasOldPlacementRules = (raw: unknown): boolean => Array.isArray(raw
  * gets the numbers as its demand. A rule without room types that chose rooms by a text of the name
  * gives the numbers only to the room type whose keywords match that text. A type that has the need
  * keeps its own numbers. A new own need is added to `needs`. The report says what happened, one
- * line for each rule.
+ * line for each rule. A rule without own numbers moves nothing: its line gives only the notes.
  */
 export function moveOldRuleNumbers<T extends { id: string; name: string; keywords?: readonly string[]; demands?: RoomDemands }>(
   types: readonly T[],
@@ -641,6 +674,11 @@ export function moveOldRuleNumbers<T extends { id: string; name: string; keyword
   const report: string[] = [];
   for (const entry of oldNumbers) {
     if (entry.need.own && !nextNeeds.some((n) => n.id === entry.need.id)) nextNeeds.push(entry.need);
+    const demand = entry.demand;
+    if (!demand) {
+      report.push([`${entry.ruleName}: now serves ${entry.need.name}${entry.need.own ? ' (a new own need)' : ''}.`, ...entry.notes].join(' '));
+      continue;
+    }
     const nameText = entry.roomTypeIds.length === 0 ? entry.nameContains?.trim() : undefined;
     const byName = nameText ? matchRoomType(nameText, undefined, nextTypes.map((t) => ({ id: t.id, name: t.name, keywords: [...(t.keywords ?? [])] }))) : null;
     const targets = nextTypes.filter((t) => (nameText ? t.id === byName?.id : entry.roomTypeIds.length === 0 || entry.roomTypeIds.includes(t.id)));
@@ -651,7 +689,7 @@ export function moveOldRuleNumbers<T extends { id: string; name: string; keyword
         kept.push(type.name);
         continue;
       }
-      type.demands = { ...type.demands, [entry.need.id]: { ...entry.demand, terms: entry.demand.terms.map((t) => ({ ...t })) } };
+      type.demands = { ...type.demands, [entry.need.id]: { ...demand, terms: demand.terms.map((t) => ({ ...t })) } };
       moved.push(type.name);
     }
     const parts = [

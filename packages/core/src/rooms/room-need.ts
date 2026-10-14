@@ -85,7 +85,7 @@ export function validateRoomNeed(need: RoomNeed, others: readonly RoomNeed[]): s
   return null;
 }
 
-/** Reads a stored or imported list of own needs. Unreadable entries, built-in ids and repeated ids are left out. Null when `raw` is not a list. */
+/** Reads a stored or imported list of own needs. Unreadable entries, built-in ids, ids that every object has ("constructor", "toString", …) and repeated ids are left out. Null when `raw` is not a list. */
 export function parseRoomNeeds(raw: unknown): RoomNeed[] | null {
   if (!Array.isArray(raw)) return null;
   const ids = new Set<string>();
@@ -93,7 +93,7 @@ export function parseRoomNeeds(raw: unknown): RoomNeed[] | null {
   for (const entry of raw) {
     if (!entry || typeof entry !== 'object') continue;
     const v = entry as Record<string, unknown>;
-    if (typeof v.id !== 'string' || !v.id || BUILT_IN_IDS.has(v.id) || ids.has(v.id) || typeof v.name !== 'string' || !v.name.trim()) continue;
+    if (typeof v.id !== 'string' || !v.id || BUILT_IN_IDS.has(v.id) || v.id in Object.prototype || ids.has(v.id) || typeof v.name !== 'string' || !v.name.trim()) continue;
     if (!OWN_NEED_KINDS.includes(v.kind as NeedKind)) continue;
     const kind = v.kind as NeedKind;
     const unit = NEED_KIND_UNITS[kind] ?? (typeof v.unit === 'string' ? v.unit.trim() : '');

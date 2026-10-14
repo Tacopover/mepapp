@@ -104,9 +104,13 @@ export function servesText(rule: PlacementRule, needs: readonly RoomNeed[]): str
   return needs.find((n) => n.id === rule.needId)?.name ?? 'A deleted need';
 }
 
+/** True when the rule counts by a need that is not in the list (an own need was deleted). A rule without room types then has no rows. */
+const needDeleted = (rule: PlacementRule, needs: readonly RoomNeed[]) => rule.countBy === 'need' && !needs.some((n) => n.id === rule.needId);
+
 /** The state of a rule in the left list, from the dry run of its rows (no stamp positions). */
-function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 'requirement'>[], found: (definitionId: string) => boolean, serves: string): StepStatus {
-  if (rule.countBy === 'need' && rows.some((row) => row.requirement.warnings.includes('needNotFound'))) return ['bad', 'The need was deleted'];
+function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 'requirement'>[], found: (definitionId: string) => boolean, needs: readonly RoomNeed[]): StepStatus {
+  if (needDeleted(rule, needs)) return ['bad', 'The need was deleted'];
+  const serves = servesText(rule, needs);
   if (!rule.stampDefinitionId) return ['bad', `${serves}: no stamp`];
   if (!found(rule.stampDefinitionId)) return ['bad', 'Stamp not found'];
   if (rows.length === 0) return ['warn', 'No room matches'];
@@ -120,7 +124,8 @@ function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 're
 }
 
 /** The state of a checked rule in the Place all table, from the rows of the plan. */
-function placeStateOf(rule: PlacementRule, rows: readonly PlacementRow[]): StepStatus {
+function placeStateOf(rule: PlacementRule, rows: readonly PlacementRow[], needs: readonly RoomNeed[]): StepStatus {
+  if (needDeleted(rule, needs)) return ['bad', 'Skipped: the need was deleted'];
   if (!rule.stampDefinitionId) return ['bad', 'Skipped: no stamp'];
   if (rows.some((row) => row.warnings.includes('stampNotFound'))) return ['bad', 'Skipped: stamp not found'];
   if (rows.length === 0) return ['warn', 'No room matches'];
@@ -281,6 +286,8 @@ export function AutoPlaceDialog({
     setStepStates([]);
     setPlaced(null);
     setBlockMessage(null);
+    // A link of a rule opens the Room types card once; the left list opens it on its first tab.
+    if (next.kind !== 'types') setTypesFocus(null);
   };
   /** Opens an item of the left list. A rule with a box that is not valid stays open (the guide says why). */
   const go = (next: Item, step = 1) => {
@@ -366,7 +373,7 @@ export function AutoPlaceDialog({
   // The left list: a dry run of every rule (no stamp positions), fast enough for each change of a rule.
   const dryRows = useMemo(() => (scene ? calculateRooms(rules, scopeRooms, valuesOf, needs).rows : []), [scene, rules, scopeRooms, valuesOf, needs]);
   const ruleStatus = useMemo(
-    () => new Map(rules.map((rule) => [rule.id, ruleStatusOf(rule, dryRows.filter((row) => row.rule.id === rule.id), (id) => stampDefinition(id) !== undefined, servesText(rule, needs))])),
+    () => new Map(rules.map((rule) => [rule.id, ruleStatusOf(rule, dryRows.filter((row) => row.rule.id === rule.id), (id) => stampDefinition(id) !== undefined, needs)])),
     [rules, dryRows, stampDefinition, needs],
   );
   const checkedRules = useMemo(() => rules.filter((r) => !unchecked.has(r.id)), [rules, unchecked]);
@@ -837,7 +844,7 @@ export function AutoPlaceDialog({
               <tbody>
                 {checkedRules.map((rule) => {
                   const rows = rowsByRule.get(rule.id) ?? [];
-                  const [state, text] = shown ? placeStateOf(rule, rows) : ['', 'Calculating…'];
+                  const [state, text] = shown ? placeStateOf(rule, rows, needs) : ['', 'Calculating…'];
                   return (
                     <tr key={rule.id} className={state === 'bad' ? 'err' : state === 'warn' ? 'bad' : ''} data-rule={rule.id} data-state={state} tabIndex={0} title="Open the rule at step 6" onClick={() => go({ kind: 'rule', id: rule.id }, 6)} onKeyDown={pickKeys(() => go({ kind: 'rule', id: rule.id }, 6))}>
                       <td>{rule.name}</td>
@@ -1030,8 +1037,9 @@ export function AutoPlaceDialog({
             onStepChange={setRuleStep}
             onStepStates={setStepStates}
             onOpenRoomTypes={(focus) => {
+              if (!canLeave()) return;
               setTypesFocus(focus ? { ...focus } : null);
-              go({ kind: 'types' });
+              show({ kind: 'types' });
             }}
           />
         ) : (

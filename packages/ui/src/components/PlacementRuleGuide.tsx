@@ -529,7 +529,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
   };
 
   // Why the settled draft cannot be saved; null when it is valid.
-  const problem = useMemo(() => parsed.error ?? (parsed.rule ? validatePlacementRule(parsed.rule, others) : null), [parsed, others]);
+  const problem = useMemo(() => parsed.error ?? (parsed.rule ? validatePlacementRule(parsed.rule, others, needs) : null), [parsed, others, needs]);
   // The guide saves each valid change at once.
   useEffect(() => {
     if (!parsed.rule || problem) return;
@@ -549,7 +549,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       setMessage(`${err.message} Correct it, or click Revert.`);
       return false;
     }
-    const invalid = validatePlacementRule(next, others);
+    const invalid = validatePlacementRule(next, others, needs);
     if (invalid) {
       if (!changed) return true;
       setMessage(`${invalid} Correct it, or click Revert.`);

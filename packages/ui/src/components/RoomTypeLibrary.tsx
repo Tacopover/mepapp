@@ -75,6 +75,8 @@ const newNeedId = () => `need-${Date.now().toString(36)}${Math.random().toString
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** The column of the area per person in the table. */
 const PERSONS = 'persons';
+/** The "Add a need" list gets the focus after a need is removed. */
+const ADD_NEED = 'add-need';
 
 type NeedPanel = { kind: 'new' } | { kind: 'edit'; needId: string } | { kind: 'delete'; needId: string };
 
@@ -95,6 +97,8 @@ function usedOwnNeeds(types: readonly RoomType[], own: readonly RoomNeed[]): Roo
 export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [], onChange, onChangeNeeds, onExport, onDirtyChange, roomCountOf, sampleOf, focus }: RoomTypeLibraryProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusNeed, setFocusNeed] = useState<{ id: string; at: number } | null>(null);
+  /** A link opened a type that only the drawing's file has: the details need it in the library first. */
+  const [fileFocus, setFileFocus] = useState<{ type: RoomType; needId?: string } | null>(null);
   const [dirty, setDirtyState] = useState(false);
   const [panel, setPanel] = useState<NeedPanel | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -110,8 +114,10 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
 
   useEffect(() => {
     if (!focus || dirty) return;
-    setSelectedId(focus.typeId);
-    setFocusNeed(focus.needId ? { id: focus.needId, at: Date.now() } : null);
+    const fileType = types.some((t) => t.id === focus.typeId) ? undefined : fileOnlyTypes.find((t) => t.id === focus.typeId);
+    setFileFocus(fileType ? { type: fileType, ...(focus.needId ? { needId: focus.needId } : {}) } : null);
+    setSelectedId(fileType ? null : focus.typeId);
+    setFocusNeed(!fileType && focus.needId ? { id: focus.needId, at: Date.now() } : null);
     // Only a new focus object opens the details again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus]);
@@ -119,6 +125,7 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
   const open = (typeId: string, needId?: string) => {
     setSelectedId(typeId);
     setFocusNeed(needId ? { id: needId, at: Date.now() } : null);
+    setFileFocus(null);
     setMessage(null);
   };
 
@@ -128,11 +135,14 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
     open(created.id);
   };
 
-  const addToLibrary = (type: RoomType) => {
+  /** The own needs of the file that the type uses and the library lacks. */
+  const missingNeedsOf = (type: RoomType) => usedOwnNeeds([type], fileOnlyNeeds).filter((n) => !needs.some((m) => m.id === n.id));
+
+  const addToLibrary = (type: RoomType, needId?: string) => {
     onChange([...types, { ...type, name: uniqueName(type.name, types) }]);
-    const missing = usedOwnNeeds([type], fileOnlyNeeds).filter((n) => !needs.some((m) => m.id === n.id));
+    const missing = missingNeedsOf(type);
     if (missing.length > 0) onChangeNeeds([...needs, ...missing]);
-    open(type.id);
+    open(type.id, needId);
   };
 
   /** Fills the empty values of each type that has example values. */
@@ -350,12 +360,32 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
           focusNeed={focusNeed}
           sample={sampleOf?.(selected.id) ?? null}
           onDirtyChange={setDirty}
-          onSave={(next) => onChange(types.map((t) => (t.id === next.id ? next : t)))}
+          onSave={(next) => {
+            onChange(types.map((t) => (t.id === next.id ? next : t)));
+            // A demand for an own need of the drawing's file: the need goes to the library too, so the table and Export have it.
+            const missing = missingNeedsOf(next);
+            if (missing.length > 0) {
+              onChangeNeeds([...needs, ...missing]);
+              setMessage(`MepApp added the need ${missing.map((n) => n.name).join(', ')} of this drawing to your library.`);
+            }
+            setFocusNeed(null);
+          }}
           onDelete={() => {
             onChange(types.filter((t) => t.id !== selected.id));
             setSelectedId(null);
           }}
         />
+      ) : fileFocus ? (
+        <div className="mep-guide-callout" data-testid="rt-file-only">
+          <span>
+            {fileFocus.type.name} is only in this drawing, not in your library. Add it to your library to change its needs.
+          </span>
+          <div className="mep-guide-inline">
+            <button type="button" onClick={() => addToLibrary(fileFocus.type, fileFocus.needId)}>
+              + Add {fileFocus.type.name} to your library
+            </button>
+          </div>
+        </div>
       ) : (
         <p className="mep-guide-note">Click a room type or a cell to see the details below the table.</p>
       )}
@@ -525,6 +555,8 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const root = useRef<HTMLElement | null>(null);
+  /** The need whose calculation gets the focus after the next render (a need was added), or ADD_NEED (a need was removed). */
+  const [focusAfter, setFocusAfter] = useState<string | null>(null);
   // The form goes with its changes (another key, or no type selected): the library is not dirty then.
   const dirtyChange = useRef(onDirtyChange);
   dirtyChange.current = onDirtyChange;
@@ -533,6 +565,8 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
   useEffect(() => {
     if (!focusNeed) {
       root.current?.scrollIntoView({ block: 'nearest' });
+      // After Save the details are new, and the clicked button went with the old ones.
+      if (document.activeElement === document.body) root.current?.focus({ preventScroll: true });
       return;
     }
     const target = root.current?.querySelector<HTMLElement>(`[data-demand="${focusNeed.id}"]`);
@@ -540,12 +574,17 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
     (target?.querySelector<HTMLElement>('select, input') ?? target?.querySelector<HTMLElement>('button'))?.focus({ preventScroll: true });
   }, [focusNeed]);
 
+  useEffect(() => {
+    if (!focusAfter) return;
+    const target = focusAfter === ADD_NEED ? root.current?.querySelector<HTMLElement>('#rt-add-need') : root.current?.querySelector<HTMLElement>(`[data-demand="${focusAfter}"]`)?.querySelector<HTMLElement>('select, input');
+    target?.focus();
+    setFocusAfter(null);
+  }, [focusAfter]);
+
   const setDraft = (next: (d: TypeDraft) => TypeDraft) => {
-    setDraftState((d) => {
-      const result = next(d);
-      onDirtyChange(JSON.stringify(result) !== JSON.stringify(initial));
-      return result;
-    });
+    const result = next(draft);
+    setDraftState(result);
+    onDirtyChange(JSON.stringify(result) !== JSON.stringify(initial));
     setError(null);
   };
   const setField = (field: 'name' | 'nameNl' | 'keywords' | 'areaPerPerson') => (value: string) => setDraft((d) => ({ ...d, [field]: value }));
@@ -556,6 +595,10 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
       else delete demands[needId];
       return { ...d, demands };
     });
+  const addDemand = (need: RoomNeed) => {
+    setDemand(need.id, newDemandDraft(need));
+    setFocusAfter(need.id);
+  };
 
   const revert = () => {
     setDraftState(initial);
@@ -615,7 +658,7 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
   const focusMissing = focusNeed && !draft.demands[focusNeed.id] ? needs.find((n) => n.id === focusNeed.id) : undefined;
 
   return (
-    <section className="mep-circuit-types-form mep-rt-details" ref={root} aria-label={`Details of ${type.name}`} data-testid="rt-details" data-type={type.id}>
+    <section className="mep-circuit-types-form mep-rt-details" ref={root} tabIndex={-1} aria-label={`Details of ${type.name}`} data-testid="rt-details" data-type={type.id}>
       <h3>{type.name}</h3>
       <div className="mep-field-row">
         <label htmlFor="rt-name">Name</label>
@@ -646,7 +689,18 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
       <h5 className="mep-room-types-group">Needs and their calculations</h5>
       {shown.length === 0 && <p className="mep-guide-note">This room type has no needs yet. A rule for a need does not place stamps in its rooms.</p>}
       {shown.map((need) => (
-        <DemandEditor key={need.id} need={need} typeName={draft.name.trim() || type.name} draft={draft.demands[need.id]!} sample={sample} people={people} onChange={(next) => setDemand(need.id, next)} />
+        <DemandEditor
+          key={need.id}
+          need={need}
+          typeName={draft.name.trim() || type.name}
+          draft={draft.demands[need.id]!}
+          sample={sample}
+          people={people}
+          onChange={(next) => {
+            setDemand(need.id, next);
+            if (!next) setFocusAfter(ADD_NEED);
+          }}
+        />
       ))}
       {focusMissing && (
         <div className="mep-guide-callout" data-demand={focusMissing.id} data-testid="rt-missing-need">
@@ -654,7 +708,7 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
             {type.name} has no {focusMissing.name}. A rule for {focusMissing.name} places no stamps in its rooms.
           </span>
           <div className="mep-guide-inline">
-            <button type="button" onClick={() => setDemand(focusMissing.id, newDemandDraft(focusMissing))}>
+            <button type="button" onClick={() => addDemand(focusMissing)}>
               + Add {focusMissing.name}
             </button>
           </div>
@@ -669,7 +723,7 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
             value=""
             onChange={(e) => {
               const need = needs.find((n) => n.id === e.target.value);
-              if (need) setDemand(need.id, newDemandDraft(need));
+              if (need) addDemand(need);
             }}
           >
             <option value="">Choose…</option>

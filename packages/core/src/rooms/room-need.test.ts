@@ -42,6 +42,8 @@ describe('room needs', () => {
       { id: 'need-bad', name: 'Bad', kind: 'light', unit: 'lm' },
       { id: 'need-empty', name: 'Empty', kind: 'count', unit: '' },
       { id: '', name: 'No id', kind: 'count', unit: 'x' },
+      { id: 'constructor', name: 'Constructor', kind: 'count', unit: 'x' },
+      { id: 'toString', name: 'To string', kind: 'count', unit: 'x' },
       null,
     ];
     expect(parseRoomNeeds(raw)).toEqual([
