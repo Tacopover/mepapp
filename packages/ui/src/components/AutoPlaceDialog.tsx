@@ -13,6 +13,7 @@ import {
   type PlacementRule,
   type PlacementWorkerLike,
   type Room,
+  type RoomNeed,
   type RoomType,
   type StampDefinition,
 } from '@mepapp/core';
@@ -30,6 +31,8 @@ export interface AutoPlaceDialogProps {
   /** The user library of placement rules. */
   rules: PlacementRule[];
   roomTypes: RoomType[];
+  /** The own needs of the user library (room-type-calculations.md §3.1). */
+  roomNeeds: RoomNeed[];
   language: 'en' | 'nl';
   /** The name of a stamp definition, or null when the id is unknown. */
   stampName: (definitionId: string) => string | null;
@@ -57,7 +60,9 @@ export interface AutoPlaceDialogProps {
   uncheckedRuleIds: readonly string[];
   onChangeUncheckedRuleIds: (ids: string[]) => void;
   /** Saves the room-type library as a JSON file. */
-  onExportRoomTypes: (types: RoomType[]) => void;
+  onExportRoomTypes: (types: RoomType[], needs: RoomNeed[]) => void;
+  /** Saves the own needs of the user library. */
+  onChangeRoomNeeds: (needs: RoomNeed[]) => void;
   /** Detects the rooms of the shown page (the handler of Menu › Detect rooms). */
   onDetectRooms: () => void;
   /** True while the room detection runs. */
@@ -130,6 +135,7 @@ export function AutoPlaceDialog({
   sceneRef,
   rules,
   roomTypes,
+  roomNeeds,
   language,
   stampName,
   stampDefinition,
@@ -145,6 +151,7 @@ export function AutoPlaceDialog({
   uncheckedRuleIds,
   onChangeUncheckedRuleIds,
   onExportRoomTypes,
+  onChangeRoomNeeds,
   onDetectRooms,
   roomsDetecting,
   onPlaced,
@@ -177,6 +184,7 @@ export function AutoPlaceDialog({
   const calibration = useMemo(() => scene?.getCalibration(pageIndex) ?? null, [scene, pageIndex, version]);
   const heights = useMemo(() => scene?.getCeilingHeights() ?? null, [scene, version]);
   const types = useMemo(() => (scene ? scene.getRoomTypes() : roomTypes.map((t) => ({ ...t, inLibrary: true }))), [scene, roomTypes, version]);
+  const fileOnlyNeeds = useMemo(() => (scene ? scene.getRoomNeeds().filter((n) => !n.inLibrary).map(({ inLibrary: _inLibrary, ...need }) => need) : []), [scene, roomNeeds, version]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const [scope, setScope] = useState<Scope>(() => (selectedRooms.length > 0 ? 'selected' : 'page'));
   const scopeRooms = scope === 'selected' ? selectedRooms : pageRooms;
@@ -664,7 +672,10 @@ export function AutoPlaceDialog({
           language={language}
           library={roomTypes}
           fileOnlyTypes={fileOnlyTypes}
+          needs={roomNeeds}
+          fileOnlyNeeds={fileOnlyNeeds}
           onChangeLibrary={onChangeRoomTypes}
+          onChangeNeeds={onChangeRoomNeeds}
           onExportLibrary={onExportRoomTypes}
           onLibraryDirtyChange={(dirty) => {
             libraryDirty.current = dirty;

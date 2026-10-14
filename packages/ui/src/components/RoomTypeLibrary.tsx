@@ -1,58 +1,106 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  allNeeds,
+  copyRoomDemands,
+  demandTotal,
+  NEED_KIND_LABELS,
+  NEED_KIND_UNITS,
+  OWN_NEED_KINDS,
   parseDecimal,
+  parseRoomNeeds,
   parseRoomTypeKeywords,
   parseRoomTypes,
-  ROOM_DEMAND_FIELDS,
-  oldDemandValue,
+  roomPeople,
   ROOM_TYPE_DEMAND_EXAMPLES,
+  validateRoomNeed,
   validateRoomTypeFields,
-  withOldDemandValue,
-  type RoomDemandKey,
+  type NeedKind,
+  type Room,
   type RoomDemands,
+  type RoomNeed,
   type RoomType,
+  type RoomValues,
 } from '@mepapp/core';
+import {
+  calcKey,
+  calcLabel,
+  calcOfKey,
+  calcsOfKind,
+  DemandTextError,
+  demandDraftOf,
+  demandOfDraft,
+  demandShort,
+  demandSumText,
+  EVERY_OF,
+  everyBefore,
+  fmtNum,
+  fmtTotal,
+  newDemandDraft,
+  totalUnit,
+  type DemandDraft,
+} from './roomDemandText.js';
+
+/** A room of the page with the type: its values give the result lines of the details. */
+export interface RoomTypeSample {
+  label: string;
+  room: Room;
+  values: RoomValues;
+}
 
 export interface RoomTypeLibraryProps {
   /** The user library. */
   types: RoomType[];
   /** Types in the active drawing's file that the library lacks. */
   fileOnlyTypes: RoomType[];
+  /** The own needs of the user library. */
+  needs: RoomNeed[];
+  /** Own needs in the active drawing's file that the library lacks. */
+  fileOnlyNeeds?: RoomNeed[];
   onChange: (types: RoomType[]) => void;
-  /** Saves the list as a JSON file. */
-  onExport: (types: RoomType[]) => void;
-  /** Called when the form gets or loses changes that are not saved. */
+  onChangeNeeds: (needs: RoomNeed[]) => void;
+  /** Saves the list and the own needs it uses as a JSON file. */
+  onExport: (types: RoomType[], needs: RoomNeed[]) => void;
+  /** Called when the details get or lose changes that are not saved. */
   onDirtyChange?: (dirty: boolean) => void;
   /** The number of rooms of the shown page with a type; shown next to each type. */
   roomCountOf?: (typeId: string) => number;
+  /** A room of the page with the type, for the result lines. Null = none. */
+  sampleOf?: (typeId: string) => RoomTypeSample | null;
+  /** Opens the details of this room type at this need. A new object opens it again. */
+  focus?: { typeId: string; needId?: string } | null;
 }
 
-/** The draft key of a demand box. */
-const demandField = (key: RoomDemandKey) => `demand.${key}`;
-
-/** The demand boxes in groups, in the order of ROOM_DEMAND_FIELDS. */
-const DEMAND_GROUPS: readonly [string, readonly RoomDemandKey[]][] = [
-  ['Lighting', ['illuminanceLx', 'workingPlaneHeightM']],
-  ['Air', ['supplyPerPersonDm3s', 'supplyPerM2Dm3s', 'exhaustFixedDm3s', 'airChangesPerH']],
-  ['Heating and cooling', ['heatingLoadWm2', 'coolingLoadWm2']],
-  ['Sockets', ['socketsPerPerson', 'socketsFixed']],
-];
-
 const newTypeId = () => `room-type-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const newNeedId = () => `need-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/** The column of the area per person in the table. */
+const PERSONS = 'persons';
+
+type NeedPanel = { kind: 'new' } | { kind: 'edit'; needId: string } | { kind: 'delete'; needId: string };
+
+/** The own needs that the types use, from the library or the file. */
+function usedOwnNeeds(types: readonly RoomType[], own: readonly RoomNeed[]): RoomNeed[] {
+  const ids = new Set(types.flatMap((t) => Object.keys(t.demands ?? {})));
+  return own.filter((n) => ids.has(n.id));
+}
 
 /**
- * Edits the user library of room types (room-auto-placement.md Phase 1): the list with the form of
- * the selected type (name, Dutch name, the keywords that name matching uses, the floor area per
- * person and the demands that placement rules use, room-placement-followup.md Phase F), Import and
- * Export. The library is not part of a drawing. A type that only the drawing's file holds can be
- * added to the library. The Room types card of Auto-place hosts it.
+ * Edits the user library of room types (room-type-calculations.md §5.1, layout B): a table with one
+ * row for each room type and one column for each need, and below it the details of the room type
+ * that the user clicks (name, Dutch name, keywords, area per person, and the calculation of each
+ * need). The user adds own needs, renames and deletes them here. Import and Export. The library is
+ * not part of a drawing. A type that only the drawing's file holds can be added to the library.
+ * The Room types card of Auto-place hosts it.
  */
-export function RoomTypeLibrary({ types, fileOnlyTypes, onChange, onExport, onDirtyChange, roomCountOf }: RoomTypeLibraryProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(types[0]?.id ?? null);
+export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [], onChange, onChangeNeeds, onExport, onDirtyChange, roomCountOf, sampleOf, focus }: RoomTypeLibraryProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [focusNeed, setFocusNeed] = useState<{ id: string; at: number } | null>(null);
   const [dirty, setDirtyState] = useState(false);
-  const [demandsOpen, setDemandsOpen] = useState(false);
+  const [panel, setPanel] = useState<NeedPanel | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const columns = allNeeds(needs);
+  const known = allNeeds([...needs, ...fileOnlyNeeds.filter((n) => !needs.some((m) => m.id === n.id))]);
   const selected = types.find((t) => t.id === selectedId) ?? null;
   const busy = dirty ? 'Save or revert your changes first' : undefined;
   const setDirty = (next: boolean) => {
@@ -60,31 +108,86 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, onChange, onExport, onDi
     onDirtyChange?.(next);
   };
 
+  useEffect(() => {
+    if (!focus || dirty) return;
+    setSelectedId(focus.typeId);
+    setFocusNeed(focus.needId ? { id: focus.needId, at: Date.now() } : null);
+    // Only a new focus object opens the details again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus]);
+
+  const open = (typeId: string, needId?: string) => {
+    setSelectedId(typeId);
+    setFocusNeed(needId ? { id: needId, at: Date.now() } : null);
+    setMessage(null);
+  };
+
   const addType = () => {
     const created: RoomType = { id: newTypeId(), name: uniqueName('New room type', types), keywords: [] };
     onChange([...types, created]);
-    setSelectedId(created.id);
+    open(created.id);
   };
 
   const addToLibrary = (type: RoomType) => {
     onChange([...types, { ...type, name: uniqueName(type.name, types) }]);
-    setSelectedId(type.id);
+    const missing = usedOwnNeeds([type], fileOnlyNeeds).filter((n) => !needs.some((m) => m.id === n.id));
+    if (missing.length > 0) onChangeNeeds([...needs, ...missing]);
+    open(type.id);
+  };
+
+  /** Fills the empty values of each type that has example values. */
+  const fillAll = () => {
+    const filled: string[] = [];
+    const next = types.map((type) => {
+      const example = ROOM_TYPE_DEMAND_EXAMPLES[type.id];
+      if (!example) return type;
+      const result: RoomType = { ...type };
+      let changed = false;
+      if (example.areaPerPersonM2 !== undefined && type.areaPerPersonM2 === undefined) {
+        result.areaPerPersonM2 = example.areaPerPersonM2;
+        changed = true;
+      }
+      const demands: RoomDemands = copyRoomDemands(type.demands ?? {});
+      for (const [needId, demand] of Object.entries(copyRoomDemands(example.demands))) {
+        if (demands[needId]) continue;
+        demands[needId] = demand;
+        changed = true;
+      }
+      if (!changed) return type;
+      result.demands = demands;
+      filled.push(type.name);
+      return result;
+    });
+    if (filled.length > 0) onChange(next);
+    setMessage(
+      filled.length > 0
+        ? `MepApp filled in the empty values of ${plural(filled.length, 'room type')}: ${filled.join(', ')}. Check them against the rules of your project.`
+        : 'Each room type with example values has them already.',
+    );
   };
 
   const importFile = async (file: File) => {
     try {
-      const imported = parseRoomTypes(JSON.parse(await file.text()));
+      const raw: unknown = JSON.parse(await file.text());
+      const record = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+      const imported = parseRoomTypes(record ? record.roomTypes : raw);
       if (!imported) {
         setMessage(`${file.name} does not hold a list of room types.`);
         return;
       }
+      const importedNeeds = record ? (parseRoomNeeds(record.roomNeeds) ?? []) : [];
       const importedIds = new Set(imported.map((t) => t.id));
       onChange([...types.map((t) => imported.find((i) => i.id === t.id) ?? t), ...imported.filter((i) => !types.some((t) => t.id === i.id))]);
-      setMessage(`Imported ${imported.length} room type${imported.length === 1 ? '' : 's'} (${types.filter((t) => importedIds.has(t.id)).length} replaced).`);
+      if (importedNeeds.length > 0) onChangeNeeds([...needs.map((n) => importedNeeds.find((i) => i.id === n.id) ?? n), ...importedNeeds.filter((i) => !needs.some((n) => n.id === i.id))]);
+      setMessage(
+        `Imported ${plural(imported.length, 'room type')} (${types.filter((t) => importedIds.has(t.id)).length} replaced)${importedNeeds.length > 0 ? ` and ${plural(importedNeeds.length, 'own need')}` : ''}.`,
+      );
     } catch {
       setMessage(`Could not read ${file.name}.`);
     }
   };
+
+  const panelNeed = panel && panel.kind !== 'new' ? needs.find((n) => n.id === panel.needId) : undefined;
 
   return (
     <>
@@ -99,149 +202,390 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, onChange, onExport, onDi
           if (file) void importFile(file);
         }}
       />
-      <div className="mep-circuit-types">
-        <div className="mep-circuit-types-list" role="listbox" aria-label="Room types">
-          {types.map((type) => (
-            <button
-              key={type.id}
-              type="button"
-              role="option"
-              aria-selected={type.id === selected?.id}
-              className={`mep-circuit-types-item${type.id === selected?.id ? ' on' : ''}`}
-              disabled={dirty && type.id !== selected?.id}
-              title={dirty && type.id !== selected?.id ? busy : roomCountOf ? 'Rooms of this type on this page' : 'Keywords'}
-              onClick={() => setSelectedId(type.id)}
-            >
-              <span>{type.name}</span>
-              <span className="mep-circuit-types-abbr">{roomCountOf ? roomCountOf(type.id) : type.keywords.length}</span>
-            </button>
-          ))}
-          <button type="button" className="mep-circuit-types-new" disabled={dirty} title={busy} onClick={addType}>
-            + New room type
-          </button>
-          {fileOnlyTypes.length > 0 && (
-            <>
-              <div className="mep-room-types-heading">Only in this drawing</div>
-              {fileOnlyTypes.map((type) => (
-                <button key={type.id} type="button" className="mep-circuit-types-item" disabled={dirty} title={busy ?? 'Add this room type to your library'} onClick={() => addToLibrary(type)}>
-                  <span>{type.name}</span>
-                  <span className="mep-circuit-types-abbr">+ add</span>
-                </button>
+      <div className="mep-guide-inline mep-rt-tools">
+        <button type="button" disabled={dirty} title={busy ?? 'Fill the empty values of the built-in room types with example values'} onClick={fillAll} data-testid="rt-fill-all">
+          Fill in the example values
+        </button>
+        <button type="button" disabled={dirty} title={busy} onClick={() => setPanel({ kind: 'new' })} data-testid="rt-new-need">
+          + New need…
+        </button>
+      </div>
+      {panel?.kind === 'new' && (
+        <NeedForm
+          others={needs}
+          onCancel={() => setPanel(null)}
+          onSave={(need) => {
+            onChangeNeeds([...needs, need]);
+            setPanel(null);
+            setMessage(`MepApp added the need ${need.name}. Click a cell in its column to add it to a room type.`);
+          }}
+        />
+      )}
+      {panel?.kind === 'edit' && panelNeed && (
+        <NeedForm
+          key={panelNeed.id}
+          need={panelNeed}
+          others={needs.filter((n) => n.id !== panelNeed.id)}
+          onCancel={() => setPanel(null)}
+          onSave={(need) => {
+            onChangeNeeds(needs.map((n) => (n.id === need.id ? need : n)));
+            setPanel(null);
+          }}
+          onDelete={() => setPanel({ kind: 'delete', needId: panelNeed.id })}
+        />
+      )}
+      {panel?.kind === 'delete' && panelNeed && (
+        <DeleteNeed
+          need={panelNeed}
+          users={types.filter((t) => t.demands?.[panelNeed.id])}
+          onCancel={() => setPanel(null)}
+          onDelete={() => {
+            onChange(
+              types.map((t) => {
+                if (!t.demands?.[panelNeed.id]) return t;
+                const { [panelNeed.id]: _gone, ...rest } = t.demands;
+                const { demands: _old, ...type } = t;
+                return Object.keys(rest).length > 0 ? { ...type, demands: rest } : type;
+              }),
+            );
+            onChangeNeeds(needs.filter((n) => n.id !== panelNeed.id));
+            setPanel(null);
+            setMessage(`MepApp deleted the need ${panelNeed.name}.`);
+          }}
+        />
+      )}
+      <div className="mep-rt-scroll">
+        <table className="mep-rt-table" aria-label="Room types and their needs" data-testid="rt-table">
+          <thead>
+            <tr>
+              <th scope="col" className="mep-rt-name">
+                Room type<span>{roomCountOf ? 'rooms on this page' : 'keywords'}</span>
+              </th>
+              <th scope="col">
+                Persons<span>m² per person</span>
+              </th>
+              {columns.map((need) => (
+                <th scope="col" key={need.id} data-need={need.id}>
+                  {need.own ? (
+                    <button type="button" className="mep-guide-link" disabled={dirty} title={busy ?? 'Rename or delete this need'} onClick={() => setPanel({ kind: 'edit', needId: need.id })}>
+                      {need.name}
+                    </button>
+                  ) : (
+                    need.name
+                  )}
+                  <span>{need.unit}</span>
+                </th>
               ))}
-            </>
-          )}
-        </div>
-        {selected ? (
-          <RoomTypeForm
-            key={JSON.stringify(selected)}
-            type={selected}
-            others={types.filter((t) => t.id !== selected.id)}
-            demandsOpen={demandsOpen}
-            onDemandsOpenChange={setDemandsOpen}
-            onDirtyChange={setDirty}
-            onSave={(next) => onChange(types.map((t) => (t.id === next.id ? next : t)))}
-            onDelete={() => {
-              onChange(types.filter((t) => t.id !== selected.id));
-              setSelectedId(null);
-            }}
-          />
-        ) : (
-          <div className="mep-circuit-types-form">
-            <p className="mep-settings-hint">Select a room type, or add a new one.</p>
-          </div>
+            </tr>
+          </thead>
+          <tbody>
+            {types.map((type) => {
+              const locked = dirty && type.id !== selected?.id;
+              const cell = (needId: string, label: string, text: string | null) => (
+                <td key={needId}>
+                  <button
+                    type="button"
+                    className={`mep-rt-cell${text === null ? ' none' : ''}`}
+                    data-type={type.id}
+                    data-need={needId}
+                    aria-label={`${type.name}, ${label}: ${text ?? 'none'}`}
+                    aria-pressed={type.id === selected?.id && focusNeed?.id === needId}
+                    disabled={locked}
+                    title={locked ? busy : undefined}
+                    onClick={() => open(type.id, needId)}
+                  >
+                    {text ?? '–'}
+                  </button>
+                </td>
+              );
+              return (
+                <tr key={type.id} className={type.id === selected?.id ? 'on' : ''} data-type={type.id}>
+                  <th scope="row" className="mep-rt-name">
+                    <button type="button" disabled={locked} title={locked ? busy : undefined} onClick={() => open(type.id)}>
+                      <span>{type.name}</span>
+                      <span className="mep-circuit-types-abbr">{roomCountOf ? roomCountOf(type.id) : type.keywords.length}</span>
+                    </button>
+                  </th>
+                  {cell(PERSONS, 'persons', type.areaPerPersonM2 !== undefined ? `${fmtNum(type.areaPerPersonM2)} m²/p` : null)}
+                  {columns.map((need) => {
+                    const demand = type.demands?.[need.id];
+                    return cell(need.id, need.name, demand ? demandShort(demand) : null);
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mep-guide-inline mep-rt-under">
+        <button type="button" className="mep-circuit-types-new" disabled={dirty} title={busy} onClick={addType}>
+          + New room type
+        </button>
+        {fileOnlyTypes.length > 0 && (
+          <>
+            <span className="mep-room-types-heading">Only in this drawing:</span>
+            {fileOnlyTypes.map((type) => (
+              <button key={type.id} type="button" className="mep-circuit-types-item" disabled={dirty} title={busy ?? 'Add this room type to your library'} onClick={() => addToLibrary(type)}>
+                <span>{type.name}</span>
+                <span className="mep-circuit-types-abbr">+ add</span>
+              </button>
+            ))}
+          </>
         )}
       </div>
+      {message && (
+        <p className="mep-settings-hint" role="status" data-testid="rt-message">
+          {message}
+        </p>
+      )}
+      {selected ? (
+        <RoomTypeForm
+          key={JSON.stringify(selected)}
+          type={selected}
+          others={types.filter((t) => t.id !== selected.id)}
+          needs={known}
+          focusNeed={focusNeed}
+          sample={sampleOf?.(selected.id) ?? null}
+          onDirtyChange={setDirty}
+          onSave={(next) => onChange(types.map((t) => (t.id === next.id ? next : t)))}
+          onDelete={() => {
+            onChange(types.filter((t) => t.id !== selected.id));
+            setSelectedId(null);
+          }}
+        />
+      ) : (
+        <p className="mep-guide-note">Click a room type or a cell to see the details below the table.</p>
+      )}
       <div className="mep-circuit-types-actions">
         <button type="button" disabled={dirty} title={busy} onClick={() => fileInput.current?.click()}>
           Import…
         </button>
-        <button type="button" disabled={dirty} title={busy} onClick={() => onExport(types)}>
+        <button type="button" disabled={dirty} title={busy} onClick={() => onExport(types, usedOwnNeeds(types, needs))}>
           Export…
         </button>
       </div>
-      {message && (
-        <p className="mep-settings-hint" role="status">
-          {message}
-        </p>
-      )}
     </>
   );
 }
 
-function uniqueName(base: string, types: readonly RoomType[]): string {
+function uniqueName(base: string, types: readonly { name: string }[]): string {
   const taken = new Set(types.map((t) => t.name.trim().toLowerCase()));
   if (!taken.has(base.toLowerCase())) return base;
   for (let n = 2; ; n++) if (!taken.has(`${base} ${n}`.toLowerCase())) return `${base} ${n}`;
 }
 
+const KIND_UNIT_HINT: Record<NeedKind, string> = {
+  light: '',
+  flow: 'The room types use dm³/s. A rule can count in dm³/s, l/s or m³/h.',
+  power: 'The room types use W. A rule can count in W or kW.',
+  count: 'A room type can also say "1 per N m²".',
+  amount: 'A room type can also say "1 per N m²".',
+};
+
+/** The form of a new own need, or of an own need to rename. Kind is fixed after the need exists. */
+function NeedForm({ need, others, onSave, onCancel, onDelete }: { need?: RoomNeed; others: RoomNeed[]; onSave: (need: RoomNeed) => void; onCancel: () => void; onDelete?: () => void }) {
+  const [name, setName] = useState(need?.name ?? '');
+  const [kind, setKind] = useState<NeedKind>(need?.kind ?? 'count');
+  const [unit, setUnit] = useState(need && NEED_KIND_UNITS[need.kind] === null ? need.unit : '');
+  const [unitOne, setUnitOne] = useState(need?.unitOne ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const fixedUnit = NEED_KIND_UNITS[kind];
+  const save = () => {
+    const next: RoomNeed = { id: need?.id ?? newNeedId(), name: name.trim(), kind, unit: fixedUnit ?? unit.trim(), own: true };
+    if (kind === 'count' && unitOne.trim()) next.unitOne = unitOne.trim();
+    const problem = validateRoomNeed(next, others);
+    if (problem) setError(problem);
+    else onSave(next);
+  };
+  return (
+    <div className="mep-guide-formula mep-rt-need-form" data-testid="rt-need-form">
+      <div className="mep-guide-term">
+        <b>{need ? `Need: ${need.name}` : 'New need'}</b>
+      </div>
+      <div className="mep-guide-term">
+        <label className="mep-guide-label" htmlFor="rt-need-name">
+          Name
+        </label>
+        <input id="rt-need-name" className="mep-guide-num wide" type="text" placeholder="for example Data outlets" value={name} onChange={(e) => (setName(e.target.value), setError(null))} />
+      </div>
+      <div className="mep-guide-term">
+        <label className="mep-guide-label" htmlFor="rt-need-kind">
+          It is
+        </label>
+        <select id="rt-need-kind" className="mep-guide-unit" value={kind} disabled={need !== undefined} title={need ? 'A need keeps its kind. Make a new need for another kind.' : undefined} onChange={(e) => (setKind(e.target.value as NeedKind), setError(null))}>
+          {OWN_NEED_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {NEED_KIND_LABELS[k].toLowerCase()}
+              {NEED_KIND_UNITS[k] ? ` (${NEED_KIND_UNITS[k]})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+      {fixedUnit === null && (
+        <div className="mep-guide-term">
+          <label className="mep-guide-label" htmlFor="rt-need-unit">
+            Unit
+          </label>
+          <input id="rt-need-unit" className="mep-guide-num wide" type="text" placeholder={kind === 'count' ? 'for example outlets' : 'for example kg'} value={unit} onChange={(e) => (setUnit(e.target.value), setError(null))} />
+        </div>
+      )}
+      {kind === 'count' && (
+        <div className="mep-guide-term">
+          <label className="mep-guide-label" htmlFor="rt-need-one">
+            The word for one
+          </label>
+          <input id="rt-need-one" className="mep-guide-num wide" type="text" placeholder={unit.trim() || 'for example outlet'} value={unitOne} onChange={(e) => setUnitOne(e.target.value)} />
+          <span className="mep-guide-note">For "1 outlet per 10 m²". Empty = the unit.</span>
+        </div>
+      )}
+      <div className="mep-guide-term">
+        <span className="mep-guide-note">{KIND_UNIT_HINT[kind]} Each room type then chooses its calculation for the need.</span>
+      </div>
+      {error && (
+        <div className="mep-guide-term mep-circuit-types-error" role="alert">
+          {error}
+        </div>
+      )}
+      <div className="mep-guide-term mep-guide-inline">
+        <button type="button" className="primary" onClick={save} data-testid="rt-need-save">
+          {need ? 'Save' : 'Add the need'}
+        </button>
+        <button type="button" onClick={onCancel}>
+          Cancel
+        </button>
+        {onDelete && (
+          <button type="button" onClick={onDelete} data-testid="rt-need-delete">
+            Delete…
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Asks in the page before an own need goes (no window.confirm in the ui package). */
+function DeleteNeed({ need, users, onDelete, onCancel }: { need: RoomNeed; users: RoomType[]; onDelete: () => void; onCancel: () => void }) {
+  return (
+    <div className="mep-guide-callout bad" role="alert" data-testid="rt-delete-need">
+      <b>Delete the need {need.name}?</b>
+      <span>
+        {users.length > 0 ? `${plural(users.length, 'room type')} lose${users.length === 1 ? 's' : ''} its numbers: ${users.map((t) => t.name).join(', ')}.` : 'No room type has numbers for it.'} A rule that serves it places no stamps until it gets another
+        need. You cannot undo this.
+      </span>
+      <div className="mep-guide-inline">
+        <button type="button" onClick={onDelete} data-testid="rt-delete-need-yes">
+          Delete
+        </button>
+        <button type="button" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface RoomTypeFormProps {
   type: RoomType;
   others: RoomType[];
-  /** The demands section is open; the parent keeps it, because a save mounts the form again. */
-  demandsOpen: boolean;
-  onDemandsOpenChange: (open: boolean) => void;
+  /** The needs that the demands can use: built-in, own, and own needs of the drawing's file. */
+  needs: RoomNeed[];
+  /** The need to show: the details scroll to it. */
+  focusNeed: { id: string; at: number } | null;
+  sample: RoomTypeSample | null;
   onDirtyChange: (dirty: boolean) => void;
   onSave: (type: RoomType) => void;
   onDelete: () => void;
 }
 
-/** The fields of one room type. Local draft with explicit Save and Revert. Its parent gives it a `key` built from the saved values, so it re-seeds after a save. */
-function RoomTypeForm({ type, others, demandsOpen, onDemandsOpenChange, onDirtyChange, onSave, onDelete }: RoomTypeFormProps) {
-  const initial = {
-    name: type.name,
-    nameNl: type.nameNl ?? '',
-    keywords: type.keywords.join(', '),
-    areaPerPerson: type.areaPerPersonM2 !== undefined ? String(type.areaPerPersonM2) : '',
-    ...Object.fromEntries(ROOM_DEMAND_FIELDS.map((f) => [demandField(f.key), String(oldDemandValue(type.demands, f.key) ?? '')])),
-  };
+interface TypeDraft {
+  name: string;
+  nameNl: string;
+  keywords: string;
+  areaPerPerson: string;
+  demands: Record<string, DemandDraft>;
+}
+
+function draftOfType(type: RoomType, needs: readonly RoomNeed[]): TypeDraft {
+  const demands: Record<string, DemandDraft> = {};
+  for (const need of needs) {
+    const demand = type.demands?.[need.id];
+    if (demand) demands[need.id] = demandDraftOf(demand);
+  }
+  return { name: type.name, nameNl: type.nameNl ?? '', keywords: type.keywords.join(', '), areaPerPerson: type.areaPerPersonM2 !== undefined ? String(type.areaPerPersonM2) : '', demands };
+}
+
+/** The details of one room type. Local draft with explicit Save and Revert. Its parent gives it a `key` built from the saved values, so it re-seeds after a save. */
+function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, onSave, onDelete }: RoomTypeFormProps) {
+  const initial = draftOfType(type, needs);
   const example = ROOM_TYPE_DEMAND_EXAMPLES[type.id];
-  const [draft, setDraft] = useState(initial);
+  const [draft, setDraftState] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const root = useRef<HTMLElement | null>(null);
 
-  const set = (field: string) => (value: string) => {
-    setDraft((d) => ({ ...d, [field]: value }));
+  useEffect(() => {
+    if (!focusNeed) {
+      root.current?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    const target = root.current?.querySelector<HTMLElement>(`[data-demand="${focusNeed.id}"]`);
+    target?.scrollIntoView({ block: 'nearest' });
+    (target?.querySelector<HTMLElement>('select, input') ?? target?.querySelector<HTMLElement>('button'))?.focus({ preventScroll: true });
+  }, [focusNeed]);
+
+  const setDraft = (next: (d: TypeDraft) => TypeDraft) => {
+    setDraftState((d) => {
+      const result = next(d);
+      onDirtyChange(JSON.stringify(result) !== JSON.stringify(initial));
+      return result;
+    });
     setError(null);
-    onDirtyChange(true);
   };
+  const setField = (field: 'name' | 'nameNl' | 'keywords' | 'areaPerPerson') => (value: string) => setDraft((d) => ({ ...d, [field]: value }));
+  const setDemand = (needId: string, next: DemandDraft | null) =>
+    setDraft((d) => {
+      const demands = { ...d.demands };
+      if (next) demands[needId] = next;
+      else delete demands[needId];
+      return { ...d, demands };
+    });
 
   const revert = () => {
-    setDraft(initial);
+    setDraftState(initial);
     setError(null);
     onDirtyChange(false);
   };
 
-  /** Fills the empty boxes with the example values of the type. */
+  /** Fills the empty values with the example values of the type. */
   const fillExample = () => {
     if (!example) return;
     setDraft((d) => {
-      const next: Record<string, string> = { ...d };
-      if (example.areaPerPersonM2 !== undefined && !next.areaPerPerson!.trim()) next.areaPerPerson = String(example.areaPerPersonM2);
-      for (const f of ROOM_DEMAND_FIELDS) {
-        const value = oldDemandValue(example.demands, f.key);
-        if (value !== undefined && !next[demandField(f.key)]!.trim()) next[demandField(f.key)] = String(value);
-      }
-      return next as typeof d;
+      const demands = { ...d.demands };
+      for (const [needId, demand] of Object.entries(example.demands)) if (!demands[needId]) demands[needId] = demandDraftOf(demand);
+      return { ...d, areaPerPerson: d.areaPerPerson.trim() || (example.areaPerPersonM2 !== undefined ? String(example.areaPerPersonM2) : ''), demands };
     });
-    setError(null);
-    onDirtyChange(true);
   };
 
   const save = () => {
-    const numberOf = (text: string) => (text.trim() === '' ? undefined : (parseDecimal(text.trim()) ?? Number.NaN));
-    const area = numberOf(draft.areaPerPerson);
+    const area = draft.areaPerPerson.trim() === '' ? undefined : (parseDecimal(draft.areaPerPerson.trim()) ?? Number.NaN);
     const next: RoomType = { id: type.id, name: draft.name.trim(), keywords: parseRoomTypeKeywords(draft.keywords) };
     if (draft.nameNl.trim()) next.nameNl = draft.nameNl.trim();
     if (area !== undefined) next.areaPerPersonM2 = area;
-    // Only the changed boxes write their term, so the parts of a demand that this form does not show stay.
-    let demands: RoomDemands | undefined = type.demands;
-    for (const f of ROOM_DEMAND_FIELDS) {
-      const field = demandField(f.key);
-      const text = (draft as Record<string, string>)[field]!;
-      if (text !== (initial as Record<string, string>)[field]) demands = withOldDemandValue(demands, f.key, numberOf(text) ?? null);
+    const demands: RoomDemands = {};
+    try {
+      for (const need of needs) {
+        const d = draft.demands[need.id];
+        if (d) demands[need.id] = demandOfDraft(need, d);
+      }
+    } catch (e) {
+      if (e instanceof DemandTextError) {
+        setError(e.message);
+        return;
+      }
+      throw e;
     }
-    if (demands && Object.keys(demands).length > 0) next.demands = demands;
-    const problem = validateRoomTypeFields(next, others);
+    if (Object.keys(demands).length > 0) next.demands = demands;
+    const problem = validateRoomTypeFields(next, others, needs);
     if (problem) {
       setError(problem);
       return;
@@ -250,61 +594,101 @@ function RoomTypeForm({ type, others, demandsOpen, onDemandsOpenChange, onDirtyC
     onSave(next);
   };
 
+  const app = draft.areaPerPerson.trim() === '' ? undefined : (parseDecimal(draft.areaPerPerson.trim()) ?? undefined);
+  const people = sample ? roomPeople(sample.room, sample.values.areaM2, app !== undefined && app > 0 ? { areaPerPersonM2: app } : undefined) : null;
+  const personsLine = !sample
+    ? null
+    : people === null
+      ? `${sample.label}: no area per person, so no persons.`
+      : people.source === 'room'
+        ? `${sample.label}: the room has its own number, ${plural(people.count, 'person')}.`
+        : `${sample.label}: ${fmtNum(sample.values.areaM2 ?? 0, 1)} m² ÷ ${fmtNum(app!)} = ${plural(people.count, 'person')}, rounded down`;
+  const shown = needs.filter((n) => draft.demands[n.id]);
+  const lacking = needs.filter((n) => !draft.demands[n.id]);
+  const focusMissing = focusNeed && !draft.demands[focusNeed.id] ? needs.find((n) => n.id === focusNeed.id) : undefined;
+
   return (
-    <div className="mep-circuit-types-form">
+    <section className="mep-circuit-types-form mep-rt-details" ref={root} aria-label={`Details of ${type.name}`} data-testid="rt-details" data-type={type.id}>
+      <h3>{type.name}</h3>
       <div className="mep-field-row">
         <label htmlFor="rt-name">Name</label>
-        <input id="rt-name" type="text" value={draft.name} onChange={(e) => set('name')(e.target.value)} />
+        <input id="rt-name" type="text" value={draft.name} onChange={(e) => setField('name')(e.target.value)} />
       </div>
       <div className="mep-field-row">
         <label htmlFor="rt-name-nl">Dutch name</label>
-        <input id="rt-name-nl" type="text" value={draft.nameNl} onChange={(e) => set('nameNl')(e.target.value)} />
+        <input id="rt-name-nl" type="text" value={draft.nameNl} onChange={(e) => setField('nameNl')(e.target.value)} />
       </div>
       <div className="mep-field-row">
         <label htmlFor="rt-keywords">Keywords</label>
-        <textarea id="rt-keywords" className="mep-room-types-keywords" rows={4} value={draft.keywords} onChange={(e) => set('keywords')(e.target.value)} />
+        <textarea id="rt-keywords" className="mep-room-types-keywords" rows={3} value={draft.keywords} onChange={(e) => setField('keywords')(e.target.value)} />
       </div>
       <p className="mep-settings-hint">Separate keywords with commas. A keyword matches a word of the room name that starts or ends with it (“toilet” matches “toiletruimte”). A keyword of 3 letters or less must be the whole word.</p>
-      <details className="mep-room-types-demands" open={demandsOpen} onToggle={(e) => onDemandsOpenChange(e.currentTarget.open)} data-testid="rt-demands">
-        <summary>Demands for rules (area per person, illuminance, airflow, …)</summary>
-        <p className="mep-settings-hint">Placement rules can use these numbers, so one rule serves all room types. An empty box means: not known.</p>
-        <h5 className="mep-room-types-group">Persons</h5>
-        <div className="mep-field-row">
-          <label htmlFor="rt-area">Area per person (m²)</label>
-          <input id="rt-area" type="text" inputMode="decimal" placeholder="none" value={draft.areaPerPerson} onChange={(e) => set('areaPerPerson')(e.target.value)} />
+      <h5 className="mep-room-types-group">Persons</h5>
+      <div className="mep-guide-formula" data-demand={PERSONS}>
+        <div className="mep-guide-term">
+          <label htmlFor="rt-area">Area per person</label>
+          <input id="rt-area" type="text" inputMode="decimal" placeholder="none" value={draft.areaPerPerson} onChange={(e) => setField('areaPerPerson')(e.target.value)} />
+          <span>m²</span>
         </div>
-        {DEMAND_GROUPS.map(([group, keys]) => (
-          <div key={group}>
-            <h5 className="mep-room-types-group">{group}</h5>
-            {keys.map((key) => {
-              const f = ROOM_DEMAND_FIELDS.find((x) => x.key === key)!;
-              return (
-                <div className="mep-field-row" key={f.key}>
-                  <label htmlFor={`rt-${f.key}`}>
-                    {f.label} ({f.unit})
-                  </label>
-                  <input id={`rt-${f.key}`} type="text" inputMode="decimal" placeholder="none" value={(draft as Record<string, string>)[demandField(f.key)]} onChange={(e) => set(demandField(f.key))(e.target.value)} />
-                </div>
-              );
-            })}
+        {personsLine && (
+          <div className="mep-guide-term result" data-testid="rt-persons-sample">
+            {personsLine}
           </div>
-        ))}
-        {example && (
-          <p className="mep-settings-hint">
-            <button type="button" onClick={fillExample} data-testid="rt-fill-example">
-              Fill in the example values
-            </button>{' '}
-            Only the empty boxes. Dutch new build (Bbl, NEN-EN 12464-1, practice): check the values against the rules of your project.
-          </p>
         )}
-      </details>
+      </div>
+      <h5 className="mep-room-types-group">Needs and their calculations</h5>
+      {shown.length === 0 && <p className="mep-guide-note">This room type has no needs yet. A rule for a need does not place stamps in its rooms.</p>}
+      {shown.map((need) => (
+        <DemandEditor key={need.id} need={need} typeName={draft.name.trim() || type.name} draft={draft.demands[need.id]!} sample={sample} people={people} onChange={(next) => setDemand(need.id, next)} />
+      ))}
+      {focusMissing && (
+        <div className="mep-guide-callout" data-demand={focusMissing.id} data-testid="rt-missing-need">
+          <span>
+            {type.name} has no {focusMissing.name}. A rule for {focusMissing.name} places no stamps in its rooms.
+          </span>
+          <div className="mep-guide-inline">
+            <button type="button" onClick={() => setDemand(focusMissing.id, newDemandDraft(focusMissing))}>
+              + Add {focusMissing.name}
+            </button>
+          </div>
+        </div>
+      )}
+      {lacking.length > 0 && (
+        <div className="mep-guide-inline mep-rt-add-need">
+          <label htmlFor="rt-add-need">Add a need</label>
+          <select
+            id="rt-add-need"
+            className="mep-guide-unit"
+            value=""
+            onChange={(e) => {
+              const need = needs.find((n) => n.id === e.target.value);
+              if (need) setDemand(need.id, newDemandDraft(need));
+            }}
+          >
+            <option value="">Choose…</option>
+            {lacking.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {example && (
+        <p className="mep-settings-hint">
+          <button type="button" onClick={fillExample} data-testid="rt-fill-example">
+            Fill in the example values
+          </button>{' '}
+          Only the empty values. Dutch new build (Bbl, NEN-EN 12464-1, practice): check the values against the rules of your project.
+        </p>
+      )}
       {error && (
         <div className="mep-circuit-types-error" role="alert">
           {error}
         </div>
       )}
       <div className="mep-circuit-types-actions">
-        <button type="button" onClick={save} disabled={!dirty}>
+        <button type="button" className="primary" onClick={save} disabled={!dirty}>
           Save
         </button>
         <button type="button" onClick={revert} disabled={!dirty}>
@@ -313,6 +697,127 @@ function RoomTypeForm({ type, others, demandsOpen, onDemandsOpenChange, onDirtyC
         <button type="button" onClick={onDelete} disabled={dirty} title="Delete this room type from your library. Rooms that use it keep it as a copy in the drawing.">
           Delete
         </button>
+      </div>
+    </section>
+  );
+}
+
+interface DemandEditorProps {
+  need: RoomNeed;
+  typeName: string;
+  draft: DemandDraft;
+  sample: RoomTypeSample | null;
+  people: ReturnType<typeof roomPeople>;
+  onChange: (draft: DemandDraft | null) => void;
+}
+
+/** The calculation and the numbers of one need, and the result in the sample room. */
+function DemandEditor({ need, typeName, draft, sample, people, onChange }: DemandEditorProps) {
+  const id = `rt-${need.id}`;
+  const setTerm = (i: number, patch: Partial<DemandDraft['terms'][number]>) => onChange({ ...draft, terms: draft.terms.map((t, k) => (k === i ? { ...t, ...patch } : t)) });
+  const calcs = calcsOfKind(need.kind);
+  let line: string;
+  try {
+    const demand = demandOfDraft(need, draft);
+    if (!sample) line = 'No room of this type on this page.';
+    else if (demand.terms.some((t) => (t.every === undefined ? t.value === undefined : !(t.every > 0)))) line = 'Enter the numbers to see the result in a room.';
+    else {
+      const result = demandTotal(need, demand, { ...sample.values, people });
+      line =
+        result.total === null
+          ? `${sample.label}: ${result.problems.includes('noPeople') ? 'no persons. Enter the area per person above.' : result.problems.includes('noCalibration') ? 'the page has no scale.' : 'a calculation does not work with this need.'}`
+          : `${sample.label}: ${demandSumText(need, result)}${result.minimumApplied ? ' → at least the minimum' : ''} = ${fmtTotal(result.total)} ${totalUnit(need)}`;
+    }
+  } catch (e) {
+    if (!(e instanceof DemandTextError)) throw e;
+    line = e.message;
+  }
+  return (
+    <div className="mep-guide-formula mep-rt-demand" data-demand={need.id}>
+      <div className="mep-guide-term mep-rt-demand-head">
+        <b>{need.name}</b>
+        <span className="mep-guide-note">{need.unit}</span>
+        {need.own && <span className="mep-rt-tag">your need</span>}
+        <button type="button" className="mep-guide-link mep-rt-remove" onClick={() => onChange(null)} data-testid={`${id}-remove`}>
+          Remove {need.name}
+        </button>
+      </div>
+      {need.kind === 'light' ? (
+        <div className="mep-guide-term">
+          <span>E</span>
+          <input id={`${id}-v-0`} type="text" inputMode="decimal" placeholder="?" aria-label={`Illuminance of ${typeName}`} value={draft.terms[0]?.text ?? ''} onChange={(e) => setTerm(0, { text: e.target.value })} />
+          <span>lx on a working plane at</span>
+          <input id={`${id}-wp`} type="text" inputMode="decimal" placeholder="0.75" aria-label={`Working-plane height of ${typeName}`} value={draft.workingPlane} onChange={(e) => onChange({ ...draft, workingPlane: e.target.value })} />
+          <span>m above the floor</span>
+        </div>
+      ) : (
+        draft.terms.map((term, i) => {
+          const calc = calcOfKey(term.key);
+          const box = (
+            <input id={`${id}-v-${i}`} type="text" inputMode="decimal" placeholder="?" aria-label={`${need.name} of ${typeName}, ${calcLabel(calc)}`} value={term.text} onChange={(e) => setTerm(i, { text: e.target.value })} />
+          );
+          return (
+            <div className="mep-guide-term" key={i}>
+              {i > 0 && <span className="mep-guide-op">+</span>}
+              <select className="mep-guide-unit" id={`${id}-calc-${i}`} aria-label={`Calculation ${i + 1} of ${need.name}`} value={term.key} onChange={(e) => setTerm(i, { key: e.target.value })}>
+                {calcs.map((c) => (
+                  <option key={calcKey(c)} value={calcKey(c)}>
+                    {calcLabel(c)}
+                  </option>
+                ))}
+              </select>
+              {calc.every ? (
+                <>
+                  <span>{everyBefore(need)}</span>
+                  {box}
+                  <span>{EVERY_OF[calc.basis]}</span>
+                </>
+              ) : calc.basis === 'volume' ? (
+                <>
+                  {box}
+                  <span>× room volume, per hour</span>
+                </>
+              ) : (
+                <>
+                  {box}
+                  <span>
+                    {need.unit} {calcLabel(calc)}
+                  </span>
+                </>
+              )}
+              {draft.terms.length > 1 && (
+                <button type="button" className="mep-guide-link" aria-label={`Remove term ${i + 1} of ${need.name}`} onClick={() => onChange({ ...draft, terms: draft.terms.filter((_, k) => k !== i) })}>
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })
+      )}
+      {need.kind !== 'light' && draft.minimum !== null && (
+        <div className="mep-guide-term">
+          <span>At least</span>
+          <input id={`${id}-min`} type="text" inputMode="decimal" placeholder="?" aria-label={`Minimum ${need.name} of ${typeName}`} value={draft.minimum} onChange={(e) => onChange({ ...draft, minimum: e.target.value })} />
+          <span>{need.unit} per room</span>
+          <button type="button" className="mep-guide-link" aria-label={`Remove the minimum of ${need.name}`} onClick={() => onChange({ ...draft, minimum: null })}>
+            ×
+          </button>
+        </div>
+      )}
+      {need.kind !== 'light' && (
+        <div className="mep-guide-term mep-guide-inline">
+          <button type="button" className="mep-guide-link" data-testid={`${id}-add-term`} onClick={() => onChange({ ...draft, terms: [...draft.terms, { key: calcKey(calcs.find((c) => !draft.terms.some((t) => t.key === calcKey(c))) ?? calcs[0]!), text: '' }] })}>
+            + Add a term (the terms add up)
+          </button>
+          {draft.minimum === null && (
+            <button type="button" className="mep-guide-link" data-testid={`${id}-add-min`} onClick={() => onChange({ ...draft, minimum: '' })}>
+              + At least…
+            </button>
+          )}
+        </div>
+      )}
+      <div className="mep-guide-term result" data-testid={`${id}-sample`}>
+        {line}
       </div>
     </div>
   );

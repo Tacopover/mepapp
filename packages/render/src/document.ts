@@ -6,6 +6,7 @@ import {
   type Annotation,
   type Calibration,
   type RoomType,
+  type RoomNeed,
   type Circuit,
   type CircuitType,
   type Fitting,
@@ -141,6 +142,8 @@ export class SketchDocument {
   readonly schematicProjectFields: Record<string, string> = {};
   /** Copies of the room types this document's rooms use, from the saved file (ProjectDocument.roomTypes). The user library comes first; these fill in a type the library lacks. */
   readonly roomTypes: RoomType[] = [];
+  /** Copies of the own needs that this document's room types use, from the saved file (ProjectDocument.roomNeeds). The user library comes first. */
+  readonly roomNeeds: RoomNeed[] = [];
   /** Ceiling height of this drawing, mm (ProjectDocument.ceilingHeightMm). Undefined = the user's global value. Not undoable, like the calibration. */
   ceilingHeightMm: number | undefined = undefined;
   /** Ceiling height per room type id in this drawing, mm (ProjectDocument.roomTypeCeilingHeightsMm). */

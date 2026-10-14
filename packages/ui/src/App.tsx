@@ -11,6 +11,7 @@ import {
   STAMP_LIBRARY,
   SAVED_STAMPS_SOURCE_ID,
   type Discipline,
+  type RoomNeed,
   type RoomType,
   type PlacementRule,
   type NetworkType,
@@ -61,6 +62,7 @@ import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
+import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
 import { AutoPlaceDialog } from './components/AutoPlaceDialog.js';
 import { getStampAppearanceDefault } from './stampAppearanceDefaults.js';
@@ -404,6 +406,11 @@ export function MepSketchApp({
   useEffect(() => {
     if (ready) sceneRef.current?.setRoomTypeLibrary(roomTypes);
   }, [ready, roomTypes, sceneRef]);
+  const [roomNeeds, setRoomNeeds] = useState<RoomNeed[]>(() => loadRoomNeeds(typeof localStorage === 'undefined' ? undefined : localStorage));
+  useEffect(() => saveRoomNeeds(typeof localStorage === 'undefined' ? undefined : localStorage, roomNeeds), [roomNeeds]);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setRoomNeedLibrary(roomNeeds);
+  }, [ready, roomNeeds, sceneRef]);
   const [placementRules, setPlacementRules] = useState<PlacementRule[]>(() => loadPlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage));
   const [uncheckedRuleIds, setUncheckedRuleIds] = useState<string[]>(() => loadUncheckedRuleIds(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveUncheckedRuleIds(typeof localStorage === 'undefined' ? undefined : localStorage, uncheckedRuleIds), [uncheckedRuleIds]);
@@ -417,7 +424,7 @@ export function MepSketchApp({
     [fileAccess],
   );
   const handleExportPlacementRules = useCallback((rules: PlacementRule[]) => exportJson(rules, 'placement-rules.json'), [exportJson]);
-  const handleExportRoomTypes = useCallback((types: RoomType[]) => exportJson(types, 'room-types.json'), [exportJson]);
+  const handleExportRoomTypes = useCallback((types: RoomType[], needs: RoomNeed[]) => exportJson({ roomTypes: types, roomNeeds: needs }, 'room-types.json'), [exportJson]);
   const handleLabelVisibilityChange = useCallback((next: StampLabelVisibility) => {
     setLabelVisibility(next);
     localStorage.setItem(LABEL_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
@@ -1576,6 +1583,7 @@ export function MepSketchApp({
           sceneRef={sceneRef}
           rules={placementRules}
           roomTypes={roomTypes}
+          roomNeeds={roomNeeds}
           language={labelLanguage}
           stampName={(id) => {
             const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
@@ -1600,6 +1608,10 @@ export function MepSketchApp({
           uncheckedRuleIds={uncheckedRuleIds}
           onChangeUncheckedRuleIds={setUncheckedRuleIds}
           onExportRoomTypes={handleExportRoomTypes}
+          onChangeRoomNeeds={(next) => {
+            sceneRef.current?.setRoomNeedLibrary(next);
+            setRoomNeeds(next);
+          }}
           onDetectRooms={() => void handleDetectRooms()}
           roomsDetecting={roomsDetecting}
           onPlaced={showPlacedStatus}

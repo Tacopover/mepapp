@@ -130,6 +130,7 @@ describe('room type fields', () => {
     expect(validateRoomTypeFields({ name: 'Lab', demands: { light: { terms: [{ basis: 'illuminance', value: -1 }] } } }, [])).toBe('Light: each number must be 0 or more.');
     expect(validateRoomTypeFields({ name: 'Lab', demands: { returnAir: { terms: [{ basis: 'volume', value: Number.NaN }] } } }, [])).toMatch(/^Return air: each number/);
     expect(validateRoomTypeFields({ name: 'Lab', demands: { heating: { terms: [] } } }, [])).toMatch(/^Heating: enter a number/);
+    expect(validateRoomTypeFields({ name: 'Lab', demands: { heating: { terms: [{ basis: 'area' }] } } }, [])).toBe('Heating: enter a number in each term.');
     expect(validateRoomTypeFields({ name: 'Lab', demands: { heating: { terms: [{ basis: 'length', value: 3 }] } } }, [])).toMatch(/does not work/);
     expect(validateRoomTypeFields({ name: 'Lab', demands: { supplyAir: { terms: [{ basis: 'area', every: 5 }] } } }, [])).toMatch(/does not work/);
     expect(validateRoomTypeFields({ name: 'Lab', demands: { sockets: { terms: [{ basis: 'area', every: 0 }] } } }, [])).toMatch(/N above 0/);

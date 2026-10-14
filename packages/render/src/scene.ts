@@ -19,12 +19,15 @@ import {
   applyRoomTypeMatch,
   ROOM_TYPE_LIBRARY,
   parseRoomTypes,
+  parseRoomNeeds,
+  BUILT_IN_NEEDS,
   computeRoomValues,
   DEFAULT_CEILING_HEIGHT_MM,
   isValidCeilingHeightMm,
   type CeilingHeightContext,
   type Room,
   type RoomType,
+  type RoomNeed,
   type RoomValues,
   CIRCUIT_TYPE_LIBRARY,
   getCircuitTypeFromLibrary,
@@ -638,6 +641,8 @@ export class SketchScene {
   private roomSettings: { gapMm?: number } = {};
   /** The user library of room types (set by the UI with setRoomTypeLibrary). Name matching uses it. */
   private roomTypeLibrary: RoomType[] = ROOM_TYPE_LIBRARY.map((t) => ({ ...t, keywords: [...t.keywords] }));
+  /** The own needs of the user library (set by the UI with setRoomNeedLibrary). The built-in needs are in core. */
+  private roomNeedLibrary: RoomNeed[] = [];
   /** The user's global ceiling height (Settings), mm: the first level of the ceiling height chain. */
   private globalCeilingHeightMm = DEFAULT_CEILING_HEIGHT_MM;
   private snapRadiusScreenPx = DEFAULT_SNAP_RADIUS_SCREEN_PX;
@@ -2941,6 +2946,35 @@ export class SketchScene {
     return this.roomTypeLibrary.find((t) => t.id === id) ?? doc.roomTypes.find((t) => t.id === id);
   }
 
+  /** The ids of the own needs that the room types of the document's rooms use. */
+  private usedRoomNeedIds(doc: SketchDocument): Set<string> {
+    const types = this.usedRoomTypes(doc, Object.values(doc.drawingHistory.getState().rooms));
+    return new Set(types.flatMap((t) => Object.keys(t.demands ?? {})));
+  }
+
+  /** Sets the own needs of the user library (room-type-calculations.md §3.4). An own need that leaves the library while a room type of an open document uses it is kept as that document's copy. */
+  setRoomNeedLibrary(needs: readonly RoomNeed[]): void {
+    const kept = new Set(needs.map((n) => n.id));
+    for (const doc of this.documents) {
+      const used = this.usedRoomNeedIds(doc);
+      for (const need of this.roomNeedLibrary) {
+        if (kept.has(need.id) || !used.has(need.id) || doc.roomNeeds.some((n) => n.id === need.id)) continue;
+        doc.roomNeeds.push(need);
+      }
+    }
+    this.roomNeedLibrary = needs.map((n) => ({ ...n }));
+  }
+
+  /** The needs to offer: the built-in needs, the own needs of the user library, then the own needs of the active document's file that the library lacks (`inLibrary: false`). */
+  getRoomNeeds(): (RoomNeed & { inLibrary: boolean })[] {
+    const libraryIds = new Set(this.roomNeedLibrary.map((n) => n.id));
+    return [
+      ...BUILT_IN_NEEDS.map((n) => ({ ...n, inLibrary: true })),
+      ...this.roomNeedLibrary.map((n) => ({ ...n, inLibrary: true })),
+      ...this.doc.roomNeeds.filter((n) => !libraryIds.has(n.id)).map((n) => ({ ...n, inLibrary: false })),
+    ];
+  }
+
   /**
    * Sets the room type of rooms as ONE undo step. A type id or null ("no type") is the user's
    * choice: name matching does not change it, and the room is locked. 'auto' gives the room back
@@ -3575,7 +3609,7 @@ export class SketchScene {
       rooms: Object.values(state.rooms),
       calibrations: Object.fromEntries([...doc.calibrations].map(([pageIndex, calibration]) => [String(pageIndex), calibration])),
       roomTypes: this.usedRoomTypes(doc, Object.values(state.rooms)),
-      roomNeeds: [],
+      roomNeeds: this.usedRoomNeeds(doc),
       ...(doc.ceilingHeightMm !== undefined ? { ceilingHeightMm: doc.ceilingHeightMm } : {}),
       roomTypeCeilingHeightsMm: { ...doc.roomTypeCeilingHeightsMm },
     }) as unknown as ProjectDocument;
@@ -3587,6 +3621,14 @@ export class SketchScene {
     return ids.flatMap((id) => {
       const type = this.resolveRoomType(doc, id);
       return type ? [type] : [];
+    });
+  }
+
+  /** The own needs that the saved room types use, as the user library has them now (or the file's copy when the library lacks one), for the save file. */
+  private usedRoomNeeds(doc: SketchDocument): RoomNeed[] {
+    return [...this.usedRoomNeedIds(doc)].flatMap((id) => {
+      const need = this.roomNeedLibrary.find((n) => n.id === id) ?? doc.roomNeeds.find((n) => n.id === id);
+      return need ? [need] : [];
     });
   }
 
@@ -3644,6 +3686,7 @@ export class SketchScene {
     Object.assign(target.schematicProjectFields, doc.schematicProjectFields);
     // The file's copies get the checks of the user library: a bad area per person or demand is dropped.
     target.roomTypes.splice(0, target.roomTypes.length, ...(parseRoomTypes(doc.roomTypes) ?? []));
+    target.roomNeeds.splice(0, target.roomNeeds.length, ...(parseRoomNeeds(doc.roomNeeds) ?? []));
     target.ceilingHeightMm = doc.ceilingHeightMm;
     for (const key of Object.keys(target.roomTypeCeilingHeightsMm)) delete target.roomTypeCeilingHeightsMm[key];
     Object.assign(target.roomTypeCeilingHeightsMm, doc.roomTypeCeilingHeightsMm);

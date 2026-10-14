@@ -328,9 +328,10 @@ function demandProblem(need: RoomNeed, demand: RoomDemand): string | null {
   if (isLight && demand.terms.length > 1) return 'enter one illuminance.';
   for (const term of demand.terms) {
     if (!termFitsKind(term, need.kind)) return 'a calculation does not work with this need.';
-    if (term.every !== undefined ? !(Number.isFinite(term.every) && term.every > 0) || term.value !== undefined : !isDemandValue(term.value)) {
-      return term.every !== undefined ? '"1 per N" needs an N above 0.' : 'each number must be 0 or more.';
-    }
+    if (term.every !== undefined) {
+      if (!(Number.isFinite(term.every) && term.every > 0) || term.value !== undefined) return '"1 per N" needs an N above 0.';
+    } else if (term.value === undefined) return 'enter a number in each term.';
+    else if (!isDemandValue(term.value)) return 'each number must be 0 or more.';
   }
   if (demand.minimum !== undefined && (isLight || !isDemandValue(demand.minimum))) return isLight ? 'Light has no minimum.' : 'the minimum must be a number of 0 or more.';
   if (demand.workingPlaneM !== undefined && (!isLight || !isDemandValue(demand.workingPlaneM))) return isLight ? 'the working-plane height must be a number of 0 or more.' : 'only Light has a working plane.';

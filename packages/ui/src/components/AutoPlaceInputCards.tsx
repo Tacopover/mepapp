@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { SketchScene } from '@mepapp/render';
-import { isValidCeilingHeightMm, roomTypeLabel, type Calibration, type CeilingHeightContext, type CeilingHeightLevel, type Room, type RoomType } from '@mepapp/core';
+import { isValidCeilingHeightMm, roomTypeLabel, type Calibration, type CeilingHeightContext, type CeilingHeightLevel, type Room, type RoomNeed, type RoomType } from '@mepapp/core';
 import { InfoTip } from './InfoTip.js';
 import type { StepState } from './PlacementRuleGuide.js';
 import { OptionalNumberInput } from './OptionalNumberInput.js';
@@ -91,18 +91,28 @@ export interface RoomTypesCardProps {
   language: 'en' | 'nl';
   library: RoomType[];
   fileOnlyTypes: RoomType[];
+  /** The own needs of the user library. */
+  needs: RoomNeed[];
+  /** Own needs in the drawing's file that the library lacks. */
+  fileOnlyNeeds: RoomNeed[];
   onChangeLibrary: (types: RoomType[]) => void;
-  onExportLibrary: (types: RoomType[]) => void;
+  onChangeNeeds: (needs: RoomNeed[]) => void;
+  onExportLibrary: (types: RoomType[], needs: RoomNeed[]) => void;
   onLibraryDirtyChange: (dirty: boolean) => void;
   pickedId: string | null;
   onPick: (roomId: string) => void;
+  /** Opens the library at a room type and a need (a link of a rule). A new object opens it again. */
+  focus?: { typeId: string; needId?: string } | null;
   footer: ReactNode;
 }
 
-/** Room types: the type of each room of the page, and the room-type library. */
-export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, fileOnlyTypes, onChangeLibrary, onExportLibrary, onLibraryDirtyChange, pickedId, onPick, footer }: RoomTypesCardProps) {
+/** Room types: the type of each room of the page, and the room-type library with the needs of each type. */
+export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, fileOnlyTypes, needs, fileOnlyNeeds, onChangeLibrary, onChangeNeeds, onExportLibrary, onLibraryDirtyChange, pickedId, onPick, focus, footer }: RoomTypesCardProps) {
   const untyped = pageRooms.filter((r) => r.roomTypeId === undefined);
-  const [tab, setTab] = useState<'rooms' | 'library'>('rooms');
+  const [tab, setTab] = useState<'rooms' | 'library'>(focus ? 'library' : 'rooms');
+  useEffect(() => {
+    if (focus) setTab('library');
+  }, [focus]);
   const [filter, setFilter] = useState<'untyped' | 'all'>(untyped.length > 0 ? 'untyped' : 'all');
   const [message, setMessage] = useState<string | null>(null);
   const [libraryDirty, setLibraryDirty] = useState(false);
@@ -121,7 +131,7 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
       <h2>Room types</h2>
       <p className="mep-guide-lead">
         Rules choose rooms by their type.
-        <InfoTip label="More about room types">MepApp finds the type from the room name. The type also gives the persons and the demands that a rule can use.</InfoTip>
+        <InfoTip label="More about room types">MepApp finds the type from the room name. The type also gives the persons and the needs of its rooms, each with its calculation.</InfoTip>
       </p>
       <div className="mep-guide-seg" role="tablist" aria-label="Room types">
         <button type="button" role="tab" className={tab === 'rooms' ? 'on' : ''} aria-selected={tab === 'rooms'} disabled={libraryDirty} title={libraryDirty ? 'Save or revert the room type first' : undefined} onClick={() => setTab('rooms')}>
@@ -212,17 +222,28 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
         </>
       ) : (
         <>
-          <p className="mep-guide-note">All drawings use this library. The numbers count the rooms of this page.</p>
+          <p className="mep-guide-note">All drawings use this library. One row for each room type, one column for each need. Click a room type or a cell to see the details below the table.</p>
           <RoomTypeLibrary
             types={library}
             fileOnlyTypes={fileOnlyTypes}
+            needs={needs}
+            fileOnlyNeeds={fileOnlyNeeds}
             onChange={onChangeLibrary}
+            onChangeNeeds={onChangeNeeds}
             onExport={onExportLibrary}
             onDirtyChange={(dirty) => {
               setLibraryDirty(dirty);
               onLibraryDirtyChange(dirty);
             }}
             roomCountOf={(id) => pageRooms.filter((r) => r.roomTypeId === id).length}
+            sampleOf={(id) => {
+              if (!scene) return null;
+              // The room that the user picked on the plan, else the largest room of the type: a small room often has 0 persons.
+              const rooms = pageRooms.filter((r) => r.roomTypeId === id).map((room) => ({ room, values: scene.getRoomValues(room) }));
+              const best = rooms.find((x) => x.room.id === pickedId) ?? rooms.reduce<(typeof rooms)[number] | null>((a, b) => (a && (a.values.areaM2 ?? 0) >= (b.values.areaM2 ?? 0) ? a : b), null);
+              return best ? { label: roomLabel(best.room), ...best } : null;
+            }}
+            focus={focus}
           />
         </>
       )}
