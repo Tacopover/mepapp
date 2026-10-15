@@ -1,6 +1,6 @@
 # Routing to the placed stamps — part 1: network types on stamps
 
-Status: **assessment, comparison, model, answers, mockup and road map done (2026-10-14). On 2026-10-15 the user accepted the recommendations (§11): the rule is the owner, the model of §4, layout A, P7 later. No product code is changed yet. Next: P1.** Branch `worktree-auto-routing`, made from `origin/worktree-room-type-calculations` (a3f3ee9), because `origin/master` (4c31201) does not contain 3f66722. Master had no newer commits, so no merge was necessary. Prompt: `auto-routing-prompt.md`.
+Status: **assessment, comparison, model, answers, mockup and road map done (2026-10-14). On 2026-10-15 the user accepted the recommendations (§11): the rule is the owner, the model of §4, layout A. The user dropped P7. Waiting for the user: questions 5 and 6 of §11. No product code is changed yet.** Branch `worktree-auto-routing`, made from `origin/worktree-room-type-calculations` (a3f3ee9), because `origin/master` (4c31201) does not contain 3f66722. Master had no newer commits, so no merge was necessary. Prompt: `auto-routing-prompt.md`.
 
 Mockup: artifact https://claude.ai/artifact/Ugzv9CJtBdJ5rKuPSAmg7e, copy in `.claude/plans/auto-routing-mockup/mockup.html`. Checked in Chromium (Playwright 1.63): 38 checks pass (19 at 400 px in the dark theme, 19 at 1280 px in the light theme). The checks type into the rule name and the capacity box, use the selects, the check boxes and the buttons, click and key-select stamps in the drawing, find no horizontal page scroll and no page errors.
 
@@ -29,7 +29,7 @@ Columns: **Must** = what part 1 must do there. "Keep" = the port network type mu
 | `PlacedStamp.ports` | `core/stamp.ts:15` | A copy of the ports of the definition | No change. The port network type goes into a separate map (§4.1). |
 | `PortSpec` | `core/geometry.ts:256` | `{id, name, fractionX, fractionY}` | No change (§4.1 says why). |
 | `getStampPorts`, `__center__` | `core/stamp.ts:44`, `:64` | The ports, or the synthetic center port | Read: the UI rows and the helpers use it, so a stamp without ports gets one row "Center". |
-| Stamp tool | `render/tools/placeStampTool.ts:56` | `[...definition.ports]`: the PortSpec objects are shared with the definition | Keep: no port network type in part 1 (P7 adds the default of the definition). |
+| Stamp tool | `render/tools/placeStampTool.ts:56` | `[...definition.ports]`: the PortSpec objects are shared with the definition | Nothing: a stamp placed by hand gets no port network type (§11, decision 4). |
 | Auto-place | `render/scene.ts:2613` `autoPlaceStamps`; `ui/components/autoPlacePlan.ts:47` `groupsOf` | Writes ports, `autoPlaced`, capacity | Read and keep: `groupsOf` gets the map for each planned stamp from the rule, `autoPlaceStamps` writes it and adopts the network types. |
 | Edit of a definition | `scene.ts:2389` `applyDefinitionToPlacedStamps` | New copy of the ports; ends on lost ports go to a new fitting | Keep: remove the keys of the lost ports, keep the others (match by id, as today). |
 | Replace stamp | `scene.ts:2485` `replaceSelectedStamps`, `:2419` `planPortReplacement` | Maps the ports by place (`matchPortsByLocation`), else by id | Keep: move each key with the same `remaps`, remove the keys of the lost ports. Replace already calls `markAutoPlacedMoved`. |
@@ -137,7 +137,7 @@ export function ruleStampNetworkTypes(rule: Pick<PlacementRule, 'networkTypeId' 
 
 The guide writes `networkTypeId` for a stamp with 0 or 1 port. For a stamp with 2 or more ports, the check box "Give each port of the stamp its own network type" writes an entry for each port; when the user clears the check box, the guide removes the map.
 
-### 4.3 The stamp definition (optional, phase P7)
+### 4.3 The stamp definition (phase P7, dropped by the user on 2026-10-15)
 
 ```ts
 export interface StampDefinition {
@@ -167,7 +167,7 @@ export interface StampDefinition {
 1. **The owner.** The rule (§3). No override in the room type in part 1. If a later case must have it, the demand gets an override that wins over the rule.
 2. **Defaults.** Yes, for the built-in needs: Supply air → Supply Air, Return air → Return Air, Heating → Heating Water, Cooling → Chilled Water. Light, Sockets and own needs → none. The guide fills the default when the user makes a rule or changes the need, but only when the old value was the default of the old need, so a choice of the user stays. An own need gets no default in part 1: the choice in the rule is enough, and a field on the own need adds a control to the Room types card for a small gain.
 3. **More ports.** The check box "Give each port of the stamp its own network type" shows one row for each port (name, place, select). A port group does not force one type. A group joins ports into one node for the flow (an air handling unit passes air from the return side to the supply side), but routing must draw a Return Air duct to the return port and a Supply Air duct to the supply port. So each port keeps its own type. (§7 lists a problem of `computeNetworks` with groups.)
-4. **The stamp definition.** Yes, but as the optional phase P7, not in the main path. The Element Editor sets a default for each port of a custom stamp; the stamp tool writes it on a stamp placed by hand; the guide fills the rows from it; the rule wins at Auto-place. The library stamps get no defaults in part 1: their data is not reliable for this (the supply grille `ventilation-grille-rh-supply` has the discipline `heatingAndCooling`), and a check of the data of the 167 stamps is a separate task.
+4. **The stamp definition.** No: the user dropped P7 on 2026-10-15 (§11, decision 4). The first answer was: yes, but as the optional phase P7, not in the main path. The Element Editor sets a default for each port of a custom stamp; the stamp tool writes it on a stamp placed by hand; the guide fills the rows from it; the rule wins at Auto-place. The library stamps get no defaults in part 1: their data is not reliable for this (the supply grille `ventilation-grille-rh-supply` has the discipline `heatingAndCooling`), and a check of the data of the 167 stamps is a separate task.
 5. **Stamps placed by hand.** Yes: Properties shows a select for each port, for each stamp (§6). A change calls `markAutoPlacedMoved`, the same as a change of a custom property (`scene.ts:2736`). Else a new run of Auto-place replaces the stamp and loses the change. A multi-selection of stamps of one definition shows the same rows, with "Mixed" when the values differ.
 6. **Segments.** The port network type is the wish, the segment type is the fact. MepApp does not change one to match the other on its own:
    - A segment of type A on a port of type B: a mark at the port in the drawing (§6) and a line in Properties with the button "Use A for the port". No automatic retag, because a retag of a run changes the whole run (the cascade invariant), and a connect must not do that silently.
@@ -250,7 +250,7 @@ Each phase ends with the core tests, a rebuild of `@mepapp/ui`, and a browser ch
 - **P4 — Keep the value through edits.** `applyDefinitionToPlacedStamps`, Replace stamp (`remaps`), copy and paste (also the network types that the stamps name). Browser: replace a 2-port stamp, edit a definition, paste into another drawing.
 - **P5 — The open ports in the drawing.** The dots, the ring and "!", the status bar check box and the count. Browser: the dots go when a segment connects, and come back on undo.
 - **P6 — Segments.** The segment tool takes the type of the start port; the cascade changes the ports on the run; the mismatch line and button in Properties. Browser: draw from a grille, retag the run, check the ports.
-- **P7 — The default of the definition (optional).** `StampDefinition.portNetworkTypeIds`, the Element Editor rows, the stamp tool, the guide rows. Later, not in part 1 (§11, decision 4).
+- **P7 — The default of the definition.** Dropped by the user (§11, decision 4).
 
 ## 10. Not changed by this plan
 
@@ -263,4 +263,11 @@ On 2026-10-15 the user accepted the recommendations:
 1. The owner: the rule.
 2. The model of §4: accepted (a map on the stamp, the rule fields, schema 18, no silent default for old rules).
 3. The layout: A (the Network section in step 1 "Stamp").
-4. P7 (the default of the definition): later, not in part 1. P7 is the last phase, so the user can still move it into part 1.
+4. P7 (the default of the definition): dropped. The user: "a stamp's port should not be part of any network type by default. They are assigned to a network type only when connected to a segment. The segment defines the network type for the port."
+
+Open questions (2026-10-15):
+
+5. **The role of the value on the port.** The rule of the user in decision 4 conflicts with parts of §4.1, §5 (questions 5, 6, 9), P2, P5 and P6. These parts treat the value on the port as the network type of the port, with a mismatch when a segment of another type connects.
+   - **A (recommended): a routing target.** The value that Auto-place writes is only the network type that routing must connect to the port. The network type of a port always comes from its segment, as MepApp does today (`computeNetworks`). When a segment connects, MepApp ignores the target of that port. The target stays stored, so it shows again when the user deletes the segment. Changes: the field becomes `PlacedStamp.routingTargets`. Properties shows the network type from the segment for a connected port, and a select for the target of a port without a segment (also on a stamp placed by hand, as an explicit choice, never a default). P5 shows the dots only, with no ring and no "!". P6 keeps only "the segment tool takes the target of the start port". The mismatch line, the button "Use A for the port" and the retag of ports in the cascade go.
+   - **B: no value on the stamp.** Routing finds the rule of each stamp through `autoPlaced.ruleId` and reads the network type there. B is smaller. But the rules are in the browser of the user, not in the drawing, so another computer or a changed or deleted rule loses the link. A stamp placed by hand can never get a target.
+6. **The word "need".** The user finds it unclear and proposed "demand network type". A need is not a network type: a need has an amount and a unit (Light in lm, Heating in W, Sockets as a count), Light and Sockets have no network type, and the relation is many to many (Return air goes to Return Air or Exhaust Air; Cooling goes to Chilled Water, or to Supply Air in an all-air system). Proposal: "demand type" in the UI text only. The code names (`RoomNeed`, `needId`) and the storage keys stay, so no migration is necessary. The word is in the UI text of 6 files (`RoomTypeLibrary.tsx`, `PlacementRuleGuide.tsx`, `AutoPlaceDialog.tsx`, `AutoPlaceInputCards.tsx`, `placementRuleDraft.ts`, `roomDemandText.ts`) and in some messages of the core. These came from `room-type-calculations`, so the change is a separate task on that branch.
