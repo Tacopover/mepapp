@@ -322,6 +322,14 @@ export function MepSketchApp({
     scene.on('roomsVisibleChanged', setRoomsVisible);
     return () => scene.off('roomsVisibleChanged', setRoomsVisible);
   }, [ready, sceneRef]);
+  const [openPortsVisible, setOpenPortsVisible] = useState(true);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    setOpenPortsVisible(scene.isOpenPortsVisible());
+    scene.on('openPortsVisibleChanged', setOpenPortsVisible);
+    return () => scene.off('openPortsVisibleChanged', setOpenPortsVisible);
+  }, [ready, sceneRef]);
   const roomClientRef = useRef<RoomDetectionClient | null>(null);
   const roomAbortRef = useRef<AbortController | null>(null);
   const [roomsDetecting, setRoomsDetecting] = useState(false);
@@ -1546,6 +1554,8 @@ export function MepSketchApp({
         labelFilterEntries={labelFilterEntries}
         roomsVisible={roomsVisible}
         onRoomsVisibleChange={(visible) => sceneRef.current?.setRoomsVisible(visible)}
+        openPortsVisible={openPortsVisible}
+        onOpenPortsVisibleChange={(visible) => sceneRef.current?.setOpenPortsVisible(visible)}
       />
 
       {calibrationPrompt && (

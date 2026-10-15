@@ -94,7 +94,7 @@ export interface UseSketchScene {
   activePdfHandle: PdfDocumentHandle | null;
 }
 
-const EMPTY_DRAWING_SUMMARY: DrawingSummary = { segmentCount: 0, fittingCount: 0, annotationCount: 0, networkCount: 0, canUndo: false, canRedo: false };
+const EMPTY_DRAWING_SUMMARY: DrawingSummary = { segmentCount: 0, fittingCount: 0, annotationCount: 0, networkCount: 0, canUndo: false, canRedo: false, openPorts: [] };
 
 export function useSketchScene(): UseSketchScene {
   const containerRef = useRef<HTMLDivElement | null>(null);

@@ -49,6 +49,7 @@ import {
   getNetworkTypeFromLibrary,
   getStampDefinition,
   getStampPorts,
+  getStampWorldPorts,
   loadProject,
   markAutoPlacedMoved,
   matchPortsByLocation,
@@ -447,7 +448,20 @@ export interface DrawingSummary {
   networkCount: number;
   canUndo: boolean;
   canRedo: boolean;
+  /** The open ports by the network type of their routing target (auto-routing.md §5 question 9), most first. */
+  openPorts: OpenPortCount[];
 }
+
+/** The number of open ports (a routing target and no segment) of one network type. `color` is the hex color of the type. */
+export interface OpenPortCount {
+  networkTypeId: string;
+  name: string;
+  color: string;
+  count: number;
+}
+
+/** The radius of the dot of an open port, in screen pixels. */
+const OPEN_PORT_RADIUS_SCREEN_PX = 4.5;
 
 /** One derived network, resolved against its NetworkType for display — the Layers panel's read model. Recomputed from live topology on every call, same as DrawingSummary. */
 export interface NetworkSummary {
@@ -520,6 +534,8 @@ interface SketchSceneEvents {
   /** The active document's rooms changed: added, edited, deleted, replaced by detect-all, undone/redone or loaded. Re-read with listRooms(). */
   roomsChanged: [];
   roomsVisibleChanged: [visible: boolean];
+  /** The dots of the open ports were shown or hidden (setOpenPortsVisible). */
+  openPortsVisibleChanged: [visible: boolean];
   roomSelectionChanged: [];
   /** The wall-line debug overlay was shown, hidden, recomputed or filtered. Re-read with getWallDebugState(). */
   wallDebugChanged: [WallDebugState];
@@ -635,6 +651,7 @@ export class SketchScene {
   private drag: DragState = { kind: 'none' };
   private readonly emitter = new TypedEmitter<SketchSceneEvents>();
   private roomsVisible = true;
+  private openPortsVisible = true;
   /** The label text resolution the room layer was last drawn with — see zoomRoomLayer. */
   private roomTextResolution = 0;
   private readonly wallDebugLayer = new Container();
@@ -2213,6 +2230,8 @@ export class SketchScene {
       fittings: Object.values(state.fittings),
       portGroups: this.doc.portGroups,
     });
+    const openPorts = new Map<string, number>();
+    for (const open of this.openPorts(state)) openPorts.set(open.networkTypeId, (openPorts.get(open.networkTypeId) ?? 0) + 1);
     return {
       segmentCount: Object.keys(state.segments).length,
       fittingCount: Object.keys(state.fittings).length,
@@ -2220,7 +2239,38 @@ export class SketchScene {
       networkCount: networks.length,
       canUndo: this.doc.drawingHistory.canUndo,
       canRedo: this.doc.drawingHistory.canRedo,
+      openPorts: [...openPorts]
+        .map(([networkTypeId, count]) => {
+          const type = this.doc.networkTypes.find((t) => t.id === networkTypeId) ?? getNetworkTypeFromLibrary(networkTypeId);
+          return { networkTypeId, name: type?.name ?? 'Unknown type', color: type?.color ?? DEFAULT_NETWORK_TYPE.color, count };
+        })
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
     };
+  }
+
+  /** Each open port of the drawing (auto-routing.md §5 question 9): a port with a routing target and no segment. */
+  private openPorts(state: DrawingState): { world: Vec2; networkTypeId: string }[] {
+    const connected = this.portSegmentTypes();
+    const open: { world: Vec2; networkTypeId: string }[] = [];
+    for (const stamp of Object.values(state.stamps)) {
+      if (!stamp.routingTargets) continue;
+      for (const port of getStampWorldPorts(stamp)) {
+        const networkTypeId = routingTargetOf(stamp, port.id);
+        if (networkTypeId && connected.get(stamp.id)?.[port.id] === undefined) open.push({ world: port.world, networkTypeId });
+      }
+    }
+    return open;
+  }
+
+  isOpenPortsVisible(): boolean {
+    return this.openPortsVisible;
+  }
+
+  /** Shows or hides the dots of the open ports (the status bar's "Open ports" check box). The dots are in the overlay only, never in the PDF. */
+  setOpenPortsVisible(visible: boolean): void {
+    this.openPortsVisible = visible;
+    this.redrawOverlay();
+    this.emitter.emit('openPortsVisibleChanged', visible);
   }
 
   undoDrawing(): void {
@@ -2823,6 +2873,7 @@ export class SketchScene {
       return { ...s, stamps };
     });
     tx.commit();
+    this.syncDrawingLayer();
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
@@ -3898,6 +3949,7 @@ export class SketchScene {
 
     if (target === this.doc) {
       this.syncDrawingLayer();
+      this.redrawOverlay();
       this.emitter.emit('documentsChanged', this.getDocuments());
       this.emitter.emit('projectLoaded');
       this.emitter.emit('roomsChanged');
@@ -5177,6 +5229,15 @@ export class SketchScene {
     this.syncFlowLabels();
 
     const state = this.doc.drawingHistory.getState();
+    if (this.openPortsVisible) {
+      const radius = OPEN_PORT_RADIUS_SCREEN_PX / this.world.scale.x;
+      for (const open of this.openPorts(state)) {
+        this.overlay
+          .circle(open.world.x, open.world.y, radius)
+          .fill({ color: this.resolveNetworkTypeVisuals(open.networkTypeId).color })
+          .stroke({ width: 1.5 / this.world.scale.x, color: 0xffffff });
+      }
+    }
     for (const id of this.doc.selectedIds) {
       const stampData = state.stamps[id];
       if (stampData) {

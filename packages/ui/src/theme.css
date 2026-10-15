@@ -1311,6 +1311,18 @@
   padding: 0 2px;
   color: var(--ink);
 }
+/* The open ports of auto-routing.md §5 question 9: the count of each network type with its color. */
+.mep-open-port-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.mep-open-port-count i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+}
 .mep-menu-dropdown.mep-dropup {
   top: auto;
   bottom: calc(100% + 6px);

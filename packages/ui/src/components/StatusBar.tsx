@@ -20,6 +20,9 @@ export interface StatusBarProps {
   labelFilterEntries: LabelFilterEntry[];
   roomsVisible: boolean;
   onRoomsVisibleChange: (visible: boolean) => void;
+  /** The dots of the open ports (auto-routing.md §5 question 9). */
+  openPortsVisible: boolean;
+  onOpenPortsVisibleChange: (visible: boolean) => void;
 }
 
 export function StatusBar({
@@ -39,7 +42,11 @@ export function StatusBar({
   labelFilterEntries,
   roomsVisible,
   onRoomsVisibleChange,
+  openPortsVisible,
+  onOpenPortsVisibleChange,
 }: StatusBarProps) {
+  const openPorts = drawingSummary.openPorts;
+  const openTotal = openPorts.reduce((n, p) => n + p.count, 0);
   return (
     <div className="mep-status">
       <span className="mep-chip mep-zoom-chip">
@@ -84,6 +91,17 @@ export function StatusBar({
         <label title="Show rooms on the canvas">
           <input type="checkbox" checked={roomsVisible} onChange={(e) => onRoomsVisibleChange(e.target.checked)} /> Rooms
         </label>
+      </span>
+      <span className="mep-chip mep-labels-chip mep-open-ports-chip" data-testid="open-ports" title={openPorts.length > 0 ? openPorts.map((p) => `${p.count} ${p.name}`).join(', ') : 'No port waits for routing'}>
+        <label title="Show the ports that wait for routing: a routing target and no segment">
+          <input type="checkbox" checked={openPortsVisible} onChange={(e) => onOpenPortsVisibleChange(e.target.checked)} /> Open ports <b>{openTotal}</b>
+        </label>
+        {openPorts.slice(0, 3).map((p) => (
+          <span key={p.networkTypeId} className="mep-open-port-count" title={`${p.count} ${p.name}`} data-type={p.networkTypeId}>
+            <i style={{ background: p.color }} />
+            {p.count}
+          </span>
+        ))}
       </span>
       <span className="mep-scale-bar" aria-hidden="true">
         <i />
