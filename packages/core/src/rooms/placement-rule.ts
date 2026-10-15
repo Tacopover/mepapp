@@ -109,7 +109,7 @@ export interface PlacementRule {
 }
 
 export const COUNT_MODE_LABELS: Record<PlacementCountMode, string> = {
-  need: 'A need of the room types',
+  need: 'A demand type of the room types',
   perRoom: 'The same number in each room',
   coverage: 'By coverage',
 };
@@ -231,10 +231,10 @@ export const REQUIREMENT_WARNING_TEXT: Record<RequirementWarning, string> = {
   noCalibration: 'no calibration',
   noPeople: 'no number of people',
   maxCountReached: 'max count reached',
-  noDemand: 'the room type does not have the need',
-  needNotFound: 'the need of the rule was deleted',
+  noDemand: 'the room type does not have the demand type',
+  needNotFound: 'the demand type of the rule was deleted',
   noRoomIndex: 'no room index: the luminaire is not above the working plane',
-  zeroNeed: 'no stamp: the need of the room is 0',
+  zeroNeed: 'no stamp: the demand of the room is 0',
 };
 
 /** The UF that one room used. */
@@ -388,7 +388,7 @@ export function validatePlacementRule(rule: PlacementRule, others: readonly Plac
   const name = rule.name.trim();
   if (!name) return 'Enter a name.';
   if (others.some((r) => r.name.trim().toLowerCase() === name.toLowerCase())) return `Another rule is already called "${name}".`;
-  if (rule.countBy === 'need' && !rule.needId) return 'Choose the need that the stamp serves.';
+  if (rule.countBy === 'need' && !rule.needId) return 'Choose the demand type that the stamp serves.';
   if (!isPositive(rule.capacityPerElement)) return 'What one stamp gives must be a number above 0.';
   if (rule.unit !== undefined && !CAPACITY_UNIT_LIST.includes(rule.unit)) return `The unit ${rule.unit} is not a unit of a flow or a power.`;
   const need = rule.countBy === 'need' ? needs.find((n) => n.id === rule.needId) : undefined;
@@ -545,7 +545,7 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
   let need: RoomNeed;
   if (linkNeeds.length > 0) {
     need = needOf(linkNeeds[0]!);
-    if (linkNeeds.length > 1) notes.push(`The rule took values of more than one need; it now serves ${need.name}.`);
+    if (linkNeeds.length > 1) notes.push(`The rule took values of more than one demand type; it now serves ${need.name}.`);
   } else if (unit === 'W' || unit === 'kW') need = needOf(nameHas(base.name, ['cool', 'koel']) ? 'cooling' : 'heating');
   // Only air changes: the room types keep air changes as Return air too (airChangesPerH).
   else if (isAirChangeUnit(unit)) need = needOf(nameHas(base.name, ['return', 'retour', 'exhaust', 'extract', 'afzuig', 'afvoer', 'toilet']) || onlyAirChanges ? 'returnAir' : 'supplyAir');
@@ -554,7 +554,7 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
     const name = base.name.replace(/\s*\(example\)\s*$/i, '').trim() || unit || 'Old rule';
     need = { id: `need-from-${base.id}`, name, kind: unit === STAMP_COUNT_UNIT || unit === '' ? 'count' : 'amount', unit: unit || STAMP_COUNT_UNIT, own: true };
   }
-  if (linkNeeds.length === 0 && !need.own) notes.push(onlyAirChanges && need.id === 'returnAir' ? 'MepApp chose Return air, because the rule has only air changes.' : `MepApp chose the need ${need.name} from the unit ${unit || '(none)'} and the rule name.`);
+  if (linkNeeds.length === 0 && !need.own) notes.push(onlyAirChanges && need.id === 'returnAir' ? 'MepApp chose Return air, because the rule has only air changes.' : `MepApp chose the demand type ${need.name} from the unit ${unit || '(none)'} and the rule name.`);
   rule.countBy = 'need';
   rule.needId = need.id;
   if (CAPACITY_UNITS[need.kind].includes(unit)) rule.unit = unit;
@@ -566,7 +566,7 @@ function fromOldRule(v: Record<string, unknown>, base: PlacementRule, oldCoverag
     }
   } else if (capacity !== undefined) rule.capacityPerElement = capacity;
   else if (need.kind === 'count')
-    notes.push('The rule had no capacity, so it placed 1 stamp in each room. Now one stamp gives 1, so a room gets 1 stamp for each 1 of its need. To change this, enter what one stamp gives in step 3 of the rule.');
+    notes.push('The rule had no capacity, so it placed 1 stamp in each room. Now one stamp gives 1, so a room gets 1 stamp for each 1 of its demand. To change this, enter what one stamp gives in step 3 of the rule.');
   if (rule.writeCapacity && !writesCapacity(need.kind)) {
     rule.writeCapacity = false;
     notes.push(`The rule no longer writes a capacity to its stamps: a rule for ${need.name} does not write one.`);
@@ -676,7 +676,7 @@ export function moveOldRuleNumbers<T extends { id: string; name: string; keyword
     if (entry.need.own && !nextNeeds.some((n) => n.id === entry.need.id)) nextNeeds.push(entry.need);
     const demand = entry.demand;
     if (!demand) {
-      report.push([`${entry.ruleName}: now serves ${entry.need.name}${entry.need.own ? ' (a new own need)' : ''}.`, ...entry.notes].join(' '));
+      report.push([`${entry.ruleName}: now serves ${entry.need.name}${entry.need.own ? ' (a new own demand type)' : ''}.`, ...entry.notes].join(' '));
       continue;
     }
     const nameText = entry.roomTypeIds.length === 0 ? entry.nameContains?.trim() : undefined;
@@ -693,7 +693,7 @@ export function moveOldRuleNumbers<T extends { id: string; name: string; keyword
       moved.push(type.name);
     }
     const parts = [
-      `${entry.ruleName}: now serves ${entry.need.name}${entry.need.own ? ' (a new own need)' : ''}.`,
+      `${entry.ruleName}: now serves ${entry.need.name}${entry.need.own ? ' (a new own demand type)' : ''}.`,
       moved.length > 0 ? `Its numbers moved to ${moved.join(', ')}.` : 'Its numbers moved to no room type.',
       kept.length > 0 ? `${kept.join(', ')} kept ${kept.length === 1 ? 'its' : 'their'} own numbers.` : '',
       nameText ? (byName ? `The rule chose rooms with "${nameText}" in the name: only ${byName.name} matches this text.` : `The rule chose rooms with "${nameText}" in the name, and no room type matches this text.`) : '',

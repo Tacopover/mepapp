@@ -77,9 +77,9 @@ export const needUnitOne = (need: Pick<RoomNeed, 'unit' | 'unitOne'>): string =>
 export function validateRoomNeed(need: RoomNeed, others: readonly RoomNeed[]): string | null {
   const name = need.name.trim();
   if (!name) return 'Enter a name.';
-  if ([...BUILT_IN_NEEDS, ...others].some((n) => n.id !== need.id && n.name.trim().toLowerCase() === name.toLowerCase())) return `Another need is already called "${name}".`;
-  if (!need.id || BUILT_IN_IDS.has(need.id)) return 'A built-in need cannot be changed.';
-  if (!OWN_NEED_KINDS.includes(need.kind)) return 'Choose what the need is.';
+  if ([...BUILT_IN_NEEDS, ...others].some((n) => n.id !== need.id && n.name.trim().toLowerCase() === name.toLowerCase())) return `Another demand type is already called "${name}".`;
+  if (!need.id || BUILT_IN_IDS.has(need.id)) return 'A built-in demand type cannot be changed.';
+  if (!OWN_NEED_KINDS.includes(need.kind)) return 'Choose what the demand type is.';
   const unit = NEED_KIND_UNITS[need.kind];
   if (unit !== null ? need.unit !== unit : !need.unit.trim()) return 'Enter the unit.';
   return null;

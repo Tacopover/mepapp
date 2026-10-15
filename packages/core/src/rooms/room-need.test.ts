@@ -26,7 +26,7 @@ describe('room needs', () => {
     expect(validateRoomNeed({ ...data, name: 'Data' }, [{ ...data, id: 'need-2', name: 'data' }])).toMatch(/already/);
     expect(validateRoomNeed(data, [data])).toBeNull();
     expect(validateRoomNeed({ ...data, id: 'heating' }, [])).toMatch(/built-in/);
-    expect(validateRoomNeed({ ...data, kind: 'light', unit: 'lm' }, [])).toMatch(/what the need is/);
+    expect(validateRoomNeed({ ...data, kind: 'light', unit: 'lm' }, [])).toMatch(/what the demand type is/);
     expect(validateRoomNeed({ ...data, unit: ' ' }, [])).toBe('Enter the unit.');
     expect(validateRoomNeed({ ...data, kind: 'flow', unit: 'm³/h' }, [])).toBe('Enter the unit.');
     expect(validateRoomNeed({ ...data, kind: 'flow', unit: 'dm³/s' }, [])).toBeNull();

@@ -91,7 +91,7 @@ const ICON: Record<StepState, string> = { ok: '✓', warn: '!', bad: '×', '': '
 const INPUT_TITLES: Record<InputKind, string> = { drawing: 'Drawing and rooms', types: 'Room types', heights: 'Ceiling heights' };
 
 const COUNT_SOURCE_TEXT: Record<PlacementRow['requirement']['countSource'], string> = {
-  amount: 'From the need of the room ÷ what one stamp gives, rounded up, then the min and max count',
+  amount: 'From the demand of the room ÷ what one stamp gives, rounded up, then the min and max count',
   perRoom: 'The same number in each room, then the min and max count',
   coverage: 'By coverage: the fewest stamps that cover the room',
   onePerRoom: 'No capacity: one per room, then the min and max count',
@@ -101,7 +101,7 @@ const COUNT_SOURCE_TEXT: Record<PlacementRow['requirement']['countSource'], stri
 export function servesText(rule: PlacementRule, needs: readonly RoomNeed[]): string {
   if (rule.countBy === 'perRoom') return `${rule.perRoomCount ?? 1} in each room`;
   if (rule.countBy === 'coverage') return 'By coverage';
-  return needs.find((n) => n.id === rule.needId)?.name ?? 'A deleted need';
+  return needs.find((n) => n.id === rule.needId)?.name ?? 'A deleted demand type';
 }
 
 /** True when the rule counts by a need that is not in the list (an own need was deleted). A rule without room types then has no rows. */
@@ -109,7 +109,7 @@ const needDeleted = (rule: PlacementRule, needs: readonly RoomNeed[]) => rule.co
 
 /** The state of a rule in the left list, from the dry run of its rows (no stamp positions). */
 function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 'requirement'>[], found: (definitionId: string) => boolean, needs: readonly RoomNeed[]): StepStatus {
-  if (needDeleted(rule, needs)) return ['bad', 'The need was deleted'];
+  if (needDeleted(rule, needs)) return ['bad', 'The demand type was deleted'];
   const serves = servesText(rule, needs);
   if (!rule.stampDefinitionId) return ['bad', `${serves}: no stamp`];
   if (!found(rule.stampDefinitionId)) return ['bad', 'Stamp not found'];
@@ -119,13 +119,13 @@ function ruleStatusOf(rule: PlacementRule, rows: readonly Pick<PlacementRow, 're
   const missing = rows.filter(missingData).length;
   if (missing > 0) return ['warn', `${plural(missing, 'room')}: data missing`];
   const zero = rows.filter(zeroNeed).length;
-  if (zero > 0) return ['warn', `${plural(zero, 'room')}: need 0, no stamp`];
+  if (zero > 0) return ['warn', `${plural(zero, 'room')}: demand 0, no stamp`];
   return ['ok', `${serves}: ${plural(rows.reduce((n, row) => n + (row.requirement.count ?? 0), 0), 'stamp')}`];
 }
 
 /** The state of a checked rule in the Place all table, from the rows of the plan. */
 function placeStateOf(rule: PlacementRule, rows: readonly PlacementRow[], needs: readonly RoomNeed[]): StepStatus {
-  if (needDeleted(rule, needs)) return ['bad', 'Skipped: the need was deleted'];
+  if (needDeleted(rule, needs)) return ['bad', 'Skipped: the demand type was deleted'];
   if (!rule.stampDefinitionId) return ['bad', 'Skipped: no stamp'];
   if (rows.some((row) => row.warnings.includes('stampNotFound'))) return ['bad', 'Skipped: stamp not found'];
   if (rows.length === 0) return ['warn', 'No room matches'];
@@ -134,7 +134,7 @@ function placeStateOf(rule: PlacementRule, rows: readonly PlacementRow[], needs:
   const missing = rows.filter(missingData).length;
   if (missing > 0) return ['warn', `${plural(missing, 'room')} skipped: data missing`];
   const zero = rows.filter(zeroNeed).length;
-  if (zero > 0) return ['warn', `${plural(zero, 'room')}: need 0, no stamp`];
+  if (zero > 0) return ['warn', `${plural(zero, 'room')}: demand 0, no stamp`];
   const problems = rows.filter((row) => spacingProblem(row) || coverageProblem(row)).length;
   if (problems > 0) return ['warn', `${plural(problems, 'room')}: check the spacing`];
   return ['ok', 'Ready'];
@@ -864,14 +864,14 @@ export function AutoPlaceDialog({
         {sameNeed.length > 0 && (
           <div className="mep-guide-callout" data-testid="ap-same-need">
             <span>
-              {sameNeed.map(({ need, rules: names, rooms }) => `${need}: ${names.join(' and ')} serve it in ${plural(rooms, 'room')}.`).join(' ')} Each rule places stamps for the full need. Uncheck a rule, or give the rules other room types.
+              {sameNeed.map(({ need, rules: names, rooms }) => `${need}: ${names.join(' and ')} serve it in ${plural(rooms, 'room')}.`).join(' ')} Each rule places stamps for the full demand. Uncheck a rule, or give the rules other room types.
             </span>
           </div>
         )}
         {zeroRules.length > 0 && (
           <div className="mep-guide-callout" data-testid="ap-zero-need">
             <span>
-              {plural(zeroRooms, 'room')} {zeroRooms === 1 ? 'gets' : 'get'} no stamp from {zeroRules.map((r) => r.name).join(', ')}, because the need of the room is 0. For example, a small room gets 0 persons. Step 3 of the rule lists the rooms.
+              {plural(zeroRooms, 'room')} {zeroRooms === 1 ? 'gets' : 'get'} no stamp from {zeroRules.map((r) => r.name).join(', ')}, because the demand of the room is 0. For example, a small room gets 0 persons. Step 3 of the rule lists the rooms.
             </span>
             <button type="button" onClick={() => go({ kind: 'rule', id: zeroRules[0]!.id }, 3)}>
               Show the rooms
@@ -891,7 +891,7 @@ export function AutoPlaceDialog({
         {scopeUntyped > 0 && (
           <div className="mep-guide-callout" data-testid="ap-untyped-note">
             <span>
-              {plural(scopeUntyped, 'room')} without a type: a rule for a need does not find {scopeUntyped === 1 ? 'it' : 'them'}.
+              {plural(scopeUntyped, 'room')} without a type: a rule for a demand type does not find {scopeUntyped === 1 ? 'it' : 'them'}.
             </span>
             <button type="button" onClick={() => go({ kind: 'types' })}>
               Room types
@@ -941,7 +941,7 @@ export function AutoPlaceDialog({
                     <th>Volume (m³)</th>
                     <th>People</th>
                     <th>Rule</th>
-                    <th>Need</th>
+                    <th>Demand</th>
                     <th>One stamp</th>
                     <th>Count</th>
                     <th>Existing</th>

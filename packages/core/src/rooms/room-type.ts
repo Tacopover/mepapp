@@ -266,10 +266,10 @@ export function parseRoomTypeKeywords(text: string): string[] {
 /** Why the demand cannot be saved, or null when it can. The text follows the name of the need. */
 function demandProblem(need: RoomNeed, demand: RoomDemand): string | null {
   const isLight = need.kind === 'light';
-  if (demand.terms.length === 0) return 'enter a number, or remove the need.';
+  if (demand.terms.length === 0) return 'enter a number, or remove the demand.';
   if (isLight && demand.terms.length > 1) return 'enter one illuminance.';
   for (const term of demand.terms) {
-    if (!termFitsKind(term, need.kind)) return 'a calculation does not work with this need.';
+    if (!termFitsKind(term, need.kind)) return 'a calculation does not work with this demand type.';
     if (term.every !== undefined) {
       if (!(Number.isFinite(term.every) && term.every > 0) || term.value !== undefined) return '"1 per N" needs an N above 0.';
     } else if (term.value === undefined) return 'enter a number in each term.';
@@ -288,7 +288,7 @@ export function validateRoomTypeFields(fields: Pick<RoomType, 'name' | 'areaPerP
   if (fields.areaPerPersonM2 !== undefined && !(Number.isFinite(fields.areaPerPersonM2) && fields.areaPerPersonM2 > 0)) return 'The area per person must be a number above 0.';
   for (const [needId, demand] of Object.entries(fields.demands ?? {})) {
     const need = needs.find((n) => n.id === needId);
-    if (!need) return 'A demand uses a need that does not exist.';
+    if (!need) return 'A demand uses a demand type that does not exist.';
     const problem = demandProblem(need, demand);
     if (problem) return `${need.name}: ${problem}`;
   }
