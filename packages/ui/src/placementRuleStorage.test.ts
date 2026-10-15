@@ -46,7 +46,7 @@ describe('the one-time move of old rules', () => {
     const storage = memory({ [PLACEMENT_RULES_STORAGE_KEY]: JSON.stringify(oldRules), [ROOM_TYPES_STORAGE_KEY]: JSON.stringify(oldTypes) });
     const report = moveStoredOldRules(storage);
     expect(report).toHaveLength(2);
-    expect(report![1]).toBe('Supply air per person + area (example): now serves Supply air. Its numbers moved to Meeting room. Office kept its own numbers. MepApp chose the need Supply air from the unit dm³/s and the rule name.');
+    expect(report![1]).toBe('Supply air per person + area (example): now serves Supply air. Its numbers moved to Meeting room. Office kept its own numbers. MepApp chose the demand type Supply air from the unit dm³/s and the rule name.');
     expect(storage.map.get(PLACEMENT_RULES_BACKUP_KEY)).toBe(JSON.stringify(oldRules));
     const types = JSON.parse(storage.map.get(ROOM_TYPES_STORAGE_KEY)!);
     expect(types[0].demands.supplyAir).toEqual({ terms: [{ basis: 'person', value: 6.5 }] });

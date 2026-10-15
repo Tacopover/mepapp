@@ -263,7 +263,7 @@ describe('validatePlacementRule', () => {
   it('rejects bad values', () => {
     expect(validatePlacementRule(rule({ name: ' ' }), [])).toBe('Enter a name.');
     expect(validatePlacementRule(rule(), [rule({ id: 'other', name: 'rule' })])).toMatch(/already called/);
-    expect(validatePlacementRule(rule({ needId: undefined }), [])).toMatch(/Choose the need/);
+    expect(validatePlacementRule(rule({ needId: undefined }), [])).toMatch(/Choose the demand type/);
     expect(validatePlacementRule(rule({ capacityPerElement: 0 }), [])).toMatch(/one stamp gives/);
     expect(validatePlacementRule(rule({ unit: 'lm' }), [])).toMatch(/not a unit of a flow or a power/);
     expect(validatePlacementRule(rule({ unit: 'kW' }), [])).toBe('The unit kW is not a unit of Supply air.');
@@ -457,7 +457,7 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
     expect(moved.types.find((t) => t.id === 'meeting')!.demands!.supplyAir).toEqual({ terms: [{ basis: 'person', value: 7 }] });
     expect(moved.types.find((t) => t.id === 'hall')!.demands!['need-from-b']).toEqual({ terms: [{ basis: 'area', value: 0.2 }] });
     expect(moved.needs.map((n) => n.id)).toEqual(['need-from-b']);
-    expect(moved.report[0]).toBe('Supply: now serves Supply air. Its numbers moved to Meeting room. Office kept its own numbers. MepApp chose the need Supply air from the unit dm³/s and the rule name.');
+    expect(moved.report[0]).toBe('Supply: now serves Supply air. Its numbers moved to Meeting room. Office kept its own numbers. MepApp chose the demand type Supply air from the unit dm³/s and the rule name.');
     expect(types[1]).toEqual({ id: 'meeting', name: 'Meeting room' });
   });
 
@@ -476,7 +476,7 @@ describe('old rules (before room-type-calculations.md §3.5)', () => {
       ['lift', false],
     ]);
     expect(moved.report[0]).toBe(
-      'Supply: now serves Supply air. Its numbers moved to Office. The rule chose rooms with "Kantoor" in the name: only Office matches this text. Rooms without a room type no longer get stamps from this rule. MepApp chose the need Supply air from the unit dm³/s and the rule name.',
+      'Supply: now serves Supply air. Its numbers moved to Office. The rule chose rooms with "Kantoor" in the name: only Office matches this text. Rooms without a room type no longer get stamps from this rule. MepApp chose the demand type Supply air from the unit dm³/s and the rule name.',
     );
     expect(moved.report[1]).toContain('Its numbers moved to no room type. The rule chose rooms with "Zolder" in the name, and no room type matches this text.');
     expect(parsed.rules[0]!.nameContains).toBe('Kantoor');

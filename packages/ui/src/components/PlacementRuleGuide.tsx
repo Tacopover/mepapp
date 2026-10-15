@@ -495,11 +495,11 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
     }
     if (n === 3) {
       if (parsed.error) return ['bad', 'A number is not correct'];
-      if (needMissing) return ['bad', draft.needId ? 'The need was deleted' : 'Choose a need'];
+      if (needMissing) return ['bad', draft.needId ? 'The demand type was deleted' : 'Choose a demand type'];
       if (tooManyRows.length > 0) return ['bad', `${plural(tooManyRows.length, 'room')}: too many stamps`];
       if ((byCoverage || alsoCoverage) && !coverage) return ['warn', 'Enter a coverage limit'];
       if (missingRows.length > 0) return ['warn', `${plural(missingRows.length, 'room')}: data missing`];
-      if (zeroRows.length > 0) return ['warn', `${plural(zeroRows.length, 'room')}: need 0, no stamp`];
+      if (zeroRows.length > 0) return ['warn', `${plural(zeroRows.length, 'room')}: demand 0, no stamp`];
       if (countBy === 'perRoom') return ['ok', `${draft.perRoomCount.trim() || '1'} in each room`];
       if (byCoverage) return ['ok', 'By coverage'];
       const capacity = valueOf(draft.capacity);
@@ -649,14 +649,14 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                 update(picked ? needPatch(draft, picked) : countByPatch(value as 'perRoom' | 'coverage'));
               }}
             >
-              <optgroup label="A need of the room types">
+              <optgroup label="A demand type of the room types">
                 {needs.map((n) => (
                   <option key={n.id} value={`need:${n.id}`}>
                     {n.name}
-                    {n.own ? ' (your need)' : ''}
+                    {n.own ? ' (your demand type)' : ''}
                   </option>
                 ))}
-                {needMissing && <option value={`need:${draft.needId}`}>{draft.needId ? 'A deleted need' : 'Choose a need'}</option>}
+                {needMissing && <option value={`need:${draft.needId}`}>{draft.needId ? 'A deleted demand type' : 'Choose a demand type'}</option>}
               </optgroup>
               <optgroup label="Another way to count">
                 <option value="perRoom">The same number in each room</option>
@@ -666,12 +666,12 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
           </div>
           <p className="mep-guide-note" data-testid="pg-serves-note">
             {need
-              ? `The room types give the need of each room: ${plural(typesWithNeed.length, 'room type')} of ${types.length} ${typesWithNeed.length === 1 ? 'has' : 'have'} ${need.name}. Step 3 asks what one stamp gives.`
+              ? `The room types give the demand of each room: ${plural(typesWithNeed.length, 'room type')} of ${types.length} ${typesWithNeed.length === 1 ? 'has' : 'have'} ${need.name}. Step 3 asks what one stamp gives.`
               : countBy === 'perRoom'
                 ? 'Each room of the rule gets the same number of stamps, for example one thermostat in each room.'
                 : countBy === 'coverage'
                   ? 'The stamps cover each point of the room, for example smoke detectors.'
-                  : 'The need of this rule was deleted. Choose another need.'}{' '}
+                  : 'The demand type of this rule was deleted. Choose another demand type.'}{' '}
             {countBy === 'need' && (
               <button type="button" className="mep-guide-link" onClick={() => onOpenRoomTypes()}>
                 Open Room types
@@ -691,12 +691,12 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
         <h2>Which rooms get this stamp?</h2>
         <p className="mep-guide-lead">
           Click the room types: the plan shows the rooms that match in blue.
-          <InfoTip label="More about room types">MepApp finds the room type from the room name in the drawing. A rule for a need without room types applies to each room whose type has the need; another rule without room types applies to each room.</InfoTip>
+          <InfoTip label="More about room types">MepApp finds the room type from the room name in the drawing. A rule for a demand type without room types applies to each room whose type has the demand type; another rule without room types applies to each room.</InfoTip>
         </p>
         {untyped.length > 0 && (
           <div className="mep-guide-callout" data-testid="pg-untyped">
             <span>
-              <b>{plural(untyped.length, 'room')}</b> on this page {untyped.length === 1 ? 'has' : 'have'} no room type. {countBy === 'need' ? 'A rule for a need' : 'A rule with room types'} does not find {untyped.length === 1 ? 'it' : 'them'}.
+              <b>{plural(untyped.length, 'room')}</b> on this page {untyped.length === 1 ? 'has' : 'have'} no room type. {countBy === 'need' ? 'A rule for a demand type' : 'A rule with room types'} does not find {untyped.length === 1 ? 'it' : 'them'}.
             </span>
             <button type="button" onClick={() => onOpenRoomTypes()}>
               Open Room types
@@ -898,14 +898,14 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
       <>
         <h2>What does one stamp give?</h2>
         <p className="mep-guide-lead">
-          The room types give the need of each room{need ? ` (${need.name})` : ''}. Enter what one stamp gives: MepApp divides the need by it and rounds up.
+          The room types give the demand of each room{need ? ` (${need.name})` : ''}. Enter what one stamp gives: MepApp divides the demand by it and rounds up.
           <InfoTip label="More about the count">
-            The need comes from the calculation of the room type in Room types, for example 6.5 dm³/s per person. Click a room in the table or on the plan to see why it gets its number of stamps.
+            The demand comes from the calculation of the room type in Room types, for example 6.5 dm³/s per person. Click a room in the table or on the plan to see why it gets its number of stamps.
           </InfoTip>
         </p>
         {needMissing && (
           <div className="mep-guide-callout bad" data-testid="pg-need-deleted">
-            <span>{draft.needId ? 'The need of this rule was deleted. MepApp places no stamps until the rule gets another need.' : 'The rule has no need.'} Choose a need in step 1.</span>
+            <span>{draft.needId ? 'The demand type of this rule was deleted. MepApp places no stamps until the rule gets another demand type.' : 'The rule has no demand type.'} Choose a demand type in step 1.</span>
             <button type="button" onClick={() => onStepChange(1)}>
               Go to step 1
             </button>
@@ -1067,7 +1067,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                     <tr>
                       <th>Room</th>
                       <th>The room type gives</th>
-                      <th>Need</th>
+                      <th>Demand</th>
                       <th>One stamp</th>
                       <th>Stamps</th>
                     </tr>
@@ -1121,7 +1121,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                   <b>
                     {plural(zeroRows.length, 'room')} {zeroRows.length === 1 ? 'gets' : 'get'} no stamp
                   </b>
-                  , because the need is 0: {zeroRows.slice(0, 8).map((row) => roomLabel(row.room)).join(', ')}
+                  , because the demand is 0: {zeroRows.slice(0, 8).map((row) => roomLabel(row.room)).join(', ')}
                   {zeroRows.length > 8 ? ', …' : ''}.
                   {zeroPersonRows > 0 &&
                     ` ${zeroPersonRows === zeroRows.length ? (zeroRows.length === 1 ? 'This room has' : 'These rooms have') : `${plural(zeroPersonRows, 'room')} of them ${zeroPersonRows === 1 ? 'has' : 'have'}`} 0 persons: the room is smaller than the area per person of its room type.`}{' '}
@@ -1423,7 +1423,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                   <th>Type</th>
                   <th>m²</th>
                   {showPeople && <th>Persons</th>}
-                  {byNeed && <th>Need ({unit})</th>}
+                  {byNeed && <th>Demand ({unit})</th>}
                   <th>Stamps</th>
                   {byNeed && <th>Each ({unit})</th>}
                   <th>Existing</th>
@@ -1704,7 +1704,7 @@ function WhyBox({ row, matches, sampleName, need, unit, typeName, rule, coverage
         {line('from', `${typeName}: ${need.name}`, `${demandShort(req.demand.demand)} (from the room type)`, '', 'pg-why-type')}
         {line(
           '',
-          'Need of the room',
+          'Demand of the room',
           result.total === null
             ? 'Room data is missing (persons or the scale)'
             : `${demandSumText(need, result)}${result.minimumApplied ? ' → at least the minimum' : ''} = ${fmtTotal(result.total)} ${need.unit}${unit !== need.unit ? ` = ${fmt(req.required)} ${unit}` : ''}`,
@@ -1723,7 +1723,7 @@ function WhyBox({ row, matches, sampleName, need, unit, typeName, rule, coverage
   const needCount = (cls: string) => (
     <>
       {line('', 'One stamp gives', capacityWhy, '', 'pg-why-capacity')}
-      {line(cls, 'Need ÷ one stamp', `${fmt(req.required)} ÷ ${fmt(req.capacity)} = ${fmt((req.required ?? 0) / (req.capacity ?? 1), 2)}, rounded up`, req.quantityCount ?? '?', 'pg-why-source')}
+      {line(cls, 'Demand ÷ one stamp',`${fmt(req.required)} ÷ ${fmt(req.capacity)} = ${fmt((req.required ?? 0) / (req.capacity ?? 1), 2)}, rounded up`, req.quantityCount ?? '?', 'pg-why-source')}
     </>
   );
   const sourceLine = (cls: string) =>
@@ -1748,9 +1748,9 @@ function WhyBox({ row, matches, sampleName, need, unit, typeName, rule, coverage
         </>
       );
   } else if (req.warnings.includes('needNotFound')) {
-    first = line('blocked', 'Need', 'The need of this rule was deleted (step 1)', '?', 'pg-why-source');
+    first = line('blocked', 'Demand type', 'The demand type of this rule was deleted (step 1)', '?', 'pg-why-source');
   } else if (req.warnings.includes('noDemand')) {
-    first = line('blocked', typeName, `${typeName} has no ${need?.name ?? 'need'}. Add it in Room types.`, '?', 'pg-why-source');
+    first = line('blocked', typeName, `${typeName} has no ${need?.name ?? 'demand'}. Add it in Room types.`, '?', 'pg-why-source');
   } else if (req.count === null) {
     first = (
       <>

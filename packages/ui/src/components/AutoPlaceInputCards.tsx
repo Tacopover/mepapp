@@ -134,7 +134,7 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
       <h2>Room types</h2>
       <p className="mep-guide-lead">
         Rules choose rooms by their type.
-        <InfoTip label="More about room types">MepApp finds the type from the room name. The type also gives the persons and the needs of its rooms, each with its calculation.</InfoTip>
+        <InfoTip label="More about room types">MepApp finds the type from the room name. The type also gives the persons and the demands of its rooms, each with its calculation.</InfoTip>
       </p>
       <div className="mep-guide-seg" role="tablist" aria-label="Room types">
         <button type="button" role="tab" className={tab === 'rooms' ? 'on' : ''} aria-selected={tab === 'rooms'} disabled={libraryDirty} title={libraryDirty ? 'Save or revert the room type first' : undefined} onClick={() => setTab('rooms')}>
@@ -149,7 +149,7 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
           {untyped.length > 0 ? (
             <div className="mep-guide-callout" data-testid="ap-untyped">
               <span>
-                <b>{plural(untyped.length, 'room')}</b> {untyped.length === 1 ? 'has' : 'have'} no type. A rule for a need does not find {untyped.length === 1 ? 'it' : 'them'}. Choose a type, or add a keyword in the library.
+                <b>{plural(untyped.length, 'room')}</b> {untyped.length === 1 ? 'has' : 'have'} no type. A rule for a demand type does not find {untyped.length === 1 ? 'it' : 'them'}. Choose a type, or add a keyword in the library.
               </span>
             </div>
           ) : (
@@ -225,7 +225,7 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
         </>
       ) : (
         <>
-          <p className="mep-guide-note">All drawings use this library. One row for each room type, one column for each need.</p>
+          <p className="mep-guide-note">All drawings use this library. One row for each room type, one column for each demand type.</p>
           <RoomTypeLibrary
             types={library}
             fileOnlyTypes={fileOnlyTypes}

@@ -75,7 +75,7 @@ const newNeedId = () => `need-${Date.now().toString(36)}${Math.random().toString
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** The column of the area per person in the table. */
 const PERSONS = 'persons';
-/** The "Add a need" list gets the focus after a need is removed. */
+/** The "Add a demand type" list gets the focus after a need is removed. */
 const ADD_NEED = 'add-need';
 
 type NeedPanel = { kind: 'new' } | { kind: 'edit'; needId: string } | { kind: 'delete'; needId: string };
@@ -191,7 +191,7 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
       onChange([...types.map((t) => imported.find((i) => i.id === t.id) ?? t), ...imported.filter((i) => !types.some((t) => t.id === i.id))]);
       if (importedNeeds.length > 0) onChangeNeeds([...needs.map((n) => importedNeeds.find((i) => i.id === n.id) ?? n), ...importedNeeds.filter((i) => !needs.some((n) => n.id === i.id))]);
       setMessage(
-        `Imported ${plural(imported.length, 'room type')} (${types.filter((t) => importedIds.has(t.id)).length} replaced)${importedNeeds.length > 0 ? ` and ${plural(importedNeeds.length, 'own need')}` : ''}.`,
+        `Imported ${plural(imported.length, 'room type')} (${types.filter((t) => importedIds.has(t.id)).length} replaced)${importedNeeds.length > 0 ? ` and ${plural(importedNeeds.length, 'own demand type')}` : ''}.`,
       );
     } catch {
       setMessage(`Could not read ${file.name}.`);
@@ -218,7 +218,7 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
           Fill in the example values
         </button>
         <button type="button" disabled={dirty} title={busy} onClick={() => setPanel({ kind: 'new' })} data-testid="rt-new-need">
-          + New need…
+          + New demand type…
         </button>
       </div>
       {panel?.kind === 'new' && (
@@ -228,7 +228,7 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
           onSave={(need) => {
             onChangeNeeds([...needs, need]);
             setPanel(null);
-            setMessage(`MepApp added the need ${need.name}. Click a cell in its column to add it to a room type.`);
+            setMessage(`MepApp added the demand type ${need.name}. Click a cell in its column to add it to a room type.`);
           }}
         />
       )}
@@ -263,12 +263,12 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
             );
             onChangeNeeds(needs.filter((n) => n.id !== panelNeed.id));
             setPanel(null);
-            setMessage(`MepApp deleted the need ${panelNeed.name}.`);
+            setMessage(`MepApp deleted the demand type ${panelNeed.name}.`);
           }}
         />
       )}
       <div className="mep-rt-scroll">
-        <table className="mep-rt-table" aria-label="Room types and their needs" data-testid="rt-table">
+        <table className="mep-rt-table" aria-label="Room types and their demands" data-testid="rt-table">
           <thead>
             <tr>
               <th scope="col" className="mep-rt-name">
@@ -280,7 +280,7 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
               {columns.map((need) => (
                 <th scope="col" key={need.id} data-need={need.id}>
                   {need.own ? (
-                    <button type="button" className="mep-guide-link" disabled={dirty} title={busy ?? 'Rename or delete this need'} onClick={() => setPanel({ kind: 'edit', needId: need.id })}>
+                    <button type="button" className="mep-guide-link" disabled={dirty} title={busy ?? 'Rename or delete this demand type'} onClick={() => setPanel({ kind: 'edit', needId: need.id })}>
                       {need.name}
                     </button>
                   ) : (
@@ -366,7 +366,7 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
             const missing = missingNeedsOf(next);
             if (missing.length > 0) {
               onChangeNeeds([...needs, ...missing]);
-              setMessage(`MepApp added the need ${missing.map((n) => n.name).join(', ')} of this drawing to your library.`);
+              setMessage(`MepApp added the demand type ${missing.map((n) => n.name).join(', ')} of this drawing to your library.`);
             }
             setFocusNeed(null);
           }}
@@ -378,7 +378,7 @@ export function RoomTypeLibrary({ types, fileOnlyTypes, needs, fileOnlyNeeds = [
       ) : fileFocus ? (
         <div className="mep-guide-callout" data-testid="rt-file-only">
           <span>
-            {fileFocus.type.name} is only in this drawing, not in your library. Add it to your library to change its needs.
+            {fileFocus.type.name} is only in this drawing, not in your library. Add it to your library to change its demands.
           </span>
           <div className="mep-guide-inline">
             <button type="button" onClick={() => addToLibrary(fileFocus.type, fileFocus.needId)}>
@@ -433,7 +433,7 @@ function NeedForm({ need, others, onSave, onCancel, onDelete, busy }: { need?: R
   return (
     <div className="mep-guide-formula mep-rt-need-form" data-testid="rt-need-form">
       <div className="mep-guide-term">
-        <b>{need ? `Need: ${need.name}` : 'New need'}</b>
+        <b>{need ? `Demand type: ${need.name}` : 'New demand type'}</b>
       </div>
       <div className="mep-guide-term">
         <label className="mep-guide-label" htmlFor="rt-need-name">
@@ -445,7 +445,7 @@ function NeedForm({ need, others, onSave, onCancel, onDelete, busy }: { need?: R
         <label className="mep-guide-label" htmlFor="rt-need-kind">
           It is
         </label>
-        <select id="rt-need-kind" className="mep-guide-unit" value={kind} disabled={need !== undefined} title={need ? 'A need keeps its kind. Make a new need for another kind.' : undefined} onChange={(e) => (setKind(e.target.value as NeedKind), setError(null))}>
+        <select id="rt-need-kind" className="mep-guide-unit" value={kind} disabled={need !== undefined} title={need ? 'A demand type keeps its kind. Make a new demand type for another kind.' : undefined} onChange={(e) => (setKind(e.target.value as NeedKind), setError(null))}>
           {OWN_NEED_KINDS.map((k) => (
             <option key={k} value={k}>
               {NEED_KIND_LABELS[k].toLowerCase()}
@@ -472,7 +472,7 @@ function NeedForm({ need, others, onSave, onCancel, onDelete, busy }: { need?: R
         </div>
       )}
       <div className="mep-guide-term">
-        <span className="mep-guide-note">{KIND_UNIT_HINT[kind]} Each room type then chooses its calculation for the need.</span>
+        <span className="mep-guide-note">{KIND_UNIT_HINT[kind]} Each room type then chooses its calculation for the demand type.</span>
       </div>
       {error && (
         <div className="mep-guide-term mep-circuit-types-error" role="alert">
@@ -481,7 +481,7 @@ function NeedForm({ need, others, onSave, onCancel, onDelete, busy }: { need?: R
       )}
       <div className="mep-guide-term mep-guide-inline">
         <button type="button" className="primary" onClick={save} data-testid="rt-need-save">
-          {need ? 'Save' : 'Add the need'}
+          {need ? 'Save' : 'Add the demand type'}
         </button>
         <button type="button" onClick={onCancel}>
           Cancel
@@ -500,10 +500,10 @@ function NeedForm({ need, others, onSave, onCancel, onDelete, busy }: { need?: R
 function DeleteNeed({ need, users, busy, onDelete, onCancel }: { need: RoomNeed; users: RoomType[]; busy?: string; onDelete: () => void; onCancel: () => void }) {
   return (
     <div className="mep-guide-callout bad" role="alert" data-testid="rt-delete-need">
-      <b>Delete the need {need.name}?</b>
+      <b>Delete the demand type {need.name}?</b>
       <span>
         {users.length > 0 ? `${plural(users.length, 'room type')} lose${users.length === 1 ? 's' : ''} its numbers: ${users.map((t) => t.name).join(', ')}.` : 'No room type has numbers for it.'} A rule that serves it places no stamps until it gets another
-        need. You cannot undo this.
+        demand type. You cannot undo this.
       </span>
       <div className="mep-guide-inline">
         <button type="button" onClick={onDelete} disabled={busy !== undefined} title={busy} data-testid="rt-delete-need-yes">
@@ -686,8 +686,8 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
           </div>
         )}
       </div>
-      <h5 className="mep-room-types-group">Needs and their calculations</h5>
-      {shown.length === 0 && <p className="mep-guide-note">This room type has no needs yet. A rule for a need does not place stamps in its rooms.</p>}
+      <h5 className="mep-room-types-group">Demand types and their calculations</h5>
+      {shown.length === 0 && <p className="mep-guide-note">This room type has no demands yet. A rule for a demand type does not place stamps in its rooms.</p>}
       {shown.map((need) => (
         <DemandEditor
           key={need.id}
@@ -716,7 +716,7 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
       )}
       {lacking.length > 0 && (
         <div className="mep-guide-inline mep-rt-add-need">
-          <label htmlFor="rt-add-need">Add a need</label>
+          <label htmlFor="rt-add-need">Add a demand type</label>
           <select
             id="rt-add-need"
             className="mep-guide-unit"
@@ -786,7 +786,7 @@ function DemandEditor({ need, typeName, draft, sample, people, onChange }: Deman
       const result = demandTotal(need, demand, { ...sample.values, people });
       line =
         result.total === null
-          ? `${sample.label}: ${result.problems.includes('noPeople') ? 'no persons. Enter the area per person above.' : result.problems.includes('noCalibration') ? 'the page has no scale.' : 'a calculation does not work with this need.'}`
+          ? `${sample.label}: ${result.problems.includes('noPeople') ? 'no persons. Enter the area per person above.' : result.problems.includes('noCalibration') ? 'the page has no scale.' : 'a calculation does not work with this demand type.'}`
           : `${sample.label}: ${demandSumText(need, result)}${result.minimumApplied ? ' → at least the minimum' : ''} = ${fmtTotal(result.total)} ${totalUnit(need)}`;
     }
   } catch (e) {
@@ -798,7 +798,7 @@ function DemandEditor({ need, typeName, draft, sample, people, onChange }: Deman
       <div className="mep-guide-term mep-rt-demand-head">
         <b>{need.name}</b>
         <span className="mep-guide-note">{need.unit}</span>
-        {need.own && <span className="mep-rt-tag">your need</span>}
+        {need.own && <span className="mep-rt-tag">your demand type</span>}
         <button type="button" className="mep-guide-link mep-rt-remove" onClick={() => onChange(null)} data-testid={`${id}-remove`}>
           Remove {need.name}
         </button>
