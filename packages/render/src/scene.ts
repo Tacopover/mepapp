@@ -66,6 +66,7 @@ import {
   reconcilePdfSync,
   recomputeAttachedSegments,
   resolveCircuitLineTargets,
+  remapRoutingTargets,
   resolveSegmentEndpoint,
   routingTargetOf,
   withRoutingTarget,
@@ -2445,7 +2446,7 @@ export class SketchScene {
     tx.update((s) => {
       const stamps = { ...s.stamps };
       for (const id of stampIds) {
-        stamps[id] = { ...stamps[id], ports: definition.ports.map((port) => ({ ...port })), nativeWidth: definition.nativeWidth, nativeHeight: definition.nativeHeight };
+        stamps[id] = this.withPortsRoutingTargets({ ...stamps[id], ports: definition.ports.map((port) => ({ ...port })), nativeWidth: definition.nativeWidth, nativeHeight: definition.nativeHeight });
       }
       const { segments, fittings } = this.detachLostPortEnds(s, removed);
       return this.applyConnectivityCascade({ ...s, stamps, segments, fittings }, this.stampPortConnectionPoints(stampIds, stamps));
@@ -2457,6 +2458,17 @@ export class SketchScene {
     this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /**
+   * The stamp with routing targets only for the ports that it has now (auto-routing.md §2): an entry moves by
+   * `remap` (old port id -> new port id, see planPortReplacement), and an entry of a port that the stamp lost goes.
+   */
+  private withPortsRoutingTargets(stamp: PlacedStamp, remap?: ReadonlyMap<string, string>): PlacedStamp {
+    if (!stamp.routingTargets) return stamp;
+    const { routingTargets, ...rest } = stamp;
+    const next = remapRoutingTargets(routingTargets, new Set(getStampPorts(stamp).map((port) => port.id)), remap);
+    return next ? { ...rest, routingTargets: next } : rest;
   }
 
   /**
@@ -2549,14 +2561,19 @@ export class SketchScene {
     tx.update((s) => {
       const stamps = { ...s.stamps };
       for (const id of stampIds) {
-        stamps[id] = markAutoPlacedMoved({
-          ...stamps[id],
-          category: definition.category,
-          definitionId: definition.id,
-          ports: definition.ports.map((port) => ({ ...port })),
-          nativeWidth: definition.nativeWidth,
-          nativeHeight: definition.nativeHeight,
-        });
+        stamps[id] = markAutoPlacedMoved(
+          this.withPortsRoutingTargets(
+            {
+              ...stamps[id],
+              category: definition.category,
+              definitionId: definition.id,
+              ports: definition.ports.map((port) => ({ ...port })),
+              nativeWidth: definition.nativeWidth,
+              nativeHeight: definition.nativeHeight,
+            },
+            remaps.get(id),
+          ),
+        );
       }
       const detached = this.detachLostPortEnds(s, removed);
       const segments = this.remapPortEnds(detached.segments, remaps);
@@ -4738,7 +4755,7 @@ export class SketchScene {
     segments: Segment[];
     /** The fittings the copied segments end on — a fitting that no copied segment touches is not copied. */
     fittings: Record<string, Fitting>;
-    /** The copied segments' network types, so a paste into a document that never adopted one still resolves its visuals (see setNetworkTypeForSegmentsNetworks). */
+    /** The network types of the copied segments and of the routing targets of the copied stamps, so a paste into a document that never adopted one still resolves its visuals (see setNetworkTypeForSegmentsNetworks). */
     networkTypes: NetworkType[];
     /** The copied stamps' project-only definitions (a user-library copy or an Element Editor element), so a paste into another document keeps their art and ports after a reopen. An edited built-in stamp is not copied: in the target document it would replace that stamp's art for every instance. */
     stampDefinitions: StampDefinition[];
@@ -4763,7 +4780,7 @@ export class SketchScene {
         if (end.kind === 'fitting' && state.fittings[end.fittingId]) fittings[end.fittingId] = state.fittings[end.fittingId];
       }
     }
-    const networkTypeIds = new Set(segments.map((segment) => segment.networkTypeId));
+    const networkTypeIds = new Set([...segments.map((segment) => segment.networkTypeId), ...stamps.flatMap((stamp) => Object.values(stamp.data.routingTargets ?? {}))]);
     const networkTypes = this.doc.networkTypes.filter((type) => networkTypeIds.has(type.id)).map((type) => ({ ...type }));
     const definitionIds = new Set(stamps.map((stamp) => stamp.data.definitionId));
     const stampDefinitions = this.doc.customStampDefinitions.filter((def) => def.source !== 'library' && definitionIds.has(def.id));
@@ -4790,6 +4807,7 @@ export class SketchScene {
       const { autoPlaced: _autoPlaced, ...copied } = data;
       const pasted: PlacedStamp = {
         ...copied,
+        ...(copied.routingTargets ? { routingTargets: { ...copied.routingTargets } } : {}),
         id,
         transform: { ...data.transform, position: { x: data.transform.position.x + OFFSET, y: data.transform.position.y + OFFSET } },
       };
@@ -4813,7 +4831,7 @@ export class SketchScene {
       newFittingId: () => `fitting-${this.doc.nextFittingSeq++}`,
     });
     this.adoptNetworkTypes(
-      this.clipboard.networkTypes.map((type) => type.id),
+      [...this.clipboard.networkTypes.map((type) => type.id), ...pastedStamps.flatMap((stamp) => Object.values(stamp.routingTargets ?? {}))],
       this.clipboard.networkTypes,
     );
     for (const definition of this.clipboard.stampDefinitions) {
