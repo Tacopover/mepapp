@@ -12,12 +12,12 @@ import type { Room } from './rooms/room.js';
 import type { RoomNeed } from './rooms/room-need.js';
 import { parseRoomDemands, type RoomType } from './rooms/room-type.js';
 import type { Schematic } from './schematic.js';
-import type { PlacedStamp } from './stamp.js';
+import { parseRoutingTargets, type PlacedStamp } from './stamp.js';
 import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 17;
+export const CURRENT_SCHEMA_VERSION = 18;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -290,6 +290,17 @@ const migrationSteps: MigrationStep[] = [
       roomNeeds: [],
     }),
   },
+  {
+    fromVersion: 17,
+    toVersion: 18,
+    // Version 17 predates PlacedStamp.routingTargets (auto-routing.md §4.5). The field is optional and absent
+    // means "no routing target", the same as PlacedStamp.color (v5->v6), so this step only advances the version
+    // number: an older MepApp then refuses the file instead of dropping the field when it saves.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 18,
+    }),
+  },
 ];
 
 function migrateRoomTypeDemands(type: unknown): unknown {
@@ -381,5 +392,14 @@ export function loadProject(raw: JsonRecord): ProjectDocument {
   if (issues.length > 0) {
     throw new ProjectLoadError('project document failed validation after migration', issues);
   }
-  return migrated as unknown as ProjectDocument;
+  const doc = migrated as unknown as ProjectDocument;
+  return { ...doc, stamps: doc.stamps.map(withCleanRoutingTargets) };
+}
+
+/** The stamp without the routing targets that are not network type ids (auto-routing.md §4.5). The same object when it has none. */
+function withCleanRoutingTargets(stamp: PlacedStamp): PlacedStamp {
+  if (!stamp || typeof stamp !== 'object' || !('routingTargets' in stamp)) return stamp;
+  const { routingTargets, ...rest } = stamp;
+  const clean = parseRoutingTargets(routingTargets);
+  return clean ? { ...rest, routingTargets: clean } : rest;
 }

@@ -80,6 +80,9 @@ export function draftOf(rule: PlacementRule) {
     rotation: rule.layout.rotation,
     fixedAngle: text(rule.layout.fixedAngleDeg),
     writeCapacity: rule.writeCapacity,
+    routingTarget: rule.routingTarget ?? '',
+    portRoutingTargets: (rule.portRoutingTargets ?? null) as Record<string, string | null> | null,
+    networkTypeCopies: rule.networkTypeCopies ?? [],
   };
 }
 
@@ -183,5 +186,8 @@ export function ruleOf(id: string, d: Draft, needs: readonly RoomNeed[] = BUILT_
     const angle = numberOf(d.fixedAngle, 'Fixed angle');
     if (angle !== undefined) rule.layout.fixedAngleDeg = angle;
   }
+  if (d.routingTarget) rule.routingTarget = d.routingTarget;
+  if (d.portRoutingTargets) rule.portRoutingTargets = { ...d.portRoutingTargets };
+  if (d.networkTypeCopies.length > 0) rule.networkTypeCopies = d.networkTypeCopies.map((t) => ({ ...t }));
   return rule;
 }

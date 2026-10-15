@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { getStampHalfExtents, getStampPorts, getStampWorldPorts, matchPortsByLocation, SYNTHETIC_CENTER_PORT_ID, type PlacedStamp } from './stamp.js';
+import {
+  getStampHalfExtents,
+  getStampPorts,
+  getStampWorldPorts,
+  matchPortsByLocation,
+  parseRoutingTargets,
+  remapRoutingTargets,
+  routingTargetOf,
+  SYNTHETIC_CENTER_PORT_ID,
+  withRoutingTarget,
+  type PlacedStamp,
+} from './stamp.js';
 
 describe('PlacedStamp helpers', () => {
   const stamp: PlacedStamp = {
@@ -59,5 +70,39 @@ describe('matchPortsByLocation', () => {
 
   it('returns null when the port counts differ', () => {
     expect(matchPortsByLocation([port('a', 0, 0)], [port('x', 0, 0), port('y', 1, 1)])).toBeNull();
+  });
+});
+
+describe('routing targets (auto-routing.md §4.1)', () => {
+  const fcu = { routingTargets: { cw: 'chilled-water', hw: 'heating-water' } };
+
+  it('routingTargetOf reads one port, the center port of a stamp without ports, and nothing for another key', () => {
+    expect(routingTargetOf(fcu, 'hw')).toBe('heating-water');
+    expect(routingTargetOf({ routingTargets: { [SYNTHETIC_CENTER_PORT_ID]: 'supply-air' } }, SYNTHETIC_CENTER_PORT_ID)).toBe('supply-air');
+    expect(routingTargetOf(fcu, 'toString')).toBeUndefined();
+    expect(routingTargetOf({}, 'cw')).toBeUndefined();
+  });
+
+  it('withRoutingTarget sets and removes the target of one port, and gives undefined when none stays', () => {
+    expect(withRoutingTarget(undefined, SYNTHETIC_CENTER_PORT_ID, 'supply-air')).toEqual({ [SYNTHETIC_CENTER_PORT_ID]: 'supply-air' });
+    expect(withRoutingTarget(fcu.routingTargets, 'hw', 'return-air')).toEqual({ cw: 'chilled-water', hw: 'return-air' });
+    expect(withRoutingTarget(fcu.routingTargets, 'hw', null)).toEqual({ cw: 'chilled-water' });
+    expect(withRoutingTarget({ cw: 'chilled-water' }, 'cw', null)).toBeUndefined();
+    expect(fcu.routingTargets).toEqual({ cw: 'chilled-water', hw: 'heating-water' });
+  });
+
+  it('remapRoutingTargets moves the entries of a remap, keeps the ports that stay, and drops the lost ports', () => {
+    expect(remapRoutingTargets(fcu.routingTargets, new Set(['cw', 'hw']))).toEqual(fcu.routingTargets);
+    expect(remapRoutingTargets(fcu.routingTargets, new Set(['cw']))).toEqual({ cw: 'chilled-water' });
+    expect(remapRoutingTargets(fcu.routingTargets, new Set(['a', 'b']), new Map([['cw', 'b'], ['hw', 'a']]))).toEqual({ a: 'heating-water', b: 'chilled-water' });
+    expect(remapRoutingTargets(fcu.routingTargets, new Set([SYNTHETIC_CENTER_PORT_ID]))).toBeUndefined();
+    expect(remapRoutingTargets(undefined, new Set(['cw']))).toBeUndefined();
+  });
+
+  it('parseRoutingTargets keeps the non-empty strings only', () => {
+    expect(parseRoutingTargets(JSON.parse('{"cw":"chilled-water","hw":"","x":3,"y":null,"__proto__":"supply-air"}'))).toEqual({ cw: 'chilled-water' });
+    expect(parseRoutingTargets({ hw: 2 })).toBeUndefined();
+    expect(parseRoutingTargets(['supply-air'])).toBeUndefined();
+    expect(parseRoutingTargets('supply-air')).toBeUndefined();
   });
 });

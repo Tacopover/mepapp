@@ -11,11 +11,14 @@ import {
   M3H_PER_CFM,
   M_PER_FT,
   moveOldRuleNumbers,
+  NEED_ROUTING_TARGET_DEFAULTS,
   parsePlacementRules,
   parseRoomDemands,
   PLACEMENT_RULE_EXAMPLES,
   ROOM_TYPE_DEMAND_EXAMPLES,
   ruleAppliesToRoom,
+  ruleRoutingTargets,
+  routingTargetDefaultOf,
   ruleUnitOf,
   ufAtRoomIndex,
   validatePlacementRule,
@@ -500,5 +503,69 @@ describe('the examples', () => {
     expect(calculateRoomRequirement(toilet, withDemands(parseRoomDemands({ exhaustFixedDm3s: 14 })!)).required).toBe(14);
     const smoke = PLACEMENT_RULE_EXAMPLES.find((x) => x.id === 'example-smoke-detector')!;
     expect(smoke.coverage).toEqual({ maxAreaPerElement: 60, maxRadius: 5.8 });
+  });
+
+  it('give a routing target to the air rules only (auto-routing.md §4.5)', () => {
+    expect(Object.fromEntries(PLACEMENT_RULE_EXAMPLES.map((x) => [x.id, x.routingTarget]))).toEqual({
+      'example-supply-air': 'supply-air',
+      'example-toilet-exhaust': 'exhaust-air',
+      'example-air-changes': 'return-air',
+      'example-lighting': undefined,
+      'example-smoke-detector': undefined,
+    });
+    expect(parsePlacementRules(JSON.parse(JSON.stringify(PLACEMENT_RULE_EXAMPLES)))!.rules).toEqual(PLACEMENT_RULE_EXAMPLES);
+  });
+});
+
+describe('routing targets of a rule (auto-routing.md §4.2)', () => {
+  const center = [{ id: '__center__' }];
+  const fcu = [{ id: 'cw' }, { id: 'hw' }];
+  const copy = { id: 'nt-7f3a2c', name: 'Supply Air 2', discipline: 'ventilation', units: 'CFM', defaultCapacity: 400, color: '#1565c0', lineWidthPt: 2, linePattern: 'solid' } as const;
+
+  it('ruleRoutingTargets gives each port the rule target, a port entry wins, and null gives none', () => {
+    expect(ruleRoutingTargets(rule({ routingTarget: 'supply-air' }), center)).toEqual({ __center__: 'supply-air' });
+    expect(ruleRoutingTargets(rule({ routingTarget: 'supply-air' }), fcu)).toEqual({ cw: 'supply-air', hw: 'supply-air' });
+    expect(ruleRoutingTargets(rule({ portRoutingTargets: { cw: 'chilled-water', hw: 'heating-water' } }), fcu)).toEqual({ cw: 'chilled-water', hw: 'heating-water' });
+    expect(ruleRoutingTargets(rule({ routingTarget: 'chilled-water', portRoutingTargets: { hw: null, other: 'return-air' } }), fcu)).toEqual({ cw: 'chilled-water' });
+    expect(ruleRoutingTargets(rule(), fcu)).toBeUndefined();
+    expect(ruleRoutingTargets(rule({ portRoutingTargets: { cw: null } }), [{ id: 'cw' }])).toBeUndefined();
+  });
+
+  it('the defaults of the built-in demand types', () => {
+    expect(BUILT_IN_NEEDS.map((n) => [n.id, routingTargetDefaultOf(n.id) ?? null])).toEqual([
+      ['light', null],
+      ['supplyAir', 'supply-air'],
+      ['returnAir', 'return-air'],
+      ['heating', 'heating-water'],
+      ['cooling', 'chilled-water'],
+      ['sockets', null],
+    ]);
+    expect(NEED_ROUTING_TARGET_DEFAULTS.supplyAir).toBe('supply-air');
+    expect(routingTargetDefaultOf('constructor')).toBeUndefined();
+    expect(routingTargetDefaultOf(undefined)).toBeUndefined();
+  });
+
+  it('the parse keeps the fields and drops the bad values', () => {
+    const stored = JSON.parse(
+      JSON.stringify([
+        {
+          ...rule({ id: 'a', routingTarget: 'supply-air', networkTypeCopies: [copy] }),
+          portRoutingTargets: { cw: 'chilled-water', hw: null, bad: 3, empty: '' },
+        },
+        { ...rule({ id: 'b', name: 'B' }), routingTarget: 7, portRoutingTargets: 'x', networkTypeCopies: [{ ...copy, linePattern: 'wavy' }, { ...copy, id: '' }, copy, copy] },
+      ]),
+    );
+    const [a, b] = parsePlacementRules(stored)!.rules;
+    expect(a).toMatchObject({ routingTarget: 'supply-air', portRoutingTargets: { cw: 'chilled-water', hw: null }, networkTypeCopies: [copy] });
+    expect(b!.routingTarget).toBeUndefined();
+    expect(b!.portRoutingTargets).toBeUndefined();
+    expect(b!.networkTypeCopies).toEqual([copy]);
+    expect(parsePlacementRules([rule({ id: 'c' })])!.rules[0]).not.toHaveProperty('routingTarget');
+  });
+
+  it('validatePlacementRule refuses an empty network type id', () => {
+    expect(validatePlacementRule(rule({ routingTarget: 'supply-air', portRoutingTargets: { cw: null } }), [])).toBeNull();
+    expect(validatePlacementRule(rule({ routingTarget: '' }), [])).toMatch(/routing target/);
+    expect(validatePlacementRule(rule({ portRoutingTargets: { cw: '' } }), [])).toMatch(/routing target/);
   });
 });

@@ -45,6 +45,13 @@ describe('the draft of a placement rule', () => {
     expect(rule.needId).toBeUndefined();
   });
 
+  it('keeps the routing targets and the network type copies', () => {
+    const copy = { id: 'nt-1', name: 'Supply Air 2', discipline: 'ventilation', units: 'CFM', defaultCapacity: 400, color: '#1565c0', lineWidthPt: 2, linePattern: 'solid' } as const;
+    const rule = { ...blankRule('R'), routingTarget: 'chilled-water', portRoutingTargets: { hw: 'heating-water', drain: null }, networkTypeCopies: [copy] };
+    expect(ruleOf(rule.id, draftOf(rule))).toEqual(rule);
+    expect(ruleOf('r', draftOf(blankRule('R')))).not.toHaveProperty('routingTarget');
+  });
+
   it('refuses a text that is not a number', () => {
     expect(() => ruleOf('r', { ...draftOf(blankRule('R')), capacity: 'abc' })).toThrow('What one stamp gives: "abc" is not a number.');
   });

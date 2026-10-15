@@ -5,7 +5,8 @@
 // the same number in each room, or count by coverage. MepApp holds no national rules: the user enters
 // the numbers. Pure functions, no I/O.
 
-import type { Discipline } from '../network.js';
+import type { PortSpec } from '../geometry.js';
+import type { Discipline, LinePattern, NetworkType } from '../network.js';
 import type { Room } from './room.js';
 import type { RoomValues } from './room-values.js';
 import { demandTotal, matchRoomType, oldDemandFieldTerm, type DemandResult, type DemandTerm, type RoomDemand, type RoomDemands } from './room-type.js';
@@ -106,6 +107,46 @@ export interface PlacementRule {
   layout: PlacementLayout;
   /** Each placed stamp gets required ÷ count as its capacity (ProjectDocument.terminalCapacities). */
   writeCapacity: boolean;
+  /** The routing target of each port of the placed stamps (auto-routing.md §4.2): a network type id. Absent = none. */
+  routingTarget?: string;
+  /**
+   * A stamp with 2 or more ports: the routing target of each port id of the stamp, in place of routingTarget.
+   * Null = this port gets no routing target. A port without an entry gets routingTarget. An id that the stamp
+   * does not have (the user chose another stamp) changes nothing.
+   */
+  portRoutingTargets?: Record<string, string | null>;
+  /**
+   * A copy of each network type that the rule names and that NETWORK_TYPE_LIBRARY does not have (a type that the
+   * user duplicated in a drawing). Auto-place adds the copy to a drawing that does not have the type.
+   */
+  networkTypeCopies?: NetworkType[];
+}
+
+/** The default routing target of a built-in demand type (code: need), a NETWORK_TYPE_LIBRARY id (auto-routing.md §5 question 2). Light, Sockets and own demand types have none. */
+export const NEED_ROUTING_TARGET_DEFAULTS: Readonly<Record<string, string>> = {
+  supplyAir: 'supply-air',
+  returnAir: 'return-air',
+  heating: 'heating-water',
+  cooling: 'chilled-water',
+};
+
+/** The default routing target of the need, or undefined. */
+export const routingTargetDefaultOf = (needId: string | undefined): string | undefined =>
+  needId !== undefined && Object.prototype.hasOwnProperty.call(NEED_ROUTING_TARGET_DEFAULTS, needId) ? NEED_ROUTING_TARGET_DEFAULTS[needId] : undefined;
+
+/**
+ * The routing targets that a stamp of the rule gets, by the id of each port of `ports` (the ports of
+ * getStampPorts: the synthetic center port for a stamp without ports of its own). An entry of
+ * portRoutingTargets wins over routingTarget. Undefined when no port gets one.
+ */
+export function ruleRoutingTargets(rule: Pick<PlacementRule, 'routingTarget' | 'portRoutingTargets'>, ports: readonly Pick<PortSpec, 'id'>[]): Record<string, string> | undefined {
+  const targets: Record<string, string> = {};
+  for (const port of ports) {
+    const own = rule.portRoutingTargets && Object.prototype.hasOwnProperty.call(rule.portRoutingTargets, port.id) ? rule.portRoutingTargets[port.id] : undefined;
+    const target = own === undefined ? rule.routingTarget : own;
+    if (target) targets[port.id] = target;
+  }
+  return Object.keys(targets).length > 0 ? targets : undefined;
 }
 
 export const COUNT_MODE_LABELS: Record<PlacementCountMode, string> = {
@@ -410,6 +451,8 @@ export function validatePlacementRule(rule: PlacementRule, others: readonly Plac
   if (!isNonNegative(rule.layout.minSpacingM)) return 'The min distance between stamps must be a number of 0 or more.';
   if (!isPositive(rule.layout.ceilingGridMm)) return 'The ceiling grid size must be a number above 0.';
   if (rule.layout.rotation === 'fixed' && !Number.isFinite(rule.layout.fixedAngleDeg ?? Number.NaN)) return 'Enter the fixed angle.';
+  if ((rule.routingTarget !== undefined && !rule.routingTarget) || Object.values(rule.portRoutingTargets ?? {}).some((target) => target !== null && !target))
+    return 'Choose a network type for the routing target, or none.';
   return null;
 }
 
@@ -630,7 +673,35 @@ function toPlacementRule(value: unknown): { rule: PlacementRule; old: OldRuleNum
   } else result = fromOldRule(v, rule, oldCoverageLayout);
   if (!result) return null;
   if (v.alsoCoverage === true && result.rule.countBy !== 'coverage') result.rule.alsoCoverage = true;
+  if (typeof v.routingTarget === 'string' && v.routingTarget) result.rule.routingTarget = v.routingTarget;
+  const portTargets = toPortRoutingTargets(v.portRoutingTargets);
+  if (portTargets) result.rule.portRoutingTargets = portTargets;
+  const copies = toNetworkTypeCopies(v.networkTypeCopies);
+  if (copies) result.rule.networkTypeCopies = copies;
   return validatePlacementRule(result.rule, []) === null ? result : null;
+}
+
+/** The routing targets by port id of a stored rule: a non-empty string or null; other values go. */
+function toPortRoutingTargets(value: unknown): Record<string, string | null> | undefined {
+  const targets: Record<string, string | null> = {};
+  for (const [portId, target] of Object.entries(rec(value))) if (portId !== '__proto__' && ((typeof target === 'string' && target) || target === null)) targets[portId] = target;
+  return Object.keys(targets).length > 0 ? targets : undefined;
+}
+
+const LINE_PATTERNS: readonly LinePattern[] = ['solid', 'dashed', 'dotted', 'dashDot', 'longDash', 'dashDotDot'];
+
+/** The network type copies of a stored rule. An entry without an id, a name, a discipline, a color or a line pattern goes, and a repeated id. */
+function toNetworkTypeCopies(value: unknown): NetworkType[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const copies: NetworkType[] = [];
+  for (const entry of value) {
+    const t = rec(entry);
+    const units = typeof t.units === 'string' ? t.units : '';
+    if (typeof t.id !== 'string' || !t.id || typeof t.name !== 'string' || typeof t.color !== 'string' || copies.some((c) => c.id === t.id)) continue;
+    if (!DISCIPLINES.includes(t.discipline as Discipline) || !LINE_PATTERNS.includes(t.linePattern as LinePattern)) continue;
+    copies.push({ id: t.id, name: t.name, discipline: t.discipline as Discipline, units, defaultCapacity: num(t.defaultCapacity) ?? 0, color: t.color, lineWidthPt: num(t.lineWidthPt) ?? 1, linePattern: t.linePattern as LinePattern });
+  }
+  return copies.length > 0 ? copies : undefined;
 }
 
 /**
@@ -725,6 +796,7 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     coverage: {},
     layout: layout('grid'),
     writeCapacity: true,
+    routingTarget: 'supply-air',
   },
   {
     id: 'example-toilet-exhaust',
@@ -740,6 +812,7 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     maxCount: 1,
     layout: layout('center', 0),
     writeCapacity: true,
+    routingTarget: 'exhaust-air',
   },
   {
     id: 'example-air-changes',
@@ -754,6 +827,7 @@ export const PLACEMENT_RULE_EXAMPLES: readonly PlacementRule[] = [
     coverage: {},
     layout: layout('grid'),
     writeCapacity: true,
+    routingTarget: 'return-air',
   },
   {
     id: 'example-lighting',

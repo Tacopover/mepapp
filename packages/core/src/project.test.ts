@@ -424,6 +424,42 @@ describe('room-type demands in the save format', () => {
   });
 });
 
+describe('routing targets in the save format (auto-routing.md §4.5)', () => {
+  const v17 = {
+    schemaVersion: 17, networkTypes: [], segments: [], fittings: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {},
+    circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, rooms: [], calibrations: {}, roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {},
+  };
+  const stamp = { id: 's1', category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, ports: [] };
+
+  it('loads a version 17 save as version 18 with the stamps unchanged', () => {
+    const loaded = loadProject({ ...v17, stamps: [stamp] });
+    expect(CURRENT_SCHEMA_VERSION).toBe(18);
+    expect(loaded.schemaVersion).toBe(18);
+    expect(loaded.stamps).toEqual([stamp]);
+  });
+
+  it('keeps the routing targets of a stamp through a save and a load', () => {
+    const withTargets = { ...stamp, ports: [{ id: 'cw', name: 'CW', fractionX: 0, fractionY: 0.5 }, { id: 'hw', name: 'HW', fractionX: 1, fractionY: 0.5 }], routingTargets: { cw: 'chilled-water', hw: 'heating-water' } };
+    const { schemaVersion: _v, ...doc } = { ...v17, stamps: [withTargets] };
+    const loaded = loadProject(JSON.parse(JSON.stringify(serializeProject(doc as never))));
+    expect(loaded.stamps[0]!.routingTargets).toEqual({ cw: 'chilled-water', hw: 'heating-water' });
+  });
+
+  it('drops the routing targets that are not network type ids, and an empty map', () => {
+    const loaded = loadProject({
+      ...v17,
+      schemaVersion: 18,
+      stamps: [
+        { ...stamp, id: 'a', routingTargets: { __center__: 'supply-air', x: 3, y: '' } },
+        { ...stamp, id: 'b', routingTargets: { x: null } },
+        { ...stamp, id: 'c', routingTargets: 'supply-air' },
+      ],
+    });
+    expect(loaded.stamps.map((s) => s.routingTargets)).toEqual([{ __center__: 'supply-air' }, undefined, undefined]);
+    expect(loaded.stamps.map((s) => 'routingTargets' in s)).toEqual([true, false, false]);
+  });
+});
+
 describe('customStampDefinitionsToSave', () => {
   const definition = (id: string, source: StampDefinition['source']): StampDefinition => ({
     id, label: id, discipline: 'other', category: 'terminal', nativeWidth: 40, nativeHeight: 40, ports: [], iconRef: 'data:image/png;base64,AAAA', source,

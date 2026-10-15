@@ -25,6 +25,51 @@ export interface PlacedStamp {
    * at placement, to tell when the room changed after the placement.
    */
   autoPlaced?: { ruleId: string; roomId: string; moved: boolean; roomKey?: string };
+  /**
+   * The network type that routing must connect to each port, by port id (auto-routing.md §4.1). Not the network
+   * type of the port: a connected segment defines that. A stamp without ports of its own uses
+   * SYNTHETIC_CENTER_PORT_ID. A port without an entry has no routing target. Absent = no port has one.
+   */
+  routingTargets?: Record<string, string>;
+}
+
+/** The routing target of one port of the stamp (a network type id), or undefined. */
+export function routingTargetOf(stamp: Pick<PlacedStamp, 'routingTargets'>, portId: string): string | undefined {
+  const targets = stamp.routingTargets;
+  return targets && Object.prototype.hasOwnProperty.call(targets, portId) ? targets[portId] : undefined;
+}
+
+/** The routing targets with the target of one port set, or removed for `null`. Undefined when no port has one. */
+export function withRoutingTarget(targets: Readonly<Record<string, string>> | undefined, portId: string, networkTypeId: string | null): Record<string, string> | undefined {
+  const next: Record<string, string> = {};
+  for (const [id, target] of Object.entries(targets ?? {})) if (id !== portId) next[id] = target;
+  if (networkTypeId !== null && portId !== '__proto__') next[portId] = networkTypeId;
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+/**
+ * The routing targets after a change of the ports of the stamp: an entry moves to `remap.get(portId)` when
+ * `remap` has the port, and goes when its (new) port id is not in `keep`. Undefined when no entry stays.
+ */
+export function remapRoutingTargets(
+  targets: Readonly<Record<string, string>> | undefined,
+  keep: ReadonlySet<string>,
+  remap?: ReadonlyMap<string, string>,
+): Record<string, string> | undefined {
+  const next: Record<string, string> = {};
+  for (const [portId, target] of Object.entries(targets ?? {})) {
+    const id = remap?.get(portId) ?? portId;
+    if (keep.has(id)) next[id] = target;
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+/** The routing targets of a saved stamp: entries whose value is not a non-empty string go. Undefined when none stays. */
+export function parseRoutingTargets(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const next: Record<string, string> = {};
+  for (const [portId, target] of Object.entries(raw)) if (portId !== '__proto__' && typeof target === 'string' && target) next[portId] = target;
+  return Object.keys(next).length > 0 ? next : undefined;
 }
 
 /** The stamp with `autoPlaced.moved` set, for a user edit of an auto-placed stamp. The same object when there is nothing to change. */
