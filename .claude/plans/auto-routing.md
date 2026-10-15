@@ -1,6 +1,6 @@
 # Routing to the placed stamps — part 1: network types on stamps
 
-Status: **assessment, comparison, model, answers, mockup and road map done (2026-10-14). Waiting for the user: the owner of the network type (§9), the model (§4) and the layout of the mockup (§6). No product code is changed.** Branch `worktree-auto-routing`, made from `origin/worktree-room-type-calculations` (a3f3ee9), because `origin/master` (4c31201) does not contain 3f66722. Master had no newer commits, so no merge was necessary. Prompt: `auto-routing-prompt.md`.
+Status: **assessment, comparison, model, answers, mockup and road map done (2026-10-14). Waiting for the user: the owner of the network type (§3), the model (§4), the layout of the mockup (§6) and phase P7 (§4.3). §11 lists the four decisions. No product code is changed.** Branch `worktree-auto-routing`, made from `origin/worktree-room-type-calculations` (a3f3ee9), because `origin/master` (4c31201) does not contain 3f66722. Master had no newer commits, so no merge was necessary. Prompt: `auto-routing-prompt.md`.
 
 Mockup: artifact https://claude.ai/artifact/Ugzv9CJtBdJ5rKuPSAmg7e, copy in `.claude/plans/auto-routing-mockup/mockup.html`. Checked in Chromium (Playwright 1.63): 38 checks pass (19 at 400 px in the dark theme, 19 at 1280 px in the light theme). The checks type into the rule name and the capacity box, use the selects, the check boxes and the buttons, click and key-select stamps in the drawing, find no horizontal page scroll and no page errors.
 
