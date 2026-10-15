@@ -1,6 +1,6 @@
 # Routing to the placed stamps — part 1: network types on stamps
 
-Status: **assessment, comparison, model, answers, mockup and road map done (2026-10-14). Waiting for the user: the owner of the network type (§3), the model (§4), the layout of the mockup (§6) and phase P7 (§4.3). §11 lists the four decisions. No product code is changed.** Branch `worktree-auto-routing`, made from `origin/worktree-room-type-calculations` (a3f3ee9), because `origin/master` (4c31201) does not contain 3f66722. Master had no newer commits, so no merge was necessary. Prompt: `auto-routing-prompt.md`.
+Status: **assessment, comparison, model, answers, mockup and road map done (2026-10-14). On 2026-10-15 the user accepted the recommendations (§11): the rule is the owner, the model of §4, layout A, P7 later. No product code is changed yet. Next: P1.** Branch `worktree-auto-routing`, made from `origin/worktree-room-type-calculations` (a3f3ee9), because `origin/master` (4c31201) does not contain 3f66722. Master had no newer commits, so no merge was necessary. Prompt: `auto-routing-prompt.md`.
 
 Mockup: artifact https://claude.ai/artifact/Ugzv9CJtBdJ5rKuPSAmg7e, copy in `.claude/plans/auto-routing-mockup/mockup.html`. Checked in Chromium (Playwright 1.63): 38 checks pass (19 at 400 px in the dark theme, 19 at 1280 px in the light theme). The checks type into the rule name and the capacity box, use the selects, the check boxes and the buttons, click and key-select stamps in the drawing, find no horizontal page scroll and no page errors.
 
@@ -10,6 +10,9 @@ Terms in this file:
 - **Open port**: a port with a port network type and no segment yet.
 - **Owner**: the place where the user chooses the port network type before Auto-place writes it on the stamps (the rule, the demand of a room type, or both).
 - **System**: a later term (§8, R2) for one network of one type, for example "Supply Air 1" of one air handling unit.
+- **Need**: one thing that a room requires, as one total in one unit (`RoomNeed`, `core/rooms/room-need.ts:11`, from `room-type-calculations.md`). MepApp has 6 built-in needs: Light (lm), Supply air (dm³/s), Return air (dm³/s), Heating (W), Cooling (W) and Sockets (a count). The user adds own needs with "+ New need…" in the Room types table. A need is not a network type. The need Supply air is the amount of air that a room requires. The network type Supply Air is the kind of duct that carries the air.
+- **Demand**: the calculation of one need for one room type, for example "Office: Supply air 6.5 dm³/s per person" (`RoomDemand`, `room-type.ts:21`). One demand is one cell of the Room types table.
+- **Rule**: a placement rule (`PlacementRule`, `placement-rule.ts`). A rule with `countBy: 'need'` serves one need (`needId`). Auto-place divides the total of the need in a room by the capacity of one stamp, and rounds up. A rule can also count without a need: "The same number in each room" or "by coverage".
 
 ## 1. The goal of part 1
 
@@ -56,7 +59,7 @@ Columns: **Must** = what part 1 must do there. "Keep" = the port network type mu
 |---|---|---|---|
 | Fan coil unit with 2 ports: Chilled Water and Heating Water | Works. The rule knows the stamp, so it lists the 2 ports and gives each one a type. | Does not work. The demand "Cooling" knows no stamp and no port. It can give one type, and the second port stays wrong. | Works only through the rule part. |
 | Toilet exhaust against office return air (both serve the need Return air) | Works with 2 rules. The examples already have 2 rules: "Return air valve toilet" (toilet, bathroom; center; max 1) and a grille rule for other rooms. The stamp, the count and the layout differ, so the rules differ anyway. | Works with 1 rule: the Toilet type says Exhaust Air. But a toilet valve and an office grille are different stamps, so 1 rule rarely serves both. | Works. The user must look in 2 places to know what a stamp gets. |
-| Radiators for Heating | Works: one rule "Radiator" → Heating Water. | Works, but each of about 20 room types with Heating needs the same value. | Works. |
+| Radiators for Heating | Works: one rule "Radiator" → Heating Water. | Works, but each of about 20 room types with Heating must get the same value. | Works. |
 | Sockets, Light | Works: none (the default). | Works: none. | Works. |
 | Smoke detector by coverage, thermostat "the same number in each room" | Works: the rule has the field for each way to count. | Does not work: these rules serve no need, so no demand exists. | Works only through the rule part. |
 | One building, 2 air handling units | Not the job of a network type. The place of the room sets the system (§8, R2). | The same. | The same. |
@@ -69,7 +72,7 @@ Columns: **Must** = what part 1 must do there. "Keep" = the port network type mu
 - The user chooses once per rule, not once per room type.
 - One place to look: the rule says what its stamps get.
 
-The argument for (b) is real but small: "the air of this room goes out of the building" is a property of the room. When a case needs this later, the demand can get an optional override (`RoomDemand.networkTypeId`) that wins over the rule. This addition needs no change to the model of part 1, so part 1 does not add it.
+The argument for (b) is real but small: "the air of this room goes out of the building" is a property of the room. If a later case must have this, the demand can get an optional override (`RoomDemand.networkTypeId`) that wins over the rule. This addition does not change the model of part 1, so part 1 does not add it.
 
 ## 4. The data model
 
@@ -161,10 +164,10 @@ export interface StampDefinition {
 
 ## 5. Answers to the open questions
 
-1. **The owner.** The rule (§3). No override in the room type in part 1. If a later case needs it, the demand gets an override that wins over the rule.
+1. **The owner.** The rule (§3). No override in the room type in part 1. If a later case must have it, the demand gets an override that wins over the rule.
 2. **Defaults.** Yes, for the built-in needs: Supply air → Supply Air, Return air → Return Air, Heating → Heating Water, Cooling → Chilled Water. Light, Sockets and own needs → none. The guide fills the default when the user makes a rule or changes the need, but only when the old value was the default of the old need, so a choice of the user stays. An own need gets no default in part 1: the choice in the rule is enough, and a field on the own need adds a control to the Room types card for a small gain.
 3. **More ports.** The check box "Give each port of the stamp its own network type" shows one row for each port (name, place, select). A port group does not force one type. A group joins ports into one node for the flow (an air handling unit passes air from the return side to the supply side), but routing must draw a Return Air duct to the return port and a Supply Air duct to the supply port. So each port keeps its own type. (§7 lists a problem of `computeNetworks` with groups.)
-4. **The stamp definition.** Yes, but as the optional phase P7, not in the main path. The Element Editor sets a default for each port of a custom stamp; the stamp tool writes it on a stamp placed by hand; the guide fills the rows from it; the rule wins at Auto-place. The library stamps get no defaults in part 1: their data is not reliable for this (the supply grille `ventilation-grille-rh-supply` has the discipline `heatingAndCooling`), and 167 stamps need a separate data pass.
+4. **The stamp definition.** Yes, but as the optional phase P7, not in the main path. The Element Editor sets a default for each port of a custom stamp; the stamp tool writes it on a stamp placed by hand; the guide fills the rows from it; the rule wins at Auto-place. The library stamps get no defaults in part 1: their data is not reliable for this (the supply grille `ventilation-grille-rh-supply` has the discipline `heatingAndCooling`), and a check of the data of the 167 stamps is a separate task.
 5. **Stamps placed by hand.** Yes: Properties shows a select for each port, for each stamp (§6). A change calls `markAutoPlacedMoved`, the same as a change of a custom property (`scene.ts:2736`). Else a new run of Auto-place replaces the stamp and loses the change. A multi-selection of stamps of one definition shows the same rows, with "Mixed" when the values differ.
 6. **Segments.** The port network type is the wish, the segment type is the fact. MepApp does not change one to match the other on its own:
    - A segment of type A on a port of type B: a mark at the port in the drawing (§6) and a line in Properties with the button "Use A for the port". No automatic retag, because a retag of a run changes the whole run (the cascade invariant), and a connect must not do that silently.
@@ -243,19 +246,21 @@ Each phase ends with the core tests, a rebuild of `@mepapp/ui`, and a browser ch
 
 - **P1 — The core model.** `PlacedStamp.portNetworkTypeIds`, `portNetworkTypeOf`, `remapPortNetworkTypes`; the rule fields, `NEED_NETWORK_TYPE_DEFAULTS`, `ruleStampNetworkTypes`; the parse and validation of the rule; the examples; schema 18 and the clean-up at load. Tests: the parse keeps the fields and drops bad values; the helpers with `__center__`, with 2 ports, with a remap; an old file loads as schema 18. Browser: open a drawing, save, open it again, no errors.
 - **P2 — Properties and the scene.** `adoptNetworkTypes` (and the existing paths use it), `setPortNetworkType`, `StampInfo.portNetworkTypeIds`, the "Networks" section in Properties for one stamp and for a multi-selection of one definition. Browser: choose a type for a port in Properties, undo, redo, save and open again.
-- **P3 — The rule and Auto-place.** The Network section in the guide (in the step that the user chooses), the draft fields, `needPatch` and the default, "Use …", the copies of drawing-only types; `groupsOf` and `autoPlaceStamps` write the map and adopt the types; the Check step note for moved stamps with another type. Browser: make a rule with the guide, place, check the types in Properties; a re-run with another type.
+- **P3 — The rule and Auto-place.** The Network section in step 1 "Stamp" of the guide (layout A), the draft fields, `needPatch` and the default, "Use …", the copies of drawing-only types; `groupsOf` and `autoPlaceStamps` write the map and adopt the types; the Check step note for moved stamps with another type. Browser: make a rule with the guide, place, check the types in Properties; a re-run with another type.
 - **P4 — Keep the value through edits.** `applyDefinitionToPlacedStamps`, Replace stamp (`remaps`), copy and paste (also the network types that the stamps name). Browser: replace a 2-port stamp, edit a definition, paste into another drawing.
 - **P5 — The open ports in the drawing.** The dots, the ring and "!", the status bar check box and the count. Browser: the dots go when a segment connects, and come back on undo.
 - **P6 — Segments.** The segment tool takes the type of the start port; the cascade changes the ports on the run; the mismatch line and button in Properties. Browser: draw from a grille, retag the run, check the ports.
-- **P7 — The default of the definition (optional).** `StampDefinition.portNetworkTypeIds`, the Element Editor rows, the stamp tool, the guide rows. Only if the user wants it in part 1.
+- **P7 — The default of the definition (optional).** `StampDefinition.portNetworkTypeIds`, the Element Editor rows, the stamp tool, the guide rows. Later, not in part 1 (§11, decision 4).
 
 ## 10. Not changed by this plan
 
 The items of `room-type-calculations-small-fixes.md` (the user wants them later). The flow solve. The network tree panel.
 
-## 11. Decisions for the user
+## 11. Decisions of the user
 
-1. The owner: the rule (recommended), the demand of a room type, or both?
-2. The model of §4: a map on the stamp, the rule fields, schema 18, no silent default for old rules.
-3. The layout: A (step 1, recommended) or B (step 3)?
-4. P7 (the default of the definition): in part 1, or later?
+On 2026-10-15 the user accepted the recommendations:
+
+1. The owner: the rule.
+2. The model of §4: accepted (a map on the stamp, the rule fields, schema 18, no silent default for old rules).
+3. The layout: A (the Network section in step 1 "Stamp").
+4. P7 (the default of the definition): later, not in part 1. P7 is the last phase, so the user can still move it into part 1.
