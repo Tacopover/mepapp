@@ -67,6 +67,8 @@ import {
   recomputeAttachedSegments,
   resolveCircuitLineTargets,
   resolveSegmentEndpoint,
+  routingTargetOf,
+  withRoutingTarget,
   rotateAnnotationGeometry,
   rotatedRectCorners,
   rotatePointAround,
@@ -388,6 +390,12 @@ export interface StampInfo {
   color?: string;
   /** User-entered capacity (Flow section) — see setTerminalCapacity/terminalCapacities. Not part of PlacedStamp itself. */
   capacity: number;
+  /** The rule and the room of an auto-placed stamp — see PlacedStamp.autoPlaced. */
+  autoPlaced?: PlacedStamp['autoPlaced'];
+  /** The routing target of each port — see PlacedStamp.routingTargets. */
+  routingTargets?: Record<string, string>;
+  /** The network type of the segment on each connected port, by port id (auto-routing.md §4.4). A port without a segment has no entry. */
+  portSegmentTypes?: Record<string, string>;
 }
 
 /** The Properties panel's read model for a single selected segment — see getSelectedSegmentInfo. */
@@ -1148,7 +1156,7 @@ export class SketchScene {
     this.stampGhostSprite = sprite;
   }
 
-  private toStampInfo(data: PlacedStamp): StampInfo {
+  private toStampInfo(data: PlacedStamp, portSegmentTypes: ReadonlyMap<string, Record<string, string>>): StampInfo {
     return {
       id: data.id,
       category: data.category,
@@ -1161,15 +1169,33 @@ export class SketchScene {
       properties: data.properties,
       color: data.color,
       capacity: this.doc.terminalCapacities.get(data.id) ?? 0,
+      autoPlaced: data.autoPlaced,
+      routingTargets: data.routingTargets,
+      portSegmentTypes: portSegmentTypes.get(data.id) ?? {},
     };
+  }
+
+  /** The network type of the segment on each connected port, by stamp id, then port id. The first segment of a port wins. */
+  private portSegmentTypes(): Map<string, Record<string, string>> {
+    const byStamp = new Map<string, Record<string, string>>();
+    for (const segment of Object.values(this.doc.drawingHistory.getState().segments)) {
+      for (const end of [segment.endpointA, segment.endpointB]) {
+        if (end.kind !== 'port') continue;
+        const ports = byStamp.get(end.elementId) ?? {};
+        ports[end.portId] ??= segment.networkTypeId;
+        byStamp.set(end.elementId, ports);
+      }
+    }
+    return byStamp;
   }
 
   getSelection(): StampInfo[] {
     const state = this.doc.drawingHistory.getState();
+    const portSegmentTypes = this.portSegmentTypes();
     return [...this.doc.selectedIds]
       .map((id) => state.stamps[id])
       .filter((d): d is PlacedStamp => d !== undefined)
-      .map((d) => this.toStampInfo(d));
+      .map((d) => this.toStampInfo(d, portSegmentTypes));
   }
 
   /** Whether anything (a stamp or an annotation) is currently selected — unlike getSelection(), which only reports stamps (the Properties panel's read model), this covers the full selection for gating UI like the rail's Rotate/Delete actions. */
@@ -1374,13 +1400,7 @@ export class SketchScene {
     // by this document (see setActiveNetworkType) — adopt it now so its own
     // color/thickness/pattern resolve correctly instead of falling back to
     // DEFAULT_NETWORK_TYPE (see resolveNetworkTypeVisuals).
-    if (!this.doc.networkTypes.some((t) => t.id === networkTypeId)) {
-      const type = getNetworkTypeFromLibrary(networkTypeId);
-      if (type) {
-        this.doc.networkTypes.push({ ...type });
-        this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
-      }
-    }
+    this.adoptNetworkTypes([networkTypeId]);
     const networks = computeNetworks({
       segments: Object.values(state.segments),
       fittings: Object.values(state.fittings),
@@ -1428,7 +1448,8 @@ export class SketchScene {
 
   /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. */
   listStamps(): StampInfo[] {
-    return Object.values(this.doc.drawingHistory.getState().stamps).map((d) => this.toStampInfo(d));
+    const portSegmentTypes = this.portSegmentTypes();
+    return Object.values(this.doc.drawingHistory.getState().stamps).map((d) => this.toStampInfo(d, portSegmentTypes));
   }
 
   /** Derives the current network topology (see core's computeNetworks) resolved against known network types — the Layers panel's "Networks" list. */
@@ -2243,11 +2264,40 @@ export class SketchScene {
    * in place, and `type` can be the shared NETWORK_TYPE_LIBRARY entry.
    */
   setActiveNetworkType(type: NetworkType): void {
-    if (!this.doc.networkTypes.some((t) => t.id === type.id)) {
-      this.doc.networkTypes.push({ ...type });
-    }
+    this.adoptTypes([type.id], [type]);
     this.activeNetworkTypeId = type.id;
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+  }
+
+  /**
+   * Adopts each network type id that the active document does not have yet (auto-routing.md §4.4, R8): the
+   * document keeps its own copy when it has the id, else it adopts the entry of `copies` (a copied segment of
+   * another document, the copy in a placement rule), else the NETWORK_TYPE_LIBRARY type. Every path that
+   * makes a document use a type goes through here, so the type has its own visuals before a segment or a
+   * routing target uses it. Emits networkTypesChanged once when it adopted a type. Returns the ids that it
+   * cannot find.
+   */
+  adoptNetworkTypes(ids: Iterable<string>, copies: readonly NetworkType[] = []): string[] {
+    const { adopted, missing } = this.adoptTypes(ids, copies);
+    if (adopted) this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+    return missing;
+  }
+
+  /** adoptNetworkTypes without the event, for a caller that emits it itself. */
+  private adoptTypes(ids: Iterable<string>, copies: readonly NetworkType[]): { adopted: boolean; missing: string[] } {
+    let adopted = false;
+    const missing: string[] = [];
+    for (const id of new Set(ids)) {
+      if (this.doc.networkTypes.some((t) => t.id === id)) continue;
+      const type = copies.find((t) => t.id === id) ?? getNetworkTypeFromLibrary(id);
+      if (!type) {
+        missing.push(id);
+        continue;
+      }
+      this.doc.networkTypes.push({ ...type });
+      adopted = true;
+    }
+    return { adopted, missing };
   }
 
   /** Renames a network type already adopted by the active document (see setActiveNetworkType) — the Networks tree's double-click-to-rename action. No-op if `id` hasn't been picked in this document yet. */
@@ -2260,13 +2310,9 @@ export class SketchScene {
 
   /** Updates a network type's name and/or visuals (color/thickness/pattern/discipline) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType. If `id` hasn't been picked in this document yet (editing a library type's swatch before ever placing a segment of it), adopts it first — same "adopt on first touch" pattern as setActiveNetworkType — so the edit actually persists instead of being silently dropped. No-op only if `id` isn't a known library type either. Re-syncs the drawing layer so already-drawn segments of this type update immediately. */
   updateNetworkType(id: string, patch: Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline'>>): void {
-    let target = this.doc.networkTypes.find((t) => t.id === id);
-    if (!target) {
-      const libraryType = getNetworkTypeFromLibrary(id);
-      if (!libraryType) return;
-      target = { ...libraryType };
-      this.doc.networkTypes.push(target);
-    }
+    this.adoptTypes([id], []);
+    const target = this.doc.networkTypes.find((t) => t.id === id);
+    if (!target) return;
     Object.assign(target, patch);
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
     this.syncDrawingLayer();
@@ -2722,6 +2768,37 @@ export class SketchScene {
     const existingIndex = groups.findIndex((g) => g.elementId === elementId);
     if (existingIndex !== -1) groups.splice(existingIndex, 1);
     if (portIds.length > 0) groups.push({ elementId, portIds });
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
+  /**
+   * Sets the routing target of one port of the given stamps, or removes it for `null` (auto-routing.md §4.4):
+   * one undo step. Adopts the network type, and marks an auto-placed stamp as moved, so a new run of
+   * Auto-place keeps the change. A stamp without the port, or with that target already, is left unchanged.
+   */
+  setRoutingTarget(stampIds: readonly string[], portId: string, networkTypeId: string | null): void {
+    const state = this.doc.drawingHistory.getState();
+    const ids = stampIds.filter((id) => {
+      const data = state.stamps[id];
+      return data !== undefined && getStampPorts(data).some((port) => port.id === portId) && (routingTargetOf(data, portId) ?? null) !== networkTypeId;
+    });
+    if (ids.length === 0) return;
+    if (networkTypeId !== null) this.adoptNetworkTypes([networkTypeId]);
+    const tx = new Transaction(this.doc.drawingHistory, networkTypeId === null ? 'Remove routing target' : 'Set routing target');
+    tx.update((s) => {
+      const stamps = { ...s.stamps };
+      for (const id of ids) {
+        const data = stamps[id];
+        if (!data) continue;
+        const { routingTargets: _old, ...rest } = data;
+        const targets = withRoutingTarget(data.routingTargets, portId, networkTypeId);
+        stamps[id] = markAutoPlacedMoved(targets ? { ...rest, routingTargets: targets } : rest);
+      }
+      return { ...s, stamps };
+    });
+    tx.commit();
+    this.redrawOverlay();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
@@ -4727,13 +4804,10 @@ export class SketchScene {
       newSegmentId: () => `segment-${this.doc.nextSegmentSeq++}`,
       newFittingId: () => `fitting-${this.doc.nextFittingSeq++}`,
     });
-    let adoptedNetworkType = false;
-    for (const type of this.clipboard.networkTypes) {
-      if (this.doc.networkTypes.some((t) => t.id === type.id)) continue;
-      this.doc.networkTypes.push({ ...type });
-      adoptedNetworkType = true;
-    }
-    if (adoptedNetworkType) this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+    this.adoptNetworkTypes(
+      this.clipboard.networkTypes.map((type) => type.id),
+      this.clipboard.networkTypes,
+    );
     for (const definition of this.clipboard.stampDefinitions) {
       if (!this.doc.customStampDefinitions.some((d) => d.id === definition.id)) this.addCustomStampDefinition(definition);
     }

@@ -24,6 +24,7 @@ import { RoomProperties } from './RoomProperties.js';
 import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
 import { ColorPicker } from './ColorPicker.js';
 import { NumberDraftInput } from './NumberDraftInput.js';
+import { RoutingSection, samePorts } from './RoutingSection.js';
 import { stampLabelFor } from './StampsPanel.js';
 import { TerminalCircuitSection } from './TerminalCircuitSection.js';
 import type { StampLabelLanguage } from './LanguageToggle.js';
@@ -457,6 +458,8 @@ export function PropertiesPanel({
     const scalePercent = commonValue(selection, (s) => Math.round(s.transform.scale.x * 100));
     const capacity = commonValue(selection, (s) => s.capacity);
     const selectedTerminals = selection.filter((s) => s.category === 'terminal');
+    // The routing rows need one set of ports: stamps of one definition (auto-routing.md §5 question 5).
+    const routable = selection.every((s) => s.category === 'terminal' || s.category === 'equipment') && commonValue(selection, (s) => s.definitionId) !== undefined && samePorts(selection);
 
     return (
       <div>
@@ -519,6 +522,7 @@ export function PropertiesPanel({
             />
           </div>
         </div>
+        {routable && <RoutingSection sceneRef={sceneRef} stamps={selection} networkTypes={availableNetworkTypes} />}
         <TerminalCircuitSection sceneRef={sceneRef} terminals={selectedTerminals} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} propertyContext={propertyContext} />
         {commonCustomPropertyDefs.length > 0 && (
           <div className="mep-section">
@@ -656,6 +660,7 @@ export function PropertiesPanel({
           />
         </div>
       </div>
+      {(stamp.category === 'terminal' || stamp.category === 'equipment') && <RoutingSection sceneRef={sceneRef} stamps={[stamp]} networkTypes={availableNetworkTypes} />}
       {stamp.category === 'terminal' && (
         <TerminalCircuitSection sceneRef={sceneRef} terminals={[stamp]} circuits={circuits} panels={panels} setSelectedCircuitId={setSelectedCircuitId} propertyContext={propertyContext} />
       )}

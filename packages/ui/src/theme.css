@@ -877,6 +877,28 @@
   line-height: 1.4;
   margin: 0 0 8px;
 }
+/* The routing target of a port (auto-routing.md §6): a line sample of the network type next to its select. */
+.mep-routing-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mep-routing-field select {
+  max-width: 150px;
+}
+.mep-routing-swatch {
+  flex: none;
+  width: 18px;
+  height: 0;
+  border-top: 3px solid var(--ink);
+}
+.mep-routing-swatch.none {
+  border-top: 1.5px dotted var(--muted);
+}
+.mep-field-row input.mep-routing-segment {
+  width: 170px;
+}
 .mep-checkbox-row {
   display: flex;
   align-items: center;
