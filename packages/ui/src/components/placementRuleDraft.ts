@@ -2,10 +2,13 @@ import {
   BUILT_IN_NEEDS,
   CAPACITY_UNITS,
   CEILING_GRID_SIZES_MM,
+  getNetworkTypeFromLibrary,
   parseDecimal,
+  routingTargetDefaultOf,
   type GridEdge,
   type GridStyle,
   type LengthUnit,
+  type NetworkType,
   type PlacementCountMode,
   type PlacementRule,
   type RoomNeed,
@@ -32,6 +35,7 @@ export function blankRule(name: string): PlacementRule {
     coverage: {},
     layout: { strategy: 'center', wallOffsetM: 0.5, rotation: 'room' },
     writeCapacity: true,
+    routingTarget: routingTargetDefaultOf('supplyAir'),
   };
 }
 
@@ -88,12 +92,21 @@ export function draftOf(rule: PlacementRule) {
 
 export type Draft = ReturnType<typeof draftOf>;
 
-/** The other draft fields that change with the way of counting: By coverage uses Even spread. */
-export function countByPatch(countBy: PlacementCountMode): Partial<Draft> {
-  return { countBy, ...(countBy === 'coverage' ? { strategy: 'evenSpread' as const } : {}) };
+/** The default routing target of the way of counting of the draft (auto-routing.md §5 question 2): only a built-in demand type has one. */
+const routingDefaultOf = (d: Pick<Draft, 'countBy' | 'needId'>): string => (d.countBy === 'need' ? (routingTargetDefaultOf(d.needId) ?? '') : '');
+
+/** The routing target that follows a change of the way of counting: the new default, but only when the old value was the old default, so a choice of the user stays. */
+function routingFollow(draft: Draft | undefined, next: Pick<Draft, 'countBy' | 'needId'>): Partial<Draft> {
+  if (!draft || draft.portRoutingTargets || draft.routingTarget !== routingDefaultOf(draft)) return {};
+  return { routingTarget: routingDefaultOf(next) };
 }
 
-/** The other draft fields that change with the need: a unit that the need offers, and the factors of a luminaire. */
+/** The other draft fields that change with the way of counting: By coverage uses Even spread, and the routing target follows the default. */
+export function countByPatch(countBy: PlacementCountMode, draft?: Draft): Partial<Draft> {
+  return { countBy, ...(countBy === 'coverage' ? { strategy: 'evenSpread' as const } : {}), ...routingFollow(draft, { countBy, needId: '' }) };
+}
+
+/** The other draft fields that change with the need: a unit that the need offers, the factors of a luminaire, and the default routing target. */
 export function needPatch(draft: Draft, need: RoomNeed): Partial<Draft> {
   const units = CAPACITY_UNITS[need.kind];
   return {
@@ -101,7 +114,20 @@ export function needPatch(draft: Draft, need: RoomNeed): Partial<Draft> {
     needId: need.id,
     unit: units.includes(draft.unit) ? draft.unit : (units[0] ?? ''),
     ...(need.kind === 'light' ? { uf: draft.uf || '0.6', mf: draft.mf || '0.8' } : {}),
+    ...routingFollow(draft, { countBy: 'need', needId: need.id }),
   };
+}
+
+/**
+ * The network type copies that a rule keeps (auto-routing.md §4.2): one for each network type that the draft names and
+ * that NETWORK_TYPE_LIBRARY does not have, from the types of the drawing, else the copy that the rule has already.
+ */
+export function networkTypeCopiesOf(d: Pick<Draft, 'routingTarget' | 'portRoutingTargets' | 'networkTypeCopies'>, drawingTypes: readonly NetworkType[]): NetworkType[] {
+  const ids = new Set([d.routingTarget, ...Object.values(d.portRoutingTargets ?? {})].filter((id): id is string => !!id && !getNetworkTypeFromLibrary(id)));
+  return [...ids].flatMap((id) => {
+    const type = drawingTypes.find((t) => t.id === id) ?? d.networkTypeCopies.find((t) => t.id === id);
+    return type ? [{ ...type }] : [];
+  });
 }
 
 /** True when a stamp of the need can write the amount per stamp as its capacity: a flow, a power or another amount. */

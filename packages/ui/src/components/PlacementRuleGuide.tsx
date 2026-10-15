@@ -16,6 +16,7 @@ import {
   lengthToM,
   LENGTH_UNIT_LABELS,
   MAX_ROOM_STAMPS,
+  NETWORK_TYPE_LIBRARY,
   parseDecimal,
   PLACEMENT_WARNING_TEXT,
   ruleAppliesToRoom,
@@ -39,12 +40,13 @@ import {
   type StampDefinition,
   type Vec2,
 } from '@mepapp/core';
-import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, zeroNeed, zeroPersons, type AutoPlaceArt } from './autoPlacePlan.js';
+import { coverageProblem, groupsOf, keptWithOtherTarget, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, zeroNeed, zeroPersons, type AutoPlaceArt } from './autoPlacePlan.js';
 import { DISCIPLINE_LABEL } from './ElementEditorDialog.js';
 import { InfoTip } from './InfoTip.js';
 import { countByPatch, draftOf, FieldError, needPatch, needWritesCapacity, OTHER_UNIT, ruleOf, type Draft } from './placementRuleDraft.js';
 import { demandShort, demandSumText, fmtTotal } from './roomDemandText.js';
 import { RulePreviewPlan, type PreviewRoomState } from './RulePreviewPlan.js';
+import { offeredNetworkTypes, routingTargetMissing, RuleRoutingSection } from './RuleRoutingSection.js';
 
 export interface PlacementRuleGuideBodyProps {
   /** The saved rule, or the blank rule of a new one. */
@@ -321,10 +323,12 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
     scene.on('roomsChanged', bump);
     scene.on('pageChanged', bump);
     scene.on('drawingChanged', bump);
+    scene.on('networkTypesChanged', bump);
     return () => {
       scene.off('roomsChanged', bump);
       scene.off('pageChanged', bump);
       scene.off('drawingChanged', bump);
+      scene.off('networkTypesChanged', bump);
     };
   }, [scene]);
 
@@ -486,8 +490,16 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
   /** The coverage limits change the count: By coverage, or an amount rule that also meets coverage. */
   const coverageOn = byCoverage || (alsoCoverage && coverage !== null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const drawingTypes = useMemo(() => [...(scene?.getNetworkTypes() ?? [])], [scene, version]);
+  const offeredTypes = useMemo(() => offeredNetworkTypes(NETWORK_TYPE_LIBRARY, drawingTypes, draft.networkTypeCopies), [drawingTypes, draft.networkTypeCopies]);
+
   const stepStatus = (n: number): [StepState, string] => {
-    if (n === 1) return draft.stampDefinitionId ? ['ok', stampName(draft.stampDefinitionId) ?? 'Stamp not found'] : ['', 'Choose a stamp'];
+    if (n === 1) {
+      if (!draft.stampDefinitionId) return ['', 'Choose a stamp'];
+      if (routingTargetMissing(draft, offeredTypes)) return ['warn', 'Routing target not found'];
+      return ['ok', stampName(draft.stampDefinitionId) ?? 'Stamp not found'];
+    }
     if (n === 2) {
       if (matched.length === 0) return ['warn', 'No room matches'];
       if (untyped.length > 0 && (draft.roomTypeIds.length > 0 || countBy === 'need')) return ['warn', `${plural(untyped.length, 'room')} without a type`];
@@ -646,7 +658,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
               onChange={(e) => {
                 const value = e.target.value;
                 const picked = value.startsWith('need:') ? needs.find((n) => `need:${n.id}` === value) : undefined;
-                update(picked ? needPatch(draft, picked) : countByPatch(value as 'perRoom' | 'coverage'));
+                update(picked ? needPatch(draft, picked) : countByPatch(value as 'perRoom' | 'coverage', draft));
               }}
             >
               <optgroup label="A demand type of the room types">
@@ -679,6 +691,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
             )}
           </p>
         </div>
+        <RuleRoutingSection draft={draft} definition={definition} need={need} offered={offeredTypes} drawingTypes={drawingTypes} onChange={(patch) => update(patch)} />
       </>
     );
   }
@@ -1393,6 +1406,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
     const problems = rows.filter((row) => spacingProblem(row) || coverageProblem(row)).length;
     const tooMany = rows.filter(tooManyStamps).length;
     const others = pageRooms.length - matched.length;
+    const autoPlacedById = new Map((scene?.listAutoPlacedStamps() ?? []).map((s) => [s.id, s]));
     const label = !artReady && !artFailed ? 'Loading the stamp…' : placeBusy ? 'Calculating…' : `Place ${plural(placeTotal, 'stamp')}${replaceIds.length > 0 ? ` (replace ${replaceIds.length})` : ''}`;
     return (
       <>
@@ -1452,7 +1466,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                       <td className="num" data-testid="placed">
                         {row.stamps.length}
                       </td>
-                      <td>{notesOf(row, false)}</td>
+                      <td>{notesOf(row, false, keptWithOtherTarget(row, (id) => autoPlacedById.get(id)))}</td>
                     </tr>
                   );
                 })}

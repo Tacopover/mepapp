@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react';
 import type { AutoPlaceGroup } from '@mepapp/render';
-import { PlacementPlanCancelled, PlacementPlanClient, PLACEMENT_WARNING_TEXT, roomPlacementKey, type PlacementPlan, type PlacementPlanInput, type PlacementRow, type PlacementWorkerLike, type StampDefinition } from '@mepapp/core';
+import {
+  PlacementPlanCancelled,
+  PlacementPlanClient,
+  PLACEMENT_WARNING_TEXT,
+  roomPlacementKey,
+  ruleRoutingTargets,
+  SYNTHETIC_CENTER_PORT_ID,
+  type PlacedStamp,
+  type PlacementPlan,
+  type PlacementPlanInput,
+  type PlacementRow,
+  type PlacementWorkerLike,
+  type StampDefinition,
+} from '@mepapp/core';
 
 /** The art of a stamp definition, loaded by the app for the preview and the placement. */
 export interface AutoPlaceArt {
@@ -22,17 +35,32 @@ export const tooManyStamps = (row: Pick<PlacementRow, 'warnings'>) => row.warnin
 /** Step 5: the layout leaves part of the room outside the coverage circles. */
 export const coverageProblem = (row: Pick<PlacementRow, 'warnings'>) => row.warnings.includes('coverageNotMet');
 
-/** Notes of one row: why it places nothing or what the layout changed, and whether the room needs a check. */
-export function notesOf(row: PlacementRow, otherPage: boolean): string {
+/** True when the two maps of routing targets have the same entries. */
+const sameTargets = (a: Readonly<Record<string, string>> | undefined, b: Readonly<Record<string, string>> | undefined): boolean => {
+  const ka = Object.keys(a ?? {});
+  return ka.length === Object.keys(b ?? {}).length && ka.every((k) => a![k] === b?.[k]);
+};
+
+/** The moved stamps that the row keeps whose routing targets differ from what the rule gives now (auto-routing.md §5 question 8). */
+export function keptWithOtherTarget(row: Pick<PlacementRow, 'existing' | 'rule'>, stampOf: (id: string) => Pick<PlacedStamp, 'ports' | 'routingTargets'> | undefined): number {
+  return row.existing.keep.filter((id) => {
+    const stamp = stampOf(id);
+    return stamp !== undefined && !sameTargets(stamp.routingTargets, ruleRoutingTargets(row.rule, stamp.ports.length > 0 ? stamp.ports : [{ id: SYNTHETIC_CENTER_PORT_ID }]));
+  }).length;
+}
+
+/** Notes of one row: why it places nothing or what the layout changed, and whether the room needs a check. `keptOther` = keptWithOtherTarget of the row. */
+export function notesOf(row: PlacementRow, otherPage: boolean, keptOther = 0): string {
   const notes = row.warnings.map((w) => (w === 'tooClose' && row.fitEstimate !== undefined ? `${PLACEMENT_WARNING_TEXT[w]}: about ${row.fitEstimate} fit` : PLACEMENT_WARNING_TEXT[w]));
   if (otherPage) notes.push('on another page');
-  if (row.existing.keep.length > 0) notes.push(`${row.existing.keep.length} moved stamp${row.existing.keep.length === 1 ? '' : 's'} kept`);
+  if (row.existing.keep.length > 0)
+    notes.push(`${row.existing.keep.length} moved stamp${row.existing.keep.length === 1 ? '' : 's'} kept${keptOther > 0 ? ` (${keptOther} with another routing target)` : ''}`);
   if (row.room.open) notes.push('room needs review');
   if (row.room.roomTypeId === undefined) notes.push('no room type');
   return notes.join('; ');
 }
 
-/** The stamps of the rows, one group per stamp definition, with the art from `art`. */
+/** The stamps of the rows, one group per stamp definition, with the art from `art`, and the routing targets and network type copies of the rules. */
 export function groupsOf(rows: readonly PlacementRow[], art: ReadonlyMap<string, AutoPlaceArt>): AutoPlaceGroup[] {
   const groups = new Map<string, AutoPlaceGroup>();
   for (const row of rows) {
@@ -46,7 +74,11 @@ export function groupsOf(rows: readonly PlacementRow[], art: ReadonlyMap<string,
     }
     const capacity = row.rule.writeCapacity && row.requirement.perElement !== null ? row.requirement.perElement : undefined;
     const roomKey = roomPlacementKey(row.room);
-    for (const stamp of row.stamps) group.stamps.push({ ...stamp, ruleId: row.rule.id, roomId: row.room.id, roomKey, ...(capacity !== undefined ? { capacity } : {}) });
+    const ports = loaded.definition.ports.length > 0 ? loaded.definition.ports : [{ id: SYNTHETIC_CENTER_PORT_ID }];
+    const routingTargets = ruleRoutingTargets(row.rule, ports);
+    for (const copy of row.rule.networkTypeCopies ?? []) if (!group.networkTypeCopies?.some((c) => c.id === copy.id)) group.networkTypeCopies = [...(group.networkTypeCopies ?? []), copy];
+    for (const stamp of row.stamps)
+      group.stamps.push({ ...stamp, ruleId: row.rule.id, roomId: row.room.id, roomKey, ...(capacity !== undefined ? { capacity } : {}), ...(routingTargets ? { routingTargets: { ...routingTargets } } : {}) });
   }
   return [...groups.values()];
 }

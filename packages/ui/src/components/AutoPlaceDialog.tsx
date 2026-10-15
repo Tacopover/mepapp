@@ -20,7 +20,7 @@ import {
   type RoomType,
   type StampDefinition,
 } from '@mepapp/core';
-import { coverageProblem, groupsOf, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, zeroNeed, type AutoPlaceArt } from './autoPlacePlan.js';
+import { coverageProblem, groupsOf, keptWithOtherTarget, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, zeroNeed, type AutoPlaceArt } from './autoPlacePlan.js';
 import { CeilingHeightsCard, DrawingCard, LEVEL_FILLS, LEVEL_NAMES, RoomTypesCard, TYPE_FILLS, typeFillOf } from './AutoPlaceInputCards.js';
 import { examplePlacementRules, RULE_MOVE_FAILED } from '../placementRuleStorage.js';
 import { Dialog } from './Dialog.js';
@@ -410,6 +410,7 @@ export function AutoPlaceDialog({
   const plan = placeJob.fresh ? placeJob.plan : null;
   const shown = placeInput ? placeJob.plan : null;
   const shownRows = useMemo(() => (shown?.rows ?? []).filter((row) => !unchecked.has(row.rule.id)), [shown, unchecked]);
+  const autoPlacedById = useMemo(() => new Map((placeInput?.existing?.stamps ?? []).map((s) => [s.id, s])), [placeInput]);
   const rowsByRule = useMemo(() => {
     const map = new Map<string, PlacementRow[]>();
     for (const row of shownRows) map.set(row.rule.id, [...(map.get(row.rule.id) ?? []), row]);
@@ -970,7 +971,7 @@ export function AutoPlaceDialog({
                       <td className="num" data-testid="placed">
                         {row.stamps.length}
                       </td>
-                      <td>{notesOf(row, false)}</td>
+                      <td>{notesOf(row, false, keptWithOtherTarget(row, (id) => autoPlacedById.get(id)))}</td>
                     </tr>
                   ))}
                 </tbody>

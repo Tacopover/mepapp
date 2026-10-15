@@ -574,8 +574,10 @@ export interface AutoPlaceGroup {
   bitmap: ImageBitmap;
   /** The remembered color and scale of the definition (the stamp tool's appearance default). */
   appearanceDefault?: { color?: string; scale?: number };
-  /** `roomKey` = roomPlacementKey of the room, written on the stamp. */
-  stamps: { position: Vec2; rotationDegrees: number; ruleId: string; roomId: string; roomKey?: string; capacity?: number }[];
+  /** `roomKey` = roomPlacementKey of the room, written on the stamp. `routingTargets` = PlacedStamp.routingTargets from the rule. */
+  stamps: { position: Vec2; rotationDegrees: number; ruleId: string; roomId: string; roomKey?: string; capacity?: number; routingTargets?: Record<string, string> }[];
+  /** The network type copies of the rules (PlacementRule.networkTypeCopies), for a type that the drawing and the library do not have. */
+  networkTypeCopies?: NetworkType[];
 }
 
 export class SketchScene {
@@ -2654,10 +2656,14 @@ export class SketchScene {
    * appearance. A user-library or custom definition is copied into the document first. Each stamp
    * records its rule and room (`autoPlaced`). A `capacity` is written to the stamp's flow-solve
    * capacity. The stamps in `replaceIds` (unmoved stamps of a re-run) are removed in the same undo
-   * step. Returns the new stamp ids, which become the selection.
+   * step. The drawing adopts the network types of the routing targets first (auto-routing.md §5
+   * question 7); a target whose type is not found is left out. Returns the new stamp ids, which
+   * become the selection.
    */
   autoPlaceStamps(groups: readonly AutoPlaceGroup[], replaceIds: readonly string[] = []): string[] {
     this.clearAutoPlacePreview();
+    const targetIds = groups.flatMap((group) => group.stamps.flatMap((planned) => Object.values(planned.routingTargets ?? {})));
+    const missing = new Set(this.adoptNetworkTypes(targetIds, groups.flatMap((group) => group.networkTypeCopies ?? [])));
     const placed: PlacedStamp[] = [];
     for (const group of groups) {
       if (group.stamps.length === 0) continue;
@@ -2670,6 +2676,7 @@ export class SketchScene {
       const scale = group.appearanceDefault?.scale ?? 1;
       for (const planned of group.stamps) {
         const id = `stamp-${this.doc.nextStampSeq++}`;
+        const routingTargets = Object.fromEntries(Object.entries(planned.routingTargets ?? {}).filter(([, typeId]) => !missing.has(typeId)));
         const data: PlacedStamp = {
           id,
           category: definition.category,
@@ -2680,6 +2687,7 @@ export class SketchScene {
           definitionId: definition.id,
           ...(group.appearanceDefault?.color !== undefined ? { color: group.appearanceDefault.color } : {}),
           autoPlaced: { ruleId: planned.ruleId, roomId: planned.roomId, moved: false, ...(planned.roomKey !== undefined ? { roomKey: planned.roomKey } : {}) },
+          ...(Object.keys(routingTargets).length > 0 ? { routingTargets } : {}),
         };
         const sprite = new Sprite(texture);
         sprite.anchor.set(0.5);

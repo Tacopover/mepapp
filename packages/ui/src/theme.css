@@ -899,6 +899,12 @@
 .mep-field-row input.mep-routing-segment {
   width: 170px;
 }
+.mep-routing-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
 .mep-checkbox-row {
   display: flex;
   align-items: center;

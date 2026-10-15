@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BUILT_IN_NEEDS, PLACEMENT_RULE_EXAMPLES, validatePlacementRule, type RoomNeed } from '@mepapp/core';
-import { blankRule, countByPatch, draftOf, FieldError, needPatch, ruleOf } from './components/placementRuleDraft.js';
+import { blankRule, countByPatch, draftOf, FieldError, needPatch, networkTypeCopiesOf, ruleOf } from './components/placementRuleDraft.js';
 
 const need = (id: string) => BUILT_IN_NEEDS.find((n) => n.id === id)!;
 
@@ -49,7 +49,31 @@ describe('the draft of a placement rule', () => {
     const copy = { id: 'nt-1', name: 'Supply Air 2', discipline: 'ventilation', units: 'CFM', defaultCapacity: 400, color: '#1565c0', lineWidthPt: 2, linePattern: 'solid' } as const;
     const rule = { ...blankRule('R'), routingTarget: 'chilled-water', portRoutingTargets: { hw: 'heating-water', drain: null }, networkTypeCopies: [copy] };
     expect(ruleOf(rule.id, draftOf(rule))).toEqual(rule);
-    expect(ruleOf('r', draftOf(blankRule('R')))).not.toHaveProperty('routingTarget');
+    expect(ruleOf('r', { ...draftOf(blankRule('R')), routingTarget: '' })).not.toHaveProperty('routingTarget');
+  });
+
+  it('a new rule gets the default routing target, and the default follows the demand type until the user chooses another', () => {
+    const draft = draftOf(blankRule('R'));
+    expect(draft.routingTarget).toBe('supply-air');
+    expect(needPatch(draft, need('returnAir')).routingTarget).toBe('return-air');
+    expect(needPatch(draft, need('light')).routingTarget).toBe('');
+    expect(countByPatch('perRoom', draft).routingTarget).toBe('');
+    expect(needPatch({ ...draft, routingTarget: 'exhaust-air' }, need('returnAir'))).not.toHaveProperty('routingTarget');
+    expect(needPatch({ ...draft, portRoutingTargets: { a: 'supply-air' } }, need('heating'))).not.toHaveProperty('routingTarget');
+    const sockets = { ...draft, ...needPatch(draft, need('sockets')) };
+    expect(sockets.routingTarget).toBe('');
+    expect(needPatch(sockets, need('cooling')).routingTarget).toBe('chilled-water');
+    expect(countByPatch('coverage')).toEqual({ countBy: 'coverage', strategy: 'evenSpread' });
+  });
+
+  it('keeps a copy of each named network type that the library does not have', () => {
+    const own = { id: 'nt-own', name: 'Supply Air 2', discipline: 'ventilation', units: 'CFM', defaultCapacity: 400, color: '#1565c0', lineWidthPt: 2, linePattern: 'solid' } as const;
+    const old = { ...own, id: 'nt-old', name: 'Old copy' };
+    const base = { routingTarget: 'nt-own', portRoutingTargets: null, networkTypeCopies: [] };
+    expect(networkTypeCopiesOf(base, [own])).toEqual([own]);
+    expect(networkTypeCopiesOf({ ...base, routingTarget: 'supply-air' }, [own])).toEqual([]);
+    expect(networkTypeCopiesOf({ routingTarget: '', portRoutingTargets: { a: 'nt-old', b: null }, networkTypeCopies: [old, own] }, [])).toEqual([old]);
+    expect(networkTypeCopiesOf({ ...base, routingTarget: 'nt-gone' }, [])).toEqual([]);
   });
 
   it('refuses a text that is not a number', () => {
