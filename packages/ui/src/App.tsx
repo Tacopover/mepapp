@@ -360,6 +360,12 @@ export function MepSketchApp({
   );
   const [activeDefinitionId, setActiveDefinitionId] = useState<string | null>(null);
   const [activeNetworkTypeId, setActiveNetworkTypeId] = useState<string | null>(null);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    scene.on('activeNetworkTypeChanged', setActiveNetworkTypeId);
+    return () => scene.off('activeNetworkTypeChanged', setActiveNetworkTypeId);
+  }, [ready, sceneRef]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [globalPropertiesOpen, setGlobalPropertiesOpen] = useState(false);
   const [customPropertyDefs, setCustomPropertyDefs] = useState<GlobalPropertyDefs>(loadCustomPropertyDefs);

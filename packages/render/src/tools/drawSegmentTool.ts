@@ -110,6 +110,7 @@ export class DrawSegmentTool implements Tool {
 
     if (!this.pendingStart) {
       this.pendingStart = resolved;
+      ctx.activateRoutingTargetOf(resolved.point);
       ctx.redrawOverlay();
       return;
     }
@@ -205,6 +206,7 @@ export class DrawSegmentTool implements Tool {
     this.pendingStart = { point, worldPosition };
     this.pendingCursor = null;
     this.guides = [];
+    ctx.activateRoutingTargetOf(point);
     ctx.syncDrawingLayer();
     ctx.redrawOverlay();
   }

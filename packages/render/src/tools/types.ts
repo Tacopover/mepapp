@@ -174,6 +174,8 @@ export interface ToolContext {
   getSnapLines(): SnapLines | null;
 
   getActiveNetworkTypeId(): string;
+  /** A segment that starts at an open port takes its routing target (auto-routing.md §5 question 6): the active network type becomes the target. Nothing happens for another point. */
+  activateRoutingTargetOf(point: ConnectionPoint): void;
   getSnapRadiusScreenPx(): number;
   /** Degrees a segment's heading snaps to while drawing (0/45/90° by default) — Settings-configurable, Shift disables it for the current drag. */
   getAngleSnapDegrees(): number;

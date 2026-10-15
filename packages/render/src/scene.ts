@@ -536,6 +536,8 @@ interface SketchSceneEvents {
   roomsVisibleChanged: [visible: boolean];
   /** The dots of the open ports were shown or hidden (setOpenPortsVisible). */
   openPortsVisibleChanged: [visible: boolean];
+  /** The type that the next drawn segment gets changed: the user picked a type, or a segment started at an open port (auto-routing.md §5 question 6). */
+  activeNetworkTypeChanged: [networkTypeId: string];
   roomSelectionChanged: [];
   /** The wall-line debug overlay was shown, hidden, recomputed or filtered. Re-read with getWallDebugState(). */
   wallDebugChanged: [WallDebugState];
@@ -789,6 +791,7 @@ export class SketchScene {
       },
       getSnapLines: () => self.currentSnapLines(),
       getActiveNetworkTypeId: () => self.activeNetworkTypeId,
+      activateRoutingTargetOf: (point) => self.activateRoutingTargetOf(point),
       getSnapRadiusScreenPx: () => self.snapRadiusScreenPx,
       getAngleSnapDegrees: () => self.angleSnapDegrees,
       getPendingStampTexture: () => self.pendingStampTexture,
@@ -2320,6 +2323,28 @@ export class SketchScene {
     this.adoptTypes([type.id], [type]);
     this.activeNetworkTypeId = type.id;
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+    this.emitter.emit('activeNetworkTypeChanged', type.id);
+  }
+
+  /** The type that the next drawn segment gets (setActiveNetworkType). */
+  getActiveNetworkTypeId(): string {
+    return this.activeNetworkTypeId;
+  }
+
+  /**
+   * The active network type becomes the routing target of `point` when it is an open port (auto-routing.md §5
+   * question 6): a segment drawn from that port joins the network that routing wants there, and the next segments of
+   * the chain keep the type. A port with a segment already, or without a routing target, changes nothing.
+   */
+  private activateRoutingTargetOf(point: ConnectionPoint): void {
+    if (point.kind !== 'port') return;
+    const stamp = this.doc.drawingHistory.getState().stamps[point.elementId];
+    const target = stamp ? routingTargetOf(stamp, point.portId) : undefined;
+    if (!target || target === this.activeNetworkTypeId || this.portSegmentTypes().get(point.elementId)?.[point.portId] !== undefined) return;
+    if (this.adoptTypes([target], []).missing.length > 0) return;
+    this.activeNetworkTypeId = target;
+    this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
+    this.emitter.emit('activeNetworkTypeChanged', target);
   }
 
   /**
