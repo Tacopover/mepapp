@@ -107,3 +107,10 @@
 {"seq":107,"at":"2026-10-16T22:06:32.451Z","type":"finding","id":"F-R2-T06-1","part":"R2","task":"R2-T06","source":"code-reviewer","severity":"low","text":"Dutch texts name UI labels that the UI shows in English only, and use the article het for startstempel. A Dutch speaker must check the wording.","status":"open"}
 {"seq":108,"at":"2026-10-16T22:06:32.490Z","type":"now","id":"now","role":"task-lead","task":"R2-T07","note":"Dialog shell, menu entry and refusal","since":"2026-10-16T22:35:00.000Z"}
 {"seq":109,"at":"2026-10-16T22:06:32.529Z","type":"task","id":"R2-T07","state":"briefed","role":"task-lead"}
+{"seq":110,"at":"2026-10-16T22:39:26.009Z","type":"task","id":"R2-T07","state":"done","commit":"1aede20","summary":"Route network dialog shell, menu entry, multi-page refusal (en, nl). Browser check 19 of 19. Refusal checked with a stub for getPageCount: wiring only."}
+{"seq":111,"at":"2026-10-16T22:39:26.048Z","type":"shot","id":"S-R2-T07-1","part":"R2","task":"R2-T07","caption":"Menu with Route network… enabled","assetId":"dbeeda02dcdffb2b39ad0c97587226d7","url":"/_blob/dbeeda02dcdffb2b39ad0c97587226d7"}
+{"seq":112,"at":"2026-10-16T22:39:26.083Z","type":"shot","id":"S-R2-T07-2","part":"R2","task":"R2-T07","caption":"Refusal for a PDF with 3 pages (stub)","assetId":"61e4cb4aab3abd229cee54de85650aee","url":"/_blob/61e4cb4aab3abd229cee54de85650aee"}
+{"seq":113,"at":"2026-10-16T22:39:26.118Z","type":"finding","id":"F-R2-T07-1","part":"R2","task":"R2-T07","source":"ui-reviewer","severity":"medium","text":"The refusal says route command but the menu and title say Route network. Fixed in T08 (one term).","status":"open"}
+{"seq":114,"at":"2026-10-16T22:39:26.153Z","type":"decision","id":"P-R2-10","part":"R2","question":"The user-visible name is Route network. The refusal text says Route network, not route command.","status":"provisional","by":"director","kind":"new"}
+{"seq":115,"at":"2026-10-16T22:39:26.192Z","type":"now","id":"now","role":"task-lead","task":"R2-T08","note":"Dialog inputs","since":"2026-10-16T23:00:00.000Z"}
+{"seq":116,"at":"2026-10-16T22:39:26.230Z","type":"task","id":"R2-T08","state":"briefed","role":"task-lead"}
