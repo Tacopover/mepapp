@@ -27,7 +27,7 @@ Read this file first. It applies to the director and to each role in `protocol.m
 - Only `@mepapp/pdf-engine-mupdf` imports `mupdf`. Everything else uses the `pdf-engine` interface.
 - Only `@mepapp/core` has real test coverage (vitest). It has no rendering and no I/O.
 - AGPLv3. Every dependency must be free and open. No SaaS backend.
-- `fixtures/pdfs/` and `fixtures/stamps/` hold real files. Never make a placeholder fixture. The PDFs are git-ignored: they live in `/root/MepApp/fixtures/pdfs/` (the main checkout).
+- `fixtures/pdfs/` and `fixtures/stamps/` hold real files. Never make a placeholder fixture. The PDFs are git-ignored: they live in `/root/MepApp/fixtures/pdfs/` (the main checkout). The folder holds 9 PDFs and `README.md`.
 - `node_modules` and `dist/` do not carry over between machines. After a fresh checkout, run `pnpm install` and then `pnpm build` at the root.
 - `apps/web` uses the `dist` of `@mepapp/ui`. After a UI change, run `pnpm build` again before a browser check.
 - A merge can break the build with no conflict marker. After a real merge, run `pnpm build` at the root.
@@ -53,7 +53,7 @@ These rules come from the memory files of the user. They are hard rules, not pre
 - Undo and redo have no keyboard shortcut. Click `.mep-rail-btn[title="Undo"]`. Ctrl+C and Ctrl+V work on `body`.
 - `page.mouse.click` has no `modifiers` option. For Shift-click use `keyboard.down('Shift')`, `mouse.click`, `keyboard.up('Shift')`.
 - `waitForFunction` does not wait for an async predicate. Poll from Node.
-- `Dialog.tsx` renders `div.mep-modal` with no `role="dialog"`. Use `.mep-modal`.
+- `Dialog.tsx` renders `div.mep-modal` (it also has `role="dialog"`, `Dialog.tsx:40`). Use `.mep-modal`. A click on the backdrop closes a `Dialog` (`Dialog.tsx:39`) unless the prop `closeOnBackdropClick={false}` is set (`:13`). In a browser check, click only inside `.mep-modal`.
 - Menu items have a leading icon. Match with `^\s*Open…\s*$`.
 - Menu → Open… opens a new document tab. A second Open of the same file does not replace the document.
 - `window.__mepSketchScene` exists only in the dev server (vite), not in `vite preview`.
@@ -64,7 +64,7 @@ These rules come from the memory files of the user. They are hard rules, not pre
 
 Files in `.claude/roadmap/browser/`:
 
-- `lib.mjs`: `open()` returns `{ page, check, menu, until, idle, start, openPdf, openAutoPlace, detect, shot, finish, ... }`. Settings come from the environment: `MEPAPP_REPO`, `MEPAPP_PORT` (5462), `MEPAPP_PDF`, `MEPAPP_SHOTS` (default `/tmp/mepapp-shots`).
+- `lib.mjs`: `open()` returns `{ page, check, menu, until, idle, start, openPdf, openAutoPlace, detect, shot, finish, ... }`. Settings come from the environment: `MEPAPP_REPO`, `MEPAPP_PORT` (5462), `MEPAPP_PDF` (read at import time, `lib.mjs:14`; do not set it before a command, because a command with a variable prefix is refused: pass the PDF path to `openPdf(path)`, `lib.mjs:65`), `MEPAPP_SHOTS` (default `/tmp/mepapp-shots`).
   - `check(ok, what, extra)` counts a pass or a fail. `shot(name)` saves `<MEPAPP_SHOTS>/<name>.png` and prints `SHOT <path>`. `finish()` prints the totals and sets a non-zero exit code on a fail.
 - `with-server.mjs <check.mjs>`: starts the dev server, runs the check, stops the server.
 - `p3-check.mjs`, `p6-check.mjs`: examples from part 1 (the Auto-place dialog, room detection, real DOM inputs). Copy the shape of one for a new check.

@@ -53,3 +53,33 @@
 {"seq":53,"at":"2026-10-16T20:32:33.166Z","type":"decision","id":"D-R2-08","status":"superseded","question":"Replaced by the new overview (network model). Do not answer."}
 {"seq":54,"at":"2026-10-16T20:32:33.201Z","type":"decision","id":"D-R4-03","status":"superseded","question":"Replaced by the new overview (network model). Do not answer."}
 {"seq":55,"at":"2026-10-16T20:32:33.241Z","type":"run","id":"run","status":"waiting","branch":"worktree-agent-framework","note":"The overview was rewritten with the term network only. Please answer the 15 decisions."}
+{"seq":56,"at":"2026-10-16T21:04:21.251Z","type":"decision","id":"D-R2-01","status":"answered","answer":"C","by":"user"}
+{"seq":57,"at":"2026-10-16T21:04:21.287Z","type":"decision","id":"D-R2-02","status":"answered","answer":"A. Single PDF files only. Project levels and risers are out of scope; a future implementation.","by":"user"}
+{"seq":58,"at":"2026-10-16T21:04:21.323Z","type":"decision","id":"D-R2-03","status":"answered","answer":"A","by":"user"}
+{"seq":59,"at":"2026-10-16T21:04:21.369Z","type":"decision","id":"D-R3-01","status":"answered","answer":"A (the new meaning of connected; rules.md section 3 rule 2 must be updated)","by":"user"}
+{"seq":60,"at":"2026-10-16T21:04:21.405Z","type":"decision","id":"D-R3-02","status":"answered","answer":"A","by":"user"}
+{"seq":61,"at":"2026-10-16T21:04:21.444Z","type":"decision","id":"D-R4-01","status":"answered","answer":"A with a setting: automatic from room types; default Corridor and Shaft; the user can add other room types. No hand-drawn areas or lines.","by":"user"}
+{"seq":62,"at":"2026-10-16T21:04:21.482Z","type":"decision","id":"D-R4-02","status":"answered","answer":"A","by":"user"}
+{"seq":63,"at":"2026-10-16T21:04:21.519Z","type":"decision","id":"D-R5-01","status":"answered","answer":"C: a unit on each network type with a conversion table","by":"user"}
+{"seq":64,"at":"2026-10-16T21:04:21.556Z","type":"decision","id":"D-R5-02","status":"answered","answer":"Velocity and Pa/m limits are for air networks only. The sizing method is an option or property of the network type; hydraulics and plumbing use other methods.","by":"user"}
+{"seq":65,"at":"2026-10-16T21:04:21.595Z","type":"decision","id":"D-R5-03","status":"answered","answer":"Whatever fits the answer to D-R5-02: sizing method and its settings are properties of the network type (A)","by":"user"}
+{"seq":66,"at":"2026-10-16T21:04:21.632Z","type":"decision","id":"D-R5-04","status":"answered","answer":"A. Ignore non-typical situations (stamps with two flows) for now; come back after the main routing feature.","by":"user"}
+{"seq":67,"at":"2026-10-16T21:04:21.671Z","type":"decision","id":"D-R5-05","status":"answered","answer":"B","by":"user"}
+{"seq":68,"at":"2026-10-16T21:04:21.707Z","type":"decision","id":"D-R6-01","status":"answered","answer":"B","by":"user"}
+{"seq":69,"at":"2026-10-16T21:04:21.743Z","type":"decision","id":"D-R6-02","status":"answered","answer":"A","by":"user"}
+{"seq":70,"at":"2026-10-16T21:04:21.784Z","type":"decision","id":"D-R7-01","status":"answered","answer":"A","by":"user"}
+{"seq":71,"at":"2026-10-16T21:04:21.822Z","type":"decision","id":"D-R7-02","status":"superseded","question":"Duplicate of D-R7-01 (circuit limits). The user answered A for both."}
+{"seq":72,"at":"2026-10-16T21:04:21.858Z","type":"run","id":"run","status":"running","branch":"worktree-agent-framework","note":"All 15 decisions answered. The planner writes the plan of R2."}
+{"seq":73,"at":"2026-10-16T21:04:21.896Z","type":"part","id":"R2","state":"decided","branch":"worktree-agent-framework"}
+{"seq":74,"at":"2026-10-16T21:17:39.459Z","type":"task","id":"R2-T01","part":"R2","order":1,"title":"Open ports in core","state":"planned"}
+{"seq":75,"at":"2026-10-16T21:17:39.502Z","type":"task","id":"R2-T02","part":"R2","order":2,"title":"Port finder","state":"planned"}
+{"seq":76,"at":"2026-10-16T21:17:39.543Z","type":"task","id":"R2-T03","part":"R2","order":3,"title":"Multi-page refusal with language","state":"planned"}
+{"seq":77,"at":"2026-10-16T21:17:39.584Z","type":"task","id":"R2-T04","part":"R2","order":4,"title":"The scene uses the core open-port function","state":"planned"}
+{"seq":78,"at":"2026-10-16T21:17:39.619Z","type":"task","id":"R2-T05","part":"R2","order":5,"title":"Route markers in the overlay","state":"planned"}
+{"seq":79,"at":"2026-10-16T21:17:39.656Z","type":"task","id":"R2-T06","part":"R2","order":6,"title":"Dialog pure logic","state":"planned"}
+{"seq":80,"at":"2026-10-16T21:17:39.693Z","type":"task","id":"R2-T07","part":"R2","order":7,"title":"Dialog shell, menu entry and refusal","state":"planned"}
+{"seq":81,"at":"2026-10-16T21:17:39.729Z","type":"task","id":"R2-T08","part":"R2","order":8,"title":"Dialog inputs: start stamp, port, type","state":"planned"}
+{"seq":82,"at":"2026-10-16T21:17:39.765Z","type":"task","id":"R2-T09a","part":"R2","order":9,"title":"Scope, room list and summary","state":"planned"}
+{"seq":83,"at":"2026-10-16T21:17:39.802Z","type":"task","id":"R2-T09b","part":"R2","order":10,"title":"Markers and event refresh","state":"planned"}
+{"seq":84,"at":"2026-10-16T21:17:39.839Z","type":"task","id":"R2-T11","part":"R2","order":11,"title":"Part check with real PDF","state":"planned"}
+{"seq":85,"at":"2026-10-16T21:17:39.876Z","type":"part","id":"R2","state":"in progress","plan":".claude/plans/auto-routing-r2.md","branch":"worktree-agent-framework"}

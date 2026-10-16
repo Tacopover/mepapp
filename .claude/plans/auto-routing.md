@@ -9,7 +9,7 @@ Terms in this file:
 - **Routing target**: the network type that routing must connect to a port (`PlacedStamp.routingTargets`). It is not the network type of the port. The network type of a port always comes from the segment that connects to it (§11, decision 4).
 - **Open port**: a port with a routing target and no segment.
 - **Owner**: the place where the user chooses the routing target before Auto-place writes it on the stamps (the rule, the demand of a room type, or both).
-- **System**: a later term (§8, R2) for one network of one type, for example "Supply Air 1" of one air handling unit.
+- **Network**: one set of joined segments, calculated by `computeNetworks`, never stored. The earlier term "system" is replaced: see `roadmap-overview.md` (2026-10-16). The code has the words **network** and **network type** only.
 - **Demand type**: one thing that a room requires, as one total in one unit. The code calls it a need (`RoomNeed`, `core/rooms/room-need.ts:11`, from `room-type-calculations.md`); the UI says "demand type" after P0. MepApp has 6 built-in demand types: Light (lm), Supply air (dm³/s), Return air (dm³/s), Heating (W), Cooling (W) and Sockets (a count). The user adds own demand types in the Room types table. A demand type is not a network type. The demand type Supply air is the amount of air that a room requires. The network type Supply Air is the kind of duct that carries the air.
 - **Demand**: the calculation of one demand type for one room type, for example "Office: Supply air 6.5 dm³/s per person" (`RoomDemand`, `room-type.ts:21`). One demand is one cell of the Room types table.
 - **Rule**: a placement rule (`PlacementRule`, `placement-rule.ts`). A rule with `countBy: 'need'` serves one demand type (`needId`). Auto-place divides the total of the demand type in a room by the capacity of one stamp, and rounds up. A rule can also count without a demand type: "The same number in each room" or "by coverage".
@@ -62,11 +62,11 @@ Columns: **Must** = what part 1 must do there. "Keep" = the routing target must 
 | Radiators for Heating | Works: one rule "Radiator" → Heating Water. | Works, but each of about 20 room types with Heating must get the same value. | Works. |
 | Sockets, Light | Works: none (the default). | Works: none. | Works. |
 | Smoke detector by coverage, thermostat "the same number in each room" | Works: the rule has the field for each way to count. | Does not work: these rules serve no demand type, so no demand exists. | Works only through the rule part. |
-| One building, 2 air handling units | Not the job of a routing target. The place of the room sets the system (§8, R2). | The same. | The same. |
+| One building, 2 air handling units | Not the job of a routing target. The user gives the start stamp and the rooms when the route command runs (`roadmap-overview.md`, R2). | The same. | The same. |
 
 ### 3.2 Recommendation: (a) the rule (accepted)
 
-- The routing target belongs to the stamp and its system, not to the room. A supply grille joins Supply Air in each room type.
+- The routing target belongs to the stamp, not to the room. A supply grille joins Supply Air in each room type.
 - Only the rule knows the stamp, so only the rule can give a different type to each port.
 - Only the rule exists for each way to count. The demand exists only for a rule that serves a demand type.
 - The user chooses once per rule, not once per room type.
@@ -172,7 +172,7 @@ A stamp definition gets no default routing target and no default network type (�
 8. **A second run of Auto-place.** Unmoved stamps: the re-run replaces them, so they get the new routing target. Moved stamps: they keep their routing target, because "moved" means "the user owns this stamp". The Check step adds to the existing note "2 moved stamps kept" the text "with another routing target" when their targets differ from the rule. The user can change them in Properties with a multi-selection.
 9. **Display.** Yes. An open port shows a dot in the color of its routing target. A connected port and a port without a routing target show nothing. The status bar gets a check box "Open ports" (on by default) and a count by type. The dots are in the overlay of MepApp only, not in the PDF export. The network tree panel does not list open ports in part 1: that list belongs to routing (R6) and to the Networks panel spec.
 10. **Electrical.** Light and Sockets get none by default. MepApp groups luminaires and sockets into circuits (`Circuit.terminalIds`), not into drawn segments, so a routing target such as Branch Circuit would tell routing to draw wires that MepApp does not use. The later circuit automation (R7) reads the demand type of the rule (Light, Sockets) and the circuit types, not the routing target. A user who draws conduit or cable tray to a stamp can still choose Conduit or Cable Tray in the rule.
-11. **Which network.** The next part (R2), not part 1. Part 1 stores only the type. A system ("Supply Air 1") with a start point and its rooms comes later. The model of part 1 does not block it: a system can later refine a routing target, for example with `routingSystemIds` on the stamp or a map from rooms to systems.
+11. **Which network.** The next part (R2), not part 1. Part 1 stores only the type. Replaced on 2026-10-16: the app stores no system and no grouping. The user gives the start stamp and the rooms (or the selected stamps) when the route command runs. See `roadmap-overview.md` and `auto-routing-r2.md`. The text about `routingSystemIds` no longer applies.
 
 ## 6. The mockup
 
@@ -197,15 +197,14 @@ The mockup is older than decisions 4 to 6. These parts of it do not apply: the r
 
 Each part gets its own plan. No detailed design here.
 
-**R2 — Which network (systems).**
+**R2 — Which network: the route dialog input and the port finder.** Replaced on 2026-10-16 by `roadmap-overview.md`; the plan is `auto-routing-r2.md`. The text below is the old draft.
 - Exists: network types per drawing; networks that MepApp calculates from the segments (`computeNetworks`), never stored; `.claude/plans/networks-panel-spec.md`.
-- Missing: a stored system (name, network type, start point, the rooms or zone that it serves); a way to give a system to a port (by the room of the stamp).
-- Open questions: does the user draw zones, or pick rooms? Is a floor (a page) a zone? Can a system serve more than one page (a riser)? Is a system a copy of a network type ("Supply Air 2", as `duplicateNetworkType` does today) or a new entity with a type?
-- Research: how Revit (systems), MagiCAD and the old MEPSketcher assign terminals to systems; the Networks panel spec.
+- Now: a route dialog takes the start stamp, the start port, the network type, and the target ports (given as rooms, or as the selected stamps). A pure finder in core lists the open ports. Nothing is stored. A multi-page PDF is refused.
+- Old draft (dropped): a stored system with a name, a start point and its rooms or zone.
 
 **R3 — A start point for each network.**
 - Exists: the category `equipment`; the flow solve takes `rootElementId` or an equipment stamp (`flow.ts`); the segment chain continues through equipment ports.
-- Missing: a start point that is not a stamp (the place where the main duct or pipe comes onto the floor: a shaft, a riser); a link from a system to its start point.
+- Missing: a start point that is not a stamp (the place where the main duct or pipe comes onto the floor: a shaft, a riser); a link from a network to its start point (replaced: the start stamp is route input, see `roadmap-overview.md`).
 - Open questions: a new stamp category, a fitting kind `riser`, or a port of a shaft room? What about port groups that join the supply and return sides (§7)?
 - Research: shafts from room detection (the room type Shaft exists); risers across pages.
 
@@ -223,7 +222,7 @@ Each part gets its own plan. No detailed design here.
 
 **R6 — The shape of the network.**
 - Exists: segments, fittings (junction, elbow, tee, reducer, cross), the segment tool and the cascade.
-- Missing: the algorithm (a main along the corridor, a branch to each room, a sub-branch to each open port), fittings at the joints, a list of open ports by type and system (the network tree panel).
+- Missing: the algorithm (a main along the corridor, a branch to each room, a sub-branch to each open port), fittings at the joints, a list of open ports by type (the network tree panel).
 - Open questions: one branch per terminal or per room? Can the user lock a drawn main and let routing add only the branches? What does a re-run do with routed segments (the same question as moved stamps)?
 - Research: rectilinear Steiner tree heuristics; the layout practice of HVAC designers; how the old MEPSketcher draws branches.
 
