@@ -83,3 +83,8 @@
 {"seq":83,"at":"2026-10-16T21:17:39.802Z","type":"task","id":"R2-T09b","part":"R2","order":10,"title":"Markers and event refresh","state":"planned"}
 {"seq":84,"at":"2026-10-16T21:17:39.839Z","type":"task","id":"R2-T11","part":"R2","order":11,"title":"Part check with real PDF","state":"planned"}
 {"seq":85,"at":"2026-10-16T21:17:39.876Z","type":"part","id":"R2","state":"in progress","plan":".claude/plans/auto-routing-r2.md","branch":"worktree-agent-framework"}
+{"seq":86,"at":"2026-10-16T21:17:56.465Z","type":"now","id":"now","role":"task-lead","task":"R2-T01","note":"Open ports in core","since":"2026-10-16T21:40:00.000Z"}
+{"seq":87,"at":"2026-10-16T21:17:56.505Z","type":"task","id":"R2-T01","state":"briefed","role":"task-lead"}
+{"seq":88,"at":"2026-10-16T21:30:14.249Z","type":"task","id":"R2-T01","state":"done","commit":"11e5117","summary":"openPortsOf in core. 924 core tests and pnpm build pass."}
+{"seq":89,"at":"2026-10-16T21:30:14.286Z","type":"now","id":"now","role":"task-lead","task":"R2-T02","note":"Port finder","since":"2026-10-16T21:35:00.000Z"}
+{"seq":90,"at":"2026-10-16T21:30:14.328Z","type":"task","id":"R2-T02","state":"briefed","role":"task-lead"}
