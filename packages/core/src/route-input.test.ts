@@ -14,7 +14,7 @@ describe('routePageProblem', () => {
 
   it('gives an English message with the count for a multi-page PDF', () => {
     expect(routePageProblem(2, 'en')).toBe(
-      'This PDF has 2 pages. The route command works on one floor for each PDF file. Split the pages into separate files.',
+      'This PDF has 2 pages. Route network works on one floor for each PDF file. Split the pages into separate files.',
     );
     expect(routePageProblem(40, 'en')).toContain('40');
   });
@@ -24,6 +24,7 @@ describe('routePageProblem', () => {
     expect(message).toContain('40');
     expect(message).toContain("pagina's");
     expect(message).toContain('verdieping');
+    expect(message).toContain('Netwerk routeren');
   });
 
   it('gives null and does not throw for a non-integer or NaN page count', () => {

@@ -1650,7 +1650,16 @@ export function MepSketchApp({
       )}
 
       {routeOpen && (
-        <RouteDialog sceneRef={sceneRef} roomTypes={roomTypes} language={labelLanguage} onClose={() => setRouteOpen(false)} />
+        <RouteDialog
+          sceneRef={sceneRef}
+          roomTypes={roomTypes}
+          language={labelLanguage}
+          stampName={(id) => {
+            const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
+            return definition ? stampLabelFor(definition, labelLanguage) : null;
+          }}
+          onClose={() => setRouteOpen(false)}
+        />
       )}
 
       {ruleStampPick && (

@@ -3453,6 +3453,29 @@
 .mep-modal--route {
   width: 420px;
   max-width: 92vw;
+  align-self: flex-start;
+  margin-top: 12vh;
+}
+.mep-modal--route .mep-route-text {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.mep-modal--route .mep-route-note {
+  color: var(--accent-ink);
+  margin-top: -4px;
+}
+.mep-modal--route .mep-route-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.mep-modal--route .mep-route-field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 /* "User library" and "Add stamp folder" dialogs: one column, own width (not the Element Editor's .mep-modal--wide, whose body is a flex row). */
 .mep-modal--library {
