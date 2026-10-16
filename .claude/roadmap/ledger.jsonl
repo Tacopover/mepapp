@@ -91,3 +91,10 @@
 {"seq":91,"at":"2026-10-16T21:39:40.144Z","type":"task","id":"R2-T02","state":"done","commit":"1a7d4bb","summary":"findRoutePorts in core, 18 new tests. 942 core tests pass."}
 {"seq":92,"at":"2026-10-16T21:39:40.183Z","type":"now","id":"now","role":"task-lead","task":"R2-T03","note":"Multi-page refusal","since":"2026-10-16T21:50:00.000Z"}
 {"seq":93,"at":"2026-10-16T21:39:40.217Z","type":"task","id":"R2-T03","state":"briefed","role":"task-lead"}
+{"seq":94,"at":"2026-10-16T21:44:36.721Z","type":"task","id":"R2-T03","state":"done","commit":"f3c4933","summary":"routePageProblem with en/nl messages in core. 947 core tests pass."}
+{"seq":95,"at":"2026-10-16T21:44:36.759Z","type":"now","id":"now","role":"task-lead","task":"R2-T04","note":"The scene uses the core open-port function","since":"2026-10-16T22:00:00.000Z"}
+{"seq":96,"at":"2026-10-16T21:44:36.793Z","type":"task","id":"R2-T04","state":"briefed","role":"task-lead"}
+{"seq":97,"at":"2026-10-16T21:50:07.190Z","type":"task","id":"R2-T04","state":"done","commit":"8950f65","summary":"openPorts in the scene calls openPortsOf. Browser check 7 of 7, status bar equals an independent count (27), undo restores."}
+{"seq":98,"at":"2026-10-16T21:50:07.227Z","type":"shot","id":"S-R2-T04-1","part":"R2","task":"R2-T04","caption":"Open ports 27 of 27 after one segment is drawn from an open port","assetId":"01ce1f396c6ea077d1123fd3b7c11bcf","url":"/_blob/01ce1f396c6ea077d1123fd3b7c11bcf"}
+{"seq":99,"at":"2026-10-16T21:50:07.266Z","type":"now","id":"now","role":"task-lead","task":"R2-T05","note":"Route markers in the overlay","since":"2026-10-16T22:12:00.000Z"}
+{"seq":100,"at":"2026-10-16T21:50:07.301Z","type":"task","id":"R2-T05","state":"briefed","role":"task-lead"}
