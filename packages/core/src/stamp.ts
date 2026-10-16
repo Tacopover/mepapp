@@ -106,11 +106,11 @@ const SYNTHETIC_CENTER_PORT: PortSpec = { id: SYNTHETIC_CENTER_PORT_ID, name: 'C
  * picker) still reads `stamp.ports` directly, since a synthetic port isn't a
  * real one a user can choose to group.
  */
-export function getStampPorts(stamp: PlacedStamp): PortSpec[] {
+export function getStampPorts(stamp: Pick<PlacedStamp, 'ports' | 'transform' | 'nativeWidth' | 'nativeHeight'>): PortSpec[] {
   return stamp.ports.length > 0 ? stamp.ports : [SYNTHETIC_CENTER_PORT];
 }
 
-export function getStampWorldPorts(stamp: PlacedStamp): Array<PortSpec & { world: Vec2 }> {
+export function getStampWorldPorts(stamp: Pick<PlacedStamp, 'ports' | 'transform' | 'nativeWidth' | 'nativeHeight'>): Array<PortSpec & { world: Vec2 }> {
   return getStampPorts(stamp).map((port) => ({
     ...port,
     world: getWorldPortPosition(port, stamp.transform, stamp.nativeWidth, stamp.nativeHeight),
