@@ -98,3 +98,8 @@
 {"seq":98,"at":"2026-10-16T21:50:07.227Z","type":"shot","id":"S-R2-T04-1","part":"R2","task":"R2-T04","caption":"Open ports 27 of 27 after one segment is drawn from an open port","assetId":"01ce1f396c6ea077d1123fd3b7c11bcf","url":"/_blob/01ce1f396c6ea077d1123fd3b7c11bcf"}
 {"seq":99,"at":"2026-10-16T21:50:07.266Z","type":"now","id":"now","role":"task-lead","task":"R2-T05","note":"Route markers in the overlay","since":"2026-10-16T22:12:00.000Z"}
 {"seq":100,"at":"2026-10-16T21:50:07.301Z","type":"task","id":"R2-T05","state":"briefed","role":"task-lead"}
+{"seq":101,"at":"2026-10-16T21:57:44.794Z","type":"task","id":"R2-T05","state":"done","commit":"513402f","summary":"setRouteMarkers and clearRouteMarkers in the scene. Browser check 17 of 17 (twice). Page and document events were emitted through the scene emitter: no real page switch."}
+{"seq":102,"at":"2026-10-16T21:57:44.899Z","type":"shot","id":"S-R2-T05-1","part":"R2","task":"R2-T05","caption":"A filled start square and a target ring on the first floor plan","assetId":"9090562cf184d23da98121e8eeb2f2d7","url":"/_blob/9090562cf184d23da98121e8eeb2f2d7"}
+{"seq":103,"at":"2026-10-16T21:57:44.936Z","type":"finding","id":"F-R2-T05-1","part":"R2","task":"R2-T05","source":"ui-reviewer","severity":"low","text":"The markers use the same cyan as the stamp selection box. Check it in the T09b dialog shot with one stamp selected.","status":"open"}
+{"seq":104,"at":"2026-10-16T21:57:44.972Z","type":"now","id":"now","role":"task-lead","task":"R2-T06","note":"Dialog pure logic","since":"2026-10-16T22:25:00.000Z"}
+{"seq":105,"at":"2026-10-16T21:57:45.010Z","type":"task","id":"R2-T06","state":"briefed","role":"task-lead"}
