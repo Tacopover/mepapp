@@ -3477,6 +3477,80 @@
   min-width: 0;
   box-sizing: border-box;
 }
+.mep-modal--route .mep-route-scope {
+  border: 0;
+  padding: 0;
+  margin: 0 0 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 13px;
+}
+.mep-modal--route .mep-route-scope legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.mep-modal--route .mep-route-radio,
+.mep-modal--route .mep-route-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+.mep-modal--route .mep-route-rooms {
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 0 0 10px;
+  border: 1px solid var(--line, #c2ced4);
+  border-radius: 4px;
+}
+.mep-modal--route .mep-route-room {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  font-size: 13px;
+}
+.mep-modal--route .mep-route-room-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-modal--route .mep-route-room-type {
+  opacity: 0.7;
+  flex: none;
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-modal--route .mep-route-room-count {
+  flex: none;
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mep-modal--route .mep-route-main {
+  font-weight: 600;
+}
+.mep-modal--route .mep-route-room-actions {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+.mep-modal--route input[type="checkbox"],
+.mep-modal--route input[type="radio"] {
+  width: auto;
+  flex: none;
+  margin: 0;
+  padding: 0;
+}
+.mep-modal--route .mep-route-radio {
+  white-space: nowrap;
+}
 /* "User library" and "Add stamp folder" dialogs: one column, own width (not the Element Editor's .mep-modal--wide, whose body is a flex row). */
 .mep-modal--library {
   width: 520px;

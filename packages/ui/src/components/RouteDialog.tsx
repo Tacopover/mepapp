@@ -1,8 +1,8 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene, StampInfo } from '@mepapp/render';
-import { getNetworkTypeFromLibrary, routePageProblem, type RoomType } from '@mepapp/core';
+import { findRoutePorts, getNetworkTypeFromLibrary, roomTypeLabel, routePageProblem, type RoomType } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
-import { looksLikeLoad, presetStart, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText } from './routePlan.js';
+import { looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText } from './routePlan.js';
 
 export interface RouteDialogProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -33,19 +33,26 @@ function uniqueLabels(stamps: readonly StampInfo[], labelOf: (stamp: StampInfo) 
   return labels;
 }
 
-export function RouteDialog({ sceneRef, language, stampName, onClose }: RouteDialogProps) {
+export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose }: RouteDialogProps) {
   const scene = sceneRef.current;
   const [pageCount, setPageCount] = useState(() => scene?.getPageCount() ?? 1);
   const [stamps, setStamps] = useState(() => scene?.listStamps() ?? []);
+  const [rooms, setRooms] = useState(() => (scene ? scene.listRooms().filter((r) => r.pageIndex === scene.getPageIndex()) : []));
+  const [selectionIds] = useState<string[]>(() => (scene ? scene.getSelection().map((s) => s.id) : []));
   const [selectionStart] = useState(() => (scene ? presetStart(scene.getSelection()) : null));
   const [startId, setStartId] = useState<string | null>(null);
   const [portId, setPortId] = useState<string | null>(null);
   const [typeId, setTypeId] = useState<string | null>(null);
+  const [scopeKind, setScopeKind] = useState<'rooms' | 'stamps'>('rooms');
+  const [unchecked, setUncheckedRooms] = useState<ReadonlySet<string>>(() => new Set());
+  const [includeOutside, setIncludeOutside] = useState(true);
+  const [allPorts, setAllPorts] = useState(false);
   useEffect(() => {
     if (!scene) return;
     const refresh = () => {
       setPageCount(scene.getPageCount());
       setStamps(scene.listStamps());
+      setRooms(scene.listRooms().filter((r) => r.pageIndex === scene.getPageIndex()));
     };
     refresh();
     scene.on('pageChanged', refresh);
@@ -70,12 +77,37 @@ export function RouteDialog({ sceneRef, language, stampName, onClose }: RouteDia
   const portChoices = startStamp && selectedType ? startPortChoices(startStamp, selectedType) : [];
   const selectedPort = portChoices.some((p) => p.portId === portId) ? portId : (portChoices[0]?.portId ?? null);
   const port = portChoices.find((p) => p.portId === selectedPort);
+  const selectionOthers = selectionIds.filter((id) => id !== selectedStart && stamps.some((s) => s.id === id));
+  const stampsEnabled = selectionOthers.length > 0;
+  const effectiveScope = scopeKind === 'stamps' && stampsEnabled ? 'stamps' : 'rooms';
+  const result = startStamp && selectedType
+    ? findRoutePorts({
+      stamps,
+      networkTypeId: selectedType,
+      scope: effectiveScope === 'rooms'
+        ? { kind: 'rooms', roomIds: new Set(rooms.filter((r) => !unchecked.has(r.id)).map((r) => r.id)) }
+        : { kind: 'stamps', stampIds: new Set(selectionOthers) },
+      startStampId: startStamp.id,
+      startPortId: selectedPort ?? undefined,
+      rooms,
+      pageIndex: scene?.getPageIndex() ?? 0,
+      includeOutsideRooms: includeOutside,
+      portsPerStamp: allPorts ? 'all' : 'one',
+    })
+    : null;
+  const checkedRoomCount = rooms.filter((r) => !unchecked.has(r.id)).length;
 
   const nameOf = (id: string) => scene?.getNetworkTypes().find((t) => t.id === id)?.name ?? getNetworkTypeFromLibrary(id)?.name ?? id;
   const labelOf = (stamp: StampInfo) => (stamp.definitionId ? stampName(stamp.definitionId) : null) ?? stamp.definitionId ?? stamp.id;
   const startLabels = uniqueLabels(candidates.map((c) => c.stamp), labelOf);
   const sources = candidates.filter((c) => c.likelySource);
   const waiting = candidates.filter((c) => !c.likelySource);
+  const lines = result && selectedType
+    ? routeSummaryLines(result, effectiveScope, typeNameInText(selectedType, nameOf(selectedType), language), checkedRoomCount, language, {
+      portsPerStamp: allPorts ? 'all' : 'one',
+      includeOutsideRooms: includeOutside,
+    })
+    : [];
 
   return (
     <Dialog
@@ -166,6 +198,105 @@ export function RouteDialog({ sceneRef, language, stampName, onClose }: RouteDia
               </label>
               {choices.length === 0 && (
                 <p className="mep-route-text" data-testid="route-no-ports">{routeText(language, 'noOpenPorts')}</p>
+              )}
+              {choices.length > 0 && startStamp && result && (
+                <>
+                  <fieldset className="mep-route-scope" data-testid="route-scope">
+                    <legend>{routeText(language, 'scope')}</legend>
+                    <label className="mep-route-radio">
+                      <input
+                        type="radio"
+                        name="route-scope"
+                        data-testid="route-scope-rooms"
+                        checked={effectiveScope === 'rooms'}
+                        onChange={() => setScopeKind('rooms')}
+                      />
+                      <span>{routeText(language, 'scopeRooms')}</span>
+                    </label>
+                    <label className="mep-route-radio">
+                      <input
+                        type="radio"
+                        name="route-scope"
+                        data-testid="route-scope-stamps"
+                        disabled={!stampsEnabled}
+                        checked={effectiveScope === 'stamps'}
+                        onChange={() => setScopeKind('stamps')}
+                      />
+                      <span>{routeText(language, 'scopeStamps')}</span>
+                    </label>
+                  </fieldset>
+                  {effectiveScope === 'rooms' && (
+                    rooms.length === 0 ? (
+                      <p className="mep-route-text" data-testid="route-no-rooms">{routeText(language, 'noRooms')}</p>
+                    ) : (
+                      <>
+                        <div className="mep-route-room-actions">
+                          <button type="button" data-testid="route-rooms-all" onClick={() => setUncheckedRooms(new Set())}>
+                            {routeText(language, 'roomsAll')}
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="route-rooms-none"
+                            onClick={() => setUncheckedRooms(new Set(rooms.map((r) => r.id)))}
+                          >
+                            {routeText(language, 'roomsNone')}
+                          </button>
+                        </div>
+                        <div className="mep-route-rooms" data-testid="route-rooms">
+                          {rooms.map((room, index) => {
+                            const type = roomTypes.find((t) => t.id === room.roomTypeId);
+                            return (
+                              <label key={room.id} className="mep-route-room">
+                                <input
+                                  type="checkbox"
+                                  data-testid="route-room"
+                                  data-room-id={room.id}
+                                  checked={!unchecked.has(room.id)}
+                                  onChange={() => setUncheckedRooms((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(room.id)) next.delete(room.id);
+                                    else next.add(room.id);
+                                    return next;
+                                  })}
+                                />
+                                <span className="mep-route-room-name">{roomLabel(room, index, language)}</span>
+                                <span className="mep-route-room-type">{type ? roomTypeLabel(type, language) : ''}</span>
+                                <span className="mep-route-room-count">{result.perRoom.find((p) => p.roomId === room.id)?.count ?? 0}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )
+                  )}
+                  {effectiveScope === 'rooms' && (
+                    <label className="mep-route-check">
+                      <input
+                        type="checkbox"
+                        data-testid="route-outside"
+                        checked={includeOutside}
+                        onChange={(event) => setIncludeOutside(event.target.checked)}
+                      />
+                      <span>{routeText(language, 'includeOutside')} ({result.outsideRooms})</span>
+                    </label>
+                  )}
+                  {result.multiPortStamps > 0 && (
+                    <label className="mep-route-check">
+                      <input
+                        type="checkbox"
+                        data-testid="route-all-ports"
+                        checked={allPorts}
+                        onChange={(event) => setAllPorts(event.target.checked)}
+                      />
+                      <span>{routeText(language, 'useAllPorts')}</span>
+                    </label>
+                  )}
+                  <div data-testid="route-summary" aria-live="polite">
+                    {lines.map((line, index) => (
+                      <p key={index} className={index === 0 ? 'mep-route-text mep-route-main' : 'mep-route-text'}>{line}</p>
+                    ))}
+                  </div>
+                </>
               )}
             </>
           )}
