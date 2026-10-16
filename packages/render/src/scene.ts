@@ -463,6 +463,9 @@ export interface OpenPortCount {
 /** The radius of the dot of an open port, in screen pixels. */
 const OPEN_PORT_RADIUS_SCREEN_PX = 4.5;
 
+/** A route marker on the overlay: the start port (square) or a target port (ring). */
+export interface RouteMarker { world: Vec2; kind: 'start' | 'target' }
+
 /** One derived network, resolved against its NetworkType for display — the Layers panel's read model. Recomputed from live topology on every call, same as DrawingSummary. */
 export interface NetworkSummary {
   id: string;
@@ -611,6 +614,8 @@ export class SketchScene {
   private autoPlacePreviewTextures: Texture[] = [];
   /** Placed stamps the auto-placement preview hides, because the placement replaces them. */
   private autoPlacePreviewHidden: Sprite[] = [];
+  /** Scene-level: the route markers of the route dialog (route-ports). Not part of the document, never saved. */
+  private routeMarkers: RouteMarker[] = [];
   /** The stamp-placement preview's current rotation (Space advances this by 45°) — persists across repeated placements of the same stamp until Escape, a tool switch, or a different stamp pick resets it to 0. Also becomes the next placed stamp's initial rotationDegrees (see placeStamp). */
   private stampGhostRotationDegrees = 0;
   /** Alignment guide(s) matched at the ghost's current (snapped) position — see resolveSnappedPoint's 'place-stamp' case. Drawn in redrawOverlay while a place-* tool is active, same as move-selection's drag.guides. */
@@ -704,6 +709,7 @@ export class SketchScene {
     this.emitter.on('zoomChanged', () => this.zoomRoomLayer());
     this.emitter.on('roomsChanged', () => this.pruneRoomSelection());
     for (const event of ['pageChanged', 'documentActivated', 'calibrationSet'] as const) this.emitter.on(event, () => void this.refreshWallDebug());
+    for (const event of ['pageChanged', 'documentActivated'] as const) this.emitter.on(event, () => this.clearRouteMarkers());
     this.emitter.on('zoomChanged', () => drawWallDebugHighlight(this.wallDebugLayer, this.wallDebugData, this.wallDebugHover, WALL_DEBUG_HIGHLIGHT_PX / this.world.scale.x));
   }
 
@@ -2733,6 +2739,19 @@ export class SketchScene {
     for (const child of this.autoPlacePreviewLayer.removeChildren()) child.destroy();
     for (const texture of this.autoPlacePreviewTextures) texture.destroy();
     this.autoPlacePreviewTextures = [];
+  }
+
+  /** Replaces the route markers on the overlay. A marker is not an edit, so this never marks the document dirty. */
+  setRouteMarkers(markers: readonly RouteMarker[]): void {
+    this.routeMarkers = markers.map((m) => ({ world: { x: m.world.x, y: m.world.y }, kind: m.kind }));
+    this.redrawOverlay();
+  }
+
+  /** Removes the route markers from the overlay. A marker is not an edit, so this never marks the document dirty. */
+  clearRouteMarkers(): void {
+    if (this.routeMarkers.length === 0) return;
+    this.routeMarkers = [];
+    this.redrawOverlay();
   }
 
   /**
@@ -5254,6 +5273,17 @@ export class SketchScene {
           .circle(open.world.x, open.world.y, radius)
           .fill({ color: this.resolveNetworkTypeVisuals(open.networkTypeId).color })
           .stroke({ width: 1.5 / this.world.scale.x, color: 0xffffff });
+      }
+    }
+    const markerRadius = (OPEN_PORT_RADIUS_SCREEN_PX * 1.9) / this.world.scale.x;
+    for (const marker of this.routeMarkers) {
+      if (marker.kind === 'start') {
+        this.overlay
+          .rect(marker.world.x - markerRadius, marker.world.y - markerRadius, 2 * markerRadius, 2 * markerRadius)
+          .fill({ color: 0x00e5ff })
+          .stroke({ width: 2 / this.world.scale.x, color: 0xffffff });
+      } else {
+        this.overlay.circle(marker.world.x, marker.world.y, markerRadius).stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
       }
     }
     for (const id of this.doc.selectedIds) {
