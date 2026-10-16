@@ -29,7 +29,7 @@ Write the summary and any user-facing prose in STE (ASD-STE100 style).
 - Scope lock. Another problem that you see goes under "Other problems seen". Do not fix it.
 - Do not do the items of `room-type-calculations-small-fixes.md`.
 - Keep your own context small: send long output work to the workers.
-- No heredocs, no chained Bash commands.
+- No heredocs, no chained Bash commands. The harness refuses a foreground `sleep`. You do not need to wait for a worker: its result comes back to you when it ends.
 - A worker that changed a file outside TARGETS makes untrusted output. Read all it touched.
 
 ## Summary

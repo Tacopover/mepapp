@@ -17,7 +17,7 @@ Run from the worktree path of your brief. One command for each Bash call. No `&&
 - `pnpm test` (core and UI tests, through turbo)
 - `pnpm typecheck`
 - `pnpm build` (root build; the UI package must be built before a browser check)
-- Browser check: `node .claude/roadmap/browser/with-server.mjs <check.mjs>` with `MEPAPP_SHOTS=<work>/shots` set before the command. The script starts the dev server, runs the check and stops the server. Do not start `vite` yourself. Never use `pkill`.
+- Browser check: `node .claude/roadmap/browser/with-server.mjs <check.mjs>`. Screenshots go to `/tmp/mepapp-shots/`. Do not put an environment variable before the command. The script starts the dev server, runs the check and stops the server. Do not start `vite` yourself. Never use `pkill`.
 
 Only one browser check runs at a time. If a Chromium process from an earlier run is still alive, report it. Do not kill other processes.
 

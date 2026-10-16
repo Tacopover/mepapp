@@ -13,7 +13,7 @@ Read `.claude/roadmap/rules.md` first (sections 4 and 5 describe the browser hel
 ## Procedure
 
 1. Read each screenshot with the Read tool. Describe what you see in one line each.
-2. If you need to see more, write a short check script in the work folder, in the shape of `.claude/roadmap/browser/p6-check.mjs`, and run it: `node .claude/roadmap/browser/with-server.mjs <check.mjs>` with `MEPAPP_SHOTS=<work>/shots` set. Use real clicks and typing, not only `window.__mepSketchScene`. Only one browser run at a time. Never start `vite` yourself. Never use `pkill`.
+2. If you need to see more, write a short check script in the work folder, in the shape of `.claude/roadmap/browser/p6-check.mjs`, and run it: `node .claude/roadmap/browser/with-server.mjs <check.mjs>`. Screenshots go to `/tmp/mepapp-shots/` (use `shot('<task id>-<name>')`). Do not put an environment variable before the command. Use real clicks and typing, not only `window.__mepSketchScene`. Only one browser run at a time. Never start `vite` yourself. Never use `pkill`.
 3. Judge against this list:
    - **Complete.** Every control of the task text exists, is visible, and has a clear label. A state with no data (nothing placed, no rooms) shows a clear message and not an empty box.
    - **It works.** Each control does what its label says, through the real input (type, Enter, Tab, click). A value that the user types stays after blur and reload.

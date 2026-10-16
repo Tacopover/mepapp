@@ -64,14 +64,16 @@ These rules come from the memory files of the user. They are hard rules, not pre
 
 Files in `.claude/roadmap/browser/`:
 
-- `lib.mjs`: `open()` returns `{ page, check, menu, until, idle, start, openPdf, openAutoPlace, detect, shot, finish, ... }`. Settings come from the environment: `MEPAPP_REPO`, `MEPAPP_PORT` (5462), `MEPAPP_PDF`, `MEPAPP_SHOTS`.
+- `lib.mjs`: `open()` returns `{ page, check, menu, until, idle, start, openPdf, openAutoPlace, detect, shot, finish, ... }`. Settings come from the environment: `MEPAPP_REPO`, `MEPAPP_PORT` (5462), `MEPAPP_PDF`, `MEPAPP_SHOTS` (default `/tmp/mepapp-shots`).
   - `check(ok, what, extra)` counts a pass or a fail. `shot(name)` saves `<MEPAPP_SHOTS>/<name>.png` and prints `SHOT <path>`. `finish()` prints the totals and sets a non-zero exit code on a fail.
 - `with-server.mjs <check.mjs>`: starts the dev server, runs the check, stops the server.
 - `p3-check.mjs`, `p6-check.mjs`: examples from part 1 (the Auto-place dialog, room detection, real DOM inputs). Copy the shape of one for a new check.
 
 Run a check with one command:
 
-`MEPAPP_SHOTS=<work>/shots node .claude/roadmap/browser/with-server.mjs <work>/<name>-check.mjs`
+`node .claude/roadmap/browser/with-server.mjs <work>/<name>-check.mjs`
+
+Do not put an environment variable before the command: the allow rules do not match it. Screenshots go to `/tmp/mepapp-shots/` (the default of `lib.mjs`). Name each one `<task id>-<name>` with `shot()`.
 
 Write the check script in the work folder with the Write tool. Import the helper with an absolute path to `lib.mjs` of the worktree.
 
