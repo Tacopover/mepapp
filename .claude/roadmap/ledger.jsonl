@@ -88,3 +88,6 @@
 {"seq":88,"at":"2026-10-16T21:30:14.249Z","type":"task","id":"R2-T01","state":"done","commit":"11e5117","summary":"openPortsOf in core. 924 core tests and pnpm build pass."}
 {"seq":89,"at":"2026-10-16T21:30:14.286Z","type":"now","id":"now","role":"task-lead","task":"R2-T02","note":"Port finder","since":"2026-10-16T21:35:00.000Z"}
 {"seq":90,"at":"2026-10-16T21:30:14.328Z","type":"task","id":"R2-T02","state":"briefed","role":"task-lead"}
+{"seq":91,"at":"2026-10-16T21:39:40.144Z","type":"task","id":"R2-T02","state":"done","commit":"1a7d4bb","summary":"findRoutePorts in core, 18 new tests. 942 core tests pass."}
+{"seq":92,"at":"2026-10-16T21:39:40.183Z","type":"now","id":"now","role":"task-lead","task":"R2-T03","note":"Multi-page refusal","since":"2026-10-16T21:50:00.000Z"}
+{"seq":93,"at":"2026-10-16T21:39:40.217Z","type":"task","id":"R2-T03","state":"briefed","role":"task-lead"}
