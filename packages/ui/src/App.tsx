@@ -65,6 +65,7 @@ import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateSto
 import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
 import { AutoPlaceDialog } from './components/AutoPlaceDialog.js';
+import { RouteDialog } from './components/RouteDialog.js';
 import { getStampAppearanceDefault } from './stampAppearanceDefaults.js';
 import { clearRuleMoveReport, loadPlacementRules, loadRuleMoveReport, loadUncheckedRuleIds, moveStoredOldRules, savePlacementRules, saveUncheckedRuleIds } from './placementRuleStorage.js';
 import { stampLabelFor } from './stampVisibility.js';
@@ -434,6 +435,7 @@ export function MepSketchApp({
   const [uncheckedRuleIds, setUncheckedRuleIds] = useState<string[]>(() => loadUncheckedRuleIds(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveUncheckedRuleIds(typeof localStorage === 'undefined' ? undefined : localStorage, uncheckedRuleIds), [uncheckedRuleIds]);
   const [autoPlaceOpen, setAutoPlaceOpen] = useState(false);
+  const [routeOpen, setRouteOpen] = useState(false);
   /** Set while the stamp picker chooses the stamp of a placement rule. */
   const [ruleStampPick, setRuleStampPick] = useState<{ onPick: (definitionId: string) => void } | null>(null);
   useEffect(() => savePlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage, placementRules), [placementRules]);
@@ -1450,6 +1452,7 @@ export function MepSketchApp({
           onCancelRoomDetection={handleCancelRoomDetection}
           onExportRooms={handleExportRooms}
           onOpenAutoPlace={() => setAutoPlaceOpen(true)}
+          onOpenRoute={() => setRouteOpen(true)}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
         />
@@ -1644,6 +1647,10 @@ export function MepSketchApp({
           onRemoved={(count) => setStatus(`Removed ${count} auto-placed stamp${count === 1 ? '' : 's'}. Undo gives them back.`)}
           onClose={ruleStampPick ? () => {} : () => setAutoPlaceOpen(false)}
         />
+      )}
+
+      {routeOpen && (
+        <RouteDialog sceneRef={sceneRef} roomTypes={roomTypes} language={labelLanguage} onClose={() => setRouteOpen(false)} />
       )}
 
       {ruleStampPick && (

@@ -3449,6 +3449,11 @@
 .mep-stamp-tile-warning {
   color: var(--accent-ink);
 }
+/* "Route network" dialog: narrow single column. */
+.mep-modal--route {
+  width: 420px;
+  max-width: 92vw;
+}
 /* "User library" and "Add stamp folder" dialogs: one column, own width (not the Element Editor's .mep-modal--wide, whose body is a flex row). */
 .mep-modal--library {
   width: 520px;

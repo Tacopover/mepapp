@@ -16,6 +16,7 @@ export interface MenuButtonProps {
   onCancelRoomDetection: () => void;
   onExportRooms: () => void;
   onOpenAutoPlace: () => void;
+  onOpenRoute: () => void;
   wallDebugVisible: boolean;
   onToggleWallDebug: () => void;
 }
@@ -34,6 +35,7 @@ export function MenuButton({
   onCancelRoomDetection,
   onExportRooms,
   onOpenAutoPlace,
+  onOpenRoute,
   wallDebugVisible,
   onToggleWallDebug,
 }: MenuButtonProps) {
@@ -153,6 +155,17 @@ export function MenuButton({
             }}
           >
             Auto-place stamps…
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            disabled={!pdfLoaded}
+            onClick={() => {
+              onOpenRoute();
+              setOpen(false);
+            }}
+          >
+            Route network…
           </button>
           {isDebugToolsEnabled() && (
             <>
