@@ -49,7 +49,6 @@ import {
   getNetworkTypeFromLibrary,
   getStampDefinition,
   getStampPorts,
-  getStampWorldPorts,
   loadProject,
   markAutoPlacedMoved,
   matchPortsByLocation,
@@ -57,6 +56,7 @@ import {
   multiRotate,
   NETWORK_TYPE_LIBRARY,
   normalizeDegrees,
+  openPortsOf,
   pasteSegments,
   planPdfSync,
   planTerminalAssignment,
@@ -2254,15 +2254,8 @@ export class SketchScene {
   /** Each open port of the drawing (auto-routing.md §5 question 9): a port with a routing target and no segment. */
   private openPorts(state: DrawingState): { world: Vec2; networkTypeId: string }[] {
     const connected = this.portSegmentTypes();
-    const open: { world: Vec2; networkTypeId: string }[] = [];
-    for (const stamp of Object.values(state.stamps)) {
-      if (!stamp.routingTargets) continue;
-      for (const port of getStampWorldPorts(stamp)) {
-        const networkTypeId = routingTargetOf(stamp, port.id);
-        if (networkTypeId && connected.get(stamp.id)?.[port.id] === undefined) open.push({ world: port.world, networkTypeId });
-      }
-    }
-    return open;
+    const stamps = Object.values(state.stamps).map((stamp) => ({ ...stamp, portSegmentTypes: connected.get(stamp.id) }));
+    return openPortsOf(stamps).map((open) => ({ world: open.world, networkTypeId: open.networkTypeId }));
   }
 
   isOpenPortsVisible(): boolean {
