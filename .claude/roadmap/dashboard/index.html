@@ -1,0 +1,510 @@
+<title>Routing Run Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a drawing-sheet title block on top, a status strip, then stacked sections. One column on a phone, two columns from 900px. */
+:root {
+  --bg: #eef1f4;
+  --panel: #ffffff;
+  --ink: #16212b;
+  --muted: #5a6875;
+  --line: #cfd7de;
+  --accent: #0b6e8a;
+  --accent-ink: #ffffff;
+  --ok: #1d7a46;
+  --warn: #a15c00;
+  --bad: #b3261e;
+  --wait: #5b4bb0;
+  --chip: #e4e9ee;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10161c;
+    --panel: #18212a;
+    --ink: #e6ecf1;
+    --muted: #93a2b0;
+    --line: #2b3844;
+    --accent: #4fb3d1;
+    --accent-ink: #08222c;
+    --ok: #55c386;
+    --warn: #e0a24a;
+    --bad: #f08a82;
+    --wait: #a99cf0;
+    --chip: #223040;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10161c;
+  --panel: #18212a;
+  --ink: #e6ecf1;
+  --muted: #93a2b0;
+  --line: #2b3844;
+  --accent: #4fb3d1;
+  --accent-ink: #08222c;
+  --ok: #55c386;
+  --warn: #e0a24a;
+  --bad: #f08a82;
+  --wait: #a99cf0;
+  --chip: #223040;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-block: 16px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1100px; margin: 0 auto; display: grid; gap: 16px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+h1 { font-size: 28px; line-height: 1.1; font-weight: 700; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+h3 { font-size: 17px; font-weight: 600; }
+button, input, textarea { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible, .part:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.muted { color: var(--muted); }
+.title-block { display: grid; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--accent); padding: 14px 16px; }
+.title-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 16px; min-width: 0; }
+.meta span { min-width: 0; overflow-wrap: anywhere; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; background: var(--chip); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.pill[data-s="running"]::before, .pill[data-s="in progress"]::before { background: var(--accent); }
+.pill[data-s="done"]::before, .pill[data-s="fixed"]::before { background: var(--ok); }
+.pill[data-s="waiting"]::before, .pill[data-s="open"]::before { background: var(--wait); }
+.pill[data-s="stopped"]::before, .pill[data-s="blocked"]::before { background: var(--bad); }
+.pill[data-s="fixing"]::before, .pill[data-s="provisional"]::before { background: var(--warn); }
+.pill[data-s="implementing"]::before, .pill[data-s="testing"]::before, .pill[data-s="code review"]::before, .pill[data-s="UI review"]::before, .pill[data-s="briefed"]::before { background: var(--accent); }
+.now { display: grid; gap: 4px; background: var(--panel); border: 1px solid var(--line); padding: 12px 16px; }
+.now strong { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+.now.busy { border-left: 4px solid var(--accent); }
+section { display: grid; gap: 10px; min-width: 0; }
+.grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.card { background: var(--panel); border: 1px solid var(--line); padding: 12px 14px; min-width: 0; }
+.stack { display: grid; gap: 8px; }
+.parts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.part { text-align: left; background: var(--panel); border: 1px solid var(--line); padding: 10px 12px; cursor: pointer; display: grid; gap: 6px; min-width: 0; }
+.part[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.part b { font-family: var(--font-display); font-size: 18px; }
+.part .nm { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.bar { height: 6px; background: var(--chip); }
+.bar > i { display: block; height: 100%; background: var(--ok); }
+.row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row .t { overflow-wrap: anywhere; }
+.row .sub { grid-column: 2 / 4; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.sev { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border: 1px solid currentColor; }
+.sev.high { color: var(--bad); }
+.sev.medium { color: var(--warn); }
+.sev.low { color: var(--muted); }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { background: var(--panel); border: 1px solid var(--accent); color: var(--accent); padding: 8px 12px; cursor: pointer; min-height: 40px; text-align: left; }
+.btn:hover:not(:disabled) { background: var(--chip); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.rec::after { content: " (recommended)"; font-size: 12px; opacity: 0.85; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.shots { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.shot { margin: 0; display: grid; gap: 4px; min-width: 0; }
+.shot button { padding: 0; border: 1px solid var(--line); background: var(--chip); cursor: zoom-in; }
+.shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; }
+.shot figcaption { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.lightbox { position: fixed; inset: 0; background: rgba(8, 12, 16, 0.88); display: grid; place-items: center; padding: 16px; z-index: 20; }
+.lightbox[hidden] { display: none; }
+.lightbox img { max-width: 100%; max-height: 82vh; background: #fff; }
+.lightbox p { color: #e6ecf1; margin: 8px 0 0; text-align: center; }
+textarea { width: 100%; min-height: 70px; background: var(--bg); border: 1px solid var(--line); padding: 8px; resize: vertical; }
+.empty { color: var(--muted); border: 1px dashed var(--line); padding: 14px; }
+.log { max-height: 280px; overflow: auto; display: grid; gap: 4px; }
+.log div { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+.note-row { padding: 6px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.alert { border: 2px solid var(--wait); background: var(--panel); padding: 12px 14px; display: grid; gap: 12px; }
+.alert[hidden] { display: none; }
+.dec { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.dec:first-of-type { border-top: 0; padding-top: 0; }
+.dec .q { font-weight: 600; overflow-wrap: anywhere; }
+.dec .why { color: var(--muted); font-size: 13.5px; overflow-wrap: anywhere; }
+.dec input[type=text] { flex: 1 1 200px; min-width: 0; background: var(--bg); border: 1px solid var(--line); padding: 8px; }
+@media (prefers-reduced-motion: no-preference) { .bar > i { transition: width 0.4s ease; } }
+</style>
+
+<main>
+  <header class="title-block">
+    <div class="title-row">
+      <h1>Routing road map, run board</h1>
+      <span class="pill" id="run-pill" data-s="idle">idle</span>
+    </div>
+    <div class="meta mono muted">
+      <span>Branch: <span id="run-branch">—</span></span>
+      <span>Last event: <span id="run-updated">—</span></span>
+      <span id="conn">Connecting…</span>
+    </div>
+    <div id="run-note" class="muted"></div>
+  </header>
+
+  <div class="now" id="now">
+    <h2>Now working</h2>
+    <strong id="now-what">Nothing runs.</strong>
+    <span class="muted mono" id="now-since"></span>
+    <span id="now-note" class="muted"></span>
+  </div>
+
+  <div class="alert" id="needs" hidden>
+    <h2 style="color:var(--wait)">The run needs you</h2>
+    <div id="needs-list" class="stack"></div>
+  </div>
+
+  <section>
+    <h2>Road map</h2>
+    <div class="parts" id="parts"></div>
+  </section>
+
+  <div class="grid">
+    <section>
+      <h2 id="tasks-h">Tasks</h2>
+      <div class="card" id="tasks"></div>
+    </section>
+    <section>
+      <h2>Review findings</h2>
+      <div class="card" id="findings"></div>
+    </section>
+  </div>
+
+  <section>
+    <h2 id="shots-h">Screenshots</h2>
+    <div id="shots" class="shots"></div>
+  </section>
+
+  <div class="grid">
+    <section>
+      <h2>Decisions</h2>
+      <div class="card" id="decisions"></div>
+    </section>
+    <section>
+      <h2>Steer the run</h2>
+      <div class="card stack">
+        <label for="note-text" class="muted">Write a note. The director reads it at the start of the next cycle. Write STOP to stop the run.</label>
+        <textarea id="note-text" placeholder="For example: use the same word 'system' on every screen."></textarea>
+        <div class="opts"><button class="btn primary" id="note-send" type="button">Send note</button><span id="note-status" class="muted" role="status"></span></div>
+        <div id="notes"></div>
+      </div>
+    </section>
+  </div>
+
+  <section>
+    <h2>Log</h2>
+    <div class="card log mono" id="log"></div>
+  </section>
+</main>
+
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-label="Screenshot">
+  <div><img id="lb-img" alt=""><p id="lb-cap"></p><p><button class="btn" id="lb-close" type="button">Close</button></p></div>
+</div>
+
+<script>
+(function () {
+  var events = [];
+  var answers = {};
+  var notes = [];
+  var selected = null;
+  var canWrite = false;
+  var db = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
+  function ago(iso) {
+    if (!iso) return '';
+    var s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (s < 60) return s + ' s ago';
+    if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + ' h ago';
+    return Math.round(s / 86400) + ' d ago';
+  }
+  function pill(state) {
+    var p = el('span', 'pill', state || '—');
+    p.setAttribute('data-s', state || '');
+    return p;
+  }
+
+  // The fold: the newest event of each type and id replaces the fields of the older ones. It matches ledger.mjs "show".
+  function fold() {
+    var map = {};
+    events.slice().sort(function (a, b) { return a.seq - b.seq; }).forEach(function (e) {
+      var k = e.type + ':' + e.id;
+      map[k] = Object.assign({}, map[k] || {}, e);
+    });
+    var out = { run: null, now: null, parts: [], tasks: [], decisions: [], findings: [], shots: [], logs: [] };
+    Object.keys(map).forEach(function (k) {
+      var e = map[k];
+      if (e.type === 'run') out.run = e;
+      else if (e.type === 'now') out.now = e;
+      else if (e.type === 'part') out.parts.push(e);
+      else if (e.type === 'task') out.tasks.push(e);
+      else if (e.type === 'decision') out.decisions.push(e);
+      else if (e.type === 'finding') out.findings.push(e);
+      else if (e.type === 'shot') out.shots.push(e);
+      else if (e.type === 'log') out.logs.push(e);
+    });
+    out.parts.sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
+    out.tasks.sort(function (a, b) { return (a.order || 0) - (b.order || 0) || a.seq - b.seq; });
+    out.logs.sort(function (a, b) { return b.seq - a.seq; });
+    return out;
+  }
+
+  function answerOf(d) { return answers[d.id] ? answers[d.id].answer : null; }
+
+  function send(decision, value) {
+    if (!db || !canWrite) return;
+    db.doc('answers/a-' + decision.id).set({ decisionId: decision.id, answer: value, at: new Date().toISOString() }).catch(function () {
+      $('conn').textContent = 'Could not save the answer. Try again.';
+    });
+  }
+
+  function decisionBlock(d) {
+    var wrap = el('div', 'dec');
+    wrap.appendChild(el('div', 'mono muted', d.id + (d.part ? ' · ' + d.part : '') + (d.kind === 'new' ? ' · new' : '')));
+    wrap.appendChild(el('div', 'q', d.question));
+    if (d.reason) wrap.appendChild(el('div', 'why', 'Reason for the recommendation: ' + d.reason));
+    var given = answerOf(d);
+    if (d.status === 'open' && given) {
+      wrap.appendChild(el('div', 'muted', 'You answered: ' + given + '. The director reads this in the next cycle.'));
+    }
+    var opts = el('div', 'opts');
+    (d.options || []).forEach(function (o) {
+      var b = el('button', 'btn' + (o.key === d.recommendation ? ' rec' : ''), o.key + ' — ' + o.label);
+      b.type = 'button';
+      b.disabled = !canWrite;
+      b.addEventListener('click', function () { send(d, o.key); });
+      opts.appendChild(b);
+    });
+    wrap.appendChild(opts);
+    var row = el('div', 'opts');
+    var inp = el('input');
+    inp.type = 'text';
+    inp.id = 'free-' + d.id;
+    inp.placeholder = 'Or write another answer';
+    inp.disabled = !canWrite;
+    var go = el('button', 'btn', 'Send');
+    go.type = 'button';
+    go.disabled = !canWrite;
+    go.addEventListener('click', function () { if (inp.value.trim()) { send(d, inp.value.trim()); inp.value = ''; } });
+    inp.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') go.click(); });
+    row.appendChild(inp);
+    row.appendChild(go);
+    wrap.appendChild(row);
+    return wrap;
+  }
+
+  function render() {
+    var s = fold();
+
+    // Header
+    var run = s.run || { status: 'idle' };
+    var rp = $('run-pill');
+    rp.textContent = run.status || 'idle';
+    rp.setAttribute('data-s', run.status || 'idle');
+    $('run-branch').textContent = run.branch || '—';
+    var last = events.reduce(function (m, e) { return e.at > m ? e.at : m; }, '');
+    $('run-updated').textContent = last ? ago(last) : 'no events yet';
+    $('run-note').textContent = run.note || '';
+
+    // Now
+    var now = s.now || {};
+    $('now').className = 'now' + (now.role ? ' busy' : '');
+    $('now-what').textContent = now.role ? now.role + (now.task ? ' · ' + now.task : '') : 'Nothing runs.';
+    $('now-since').textContent = now.role && now.since ? 'Since ' + ago(now.since) : '';
+    $('now-note').textContent = now.note || '';
+
+    // Needs you
+    var open = s.decisions.filter(function (d) { return d.status === 'open'; });
+    $('needs').hidden = open.length === 0 && run.status !== 'waiting' && run.status !== 'stopped';
+    var nl = clear($('needs-list'));
+    if (run.status === 'stopped' || run.status === 'waiting') nl.appendChild(el('div', '', run.note || ''));
+    open.forEach(function (d) { nl.appendChild(decisionBlock(d)); });
+
+    // Parts
+    if (!selected || !s.parts.some(function (p) { return p.id === selected; })) {
+      var cur = s.parts.filter(function (p) { return p.state === 'in progress'; })[0] || s.parts[0];
+      selected = cur ? cur.id : null;
+    }
+    var pe = clear($('parts'));
+    if (!s.parts.length) pe.appendChild(el('div', 'empty', 'No parts yet. The director adds R2 to R7 when the run starts.'));
+    s.parts.forEach(function (p) {
+      var tasks = s.tasks.filter(function (t) { return t.part === p.id; });
+      var done = tasks.filter(function (t) { return t.state === 'done'; }).length;
+      var b = el('button', 'part');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(p.id === selected));
+      var top = el('div');
+      top.appendChild(el('b', '', p.id));
+      b.appendChild(top);
+      b.appendChild(el('span', 'nm', p.name || ''));
+      b.appendChild(pill(p.state));
+      var bar = el('div', 'bar');
+      var fill = el('i');
+      fill.style.width = (tasks.length ? Math.round(100 * done / tasks.length) : (p.state === 'done' ? 100 : 0)) + '%';
+      bar.appendChild(fill);
+      b.appendChild(bar);
+      b.appendChild(el('span', 'mono muted', tasks.length ? done + ' of ' + tasks.length + ' tasks' : 'no tasks yet'));
+      b.addEventListener('click', function () { selected = p.id; render(); });
+      pe.appendChild(b);
+    });
+
+    // Tasks
+    $('tasks-h').textContent = 'Tasks' + (selected ? ' of ' + selected : '');
+    var te = clear($('tasks'));
+    var tasks = s.tasks.filter(function (t) { return t.part === selected; });
+    if (!tasks.length) te.appendChild(el('div', 'empty', 'No tasks for this part yet.'));
+    tasks.forEach(function (t) {
+      var r = el('div', 'row');
+      r.appendChild(el('span', 'mono muted', t.id));
+      r.appendChild(el('span', 't', t.title || ''));
+      r.appendChild(pill(t.state));
+      var sub = [t.role ? t.role : '', t.commit ? 'commit ' + t.commit : '', t.summary || ''].filter(Boolean).join(' · ');
+      if (sub) r.appendChild(el('span', 'sub', sub));
+      te.appendChild(r);
+    });
+    var part = s.parts.filter(function (p) { return p.id === selected; })[0];
+    if (part && part.summary) te.appendChild(el('div', 'note-row muted', part.summary));
+
+    // Findings
+    var fe = clear($('findings'));
+    var fs = s.findings.filter(function (f) { return f.part === selected; });
+    if (!fs.length) fe.appendChild(el('div', 'empty', 'No findings for this part.'));
+    fs.forEach(function (f) {
+      var r = el('div', 'row');
+      r.appendChild(el('span', 'sev ' + (f.severity || 'low'), f.severity || 'low'));
+      r.appendChild(el('span', 't', f.text || ''));
+      r.appendChild(pill(f.status));
+      r.appendChild(el('span', 'sub', [f.task, f.source].filter(Boolean).join(' · ')));
+      fe.appendChild(r);
+    });
+
+    // Decisions (all)
+    var de = clear($('decisions'));
+    var others = s.decisions.filter(function (d) { return d.status !== 'open'; });
+    if (!s.decisions.length) de.appendChild(el('div', 'empty', 'No decisions yet. The director adds the batch after the overview.'));
+    others.forEach(function (d) {
+      var r = el('div', 'row');
+      r.appendChild(el('span', 'mono muted', d.id));
+      r.appendChild(el('span', 't', d.question));
+      r.appendChild(pill(d.status));
+      r.appendChild(el('span', 'sub', 'Answer: ' + (d.answer || '—') + (d.by ? ' (by the ' + d.by + ')' : '')));
+      de.appendChild(r);
+    });
+    if (s.decisions.length && !others.length) de.appendChild(el('div', 'muted', 'All decisions are open. They are at the top of the page.'));
+
+    // Shots
+    $('shots-h').textContent = 'Screenshots' + (selected ? ' of ' + selected : '');
+    var se = clear($('shots'));
+    var ss = s.shots.filter(function (x) { return x.part === selected; });
+    if (!ss.length) se.appendChild(el('div', 'empty', 'No screenshots for this part yet. The tester adds them after each task.'));
+    ss.forEach(function (x) {
+      var fig = el('figure', 'shot');
+      var b = el('button');
+      b.type = 'button';
+      b.setAttribute('aria-label', 'Open screenshot: ' + (x.caption || x.id));
+      var img = el('img');
+      img.loading = 'lazy';
+      img.alt = x.caption || x.id;
+      img.src = x.url || ('/_blob/' + x.assetId);
+      b.appendChild(img);
+      b.addEventListener('click', function () {
+        $('lb-img').src = img.src;
+        $('lb-img').alt = img.alt;
+        $('lb-cap').textContent = (x.task ? x.task + ' · ' : '') + (x.caption || '');
+        $('lightbox').hidden = false;
+        $('lb-close').focus();
+      });
+      fig.appendChild(b);
+      fig.appendChild(el('figcaption', '', (x.task ? x.task + ' · ' : '') + (x.caption || '')));
+      se.appendChild(fig);
+    });
+
+    // Notes
+    var ne = clear($('notes'));
+    notes.slice().sort(function (a, b) { return a.at < b.at ? 1 : -1; }).slice(0, 8).forEach(function (n) {
+      var r = el('div', 'note-row');
+      r.appendChild(el('div', 'mono muted', ago(n.at) + (n.handled ? ' · read by the director' : ' · not read yet')));
+      r.appendChild(el('div', '', n.text));
+      ne.appendChild(r);
+    });
+
+    // Log
+    var le = clear($('log'));
+    if (!s.logs.length) le.appendChild(el('div', 'muted', 'The log is empty.'));
+    s.logs.slice(0, 60).forEach(function (l) {
+      var r = el('div');
+      r.appendChild(el('span', 'muted', ago(l.at)));
+      r.appendChild(el('span', '', l.text));
+      le.appendChild(r);
+    });
+  }
+
+  $('lb-close').addEventListener('click', function () { $('lightbox').hidden = true; });
+  $('lightbox').addEventListener('click', function (ev) { if (ev.target === $('lightbox')) $('lightbox').hidden = true; });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') $('lightbox').hidden = true; });
+
+  $('note-send').addEventListener('click', function () {
+    var t = $('note-text').value.trim();
+    if (!t || !db || !canWrite) return;
+    var id = 'n' + Date.now();
+    db.doc('notes/' + id).set({ text: t, at: new Date().toISOString(), handled: false }).then(function () {
+      $('note-text').value = '';
+      $('note-status').textContent = 'Sent.';
+    }).catch(function () { $('note-status').textContent = 'Could not send the note. Try again.'; });
+  });
+
+  function setup() {
+    if (!window.claude || !window.claude.use) { $('conn').textContent = 'Offline view. No data.'; return render(); }
+    Promise.all([window.claude.use('db'), window.claude.use('user')]).then(function (r) {
+      db = r[0];
+      var user = r[1];
+      if (!db) { $('conn').textContent = 'No data connection.'; return render(); }
+      var p = user && user.can ? user.can('data.write') : Promise.resolve(null);
+      return Promise.resolve(p).then(function (ok) {
+        canWrite = ok !== false;
+        $('note-send').disabled = !canWrite;
+        $('note-text').disabled = !canWrite;
+        $('conn').textContent = canWrite ? 'Live' : 'Live, read only';
+        db.collection('events').limit(1000).onSnapshot(function (snap) {
+          events = snap.docs.map(function (d) { return d.data(); });
+          render();
+        }, function () { $('conn').textContent = 'Lost the data connection. Reload the page.'; });
+        db.collection('answers').onSnapshot(function (snap) {
+          answers = {};
+          snap.docs.forEach(function (d) { var v = d.data(); answers[v.decisionId] = v; });
+          render();
+        }, function () {});
+        db.collection('notes').limit(100).onSnapshot(function (snap) {
+          notes = snap.docs.map(function (d) { return d.data(); });
+          render();
+        }, function () {});
+      });
+    }).catch(function () { $('conn').textContent = 'No data connection.'; render(); });
+  }
+
+  render();
+  setup();
+  setInterval(function () {
+    var a = document.activeElement;
+    if (events.length && !(a && a.tagName === 'INPUT')) render();
+  }, 60000);
+})();
+</script>

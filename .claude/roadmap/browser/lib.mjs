@@ -1,10 +1,19 @@
-// Shared driver helpers for the browser checks of auto-routing.md (copied from the room-type-calculations checks).
-import { readFileSync } from 'node:fs';
+// Shared driver helpers for the browser checks of the routing road map (from the checks of auto-routing.md part 1).
+// Settings come from environment variables, so the same file works in every worktree:
+//   MEPAPP_REPO   root of the worktree whose node_modules has playwright (default: the repo that holds this file)
+//   MEPAPP_PORT   port of the dev server (default 5462)
+//   MEPAPP_PDF    default PDF for openPdf() (default: fixtures/pdfs/01_arch_first_floor.pdf of the main checkout)
+//   MEPAPP_SHOTS  folder for screenshots (default: <tmpdir>/mepapp-shots)
+import { readFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { join, resolve, dirname } from 'node:path';
 
-export const REPO = '/root/MepApp/.claude/worktrees/auto-routing';
-export const BASE = 'http://127.0.0.1:5462/';
-export const PDF = '/root/MepApp/fixtures/pdfs/01_arch_first_floor.pdf';
-export const SP = '/tmp/claude-0/-root-MepApp/b8d93002-0ef6-45fd-91e3-9f5b7239773a/scratchpad';
+export const REPO = process.env.MEPAPP_REPO ?? resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+export const BASE = `http://127.0.0.1:${process.env.MEPAPP_PORT ?? '5462'}/`;
+export const PDF = process.env.MEPAPP_PDF ?? '/root/MepApp/fixtures/pdfs/01_arch_first_floor.pdf';
+export const SP = process.env.MEPAPP_SHOTS ?? join(tmpdir(), 'mepapp-shots');
+mkdirSync(SP, { recursive: true });
 export const D = '.mep-modal--auto-place';
 const { chromium } = await import(`${REPO}/node_modules/playwright/index.mjs`);
 
@@ -78,12 +87,20 @@ export async function open({ width = 1600, height = 1000, seed = {}, dark = fals
     await until(async () => (await page.evaluate(() => window.__mepSketchScene.listRooms().length)) > 0 && !/Detecting/i.test(await statusText()), 'detect');
     await idle(1000);
   }
+  /** Saves a screenshot of the page as <SHOTS>/<name>.png and prints the path. */
+  async function shot(name) {
+    const path = join(SP, `${name}.png`);
+    await page.screenshot({ path });
+    console.log(`SHOT ${path}`);
+    return path;
+  }
   async function finish() {
     check(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
     console.log(`\n${pass} passed, ${fails.length} failed`);
     for (const f of fails) console.log('  - ' + f);
+    process.exitCode = fails.length ? 1 : 0;
     await browser.close();
   }
   const nav = `${D} nav[data-testid=ap-nav]`;
-  return { browser, context, page, errors, check, menu, until, idle, start, openPdf, openAutoPlace, detect, finish, statusText, nav };
+  return { browser, context, page, errors, check, menu, until, idle, start, openPdf, openAutoPlace, detect, shot, finish, statusText, nav };
 }

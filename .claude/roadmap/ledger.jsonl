@@ -1,0 +1,9 @@
+{"seq":1,"at":"2026-10-16T13:20:00.000Z","type":"run","id":"run","status":"idle","branch":"worktree-agent-framework","note":"The framework is built. The run has not started."}
+{"seq":2,"at":"2026-10-16T13:20:00.000Z","type":"part","id":"R2","order":2,"name":"Which network (systems)","state":"overview"}
+{"seq":3,"at":"2026-10-16T13:20:00.000Z","type":"part","id":"R3","order":3,"name":"A start point for each network","state":"overview"}
+{"seq":4,"at":"2026-10-16T13:20:00.000Z","type":"part","id":"R4","order":4,"name":"Where a duct or pipe may go","state":"overview"}
+{"seq":5,"at":"2026-10-16T13:20:00.000Z","type":"part","id":"R5","order":5,"name":"Sizing","state":"overview"}
+{"seq":6,"at":"2026-10-16T13:20:00.000Z","type":"part","id":"R6","order":6,"name":"The shape of the network","state":"overview"}
+{"seq":7,"at":"2026-10-16T13:20:00.000Z","type":"part","id":"R7","order":7,"name":"Electrical circuits","state":"overview"}
+{"seq":8,"at":"2026-10-16T13:20:00.000Z","type":"now","id":"now","role":"","task":"","note":"Nothing runs."}
+{"seq":9,"at":"2026-10-16T13:20:00.000Z","type":"log","id":"L-9","text":"The agent framework is built. The dry run is next."}
