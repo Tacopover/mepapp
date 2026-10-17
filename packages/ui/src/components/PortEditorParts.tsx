@@ -66,8 +66,8 @@ export function PortsSidebar({ portsEditor, hint }: { portsEditor: PortEditor; h
         <div className="mep-section">
           <h4>Linked Ports</h4>
           <p className="mep-hint">
-            Linked ports collapse into one connectivity node once placed — e.g. a unit's supply and return,
-            so a segment between them never bridges the two networks.
+            Linked ports, once placed, act as one connection point for segments of one network type, for example a
+            unit's supply and return. Segments of different network types on these ports stay separate networks.
           </p>
           <button
             type="button"

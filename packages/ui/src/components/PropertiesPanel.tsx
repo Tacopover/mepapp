@@ -690,8 +690,8 @@ export function PropertiesPanel({
         <div className="mep-section">
           <h4>Linked ports</h4>
           <p className="mep-hint">
-            Checked ports on this element act as one connectivity node — e.g. a unit's supply and return, so a segment
-            between them never bridges the two networks.
+            Checked ports on this element act as one connection point for segments of one network type, for example a
+            unit's supply and return. Segments of different network types on these ports stay separate networks.
           </p>
           {stamp.ports.map((port) => {
             const checked = stamp.linkedPortIds?.includes(port.id) ?? false;
