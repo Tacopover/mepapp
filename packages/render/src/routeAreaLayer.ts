@@ -7,7 +7,7 @@ const BRANCH_COLOR = 0xffab00;
 const SHAFT_COLOR = 0xd50000;
 const DASH_PX = 6;
 const GAP_PX = 4;
-const CROSS_ARM_PX = 4;
+const CROSS_ARM_PX = 5;
 
 export interface RouteAreaView { area: RouteArea; warnings: RouteAreaWarning[] }
 
@@ -49,13 +49,16 @@ export function drawRouteArea(layer: Container, view: RouteAreaView | null, room
 
   const byId = new Map(rooms.map((r) => [r.id, r]));
   const fill = new Graphics();
+  const outline = new Graphics();
   for (const areaRoom of area.rooms) {
     const room = byId.get(areaRoom.roomId);
     if (!room) continue;
     fill.poly(flat(room.polygon.outer)).fill({ color: AREA_FILL_COLOR, alpha: 0.18 });
     for (const hole of room.polygon.holes) fill.poly(flat(hole)).cut();
+    outline.poly(flat(room.polygon.outer)).stroke({ width: 1.5 * pxPt, color: AREA_FILL_COLOR, alpha: 0.85 });
+    for (const hole of room.polygon.holes) outline.poly(flat(hole)).stroke({ width: 1.5 * pxPt, color: AREA_FILL_COLOR, alpha: 0.85 });
   }
-  layer.addChild(fill);
+  layer.addChild(fill, outline);
 
   const center = new Graphics();
   const connectors = new Graphics();
@@ -73,18 +76,22 @@ export function drawRouteArea(layer: Container, view: RouteAreaView | null, room
   connectors.stroke({ width: 1.5 * pxPt, color: CENTER_COLOR, alpha: 0.9 });
   layer.addChild(center, connectors);
 
+  const halo = new Graphics();
   const branch = new Graphics();
   const shaft = new Graphics();
   const armPt = CROSS_ARM_PX * pxPt;
   for (const entry of area.entries) {
     if (entry.primary && !entry.shaft) cross(branch, entry.point, armPt);
     if (entry.shaft) cross(shaft, entry.point, armPt);
+    if ((entry.primary && !entry.shaft) || entry.shaft) cross(halo, entry.point, armPt);
   }
   for (const link of area.links) {
     if (!link.shaft) cross(branch, link.point, armPt);
     if (link.shaft) cross(shaft, link.point, armPt);
+    cross(halo, link.point, armPt);
   }
+  halo.stroke({ width: 3.5 * pxPt, color: 0xffffff, alpha: 0.9 });
   branch.stroke({ width: 1.5 * pxPt, color: BRANCH_COLOR, alpha: 1 });
   shaft.stroke({ width: 1.5 * pxPt, color: SHAFT_COLOR, alpha: 1 });
-  layer.addChild(branch, shaft);
+  layer.addChild(halo, branch, shaft);
 }
