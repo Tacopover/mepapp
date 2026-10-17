@@ -251,3 +251,7 @@
 {"seq":251,"at":"2026-10-17T05:57:32.712Z","type":"task","id":"R4-T03","state":"done","commit":"d6bfd92","summary":"Raster and Zhang-Suen thinning of the route skeleton. 11 tests; core 1022 pass."}
 {"seq":252,"at":"2026-10-17T05:57:32.749Z","type":"now","id":"now","role":"task-lead","task":"R4-T04","note":"Skeleton graph, prune, simplify (T04, T05a, T05b)","since":"2026-10-17T06:40:00.000Z"}
 {"seq":253,"at":"2026-10-17T05:57:32.785Z","type":"task","id":"R4-T04","state":"briefed","role":"task-lead"}
+{"seq":254,"at":"2026-10-17T06:38:03.908Z","type":"task","id":"R4-T04","state":"done","commit":"923b16f","summary":"Pixel graph of the route skeleton."}
+{"seq":255,"at":"2026-10-17T06:38:04.256Z","type":"task","id":"R4-T05a","state":"done","commit":"349c652","summary":"Prune and half-width of the route skeleton."}
+{"seq":256,"at":"2026-10-17T06:38:05.159Z","type":"task","id":"R4-T05b","state":"done","commit":"47f5487","summary":"centerLineOf and real-room tests. 5 corridors in about 220 ms. Rule relaxed: 26 of 29 vertices keep 25 percent of the half-width from the walls; all are at least 40 mm from walls."}
+{"seq":257,"at":"2026-10-17T06:38:20.383Z","type":"now","id":"now","role":"task-lead","task":"R4-T06","note":"Wall stretch, crossings, graph helpers (T06, T07, T08)","since":"2026-10-17T06:42:00.000Z"}
