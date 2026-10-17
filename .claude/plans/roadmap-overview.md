@@ -68,6 +68,15 @@ Example. For air handling unit 1 the main runs from the shaft along the corridor
 
 An air handling unit with heat recovery has more ducts: outdoor air in and discharge out. The network type library has no such types. It has Supply Air, Return Air and Exhaust Air for ventilation (`packages/core/src/network-type-library.ts:11`-`:13`). The user must add the two types as custom types (not verified: that the network type editor lets the user add a type with the discipline ventilation). R6 does not need them: it routes any adopted type.
 
+**Layout rule of the routed segments (user note, 2026-10-17).** The R4 center line is a guide only. It has free angles, because it follows the middle of the room. R6 does not copy it. R6 builds each routed segment from it with this rule:
+
+- Each routed segment is orthogonal (0 or 90 degrees) or at 45 degrees. Orthogonal is the first choice.
+- A small jump (a lateral offset between two parallel runs) uses a pair of 45 degree bends. A larger jump uses two 90 degree bends.
+- A free angle is allowed only in rare cases (for example a port with a fixed direction that no 45 or 90 degree path can reach inside the room). The preview then shows a warning with the place. The user can accept it or move the item.
+- Provisional values (the director chose them; easy to reverse, one constant each): the jump is "small" at 1000 mm or less (measured on the offset between the two runs); the free angle is a fallback after 90 and 45 degree paths fail. The R6 plan checks these values with the domain checker (standard fitting angles of a duct network: 45 and 90 degrees).
+- The rule uses the same angle set as the Snap Angle option of the segment tool. The R6 plan reads that code first and reuses it (rule 3 of `rules.md`).
+- R4 changes nothing for this rule. The R4 legend already says "The center line is a guide".
+
 ### R7. Electrical circuits
 
 The user presses "Make circuits". The command takes a panel (an existing `Panel`) and a set of rooms as input. It groups the unassigned luminaires and sockets of those rooms into circuits, by room and by a limit for each circuit type, and puts them on the panel. The dialog shows the count of rooms and of terminals for each panel before the user accepts. A second panel can take the terminals that the first panel left.
