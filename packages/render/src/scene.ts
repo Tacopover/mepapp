@@ -38,6 +38,7 @@ import {
   DEFAULT_STAMP_LABEL_VISIBILITY,
   isStampLabelVisible,
   computeNetworks,
+  segmentIdsOfNetworks,
   customStampDefinitionsToSave,
   distance,
   findCircuitForTerminal,
@@ -1432,16 +1433,7 @@ export class SketchScene {
     // color/thickness/pattern resolve correctly instead of falling back to
     // DEFAULT_NETWORK_TYPE (see resolveNetworkTypeVisuals).
     this.adoptNetworkTypes([networkTypeId]);
-    const networks = computeNetworks({
-      segments: Object.values(state.segments),
-      fittings: Object.values(state.fittings),
-      portGroups: this.doc.portGroups,
-    });
-    const targetIds = new Set<string>();
-    for (const segmentId of validIds) {
-      const network = networks.find((n) => n.segmentIds.includes(segmentId));
-      for (const id of network ? network.segmentIds : [segmentId]) targetIds.add(id);
-    }
+    const targetIds = segmentIdsOfNetworks({ segments: Object.values(state.segments), fittings: Object.values(state.fittings), portGroups: this.doc.portGroups }, validIds);
     const tx = new Transaction(this.doc.drawingHistory, 'Change network type');
     tx.update((s) => {
       const segments = { ...s.segments };
@@ -2882,6 +2874,8 @@ export class SketchScene {
     const existingIndex = groups.findIndex((g) => g.elementId === elementId);
     if (existingIndex !== -1) groups.splice(existingIndex, 1);
     if (portIds.length > 0) groups.push({ elementId, portIds });
+    this.emitter.emit('drawingChanged', this.getDrawingSummary());
+    this.recomputeFlow();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
