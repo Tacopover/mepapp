@@ -4,6 +4,7 @@
 
 import type { RoomPolygon } from './rooms/types.js';
 import { polygonContainsPoint } from './rooms/room.js';
+import { distanceTransform } from './rooms/raster.js';
 
 /** A room drawn as a mask. Pixel (x, y) is at index y * w + x and covers the page rectangle starting at (x0 + x * pixelPt, y0 + y * pixelPt). */
 export interface RasterMask {
@@ -307,5 +308,96 @@ export function pixelGraphOf(raster: RasterMask): PixelGraph {
     }
   });
 
+  return { nodes, edges };
+}
+
+/** Distances (px) from every pixel to the nearest EMPTY pixel of the room mask. Call it with the mask of the room BEFORE thinning. */
+export function roomDistances(room: RasterMask): Float32Array {
+  const inverted = new Uint8Array(room.mask.length);
+  for (let i = 0; i < inverted.length; i++) inverted[i] = 1 - room.mask[i]!;
+  return distanceTransform(inverted, room.w, room.h);
+}
+
+/** Half-width in pixels at pixel (x, y): the value of the distance array there. x and y are rounded to the nearest integer and clamped to the raster. */
+export function halfWidthAt(distances: Float32Array, w: number, h: number, x: number, y: number): number {
+  const cx = Math.min(w - 1, Math.max(0, Math.round(x)));
+  const cy = Math.min(h - 1, Math.max(0, Math.round(y)));
+  return distances[cy * w + cx]!;
+}
+
+/**
+ * Removes the short spurs of a pixel graph. A spur is an edge from an end node to a
+ * junction or bend node. It goes when its length is at most pruneFactor times the
+ * half-width at that junction. Each round removes all spurs at once, then joins the
+ * nodes that lost an edge. The last edge of the graph stays. The input graph is not changed.
+ */
+export function pruneGraph(
+  graph: PixelGraph,
+  halfWidthPx: (x: number, y: number) => number,
+  pruneFactor = 1.5,
+): PixelGraph {
+  let nodes: PixelNode[] = graph.nodes.map((n) => ({ ...n }));
+  let edges: PixelEdge[] = graph.edges.map((e) => ({ from: e.from, to: e.to, pixels: e.pixels.slice() }));
+  for (;;) {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const spurs: { i: number; end: string; junc: string; len: number }[] = [];
+    edges.forEach((e, i) => {
+      if (e.from === e.to) return;
+      const a = byId.get(e.from)!;
+      const b = byId.get(e.to)!;
+      const aEnd = a.kind === 'end';
+      if (aEnd === (b.kind === 'end')) return;
+      const junc = aEnd ? b : a;
+      const len = e.pixels.length - 1;
+      if (len <= pruneFactor * halfWidthPx(junc.x, junc.y)) {
+        spurs.push({ i, end: aEnd ? a.id : b.id, junc: junc.id, len });
+      }
+    });
+    if (spurs.length === edges.length) {
+      let keep = 0;
+      spurs.forEach((s, k) => {
+        if (s.len > spurs[keep]!.len) keep = k;
+      });
+      spurs.splice(keep, 1);
+    }
+    if (!spurs.length) break;
+
+    const cut = new Set(spurs.map((s) => s.i));
+    const gone = new Set(spurs.map((s) => s.end));
+    const touched = new Set(spurs.map((s) => s.junc));
+    const dropped = new Set<string>();
+    edges = edges.filter((_, i) => !cut.has(i));
+    for (const id of touched) {
+      const n = byId.get(id)!;
+      const inc: number[] = [];
+      edges.forEach((e, i) => {
+        if (e.from === id || e.to === id) inc.push(i);
+      });
+      let ends = 0;
+      for (const i of inc) ends += (edges[i]!.from === id ? 1 : 0) + (edges[i]!.to === id ? 1 : 0);
+      if (ends === 0) {
+        dropped.add(id);
+      } else if (ends === 1) {
+        n.kind = 'end';
+      } else if (ends === 2 && inc.length === 2) {
+        const i1 = inc[0]!;
+        const i2 = inc[1]!;
+        const e1 = edges[i1]!;
+        const e2 = edges[i2]!;
+        const p1 = e1.from === id ? e1.pixels.slice().reverse() : e1.pixels;
+        const p2 = e2.from === id ? e2.pixels : e2.pixels.slice().reverse();
+        edges[i1] = {
+          from: e1.from === id ? e1.to : e1.from,
+          to: e2.from === id ? e2.to : e2.from,
+          pixels: [...p1, ...p2.slice(1)],
+        };
+        edges = edges.filter((_, i) => i !== i2);
+        dropped.add(id);
+      } else if (inc.length === 1) {
+        n.kind = 'bend';
+      }
+    }
+    nodes = nodes.filter((n) => !gone.has(n.id) && !dropped.has(n.id));
+  }
   return { nodes, edges };
 }

@@ -3,8 +3,11 @@ import { polygonAreaPt2 } from './rooms/room.js';
 import type { RoomPolygon } from './rooms/types.js';
 import {
   crossingNumber,
+  halfWidthAt,
   pixelGraphOf,
+  pruneGraph,
   rasterizePolygon,
+  roomDistances,
   thinMask,
   type PixelGraph,
   type RasterMask,
@@ -346,7 +349,7 @@ describe('pixelGraphOf', () => {
     const r = rasterizePolygon(rect(0, 0, 100, 20), 1);
     thinMask(r);
     const g = pixelGraphOf(r);
-    // spurs are pruned in T05a
+    // no spurs for a plain rectangle
     expect(countKind(g, 'end')).toBe(2);
     expect(g.edges).toHaveLength(1);
   });
@@ -389,5 +392,247 @@ describe('pixelGraphOf', () => {
     const before = Array.from(r.mask);
     pixelGraphOf(r);
     expect(Array.from(r.mask)).toEqual(before);
+  });
+});
+
+const T: RoomPolygon = {
+  outer: [
+    { x: 0, y: 0 },
+    { x: 120, y: 0 },
+    { x: 120, y: 20 },
+    { x: 70, y: 20 },
+    { x: 70, y: 100 },
+    { x: 50, y: 100 },
+    { x: 50, y: 20 },
+    { x: 0, y: 20 },
+  ],
+  holes: [],
+};
+
+function skeletonOf(room: RasterMask): PixelGraph {
+  const skel = { ...room, mask: room.mask.slice() };
+  thinMask(skel);
+  return pixelGraphOf(skel);
+}
+
+function halfWidthOf(room: RasterMask): (x: number, y: number) => number {
+  const d = roomDistances(room);
+  return (x, y) => halfWidthAt(d, room.w, room.h, x, y);
+}
+
+function pixelRun(x0: number, y0: number, x1: number, y1: number): { x: number; y: number }[] {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  const out: { x: number; y: number }[] = [];
+  for (let k = 0; k <= n; k++) out.push({ x: x0 + Math.sign(x1 - x0) * k, y: y0 + Math.sign(y1 - y0) * k });
+  return out;
+}
+
+// Junction j with a leg to e0, a leg to e1 (both along x) and a leg to e2 (down along y).
+function tee(legA: number, legB: number, legC: number): PixelGraph {
+  return {
+    nodes: [
+      { id: 'e0', x: 0, y: 0, kind: 'end' },
+      { id: 'j', x: legA, y: 0, kind: 'junction' },
+      { id: 'e1', x: legA + legB, y: 0, kind: 'end' },
+      { id: 'e2', x: legA, y: legC, kind: 'end' },
+    ],
+    edges: [
+      { from: 'e0', to: 'j', pixels: pixelRun(0, 0, legA, 0) },
+      { from: 'j', to: 'e1', pixels: pixelRun(legA, 0, legA + legB, 0) },
+      { from: 'j', to: 'e2', pixels: pixelRun(legA, 0, legA, legC) },
+    ],
+  };
+}
+
+describe('halfWidthAt', () => {
+  it('gives about 10 pixels at the middle line of a 20 pixel corridor', () => {
+    const room = rasterizePolygon(rect(0, 0, 100, 20), 1);
+    const d = roomDistances(room);
+    const x = Math.round((50 - room.x0) / room.pixelPt);
+    const y = Math.round((10 - room.y0) / room.pixelPt);
+    const v = halfWidthAt(d, room.w, room.h, x, y);
+    expect(v).toBeGreaterThan(9);
+    expect(v).toBeLessThan(11);
+  });
+
+  it('clamps x and y to the raster', () => {
+    const room = rasterizePolygon(rect(0, 0, 100, 20), 1);
+    const d = roomDistances(room);
+    expect(halfWidthAt(d, room.w, room.h, -3, 1000)).toBe(d[(room.h - 1) * room.w]);
+  });
+});
+
+describe('pruneGraph', () => {
+  it('keeps the skeleton of a rectangle with no spurs', () => {
+    const room = rasterizePolygon(rect(0, 0, 100, 20), 1);
+    const g = skeletonOf(room);
+    const p = pruneGraph(g, halfWidthOf(room));
+    expect(p).toEqual(g);
+    expect(countKind(p, 'end')).toBe(2);
+    expect(p.edges).toHaveLength(1);
+  });
+
+  it('keeps the skeleton of a T with no spurs', () => {
+    const room = rasterizePolygon(T, 1);
+    const g = skeletonOf(room);
+    const p = pruneGraph(g, halfWidthOf(room));
+    expect(p).toEqual(g);
+    expect(countKind(p, 'end')).toBe(3);
+    expect(countKind(p, 'junction')).toBe(1);
+    expect(p.edges).toHaveLength(3);
+  });
+
+  it('removes the 11 step spur of a 100 by 20 rectangle with a 3 pixel bump', () => {
+    const bump: RoomPolygon = {
+      outer: [
+        { x: 0, y: 0 },
+        { x: 40, y: 0 },
+        { x: 40, y: -3 },
+        { x: 43, y: -3 },
+        { x: 43, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 20 },
+        { x: 0, y: 20 },
+      ],
+      holes: [],
+    };
+    const room = rasterizePolygon(bump, 1);
+    const g = skeletonOf(room);
+    expect(g.edges).toHaveLength(3);
+    expect(countKind(g, 'junction')).toBe(1);
+    const p = pruneGraph(g, halfWidthOf(room));
+    expect(p.edges).toHaveLength(1);
+    expect(p.edges[0]!.pixels).toHaveLength(80);
+    expect(countKind(p, 'end')).toBe(2);
+    expect(countKind(p, 'junction')).toBe(0);
+  });
+
+  it('turns a junction with a loop edge only into a bend', () => {
+    const loop = pixelRun(0, 0, 4, 0).concat(pixelRun(4, 0, 4, 4), pixelRun(4, 4, 0, 4), pixelRun(0, 4, 0, 0));
+    const g: PixelGraph = {
+      nodes: [
+        { id: 'j', x: 0, y: 0, kind: 'junction' },
+        { id: 's', x: 0, y: 2, kind: 'end' },
+      ],
+      edges: [
+        { from: 'j', to: 'j', pixels: loop },
+        { from: 'j', to: 's', pixels: pixelRun(0, 0, 0, 2) },
+      ],
+    };
+    const p = pruneGraph(g, () => 5, 1.5);
+    expect(p.nodes).toEqual([{ id: 'j', x: 0, y: 0, kind: 'bend' }]);
+    expect(p.edges).toHaveLength(1);
+    expect(p.edges[0]!.from).toBe('j');
+    expect(p.edges[0]!.to).toBe('j');
+  });
+
+  it('turns a junction that keeps one edge into an end', () => {
+    const g: PixelGraph = {
+      nodes: [
+        { id: 'j', x: 0, y: 0, kind: 'junction' },
+        { id: 's1', x: 0, y: 2, kind: 'end' },
+        { id: 's2', x: 2, y: 0, kind: 'end' },
+        { id: 'e0', x: 20, y: 0, kind: 'end' },
+      ],
+      edges: [
+        { from: 'j', to: 's1', pixels: pixelRun(0, 0, 0, 2) },
+        { from: 'j', to: 's2', pixels: pixelRun(0, 0, 2, 0) },
+        { from: 'j', to: 'e0', pixels: pixelRun(0, 0, 20, 0) },
+      ],
+    };
+    const p = pruneGraph(g, () => 5, 1.5);
+    expect(p.nodes.find((n) => n.id === 'j')!.kind).toBe('end');
+    expect(countKind(p, 'junction')).toBe(0);
+    expect(p.edges).toHaveLength(1);
+  });
+
+  it('cuts a second spur in round 2 after a join of round 1', () => {
+    const halfWidth = (x: number, y: number) => (x === 0 ? 2 : 100);
+    const g: PixelGraph = {
+      nodes: [
+        { id: 'J', x: 0, y: 0, kind: 'junction' },
+        { id: 's', x: 3, y: 0, kind: 'end' },
+        { id: 'e0', x: 4, y: 0, kind: 'end' },
+        { id: 'K', x: 50, y: 0, kind: 'junction' },
+        { id: 'e5', x: 202, y: 0, kind: 'end' },
+      ],
+      edges: [
+        { from: 'J', to: 's', pixels: pixelRun(0, 0, 3, 0) },
+        { from: 'J', to: 'e0', pixels: pixelRun(0, 0, 4, 0) },
+        { from: 'J', to: 'K', pixels: pixelRun(0, 0, 2, 0) },
+        { from: 'K', to: 'e5', pixels: pixelRun(2, 0, 202, 0) },
+      ],
+    };
+    const p = pruneGraph(g, halfWidth, 1.5);
+    expect(p.nodes.map((n) => n.id)).toEqual(['K', 'e5']);
+    expect(p.nodes.find((n) => n.id === 'K')!.kind).toBe('end');
+    expect(p.edges).toHaveLength(1);
+    expect(p.edges[0]!.pixels).toHaveLength(201);
+  });
+
+  it('joins a junction with its two edges stored in both directions without a repeated pixel', () => {
+    const g: PixelGraph = {
+      nodes: [
+        { id: 'e0', x: 0, y: 0, kind: 'end' },
+        { id: 'j', x: 9, y: 0, kind: 'junction' },
+        { id: 'e1', x: 18, y: 0, kind: 'end' },
+        { id: 'e2', x: 9, y: 3, kind: 'end' },
+      ],
+      edges: [
+        { from: 'j', to: 'e0', pixels: pixelRun(9, 0, 0, 0) },
+        { from: 'e1', to: 'j', pixels: pixelRun(18, 0, 9, 0) },
+        { from: 'j', to: 'e2', pixels: pixelRun(9, 0, 9, 3) },
+      ],
+    };
+    const p = pruneGraph(g, () => 5, 1.5);
+    expect(countKind(p, 'end')).toBe(2);
+    expect(countKind(p, 'junction')).toBe(0);
+    expect(p.edges).toHaveLength(1);
+    const e = p.edges[0]!;
+    expect(e.from).toBe('e0');
+    expect(e.to).toBe('e1');
+    expect(e.pixels).toHaveLength(19);
+    expect(new Set(e.pixels.map((q) => `${q.x},${q.y}`)).size).toBe(19);
+    expect(e.pixels[0]).toEqual({ x: 0, y: 0 });
+    expect(e.pixels[9]).toEqual({ x: 9, y: 0 });
+    expect(e.pixels[e.pixels.length - 1]).toEqual({ x: 18, y: 0 });
+  });
+
+  it('joins the two long edges of a junction that keeps two edges into one edge', () => {
+    const g = tee(9, 9, 3);
+    const p = pruneGraph(g, () => 5, 1.5);
+    expect(countKind(p, 'end')).toBe(2);
+    expect(countKind(p, 'junction')).toBe(0);
+    expect(p.edges).toHaveLength(1);
+    const e = p.edges[0]!;
+    expect(e.pixels).toHaveLength(19);
+    expect(new Set(e.pixels.map((q) => `${q.x},${q.y}`)).size).toBe(19);
+    expect(e.pixels[0]).toEqual({ x: 0, y: 0 });
+    expect(e.pixels[e.pixels.length - 1]).toEqual({ x: 18, y: 0 });
+  });
+
+  it('keeps a branch longer than 1.5 times the half-width', () => {
+    const g = tee(12, 12, 12);
+    const p = pruneGraph(g, () => 5, 1.5);
+    expect(p).toEqual(g);
+  });
+
+  it('never removes the last edge', () => {
+    const g: PixelGraph = {
+      nodes: [
+        { id: 'j', x: 0, y: 0, kind: 'junction' },
+        { id: 'e', x: 2, y: 0, kind: 'end' },
+      ],
+      edges: [{ from: 'j', to: 'e', pixels: pixelRun(0, 0, 2, 0) }],
+    };
+    const p = pruneGraph(g, () => 100);
+    expect(p).toEqual(g);
+  });
+
+  it('does not change the input graph', () => {
+    const g = tee(9, 9, 3);
+    const before = JSON.parse(JSON.stringify(g));
+    pruneGraph(g, () => 5);
+    expect(g).toEqual(before);
   });
 });
