@@ -45,3 +45,4 @@ export * from './user-stamp.js';
 export * from './flow-units.js';
 export * from './sizing-hydraulics.js';
 export * from './sizing-series.js';
+export * from './sizing-settings.js';

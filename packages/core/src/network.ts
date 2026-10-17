@@ -8,6 +8,8 @@
 // topology edit instead of mutating stored membership.
 
 import type { Vec2 } from './geometry.js';
+import type { FlowUnitId } from './flow-units.js';
+import type { SizingSettings } from './sizing-settings.js';
 
 export type Discipline =
   | 'heatingAndCooling'
@@ -30,6 +32,10 @@ export interface NetworkType {
   color: string;
   lineWidthPt: number;
   linePattern: LinePattern;
+  /** The unit of the capacity numbers of this type (flow-units.ts). Absent = not set. */
+  flowUnit?: FlowUnitId;
+  /** How to size a network of this type. Absent = not sized. */
+  sizing?: SizingSettings;
 }
 
 export type SegmentShape = 'round' | 'rectangular';
