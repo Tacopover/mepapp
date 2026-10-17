@@ -1,4 +1,4 @@
-import { getStampPorts, openPortsOf, routingTargetOf, type Room, type RouteLanguage, type RoutePortsResult, type RouteStamp, type StartProblem, type StartProblemCode, type StartSeverity } from '@mepapp/core';
+import { getStampPorts, openPortsOf, routingTargetOf, type Room, type RoomType, roomTypeLabel, type RouteArea, type RouteAreaWarning, type RouteAreaWarningCode, type RouteLanguage, type RoutePortsResult, type RouteStamp, type StartProblem, type StartProblemCode, type StartSeverity } from '@mepapp/core';
 
 /** Network types that the type select does not list. */
 export const GRAVITY_TYPE_IDS: readonly string[] = ['sanitary-waste'];
@@ -82,7 +82,12 @@ export type RouteTextKey =
   | 'roomsAll' | 'roomsNone' | 'noRooms' | 'includeOutside' | 'useAllPorts'
   | 'scopeStampsHint' | 'roomsColRoom' | 'roomsColType' | 'roomsColPorts' | 'noChoice' | 'scopeStampsNote' | 'roomsColPortsTitle'
   | 'checkUnknownStart' | 'checkNotEquipment' | 'checkPortSegments' | 'checkPortSegmentsHint' | 'checkPortForeignType' | 'checkPortForeignTypeHint'
-  | 'checkGroupOtherType' | 'checkGroupSameType' | 'checkSecondEquipment' | 'checkSecondEquipmentHint' | 'selectionNotEquipment' | 'selectionRiserNote' | 'severityError' | 'severityWarning' | 'severityInfo';
+  | 'checkGroupOtherType' | 'checkGroupSameType' | 'checkSecondEquipment' | 'checkSecondEquipmentHint' | 'selectionNotEquipment' | 'selectionRiserNote' | 'severityError' | 'severityWarning' | 'severityInfo'
+  | 'areaTitle' | 'areaTypes' | 'areaAdd' | 'areaRemove' | 'areaReset' | 'areaShow' | 'areaTypesHint' | 'areaCalculating'
+  | 'areaSummary' | 'areaSummaryOne' | 'areaSummaryEntryOne' | 'areaLegend' | 'areaLegendGuide'
+  | 'warnNoCalibration' | 'warnNoRooms' | 'warnNoTypes' | 'warnNoRouteRooms' | 'warnOpenRoom' | 'warnOpenRoomOne' | 'warnParts'
+  | 'warnWallCrossings' | 'warnWallCrossingsOne' | 'warnWallCrossingsHint' | 'warnShaftCrossing' | 'warnShaftCrossingHint'
+  | 'warnUnreached' | 'warnUnreachedOne' | 'warnStairName' | 'warnDraft2d';
 
 const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
   en: {
@@ -127,6 +132,35 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     severityError: 'Error',
     severityWarning: 'Warning',
     severityInfo: 'Note',
+    areaTitle: 'Route area',
+    areaTypes: 'Room types in the route area',
+    areaAdd: 'Add a room type…',
+    areaRemove: 'Remove {type}',
+    areaReset: 'Use Corridor and Shaft',
+    areaShow: 'Show the route area on the plan',
+    areaTypesHint: 'Entrance and hall can carry a main.',
+    areaCalculating: 'Calculating the route area…',
+    areaSummary: '{rooms} rooms in the route area. {entries} rooms have a wall with it.',
+    areaSummaryOne: '1 room in the route area.',
+    areaSummaryEntryOne: '{rooms} rooms in the route area. 1 room has a wall with it.',
+    areaLegend: 'Route area, center line, possible place for a branch, shaft place',
+    areaLegendGuide: 'The center line is a guide.',
+    warnNoCalibration: 'The drawing has no scale. Set the scale first.',
+    warnNoRooms: 'The drawing has no rooms. Run Detect rooms in Auto-place.',
+    warnNoTypes: 'No room type is in the list. Add a room type.',
+    warnNoRouteRooms: 'No room has a room type of the list. Add a room type, or change the room type of a room in the Rooms tab.',
+    warnOpenRoom: '{count} rooms of the route area may have a wrong outline (no closed wall found). The center line can be wrong.',
+    warnOpenRoomOne: '1 room of the route area may have a wrong outline (no closed wall found). The center line can be wrong.',
+    warnParts: 'The route area has {count} separate parts. A branch between them passes rooms that are not in the route area.',
+    warnWallCrossings: '{count} rooms can be reached through a wall of the route area. The places are marked.',
+    warnWallCrossingsOne: '1 room can be reached through a wall of the route area. The place is marked.',
+    warnWallCrossingsHint: 'Check which of these walls are fire walls. A duct needs a fire damper there. A pipe or cable tray needs a firestop.',
+    warnShaftCrossing: 'The shaft {room} has {count} possible places for a branch through its wall.',
+    warnShaftCrossingHint: 'Check which of these walls are fire walls. A duct needs a fire damper there. A pipe or cable tray needs a firestop.',
+    warnUnreached: '{count} rooms have no wall with the route area. A branch to them passes more than one wall or room.',
+    warnUnreachedOne: '1 room has no wall with the route area. A branch to it passes more than one wall or room.',
+    warnStairName: '{room} may be a stairwell. Check if a branch can go there.',
+    warnDraft2d: 'Draft in 2D. Check height, clashes, clearances and slope yourself.',
   },
   nl: {
     title: 'Netwerk routeren',
@@ -170,6 +204,35 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     severityError: 'Fout',
     severityWarning: 'Waarschuwing',
     severityInfo: 'Opmerking',
+    areaTitle: 'Route area',
+    areaTypes: 'Room types in the route area',
+    areaAdd: 'Add a room type…',
+    areaRemove: 'Remove {type}',
+    areaReset: 'Use Corridor and Shaft',
+    areaShow: 'Show the route area on the plan',
+    areaTypesHint: 'Entrance and hall can carry a main.',
+    areaCalculating: 'Calculating the route area…',
+    areaSummary: '{rooms} rooms in the route area. {entries} rooms have a wall with it.',
+    areaSummaryOne: '1 room in the route area.',
+    areaSummaryEntryOne: '{rooms} rooms in the route area. 1 room has a wall with it.',
+    areaLegend: 'Route area, center line, possible place for a branch, shaft place',
+    areaLegendGuide: 'The center line is a guide.',
+    warnNoCalibration: 'The drawing has no scale. Set the scale first.',
+    warnNoRooms: 'The drawing has no rooms. Run Detect rooms in Auto-place.',
+    warnNoTypes: 'No room type is in the list. Add a room type.',
+    warnNoRouteRooms: 'No room has a room type of the list. Add a room type, or change the room type of a room in the Rooms tab.',
+    warnOpenRoom: '{count} rooms of the route area may have a wrong outline (no closed wall found). The center line can be wrong.',
+    warnOpenRoomOne: '1 room of the route area may have a wrong outline (no closed wall found). The center line can be wrong.',
+    warnParts: 'The route area has {count} separate parts. A branch between them passes rooms that are not in the route area.',
+    warnWallCrossings: '{count} rooms can be reached through a wall of the route area. The places are marked.',
+    warnWallCrossingsOne: '1 room can be reached through a wall of the route area. The place is marked.',
+    warnWallCrossingsHint: 'Check which of these walls are fire walls. A duct needs a fire damper there. A pipe or cable tray needs a firestop.',
+    warnShaftCrossing: 'The shaft {room} has {count} possible places for a branch through its wall.',
+    warnShaftCrossingHint: 'Check which of these walls are fire walls. A duct needs a fire damper there. A pipe or cable tray needs a firestop.',
+    warnUnreached: '{count} rooms have no wall with the route area. A branch to them passes more than one wall or room.',
+    warnUnreachedOne: '1 room has no wall with the route area. A branch to it passes more than one wall or room.',
+    warnStairName: '{room} may be a stairwell. Check if a branch can go there.',
+    warnDraft2d: 'Draft in 2D. Check height, clashes, clearances and slope yourself.',
   },
 };
 
@@ -230,6 +293,102 @@ export function startCheckLines(
         return { code, severity, text: routeText(language, 'checkSecondEquipment', { stamps }), hint: routeText(language, 'checkSecondEquipmentHint') };
     }
   });
+}
+
+export interface RouteAreaLine {
+  code: RouteAreaWarningCode;
+  severity: 'error' | 'warning' | 'info';
+  text: string;
+  /** Empty when the code has no hint. */
+  hint: string;
+}
+
+/**
+ * One line per warning, in the order of `warnings`. Exception: a `stair-name` warning gives one line per id in its roomIds (text uses names.room(id)); with no roomIds it gives one line with names.room('').
+ * `shaft-crossing` uses names.room(roomIds[0] ?? ''). {count} is warning.count ?? 0. hint is '' for every other code.
+ */
+export function routeAreaLines(
+  warnings: readonly RouteAreaWarning[],
+  names: { room: (roomId: string) => string },
+  language: RouteLanguage,
+): RouteAreaLine[] {
+  const lines: RouteAreaLine[] = [];
+  for (const warning of warnings) {
+    const { code, severity } = warning;
+    const count = warning.count ?? 0;
+    const add = (text: string, hint = ''): void => {
+      lines.push({ code, severity, text, hint });
+    };
+    switch (code) {
+      case 'no-calibration':
+        add(routeText(language, 'warnNoCalibration'));
+        break;
+      case 'no-rooms':
+        add(routeText(language, 'warnNoRooms'));
+        break;
+      case 'no-types':
+        add(routeText(language, 'warnNoTypes'));
+        break;
+      case 'no-route-rooms':
+        add(routeText(language, 'warnNoRouteRooms'));
+        break;
+      case 'open-room':
+        add(count === 1 ? routeText(language, 'warnOpenRoomOne') : routeText(language, 'warnOpenRoom', { count }));
+        break;
+      case 'parts':
+        add(routeText(language, 'warnParts', { count }));
+        break;
+      case 'wall-crossings':
+        add(
+          count === 1 ? routeText(language, 'warnWallCrossingsOne') : routeText(language, 'warnWallCrossings', { count }),
+          routeText(language, 'warnWallCrossingsHint'),
+        );
+        break;
+      case 'shaft-crossing':
+        add(
+          routeText(language, 'warnShaftCrossing', { room: names.room(warning.roomIds?.[0] ?? ''), count }),
+          routeText(language, 'warnShaftCrossingHint'),
+        );
+        break;
+      case 'unreached':
+        add(count === 1 ? routeText(language, 'warnUnreachedOne') : routeText(language, 'warnUnreached', { count }));
+        break;
+      case 'stair-name': {
+        const roomIds = warning.roomIds?.length ? warning.roomIds : [''];
+        for (const roomId of roomIds) add(routeText(language, 'warnStairName', { room: names.room(roomId) }));
+        break;
+      }
+      case 'draft-2d':
+        add(routeText(language, 'warnDraft2d'));
+        break;
+    }
+  }
+  return lines;
+}
+
+/** rooms = area.rooms.length; entries = number of DISTINCT roomId in area.entries. rooms 1 -> areaSummaryOne (nothing else); rooms 0 -> areaSummary with rooms 0 and entries 0; rooms >= 2: entries 1 -> areaSummaryEntryOne, else areaSummary. */
+export function routeAreaSummaryLine(area: RouteArea, language: RouteLanguage): string {
+  const rooms = area.rooms.length;
+  if (rooms === 1) return routeText(language, 'areaSummaryOne');
+  if (rooms === 0) return routeText(language, 'areaSummary', { rooms: 0, entries: 0 });
+  const entries = new Set(area.entries.map((entry) => entry.roomId)).size;
+  if (entries === 1) return routeText(language, 'areaSummaryEntryOne', { rooms });
+  return routeText(language, 'areaSummary', { rooms, entries });
+}
+
+/**
+ * One item per library type in the library order: { id: type.id, label: roomTypeLabel(type, language), inList: ids.includes(type.id) }.
+ * Then one item per id in `ids` that matches no library type, in the order of `ids` with doubles removed: { id, label: id, inList: true }.
+ */
+export function routeAreaTypeChoices(
+  roomTypes: readonly RoomType[],
+  ids: readonly string[],
+  language: RouteLanguage,
+): { id: string; label: string; inList: boolean }[] {
+  const libraryIds = new Set(roomTypes.map((type) => type.id));
+  const libraryChoices = roomTypes.map((type) => ({ id: type.id, label: roomTypeLabel(type, language), inList: ids.includes(type.id) }));
+  const unknownChoices = [...new Set(ids)].filter((id) => !libraryIds.has(id)).map((id) => ({ id, label: id, inList: true }));
+  return [...libraryChoices, ...unknownChoices];
 }
 
 export interface RouteSummaryOptions {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { RouteLanguage, RoutePortsResult, RouteStamp, StartProblem } from '@mepapp/core';
+import type { RouteArea, RouteAreaWarning, RouteLanguage, RoomType, RoutePortsResult, RouteStamp, StartProblem } from '@mepapp/core';
 import {
-  includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startCheckLines, startPortChoices, typeChoices, typeNameInText, typeOptionText,
+  includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeAreaLines, routeAreaSummaryLine, routeAreaTypeChoices, routeSummaryLines, routeText, startCandidates, startCheckLines, startPortChoices, typeChoices, typeNameInText, typeOptionText,
   type RouteTextKey,
 } from './components/routePlan.js';
 
@@ -551,5 +551,198 @@ describe('startCheckLines', () => {
       expect(line.text.length).toBeLessThanOrEqual(140);
       expect(line.hint.length).toBeLessThanOrEqual(140);
     }
+  });
+});
+
+const AREA_TEXT_KEYS: RouteTextKey[] = [
+  'areaTitle', 'areaTypes', 'areaAdd', 'areaRemove', 'areaReset', 'areaShow', 'areaTypesHint', 'areaCalculating',
+  'areaSummary', 'areaSummaryOne', 'areaSummaryEntryOne', 'areaLegend', 'areaLegendGuide',
+  'warnNoCalibration', 'warnNoRooms', 'warnNoTypes', 'warnNoRouteRooms', 'warnOpenRoom', 'warnOpenRoomOne', 'warnParts',
+  'warnWallCrossings', 'warnWallCrossingsOne', 'warnWallCrossingsHint', 'warnShaftCrossing', 'warnShaftCrossingHint',
+  'warnUnreached', 'warnUnreachedOne', 'warnStairName', 'warnDraft2d',
+];
+const AREA_SAMPLE_PARAMS = { count: '12', room: 'Corridor 1', type: 'Office', rooms: '40', entries: '25' };
+
+describe('route area texts', () => {
+  it('has an English text for every area key, and the Dutch text is the same English text', () => {
+    for (const key of AREA_TEXT_KEYS) {
+      expect(routeText('en', key).length).toBeGreaterThan(0);
+      expect(routeText('nl', key)).toBe(routeText('en', key));
+    }
+  });
+
+  it('keeps every English area text within 140 characters', () => {
+    for (const key of AREA_TEXT_KEYS) expect(routeText('en', key, AREA_SAMPLE_PARAMS).length).toBeLessThanOrEqual(140);
+  });
+
+  it('keeps the wall-crossing hint and the 2D draft text within 140 characters', () => {
+    expect(routeText('en', 'warnWallCrossingsHint', AREA_SAMPLE_PARAMS).length).toBeLessThanOrEqual(140);
+    expect(routeText('en', 'warnDraft2d', AREA_SAMPLE_PARAMS).length).toBeLessThanOrEqual(140);
+  });
+
+  it('writes no CFM, GPM, door or crossing word in an English area text', () => {
+    for (const key of AREA_TEXT_KEYS) {
+      const text = routeText('en', key, AREA_SAMPLE_PARAMS);
+      expect(text).not.toMatch(/CFM|GPM/);
+      expect(text).not.toMatch(/\bdoors?\b|crossing/i);
+    }
+  });
+
+  it('names the fire walls in every text that mentions them', () => {
+    for (const key of AREA_TEXT_KEYS) {
+      const text = routeText('en', key, AREA_SAMPLE_PARAMS);
+      if (text.includes('fire walls')) expect(text).toContain('which of these walls are fire walls');
+    }
+  });
+});
+
+describe('routeAreaLines', () => {
+  const names = { room: (roomId: string) => ({ shaft1: 'Shaft 1', stair1: 'Stair A', stair2: 'Stair B' })[roomId] ?? roomId };
+  const warning = (patch: Partial<RouteAreaWarning> & Pick<RouteAreaWarning, 'code'>): RouteAreaWarning => ({ severity: 'warning', ...patch });
+
+  it('fills the count and the room name', () => {
+    const lines = routeAreaLines([
+      warning({ code: 'open-room', count: 12 }),
+      warning({ code: 'shaft-crossing', roomIds: ['shaft1'], count: 3 }),
+    ], names, 'en');
+    expect(lines[0]!.text).toBe('12 rooms of the route area may have a wrong outline (no closed wall found). The center line can be wrong.');
+    expect(lines[1]!.text).toBe('The shaft Shaft 1 has 3 possible places for a branch through its wall.');
+  });
+
+  it('keeps the order of the warnings', () => {
+    const lines = routeAreaLines([
+      warning({ code: 'draft-2d', severity: 'info' }),
+      warning({ code: 'no-rooms', severity: 'error' }),
+      warning({ code: 'parts', count: 2 }),
+    ], names, 'en');
+    expect(lines.map((line) => line.code)).toEqual(['draft-2d', 'no-rooms', 'parts']);
+  });
+
+  it('copies the severity from the warning', () => {
+    const [line] = routeAreaLines([warning({ code: 'no-calibration', severity: 'error' })], names, 'en');
+    expect(line!.severity).toBe('error');
+  });
+
+  it('gives an empty hint for codes without a hint', () => {
+    const lines = routeAreaLines([
+      warning({ code: 'no-calibration' }),
+      warning({ code: 'no-rooms' }),
+      warning({ code: 'no-types' }),
+      warning({ code: 'no-route-rooms' }),
+      warning({ code: 'open-room', count: 2 }),
+      warning({ code: 'parts', count: 2 }),
+      warning({ code: 'unreached', count: 2 }),
+      warning({ code: 'stair-name', roomIds: ['stair1'] }),
+      warning({ code: 'draft-2d' }),
+    ], names, 'en');
+    for (const line of lines) expect(line.hint).toBe('');
+  });
+
+  it('gives the wall-crossing hint for wall-crossings and shaft-crossing', () => {
+    const lines = routeAreaLines([
+      warning({ code: 'wall-crossings', count: 4 }),
+      warning({ code: 'shaft-crossing', roomIds: ['shaft1'], count: 2 }),
+    ], names, 'en');
+    expect(lines.map((line) => line.hint)).toEqual([routeText('en', 'warnWallCrossingsHint'), routeText('en', 'warnWallCrossingsHint')]);
+  });
+
+  it('gives one line per stair-name room', () => {
+    const lines = routeAreaLines([warning({ code: 'stair-name', roomIds: ['stair1', 'stair2'], count: 2 })], names, 'en');
+    expect(lines.map((line) => line.text)).toEqual([
+      'Stair A may be a stairwell. Check if a branch can go there.',
+      'Stair B may be a stairwell. Check if a branch can go there.',
+    ]);
+  });
+
+  it('gives one stair-name line with an empty room name when there are no roomIds', () => {
+    const lines = routeAreaLines([warning({ code: 'stair-name' })], names, 'en');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.text).toBe(routeText('en', 'warnStairName', { room: '' }));
+  });
+
+  it('uses the singular text for a count of 1', () => {
+    const lines = routeAreaLines([
+      warning({ code: 'wall-crossings', count: 1 }),
+      warning({ code: 'open-room', count: 1 }),
+      warning({ code: 'unreached', count: 1 }),
+    ], names, 'en');
+    expect(lines.map((line) => line.text)).toEqual([
+      routeText('en', 'warnWallCrossingsOne'),
+      routeText('en', 'warnOpenRoomOne'),
+      routeText('en', 'warnUnreachedOne'),
+    ]);
+  });
+
+  it('maps every code to its English text', () => {
+    const lines = routeAreaLines([
+      warning({ code: 'no-calibration' }),
+      warning({ code: 'no-rooms' }),
+      warning({ code: 'no-types' }),
+      warning({ code: 'no-route-rooms' }),
+      warning({ code: 'parts', count: 3 }),
+      warning({ code: 'draft-2d' }),
+    ], names, 'en');
+    expect(lines.map((line) => line.text)).toEqual([
+      routeText('en', 'warnNoCalibration'),
+      routeText('en', 'warnNoRooms'),
+      routeText('en', 'warnNoTypes'),
+      routeText('en', 'warnNoRouteRooms'),
+      routeText('en', 'warnParts', { count: 3 }),
+      routeText('en', 'warnDraft2d'),
+    ]);
+  });
+});
+
+describe('routeAreaSummaryLine', () => {
+  const area = (rooms: number, entryRoomIds: string[]) => ({
+    rooms: Array.from({ length: rooms }, (_, index) => ({ roomId: `r${index}` })),
+    entries: entryRoomIds.map((roomId) => ({ roomId })),
+  }) as unknown as RouteArea;
+
+  it('gives the zero-room line', () => {
+    expect(routeAreaSummaryLine(area(0, []), 'en')).toBe('0 rooms in the route area. 0 rooms have a wall with it.');
+  });
+
+  it('gives the one-room line with nothing else', () => {
+    expect(routeAreaSummaryLine(area(1, ['r0']), 'en')).toBe('1 room in the route area.');
+  });
+
+  it('gives the single-entry line for two or more rooms with one entry room', () => {
+    expect(routeAreaSummaryLine(area(2, ['r0']), 'en')).toBe('2 rooms in the route area. 1 room has a wall with it.');
+    expect(routeAreaSummaryLine(area(3, ['r0', 'r0', 'r0']), 'en')).toBe('3 rooms in the route area. 1 room has a wall with it.');
+  });
+
+  it('gives the entry count for two or more rooms with many entry rooms', () => {
+    expect(routeAreaSummaryLine(area(4, ['r0', 'r1', 'r1', 'r2']), 'en')).toBe('4 rooms in the route area. 3 rooms have a wall with it.');
+  });
+});
+
+describe('routeAreaTypeChoices', () => {
+  const roomTypes = [
+    { id: 'office', name: 'Office', nameNl: 'Kantoor', keywords: [] },
+    { id: 'corridor', name: 'Corridor', keywords: [] },
+  ] as unknown as RoomType[];
+
+  it('marks the types in the list', () => {
+    expect(routeAreaTypeChoices(roomTypes, ['corridor'], 'en')).toEqual([
+      { id: 'office', label: 'Office', inList: false },
+      { id: 'corridor', label: 'Corridor', inList: true },
+    ]);
+  });
+
+  it('uses the room type label in English', () => {
+    expect(routeAreaTypeChoices(roomTypes, [], 'en')[0]!.label).toBe('Office');
+  });
+
+  it('keeps the library order', () => {
+    expect(routeAreaTypeChoices(roomTypes, ['corridor', 'office'], 'en').map((choice) => choice.id)).toEqual(['office', 'corridor']);
+  });
+
+  it('adds an unknown id at the end with its id as label, once', () => {
+    expect(routeAreaTypeChoices(roomTypes, ['ghost', 'corridor', 'ghost'], 'en')).toEqual([
+      { id: 'office', label: 'Office', inList: false },
+      { id: 'corridor', label: 'Corridor', inList: true },
+      { id: 'ghost', label: 'ghost', inList: true },
+    ]);
   });
 });
