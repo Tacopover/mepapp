@@ -3465,6 +3465,10 @@
   color: var(--accent-ink);
   margin-top: -4px;
 }
+.mep-modal--route .mep-route-hint {
+  opacity: 0.7;
+  margin-top: -4px;
+}
 .mep-modal--route .mep-route-field {
   display: flex;
   flex-direction: column;
@@ -3529,9 +3533,33 @@
 }
 .mep-modal--route .mep-route-room-count {
   flex: none;
-  min-width: 2ch;
+  width: 10ch;
+  min-width: 10ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+.mep-modal--route .mep-route-room-head {
+  font-weight: 600;
+  font-size: 12px;
+  opacity: 0.8;
+  padding-left: 7px;
+  padding-right: 7px;
+  padding-bottom: 0;
+  border-left: none;
+  border-right: none;
+}
+.mep-modal--route .mep-route-room-spacer {
+  width: 13px;
+  flex: none;
+}
+.mep-modal--route .mep-route-room-head .mep-route-room-count {
+  flex: none;
+  width: 10ch;
+  min-width: 10ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  white-space: nowrap;
 }
 .mep-modal--route .mep-route-main {
   font-weight: 600;

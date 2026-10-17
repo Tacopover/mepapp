@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteLanguage, RoutePortsResult, RouteStamp } from '@mepapp/core';
 import {
-  looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText,
+  includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText,
   type RouteTextKey,
 } from './components/routePlan.js';
 
@@ -211,6 +211,7 @@ const ROUTE_TEXT_KEYS: RouteTextKey[] = [
   'title', 'close', 'noEquipment', 'startStamp', 'groupSources', 'groupWaiting', 'startWarning',
   'startPort', 'portNote', 'networkType', 'noOpenPorts', 'scope', 'scopeRooms', 'scopeStamps',
   'roomsAll', 'roomsNone', 'noRooms', 'includeOutside', 'useAllPorts',
+  'scopeStampsHint', 'roomsColRoom', 'roomsColType', 'roomsColPorts', 'noChoice',
 ];
 const LANGUAGES: RouteLanguage[] = ['en', 'nl'];
 
@@ -227,14 +228,14 @@ const allSummaryLines = (): string[] => {
 
 describe('routeSummaryLines', () => {
   it('writes the room line in English with singular and plural', () => {
-    expect(routeSummaryLines(routeResult({ ports: routePorts(1) }), 'rooms', 'Supply Air', 1, 'en')).toEqual(['1 open port of Supply Air in 1 room.']);
-    expect(routeSummaryLines(routeResult({ ports: routePorts(15) }), 'rooms', 'Supply Air', 9, 'en')).toEqual(['15 open ports of Supply Air in 9 rooms.']);
-    expect(routeSummaryLines(routeResult(), 'rooms', 'Supply Air', 0, 'en')).toEqual(['0 open ports of Supply Air in 0 rooms.']);
+    expect(routeSummaryLines(routeResult({ ports: routePorts(1) }), 'rooms', 'Supply Air', 1, 'en')).toEqual(['1 open port of Supply Air in 1 checked room.']);
+    expect(routeSummaryLines(routeResult({ ports: routePorts(15) }), 'rooms', 'Supply Air', 9, 'en')).toEqual(['15 open ports of Supply Air in 9 checked rooms.']);
+    expect(routeSummaryLines(routeResult(), 'rooms', 'Supply Air', 0, 'en')).toEqual(['0 open ports of Supply Air in 0 checked rooms.']);
   });
 
   it('writes the room line in Dutch with singular and plural', () => {
-    expect(routeSummaryLines(routeResult({ ports: routePorts(1) }), 'rooms', 'toevoerlucht', 1, 'nl')).toEqual(['1 open aansluiting voor toevoerlucht in 1 ruimte.']);
-    expect(routeSummaryLines(routeResult({ ports: routePorts(15) }), 'rooms', 'toevoerlucht', 9, 'nl')).toEqual(['15 open aansluitingen voor toevoerlucht in 9 ruimtes.']);
+    expect(routeSummaryLines(routeResult({ ports: routePorts(1) }), 'rooms', 'toevoerlucht', 1, 'nl')).toEqual(['1 open aansluiting voor toevoerlucht in 1 aangevinkte ruimte.']);
+    expect(routeSummaryLines(routeResult({ ports: routePorts(15) }), 'rooms', 'toevoerlucht', 9, 'nl')).toEqual(['15 open aansluitingen voor toevoerlucht in 9 aangevinkte ruimtes.']);
   });
 
   it('writes the stamps line in English', () => {
@@ -297,20 +298,28 @@ describe('routeSummaryLines', () => {
 
   it('writes the multi-port line in mode one', () => {
     expect(routeSummaryLines(routeResult({ ports: routePorts(1), multiPortStamps: 1 }), 'rooms', 'Supply Air', 1, 'en')[1])
-      .toBe('1 stamp has more than 1 port of the same type. The finder uses 1 port of each.');
+      .toBe('1 stamp has more than 1 port of the same type. Only 1 port of each is used.');
     expect(routeSummaryLines(routeResult({ ports: routePorts(1), multiPortStamps: 2 }), 'rooms', 'Supply Air', 1, 'en')[1])
-      .toBe('2 stamps have more than 1 port of the same type. The finder uses 1 port of each.');
+      .toBe('2 stamps have more than 1 port of the same type. Only 1 port of each is used.');
     expect(routeSummaryLines(routeResult({ ports: routePorts(1), multiPortStamps: 1 }), 'rooms', 'toevoerlucht', 1, 'nl')[1])
-      .toBe('1 stempel heeft meer dan 1 aansluiting van hetzelfde type. De zoeker gebruikt 1 aansluiting van elk.');
+      .toBe('1 stempel heeft meer dan 1 aansluiting van hetzelfde type. Van elk wordt 1 aansluiting gebruikt.');
     expect(routeSummaryLines(routeResult({ ports: routePorts(1), multiPortStamps: 2 }), 'rooms', 'toevoerlucht', 1, 'nl')[1])
-      .toBe('2 stempels hebben meer dan 1 aansluiting van hetzelfde type. De zoeker gebruikt 1 aansluiting van elk.');
+      .toBe('2 stempels hebben meer dan 1 aansluiting van hetzelfde type. Van elk wordt 1 aansluiting gebruikt.');
   });
 
   it('writes the multi-port line in mode all', () => {
     expect(routeSummaryLines(routeResult({ ports: routePorts(1), multiPortStamps: 1 }), 'rooms', 'Supply Air', 1, 'en', { portsPerStamp: 'all' })[1])
-      .toBe('1 stamp has more than 1 port of the same type. The finder uses all ports.');
+      .toBe('1 stamp has more than 1 port of the same type. All ports are used.');
     expect(routeSummaryLines(routeResult({ ports: routePorts(1), multiPortStamps: 1 }), 'rooms', 'toevoerlucht', 1, 'nl', { portsPerStamp: 'all' })[1])
-      .toBe('1 stempel heeft meer dan 1 aansluiting van hetzelfde type. De zoeker gebruikt alle aansluitingen.');
+      .toBe('1 stempel heeft meer dan 1 aansluiting van hetzelfde type. Alle aansluitingen worden gebruikt.');
+  });
+
+  it('never writes finder or zoeker in a summary line', () => {
+    for (const line of allSummaryLines()) expect(line).not.toMatch(/finder|zoeker/i);
+    for (const language of LANGUAGES) {
+      for (const key of ROUTE_TEXT_KEYS) expect(routeText(language, key)).not.toMatch(/finder|zoeker/i);
+      for (const count of [0, 1, 2]) expect(includeOutsideText(language, count)).not.toMatch(/finder|zoeker/i);
+    }
   });
 
   it('keeps only the first line when no count is above 0', () => {
@@ -327,9 +336,23 @@ describe('routeSummaryLines', () => {
   });
 });
 
+describe('includeOutsideText', () => {
+  it('gives the English count with singular and plural', () => {
+    expect(includeOutsideText('en', 0)).toBe('Include ports outside rooms: 0 ports');
+    expect(includeOutsideText('en', 1)).toBe('Include ports outside rooms: 1 port');
+    expect(includeOutsideText('en', 2)).toBe('Include ports outside rooms: 2 ports');
+  });
+
+  it('gives the Dutch count with singular and plural', () => {
+    expect(includeOutsideText('nl', 0)).toBe('Aansluitingen buiten ruimtes meenemen: 0 aansluitingen');
+    expect(includeOutsideText('nl', 1)).toBe('Aansluitingen buiten ruimtes meenemen: 1 aansluiting');
+    expect(includeOutsideText('nl', 2)).toBe('Aansluitingen buiten ruimtes meenemen: 2 aansluitingen');
+  });
+});
+
 describe('routeText', () => {
-  it('has a text in English and Dutch for all 19 keys', () => {
-    expect(ROUTE_TEXT_KEYS).toHaveLength(19);
+  it('has a text in English and Dutch for all 24 keys', () => {
+    expect(ROUTE_TEXT_KEYS).toHaveLength(24);
     for (const language of LANGUAGES) {
       for (const key of ROUTE_TEXT_KEYS) expect(routeText(language, key).length).toBeGreaterThan(0);
     }

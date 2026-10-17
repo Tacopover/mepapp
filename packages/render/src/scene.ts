@@ -463,6 +463,8 @@ export interface OpenPortCount {
 /** The radius of the dot of an open port, in screen pixels. */
 const OPEN_PORT_RADIUS_SCREEN_PX = 4.5;
 
+const ROUTE_MARKER_COLOR = 0xe6007e;
+
 /** A route marker on the overlay: the start port (square) or a target port (ring). */
 export interface RouteMarker { world: Vec2; kind: 'start' | 'target' }
 
@@ -5280,10 +5282,10 @@ export class SketchScene {
       if (marker.kind === 'start') {
         this.overlay
           .rect(marker.world.x - markerRadius, marker.world.y - markerRadius, 2 * markerRadius, 2 * markerRadius)
-          .fill({ color: 0x00e5ff })
+          .fill({ color: ROUTE_MARKER_COLOR })
           .stroke({ width: 2 / this.world.scale.x, color: 0xffffff });
       } else {
-        this.overlay.circle(marker.world.x, marker.world.y, markerRadius).stroke({ width: 2 / this.world.scale.x, color: 0x00e5ff });
+        this.overlay.circle(marker.world.x, marker.world.y, markerRadius).stroke({ width: 2 / this.world.scale.x, color: ROUTE_MARKER_COLOR });
       }
     }
     for (const id of this.doc.selectedIds) {

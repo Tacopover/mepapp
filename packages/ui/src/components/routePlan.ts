@@ -79,7 +79,8 @@ export function typeNameInText(typeId: string, libraryName: string, language: Ro
 export type RouteTextKey =
   | 'title' | 'close' | 'noEquipment' | 'startStamp' | 'groupSources' | 'groupWaiting' | 'startWarning'
   | 'startPort' | 'portNote' | 'networkType' | 'noOpenPorts' | 'scope' | 'scopeRooms' | 'scopeStamps'
-  | 'roomsAll' | 'roomsNone' | 'noRooms' | 'includeOutside' | 'useAllPorts';
+  | 'roomsAll' | 'roomsNone' | 'noRooms' | 'includeOutside' | 'useAllPorts'
+  | 'scopeStampsHint' | 'roomsColRoom' | 'roomsColType' | 'roomsColPorts' | 'noChoice';
 
 const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
   en: {
@@ -102,6 +103,11 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     noRooms: 'No rooms yet. Run Detect rooms in Auto-place, or use the selected stamps.',
     includeOutside: 'Include ports outside rooms',
     useAllPorts: 'Use all ports of stamps with 2 ports of the same type',
+    scopeStampsHint: 'Select other stamps on the plan first.',
+    roomsColRoom: 'Room',
+    roomsColType: 'Type',
+    roomsColPorts: 'Open ports',
+    noChoice: 'None available',
   },
   nl: {
     title: 'Netwerk routeren',
@@ -123,8 +129,18 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     noRooms: 'Nog geen ruimtes. Gebruik Ruimtes detecteren in Auto-plaatsen, of gebruik de geselecteerde stempels.',
     includeOutside: 'Aansluitingen buiten ruimtes meenemen',
     useAllPorts: 'Gebruik alle aansluitingen van stempels met 2 aansluitingen van hetzelfde type',
+    scopeStampsHint: 'Selecteer eerst andere stempels op het plan.',
+    roomsColRoom: 'Ruimte',
+    roomsColType: 'Type',
+    roomsColPorts: 'Open aansluitingen',
+    noChoice: 'Niet beschikbaar',
   },
 };
+
+export function includeOutsideText(language: RouteLanguage, count: number): string {
+  if (language === 'nl') return `${routeText(language, 'includeOutside')}: ${count} ${count === 1 ? 'aansluiting' : 'aansluitingen'}`;
+  return `${routeText(language, 'includeOutside')}: ${count} ${count === 1 ? 'port' : 'ports'}`;
+}
 
 /** Replaces each {name} in the text with String(params[name]). A {name} with no param stays as it is. */
 export function routeText(language: RouteLanguage, key: RouteTextKey, params?: Record<string, string | number>): string {
@@ -153,8 +169,8 @@ export function routeSummaryLines(
 
   if (scope === 'rooms') {
     lines.push(nl
-      ? `${ports} open ${ports === 1 ? 'aansluiting' : 'aansluitingen'} voor ${typeName} in ${roomCount} ${roomCount === 1 ? 'ruimte' : 'ruimtes'}.`
-      : `${ports} open ${ports === 1 ? 'port' : 'ports'} of ${typeName} in ${roomCount} ${roomCount === 1 ? 'room' : 'rooms'}.`);
+      ? `${ports} open ${ports === 1 ? 'aansluiting' : 'aansluitingen'} voor ${typeName} in ${roomCount} aangevinkte ${roomCount === 1 ? 'ruimte' : 'ruimtes'}.`
+      : `${ports} open ${ports === 1 ? 'port' : 'ports'} of ${typeName} in ${roomCount} checked ${roomCount === 1 ? 'room' : 'rooms'}.`);
   } else {
     const stamps = new Set(result.ports.map((port) => port.stampId)).size;
     lines.push(nl
@@ -198,8 +214,8 @@ export function routeSummaryLines(
       ? `${m} ${m === 1 ? 'stempel heeft' : 'stempels hebben'} meer dan 1 aansluiting van hetzelfde type.`
       : `${m} ${m === 1 ? 'stamp has' : 'stamps have'} more than 1 port of the same type.`;
     const second = nl
-      ? (portsPerStamp === 'all' ? 'De zoeker gebruikt alle aansluitingen.' : 'De zoeker gebruikt 1 aansluiting van elk.')
-      : (portsPerStamp === 'all' ? 'The finder uses all ports.' : 'The finder uses 1 port of each.');
+      ? (portsPerStamp === 'all' ? 'Alle aansluitingen worden gebruikt.' : 'Van elk wordt 1 aansluiting gebruikt.')
+      : (portsPerStamp === 'all' ? 'All ports are used.' : 'Only 1 port of each is used.');
     lines.push(`${first} ${second}`);
   }
 
