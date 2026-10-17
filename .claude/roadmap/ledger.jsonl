@@ -219,3 +219,28 @@
 {"seq":219,"at":"2026-10-17T05:09:42.179Z","type":"now","id":"now","role":"","task":"","note":"R4 plan is next."}
 {"seq":220,"at":"2026-10-17T05:10:17.913Z","type":"finding","id":"F-R3-04","part":"R3","task":"R3-T10","source":"ui-reviewer","severity":"medium","text":"Warning lines have the same blue as the app accent, so a warning looks like an info line. Fixed in T13 with a text label. The Dutch dialog mixes English network type names with Dutch air words: open, accepted.","status":"fixed"}
 {"seq":221,"at":"2026-10-17T05:10:17.949Z","type":"finding","id":"F-R3-05","part":"R3","task":"R3-T12","source":"ui-reviewer","severity":"low","text":"The Element Editor hint of linked ports is not verified (the Linked Ports section did not show for the library unit). No screenshot of a Note line; the DOM check covers it.","status":"open"}
+{"seq":222,"at":"2026-10-17T05:32:56.479Z","type":"task","id":"R4-T01","part":"R4","order":1,"title":"Fixture and loader of real rooms","state":"planned"}
+{"seq":223,"at":"2026-10-17T05:32:56.521Z","type":"task","id":"R4-T02","part":"R4","order":2,"title":"Route area types and room selection","state":"planned"}
+{"seq":224,"at":"2026-10-17T05:32:56.559Z","type":"task","id":"R4-T03","part":"R4","order":3,"title":"Raster and thinning","state":"planned"}
+{"seq":225,"at":"2026-10-17T05:32:56.595Z","type":"task","id":"R4-T04","part":"R4","order":4,"title":"Skeleton pixel graph","state":"planned"}
+{"seq":226,"at":"2026-10-17T05:32:56.635Z","type":"task","id":"R4-T05a","part":"R4","order":5,"title":"Prune and half-width","state":"planned"}
+{"seq":227,"at":"2026-10-17T05:32:56.671Z","type":"task","id":"R4-T05b","part":"R4","order":6,"title":"Simplify, centerLineOf, real-room tests","state":"planned"}
+{"seq":228,"at":"2026-10-17T05:32:56.710Z","type":"task","id":"R4-T06","part":"R4","order":7,"title":"Wall stretch and boundary gap","state":"planned"}
+{"seq":229,"at":"2026-10-17T05:32:56.747Z","type":"task","id":"R4-T07","part":"R4","order":8,"title":"Crossings along a path","state":"planned"}
+{"seq":230,"at":"2026-10-17T05:32:56.785Z","type":"task","id":"R4-T08","part":"R4","order":9,"title":"Graph helpers","state":"planned"}
+{"seq":231,"at":"2026-10-17T05:32:56.822Z","type":"task","id":"R4-T09","part":"R4","order":10,"title":"computeRouteArea part 1","state":"planned"}
+{"seq":232,"at":"2026-10-17T05:32:56.861Z","type":"task","id":"R4-T10a","part":"R4","order":11,"title":"Links and entries","state":"planned"}
+{"seq":233,"at":"2026-10-17T05:32:56.899Z","type":"task","id":"R4-T10b","part":"R4","order":12,"title":"Unreached rooms, parts, shaft cases","state":"planned"}
+{"seq":234,"at":"2026-10-17T05:32:56.937Z","type":"task","id":"R4-T11","part":"R4","order":13,"title":"Warnings","state":"planned"}
+{"seq":235,"at":"2026-10-17T05:32:56.975Z","type":"task","id":"R4-T12","part":"R4","order":14,"title":"Chain test on real rooms","state":"planned"}
+{"seq":236,"at":"2026-10-17T05:32:57.013Z","type":"task","id":"R4-T13","part":"R4","order":15,"title":"Overlay drawing","state":"planned"}
+{"seq":237,"at":"2026-10-17T05:32:57.049Z","type":"task","id":"R4-T14a","part":"R4","order":16,"title":"Scene: list, cache, flag, layer","state":"planned"}
+{"seq":238,"at":"2026-10-17T05:32:57.086Z","type":"task","id":"R4-T14b","part":"R4","order":17,"title":"r4-lib.mjs and the scene browser check","state":"planned"}
+{"seq":239,"at":"2026-10-17T05:32:57.135Z","type":"task","id":"R4-T15","part":"R4","order":18,"title":"Room type list storage","state":"planned"}
+{"seq":240,"at":"2026-10-17T05:32:57.173Z","type":"task","id":"R4-T16","part":"R4","order":19,"title":"Menu switch Show or Hide route area","state":"planned"}
+{"seq":241,"at":"2026-10-17T05:32:57.215Z","type":"task","id":"R4-T17","part":"R4","order":20,"title":"Texts (en, nl) and line builders","state":"planned"}
+{"seq":242,"at":"2026-10-17T05:32:57.252Z","type":"task","id":"R4-T18","part":"R4","order":21,"title":"Dialog section","state":"planned"}
+{"seq":243,"at":"2026-10-17T05:32:57.289Z","type":"task","id":"R4-T19","part":"R4","order":22,"title":"Room type list control","state":"planned"}
+{"seq":244,"at":"2026-10-17T05:32:57.328Z","type":"task","id":"R4-T20","part":"R4","order":23,"title":"Part check r4-check.mjs","state":"planned"}
+{"seq":245,"at":"2026-10-17T05:32:57.365Z","type":"part","id":"R4","state":"in progress","plan":".claude/plans/auto-routing-r4.md","branch":"worktree-agent-framework"}
+{"seq":246,"at":"2026-10-17T05:32:57.401Z","type":"decision","id":"Q-R4-01","part":"R4","question":"Should the room type list of the route area travel in the project file? A: no, keep it in localStorage (recommended; no schema step). B: yes, in the project file (a schema step 19; R4 stops for your answer at T15).","options":[{"key":"A","label":"No. localStorage, default Corridor and Shaft."},{"key":"B","label":"Yes. In the project file, schema step 19."}],"recommendation":"A","reason":"A list of room types for a view is a setting, like the unchecked Auto-place rules. It is easy to move later.","status":"open","kind":"new"}
