@@ -265,3 +265,6 @@
 {"seq":265,"at":"2026-10-17T07:38:59.068Z","type":"now","id":"now","role":"task-lead","task":"R4-T11","note":"Warnings and the chain on real rooms (T11, T12)","since":"2026-10-17T07:40:00.000Z"}
 {"seq":266,"at":"2026-10-17T07:49:05.014Z","type":"decision","id":"Q-R3-01","part":"R3","status":"answered","answer":"A","by":"user"}
 {"seq":267,"at":"2026-10-17T07:49:05.419Z","type":"log","id":"L-note-dutch","text":"Note of the user: no new Dutch text in the UI. R4 plan section 11 drops the Dutch items of T17 to T20."}
+{"seq":268,"at":"2026-10-17T08:09:28.336Z","type":"task","id":"R4-T11","state":"done","commit":"ecccc29","summary":"routeAreaWarnings. 19 tests."}
+{"seq":269,"at":"2026-10-17T08:09:29.095Z","type":"task","id":"R4-T12","state":"done","commit":"12338a3","summary":"Chain test on the first floor: 18 of 33 rooms have an entry, 16 of 18 consistent, 15 unreached, 146 ms. A float fix in wallStretch (run 499.99999999999994 under 500) brought room-22 an entry."}
+{"seq":270,"at":"2026-10-17T08:09:30.948Z","type":"now","id":"now","role":"task-lead","task":"R4-T13","note":"Overlay drawing, scene wiring, scene browser check (T13, T14a, T14b)","since":"2026-10-17T08:12:00.000Z"}
