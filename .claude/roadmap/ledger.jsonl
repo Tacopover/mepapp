@@ -172,3 +172,6 @@
 {"seq":172,"at":"2026-10-17T01:59:46.828Z","type":"task","id":"R3-T02","state":"done","commit":"3c5aaec","summary":"solveFlow root by exact element id plus optional rootPortId. 8 new tests, core 963 pass. Fixes the stamp-1 versus stamp-12 match."}
 {"seq":173,"at":"2026-10-17T01:59:46.867Z","type":"now","id":"now","role":"task-lead","task":"R3-T03","note":"segmentIdsOfNetworks helper","since":"2026-10-17T02:12:00.000Z"}
 {"seq":174,"at":"2026-10-17T01:59:46.905Z","type":"task","id":"R3-T03","state":"briefed","role":"task-lead"}
+{"seq":175,"at":"2026-10-17T02:03:21.930Z","type":"task","id":"R3-T03","state":"done","commit":"f805b2f","summary":"segmentIdsOfNetworks helper in core, 6 new tests. Core 969, UI 181 pass."}
+{"seq":176,"at":"2026-10-17T02:03:21.967Z","type":"now","id":"now","role":"task-lead","task":"R3-T04","note":"Old files and flow over two networks (tests)","since":"2026-10-17T02:25:00.000Z"}
+{"seq":177,"at":"2026-10-17T02:03:22.005Z","type":"task","id":"R3-T04","state":"briefed","role":"task-lead"}
