@@ -263,3 +263,5 @@
 {"seq":263,"at":"2026-10-17T07:38:46.691Z","type":"task","id":"R4-T10a","state":"done","commit":"7f4cf0a","summary":"Links and entries. Tap tolerance is one pixel (100 mm) because the center line sits on the pixel grid."}
 {"seq":264,"at":"2026-10-17T07:38:47.409Z","type":"task","id":"R4-T10b","state":"done","commit":"9472cd3","summary":"Unreached rooms, parts, shaft cases. Smoke on the first floor: 17 primary entries, 1 link, 16 unreached, 4 parts, 231 ms."}
 {"seq":265,"at":"2026-10-17T07:38:59.068Z","type":"now","id":"now","role":"task-lead","task":"R4-T11","note":"Warnings and the chain on real rooms (T11, T12)","since":"2026-10-17T07:40:00.000Z"}
+{"seq":266,"at":"2026-10-17T07:49:05.014Z","type":"decision","id":"Q-R3-01","part":"R3","status":"answered","answer":"A","by":"user"}
+{"seq":267,"at":"2026-10-17T07:49:05.419Z","type":"log","id":"L-note-dutch","text":"Note of the user: no new Dutch text in the UI. R4 plan section 11 drops the Dutch items of T17 to T20."}

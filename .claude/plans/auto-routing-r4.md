@@ -866,3 +866,16 @@ R4 gives: `computeRouteArea` (center-line graph, possible places for a branch (e
 | A13 | The refusal branch shows no section; the menu switch still works (sections 2 and 4.6). |
 | A14 | The "not verified" on the scale option 100 is gone (`calibration.ts:74`). |
 | M1 to M7 | Texts and notes: sections 3.2, 4.4, 4.6; P-R4-16 and P-R4-17. |
+
+## 11. Revision 2026-10-17: no new Dutch text (note of the user)
+
+The user wrote on the dashboard: "There is no need to include Dutch names anywhere in the UI. The user can switch to stamps with a Dutch name and that is fine for now. If we need more Dutch in the app then we will add this later, it should not be part of these tasks."
+
+This overrides P-R4-11 and P-R4-17 and every Dutch item in T17 to T20:
+
+- New texts of R4 have an English text only. If the type of `TEXTS` in `routePlan.ts` needs a Dutch entry, the Dutch entry holds the same English text. No new Dutch wording is written.
+- No test checks Dutch texts, the Dutch length of 140 characters, or a Dutch plural form. The English checks stay.
+- No browser run in Dutch and no Dutch screenshot (`T18-section-nl-narrow`, `T19-types-nl-narrow`, `T20-dialog-nl-narrow` are dropped). The English 400 px run stays.
+- Room type names still follow the language of the label setting. That is existing data, not new text.
+- Risk R-11 (Dutch speaker) and the "Routegebied" question are removed from R4. They return when the user asks for more Dutch.
+- Texts of R2 and R3 that already have Dutch stay as they are. The user did not ask to remove them.
