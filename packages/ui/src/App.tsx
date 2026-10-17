@@ -68,6 +68,7 @@ import { AutoPlaceDialog } from './components/AutoPlaceDialog.js';
 import { RouteDialog } from './components/RouteDialog.js';
 import { getStampAppearanceDefault } from './stampAppearanceDefaults.js';
 import { clearRuleMoveReport, loadPlacementRules, loadRuleMoveReport, loadUncheckedRuleIds, moveStoredOldRules, savePlacementRules, saveUncheckedRuleIds } from './placementRuleStorage.js';
+import { loadRouteRoomTypeIds, saveRouteRoomTypeIds } from './routeAreaStorage.js';
 import { stampLabelFor } from './stampVisibility.js';
 import { loadCustomSymbols, saveCustomSymbols } from './schematicSymbolStorage.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
@@ -434,6 +435,11 @@ export function MepSketchApp({
   const [placementRules, setPlacementRules] = useState<PlacementRule[]>(() => loadPlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage));
   const [uncheckedRuleIds, setUncheckedRuleIds] = useState<string[]>(() => loadUncheckedRuleIds(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveUncheckedRuleIds(typeof localStorage === 'undefined' ? undefined : localStorage, uncheckedRuleIds), [uncheckedRuleIds]);
+  const [routeRoomTypeIds, setRouteRoomTypeIds] = useState<string[]>(() => loadRouteRoomTypeIds(typeof localStorage === 'undefined' ? undefined : localStorage));
+  useEffect(() => saveRouteRoomTypeIds(typeof localStorage === 'undefined' ? undefined : localStorage, routeRoomTypeIds), [routeRoomTypeIds]);
+  useEffect(() => {
+    if (ready) sceneRef.current?.setRouteAreaRoomTypes(routeRoomTypeIds);
+  }, [ready, routeRoomTypeIds, sceneRef]);
   const [autoPlaceOpen, setAutoPlaceOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
   /** Set while the stamp picker chooses the stamp of a placement rule. */
