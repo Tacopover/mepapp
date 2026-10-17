@@ -2,6 +2,7 @@
 // Zhang-Suen thinning reduces the mask to a 1 pixel wide center line. Known
 // limits: a 2 by 2 blob can disappear, and a diagonal of two pixels can blur.
 
+import type { Vec2 } from './geometry.js';
 import type { RoomPolygon } from './rooms/types.js';
 import { polygonContainsPoint } from './rooms/room.js';
 import { distanceTransform } from './rooms/raster.js';
@@ -400,4 +401,123 @@ export function pruneGraph(
     nodes = nodes.filter((n) => !gone.has(n.id) && !dropped.has(n.id));
   }
   return { nodes, edges };
+}
+
+export interface CenterLineNode {
+  id: string;
+  point: Vec2;
+  kind: 'end' | 'junction' | 'bend';
+}
+
+export interface CenterLineEdge {
+  from: string;
+  to: string;
+  points: Vec2[];
+}
+
+export interface CenterLine {
+  nodes: CenterLineNode[];
+  edges: CenterLineEdge[];
+  halfWidthMm: number;
+}
+
+// Equal to DEFAULT_SKELETON_PIXEL_MM in route-area.ts. Not imported, to avoid an import cycle.
+const DEFAULT_PIXEL_MM = 100;
+
+/**
+ * The center line of a room in page points. The room is rasterized at pixelMm
+ * (default DEFAULT_PIXEL_MM), thinned, pruned and simplified. For a huge room the
+ * pixel size grows and pixelMm is ignored. A room narrower than 300 mm gives an
+ * empty center line.
+ */
+export function centerLineOf(
+  polygon: RoomPolygon,
+  mmPerPt: number,
+  options: { pixelMm?: number; pruneFactor?: number } = {},
+): CenterLine {
+  if (!(mmPerPt > 0)) return { nodes: [], edges: [], halfWidthMm: 0 };
+  const pixelMm = options.pixelMm ?? DEFAULT_PIXEL_MM;
+  const room = rasterizePolygon(polygon, pixelMm / mmPerPt);
+  const pixelMmEff = room.pixelPt * mmPerPt;
+  const distances = roomDistances(room);
+  let maxDistance = 0;
+  for (let i = 0; i < distances.length; i++) if (distances[i]! > maxDistance) maxDistance = distances[i]!;
+  if (2 * maxDistance * pixelMmEff < 300) return { nodes: [], edges: [], halfWidthMm: 0 };
+  const thinned = { ...room, mask: room.mask.slice() };
+  thinMask(thinned);
+  const graph = pruneGraph(
+    pixelGraphOf(thinned),
+    (x, y) => halfWidthAt(distances, room.w, room.h, x, y),
+    options.pruneFactor,
+  );
+
+  const toPage = (px: number, py: number): Vec2 => ({
+    x: room.x0 + (px + 0.5) * room.pixelPt,
+    y: room.y0 + (py + 0.5) * room.pixelPt,
+  });
+  const at = new Map(graph.nodes.map((n) => [n.id, n]));
+  const edges: CenterLineEdge[] = graph.edges
+    .filter((e) => at.has(e.from) && at.has(e.to))
+    .map((e) => {
+      const a = at.get(e.from)!;
+      const b = at.get(e.to)!;
+      const points = simplifyChain(e.pixels, 1).map((p) => toPage(p.x, p.y));
+      points[0] = toPage(a.x, a.y);
+      points[points.length - 1] = toPage(b.x, b.y);
+      return { from: e.from, to: e.to, points };
+    });
+  const used = new Set<string>();
+  for (const e of edges) {
+    used.add(e.from);
+    used.add(e.to);
+  }
+  const nodes: CenterLineNode[] = graph.nodes
+    .filter((n) => edges.length === 0 || used.has(n.id))
+    .map((n) => ({ id: n.id, point: toPage(n.x, n.y), kind: n.kind }));
+
+  const widths: number[] = [];
+  for (const e of graph.edges) {
+    for (const p of e.pixels) widths.push(halfWidthAt(distances, room.w, room.h, p.x, p.y));
+  }
+  if (!widths.length) return { nodes, edges, halfWidthMm: 0 };
+  widths.sort((a, b) => a - b);
+  const mid = widths.length >> 1;
+  const median = widths.length % 2 ? widths[mid]! : (widths[mid - 1]! + widths[mid]!) / 2;
+  return { nodes, edges, halfWidthMm: median * pixelMmEff };
+}
+
+// Douglas-Peucker for an open chain. A closed loop (first pixel equals last) keeps its first and last pixel.
+function simplifyChain(pixels: { x: number; y: number }[], tolerance: number): { x: number; y: number }[] {
+  const n = pixels.length;
+  if (n < 3) return pixels.slice();
+  const keep = new Uint8Array(n);
+  keep[0] = 1;
+  keep[n - 1] = 1;
+  const stack: [number, number][] = [[0, n - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop()!;
+    let worst = -1;
+    let worstDist = -1;
+    for (let i = a + 1; i < b; i++) {
+      const d = segmentDistance(pixels[i]!, pixels[a]!, pixels[b]!);
+      if (d > worstDist) {
+        worstDist = d;
+        worst = i;
+      }
+    }
+    if (worst >= 0 && worstDist > tolerance) {
+      keep[worst] = 1;
+      stack.push([a, worst], [worst, b]);
+    }
+  }
+  return pixels.filter((_, i) => keep[i] === 1);
+}
+
+function segmentDistance(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 > 0 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2 : 0;
+  t = Math.min(1, Math.max(0, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import type { Vec2 } from './geometry.js';
 import { polygonAreaPt2 } from './rooms/room.js';
 import type { RoomPolygon } from './rooms/types.js';
 import {
+  centerLineOf,
   crossingNumber,
   halfWidthAt,
   pixelGraphOf,
@@ -634,5 +636,102 @@ describe('pruneGraph', () => {
     const before = JSON.parse(JSON.stringify(g));
     pruneGraph(g, () => 5);
     expect(g).toEqual(before);
+  });
+});
+
+function pathLength(points: Vec2[]): number {
+  let len = 0;
+  for (let i = 1; i < points.length; i++) len += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y);
+  return len;
+}
+
+// Number of interior vertices of a chain whose turn angle is more than 30 degrees.
+function sharpTurns(points: Vec2[]): number {
+  let n = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const a = Math.atan2(points[i]!.y - points[i - 1]!.y, points[i]!.x - points[i - 1]!.x);
+    const b = Math.atan2(points[i + 1]!.y - points[i]!.y, points[i + 1]!.x - points[i]!.x);
+    let d = Math.abs(b - a);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    if ((d * 180) / Math.PI > 30) n++;
+  }
+  return n;
+}
+
+describe('centerLineOf', () => {
+  it('gives 2 end nodes and 1 edge for a 10 m by 2 m rectangle', () => {
+    const cl = centerLineOf(rect(0, 0, 1000, 200), 10);
+    expect(cl.nodes).toHaveLength(2);
+    expect(cl.nodes.filter((n) => n.kind === 'end')).toHaveLength(2);
+    expect(cl.edges).toHaveLength(1);
+    const pts = cl.edges[0]!.points;
+    const len = pathLength(pts) * 10;
+    // The Zhang-Suen skeleton ends retract about one half-width per end, so the length is below L - W.
+    expect(len).toBeGreaterThanOrEqual(7800);
+    expect(len).toBeLessThanOrEqual(10000);
+    for (const p of pts) expect(Math.abs(p.y - 100) * 10).toBeLessThanOrEqual(150);
+    expect(cl.halfWidthMm).toBeGreaterThanOrEqual(900);
+    expect(cl.halfWidthMm).toBeLessThanOrEqual(1100);
+  });
+
+  it('keeps the 3 ends and 1 junction of a T of two 2 m corridors away from the inner corners', () => {
+    const tee: RoomPolygon = {
+      outer: [
+        { x: 0, y: 0 },
+        { x: 1200, y: 0 },
+        { x: 1200, y: 200 },
+        { x: 700, y: 200 },
+        { x: 700, y: 1000 },
+        { x: 500, y: 1000 },
+        { x: 500, y: 200 },
+        { x: 0, y: 200 },
+      ],
+      holes: [],
+    };
+    const cl = centerLineOf(tee, 10);
+    expect(cl.nodes.filter((n) => n.kind === 'end')).toHaveLength(3);
+    expect(cl.nodes.filter((n) => n.kind === 'junction')).toHaveLength(1);
+    expect(cl.edges).toHaveLength(3);
+    for (const n of cl.nodes.filter((m) => m.kind === 'end')) {
+      expect(Math.hypot(n.point.x - 500, n.point.y - 200)).toBeGreaterThanOrEqual(300);
+      expect(Math.hypot(n.point.x - 700, n.point.y - 200)).toBeGreaterThanOrEqual(300);
+    }
+  });
+
+  it('gives 2 end nodes and one corner on the path of an L', () => {
+    const cl = centerLineOf(
+      {
+        outer: [
+          { x: 0, y: 0 },
+          { x: 1000, y: 0 },
+          { x: 1000, y: 200 },
+          { x: 200, y: 200 },
+          { x: 200, y: 1000 },
+          { x: 0, y: 1000 },
+        ],
+        holes: [],
+      },
+      10,
+    );
+    expect(cl.nodes.filter((n) => n.kind === 'end')).toHaveLength(2);
+    expect(cl.edges).toHaveLength(1);
+    expect(sharpTurns(cl.edges[0]!.points)).toBe(1);
+  });
+
+  it('gives one edge from a node to itself for a wide ring', () => {
+    const cl = centerLineOf({ outer: rect(0, 0, 1000, 1000).outer, holes: [rect(300, 300, 700, 700).outer] }, 10);
+    expect(cl.edges).toHaveLength(1);
+    expect(cl.edges[0]!.from).toBe(cl.edges[0]!.to);
+  });
+
+  it('gives no node, no edge and halfWidthMm 0 for a room narrower than 300 mm', () => {
+    expect(centerLineOf(rect(0, 0, 1000, 25), 10)).toEqual({ nodes: [], edges: [], halfWidthMm: 0 });
+  });
+
+  it('does not change the input polygon', () => {
+    const poly = rect(0, 0, 1000, 200);
+    const before = JSON.parse(JSON.stringify(poly));
+    centerLineOf(poly, 10);
+    expect(poly).toEqual(before);
   });
 });

@@ -8,6 +8,7 @@ export * from './route-ports.js';
 export * from './route-start.js';
 export * from './route-input.js';
 export * from './route-area.js';
+export * from './route-skeleton.js';
 export * from './stamp-library.js';
 export * from './symbol-shapes.js';
 export * from './symbol-shape-geometry.js';
