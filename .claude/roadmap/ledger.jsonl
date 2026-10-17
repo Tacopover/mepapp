@@ -178,3 +178,6 @@
 {"seq":178,"at":"2026-10-17T02:08:14.188Z","type":"task","id":"R3-T04","state":"done","commit":"ac094ea","summary":"Old v18 file with a mixed group: loads without a schema step, one network becomes two, flow solves per network, save and load round trip. 5 tests, core 974 pass."}
 {"seq":179,"at":"2026-10-17T02:08:14.227Z","type":"now","id":"now","role":"task-lead","task":"R3-T05a","note":"checkRouteStart code","since":"2026-10-17T02:30:00.000Z"}
 {"seq":180,"at":"2026-10-17T02:08:14.266Z","type":"task","id":"R3-T05a","state":"briefed","role":"task-lead"}
+{"seq":181,"at":"2026-10-17T02:16:27.282Z","type":"task","id":"R3-T05a","state":"done","commit":"4416a59","summary":"checkRouteStart in core with severities error, warning, info and phases before and after. 10 tests, core 984 pass."}
+{"seq":182,"at":"2026-10-17T02:16:27.318Z","type":"now","id":"now","role":"task-lead","task":"R3-T05b","note":"checkRouteStart group and equipment tests","since":"2026-10-17T02:35:00.000Z"}
+{"seq":183,"at":"2026-10-17T02:16:27.354Z","type":"task","id":"R3-T05b","state":"briefed","role":"task-lead"}
