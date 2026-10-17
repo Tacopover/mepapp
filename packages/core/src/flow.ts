@@ -6,6 +6,7 @@
 // anywhere here; NetworkType.units (network.ts) is a display label only and
 // is never read by this module, matching the old app's FlowResult doc
 // comment ("unitless") confirmed by investigation.
+// Sizing is in sizing-network.ts; this module still has no unit.
 
 import type { Fitting, Network, PortGroup, Segment } from './network.js';
 import { nodeKeyOf } from './network.js';
