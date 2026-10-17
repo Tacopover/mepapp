@@ -169,3 +169,6 @@
 {"seq":169,"at":"2026-10-17T01:45:10.239Z","type":"task","id":"R3-T01","state":"done","commit":"8d70a32","summary":"computeNetworks splits a port group node by network type. 8 new tests, core 955 and UI 181 tests pass. Water flow and return stay joined (stated limit)."}
 {"seq":170,"at":"2026-10-17T01:45:10.279Z","type":"now","id":"now","role":"task-lead","task":"R3-T02","note":"Exact flow root and rootPortId","since":"2026-10-17T02:00:00.000Z"}
 {"seq":171,"at":"2026-10-17T01:45:10.317Z","type":"task","id":"R3-T02","state":"briefed","role":"task-lead"}
+{"seq":172,"at":"2026-10-17T01:59:46.828Z","type":"task","id":"R3-T02","state":"done","commit":"3c5aaec","summary":"solveFlow root by exact element id plus optional rootPortId. 8 new tests, core 963 pass. Fixes the stamp-1 versus stamp-12 match."}
+{"seq":173,"at":"2026-10-17T01:59:46.867Z","type":"now","id":"now","role":"task-lead","task":"R3-T03","note":"segmentIdsOfNetworks helper","since":"2026-10-17T02:12:00.000Z"}
+{"seq":174,"at":"2026-10-17T01:59:46.905Z","type":"task","id":"R3-T03","state":"briefed","role":"task-lead"}
