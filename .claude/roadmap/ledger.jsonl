@@ -244,3 +244,10 @@
 {"seq":244,"at":"2026-10-17T05:32:57.328Z","type":"task","id":"R4-T20","part":"R4","order":23,"title":"Part check r4-check.mjs","state":"planned"}
 {"seq":245,"at":"2026-10-17T05:32:57.365Z","type":"part","id":"R4","state":"in progress","plan":".claude/plans/auto-routing-r4.md","branch":"worktree-agent-framework"}
 {"seq":246,"at":"2026-10-17T05:32:57.401Z","type":"decision","id":"Q-R4-01","part":"R4","question":"Should the room type list of the route area travel in the project file? A: no, keep it in localStorage (recommended; no schema step). B: yes, in the project file (a schema step 19; R4 stops for your answer at T15).","options":[{"key":"A","label":"No. localStorage, default Corridor and Shaft."},{"key":"B","label":"Yes. In the project file, schema step 19."}],"recommendation":"A","reason":"A list of room types for a view is a setting, like the unchecked Auto-place rules. It is easy to move later.","status":"open","kind":"new"}
+{"seq":247,"at":"2026-10-17T05:33:10.230Z","type":"now","id":"now","role":"task-lead","task":"R4-T01","note":"Fixture, types, raster (T01 to T03)","since":"2026-10-17T06:10:00.000Z"}
+{"seq":248,"at":"2026-10-17T05:33:10.272Z","type":"task","id":"R4-T01","state":"briefed","role":"task-lead"}
+{"seq":249,"at":"2026-10-17T05:57:32.631Z","type":"task","id":"R4-T01","state":"done","commit":"7b8e79f","summary":"Real-room fixture of the first floor (38 rooms, 5 corridor rooms) with script and loader."}
+{"seq":250,"at":"2026-10-17T05:57:32.675Z","type":"task","id":"R4-T02","state":"done","commit":"071dd67","summary":"Route area types, defaults and room selection. 14 tests."}
+{"seq":251,"at":"2026-10-17T05:57:32.712Z","type":"task","id":"R4-T03","state":"done","commit":"d6bfd92","summary":"Raster and Zhang-Suen thinning of the route skeleton. 11 tests; core 1022 pass."}
+{"seq":252,"at":"2026-10-17T05:57:32.749Z","type":"now","id":"now","role":"task-lead","task":"R4-T04","note":"Skeleton graph, prune, simplify (T04, T05a, T05b)","since":"2026-10-17T06:40:00.000Z"}
+{"seq":253,"at":"2026-10-17T05:57:32.785Z","type":"task","id":"R4-T04","state":"briefed","role":"task-lead"}

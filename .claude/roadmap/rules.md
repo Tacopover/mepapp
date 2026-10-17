@@ -27,7 +27,7 @@ Read this file first. It applies to the director and to each role in `protocol.m
 - Only `@mepapp/pdf-engine-mupdf` imports `mupdf`. Everything else uses the `pdf-engine` interface.
 - Only `@mepapp/core` has real test coverage (vitest). It has no rendering and no I/O.
 - AGPLv3. Every dependency must be free and open. No SaaS backend.
-- `fixtures/pdfs/` and `fixtures/stamps/` hold real files. Never make a placeholder fixture. The PDFs are git-ignored: they live in `/root/MepApp/fixtures/pdfs/` (the main checkout). The folder holds 9 PDFs and `README.md`.
+- `fixtures/pdfs/` and `fixtures/stamps/` hold real files. Never make a placeholder fixture. Most PDFs are git-ignored and live in `/root/MepApp/fixtures/pdfs/` (the main checkout). Three are tracked: `00_arch_ground_floor.pdf`, `01_arch_first_floor.pdf` and `arch_simple_A4.pdf`. Never copy an ignored PDF into git. The folder holds 9 PDFs and `README.md`.
 - `node_modules` and `dist/` do not carry over between machines. After a fresh checkout, run `pnpm install` and then `pnpm build` at the root.
 - `apps/web` uses the `dist` of `@mepapp/ui`. After a UI change, run `pnpm build` again before a browser check.
 - A merge can break the build with no conflict marker. After a real merge, run `pnpm build` at the root.
