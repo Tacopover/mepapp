@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git fetch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git worktree add:*)",
+      "Bash(git push origin worktree-agent-framework)",
+      "Bash(git push origin worktree-routing-*)",
+      "Bash(git push -u origin worktree-routing-*)",
+      "Bash(pnpm install)",
+      "Bash(pnpm build)",
+      "Bash(pnpm test)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm --filter:*)",
+      "Bash(node .claude/roadmap/ledger.mjs:*)",
+      "Bash(node .claude/roadmap/browser/with-server.mjs:*)",
+      "Bash(node --check:*)",
+      "Bash(cmp:*)",
+      "Bash(cp .claude/roadmap/protocol.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/agent-framework.md\")",
+      "Bash(cp .claude/plans/roadmap-overview.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/roadmap-overview.md\")",
+      "Bash(cp .claude/plans/auto-routing.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/auto-routing.md\")",
+      "Bash(cp .claude/plans/auto-routing-r2.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/auto-routing-r2.md\")",
+      "Bash(cp .claude/plans/auto-routing-r3.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/auto-routing-r3.md\")",
+      "Bash(cp .claude/plans/auto-routing-r4.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/auto-routing-r4.md\")",
+      "Bash(cp .claude/plans/auto-routing-r5.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/auto-routing-r5.md\")",
+      "Bash(cp .claude/plans/auto-routing-r6.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/auto-routing-r6.md\")",
+      "Bash(cp .claude/plans/auto-routing-r7.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/auto-routing-r7.md\")",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Write",
+      "Edit",
+      "Agent",
+      "ArtifactData",
+      "Artifact",
+      "PushNotification",
+      "ScheduleWakeup"
+    ],
+    "deny": [
+      "Bash(git push origin master:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(pkill:*)"
+    ]
+  }
+}
