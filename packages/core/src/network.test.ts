@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeNetworks, type Fitting, type PortGroup, type Segment } from './network.js';
+import { computeNetworks, segmentIdsOfNetworks, type Fitting, type PortGroup, type Segment } from './network.js';
 
 function segment(
   id: string,
@@ -208,5 +208,80 @@ describe('computeNetworks', () => {
     expect(networks).toHaveLength(1);
     expect(networks[0].networkTypeId).toBe('heating-water');
     expect(networks[0].segmentIds.sort()).toEqual(['s1', 's2']);
+  });
+});
+
+describe('segmentIdsOfNetworks', () => {
+  const portGroups: PortGroup[] = [{ elementId: 'ahu', portIds: ['p-out', 'p-in'] }];
+
+  it('returns the segments of the seed network only, not a network of another type on the same group', () => {
+    const segments = [
+      segment('a1', { kind: 'port', elementId: 'ahu', portId: 'p-out' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }, 'supply-air'),
+      segment('b1', { kind: 'port', elementId: 'ahu', portId: 'p-in' }, { kind: 'port', elementId: 'grille', portId: 'p1' }, 'return-air'),
+    ];
+    const ids = segmentIdsOfNetworks({ segments, fittings: [], portGroups }, ['a1']);
+
+    expect([...ids]).toEqual(['a1']);
+  });
+
+  it('returns the segments of both networks when seeds lie in both', () => {
+    const segments = [
+      segment('a1', { kind: 'port', elementId: 'ahu', portId: 'p-out' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }, 'supply-air'),
+      segment('b1', { kind: 'port', elementId: 'ahu', portId: 'p-in' }, { kind: 'port', elementId: 'grille', portId: 'p1' }, 'return-air'),
+    ];
+    const ids = segmentIdsOfNetworks({ segments, fittings: [], portGroups }, ['a1', 'b1']);
+
+    expect([...ids].sort()).toEqual(['a1', 'b1']);
+  });
+
+  it('returns a network once when two seeds lie in it', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'ahu', portId: 'p-out' }, { kind: 'fitting', fittingId: 'f1' }),
+      segment('s2', { kind: 'fitting', fittingId: 'f1' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }),
+    ];
+    const ids = segmentIdsOfNetworks({ segments, fittings: [fitting('f1')], portGroups: [] }, ['s1', 's2']);
+
+    expect(ids.size).toBe(2);
+    expect([...ids].sort()).toEqual(['s1', 's2']);
+  });
+
+  it('leaves out an unknown id and returns an empty set for unknown ids only', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'a', portId: 'p1' }, { kind: 'port', elementId: 'b', portId: 'p1' }),
+    ];
+    const input = { segments, fittings: [], portGroups: [] };
+
+    expect([...segmentIdsOfNetworks(input, ['s1', 'missing'])]).toEqual(['s1']);
+    expect(segmentIdsOfNetworks(input, ['missing']).size).toBe(0);
+  });
+
+  it('returns all segments joined through a port group when the group has one type', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'ahu', portId: 'p-out' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }, 'supply-air'),
+      segment('s2', { kind: 'port', elementId: 'ahu', portId: 'p-in' }, { kind: 'port', elementId: 'grille', portId: 'p1' }, 'supply-air'),
+    ];
+    const ids = segmentIdsOfNetworks({ segments, fittings: [], portGroups }, ['s1']);
+
+    expect([...ids].sort()).toEqual(['s1', 's2']);
+  });
+
+  it('joins the networks of a cascade retag over a port group into one network', () => {
+    const input = {
+      segments: [
+        segment('a1', { kind: 'port', elementId: 'ahu', portId: 'p-out' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }, 'supply-air'),
+        segment('b1', { kind: 'port', elementId: 'ahu', portId: 'p-in' }, { kind: 'port', elementId: 'grille', portId: 'p1' }, 'return-air'),
+      ],
+      fittings: [],
+      portGroups,
+    };
+    const seedIds = segmentIdsOfNetworks(input, ['a1']);
+    const retagged = {
+      ...input,
+      segments: input.segments.map((s) => (seedIds.has(s.id) ? { ...s, networkTypeId: 'return-air' } : s)),
+    };
+    const networks = computeNetworks(retagged);
+
+    expect(networks).toHaveLength(1);
+    expect(networks[0].segmentIds.sort()).toEqual(['a1', 'b1']);
   });
 });

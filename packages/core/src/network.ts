@@ -193,3 +193,17 @@ export function computeNetworks(input: NetworkGraphInput): Network[] {
     fittingIds: Array.from(rootToFittingIds.get(root) ?? []),
   }));
 }
+
+/** The ids of all segments in the networks that hold any of `segmentIds`. An id that is no segment of `input` is left out. */
+export function segmentIdsOfNetworks(input: NetworkGraphInput, segmentIds: readonly string[]): Set<string> {
+  const seeds = new Set(segmentIds);
+  const result = new Set<string>();
+  for (const network of computeNetworks(input)) {
+    if (network.segmentIds.some((id) => seeds.has(id))) {
+      for (const id of network.segmentIds) {
+        result.add(id);
+      }
+    }
+  }
+  return result;
+}
