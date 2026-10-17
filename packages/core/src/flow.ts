@@ -18,8 +18,10 @@ export interface FlowSolveInput {
   portGroups: PortGroup[];
   /** User-entered capacity per element (typically terminals only — equipment/fittings contribute 0 of their own, same as the old app). */
   terminalCapacities: Record<string, number>;
-  /** Optional explicit source; when omitted the root follows the old app's FindRoot order (NetworkFlowProcessor.cs:227-276) — see solveFlow — without its MainEquipment step, which this layer has no concept of. */
+  /** Optional explicit source: the exact element id. Its port nodes, group nodes and fitting nodes can be the root. When omitted the root follows the old app's FindRoot order (NetworkFlowProcessor.cs:227-276) — see solveFlow — without its MainEquipment step, which this layer has no concept of. */
   rootElementId?: string;
+  /** With `rootElementId`: the start port. It picks one node when the element has more than one node in the network. A port in a port group gives the group node. */
+  rootPortId?: string;
   /** The stamp category of each element whose ports are in the network — what tells an equipment (the source) apart from a terminal and a loose duct end. An element missing here counts as a terminal only when it has a capacity. */
   elementCategories?: Record<string, StampCategory>;
 }
@@ -91,9 +93,18 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
   };
   const isTerminal = (nodeKey: string): boolean =>
     categoryOf(nodeKey) === 'terminal' || ownCapacityOf(nodeKey, input.terminalCapacities) !== 0;
+  const isRootNode = (k: string): boolean =>
+    elementIdOf(k) === input.rootElementId || k === `fitting:${input.rootElementId}`;
+  let explicitRootKey: string | undefined;
+  if (input.rootElementId) {
+    if (input.rootPortId) {
+      const portKey = nodeKeyOf({ kind: 'port', elementId: input.rootElementId, portId: input.rootPortId }, input.portGroups);
+      if (adjacency.has(portKey)) explicitRootKey = portKey;
+    }
+    explicitRootKey ??= nodeKeys.find(isRootNode);
+  }
   const rootKey =
-    (input.rootElementId &&
-      nodeKeys.find((k) => k.includes(`:${input.rootElementId}`) || k.startsWith(`fitting:${input.rootElementId}`))) ||
+    explicitRootKey ||
     nodeKeys.find((k) => degreeOf(k) === 1 && categoryOf(k) === 'equipment') ||
     nodeKeys.find((k) => degreeOf(k) === 1 && !isTerminal(k)) ||
     nodeKeys.find((k) => categoryOf(k) === 'equipment') ||

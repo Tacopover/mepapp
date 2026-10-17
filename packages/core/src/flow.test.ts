@@ -171,3 +171,225 @@ describe('solveFlow — capacity accumulation (not physics)', () => {
     expect(result.totalCapacity).toBe(175);
   });
 });
+
+describe('solveFlow — exact root element, root port and the fallback', () => {
+  it('roots at stamp-1 and not at stamp-12, whose id starts with the same text', () => {
+    const segments = [
+      segment('a', { kind: 'port', elementId: 'stamp-1', portId: 'p1' }, { kind: 'port', elementId: 'stamp-12', portId: 'p1' }),
+    ];
+    const [network] = computeNetworks({ segments, fittings: [], portGroups: [] });
+    const terminalCapacities = { 'stamp-1': 10, 'stamp-12': 40 };
+
+    const root1 = solveFlow({ network, segments, fittings: [], portGroups: [], terminalCapacities, rootElementId: 'stamp-1' });
+    expect(root1.segmentCapacity.a).toBe(40);
+    expect(root1.segmentDirection.a).toBe('BtoA');
+    expect(root1.totalCapacity).toBe(50);
+
+    const root12 = solveFlow({ network, segments, fittings: [], portGroups: [], terminalCapacities, rootElementId: 'stamp-12' });
+    expect(root12.segmentCapacity.a).toBe(10);
+    expect(root12.segmentDirection.a).toBe('AtoB');
+    expect(root12.totalCapacity).toBe(50);
+  });
+
+  it('roots at fit-1 and not at fit-12, whose id starts with the same text', () => {
+    const segments = [
+      segment('a', { kind: 'fitting', fittingId: 'fit-1' }, { kind: 'fitting', fittingId: 'fit-12' }),
+      segment('d1', { kind: 'port', elementId: 'diffuser1', portId: 'p1' }, { kind: 'fitting', fittingId: 'fit-1' }),
+      segment('d2', { kind: 'port', elementId: 'diffuser2', portId: 'p1' }, { kind: 'fitting', fittingId: 'fit-12' }),
+    ];
+    const fittings = [fitting('fit-1'), fitting('fit-12')];
+    const [network] = computeNetworks({ segments, fittings, portGroups: [] });
+    const terminalCapacities = { diffuser1: 10, diffuser2: 40 };
+
+    const root1 = solveFlow({ network, segments, fittings, portGroups: [], terminalCapacities, rootElementId: 'fit-1' });
+    expect(root1.segmentCapacity.a).toBe(40);
+    expect(root1.segmentDirection.a).toBe('BtoA');
+    expect(root1.totalCapacity).toBe(50);
+
+    const root12 = solveFlow({ network, segments, fittings, portGroups: [], terminalCapacities, rootElementId: 'fit-12' });
+    expect(root12.segmentCapacity.a).toBe(10);
+    expect(root12.segmentDirection.a).toBe('AtoB');
+    expect(root12.totalCapacity).toBe(50);
+
+    const lonely = [segment('d2', { kind: 'port', elementId: 'diffuser2', portId: 'p1' }, { kind: 'fitting', fittingId: 'fit-12' })];
+    const lonelyFittings = [fitting('fit-12')];
+    const [lonelyNetwork] = computeNetworks({ segments: lonely, fittings: lonelyFittings, portGroups: [] });
+    const withAbsent = solveFlow({
+      network: lonelyNetwork,
+      segments: lonely,
+      fittings: lonelyFittings,
+      portGroups: [],
+      terminalCapacities: { diffuser2: 40 },
+      rootElementId: 'fit-1',
+    });
+    const withoutAbsent = solveFlow({
+      network: lonelyNetwork,
+      segments: lonely,
+      fittings: lonelyFittings,
+      portGroups: [],
+      terminalCapacities: { diffuser2: 40 },
+    });
+    expect(withAbsent).toEqual(withoutAbsent);
+  });
+
+  it('roots at an air handling unit with a degree-2 start port, not at a loose duct end', () => {
+    const segments = [
+      segment('sA', { kind: 'port', elementId: 'ahu', portId: 'out' }, { kind: 'fitting', fittingId: 'j1' }),
+      segment('sB', { kind: 'port', elementId: 'ahu', portId: 'out' }, { kind: 'fitting', fittingId: 'j2' }),
+      segment('sC', { kind: 'fitting', fittingId: 'j1' }, { kind: 'port', elementId: 't1', portId: 'p1' }),
+      segment('sD', { kind: 'fitting', fittingId: 'j2' }, { kind: 'port', elementId: 't2', portId: 'p1' }),
+      segment('sE', { kind: 'fitting', fittingId: 'j1' }, { kind: 'fitting', fittingId: 'end1' }),
+      segment('sG', { kind: 'fitting', fittingId: 'j2' }, { kind: 'fitting', fittingId: 'end2' }),
+    ];
+    const fittings = [fitting('j1'), fitting('j2'), fitting('end1'), fitting('end2')];
+    const [network] = computeNetworks({ segments, fittings, portGroups: [] });
+    const terminalCapacities = { t1: 30, t2: 20 };
+    const elementCategories = { ahu: 'equipment' as const, t1: 'terminal' as const, t2: 'terminal' as const };
+
+    const withRoot = solveFlow({
+      network,
+      segments,
+      fittings,
+      portGroups: [],
+      terminalCapacities,
+      elementCategories,
+      rootElementId: 'ahu',
+    });
+    expect(withRoot.totalCapacity).toBe(50);
+    expect(withRoot.segmentCapacity.sA).toBe(30);
+    expect(withRoot.segmentCapacity.sB).toBe(20);
+    expect(withRoot.segmentDirection.sA).toBe('BtoA');
+    expect(withRoot.segmentDirection.sB).toBe('BtoA');
+
+    const withoutRoot = solveFlow({ network, segments, fittings, portGroups: [], terminalCapacities, elementCategories });
+    expect(withoutRoot.totalCapacity).toBe(50);
+    expect(withoutRoot.segmentCapacity.sE).toBe(50);
+    expect(withoutRoot.segmentDirection.sE).toBe('AtoB');
+  });
+
+  it('roots at the air handling unit and not at a second equipment stamp in the same network', () => {
+    const segments = [
+      segment('sA', { kind: 'port', elementId: 'ahu', portId: 'out' }, { kind: 'fitting', fittingId: 'j1' }),
+      segment('sB', { kind: 'port', elementId: 'ahu', portId: 'out' }, { kind: 'fitting', fittingId: 'j2' }),
+      segment('sC', { kind: 'fitting', fittingId: 'j1' }, { kind: 'port', elementId: 't1', portId: 'p1' }),
+      segment('sD', { kind: 'fitting', fittingId: 'j2' }, { kind: 'port', elementId: 't2', portId: 'p1' }),
+      segment('sE', { kind: 'fitting', fittingId: 'j1' }, { kind: 'fitting', fittingId: 'end1' }),
+      segment('sF', { kind: 'fitting', fittingId: 'j2' }, { kind: 'port', elementId: 'fcu', portId: 'p1' }),
+    ];
+    const fittings = [fitting('j1'), fitting('j2'), fitting('end1')];
+    const [network] = computeNetworks({ segments, fittings, portGroups: [] });
+    const terminalCapacities = { t1: 30, t2: 20 };
+    const elementCategories = { ahu: 'equipment' as const, fcu: 'equipment' as const, t1: 'terminal' as const, t2: 'terminal' as const };
+
+    const result = solveFlow({
+      network,
+      segments,
+      fittings,
+      portGroups: [],
+      terminalCapacities,
+      elementCategories,
+      rootElementId: 'ahu',
+    });
+    expect(result.totalCapacity).toBe(50);
+    expect(result.segmentCapacity.sA).toBe(30);
+    expect(result.segmentCapacity.sB).toBe(20);
+    expect(result.segmentDirection.sF).toBe('BtoA');
+  });
+
+  it('roots at the port named by rootPortId: out, then in, of one stamp', () => {
+    const segments = [
+      segment('sIn', { kind: 'port', elementId: 'fcu', portId: 'in' }, { kind: 'fitting', fittingId: 'j' }),
+      segment('sOut', { kind: 'port', elementId: 'fcu', portId: 'out' }, { kind: 'fitting', fittingId: 'j' }),
+      segment('sT', { kind: 'fitting', fittingId: 'j' }, { kind: 'port', elementId: 't1', portId: 'p1' }),
+    ];
+    const fittings = [fitting('j')];
+    const [network] = computeNetworks({ segments, fittings, portGroups: [] });
+    const terminalCapacities = { t1: 30 };
+
+    const rootOut = solveFlow({
+      network,
+      segments,
+      fittings,
+      portGroups: [],
+      terminalCapacities,
+      rootElementId: 'fcu',
+      rootPortId: 'out',
+    });
+    expect(rootOut.segmentCapacity.sOut).toBe(30);
+    expect(rootOut.segmentCapacity.sIn).toBe(0);
+    expect(rootOut.segmentDirection.sOut).toBe('BtoA');
+
+    const rootIn = solveFlow({
+      network,
+      segments,
+      fittings,
+      portGroups: [],
+      terminalCapacities,
+      rootElementId: 'fcu',
+      rootPortId: 'in',
+    });
+    expect(rootIn.segmentCapacity.sIn).toBe(30);
+    expect(rootIn.segmentCapacity.sOut).toBe(0);
+    expect(rootIn.segmentDirection.sIn).toBe('BtoA');
+  });
+
+  it('roots at the port group node when rootPortId names a port in a group', () => {
+    const segments = [
+      segment('sA', { kind: 'port', elementId: 'ahu', portId: 'out' }, { kind: 'port', elementId: 't1', portId: 'p1' }),
+      segment('sE', { kind: 'port', elementId: 'ahu', portId: 'in' }, { kind: 'fitting', fittingId: 'end1' }),
+    ];
+    const fittings = [fitting('end1')];
+    const portGroups = [{ elementId: 'ahu', portIds: ['in', 'out'] }];
+    const [network] = computeNetworks({ segments, fittings, portGroups });
+
+    const result = solveFlow({
+      network,
+      segments,
+      fittings,
+      portGroups,
+      terminalCapacities: { t1: 30 },
+      rootElementId: 'ahu',
+      rootPortId: 'out',
+    });
+    expect(result.totalCapacity).toBe(30);
+    expect(result.segmentCapacity.sA).toBe(30);
+    expect(result.segmentCapacity.sE).toBe(0);
+    expect(result.segmentDirection.sE).toBe('BtoA');
+  });
+
+  it('roots at the first node in sorted order when rootPortId names a port that is not in the network', () => {
+    const segments = [
+      segment('sIn', { kind: 'port', elementId: 'fcu', portId: 'in' }, { kind: 'fitting', fittingId: 'j' }),
+      segment('sMid', { kind: 'port', elementId: 'fcu', portId: 'mid' }, { kind: 'fitting', fittingId: 'j' }),
+      segment('sT', { kind: 'fitting', fittingId: 'j' }, { kind: 'port', elementId: 't1', portId: 'p1' }),
+      segment('sLoose', { kind: 'port', elementId: 'fcu', portId: 'in' }, { kind: 'fitting', fittingId: 'end' }),
+    ];
+    const fittings = [fitting('j'), fitting('end')];
+    const [network] = computeNetworks({ segments, fittings, portGroups: [] });
+
+    const result = solveFlow({
+      network,
+      segments,
+      fittings,
+      portGroups: [],
+      terminalCapacities: { t1: 30 },
+      rootElementId: 'fcu',
+      rootPortId: 'out',
+    });
+    expect(result.segmentCapacity.sIn).toBe(30);
+    expect(result.segmentCapacity.sMid).toBe(0);
+    expect(result.segmentCapacity.sLoose).toBe(0);
+  });
+
+  it('gives the same result as no root when rootElementId is not in the network', () => {
+    const segments = [
+      segment('trunk', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+    ];
+    const [network] = computeNetworks({ segments, fittings: [], portGroups: [] });
+    const terminalCapacities = { diffuser: 150 };
+
+    const withGhost = solveFlow({ network, segments, fittings: [], portGroups: [], terminalCapacities, rootElementId: 'ghost' });
+    const withoutRoot = solveFlow({ network, segments, fittings: [], portGroups: [], terminalCapacities });
+    expect(withGhost).toEqual(withoutRoot);
+  });
+});
