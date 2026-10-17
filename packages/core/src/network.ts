@@ -74,10 +74,10 @@ export interface Fitting {
 }
 
 /**
- * Ports on the same element that are internally linked (e.g. an air
- * handling unit's supply and return ports are two separate groups so flow
- * never leaks between them — MepPortConnection.cs:6-9 in the old app). A
- * port with no matching group entry is its own singleton group.
+ * Ports on the same element that are internally linked. A segment between
+ * two grouped ports joins them when both ends have one network type. A group
+ * alone never joins segments of different network types. A port with no
+ * matching group entry is its own singleton group.
  */
 export interface PortGroup {
   elementId: string;
@@ -107,6 +107,12 @@ export function nodeKeyOf(point: ConnectionPoint, portGroups: PortGroup[]): stri
   return group
     ? `port-group:${point.elementId}:${[...group.portIds].sort().join(',')}`
     : `port:${point.elementId}:${point.portId}`;
+}
+
+/** The key of a connection point for the union in computeNetworks. A group node is split by the network type of the segment, so a port group never joins segments of different types. */
+function unionKeyOf(point: ConnectionPoint, networkTypeId: string, portGroups: PortGroup[]): string {
+  const key = nodeKeyOf(point, portGroups);
+  return key.startsWith('port-group:') ? `${key}@${networkTypeId}` : key;
 }
 
 class UnionFind {
@@ -139,17 +145,20 @@ class UnionFind {
  * Derives connected networks from segment/fitting topology. A fitting with
  * no connected segments is orphaned and excluded from the result, matching
  * the old app's Fitting (a fitting whose last segment is removed clears its
- * NetworkId — Fitting.cs:256-260). Assumes every segment in a connected
- * component shares one networkTypeId; the first segment encountered wins if
- * that assumption is violated, since resolving a mismatch is a UI/validation
- * concern, not this function's job.
+ * NetworkId — Fitting.cs:256-260). Two segments are connected when they share
+ * a fitting or a plain port, or when their ends sit in one port group and both
+ * segments have the same networkTypeId. Two limits: (1) air only: water flow
+ * and return share one type, so a group over them still joins both pipes;
+ * (2) a fitting or port that two segments of different types share still
+ * joins them, and the first segment wins the type. A mismatch is a UI and
+ * validation concern, not this function's job.
  */
 export function computeNetworks(input: NetworkGraphInput): Network[] {
   const uf = new UnionFind();
 
   for (const segment of input.segments) {
-    const keyA = nodeKeyOf(segment.endpointA, input.portGroups);
-    const keyB = nodeKeyOf(segment.endpointB, input.portGroups);
+    const keyA = unionKeyOf(segment.endpointA, segment.networkTypeId, input.portGroups);
+    const keyB = unionKeyOf(segment.endpointB, segment.networkTypeId, input.portGroups);
     uf.union(keyA, keyB);
   }
 
@@ -157,7 +166,7 @@ export function computeNetworks(input: NetworkGraphInput): Network[] {
   const rootToNetworkType = new Map<string, string>();
 
   for (const segment of input.segments) {
-    const root = uf.find(nodeKeyOf(segment.endpointA, input.portGroups));
+    const root = uf.find(unionKeyOf(segment.endpointA, segment.networkTypeId, input.portGroups));
     if (!rootToSegmentIds.has(root)) {
       rootToSegmentIds.set(root, new Set());
       rootToNetworkType.set(root, segment.networkTypeId);
