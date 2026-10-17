@@ -208,7 +208,7 @@ Each part gets its own plan. No detailed design here.
 - Open questions: a new stamp category, a fitting kind `riser`, or a port of a shaft room? What about port groups that join the supply and return sides (§7)?
 - Research: shafts from room detection (the room type Shaft exists); risers across pages.
 
-**R4 — Where a duct or pipe may go.**
+**R4 — Where a duct or pipe may go. DONE 2026-10-17 (see `auto-routing-r4.md`).** The text below is the old draft.
 - Exists: room polygons and room types (Corridor, Shaft); wall lines of the room detection (debug menu); no door positions (`rooms/types.ts:71`–`:74` finds door arcs only to remove them).
 - Missing: a routing graph (corridor center lines, places where a branch may cross a wall), obstacles, heights.
 - Open questions: mains only in corridors? Branches only through doors, or through any wall above the ceiling? Can the user draw "route zones" by hand?

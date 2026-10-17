@@ -1,5 +1,47 @@
 # R4 plan: where a duct or pipe may go (the route area, its graph and its possible wall places)
 
+**Status: DONE 2026-10-17 (on branch `worktree-agent-framework`, not merged; the user tests on Windows first).** R4 stores nothing in the project file; the schema stays at 18. The room type list is in `localStorage` (`mepapp.routeRoomTypes.v1`, provisional Q-R4-01 A). No new Dutch text (user note, section 11).
+
+| Task | Commit | Verification |
+|---|---|---|
+| T01 fixture and loader of real rooms | `7b8e79f` | core 1022 tests (with T02, T03) |
+| T02 types, defaults, room selection | `071dd67` | 14 tests |
+| T03 raster and thinning | `d6bfd92` | 11 tests |
+| T04 pixel graph | `923b16f` | core 1036 tests |
+| T05a prune and half-width | `349c652` | core 1049 tests |
+| T05b simplify, `centerLineOf`, real rooms | `47f5487` | core 1056 tests; 5 corridors in about 220 ms; rule of 25 % of the half-width relaxed (26 of 29 vertices), all vertices inside and at least 40 mm from walls |
+| T06 wall stretch, boundary gap | `b04c891` | core tests; a direction test was added to the wall rule |
+| T07 crossings along a path | `4b68b01` | core tests; gaps measure up to one 100 mm step too large |
+| T08 graph helpers | `e76d60d` | core 1108 tests (T06 to T08) |
+| T09 `computeRouteArea` part 1 | `49a61a7` | core 1117 tests |
+| T10a links and entries | `7f4cf0a` | core 1127 tests; tap tolerance 100 mm (pixel grid) |
+| T10b unreached, parts, shaft cases | `9472cd3` | core 1139 tests |
+| T11 warnings | `ecccc29` | core 1158 tests |
+| T12 chain test on real rooms | `12338a3` | core 1168 tests; 18 of 33 rooms have an entry, 16 of 18 consistent, 146 ms; float fix in `wallStretch` |
+| T13 overlay drawing | `3e1b39c` | build |
+| T14a scene: list, cache, flag, layer, debounce | `5fbbbe4` | typecheck and build |
+| T14b `r4-lib.mjs` and scene check | `4e16384` | `t14-check` 31 of 31 (rerun by the director's agent) |
+| T15 list storage and wiring | `c204f6e` | `t15-check` 6, 5 and 5 passed |
+| T17 texts (English only) and line builders | `3f979c8` | UI 226 tests |
+| T16 menu switch | `be5e5f2` | `t16-check` 17 of 17 and 3 of 3 (real clicks) |
+| T18 dialog section | `59bead6` | `t18-check` 44 of 44 |
+| T19 room type list control | `99041fd` | `t19-check` 30 of 30 |
+| T20a singular text of the shaft warning | `c51c6d9` | UI 227 tests |
+| T20 part check | `f06c8ec` | `r4-check` exit 0 (50, 6, 6, 5, 6 passed; 0 failed); `r2-check` 66 of 66 and 10 of 10; `r3-check` 44 of 44 and 7 of 7; core 1168 tests; UI 227 tests; forced typecheck 17 of 17 and build 9 of 9, 0 cached (the typecheck and build ran before the script fixes of T20, which changed no product code) |
+
+Measured at the end of R4: first floor: 6 rooms (5 corridor, 1 shaft made for the check), 48 nodes, 44 edges, 17 primary entries, 4 parts, first compute 98 to 424 ms. Plan 10A at scale 1:100: 34 rooms found, 7 route-area rooms (2 "gang", 3 "schacht", 2 "Plenum"), first compute about 165 ms. A room edit takes about 870 ms to recompute on the first floor (limit 1 s, P-R4-13).
+
+Open at the end of R4:
+- **Q-R4-01 (open, user):** the room type list stays in `localStorage` (A). Option B would put it in the project file (schema step).
+- **UI findings, medium, open:** the purple center line crosses the room label text (room labels are below the route layer); the amber entry crosses have low contrast on the orange Lift room.
+- The "Calculating" note shows about 300 ms late (the plan asks for 100 ms).
+- The `t14-check` step 9 can flake on a loaded machine (the 600 ms wait for the 300 ms debounce). Increase the wait if it recurs.
+- The real-room test of T05b has a 1000 ms wall-clock guard.
+- Two entries of the first floor fail the straight-line check ("Overleg" rooms with 0 and 2 crossings). Not investigated.
+- The shaft-crossing warning counts primary shaft entries and shaft links only (plan text: any entry). The first floor has no shaft, so no real-room test covers this.
+- The layout rule of routed segments (orthogonal and 45 degrees, user note 2026-10-17) is in `roadmap-overview.md` for R6.
+- Dutch: no new Dutch text; the question of the Dutch term for the route area is removed from R4.
+
 Status: written 2026-10-17 by the road map planner, on the branch `worktree-agent-framework` after R3 (end of R3 = commit `71156cd`). Revised 2026-10-17, round 1 of the audit (items A1 to A14, M1 to M7; the "Round 1" section at the end lists each change).
 Origin: `roadmap-overview.md` (R4 text, sections 1a, 3, 5, 6; gaps G3 and G10), `auto-routing-r2.md`, `auto-routing-r3.md`, `auto-routing.md` (§8, R4), `.claude/roadmap/rules.md`.
 Answers of the user that bind this plan (final): **D-R4-01** (the route area is automatic only, from room types; the default room types are Corridor and Shaft; the user can add other room types to the list; no hand-drawn area; no stored "no crossing" line). **D-R4-02 A** (a 2D draft is acceptable; the app shows a note). The decision is the 2D draft. The words of the note grew in round 1 (M5): "Draft in 2D. Check height, clashes, clearances and slope yourself." **D-R2-03 A** (single PDF files; a multi-page PDF is refused).
