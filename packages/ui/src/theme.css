@@ -3469,6 +3469,12 @@
   opacity: 0.7;
   margin-top: -4px;
 }
+.mep-modal--route .mep-route-checks { margin: 0 0 6px; }
+.mep-modal--route .mep-route-check-line { margin: 0 0 6px; }
+.mep-modal--route .mep-route-check-line .mep-route-text { margin-bottom: 4px; overflow-wrap: anywhere; }
+.mep-modal--route .mep-route-check-error { color: #b3261e; font-weight: 600; }
+.mep-modal--route .mep-route-check-warning { color: var(--accent-ink); }
+.mep-modal--route .mep-route-check-info { opacity: 0.75; }
 .mep-modal--route .mep-route-field {
   display: flex;
   flex-direction: column;
