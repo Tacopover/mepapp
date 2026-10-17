@@ -212,3 +212,8 @@
 {"seq":212,"at":"2026-10-17T04:49:56.954Z","type":"task","id":"R3-T13","part":"R3","order":16,"title":"Severity label on each check line; old comment wording","state":"planned"}
 {"seq":213,"at":"2026-10-17T04:49:56.993Z","type":"now","id":"now","role":"task-lead","task":"R3-T13","note":"Severity label on each check line","since":"2026-10-17T05:30:00.000Z"}
 {"seq":214,"at":"2026-10-17T04:49:57.030Z","type":"task","id":"R3-T13","state":"briefed","role":"task-lead"}
+{"seq":215,"at":"2026-10-17T05:09:42.026Z","type":"task","id":"R3-T13","state":"done","commit":"71156cd","summary":"Severity label (Error, Warning, Note; Fout, Waarschuwing, Opmerking) on each check line; comment wording. UI 195 tests, t10 23 of 23, r3-check 44 of 44."}
+{"seq":216,"at":"2026-10-17T05:09:42.065Z","type":"shot","id":"S-R3-T13-1","part":"R3","task":"R3-T13","caption":"Check block with a bold Warning label before the line","assetId":"b18c6f7f31be84ca96c82e9347d256f0","url":"/_blob/b18c6f7f31be84ca96c82e9347d256f0"}
+{"seq":217,"at":"2026-10-17T05:09:42.104Z","type":"shot","id":"S-R3-T12-1","part":"R3","task":"R3-T12","caption":"Part check file: the status bar reads 2 networks for the mixed group","assetId":"46256f0662035ed489b3895e21d17945","url":"/_blob/46256f0662035ed489b3895e21d17945"}
+{"seq":218,"at":"2026-10-17T05:09:42.142Z","type":"part","id":"R3","state":"done","commit":"71156cd","summary":"Start point checks, a port group keeps networks of different types apart, exact flow root. Nothing stored. Open: Q-R3-01 (segment tool on a shared port), paste loses a port group, water flow and return in one group."}
+{"seq":219,"at":"2026-10-17T05:09:42.179Z","type":"now","id":"now","role":"","task":"","note":"R4 plan is next."}

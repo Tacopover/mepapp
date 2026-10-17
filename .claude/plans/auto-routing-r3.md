@@ -1,5 +1,36 @@
 # R3 plan: the start point, a clean network and a sure root
 
+**Status: DONE 2026-10-17 (on branch `worktree-agent-framework`, not merged; the user tests on Windows first).** R3 stores nothing; the schema stays at 18.
+
+| Task | Commit | Verification |
+|---|---|---|
+| T00 rule 2 in `rules.md` (director) | `b41d6a4` | user decision D-R3-01 A |
+| T01 a port group keeps networks of different types apart | `8d70a32` | core 955 tests (8 new) |
+| T02 exact flow root and `rootPortId` | `3c5aaec` | core 963 tests (8 new) |
+| T03 `segmentIdsOfNetworks` | `f805b2f` | core 969 tests (6 new) |
+| T04 old v18 file with a mixed group | `ac094ea` | core 974 tests: no schema step, one network becomes two |
+| T05a `checkRouteStart` | `4416a59` | core 984 tests |
+| T05b group, second equipment and order tests | `a13b39e` | core 993 tests |
+| T06a scene cascade uses the helper; `setPortGroup` refresh | `fa3d94f` | proven by T06b |
+| T06b `r3-lib.mjs`, cascade browser check | `3887d54` | browser check 18 of 18 (rerun by the director) |
+| T07 `getConnectivity()` | `33eca7a` | browser check 7 of 7 |
+| T08 consumers, group toggle, paste | `3e2e891` | browser check 19 of 19 (rerun by the director) |
+| T09 check lines and texts (en, nl) | `766cec6` | UI 194 tests |
+| T10 check block in the dialog | `e5a5c8a` | browser check 22 of 22 (en), 9 of 9 (nl) |
+| T11 hints of linked ports | `63bfba3` | browser check 5 of 5 |
+| T12 part check | `c8a90ad` | `r3-check.mjs` 44 of 44 and 7 of 7 (rerun by the director); `r2-check.mjs` 66 of 66 and 10 of 10; forced fresh typecheck 17 of 17 and build 9 of 9, 0 cached |
+| T13 severity label on each check line; comment wording | `71156cd` | UI 195 tests; `t10` 23 of 23 and 9 of 9; `r3-check` 44 of 44 and 7 of 7 |
+
+Open at the end of R3:
+- **Q-R3-01 (open, user):** the segment tool does not stop a segment of another type on a shared port or fitting. R3 keeps option A (no change; R6 refuses to route into it). `rules.md` rule 2 names this "Known hole".
+- **F-R3-01:** the clipboard loses a port group on paste (measured: same drawing 2 to 4 networks; other drawing 2 networks). Not fixed.
+- Water: a port group over the flow and return ports of one water type still joins both pipes (one network type for both pipes). The pipe side is an R6 question (Q-R2-02). Q-R2-01 (a source or load role on a stamp): no field, R3 uses the category `equipment`.
+- The Element Editor hint is not verified (the Linked Ports section did not show for the library unit).
+- The Dutch wording needs a Dutch speaker. The Dutch dialog mixes English network type names with Dutch air words.
+- Older than R3: the status bar says "0 selected" while a segment is selected; the Properties header shows an internal id; the status bar wraps at 400 px.
+- Provisional choices: P-R3-00 to P-R3-08 (see section 0 and the ledger).
+
+
 Status: written 2026-10-17 by the road map planner. Revised in round 1 of 2 after the audit and the domain check (items A1 to A11, M1 to M9).
 Origin: `roadmap-overview.md` (sections 0 to 5, R3), `auto-routing-r2.md` (what R2 built), `auto-routing.md` (§3.1, §5, §7, §8, §11), `.claude/roadmap/rules.md`.
 Answers of the user that bind this plan (final): D-R3-01 A (the new meaning of "connected"), D-R3-02 A (the start stamp is user input and goes to `solveFlow` as `rootElementId`; nothing is stored), D-R2-02/D-R2-03 (single PDF files only; a multi-page PDF is refused), D-R5-04 (stamps with two flows are deferred), D-R6-02 A (the `routedBy` marks come in R6, not R3).
