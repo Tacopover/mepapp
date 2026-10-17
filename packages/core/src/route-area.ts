@@ -1,6 +1,7 @@
 import { distance, type Vec2 } from './geometry.js';
 import { centerLineOf } from './route-skeleton.js';
-import { connectedParts } from './route-graph.js';
+import { connectedParts, nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
+import { wallStretch } from './route-wall.js';
 import { roomLabelPoint, type Room } from './rooms/room.js';
 
 export const DEFAULT_ROUTE_AREA_TYPE_IDS: readonly string[] = ['corridor', 'shaft'];
@@ -78,25 +79,85 @@ export function selectRouteAreaRooms(rooms: readonly Room[], options: Pick<Route
     }));
 }
 
-// Stub: T10a and T10b fill the entries, links and unreached rooms.
+// T10b fills unreached.
 export function computeRouteArea(rooms: readonly Room[], options: RouteAreaOptions): RouteArea {
   if (options.mmPerPt === null) return emptyArea('no-calibration');
   if (!rooms.some((r) => r.pageIndex === options.pageIndex)) return emptyArea('no-rooms');
   if (options.roomTypeIds.length === 0) return emptyArea('no-types');
   const selected = selectRouteAreaRooms(rooms, options);
   if (selected.length === 0) return emptyArea('no-route-rooms');
-  const { nodes, edges } = buildCenterGraph(rooms, selected, options.mmPerPt, options.pixelMm ?? DEFAULT_SKELETON_PIXEL_MM);
-  const parts = connectedParts({ nodes, edges }).length;
-  return { status: 'ok', rooms: selected, nodes, edges, entries: [], links: [], unreached: [], parts };
+  const mm = options.mmPerPt;
+  const byId = new Map(rooms.map((r) => [r.id, r]));
+  const polyOf = (id: string) => byId.get(id)!.polygon;
+  const stretchOptions: { maxWallMm?: number; minWallRunMm?: number } = {};
+  if (options.maxWallMm !== undefined) stretchOptions.maxWallMm = options.maxWallMm;
+  if (options.minWallRunMm !== undefined) stretchOptions.minWallRunMm = options.minWallRunMm;
+  const graph: GraphData = buildCenterGraph(byId, selected, mm, options.pixelMm ?? DEFAULT_SKELETON_PIXEL_MM);
+
+  const links: RouteLink[] = [];
+  for (let i = 0; i < selected.length; i++) {
+    for (let j = i + 1; j < selected.length; j++) {
+      const a = selected[i]!;
+      const b = selected[j]!;
+      const stretch = wallStretch(polyOf(a.roomId), polyOf(b.roomId), mm, stretchOptions);
+      if (!stretch) continue;
+      const linkId = `rk-${a.roomId}-${b.roomId}`;
+      const wallNode: RouteNode = { id: `rl-${a.roomId}-${b.roomId}`, point: { ...stretch.point }, kind: 'wall', roomId: a.roomId };
+      connectTo(graph, a.roomId, wallNode, `rt-${linkId}-0`, `rc-${linkId}-0`, mm);
+      connectTo(graph, b.roomId, wallNode, `rt-${linkId}-1`, `rc-${linkId}-1`, mm);
+      links.push({
+        id: linkId,
+        roomIds: [a.roomId, b.roomId],
+        nodeId: wallNode.id,
+        point: { ...stretch.point },
+        runMm: stretch.runMm,
+        gapMm: stretch.gapMm,
+        shaft: a.kind === 'shaft' || b.kind === 'shaft',
+      });
+    }
+  }
+
+  const selectedIds = new Set(selected.map((r) => r.roomId));
+  const served = rooms.filter((r) => r.pageIndex === options.pageIndex && !selectedIds.has(r.id));
+  const entries: RouteEntry[] = [];
+  for (const s of served) {
+    const own: RouteEntry[] = [];
+    for (const area of selected) {
+      const stretch = wallStretch(polyOf(s.id), polyOf(area.roomId), mm, stretchOptions);
+      if (!stretch) continue;
+      const entryId = `ry-${s.id}-${area.roomId}`;
+      const wallNode: RouteNode = { id: `rw-${s.id}-${area.roomId}`, point: { ...stretch.point }, kind: 'wall', roomId: s.id };
+      connectTo(graph, area.roomId, wallNode, `rt-${entryId}-0`, `rc-${entryId}-0`, mm);
+      own.push({
+        id: entryId,
+        roomId: s.id,
+        areaRoomId: area.roomId,
+        nodeId: wallNode.id,
+        point: { ...stretch.point },
+        runMm: stretch.runMm,
+        gapMm: stretch.gapMm,
+        primary: false,
+        shaft: area.kind === 'shaft',
+      });
+    }
+    let best: RouteEntry | undefined;
+    for (const entry of own) {
+      if (!best || entry.runMm > best.runMm) best = entry;
+    }
+    if (best) best.primary = true;
+    entries.push(...own);
+  }
+
+  const parts = connectedParts(graph).length;
+  return { status: 'ok', rooms: selected, nodes: graph.nodes, edges: graph.edges, entries, links, unreached: [], parts };
 }
 
 function buildCenterGraph(
-  rooms: readonly Room[],
+  byId: ReadonlyMap<string, Room>,
   selected: readonly RouteAreaRoom[],
   mmPerPt: number,
   pixelMm: number,
-): { nodes: RouteNode[]; edges: RouteEdge[] } {
-  const byId = new Map(rooms.map((r) => [r.id, r]));
+): GraphData {
   const nodes: RouteNode[] = [];
   const edges: RouteEdge[] = [];
   for (const area of selected) {
@@ -131,6 +192,32 @@ function buildCenterGraph(
     });
   }
   return { nodes, edges };
+}
+
+function connectTo(
+  graph: GraphData,
+  areaRoomId: string,
+  wallNode: RouteNode,
+  tapNodeId: string,
+  connectorId: string,
+  mmPerPt: number,
+): void {
+  if (!graph.nodes.includes(wallNode)) graph.nodes.push(wallNode);
+  const near = nearestOnEdges(graph, wallNode.point, (e) => e.kind === 'center' && e.roomId === areaRoomId);
+  const targetId =
+    near === null
+      ? graph.nodes.find((n) => n.roomId === areaRoomId && n.kind !== 'wall' && n.kind !== 'tap')!.id
+      : splitEdgeAt(graph, near.edgeId, near.segment, near.point, tapNodeId);
+  const target = graph.nodes.find((n) => n.id === targetId)!;
+  graph.edges.push({
+    id: connectorId,
+    from: wallNode.id,
+    to: target.id,
+    kind: 'connector',
+    points: [{ ...wallNode.point }, { ...target.point }],
+    lengthMm: distance(wallNode.point, target.point) * mmPerPt,
+    roomId: null,
+  });
 }
 
 function polylineLength(points: readonly Vec2[]): number {

@@ -225,3 +225,170 @@ describe('computeRouteArea', () => {
     expect(input).toEqual(before);
   });
 });
+
+describe('computeRouteArea links and entries', () => {
+  const threeOffices = [
+    rect('c', 0, 0, 10000, 2000, 'corridor'),
+    rect('o0', 0, 2300, 3000, 6000, 'office'),
+    rect('o1', 3300, 2300, 6300, 6000, 'office'),
+    rect('o2', 6600, 2300, 9600, 6000, 'office'),
+  ];
+
+  it('gives one entry per office on the corridor side, all primary', () => {
+    const area = computeRouteArea(threeOffices, ROUTE_OPTIONS);
+    expect(area.entries.map((e) => e.id)).toEqual(['ry-o0-c', 'ry-o1-c', 'ry-o2-c']);
+    expect(area.entries.every((e) => e.primary && !e.shaft && e.areaRoomId === 'c')).toBe(true);
+    area.entries.forEach((entry, k) => {
+      expect(entry.point.y).toBeGreaterThanOrEqual(2000);
+      expect(entry.point.y).toBeLessThanOrEqual(2300);
+      expect(entry.point.x).toBeGreaterThanOrEqual(k * 3300);
+      expect(entry.point.x).toBeLessThanOrEqual(k * 3300 + 3000);
+      const connectors = area.edges.filter((e) => e.kind === 'connector' && e.from === entry.nodeId);
+      expect(connectors).toHaveLength(1);
+      const tap = area.nodes.find((n) => n.id === connectors[0]!.to)!;
+      expect(tap.kind).toBe('tap');
+      // The center line lies on the 100 mm pixel grid: y 950 measured for a 2000 mm corridor.
+      expect(Math.abs(tap.point.y - 1000)).toBeLessThanOrEqual(100);
+      expect(area.edges.some((e) => e.kind === 'center' && (e.from === tap.id || e.to === tap.id))).toBe(true);
+    });
+  });
+
+  it('marks the entry of the longer run as primary for an office on two corridors', () => {
+    const rooms = [
+      rect('c1', 0, 0, 10000, 2000, 'corridor'),
+      rect('c2', 0, 6300, 4000, 8300, 'corridor'),
+      rect('o', 0, 2300, 6000, 6000, 'office'),
+    ];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.entries).toHaveLength(2);
+    const primary = area.entries.filter((e) => e.primary);
+    expect(primary).toHaveLength(1);
+    expect(primary[0]!.areaRoomId).toBe('c1');
+  });
+
+  it('marks the entry of the first corridor primary when two corridors have equal runs', () => {
+    const rooms = [
+      rect('c1', 0, 0, 10000, 2000, 'corridor'),
+      rect('c2', 0, 6300, 10000, 8300, 'corridor'),
+      rect('o', 3000, 2300, 5000, 6000, 'office'),
+    ];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.entries.map((e) => e.id)).toEqual(['ry-o-c1', 'ry-o-c2']);
+    const [first, second] = area.entries;
+    expect(Math.abs(first!.runMm - second!.runMm)).toBeLessThanOrEqual(1);
+    expect(first!.primary).toBe(true);
+    expect(second!.primary).toBe(false);
+  });
+
+  it('joins two touching corridors with one link and two connectors', () => {
+    const rooms = [rect('a', 0, 0, 10000, 2000, 'corridor'), rect('b', 10000, 0, 20000, 2000, 'corridor')];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.links).toHaveLength(1);
+    const link = area.links[0]!;
+    expect(link.id).toBe('rk-a-b');
+    expect(link.roomIds).toEqual(['a', 'b']);
+    expect(link.nodeId).toBe('rl-a-b');
+    expect(link.shaft).toBe(false);
+    expect(area.entries).toEqual([]);
+    const connectors = area.edges.filter((e) => e.kind === 'connector');
+    expect(connectors.map((e) => e.id).sort()).toEqual(['rc-rk-a-b-0', 'rc-rk-a-b-1']);
+    expect(connectors.every((e) => e.from === 'rl-a-b')).toBe(true);
+    expect(area.parts).toBe(1);
+  });
+
+  it('ends the two connectors of a link at the tap nodes of the link', () => {
+    const rooms = [rect('a', 0, 0, 10000, 2000, 'corridor'), rect('b', 10000, 0, 20000, 2000, 'corridor')];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    // Measured: no tap node is made for a touching link. Each connector ends at the end node of one room.
+    const ends = area.edges.filter((e) => e.kind === 'connector' && e.from === 'rl-a-b').map((e) => e.to);
+    expect(ends.sort()).toEqual(['rn-a-1', 'rn-b-0']);
+    expect(area.nodes.find((n) => n.id === 'rn-a-1')).toMatchObject({ kind: 'end', roomId: 'a' });
+    expect(area.nodes.find((n) => n.id === 'rn-b-0')).toMatchObject({ kind: 'end', roomId: 'b' });
+    expect(area.nodes.some((n) => n.kind === 'tap')).toBe(false);
+  });
+
+  it('marks a link to a shaft room as shaft and ends one connector at the shaft node', () => {
+    const rooms = [rect('c', 0, 0, 10000, 2000, 'corridor'), rect('s', 10000, 0, 12000, 2000, 'shaft')];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.links).toHaveLength(1);
+    expect(area.links[0]!.shaft).toBe(true);
+    const ends = area.edges.filter((e) => e.kind === 'connector' && e.from === 'rl-c-s').map((e) => e.to);
+    expect(ends).toContain('rn-s-0');
+  });
+
+  it('gives a shaft room an entry marked shaft when only an office touches it', () => {
+    const rooms = [
+      rect('far', 50000, 0, 60000, 2000, 'corridor'),
+      rect('o', 0, 2300, 6000, 6000, 'office'),
+      rect('s', 6000, 2300, 8000, 4000, 'shaft'),
+    ];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.entries).toHaveLength(1);
+    expect(area.entries[0]!.shaft).toBe(true);
+    expect(area.entries[0]!.areaRoomId).toBe('s');
+    expect(area.links).toEqual([]);
+  });
+
+  it('ends the connector of a fallback entry at the end node of a path room', () => {
+    const rooms = [rect('n', 0, 0, 10000, 250, 'corridor'), rect('o', 0, 550, 3000, 4000, 'office')];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.entries).toHaveLength(1);
+    const entry = area.entries[0]!;
+    expect(entry.primary).toBe(true);
+    const connectors = area.edges.filter((e) => e.kind === 'connector' && e.from === entry.nodeId);
+    expect(connectors).toHaveLength(1);
+    expect(connectors[0]!.to).toBe('rn-n-0');
+    expect(area.nodes.some((n) => n.kind === 'tap')).toBe(false);
+    expect(area.parts).toBe(1);
+  });
+
+  it('gives no entry and no link across a gap of 800 mm', () => {
+    const rooms = [rect('c', 0, 0, 10000, 2000, 'corridor'), rect('o', 0, 2800, 3000, 6000, 'office')];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.entries).toEqual([]);
+    expect(area.links).toEqual([]);
+  });
+
+  it('names the entry, wall, tap and connector ids by the rule', () => {
+    const area = computeRouteArea(threeOffices, ROUTE_OPTIONS);
+    for (const k of [0, 1, 2]) {
+      const entryId = `ry-o${k}-c`;
+      expect(area.nodes.find((n) => n.id === `rw-o${k}-c`)?.kind).toBe('wall');
+      expect(area.nodes.find((n) => n.id === `rt-${entryId}-0`)?.kind).toBe('tap');
+      expect(area.edges.find((e) => e.id === `rc-${entryId}-0`)?.kind).toBe('connector');
+    }
+  });
+
+  it('names each split edge after the edge it splits and the tap node', () => {
+    const area = computeRouteArea(threeOffices, ROUTE_OPTIONS);
+    const split = area.edges.filter((e) => e.id.includes('~'));
+    expect(split).toHaveLength(3);
+    for (const edge of split) {
+      const cut = edge.id.lastIndexOf('~');
+      const first = edge.id.slice(0, cut);
+      const tap = edge.id.slice(cut + 1);
+      const firstEdge = area.edges.find((e) => e.id === first);
+      expect(firstEdge).toBeDefined();
+      expect(firstEdge!.to).toBe(tap);
+      expect(edge.from).toBe(tap);
+      expect(area.nodes.find((n) => n.id === tap)?.kind).toBe('tap');
+    }
+  });
+
+  it('gives the same result twice, with unique node and edge ids', () => {
+    const input = [...threeOffices, rect('b', 10000, 0, 20000, 2000, 'corridor')];
+    const first = computeRouteArea(input, ROUTE_OPTIONS);
+    expect(computeRouteArea(input, ROUTE_OPTIONS)).toEqual(first);
+    const nodeIds = first.nodes.map((n) => n.id);
+    expect(new Set(nodeIds).size).toBe(nodeIds.length);
+    const edgeIds = first.edges.map((e) => e.id);
+    expect(new Set(edgeIds).size).toBe(edgeIds.length);
+  });
+
+  it('does not change its input rooms', () => {
+    const input = [...threeOffices, rect('b', 10000, 0, 20000, 2000, 'corridor')];
+    const before = structuredClone(input);
+    computeRouteArea(input, ROUTE_OPTIONS);
+    expect(input).toEqual(before);
+  });
+});
