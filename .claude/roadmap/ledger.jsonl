@@ -259,3 +259,7 @@
 {"seq":259,"at":"2026-10-17T07:22:05.172Z","type":"task","id":"R4-T07","state":"done","commit":"4b68b01","summary":"crossingsAlongPath. Gaps measure up to one 100 mm step too large."}
 {"seq":260,"at":"2026-10-17T07:22:05.533Z","type":"task","id":"R4-T08","state":"done","commit":"e76d60d","summary":"Graph helpers: nearestOnEdges, splitEdgeAt, connectedParts."}
 {"seq":261,"at":"2026-10-17T07:22:16.940Z","type":"now","id":"now","role":"task-lead","task":"R4-T09","note":"computeRouteArea parts 1, 2a, 2b (T09, T10a, T10b)","since":"2026-10-17T07:23:00.000Z"}
+{"seq":262,"at":"2026-10-17T07:38:46.004Z","type":"task","id":"R4-T09","state":"done","commit":"49a61a7","summary":"computeRouteArea part 1: rooms, center lines, shaft nodes, empty cases."}
+{"seq":263,"at":"2026-10-17T07:38:46.691Z","type":"task","id":"R4-T10a","state":"done","commit":"7f4cf0a","summary":"Links and entries. Tap tolerance is one pixel (100 mm) because the center line sits on the pixel grid."}
+{"seq":264,"at":"2026-10-17T07:38:47.409Z","type":"task","id":"R4-T10b","state":"done","commit":"9472cd3","summary":"Unreached rooms, parts, shaft cases. Smoke on the first floor: 17 primary entries, 1 link, 16 unreached, 4 parts, 231 ms."}
+{"seq":265,"at":"2026-10-17T07:38:59.068Z","type":"now","id":"now","role":"task-lead","task":"R4-T11","note":"Warnings and the chain on real rooms (T11, T12)","since":"2026-10-17T07:40:00.000Z"}
