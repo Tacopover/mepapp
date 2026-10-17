@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { RouteMarker, SketchScene, StampInfo } from '@mepapp/render';
 import { checkRouteStart, findRoutePorts, getNetworkTypeFromLibrary, getStampWorldPorts, roomTypeLabel, routePageProblem, type RoomType } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
+import { RouteAreaSection } from './RouteAreaSection.js';
 import { includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startCheckLines, startPortChoices, typeChoices, typeNameInText, typeOptionText } from './routePlan.js';
 
 export interface RouteDialogProps {
@@ -369,6 +370,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
               )}
             </>
           )}
+          <RouteAreaSection sceneRef={sceneRef} roomTypes={roomTypes} language={language} />
         </div>
       )}
     </Dialog>

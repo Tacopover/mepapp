@@ -3591,6 +3591,70 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+.mep-modal--route .mep-route-area {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.mep-modal--route .mep-route-area-title {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.mep-modal--route .mep-route-area-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  margin-top: 12px;
+}
+.mep-modal--route .mep-route-area-guide {
+  margin-top: 6px;
+}
+.mep-modal--route .mep-route-area-legend-item {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.mep-modal--route .mep-route-area-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.mep-modal--route .mep-route-area-swatch--fill {
+  background: #00897b;
+}
+.mep-modal--route .mep-route-area-swatch--center {
+  background: #6a1b9a;
+}
+.mep-modal--route .mep-route-area-swatch--branch {
+  background: #ffab00;
+}
+.mep-modal--route .mep-route-area-swatch--shaft {
+  background: #d50000;
+}
+.mep-modal--route .mep-route-area-types {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0;
+  margin: 0 0 8px;
+}
+.mep-modal--route .mep-route-area-types li {
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
 .mep-modal-backdrop--route {
   background: transparent;
   justify-content: flex-end;
