@@ -1676,6 +1676,7 @@ export function MepSketchApp({
             const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
             return definition ? stampLabelFor(definition, labelLanguage) : null;
           }}
+          onRouteTypeIdsChange={setRouteRoomTypeIds}
           onClose={() => setRouteOpen(false)}
         />
       )}

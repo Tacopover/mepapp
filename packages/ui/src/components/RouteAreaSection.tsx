@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import type { RouteAreaView, SketchScene } from '@mepapp/render';
-import type { RoomType } from '@mepapp/core';
+import { DEFAULT_ROUTE_AREA_TYPE_IDS, type RoomType } from '@mepapp/core';
 import { roomLabel, routeAreaLines, routeAreaSummaryLine, routeAreaTypeChoices, routeText } from './routePlan.js';
 
 export interface RouteAreaSectionProps {
   sceneRef: RefObject<SketchScene | null>;
   roomTypes: RoomType[];
   language: 'en' | 'nl';
+  onRouteTypeIdsChange: (ids: string[]) => void;
 }
 
 const legendSwatches = ['fill', 'center', 'branch', 'shaft'] as const;
 
-export function RouteAreaSection({ sceneRef, roomTypes, language }: RouteAreaSectionProps) {
+export function RouteAreaSection({ sceneRef, roomTypes, language, onRouteTypeIdsChange }: RouteAreaSectionProps) {
   const scene = sceneRef.current;
   const [view, setView] = useState<RouteAreaView | null>(() => scene?.getRouteArea() ?? null);
   const [rooms, setRooms] = useState(() => (scene ? scene.listRooms().filter((r) => r.pageIndex === scene.getPageIndex()) : []));
@@ -62,7 +63,15 @@ export function RouteAreaSection({ sceneRef, roomTypes, language }: RouteAreaSec
   const lines = routeAreaLines(view.warnings, { room: roomNameOf }, language);
   const allTypeChoices = routeAreaTypeChoices(roomTypes, typeIds, language);
   const typeChoices = allTypeChoices.filter((c) => c.inList);
+  const addChoices = allTypeChoices.filter((c) => !c.inList);
   const legendLabels = routeText(language, 'areaLegend').split(', ');
+  // With the overlay on, App's effect pushes the list and the scene emits routeAreaChanged. With the overlay off the scene emits nothing, so the list is set here at once.
+  const changeTypes = (next: string[]) => {
+    const overlayOn = scene.isRouteAreaVisible();
+    if (!overlayOn) scene.setRouteAreaRoomTypes(next);
+    onRouteTypeIdsChange(next);
+    if (!overlayOn) refreshAll();
+  };
 
   return (
     <details open className="mep-route-area" data-testid="route-area">
@@ -77,9 +86,19 @@ export function RouteAreaSection({ sceneRef, roomTypes, language }: RouteAreaSec
         <p className="mep-route-text">{routeText(language, 'areaTypes')}</p>
         <ul className="mep-route-area-types" data-testid="route-area-types">
           {typeChoices.map((c) => (
-            <li key={c.id} data-testid="route-area-type" data-type-id={c.id}>{c.label}</li>
+            <li key={c.id} data-testid="route-area-type" data-type-id={c.id}>
+              <span>{c.label}</span>
+              <button type="button" data-testid="route-area-remove" aria-label={routeText(language, 'areaRemove', { type: c.label })} onClick={() => changeTypes(typeIds.filter((id) => id !== c.id))}>×</button>
+            </li>
           ))}
         </ul>
+        <select className="mep-route-area-add" data-testid="route-area-add" value="" aria-label={routeText(language, 'areaAdd')} disabled={addChoices.length === 0}
+          onChange={(e) => { if (e.target.value) changeTypes([...typeIds, e.target.value]); }}>
+          <option value="">{routeText(language, 'areaAdd')}</option>
+          {addChoices.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+        <p className="mep-route-text mep-route-hint" data-testid="route-area-types-hint">{routeText(language, 'areaTypesHint')}</p>
+        <button type="button" className="mep-route-area-reset" data-testid="route-area-reset" onClick={() => changeTypes([...DEFAULT_ROUTE_AREA_TYPE_IDS])}>{routeText(language, 'areaReset')}</button>
       </div>
       {lines.length > 0 && (
         <div className="mep-route-checks" data-testid="route-area-lines">

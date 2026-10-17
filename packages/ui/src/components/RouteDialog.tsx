@@ -10,6 +10,7 @@ export interface RouteDialogProps {
   roomTypes: RoomType[];
   language: 'en' | 'nl';
   stampName: (definitionId: string) => string | null;
+  onRouteTypeIdsChange: (ids: string[]) => void;
   onClose: () => void;
 }
 
@@ -34,7 +35,7 @@ function uniqueLabels(stamps: readonly StampInfo[], labelOf: (stamp: StampInfo) 
   return labels;
 }
 
-export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose }: RouteDialogProps) {
+export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteTypeIdsChange, onClose }: RouteDialogProps) {
   const scene = sceneRef.current;
   const [pageCount, setPageCount] = useState(() => scene?.getPageCount() ?? 1);
   const [stamps, setStamps] = useState(() => scene?.listStamps() ?? []);
@@ -370,7 +371,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
               )}
             </>
           )}
-          <RouteAreaSection sceneRef={sceneRef} roomTypes={roomTypes} language={language} />
+          <RouteAreaSection sceneRef={sceneRef} roomTypes={roomTypes} language={language} onRouteTypeIdsChange={onRouteTypeIdsChange} />
         </div>
       )}
     </Dialog>
