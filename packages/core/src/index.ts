@@ -11,6 +11,7 @@ export * from './route-area.js';
 export * from './route-skeleton.js';
 export * from './route-wall.js';
 export * from './route-crossings.js';
+export * from './route-graph.js';
 export * from './stamp-library.js';
 export * from './symbol-shapes.js';
 export * from './symbol-shape-geometry.js';
