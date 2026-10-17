@@ -558,7 +558,7 @@ const AREA_TEXT_KEYS: RouteTextKey[] = [
   'areaTitle', 'areaTypes', 'areaAdd', 'areaRemove', 'areaReset', 'areaShow', 'areaTypesHint', 'areaCalculating',
   'areaSummary', 'areaSummaryOne', 'areaSummaryEntryOne', 'areaLegend', 'areaLegendGuide',
   'warnNoCalibration', 'warnNoRooms', 'warnNoTypes', 'warnNoRouteRooms', 'warnOpenRoom', 'warnOpenRoomOne', 'warnParts',
-  'warnWallCrossings', 'warnWallCrossingsOne', 'warnWallCrossingsHint', 'warnShaftCrossing', 'warnShaftCrossingHint',
+  'warnWallCrossings', 'warnWallCrossingsOne', 'warnWallCrossingsHint', 'warnShaftCrossing', 'warnShaftCrossingOne', 'warnShaftCrossingHint',
   'warnUnreached', 'warnUnreachedOne', 'warnStairName', 'warnDraft2d',
 ];
 const AREA_SAMPLE_PARAMS = { count: '12', room: 'Corridor 1', type: 'Office', rooms: '40', entries: '25' };
@@ -671,6 +671,13 @@ describe('routeAreaLines', () => {
       routeText('en', 'warnOpenRoomOne'),
       routeText('en', 'warnUnreachedOne'),
     ]);
+  });
+
+  it('uses the singular shaft-crossing text for a count of 1 and the plural for a count of 2', () => {
+    const one = routeAreaLines([warning({ code: 'shaft-crossing', roomIds: ['shaft1'], count: 1 })], names, 'en');
+    const two = routeAreaLines([warning({ code: 'shaft-crossing', roomIds: ['shaft1'], count: 2 })], names, 'en');
+    expect(one[0]!.text).toBe('The shaft Shaft 1 has 1 possible place for a branch through its wall.');
+    expect(two[0]!.text).toBe('The shaft Shaft 1 has 2 possible places for a branch through its wall.');
   });
 
   it('maps every code to its English text', () => {

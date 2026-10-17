@@ -86,7 +86,7 @@ export type RouteTextKey =
   | 'areaTitle' | 'areaTypes' | 'areaAdd' | 'areaRemove' | 'areaReset' | 'areaShow' | 'areaTypesHint' | 'areaCalculating'
   | 'areaSummary' | 'areaSummaryOne' | 'areaSummaryEntryOne' | 'areaLegend' | 'areaLegendGuide'
   | 'warnNoCalibration' | 'warnNoRooms' | 'warnNoTypes' | 'warnNoRouteRooms' | 'warnOpenRoom' | 'warnOpenRoomOne' | 'warnParts'
-  | 'warnWallCrossings' | 'warnWallCrossingsOne' | 'warnWallCrossingsHint' | 'warnShaftCrossing' | 'warnShaftCrossingHint'
+  | 'warnWallCrossings' | 'warnWallCrossingsOne' | 'warnWallCrossingsHint' | 'warnShaftCrossing' | 'warnShaftCrossingOne' | 'warnShaftCrossingHint'
   | 'warnUnreached' | 'warnUnreachedOne' | 'warnStairName' | 'warnDraft2d';
 
 const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
@@ -156,6 +156,7 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     warnWallCrossingsOne: '1 room can be reached through a wall of the route area. The place is marked.',
     warnWallCrossingsHint: 'Check which of these walls are fire walls. A duct needs a fire damper there. A pipe or cable tray needs a firestop.',
     warnShaftCrossing: 'The shaft {room} has {count} possible places for a branch through its wall.',
+    warnShaftCrossingOne: 'The shaft {room} has 1 possible place for a branch through its wall.',
     warnShaftCrossingHint: 'Check which of these walls are fire walls. A duct needs a fire damper there. A pipe or cable tray needs a firestop.',
     warnUnreached: '{count} rooms have no wall with the route area. A branch to them passes more than one wall or room.',
     warnUnreachedOne: '1 room has no wall with the route area. A branch to it passes more than one wall or room.',
@@ -228,6 +229,7 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     warnWallCrossingsOne: '1 room can be reached through a wall of the route area. The place is marked.',
     warnWallCrossingsHint: 'Check which of these walls are fire walls. A duct needs a fire damper there. A pipe or cable tray needs a firestop.',
     warnShaftCrossing: 'The shaft {room} has {count} possible places for a branch through its wall.',
+    warnShaftCrossingOne: 'The shaft {room} has 1 possible place for a branch through its wall.',
     warnShaftCrossingHint: 'Check which of these walls are fire walls. A duct needs a fire damper there. A pipe or cable tray needs a firestop.',
     warnUnreached: '{count} rooms have no wall with the route area. A branch to them passes more than one wall or room.',
     warnUnreachedOne: '1 room has no wall with the route area. A branch to it passes more than one wall or room.',
@@ -346,7 +348,9 @@ export function routeAreaLines(
         break;
       case 'shaft-crossing':
         add(
-          routeText(language, 'warnShaftCrossing', { room: names.room(warning.roomIds?.[0] ?? ''), count }),
+          count === 1
+            ? routeText(language, 'warnShaftCrossingOne', { room: names.room(warning.roomIds?.[0] ?? '') })
+            : routeText(language, 'warnShaftCrossing', { room: names.room(warning.roomIds?.[0] ?? ''), count }),
           routeText(language, 'warnShaftCrossingHint'),
         );
         break;
