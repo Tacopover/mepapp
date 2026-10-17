@@ -208,3 +208,7 @@
 {"seq":208,"at":"2026-10-17T03:48:12.210Z","type":"decision","id":"P-R3-08","part":"R3","question":"The linked ports hint says segments of different network types on these ports stay separate networks. It is true for the port group; a segment that shares one port with another type still joins (Q-R3-01 hole). The hint keeps the plan wording.","status":"provisional","by":"director","kind":"new"}
 {"seq":209,"at":"2026-10-17T03:48:12.246Z","type":"now","id":"now","role":"task-lead","task":"R3-T12","note":"Part check r3-check.mjs","since":"2026-10-17T04:25:00.000Z"}
 {"seq":210,"at":"2026-10-17T03:48:12.283Z","type":"task","id":"R3-T12","state":"briefed","role":"task-lead"}
+{"seq":211,"at":"2026-10-17T04:49:56.915Z","type":"task","id":"R3-T12","state":"done","commit":"c8a90ad","summary":"Part check r3-check.mjs: 44 of 44 (en) and 7 of 7 (nl, 400 px) rerun by the director; r2-check 66 of 66 and 10 of 10; t06, t07, t08, t10, t11 all pass; forced fresh typecheck 17 of 17 and build 9 of 9 (0 cached). UI review: severity is shown by color only: fixed in T13."}
+{"seq":212,"at":"2026-10-17T04:49:56.954Z","type":"task","id":"R3-T13","part":"R3","order":16,"title":"Severity label on each check line; old comment wording","state":"planned"}
+{"seq":213,"at":"2026-10-17T04:49:56.993Z","type":"now","id":"now","role":"task-lead","task":"R3-T13","note":"Severity label on each check line","since":"2026-10-17T05:30:00.000Z"}
+{"seq":214,"at":"2026-10-17T04:49:57.030Z","type":"task","id":"R3-T13","state":"briefed","role":"task-lead"}
