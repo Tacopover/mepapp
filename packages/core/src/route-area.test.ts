@@ -392,3 +392,68 @@ describe('computeRouteArea links and entries', () => {
     expect(input).toEqual(before);
   });
 });
+
+describe('computeRouteArea unreached and parts', () => {
+  const corridor = rect('c', 0, 0, 10000, 2000, 'corridor');
+
+  it('leaves no unreached room when three offices touch the corridor', () => {
+    const rooms = [
+      corridor,
+      rect('o0', 0, 2300, 3000, 6000, 'office'),
+      rect('o1', 3300, 2300, 6300, 6000, 'office'),
+      rect('o2', 6600, 2300, 9600, 6000, 'office'),
+    ];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.unreached).toEqual([]);
+    expect(area.parts).toBe(1);
+  });
+
+  it('gives an office behind another office as unreached, with its gap to the corridor', () => {
+    const rooms = [
+      corridor,
+      rect('o1', 0, 2300, 3000, 6000, 'office'),
+      rect('o2', 0, 6800, 3000, 9000, 'office'),
+    ];
+    const area = computeRouteArea(rooms, ROUTE_OPTIONS);
+    expect(area.entries.map((e) => e.roomId)).toEqual(['o1']);
+    expect(area.unreached).toHaveLength(1);
+    const [entry] = area.unreached;
+    expect(entry!.roomId).toBe('o2');
+    expect(entry!.distanceMm).not.toBeNull();
+    expect(Math.abs(entry!.distanceMm! - 4800)).toBeLessThanOrEqual(20);
+    expect(entry!.distanceMm! % 10).toBe(0);
+  });
+
+  it('gives parts 1 for two corridors that touch', () => {
+    const rooms = [rect('a', 0, 0, 10000, 2000, 'corridor'), rect('b', 10000, 0, 20000, 2000, 'corridor')];
+    expect(computeRouteArea(rooms, ROUTE_OPTIONS).parts).toBe(1);
+  });
+
+  it('gives parts 2 for two corridors 800 mm apart', () => {
+    const rooms = [rect('a', 0, 0, 10000, 2000, 'corridor'), rect('b', 10800, 0, 20800, 2000, 'corridor')];
+    expect(computeRouteArea(rooms, ROUTE_OPTIONS).parts).toBe(2);
+  });
+
+  it('gives unreached [] and parts 0 for each status other than ok', () => {
+    const rooms = [corridor, rect('o', 0, 6800, 3000, 9000, 'office')];
+    const results = [
+      computeRouteArea(rooms, { ...ROUTE_OPTIONS, mmPerPt: null }),
+      computeRouteArea([rect('o', 0, 0, 3000, 3000, 'office')], { ...ROUTE_OPTIONS, pageIndex: 1 }),
+      computeRouteArea(rooms, { ...ROUTE_OPTIONS, roomTypeIds: [] }),
+      computeRouteArea([rect('o', 0, 0, 3000, 3000, 'office')], ROUTE_OPTIONS),
+    ];
+    expect(results.map((r) => r.status)).toEqual(['no-calibration', 'no-rooms', 'no-types', 'no-route-rooms']);
+    for (const area of results) {
+      expect(area.unreached).toEqual([]);
+      expect(area.parts).toBe(0);
+    }
+  });
+
+  it('gives the same result for the same input and does not change the input', () => {
+    const input = [corridor, rect('o1', 0, 2300, 3000, 6000, 'office'), rect('o2', 0, 6800, 3000, 9000, 'office')];
+    const before = structuredClone(input);
+    const first = computeRouteArea(input, ROUTE_OPTIONS);
+    expect(computeRouteArea(input, ROUTE_OPTIONS)).toEqual(first);
+    expect(input).toEqual(before);
+  });
+});

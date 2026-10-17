@@ -1,7 +1,7 @@
 import { distance, type Vec2 } from './geometry.js';
 import { centerLineOf } from './route-skeleton.js';
 import { connectedParts, nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
-import { wallStretch } from './route-wall.js';
+import { boundaryGapMm, wallStretch } from './route-wall.js';
 import { roomLabelPoint, type Room } from './rooms/room.js';
 
 export const DEFAULT_ROUTE_AREA_TYPE_IDS: readonly string[] = ['corridor', 'shaft'];
@@ -79,7 +79,6 @@ export function selectRouteAreaRooms(rooms: readonly Room[], options: Pick<Route
     }));
 }
 
-// T10b fills unreached.
 export function computeRouteArea(rooms: readonly Room[], options: RouteAreaOptions): RouteArea {
   if (options.mmPerPt === null) return emptyArea('no-calibration');
   if (!rooms.some((r) => r.pageIndex === options.pageIndex)) return emptyArea('no-rooms');
@@ -148,8 +147,16 @@ export function computeRouteArea(rooms: readonly Room[], options: RouteAreaOptio
     entries.push(...own);
   }
 
+  const unreached: UnreachedRoom[] = [];
+  for (const s of served) {
+    if (entries.some((e) => e.roomId === s.id)) continue;
+    let gap = Infinity;
+    for (const area of selected) gap = Math.min(gap, boundaryGapMm(polyOf(s.id), polyOf(area.roomId), mm));
+    unreached.push({ roomId: s.id, distanceMm: Number.isFinite(gap) ? Math.round(gap / 10) * 10 : null });
+  }
+
   const parts = connectedParts(graph).length;
-  return { status: 'ok', rooms: selected, nodes: graph.nodes, edges: graph.edges, entries, links, unreached: [], parts };
+  return { status: 'ok', rooms: selected, nodes: graph.nodes, edges: graph.edges, entries, links, unreached, parts };
 }
 
 function buildCenterGraph(
