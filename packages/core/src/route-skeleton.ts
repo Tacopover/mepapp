@@ -104,3 +104,208 @@ export function thinMask(raster: RasterMask): void {
     }
   }
 }
+
+export interface PixelNode {
+  id: string;
+  x: number;
+  y: number;
+  kind: 'end' | 'junction' | 'bend';
+}
+
+export interface PixelEdge {
+  from: string;
+  to: string;
+  pixels: { x: number; y: number }[];
+}
+
+export interface PixelGraph {
+  nodes: PixelNode[];
+  edges: PixelEdge[];
+}
+
+const RING_DX = [0, 1, 1, 1, 0, -1, -1, -1];
+const RING_DY = [-1, -1, 0, 1, 1, 1, 0, -1];
+
+/** Number of 0-to-1 steps around the ring of the 8 neighbors. Ring order p2..p9 clockwise from north, as in thinMask, closed by p2. */
+export function crossingNumber(mask: Uint8Array, w: number, x: number, y: number): number {
+  const at = (i: number): number => mask[(y + RING_DY[i % 8]!) * w + x + RING_DX[i % 8]!]!;
+  let a = 0;
+  for (let i = 0; i < 8; i++) if (at(i) === 0 && at(i + 1) === 1) a++;
+  return a;
+}
+
+interface PixelGroup {
+  kind: PixelNode['kind'];
+  cells: number[];
+  first: number;
+}
+
+/**
+ * Turns a thinned mask into nodes and edges. A set pixel with CN 0 or 1 is an
+ * end, CN 2 a chain pixel, and CN 3 or more a junction pixel. Junction pixels
+ * that touch form one node. A set component with no node pixel is a closed
+ * ring with one bend node. The border of the mask is not scanned.
+ */
+export function pixelGraphOf(raster: RasterMask): PixelGraph {
+  const { mask, w, h } = raster;
+  const n = w * h;
+  const kind = new Uint8Array(n);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      if (!mask[p]) continue;
+      const cn = crossingNumber(mask, w, x, y);
+      kind[p] = cn <= 1 ? 1 : cn === 2 ? 2 : 3;
+    }
+  }
+  const around = (p: number, d: number): number => {
+    const x = (p % w) + RING_DX[d]!;
+    const y = Math.floor(p / w) + RING_DY[d]!;
+    return x < 0 || y < 0 || x >= w || y >= h ? -1 : y * w + x;
+  };
+  const dist4 = (a: number, b: number): number =>
+    Math.abs((a % w) - (b % w)) + Math.abs(Math.floor(a / w) - Math.floor(b / w));
+
+  const groups: PixelGroup[] = [];
+  const inCluster = new Uint8Array(n);
+  const stack: number[] = [];
+  for (let p = 0; p < n; p++) {
+    if (kind[p] === 1) {
+      groups.push({ kind: 'end', cells: [p], first: p });
+    } else if (kind[p] === 3 && !inCluster[p]) {
+      const cells: number[] = [];
+      inCluster[p] = 1;
+      stack.push(p);
+      while (stack.length) {
+        const c = stack.pop()!;
+        cells.push(c);
+        for (let d = 0; d < 8; d++) {
+          const q = around(c, d);
+          if (q >= 0 && kind[q] === 3 && !inCluster[q]) {
+            inCluster[q] = 1;
+            stack.push(q);
+          }
+        }
+      }
+      groups.push({ kind: 'junction', cells, first: p });
+    }
+  }
+
+  const seen = new Uint8Array(n);
+  for (let p = 0; p < n; p++) {
+    if (kind[p] !== 2 || seen[p]) continue;
+    let hasNode = false;
+    seen[p] = 1;
+    stack.push(p);
+    while (stack.length) {
+      const c = stack.pop()!;
+      if (kind[c] !== 2) hasNode = true;
+      for (let d = 0; d < 8; d++) {
+        const q = around(c, d);
+        if (q >= 0 && mask[q] && !seen[q]) {
+          seen[q] = 1;
+          stack.push(q);
+        }
+      }
+    }
+    if (!hasNode) groups.push({ kind: 'bend', cells: [], first: p });
+  }
+
+  groups.sort((a, b) => a.first - b.first);
+  const nodeOf = new Int32Array(n).fill(-1);
+  groups.forEach((g, gi) => {
+    for (const c of g.cells) nodeOf[c] = gi;
+  });
+  const nodes: PixelNode[] = groups.map((g, gi) => {
+    const pts = g.cells.length ? g.cells : [g.first];
+    let sx = 0;
+    let sy = 0;
+    for (const c of pts) {
+      sx += c % w;
+      sy += Math.floor(c / w);
+    }
+    return { id: `n${gi}`, x: sx / pts.length, y: sy / pts.length, kind: g.kind };
+  });
+
+  const pt = (p: number) => ({ x: p % w, y: Math.floor(p / w) });
+  const visited = new Uint8Array(n);
+  const direct = new Set<number>();
+  const edges: PixelEdge[] = [];
+
+  const touching = (c: number, skip: number, fourOnly: boolean): number => {
+    for (let d = 0; d < 8; d += fourOnly ? 2 : 1) {
+      const q = around(c, d);
+      if (q >= 0 && nodeOf[q]! >= 0 && nodeOf[q] !== skip) return q;
+    }
+    return -1;
+  };
+  const pick = (c: number, prev: number): number => {
+    let best = -1;
+    let bestScore = -1;
+    for (let d = 0; d < 8; d++) {
+      const q = around(c, d);
+      if (q < 0 || !mask[q] || kind[q] !== 2 || visited[q]) continue;
+      const score = (prev < 0 || dist4(q, prev) !== 1 ? 2 : 0) + (d % 2 === 0 ? 1 : 0);
+      if (score > bestScore) {
+        best = q;
+        bestScore = score;
+      }
+    }
+    return best;
+  };
+  const walk = (first: number, group: number, from: number): { chain: number[]; end: number } => {
+    const chain: number[] = [];
+    let prev = from;
+    let cur = first;
+    for (;;) {
+      visited[cur] = 1;
+      chain.push(cur);
+      const skip = chain.length === 1 ? group : -1;
+      const t = touching(cur, skip, true);
+      if (t >= 0) return { chain, end: t };
+      const nxt = pick(cur, prev);
+      if (nxt < 0) return { chain, end: touching(cur, skip, false) };
+      prev = cur;
+      cur = nxt;
+    }
+  };
+
+  groups.forEach((g, gi) => {
+    const from = nodes[gi]!.id;
+    if (g.kind === 'bend') {
+      const loop = [g.first];
+      visited[g.first] = 1;
+      let prev = -1;
+      let cur = g.first;
+      for (;;) {
+        const nxt = pick(cur, prev);
+        if (nxt < 0) break;
+        visited[nxt] = 1;
+        loop.push(nxt);
+        prev = cur;
+        cur = nxt;
+      }
+      loop.push(g.first);
+      edges.push({ from, to: from, pixels: loop.map(pt) });
+      return;
+    }
+    for (const s of g.cells) {
+      for (let d = 0; d < 8; d++) {
+        const q = around(s, d);
+        if (q < 0 || !mask[q] || nodeOf[q] === gi) continue;
+        if (nodeOf[q]! >= 0) {
+          const key = Math.min(s, q) * n + Math.max(s, q);
+          if (direct.has(key)) continue;
+          direct.add(key);
+          edges.push({ from, to: nodes[nodeOf[q]!]!.id, pixels: [pt(s), pt(q)] });
+        } else if (kind[q] === 2 && !visited[q]) {
+          const { chain, end } = walk(q, gi, s);
+          if (end < 0) continue;
+          edges.push({ from, to: nodes[nodeOf[end]!]!.id, pixels: [pt(s), ...chain.map(pt), pt(end)] });
+        }
+      }
+    }
+  });
+
+  return { nodes, edges };
+}

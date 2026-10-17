@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { polygonAreaPt2 } from './rooms/room.js';
 import type { RoomPolygon } from './rooms/types.js';
-import { rasterizePolygon, thinMask, type RasterMask } from './route-skeleton.js';
+import {
+  crossingNumber,
+  pixelGraphOf,
+  rasterizePolygon,
+  thinMask,
+  type PixelGraph,
+  type RasterMask,
+} from './route-skeleton.js';
 
 const rect = (x0: number, y0: number, x1: number, y1: number): RoomPolygon => ({
   outer: [
@@ -202,5 +209,185 @@ describe('thinMask', () => {
     const before = { w: r.w, h: r.h, x0: r.x0, y0: r.y0, pixelPt: r.pixelPt };
     thinMask(r);
     expect({ w: r.w, h: r.h, x0: r.x0, y0: r.y0, pixelPt: r.pixelPt }).toEqual(before);
+  });
+});
+
+function maskFrom(pts: [number, number][]): RasterMask {
+  const w = 40;
+  const h = 40;
+  const mask = new Uint8Array(w * h);
+  for (const [x, y] of pts) mask[y * w + x] = 1;
+  return { mask, w, h, x0: 0, y0: 0, pixelPt: 1 };
+}
+
+function hline(x0: number, x1: number, y: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let x = x0; x <= x1; x++) out.push([x, y]);
+  return out;
+}
+
+function vline(x: number, y0: number, y1: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let y = y0; y <= y1; y++) out.push([x, y]);
+  return out;
+}
+
+function countKind(g: PixelGraph, kind: string): number {
+  return g.nodes.filter((n) => n.kind === kind).length;
+}
+
+// Number of distinct pixels that the edges of the graph cover.
+function coveredPixels(g: PixelGraph): number {
+  return new Set(g.edges.flatMap((e) => e.pixels.map((p) => `${p.x},${p.y}`))).size;
+}
+
+describe('pixelGraphOf', () => {
+  it('gives one edge of 10 pixels for a straight chain of 10 pixels', () => {
+    const r = maskFrom(hline(5, 14, 10));
+    const g = pixelGraphOf(r);
+    expect(countKind(g, 'end')).toBe(2);
+    expect(g.edges).toHaveLength(1);
+    expect(g.edges[0]!.pixels).toHaveLength(10);
+    expect(coveredPixels(g)).toBe(setCount(r));
+  });
+
+  it('gives 4 ends, 1 junction and 4 edges for a plus', () => {
+    const r = maskFrom([...hline(5, 15, 10), ...vline(10, 5, 15).filter(([, y]) => y !== 10)]);
+    const g = pixelGraphOf(r);
+    expect(countKind(g, 'end')).toBe(4);
+    expect(countKind(g, 'junction')).toBe(1);
+    expect(g.edges).toHaveLength(4);
+    expect(coveredPixels(g)).toBe(setCount(r));
+  });
+
+  it('gives 3 ends, 1 junction and 3 edges for a T', () => {
+    const r = maskFrom([...hline(5, 15, 10), ...vline(10, 11, 15)]);
+    const g = pixelGraphOf(r);
+    expect(countKind(g, 'end')).toBe(3);
+    expect(countKind(g, 'junction')).toBe(1);
+    expect(g.edges).toHaveLength(3);
+    expect(coveredPixels(g)).toBe(setCount(r));
+  });
+
+  it('gives one junction node for two touching junction pixels', () => {
+    const r = maskFrom([...hline(5, 16, 10), ...vline(10, 11, 15), ...vline(11, 5, 9)]);
+    const g = pixelGraphOf(r);
+    expect(countKind(g, 'junction')).toBe(1);
+    expect(countKind(g, 'end')).toBe(4);
+    expect(g.nodes).toHaveLength(5);
+    expect(g.edges).toHaveLength(4);
+    expect(coveredPixels(g)).toBe(setCount(r));
+  });
+
+  it('gives one bend node and one loop edge for a hand-built square ring', () => {
+    const r = maskFrom([...hline(2, 7, 2), ...hline(2, 7, 7), ...vline(2, 3, 6), ...vline(7, 3, 6)]);
+    const g = pixelGraphOf(r);
+    expect(countKind(g, 'bend')).toBe(1);
+    expect(countKind(g, 'end')).toBe(0);
+    expect(g.edges).toHaveLength(1);
+    const e = g.edges[0]!;
+    expect(e.from).toBe(e.to);
+    expect(e.pixels[0]).toEqual(e.pixels[e.pixels.length - 1]);
+    expect(coveredPixels(g)).toBe(setCount(r));
+  });
+
+  it('gives one bend node and one loop edge for a thinned ring', () => {
+    const r = rasterizePolygon(ring, 2);
+    thinMask(r);
+    const g = pixelGraphOf(r);
+    expect(countKind(g, 'bend')).toBe(1);
+    expect(countKind(g, 'end')).toBe(0);
+    expect(g.edges).toHaveLength(1);
+    const e = g.edges[0]!;
+    expect(e.from).toBe(e.to);
+    expect(e.pixels[0]).toEqual(e.pixels[e.pixels.length - 1]);
+  });
+
+  it('gives 2 ends and 1 edge for a hand-built 45 degree staircase', () => {
+    const r = maskFrom([
+      [5, 5],
+      [6, 5],
+      [6, 6],
+      [7, 6],
+      [7, 7],
+      [8, 7],
+      [8, 8],
+      [9, 8],
+    ]);
+    const g = pixelGraphOf(r);
+    expect(countKind(g, 'end')).toBe(2);
+    expect(countKind(g, 'junction')).toBe(0);
+    expect(g.edges).toHaveLength(1);
+    expect(coveredPixels(g)).toBe(setCount(r));
+  });
+
+  it('gives 2 ends and 1 edge for a thinned parallelogram', () => {
+    const r = rasterizePolygon(
+      {
+        outer: [
+          { x: 0, y: 0 },
+          { x: 20, y: 0 },
+          { x: 120, y: 100 },
+          { x: 100, y: 100 },
+        ],
+        holes: [],
+      },
+      2,
+    );
+    thinMask(r);
+    const g = pixelGraphOf(r);
+    expect(countKind(g, 'end')).toBe(2);
+    expect(countKind(g, 'junction')).toBe(0);
+    expect(g.edges).toHaveLength(1);
+    expect(coveredPixels(g)).toBe(setCount(r));
+  });
+
+  it('measures a thinned 100 by 20 rectangle', () => {
+    const r = rasterizePolygon(rect(0, 0, 100, 20), 1);
+    thinMask(r);
+    const g = pixelGraphOf(r);
+    // spurs are pruned in T05a
+    expect(countKind(g, 'end')).toBe(2);
+    expect(g.edges).toHaveLength(1);
+  });
+
+  it('gives CN 2 for a staircase pixel with 3 set neighbors and CN 1 for an end', () => {
+    const r = maskFrom([
+      [5, 5],
+      [6, 5],
+      [6, 6],
+      [7, 6],
+      [7, 7],
+      [8, 7],
+      [8, 8],
+      [9, 8],
+    ]);
+    const b = r.mask[5 * r.w + 5]! + r.mask[6 * r.w + 6]! + r.mask[6 * r.w + 7]!;
+    expect(b).toBe(3);
+    expect(crossingNumber(r.mask, r.w, 6, 5)).toBe(2);
+    expect(crossingNumber(r.mask, r.w, 5, 5)).toBe(1);
+  });
+
+  it('gives CN 4 for the center of a plus', () => {
+    const r = maskFrom([...hline(5, 15, 10), ...vline(10, 5, 15).filter(([, y]) => y !== 10)]);
+    expect(crossingNumber(r.mask, r.w, 10, 10)).toBe(4);
+  });
+
+  it('gives no node and no edge for an empty raster', () => {
+    expect(pixelGraphOf(maskFrom([]))).toEqual({ nodes: [], edges: [] });
+  });
+
+  it('gives one end and no edge for a lone pixel', () => {
+    const g = pixelGraphOf(maskFrom([[5, 5]]));
+    expect(g.nodes).toHaveLength(1);
+    expect(countKind(g, 'end')).toBe(1);
+    expect(g.edges).toHaveLength(0);
+  });
+
+  it('does not change the raster', () => {
+    const r = maskFrom([...hline(5, 15, 10), ...vline(10, 11, 15)]);
+    const before = Array.from(r.mask);
+    pixelGraphOf(r);
+    expect(Array.from(r.mask)).toEqual(before);
   });
 });
