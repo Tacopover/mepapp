@@ -204,7 +204,7 @@ export function wallStretch(
     }
   }
 
-  if (!best || best.runMm < minWallRunMm) return null;
+  if (!best || best.runMm < minWallRunMm - 1e-6) return null;
   return {
     point: { x: (best.onA.x + best.onB.x) / 2, y: (best.onA.y + best.onB.y) / 2 },
     onA: best.onA,

@@ -56,6 +56,13 @@ describe('wallStretch', () => {
     expect(Math.abs(s!.runMm - 600)).toBeLessThanOrEqual(100);
   });
 
+  it('keeps a run equal to minWallRunMm despite float error', () => {
+    const a = rect(0, 0, 1000, 1000);
+    const b = rect(1000, 0, 2000, 600);
+    const run = wallStretch(a, b, 1, { minWallRunMm: 0 })!.runMm;
+    expect(wallStretch(a, b, 1, { minWallRunMm: run + 1e-9 })).not.toBeNull();
+  });
+
   it('takes the longer of two runs', () => {
     const a = rect(0, 0, 4000, 1000);
     const b: RoomPolygon = {
