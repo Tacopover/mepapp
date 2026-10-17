@@ -343,3 +343,9 @@
 {"seq":343,"at":"2026-10-17T16:54:20.782Z","type":"task","id":"R5-T03","state":"done","commit":"300f0d1","summary":"Size series for ducts and pipes. Core 1198 tests."}
 {"seq":344,"at":"2026-10-17T16:54:20.821Z","type":"decision","id":"Q-R4-01","part":"R4","status":"answered","answer":"A","by":"user"}
 {"seq":345,"at":"2026-10-17T16:54:26.202Z","type":"now","id":"now","role":"general-purpose","task":"R5-T04","note":"Settings, schema 19, air and water size (T04, T05, T06a, T06b, T07)","since":"2026-10-17T17:00:00.000Z"}
+{"seq":346,"at":"2026-10-17T17:12:03.668Z","type":"task","id":"R5-T04","state":"done","commit":"5137759","summary":"Sizing settings and the NetworkType flowUnit and sizing fields."}
+{"seq":347,"at":"2026-10-17T17:12:03.713Z","type":"task","id":"R5-T05","state":"done","commit":"b6b17bc","summary":"Schema step 19 and the clean-up of the sizing fields on load."}
+{"seq":348,"at":"2026-10-17T17:12:03.753Z","type":"task","id":"R5-T06a","state":"done","commit":"f0b5df4","summary":"Air size, round. 0.1 m3/s gives 200 mm, 0.7025 Pa/m."}
+{"seq":349,"at":"2026-10-17T17:12:03.791Z","type":"task","id":"R5-T06b","state":"done","commit":"5b0f635","summary":"Air size, rectangular. The aspect case of the plan was corrected by measurement."}
+{"seq":350,"at":"2026-10-17T17:12:03.831Z","type":"task","id":"R5-T07","state":"done","commit":"aee7e15","summary":"Water size and the flow from a power. 10 kW at dT 10 K gives DN25, 154 Pa/m, by pressure."}
+{"seq":351,"at":"2026-10-17T17:12:19.298Z","type":"now","id":"now","role":"general-purpose","task":"R5-T08a","note":"Network sizing core and the scene type fields (T08a, T08b, T09)","since":"2026-10-17T17:15:00.000Z"}
