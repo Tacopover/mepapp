@@ -469,6 +469,12 @@ const ROUTE_MARKER_COLOR = 0xe6007e;
 /** A route marker on the overlay: the start port (square) or a target port (ring). */
 export interface RouteMarker { world: Vec2; kind: 'start' | 'target' }
 
+export interface ConnectivityView {
+  segments: Segment[];
+  fittings: Fitting[];
+  portGroups: PortGroup[];
+}
+
 /** One derived network, resolved against its NetworkType for display — the Layers panel's read model. Recomputed from live topology on every call, same as DrawingSummary. */
 export interface NetworkSummary {
   id: string;
@@ -1473,6 +1479,16 @@ export class SketchScene {
   listStamps(): StampInfo[] {
     const portSegmentTypes = this.portSegmentTypes();
     return Object.values(this.doc.drawingHistory.getState().stamps).map((d) => this.toStampInfo(d, portSegmentTypes));
+  }
+
+  /** The segments, fittings and port groups of the active document. Copies of the arrays. The route dialog reads it for the start check. */
+  getConnectivity(): ConnectivityView {
+    const state = this.doc.drawingHistory.getState();
+    return {
+      segments: Object.values(state.segments),
+      fittings: Object.values(state.fittings),
+      portGroups: this.doc.portGroups.map((g) => ({ ...g, portIds: [...g.portIds] })),
+    };
   }
 
   /** Derives the current network topology (see core's computeNetworks) resolved against known network types — the Layers panel's "Networks" list. */
