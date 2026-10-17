@@ -1,5 +1,7 @@
-import type { Vec2 } from './geometry.js';
-import type { Room } from './rooms/room.js';
+import { distance, type Vec2 } from './geometry.js';
+import { centerLineOf } from './route-skeleton.js';
+import { connectedParts } from './route-graph.js';
+import { roomLabelPoint, type Room } from './rooms/room.js';
 
 export const DEFAULT_ROUTE_AREA_TYPE_IDS: readonly string[] = ['corridor', 'shaft'];
 export const SHAFT_ROOM_TYPE_ID = 'shaft';
@@ -76,14 +78,65 @@ export function selectRouteAreaRooms(rooms: readonly Room[], options: Pick<Route
     }));
 }
 
-// Stub: T09 to T10b fill the nodes, edges, entries, links and unreached rooms.
+// Stub: T10a and T10b fill the entries, links and unreached rooms.
 export function computeRouteArea(rooms: readonly Room[], options: RouteAreaOptions): RouteArea {
   if (options.mmPerPt === null) return emptyArea('no-calibration');
   if (!rooms.some((r) => r.pageIndex === options.pageIndex)) return emptyArea('no-rooms');
   if (options.roomTypeIds.length === 0) return emptyArea('no-types');
   const selected = selectRouteAreaRooms(rooms, options);
   if (selected.length === 0) return emptyArea('no-route-rooms');
-  return emptyArea('ok', selected);
+  const { nodes, edges } = buildCenterGraph(rooms, selected, options.mmPerPt, options.pixelMm ?? DEFAULT_SKELETON_PIXEL_MM);
+  const parts = connectedParts({ nodes, edges }).length;
+  return { status: 'ok', rooms: selected, nodes, edges, entries: [], links: [], unreached: [], parts };
+}
+
+function buildCenterGraph(
+  rooms: readonly Room[],
+  selected: readonly RouteAreaRoom[],
+  mmPerPt: number,
+  pixelMm: number,
+): { nodes: RouteNode[]; edges: RouteEdge[] } {
+  const byId = new Map(rooms.map((r) => [r.id, r]));
+  const nodes: RouteNode[] = [];
+  const edges: RouteEdge[] = [];
+  for (const area of selected) {
+    const room = byId.get(area.roomId)!;
+    const label = roomLabelPoint(room);
+    if (area.kind === 'shaft') {
+      nodes.push({ id: `rn-${area.roomId}-0`, point: label, kind: 'shaft', roomId: area.roomId });
+      continue;
+    }
+    const cl = centerLineOf(room.polygon, mmPerPt, { pixelMm });
+    if (cl.nodes.length === 0) {
+      nodes.push({ id: `rn-${area.roomId}-0`, point: label, kind: 'end', roomId: area.roomId });
+      continue;
+    }
+    const ids = new Map<string, string>();
+    cl.nodes.forEach((node, k) => {
+      const id = `rn-${area.roomId}-${k}`;
+      ids.set(node.id, id);
+      nodes.push({ id, point: { x: node.point.x, y: node.point.y }, kind: node.kind, roomId: area.roomId });
+    });
+    cl.edges.forEach((edge, k) => {
+      const points = edge.points.map((p) => ({ x: p.x, y: p.y }));
+      edges.push({
+        id: `re-${area.roomId}-${k}`,
+        from: ids.get(edge.from)!,
+        to: ids.get(edge.to)!,
+        kind: 'center',
+        points,
+        lengthMm: polylineLength(points) * mmPerPt,
+        roomId: area.roomId,
+      });
+    });
+  }
+  return { nodes, edges };
+}
+
+function polylineLength(points: readonly Vec2[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) total += distance(points[i - 1]!, points[i]!);
+  return total;
 }
 
 function emptyArea(status: RouteAreaStatus, rooms: RouteAreaRoom[] = []): RouteArea {
