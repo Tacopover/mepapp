@@ -17,6 +17,8 @@ export interface MenuButtonProps {
   onExportRooms: () => void;
   onOpenAutoPlace: () => void;
   onOpenRoute: () => void;
+  routeAreaVisible: boolean;
+  onToggleRouteArea: () => void;
   wallDebugVisible: boolean;
   onToggleWallDebug: () => void;
 }
@@ -36,6 +38,8 @@ export function MenuButton({
   onExportRooms,
   onOpenAutoPlace,
   onOpenRoute,
+  routeAreaVisible,
+  onToggleRouteArea,
   wallDebugVisible,
   onToggleWallDebug,
 }: MenuButtonProps) {
@@ -166,6 +170,17 @@ export function MenuButton({
             }}
           >
             Route network…
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            disabled={!pdfLoaded}
+            onClick={() => {
+              onToggleRouteArea();
+              setOpen(false);
+            }}
+          >
+            {routeAreaVisible ? 'Hide route area' : 'Show route area'}
           </button>
           {isDebugToolsEnabled() && (
             <>

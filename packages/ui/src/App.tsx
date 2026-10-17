@@ -317,6 +317,16 @@ export function MepSketchApp({
     scene.on('wallDebugChanged', onChanged);
     return () => scene.off('wallDebugChanged', onChanged);
   }, [ready, sceneRef]);
+  const [routeAreaVisible, setRouteAreaVisible] = useState(false);
+  const handleToggleRouteArea = useCallback(() => sceneRef.current?.setRouteAreaVisible(!sceneRef.current.isRouteAreaVisible()), [sceneRef]);
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    setRouteAreaVisible(scene.isRouteAreaVisible());
+    const onChanged = (visible: boolean) => setRouteAreaVisible(visible);
+    scene.on('routeAreaVisibleChanged', onChanged);
+    return () => scene.off('routeAreaVisibleChanged', onChanged);
+  }, [ready, sceneRef]);
   useEffect(() => {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
@@ -1459,6 +1469,8 @@ export function MepSketchApp({
           onExportRooms={handleExportRooms}
           onOpenAutoPlace={() => setAutoPlaceOpen(true)}
           onOpenRoute={() => setRouteOpen(true)}
+          routeAreaVisible={routeAreaVisible}
+          onToggleRouteArea={handleToggleRouteArea}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
         />
