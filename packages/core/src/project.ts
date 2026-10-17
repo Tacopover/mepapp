@@ -7,17 +7,19 @@
 import type { Annotation } from './annotation.js';
 import type { Calibration } from './calibration.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
+import { isFlowUnitId } from './flow-units.js';
 import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
 import type { Room } from './rooms/room.js';
 import type { RoomNeed } from './rooms/room-need.js';
 import { parseRoomDemands, type RoomType } from './rooms/room-type.js';
 import type { Schematic } from './schematic.js';
+import { parseSizingSettings } from './sizing-settings.js';
 import { parseRoutingTargets, type PlacedStamp } from './stamp.js';
 import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 18;
+export const CURRENT_SCHEMA_VERSION = 19;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -301,6 +303,17 @@ const migrationSteps: MigrationStep[] = [
       schemaVersion: 18,
     }),
   },
+  {
+    fromVersion: 18,
+    toVersion: 19,
+    // Version 18 predates NetworkType.flowUnit and NetworkType.sizing (auto-routing-r5.md §4.1). Both fields are optional
+    // and absent means "not set", so this step only advances the version number: an older MepApp then refuses the file
+    // instead of dropping the fields when it saves.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 19,
+    }),
+  },
 ];
 
 function migrateRoomTypeDemands(type: unknown): unknown {
@@ -393,7 +406,7 @@ export function loadProject(raw: JsonRecord): ProjectDocument {
     throw new ProjectLoadError('project document failed validation after migration', issues);
   }
   const doc = migrated as unknown as ProjectDocument;
-  return { ...doc, stamps: doc.stamps.map(withCleanRoutingTargets) };
+  return { ...doc, stamps: doc.stamps.map(withCleanRoutingTargets), networkTypes: doc.networkTypes.map(withCleanSizing) };
 }
 
 /** The stamp without the routing targets that are not network type ids (auto-routing.md §4.5). The same object when it has none. */
@@ -402,4 +415,18 @@ function withCleanRoutingTargets(stamp: PlacedStamp): PlacedStamp {
   const { routingTargets, ...rest } = stamp;
   const clean = parseRoutingTargets(routingTargets);
   return clean ? { ...rest, routingTargets: clean } : rest;
+}
+
+/** The network type without a flow unit or sizing that does not parse (auto-routing-r5.md §4.1). The same object when nothing is wrong. */
+function withCleanSizing(type: NetworkType): NetworkType {
+  if (!type || typeof type !== 'object' || !('flowUnit' in type || 'sizing' in type)) return type;
+  const flowUnitOk = !('flowUnit' in type) || isFlowUnitId(type.flowUnit);
+  const sizingOk = !('sizing' in type) || parseSizingSettings(type.sizing) !== undefined;
+  if (flowUnitOk && sizingOk) return type;
+  const { flowUnit, sizing, ...rest } = type;
+  const next: NetworkType = { ...rest };
+  if (isFlowUnitId(flowUnit)) next.flowUnit = flowUnit;
+  const cleanSizing = parseSizingSettings(sizing);
+  if (cleanSizing) next.sizing = cleanSizing;
+  return next;
 }
