@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { RouteLanguage, RoutePortsResult, RouteStamp } from '@mepapp/core';
+import type { RouteLanguage, RoutePortsResult, RouteStamp, StartProblem } from '@mepapp/core';
 import {
-  includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText, typeOptionText,
+  includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startCheckLines, startPortChoices, typeChoices, typeNameInText, typeOptionText,
   type RouteTextKey,
 } from './components/routePlan.js';
 
@@ -212,6 +212,8 @@ const ROUTE_TEXT_KEYS: RouteTextKey[] = [
   'startPort', 'portNote', 'networkType', 'noOpenPorts', 'scope', 'scopeRooms', 'scopeStamps',
   'roomsAll', 'roomsNone', 'noRooms', 'includeOutside', 'useAllPorts',
   'scopeStampsHint', 'roomsColRoom', 'roomsColType', 'roomsColPorts', 'noChoice', 'scopeStampsNote', 'roomsColPortsTitle',
+  'checkUnknownStart', 'checkNotEquipment', 'checkPortSegments', 'checkPortSegmentsHint', 'checkPortForeignType', 'checkPortForeignTypeHint',
+  'checkGroupOtherType', 'checkGroupSameType', 'checkSecondEquipment', 'checkSecondEquipmentHint', 'selectionNotEquipment', 'selectionRiserNote',
 ];
 const LANGUAGES: RouteLanguage[] = ['en', 'nl'];
 
@@ -373,8 +375,8 @@ describe('routeText', () => {
     expect(routeText('nl', 'scopeStampsNote')).toContain('startstempel');
   });
 
-  it('has a text in English and Dutch for all 26 keys', () => {
-    expect(ROUTE_TEXT_KEYS).toHaveLength(26);
+  it('has a text in English and Dutch for all 38 keys', () => {
+    expect(ROUTE_TEXT_KEYS).toHaveLength(38);
     for (const language of LANGUAGES) {
       for (const key of ROUTE_TEXT_KEYS) expect(routeText(language, key).length).toBeGreaterThan(0);
     }
@@ -399,10 +401,140 @@ describe('routeText', () => {
   });
 
   it('keeps every text within 140 characters', () => {
+    const params = {
+      type: 'Supply Air', target: 'Exhaust Air', count: '2 segments', types: 'Supply Air, Return Air',
+      ports: 'in, out', stamps: 'Fan coil unit, Pump', stamp: 'Air handling unit AHU-01',
+    };
     for (const language of LANGUAGES) {
       for (const key of ROUTE_TEXT_KEYS) {
-        expect(routeText(language, key, { type: 'Supply Air', target: 'Exhaust Air' }).length).toBeLessThanOrEqual(140);
+        expect(routeText(language, key, params).length).toBeLessThanOrEqual(140);
       }
+    }
+  });
+
+  it('never writes CFM or GPM in a text', () => {
+    for (const language of LANGUAGES) {
+      for (const key of ROUTE_TEXT_KEYS) expect(routeText(language, key)).not.toMatch(/CFM|GPM/);
+    }
+  });
+});
+
+describe('startCheckLines', () => {
+  const typeNames: Record<string, string> = { 'supply-air': 'Supply Air', 'return-air': 'Return Air' };
+  const stampNames: Record<string, string> = { fcu: 'Fan coil unit', pump: 'Pump' };
+  const english = {
+    type: (typeId: string) => typeNames[typeId] ?? typeId,
+    stamp: (stampId: string) => stampNames[stampId] ?? stampId,
+    port: (portId: string) => portId,
+  };
+  const dutch = { ...english, type: (typeId: string) => typeNameInText(typeId, typeNames[typeId] ?? typeId, 'nl') };
+  const problem = (patch: Partial<StartProblem> & Pick<StartProblem, 'code'>): StartProblem => ({ severity: 'warning', ...patch });
+
+  it('fills the count, types, ports and stamps', () => {
+    const lines = startCheckLines([
+      problem({ code: 'port-segments', count: 2 }),
+      problem({ code: 'port-foreign-type', typeIds: ['return-air'] }),
+      problem({ code: 'group-other-type', portIds: ['in', 'out'], typeIds: ['return-air'] }),
+      problem({ code: 'second-equipment', stampIds: ['fcu', 'pump'] }),
+    ], english, 'en');
+    expect(lines.map((line) => line.text)).toEqual([
+      'The start port has 2 segments.',
+      'The start port already has a segment of Return Air.',
+      'in, out is in one port group with this port. Its segment has type Return Air. It stays a separate network.',
+      'The network at this port has more equipment: Fan coil unit, Pump.',
+    ]);
+  });
+
+  it('joins several ids with ", "', () => {
+    const [line] = startCheckLines([problem({ code: 'group-same-type', portIds: ['in', 'out', 'drain'] })], english, 'en');
+    expect(line!.text).toBe('in, out, drain is in one port group with this port. Its segment has the same type, so the run joins that network.');
+  });
+
+  it('uses the Dutch air words through names.type', () => {
+    const [line] = startCheckLines([problem({ code: 'port-foreign-type', typeIds: ['supply-air'] })], dutch, 'nl');
+    expect(line!.text).toBe('De startaansluiting heeft al een segment van toevoerlucht.');
+  });
+
+  it('keeps the order of the problems', () => {
+    const lines = startCheckLines([
+      problem({ code: 'second-equipment', stampIds: ['pump'] }),
+      problem({ code: 'unknown-start' }),
+      problem({ code: 'port-segments', count: 1 }),
+    ], english, 'en');
+    expect(lines.map((line) => line.code)).toEqual(['second-equipment', 'unknown-start', 'port-segments']);
+  });
+
+  it('gives an empty hint where a code has none', () => {
+    const lines = startCheckLines([
+      problem({ code: 'unknown-start' }),
+      problem({ code: 'not-equipment' }),
+      problem({ code: 'group-other-type', portIds: ['in'], typeIds: ['return-air'] }),
+      problem({ code: 'group-same-type', portIds: ['in'] }),
+    ], english, 'en');
+    for (const line of lines) expect(line.hint).toBe('');
+  });
+
+  it('gives a hint where a code has one', () => {
+    const lines = startCheckLines([
+      problem({ code: 'port-segments', count: 2 }),
+      problem({ code: 'port-foreign-type', typeIds: ['return-air'] }),
+      problem({ code: 'second-equipment', stampIds: ['pump'] }),
+    ], english, 'en');
+    expect(lines.map((line) => line.hint)).toEqual([
+      routeText('en', 'checkPortSegmentsHint'),
+      routeText('en', 'checkPortForeignTypeHint'),
+      routeText('en', 'checkSecondEquipmentHint'),
+    ]);
+  });
+
+  it('gives the English and Dutch plural for count 1 and 2', () => {
+    expect(startCheckLines([problem({ code: 'port-segments', count: 1 })], english, 'en')[0]!.text).toBe('The start port has 1 segment.');
+    expect(startCheckLines([problem({ code: 'port-segments', count: 2 })], english, 'en')[0]!.text).toBe('The start port has 2 segments.');
+    expect(startCheckLines([problem({ code: 'port-segments', count: 1 })], dutch, 'nl')[0]!.text).toBe('De startaansluiting heeft 1 segment.');
+    expect(startCheckLines([problem({ code: 'port-segments', count: 2 })], dutch, 'nl')[0]!.text).toBe('De startaansluiting heeft 2 segmenten.');
+  });
+
+  it('gives the not-equipment text with the word for this stamp', () => {
+    expect(startCheckLines([problem({ code: 'not-equipment' })], english, 'en')[0]!.text).toBe('This stamp has a category other than equipment. Only equipment can start a network.');
+    expect(startCheckLines([problem({ code: 'not-equipment' })], dutch, 'nl')[0]!.text).toBe('Dit stempel heeft een andere categorie dan apparaat. Alleen een apparaat kan een netwerk starten.');
+  });
+
+  it('copies the code and the severity', () => {
+    const [line] = startCheckLines([problem({ code: 'port-segments', severity: 'error', count: 2 })], english, 'en');
+    expect(line!.code).toBe('port-segments');
+    expect(line!.severity).toBe('error');
+  });
+
+  it('gives 0 segments when the count is missing', () => {
+    expect(startCheckLines([problem({ code: 'port-segments' })], english, 'en')[0]!.text).toBe('The start port has 0 segments.');
+  });
+
+  it('gives no leading space when a group text has no ports or types', () => {
+    for (const language of LANGUAGES) {
+      const names = language === 'nl' ? dutch : english;
+      const lines = startCheckLines([
+        problem({ code: 'group-other-type' }),
+        problem({ code: 'group-same-type' }),
+      ], names, language);
+      for (const line of lines) expect(line.text.startsWith(' ')).toBe(false);
+    }
+  });
+
+  it('keeps the Dutch group texts within 140 characters with Dutch air words', () => {
+    const airNames = {
+      type: (typeId: string) => typeNameInText(typeId, typeId, 'nl'),
+      stamp: (stampId: string) => ({ fcu: 'Ventilatorconvector', pump: 'Pomp' })[stampId] ?? stampId,
+      port: (portId: string) => portId,
+    };
+    const lines = startCheckLines([
+      problem({ code: 'group-other-type', portIds: ['in', 'out'], typeIds: ['supply-air', 'exhaust-air'] }),
+      problem({ code: 'group-same-type', portIds: ['in', 'out'] }),
+      problem({ code: 'second-equipment', stampIds: ['fcu', 'pump'] }),
+    ], airNames, 'nl');
+    expect(lines[0]!.text).toBe('in, out staat met deze aansluiting in één groep. Het segment heeft type toevoerlucht, afzuiglucht. Het blijft een apart netwerk.');
+    for (const line of lines) {
+      expect(line.text.length).toBeLessThanOrEqual(140);
+      expect(line.hint.length).toBeLessThanOrEqual(140);
     }
   });
 });

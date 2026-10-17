@@ -1,4 +1,4 @@
-import { getStampPorts, openPortsOf, routingTargetOf, type Room, type RouteLanguage, type RoutePortsResult, type RouteStamp } from '@mepapp/core';
+import { getStampPorts, openPortsOf, routingTargetOf, type Room, type RouteLanguage, type RoutePortsResult, type RouteStamp, type StartProblem, type StartProblemCode, type StartSeverity } from '@mepapp/core';
 
 /** Network types that the type select does not list. */
 export const GRAVITY_TYPE_IDS: readonly string[] = ['sanitary-waste'];
@@ -80,7 +80,9 @@ export type RouteTextKey =
   | 'title' | 'close' | 'noEquipment' | 'startStamp' | 'groupSources' | 'groupWaiting' | 'startWarning'
   | 'startPort' | 'portNote' | 'networkType' | 'noOpenPorts' | 'scope' | 'scopeRooms' | 'scopeStamps'
   | 'roomsAll' | 'roomsNone' | 'noRooms' | 'includeOutside' | 'useAllPorts'
-  | 'scopeStampsHint' | 'roomsColRoom' | 'roomsColType' | 'roomsColPorts' | 'noChoice' | 'scopeStampsNote' | 'roomsColPortsTitle';
+  | 'scopeStampsHint' | 'roomsColRoom' | 'roomsColType' | 'roomsColPorts' | 'noChoice' | 'scopeStampsNote' | 'roomsColPortsTitle'
+  | 'checkUnknownStart' | 'checkNotEquipment' | 'checkPortSegments' | 'checkPortSegmentsHint' | 'checkPortForeignType' | 'checkPortForeignTypeHint'
+  | 'checkGroupOtherType' | 'checkGroupSameType' | 'checkSecondEquipment' | 'checkSecondEquipmentHint' | 'selectionNotEquipment' | 'selectionRiserNote';
 
 const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
   en: {
@@ -110,6 +112,18 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     noChoice: 'None available',
     scopeStampsNote: 'The start stamp itself is not counted.',
     roomsColPortsTitle: 'Open ports',
+    checkUnknownStart: 'The start stamp or the start port does not exist.',
+    checkNotEquipment: '{stamp} has a category other than equipment. Only equipment can start a network.',
+    checkPortSegments: 'The start port has {count}.',
+    checkPortSegmentsHint: 'Many segments are normal for a shaft, a riser or a manifold. For one run, use a port with 0 or 1.',
+    checkPortForeignType: 'The start port already has a segment of {types}.',
+    checkPortForeignTypeHint: 'The segment sets the network type. Choose that type, or use another port.',
+    checkGroupOtherType: '{ports} is in one port group with this port. Its segment has type {types}. It stays a separate network.',
+    checkGroupSameType: '{ports} is in one port group with this port. Its segment has the same type, so the run joins that network.',
+    checkSecondEquipment: 'The network at this port has more equipment: {stamps}.',
+    checkSecondEquipmentHint: 'This is normal for water networks. The flow sum starts at your start stamp. Check that you want one network.',
+    selectionNotEquipment: 'The selected stamp {stamp} is not equipment. Only equipment starts a network. Change the category in the Element Editor.',
+    selectionRiserNote: 'A riser across floors is not one start stamp yet.',
   },
   nl: {
     title: 'Netwerk routeren',
@@ -138,6 +152,18 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     noChoice: 'Niet beschikbaar',
     scopeStampsNote: 'Het startstempel zelf wordt niet meegeteld.',
     roomsColPortsTitle: 'Open aansluitingen',
+    checkUnknownStart: 'Het startstempel of de startaansluiting bestaat niet.',
+    checkNotEquipment: '{stamp} heeft een andere categorie dan apparaat. Alleen een apparaat kan een netwerk starten.',
+    checkPortSegments: 'De startaansluiting heeft {count}.',
+    checkPortSegmentsHint: 'Meerdere segmenten zijn normaal voor een schacht, een stijgleiding of een verdeler. Gebruik voor één netwerk een aansluiting met 0 of 1.',
+    checkPortForeignType: 'De startaansluiting heeft al een segment van {types}.',
+    checkPortForeignTypeHint: 'Het segment bepaalt het netwerktype. Kies dat type of gebruik een andere aansluiting.',
+    checkGroupOtherType: '{ports} staat met deze aansluiting in één groep. Het segment heeft type {types}. Het blijft een apart netwerk.',
+    checkGroupSameType: '{ports} staat met deze aansluiting in één groep. Het segment heeft hetzelfde type, dus het sluit aan op dat netwerk.',
+    checkSecondEquipment: 'Het netwerk bij deze aansluiting heeft meer apparaten: {stamps}.',
+    checkSecondEquipmentHint: 'Dit is normaal voor waternetwerken. De som van de debieten begint bij uw startstempel. Controleer of u één netwerk wilt.',
+    selectionNotEquipment: 'Het stempel {stamp} is geen apparaat. Alleen een apparaat start een netwerk. Wijzig de categorie in de Element Editor.',
+    selectionRiserNote: 'Een stijgleiding over verdiepingen is nog niet één startstempel.',
   },
 };
 
@@ -156,6 +182,48 @@ export function routeText(language: RouteLanguage, key: RouteTextKey, params?: R
   const text = TEXTS[language][key];
   if (!params) return text;
   return text.replace(/\{(\w+)\}/g, (match, name: string) => (Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match));
+}
+
+export interface StartCheckLine {
+  code: StartProblemCode;
+  severity: StartSeverity;
+  /** The problem. */
+  text: string;
+  /** Empty when the code has no hint. */
+  hint: string;
+}
+
+/** One line per problem, in the order of `problems`. names maps a type, stamp or port id to its text. */
+export function startCheckLines(
+  problems: readonly StartProblem[],
+  names: { type: (typeId: string) => string; stamp: (stampId: string) => string; port: (portId: string) => string },
+  language: RouteLanguage,
+): StartCheckLine[] {
+  const nl = language === 'nl';
+  return problems.map((problem): StartCheckLine => {
+    const { code, severity } = problem;
+    const types = (problem.typeIds ?? []).map((typeId) => names.type(typeId)).join(', ');
+    const ports = (problem.portIds ?? []).map((portId) => names.port(portId)).join(', ');
+    const stamps = (problem.stampIds ?? []).map((stampId) => names.stamp(stampId)).join(', ');
+    const count = problem.count ?? 0;
+    const countText = `${count} ${count === 1 ? 'segment' : nl ? 'segmenten' : 'segments'}`;
+    switch (code) {
+      case 'unknown-start':
+        return { code, severity, text: routeText(language, 'checkUnknownStart'), hint: '' };
+      case 'not-equipment':
+        return { code, severity, text: routeText(language, 'checkNotEquipment', { stamp: nl ? 'Dit stempel' : 'This stamp' }), hint: '' };
+      case 'port-segments':
+        return { code, severity, text: routeText(language, 'checkPortSegments', { count: countText }), hint: routeText(language, 'checkPortSegmentsHint') };
+      case 'port-foreign-type':
+        return { code, severity, text: routeText(language, 'checkPortForeignType', { types }), hint: routeText(language, 'checkPortForeignTypeHint') };
+      case 'group-other-type':
+        return { code, severity, text: routeText(language, 'checkGroupOtherType', { ports, types }).trim(), hint: '' };
+      case 'group-same-type':
+        return { code, severity, text: routeText(language, 'checkGroupSameType', { ports }).trim(), hint: '' };
+      case 'second-equipment':
+        return { code, severity, text: routeText(language, 'checkSecondEquipment', { stamps }), hint: routeText(language, 'checkSecondEquipmentHint') };
+    }
+  });
 }
 
 export interface RouteSummaryOptions {
