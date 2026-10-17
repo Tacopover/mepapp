@@ -82,7 +82,7 @@ export type RouteTextKey =
   | 'roomsAll' | 'roomsNone' | 'noRooms' | 'includeOutside' | 'useAllPorts'
   | 'scopeStampsHint' | 'roomsColRoom' | 'roomsColType' | 'roomsColPorts' | 'noChoice' | 'scopeStampsNote' | 'roomsColPortsTitle'
   | 'checkUnknownStart' | 'checkNotEquipment' | 'checkPortSegments' | 'checkPortSegmentsHint' | 'checkPortForeignType' | 'checkPortForeignTypeHint'
-  | 'checkGroupOtherType' | 'checkGroupSameType' | 'checkSecondEquipment' | 'checkSecondEquipmentHint' | 'selectionNotEquipment' | 'selectionRiserNote';
+  | 'checkGroupOtherType' | 'checkGroupSameType' | 'checkSecondEquipment' | 'checkSecondEquipmentHint' | 'selectionNotEquipment' | 'selectionRiserNote' | 'severityError' | 'severityWarning' | 'severityInfo';
 
 const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
   en: {
@@ -124,6 +124,9 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     checkSecondEquipmentHint: 'Many networks have more than one equipment stamp. The flow is counted from your start stamp. Check that you want one network.',
     selectionNotEquipment: 'The selected stamp {stamp} is not equipment. Only equipment starts a network. Change the category in the Element Editor.',
     selectionRiserNote: 'A riser across floors is not one start stamp yet.',
+    severityError: 'Error',
+    severityWarning: 'Warning',
+    severityInfo: 'Note',
   },
   nl: {
     title: 'Netwerk routeren',
@@ -164,6 +167,9 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     checkSecondEquipmentHint: 'Veel netwerken hebben meer dan één apparaat. De debieten worden geteld vanaf uw startstempel. Controleer of u één netwerk wilt.',
     selectionNotEquipment: 'Het stempel {stamp} is geen apparaat. Alleen een apparaat start een netwerk. Wijzig de categorie in de Element Editor.',
     selectionRiserNote: 'Een stijgleiding over verdiepingen is nog niet één startstempel.',
+    severityError: 'Fout',
+    severityWarning: 'Waarschuwing',
+    severityInfo: 'Opmerking',
   },
 };
 

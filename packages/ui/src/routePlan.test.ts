@@ -214,6 +214,7 @@ const ROUTE_TEXT_KEYS: RouteTextKey[] = [
   'scopeStampsHint', 'roomsColRoom', 'roomsColType', 'roomsColPorts', 'noChoice', 'scopeStampsNote', 'roomsColPortsTitle',
   'checkUnknownStart', 'checkNotEquipment', 'checkPortSegments', 'checkPortSegmentsHint', 'checkPortForeignType', 'checkPortForeignTypeHint',
   'checkGroupOtherType', 'checkGroupSameType', 'checkSecondEquipment', 'checkSecondEquipmentHint', 'selectionNotEquipment', 'selectionRiserNote',
+  'severityError', 'severityWarning', 'severityInfo',
 ];
 const LANGUAGES: RouteLanguage[] = ['en', 'nl'];
 
@@ -375,10 +376,24 @@ describe('routeText', () => {
     expect(routeText('nl', 'scopeStampsNote')).toContain('startstempel');
   });
 
-  it('has a text in English and Dutch for all 38 keys', () => {
-    expect(ROUTE_TEXT_KEYS).toHaveLength(38);
+  it('has a text in English and Dutch for all 41 keys', () => {
+    expect(ROUTE_TEXT_KEYS).toHaveLength(41);
     for (const language of LANGUAGES) {
       for (const key of ROUTE_TEXT_KEYS) expect(routeText(language, key).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('writes the severity labels in English and Dutch without the word network', () => {
+    expect(routeText('en', 'severityError')).toBe('Error');
+    expect(routeText('en', 'severityWarning')).toBe('Warning');
+    expect(routeText('en', 'severityInfo')).toBe('Note');
+    expect(routeText('nl', 'severityError')).toBe('Fout');
+    expect(routeText('nl', 'severityWarning')).toBe('Waarschuwing');
+    expect(routeText('nl', 'severityInfo')).toBe('Opmerking');
+    for (const language of LANGUAGES) {
+      for (const key of ['severityError', 'severityWarning', 'severityInfo'] as const) {
+        expect(routeText(language, key)).not.toMatch(/netwerk|network/i);
+      }
     }
   });
 

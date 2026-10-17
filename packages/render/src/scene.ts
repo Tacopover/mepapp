@@ -2876,10 +2876,11 @@ export class SketchScene {
   }
 
   /**
-   * Links (or re-links) which of an element's own ports collapse into one
-   * connectivity node — e.g. an AHU's supply and return ports, so a segment
-   * drawn between them doesn't bridge supply into return (core's PortGroup
-   * doc comment). An empty portIds clears any existing group for this
+   * Links (or re-links) which of an element's own ports belong to one port group — e.g.
+   * an AHU's supply and return ports. The group joins those ports only for segments of
+   * ONE network type. Segments of different network types at these ports stay separate
+   * networks, so a segment drawn between supply and return does not join them (core's
+   * PortGroup doc comment). An empty portIds clears any existing group for this
    * element. A single portId is stored as-is (a one-port "group" behaves
    * identically to no group in nodeKeyOf) rather than silently dropped —
    * dropping it would make checking one port in the UI immediately revert to

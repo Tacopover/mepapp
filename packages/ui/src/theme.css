@@ -3475,6 +3475,7 @@
 .mep-modal--route .mep-route-check-error { color: #b3261e; font-weight: 600; }
 .mep-modal--route .mep-route-check-warning { color: var(--accent-ink); }
 .mep-modal--route .mep-route-check-info { opacity: 0.75; }
+.mep-modal--route .mep-route-severity { font-weight: 700; }
 .mep-modal--route .mep-route-field {
   display: flex;
   flex-direction: column;

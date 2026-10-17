@@ -121,6 +121,9 @@ check(/Supply Air/.test(await h.text('port-foreign-type')), 'step 4: the line na
 const order = await page.locator(`${R} [data-testid=route-checks] [data-severity]`).evaluateAll((els) => els.map((e) => e.dataset.severity));
 const rank = { error: 0, warning: 1, info: 2 };
 check(order.every((s, i) => i === 0 || rank[order[i - 1]] <= rank[s]), 'step 4: the lines are in the order error, warning, info', JSON.stringify(order));
+const labelOf = { error: 'Error', warning: 'Warning', info: 'Note' };
+const labelled = await page.locator(`${R} [data-testid=route-checks] [data-severity]`).evaluateAll((els) => els.map((e) => [e.dataset.severity, e.innerText]));
+check(labelled.length > 0 && labelled.every(([s, text]) => text.startsWith(`${labelOf[s]} `)), 'step 4: each check line starts with the label of its severity', JSON.stringify(labelled));
 await t.shot('T10-checks-error');
 await h.escapeRoute();
 

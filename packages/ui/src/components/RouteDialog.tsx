@@ -247,7 +247,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
                 <div className="mep-route-checks" data-testid="route-checks">
                   {checkLines.map((line) => (
                     <div key={line.code} className="mep-route-check-line">
-                      <p className={`mep-route-text mep-route-check-${line.severity}`} data-testid={`route-check-${line.code}`} data-severity={line.severity}>{line.text}</p>
+                      <p className={`mep-route-text mep-route-check-${line.severity}`} data-testid={`route-check-${line.code}`} data-severity={line.severity}><strong className="mep-route-severity">{routeText(language, line.severity === 'error' ? 'severityError' : line.severity === 'warning' ? 'severityWarning' : 'severityInfo')}</strong>{' '}{line.text}</p>
                       {line.hint !== '' && <p className="mep-route-text mep-route-hint">{line.hint}</p>}
                     </div>
                   ))}
