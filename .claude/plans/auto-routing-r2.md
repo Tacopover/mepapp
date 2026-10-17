@@ -1,6 +1,30 @@
 # R2 plan: the route dialog input and the port finder
 
-Status: written 2026-10-16 by the road map planner. Revised in round 1 of 2 after the audit and the domain check. All answers of the user for R2 are final (D-R2-01 C, D-R2-02 A, D-R2-03 A). Nothing is built yet.
+**Status: DONE 2026-10-17 (on branch `worktree-agent-framework`, not merged; the user tests on Windows first).** One task is open: a real multi-page PDF is needed to prove the refusal (NEEDS_CONTEXT, see below).
+
+| Task | Commit | Verification |
+|---|---|---|
+| T01 open ports in core | `11e5117` | core 924 tests, build |
+| T02 port finder | `1a7d4bb` | core 942 tests (18 new) |
+| T03 multi-page refusal (en, nl) | `f3c4933` | core 947 tests |
+| T04 scene uses `openPortsOf` | `8950f65` | browser check 7 of 7: status bar equals an independent count, Undo restores |
+| T05 route markers | `513402f` | browser check 17 of 17: pixels change, `isDirty`, `exportProject` and Undo state unchanged |
+| T06 dialog pure logic | `8c47e73` | UI 174 tests (49 new) |
+| T07 dialog shell, menu entry, refusal | `1aede20` | browser check 19 of 19, backdrop click keeps the dialog open |
+| T08 dialog inputs | `06cb108` | browser check 27 of 27 (en) and 5 of 5 (nl, 400 px); one term "Route network" |
+| T09a scope, room list, summary | `4ed894c` | browser check 34 of 34 and 4 of 4; the count drops by a room's count when it is unchecked |
+| T09b markers, event refresh, polish | `432dd3b` | browser check 22 of 22; markers magenta (distinct from the cyan selection box) |
+| T11 part check | `97de784` | core 947, UI 177, typecheck, build; `r2-check.mjs` 55 of 55 and 5 of 5 |
+| T12 fixes from the part check | `8e2e204` | core 947, UI 181, typecheck 17 of 17, `pnpm build` fresh (`turbo --force`, 0 cached, 9 of 9); `r2-check.mjs` 64 of 64 and 10 of 10 |
+
+Open at the end of R2:
+- **NEEDS_CONTEXT:** all 9 files in `fixtures/pdfs/` have 1 page. The refusal of a multi-page PDF is proven only with a stub of `getPageCount` (wiring and texts, en and nl). A real multi-page PDF fixture is needed. Nobody makes a fake one.
+- Auto-place places 0 stamps on `plattegrond begane grond 10A.pdf` with the scale of `lib.mjs` `detect`. The part check ran on `01_arch_first_floor.pdf`. Cause not found.
+- The Dutch wording (the formal "u", "ruimtes", "(N open)", the mix of Dutch stamp names and English network type names) needs a Dutch speaker.
+- The dialog sits at the right and cannot be moved. The plan has no legend for the marker colors. The dialog lists counts only: a list of the target ports (stamp and port name) comes with R3 or later.
+- Provisional choices (easy to reverse): P-R2-01 to P-R2-11 (see section 0 and the ledger).
+
+Status: written 2026-10-16 by the road map planner. Revised in round 1 of 2 after the audit and the domain check. All answers of the user for R2 are final (D-R2-01 C, D-R2-02 A, D-R2-03 A). (Written before the build; see the status above.)
 Origin: `roadmap-overview.md` (sections 0, 1, 3, 5), `auto-routing.md`, `auto-routing-r2-prompt.md`. The model changed after the R2 prompt: the app stores no grouping of ports. So R2 has no entity to design and no migration. The research on Revit, MagiCAD and the old app is not needed for this model and is not repeated here. Not verified: that no later part needs it.
 Code claims carry `path:line`. Paths start at the repository root. A line number can move after a later commit.
 Read `.claude/roadmap/rules.md` first.

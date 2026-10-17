@@ -197,7 +197,7 @@ The mockup is older than decisions 4 to 6. These parts of it do not apply: the r
 
 Each part gets its own plan. No detailed design here.
 
-**R2 — Which network: the route dialog input and the port finder.** Replaced on 2026-10-16 by `roadmap-overview.md`; the plan is `auto-routing-r2.md`. The text below is the old draft.
+**R2 — Which network: the route dialog input and the port finder. DONE 2026-10-17 (see `auto-routing-r2.md`).** Replaced on 2026-10-16 by `roadmap-overview.md`; the plan is `auto-routing-r2.md`. The text below is the old draft.
 - Exists: network types per drawing; networks that MepApp calculates from the segments (`computeNetworks`), never stored; `.claude/plans/networks-panel-spec.md`.
 - Now: a route dialog takes the start stamp, the start port, the network type, and the target ports (given as rooms, or as the selected stamps). A pure finder in core lists the open ports. Nothing is stored. A multi-page PDF is refused.
 - Old draft (dropped): a stored system with a name, a start point and its rooms or zone.
