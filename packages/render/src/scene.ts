@@ -118,6 +118,9 @@ import {
   type TerminalAssignmentPlan,
   type Transform2D,
   type Vec2,
+  computeRouteArea,
+  DEFAULT_ROUTE_AREA_TYPE_IDS,
+  routeAreaWarnings,
 } from '@mepapp/core';
 import { PATH_KIND, type AnnotationGeometry as PdfAnnotationGeometry, type PdfDocumentHandle, type StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
@@ -125,6 +128,7 @@ import { applyStampColor, destroyStampEntries } from './colorize.js';
 import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js';
 import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, removeVertices, verticesInBox, roomBounds, type VertexRef, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, polygonDifference, polygonContainsPoint, rectPolygon, pushVerticesOut, wrapAroundRooms, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams, filterWallSegments } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
+import { drawRouteArea, type RouteAreaView } from './routeAreaLayer.js';
 import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroupVisibility, type WallDebugGroup, type WallLineInfo } from './wallDebugLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
@@ -553,6 +557,12 @@ interface SketchSceneEvents {
   roomSelectionChanged: [];
   /** The wall-line debug overlay was shown, hidden, recomputed or filtered. Re-read with getWallDebugState(). */
   wallDebugChanged: [WallDebugState];
+  /** The route-area overlay was recomputed and redrawn. The payload holds the area and its warnings. */
+  routeAreaChanged: [RouteAreaView];
+  /** The route-area overlay was shown or hidden. */
+  routeAreaVisibleChanged: [boolean];
+  /** A recompute of the route-area overlay started (true) or finished (false). */
+  routeAreaPendingChanged: [boolean];
   /** The pointer moved onto a line of the wall-line debug overlay (info and container-relative screen position), or off it (null). */
   wallLineHover: [info: WallLineInfo | null, screen: Vec2 | null];
   /** W (should be a wall) or N (should not be a wall) was pressed while the pointer was on a line of the wall-line debug overlay. */
@@ -678,6 +688,13 @@ export class SketchScene {
   private wallDebugBusy = false;
   private wallDebugMessage: string | null = null;
   private wallDebugToken = 0;
+  private readonly routeAreaLayer = new Container();
+  private routeAreaRoomTypes: string[] = [...DEFAULT_ROUTE_AREA_TYPE_IDS];
+  private routeAreaVisible = false;
+  private routeAreaPending = false;
+  private routeAreaTimer: ReturnType<typeof setTimeout> | null = null;
+  private routeAreaCache: { rooms: object; types: string; pageIndex: number; factor: number | null; view: RouteAreaView } | null = null;
+  private routeAreaDrawn: { view: RouteAreaView; rooms: Room[] } | null = null;
   private selectedRoomIds = new Set<string>();
   /** Selected vertices of the single selected room (edit-room tool). Cleared when the room selection, the tool, or the history (undo/redo) changes. */
   private selectedRoomVertices: VertexRef[] = [];
@@ -720,6 +737,35 @@ export class SketchScene {
     for (const event of ['pageChanged', 'documentActivated', 'calibrationSet'] as const) this.emitter.on(event, () => void this.refreshWallDebug());
     for (const event of ['pageChanged', 'documentActivated'] as const) this.emitter.on(event, () => this.clearRouteMarkers());
     this.emitter.on('zoomChanged', () => drawWallDebugHighlight(this.wallDebugLayer, this.wallDebugData, this.wallDebugHover, WALL_DEBUG_HIGHLIGHT_PX / this.world.scale.x));
+    this.emitter.on('roomsChanged', () => {
+      if (!this.routeAreaVisible) return;
+      if (this.routeAreaTimer !== null) clearTimeout(this.routeAreaTimer);
+      if (!this.routeAreaPending) {
+        this.routeAreaPending = true;
+        this.emitter.emit('routeAreaPendingChanged', true);
+      }
+      this.routeAreaTimer = setTimeout(() => {
+        this.routeAreaTimer = null;
+        const view = this.getRouteArea();
+        this.redrawRouteArea(false);
+        this.routeAreaPending = false;
+        this.emitter.emit('routeAreaPendingChanged', false);
+        this.emitter.emit('routeAreaChanged', view);
+      }, 300);
+    });
+    for (const event of ['pageChanged', 'documentActivated', 'calibrationSet'] as const) {
+      this.emitter.on(event, () => {
+        this.cancelRouteAreaWait();
+        this.redrawRouteArea(this.routeAreaVisible);
+      });
+    }
+    this.emitter.on('zoomChanged', () => {
+      if (this.routeAreaTimer !== null || !this.routeAreaVisible) {
+        if (this.routeAreaDrawn) drawRouteArea(this.routeAreaLayer, this.routeAreaDrawn.view, this.routeAreaDrawn.rooms, 1 / this.world.scale.x);
+        return;
+      }
+      this.redrawRouteArea(false);
+    });
   }
 
   private buildToolMap(): Map<SketchTool, Tool> {
@@ -857,6 +903,7 @@ export class SketchScene {
     this.resizeObserver.observe(this.container);
 
     this.world.addChild(this.doc.roomLayer);
+    this.world.addChild(this.routeAreaLayer);
     this.world.addChild(this.wallDebugLayer);
     this.world.addChild(this.doc.stampsLayer);
     this.world.addChild(this.doc.drawingLayer);
@@ -904,6 +951,7 @@ export class SketchScene {
 
   destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown);
+    if (this.routeAreaTimer !== null) clearTimeout(this.routeAreaTimer);
     this.resizeObserver?.disconnect();
     this.stampGhostSprite?.destroy();
     for (const document of this.documents) document.destroy();
@@ -1105,6 +1153,7 @@ export class SketchScene {
     this.world.removeChildren();
     if (target.backdropSprite) this.world.addChild(target.backdropSprite);
     this.world.addChild(target.roomLayer);
+    this.world.addChild(this.routeAreaLayer);
     this.world.addChild(this.wallDebugLayer);
     this.world.addChild(target.stampsLayer);
     this.world.addChild(target.drawingLayer);
@@ -3470,6 +3519,69 @@ export class SketchScene {
     setWallDebugGroupVisibility(this.wallDebugLayer, this.wallDebugHidden);
     this.setWallDebugHover(null, null);
     this.emitter.emit('wallDebugChanged', this.getWallDebugState());
+  }
+
+  setRouteAreaRoomTypes(ids: readonly string[]): void {
+    this.routeAreaRoomTypes = [...ids];
+    this.routeAreaCache = null;
+    this.cancelRouteAreaWait();
+    if (this.routeAreaVisible) this.redrawRouteArea(true);
+  }
+
+  getRouteAreaRoomTypes(): string[] {
+    return [...this.routeAreaRoomTypes];
+  }
+
+  getRouteArea(): RouteAreaView {
+    const pageIndex = this.doc.pageIndex;
+    const cal = this.getCalibration();
+    const factor = cal ? 1 / cal.pageUnitsPerRealUnit : null;
+    const rooms = this.doc.drawingHistory.getState().rooms;
+    const types = JSON.stringify(this.routeAreaRoomTypes);
+    const cache = this.routeAreaCache;
+    if (cache && cache.rooms === rooms && cache.types === types && cache.pageIndex === pageIndex && cache.factor === factor) return cache.view;
+    const area = computeRouteArea(Object.values(rooms), { roomTypeIds: this.routeAreaRoomTypes, mmPerPt: factor, pageIndex });
+    const view = { area, warnings: routeAreaWarnings(area) };
+    this.routeAreaCache = { rooms, types, pageIndex, factor, view };
+    return view;
+  }
+
+  setRouteAreaVisible(visible: boolean): void {
+    if (visible === this.routeAreaVisible) return;
+    this.routeAreaVisible = visible;
+    if (!visible) this.cancelRouteAreaWait();
+    this.redrawRouteArea(visible);
+    this.emitter.emit('routeAreaVisibleChanged', visible);
+  }
+
+  isRouteAreaVisible(): boolean {
+    return this.routeAreaVisible;
+  }
+
+  isRouteAreaPending(): boolean {
+    return this.routeAreaPending;
+  }
+
+  private redrawRouteArea(emit: boolean): void {
+    if (!this.routeAreaVisible) {
+      drawRouteArea(this.routeAreaLayer, null, [], 1 / this.world.scale.x);
+      this.routeAreaDrawn = null;
+      return;
+    }
+    const view = this.getRouteArea();
+    const rooms = this.listRooms();
+    drawRouteArea(this.routeAreaLayer, view, rooms, 1 / this.world.scale.x);
+    this.routeAreaDrawn = { view, rooms };
+    if (emit) this.emitter.emit('routeAreaChanged', view);
+  }
+
+  private cancelRouteAreaWait(): void {
+    if (this.routeAreaTimer !== null) clearTimeout(this.routeAreaTimer);
+    this.routeAreaTimer = null;
+    if (this.routeAreaPending) {
+      this.routeAreaPending = false;
+      this.emitter.emit('routeAreaPendingChanged', false);
+    }
   }
 
   private async refreshWallDebug(): Promise<void> {
