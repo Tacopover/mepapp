@@ -216,7 +216,7 @@ check(await page.locator(`${R} [data-testid=route-port]`).isEnabled(), 'the star
 const typeOptions = await page.locator(`${R} [data-testid=route-type] option`).evaluateAll((els) => els.map((e) => ({ value: e.value, text: e.textContent })));
 console.log('TYPE OPTIONS ' + JSON.stringify(typeOptions));
 check(typeOptions.every((o) => / \(\d+ open ports?\)$/.test(o.text)), 'every type option ends with the open ports count', JSON.stringify(typeOptions));
-const selectOrder = await page.locator(`${R} [data-testid=route-body] select`).evaluateAll((els) => els.map((e) => e.dataset.testid));
+const selectOrder = await page.locator(`${R} [data-testid=route-body] select`).evaluateAll((els) => els.map((e) => e.dataset.testid).filter((id) => id !== 'route-area-add'));
 check(JSON.stringify(selectOrder) === JSON.stringify(['route-start', 'route-type', 'route-port']), 'the selects are in the order start, type, port', JSON.stringify(selectOrder));
 const dialogX = (await page.locator(R).boundingBox())?.x ?? 0;
 check(dialogX > 800, 'the dialog sits at the right of the window', String(dialogX));
