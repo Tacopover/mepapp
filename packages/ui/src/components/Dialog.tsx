@@ -15,6 +15,8 @@ export interface DialogProps {
   header?: ReactNode;
   /** Keeps every key press inside the dialog: the scene's window key handler (Delete, Ctrl+C, Ctrl+V, tool keys) does not see it, so a Delete meant for the dialog never deletes the canvas selection behind it. Listeners on the document still run. Defaults to true. */
   isolateKeys?: boolean;
+  /** Extra class appended to .mep-modal-backdrop, for a dialog that needs its own backdrop look or placement. */
+  backdropClassName?: string;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface DialogProps {
  * and Escape both dismiss via onClose. Reuses the mep-modal / mep-modal-actions
  * classes the calibration prompt already established rather than a new look.
  */
-export function Dialog({ title, onClose, children, actions, className, closeOnBackdropClick = true, header, isolateKeys = true }: DialogProps) {
+export function Dialog({ title, onClose, children, actions, className, closeOnBackdropClick = true, header, isolateKeys = true, backdropClassName }: DialogProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isolateKeys) event.stopPropagation();
@@ -36,7 +38,7 @@ export function Dialog({ title, onClose, children, actions, className, closeOnBa
   }, [onClose, isolateKeys]);
 
   return (
-    <div className="mep-modal-backdrop" onClick={closeOnBackdropClick ? onClose : undefined}>
+    <div className={`mep-modal-backdrop${backdropClassName ? ` ${backdropClassName}` : ''}`} onClick={closeOnBackdropClick ? onClose : undefined}>
       <div className={`mep-modal${className ? ` ${className}` : ''}`} role="dialog" aria-label={title} onClick={(event) => event.stopPropagation()}>
         {header ? <div className="mep-modal-header">{header}</div> : <h3 className="mep-modal-title">{title}</h3>}
         {/* Scrolls independently of the title/actions so a tall dialog (many rows, e.g. the Element Editor's port list) never pushes its action buttons below the viewport. */}

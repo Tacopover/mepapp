@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteLanguage, RoutePortsResult, RouteStamp } from '@mepapp/core';
 import {
-  includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText,
+  includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText, typeOptionText,
   type RouteTextKey,
 } from './components/routePlan.js';
 
@@ -211,7 +211,7 @@ const ROUTE_TEXT_KEYS: RouteTextKey[] = [
   'title', 'close', 'noEquipment', 'startStamp', 'groupSources', 'groupWaiting', 'startWarning',
   'startPort', 'portNote', 'networkType', 'noOpenPorts', 'scope', 'scopeRooms', 'scopeStamps',
   'roomsAll', 'roomsNone', 'noRooms', 'includeOutside', 'useAllPorts',
-  'scopeStampsHint', 'roomsColRoom', 'roomsColType', 'roomsColPorts', 'noChoice',
+  'scopeStampsHint', 'roomsColRoom', 'roomsColType', 'roomsColPorts', 'noChoice', 'scopeStampsNote', 'roomsColPortsTitle',
 ];
 const LANGUAGES: RouteLanguage[] = ['en', 'nl'];
 
@@ -350,9 +350,31 @@ describe('includeOutsideText', () => {
   });
 });
 
+describe('typeOptionText', () => {
+  it('gives the English port count with singular and plural', () => {
+    expect(typeOptionText('en', 'Supply Air', 27)).toBe('Supply Air (27 open ports)');
+    expect(typeOptionText('en', 'Supply Air', 1)).toBe('Supply Air (1 open port)');
+  });
+
+  it('gives the Dutch aansluiting count with singular and plural', () => {
+    expect(typeOptionText('nl', 'toevoerlucht', 27)).toBe('toevoerlucht (27 open)');
+    expect(typeOptionText('nl', 'toevoerlucht', 1)).toBe('toevoerlucht (1 open)');
+  });
+});
+
 describe('routeText', () => {
-  it('has a text in English and Dutch for all 24 keys', () => {
-    expect(ROUTE_TEXT_KEYS).toHaveLength(24);
+  it('gives the Dutch open ports column and its title', () => {
+    expect(routeText('nl', 'roomsColPorts')).toBe('Open');
+    expect(routeText('nl', 'roomsColPortsTitle')).toBe('Open aansluitingen');
+  });
+
+  it('gives the start stamp note in English and Dutch', () => {
+    expect(routeText('en', 'scopeStampsNote')).toContain('start stamp');
+    expect(routeText('nl', 'scopeStampsNote')).toContain('startstempel');
+  });
+
+  it('has a text in English and Dutch for all 26 keys', () => {
+    expect(ROUTE_TEXT_KEYS).toHaveLength(26);
     for (const language of LANGUAGES) {
       for (const key of ROUTE_TEXT_KEYS) expect(routeText(language, key).length).toBeGreaterThan(0);
     }

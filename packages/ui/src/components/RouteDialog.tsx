@@ -2,7 +2,7 @@ import { useEffect, useState, type RefObject } from 'react';
 import type { RouteMarker, SketchScene, StampInfo } from '@mepapp/render';
 import { findRoutePorts, getNetworkTypeFromLibrary, getStampWorldPorts, roomTypeLabel, routePageProblem, type RoomType } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
-import { includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText } from './routePlan.js';
+import { includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startPortChoices, typeChoices, typeNameInText, typeOptionText } from './routePlan.js';
 
 export interface RouteDialogProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -131,6 +131,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
     <Dialog
       title={routeText(language, 'title')}
       className="mep-modal--route"
+      backdropClassName="mep-modal-backdrop--route"
       closeOnBackdropClick={false}
       onClose={onClose}
       actions={
@@ -179,6 +180,24 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
                 </p>
               )}
               <label className="mep-route-field">
+                <span>{routeText(language, 'networkType')}</span>
+                <select
+                  data-testid="route-type"
+                  value={selectedType ?? ''}
+                  disabled={choices.length === 0}
+                  onChange={(event) => {
+                    setTypeId(event.target.value);
+                    setPortId(null);
+                  }}
+                >
+                  {choices.length === 0 ? (
+                    <option value="">{routeText(language, 'noChoice')}</option>
+                  ) : choices.map((c) => (
+                    <option key={c.networkTypeId} value={c.networkTypeId}>{typeOptionText(language, nameOf(c.networkTypeId), c.count)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="mep-route-field">
                 <span>{routeText(language, 'startPort')}</span>
                 <select
                   data-testid="route-port"
@@ -201,24 +220,6 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
                   })}
                 </p>
               )}
-              <label className="mep-route-field">
-                <span>{routeText(language, 'networkType')}</span>
-                <select
-                  data-testid="route-type"
-                  value={selectedType ?? ''}
-                  disabled={choices.length === 0}
-                  onChange={(event) => {
-                    setTypeId(event.target.value);
-                    setPortId(null);
-                  }}
-                >
-                  {choices.length === 0 ? (
-                    <option value="">{routeText(language, 'noChoice')}</option>
-                  ) : choices.map((c) => (
-                    <option key={c.networkTypeId} value={c.networkTypeId}>{`${nameOf(c.networkTypeId)} (${c.count})`}</option>
-                  ))}
-                </select>
-              </label>
               {choices.length === 0 && (
                 <p className="mep-route-text" data-testid="route-no-ports">{routeText(language, 'noOpenPorts')}</p>
               )}
@@ -236,7 +237,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
                       />
                       <span>{routeText(language, 'scopeRooms')}</span>
                     </label>
-                    <label className="mep-route-radio">
+                    <label className={`mep-route-radio${stampsEnabled ? '' : ' mep-route-radio--disabled'}`}>
                       <input
                         type="radio"
                         name="route-scope"
@@ -248,6 +249,9 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
                       <span>{routeText(language, 'scopeStamps')}</span>
                     </label>
                   </fieldset>
+                  {effectiveScope === 'stamps' && (
+                    <p className="mep-route-text mep-route-hint" data-testid="route-stamps-note">{routeText(language, 'scopeStampsNote')}</p>
+                  )}
                   {!stampsEnabled && (
                     <p className="mep-route-text mep-route-hint" data-testid="route-stamps-hint">{routeText(language, 'scopeStampsHint')}</p>
                   )}
@@ -272,7 +276,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onClose 
                           <span className="mep-route-room-spacer" />
                           <span className="mep-route-room-name">{routeText(language, 'roomsColRoom')}</span>
                           <span className="mep-route-room-type">{routeText(language, 'roomsColType')}</span>
-                          <span className="mep-route-room-count">{routeText(language, 'roomsColPorts')}</span>
+                          <span className="mep-route-room-count" title={routeText(language, 'roomsColPortsTitle')}>{routeText(language, 'roomsColPorts')}</span>
                         </div>
                         <div className="mep-route-rooms" data-testid="route-rooms">
                           {rooms.map((room, index) => {

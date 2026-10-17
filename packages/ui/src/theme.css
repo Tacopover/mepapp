@@ -3579,6 +3579,17 @@
 .mep-modal--route .mep-route-radio {
   white-space: nowrap;
 }
+.mep-modal--route .mep-route-radio--disabled {
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.mep-modal-backdrop--route {
+  background: transparent;
+  justify-content: flex-end;
+  padding-right: 16px;
+  box-sizing: border-box;
+}
 /* "User library" and "Add stamp folder" dialogs: one column, own width (not the Element Editor's .mep-modal--wide, whose body is a flex row). */
 .mep-modal--library {
   width: 520px;

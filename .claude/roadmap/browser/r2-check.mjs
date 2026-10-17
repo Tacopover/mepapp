@@ -18,7 +18,6 @@ const ALL_PDFS = [
 ];
 const R = '.mep-modal--route';
 let anyFail = false;
-const finding = (ok, what, extra = '') => console.log(ok ? 'PASS ' + what : 'FINDING ' + what + ' ' + extra);
 const done = async (t) => {
   await t.finish();
   if (process.exitCode) anyFail = true;
@@ -216,6 +215,16 @@ check(type0 === 'supply-air', 'the type select starts with supply-air', type0);
 check(await page.locator(`${R} [data-testid=route-port]`).isEnabled(), 'the start port select is enabled');
 const typeOptions = await page.locator(`${R} [data-testid=route-type] option`).evaluateAll((els) => els.map((e) => ({ value: e.value, text: e.textContent })));
 console.log('TYPE OPTIONS ' + JSON.stringify(typeOptions));
+check(typeOptions.every((o) => / \(\d+ open ports?\)$/.test(o.text)), 'every type option ends with the open ports count', JSON.stringify(typeOptions));
+const selectOrder = await page.locator(`${R} [data-testid=route-body] select`).evaluateAll((els) => els.map((e) => e.dataset.testid));
+check(JSON.stringify(selectOrder) === JSON.stringify(['route-start', 'route-type', 'route-port']), 'the selects are in the order start, type, port', JSON.stringify(selectOrder));
+const dialogX = (await page.locator(R).boundingBox())?.x ?? 0;
+check(dialogX > 800, 'the dialog sits at the right of the window', String(dialogX));
+const backdropBg = await page.evaluate(() => {
+  const b = document.querySelector('.mep-modal-backdrop');
+  return b ? getComputedStyle(b).backgroundColor : 'missing';
+});
+check(backdropBg === 'rgba(0, 0, 0, 0)' || backdropBg === 'transparent', 'the backdrop is transparent', backdropBg);
 const exp0 = await expectedCount(type0, aId);
 let lines = await summary();
 const n0 = await total();
@@ -231,20 +240,18 @@ const m0 = await markers();
 check(m0.filter((x) => x.kind === 'start').length === 1 && m0.filter((x) => x.kind === 'target').length === n0, 'markers: one start and one per counted port', `${m0.length}`);
 await t.shot('T11-dialog-rooms');
 
-// Markers on the plan: find a target outside the dialog and look for magenta pixels there.
+// Markers on the plan: a centre probe (under the area the old centred dialog covered) and an edge probe (beside the dialog).
 const modalBox = await page.locator(R).boundingBox();
-let probe = null;
-for (const m of m0.filter((x) => x.kind === 'target')) {
-  const q = await screenOf({ x: m.x, y: m.y });
-  const outside = q.x < modalBox.x - 30 || q.x > modalBox.x + modalBox.width + 30 || q.y < modalBox.y - 30 || q.y > modalBox.y + modalBox.height + 30;
-  if (outside && q.x > 70 && q.y > 90 && q.x < 1150 && q.y < 930) { probe = q; break; }
-}
-check(!!probe, 'a target marker outside the dialog exists for the pixel check');
-let magentaOpen = 0;
-if (probe) {
-  magentaOpen = await magentaIn(probe);
-  check(magentaOpen > 0, 'magenta marker pixels show around a target port while the dialog is open', String(magentaOpen));
-}
+const targetScreens = [];
+for (const m of m0.filter((x) => x.kind === 'target')) targetScreens.push(await screenOf({ x: m.x, y: m.y }));
+const centreProbe = targetScreens.find((q) => q.x >= 590 && q.x <= 1010 && q.y >= 140 && q.y <= 930) ?? null;
+const edgeProbe = targetScreens.find((q) => q.x >= modalBox.x - 150 && q.x <= modalBox.x - 25 && q.y >= 90 && q.y <= 930) ?? null;
+check(!!centreProbe, 'a target marker lies in the plan centre for the pixel check');
+const probe = centreProbe;
+const centreMagenta = centreProbe ? await magentaIn(centreProbe) : 0;
+if (centreProbe) check(centreMagenta > 0, 'magenta marker pixels show in the plan centre that the dialog used to cover', String(centreMagenta));
+check(!!edgeProbe, 'a target marker lies near the dialog edge for the pixel check');
+if (edgeProbe) check((await magentaIn(edgeProbe)) > 0, 'magenta marker pixels show near the dialog edge', String(await magentaIn(edgeProbe)));
 await t.shot('T11-markers-on-plan');
 
 // Step 4: real clicks. Uncheck a room.
@@ -292,6 +299,8 @@ lines = await summary();
 check((await total()) === expSel && expSel > 0, 'selected stamps scope: the count equals the independent count', `${await total()} vs ${expSel}: ${lines[0]}`);
 check(/ on \d+ selected stamps?\.$/.test(lines[0] ?? ''), 'selected stamps scope: the stamps wording', lines[0]);
 check((await page.locator(`${R} [data-testid=route-rooms]`).count()) === 0, 'selected stamps scope: no room list');
+const stampsNotes = await page.locator(`${R} [data-testid=route-stamps-note]`).allInnerTexts();
+check(stampsNotes.length === 1 && /start stamp/.test(stampsNotes[0] ?? ''), 'selected stamps scope: the note says the start stamp is not counted', JSON.stringify(stampsNotes));
 await t.shot('T11-dialog-selection');
 await page.locator(`${R} [data-testid=route-scope-rooms]`).click();
 await idle(300);
@@ -326,6 +335,24 @@ await t.shot('T11-narrow-400');
 await escapeRoute();
 await page.setViewportSize({ width: 1600, height: 1000 });
 await idle(500);
+
+// Selected stamps scope with no selection: the radio is disabled, dimmed, and the hint stays.
+await page.mouse.click(110, 150);
+await idle(300);
+await openRoute();
+const stampsRadio = page.locator(`${R} [data-testid=route-scope-stamps]`);
+if ((await stampsRadio.count()) === 0) {
+  check(false, 'no selection: the selected stamps radio is present');
+} else {
+  check(await stampsRadio.isDisabled(), 'no selection: the selected stamps radio is disabled');
+}
+const disabledLabels = page.locator(`${R} .mep-route-radio--disabled`);
+check((await disabledLabels.count()) === 1, 'no selection: the disabled radio label has the disabled class');
+const labelOpacity = (await disabledLabels.count()) === 1 ? await disabledLabels.evaluate((e) => getComputedStyle(e).opacity) : 'missing';
+check(Number(labelOpacity) < 1, 'no selection: the disabled radio label is dimmed', labelOpacity);
+const stampsHint = page.locator(`${R} [data-testid=route-stamps-hint]`);
+check((await stampsHint.isVisible()) && (await stampsHint.innerText()).trim() !== '', 'no selection: the selected stamps hint is visible');
+await escapeRoute();
 
 // Extra (a): equipment, but no routing targets.
 const noTargets = JSON.parse(projectJson);
@@ -366,13 +393,18 @@ const nlText = await page.locator(R).innerText();
 const nlLines = await summary();
 check(/^\d+ open aansluitingen? voor toevoerlucht in \d+ aangevinkte ruimtes?\.$/.test(nlLines[0] ?? ''), 'Dutch first summary line', nlLines[0]);
 check(/Bereik/.test(nlText) && /Ruimtes/.test(nlText) && /Aansluitingen buiten ruimtes meenemen/.test(nlText) && /Startstempel/.test(nlText), 'Dutch labels show');
+const nlTypeOptions = await page.locator(`${R} [data-testid=route-type] option`).allInnerTexts();
+check(nlTypeOptions.length > 0 && nlTypeOptions.every((o) => /\(\d+ open\)$/.test(o)),'Dutch type options end with the open aansluitingen count', JSON.stringify(nlTypeOptions));
 check(await noOverflow(), 'Dutch 400 px: no horizontal overflow');
 const nlHead = await headCells();
 console.log('NL HEAD ' + JSON.stringify(nlHead));
-const nlPorts = nlHead.find((c) => c.text === 'Open aansluitingen');
-check(!!nlPorts, 'Dutch 400 px: the room header shows "Open aansluitingen"', JSON.stringify(nlHead.map((c) => c.text)));
-finding(!!nlPorts && nlPorts.scroll <= nlPorts.client, 'Dutch 400 px: the header "Open aansluitingen" is not cut by an ellipsis', JSON.stringify(nlPorts));
-finding(nlHead.every((c) => c.scroll <= c.client), 'Dutch 400 px: no room header cell is cut', JSON.stringify(nlHead));
+const nlOpenIdx = nlHead.findIndex((c) => c.text === 'Open');
+check(nlOpenIdx >= 0, 'Dutch 400 px: the room header shows "Open"', JSON.stringify(nlHead.map((c) => c.text)));
+const nlOpenTitle = nlOpenIdx >= 0 ? await page.locator(`${R} [data-testid=route-rooms-head] span`).nth(nlOpenIdx).getAttribute('title') : null;
+check(nlOpenTitle === 'Open aansluitingen', 'Dutch 400 px: the header "Open" has the title "Open aansluitingen"', String(nlOpenTitle));
+check(nlOpenIdx >= 0 && nlHead[nlOpenIdx].scroll <= nlHead[nlOpenIdx].client, 'Dutch 400 px: the header "Open" is not cut', JSON.stringify(nlHead[nlOpenIdx]));
+check(nlHead.every((c) => !/…$|\.\.\.$/.test(c.text)), 'Dutch 400 px: no room header text ends with an ellipsis', JSON.stringify(nlHead.map((c) => c.text)));
+check(nlHead.every((c) => c.scroll <= c.client), 'Dutch 400 px: no room header cell is cut', JSON.stringify(nlHead));
 await t.shot('T11-narrow-400-nl');
 await escapeRoute();
 await done(t);

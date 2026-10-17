@@ -80,7 +80,7 @@ export type RouteTextKey =
   | 'title' | 'close' | 'noEquipment' | 'startStamp' | 'groupSources' | 'groupWaiting' | 'startWarning'
   | 'startPort' | 'portNote' | 'networkType' | 'noOpenPorts' | 'scope' | 'scopeRooms' | 'scopeStamps'
   | 'roomsAll' | 'roomsNone' | 'noRooms' | 'includeOutside' | 'useAllPorts'
-  | 'scopeStampsHint' | 'roomsColRoom' | 'roomsColType' | 'roomsColPorts' | 'noChoice';
+  | 'scopeStampsHint' | 'roomsColRoom' | 'roomsColType' | 'roomsColPorts' | 'noChoice' | 'scopeStampsNote' | 'roomsColPortsTitle';
 
 const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
   en: {
@@ -108,6 +108,8 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     roomsColType: 'Type',
     roomsColPorts: 'Open ports',
     noChoice: 'None available',
+    scopeStampsNote: 'The start stamp itself is not counted.',
+    roomsColPortsTitle: 'Open ports',
   },
   nl: {
     title: 'Netwerk routeren',
@@ -132,14 +134,21 @@ const TEXTS: Record<RouteLanguage, Record<RouteTextKey, string>> = {
     scopeStampsHint: 'Selecteer eerst andere stempels op het plan.',
     roomsColRoom: 'Ruimte',
     roomsColType: 'Type',
-    roomsColPorts: 'Open aansluitingen',
+    roomsColPorts: 'Open',
     noChoice: 'Niet beschikbaar',
+    scopeStampsNote: 'Het startstempel zelf wordt niet meegeteld.',
+    roomsColPortsTitle: 'Open aansluitingen',
   },
 };
 
 export function includeOutsideText(language: RouteLanguage, count: number): string {
   if (language === 'nl') return `${routeText(language, 'includeOutside')}: ${count} ${count === 1 ? 'aansluiting' : 'aansluitingen'}`;
   return `${routeText(language, 'includeOutside')}: ${count} ${count === 1 ? 'port' : 'ports'}`;
+}
+
+export function typeOptionText(language: RouteLanguage, name: string, count: number): string {
+  if (language === 'nl') return `${name} (${count} open)`;
+  return `${name} (${count} open ${count === 1 ? 'port' : 'ports'})`;
 }
 
 /** Replaces each {name} in the text with String(params[name]). A {name} with no param stays as it is. */
