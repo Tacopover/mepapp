@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import type { Vec2 } from './geometry.js';
 import {
   MIN_LEG_MM,
   applyJogRule,
   elbowPath,
+  insideRouteArea,
   isLayoutPath,
   jogPath,
   legClass,
+  straightenPolyline,
+  withWallGaps,
 } from './route-layout.js';
 
 function pathLength(path: readonly { x: number; y: number }[]): number {
@@ -324,5 +328,174 @@ describe('applyJogRule', () => {
       expect(path[0]).toEqual(from);
       expect(path[path.length - 1]).toEqual(to);
     }
+  });
+});
+
+describe('straightenPolyline', () => {
+  const always = (): boolean => true;
+
+  it('keeps a straight axis polyline', () => {
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 0 }], always)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 10000, y: 0 }],
+      free: false,
+    });
+  });
+
+  it('drifts a 100 mm offset onto the axis', () => {
+    const result = straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 100 }], always);
+    expect(result.path).toEqual([{ x: 0, y: 0 }, { x: 10000, y: 0 }]);
+    expect(pathLength(result.path)).toBe(10000);
+    expect(result.free).toBe(false);
+  });
+
+  it('bends a 400 mm offset into a 45 degree jog', () => {
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 400 }], always)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 4800, y: 0 }, { x: 5200, y: 400 }, { x: 10000, y: 400 }],
+      free: false,
+    });
+  });
+
+  it('keeps an L corridor of two axis legs', () => {
+    const result = straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 0 }, { x: 10000, y: 8000 }], always);
+    expect(result.path).toEqual([{ x: 0, y: 0 }, { x: 10000, y: 0 }, { x: 10000, y: 8000 }]);
+    expect(result.free).toBe(false);
+  });
+
+  it('bends a tilted leg into a 45 degree jog', () => {
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 600 }], always)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 4700, y: 0 }, { x: 5300, y: 600 }, { x: 10000, y: 600 }],
+      free: false,
+    });
+  });
+
+  it('removes a collinear middle vertex', () => {
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 5000, y: 0 }, { x: 10000, y: 0 }], always)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 10000, y: 0 }],
+      free: false,
+    });
+  });
+
+  it('replaces a Z that leaves the region with an x-first elbow', () => {
+    const region = (p: Vec2): boolean => (p.y <= 100 && p.x <= 10100) || p.x >= 9900;
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 6000 }], region)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 10000, y: 0 }, { x: 10000, y: 6000 }],
+      free: false,
+    });
+  });
+
+  it('returns the input unchanged and free when the region excludes everything', () => {
+    const points = [{ x: 0, y: 0 }, { x: 10000, y: 600 }];
+    expect(straightenPolyline(points, () => false)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 10000, y: 600 }],
+      free: true,
+    });
+  });
+
+  it('keeps a link valid when a wall node covers the gap', () => {
+    const inner = (p: Vec2): boolean => (p.x <= 6000 || p.x >= 6400) && Math.abs(p.y) <= 50;
+    const region = withWallGaps(inner, [{ x: 6200, y: 0 }]);
+    expect(
+      straightenPolyline([{ x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6400, y: 0 }, { x: 12000, y: 0 }], region),
+    ).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 12000, y: 0 }],
+      free: false,
+    });
+  });
+
+  it('returns the input unchanged and free when the wall node is too far from the gap', () => {
+    const inner = (p: Vec2): boolean => (p.x <= 6000 || p.x >= 6400) && Math.abs(p.y) <= 50;
+    const region = withWallGaps(inner, [{ x: 8200, y: 0 }]);
+    const points = [{ x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6400, y: 0 }, { x: 12000, y: 0 }];
+    expect(straightenPolyline(points, region)).toEqual({ path: points, free: true });
+  });
+
+  it('bends a short tilted pair with one elbow, longer leg first', () => {
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 500, y: 400 }], always)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 400 }],
+      free: false,
+    });
+  });
+
+  it('does not drift a 200 mm offset over a long run', () => {
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 200 }], always)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 4900, y: 0 }, { x: 5100, y: 200 }, { x: 10000, y: 200 }],
+      free: false,
+    });
+  });
+
+  it('drops a duplicate vertex', () => {
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 5000, y: 0 }], always)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 5000, y: 0 }],
+      free: false,
+    });
+  });
+
+  it('takes the y-first elbow when the Z and the x-first elbow leave the region', () => {
+    const region = (p: Vec2): boolean => p.x <= 100 || p.y >= 1900;
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 3000, y: 2000 }], region)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 0, y: 2000 }, { x: 3000, y: 2000 }],
+      free: false,
+    });
+  });
+
+  it('keeps the Z when the region holds everything and no 45 degree pair fits', () => {
+    expect(straightenPolyline([{ x: 0, y: 0 }, { x: 3000, y: 2000 }], always)).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 1500, y: 0 }, { x: 1500, y: 2000 }, { x: 3000, y: 2000 }],
+      free: false,
+    });
+  });
+
+  it('does not mutate the input', () => {
+    const input = [{ x: 0, y: 0 }, { x: 5000, y: 0 }, { x: 10000, y: 0 }];
+    const copy = input.map((v) => ({ ...v }));
+    straightenPolyline(input, always);
+    expect(input).toEqual(copy);
+    const jogInput = [{ x: 0, y: 0 }, { x: 10000, y: 600 }];
+    const jogCopy = jogInput.map((v) => ({ ...v }));
+    straightenPolyline(jogInput, always);
+    expect(jogInput).toEqual(jogCopy);
+  });
+});
+
+describe('insideRouteArea', () => {
+  const square = {
+    polygon: {
+      outer: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }],
+      holes: [],
+    },
+  };
+  const far = {
+    polygon: {
+      outer: [{ x: 200, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 100 }, { x: 200, y: 100 }],
+      holes: [],
+    },
+  };
+
+  it('counts a point inside the room', () => {
+    expect(insideRouteArea([square], 10)({ x: 500, y: 500 })).toBe(true);
+  });
+
+  it('counts a point 100 mm outside the edge within the tolerance', () => {
+    expect(insideRouteArea([square], 10)({ x: 1100, y: 500 })).toBe(true);
+  });
+
+  it('rejects a point 300 mm outside the edge', () => {
+    expect(insideRouteArea([square], 10)({ x: 1300, y: 500 })).toBe(false);
+  });
+
+  it('counts a point inside either room', () => {
+    expect(insideRouteArea([square, far], 10)({ x: 2500, y: 500 })).toBe(true);
+  });
+});
+
+describe('withWallGaps', () => {
+  const none = (): boolean => false;
+
+  it('counts a point 700 mm from a wall node', () => {
+    expect(withWallGaps(none, [{ x: 0, y: 0 }])({ x: 700, y: 0 })).toBe(true);
+  });
+
+  it('rejects a point 800 mm from a wall node', () => {
+    expect(withWallGaps(none, [{ x: 0, y: 0 }])({ x: 800, y: 0 })).toBe(false);
   });
 });

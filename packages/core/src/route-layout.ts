@@ -1,5 +1,7 @@
 import type { Vec2 } from './geometry.js';
 import { resolveAngleSnap } from './angle-snap.js';
+import { polygonContainsPoint, type Room } from './rooms/room.js';
+import { distanceToRing } from './route-wall.js';
 
 export const ROUTE_ANGLE_INCREMENT_DEGREES = 45;
 export const SMALL_JUMP_MM = 1000;
@@ -105,4 +107,126 @@ export function applyJogRule(path: readonly Vec2[]): Vec2[] {
     }
   }
   return p;
+}
+
+export const REGION_TOL_MM = 150;
+export const WALL_GAP_MM = 750;
+export const ROUTE_SAMPLE_STEP_MM = 100;
+
+/** Region test in millimetres. `rooms` are the route-area rooms in page points; mmPerPt converts. A point is inside when a polygon holds it or its boundary is within toleranceMm. */
+export function insideRouteArea(
+  rooms: readonly Pick<Room, 'polygon'>[],
+  mmPerPt: number,
+  toleranceMm = REGION_TOL_MM,
+): (p: Vec2) => boolean {
+  return (p) => {
+    const pt = { x: p.x / mmPerPt, y: p.y / mmPerPt };
+    return rooms.some(
+      (room) =>
+        polygonContainsPoint(room.polygon, pt) || distanceToRing(room.polygon, pt) * mmPerPt <= toleranceMm,
+    );
+  };
+}
+
+/** Adds the wall gaps of the link edges: a point within gapMm of any wall node also counts as inside. */
+export function withWallGaps(
+  inside: (p: Vec2) => boolean,
+  wallNodesMm: readonly Vec2[],
+  gapMm = WALL_GAP_MM,
+): (p: Vec2) => boolean {
+  return (p) => inside(p) || wallNodesMm.some((w) => Math.hypot(p.x - w.x, p.y - w.y) <= gapMm);
+}
+
+function copyVec(p: Vec2): Vec2 {
+  return { x: p.x, y: p.y };
+}
+
+/** Walks the vertices. A free leg is drift-fixed or replaced by the points that jogLeg returns, which end at the next vertex. */
+function walkPolyline(points: readonly Vec2[], jogLeg: (cur: Vec2, b: Vec2) => Vec2[]): Vec2[] {
+  const out: Vec2[] = [copyVec(points[0]!)];
+  let cur = points[0]!;
+  for (let i = 1; i < points.length; i++) {
+    const b = points[i]!;
+    if (legClass(cur, b) !== 'free') {
+      out.push(copyVec(b));
+      cur = b;
+      continue;
+    }
+    const dx = b.x - cur.x;
+    const dy = b.y - cur.y;
+    const drift = Math.min(Math.abs(dx), Math.abs(dy));
+    if (drift < MIN_JOG_MM && drift <= MAX_DRIFT_MM) {
+      cur = Math.abs(dx) >= Math.abs(dy) ? { x: b.x, y: cur.y } : { x: cur.x, y: b.y };
+      out.push(copyVec(cur));
+    } else {
+      for (const p of jogLeg(cur, b)) out.push(copyVec(p));
+      cur = b;
+    }
+  }
+  return out;
+}
+
+/** Drops a repeated vertex and a middle vertex of two collinear legs that run the same way. */
+function joinLegs(path: readonly Vec2[]): Vec2[] {
+  const out: Vec2[] = [];
+  for (const p of path) {
+    const last = out[out.length - 1];
+    if (last && last.x === p.x && last.y === p.y) continue;
+    out.push(copyVec(p));
+    while (out.length >= 3) {
+      const a = out[out.length - 3]!;
+      const m = out[out.length - 2]!;
+      const c = out[out.length - 1]!;
+      const ux = m.x - a.x;
+      const uy = m.y - a.y;
+      const vx = c.x - m.x;
+      const vy = c.y - m.y;
+      const cross = ux * vy - uy * vx;
+      const dot = ux * vx + uy * vy;
+      if (Math.abs(cross) > 1e-9 * Math.hypot(ux, uy) * Math.hypot(vx, vy) || dot <= 0) break;
+      out.splice(out.length - 2, 1);
+    }
+  }
+  return out;
+}
+
+/** True when every sample on every leg of the path is inside the region. Samples are ROUTE_SAMPLE_STEP_MM apart at most. */
+function legsInside(path: readonly Vec2[], insideRegion: (p: Vec2) => boolean): boolean {
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1]!;
+    const b = path[i]!;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / ROUTE_SAMPLE_STEP_MM));
+    for (let k = 0; k <= n; k++) {
+      const t = k / n;
+      if (!insideRegion({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })) return false;
+    }
+  }
+  return true;
+}
+
+/** Straightens a corridor centre line into axis and 45 degree legs. free is true when no such path stays inside the region; then the path is a copy of the input. */
+export function straightenPolyline(
+  points: readonly Vec2[],
+  insideRegion: (p: Vec2) => boolean,
+): { path: Vec2[]; free: boolean } {
+  if (points.length < 2) return { path: points.map(copyVec), free: false };
+  const jog = (cur: Vec2, b: Vec2): Vec2[] => applyJogRule(jogPath(cur, b)).slice(1);
+  const shortJog = (cur: Vec2, b: Vec2): Vec2[] => {
+    const dx = b.x - cur.x;
+    const dy = b.y - cur.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) / 2 < MIN_LEG_MM) {
+      return elbowPath(cur, b, Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y').slice(1);
+    }
+    return jog(cur, b);
+  };
+  const first = joinLegs(walkPolyline(points, shortJog));
+  if (legsInside(first, insideRegion)) return { path: first, free: false };
+  const second = joinLegs(
+    walkPolyline(points, (cur, b) => {
+      const alternatives = [jog(cur, b), elbowPath(cur, b, 'x').slice(1), elbowPath(cur, b, 'y').slice(1)];
+      return alternatives.find((alt) => legsInside([cur, ...alt], insideRegion)) ?? alternatives[0]!;
+    }),
+  );
+  if (legsInside(second, insideRegion)) return { path: second, free: false };
+  return { path: points.map(copyVec), free: true };
 }

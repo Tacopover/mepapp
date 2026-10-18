@@ -123,6 +123,11 @@ function nearestOnBoundary(poly: RoomPolygon, p: Vec2): Nearest {
   return best;
 }
 
+/** The distance in pt from a page point to the nearest boundary ring of the polygon. Infinity when the polygon has no ring. */
+export function distanceToRing(poly: RoomPolygon, p: Vec2): number {
+  return nearestOnBoundary(poly, p).dist;
+}
+
 /** A sample is a wall sample when B is within maxWallMm and lies across the edge, not along it. */
 function isWallSample(s: Sample, near: Nearest, mmPerPt: number, maxWallMm: number): boolean {
   const distMm = near.dist * mmPerPt;
