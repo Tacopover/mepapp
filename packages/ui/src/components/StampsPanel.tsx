@@ -454,7 +454,7 @@ export function StampsPanel({
                 >
                   <button type="button" className="mep-networktype-pick" onClick={() => onPickNetworkType(effective)}>
                     <span className="mep-networktype-name">{effective.name}</span>
-                    {effective.units && <span className="mep-networktype-units">{effective.units}</span>}
+                    {(effective.flowUnit ?? effective.units) && <span className="mep-networktype-units">{effective.flowUnit ?? effective.units}</span>}
                   </button>
                   <button
                     type="button"

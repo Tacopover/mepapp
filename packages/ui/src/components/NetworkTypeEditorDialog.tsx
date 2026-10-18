@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import type { Discipline, LinePattern, NetworkType } from '@mepapp/core';
+import type { Discipline, FlowUnitId, LinePattern, NetworkType } from '@mepapp/core';
+import { FLOW_UNITS } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { ColorPicker } from './ColorPicker.js';
+import { coerceMethod, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingMethodChoice } from './sizingDraft.js';
+import { sizeText, type SizeTextKey } from './sizePlan.js';
 
-export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline'>>;
+export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline' | 'flowUnit' | 'sizing'>>;
 
 /** All 6 core Discipline values, human-labeled — finer-grained than disciplineGroups.ts's 5-way UI grouping (which this dialog's dropdown drives, via disciplineGroupOf), so it needs its own label map. */
 const DISCIPLINES: Array<{ value: Discipline; label: string }> = [
@@ -23,6 +26,8 @@ export interface NetworkTypeEditorDialogProps {
   onClose: () => void;
 }
 
+const METHOD_TEXT_KEYS: Record<SizingMethodChoice, SizeTextKey> = { none: 'methodNone', air: 'methodAir', water: 'methodWater' };
+
 const LINE_PATTERNS: Array<{ value: LinePattern; label: string }> = [
   { value: 'solid', label: 'Solid' },
   { value: 'dashed', label: 'Dashed' },
@@ -39,14 +44,17 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
   const [lineWidthPt, setLineWidthPt] = useState(networkType.lineWidthPt);
   const [linePattern, setLinePattern] = useState<LinePattern>(networkType.linePattern);
   const [discipline, setDiscipline] = useState<Discipline>(networkType.discipline);
+  const [sizingDraft, setSizingDraft] = useState(() => coerceMethod(draftFromType(networkType), networkType.discipline));
+  const errors = draftErrors(sizingDraft);
+  const methods = methodsForDiscipline(discipline);
 
   function handleSave() {
-    onSave(networkType.id, { name: name.trim() || networkType.name, color, lineWidthPt, linePattern, discipline });
+    onSave(networkType.id, { name: name.trim() || networkType.name, color, lineWidthPt, linePattern, discipline, ...draftToPatch(sizingDraft) });
   }
 
   return (
     <Dialog
-      title={`${networkType.name} visuals`}
+      title={sizeText('editorTitle', { name: networkType.name })}
       onClose={onClose}
       actions={
         <>
@@ -54,7 +62,7 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
           <button onClick={() => onDuplicate(networkType.id)} title="Create a copy of this network type">
             Duplicate
           </button>
-          <button onClick={handleSave}>Save</button>
+          <button onClick={handleSave} disabled={draftHasErrors(errors)}>Save</button>
         </>
       }
     >
@@ -65,7 +73,14 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
         </div>
         <div className="mep-field-row">
           <label>Discipline</label>
-          <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)}>
+          <select
+            value={discipline}
+            onChange={(e) => {
+              const value = e.target.value as Discipline;
+              setDiscipline(value);
+              setSizingDraft((d) => coerceMethod(d, value));
+            }}
+          >
             {DISCIPLINES.map(({ value, label }) => (
               <option key={value} value={value}>
                 {label}
@@ -97,6 +112,105 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
             ))}
           </select>
         </div>
+      </div>
+      <div className="mep-section">
+        <div className="mep-nt-section-title">{sizeText('flowSection')}</div>
+        <div className="mep-field-row">
+          <label>{sizeText('flowUnit')}</label>
+          <select
+            data-testid="nt-flow-unit"
+            value={sizingDraft.flowUnit}
+            onChange={(e) => setSizingDraft((d) => ({ ...d, flowUnit: e.target.value as FlowUnitId | '' }))}
+          >
+            <option value="">{sizeText('flowUnitNotSet')}</option>
+            {FLOW_UNITS.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.id}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mep-field-row">
+          <label>{sizeText('sizingMethod')}</label>
+          <select
+            data-testid="nt-sizing-method"
+            value={sizingDraft.method}
+            onChange={(e) => setSizingDraft((d) => ({ ...d, method: e.target.value as SizingMethodChoice }))}
+          >
+            {methods.map((method) => (
+              <option key={method} value={method}>
+                {sizeText(METHOD_TEXT_KEYS[method])}
+              </option>
+            ))}
+          </select>
+        </div>
+        {methods.length === 1 && <p className="mep-nt-note" data-testid="nt-discipline-note">{sizeText('disciplineNotSized')}</p>}
+        {sizingDraft.method === 'air' && (
+          <>
+            <div className="mep-field-row">
+              <label>{sizeText('maxVelocity')}</label>
+              <input
+                data-testid="nt-air-max-velocity"
+                type="number"
+                step="any"
+                value={sizingDraft.air.maxVelocity}
+                onChange={(e) => setSizingDraft((d) => ({ ...d, air: { ...d.air, maxVelocity: e.target.value } }))}
+              />
+            </div>
+            {errors.airMaxVelocity && <p className="mep-field-error" data-testid="nt-error-air-max-velocity">{sizeText('valueNotPositive')}</p>}
+            <div className="mep-field-row">
+              <label>{sizeText('maxDrop')}</label>
+              <input
+                data-testid="nt-air-max-drop"
+                type="number"
+                step="any"
+                value={sizingDraft.air.maxDrop}
+                onChange={(e) => setSizingDraft((d) => ({ ...d, air: { ...d.air, maxDrop: e.target.value } }))}
+              />
+            </div>
+            {errors.airMaxDrop && <p className="mep-field-error" data-testid="nt-error-air-max-drop">{sizeText('valueNotPositive')}</p>}
+            <div className="mep-field-row">
+              <label>{sizeText('airShape')}</label>
+              <select
+                data-testid="nt-air-shape"
+                value={sizingDraft.air.shape}
+                onChange={(e) => setSizingDraft((d) => ({ ...d, air: { ...d.air, shape: e.target.value as 'round' | 'rectangular' } }))}
+              >
+                <option value="round">{sizeText('shapeRound')}</option>
+                <option value="rectangular">{sizeText('shapeRect')}</option>
+              </select>
+            </div>
+            {sizingDraft.air.shape === 'rectangular' && (
+              <>
+                <div className="mep-field-row">
+                  <label>{sizeText('maxAspect')}</label>
+                  <input
+                    data-testid="nt-air-aspect"
+                    type="number"
+                    step="any"
+                    placeholder="4"
+                    value={sizingDraft.air.aspect}
+                    onChange={(e) => setSizingDraft((d) => ({ ...d, air: { ...d.air, aspect: e.target.value } }))}
+                  />
+                </div>
+                {errors.airAspect && <p className="mep-field-error" data-testid="nt-error-air-aspect">{sizeText('valueAtLeastOne')}</p>}
+              </>
+            )}
+            <div className="mep-field-row">
+              <label>{sizeText('airSeries')}</label>
+              <select
+                data-testid="nt-air-series"
+                value={sizingDraft.air.series}
+                onChange={(e) => setSizingDraft((d) => ({ ...d, air: { ...d.air, series: e.target.value as 'standard' | 'free' } }))}
+              >
+                <option value="standard">{sizeText('seriesStandard')}</option>
+                <option value="free">{sizeText('seriesFree')}</option>
+              </select>
+            </div>
+            <p className="mep-nt-note">{sizeText('velocityNote')}</p>
+            <p className="mep-nt-note">{sizeText('fluidAir')}</p>
+          </>
+        )}
       </div>
     </Dialog>
   );

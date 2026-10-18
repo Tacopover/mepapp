@@ -1635,6 +1635,19 @@
   font-size: 11px;
   margin: 0 0 8px;
 }
+.mep-nt-section-title {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.mep-nt-note {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin: 0 0 8px;
+  max-width: 24em;
+}
 .mep-buildings-layout {
   display: flex;
   gap: 0;

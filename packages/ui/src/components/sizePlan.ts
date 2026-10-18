@@ -59,6 +59,7 @@ const TEXTS = {
   seriesFree: 'Free (steps of 10 mm)',
   deltaT: 'Delta T (K)',
   valueNotPositive: 'Enter a number above 0.',
+  valueAtLeastOne: 'Enter a number of 1 or more.',
   editorTitle: 'Network type: {name}',
   'problem_no-start': 'No start port is chosen.',
   'problem_no-segment-at-port': 'No segment is connected to this port.',
