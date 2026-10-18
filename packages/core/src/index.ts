@@ -22,6 +22,7 @@ export * from './route-build.js';
 export * from './route-trunk.js';
 export * from './route-branch.js';
 export * from './route-topology.js';
+export * from './route-checks.js';
 export * from './route-marks.js';
 export * from './stamp-library.js';
 export * from './symbol-shapes.js';

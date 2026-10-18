@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { groupTargetPorts, planRoute, reducedState, resolveStart, type RouteBuildInput } from './route-build.js';
 import type { RoutePlanWarning } from './route-plan-warnings.js';
-import type { ConnectionPoint, Fitting, Segment } from './network.js';
+import { computeNetworks, type ConnectionPoint, type Fitting, type Segment } from './network.js';
 import type { RoutePort, RouteStamp } from './route-ports.js';
 import type { RouteArea, RouteAreaRoom, RouteEdge, RouteEntry, RouteNode } from './route-area.js';
 import { distance, type Vec2 } from './geometry.js';
@@ -354,7 +354,7 @@ function onPort(s: Segment, stampId: string): boolean {
 describe('planRoute items', () => {
   it('builds marked segments and fittings for a corridor with two served rooms', () => {
     const data = corridorScene();
-    const existing = { ...data.state, segments: [segment('old-s1', 'supply-air', port('t1', 'out'), port('t2', 'out'))], fittings: [fitting('old-f1')] };
+    const existing = { ...data.state, segments: [segment('old-s1', 'supply-air', port('ahu', 'in'), port('ahu', 'out2'))], fittings: [fitting('old-f1')] };
     const result = planRoute({ ...data, state: existing });
     expect(result.status).toBe('ok');
     const { segments, fittings, stats, warnings } = result.plan;
@@ -432,5 +432,92 @@ describe('resolveStart', () => {
     expectRefused(planRoute(input({ state })), 'foreign-start');
     const result = planRoute(input({ state, removal: { segmentIds: ['f1'], fittingIds: [] } }));
     expect(result.status).toBe('ok');
+  });
+});
+
+function foreignLine(id: string, xMm0: number, yMm0: number, xMm1: number, yMm1: number): { segment: Segment; fittings: Fitting[] } {
+  const a = pt({ x: xMm0, y: yMm0 });
+  const b = pt({ x: xMm1, y: yMm1 });
+  return {
+    segment: { ...segment(id, 'return-air', { kind: 'fitting', fittingId: `${id}-a` }, { kind: 'fitting', fittingId: `${id}-b` }), geometry: [a, b] },
+    fittings: [fitting(`${id}-a`, a.x, a.y), fitting(`${id}-b`, b.x, b.y)],
+  };
+}
+
+function withForeign(data: RouteBuildInput, foreign: { segment: Segment; fittings: Fitting[] }): RouteBuildInput {
+  return { ...data, state: { ...data.state, segments: [...data.state.segments, foreign.segment], fittings: [...data.state.fittings, ...foreign.fittings] } };
+}
+
+describe('planRoute existing segments', () => {
+  it('reports a foreign segment across an off-graph connection and still plans the route', () => {
+    const result = planRoute(withForeign(corridorScene(), foreignLine('fx', 14000, 2500, 16000, 2500)));
+    expect(result.status).toBe('ok');
+    expect(result.plan.segments.some((s) => onPort(s, 't3'))).toBe(true);
+    expect(result.plan.warnings.find((w) => w.code === 'existing-crossings')).toEqual({ code: 'existing-crossings', severity: 'warning', count: 1, points: [pt({ x: 15000, y: 2500 })] });
+    expect(result.plan.stats.existingCrossings).toBe(1);
+    expect(codes(result)).not.toContain('existing-overlap');
+    expect(codes(result)).not.toContain('internal-join');
+  });
+
+  it('leaves an off-graph port when both layouts end within 50 mm of a foreign fitting', () => {
+    const result = planRoute(withForeign(corridorScene(), foreignLine('fx', 18000, 5030, 19000, 5030)));
+    expect(result.status).toBe('ok');
+    expect(result.plan.segments.some((s) => onPort(s, 't3'))).toBe(false);
+    expect(result.plan.warnings).toContainEqual({ code: 'ports-left', severity: 'warning', count: 1 });
+    expect(result.plan.warnings).toContainEqual({ code: 'rooms-skipped', severity: 'info', ids: ['r3'], count: 1 });
+    expect(result.plan.stats).toMatchObject({ portsLeft: 1, ports: 3 });
+  });
+
+  it('leaves a target port that already holds a segment of another type', () => {
+    const data = corridorScene();
+    const onT1 = { segment: segment('fx', 'return-air', port('t1', 'out'), { kind: 'fitting', fittingId: 'fx-b' }), fittings: [fitting('fx-b', 700, -300)] };
+    const result = planRoute(withForeign(data, onT1));
+    expect(result.status).toBe('ok');
+    expect(result.plan.segments.some((s) => onPort(s, 't1'))).toBe(false);
+    expect(result.plan.warnings).toContainEqual({ code: 'ports-left', severity: 'warning', count: 1 });
+    expect(result.plan.warnings).toContainEqual({ code: 'rooms-skipped', severity: 'info', ids: ['r1'], count: 1 });
+    expect(result.plan.stats.portsLeft).toBe(1);
+  });
+
+  it('leaves a target port that already holds a segment of the run type', () => {
+    const data = corridorScene();
+    const onT1 = { segment: segment('same', 'supply-air', port('t1', 'out'), { kind: 'fitting', fittingId: 'same-b' }), fittings: [fitting('same-b', 700, -300)] };
+    const result = planRoute(withForeign(data, onT1));
+    expect(result.status).toBe('ok');
+    expect(result.plan.segments.some((s) => onPort(s, 't1'))).toBe(false);
+    expect(result.plan.warnings).toContainEqual({ code: 'ports-left', severity: 'warning', count: 1 });
+    expect(result.plan.warnings).toContainEqual({ code: 'rooms-skipped', severity: 'info', ids: ['r1'], count: 1 });
+    expect(codes(result)).not.toContain('internal-join');
+  });
+
+  it('reports an overlap with a foreign segment once and puts a routed overlap into shares-lane', () => {
+    const plain = planRoute(withForeign(corridorScene(), foreignLine('fx', 1000, 0, 6000, 0)));
+    expect(plain.plan.warnings.find((w) => w.code === 'existing-overlap')).toEqual({ code: 'existing-overlap', severity: 'warning', count: 1, ids: ['fx'] });
+    expect(codes(plain)).not.toContain('shares-lane');
+    const routed = foreignLine('fx', 1000, 0, 6000, 0);
+    routed.segment.routedBy = 'route';
+    const lane = planRoute(withForeign(corridorScene(), routed));
+    expect(lane.plan.warnings.find((w) => w.code === 'shares-lane')).toEqual({ code: 'shares-lane', severity: 'info', count: 1, ids: ['fx'] });
+    expect(codes(lane)).not.toContain('existing-overlap');
+  });
+
+  it('keeps old foreign networks unchanged and builds networks of one type', () => {
+    const data = withForeign(corridorScene(), foreignLine('fx', 14000, 2500, 16000, 2500));
+    const result = planRoute(data);
+    expect(codes(result)).not.toContain('internal-join');
+    const graph = {
+      segments: [...data.state.segments, ...result.plan.segments],
+      fittings: [...data.state.fittings, ...result.plan.fittings],
+      portGroups: [],
+    };
+    const networks = computeNetworks(graph);
+    const newIds = new Set(result.plan.segments.map((s) => s.id));
+    const typeOf = new Map(graph.segments.map((s) => [s.id, s.networkTypeId] as const));
+    for (const network of networks) {
+      const types = new Set(network.segmentIds.map((id) => typeOf.get(id)));
+      expect(types.size).toBe(1);
+      if (network.segmentIds.some((id) => newIds.has(id))) expect(network.segmentIds.every((id) => newIds.has(id))).toBe(true);
+    }
+    expect(networks.find((network) => network.segmentIds.includes('fx'))!.segmentIds).toEqual(['fx']);
   });
 });

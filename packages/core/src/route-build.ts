@@ -10,6 +10,7 @@ import { planBranches, type BranchRoomInput } from './route-branch.js';
 import { elbowPath, insideRouteArea } from './route-layout.js';
 import { buildRouteItems, connectLoosePorts, type TopologyPort } from './route-topology.js';
 import { checkRouteStart } from './route-start.js';
+import { canJoinPoint, checkExisting, checkInvariant, distanceToPiece, makeCrossesExisting, NEAR_ITEM_MM } from './route-checks.js';
 import type { RoutePort, RouteStamp } from './route-ports.js';
 import type { RouteArea } from './route-area.js';
 import type { Room } from './rooms/room.js';
@@ -87,6 +88,18 @@ function isPortEndpoint(point: ConnectionPoint, stampId: string, portId: string)
 
 function segmentsOnPort(segments: readonly Segment[], stampId: string, portId: string): Segment[] {
   return segments.filter((segment) => isPortEndpoint(segment.endpointA, stampId, portId) || isPortEndpoint(segment.endpointB, stampId, portId));
+}
+
+function existingPortPoints(stamps: readonly RouteStamp[], segments: readonly Segment[]): Vec2[] {
+  const used = new Set<string>();
+  for (const s of segments) {
+    for (const end of [s.endpointA, s.endpointB]) if (end.kind === 'port') used.add(`${end.elementId}:${end.portId}`);
+  }
+  const points: Vec2[] = [];
+  for (const stamp of stamps) {
+    for (const stampPort of getStampWorldPorts(stamp)) if (used.has(`${stamp.id}:${stampPort.id}`)) points.push(stampPort.world);
+  }
+  return points;
 }
 
 function refused(warnings: RoutePlanWarning[]): { status: 'refused'; plan: PlannedRoute } {
@@ -176,9 +189,47 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
   const start = resolveStart(input, reduced, warnings);
   if (!start.ok) return refused(warnings);
 
-  const grouped = groupTargetPorts(input.targetPorts, new Set(input.area.rooms.map((room) => room.roomId)));
-
   const mmPerPt = input.mmPerPt ?? 0;
+  const reducedGraph = { segments: reduced.segments, fittings: reduced.fittings, portGroups: input.state.portGroups };
+  const reducedNetworks = computeNetworks({ segments: [...reduced.segments], fittings: [...reduced.fittings], portGroups: [...input.state.portGroups] });
+  const startNetwork = new Set<string>();
+  const startFittings = new Set<string>();
+  if (start.stubSegmentId !== null) {
+    for (const network of reducedNetworks) {
+      if (!network.segmentIds.includes(start.stubSegmentId)) continue;
+      for (const id of network.segmentIds) startNetwork.add(id);
+      for (const id of network.fittingIds) startFittings.add(id);
+    }
+  }
+  const existing = { segments: reduced.segments.filter((s) => !startNetwork.has(s.id)), fittings: reduced.fittings.filter((f) => !startFittings.has(f.id)) };
+
+  const growable = new Set<string>(startNetwork);
+  const startJoin = canJoinPoint(reducedGraph, { kind: 'port', elementId: input.startStampId, portId: input.startPortId }, input.networkTypeId, reducedNetworks);
+  if (startJoin.ok) for (const id of startJoin.sameTypeJoinIds) growable.add(id);
+  const sameTypeJoinIds = new Set<string>();
+  const refusedPorts: RoutePort[] = [];
+  const targetPorts: RoutePort[] = [];
+  for (const port of input.targetPorts) {
+    const join = canJoinPoint(reducedGraph, { kind: 'port', elementId: port.stampId, portId: port.portId }, input.networkTypeId, reducedNetworks);
+    if (!join.ok || (join.sameTypeJoinIds.length === 0 && join.atNodeIds.length > 0)) {
+      refusedPorts.push(port);
+      continue;
+    }
+    targetPorts.push(port);
+    for (const id of join.sameTypeJoinIds) {
+      sameTypeJoinIds.add(id);
+      growable.add(id);
+    }
+  }
+  if (sameTypeJoinIds.size > 0) {
+    const at = warnings.findIndex((warning) => warning.code === 'same-type-join');
+    const ids = [...new Set([...(at >= 0 ? warnings[at]!.ids ?? [] : []), ...sameTypeJoinIds])].sort();
+    if (at >= 0) warnings[at] = { ...warnings[at]!, ids };
+    else warnings.push({ code: 'same-type-join', severity: 'warning', ids });
+  }
+
+  const grouped = groupTargetPorts(targetPorts, new Set(input.area.rooms.map((room) => room.roomId)));
+
   const discipline = (input.networkType ?? getNetworkTypeFromLibrary(input.networkTypeId))?.discipline ?? 'other';
   const toMm = (p: Vec2): Vec2 => ({ x: p.x * mmPerPt, y: p.y * mmPerPt });
   const toPage = (p: Vec2): Vec2 => ({ x: p.x / mmPerPt, y: p.y / mmPerPt });
@@ -212,6 +263,7 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
   });
   const portById = new Map(input.targetPorts.map((port) => [portKey(port), port] as const));
   for (const branch of planBranches({
+    crossesExisting: makeCrossesExisting(existing.segments, mmPerPt),
     trunk: trunk.edges.map((edge) => ({ id: edge.id, path: edge.path })),
     rootPointMm: trunk.rootPointMm ?? start.pointMm,
     rooms: branchRooms,
@@ -220,16 +272,42 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
     for (const id of branch.offGraphPortIds) loosePorts.push(portById.get(id)!);
   }
 
+  // Provisional: "would join an item of another network type" is read as a geometric nearness (NEAR_ITEM_MM) to a foreign item. It checks vertices only; a leg along a foreign segment is reported by checkExisting.
+  const foreignSegments = existing.segments.filter((s) => s.networkTypeId !== input.networkTypeId);
+  const foreignFittingIds = new Set<string>();
+  const foreignPortKeys = new Set<string>();
+  for (const s of foreignSegments) {
+    for (const end of [s.endpointA, s.endpointB]) {
+      if (end.kind === 'fitting') foreignFittingIds.add(end.fittingId);
+      else foreignPortKeys.add(`${end.elementId}:${end.portId}`);
+    }
+  }
+  const foreignPoints: Vec2[] = existing.fittings.filter((f) => foreignFittingIds.has(f.id)).map((f) => toMm(f.position));
+  for (const stampItem of input.state.stamps) {
+    for (const stampPort of getStampWorldPorts(stampItem)) {
+      if (foreignPortKeys.has(`${stampItem.id}:${stampPort.id}`)) foreignPoints.push(toMm(stampPort.world));
+    }
+  }
+  const foreignPieces: [Vec2, Vec2][] = [];
+  for (const s of foreignSegments) {
+    for (let i = 1; i < s.geometry.length; i++) foreignPieces.push([toMm(s.geometry[i - 1]!), toMm(s.geometry[i]!)]);
+  }
+
   const connected = connectLoosePorts({
     paths,
     startPoint: start.pointMm,
     loose: loosePorts.map((port) => ({ id: portKey(port), point: toMm(port.world) })),
-    targetPoints: input.targetPorts.map((port) => toMm(port.world)),
+    targetPoints: targetPorts.map((port) => toMm(port.world)),
     noTapPoints: start.stubFittingId === null ? [start.pointMm] : [],
+    accepts: (path) => path.every((vertex, index) => {
+      if (foreignPoints.some((p) => Math.hypot(p.x - vertex.x, p.y - vertex.y) <= NEAR_ITEM_MM)) return false;
+      if (index === 0) return true;
+      return !foreignPieces.some(([a, b]) => distanceToPiece(vertex, a, b) <= NEAR_ITEM_MM);
+    }),
   });
   paths.push(...connected.paths);
   const leftIds = new Set(connected.left);
-  const connectedPorts = input.targetPorts.filter((port) => !leftIds.has(portKey(port)));
+  const connectedPorts = targetPorts.filter((port) => !leftIds.has(portKey(port)));
 
   const stubFitting = start.stubFittingId === null ? undefined : reduced.fittings.find((fitting) => fitting.id === start.stubFittingId);
   const topologyPorts: TopologyPort[] = connectedPorts.map((port) => ({ point: toMm(port.world), pagePoint: port.world, stampId: port.stampId, portId: port.portId }));
@@ -253,12 +331,38 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
 
   if (trunk.freeEdges.length > 0) warnings.push({ code: 'free-angle', severity: 'warning', count: trunk.freeEdges.length, points: trunk.freeEdges.map((edge) => toPage(edge.pointMm)) });
   if (trunk.offGraphRoomIds.length > 0) warnings.push({ code: 'room-off-graph', severity: 'warning', ids: [...trunk.offGraphRoomIds].sort(), count: trunk.offGraphRoomIds.length });
-  if (connected.left.length > 0) {
-    warnings.push({ code: 'ports-left', severity: 'warning', count: connected.left.length });
-    const skipped = [...new Set(connected.left.map((id) => portById.get(id)!.roomId).filter((id): id is string => id !== null))].sort();
+  const leftCount = connected.left.length + refusedPorts.length;
+  if (leftCount > 0) {
+    warnings.push({ code: 'ports-left', severity: 'warning', count: leftCount });
+    const leftPorts = [...connected.left.map((id) => portById.get(id)!), ...refusedPorts];
+    const skipped = [...new Set(leftPorts.map((port) => port.roomId).filter((id): id is string => id !== null))].sort();
     if (skipped.length > 0) warnings.push({ code: 'rooms-skipped', severity: 'info', ids: skipped, count: skipped.length });
   }
+
+  const checked = checkExisting({
+    newSegments: items.segments,
+    newFittings: items.fittings,
+    existingSegments: existing.segments,
+    existingFittings: existing.fittings,
+    existingPortPoints: existingPortPoints(input.state.stamps, existing.segments),
+    mmPerPt,
+  });
+  const existingCrossings = checked.crossings + checked.nearItems;
+  if (existingCrossings > 0) warnings.push({ code: 'existing-crossings', severity: 'warning', count: existingCrossings, points: [...checked.crossingPoints, ...checked.nearPoints] });
+  if (checked.overlaps > 0) warnings.push({ code: 'existing-overlap', severity: 'warning', count: checked.overlaps, ids: checked.overlapIds });
+  if (checked.lane > 0) warnings.push({ code: 'shares-lane', severity: 'info', count: checked.lane, ids: checked.laneIds });
   warnings.push({ code: 'draft-2d', severity: 'info' });
+
+  const broken = checkInvariant({
+    reducedSegments: reduced.segments,
+    reducedFittings: reduced.fittings,
+    newSegments: items.segments,
+    newFittings: items.fittings,
+    portGroups: input.state.portGroups,
+    networkTypeId: input.networkTypeId,
+    growableSegmentIds: [...growable],
+  });
+  if (broken.length > 0) return refused([...warnings.filter((warning) => warning.code !== 'draft-2d'), { code: 'internal-join', severity: 'error', ids: broken }]);
 
   const roomsWithPorts = new Set(connectedPorts.map((port) => port.roomId).filter((id): id is string => id !== null && grouped.byRoom.has(id)));
   return {
@@ -279,7 +383,8 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
         freeLegs: items.freeLegs,
         rooms: roomsWithPorts.size,
         ports: connectedPorts.length,
-        portsLeft: connected.left.length,
+        portsLeft: leftCount,
+        existingCrossings,
         removedSegments: input.removal.segmentIds.length,
         removedFittings: input.removal.fittingIds.length,
       },
