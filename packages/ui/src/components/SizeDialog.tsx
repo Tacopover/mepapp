@@ -3,6 +3,8 @@ import type { SketchScene, StampInfo } from '@mepapp/render';
 import { getStampPorts, networkOfStartPort } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { startCandidates } from './routePlan.js';
+import { SizingLimitsFields } from './SizingLimitsFields.js';
+import { emptyLimitsDraft, limitsDraftFromSettings, limitsErrors, limitsToSettings, suggestedLimitsDraft, type LimitsDraft, type LimitsErrors } from './sizingDraft.js';
 import { hasTwoFlows, needsConfirm, portsWithSegment, showEditTypeButton, sizeChangeLines, sizeProblemLines, sizeResultLines, sizeText, stampIdsOfSegments, totalFlowText, type SizeTextKey } from './sizePlan.js';
 
 export interface SizeDialogProps {
@@ -52,7 +54,7 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
       setVersion((v) => v + 1);
     };
     refresh();
-    const events = ['pageChanged', 'documentActivated', 'drawingChanged', 'flowSolved', 'networkTypesChanged'] as const;
+    const events = ['pageChanged', 'documentActivated', 'drawingChanged', 'flowSolved', 'networkTypesChanged', 'networkSizingChanged'] as const;
     for (const event of events) scene.on(event, refresh);
     return () => {
       for (const event of events) scene.off(event, refresh);
@@ -72,9 +74,49 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [scene, startStamp?.id, selectedPort, version],
   );
-  const method = plan?.networkTypeId ? scene?.getNetworkTypes().find((t) => t.id === plan.networkTypeId)?.sizing?.method : undefined;
+  const method = plan?.sizingMethod ?? undefined;
+  const savedKey = JSON.stringify(plan?.sizing ?? null);
+  const [limits, setLimits] = useState<LimitsDraft>(() => limitsDraftFromSettings(plan?.sizing));
+  useEffect(() => {
+    setLimits(limitsDraftFromSettings(plan?.sizing));
+    // The draft resets when the start pair or the method changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startStamp?.id, selectedPort, method]);
+  useEffect(() => {
+    if (!method) return;
+    if (JSON.stringify(limitsToSettings(limits, method)) !== savedKey) setLimits(limitsDraftFromSettings(plan?.sizing));
+    // Only a change of the saved entry resets the draft. The own write of the dialog equals the draft, so it does not.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedKey]);
   const network = startStamp && selectedPort ? networkOfStartPort(connectivity, startStamp.id, selectedPort) : null;
   const twoFlows = network ? hasTwoFlows(stamps, stampIdsOfSegments(connectivity.segments, network.segmentIds)) : false;
+
+  const limitsBlockers = new Set<string>(['discipline-not-sized', 'method-discipline', 'no-segment-at-port']);
+  const showLimits = (method === 'air' || method === 'water') && !(plan?.result.problems ?? []).some((problem) => limitsBlockers.has(problem.code));
+  const hasSaved = plan?.sizing != null;
+  const saveLimits = (next: LimitsDraft) => {
+    setLimits(next);
+    if (!scene || !startStamp || !selectedPort || !method) return;
+    const settings = limitsToSettings(next, method);
+    if (settings) scene.setNetworkSizing(startStamp.id, selectedPort, settings);
+  };
+  const clearLimits = () => {
+    if (!scene || !startStamp || !selectedPort) return;
+    scene.setNetworkSizing(startStamp.id, selectedPort, undefined);
+    setLimits(emptyLimitsDraft());
+  };
+  const limitsShown = ((): LimitsErrors => {
+    const errors = limitsErrors(limits, method ?? 'air');
+    const filled = (text: string) => text.trim() !== '' || hasSaved;
+    return {
+      airMaxVelocity: errors.airMaxVelocity && filled(limits.air.maxVelocity),
+      airMaxDrop: errors.airMaxDrop && filled(limits.air.maxDrop),
+      airAspect: errors.airAspect && filled(limits.air.aspect),
+      waterMaxVelocity: errors.waterMaxVelocity && filled(limits.water.maxVelocity),
+      waterMaxDrop: errors.waterMaxDrop && filled(limits.water.maxDrop),
+      waterDeltaT: errors.waterDeltaT && filled(limits.water.deltaT),
+    };
+  })();
 
   const labelOf = (stamp: StampInfo) => (stamp.definitionId ? stampName(stamp.definitionId) : null) ?? stamp.definitionId ?? stamp.id;
   const startLabels = uniqueLabels(candidates.map((c) => c.stamp), labelOf);
@@ -179,6 +221,20 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
                 <button type="button" data-testid="size-edit-type" onClick={() => onEditNetworkType(plan.networkTypeId as string)}>
                   {sizeText('editType')}
                 </button>
+              </div>
+            )}
+            {showLimits && (method === 'air' || method === 'water') && (
+              <div className="mep-size-limits" data-testid="size-limits">
+                <p className="mep-size-limits-title">{sizeText('limitsSection')}</p>
+                <SizingLimitsFields method={method} draft={limits} onChange={saveLimits} showErrors={limitsShown} />
+                <div className="mep-size-limits-actions">
+                  <button type="button" data-testid="size-limits-suggest" onClick={() => saveLimits(suggestedLimitsDraft(method))}>
+                    {sizeText('suggest')}
+                  </button>
+                  <button type="button" data-testid="size-limits-clear" disabled={!hasSaved} onClick={clearLimits}>
+                    {sizeText('clearLimits')}
+                  </button>
+                </div>
               </div>
             )}
             {okResult && (

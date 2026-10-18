@@ -3485,7 +3485,9 @@
   max-width: 92vw;
   align-self: flex-start;
   margin-top: 12vh;
+  max-height: calc(100vh - 12vh - 32px);
 }
+.mep-modal--route .mep-modal-body { overflow-y: auto; }
 .mep-modal--route .mep-route-text {
   margin: 0 0 10px;
   font-size: 13px;
@@ -3513,11 +3515,23 @@
   margin: 0 0 10px;
   font-size: 13px;
 }
-.mep-modal--route .mep-route-field select {
+.mep-modal--route .mep-route-field select,
+.mep-modal--route .mep-route-field input {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
+.mep-modal--route .mep-route-field input {
+  margin-bottom: 0;
+  font-family: var(--font-mono);
+  padding: 6px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.mep-modal--route input[aria-invalid='true'] { border-color: #b3261e; }
+.mep-modal--route .mep-route-severity::after { content: ':'; }
 .mep-modal--route .mep-route-scope {
   border: 0;
   padding: 0;
@@ -3607,6 +3621,15 @@
 .mep-modal--route .mep-size-confirm .mep-route-text { margin-bottom: 8px; }
 .mep-modal--route .mep-size-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .mep-modal--route .mep-size-applied { font-weight: 600; }
+.mep-modal--route .mep-size-limits {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  min-width: 0;
+}
+.mep-modal--route .mep-size-limits-title { margin: 0 0 6px; font-weight: 600; }
+.mep-modal--route .mep-size-limits-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .mep-modal--route .mep-route-main {
   font-weight: 600;
 }

@@ -10,15 +10,15 @@ const PLAIN_KEYS: SizeTextKey[] = [
   'convertQuestion', 'convertQuestionOne', 'convertYes', 'convertNo', 'convertSkipped', 'unitKindWarning', 'sizesSourceHint', 'deltaTHint',
   'suggest', 'flowSection', 'flowUnit', 'flowUnitNotSet', 'sizingMethod', 'methodNone', 'methodAir', 'methodWater',
   'maxVelocity', 'maxDrop', 'airShape', 'shapeRound', 'shapeRect', 'maxAspect', 'airSeries', 'seriesStandard', 'seriesFree',
-  'deltaT', 'valueNotPositive', 'valueAtLeastOne', 'editorTitle',
+  'deltaT', 'valueNotPositive', 'valueAtLeastOne', 'editorTitle', 'limitsSection', 'clearLimits',
 ];
 
 const PROBLEM_CODES: SizingProblemCode[] = [
-  'no-start', 'no-segment-at-port', 'discipline-not-sized', 'method-discipline', 'no-flow-unit', 'no-sizing',
+  'no-start', 'no-segment-at-port', 'discipline-not-sized', 'no-method', 'method-discipline', 'no-flow-unit', 'no-sizing',
   'unit-kind', 'no-delta-t', 'no-flow', 'unit-unknown', 'not-resolved', 'zero-flow', 'too-large', 'mixed-type', 'start-two-ports',
 ];
 const COUNTED_CODES: SizingProblemCode[] = ['unit-unknown', 'not-resolved', 'zero-flow', 'too-large', 'mixed-type'];
-const HINTED_CODES: SizingProblemCode[] = ['method-discipline', 'no-flow-unit', 'no-sizing', 'unit-kind', 'no-delta-t', 'no-flow'];
+const HINTED_CODES: SizingProblemCode[] = ['method-discipline', 'no-method', 'no-flow-unit', 'no-sizing', 'unit-kind', 'no-delta-t', 'no-flow'];
 
 const PROBLEM_KEYS: SizeTextKey[] = [
   ...PROBLEM_CODES.map((code) => `problem_${code}` as SizeTextKey),
@@ -202,9 +202,13 @@ const segmentBetween = (id: string, a: ReturnType<typeof portPoint>, b: ReturnTy
 describe('showEditTypeButton', () => {
   const problem = (code: SizingProblemCode) => ({ code, severity: 'error' as const });
   it('is true for each problem that the network type editor fixes', () => {
-    for (const code of ['no-flow-unit', 'no-sizing', 'no-delta-t', 'unit-kind', 'method-discipline'] as const) {
+    for (const code of ['no-flow-unit', 'no-method', 'unit-kind', 'method-discipline'] as const) {
       expect(showEditTypeButton([problem(code)]), code).toBe(true);
     }
+  });
+  it('is false for no-sizing and no-delta-t, which the limits section fixes', () => {
+    expect(showEditTypeButton([problem('no-sizing')])).toBe(false);
+    expect(showEditTypeButton([problem('no-delta-t')])).toBe(false);
   });
   it('is false for discipline-not-sized, no-flow and an empty list', () => {
     expect(showEditTypeButton([problem('discipline-not-sized')])).toBe(false);

@@ -145,3 +145,39 @@ export function draftToPatch(draft: SizingDraft): { flowUnit: FlowUnitId | undef
   }
   return { flowUnit, sizing: undefined };
 }
+
+export type LimitsDraft = Pick<SizingDraft, 'air' | 'water'>;
+
+export interface LimitsErrors {
+  airMaxVelocity: boolean;
+  airMaxDrop: boolean;
+  airAspect: boolean;
+  waterMaxVelocity: boolean;
+  waterMaxDrop: boolean;
+  waterDeltaT: boolean;
+}
+
+export const emptyLimitsDraft = (): LimitsDraft => ({
+  air: { maxVelocity: '', maxDrop: '', shape: 'round', aspect: '', series: 'standard' },
+  water: { maxVelocity: '', maxDrop: '', deltaT: '' },
+});
+
+export function limitsDraftFromSettings(settings: SizingSettings | null | undefined): LimitsDraft {
+  const { air, water } = draftFromType({ sizing: settings ?? undefined });
+  return { air, water };
+}
+
+export function suggestedLimitsDraft(method: 'air' | 'water'): LimitsDraft {
+  const { air, water } = applySuggested({ flowUnit: '', method, ...emptyLimitsDraft() }, method);
+  return { air, water };
+}
+
+export function limitsErrors(draft: LimitsDraft, method: 'air' | 'water'): LimitsErrors {
+  return draftErrors({ flowUnit: '', method, ...draft });
+}
+
+export function limitsToSettings(draft: LimitsDraft, method: 'air' | 'water'): SizingSettings | null {
+  const full: SizingDraft = { flowUnit: '', method, ...draft };
+  if (draftHasErrors(draftErrors(full))) return null;
+  return draftToPatch(full).sizing ?? null;
+}

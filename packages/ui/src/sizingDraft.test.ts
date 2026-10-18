@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Discipline, NetworkType } from '@mepapp/core';
+import type { Discipline, NetworkType, SizingSettings } from '@mepapp/core';
+import { SUGGESTED_AIR_SIZING, SUGGESTED_WATER_SIZING } from '@mepapp/core';
 import {
-  applySuggested, coerceMethod, convertPanelOf, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingDraft,
+  applySuggested, coerceMethod, convertPanelOf, draftErrors, draftFromType, draftHasErrors, draftToPatch, emptyLimitsDraft, limitsDraftFromSettings,
+  limitsErrors, limitsToSettings, methodsForDiscipline, suggestedLimitsDraft, type LimitsDraft, type SizingDraft,
 } from './components/sizingDraft.js';
 
 const airDraft = (patch: Partial<SizingDraft['air']> = {}): SizingDraft => ({
@@ -215,6 +217,73 @@ describe('draftToPatch', () => {
     const patch = draftToPatch({ ...airDraft(), method: 'none' });
     expect('sizing' in patch).toBe(true);
     expect(patch.sizing).toBeUndefined();
+  });
+});
+
+describe('limits draft', () => {
+  const air = (patch: Partial<LimitsDraft['air']> = {}): LimitsDraft => ({ ...emptyLimitsDraft(), air: { ...suggestedLimitsDraft('air').air, ...patch } });
+  const water = (patch: Partial<LimitsDraft['water']> = {}): LimitsDraft => ({ ...emptyLimitsDraft(), water: { ...suggestedLimitsDraft('water').water, ...patch } });
+
+  it('starts empty', () => {
+    const empty = emptyLimitsDraft();
+    expect(empty.air).toEqual({ maxVelocity: '', maxDrop: '', shape: 'round', aspect: '', series: 'standard' });
+    expect(empty.water).toEqual({ maxVelocity: '', maxDrop: '', deltaT: '' });
+    expect(limitsDraftFromSettings(undefined)).toEqual(empty);
+    expect(limitsDraftFromSettings(null)).toEqual(empty);
+  });
+
+  it('turns the suggested air draft into the suggested air values (a round shape drops the aspect)', () => {
+    const { maxAspectRatio: _aspect, ...expected } = SUGGESTED_AIR_SIZING;
+    expect(limitsToSettings(suggestedLimitsDraft('air'), 'air')).toEqual(expected);
+    expect(limitsToSettings(air({ shape: 'rectangular' }), 'air')).toEqual({ ...SUGGESTED_AIR_SIZING, shape: 'rectangular' });
+  });
+
+  it('turns the suggested water draft into the suggested water values, with an empty delta T', () => {
+    expect(suggestedLimitsDraft('water').water.deltaT).toBe('');
+    expect(limitsToSettings(suggestedLimitsDraft('water'), 'water')).toEqual(SUGGESTED_WATER_SIZING);
+  });
+
+  it('gives null for an empty, zero, negative or non-numeric required field', () => {
+    for (const text of ['', '0', '-1', 'abc']) {
+      expect(limitsToSettings(air({ maxVelocity: text }), 'air'), text).toBeNull();
+      expect(limitsToSettings(air({ maxDrop: text }), 'air'), text).toBeNull();
+      expect(limitsToSettings(water({ maxVelocity: text }), 'water'), text).toBeNull();
+      expect(limitsToSettings(water({ maxDrop: text }), 'water'), text).toBeNull();
+    }
+    expect(limitsToSettings(emptyLimitsDraft(), 'air')).toBeNull();
+    expect(limitsToSettings(emptyLimitsDraft(), 'water')).toBeNull();
+  });
+
+  it('gives null for a rectangular aspect below 1', () => {
+    expect(limitsToSettings(air({ shape: 'rectangular', aspect: '0.5' }), 'air')).toBeNull();
+    expect(limitsErrors(air({ shape: 'rectangular', aspect: '0.5' }), 'air').airAspect).toBe(true);
+  });
+
+  it('writes deltaTK only when the delta T is filled', () => {
+    expect(limitsToSettings(water(), 'water')).not.toHaveProperty('deltaTK');
+    expect(limitsToSettings(water({ deltaT: '10' }), 'water')).toMatchObject({ deltaTK: 10 });
+    expect(limitsToSettings(water({ deltaT: '0' }), 'water')).toBeNull();
+  });
+
+  it('reports an error for each empty required field', () => {
+    const errors = limitsErrors(emptyLimitsDraft(), 'air');
+    expect(errors).toEqual({ airMaxVelocity: true, airMaxDrop: true, airAspect: false, waterMaxVelocity: false, waterMaxDrop: false, waterDeltaT: false });
+    expect(limitsErrors(emptyLimitsDraft(), 'water')).toMatchObject({ waterMaxVelocity: true, waterMaxDrop: true, airMaxVelocity: false });
+  });
+
+  it('round trips settings to a draft and back', () => {
+    const rectAir: SizingSettings = { method: 'air', maxVelocityMs: 6, maxPressureDropPaPerM: 0.8, shape: 'rectangular', maxAspectRatio: 3, series: 'free' };
+    const waterDelta: SizingSettings = { method: 'water', maxVelocityMs: 1, maxPressureDropPaPerM: 200, deltaTK: 10 };
+    expect(limitsToSettings(limitsDraftFromSettings(rectAir), 'air')).toEqual(rectAir);
+    expect(limitsToSettings(limitsDraftFromSettings(SUGGESTED_WATER_SIZING), 'water')).toEqual(SUGGESTED_WATER_SIZING);
+    expect(limitsToSettings(limitsDraftFromSettings(waterDelta), 'water')).toEqual(waterDelta);
+  });
+
+  it('gives null only for the first of the drafts typed one character at a time', () => {
+    const typed = ['', '7', '70'].map((text) => limitsToSettings(air({ maxVelocity: text }), 'air'));
+    expect(typed[0]).toBeNull();
+    expect(typed[1]).toMatchObject({ maxVelocityMs: 7 });
+    expect(typed[2]).toMatchObject({ maxVelocityMs: 70 });
   });
 });
 

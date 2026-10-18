@@ -47,6 +47,8 @@ const TEXTS = {
   sizesSourceHint: 'Sources for the suggested values are secondary. Check your standard.',
   deltaTHint: 'Needed when the flow unit is a power.',
   suggest: 'Use suggested values',
+  limitsSection: 'Limits of this network',
+  clearLimits: 'Clear limits',
   flowSection: 'Flow and sizing',
   flowUnit: 'Flow unit',
   flowUnitNotSet: 'Not set',
@@ -74,12 +76,14 @@ const TEXTS = {
   'hint_method-discipline': 'Change the method or the discipline in the network type.',
   'problem_no-flow-unit': 'The network type has no flow unit.',
   'hint_no-flow-unit': 'Set the flow unit in the network type.',
-  'problem_no-sizing': 'The network type has no sizing method.',
-  'hint_no-sizing': 'Set a sizing method in the network type.',
+  'problem_no-method': 'The network type has no sizing method.',
+  'hint_no-method': 'Set the sizing method in the network type.',
+  'problem_no-sizing': 'No limits are saved for this network.',
+  'hint_no-sizing': 'Enter the limits below or use the suggested values.',
   'problem_unit-kind': 'Air is sized from a volume flow. The flow unit is a power.',
   'hint_unit-kind': 'Choose a volume unit in the network type.',
   'problem_no-delta-t': 'The flow unit is a power, so water needs a delta T.',
-  'hint_no-delta-t': 'Enter the delta T in the network type.',
+  'hint_no-delta-t': 'Enter the delta T below.',
   'problem_no-flow': 'No segment of this network carries a flow.',
   'hint_no-flow': 'Set a capacity on at least one terminal.',
   'problem_unit-unknown': '{count} elements have a capacity that cannot be read in the flow unit.',
@@ -112,7 +116,7 @@ export interface SizeProblemLine {
 }
 
 const COUNTED_CODES: readonly SizingProblemCode[] = ['unit-unknown', 'not-resolved', 'zero-flow', 'too-large', 'mixed-type'];
-const HINTED_CODES: readonly SizingProblemCode[] = ['method-discipline', 'no-flow-unit', 'no-sizing', 'unit-kind', 'no-delta-t', 'no-flow'];
+const HINTED_CODES: readonly SizingProblemCode[] = ['method-discipline', 'no-method', 'no-flow-unit', 'no-sizing', 'unit-kind', 'no-delta-t', 'no-flow'];
 
 /** One line per problem, in the order of `problems`. The count is the length of `ids`. */
 export function sizeProblemLines(problems: readonly SizingProblem[]): SizeProblemLine[] {
@@ -164,7 +168,7 @@ export function sizeLabel(pick: SizePick, method?: 'air' | 'water'): string {
   return `${pick.widthMm} × ${pick.heightMm}`;
 }
 
-const EDIT_TYPE_CODES: readonly SizingProblemCode[] = ['no-flow-unit', 'no-sizing', 'no-delta-t', 'unit-kind', 'method-discipline'];
+const EDIT_TYPE_CODES: readonly SizingProblemCode[] = ['no-flow-unit', 'no-method', 'unit-kind', 'method-discipline'];
 
 /** True when one problem is fixed in the network type editor, so the dialog shows the "Edit network type…" button. */
 export function showEditTypeButton(problems: readonly SizingProblem[]): boolean {
