@@ -17,6 +17,8 @@ export * from './angle-snap.js';
 export * from './route-layout.js';
 export * from './route-steiner.js';
 export * from './route-hanan.js';
+export * from './route-plan-warnings.js';
+export * from './route-build.js';
 export * from './stamp-library.js';
 export * from './symbol-shapes.js';
 export * from './symbol-shape-geometry.js';
