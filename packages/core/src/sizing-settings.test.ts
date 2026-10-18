@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { NetworkType } from './network.js';
-import { SUGGESTED_AIR_SIZING, SUGGESTED_FLOW_UNIT, SUGGESTED_WATER_SIZING, parseSizingSettings } from './sizing-settings.js';
+import { SUGGESTED_AIR_SIZING, SUGGESTED_FLOW_UNIT, SUGGESTED_WATER_SIZING, findNetworkSizing, parseNetworkSizing, parseSizingSettings, withNetworkSizing } from './sizing-settings.js';
 
 describe('suggested sizing settings', () => {
   it('parse to themselves as new objects', () => {
@@ -92,5 +92,52 @@ describe('NetworkType sizing fields', () => {
     const plain: NetworkType = base;
     expect(sized.sizing).toEqual(SUGGESTED_AIR_SIZING);
     expect(plain.flowUnit).toBeUndefined();
+  });
+});
+
+describe('network sizing entries', () => {
+  const entry = { startStampId: 'ahu', startPortId: 'out', settings: SUGGESTED_AIR_SIZING };
+
+  it('finds the limits of a pair and nothing for another pair', () => {
+    expect(findNetworkSizing([entry], 'ahu', 'out')).toEqual(SUGGESTED_AIR_SIZING);
+    expect(findNetworkSizing([entry], 'ahu', 'in')).toBeUndefined();
+    expect(findNetworkSizing([entry], 'ahu2', 'out')).toBeUndefined();
+  });
+
+  it('adds, replaces and removes an entry without changing the input', () => {
+    const empty: never[] = [];
+    const one = withNetworkSizing(empty, 'ahu', 'out', SUGGESTED_AIR_SIZING);
+    expect(empty).toEqual([]);
+    expect(one).toHaveLength(1);
+    expect(one[0]!.settings).toEqual(SUGGESTED_AIR_SIZING);
+    expect(one[0]!.settings).not.toBe(SUGGESTED_AIR_SIZING);
+    const replaced = withNetworkSizing(one, 'ahu', 'out', SUGGESTED_WATER_SIZING);
+    expect(replaced).toHaveLength(1);
+    expect(replaced[0]!.settings).toEqual(SUGGESTED_WATER_SIZING);
+    expect(one[0]!.settings).toEqual(SUGGESTED_AIR_SIZING);
+    expect(withNetworkSizing(one, 'ahu', 'out', undefined)).toEqual([]);
+    expect(one).toHaveLength(1);
+  });
+
+  it('parses good entries, drops a bad entry whole and keeps the last of a pair', () => {
+    const bad = { startStampId: 5, startPortId: '', settings: { method: 'air' } };
+    const later = { startStampId: 'ahu', startPortId: 'out', settings: SUGGESTED_WATER_SIZING };
+    const other = { startStampId: 'fcu', startPortId: 'in', settings: SUGGESTED_WATER_SIZING };
+    expect(parseNetworkSizing([bad, entry, other])).toEqual([entry, other]);
+    expect(parseNetworkSizing([entry, later])).toEqual([later]);
+    const parsed = parseNetworkSizing([entry]);
+    expect(parsed[0]!.settings).not.toBe(SUGGESTED_AIR_SIZING);
+  });
+
+  it('gives an empty list for a value that is not an array', () => {
+    for (const raw of ['x', null, {}, undefined, 3]) expect(parseNetworkSizing(raw)).toEqual([]);
+  });
+
+  it('does not pollute the prototype through __proto__', () => {
+    const raw = JSON.parse('[{"startStampId":"__proto__","startPortId":"polluted","settings":{"method":"water","maxVelocityMs":1,"maxPressureDropPaPerM":2,"__proto__":{"polluted":true}}}]');
+    const parsed = parseNetworkSizing(raw);
+    expect(parsed).toHaveLength(1);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect((parsed[0]!.settings as unknown as Record<string, unknown>).polluted).toBeUndefined();
   });
 });

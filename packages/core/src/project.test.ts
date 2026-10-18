@@ -5,7 +5,7 @@ import type { Fitting, NetworkType, Segment } from './network.js';
 import type { PlacedStamp } from './stamp.js';
 import type { StampDefinition } from './stamp-library.js';
 import { SchemaMigrationError } from './schema.js';
-import { SUGGESTED_WATER_SIZING } from './sizing-settings.js';
+import { SUGGESTED_AIR_SIZING, SUGGESTED_WATER_SIZING } from './sizing-settings.js';
 
 const networkType: NetworkType = { id: 'supply-air', name: 'Supply Air', discipline: 'ventilation', units: 'CFM', defaultCapacity: 0 };
 const segment: Segment = {
@@ -33,6 +33,7 @@ describe('serializeProject / loadProject round trip', () => {
       annotations: [annotation],
       customStampDefinitions: [],
       terminalCapacities: { 'stamp-1': 400 },
+      networkSizing: [],
       circuits: [],
       panels: [],
       panelSections: [],
@@ -211,6 +212,7 @@ describe('serializeProject / loadProject round trip', () => {
       annotations: [],
       customStampDefinitions: [],
       terminalCapacities: {},
+      networkSizing: [],
     };
 
     const loaded = loadProject(legacyDoc);
@@ -238,6 +240,7 @@ describe('serializeProject / loadProject round trip', () => {
       annotations: [],
       customStampDefinitions: [],
       terminalCapacities: {},
+      networkSizing: [],
       circuits: [],
       panels: [],
       panelSections: [],
@@ -263,6 +266,7 @@ describe('serializeProject / loadProject round trip', () => {
       annotations: [],
       customStampDefinitions: [],
       terminalCapacities: {},
+      networkSizing: [],
       circuits: [],
       panels: [],
       panelSections: [],
@@ -287,6 +291,7 @@ describe('serializeProject / loadProject round trip', () => {
       annotations: [],
       customStampDefinitions: [],
       terminalCapacities: {},
+      networkSizing: [],
       circuits: [],
       panels: [],
       panelSections: [],
@@ -311,6 +316,7 @@ describe('serializeProject / loadProject round trip', () => {
       annotations: [],
       customStampDefinitions: [],
       terminalCapacities: {},
+      networkSizing: [],
       circuits: [],
       panels: [],
       panelSections: [],
@@ -346,7 +352,7 @@ describe('calibrations in the save format', () => {
   });
 
   it('rejects a calibration that is not a positive number or a key that is not a page index', () => {
-    const bad = { ...v13, schemaVersion: CURRENT_SCHEMA_VERSION, roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {}, calibrations: { '0': { pageUnitsPerRealUnit: 0 }, page1: { pageUnitsPerRealUnit: 1 }, '3': null } };
+    const bad = { ...v13, schemaVersion: CURRENT_SCHEMA_VERSION, networkSizing: [], roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {}, calibrations: { '0': { pageUnitsPerRealUnit: 0 }, page1: { pageUnitsPerRealUnit: 1 }, '3': null } };
     try {
       loadProject(bad);
       expect.unreachable();
@@ -373,14 +379,14 @@ describe('ceiling heights in the save format', () => {
   });
 
   it('keeps the drawing and room type heights', () => {
-    const loaded = loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, roomNeeds: [], ceilingHeightMm: 3000, roomTypeCeilingHeightsMm: { toilet: 2400 } });
+    const loaded = loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, networkSizing: [], roomNeeds: [], ceilingHeightMm: 3000, roomTypeCeilingHeightsMm: { toilet: 2400 } });
     expect(loaded.ceilingHeightMm).toBe(3000);
     expect(loaded.roomTypeCeilingHeightsMm).toEqual({ toilet: 2400 });
   });
 
   it('rejects a height that is not a positive number', () => {
     try {
-      loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, roomNeeds: [], ceilingHeightMm: -1, roomTypeCeilingHeightsMm: { toilet: 0, office: '2600' } });
+      loadProject({ ...v15, schemaVersion: CURRENT_SCHEMA_VERSION, networkSizing: [], roomNeeds: [], ceilingHeightMm: -1, roomTypeCeilingHeightsMm: { toilet: 0, office: '2600' } });
       expect.unreachable();
     } catch (error) {
       expect((error as ProjectLoadError).issues).toEqual([
@@ -435,14 +441,14 @@ describe('routing targets in the save format (auto-routing.md §4.5)', () => {
 
   it('loads a version 17 save with the stamps unchanged', () => {
     const loaded = loadProject({ ...v17, stamps: [stamp] });
-    expect(CURRENT_SCHEMA_VERSION).toBe(19);
-    expect(loaded.schemaVersion).toBe(19);
+    expect(CURRENT_SCHEMA_VERSION).toBe(20);
+    expect(loaded.schemaVersion).toBe(20);
     expect(loaded.stamps).toEqual([stamp]);
   });
 
   it('keeps the routing targets of a stamp through a save and a load', () => {
     const withTargets = { ...stamp, ports: [{ id: 'cw', name: 'CW', fractionX: 0, fractionY: 0.5 }, { id: 'hw', name: 'HW', fractionX: 1, fractionY: 0.5 }], routingTargets: { cw: 'chilled-water', hw: 'heating-water' } };
-    const { schemaVersion: _v, ...doc } = { ...v17, stamps: [withTargets] };
+    const { schemaVersion: _v, ...doc } = { ...v17, stamps: [withTargets], networkSizing: [] };
     const loaded = loadProject(JSON.parse(JSON.stringify(serializeProject(doc as never))));
     expect(loaded.stamps[0]!.routingTargets).toEqual({ cw: 'chilled-water', hw: 'heating-water' });
   });
@@ -472,25 +478,25 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
 
   it('loads a version 18 save with two network types as version 19 with the types unchanged', () => {
     const loaded = loadProject({ ...v18, networkTypes: [airType, waterType] });
-    expect(loaded.schemaVersion).toBe(19);
+    expect(loaded.schemaVersion).toBe(20);
     expect(loaded.networkTypes).toEqual([airType, waterType]);
   });
 
-  it('keeps a valid flow unit and sizing through a save and a load', () => {
-    const sized: NetworkType = { ...waterType, flowUnit: 'kW', sizing: SUGGESTED_WATER_SIZING };
-    const { schemaVersion: _v, ...doc } = { ...v18, networkTypes: [sized] };
+  it('keeps a valid flow unit and sizing method through a save and a load', () => {
+    const sized: NetworkType = { ...waterType, flowUnit: 'kW', sizingMethod: 'water' };
+    const { schemaVersion: _v, ...doc } = { ...v18, networkTypes: [sized], networkSizing: [] };
     const loaded = loadProject(JSON.parse(JSON.stringify(serializeProject(doc as never))));
     expect(loaded.networkTypes).toEqual([sized]);
   });
 
   it('drops a flow unit that is not a known unit and keeps the other fields', () => {
-    const loaded = loadProject({ ...v18, networkTypes: [{ ...waterType, flowUnit: 'kg', sizing: SUGGESTED_WATER_SIZING }] });
+    const loaded = loadProject({ ...v18, networkTypes: [{ ...waterType, flowUnit: 'kg' }] });
     expect('flowUnit' in loaded.networkTypes[0]!).toBe(false);
-    expect(loaded.networkTypes[0]).toEqual({ ...waterType, sizing: SUGGESTED_WATER_SIZING });
+    expect(loaded.networkTypes[0]).toEqual(waterType);
   });
 
-  it('drops a sizing that does not parse and keeps the flow unit', () => {
-    const loaded = loadProject({ ...v18, networkTypes: [{ ...waterType, flowUnit: 'kW', sizing: { method: 'air' } }] });
+  it('drops a stray sizing key of a version 20 save and keeps the flow unit', () => {
+    const loaded = loadProject({ ...v18, schemaVersion: 20, networkSizing: [], networkTypes: [{ ...waterType, flowUnit: 'kW', sizing: SUGGESTED_WATER_SIZING }] });
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
     expect(loaded.networkTypes[0]).toEqual({ ...waterType, flowUnit: 'kW' });
   });
@@ -502,8 +508,55 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
   });
 
-  it('refuses a save of a version newer than 19', () => {
-    expect(() => loadProject({ ...v18, schemaVersion: 20 })).toThrow(SchemaMigrationError);
+  it('refuses a save of a version newer than 20', () => {
+    expect(() => loadProject({ ...v18, schemaVersion: 21 })).toThrow(SchemaMigrationError);
+  });
+});
+
+describe('network sizing in the save format (auto-routing-r5.md §12.2)', () => {
+  const v19 = {
+    schemaVersion: 19, networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {},
+    circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, rooms: [], calibrations: {}, roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {},
+  };
+  const base = { id: 'x', name: 'X', discipline: 'ventilation', units: 'CFM', defaultCapacity: 0, color: '#2196f3', lineWidthPt: 1, linePattern: 'solid' };
+  const stampAt = (id: string) => ({ id, category: 'equipment', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, ports: [] });
+
+  it('moves the method of the type in a version 19 save and drops the limits', () => {
+    const air = { ...base, id: 'supply-air', flowUnit: 'dm³/s', sizing: SUGGESTED_AIR_SIZING };
+    const water = { ...base, id: 'water', sizing: SUGGESTED_WATER_SIZING };
+    const bad = { ...base, id: 'bad', sizing: { method: 'x' } };
+    const none = { ...base, id: 'none' };
+    const loaded = loadProject({ ...v19, networkTypes: [air, water, bad, none] });
+    expect(loaded.schemaVersion).toBe(20);
+    expect(loaded.networkSizing).toEqual([]);
+    expect(loaded.networkTypes[0]).toEqual({ ...base, id: 'supply-air', flowUnit: 'dm³/s', sizingMethod: 'air' });
+    expect('sizing' in loaded.networkTypes[0]!).toBe(false);
+    expect(loaded.networkTypes[1]).toEqual({ ...base, id: 'water', sizingMethod: 'water' });
+    expect(loaded.networkTypes[2]).toEqual({ ...base, id: 'bad' });
+    expect(loaded.networkTypes[3]).toEqual(none);
+  });
+
+  it('loads a version 18 save with an empty networkSizing', () => {
+    expect(loadProject({ ...v19, schemaVersion: 18 }).networkSizing).toEqual([]);
+  });
+
+  it('drops the entry of a stamp that is not in the drawing', () => {
+    const keep = { startStampId: 'ahu', startPortId: 'out', settings: SUGGESTED_AIR_SIZING };
+    const gone = { startStampId: 'gone', startPortId: 'out', settings: SUGGESTED_AIR_SIZING };
+    const loaded = loadProject({ ...v19, schemaVersion: 20, stamps: [stampAt('ahu')], networkSizing: [keep, gone] });
+    expect(loaded.networkSizing).toEqual([keep]);
+  });
+
+  it('round-trips a version 20 save through serializeProject and loadProject', () => {
+    const entry = { startStampId: 'ahu', startPortId: 'out', settings: SUGGESTED_WATER_SIZING };
+    const { schemaVersion: _v, ...doc } = { ...v19, stamps: [stampAt('ahu')], networkSizing: [entry] };
+    const loaded = loadProject(JSON.parse(JSON.stringify(serializeProject(doc as never))));
+    expect(loaded.networkSizing).toEqual([entry]);
+    expect(loadProject(JSON.parse(JSON.stringify(serializeProject(loaded))))).toEqual(loaded);
+  });
+
+  it('refuses a version 20 save without networkSizing', () => {
+    expect(() => loadProject({ ...v19, schemaVersion: 20 })).toThrow(ProjectLoadError);
   });
 });
 

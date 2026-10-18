@@ -9,7 +9,7 @@
 
 import type { Vec2 } from './geometry.js';
 import type { FlowUnitId } from './flow-units.js';
-import type { SizingSettings } from './sizing-settings.js';
+import type { SizingMethod, SizingSettings } from './sizing-settings.js';
 
 export type Discipline =
   | 'heatingAndCooling'
@@ -34,7 +34,9 @@ export interface NetworkType {
   linePattern: LinePattern;
   /** The unit of the capacity numbers of this type (flow-units.ts). Absent = not set. */
   flowUnit?: FlowUnitId;
-  /** How to size a network of this type. Absent = not sized. */
+  /** The method to size a network of this type with. Absent = not sized. The limits are in ProjectDocument.networkSizing. */
+  sizingMethod?: SizingMethod;
+  /** @deprecated removed in T23; never present after load */
   sizing?: SizingSettings;
 }
 

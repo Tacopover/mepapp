@@ -4009,6 +4009,7 @@ export class SketchScene {
       annotations: Object.values(state.annotations),
       customStampDefinitions: customStampDefinitionsToSave(doc.customStampDefinitions, Object.values(state.stamps)),
       terminalCapacities: Object.fromEntries(doc.terminalCapacities),
+      networkSizing: [],
       circuits: Object.values(state.circuits),
       panels: Object.values(state.panels),
       panelSections: Object.values(state.panelSections),

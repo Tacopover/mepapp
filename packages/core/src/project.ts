@@ -13,13 +13,13 @@ import type { Room } from './rooms/room.js';
 import type { RoomNeed } from './rooms/room-need.js';
 import { parseRoomDemands, type RoomType } from './rooms/room-type.js';
 import type { Schematic } from './schematic.js';
-import { parseSizingSettings } from './sizing-settings.js';
+import { parseNetworkSizing, type NetworkSizingEntry } from './sizing-settings.js';
 import { parseRoutingTargets, type PlacedStamp } from './stamp.js';
 import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 19;
+export const CURRENT_SCHEMA_VERSION = 20;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -33,6 +33,8 @@ export interface ProjectDocument {
   customStampDefinitions: StampDefinition[];
   /** User-entered flow-solve input, keyed by terminal/equipment stamp id (see flow.ts's solveFlow). Solved output (FlowResult) is deliberately not part of this document — it's derived from current topology and recomputed on demand, never persisted. */
   terminalCapacities: Record<string, number>;
+  /** The sizing limits of each network, keyed by its start stamp and start port (auto-routing-r5.md §12.2). */
+  networkSizing: NetworkSizingEntry[];
   circuits: Circuit[];
   panels: Panel[];
   panelSections: PanelSection[];
@@ -314,7 +316,26 @@ const migrationSteps: MigrationStep[] = [
       schemaVersion: 19,
     }),
   },
+  {
+    fromVersion: 19,
+    toVersion: 20,
+    // Version 19 keeps the sizing limits on the network type. Version 20 keeps the method on the type and the limits
+    // of each network in networkSizing (auto-routing-r5.md §12.2). The old limits are dropped.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 20,
+      networkTypes: Array.isArray(data.networkTypes) ? data.networkTypes.map(moveSizingMethod) : data.networkTypes,
+      networkSizing: [],
+    }),
+  },
 ];
+
+function moveSizingMethod(type: unknown): unknown {
+  if (!type || typeof type !== 'object' || !('sizing' in type)) return type;
+  const { sizing, ...rest } = type as JsonRecord;
+  const method = sizing && typeof sizing === 'object' ? (sizing as JsonRecord).method : undefined;
+  return method === 'air' || method === 'water' ? { ...rest, sizingMethod: method } : rest;
+}
 
 function migrateRoomTypeDemands(type: unknown): unknown {
   if (!type || typeof type !== 'object' || !('demands' in type)) return type;
@@ -365,6 +386,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'annotations'),
   (data: JsonRecord) => requireArray(data, 'customStampDefinitions'),
   (data: JsonRecord) => requireRecord(data, 'terminalCapacities'),
+  (data: JsonRecord) => requireArray(data, 'networkSizing'),
   (data: JsonRecord) => requireArray(data, 'circuits'),
   (data: JsonRecord) => requireArray(data, 'panels'),
   (data: JsonRecord) => requireArray(data, 'panelSections'),
@@ -406,7 +428,13 @@ export function loadProject(raw: JsonRecord): ProjectDocument {
     throw new ProjectLoadError('project document failed validation after migration', issues);
   }
   const doc = migrated as unknown as ProjectDocument;
-  return { ...doc, stamps: doc.stamps.map(withCleanRoutingTargets), networkTypes: doc.networkTypes.map(withCleanSizing) };
+  const stampIds = new Set(doc.stamps.map((stamp) => stamp.id));
+  return {
+    ...doc,
+    stamps: doc.stamps.map(withCleanRoutingTargets),
+    networkTypes: doc.networkTypes.map(withCleanSizing),
+    networkSizing: parseNetworkSizing(doc.networkSizing).filter((entry) => stampIds.has(entry.startStampId)),
+  };
 }
 
 /** The stamp without the routing targets that are not network type ids (auto-routing.md §4.5). The same object when it has none. */
@@ -417,16 +445,13 @@ function withCleanRoutingTargets(stamp: PlacedStamp): PlacedStamp {
   return clean ? { ...rest, routingTargets: clean } : rest;
 }
 
-/** The network type without a flow unit or sizing that does not parse (auto-routing-r5.md §4.1). The same object when nothing is wrong. */
+/** The network type without a flow unit that does not parse and without a stray sizing key (auto-routing-r5.md §12.2). The same object when nothing is wrong. */
 function withCleanSizing(type: NetworkType): NetworkType {
   if (!type || typeof type !== 'object' || !('flowUnit' in type || 'sizing' in type)) return type;
   const flowUnitOk = !('flowUnit' in type) || isFlowUnitId(type.flowUnit);
-  const sizingOk = !('sizing' in type) || parseSizingSettings(type.sizing) !== undefined;
-  if (flowUnitOk && sizingOk) return type;
+  if (flowUnitOk && !('sizing' in type)) return type;
   const { flowUnit, sizing, ...rest } = type;
   const next: NetworkType = { ...rest };
   if (isFlowUnitId(flowUnit)) next.flowUnit = flowUnit;
-  const cleanSizing = parseSizingSettings(sizing);
-  if (cleanSizing) next.sizing = cleanSizing;
   return next;
 }
