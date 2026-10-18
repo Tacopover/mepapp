@@ -1,5 +1,5 @@
 import type { Discipline, FlowUnitId, NetworkType, SizingSettings } from '@mepapp/core';
-import { SUGGESTED_AIR_SIZING, SUGGESTED_FLOW_UNIT, SUGGESTED_WATER_SIZING } from '@mepapp/core';
+import { flowUnitOf, SUGGESTED_AIR_SIZING, SUGGESTED_FLOW_UNIT, SUGGESTED_WATER_SIZING } from '@mepapp/core';
 
 export type SizingMethodChoice = 'none' | 'air' | 'water';
 
@@ -107,6 +107,13 @@ export function draftErrors(draft: SizingDraft): DraftErrors {
 }
 
 export const draftHasErrors = (errors: DraftErrors): boolean => Object.values(errors).some(Boolean);
+
+export type ConvertPanel = 'none' | 'question' | 'kindWarning';
+
+export function convertPanelOf(oldUnit: FlowUnitId | undefined, newUnit: FlowUnitId | '', convertible: number): ConvertPanel {
+  if (oldUnit === undefined || newUnit === '' || oldUnit === newUnit || convertible === 0) return 'none';
+  return flowUnitOf(oldUnit).kind !== flowUnitOf(newUnit).kind ? 'kindWarning' : 'question';
+}
 
 export function draftToPatch(draft: SizingDraft): { flowUnit: FlowUnitId | undefined; sizing: SizingSettings | undefined } {
   const flowUnit = draft.flowUnit === '' ? undefined : draft.flowUnit;

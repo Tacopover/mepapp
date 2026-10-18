@@ -3,7 +3,7 @@ import type { Discipline, FlowUnitId, LinePattern, NetworkType } from '@mepapp/c
 import { FLOW_UNITS } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { ColorPicker } from './ColorPicker.js';
-import { applySuggested, coerceMethod, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingMethodChoice } from './sizingDraft.js';
+import { applySuggested, coerceMethod, draftErrors, draftFromType, draftHasErrors, convertPanelOf, draftToPatch, methodsForDiscipline, type SizingMethodChoice } from './sizingDraft.js';
 import { sizeText, type SizeTextKey } from './sizePlan.js';
 
 export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline' | 'flowUnit' | 'sizing'>>;
@@ -23,6 +23,9 @@ export interface NetworkTypeEditorDialogProps {
   onSave: (id: string, patch: NetworkTypeEditPatch) => void;
   /** Clones networkType into a brand-new "<name>_copy" type — see SketchScene.duplicateNetworkType. The caller retargets this same dialog at the new copy (pass a new `key` so local state re-seeds) rather than closing it. */
   onDuplicate: (id: string) => void;
+  /** Counts the stored capacities of this type: `convertible` can change unit, `mixed` (stamps with two network types) are skipped. */
+  capacityInfo: (typeId: string) => { convertible: number; mixed: number };
+  onConvertCapacities: (typeId: string, from: FlowUnitId, to: FlowUnitId) => void;
   onClose: () => void;
 }
 
@@ -38,7 +41,7 @@ const LINE_PATTERNS: Array<{ value: LinePattern; label: string }> = [
 ];
 
 /** Edits a network type's name and drawn visuals (color/thickness/pattern) — every segment tagged with this type re-renders immediately on Save, via SketchScene.updateNetworkType. Modeled on ElementEditorDialog/GlobalPropertiesDialog's local-draft + explicit Save pattern. */
-export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onClose }: NetworkTypeEditorDialogProps) {
+export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, capacityInfo, onConvertCapacities, onClose }: NetworkTypeEditorDialogProps) {
   const [name, setName] = useState(networkType.name);
   const [color, setColor] = useState(networkType.color);
   const [lineWidthPt, setLineWidthPt] = useState(networkType.lineWidthPt);
@@ -47,6 +50,20 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
   const [sizingDraft, setSizingDraft] = useState(() => coerceMethod(draftFromType(networkType), networkType.discipline));
   const errors = draftErrors(sizingDraft);
   const methods = methodsForDiscipline(discipline);
+
+  const [info] = useState(() => capacityInfo(networkType.id));
+  const [showConvert, setShowConvert] = useState(false);
+  const panel = convertPanelOf(networkType.flowUnit, sizingDraft.flowUnit, info.convertible);
+
+  function handleSaveClick() {
+    if (panel === 'none') handleSave();
+    else setShowConvert(true);
+  }
+
+  function handleConvertYes() {
+    if (networkType.flowUnit && sizingDraft.flowUnit) onConvertCapacities(networkType.id, networkType.flowUnit, sizingDraft.flowUnit);
+    handleSave();
+  }
 
   function handleSave() {
     onSave(networkType.id, { name: name.trim() || networkType.name, color, lineWidthPt, linePattern, discipline, ...draftToPatch(sizingDraft) });
@@ -62,7 +79,7 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
           <button onClick={() => onDuplicate(networkType.id)} title="Create a copy of this network type">
             Duplicate
           </button>
-          <button onClick={handleSave} disabled={draftHasErrors(errors)}>Save</button>
+          <button onClick={handleSaveClick} disabled={draftHasErrors(errors) || (showConvert && panel !== 'none')}>Save</button>
         </>
       }
     >
@@ -130,6 +147,9 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
             ))}
           </select>
         </div>
+        {networkType.flowUnit === undefined && sizingDraft.flowUnit !== '' && (
+          <p className="mep-nt-note" data-testid="nt-unit-read-note">{sizeText('unitReadNote', { unit: sizingDraft.flowUnit })}</p>
+        )}
         <div className="mep-field-row">
           <label>{sizeText('sizingMethod')}</label>
           <select
@@ -264,6 +284,22 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
           </>
         )}
       </div>
+      {showConvert && panel !== 'none' && networkType.flowUnit && sizingDraft.flowUnit && (
+        <div className="mep-nt-convert" data-testid="nt-convert-panel">
+          <p>
+            {panel === 'question'
+              ? sizeText(info.convertible === 1 ? 'convertQuestionOne' : 'convertQuestion', { n: info.convertible, old: networkType.flowUnit, new: sizingDraft.flowUnit })
+              : sizeText('unitKindWarning')}
+          </p>
+          {panel === 'question' && info.mixed > 0 && <p>{sizeText('convertSkipped', { n: info.mixed })}</p>}
+          <div className="mep-nt-convert-buttons">
+            {panel === 'question' && (
+              <button type="button" data-testid="nt-convert-yes" onClick={handleConvertYes}>{sizeText('convertYes')}</button>
+            )}
+            <button type="button" data-testid="nt-convert-no" onClick={handleSave}>{sizeText('convertNo')}</button>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Discipline, NetworkType } from '@mepapp/core';
 import {
-  applySuggested, coerceMethod, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingDraft,
+  applySuggested, coerceMethod, convertPanelOf, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingDraft,
 } from './components/sizingDraft.js';
 
 const airDraft = (patch: Partial<SizingDraft['air']> = {}): SizingDraft => ({
@@ -215,5 +215,20 @@ describe('draftToPatch', () => {
     const patch = draftToPatch({ ...airDraft(), method: 'none' });
     expect('sizing' in patch).toBe(true);
     expect(patch.sizing).toBeUndefined();
+  });
+});
+
+describe('convertPanelOf', () => {
+  it('shows no panel when nothing needs converting', () => {
+    expect(convertPanelOf(undefined, 'm³/h', 2)).toBe('none');
+    expect(convertPanelOf('m³/h', '', 2)).toBe('none');
+    expect(convertPanelOf('m³/h', 'm³/h', 2)).toBe('none');
+    expect(convertPanelOf('m³/h', 'dm³/s', 0)).toBe('none');
+  });
+
+  it('asks a question for the same kind and warns for a different kind', () => {
+    expect(convertPanelOf('m³/h', 'dm³/s', 2)).toBe('question');
+    expect(convertPanelOf('m³/h', 'kW', 2)).toBe('kindWarning');
+    expect(convertPanelOf('kW', 'W', 1)).toBe('question');
   });
 });

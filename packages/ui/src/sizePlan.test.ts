@@ -7,7 +7,7 @@ const PLAIN_KEYS: SizeTextKey[] = [
   'capacityUnitNote', 'totalFlow', 'sizedCount', 'sizedCountOne', 'sizeCount', 'sizeCountOne', 'riserNote', 'twoFlowsNote',
   'draftNote', 'disciplineNotSized', 'velocityNote', 'fluidAir', 'fluidWater', 'pipeNote', 'returnNote',
   'unsizedKeep', 'unsizedKeepOne', 'newSize', 'newSizeOne', 'confirmQuestion', 'confirmYes', 'confirmNo', 'unitReadNote',
-  'convertQuestion', 'convertQuestionOne', 'convertYes', 'convertNo', 'unitKindWarning', 'sizesSourceHint', 'deltaTHint',
+  'convertQuestion', 'convertQuestionOne', 'convertYes', 'convertNo', 'convertSkipped', 'unitKindWarning', 'sizesSourceHint', 'deltaTHint',
   'suggest', 'flowSection', 'flowUnit', 'flowUnitNotSet', 'sizingMethod', 'methodNone', 'methodAir', 'methodWater',
   'maxVelocity', 'maxDrop', 'airShape', 'shapeRound', 'shapeRect', 'maxAspect', 'airSeries', 'seriesStandard', 'seriesFree',
   'deltaT', 'valueNotPositive', 'valueAtLeastOne', 'editorTitle',

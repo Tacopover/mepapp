@@ -4587,6 +4587,56 @@ export class SketchScene {
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
+  /** The stamps with a capacity that have a segment of this network type on a port. `convertible`: stamps whose segments all have this type. `mixed`: stamps that also have a segment of another type (not converted). */
+  countCapacitiesOfType(typeId: string): { convertible: number; mixed: number } {
+    const typesByElement = this.capacitySegmentTypesByElement();
+    let convertible = 0;
+    let mixed = 0;
+    for (const [elementId, types] of typesByElement) {
+      if (!this.doc.terminalCapacities.has(elementId) || !types.has(typeId)) continue;
+      if (types.size === 1) convertible++;
+      else mixed++;
+    }
+    return { convertible, mixed };
+  }
+
+  /** Converts those capacities from one flow unit to another of the same kind. Returns the number converted. Writes nothing when the kinds differ. Not undoable, like setTerminalCapacity. */
+  convertCapacitiesOfType(typeId: string, from: FlowUnitId, to: FlowUnitId): number {
+    if (convertFlow(1, from, to) === null) return 0;
+    const typesByElement = this.capacitySegmentTypesByElement();
+    let converted = 0;
+    for (const [elementId, types] of typesByElement) {
+      if (!this.doc.terminalCapacities.has(elementId) || types.size !== 1 || !types.has(typeId)) continue;
+      const value = this.doc.terminalCapacities.get(elementId);
+      if (value === undefined) continue;
+      const next = convertFlow(value, from, to);
+      if (next === null) continue;
+      this.doc.terminalCapacities.set(elementId, next);
+      converted++;
+    }
+    if (converted > 0) {
+      this.recomputeFlow();
+      this.syncLabels();
+      this.markDirty();
+      this.emitter.emit('selectionChanged', this.getSelection());
+    }
+    return converted;
+  }
+
+  /** The network type ids of the segments on each port, by element id. */
+  private capacitySegmentTypesByElement(): Map<string, Set<string>> {
+    const typesByElement = new Map<string, Set<string>>();
+    for (const segment of Object.values(this.doc.drawingHistory.getState().segments)) {
+      for (const end of [segment.endpointA, segment.endpointB]) {
+        if (end.kind !== 'port') continue;
+        const types = typesByElement.get(end.elementId) ?? new Set<string>();
+        types.add(segment.networkTypeId);
+        typesByElement.set(end.elementId, types);
+      }
+    }
+    return typesByElement;
+  }
+
   /** Current world scale (1 = 100%) — the status bar's zoom readout. */
   getZoom(): number {
     return this.world.scale.x;

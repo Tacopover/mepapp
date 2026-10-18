@@ -1648,6 +1648,23 @@
   margin: 0 0 8px;
   max-width: 24em;
 }
+.mep-nt-convert {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.mep-nt-convert p {
+  margin: 0 0 6px;
+}
+.mep-nt-convert-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .mep-buildings-layout {
   display: flex;
   gap: 0;

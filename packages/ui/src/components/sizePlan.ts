@@ -37,6 +37,7 @@ const TEXTS = {
   convertQuestionOne: 'Convert 1 stored capacity from {old} to {new}?',
   convertYes: 'Convert',
   convertNo: 'Keep numbers',
+  convertSkipped: '{n} capacities of stamps with two network types are not converted.',
   unitKindWarning: 'A volume unit and a power unit cannot be converted. The stored capacities keep their numbers.',
   sizesSourceHint: 'Sources for the suggested values are secondary. Check your standard.',
   deltaTHint: 'Needed when the flow unit is a power.',

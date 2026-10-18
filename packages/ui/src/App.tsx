@@ -1819,6 +1819,8 @@ export function MepSketchApp({
           networkType={networkTypeEditorTarget}
           onSave={handleSaveNetworkType}
           onDuplicate={handleDuplicateNetworkType}
+          capacityInfo={(id) => sceneRef.current?.countCapacitiesOfType(id) ?? { convertible: 0, mixed: 0 }}
+          onConvertCapacities={(id, from, to) => { sceneRef.current?.convertCapacitiesOfType(id, from, to); }}
           onClose={() => setNetworkTypeEditorTarget(null)}
         />
       )}
