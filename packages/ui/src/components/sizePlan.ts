@@ -1,4 +1,4 @@
-import { getStampPorts, routingTargetOf, type RouteStamp, type Segment, type SizeNetworkResult, type SizePick, type SizingProblem, type SizingProblemCode } from '@mepapp/core';
+import { convertFlow, getStampPorts, routingTargetOf, type FlowUnitId, type RouteStamp, type Segment, type SizeNetworkResult, type SizePick, type SizingProblem, type SizingProblemCode } from '@mepapp/core';
 
 const TEXTS = {
   title: 'Size network',
@@ -32,6 +32,8 @@ const TEXTS = {
   unsizedKeepOne: '1 segment is not sized and keeps its old size.',
   newSize: '{n} segments get a new size. A size that you typed by hand is overwritten.',
   newSizeOne: '1 segment gets a new size. A size that you typed by hand is overwritten.',
+  appliedCount: 'Sized {n} segments.',
+  appliedCountOne: 'Sized 1 segment.',
   confirmQuestion: 'Some segments get no size and keep their old size. Size the others anyway?',
   confirmYes: 'Size anyway',
   confirmNo: 'Cancel',
@@ -204,4 +206,26 @@ export function hasTwoFlows(stamps: readonly RouteStamp[], stampIds: ReadonlySet
     }
     return targets.size >= 2;
   });
+}
+
+/** True when the first press of the Size button must ask first: some segment of the network gets no size. */
+export function needsConfirm(result: SizeNetworkResult): boolean {
+  return result.unsized.length > 0;
+}
+
+/** The total flow with its unit, for example '400 dm³/s'. A volume unit is kept; a power unit or no unit shows l/s. */
+export function totalFlowText(totalFlowM3s: number, unit: FlowUnitId | null): string {
+  const shown: FlowUnitId = unit !== null && convertFlow(1, unit, 'm³/s') !== null ? unit : 'l/s';
+  const value = convertFlow(totalFlowM3s, 'm³/s', shown) ?? totalFlowM3s;
+  return `${Number(value.toPrecision(4))} ${shown}`;
+}
+
+/** The lines under the sized count: the segments that keep their old size, then the segments that get a new size. */
+export function sizeChangeLines(result: SizeNetworkResult): string[] {
+  const lines: string[] = [];
+  const kept = result.unsized.length;
+  if (kept > 0) lines.push(kept === 1 ? sizeText('unsizedKeepOne') : sizeText('unsizedKeep', { n: kept }));
+  const changed = result.sizes.length;
+  if (changed > 0) lines.push(changed === 1 ? sizeText('newSizeOne') : sizeText('newSize', { n: changed }));
+  return lines;
 }

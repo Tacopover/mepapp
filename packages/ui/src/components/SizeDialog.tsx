@@ -3,7 +3,7 @@ import type { SketchScene, StampInfo } from '@mepapp/render';
 import { getStampPorts, networkOfStartPort } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { startCandidates } from './routePlan.js';
-import { hasTwoFlows, portsWithSegment, showEditTypeButton, sizeProblemLines, sizeText, stampIdsOfSegments, type SizeTextKey } from './sizePlan.js';
+import { hasTwoFlows, needsConfirm, portsWithSegment, showEditTypeButton, sizeChangeLines, sizeProblemLines, sizeResultLines, sizeText, stampIdsOfSegments, totalFlowText, type SizeTextKey } from './sizePlan.js';
 
 export interface SizeDialogProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -42,6 +42,8 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
   const [version, setVersion] = useState(0);
   const [startId, setStartId] = useState<string | null>(null);
   const [portId, setPortId] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [applied, setApplied] = useState<{ signature: string; count: number } | null>(null);
   useEffect(() => {
     if (!scene) return;
     const refresh = () => {
@@ -77,6 +79,24 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
   const labelOf = (stamp: StampInfo) => (stamp.definitionId ? stampName(stamp.definitionId) : null) ?? stamp.definitionId ?? stamp.id;
   const startLabels = uniqueLabels(candidates.map((c) => c.stamp), labelOf);
   const problemLines = plan ? sizeProblemLines(plan.result.problems) : [];
+  const result = plan?.result;
+  const okResult = result && result.status === 'ok' ? result : null;
+  const signature = okResult ? JSON.stringify([okResult.sizes, okResult.unsized]) : '';
+  const canApply = okResult !== null && okResult.sizes.length > 0;
+  const resultLines = okResult
+    ? [...sizeResultLines(okResult, okResult.totalFlowM3s === null ? '' : totalFlowText(okResult.totalFlowM3s, plan?.flowUnit ?? null), method === 'water' ? 'water' : 'air'), ...sizeChangeLines(okResult)]
+    : [];
+  useEffect(() => {
+    setConfirming(false);
+  }, [signature]);
+  const appliedNow = applied !== null && applied.signature === signature ? applied.count : null;
+  const showConfirm = confirming && okResult !== null && needsConfirm(okResult);
+  const apply = () => {
+    if (!scene || !okResult) return;
+    scene.applyNetworkSizes(okResult.sizes);
+    setApplied({ signature, count: okResult.sizes.length });
+    setConfirming(false);
+  };
 
   return (
     <Dialog
@@ -86,9 +106,22 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
       closeOnBackdropClick={false}
       onClose={onClose}
       actions={
-        <button type="button" data-testid="size-close" onClick={onClose}>
-          {sizeText('close')}
-        </button>
+        <>
+          <button
+            type="button"
+            data-testid="size-apply"
+            disabled={!canApply || showConfirm}
+            onClick={() => {
+              if (okResult && needsConfirm(okResult)) setConfirming(true);
+              else apply();
+            }}
+          >
+            {sizeText('size')}
+          </button>
+          <button type="button" data-testid="size-close" onClick={onClose}>
+            {sizeText('close')}
+          </button>
+        </>
       }
     >
       <div data-testid="size-body">
@@ -104,6 +137,7 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
                 onChange={(event) => {
                   setStartId(event.target.value);
                   setPortId(null);
+                  setConfirming(false);
                 }}
               >
                 {candidates.map((c) => (
@@ -113,7 +147,10 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
             </label>
             <label className="mep-route-field">
               <span>{sizeText('startPort')}</span>
-              <select data-testid="size-port" value={selectedPort ?? ''} onChange={(event) => setPortId(event.target.value)}>
+              <select data-testid="size-port" value={selectedPort ?? ''} onChange={(event) => {
+                setPortId(event.target.value);
+                setConfirming(false);
+              }}>
                 {portIds.map((id) => (
                   <option key={id} value={id}>{portNameOf(id)}</option>
                 ))}
@@ -142,6 +179,27 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
                 <button type="button" data-testid="size-edit-type" onClick={() => onEditNetworkType(plan.networkTypeId as string)}>
                   {sizeText('editType')}
                 </button>
+              </div>
+            )}
+            {okResult && (
+              <div data-testid="size-result" aria-live="polite">
+                {resultLines.map((line, index) => (
+                  <p key={index} className={index === 0 ? 'mep-route-text mep-route-main' : 'mep-route-text'}>{line}</p>
+                ))}
+                {appliedNow !== null && (
+                  <p className="mep-route-text mep-size-applied" data-testid="size-applied">
+                    {appliedNow === 1 ? sizeText('appliedCountOne') : sizeText('appliedCount', { n: appliedNow })}
+                  </p>
+                )}
+              </div>
+            )}
+            {showConfirm && (
+              <div className="mep-size-confirm" data-testid="size-confirm" role="alertdialog" aria-label={sizeText('confirmQuestion')}>
+                <p className="mep-route-text">{sizeText('confirmQuestion')}</p>
+                <div className="mep-size-confirm-actions">
+                  <button type="button" data-testid="size-confirm-yes" onClick={apply}>{sizeText('confirmYes')}</button>
+                  <button type="button" data-testid="size-confirm-no" onClick={() => setConfirming(false)}>{sizeText('confirmNo')}</button>
+                </div>
               </div>
             )}
             <div data-testid="size-notes">

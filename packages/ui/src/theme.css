@@ -3598,6 +3598,15 @@
   text-align: right;
   white-space: nowrap;
 }
+.mep-modal--route .mep-size-confirm {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent-ink);
+  border-radius: 4px;
+}
+.mep-modal--route .mep-size-confirm .mep-route-text { margin-bottom: 8px; }
+.mep-modal--route .mep-size-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mep-modal--route .mep-size-applied { font-weight: 600; }
 .mep-modal--route .mep-route-main {
   font-weight: 600;
 }

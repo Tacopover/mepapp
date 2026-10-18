@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteStamp, Segment, SizedSegment, SizeNetworkResult, SizePick, SizingProblemCode } from '@mepapp/core';
-import { hasTwoFlows, portsWithSegment, showEditTypeButton, sizeLabel, sizeProblemLines, sizeResultLines, sizeText, stampIdsOfSegments, type SizeTextKey } from './components/sizePlan.js';
+import { hasTwoFlows, needsConfirm, portsWithSegment, sizeChangeLines, totalFlowText, showEditTypeButton, sizeLabel, sizeProblemLines, sizeResultLines, sizeText, stampIdsOfSegments, type SizeTextKey } from './components/sizePlan.js';
 
 const PLAIN_KEYS: SizeTextKey[] = [
   'title', 'startStamp', 'startPort', 'networkType', 'noEquipment', 'noSegments', 'size', 'close', 'editType',
-  'severityError', 'severityWarning', 'severityInfo', 'capacityUnitNote', 'totalFlow', 'sizedCount', 'sizedCountOne', 'sizeCount', 'sizeCountOne', 'riserNote', 'twoFlowsNote',
+  'appliedCount', 'appliedCountOne', 'severityError', 'severityWarning', 'severityInfo', 'capacityUnitNote', 'totalFlow', 'sizedCount', 'sizedCountOne', 'sizeCount', 'sizeCountOne', 'riserNote', 'twoFlowsNote',
   'draftNote', 'disciplineNotSized', 'velocityNote', 'fluidAir', 'fluidWater', 'pipeNote', 'returnNote',
   'unsizedKeep', 'unsizedKeepOne', 'newSize', 'newSizeOne', 'confirmQuestion', 'confirmYes', 'confirmNo', 'unitReadNote',
   'convertQuestion', 'convertQuestionOne', 'convertYes', 'convertNo', 'convertSkipped', 'unitKindWarning', 'sizesSourceHint', 'deltaTHint',
@@ -251,5 +251,35 @@ describe('hasTwoFlows', () => {
     expect(hasTwoFlows([stamp('x', ['a', 'b'], { a: 'supply-air', b: 'supply-air' })], new Set(['x']))).toBe(false);
     expect(hasTwoFlows([stamp('x', ['a'])], new Set(['x']))).toBe(false);
     expect(hasTwoFlows([stamp('fcu', ['a', 'b'], { a: 'supply-air', b: 'return-air' })], new Set(['other']))).toBe(false);
+  });
+});
+
+describe('needsConfirm', () => {
+  it('is true only when a segment is unsized', () => {
+    expect(needsConfirm(result({ unsized: [{ segmentId: 's1', reason: 'zero-flow' }] }))).toBe(true);
+    expect(needsConfirm(result({ sizes: [sized('s1', round(200))] }))).toBe(false);
+  });
+});
+
+describe('totalFlowText', () => {
+  it('keeps a volume unit', () => {
+    expect(totalFlowText(0.4, 'm³/s')).toBe('0.4 m³/s');
+    expect(totalFlowText(0.4, 'dm³/s')).toBe('400 dm³/s');
+  });
+  it('shows l/s for a power unit or no unit', () => {
+    expect(totalFlowText(0.001, 'kW')).toBe('1 l/s');
+    expect(totalFlowText(0.001, null)).toBe('1 l/s');
+  });
+});
+
+describe('sizeChangeLines', () => {
+  it('uses the singular and plural texts', () => {
+    expect(sizeChangeLines(result({ sizes: [sized('a', round(200))], unsized: [{ segmentId: 'b', reason: 'zero-flow' }] }))).toEqual([
+      '1 segment is not sized and keeps its old size.',
+      '1 segment gets a new size. A size that you typed by hand is overwritten.',
+    ]);
+    expect(sizeChangeLines(result({ sizes: [sized('a', round(200)), sized('b', round(200))] }))).toEqual([
+      '2 segments get a new size. A size that you typed by hand is overwritten.',
+    ]);
   });
 });
