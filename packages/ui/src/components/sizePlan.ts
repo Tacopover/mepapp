@@ -23,6 +23,7 @@ const TEXTS = {
   twoFlowsNote: 'Stamps with two flows use one capacity here.',
   draftNote: 'Draft in 2D. Check clashes and clearances yourself.',
   disciplineNotSized: 'This network type has no sizing method. Sizing is for ventilation and heating/cooling water only. Plumbing, drains and fire protection are not sized by this command.',
+  limitsNote: 'Limits are set for each network in the Size dialog.',
   velocityNote: 'The velocity limit applies to every segment.',
   fluidAir: 'Air at 20 °C.',
   fluidWater: 'Water at 20 °C, no glycol.',

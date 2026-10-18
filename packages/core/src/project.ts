@@ -448,10 +448,11 @@ function withCleanRoutingTargets(stamp: PlacedStamp): PlacedStamp {
 /** The network type without a flow unit that does not parse and without a stray sizing key (auto-routing-r5.md §12.2). The same object when nothing is wrong. */
 function withCleanSizing(type: NetworkType): NetworkType {
   if (!type || typeof type !== 'object' || !('flowUnit' in type || 'sizing' in type)) return type;
-  const flowUnitOk = !('flowUnit' in type) || isFlowUnitId(type.flowUnit);
-  if (flowUnitOk && !('sizing' in type)) return type;
-  const { flowUnit, sizing, ...rest } = type;
-  const next: NetworkType = { ...rest };
+  const record = type as unknown as JsonRecord;
+  const flowUnitOk = !('flowUnit' in record) || isFlowUnitId(record.flowUnit);
+  if (flowUnitOk && !('sizing' in record)) return type;
+  const { flowUnit, sizing, ...rest } = record;
+  const next = { ...rest } as unknown as NetworkType;
   if (isFlowUnitId(flowUnit)) next.flowUnit = flowUnit;
   return next;
 }

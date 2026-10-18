@@ -10,7 +10,7 @@ const PLAIN_KEYS: SizeTextKey[] = [
   'convertQuestion', 'convertQuestionOne', 'convertYes', 'convertNo', 'convertSkipped', 'unitKindWarning', 'sizesSourceHint', 'deltaTHint',
   'suggest', 'flowSection', 'flowUnit', 'flowUnitNotSet', 'sizingMethod', 'methodNone', 'methodAir', 'methodWater',
   'maxVelocity', 'maxDrop', 'airShape', 'shapeRound', 'shapeRect', 'maxAspect', 'airSeries', 'seriesStandard', 'seriesFree',
-  'deltaT', 'valueNotPositive', 'valueAtLeastOne', 'editorTitle', 'limitsSection', 'clearLimits',
+  'deltaT', 'valueNotPositive', 'valueAtLeastOne', 'editorTitle', 'limitsSection', 'clearLimits', 'limitsNote',
 ];
 
 const PROBLEM_CODES: SizingProblemCode[] = [

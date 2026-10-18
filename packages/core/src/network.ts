@@ -9,7 +9,7 @@
 
 import type { Vec2 } from './geometry.js';
 import type { FlowUnitId } from './flow-units.js';
-import type { SizingMethod, SizingSettings } from './sizing-settings.js';
+import type { SizingMethod } from './sizing-settings.js';
 
 export type Discipline =
   | 'heatingAndCooling'
@@ -36,8 +36,6 @@ export interface NetworkType {
   flowUnit?: FlowUnitId;
   /** The method to size a network of this type with. Absent = not sized. The limits are in ProjectDocument.networkSizing. */
   sizingMethod?: SizingMethod;
-  /** @deprecated removed in T23; never present after load */
-  sizing?: SizingSettings;
 }
 
 export type SegmentShape = 'round' | 'rectangular';

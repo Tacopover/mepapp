@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import type { Discipline, NetworkType, SizingSettings } from '@mepapp/core';
+import type { Discipline, SizingSettings } from '@mepapp/core';
 import { SUGGESTED_AIR_SIZING, SUGGESTED_WATER_SIZING } from '@mepapp/core';
 import {
-  applySuggested, coerceMethod, convertPanelOf, draftErrors, draftFromType, draftHasErrors, draftToPatch, emptyLimitsDraft, limitsDraftFromSettings,
+  coerceMethod, convertPanelOf, draftFromType, draftToPatch, emptyLimitsDraft, limitsDraftFromSettings,
   limitsErrors, limitsToSettings, methodsForDiscipline, suggestedLimitsDraft, type LimitsDraft, type SizingDraft,
 } from './components/sizingDraft.js';
 
-const airDraft = (patch: Partial<SizingDraft['air']> = {}): SizingDraft => ({
-  flowUnit: '',
-  method: 'air',
+const airDraft = (): SizingDraft => ({ flowUnit: '', method: 'air' });
+
+const waterDraft = (): SizingDraft => ({ flowUnit: '', method: 'water' });
+
+const airLimits = (patch: Partial<LimitsDraft['air']> = {}): LimitsDraft => ({
+  ...emptyLimitsDraft(),
   air: { maxVelocity: '5', maxDrop: '1', shape: 'round', aspect: '', series: 'standard', ...patch },
-  water: { maxVelocity: '', maxDrop: '', deltaT: '' },
 });
 
-const waterDraft = (patch: Partial<SizingDraft['water']> = {}): SizingDraft => ({
-  flowUnit: '',
-  method: 'water',
-  air: { maxVelocity: '', maxDrop: '', shape: 'round', aspect: '', series: 'standard' },
+const waterLimits = (patch: Partial<LimitsDraft['water']> = {}): LimitsDraft => ({
+  ...emptyLimitsDraft(),
   water: { maxVelocity: '1', maxDrop: '200', deltaT: '', ...patch },
 });
 
@@ -37,43 +37,16 @@ describe('methodsForDiscipline', () => {
 });
 
 describe('draftFromType', () => {
-  it('starts empty for a type without sizing', () => {
-    expect(draftFromType({})).toEqual({
-      flowUnit: '',
-      method: 'none',
-      air: { maxVelocity: '', maxDrop: '', shape: 'round', aspect: '', series: 'standard' },
-      water: { maxVelocity: '', maxDrop: '', deltaT: '' },
-    });
+  it('starts empty for a type without a flow unit or a method', () => {
+    expect(draftFromType({})).toEqual({ flowUnit: '', method: 'none' });
   });
 
-  it('reads a round air type', () => {
-    const draft = draftFromType({
-      flowUnit: 'dm³/s',
-      sizing: { method: 'air', maxVelocityMs: 5, maxPressureDropPaPerM: 1, shape: 'round', series: 'standard' },
-    });
-    expect(draft.flowUnit).toBe('dm³/s');
-    expect(draft.method).toBe('air');
-    expect(draft.air).toEqual({ maxVelocity: '5', maxDrop: '1', shape: 'round', aspect: '', series: 'standard' });
+  it('reads an air type', () => {
+    expect(draftFromType({ flowUnit: 'dm³/s', sizingMethod: 'air' })).toEqual({ flowUnit: 'dm³/s', method: 'air' });
   });
 
-  it('reads a rectangular air type with aspect 3', () => {
-    const draft = draftFromType({
-      sizing: { method: 'air', maxVelocityMs: 6, maxPressureDropPaPerM: 0.8, shape: 'rectangular', maxAspectRatio: 3, series: 'free' },
-    });
-    expect(draft.air).toEqual({ maxVelocity: '6', maxDrop: '0.8', shape: 'rectangular', aspect: '3', series: 'free' });
-  });
-
-  it('reads a water type with deltaTK 10', () => {
-    const draft = draftFromType({
-      sizing: { method: 'water', maxVelocityMs: 1, maxPressureDropPaPerM: 200, deltaTK: 10 },
-    });
-    expect(draft.method).toBe('water');
-    expect(draft.water).toEqual({ maxVelocity: '1', maxDrop: '200', deltaT: '10' });
-  });
-
-  it('reads a water type without deltaTK', () => {
-    const draft = draftFromType({ sizing: { method: 'water', maxVelocityMs: 1, maxPressureDropPaPerM: 200 } });
-    expect(draft.water.deltaT).toBe('');
+  it('reads a water type', () => {
+    expect(draftFromType({ flowUnit: 'kW', sizingMethod: 'water' })).toEqual({ flowUnit: 'kW', method: 'water' });
   });
 });
 
@@ -90,135 +63,95 @@ describe('coerceMethod', () => {
     expect(coerceMethod(waterDraft(), 'ventilation').method).toBe('none');
   });
 
-  it('sets a stored air sizing to none on plumbing', () => {
-    const draft = draftFromType({
-      sizing: { method: 'air', maxVelocityMs: 5, maxPressureDropPaPerM: 1, shape: 'round', series: 'standard' },
-    });
+  it('sets a stored air method to none on plumbing', () => {
+    const draft = draftFromType({ sizingMethod: 'air' });
     expect(coerceMethod(draft, 'plumbing').method).toBe('none');
   });
 });
 
-describe('draftErrors', () => {
+describe('limitsErrors', () => {
   it.each(['0', '-3', '', 'abc', 'NaN'])('flags the velocity %j', (value) => {
-    expect(draftErrors(airDraft({ maxVelocity: value })).airMaxVelocity).toBe(true);
+    expect(limitsErrors(airLimits({ maxVelocity: value }), 'air').airMaxVelocity).toBe(true);
   });
 
   it('accepts the velocity 1e3', () => {
-    expect(draftErrors(airDraft({ maxVelocity: '1e3' })).airMaxVelocity).toBe(false);
+    expect(limitsErrors(airLimits({ maxVelocity: '1e3' }), 'air').airMaxVelocity).toBe(false);
   });
 
   it('flags an aspect of 0.5 on a rectangular draft', () => {
-    expect(draftErrors(airDraft({ shape: 'rectangular', aspect: '0.5' })).airAspect).toBe(true);
+    expect(limitsErrors(airLimits({ shape: 'rectangular', aspect: '0.5' }), 'air').airAspect).toBe(true);
   });
 
   it('accepts an empty aspect on a round draft', () => {
-    expect(draftErrors(airDraft({ shape: 'round', aspect: '' })).airAspect).toBe(false);
+    expect(limitsErrors(airLimits({ shape: 'round', aspect: '' }), 'air').airAspect).toBe(false);
   });
 
   it('accepts an empty aspect on a rectangular draft', () => {
-    expect(draftErrors(airDraft({ shape: 'rectangular', aspect: '' })).airAspect).toBe(false);
+    expect(limitsErrors(airLimits({ shape: 'rectangular', aspect: '' }), 'air').airAspect).toBe(false);
   });
 
   it('accepts an empty deltaT', () => {
-    expect(draftErrors(waterDraft({ deltaT: '' })).waterDeltaT).toBe(false);
+    expect(limitsErrors(waterLimits({ deltaT: '' }), 'water').waterDeltaT).toBe(false);
   });
 
   it('flags a deltaT of 0 and of -1', () => {
-    expect(draftErrors(waterDraft({ deltaT: '0' })).waterDeltaT).toBe(true);
-    expect(draftErrors(waterDraft({ deltaT: '-1' })).waterDeltaT).toBe(true);
+    expect(limitsErrors(waterLimits({ deltaT: '0' }), 'water').waterDeltaT).toBe(true);
+    expect(limitsErrors(waterLimits({ deltaT: '-1' }), 'water').waterDeltaT).toBe(true);
   });
 
   it('reports no error for the fields of the unchosen method', () => {
-    const errors = draftErrors({ ...airDraft({ maxVelocity: '', maxDrop: '', shape: 'rectangular', aspect: '' }), method: 'water' });
+    const errors = limitsErrors(airLimits({ maxVelocity: '', maxDrop: '', shape: 'rectangular', aspect: '' }), 'water');
     expect(errors.airMaxVelocity).toBe(false);
     expect(errors.airMaxDrop).toBe(false);
     expect(errors.airAspect).toBe(false);
     expect(errors.waterMaxVelocity).toBe(true);
-    expect(draftHasErrors(errors)).toBe(true);
   });
 });
 
-describe('applySuggested', () => {
-  it('fills the air fields with the suggested values', () => {
-    const draft = applySuggested({ ...airDraft({ maxVelocity: '9', maxDrop: '9', shape: 'rectangular', aspect: '2', series: 'free' }), flowUnit: '' }, 'air');
-    expect(draft.flowUnit).toBe('dm³/s');
-    expect(draft.method).toBe('air');
+describe('suggestedLimitsDraft', () => {
+  it('fills the air fields with the suggested values and leaves the water fields empty', () => {
+    const draft = suggestedLimitsDraft('air');
     expect(draft.air).toEqual({ maxVelocity: '5', maxDrop: '1', shape: 'round', aspect: '4', series: 'standard' });
+    expect(draft.water).toEqual(emptyLimitsDraft().water);
   });
 
-  it('fills the water fields and leaves deltaT empty', () => {
-    const draft = applySuggested(waterDraft({ deltaT: '10' }), 'water');
-    expect(draft.flowUnit).toBe('kW');
-    expect(draft.method).toBe('water');
+  it('fills the water fields, leaves deltaT empty and leaves the air fields empty', () => {
+    const draft = suggestedLimitsDraft('water');
     expect(draft.water).toEqual({ maxVelocity: '1', maxDrop: '200', deltaT: '' });
-  });
-
-  it('leaves the fields of the other method unchanged', () => {
-    const start = { ...airDraft({ maxVelocity: '7' }), water: { maxVelocity: '3', maxDrop: '4', deltaT: '5' } };
-    expect(applySuggested(start, 'air').water).toEqual(start.water);
-    expect(applySuggested(waterDraft(), 'water').air).toEqual(waterDraft().air);
-  });
-
-  it('does not mutate the input draft', () => {
-    const start = waterDraft({ deltaT: '10' });
-    const snapshot = structuredClone(start);
-    applySuggested(start, 'water');
-    expect(start).toEqual(snapshot);
+    expect(draft.air).toEqual(emptyLimitsDraft().air);
   });
 });
 
 describe('draftToPatch', () => {
-  const roundAir: Pick<NetworkType, 'flowUnit' | 'sizing'> = {
-    flowUnit: 'dm³/s',
-    sizing: { method: 'air', maxVelocityMs: 5, maxPressureDropPaPerM: 1, shape: 'round', series: 'standard' },
-  };
-  const rectAir: Pick<NetworkType, 'flowUnit' | 'sizing'> = {
-    flowUnit: 'm³/h',
-    sizing: { method: 'air', maxVelocityMs: 6, maxPressureDropPaPerM: 0.8, shape: 'rectangular', maxAspectRatio: 3, series: 'free' },
-  };
-  const waterNoDelta: Pick<NetworkType, 'flowUnit' | 'sizing'> = {
-    flowUnit: 'kW',
-    sizing: { method: 'water', maxVelocityMs: 1, maxPressureDropPaPerM: 200 },
-  };
-  const waterDelta: Pick<NetworkType, 'flowUnit' | 'sizing'> = {
-    flowUnit: 'kW',
-    sizing: { method: 'water', maxVelocityMs: 1, maxPressureDropPaPerM: 200, deltaTK: 10 },
-  };
-  const empty: Pick<NetworkType, 'flowUnit' | 'sizing'> = {};
+  it('gives the flow unit and the method air', () => {
+    expect(draftToPatch({ flowUnit: 'dm³/s', method: 'air' })).toEqual({ flowUnit: 'dm³/s', sizingMethod: 'air' });
+  });
+
+  it('gives the flow unit and the method water', () => {
+    expect(draftToPatch({ flowUnit: 'kW', method: 'water' })).toEqual({ flowUnit: 'kW', sizingMethod: 'water' });
+  });
 
   it.each([
-    ['air round', roundAir],
-    ['air rectangular', rectAir],
-    ['water without deltaT', waterNoDelta],
-    ['water with deltaT', waterDelta],
-    ['empty', empty],
-  ])('round trips %s', (_name, type) => {
-    expect(draftToPatch(draftFromType(type))).toEqual({ flowUnit: type.flowUnit, sizing: type.sizing });
+    ['air', { flowUnit: 'dm³/s', sizingMethod: 'air' }],
+    ['water', { flowUnit: 'kW', sizingMethod: 'water' }],
+    ['empty', {}],
+  ] as const)('round trips %s', (_name, type) => {
+    const patch = draftToPatch(draftFromType(type));
+    expect(patch.flowUnit).toBe((type as { flowUnit?: string }).flowUnit);
+    expect(patch.sizingMethod).toBe((type as { sizingMethod?: string }).sizingMethod);
   });
 
   it('gives an undefined flow unit for unit ""', () => {
     expect(draftToPatch(airDraft()).flowUnit).toBeUndefined();
   });
 
-  it('drops maxAspectRatio for a round shape', () => {
-    const patch = draftToPatch(draftFromType({
-      sizing: { method: 'air', maxVelocityMs: 5, maxPressureDropPaPerM: 1, shape: 'round', maxAspectRatio: 3, series: 'standard' },
-    }));
-    expect(patch.sizing).toEqual({ method: 'air', maxVelocityMs: 5, maxPressureDropPaPerM: 1, shape: 'round', series: 'standard' });
-    expect(patch.sizing).not.toHaveProperty('maxAspectRatio');
-  });
-
-  it('drops maxAspectRatio for a rectangular shape with an empty aspect', () => {
-    const patch = draftToPatch(airDraft({ shape: 'rectangular', aspect: '' }));
-    expect(patch.sizing).not.toHaveProperty('maxAspectRatio');
-  });
-
-  it('keeps the sizing key with an undefined value for method none', () => {
-    const patch = draftToPatch({ ...airDraft(), method: 'none' });
-    expect('sizing' in patch).toBe(true);
-    expect(patch.sizing).toBeUndefined();
+  it('keeps the sizingMethod key with an undefined value for method none', () => {
+    const patch = draftToPatch({ flowUnit: 'kW', method: 'none' });
+    expect('sizingMethod' in patch).toBe(true);
+    expect(patch.sizingMethod).toBeUndefined();
   });
 });
+
 
 describe('limits draft', () => {
   const air = (patch: Partial<LimitsDraft['air']> = {}): LimitsDraft => ({ ...emptyLimitsDraft(), air: { ...suggestedLimitsDraft('air').air, ...patch } });

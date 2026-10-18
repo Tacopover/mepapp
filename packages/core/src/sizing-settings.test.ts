@@ -88,9 +88,9 @@ describe('NetworkType sizing fields', () => {
   };
 
   it('accepts a NetworkType with both sizing fields and one with neither', () => {
-    const sized: NetworkType = { ...base, flowUnit: 'dm³/s', sizing: SUGGESTED_AIR_SIZING };
+    const sized: NetworkType = { ...base, flowUnit: 'dm³/s', sizingMethod: 'air' };
     const plain: NetworkType = base;
-    expect(sized.sizing).toEqual(SUGGESTED_AIR_SIZING);
+    expect(sized.sizingMethod).toBe('air');
     expect(plain.flowUnit).toBeUndefined();
   });
 });
