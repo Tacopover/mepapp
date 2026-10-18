@@ -352,3 +352,15 @@
 {"seq":352,"at":"2026-10-18T10:48:45.632Z","type":"task","id":"R5-T08a","state":"done","commit":"f19c5ce"}
 {"seq":353,"at":"2026-10-18T10:48:45.759Z","type":"task","id":"R5-T08b","state":"done","commit":"3492aa4"}
 {"seq":354,"at":"2026-10-18T10:48:45.878Z","type":"task","id":"R5-T09","state":"done","commit":"e18685d"}
+{"seq":355,"at":"2026-10-18T10:49:09.794Z","type":"now","id":"R5-T10a","text":"R5-T10a, T13, T14a, T14b, T15a running"}
+{"seq":356,"at":"2026-10-18T11:50:41.598Z","type":"task","id":"R5-T10a","state":"done","commit":"e8b70a6"}
+{"seq":357,"at":"2026-10-18T11:50:41.732Z","type":"task","id":"R5-T13","state":"done","commit":"a5fa5c2"}
+{"seq":358,"at":"2026-10-18T11:50:41.858Z","type":"task","id":"R5-T14a","state":"done","commit":"59d8bd3"}
+{"seq":359,"at":"2026-10-18T11:50:41.988Z","type":"task","id":"R5-T14b","state":"done","commit":"02ead09"}
+{"seq":360,"at":"2026-10-18T11:50:51.648Z","type":"shot","id":"R5-T14a-initial","part":"R5","task":"R5-T14a","caption":"Network type editor, Supply Air: Flow and sizing section, Not set / Not sized","assetId":"efce21e386999f074dd108470dae2703","url":"/_blob/efce21e386999f074dd108470dae2703"}
+{"seq":361,"at":"2026-10-18T11:50:51.782Z","type":"shot","id":"R5-T14a-air","part":"R5","task":"R5-T14a","caption":"Air fields filled: dm3/s, Air, 7 m/s, 0.9 Pa/m, Rectangular, aspect 3","assetId":"9498ba7b7f1607997f9c37329dee7a0c","url":"/_blob/9498ba7b7f1607997f9c37329dee7a0c"}
+{"seq":362,"at":"2026-10-18T11:50:51.907Z","type":"shot","id":"R5-T14a-narrow","part":"R5","task":"R5-T14a","caption":"Same editor at 400 px width, no horizontal overflow","assetId":"23cafdcc8d68688ef103350ee2663d6e","url":"/_blob/23cafdcc8d68688ef103350ee2663d6e"}
+{"seq":363,"at":"2026-10-18T11:50:52.033Z","type":"shot","id":"R5-T14a-plumbing","part":"R5","task":"R5-T14a","caption":"Domestic Cold Water: only Not sized, with the no-method note","assetId":"575cdace271805b9060f3e2e69d5b34d","url":"/_blob/575cdace271805b9060f3e2e69d5b34d"}
+{"seq":364,"at":"2026-10-18T11:50:52.189Z","type":"shot","id":"R5-T14a-error","part":"R5","task":"R5-T14a","caption":"Velocity 0: error line, Save disabled","assetId":"c70926cb1f1b16f5331cb12d357ec494","url":"/_blob/c70926cb1f1b16f5331cb12d357ec494"}
+{"seq":365,"at":"2026-10-18T11:50:52.335Z","type":"shot","id":"R5-T14b-water","part":"R5","task":"R5-T14b","caption":"Heating Water: kW, Water, velocity, pressure drop, delta T, notes, Use suggested values","assetId":"d6fc23558d2f81000c325defedf56ca1","url":"/_blob/d6fc23558d2f81000c325defedf56ca1"}
+{"seq":366,"at":"2026-10-18T11:50:52.490Z","type":"shot","id":"R5-T14b-suggested","part":"R5","task":"R5-T14b","caption":"After Use suggested values: 1 m/s, 200 Pa/m, delta T empty","assetId":"74c7a3b2b8bfa2b79d14585e77b1913c","url":"/_blob/74c7a3b2b8bfa2b79d14585e77b1913c"}
