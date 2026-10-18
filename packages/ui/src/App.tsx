@@ -8,6 +8,7 @@ import {
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
   DEFAULT_CEILING_HEIGHT_MM,
+  getNetworkTypeFromLibrary,
   STAMP_LIBRARY,
   SAVED_STAMPS_SOURCE_ID,
   type Discipline,
@@ -66,6 +67,7 @@ import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
 import { AutoPlaceDialog } from './components/AutoPlaceDialog.js';
 import { RouteDialog } from './components/RouteDialog.js';
+import { SizeDialog } from './components/SizeDialog.js';
 import { getStampAppearanceDefault } from './stampAppearanceDefaults.js';
 import { clearRuleMoveReport, loadPlacementRules, loadRuleMoveReport, loadUncheckedRuleIds, moveStoredOldRules, savePlacementRules, saveUncheckedRuleIds } from './placementRuleStorage.js';
 import { loadRouteRoomTypeIds, saveRouteRoomTypeIds } from './routeAreaStorage.js';
@@ -452,6 +454,7 @@ export function MepSketchApp({
   }, [ready, routeRoomTypeIds, sceneRef]);
   const [autoPlaceOpen, setAutoPlaceOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
+  const [sizeOpen, setSizeOpen] = useState(false);
   /** Set while the stamp picker chooses the stamp of a placement rule. */
   const [ruleStampPick, setRuleStampPick] = useState<{ onPick: (definitionId: string) => void } | null>(null);
   useEffect(() => savePlacementRules(typeof localStorage === 'undefined' ? undefined : localStorage, placementRules), [placementRules]);
@@ -1469,6 +1472,7 @@ export function MepSketchApp({
           onExportRooms={handleExportRooms}
           onOpenAutoPlace={() => setAutoPlaceOpen(true)}
           onOpenRoute={() => setRouteOpen(true)}
+          onOpenSize={() => setSizeOpen(true)}
           routeAreaVisible={routeAreaVisible}
           onToggleRouteArea={handleToggleRouteArea}
           wallDebugVisible={wallDebugVisible}
@@ -1678,6 +1682,21 @@ export function MepSketchApp({
           }}
           onRouteTypeIdsChange={setRouteRoomTypeIds}
           onClose={() => setRouteOpen(false)}
+        />
+      )}
+
+      {sizeOpen && (
+        <SizeDialog
+          sceneRef={sceneRef}
+          stampName={(id) => {
+            const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
+            return definition ? stampLabelFor(definition, labelLanguage) : null;
+          }}
+          onEditNetworkType={(id) => {
+            const type = sceneRef.current?.getNetworkTypes().find((t) => t.id === id) ?? getNetworkTypeFromLibrary(id);
+            if (type) setNetworkTypeEditorTarget(type);
+          }}
+          onClose={() => setSizeOpen(false)}
         />
       )}
 

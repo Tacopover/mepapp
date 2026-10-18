@@ -17,6 +17,7 @@ export interface MenuButtonProps {
   onExportRooms: () => void;
   onOpenAutoPlace: () => void;
   onOpenRoute: () => void;
+  onOpenSize: () => void;
   routeAreaVisible: boolean;
   onToggleRouteArea: () => void;
   wallDebugVisible: boolean;
@@ -38,6 +39,7 @@ export function MenuButton({
   onExportRooms,
   onOpenAutoPlace,
   onOpenRoute,
+  onOpenSize,
   routeAreaVisible,
   onToggleRouteArea,
   wallDebugVisible,
@@ -170,6 +172,17 @@ export function MenuButton({
             }}
           >
             Route network…
+          </button>
+          <button
+            type="button"
+            className="mep-menu-item"
+            disabled={!pdfLoaded}
+            onClick={() => {
+              onOpenSize();
+              setOpen(false);
+            }}
+          >
+            Size network…
           </button>
           <button
             type="button"
