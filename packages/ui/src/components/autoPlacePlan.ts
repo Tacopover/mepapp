@@ -7,6 +7,7 @@ import {
   roomPlacementKey,
   ruleRoutingTargets,
   SYNTHETIC_CENTER_PORT_ID,
+  type AutoPlaceUnitNoteReason,
   type PlacedStamp,
   type PlacementPlan,
   type PlacementPlanInput,
@@ -82,6 +83,20 @@ export function groupsOf(rows: readonly PlacementRow[], art: ReadonlyMap<string,
       group.stamps.push({ ...stamp, ruleId: row.rule.id, roomId: row.room.id, roomKey, ...(capacity !== undefined ? { capacity } : {}), ...(capacityUnit !== undefined ? { capacityUnit } : {}), ...(routingTargets ? { routingTargets: { ...routingTargets } } : {}) });
   }
   return [...groups.values()];
+}
+
+const UNIT_NOTE_CAUSE: Record<AutoPlaceUnitNoteReason, string> = {
+  noTargetUnit: 'the routing target has no flow unit',
+  targetUnitsDiffer: 'the routing targets have different flow units',
+  unitKindDiffers: 'the flow unit of the routing target is of another kind',
+};
+
+/** One line for the Auto-place result: how many stamps kept the unit of the rule, and why. Empty when no stamp did. */
+export function unitNotesText(notes: readonly { reason: AutoPlaceUnitNoteReason; count: number }[]): string {
+  return notes
+    .filter((note) => note.count > 0)
+    .map((note) => `${note.count} stamp${note.count === 1 ? '' : 's'} kept the unit of the rule because ${UNIT_NOTE_CAUSE[note.reason]}.`)
+    .join(' ');
 }
 
 /**

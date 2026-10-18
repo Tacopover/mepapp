@@ -109,6 +109,39 @@ async function main() {
   await idle(500);
   c = await caps();
   check(c[t1] === 36 && near(c[t2], 20), 'step 5: the mixed terminal keeps 36, the other becomes 20', JSON.stringify(c));
+  // 6. a stamp that is not routed yet (Auto-place writes the capacity and the routing targets first) is converted too
+  const placeUnrouted = (targets, x) =>
+    sc(
+      async ([targets, x]) => {
+        const s = window.__mepSketchScene;
+        const canvas = new OffscreenCanvas(60, 60);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(10, 10, 40, 40);
+        const bitmap = await createImageBitmap(canvas);
+        const definition = { id: 'custom-t14c', label: 'T14c', discipline: 'ventilation', category: 'terminal', nativeWidth: 14, nativeHeight: 14, ports: [{ id: 'in', name: 'in', fractionX: 0, fractionY: 0.5 }, { id: 'out', name: 'out', fractionX: 1, fractionY: 0.5 }], iconRef: 'data:image/png;base64,AAAA', source: 'custom' };
+        const stamp = { position: { x, y: 600 }, rotationDegrees: 0, ruleId: 'r', roomId: 'room', capacity: 36, routingTargets: targets };
+        return s.autoPlaceStamps([{ definition, bitmap, stamps: [stamp] }])[0];
+      },
+      [targets, x],
+    );
+  await setUnit('m³/h');
+  await setCaps(36, 72);
+  const unroutedId = await placeUnrouted({ in: 'supply-air' }, 300);
+  const unroutedMixedId = await placeUnrouted({ in: 'supply-air', out: 'return-air' }, 400);
+  c = await caps();
+  check(c[unroutedId] === 36 && c[unroutedMixedId] === 36, 'step 6: both unrouted stamps have capacity 36', JSON.stringify(c));
+  await openEditor();
+  await page.locator(`${M} [data-testid=nt-flow-unit]`).selectOption('dm³/s');
+  await save().click();
+  await idle(300);
+  const q6 = await panel().innerText();
+  check(/Convert 2 stored capacities/.test(q6) && /not converted/.test(q6), 'step 6: the unrouted stamp is counted (2 convertible), the mixed ones are reported', q6);
+  await shot('T24-convert-unrouted');
+  await page.locator(`${M} [data-testid=nt-convert-yes]`).click();
+  await idle(500);
+  c = await caps();
+  check(near(c[unroutedId], 10) && c[unroutedMixedId] === 36 && near(c[t2], 20) && c[t1] === 36, 'step 6: the unrouted stamp becomes 10, the unrouted mixed stamp keeps 36', JSON.stringify(c));
 }
 
 try {

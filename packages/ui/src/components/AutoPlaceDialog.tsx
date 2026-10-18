@@ -20,7 +20,7 @@ import {
   type RoomType,
   type StampDefinition,
 } from '@mepapp/core';
-import { coverageProblem, groupsOf, keptWithOtherTarget, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, usePlacementPlan, zeroNeed, type AutoPlaceArt } from './autoPlacePlan.js';
+import { coverageProblem, groupsOf, keptWithOtherTarget, missingData, notesOf, replaceIdsOf, spacingProblem, tooManyStamps, unitNotesText, usePlacementPlan, zeroNeed, type AutoPlaceArt } from './autoPlacePlan.js';
 import { CeilingHeightsCard, DrawingCard, LEVEL_FILLS, LEVEL_NAMES, RoomTypesCard, TYPE_FILLS, typeFillOf } from './AutoPlaceInputCards.js';
 import { examplePlacementRules, RULE_MOVE_FAILED } from '../placementRuleStorage.js';
 import { Dialog } from './Dialog.js';
@@ -240,7 +240,7 @@ export function AutoPlaceDialog({
   const openRule = item.kind === 'rule' ? (rules.find((r) => r.id === item.id) ?? null) : null;
   const unchecked = useMemo(() => new Set(uncheckedRuleIds), [uncheckedRuleIds]);
   const [previewing, setPreviewing] = useState(false);
-  const [placed, setPlaced] = useState<{ count: number; replaced: number } | null>(null);
+  const [placed, setPlaced] = useState<{ count: number; replaced: number; unitNote: string } | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [calibrating, setCalibrating] = useState(false);
   // The room type form has changes that are not saved: the dialog stays on the card.
@@ -506,7 +506,7 @@ export function AutoPlaceDialog({
     if (!canPlace) return;
     const ids = scene.autoPlaceStamps(groups, replaceIds);
     setPreviewing(false);
-    setPlaced({ count: ids.length, replaced: replaceIds.length });
+    setPlaced({ count: ids.length, replaced: replaceIds.length, unitNote: unitNotesText(scene.getAutoPlaceUnitNotes()) });
     setVersion((v) => v + 1);
     onPlaced(ids.length, replaceIds.length);
   };
@@ -904,6 +904,7 @@ export function AutoPlaceDialog({
             <span>
               MepApp placed {plural(placed.count, 'stamp')}
               {placed.replaced > 0 ? ` and removed ${plural(placed.replaced, 'earlier auto-placed stamp')}` : ''}. One Undo removes all of them.
+              {placed.unitNote && <span data-testid="ap-unit-note"> {placed.unitNote}</span>}
             </span>
             <button type="button" id="ap-undo" onClick={undoPlace}>
               Undo

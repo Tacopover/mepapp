@@ -40,4 +40,40 @@ r = await run(undefined, 10, 'dm³/s');
 check(near(r[0], 10), 'type without flowUnit: number unchanged', JSON.stringify(r));
 r = await run('l/s', 10, undefined);
 check(near(r[0], 10), 'no capacityUnit on the plan: number unchanged', JSON.stringify(r));
+
+const notesNow = () => page.evaluate(() => window.__mepSketchScene.getAutoPlaceUnitNotes());
+// Several routing targets (two ports, two types).
+const runTwo = (unitA, unitB) =>
+  page.evaluate(
+    async ([unitA, unitB]) => {
+      const sc = window.__mepSketchScene;
+      sc.adoptNetworkTypes(['supply-air', 'return-air']);
+      sc.updateNetworkType('supply-air', { flowUnit: unitA });
+      sc.updateNetworkType('return-air', { flowUnit: unitB });
+      const canvas = new OffscreenCanvas(60, 60);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(10, 10, 40, 40);
+      const bitmap = await createImageBitmap(canvas);
+      const definition = { id: 'custom-t12b', label: 'T12b', discipline: 'ventilation', category: 'terminal', nativeWidth: 14, nativeHeight: 14, ports: [{ id: 'in', name: 'in', fractionX: 0, fractionY: 0.5 }, { id: 'out', name: 'out', fractionX: 1, fractionY: 0.5 }], iconRef: 'data:image/png;base64,AAAA', source: 'custom' };
+      const stamp = { position: { x: 300, y: 300 }, rotationDegrees: 0, ruleId: 'r', roomId: 'room', capacity: 36, capacityUnit: 'm³/h', routingTargets: { in: 'supply-air', out: 'return-air' } };
+      const ids = sc.autoPlaceStamps([{ definition, bitmap, stamps: [stamp] }]);
+      return { cap: ids.map((id) => sc.exportProject().terminalCapacities[id]), notes: sc.getAutoPlaceUnitNotes() };
+    },
+    [unitA, unitB],
+  );
+await run('dm³/s', 10, 'dm³/s');
+let notes = await notesNow();
+check(notes.length === 0, 'one target with a unit: no note', JSON.stringify(notes));
+await run(undefined, 10, 'dm³/s');
+notes = await notesNow();
+check(notes.length === 1 && notes[0].reason === 'noTargetUnit', 'target without a unit: note noTargetUnit', JSON.stringify(notes));
+let two = await runTwo('dm³/s', 'l/min');
+check(near(two.cap[0], 36) && two.notes.length === 1 && two.notes[0].reason === 'targetUnitsDiffer', 'two targets with different units: 36 kept, note targetUnitsDiffer', JSON.stringify(two));
+two = await runTwo('dm³/s', 'dm³/s');
+check(Math.abs(two.cap[0] - 10) < 1e-9 && two.notes.length === 0, 'two targets with one unit: converted, no note', JSON.stringify(two));
+two = await runTwo(undefined, 'dm³/s');
+check(Math.abs(two.cap[0] - 10) < 1e-9 && two.notes.length === 0, 'one of two targets has a unit: converted, no note', JSON.stringify(two));
+two = await runTwo(undefined, undefined);
+check(near(two.cap[0], 36) && two.notes[0]?.reason === 'noTargetUnit', 'no target has a unit: 36 kept, note noTargetUnit', JSON.stringify(two));
 t.finish();

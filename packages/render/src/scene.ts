@@ -124,7 +124,10 @@ import {
   sizeNetwork,
   type FlowUnitId,
   convertFlow,
-  isFlowUnitId,
+  classifyCapacityElements,
+  resolveAutoPlaceCapacity,
+  type AutoPlaceUnitNoteReason,
+  type CapacityElement,
   type SizeNetworkResult,
   type SizedSegment,
   type SizingMethod,
@@ -657,6 +660,7 @@ export class SketchScene {
   private autoPlacePreviewHidden: Sprite[] = [];
   /** Scene-level: the route markers of the route dialog (route-ports). Not part of the document, never saved. */
   private routeMarkers: RouteMarker[] = [];
+  private autoPlaceUnitNotes: { reason: AutoPlaceUnitNoteReason; count: number }[] = [];
   /** The stamp-placement preview's current rotation (Space advances this by 45°) — persists across repeated placements of the same stamp until Escape, a tool switch, or a different stamp pick resets it to 0. Also becomes the next placed stamp's initial rotationDegrees (see placeStamp). */
   private stampGhostRotationDegrees = 0;
   /** Alignment guide(s) matched at the ghost's current (snapped) position — see resolveSnappedPoint's 'place-stamp' case. Drawn in redrawOverlay while a place-* tool is active, same as move-selection's drag.guides. */
@@ -2923,6 +2927,7 @@ export class SketchScene {
     const targetIds = groups.flatMap((group) => group.stamps.flatMap((planned) => Object.values(planned.routingTargets ?? {})));
     const missing = new Set(this.adoptNetworkTypes(targetIds, groups.flatMap((group) => group.networkTypeCopies ?? [])));
     const placed: PlacedStamp[] = [];
+    const unitNotes = new Map<AutoPlaceUnitNoteReason, number>();
     for (const group of groups) {
       if (group.stamps.length === 0) continue;
       const { definition } = group;
@@ -2955,18 +2960,15 @@ export class SketchScene {
         this.doc.stampsLayer.addChild(sprite);
         for (const portIds of definition.definitionPortGroups ?? []) this.doc.portGroups.push({ elementId: id, portIds });
         if (planned.capacity !== undefined) {
-          let value = planned.capacity;
-          const firstTargetId = Object.values(routingTargets)[0];
-          if (isFlowUnitId(planned.capacityUnit) && firstTargetId !== undefined) {
-            const targetUnit = this.doc.networkTypes.find((t) => t.id === firstTargetId)?.flowUnit;
-            const converted = targetUnit !== undefined ? convertFlow(value, planned.capacityUnit, targetUnit) : null;
-            if (converted !== null) value = converted;
-          }
-          this.doc.terminalCapacities.set(id, value);
+          const targetUnits = Object.values(routingTargets).map((typeId) => this.doc.networkTypes.find((t) => t.id === typeId)?.flowUnit);
+          const resolved = resolveAutoPlaceCapacity(planned.capacity, planned.capacityUnit, targetUnits);
+          if (resolved.note) unitNotes.set(resolved.note, (unitNotes.get(resolved.note) ?? 0) + 1);
+          this.doc.terminalCapacities.set(id, resolved.value);
         }
         placed.push(data);
       }
     }
+    this.autoPlaceUnitNotes = [...unitNotes].map(([reason, count]) => ({ reason, count }));
     const removeIds = replaceIds.filter((id) => this.doc.drawingHistory.getState().stamps[id]);
     if (placed.length === 0 && removeIds.length === 0) return [];
     const tx = new Transaction(this.doc.drawingHistory, `Auto-place ${placed.length} stamp${placed.length === 1 ? '' : 's'}`);
@@ -2986,6 +2988,11 @@ export class SketchScene {
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
     return placed.map((p) => p.id);
+  }
+
+  /** For the last autoPlaceStamps call: how many stamps kept the unit of the rule, by reason (see resolveAutoPlaceCapacity). Empty when none. */
+  getAutoPlaceUnitNotes(): { reason: AutoPlaceUnitNoteReason; count: number }[] {
+    return this.autoPlaceUnitNotes.map((note) => ({ ...note }));
   }
 
   /** Every placed stamp that auto-placement made (`autoPlaced` is set), for a re-run or a removal. */
@@ -4614,26 +4621,17 @@ export class SketchScene {
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
-  /** The stamps with a capacity that have a segment of this network type on a port. `convertible`: stamps whose segments all have this type. `mixed`: stamps that also have a segment of another type (not converted). */
+  /** The stamps with a capacity that have this network type: a segment on a port, or a routing target (an unrouted auto-placed stamp). `convertible`: stamps whose only type is this one. `mixed`: stamps that also have another type (not converted). */
   countCapacitiesOfType(typeId: string): { convertible: number; mixed: number } {
-    const typesByElement = this.capacitySegmentTypesByElement();
-    let convertible = 0;
-    let mixed = 0;
-    for (const [elementId, types] of typesByElement) {
-      if (!this.doc.terminalCapacities.has(elementId) || !types.has(typeId)) continue;
-      if (types.size === 1) convertible++;
-      else mixed++;
-    }
-    return { convertible, mixed };
+    const { convertible, mixed } = classifyCapacityElements(typeId, this.capacityElements());
+    return { convertible: convertible.length, mixed: mixed.length };
   }
 
   /** Converts those capacities from one flow unit to another of the same kind. Returns the number converted. Writes nothing when the kinds differ. Not undoable, like setTerminalCapacity. */
   convertCapacitiesOfType(typeId: string, from: FlowUnitId, to: FlowUnitId): number {
     if (convertFlow(1, from, to) === null) return 0;
-    const typesByElement = this.capacitySegmentTypesByElement();
     let converted = 0;
-    for (const [elementId, types] of typesByElement) {
-      if (!this.doc.terminalCapacities.has(elementId) || types.size !== 1 || !types.has(typeId)) continue;
+    for (const elementId of classifyCapacityElements(typeId, this.capacityElements()).convertible) {
       const value = this.doc.terminalCapacities.get(elementId);
       if (value === undefined) continue;
       const next = convertFlow(value, from, to);
@@ -4650,18 +4648,26 @@ export class SketchScene {
     return converted;
   }
 
-  /** The network type ids of the segments on each port, by element id. */
-  private capacitySegmentTypesByElement(): Map<string, Set<string>> {
+  /** The stamps with a stored capacity, each with the network type ids of its port segments and of its routing targets. */
+  private capacityElements(): CapacityElement[] {
+    const state = this.doc.drawingHistory.getState();
     const typesByElement = new Map<string, Set<string>>();
-    for (const segment of Object.values(this.doc.drawingHistory.getState().segments)) {
+    const add = (elementId: string, typeId: string) => {
+      const types = typesByElement.get(elementId) ?? new Set<string>();
+      types.add(typeId);
+      typesByElement.set(elementId, types);
+    };
+    for (const segment of Object.values(state.segments)) {
       for (const end of [segment.endpointA, segment.endpointB]) {
-        if (end.kind !== 'port') continue;
-        const types = typesByElement.get(end.elementId) ?? new Set<string>();
-        types.add(segment.networkTypeId);
-        typesByElement.set(end.elementId, types);
+        if (end.kind === 'port') add(end.elementId, segment.networkTypeId);
       }
     }
-    return typesByElement;
+    for (const stamp of Object.values(state.stamps)) {
+      for (const typeId of Object.values(stamp.routingTargets ?? {})) add(stamp.id, typeId);
+    }
+    return [...typesByElement]
+      .filter(([elementId]) => this.doc.terminalCapacities.has(elementId))
+      .map(([id, types]) => ({ id, typeIds: types }));
   }
 
   /** Current world scale (1 = 100%) — the status bar's zoom readout. */

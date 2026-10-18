@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlacementRow, PlacementRule, StampDefinition } from '@mepapp/core';
-import { groupsOf, keptWithOtherTarget, notesOf, type AutoPlaceArt } from './components/autoPlacePlan.js';
+import { groupsOf, keptWithOtherTarget, notesOf, unitNotesText, type AutoPlaceArt } from './components/autoPlacePlan.js';
 
 const definition = (ports: StampDefinition['ports']): StampDefinition => ({
   id: 'fcu',
@@ -64,5 +64,14 @@ describe('the routing targets of auto-placement (auto-routing.md P3)', () => {
     expect(keptWithOtherTarget(kept, (id) => stamps[id])).toBe(2);
     expect(notesOf(kept, false, 2)).toBe('3 moved stamps kept (2 with another routing target)');
     expect(notesOf(row(r, 0, ['same']), false, keptWithOtherTarget(row(r, 0, ['same']), (id) => stamps[id]))).toBe('1 moved stamp kept');
+  });
+
+  it('unitNotesText gives one English line for each reason and nothing for no notes', () => {
+    expect(unitNotesText([])).toBe('');
+    expect(unitNotesText([{ reason: 'noTargetUnit', count: 1 }])).toBe('1 stamp kept the unit of the rule because the routing target has no flow unit.');
+    expect(unitNotesText([{ reason: 'targetUnitsDiffer', count: 3 }, { reason: 'unitKindDiffers', count: 2 }])).toBe(
+      '3 stamps kept the unit of the rule because the routing targets have different flow units. 2 stamps kept the unit of the rule because the flow unit of the routing target is of another kind.',
+    );
+    expect(unitNotesText([{ reason: 'noTargetUnit', count: 0 }])).toBe('');
   });
 });
