@@ -51,6 +51,8 @@ export interface RoutePortsInput {
   includeOutsideRooms?: boolean;
   /** 'one': one target port for each multi-port stamp (P-R2-01). 'all': every port. Default 'one'. */
   portsPerStamp?: 'one' | 'all';
+  /** The port kept of a multi-port stamp with portsPerStamp 'one'. 'nearest': the port nearest to the start port. 'order': the first open port in port order. Default 'nearest'. */
+  portChoice?: 'nearest' | 'order';
 }
 
 export interface RoutePort extends OpenPort {
@@ -93,8 +95,8 @@ function nearestPort(group: readonly RoutePort[], from: Vec2 | undefined): Route
 }
 
 /**
- * The target ports of one network type for a route. Rule 7 keeps one port of a multi-port stamp, but the finder does not know the pipe side:
- * for a water unit with a flow and a return port, it cannot tell which port is the flow port (R6 and Q-R2-02 decide this).
+ * The target ports of one network type for a route. Rule 7 keeps one port of a multi-port stamp: by default the port nearest to the start port,
+ * with `portChoice` 'order' the first open port in port order. The finder does not know the pipe side (flow or return) of a port.
  */
 export function findRoutePorts(input: RoutePortsInput): RoutePortsResult {
   const rooms = input.rooms ?? [];
@@ -130,7 +132,7 @@ export function findRoutePorts(input: RoutePortsInput): RoutePortsResult {
   let droppedExtraPorts = 0;
   for (const group of byStamp.values()) {
     if (group.length >= 2) multiPortStamps++;
-    const nearest = group.length >= 2 && perStamp === 'one' ? nearestPort(group, start) : undefined;
+    const nearest = group.length >= 2 && perStamp === 'one' ? (input.portChoice === 'order' ? group[0] : nearestPort(group, start)) : undefined;
     for (const port of group) {
       if (nearest && port !== nearest) droppedExtraPorts++;
       else kept.add(port);

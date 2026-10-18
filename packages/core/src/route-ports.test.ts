@@ -246,3 +246,48 @@ describe('findRoutePorts', () => {
     expect(input).toEqual(before);
   });
 });
+
+const SIDE_A = { id: 'a', name: 'A', fractionX: 0, fractionY: 0 };
+const SIDE_B = { id: 'b', name: 'B', fractionX: 1, fractionY: 1 };
+const START_FLOW = { id: 'flow', name: 'Flow', fractionX: 0, fractionY: 0 };
+const START_RETURN = { id: 'return', name: 'Return', fractionX: 1, fractionY: 1 };
+
+function radiator(id: string, x: number, y: number, rotationDegrees: number): RouteStamp {
+  return { id, category: 'terminal', transform: { position: { x, y }, rotationDegrees, scale: { x: 1, y: 1 } }, nativeWidth: 100, nativeHeight: 50, ports: [SIDE_A, SIDE_B], routingTargets: { a: 'heating-water', b: 'heating-water' } };
+}
+
+const UNITS = (): RouteStamp[] => [radiator('rad-1', 300, 300, 0), radiator('rad-2', 300, 450, 90), radiator('rad-3', 450, 200, 180)];
+const BOILER: RouteStamp = { id: 'boiler', category: 'equipment', transform: { position: { x: 400, y: 400 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 100, nativeHeight: 50, ports: [START_FLOW, START_RETURN], routingTargets: { flow: 'heating-water', return: 'heating-water' } };
+const UNIT_SCOPE: RouteScope = { kind: 'stamps', stampIds: new Set(['rad-1', 'rad-2', 'rad-3']) };
+
+describe('findRoutePorts with portChoice', () => {
+  it('keeps port a of every radiator with portChoice order', () => {
+    const result = findRoutePorts({ stamps: [...UNITS(), BOILER], networkTypeId: 'heating-water', scope: UNIT_SCOPE, startStampId: 'boiler', startPortId: 'flow', portsPerStamp: 'one', portChoice: 'order' });
+    expect(keys(result.ports)).toEqual(['rad-1:a', 'rad-2:a', 'rad-3:a']);
+    expect(result.droppedExtraPorts).toBe(3);
+  });
+
+  it('keeps port b of every radiator with portChoice order when port a has a segment', () => {
+    const piped = UNITS().map((unit) => ({ ...unit, portSegmentTypes: { a: 'heating-water' } }));
+    const result = findRoutePorts({ stamps: [...piped, BOILER], networkTypeId: 'heating-water', scope: UNIT_SCOPE, startStampId: 'boiler', startPortId: 'return', portsPerStamp: 'one', portChoice: 'order' });
+    expect(keys(result.ports)).toEqual(['rad-1:b', 'rad-2:b', 'rad-3:b']);
+  });
+
+  it('keeps the port nearest to the start port by default, so the sides differ between radiators', () => {
+    const result = findRoutePorts({ stamps: [...UNITS(), BOILER], networkTypeId: 'heating-water', scope: UNIT_SCOPE, startStampId: 'boiler', startPortId: 'flow' });
+    expect(keys(result.ports)).toEqual(['rad-1:b', 'rad-2:a', 'rad-3:b']);
+  });
+
+  it('keeps the one open port of a stamp unchanged with portChoice order', () => {
+    const solo = { ...radiator('solo', 300, 300, 0), portSegmentTypes: { b: 'heating-water' } };
+    const scope: RouteScope = { kind: 'stamps', stampIds: new Set(['solo']) };
+    expect(keys(findRoutePorts({ stamps: [solo, BOILER], networkTypeId: 'heating-water', scope, startStampId: 'boiler', startPortId: 'flow', portChoice: 'order' }).ports)).toEqual(['solo:a']);
+    expect(keys(findRoutePorts({ stamps: [solo, BOILER], networkTypeId: 'heating-water', scope, startStampId: 'boiler', startPortId: 'flow' }).ports)).toEqual(['solo:a']);
+  });
+
+  it('keeps every port with portChoice order when portsPerStamp is all', () => {
+    const result = findRoutePorts({ stamps: [...UNITS(), BOILER], networkTypeId: 'heating-water', scope: UNIT_SCOPE, startStampId: 'boiler', startPortId: 'flow', portsPerStamp: 'all', portChoice: 'order' });
+    expect(keys(result.ports)).toEqual(['rad-1:a', 'rad-1:b', 'rad-2:a', 'rad-2:b', 'rad-3:a', 'rad-3:b']);
+    expect(result.droppedExtraPorts).toBe(0);
+  });
+});
