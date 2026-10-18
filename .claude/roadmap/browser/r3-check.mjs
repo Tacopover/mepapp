@@ -148,7 +148,7 @@ b = await buildMixedGroupProject(t, 'mixed');
 await rail('Select').click();
 check((await networkCountText(page)) === '2 networks', 'step 2: the mixed group file gives 2 networks', await networkCountText(page));
 const exported = await page.evaluate(() => window.__mepSketchScene.exportProject());
-check(exported.schemaVersion === 18, 'step 2: the schema version of exportProject is 18', String(exported.schemaVersion));
+check(exported.schemaVersion === 19, 'step 2: the schema version of exportProject is 19', String(exported.schemaVersion));
 check(Array.isArray(exported.portGroups) && exported.portGroups.length === 1, 'step 2: the export keeps the port group', JSON.stringify(exported.portGroups));
 await page.evaluate((raw) => window.__mepSketchScene.loadProjectFromJson(JSON.parse(raw)), JSON.stringify(exported));
 await idle(1500);
