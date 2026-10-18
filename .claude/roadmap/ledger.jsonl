@@ -438,3 +438,4 @@
 {"seq":438,"at":"2026-10-18T20:43:46.364Z","type":"task","id":"R6-T08","state":"done","commit":"514dc07"}
 {"seq":439,"at":"2026-10-18T20:43:46.404Z","type":"task","id":"R6-T09a","state":"done","commit":"7e32ce3"}
 {"seq":440,"at":"2026-10-18T20:43:46.444Z","type":"now","id":"R6-T09","text":"R6-T09 to T11 (planner core), R5 size lists (Q-R5-05) and the R6 plan edit for Q-R6-04 A running"}
+{"seq":441,"at":"2026-10-18T20:49:54.446Z","type":"task","id":"R5-T25","part":"R5","title":"EN 1505 size lists for round and rectangular ducts (Q-R5-05)","state":"done","commit":"73f34dc"}
