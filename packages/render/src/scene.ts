@@ -603,6 +603,11 @@ function ceilingHeightField(room: Room): Pick<Room, 'ceilingHeightMm'> {
   return room.ceilingHeightMm !== undefined ? { ceilingHeightMm: room.ceilingHeightMm } : {};
 }
 
+/** A copy of a network type. The nested sizing settings are copied by value, so the copy never shares them. */
+function copyNetworkType(type: NetworkType): NetworkType {
+  return type.sizing !== undefined ? { ...type, sizing: structuredClone(type.sizing) } : { ...type };
+}
+
 /** The room type fields of a room, to carry over to a room made from it (split, merge). */
 function roomTypeFields(room: Room): Pick<Room, 'roomTypeId' | 'roomTypeSource'> {
   return { ...(room.roomTypeId !== undefined ? { roomTypeId: room.roomTypeId } : {}), ...(room.roomTypeSource !== undefined ? { roomTypeSource: room.roomTypeSource } : {}) };
@@ -2430,7 +2435,7 @@ export class SketchScene {
         missing.push(id);
         continue;
       }
-      this.doc.networkTypes.push({ ...type });
+      this.doc.networkTypes.push(copyNetworkType(type));
       adopted = true;
     }
     return { adopted, missing };
@@ -2444,14 +2449,23 @@ export class SketchScene {
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
-  /** Updates a network type's name and/or visuals (color/thickness/pattern/discipline) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType. If `id` hasn't been picked in this document yet (editing a library type's swatch before ever placing a segment of it), adopts it first — same "adopt on first touch" pattern as setActiveNetworkType — so the edit actually persists instead of being silently dropped. No-op only if `id` isn't a known library type either. Re-syncs the drawing layer so already-drawn segments of this type update immediately. */
-  updateNetworkType(id: string, patch: Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline'>>): void {
+  /** Updates a network type's name and/or visuals (color/thickness/pattern/discipline) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType. If `id` hasn't been picked in this document yet (editing a library type's swatch before ever placing a segment of it), adopts it first — same "adopt on first touch" pattern as setActiveNetworkType — so the edit actually persists instead of being silently dropped. No-op only if `id` isn't a known library type either. Re-syncs the drawing layer so already-drawn segments of this type update immediately. flowUnit and sizing are stored too (undefined removes the field; sizing is copied by value); a patch of only those two does not redraw. */
+  updateNetworkType(id: string, patch: Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline' | 'flowUnit' | 'sizing'>>): void {
     this.adoptTypes([id], []);
     const target = this.doc.networkTypes.find((t) => t.id === id);
     if (!target) return;
-    Object.assign(target, patch);
+    const { flowUnit, sizing, ...visual } = patch;
+    Object.assign(target, visual);
+    if ('flowUnit' in patch) {
+      if (flowUnit === undefined) delete target.flowUnit;
+      else target.flowUnit = flowUnit;
+    }
+    if ('sizing' in patch) {
+      if (sizing === undefined) delete target.sizing;
+      else target.sizing = structuredClone(sizing);
+    }
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
-    this.syncDrawingLayer();
+    if (Object.keys(visual).length > 0) this.syncDrawingLayer();
     this.markDirty();
   }
 
@@ -2459,7 +2473,7 @@ export class SketchScene {
   duplicateNetworkType(id: string): NetworkType | null {
     const source = this.doc.networkTypes.find((t) => t.id === id);
     if (!source) return null;
-    const copy: NetworkType = { ...source, id: crypto.randomUUID(), name: `${source.name}_copy` };
+    const copy: NetworkType = { ...copyNetworkType(source), id: crypto.randomUUID(), name: `${source.name}_copy` };
     this.doc.networkTypes.push(copy);
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
     return copy;
@@ -4995,7 +5009,7 @@ export class SketchScene {
       }
     }
     const networkTypeIds = new Set([...segments.map((segment) => segment.networkTypeId), ...stamps.flatMap((stamp) => Object.values(stamp.data.routingTargets ?? {}))]);
-    const networkTypes = this.doc.networkTypes.filter((type) => networkTypeIds.has(type.id)).map((type) => ({ ...type }));
+    const networkTypes = this.doc.networkTypes.filter((type) => networkTypeIds.has(type.id)).map(copyNetworkType);
     const definitionIds = new Set(stamps.map((stamp) => stamp.data.definitionId));
     const stampDefinitions = this.doc.customStampDefinitions.filter((def) => def.source !== 'library' && definitionIds.has(def.id));
     this.clipboard = { stamps, annotations, segments, fittings, networkTypes, stampDefinitions };
