@@ -2,10 +2,12 @@
 
 Status: written 2026-10-17 by the road map planner, on the branch `worktree-agent-framework` after R4 (R4 done, last commit `179a88e`). Not yet audited.
 Origin: `roadmap-overview.md` (R5 text, sections 0 to 6, gaps G4, G5, G6, G13, G14, G15, G16, decisions D-R5-01 to D-R5-05), `auto-routing-r4.md` and `auto-routing-r3.md` (format, and what they built), `.claude/roadmap/rules.md`, `.claude/roadmap/protocol.md`.
+**Revision 2 (2026-10-18):** Q-R5-04 is answered **B** (section 12). The sizing limits are saved per network in the project file, not on the network type. Where section 12 and sections 0 to 11 disagree, section 12 wins. Q-R5-01 = E, Q-R5-02 = B and Q-R5-03 = A are answered (ledger seq 367 to 369).
 Answers of the user that bind this plan (final):
+- **Q-R5-04 B (2026-10-18).** The limits (maximum velocity, maximum pressure drop, shape, aspect ratio, series, delta T) are not on the network type. They are saved for each network, keyed by the start stamp and the start port, and the Size dialog shows and edits them. The flow unit and the sizing method stay on the network type. This replaces D-R5-03 for the limits. Schema step 20 is new.
 - **D-R5-01 C.** A flow unit on each network type, with a conversion table in core.
 - **D-R5-02.** The velocity and pressure-drop method is for air networks only. The user picks the sizing method as an option on the network type. Hydraulics and plumbing use other methods.
-- **D-R5-03.** The settings are properties of the network type: one optional field `sizing` (a union with a `method` key).
+- **D-R5-03 (changed by Q-R5-04 B).** Only the sizing method is a property of the network type (field `sizingMethod`). The limits are not (section 12).
 - **D-R5-04.** Stamps with two flows, risers and other non-typical cases are out of scope. The user comes back to them after the main routing feature.
 - **D-R5-05 B.** R5 sizes water too. The user enters the delta T. There is no default.
 - **Schema step 19** holds the two new optional `NetworkType` fields (`flowUnit`, `sizing`) in one step. The default comes from the clean-up on load, as schema 18 does.
@@ -640,7 +642,7 @@ No dependency: **T01, T02, T03**. They write different files. `packages/core/src
   12. The dialog ignores a click on the backdrop (the check does not click it).
   13. No page error (`finish()` of `lib.mjs`).
   14. Stale test (P-R5-24): with the dialog open and the sizing ready, type a new capacity into the Properties panel of a terminal (a real click on the terminal on the canvas first; the clear backdrop allows it; the check clicks on the canvas, not on the backdrop of a closing dialog, and the dialog stays open because `closeOnBackdropClick` is false). The total flow in `size-result` changes within 1 s to the new independent sum.
-  15. Unsized confirm (P-R5-11): set one terminal to capacity 0. `size-result` shows `unsizedKeep` ("1 segments are not sized and keep their old size." in the plural-safe text of T13) and `newSize`. Click `size-apply`: `size-confirm` shows and the export is unchanged. Click `size-confirm-no`: still unchanged. Click `size-apply` and `size-confirm-yes`: the sized segments change and the unsized one keeps its old number.
+  15. Unsized confirm (P-R5-11): set one terminal to capacity 0. `size-result` shows `unsizedKeepOne` ("1 segment is not sized and keeps its old size.") and `newSize`. Click `size-apply`: `size-confirm` shows and the export is unchanged. Click `size-confirm-no`: still unchanged. Click `size-apply` and `size-confirm-yes`: the sized segments change and the unsized one keeps its old number.
   16. Notes: for the air type, `size-velocity-note`, the fluid line "Air at 20 °C." and the riser note show. For the water type, `size-return-note` ("Supply and return pipes must be separate networks."), `size-pipe-note`, and "Water at 20 °C, no glycol." show. A water network whose start stamp has the flow and return ports in one port group shows `size-line-start-two-ports` (Warning).
   17. Unsupported discipline: a Domestic Cold Water network (plumbing) shows `size-line-discipline-not-sized` with the full text "This network type has no sizing method. Sizing is for ventilation and heating/cooling water only. Plumbing, drains and fire protection are not sized by this command."; `size-apply` is disabled; `size-edit-type` is not shown; the export is unchanged. Even when the type holds an `air` setting in the loaded JSON, the line shows and nothing is written.
   18. Mixed type: a Supply Air tree with a Return Air segment on a shared fitting shows `size-line-mixed-type` (Warning); the Return Air segment keeps its number after the apply.
@@ -718,7 +720,7 @@ Dialogs that are new or changed, and their screenshots for the dashboard: the ne
 
 R5 gives: the flow unit table (`flow-units.ts`), the sizing settings and the two fields on `NetworkType`, the schema step 19, the pure functions `sizeAirSegment`, `sizeWaterSegment` and `sizeNetwork`, the scene methods `planNetworkSizes` and `applyNetworkSizes`, the network type editor section and the Size dialog.
 
-- **R6** (the shape of the network) calls `sizeNetwork` after it routes, with its start stamp and start port, and `applyNetworkSizes` in the same undo step or a second one (the R6 plan decides). R6 reads `NetworkType.sizing` and `flowUnit`. R6 adds the `routedBy` marks in the schema step after 19 (20, or 21 if Q-R5-01 = B). R6 owns the layout rule of routed segments (orthogonal and 45 degrees). R5 does not.
+- **R6** (the shape of the network) calls `sizeNetwork` after it routes, with its start stamp and start port, and `applyNetworkSizes` in the same undo step or a second one (the R6 plan decides). R6 reads `NetworkType.sizing` and `flowUnit`. R6 adds the `routedBy` marks in schema step 21 (step 20 is the per-network limits of section 12). R6 owns the layout rule of routed segments (orthogonal and 45 degrees). R5 does not.
 - **R2 to R4** are not changed. The route dialog is not changed. The Size dialog does not use the open-port finder.
 - **Not in R5 (out of scope, D-R5-04 and the user's note: come back after the main routing feature):**
   - stamps with two flows (a fan coil unit with heating and chilled water): `portCapacities` is not built (P-R5-16 shows a note);
@@ -787,3 +789,240 @@ R5 gives: the flow unit table (`flow-units.ts`), the sizing settings and the two
 | 18 | The editor title becomes "Network type: {name}" (P-R5-25, T14a). The Escape behavior of stacked dialogs is recorded in T16 step 19 and R-22. |
 | 19 | The unit is named `US gpm` (P-R5-23). Optional later settings and the not-verified list are in section 8 and R-21. |
 | 20 | Plumbing, drains and fire protection stay out of scope (section 8, P-R5-03). |
+| 2026-10-18 | Revision 2 (section 12): Q-R5-04 = B. Limits move from `NetworkType.sizing` to `ProjectDocument.networkSizing`. Schema step 20 (R6 mark moves to 21, R7 to 22). Tasks T19 to T23 are new. T16 and T18 change. T04, T05, T08b, T09, T10a, T10b, T14a, T14b, T15a, T15b are reworked. |
+
+## 12. Revision 2: sizing limits per network (Q-R5-04 B)
+
+Answer of the user, 2026-10-18 (ledger seq 382): the limits differ for each network, so they must not live on the network type. They are saved for each network in the project file, keyed by the start stamp and the start port. The Size dialog shows and edits them. Air and water limits are included, delta T too. The flow unit and the sizing method (Air or Water) stay on the network type. Suggested values never apply by themselves (D-R5-05).
+
+Terms. **Network sizing entry**: the saved limits of one network, with the start stamp id and the start port id that name the network. **Limits**: the `SizingSettings` value (section 4.2) inside an entry.
+
+### 12.1 What is built now and what changes
+
+Built and committed: `SizingSettings` and `NetworkType.sizing` in schema 19 (`packages/core/src/sizing-settings.ts`, `network.ts`, `project.ts:22`, `:421` `withCleanSizing`), `sizeNetwork` that reads `networkType.sizing` (T08b), the scene copy by value (T09, `scene.ts:619`, `:2525`), `planNetworkSizes` (`scene.ts:1562`) and `applyNetworkSizes` (`:1592`), the editor fields (T14a, T14b), the conversion panel (T14c), the Size dialog (T15a `b08e89f`, T15b `ac42a2c`). Schema 17 to 19 are not on master (`origin/master` is at schema 16), so no live file holds a v19 `sizing`. Only test files made on this branch can hold one.
+
+### 12.2 The data model
+
+**Where.** A new required field of `ProjectDocument`, next to `terminalCapacities` (`project.ts:35`):
+
+```ts
+// packages/core/src/sizing-settings.ts
+export type SizingMethod = 'air' | 'water';
+export interface NetworkSizingEntry {
+  startStampId: string;     // the id of the start stamp
+  startPortId: string;      // the id of the port on that stamp
+  settings: SizingSettings; // the limits; settings.method must equal the sizingMethod of the network type
+}
+// packages/core/src/project.ts
+export interface ProjectDocument { /* ... */ networkSizing: NetworkSizingEntry[]; }
+// packages/core/src/network.ts
+export interface NetworkType { /* ... */ sizingMethod?: SizingMethod; /** @deprecated removed in T23; never present after load */ sizing?: SizingSettings; }
+// helpers in sizing-settings.ts (pure)
+export function parseNetworkSizing(raw: unknown): NetworkSizingEntry[];
+export function findNetworkSizing(entries: readonly NetworkSizingEntry[], startStampId: string, startPortId: string): SizingSettings | undefined;
+/** A new array. `settings` undefined removes the entry. At most one entry for each pair. */
+export function withNetworkSizing(entries: readonly NetworkSizingEntry[], startStampId: string, startPortId: string, settings: SizingSettings | undefined): NetworkSizingEntry[];
+```
+
+**Key format.** The key is the pair (`startStampId`, `startPortId`). It is two fields of one entry, not one joined string. A joined string would need a separator that no id may hold, and the plan does not verify the id format. Reuse: this is the shape of `portGroups` (`{ elementId, portIds }`) and avoids a parser. At most one entry exists for each pair. `parseNetworkSizing` keeps the last of two entries with the same pair.
+
+**Why an array and not a map.** Reuse of the document pattern for lists of small records (`portGroups`, `rooms`). A `Record` like `terminalCapacities` needs the joined key.
+
+**The method lives on the type.** `NetworkType.sizingMethod` replaces the `method` that the old `NetworkType.sizing` held. The entry holds `settings.method` too. They can differ (the user changes the method on the type after the limits were saved). Rule: when `settings.method` differs from `type.sizingMethod`, `sizeNetwork` treats the limits as not saved (code `no-sizing`) and the dialog shows empty fields for the new method. The old entry stays in the file until the user saves limits of the new method for the same key, which replaces it. Nothing converts the old limits to the other method.
+
+**In memory.** `SketchDocument` gets `networkSizing: NetworkSizingEntry[]` (`packages/render/src/document.ts:151`, next to `terminalCapacities`). One list for each open document.
+
+**Undo and dirty.** Writing limits is not an undo step. This is the stance of `setTerminalCapacity` (`scene.ts:3013`, "plain per-document state with no undo history", `document.ts:34`). Reason: the limits are values that the user types in a dialog, not drawing geometry, and an undo step per typed value would fill the history. `setNetworkSizing` calls `markDirty()`. The write of the sizes ("Size network", `applyNetworkSizes`) stays one undo step, and undo of it does not change the limits. The scene emits a new event `networkSizingChanged` (payload: none). The Size dialog listens to it (P-R5-24 lists the other events).
+
+**Load and save.**
+- Save: `serializeDocument` (`scene.ts:4011`) writes `networkSizing` with the entries whose `startStampId` is a stamp in the drawing now. Entries of deleted stamps are dropped here.
+- Load: step 20 adds `networkSizing: []` to an older file. `loadProject` (`project.ts:409`) maps the field through `parseNetworkSizing` (drops an entry with a bad id string or bad limits, a whole entry and never half of it, P-R5-17) and drops an entry whose `startStampId` is not in `doc.stamps`. A port id that the stamp does not have is kept (the check needs the stamp definition, which core does not have here). It is harmless: no network starts at that port.
+- Document switch and open: the block at `scene.ts:4105` (which fills `terminalCapacities`) also replaces `target.networkSizing` with a copy of the loaded list.
+- The validator list (`project.ts:364`) gets `requireArray(data, 'networkSizing')`.
+
+**Copy, paste, duplicate, delete.**
+- Delete a start stamp: the entry stays in memory and is dropped at the next save. Reason: `terminalCapacities` is deleted at once and lost on undo (`scene.ts:5068`, comment "no home to be restored"). Pruning at save avoids this loss for limits: an undo of the delete restores the stamp, and the limits are still there.
+- Copy and paste of a network or its start stamp (same drawing or another one): the pasted stamp has a new id, so the pasted network has no entry. The Size dialog shows "no limits saved" and the button "Use suggested values". Limits are not copied. This is the smaller option. A later task can copy the entry with the stamp.
+- Duplicate or replace a stamp: the same rule (a new id has no entry). A replace that keeps the stamp id keeps the entry. Not verified: whether "Replace stamp" keeps the id (the T21 implementer reads `replaceStamps` first and reports).
+- Delete a network (all its segments) but keep the stamp: the entry stays. A new network from the same stamp and port gets the same limits again. This is wanted: the limits belong to the pair.
+- Change the network type of a run (cascade, `scene.ts:1482`): the entry stays. If the new type has another `sizingMethod`, the rule above gives `no-sizing`.
+
+**A stale key.** An entry whose stamp or port has no network now is ignored by the plan. It never gives an error or a line in the dialog. An entry of a missing stamp is dropped at save and at load. An entry of a missing port stays as a few bytes (the cost of the choice above).
+
+**Another start stamp in the same network.** A network can have two equipment stamps. The user can pick either as the start in the Size dialog. Each pair has its own limits. The dialog does not copy limits from one pair to the other. This is the meaning of "keyed by the start stamp and start port". R6 sizes from the stamp that it routes from, so R6 uses the entry of that pair. If R6 finds no entry, it asks the user (the R6 plan decides how).
+
+**Migration step 20.**
+
+```ts
+{ fromVersion: 19, toVersion: 20, migrate: (data) => ({
+    ...data, schemaVersion: 20,
+    networkTypes: data.networkTypes.map(moveSizingMethod),  // sizing -> sizingMethod
+    networkSizing: [],
+}) }
+```
+
+`moveSizingMethod(type)`: when `type.sizing` is an object whose `method` is `'air'` or `'water'`, the type gets `sizingMethod` with that method. In every case the `sizing` key is deleted. The same object is returned when the type has no `sizing` key. The migration works on raw JSON (`JsonRecord`), as the steps before it do.
+
+**Decision for a v19 file with `NetworkType.sizing`: keep the method, drop the limits.** Options and reason:
+- *Seed.* Keep the old type limits and use them for any network that has no saved entry. Rejected: it keeps the exact model that the user rejected (limits on the type), needs a second read path in `sizeNetwork` and in the dialog for one release, and applies a value to a network the user never set. D-R5-05 says a default never applies by itself. Old type limits would act as a hidden default.
+- *Copy to every network at migration.* Rejected: the migration does not know the start stamps. It would have to guess which equipment stamp starts each network.
+- *Drop the limits, keep the method (chosen).* The user loses typed limits only in a file saved on this branch. Master has schema 16, so no live file has them. The method (a choice that the user made on the type) is kept, so the Size dialog does not also ask for it again. The dialog then shows `no-sizing` with the fields empty and the button "Use suggested values". The cost is one retype in a test file. This is stated in the T19 test and in the part check.
+- A file of schema 20 that still has a `sizing` key on a type (a hand-made file): `loadProject` drops the key (the clean-up `withCleanSizing` keeps only the `flowUnit` check and deletes `sizing`). `NetworkType.sizing` is then never present in memory. The TypeScript field stays marked `@deprecated` until T23 deletes it, so the build stays green while the readers move (T20 to T22).
+- An older MepApp refuses a v20 file (`schema.ts:69`-`:71`). This is the design of every step.
+
+**How the rules of `rules.md` §3 stay true.**
+1. The segment defines the network type of a port. The limits are not on a port or a stamp definition. The network type still comes from the segment at the start port. The entry names a start stamp and port as a key only.
+2. The cascade invariant. The limits are not a per-segment field. A cascade of the network type of a run changes no limit. The sizing method follows the type of the run.
+3. Reuse. The pattern is `portGroups` (list) and `terminalCapacities` (non-undo state, markDirty, load and save blocks). The draft helpers (`sizingDraft.ts`), `NumberDraftInput` and `parseSizingSettings` are reused.
+4. The adoption trap. `applyNetworkSizes` still adopts the type first. The method field `sizingMethod` is on an adopted type only, as the old `sizing` was. A library type has no `sizingMethod`, so the dialog shows `no-method` (the editor adopts the type on first save).
+
+### 12.3 What the Size dialog does with the limits
+
+- Under the check lines, a section "Limits of this network" shows the fields of the method of the type: air (maximum velocity, maximum pressure drop, shape, aspect ratio, series) or water (maximum velocity, maximum pressure drop, delta T). The field components are the ones of the editor, moved to `packages/ui/src/components/SizingLimitsFields.tsx`.
+- The fields show the saved entry of the chosen pair. With no entry they are empty and the line `size-line-no-sizing` shows (an error).
+- "Use suggested values" (`size-limits-suggest`) fills the draft from `SUGGESTED_AIR_SIZING` or `SUGGESTED_WATER_SIZING`. The delta T stays empty (D-R5-05). Nothing is filled without the button.
+- Save rule: each valid change of a field writes the whole draft with `scene.setNetworkSizing` when every required field of the method is valid. An invalid or incomplete draft writes nothing, keeps the last saved entry, and shows one line under the field. There is no "Save" button. The result block and the check lines always read the saved entry (through the plan), so they never show a result for text that is not saved.
+- "Clear limits" (`size-limits-clear`) removes the entry.
+- The delta T is a limit now, so `no-delta-t` is fixed in the dialog (no button to the editor). The editor button `size-edit-type` shows for `no-flow-unit`, `no-method`, `unit-kind` and `method-discipline` only.
+- The notes `velocityNote`, `fluidAir`, `fluidWater`, `pipeNote` and `returnNote` stay in the dialog (they were there before). The editor loses them.
+
+### 12.4 Changed and new core rules for `sizeNetwork` (T20)
+
+```ts
+export interface SizeNetworkInput {
+  /* ... as before ... */
+  networkType: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizingMethod'>;
+  /** The saved limits of this network, or undefined. */
+  sizing?: SizingSettings;
+}
+export type SizingProblemCode = /* as before, and */ | 'no-method';
+```
+- `no-method` (error): the type has no `sizingMethod`. The old meaning of `no-sizing` ("the type has no settings") splits in two: `no-method` for the type, `no-sizing` for "no limits saved for this network, or saved for the other method".
+- `discipline-not-sized` and `method-discipline` read `sizingMethod` instead of `sizing.method`. The order of the checks is: discipline, method vs discipline, flow unit, limits, unit kind, delta T (as in section 4.2 item 5, with `no-method` before `no-flow-unit` only when the discipline is sized).
+- `unit-kind` and `no-delta-t` read the limits from `input.sizing`. All size picks are unchanged (same pure functions and same numbers).
+
+### 12.5 The tasks
+
+New tasks are numbered T19 to T23. They run before T16, T17 and T18 (which are not done). T16 has uncommitted edits in `packages/ui/src/App.tsx` and `MenuButton.tsx`: nobody touches these two files before T16 resumes. T19 to T23 touch other places in `App.tsx` only in T23 (the editor save handler, `handleSaveNetworkType`). T23 therefore waits until T16 is committed, or the lead merges the two edits by hand and reports it.
+
+Order: **T19, T20, T21, T22, T23, then T16, T17, T18.** Each task ends with `pnpm build` and `pnpm typecheck` green.
+
+| Task | Title | Depends on | Files (main) | Reworks |
+|---|---|---|---|---|
+| T19 | Core data model and schema step 20 | none | `sizing-settings.ts`, `network.ts`, `project.ts` and their tests, `index.ts` | T04, T05 |
+| T20 | `sizeNetwork` reads the method of the type and the limits of the network | T19 | `sizing-network.ts`, `sizing-network.test.ts` | T08b |
+| T21 | Scene: store, get and set the limits; plan reads them | T19, T20 | `document.ts`, `scene.ts`, `packages/render/src/index.ts`, `r5-lib.mjs` | T10a, T10b |
+| T22 | Size dialog edits and saves the limits | T21 | `SizingLimitsFields.tsx` (new), `SizeDialog.tsx`, `sizePlan.ts`, `sizingDraft.ts`, `theme.css` | T15a, T15b |
+| T23 | Editor keeps only the flow unit and the method; remove the old `sizing` field | T22 | `NetworkTypeEditorDialog.tsx`, `sizingDraft.ts`, `App.tsx`, `scene.ts`, `network.ts`, `StampsPanel.tsx` (no change expected) | T09, T14a, T14b |
+| T16 | Menu wiring (changed browser steps) | T22 | as before | T16 |
+| T17 | Unit labels | T11 | no change | none |
+| T18 | Part check (changed steps) | all | `r5-check.mjs` | T18 |
+
+#### T19. Core data model and schema step 20
+- **Depends on:** none.
+- **Files:** `packages/core/src/sizing-settings.ts`, `sizing-settings.test.ts`, `network.ts`, `project.ts`, `project.test.ts`, `index.ts` (export lines), and any core test or browser script that names the current schema version (`grep -rn "schemaVersion" packages/core .claude/roadmap/browser`; `r3-check.mjs:151` expects 19 and must expect 20).
+- **Shapes:** section 12.2: `SizingMethod`, `NetworkSizingEntry`, `parseNetworkSizing`, `findNetworkSizing`, `withNetworkSizing`; `NetworkType.sizingMethod?`; `NetworkType.sizing` marked `@deprecated`; `ProjectDocument.networkSizing`; `CURRENT_SCHEMA_VERSION = 20`; the step 19 to 20 and `moveSizingMethod`; `requireArray` for the new field; the clean-up in `loadProject` (parse the list, drop the entries of missing stamps, drop a stray `sizing` key from a type, keep the `flowUnit` check); `serializeProject` input and output carry the field (pruning is the scene's job, T21).
+- **Must not touch:** `sizing-network.ts`, the scene, the UI, the other migration steps.
+- **Tests (core), with hand values:**
+  - `findNetworkSizing([{ahu,out,AIR}], 'ahu', 'out')` returns AIR; `('ahu','in')` and `('ahu2','out')` return `undefined`.
+  - `withNetworkSizing` on `[]` adds one entry; the same pair again replaces it (length stays 1); `undefined` removes it (length 0); the input array is not changed; the result does not share the `settings` object with the input.
+  - `parseNetworkSizing`: a bad entry (`startStampId: 5`, `startPortId: ''`, settings `{method:'air'}`) is dropped and a good entry beside it is kept; two entries with one pair keep the last; `'x'`, `null` and `{}` give `[]`; `__proto__` does not pollute.
+  - A v19 file whose type `supply-air` has `flowUnit: 'dm³/s'` and `sizing: SUGGESTED_AIR_SIZING` loads as schema 20 with `flowUnit: 'dm³/s'`, `sizingMethod: 'air'`, no `sizing` key, and `networkSizing` equal to `[]`. A type with a `water` setting gets `sizingMethod: 'water'`. A type with `{method:'x'}` or no `sizing` gets no `sizingMethod`. A type with neither field is the same object (`toBe`).
+  - A v20 file with two entries (one for a stamp in `stamps`, one for stamp `gone`) loads with one entry. A v20 round trip through `serializeProject` and `loadProject` is equal (deep). A v18 file loads as 20 with `networkSizing: []`. A file of schema 21 is refused with the `SchemaMigrationError` text. A v20 file with a stray `sizing` on a type loads without it.
+- **Verify:** `pnpm --filter @mepapp/core test`; `pnpm typecheck`; `pnpm build`; `grep -rn "schemaVersion: 19" packages .claude/roadmap/browser` has no line left that expects the current version.
+- **Size:** about 120 lines and 120 of tests. The lead may split the schema step (T19b) from the helpers (T19a) if the diff passes 150 lines.
+
+#### T20. `sizeNetwork` reads the method of the type and the limits of the network
+- **Depends on:** T19.
+- **Files:** `packages/core/src/sizing-network.ts`, `sizing-network.test.ts`.
+- **Shapes:** section 12.4. The input gets `sizing?`; `networkType` carries `sizingMethod`; the new code `no-method`; the check order of section 12.4. The pick loop calls `sizeAirSegment` or `sizeWaterSegment` with `input.sizing` as before.
+- **Must not touch:** `sizing-air.ts`, `sizing-water.ts`, `sizing-hydraulics.ts`, `flow.ts`.
+- **Tests (core):** every existing T08b case moves its settings from `networkType.sizing` to `input.sizing` and its method to `networkType.sizingMethod`, with the same expected sizes (the numbers do not change). New cases: no `sizingMethod` on a ventilation type gives `no-method` (error, `sizes: []`); `sizingMethod: 'air'` with `sizing` undefined gives `no-sizing`; `sizingMethod: 'water'` with air limits gives `no-sizing` (method mismatch); `sizingMethod: 'air'` with a `kW` unit gives `unit-kind`; `sizingMethod: 'water'`, `kW`, limits with no `deltaTK` gives `no-delta-t`; with `deltaTK: 10` it is `ok`; a plumbing type with `sizingMethod: 'air'` and limits gives `discipline-not-sized` (no fallback).
+  **Same flow, two networks, two limit sets (hand values, section 12.6):** a one-segment network with 0.1 m³/s: suggested air limits give Ø 200; the same limits with `maxVelocityMs: 3` give Ø 250, `governedBy: 'velocity'`; with `maxPressureDropPaPerM: 0.5` give Ø 250, `governedBy: 'pressure'`.
+- **Verify:** `pnpm --filter @mepapp/core test`; `pnpm typecheck`; `pnpm build`. The scene call in `planNetworkSizes` (`scene.ts:1571`-`:1582`) must still compile. The T20 implementer reads it first and changes only the `networkType` literal there so that it passes `sizingMethod` from the type (and no `sizing`). The scene then reports `no-sizing` until T21 adds the stored limits. T21 replaces this literal.
+- **Size:** about 60 lines and 100 of tests.
+
+#### T21. Scene: store, get and set the limits; the plan reads them
+- **Depends on:** T19, T20.
+- **Files:** `packages/render/src/document.ts` (field `networkSizing`), `packages/render/src/scene.ts`, `packages/render/src/index.ts` (export the plan type if it changed), `.claude/roadmap/browser/r5-lib.mjs`, `t21-check.mjs` (work folder).
+- **Shapes:**
+  ```ts
+  // scene.ts
+  getNetworkSizing(startStampId: string, startPortId: string): SizingSettings | undefined;   // a copy
+  /** Not an undo step. Marks dirty. undefined removes the entry. Returns false and writes nothing when `settings` does not parse (parseSizingSettings). Emits networkSizingChanged. */
+  setNetworkSizing(startStampId: string, startPortId: string, settings: SizingSettings | undefined): boolean;
+  interface NetworkSizePlan { /* as before */ sizingMethod: SizingMethod | null; sizing: SizingSettings | null; }
+  ```
+  The event map gets `networkSizingChanged: []`. `planNetworkSizes` passes `networkType.sizingMethod` and `findNetworkSizing(this.doc.networkSizing, startStampId, startPortId)` to `sizeNetwork`, and returns both in the plan. The write copies the settings (`structuredClone`) and the read returns a copy. `serializeDocument` (`:4011`) writes only the entries whose stamp exists. The load block (`:4105`) replaces `target.networkSizing`. A new document starts with `[]`. No other change.
+- **Must not touch:** `applyNetworkSizes`, `updateNetworkType`, `adoptTypes`, `duplicateNetworkType` (T23), the undo history.
+- **`r5-lib.mjs`:** `buildSizingProject` puts the limits in `networkSizing` (key: the start stamp and `out`) and sets `sizingMethod` on the type. It writes schema 20. The helper `segmentSizes` is unchanged.
+- **Verify:** `pnpm typecheck`; `pnpm build`. Browser check `t21-check.mjs` (setup with the scene API for reading and writing): (1) after `loadProjectFromJson` of a project with one `networkSizing` entry, `getNetworkSizing` returns it and `planNetworkSizes` gives `ok`; (2) `setNetworkSizing(stamp,'out', AIR)` then `exportProject().networkSizing` has the entry, `isDirty` is true, `canUndo` is unchanged by the call; (3) change the object that the caller kept: the stored copy does not change; (4) `setNetworkSizing(stamp,'out', undefined)` empties the list; (5) `setNetworkSizing(stamp,'out', {method:'air'})` returns false and the export is unchanged; (6) two start pairs on two networks hold different limits and the plans give different sizes for the same flow (0.1 m³/s: Ø 200 against Ø 250 with `maxVelocityMs: 3`); (7) delete the start stamp by the scene API: `exportProject().networkSizing` has no entry for it; undo of the delete (the toolbar button) restores the stamp, and a second export has the entry again; (8) copy and paste of the start stamp (Ctrl+C, Ctrl+V on `body`): the pasted stamp has no entry; (9) save, then `loadProjectFromJson` of the export: the limits are the same; (10) a plan with a library type that is not adopted gives `no-method` and the export is unchanged; (11) a v19 JSON with `sizing` on the type loads: `getNetworkTypes()` shows `sizingMethod: 'air'` and no `sizing`, and the plan gives `no-sizing`. No screenshot.
+- **Size:** about 70 lines of scene and document.
+
+#### T22. Size dialog edits and saves the limits
+- **Depends on:** T21.
+- **Files:** `packages/ui/src/components/SizingLimitsFields.tsx` (new: the air and water field blocks, copied from the editor), `SizeDialog.tsx`, `sizePlan.ts` (texts and the new code lines), `sizingDraft.ts` (a draft that starts from a `SizingSettings` and gives a `SizingSettings | null`), `packages/ui/src/theme.css`, `sizePlan.test.ts`.
+- **What it adds:** section 12.3. Test ids: `size-limits` (the section), `size-air-max-velocity`, `size-air-max-drop`, `size-air-shape`, `size-air-aspect`, `size-air-series`, `size-water-max-velocity`, `size-water-max-drop`, `size-water-delta-t`, `size-limits-suggest`, `size-limits-clear`, and `size-line-no-method`. The editor keeps its own copies until T23. The dialog reads `plan.sizing` and `plan.sizingMethod`. It listens to `networkSizingChanged` too. The draft resets when the start pair, the method or the saved entry changes (not on every event, so a half-typed value stays). `showEditTypeButton` loses `no-delta-t` and gains `no-method`. The hints of `no-sizing` ("Enter the limits below or use the suggested values.") and `no-delta-t` ("Enter the delta T below.") point to the section.
+- **Must not touch:** the editor, `RouteDialog.tsx`, the scene.
+- **Verify:** `pnpm --filter @mepapp/ui test` (draft logic as pure functions: complete valid draft gives settings; empty, zero, negative, `abc`, aspect 0.5 give `null`; the water draft with an empty delta T gives settings without `deltaTK`; the texts are English, 140 characters or less, no Dutch); `pnpm typecheck`; `pnpm build`. The dialog still opens only through the menu (T16), so the browser steps run in T16 (steps 3 to 5, 8, 9, 20 to 24 below). A pure-function test of "save when valid" is required.
+- **Size:** about 150 lines. The lead may split the water block (T22b) from the air block and the save rule (T22a).
+
+#### T23. Editor keeps only the flow unit and the method; remove the old field
+- **Depends on:** T22, and T16 committed (see the note above `App.tsx`).
+- **Files:** `packages/ui/src/components/NetworkTypeEditorDialog.tsx`, `packages/ui/src/components/sizingDraft.ts`, `packages/ui/src/App.tsx` (`handleSaveNetworkType`), `packages/render/src/scene.ts`, `packages/core/src/network.ts`, UI tests that name the removed testids.
+- **What changes:** the editor keeps the flow unit select, the sizing method select (Not sized, Air for Ventilation, Water for Heating & Cooling; P-R5-03), the discipline note and the conversion panel (T14c). It loses the air fields, the water fields, `nt-suggest` and the velocity, fluid and pipe notes. The patch carries `flowUnit` and `sizingMethod` (undefined removes). `updateNetworkType` patch: `sizing` is replaced by `sizingMethod` (the removal rule for `undefined` stays). `adoptTypes`, `duplicateNetworkType` and the clipboard copy lose the `sizing` by-value code of T09 (`scene.ts:619`-`:621` and its three callers); `sizingMethod` is a string and copies with the spread. `NetworkType.sizing` is deleted from `network.ts` and the code that reads it (the compiler lists it). The editor text under the method select says "Limits are set for each network in the Size dialog."
+- **Must not touch:** the visual fields, the conversion panel logic, `SizingLimitsFields.tsx`.
+- **Verify:** `pnpm --filter @mepapp/ui test`; `pnpm --filter @mepapp/core test`; `pnpm typecheck`; `pnpm build`; `grep -rn "\.sizing\b" packages` shows only `plan.sizing`, `input.sizing` and entry fields, never a network type. Browser check `t23-check.mjs` through real inputs: open the editor on Supply Air: the section shows the unit select and the method select and no `nt-air-*`, `nt-water-*` or `nt-suggest`; choose `dm³/s` and Air, Save: `exportProject().networkTypes` holds `flowUnit: 'dm³/s'` and `sizingMethod: 'air'` and no `sizing`; choose Not sized, Save: `sizingMethod` is gone; the discipline rule still switches the draft to Not sized; the visual color change still saves; the conversion panel (T14c steps) still works. Screenshots: `T23-editor`, `T23-editor-narrow`.
+- **Size:** about 100 lines, mostly deletions.
+
+#### T16 (changed). Menu wiring and the browser steps
+The product code of T16 does not change. The browser steps change, because the limits are typed in the dialog:
+- Step 4 becomes: click `size-edit-type`; in the editor choose `dm³/s` and Air; Save. The dialog behind updates (`size-line-no-flow-unit` goes, `size-line-no-sizing` shows). Then click `size-limits-suggest`: the fields show 5 and 1, `size-line-no-sizing` goes, `exportProject().networkSizing` holds one entry with the start stamp, `out` and the suggested limits.
+- Step 5 starts after step 4. The total flow is 400 dm³/s as before.
+- Step 8 (water): set the type to kW and Water in the editor; in the dialog click `size-limits-suggest`: `size-line-no-delta-t` shows (Error) and `size-edit-type` is not shown; type 10 into `size-water-delta-t` and press Tab: the line goes and the entry holds `deltaTK: 10`. Apply gives DN values.
+- Step 9 (unadopted type): the dialog shows `size-line-no-method`; after the editor saves Air, `size-line-no-sizing` shows; after the suggested values, apply works.
+- Step 17 (plumbing): the loaded JSON gives the type `sizingMethod: 'air'` and an entry with air limits; the line `size-line-discipline-not-sized` still shows and nothing is written.
+- New steps:
+  20. Persistence: after step 4, `exportProject()` then `loadProjectFromJson` of that export: reopen the dialog; the fields show 5 and 1 (the limits survive a save and a load).
+  21. Per network: add a second start (a second equipment stamp on the second network of the setup, or switch the start select to it): its fields are empty and `size-line-no-sizing` shows. Type 3 into its `size-air-max-velocity` after "Use suggested values": the first start still shows 5. With the same flow 0.1 m³/s the two networks give Ø 200 and Ø 250 (section 12.6).
+  22. Invalid input: type `0` into `size-air-max-velocity`: a line shows, the export keeps the last valid entry (5 stays). Type `abc` (the number input stays empty): the same. Click `size-limits-clear`: the entry is gone from the export and `size-line-no-sizing` shows.
+  23. Delete and undo: delete the start stamp by a real click and Delete; the dialog shows `noEquipment` or another start. Save (`exportProject()`): no entry for that stamp. Undo (toolbar): the stamp returns, and the entry is in the next export.
+  24. A v19 file: load the export of the baseline with `schemaVersion: 19`, `sizing` on the type: the dialog shows `size-line-no-sizing`, the method is kept in the editor, `exportProject().schemaVersion` is 20, and the type has no `sizing`.
+  25. Method change: change the method of the type from Air to Water in the editor: the air entry is ignored (`size-line-no-sizing`, water fields empty, the export still holds the air entry until a water entry replaces it).
+- The screenshot `T16-size-dialog-ok` shows the limits section. New: `T16-size-limits`, `T16-size-limits-water`.
+
+#### T17 (unchanged)
+The Properties labels do not read the limits. T17 depends on T11 only and needs no rework.
+
+#### T18 (changed steps)
+- Step 3 (editor, in short): flow unit and method only; the check asserts that no `nt-air-*` field exists.
+- Step 4 adds: the limits section, "Use suggested values", a typed velocity, the export of `networkSizing`.
+- Step 5 (water): delta T typed in the dialog.
+- Step 6 (unadopted type): `no-method` then `no-sizing`.
+- Step 7 (round trip): `schemaVersion` is **20**; the sizes, `flowUnit`, `sizingMethod` and `networkSizing` are the same after save and load.
+- Step 8: a file of schema 18 loads (no `networkSizing`, shown as `no-flow-unit`) **and** a file of schema 19 with `sizing` on a type loads as 20 (T16 step 24).
+- New step: two networks with different limits give the sizes of section 12.6 for the same flow.
+- Screenshots: add `T18-size-limits`. The regression scripts `r2-check.mjs`, `r3-check.mjs` and `r4-check.mjs` run again. `r3-check.mjs:151` (schema 20) is fixed in T19.
+
+### 12.6 Hand-checked values
+
+The implementer recomputes each value. The rule stays: never bend a formula or a constant to hit a hand value (section 3.4).
+- Flow 0.1 m³/s, air (P-R5-05), formula P-R5-07. Velocity-only diameter: `D = sqrt(4·0.1 / (π·v))`. For v = 5 m/s: 0.1596 m. For v = 3 m/s: 0.4 / 9.4248 = 0.04244, square root 0.2060 m. Pressure-only diameter for 1.0 Pa/m: about 186 mm (section 3.4). For 0.5 Pa/m: about 214 mm (the drop falls about with D to the power -4.9: 186 × 2^(1/4.9) = 214; the planner's estimate, with a tolerance of 5 mm).
+- Suggested air limits (5 m/s, 1.0 Pa/m): D* = 186 mm, the series gives **Ø 200**, 3.18 m/s, 0.70 Pa/m, governed by pressure (section 3.4).
+- `maxVelocityMs: 3`, 1.0 Pa/m: the velocity gives 206 mm, which is above 186 mm. The series gives **Ø 250**, governed by velocity.
+- `maxPressureDropPaPerM: 0.5`, 5 m/s: D* about 214 mm. Ø 200 gives 0.70 Pa/m, above 0.5. The series gives **Ø 250**, governed by pressure. Ø 250 gives about 0.24 Pa/m (0.70 × (200/250)^4.9; estimate).
+- Water, 10 kW, delta T 10 K (section 3.4): suggested limits (1.0 m/s, 200 Pa/m) give **DN 25** (154 Pa/m). With `maxPressureDropPaPerM: 500` the DN 20 pipe (0.76 m/s, 462 Pa/m) meets both limits and the result is **DN 20**. With 400 Pa/m it stays DN 25 (462 is above 400).
+- A delta T of 20 K halves the flow (1.194e-4 m³/s) and gives a DN not larger than 25 (the test asserts `<=`, not an exact value).
+- Migration: the v19 fixture of T19 has one type with the suggested air limits. After load it has `sizingMethod: 'air'`, `flowUnit: 'dm³/s'` and `networkSizing` of length 0.
+
+### 12.7 Risks of this revision
+
+- **R-23 A retype for old test files.** A file saved on this branch at schema 19 loses its limits at load (12.2). The method stays. The cost is one retype. Master has no v19 file.
+- **R-24 Limits are not copied with a pasted network.** A pasted or duplicated start stamp has a new id and no entry. The user presses "Use suggested values" or retypes. This is the smaller option. A later task can copy the entry with the stamp (clipboard payload).
+- **R-25 Stale port keys stay in the file.** An entry whose port the stamp no longer has stays until the stamp goes. It is a few bytes and has no effect. A fix needs the stamp definition in the loader.
+- **R-26 Non-undoable limits.** A change of a limit is not an undo step, and an undo of "Size network" does not restore the old limits. This is the stance of `terminalCapacities`. The user sees the limits in the dialog, so nothing is hidden.
+- **R-27 R6 needs an entry.** R6 sizes after it routes, from the stamp that it routes from. A new route has an entry only if the user saved limits for that stamp and port before. The R6 plan must decide: ask in the R6 dialog, or run the Size dialog next. R5 gives `getNetworkSizing` and `setNetworkSizing` for this. The overview (schema section) now says R6 uses step 21.
+- **R-28 Method mismatch looks like a missing entry.** After a change of the method on the type, the old entry stays but the dialog shows empty fields. The user can think the limits are lost. The line `size-line-no-sizing` and T16 step 25 cover it. The old entry is replaced when the user saves new limits for the pair.
+- **R-29 Two edits in `App.tsx`.** T16 has uncommitted edits in `App.tsx` and `MenuButton.tsx`, and T23 changes `handleSaveNetworkType` in `App.tsx`. T23 waits for the T16 commit.
+- **R-30 Per-change write.** Each valid field change writes and marks dirty. A user who types `7` then `70` writes twice. This is cheap (a small list). Not measured.
+- **R-31 Work-folder scripts are stale.** `t14a-check.mjs`, `t14b-check.mjs`, `t15`/`t16` drafts and `r5-lib.mjs` of the first design name the removed fields. T21 fixes `r5-lib.mjs`. The old scripts are not run again; T18 and the new `t21`/`t23` checks replace them.
