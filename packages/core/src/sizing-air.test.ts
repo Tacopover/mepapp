@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sizeAirSegment } from './sizing-air.js';
 import { AIR_FLUID, equivalentDiameterMm, minimumDiameterM, pressureDropPaPerM, velocityMs } from './sizing-hydraulics.js';
-import { RECT_SIDE_MAX_MM, RECT_SIDE_MIN_MM, RECT_SIDE_STEP_MM, ROUND_DUCT_SERIES_MM } from './sizing-series.js';
+import { RECT_DUCT_SIDES_MM, ROUND_DUCT_SERIES_MM, rectFreeSidesMm } from './sizing-series.js';
 import { SUGGESTED_AIR_SIZING, type AirSizing } from './sizing-settings.js';
 
 const settings = { ...SUGGESTED_AIR_SIZING };
@@ -94,11 +94,12 @@ describe('sizeAirSegment (round)', () => {
 
 const rect: AirSizing = { ...SUGGESTED_AIR_SIZING, shape: 'rectangular' };
 
-/** Every grid pair (w >= h) within the aspect limit that meets the velocity and pressure limits. */
-function validPairs(flowM3s: number, maxRatio: number, maxVelocityMs: number, pressureDiameterMm: number) {
+/** Every pair (w >= h) of the list of sides within the aspect limit that meets the velocity and pressure limits. */
+function validPairs(flowM3s: number, maxRatio: number, maxVelocityMs: number, pressureDiameterMm: number, sides: readonly number[] = RECT_DUCT_SIDES_MM) {
   const pairs: { w: number; h: number }[] = [];
-  for (let h = RECT_SIDE_MIN_MM; h <= RECT_SIDE_MAX_MM; h += RECT_SIDE_STEP_MM) {
-    for (let w = h; w <= RECT_SIDE_MAX_MM; w += RECT_SIDE_STEP_MM) {
+  for (const h of sides) {
+    for (const w of sides) {
+      if (w < h) continue;
       if (w / h > maxRatio + 1e-9) break;
       if (equivalentDiameterMm(w, h) >= pressureDiameterMm && flowM3s / (w * h * 1e-6) <= maxVelocityMs) pairs.push({ w, h });
     }
@@ -107,8 +108,7 @@ function validPairs(flowM3s: number, maxRatio: number, maxVelocityMs: number, pr
 }
 
 describe('sizeAirSegment (rectangular)', () => {
-  it('picks the smallest valid grid pair at 0.1 m³/s', () => {
-    // Measured: 200 x 150 mm, 3.333 m/s, 0.9297 Pa/m, governed by pressure.
+  it('picks the smallest valid pair of the preferred sides (values unverified against EN 1505) at 0.1 m³/s', () => {
     const pressureDiameterMm = 1000 * minimumDiameterM(0.1, AIR_FLUID, Infinity, 1);
     const pick = sizeAirSegment(0.1, rect)!;
     expect(equivalentDiameterMm(pick.widthMm!, pick.heightMm!)).toBeGreaterThanOrEqual(pressureDiameterMm);
@@ -116,6 +116,24 @@ describe('sizeAirSegment (rectangular)', () => {
     const area = pick.widthMm! * pick.heightMm!;
     const smaller = validPairs(0.1, 4, 5, pressureDiameterMm).filter((p) => p.w * p.h < area);
     expect(smaller).toEqual([]);
+    expect(RECT_DUCT_SIDES_MM).toContain(pick.widthMm);
+    expect(RECT_DUCT_SIDES_MM).toContain(pick.heightMm);
+  });
+
+  it('picks a pair of the 50 mm grid with the free series', () => {
+    const pressureDiameterMm = 1000 * minimumDiameterM(0.1, AIR_FLUID, Infinity, 1);
+    const pick = sizeAirSegment(0.1, { ...rect, series: 'free' })!;
+    const sides = rectFreeSidesMm();
+    expect(sides).toContain(pick.widthMm);
+    expect(sides).toContain(pick.heightMm);
+    const area = pick.widthMm! * pick.heightMm!;
+    expect(validPairs(0.1, 4, 5, pressureDiameterMm, sides).filter((p) => p.w * p.h < area)).toEqual([]);
+  });
+
+  it('has the preferred sides (unverified against EN 1505) in increasing order from 100 to 2000 mm', () => {
+    expect(RECT_DUCT_SIDES_MM[0]).toBe(100);
+    expect(RECT_DUCT_SIDES_MM[RECT_DUCT_SIDES_MM.length - 1]).toBe(2000);
+    RECT_DUCT_SIDES_MM.slice(1).forEach((side, index) => expect(side).toBeGreaterThan(RECT_DUCT_SIDES_MM[index]));
   });
 
   it('breaks an area tie with the smaller aspect ratio', () => {

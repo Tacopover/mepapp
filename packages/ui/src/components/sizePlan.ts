@@ -65,7 +65,7 @@ const TEXTS = {
   maxAspect: 'Maximum aspect ratio',
   airSeries: 'Size series',
   seriesStandard: 'Standard',
-  seriesFree: 'Free (steps of 10 mm)',
+  seriesFree: 'Free (steps of 10 mm round, 50 mm rectangular)',
   deltaT: 'Delta T (K)',
   valueNotPositive: 'Enter a number above 0.',
   valueAtLeastOne: 'Enter a number of 1 or more.',
