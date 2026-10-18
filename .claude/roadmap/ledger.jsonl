@@ -368,3 +368,7 @@
 {"seq":368,"at":"2026-10-18T11:51:15.167Z","type":"decision","id":"Q-R5-02","status":"answered","answer":"B","by":"user"}
 {"seq":369,"at":"2026-10-18T11:51:15.311Z","type":"decision","id":"Q-R5-03","status":"answered","answer":"A","by":"user"}
 {"seq":370,"at":"2026-10-18T11:51:24.901Z","type":"now","id":"R5-T10b","text":"R5-T10b, T11, T12, T14c running (Q-R5-01 E, Q-R5-02 B, Q-R5-03 A answered)"}
+{"seq":371,"at":"2026-10-18T12:41:23.198Z","type":"task","id":"R5-T10b","state":"done","commit":"18d8305"}
+{"seq":372,"at":"2026-10-18T12:41:23.332Z","type":"task","id":"R5-T11","state":"done","commit":"e707c84"}
+{"seq":373,"at":"2026-10-18T12:41:23.455Z","type":"task","id":"R5-T12","state":"done","commit":"7d64eda"}
+{"seq":374,"at":"2026-10-18T12:41:23.578Z","type":"task","id":"R5-T14c","state":"done","commit":"477400c"}
