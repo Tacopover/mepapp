@@ -124,6 +124,7 @@ import {
   sizeNetwork,
   type FlowUnitId,
   type SizeNetworkResult,
+  type SizedSegment,
 } from '@mepapp/core';
 import { PATH_KIND, type AnnotationGeometry as PdfAnnotationGeometry, type PdfDocumentHandle, type StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
@@ -1583,6 +1584,35 @@ export class SketchScene {
       flowUnit: type?.flowUnit ?? null,
       result,
     };
+  }
+
+  /** Writes the network sizes to their segments in one undo step ("Size network"). Millimetres are stored as-is. Skips a size whose segment is missing, and adopts the network types of the sized segments first. */
+  applyNetworkSizes(sizes: readonly SizedSegment[]): void {
+    const state = this.doc.drawingHistory.getState();
+    const valid = sizes.filter((size) => state.segments[size.segmentId] !== undefined);
+    if (valid.length === 0) return;
+    this.adoptNetworkTypes(valid.map((size) => state.segments[size.segmentId].networkTypeId));
+    const tx = new Transaction(this.doc.drawingHistory, 'Size network');
+    tx.update((s) => {
+      const segments = { ...s.segments };
+      for (const size of valid) {
+        const segment: Segment = { ...segments[size.segmentId], shape: size.shape };
+        if (size.shape === 'round') {
+          segment.diameter = size.diameterMm;
+          delete segment.width;
+          delete segment.height;
+        } else {
+          segment.width = size.widthMm;
+          segment.height = size.heightMm;
+          delete segment.diameter;
+        }
+        segments[size.segmentId] = segment;
+      }
+      return { ...s, segments };
+    });
+    tx.commit();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
   }
 
   /** Derives the current network topology (see core's computeNetworks) resolved against known network types — the Layers panel's "Networks" list. */
