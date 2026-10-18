@@ -3,7 +3,11 @@ import { groupTargetPorts, planRoute, reducedState, resolveStart, type RouteBuil
 import type { RoutePlanWarning } from './route-plan-warnings.js';
 import type { ConnectionPoint, Fitting, Segment } from './network.js';
 import type { RoutePort, RouteStamp } from './route-ports.js';
-import type { RouteArea } from './route-area.js';
+import type { RouteArea, RouteAreaRoom, RouteEdge, RouteEntry, RouteNode } from './route-area.js';
+import { distance, type Vec2 } from './geometry.js';
+import { nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
+import { legClass } from './route-layout.js';
+import type { Room } from './rooms/room.js';
 
 const OUT = { id: 'out', name: 'Out', fractionX: 0, fractionY: 0 };
 const OUT2 = { id: 'out2', name: 'Out 2', fractionX: 1, fractionY: 0 };
@@ -227,7 +231,6 @@ describe('planRoute result', () => {
     const targetPorts = [target('a', 'r1'), target('b', 'r1'), target('c', 'r2'), target('d', null)];
     const result = planRoute(input({ targetPorts }));
     expect(result.status).toBe('ok');
-    expect(result.plan.segments).toEqual([]);
     expect(result.plan.stats.rooms).toBe(2);
     expect(result.plan.stats.ports).toBe(4);
   });
@@ -243,6 +246,167 @@ describe('planRoute result', () => {
     const before = { ...structuredClone(data), newSegmentId, newFittingId };
     planRoute(value);
     expect(value).toEqual(before);
+  });
+});
+
+const MM_PER_PT = 10;
+
+function pt(p: Vec2): Vec2 {
+  return { x: p.x / MM_PER_PT, y: p.y / MM_PER_PT };
+}
+
+function rect(id: string, x0: number, y0: number, x1: number, y1: number): Room {
+  const outer = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }].map(pt);
+  return { id, pageIndex: 0, polygon: { outer, holes: [] }, name: null, number: null, source: 'manual', locked: false, open: false };
+}
+
+function pathNode(roomId: string, k: number, xMm: number, yMm: number): RouteNode {
+  return { id: `rn-${roomId}-${k}`, point: pt({ x: xMm, y: yMm }), kind: 'end', roomId };
+}
+
+function pathEdge(roomId: string, k: number, fromId: string, toId: string, pointsMm: Vec2[]): RouteEdge {
+  const points = pointsMm.map(pt);
+  let length = 0;
+  for (let i = 1; i < points.length; i++) length += distance(points[i - 1]!, points[i]!);
+  return { id: `re-${roomId}-${k}`, from: fromId, to: toId, kind: 'center', points, lengthMm: length * MM_PER_PT, roomId };
+}
+
+function addEntry(graph: GraphData, servedRoomId: string, areaRoomId: string, wallMm: Vec2): RouteEntry {
+  const entryId = `ry-${servedRoomId}-${areaRoomId}`;
+  const wallNode: RouteNode = { id: `rw-${servedRoomId}-${areaRoomId}`, point: pt(wallMm), kind: 'wall', roomId: servedRoomId };
+  graph.nodes.push(wallNode);
+  const near = nearestOnEdges(graph, wallNode.point, (e) => e.kind === 'center' && e.roomId === areaRoomId)!;
+  const targetId = splitEdgeAt(graph, near.edgeId, near.segment, near.point, `rt-${entryId}-0`);
+  const target = graph.nodes.find((n) => n.id === targetId)!;
+  graph.edges.push({
+    id: `rc-${entryId}-0`,
+    from: wallNode.id,
+    to: target.id,
+    kind: 'connector',
+    points: [{ ...wallNode.point }, { ...target.point }],
+    lengthMm: distance(wallNode.point, target.point) * MM_PER_PT,
+    roomId: null,
+  });
+  return { id: entryId, roomId: servedRoomId, areaRoomId, nodeId: wallNode.id, point: pt(wallMm), runMm: 1000, gapMm: 0, primary: true, shaft: false };
+}
+
+function makeArea(rooms: RouteAreaRoom[], graph: GraphData, entries: RouteEntry[]): RouteArea {
+  return { status: 'ok', rooms, nodes: graph.nodes, edges: graph.edges, entries, links: [], unreached: [], parts: 1 };
+}
+
+function placed(id: string, category: RouteStamp['category'], xMm: number, yMm: number): RouteStamp {
+  return {
+    id,
+    category,
+    transform: { position: pt({ x: xMm, y: yMm }), rotationDegrees: 0, scale: { x: 1, y: 1 } },
+    nativeWidth: 10,
+    nativeHeight: 10,
+    ports: [{ id: 'out', name: 'Out', fractionX: 0.5, fractionY: 0.5 }],
+  };
+}
+
+function targetAt(stampId: string, xMm: number, yMm: number, roomId: string | null, networkTypeId = 'supply-air'): RoutePort {
+  return { stampId, portId: 'out', networkTypeId, world: pt({ x: xMm, y: yMm }), roomId };
+}
+
+/** A corridor c1 from (0,0) to (20000,0). r1 and r2 have an entry. r3 has none. The start stamp is at (0,-300). */
+function corridorScene(networkTypeId = 'supply-air'): RouteBuildInput {
+  const graph: GraphData = {
+    nodes: [pathNode('c1', 0, 0, 0), pathNode('c1', 1, 20000, 0)],
+    edges: [pathEdge('c1', 0, 'rn-c1-0', 'rn-c1-1', [{ x: 0, y: 0 }, { x: 20000, y: 0 }])],
+  };
+  const entries = [addEntry(graph, 'r1', 'c1', { x: 5000, y: -1000 }), addEntry(graph, 'r2', 'c1', { x: 12000, y: 1000 })];
+  const area = makeArea([{ roomId: 'c1', kind: 'path', typeId: 'corridor', open: false, name: null }], graph, entries);
+  const rooms = [rect('c1', 0, -1000, 20000, 1000), rect('r1', 4000, -5000, 8000, -1000), rect('r2', 10000, 1000, 14000, 5000), rect('r3', 16000, 3000, 20000, 7000)];
+  const stamps = [placed('ahu', 'equipment', 0, -300), placed('t1', 'terminal', 6000, -3000), placed('t2', 'terminal', 12000, 3000), placed('t3', 'terminal', 18000, 5000), placed('t4', 'terminal', 15000, 500)];
+  const targetPorts = [
+    targetAt('t1', 6000, -3000, 'r1', networkTypeId),
+    targetAt('t2', 12000, 3000, 'r2', networkTypeId),
+    targetAt('t3', 18000, 5000, 'r3', networkTypeId),
+    targetAt('t4', 15000, 500, 'c1', networkTypeId),
+  ];
+  let seg = 0;
+  let fit = 0;
+  return {
+    startStampId: 'ahu',
+    startPortId: 'out',
+    networkTypeId,
+    targetPorts,
+    state: { stamps, segments: [], fittings: [], portGroups: [] },
+    removal: { segmentIds: [], fittingIds: [] },
+    rooms,
+    area,
+    mmPerPt: MM_PER_PT,
+    pageIndex: 0,
+    newSegmentId: () => `n-s${++seg}`,
+    newFittingId: () => `n-f${++fit}`,
+  };
+}
+
+function segmentMm(s: Segment): number {
+  return Math.hypot(s.geometry[1]!.x - s.geometry[0]!.x, s.geometry[1]!.y - s.geometry[0]!.y) * MM_PER_PT;
+}
+
+function onPort(s: Segment, stampId: string): boolean {
+  return [s.endpointA, s.endpointB].some((end) => end.kind === 'port' && end.elementId === stampId);
+}
+
+describe('planRoute items', () => {
+  it('builds marked segments and fittings for a corridor with two served rooms', () => {
+    const data = corridorScene();
+    const existing = { ...data.state, segments: [segment('old-s1', 'supply-air', port('t1', 'out'), port('t2', 'out'))], fittings: [fitting('old-f1')] };
+    const result = planRoute({ ...data, state: existing });
+    expect(result.status).toBe('ok');
+    const { segments, fittings, stats, warnings } = result.plan;
+    expect(segments.length).toBeGreaterThan(0);
+    expect(segments.every((s) => s.routedBy === 'route')).toBe(true);
+    expect(fittings.every((f) => f.routedBy === 'route')).toBe(true);
+    const ids = [...segments.map((s) => s.id), ...fittings.map((f) => f.id)];
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).not.toContain('old-s1');
+    expect(ids).not.toContain('old-f1');
+    const fromStart = segments.filter((s) => onPort(s, 'ahu'));
+    expect(fromStart).toHaveLength(1);
+    expect(fromStart[0]!.endpointA).toEqual({ kind: 'port', elementId: 'ahu', portId: 'out' });
+    expect(fromStart[0]!.geometry[0]).toEqual({ x: 0, y: -30 });
+    const endsOn = (stampId: string): number => segments.reduce((n, s) => n + [s.endpointA, s.endpointB].filter((e) => e.kind === 'port' && e.elementId === stampId).length, 0);
+    for (const stampId of ['ahu', 't1', 't2', 't3', 't4']) expect(endsOn(stampId)).toBe(1);
+    for (const s of segments) {
+      expect(['axis', 'diagonal']).toContain(legClass({ x: s.geometry[0]!.x * MM_PER_PT, y: s.geometry[0]!.y * MM_PER_PT }, { x: s.geometry[1]!.x * MM_PER_PT, y: s.geometry[1]!.y * MM_PER_PT }));
+    }
+    expect(segments.reduce((sum, s) => sum + segmentMm(s), 0)).toBeCloseTo(stats.lengthMm, 3);
+    expect(stats).toMatchObject({ segments: segments.length, fittings: fittings.length, rooms: 3, ports: 4, portsLeft: 0 });
+    expect(warnings.find((w) => w.code === 'room-off-graph')).toEqual({ code: 'room-off-graph', severity: 'warning', ids: ['r3'], count: 1 });
+    expect(warnings.some((w) => w.code === 'ports-left')).toBe(false);
+    expect(warnings.at(-1)!.code).toBe('draft-2d');
+  });
+
+  it('gives the placeholder diameter of the discipline', () => {
+    const water = planRoute(corridorScene('heating-water'));
+    expect(water.plan.segments.length).toBeGreaterThan(0);
+    expect(water.plan.segments.every((s) => s.diameter === 25 && s.networkTypeId === 'heating-water')).toBe(true);
+    const air = planRoute(corridorScene('supply-air'));
+    expect(air.plan.segments.every((s) => s.diameter === 200)).toBe(true);
+    const typed = planRoute({ ...corridorScene('unknown-type'), networkType: { id: 'unknown-type', discipline: 'plumbing' } });
+    expect(typed.plan.segments.every((s) => s.diameter === 25)).toBe(true);
+    const unknown = planRoute(corridorScene('unknown-type'));
+    expect(unknown.plan.segments.every((s) => s.diameter === 50)).toBe(true);
+  });
+
+  it('does not change its input and gives the same result twice', () => {
+    const data = corridorScene();
+    const { newSegmentId, newFittingId, ...plain } = data;
+    const before = structuredClone(plain);
+    const first = planRoute(data);
+    expect({ ...plain }).toEqual(before);
+    const second = planRoute(corridorScene());
+    expect(second).toEqual(first);
+  });
+
+  it('connects a port that lies in a route-area room through the off-graph step', () => {
+    const result = planRoute(corridorScene());
+    expect(result.plan.segments.some((s) => onPort(s, 't4'))).toBe(true);
+    expect(result.plan.warnings.find((w) => w.code === 'room-off-graph')!.ids).not.toContain('c1');
   });
 });
 

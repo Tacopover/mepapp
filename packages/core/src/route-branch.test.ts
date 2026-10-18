@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from './geometry.js';
-import { planBranches, type BranchRoomInput } from './route-branch.js';
+import { placeTapPosition, planBranches, type BranchRoomInput } from './route-branch.js';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
 
@@ -103,6 +103,25 @@ describe('planBranches', () => {
       len += Math.hypot(rb.branch[i]!.x - rb.branch[i - 1]!.x, rb.branch[i]!.y - rb.branch[i - 1]!.y);
     }
     expect(len).toBeCloseTo(2441.42, 2);
+  });
+
+  it('keeps 300 mm between three taps on one leg (7000, 7300, 7600)', () => {
+    const a = rectRoom('A', v(7000, 2400), [], 0, 2400, 14000, 6000);
+    const b = rectRoom('B', v(7200, -2400), [], 0, -6000, 14000, -2400);
+    const c = rectRoom('C', v(7400, 2400), [], 0, 2400, 14000, 6000);
+    const trunk = [{ id: 'e1', path: [v(0, 0), v(20000, 0)] }];
+    const xs = planBranches({ trunk, rootPointMm: v(0, 0), rooms: [c, b, a] }).rooms.map((r) => r.tapMm.x);
+    expect(xs).toEqual([7000, 7300, 7600]);
+    expect(Math.min(xs[1]! - xs[0]!, xs[2]! - xs[1]!)).toBeGreaterThanOrEqual(300);
+  });
+
+  it('places a tap with placeTapPosition', () => {
+    expect(placeTapPosition(20000, 7000, [], 300)).toBe(7000);
+    expect(placeTapPosition(20000, 100, [], 300)).toBe(300);
+    expect(placeTapPosition(20000, 7200, [7000], 300)).toBe(7300);
+    expect(placeTapPosition(500, 100, [], 300)).toBe(0);
+    expect(placeTapPosition(500, 400, [], 300)).toBe(500);
+    expect(placeTapPosition(20000, 7400, [7000, 7300], 300)).toBe(7600);
   });
 
   it('uses the nearest axis leg when the nearest leg is diagonal', () => {

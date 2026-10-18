@@ -106,26 +106,36 @@ function pointAt(leg: Leg, s: number): Vec2 {
   return { x: leg.a.x + (leg.b.x - leg.a.x) * t, y: leg.a.y + (leg.b.y - leg.a.y) * t };
 }
 
+/** Position along a leg of length len (0..len) for a tap that wants `preferred`. Keeps minGap from every blocker and from both ends when len >= 2*minGap. */
+export function placeTapPosition(len: number, preferred: number, blockers: readonly number[], minGap: number): number {
+  if (len < 2 * minGap) return preferred <= len / 2 ? 0 : len;
+  const clamped = Math.min(Math.max(preferred, minGap), len - minGap);
+  const candidates = [clamped];
+  for (const b of blockers) candidates.push(b + minGap, b - minGap);
+  let best = clamped;
+  let bestDistance = Infinity;
+  let found = false;
+  for (const c of candidates) {
+    if (c < minGap - EPS || c > len - minGap + EPS) continue;
+    if (blockers.some((b) => Math.abs(c - b) < minGap - EPS)) continue;
+    const d = Math.abs(c - clamped);
+    if (!found || d < bestDistance - EPS || (Math.abs(d - bestDistance) <= EPS && c > best)) {
+      best = c;
+      bestDistance = d;
+      found = true;
+    }
+  }
+  return found ? best : clamped;
+}
+
 function placeOnAxisLeg(leg: Leg, e: Vec2, placed: readonly PlacedTap[]): number {
   const len = legLength(leg);
   const horizontal = Math.abs(leg.b.y - leg.a.y) <= Math.abs(leg.b.x - leg.a.x);
   const sign = horizontal ? Math.sign(leg.b.x - leg.a.x) : Math.sign(leg.b.y - leg.a.y);
   let s = horizontal ? (e.x - leg.a.x) * sign : (e.y - leg.a.y) * sign;
   s = Math.min(Math.max(s, 0), len);
-  if (len < 2 * MIN_LEG_MM) {
-    return s <= len / 2 ? 0 : len;
-  }
-  s = Math.min(Math.max(s, MIN_LEG_MM), len - MIN_LEG_MM);
-  const clamped = s;
-  for (const tap of placed) {
-    if (tap.edgeId !== leg.edgeId || tap.index !== leg.index) continue;
-    if (Math.abs(s - tap.s) >= MIN_LEG_MM) continue;
-    let next = s >= tap.s ? tap.s + MIN_LEG_MM : tap.s - MIN_LEG_MM;
-    if (next > len - MIN_LEG_MM) next = tap.s - MIN_LEG_MM;
-    if (next < MIN_LEG_MM) return clamped;
-    s = next;
-  }
-  return s;
+  const blockers = placed.filter((tap) => tap.edgeId === leg.edgeId && tap.index === leg.index).map((tap) => tap.s);
+  return placeTapPosition(len, s, blockers, MIN_LEG_MM);
 }
 
 function unitDirOf(from: Vec2, to: Vec2): Vec2 {

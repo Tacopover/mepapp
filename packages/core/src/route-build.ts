@@ -2,8 +2,13 @@
 
 import type { Vec2 } from './geometry.js';
 import { computeNetworks } from './network.js';
-import type { ConnectionPoint, Fitting, PortGroup, Segment } from './network.js';
+import type { ConnectionPoint, Fitting, NetworkType, PortGroup, Segment } from './network.js';
+import { getNetworkTypeFromLibrary } from './network-type-library.js';
 import { getStampWorldPorts } from './stamp.js';
+import { buildTrunk } from './route-trunk.js';
+import { planBranches, type BranchRoomInput } from './route-branch.js';
+import { elbowPath, insideRouteArea } from './route-layout.js';
+import { buildRouteItems, connectLoosePorts, type TopologyPort } from './route-topology.js';
 import { checkRouteStart } from './route-start.js';
 import type { RoutePort, RouteStamp } from './route-ports.js';
 import type { RouteArea } from './route-area.js';
@@ -23,6 +28,8 @@ export interface RouteBuildInput {
   /** The number of pages of the file. Default 1. More than 1 gives the error multi-page. */
   pageCount?: number;
   limits?: SizingSettings;
+  /** The network type of the run. Default: the type of the library with `networkTypeId`; none found gives discipline 'other'. */
+  networkType?: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizingMethod'>;
   newSegmentId: () => string; newFittingId: () => string;
 }
 
@@ -171,21 +178,110 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
 
   const grouped = groupTargetPorts(input.targetPorts, new Set(input.area.rooms.map((room) => room.roomId)));
 
+  const mmPerPt = input.mmPerPt ?? 0;
+  const discipline = (input.networkType ?? getNetworkTypeFromLibrary(input.networkTypeId))?.discipline ?? 'other';
+  const toMm = (p: Vec2): Vec2 => ({ x: p.x * mmPerPt, y: p.y * mmPerPt });
+  const toPage = (p: Vec2): Vec2 => ({ x: p.x / mmPerPt, y: p.y / mmPerPt });
+  const portKey = (port: RoutePort): string => `${port.stampId}:${port.portId}`;
+
+  const servedRoomIds = [...grouped.byRoom.keys()];
+  const trunk = buildTrunk({ area: input.area, rooms: input.rooms, mmPerPt, startPointMm: start.pointMm, servedRoomIds });
+
+  const paths: Vec2[][] = [];
+  if (trunk.rootPointMm) {
+    const dx = trunk.rootPointMm.x - start.pointMm.x;
+    const dy = trunk.rootPointMm.y - start.pointMm.y;
+    if (Math.hypot(dx, dy) > 1e-6) paths.push(elbowPath(start.pointMm, trunk.rootPointMm, Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'));
+  }
+  for (const edge of trunk.edges) paths.push(edge.path);
+
+  // A port in a route-area room (inArea) is treated like an outside port: it gets the off-graph connection. Provisional rule, the plan has none yet.
+  const loosePorts: RoutePort[] = [];
+  for (const roomId of trunk.offGraphRoomIds) loosePorts.push(...(grouped.byRoom.get(roomId) ?? []));
+  loosePorts.push(...grouped.outside, ...grouped.inArea);
+
+  const roomById = new Map(input.rooms.map((room) => [room.id, room] as const));
+  const branchRooms: BranchRoomInput[] = trunk.served.map((served) => {
+    const room = roomById.get(served.roomId);
+    return {
+      roomId: served.roomId,
+      entryPointMm: served.entryPointMm,
+      ports: grouped.byRoom.get(served.roomId)!.map((port) => ({ id: portKey(port), point: toMm(port.world) })),
+      inside: room ? insideRouteArea([room], mmPerPt) : () => false,
+    };
+  });
+  const portById = new Map(input.targetPorts.map((port) => [portKey(port), port] as const));
+  for (const branch of planBranches({
+    trunk: trunk.edges.map((edge) => ({ id: edge.id, path: edge.path })),
+    rootPointMm: trunk.rootPointMm ?? start.pointMm,
+    rooms: branchRooms,
+  }).rooms) {
+    paths.push(branch.branch, ...branch.spine);
+    for (const id of branch.offGraphPortIds) loosePorts.push(portById.get(id)!);
+  }
+
+  const connected = connectLoosePorts({
+    paths,
+    startPoint: start.pointMm,
+    loose: loosePorts.map((port) => ({ id: portKey(port), point: toMm(port.world) })),
+    targetPoints: input.targetPorts.map((port) => toMm(port.world)),
+    noTapPoints: start.stubFittingId === null ? [start.pointMm] : [],
+  });
+  paths.push(...connected.paths);
+  const leftIds = new Set(connected.left);
+  const connectedPorts = input.targetPorts.filter((port) => !leftIds.has(portKey(port)));
+
+  const stubFitting = start.stubFittingId === null ? undefined : reduced.fittings.find((fitting) => fitting.id === start.stubFittingId);
+  const topologyPorts: TopologyPort[] = connectedPorts.map((port) => ({ point: toMm(port.world), pagePoint: port.world, stampId: port.stampId, portId: port.portId }));
+  if (!stubFitting) {
+    const startStamp = input.state.stamps.find((stamp) => stamp.id === input.startStampId);
+    const world = startStamp ? getStampWorldPorts(startStamp).find((port) => port.id === input.startPortId)?.world : undefined;
+    topologyPorts.push({ point: start.pointMm, pagePoint: world ?? toPage(start.pointMm), stampId: input.startStampId, portId: input.startPortId });
+  }
+  const items = buildRouteItems({
+    paths,
+    ports: topologyPorts,
+    stubFitting: stubFitting ? { point: start.pointMm, pagePoint: stubFitting.position, fittingId: stubFitting.id } : null,
+    startPoint: start.pointMm,
+    networkTypeId: input.networkTypeId,
+    discipline,
+    pageIndex: input.pageIndex,
+    mmPerPt,
+    newSegmentId: input.newSegmentId,
+    newFittingId: input.newFittingId,
+  });
+
+  if (trunk.freeEdges.length > 0) warnings.push({ code: 'free-angle', severity: 'warning', count: trunk.freeEdges.length, points: trunk.freeEdges.map((edge) => toPage(edge.pointMm)) });
+  if (trunk.offGraphRoomIds.length > 0) warnings.push({ code: 'room-off-graph', severity: 'warning', ids: [...trunk.offGraphRoomIds].sort(), count: trunk.offGraphRoomIds.length });
+  if (connected.left.length > 0) {
+    warnings.push({ code: 'ports-left', severity: 'warning', count: connected.left.length });
+    const skipped = [...new Set(connected.left.map((id) => portById.get(id)!.roomId).filter((id): id is string => id !== null))].sort();
+    if (skipped.length > 0) warnings.push({ code: 'rooms-skipped', severity: 'info', ids: skipped, count: skipped.length });
+  }
   warnings.push({ code: 'draft-2d', severity: 'info' });
+
+  const roomsWithPorts = new Set(connectedPorts.map((port) => port.roomId).filter((id): id is string => id !== null && grouped.byRoom.has(id)));
   return {
     status: 'ok',
     plan: {
-      segments: [],
-      fittings: [],
+      segments: items.segments,
+      fittings: items.fittings,
       removeSegmentIds: [...input.removal.segmentIds].sort(),
       removeFittingIds: [...input.removal.fittingIds].sort(),
       warnings,
       stats: {
         ...emptyStats(),
+        segments: items.segments.length,
+        fittings: items.fittings.length,
+        lengthMm: items.lengthMm,
+        bends90: items.bends90,
+        bends45: items.bends45,
+        freeLegs: items.freeLegs,
+        rooms: roomsWithPorts.size,
+        ports: connectedPorts.length,
+        portsLeft: connected.left.length,
         removedSegments: input.removal.segmentIds.length,
         removedFittings: input.removal.fittingIds.length,
-        rooms: grouped.byRoom.size,
-        ports: input.targetPorts.length,
       },
     },
   };
