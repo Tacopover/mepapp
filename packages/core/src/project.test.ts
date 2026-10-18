@@ -441,8 +441,8 @@ describe('routing targets in the save format (auto-routing.md §4.5)', () => {
 
   it('loads a version 17 save with the stamps unchanged', () => {
     const loaded = loadProject({ ...v17, stamps: [stamp] });
-    expect(CURRENT_SCHEMA_VERSION).toBe(20);
-    expect(loaded.schemaVersion).toBe(20);
+    expect(CURRENT_SCHEMA_VERSION).toBe(21);
+    expect(loaded.schemaVersion).toBe(21);
     expect(loaded.stamps).toEqual([stamp]);
   });
 
@@ -478,7 +478,7 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
 
   it('loads a version 18 save with two network types as version 19 with the types unchanged', () => {
     const loaded = loadProject({ ...v18, networkTypes: [airType, waterType] });
-    expect(loaded.schemaVersion).toBe(20);
+    expect(loaded.schemaVersion).toBe(21);
     expect(loaded.networkTypes).toEqual([airType, waterType]);
   });
 
@@ -508,8 +508,8 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
   });
 
-  it('refuses a save of a version newer than 20', () => {
-    expect(() => loadProject({ ...v18, schemaVersion: 21 })).toThrow(SchemaMigrationError);
+  it('refuses a save of a version newer than 21', () => {
+    expect(() => loadProject({ ...v18, schemaVersion: 22 })).toThrow(SchemaMigrationError);
   });
 });
 
@@ -527,7 +527,7 @@ describe('network sizing in the save format (auto-routing-r5.md §12.2)', () => 
     const bad = { ...base, id: 'bad', sizing: { method: 'x' } };
     const none = { ...base, id: 'none' };
     const loaded = loadProject({ ...v19, networkTypes: [air, water, bad, none] });
-    expect(loaded.schemaVersion).toBe(20);
+    expect(loaded.schemaVersion).toBe(21);
     expect(loaded.networkSizing).toEqual([]);
     expect(loaded.networkTypes[0]).toEqual({ ...base, id: 'supply-air', flowUnit: 'dm³/s', sizingMethod: 'air' });
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
@@ -557,6 +557,50 @@ describe('network sizing in the save format (auto-routing-r5.md §12.2)', () => 
 
   it('refuses a version 20 save without networkSizing', () => {
     expect(() => loadProject({ ...v19, schemaVersion: 20 })).toThrow(ProjectLoadError);
+  });
+});
+
+describe('routed marks in the save format (auto-routing-r6.md section 4.1)', () => {
+  const v20 = {
+    schemaVersion: 20, networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {},
+    circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, rooms: [], calibrations: {}, roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {},
+    networkSizing: [],
+  };
+
+  it('loads a version 20 save with an unmarked segment and fitting as version 21 with the items unchanged', () => {
+    const loaded = loadProject({ ...v20, segments: [segment], fittings: [fitting] });
+    expect(loaded.schemaVersion).toBe(21);
+    expect(loaded.segments).toEqual([segment]);
+    expect(loaded.fittings).toEqual([fitting]);
+  });
+
+  it('keeps the routed mark of a segment and a fitting through a save and a load', () => {
+    const routedSegment: Segment = { ...segment, routedBy: 'route' };
+    const routedFitting: Fitting = { ...fitting, routedBy: 'route' };
+    const { schemaVersion: _v, ...doc } = { ...v20, segments: [routedSegment], fittings: [routedFitting] };
+    const loaded = loadProject(JSON.parse(JSON.stringify(serializeProject(doc as never))));
+    expect(loaded.segments).toEqual([routedSegment]);
+    expect(loaded.fittings).toEqual([routedFitting]);
+  });
+
+  it('drops a routed mark that is not the route mark and keeps the other fields', () => {
+    for (const value of ['x', true, 1]) {
+      const loaded = loadProject({ ...v20, schemaVersion: 21, segments: [{ ...segment, routedBy: value }], fittings: [{ ...fitting, routedBy: value }] });
+      expect('routedBy' in loaded.segments[0]!).toBe(false);
+      expect(loaded.segments[0]).toEqual(segment);
+      expect('routedBy' in loaded.fittings[0]!).toBe(false);
+      expect(loaded.fittings[0]).toEqual(fitting);
+    }
+  });
+
+  it('keeps an item without a routed mark as the same object', () => {
+    const loaded = loadProject({ ...v20, segments: [segment], fittings: [fitting] });
+    expect(loaded.segments[0]).toBe(segment);
+    expect(loaded.fittings[0]).toBe(fitting);
+  });
+
+  it('refuses a save of a version newer than 21', () => {
+    expect(() => loadProject({ ...v20, schemaVersion: 22 })).toThrow(SchemaMigrationError);
   });
 });
 

@@ -69,10 +69,10 @@ const doc: Omit<ProjectDocument, 'schemaVersion'> = {
 describe('port group over two network types in a saved file', () => {
   const v18File = { ...serializeProject(doc), schemaVersion: 18 };
 
-  it('loads a v18 file through the step to 19, at the current version 20', () => {
+  it('loads a v18 file through the step to 19, at the current version 21', () => {
     const loaded = loadProject(v18File);
-    expect(loaded.schemaVersion).toBe(20);
-    expect(CURRENT_SCHEMA_VERSION).toBe(20);
+    expect(loaded.schemaVersion).toBe(21);
+    expect(CURRENT_SCHEMA_VERSION).toBe(21);
   });
 
   it('keeps ahu.out and ahu.in in one port group node', () => {

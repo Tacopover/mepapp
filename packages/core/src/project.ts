@@ -8,7 +8,7 @@ import type { Annotation } from './annotation.js';
 import type { Calibration } from './calibration.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import { isFlowUnitId } from './flow-units.js';
-import type { Fitting, NetworkType, PortGroup, Segment } from './network.js';
+import { ROUTED_MARK, type Fitting, type NetworkType, type PortGroup, type Segment } from './network.js';
 import type { Room } from './rooms/room.js';
 import type { RoomNeed } from './rooms/room-need.js';
 import { parseRoomDemands, type RoomType } from './rooms/room-type.js';
@@ -19,7 +19,7 @@ import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 20;
+export const CURRENT_SCHEMA_VERSION = 21;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -328,6 +328,17 @@ const migrationSteps: MigrationStep[] = [
       networkSizing: [],
     }),
   },
+  {
+    fromVersion: 20,
+    toVersion: 21,
+    // Version 20 predates Segment.routedBy and Fitting.routedBy (auto-routing-r6.md section 4.1). Both fields are optional
+    // and absent means "drawn by hand", so this step only advances the version number: an older MepApp then refuses the
+    // file instead of dropping the fields when it saves.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 21,
+    }),
+  },
 ];
 
 function moveSizingMethod(type: unknown): unknown {
@@ -434,7 +445,17 @@ export function loadProject(raw: JsonRecord): ProjectDocument {
     stamps: doc.stamps.map(withCleanRoutingTargets),
     networkTypes: doc.networkTypes.map(withCleanSizing),
     networkSizing: parseNetworkSizing(doc.networkSizing).filter((entry) => stampIds.has(entry.startStampId)),
+    segments: doc.segments.map(withCleanRoutedMark),
+    fittings: doc.fittings.map(withCleanRoutedMark),
   };
+}
+
+/** The segment or fitting without a routed mark that is not 'route' (auto-routing-r6.md section 4.1). The same object when it has none. */
+function withCleanRoutedMark<T extends { routedBy?: unknown }>(item: T): T {
+  if (!item || typeof item !== 'object' || !('routedBy' in item)) return item;
+  if (item.routedBy === ROUTED_MARK) return item;
+  const { routedBy, ...rest } = item;
+  return rest as T;
 }
 
 /** The stamp without the routing targets that are not network type ids (auto-routing.md §4.5). The same object when it has none. */

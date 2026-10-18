@@ -51,6 +51,10 @@ export type ConnectionPoint =
   | { kind: 'fitting'; fittingId: string }
   | { kind: 'port'; elementId: string; portId: string };
 
+/** The route command made this item (auto-routing-r6.md section 4.1). Absent = drawn by hand. */
+export type RoutedMark = 'route';
+export const ROUTED_MARK: RoutedMark = 'route';
+
 export interface Segment {
   id: string;
   pageIndex: number;
@@ -63,6 +67,8 @@ export interface Segment {
   height?: number;
   /** Duct/pipe/conduit material. New field — the old app never had one. */
   material?: string;
+  /** The route command made this segment (auto-routing-r6.md section 4.1). Absent = drawn by hand. */
+  routedBy?: RoutedMark;
   endpointA: ConnectionPoint;
   endpointB: ConnectionPoint;
   /** Polyline in page space; first point is endpointA's world position, last is endpointB's. */
@@ -77,6 +83,8 @@ export interface Fitting {
   position: Vec2;
   /** The old app tried and abandoned a fitting-type field (Fitting.cs:99, commented out); the new app keeps it. */
   kind: FittingKind;
+  /** The route command made this fitting (auto-routing-r6.md section 4.1). Absent = drawn by hand. */
+  routedBy?: RoutedMark;
 }
 
 /**
