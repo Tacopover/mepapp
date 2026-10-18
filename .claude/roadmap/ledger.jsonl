@@ -439,3 +439,7 @@
 {"seq":439,"at":"2026-10-18T20:43:46.404Z","type":"task","id":"R6-T09a","state":"done","commit":"7e32ce3"}
 {"seq":440,"at":"2026-10-18T20:43:46.444Z","type":"now","id":"R6-T09","text":"R6-T09 to T11 (planner core), R5 size lists (Q-R5-05) and the R6 plan edit for Q-R6-04 A running"}
 {"seq":441,"at":"2026-10-18T20:49:54.446Z","type":"task","id":"R5-T25","part":"R5","title":"EN 1505 size lists for round and rectangular ducts (Q-R5-05)","state":"done","commit":"73f34dc"}
+{"seq":442,"at":"2026-10-18T20:59:52.845Z","type":"task","id":"R6-T09","state":"done","commit":"f83537c"}
+{"seq":443,"at":"2026-10-18T20:59:52.885Z","type":"task","id":"R6-T10","state":"done","commit":"4543d65"}
+{"seq":444,"at":"2026-10-18T20:59:52.927Z","type":"task","id":"R6-T11","state":"done","commit":"0225e51"}
+{"seq":445,"at":"2026-10-18T20:59:52.965Z","type":"now","id":"R6-T01","text":"R6-T01 to T03 and T14 (routedBy mark, schema 21, browser setup) running"}
