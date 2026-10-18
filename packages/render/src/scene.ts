@@ -123,6 +123,8 @@ import {
   routeAreaWarnings,
   sizeNetwork,
   type FlowUnitId,
+  convertFlow,
+  isFlowUnitId,
   type SizeNetworkResult,
   type SizedSegment,
 } from '@mepapp/core';
@@ -632,7 +634,7 @@ export interface AutoPlaceGroup {
   /** The remembered color and scale of the definition (the stamp tool's appearance default). */
   appearanceDefault?: { color?: string; scale?: number };
   /** `roomKey` = roomPlacementKey of the room, written on the stamp. `routingTargets` = PlacedStamp.routingTargets from the rule. */
-  stamps: { position: Vec2; rotationDegrees: number; ruleId: string; roomId: string; roomKey?: string; capacity?: number; routingTargets?: Record<string, string> }[];
+  stamps: { position: Vec2; rotationDegrees: number; ruleId: string; roomId: string; roomKey?: string; capacity?: number; capacityUnit?: string; routingTargets?: Record<string, string> }[];
   /** The network type copies of the rules (PlacementRule.networkTypeCopies), for a type that the drawing and the library do not have. */
   networkTypeCopies?: NetworkType[];
 }
@@ -2943,7 +2945,16 @@ export class SketchScene {
         this.doc.stamps.set(id, { sprite, baseScale, baseTexture: texture });
         this.doc.stampsLayer.addChild(sprite);
         for (const portIds of definition.definitionPortGroups ?? []) this.doc.portGroups.push({ elementId: id, portIds });
-        if (planned.capacity !== undefined) this.doc.terminalCapacities.set(id, planned.capacity);
+        if (planned.capacity !== undefined) {
+          let value = planned.capacity;
+          const firstTargetId = Object.values(routingTargets)[0];
+          if (isFlowUnitId(planned.capacityUnit) && firstTargetId !== undefined) {
+            const targetUnit = this.doc.networkTypes.find((t) => t.id === firstTargetId)?.flowUnit;
+            const converted = targetUnit !== undefined ? convertFlow(value, planned.capacityUnit, targetUnit) : null;
+            if (converted !== null) value = converted;
+          }
+          this.doc.terminalCapacities.set(id, value);
+        }
         placed.push(data);
       }
     }

@@ -73,12 +73,13 @@ export function groupsOf(rows: readonly PlacementRow[], art: ReadonlyMap<string,
       groups.set(id, group);
     }
     const capacity = row.rule.writeCapacity && row.requirement.perElement !== null ? row.requirement.perElement : undefined;
+    const capacityUnit = capacity !== undefined ? row.requirement.capacityUnit : undefined;
     const roomKey = roomPlacementKey(row.room);
     const ports = loaded.definition.ports.length > 0 ? loaded.definition.ports : [{ id: SYNTHETIC_CENTER_PORT_ID }];
     const routingTargets = ruleRoutingTargets(row.rule, ports);
     for (const copy of row.rule.networkTypeCopies ?? []) if (!group.networkTypeCopies?.some((c) => c.id === copy.id)) group.networkTypeCopies = [...(group.networkTypeCopies ?? []), copy];
     for (const stamp of row.stamps)
-      group.stamps.push({ ...stamp, ruleId: row.rule.id, roomId: row.room.id, roomKey, ...(capacity !== undefined ? { capacity } : {}), ...(routingTargets ? { routingTargets: { ...routingTargets } } : {}) });
+      group.stamps.push({ ...stamp, ruleId: row.rule.id, roomId: row.room.id, roomKey, ...(capacity !== undefined ? { capacity } : {}), ...(capacityUnit !== undefined ? { capacityUnit } : {}), ...(routingTargets ? { routingTargets: { ...routingTargets } } : {}) });
   }
   return [...groups.values()];
 }

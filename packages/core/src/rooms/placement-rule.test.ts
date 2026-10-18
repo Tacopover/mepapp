@@ -68,6 +68,11 @@ describe('calculateRoomRequirement: need ÷ capacity', () => {
     expect(r.demand?.result.parts.map((p) => p.amount)).toEqual([28]);
   });
 
+  it('returns the unit of the capacity: the unit of the rule, else the unit of the need', () => {
+    expect(calculateRoomRequirement(rule({ capacityPerElement: 50, unit: 'm³/h' }), withDemands(supply7)).capacityUnit).toBe('m³/h');
+    expect(calculateRoomRequirement(rule({ capacityPerElement: 10 }), withDemands(supply7)).capacityUnit).toBe('dm³/s');
+  });
+
   it('counts in the unit of the rule: m³/h, l/s, cfm', () => {
     const inM3h = calculateRoomRequirement(rule({ capacityPerElement: 50, unit: 'm³/h' }), withDemands(supply7));
     expect(inM3h.required).toBeCloseTo(100.8);

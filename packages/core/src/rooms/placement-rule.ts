@@ -300,6 +300,8 @@ export interface RoomRequirement {
   countSource: CountSource;
   /** required ÷ count: the capacity each placed element gets. */
   perElement: number | null;
+  /** The unit of `required` and `perElement`. */
+  capacityUnit?: string;
   warnings: RequirementWarning[];
   /** The demand of the room type and its total in the unit of the need: the "Why" chain shows it. */
   demand?: { needId: string; demand: RoomDemand; result: DemandResult };
@@ -382,6 +384,7 @@ export function calculateRoomRequirement(rule: PlacementRule, values: RoomValues
     count,
     countSource: quantityCount !== null || blocked ? 'amount' : 'onePerRoom',
     perElement: required !== null && count !== null && count > 0 ? required / count : null,
+    capacityUnit: unit,
     warnings,
     demand: { needId: need.id, demand, result },
     ...(lighting ? { lighting } : {}),
