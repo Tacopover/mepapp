@@ -22,6 +22,7 @@ import { IconRotate } from '../icons.js';
 import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 import { RoomProperties } from './RoomProperties.js';
 import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
+import { capacityLabel } from './capacityLabel.js';
 import { ColorPicker } from './ColorPicker.js';
 import { NumberDraftInput } from './NumberDraftInput.js';
 import { RoutingSection, samePorts } from './RoutingSection.js';
@@ -245,7 +246,7 @@ export function PropertiesPanel({
           </div>
           {selectedSegment.shape === 'round' ? (
             <div className="mep-field-row">
-              <label>Diameter (pt)</label>
+              <label>Diameter (mm)</label>
               <input
                 type="number"
                 value={selectedSegment.diameter ?? DEFAULT_DIAMETER}
@@ -255,7 +256,7 @@ export function PropertiesPanel({
           ) : (
             <>
               <div className="mep-field-row">
-                <label>Width (pt)</label>
+                <label>Width (mm)</label>
                 <input
                   type="number"
                   value={selectedSegment.width ?? DEFAULT_WIDTH}
@@ -263,7 +264,7 @@ export function PropertiesPanel({
                 />
               </div>
               <div className="mep-field-row">
-                <label>Height (pt)</label>
+                <label>Height (mm)</label>
                 <input
                   type="number"
                   value={selectedSegment.height ?? DEFAULT_HEIGHT}
@@ -384,7 +385,7 @@ export function PropertiesPanel({
           </div>
           {shape === 'round' && (
             <div className="mep-field-row">
-              <label>Diameter (pt){diameter === undefined ? ` (${VARIES})` : ''}</label>
+              <label>Diameter (mm){diameter === undefined ? ` (${VARIES})` : ''}</label>
               <input
                 type="number"
                 value={diameter ?? ''}
@@ -396,7 +397,7 @@ export function PropertiesPanel({
           {shape === 'rectangular' && (
             <>
               <div className="mep-field-row">
-                <label>Width (pt){width === undefined ? ` (${VARIES})` : ''}</label>
+                <label>Width (mm){width === undefined ? ` (${VARIES})` : ''}</label>
                 <input
                   type="number"
                   value={width ?? ''}
@@ -405,7 +406,7 @@ export function PropertiesPanel({
                 />
               </div>
               <div className="mep-field-row">
-                <label>Height (pt){height === undefined ? ` (${VARIES})` : ''}</label>
+                <label>Height (mm){height === undefined ? ` (${VARIES})` : ''}</label>
                 <input
                   type="number"
                   value={height ?? ''}
@@ -513,7 +514,7 @@ export function PropertiesPanel({
             />
           </div>
           <div className="mep-field-row">
-            <label>Capacity</label>
+            <label>{capacityLabel(selection, availableNetworkTypes)}</label>
             <input
               type="number"
               value={capacity ?? ''}
@@ -652,7 +653,7 @@ export function PropertiesPanel({
           />
         </div>
         <div className="mep-field-row">
-          <label>Capacity</label>
+          <label>{capacityLabel([stamp], availableNetworkTypes)}</label>
           <input
             type="number"
             value={stamp.capacity}
