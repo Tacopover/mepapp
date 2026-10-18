@@ -1568,7 +1568,7 @@ export class SketchScene {
     const isStartPort = (point: ConnectionPoint) => point.kind === 'port' && point.elementId === startStampId && point.portId === startPortId;
     const startSegment = segments.find((s) => isStartPort(s.endpointA) || isStartPort(s.endpointB));
     const type = startSegment ? this.doc.networkTypes.find((t) => t.id === startSegment.networkTypeId) ?? getNetworkTypeFromLibrary(startSegment.networkTypeId) : undefined;
-    const networkType: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizing'> = type ?? { id: '', discipline: 'other' };
+    const networkType: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizingMethod'> = type ?? { id: '', discipline: 'other' };
     const result = sizeNetwork({
       segments,
       fittings,
@@ -1578,7 +1578,7 @@ export class SketchScene {
       elementCategories,
       startStampId,
       startPortId,
-      networkType: { id: networkType.id, discipline: networkType.discipline, flowUnit: networkType.flowUnit, sizing: networkType.sizing },
+      networkType: { id: networkType.id, discipline: networkType.discipline, flowUnit: networkType.flowUnit, sizingMethod: networkType.sizingMethod },
     });
     return {
       networkTypeId: type?.id ?? null,

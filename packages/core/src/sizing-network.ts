@@ -5,9 +5,10 @@ import type { StampCategory } from './stamp-library.js';
 import { toBaseFlow, flowUnitOf, type FlowUnitId } from './flow-units.js';
 import { sizeWaterSegment, waterFlowFromPowerM3s } from './sizing-water.js';
 import { sizeAirSegment, type SizePick } from './sizing-air.js';
+import type { SizingSettings } from './sizing-settings.js';
 
 export type SizingProblemCode =
-  | 'no-start' | 'no-segment-at-port' | 'discipline-not-sized' | 'method-discipline' | 'no-flow-unit' | 'no-sizing'
+  | 'no-start' | 'no-segment-at-port' | 'discipline-not-sized' | 'no-method' | 'method-discipline' | 'no-flow-unit' | 'no-sizing'
   | 'unit-kind' | 'no-delta-t' | 'no-flow'
   | 'unit-unknown' | 'not-resolved' | 'zero-flow' | 'too-large' | 'mixed-type' | 'start-two-ports';
 export interface SizingProblem {
@@ -24,7 +25,9 @@ export interface SizeNetworkInput {
   capacityUnitOf: (elementId: string) => FlowUnitId | null;
   elementCategories?: Record<string, StampCategory>;
   startStampId: string; startPortId: string;
-  networkType: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizing'>;
+  networkType: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizingMethod'>;
+  /** The saved limits of this network, or undefined. */
+  sizing?: SizingSettings;
 }
 export interface SizeNetworkResult {
   /** 'refused' when an error problem exists. Then `sizes` is empty. */
@@ -121,15 +124,16 @@ export function sizeNetwork(input: SizeNetworkInput): SizeNetworkResult {
 
   const type = input.networkType;
   if (type.discipline !== 'ventilation' && type.discipline !== 'heatingAndCooling') return fail('discipline-not-sized');
-  const sizing = type.sizing;
-  if (!sizing) return fail('no-sizing');
+  if (!type.sizingMethod) return fail('no-method');
   if (
-    (sizing.method === 'air' && type.discipline === 'heatingAndCooling') ||
-    (sizing.method === 'water' && type.discipline === 'ventilation')
+    (type.sizingMethod === 'air' && type.discipline === 'heatingAndCooling') ||
+    (type.sizingMethod === 'water' && type.discipline === 'ventilation')
   ) {
     return fail('method-discipline');
   }
   if (!type.flowUnit) return fail('no-flow-unit');
+  if (!input.sizing || input.sizing.method !== type.sizingMethod) return fail('no-sizing');
+  const sizing = input.sizing;
   const unitKind = flowUnitOf(type.flowUnit).kind;
   if (sizing.method === 'air' && unitKind === 'power') return fail('unit-kind');
   const deltaTK = sizing.method === 'water' ? sizing.deltaTK : undefined;

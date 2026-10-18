@@ -273,7 +273,7 @@ describe('sizeNetwork - refusals', () => {
     id: 'supply-air',
     discipline: 'ventilation',
     flowUnit: 'dm³/s',
-    sizing: { ...SUGGESTED_AIR_SIZING },
+    sizingMethod: 'air',
   });
 
   const teeSegments = (networkTypeId = 'supply-air'): Segment[] => [
@@ -288,6 +288,7 @@ describe('sizeNetwork - refusals', () => {
       fittings: [fit('f1')],
       terminalCapacities: { t1: 40, t2: 60 },
       networkType: airType(),
+      sizing: { ...SUGGESTED_AIR_SIZING },
       ...overrides,
     });
 
@@ -299,6 +300,7 @@ describe('sizeNetwork - refusals', () => {
     startStampId: i.startStampId,
     startPortId: i.startPortId,
     networkType: i.networkType,
+    sizing: i.sizing,
   });
 
   function expectRefusal(result: SizeNetworkResult, code: string): void {
@@ -326,9 +328,9 @@ describe('sizeNetwork - refusals', () => {
 
   it('refuses a discipline that is not sized, with no fallback to another method', () => {
     for (const discipline of ['plumbing', 'fireProtection', 'electrical', 'other'] as const) {
-      const air = teeInput({ networkType: { id: 'supply-air', discipline, flowUnit: 'dm³/s', sizing: { ...SUGGESTED_AIR_SIZING } } });
+      const air = teeInput({ networkType: { id: 'supply-air', discipline, flowUnit: 'dm³/s', sizingMethod: 'air' }, sizing: { ...SUGGESTED_AIR_SIZING } });
       expectRefusal(sizeNetwork(air), 'discipline-not-sized');
-      const water = teeInput({ networkType: { id: 'supply-air', discipline, flowUnit: 'dm³/s', sizing: { ...SUGGESTED_WATER_SIZING } } });
+      const water = teeInput({ networkType: { id: 'supply-air', discipline, flowUnit: 'dm³/s', sizingMethod: 'water' }, sizing: { ...SUGGESTED_WATER_SIZING } });
       expectRefusal(sizeNetwork(water), 'discipline-not-sized');
     }
   });
@@ -337,39 +339,60 @@ describe('sizeNetwork - refusals', () => {
     const plumbing = teeInput({
       segments: teeSegments('sanitary-waste'),
       networkType: { id: 'sanitary-waste', discipline: 'plumbing', flowUnit: 'dm³/s' },
+      sizing: undefined,
+    });
+    expectRefusal(sizeNetwork(plumbing), 'discipline-not-sized');
+  });
+
+  it('refuses a plumbing type with a method and limits as discipline-not-sized', () => {
+    const plumbing = teeInput({
+      networkType: { id: 'supply-air', discipline: 'plumbing', flowUnit: 'dm³/s', sizingMethod: 'air' },
     });
     expectRefusal(sizeNetwork(plumbing), 'discipline-not-sized');
   });
 
   it('refuses a method that does not fit the discipline', () => {
-    const airOnHeating = teeInput({ networkType: { id: 'supply-air', discipline: 'heatingAndCooling', flowUnit: 'dm³/s', sizing: { ...SUGGESTED_AIR_SIZING } } });
+    const airOnHeating = teeInput({ networkType: { id: 'supply-air', discipline: 'heatingAndCooling', flowUnit: 'dm³/s', sizingMethod: 'air' } });
     expectRefusal(sizeNetwork(airOnHeating), 'method-discipline');
-    const waterOnVentilation = teeInput({ networkType: { id: 'supply-air', discipline: 'ventilation', flowUnit: 'dm³/s', sizing: { ...SUGGESTED_WATER_SIZING, deltaTK: 10 } } });
+    const waterOnVentilation = teeInput({
+      networkType: { id: 'supply-air', discipline: 'ventilation', flowUnit: 'dm³/s', sizingMethod: 'water' },
+      sizing: { ...SUGGESTED_WATER_SIZING, deltaTK: 10 },
+    });
     expectRefusal(sizeNetwork(waterOnVentilation), 'method-discipline');
   });
 
   it('refuses a type with no flow unit', () => {
-    const noUnit = teeInput({ networkType: { id: 'supply-air', discipline: 'ventilation', sizing: { ...SUGGESTED_AIR_SIZING } } });
+    const noUnit = teeInput({ networkType: { id: 'supply-air', discipline: 'ventilation', sizingMethod: 'air' } });
     expectRefusal(sizeNetwork(noUnit), 'no-flow-unit');
   });
 
-  it('refuses a ventilation type with no sizing', () => {
-    const noSizing = teeInput({ networkType: { id: 'supply-air', discipline: 'ventilation', flowUnit: 'dm³/s' } });
-    expectRefusal(sizeNetwork(noSizing), 'no-sizing');
+  it('refuses a ventilation type with no sizing method', () => {
+    const noMethod = teeInput({ networkType: { id: 'supply-air', discipline: 'ventilation', flowUnit: 'dm³/s' } });
+    expectRefusal(sizeNetwork(noMethod), 'no-method');
+  });
+
+  it('refuses a network with no saved limits', () => {
+    expectRefusal(sizeNetwork(teeInput({ sizing: undefined })), 'no-sizing');
+  });
+
+  it('refuses limits that are saved for the other method', () => {
+    const waterType: SizeNetworkInput['networkType'] = { id: 'heat-water', discipline: 'heatingAndCooling', flowUnit: 'm³/h', sizingMethod: 'water' };
+    expectRefusal(sizeNetwork(teeInput({ networkType: waterType, sizing: { ...SUGGESTED_AIR_SIZING } })), 'no-sizing');
   });
 
   it('refuses an air type with a power unit', () => {
-    const powerUnit = teeInput({ networkType: { id: 'supply-air', discipline: 'ventilation', flowUnit: 'kW', sizing: { ...SUGGESTED_AIR_SIZING } } });
+    const powerUnit = teeInput({ networkType: { id: 'supply-air', discipline: 'ventilation', flowUnit: 'kW', sizingMethod: 'air' } });
     expectRefusal(sizeNetwork(powerUnit), 'unit-kind');
   });
 
   it('refuses a water type with a power unit and no positive delta T', () => {
-    const waterType = (sizing: SizeNetworkInput['networkType']['sizing']): SizeNetworkInput =>
+    const waterType = (sizing: SizeNetworkInput['sizing']): SizeNetworkInput =>
       teeInput({
         segments: teeSegments('heat-water'),
         terminalCapacities: { t1: 5, t2: 5 },
         capacityUnitOf: () => 'kW',
-        networkType: { id: 'heat-water', discipline: 'heatingAndCooling', flowUnit: 'kW', sizing },
+        networkType: { id: 'heat-water', discipline: 'heatingAndCooling', flowUnit: 'kW', sizingMethod: 'water' },
+        sizing,
       });
     expectRefusal(sizeNetwork(waterType({ ...SUGGESTED_WATER_SIZING })), 'no-delta-t');
     expectRefusal(sizeNetwork(waterType({ ...SUGGESTED_WATER_SIZING, deltaTK: 0 })), 'no-delta-t');
@@ -382,7 +405,8 @@ describe('sizeNetwork - refusals', () => {
         segments: teeSegments('heat-water'),
         terminalCapacities: { t1: 5, t2: 5 },
         capacityUnitOf: () => 'kW',
-        networkType: { id: 'heat-water', discipline: 'heatingAndCooling', flowUnit: 'kW', sizing: { ...SUGGESTED_WATER_SIZING, deltaTK: 10 } },
+        networkType: { id: 'heat-water', discipline: 'heatingAndCooling', flowUnit: 'kW', sizingMethod: 'water' },
+        sizing: { ...SUGGESTED_WATER_SIZING, deltaTK: 10 },
       }),
     );
     expect(result.status).toBe('ok');
@@ -395,7 +419,8 @@ describe('sizeNetwork - refusals', () => {
       teeInput({
         segments: teeSegments('heat-water'),
         capacityUnitOf: () => 'm³/h',
-        networkType: { id: 'heat-water', discipline: 'heatingAndCooling', flowUnit: 'm³/h', sizing: { ...SUGGESTED_WATER_SIZING } },
+        networkType: { id: 'heat-water', discipline: 'heatingAndCooling', flowUnit: 'm³/h', sizingMethod: 'water' },
+        sizing: { ...SUGGESTED_WATER_SIZING },
       }),
     );
     expect(result.status).toBe('ok');
@@ -433,14 +458,14 @@ describe('sizeNetwork - sizes and warnings', () => {
     id: 'supply-air',
     discipline: 'ventilation',
     flowUnit: 'dm³/s',
-    sizing: { ...SUGGESTED_AIR_SIZING },
+    sizingMethod: 'air',
   });
 
   const waterType = (): SizeNetworkInput['networkType'] => ({
     id: 'heating-water',
     discipline: 'heatingAndCooling',
     flowUnit: 'kW',
-    sizing: { ...SUGGESTED_WATER_SIZING, deltaTK: 10 },
+    sizingMethod: 'water',
   });
 
   const f1 = { kind: 'fitting', fittingId: 'f1' } as const;
@@ -459,6 +484,7 @@ describe('sizeNetwork - sizes and warnings', () => {
       fittings: [fit('f1')],
       terminalCapacities: { t1: 40, t2: 60 },
       networkType: airType(),
+      sizing: { ...SUGGESTED_AIR_SIZING },
       ...overrides,
     });
 
@@ -477,6 +503,7 @@ describe('sizeNetwork - sizes and warnings', () => {
       terminalCapacities: { t1: 5, t2: 5, t3: 5, t4: 5 },
       capacityUnitOf: () => 'kW',
       networkType: waterType(),
+      sizing: { ...SUGGESTED_WATER_SIZING, deltaTK: 10 },
       ...overrides,
     });
 
@@ -488,6 +515,7 @@ describe('sizeNetwork - sizes and warnings', () => {
     startStampId: i.startStampId,
     startPortId: i.startPortId,
     networkType: i.networkType,
+    sizing: i.sizing,
   });
 
   const pickOf = (result: SizeNetworkResult, id: string) => result.sizes.find((s) => s.segmentId === id);
@@ -533,11 +561,30 @@ describe('sizeNetwork - sizes and warnings', () => {
     }
   });
 
+  it('sizes the same flow with two limit sets of the same type', () => {
+    const segments = [seg('s1', ahuOut, portOf('t1'))];
+    const sizeWith = (sizing: SizeNetworkInput['sizing']) =>
+      pickOf(sizeNetwork(input({ segments, terminalCapacities: { t1: 100 }, networkType: airType(), sizing })), 's1');
+
+    const suggested = sizeWith({ ...SUGGESTED_AIR_SIZING });
+    expect(suggested?.diameterMm).toBe(200);
+
+    const velocity = sizeWith({ ...SUGGESTED_AIR_SIZING, maxVelocityMs: 3 });
+    expect(velocity?.diameterMm).toBe(250);
+    expect(velocity?.governedBy).toBe('velocity');
+
+    const pressure = sizeWith({ ...SUGGESTED_AIR_SIZING, maxPressureDropPaPerM: 0.5 });
+    expect(pressure?.diameterMm).toBe(250);
+    expect(pressure?.governedBy).toBe('pressure');
+    expectWithin(pressure?.pressureDropPaPerM, 0.24, 0.15);
+  });
+
   it('sizes a water type with a volume unit and needs no delta T', () => {
     const result = sizeNetwork(
       waterInput({
         capacityUnitOf: () => 'm³/h',
-        networkType: { id: 'heating-water', discipline: 'heatingAndCooling', flowUnit: 'm³/h', sizing: { ...SUGGESTED_WATER_SIZING } },
+        networkType: { id: 'heating-water', discipline: 'heatingAndCooling', flowUnit: 'm³/h', sizingMethod: 'water' },
+        sizing: { ...SUGGESTED_WATER_SIZING },
       }),
     );
     expect(result.status).toBe('ok');
@@ -569,7 +616,7 @@ describe('sizeNetwork - sizes and warnings', () => {
       seg('b1', { kind: 'fitting', fittingId: 'f1' }, portOf('t1')),
     ];
     const fittings = [fit('f1'), fit('f2')];
-    const loopInput = input({ segments, fittings, terminalCapacities: { t1: 40 }, networkType: airType() });
+    const loopInput = input({ segments, fittings, terminalCapacities: { t1: 40 }, networkType: airType(), sizing: { ...SUGGESTED_AIR_SIZING } });
     const network = networkOf(segments, fittings, 'l1');
     const { flow } = flowsOfNetwork(loopInput, network);
     const nullIds = network.segmentIds.filter((id) => flow.segmentCapacity[id] === null || flow.segmentCapacity[id] === undefined).sort();
@@ -625,6 +672,7 @@ describe('sizeNetwork - sizes and warnings', () => {
         terminalCapacities: { t1: 5, t2: 5 },
         capacityUnitOf: () => 'kW',
         networkType: waterType(),
+        sizing: { ...SUGGESTED_WATER_SIZING, deltaTK: 10 },
       }),
     );
     const joined = computeNetworks({ segments, fittings: [], portGroups: [{ elementId: 'ahu', portIds: ['out', 'in'] }] });
@@ -644,6 +692,7 @@ describe('sizeNetwork - sizes and warnings', () => {
         portGroups: [{ elementId: 'ahu', portIds: ['out', 'in'] }],
         terminalCapacities: { t1: 40, t2: 60 },
         networkType: airType(),
+        sizing: { ...SUGGESTED_AIR_SIZING },
       }),
     );
     expect(result.status).toBe('ok');
