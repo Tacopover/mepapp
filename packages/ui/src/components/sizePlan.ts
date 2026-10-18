@@ -1,4 +1,4 @@
-import type { SizeNetworkResult, SizePick, SizingProblem, SizingProblemCode } from '@mepapp/core';
+import { getStampPorts, routingTargetOf, type RouteStamp, type Segment, type SizeNetworkResult, type SizePick, type SizingProblem, type SizingProblemCode } from '@mepapp/core';
 
 const TEXTS = {
   title: 'Size network',
@@ -10,6 +10,9 @@ const TEXTS = {
   size: 'Size network',
   close: 'Close',
   editType: 'Edit network type…',
+  severityError: 'Error',
+  severityWarning: 'Warning',
+  severityInfo: 'Note',
   capacityUnitNote: 'Capacities are read as {unit}.',
   totalFlow: 'Total flow: {flow}',
   sizedCount: '{n} segments sized.',
@@ -157,4 +160,48 @@ export function sizeResultLines(result: SizeNetworkResult, totalText: string, me
 export function sizeLabel(pick: SizePick, method?: 'air' | 'water'): string {
   if (pick.shape === 'round') return method === 'water' ? `DN ${pick.diameterMm}` : `Ø ${pick.diameterMm}`;
   return `${pick.widthMm} × ${pick.heightMm}`;
+}
+
+const EDIT_TYPE_CODES: readonly SizingProblemCode[] = ['no-flow-unit', 'no-sizing', 'no-delta-t', 'unit-kind', 'method-discipline'];
+
+/** True when one problem is fixed in the network type editor, so the dialog shows the "Edit network type…" button. */
+export function showEditTypeButton(problems: readonly SizingProblem[]): boolean {
+  return problems.some((problem) => EDIT_TYPE_CODES.includes(problem.code));
+}
+
+/** The ids of the ports of the stamp that have a segment end, in the order of the segments. */
+export function portsWithSegment(stampId: string, segments: readonly Segment[]): string[] {
+  const ids: string[] = [];
+  for (const segment of segments) {
+    for (const point of [segment.endpointA, segment.endpointB]) {
+      if (point.kind === 'port' && point.elementId === stampId && !ids.includes(point.portId)) ids.push(point.portId);
+    }
+  }
+  return ids;
+}
+
+/** The ids of the stamps that a segment of the list ends on. */
+export function stampIdsOfSegments(segments: readonly Segment[], segmentIds: readonly string[]): Set<string> {
+  const wanted = new Set(segmentIds);
+  const ids = new Set<string>();
+  for (const segment of segments) {
+    if (!wanted.has(segment.id)) continue;
+    for (const point of [segment.endpointA, segment.endpointB]) {
+      if (point.kind === 'port') ids.add(point.elementId);
+    }
+  }
+  return ids;
+}
+
+/** True when a stamp of the set has routing targets of two or more network types on its ports. */
+export function hasTwoFlows(stamps: readonly RouteStamp[], stampIds: ReadonlySet<string>): boolean {
+  return stamps.some((stamp) => {
+    if (!stampIds.has(stamp.id)) return false;
+    const targets = new Set<string>();
+    for (const port of getStampPorts(stamp)) {
+      const target = routingTargetOf(stamp, port.id);
+      if (target !== undefined) targets.add(target);
+    }
+    return targets.size >= 2;
+  });
 }

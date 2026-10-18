@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { SizedSegment, SizeNetworkResult, SizePick, SizingProblemCode } from '@mepapp/core';
-import { sizeLabel, sizeProblemLines, sizeResultLines, sizeText, type SizeTextKey } from './components/sizePlan.js';
+import type { RouteStamp, Segment, SizedSegment, SizeNetworkResult, SizePick, SizingProblemCode } from '@mepapp/core';
+import { hasTwoFlows, portsWithSegment, showEditTypeButton, sizeLabel, sizeProblemLines, sizeResultLines, sizeText, stampIdsOfSegments, type SizeTextKey } from './components/sizePlan.js';
 
 const PLAIN_KEYS: SizeTextKey[] = [
   'title', 'startStamp', 'startPort', 'networkType', 'noEquipment', 'noSegments', 'size', 'close', 'editType',
-  'capacityUnitNote', 'totalFlow', 'sizedCount', 'sizedCountOne', 'sizeCount', 'sizeCountOne', 'riserNote', 'twoFlowsNote',
+  'severityError', 'severityWarning', 'severityInfo', 'capacityUnitNote', 'totalFlow', 'sizedCount', 'sizedCountOne', 'sizeCount', 'sizeCountOne', 'riserNote', 'twoFlowsNote',
   'draftNote', 'disciplineNotSized', 'velocityNote', 'fluidAir', 'fluidWater', 'pipeNote', 'returnNote',
   'unsizedKeep', 'unsizedKeepOne', 'newSize', 'newSizeOne', 'confirmQuestion', 'confirmYes', 'confirmNo', 'unitReadNote',
   'convertQuestion', 'convertQuestionOne', 'convertYes', 'convertNo', 'convertSkipped', 'unitKindWarning', 'sizesSourceHint', 'deltaTHint',
@@ -191,5 +191,65 @@ describe('sizeResultLines', () => {
       .map((line) => /: (\d+) segments?$/.exec(line))
       .reduce((sum, match) => sum + (match ? Number(match[1]) : 0), 0);
     expect(total).toBe(sizes.length);
+  });
+});
+
+const portPoint = (elementId: string, portId: string) => ({ kind: 'port' as const, elementId, portId });
+const segmentBetween = (id: string, a: ReturnType<typeof portPoint>, b: ReturnType<typeof portPoint>): Segment => ({
+  id, pageIndex: 0, networkTypeId: 'supply-air', shape: 'round', diameter: 200, endpointA: a, endpointB: b, geometry: [],
+});
+
+describe('showEditTypeButton', () => {
+  const problem = (code: SizingProblemCode) => ({ code, severity: 'error' as const });
+  it('is true for each problem that the network type editor fixes', () => {
+    for (const code of ['no-flow-unit', 'no-sizing', 'no-delta-t', 'unit-kind', 'method-discipline'] as const) {
+      expect(showEditTypeButton([problem(code)]), code).toBe(true);
+    }
+  });
+  it('is false for discipline-not-sized, no-flow and an empty list', () => {
+    expect(showEditTypeButton([problem('discipline-not-sized')])).toBe(false);
+    expect(showEditTypeButton([problem('no-flow')])).toBe(false);
+    expect(showEditTypeButton([])).toBe(false);
+  });
+});
+
+describe('portsWithSegment', () => {
+  const segments = [
+    segmentBetween('s1', portPoint('ahu', 'out'), portPoint('t1', 'in')),
+    segmentBetween('s2', portPoint('t2', 'in'), portPoint('ahu', 'ret')),
+    segmentBetween('s3', portPoint('ahu', 'out'), portPoint('t3', 'in')),
+  ];
+  it('lists each port of the stamp once, in segment order', () => {
+    expect(portsWithSegment('ahu', segments)).toEqual(['out', 'ret']);
+  });
+  it('gives an empty list for a stamp with no segment', () => {
+    expect(portsWithSegment('fan', segments)).toEqual([]);
+  });
+});
+
+describe('stampIdsOfSegments', () => {
+  it('collects the stamps on the ends of the chosen segments only', () => {
+    const segments = [
+      segmentBetween('s1', portPoint('ahu', 'out'), portPoint('t1', 'in')),
+      segmentBetween('s2', portPoint('t2', 'in'), portPoint('t3', 'in')),
+    ];
+    expect([...stampIdsOfSegments(segments, ['s1'])].sort()).toEqual(['ahu', 't1']);
+  });
+});
+
+describe('hasTwoFlows', () => {
+  const port = (id: string) => ({ id, name: id, fractionX: 0.5, fractionY: 0.5 });
+  const stamp = (id: string, ports: string[], routingTargets?: Record<string, string>): RouteStamp => ({
+    id, category: 'equipment', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } },
+    nativeWidth: 10, nativeHeight: 10, ports: ports.map(port), routingTargets,
+  });
+  it('is true when a stamp of the set has two different targets', () => {
+    const stamps = [stamp('fcu', ['a', 'b'], { a: 'supply-air', b: 'return-air' })];
+    expect(hasTwoFlows(stamps, new Set(['fcu']))).toBe(true);
+  });
+  it('is false for one target twice, no target, or a stamp outside the set', () => {
+    expect(hasTwoFlows([stamp('x', ['a', 'b'], { a: 'supply-air', b: 'supply-air' })], new Set(['x']))).toBe(false);
+    expect(hasTwoFlows([stamp('x', ['a'])], new Set(['x']))).toBe(false);
+    expect(hasTwoFlows([stamp('fcu', ['a', 'b'], { a: 'supply-air', b: 'return-air' })], new Set(['other']))).toBe(false);
   });
 });
