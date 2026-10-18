@@ -1621,6 +1621,7 @@ export class SketchScene {
       return { ...s, segments };
     });
     tx.commit();
+    this.syncDrawingLayer();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
