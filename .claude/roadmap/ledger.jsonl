@@ -372,3 +372,8 @@
 {"seq":372,"at":"2026-10-18T12:41:23.332Z","type":"task","id":"R5-T11","state":"done","commit":"e707c84"}
 {"seq":373,"at":"2026-10-18T12:41:23.455Z","type":"task","id":"R5-T12","state":"done","commit":"7d64eda"}
 {"seq":374,"at":"2026-10-18T12:41:23.578Z","type":"task","id":"R5-T14c","state":"done","commit":"477400c"}
+{"seq":375,"at":"2026-10-18T15:01:11.552Z","type":"shot","id":"R5-T14c-question","part":"R5","task":"R5-T14c","caption":"Editor asks to convert 2 stored capacities from m3/h to dm3/s: Convert or Keep numbers","assetId":"4424239e5ed2f467389cc42d496ffc42","url":"/_blob/4424239e5ed2f467389cc42d496ffc42"}
+{"seq":376,"at":"2026-10-18T15:01:11.691Z","type":"shot","id":"R5-T14c-warning","part":"R5","task":"R5-T14c","caption":"Warning: volume unit and power unit cannot be converted; Keep numbers only","assetId":"72973ecee49ad402c162bde5913413ef","url":"/_blob/72973ecee49ad402c162bde5913413ef"}
+{"seq":377,"at":"2026-10-18T15:01:11.825Z","type":"shot","id":"R5-T14c-note","part":"R5","task":"R5-T14c","caption":"From Not set to dm3/s: no panel, note that capacities are read as dm3/s","assetId":"1135918fbcca6315ad7df1708cd68615","url":"/_blob/1135918fbcca6315ad7df1708cd68615"}
+{"seq":378,"at":"2026-10-18T15:01:11.958Z","type":"shot","id":"R5-T11-properties","part":"R5","task":"R5-T11","caption":"Properties panel shows the written size: Diameter 315 on the main segment","assetId":"aaa064f683e275f1f5e9c2024bf010dd","url":"/_blob/aaa064f683e275f1f5e9c2024bf010dd"}
+{"seq":379,"at":"2026-10-18T15:01:27.364Z","type":"now","id":"R5-T15a","text":"R5-T15a, T15b, T16, T17 running"}
