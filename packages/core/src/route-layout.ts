@@ -155,6 +155,7 @@ function walkPolyline(points: readonly Vec2[], jogLeg: (cur: Vec2, b: Vec2) => V
     const dx = b.x - cur.x;
     const dy = b.y - cur.y;
     const drift = Math.min(Math.abs(dx), Math.abs(dy));
+    // The moved vertex shifts by the drift, below MIN_JOG_MM, so the MAX_DRIFT_MM test never fails.
     if (drift < MIN_JOG_MM && drift <= MAX_DRIFT_MM) {
       cur = Math.abs(dx) >= Math.abs(dy) ? { x: b.x, y: cur.y } : { x: cur.x, y: b.y };
       out.push(copyVec(cur));
