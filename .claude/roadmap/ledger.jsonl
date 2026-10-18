@@ -364,3 +364,7 @@
 {"seq":364,"at":"2026-10-18T11:50:52.189Z","type":"shot","id":"R5-T14a-error","part":"R5","task":"R5-T14a","caption":"Velocity 0: error line, Save disabled","assetId":"c70926cb1f1b16f5331cb12d357ec494","url":"/_blob/c70926cb1f1b16f5331cb12d357ec494"}
 {"seq":365,"at":"2026-10-18T11:50:52.335Z","type":"shot","id":"R5-T14b-water","part":"R5","task":"R5-T14b","caption":"Heating Water: kW, Water, velocity, pressure drop, delta T, notes, Use suggested values","assetId":"d6fc23558d2f81000c325defedf56ca1","url":"/_blob/d6fc23558d2f81000c325defedf56ca1"}
 {"seq":366,"at":"2026-10-18T11:50:52.490Z","type":"shot","id":"R5-T14b-suggested","part":"R5","task":"R5-T14b","caption":"After Use suggested values: 1 m/s, 200 Pa/m, delta T empty","assetId":"74c7a3b2b8bfa2b79d14585e77b1913c","url":"/_blob/74c7a3b2b8bfa2b79d14585e77b1913c"}
+{"seq":367,"at":"2026-10-18T11:51:15.038Z","type":"decision","id":"Q-R5-01","status":"answered","answer":"E","by":"user"}
+{"seq":368,"at":"2026-10-18T11:51:15.167Z","type":"decision","id":"Q-R5-02","status":"answered","answer":"B","by":"user"}
+{"seq":369,"at":"2026-10-18T11:51:15.311Z","type":"decision","id":"Q-R5-03","status":"answered","answer":"A","by":"user"}
+{"seq":370,"at":"2026-10-18T11:51:24.901Z","type":"now","id":"R5-T10b","text":"R5-T10b, T11, T12, T14c running (Q-R5-01 E, Q-R5-02 B, Q-R5-03 A answered)"}
