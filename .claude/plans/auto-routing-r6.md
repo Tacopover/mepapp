@@ -29,33 +29,33 @@ Terms (the terms of the overview and of the plans R2 to R5 apply; the plan uses 
 - **Plan**: the pure result of the planner. It is not stored. It holds the new items, the items to remove, the warnings and the numbers.
 - **Free angle**: a leg that is not a multiple of 45 degrees.
 
-## 0. Questions, provisional choices, and what blocks
+## 0. Questions (all answered) and provisional choices
 
-### Questions for the user (data model; the batch did not cover them)
+### Questions for the user (all answered by the user on 2026-10-18)
 
-Rule of the brief: a stored field or a changed meaning of a stored value that the batch did not cover is a question. The planner does not decide it. All questions have a recommendation. Tasks that wait for an answer are listed in section 6.
+Rule of the brief: a stored field or a changed meaning of a stored value that the batch did not cover is a question. The planner does not decide it. The user answered all five questions. The answers bind this plan. No task waits for an answer.
 
-- **Q-R6-01 [data model]. What value does `routedBy` hold?** D-R6-02 A names the two fields. It does not name the value. Options:
+- **Q-R6-01 [data model]. What value does `routedBy` hold?** ANSWERED B by the user: `routedBy?: 'route'`. D-R6-02 A names the two fields. The value is a literal text that names the command that made the item. The options were:
   - **A.** `routedBy?: true`. The smallest value.
   - **B.** `routedBy?: 'route'`. A literal text. It names the command that made the item. It reads clearly in a file and a later command can add a value.
-  - **C.** `routedBy?: { startStampId: string; startPortId: string }`. The mark holds the run key. A re-run then removes only the items of its own run, and does not depend on the walk. Cost: one id pair on every item, and the pair goes stale when the stamp is deleted or replaced.
-  - **Recommendation: B.** Reason: the walk (section 4.3, step 2) limits a re-run to one run. It follows marked segments through fittings only, and it crosses a stamp port only at the start port of the run. Every other stamp port is a leaf, so a terminal that two runs share, or a port group, cannot lead the walk into another run. A hand-drawn segment stops the walk. R6 never joins two runs (step 11). Only a hand edit can join them, and a hand segment stops the walk. So A and B are enough. C removes the remaining doubt by data, at the cost named above. The user decides.
-  - **Blocks:** T01, T02, T03, T12, and every task that depends on them (T13 and T14 to T26). **The director may use B provisionally**: the value is one constant (`ROUTED_MARK`) and one clean-up function. A change to A or C after the work started needs a new schema clean-up and a re-run of T01, T02 and T24.
-- **Q-R6-02 [data model: it sets what the stored mark means]. Which hand edit makes a routed segment a "hand-edited" one (the mark goes)?** D-R6-02 A says: "keeps hand-drawn or edited ones". The overview lists the paths (cascade, split, merge, drag, delete, paste, undo). It does not name an edit of a property in the Properties panel (size, shape, material). Options:
+  - **C.** `routedBy?: { startStampId: string; startPortId: string }`. The mark holds the run key. Not chosen. Cost: one id pair on every item, and the pair goes stale when the stamp is deleted or replaced.
+  - **Answer: B.** The walk (section 4.3, step 2) limits a re-run to one run. It follows marked segments through fittings only, and it crosses a stamp port only at the start port of the run. Every other stamp port is a leaf, so a terminal that two runs share, or a port group, cannot lead the walk into another run. A hand-drawn segment stops the walk. R6 never joins two runs (step 11).
+  - **Effect:** the value is one constant (`ROUTED_MARK = 'route'`) and one clean-up function. T01, T02, T03, T12 and every task that depends on them are unblocked.
+- **Q-R6-02 [data model: it sets what the stored mark means]. Which hand edit makes a routed segment a "hand-edited" one (the mark goes)?** ANSWERED A by the user (geometry edit only). D-R6-02 A says: "keeps hand-drawn or edited ones". The overview lists the paths (cascade, split, merge, drag, delete, paste, undo). It does not name an edit of a property in the Properties panel (size, shape, material). Options:
   - **A.** Only an edit of the geometry clears the mark: a drag of a fitting or a segment. A change of size, shape or material keeps the mark. A re-run then rebuilds the segment and loses the typed material. R5 already says "a size that you typed by hand is overwritten" (R5 P-R5-11).
   - **B.** Any edit of a segment in the Properties panel clears the mark of that segment.
   - **C.** Like A, and also a move of any stamp that a routed segment ends on clears the mark of that segment.
-  - **Recommendation: A.** Reason: the geometry is what the route command owns. A size is recalculated by "Size network". A move of a stamp is an edit of the stamp, not of the segment, and a re-run after a stamp move is the normal way to fix the route. The dialog counts what a re-run removes before it removes it.
-  - **Blocks:** T03.
-- **Q-R6-03 [data model; closes Q-R2-02]. Should a water port know its pipe side (flow or return)?** The library has one `heating-water` type and one `chilled-water` type for both pipes (`packages/core/src/network-type-library.ts:14`-`:15`). The R2 finder keeps, for a stamp with several open ports, the port that is nearest to the start port (`auto-routing-r2.md:190`-`:195`). With that rule the first run could take the return-side port of one radiator and the flow-side port of the next one, and the second run would get the opposite sides. Options:
+  - **Answer: A.** The geometry is what the route command owns. A size is recalculated by "Size network". A move of a stamp is an edit of the stamp, not of the segment, and a re-run after a stamp move is the normal way to fix the route. The dialog counts what a re-run removes before it removes it.
+  - **Effect:** T03 is unblocked.
+- **Q-R6-03 [data model; closes Q-R2-02]. Should a water port know its pipe side (flow or return)?** ANSWERED A by the user (first open port in the stamp port order, no stored side). The library has one `heating-water` type and one `chilled-water` type for both pipes (`packages/core/src/network-type-library.ts:14`-`:15`). The R2 finder keeps, for a stamp with several open ports, the port that is nearest to the start port (`auto-routing-r2.md:190`-`:195`). With that rule the first run could take the return-side port of one radiator and the flow-side port of the next one, and the second run would get the opposite sides. Options:
   - **A.** No stored pipe side, and a fixed side rule. R6 asks the finder for `portChoice: 'order'` (task T09a). On a stamp with more than one open port of the chosen type, the run takes the open port that comes first in the port order of the stamp (`getStampPorts`). The first run of a pair takes the first port of every radiator. The second run takes the remaining port. The sides then match across all terminals, also when the stamps are rotated differently, because the port order belongs to the stamp definition. The user decides which run is the flow and which is the return by the order of the runs. T09a has a test with 3 radiators.
   - **B.** A stored pipe side on the port or on the routing target. A new schema step.
-  - **Recommendation: A.** Reason: no new data, and the sides are the same on every terminal. The cost: the user, not the app, decides which pipe is which, and a definition with the ports in the wrong order puts flow on the return side everywhere (the user then runs the return first). A port group over the flow and return ports still joins the two pipes into one network and doubles the water power in the sizing (R5 R-11). The Route dialog keeps the R3 warning `group-same-type`.
-  - **Blocks:** nothing (A is the default). A change to B waits for the user.
-- **Q-R6-04 [behaviour, not data; it sets what the route does to the plan]. What does the route do with rooms that have no connected entry to the route area ("off-graph" rooms)?** On the first floor, 15 of 33 rooms have no wall with a corridor (R4 plan R-4). Options: **A.** Serve them with a free orthogonal connection from the nearest point of the route. The ducts cross unrelated rooms, with warnings. **B.** Serve only the reachable rooms. The ports of the other rooms stay open and the dialog lists the rooms (`rooms-skipped`). A switch in the dialog, off by default ("Also serve rooms outside the route area"), turns on the A behaviour for one run. **C.** Route through neighbour rooms (a new adjacency graph of all rooms; a later task, not in R6). **Recommendation: B.** Reason: no duct crosses an unrelated room unless the user asks, and the user sees which rooms were left. The switch gives A at no extra stored data. Provisional: the director may build B with the switch, because it is easy to change (one default value in the dialog state). **Blocks:** the default of the switch in T22 and the tests of T12 for the off-graph connection. T10 and T11 do not wait.
-- **Q-R6-05 [behaviour]. Two runs of the same network type through one corridor.** Both follow the same center line, so the second run lies on top of the first. Options: **A.** R6 places no lateral lane. The dialog shows one Note for the whole run ("This route runs on top of N segments of earlier runs. Move one run by hand."), not a warning on each leg. **B.** A lateral offset for each earlier run in the same corridor (a lane pitch of the duct width plus a gap). It needs the sizes and a new search, and it changes the straighten step. **Recommendation: A for R6.** Reason: B is a layout feature of its own. Provisional (easy to change): A. Not blocking.
+  - **Answer: A.** No new data, and the sides are the same on every terminal. The cost: the user, not the app, decides which pipe is which, and a definition with the ports in the wrong order puts flow on the return side everywhere (the user then runs the return first). A port group over the flow and return ports still joins the two pipes into one network and doubles the water power in the sizing (R5 R-11). The Route dialog keeps the R3 warning `group-same-type`.
+  - **Effect:** nothing waits. A change to B (a stored pipe side) is a later part.
+- **Q-R6-04 [behaviour, not data; it sets what the route does to the plan]. What does the route do with rooms that have no connected entry to the route area ("off-graph" rooms)?** ANSWERED A by the user. This replaces the earlier recommendation B (skip by default, with a switch). On the first floor, 15 of 33 rooms have no wall with a corridor (R4 plan R-4). **Answer: A.** Rooms with no connected entry to the route area ARE served. The planner joins each such room with a free orthogonal connection from the nearest point of the built route. The ducts cross unrelated rooms, with warnings (`room-off-graph`, `wall-crossings`). There is no switch in the dialog. The warning lists the off-graph rooms. `rooms-skipped` stays only for a room that cannot be served at all: a room is skipped when both orthogonal layouts of its connection (first axis x and first axis y) would join an item of another network type (the foreign check of T13). Its ports then stay open and the plan lists the room. A room with no target port is not "skipped": it has nothing to serve. C (route through neighbour rooms) is a later part, not in R6. **Effect:** the off-graph connection is the default behaviour. T12 builds it with its tests. T22 has no switch.
+- **Q-R6-05 [behaviour]. Two runs of the same network type through one corridor.** ANSWERED A by the user. Both follow the same center line, so the second run lies on top of the first. **Answer: A.** R6 places no lateral lane. The dialog shows one Note for the whole run ("This route runs on top of N segments of earlier runs. Move one run by hand."), not a warning on each leg. If two runs overlap during the tests, the director must alert the user (a message to the user, not only a line on the dashboard). B (a lateral offset for each earlier run) is a layout feature of its own and is not in R6. Nothing waits.
 
-### Provisional choices (easy to reverse; the director takes them without a stop)
+### Provisional choices (easy to reverse; the director takes them without a stop). The five questions above are not provisional.
 
 | Id | Choice | Reason |
 |---|---|---|
@@ -66,7 +66,7 @@ Rule of the brief: a stored field or a changed meaning of a stored value that th
 | P-R6-DIAG | A pair of polyline vertices that is already an exact 45 degree diagonal stays one 45 degree leg. Orthogonal first applies to a pair that is not aligned. | A diagonal corridor stays a diagonal run. |
 | P-R6-TREE | The trunk is a Steiner tree built with the heuristic of Takahashi and Matsuyama on the R4 graph. The room spine is the same heuristic on the Hanan grid of the room. Tie-breaks use ids and coordinates, so the same input gives the same output. | A known heuristic with a proven bound (section 3). It is simple. The optimal tree is NP-hard (section 3). |
 | P-R6-ENTRY | A served room uses its `primary` entry (`route-area.ts`, `RouteEntry.primary`). If the graph part of the primary entry is not connected to the start, the room tries its other entries in the order of their run length. If none connects, the room is "off graph" (P-R6-OFFGRAPH). | R4 plan section 8 says R6 uses the primary entry. |
-| P-R6-OFFGRAPH | Q-R6-04 B (provisional). A served room with no connected entry is "off graph". By default the planner skips it, its ports stay open, and the plan lists it in `rooms-skipped` (info). The dialog switch "Also serve rooms outside the route area" (off by default, not stored, input `includeOffGraph`) joins such a room with a free orthogonal path from the nearest point of the built route (the "off graph connection"). The path is checked with `crossingsAlongPath`. The plan then shows `room-off-graph` and `wall-crossings`, both at warning level. A port in no room (the R2 check box "include ports outside rooms" is on) and a port that the room spine cannot reach inside its room use the same connection, whatever the switch says, because the user chose them. The user removes a room from the run with the R2 room list (section 4.6). | R4 found that 15 of 33 rooms on the first floor have no wall with a corridor (R4 plan R-4). A duct that crosses unrelated rooms must be a choice of the user. |
+| P-R6-OFFGRAPH | Q-R6-04 A (answered). A served room with no connected entry is "off graph". The planner serves it: it joins the room with a free orthogonal path from the nearest point of the built route (the "off graph connection"). The path is checked with `crossingsAlongPath`. The plan shows `room-off-graph` (the list of rooms) and `wall-crossings`, both at warning level. There is no dialog switch and no input `includeOffGraph`. A room is skipped (`rooms-skipped`, info) only when both orthogonal layouts of its connection (first axis x, first axis y) would join an item of another network type. A port in no room (the R2 check box "include ports outside rooms" is on) and a port that the room spine cannot reach inside its room use the same connection. The user removes a room from the run with the R2 room list (section 4.6). | R4 found that 15 of 33 rooms on the first floor have no wall with a corridor (R4 plan R-4). The user chose to serve them, with warnings. |
 | P-R6-EXTEND | If the start port already has exactly one segment that is not routed, and its far end is a fitting, the route starts at that fitting. The hand-drawn stub stays and keeps its size. The walk of a re-run starts at the same fitting (step 2), so a re-run of an extended run removes the routed part and builds it again. The overview open question "lock a drawn main" is answered this way for the stub at the start port only. | Reuse of the R3 start check (a start port with one segment is a normal case, `route-start.ts:76`-`:80`). It costs no data. |
 | P-R6-KIND | A new fitting gets the kind `elbow` (2 segments), `tee` (3 segments) or `cross` (4 segments). The tool makes `junction` only (`drawSegmentTool.ts:160`). The kind has no effect on drawing today (a search of `packages/render/src` finds `fitting.kind` only in `scene.ts:1416`). | A closer match to the real fitting. The user can change the kind in Properties (`PropertiesPanel.tsx:40`). |
 | P-R6-SEG | Each leg is one segment with a two-point geometry, as the tool makes it. A node of degree 2 on a straight line has no fitting (the legs merge). | `mergeSegmentsAtFitting` expects two-point segments (`segmentTool.ts:130`-`:161`). |
@@ -76,7 +76,7 @@ Rule of the brief: a stored field or a changed meaning of a stored value that th
 | P-R6-MM | The planner works in millimetres. It converts a page point with `mmPerPt = 1 / pageUnitsPerRealUnit` (`calibration.ts:56`) and converts back at the end. All thresholds are in millimetres. | Angles do not change under a uniform scale. |
 | P-R6-PEN | Bend penalty `BEND_PENALTY_MM = 500` and crossing penalty `CROSSING_PENALTY_MM = 1000` in the search on the Hanan grid. The penalties choose between paths of similar length. The reported length is the real length. | Fewer bends and fewer crossings look better. Planner values, not from a source. |
 | P-R6-STEP | Samples along a path for region and wall tests are every 100 mm (the step of `crossingsAlongPath`, `route-crossings.ts:51`). A sample is "inside" a room when it is inside the polygon or within `REGION_TOL_MM = 150` of its boundary. For a trunk edge that holds a `wall` node (a link, `rl-`), a sample is also "inside" within `WALL_GAP_MM = 750` (the R4 limit `DEFAULT_MAX_WALL_MM = 600` plus the tolerance) of that wall node. | The skeleton pixel is 100 mm. The tolerance covers the half pixel and the wall thickness error of the polygon. A link joins two route-area rooms through a wall gap of up to 600 mm (`route-area.ts:9`), so a leg through a link leaves both polygons for that gap. |
-| P-R6-LANE | R6 places no lateral lane for a second run in the same corridor (Q-R6-05 A). | A layout feature of its own. |
+| P-R6-LANE | R6 places no lateral lane for a second run in the same corridor (Q-R6-05 A, answered). If two runs overlap during the tests, the director alerts the user. | A layout feature of its own. |
 | P-R6-GRAVITY | R6 refuses a gravity network type (`sanitary-waste`, `GRAVITY_TYPE_IDS`, `routePlan.ts:4`) with the error `gravity-not-routed`: "Drains need a slope. R6 does not route drains." | A drain needs a fall, and a 2D draft has no height. Forced 45 degree joints and a no-slope warning are a later feature. |
 | P-R6-TAP | A tap sits on an axis leg of the trunk. When the nearest trunk leg is a 45 degree leg, the tap moves to the nearest axis leg of the same trunk edge. Two taps on one leg are at least `MIN_LEG_MM` apart (the later tap moves along the leg, away from the earlier one). | A tee on a diagonal needs a special fitting. Two tees closer than 300 mm have no room. Planner value. |
 | P-R6-SHORT | After sizing, a leg shorter than 2 diameters (the larger side for a rectangular segment) gives the warning `short-leg` with the count. | A fitting needs about 2 diameters of run (planner value, not verified in a catalogue). |
@@ -150,7 +150,7 @@ What MepApp can use: our own code for the Steiner tree, the Hanan grid, the jog 
 
 ### 4.1 Stored data (schema step 21)
 
-R6 stores two new optional fields. The type of the value waits for Q-R6-01. This plan writes the recommended value (B).
+R6 stores two new optional fields. The value is the literal text `'route'` (Q-R6-01 B, answered).
 
 ```ts
 // packages/core/src/network.ts
@@ -222,7 +222,6 @@ export interface RouteBuildInput {
   rooms: readonly Room[];
   area: RouteArea;                             // from computeRouteArea (R4)
   mmPerPt: number | null; pageIndex: number;
-  includeOffGraph: boolean;                    // Q-R6-04; default false
   limits?: SizingSettings;                     // the saved limits of the run key, or undefined
   newSegmentId: () => string; newFittingId: () => string;
 }
@@ -282,7 +281,7 @@ The planner runs these steps in order. A step that finds an `error` warning stop
    4. After the pair step, the planner joins collinear legs.
    5. The path is tested with the region test. If one sample is outside, the planner tries the same pair again with the per-vertex path (rule 2 applied to each pair of the original polyline, not to the whole displacement). If a sample is still outside, the original polyline is kept as a free-angle path: the result has `free: true`, and the plan gets one `free-angle` warning with the points.
    The result is a trunk of axis and diagonal legs. The trunk nodes (the junctions of the tree) keep their positions after the walk.
-8. **The start leg and the off-graph connections.** The start leg joins the start point to the trunk root. A served room that is off graph (no connected entry): when `includeOffGraph` is false, the planner skips it, its ports stay open, and `rooms-skipped` (info) lists it. When `includeOffGraph` is true, or for a port in no room, the leg joins the nearest point of the built route to the target point. Each leg is `elbowPath` with the first axis chosen as the longer side, then `applyJogRule`. The leg is not tested against the region (it may cross rooms by design). It is tested with `crossingsAlongPath` (step 10). Each off-graph room adds its id to `room-off-graph`.
+8. **The start leg and the off-graph connections.** The start leg joins the start point to the trunk root. A served room that is off graph (no connected entry) is always served (Q-R6-04 A): for such a room, and for a port in no room, the leg joins the nearest point of the built route to the target point. The planner skips a room only when both orthogonal layouts of its connection (first axis x, first axis y) would join an item of another network type (step 12): the room goes to `rooms-skipped` (info) and its ports stay open. Each leg is `elbowPath` with the first axis chosen as the longer side, then `applyJogRule`. The leg is not tested against the region (it may cross rooms by design). It is tested with `crossingsAlongPath` (step 10). Each off-graph room adds its id to `room-off-graph`.
 9. **The branches (D-R6-01 B).** For each served room with an entry on the trunk:
    1. Find the nearest trunk leg to the entry point `E`. If it is a 45 degree leg, take the nearest axis leg of the same trunk edge instead (P-R6-TAP). The tap `T` is the projection of `E` on that leg along the axis that gives the smaller distance. If `T` lies less than `MIN_LEG_MM` from a vertex of the leg, `T` moves along the leg to `MIN_LEG_MM` from that vertex, or to the vertex when the leg is shorter than `2 * MIN_LEG_MM`. Two taps on one leg are at least `MIN_LEG_MM` apart: the tap that comes later in the order of the room ids moves along the leg, away from the earlier tap.
    2. The branch path from `T` to `E` is a straight leg when `T` and `E` share an axis coordinate. Else it is `jogPath(T, E)` with the jog rule.
@@ -321,7 +320,7 @@ planRoute(input: RouteRequest): RoutePlanView                 // read-only: adop
 applyRoute(plan: PlannedRoute, options: { size: boolean }): { segments: number; fittings: number; removedSegments: number; removedFittings: number } | null
 setRoutePreview(plan: PlannedRoute | null): void             // overlay only; cleared on pageChanged and documentActivated
 // RouteRequest = { startStampId, startPortId, networkTypeId,
-//   scope: RouteScope, includeOutsideRooms: boolean, portsPerStamp: 'one' | 'all', includeOffGraph: boolean }
+//   scope: RouteScope, includeOutsideRooms: boolean, portsPerStamp: 'one' | 'all' }
 //   (the scope inputs of RoutePortsInput in route-ports.ts:38, WITHOUT stamps: the scene supplies them)
 // RoutePlanView = { status, plan, networkTypeName, flowUnit, hasLimits, portsAfterRemoval: number }
 ```
@@ -341,7 +340,7 @@ setRoutePreview(plan: PlannedRoute | null): void             // overlay only; cl
 - `route-build-remove`: the removal line.
 - `route-build-lines`: one `route-build-line-<code>` for each warning, with `data-severity` and the label Error, Warning or Note (`routeText('en', 'severityError' ...)`, the markup of `RouteDialog.tsx:252`). A fire hint line goes with `wall-crossings` and `shaft-crossing` (the R4 hint, `warnWallCrossingsHint`).
 - The rooms and stamps of the run come from the R2 scope (`route-scope`, `route-room`, `route-outside`, `route-all-ports` of `RouteDialog.tsx:263`-`:364`). R6 adds no room list. The dialog passes the scope to `planRoute` as `RouteRequest`.
-- `route-build-offgraph`: the check box "Also serve rooms outside the route area" (off by default, kept in the dialog state only, Q-R6-04). With it off, the Note `rooms-skipped` lists the rooms that are left.
+- There is no off-graph switch (Q-R6-04 A). The Warning `room-off-graph` lists the off-graph rooms that the route serves. The Note `rooms-skipped` lists only the rooms that cannot be served at all.
 - `route-build-size`: the check box "Size the network after routing". It shows only when limits exist. Default on.
 - `route-place`: the button "Place route". It is disabled when the status is `refused`, when no segment is planned, or while the plan is pending.
 - `route-build-result`: after Place, "Placed {segments} segments and {fittings} fittings." The dialog stays open.
@@ -359,8 +358,7 @@ setRoutePreview(plan: PlannedRoute | null): void             // overlay only; cl
 | `buildRemove` | "This run removes {segments} routed segments and {fittings} fittings. Hand-drawn segments stay." |
 | `buildExtends` | "The route starts at the end of a hand-drawn segment. That segment stays." |
 | `buildPortsAfter` | "After the removal, {n} ports are open for this run." |
-| `buildOffGraph` | "Also serve rooms outside the route area" |
-| `noteRoomsSkipped` | "{count} rooms have no way into the route area. Their ports stay open." |
+| `noteRoomsSkipped` | "{count} rooms cannot be joined without joining another network. Their ports stay open." |
 | `noteSharesLane` | "This route runs on top of {count} segments of earlier runs. Move one run by hand." |
 | `noteHandKept` | "{count} hand-drawn segments of this network keep their size." |
 | `errGravity` | "Drains need a slope. R6 does not route drains." |
@@ -379,7 +377,7 @@ setRoutePreview(plan: PlannedRoute | null): void             // overlay only; cl
 | `warnWalls` | "{count} walls are crossed by the route. The places are marked." |
 | `warnWallsHint` | "Corridor and shaft walls are often fire rated. Check them. A duct needs a fire damper there. A pipe or cable tray needs a firestop." (131 characters; extends the R4 text) |
 | `warnShaft` | "The route crosses the wall of the shaft {room} {count} times." |
-| `warnOffGraph` | "{count} rooms are outside the route area. Their branches cross more walls." |
+| `warnOffGraph` | "{count} rooms are outside the route area. Their branches cross more walls: {rooms}." |
 | `warnPortsLeft` | "{count} ports could not be reached. They stay open." |
 | `warnCrossings` | "The route crosses {count} existing segments. Check the clearances." |
 | `warnOverlap` | "The route runs on top of {count} existing segments." |
@@ -461,9 +459,9 @@ Phases: **A** the mark (T01 to T03; T14 runs right after T01), **B** the layout 
 
 | Task | Title | Depends on | Waits for | Files (main) |
 |---|---|---|---|---|
-| T01 | The mark: type, schema step 21, clean-up | none | Q-R6-01 | `network.ts`, `project.ts`, `project.test.ts` |
-| T02 | Mark rules in core: merge, paste, the walk, the clear helper | T01 | Q-R6-01 | `segmentTool.ts`, `segmentPaste.ts`, `route-marks.ts`, tests |
-| T03 | The hand drag clears the mark; browser check | T02, T14 | Q-R6-01, Q-R6-02 | `selectTool.ts`, `scene.ts`, `r6-t03-check.mjs` |
+| T01 | The mark: type, schema step 21, clean-up | none | none | `network.ts`, `project.ts`, `project.test.ts` |
+| T02 | Mark rules in core: merge, paste, the walk, the clear helper | T01 | none | `segmentTool.ts`, `segmentPaste.ts`, `route-marks.ts`, tests |
+| T03 | The hand drag clears the mark; browser check | T02, T14 | none | `selectTool.ts`, `scene.ts`, `r6-t03-check.mjs` |
 | T04 | Move `resolveAngleSnap` to core; layout classes | none | none | `angle-snap.ts`, `route-layout.ts`, `tools/angleSnap.ts`, `index.ts` |
 | T05 | Jog rule and path builders | T04 | none | `route-layout.ts`, `route-layout.test.ts` |
 | T06 | `straightenPolyline` with the region test | T05 | none | `route-layout.ts`, `route-layout.test.ts` |
@@ -473,28 +471,28 @@ Phases: **A** the mark (T01 to T03; T14 runs right after T01), **B** the layout 
 | T09 | Planner part 1: input, preconditions, groups, start (takes `removal` as input, does not call T02) | T04, T07 | none | `route-build.ts`, `route-plan-warnings.ts`, tests |
 | T10 | Planner part 2: the trunk | T06, T07, T09 | none | `route-build.ts` or `route-trunk.ts`, tests |
 | T11 | Planner part 3: branches and spines | T08, T10 | none | `route-branch.ts`, tests |
-| T12 | Planner part 4: off-graph, topology, items, marks | T02, T11 | Q-R6-01, Q-R6-04 | `route-topology.ts`, `route-build.ts`, tests |
-| T13 | Planner part 5: collisions, foreign check, invariant | T12 | Q-R6-01 | `route-checks.ts`, `route-build.ts`, tests |
-| T15 | Planner part 6: real crossings, shaft, capacity, sizes | T12 | Q-R6-01 | `route-plan-warnings.ts`, `route-build.ts`, tests |
-| T16 | The chain on real rooms (test only) and the re-run | T13, T15, T02 | Q-R6-01 | `route-run.test.ts` |
-| T14 | Browser setup `r6-lib.mjs` (move it early: it needs T01 only) | T01 | Q-R6-01 | `.claude/roadmap/browser/r6-lib.mjs` |
-| T17 | Scene: `planRoute` and the preview layer | T16, T14, T09a | Q-R6-01 | `scene.ts`, `routePreviewLayer.ts`, `index.ts` |
-| T18 | Scene: `applyRoute` | T14, T17 | Q-R6-01 | `scene.ts`, `r6-t18-check.mjs` |
-| T19 | Scene browser check: undo, adoption, networks | T18 | Q-R6-01 | `r6-t19-check.mjs` |
+| T12 | Planner part 4: off-graph, topology, items, marks | T02, T11 | none | `route-topology.ts`, `route-build.ts`, tests |
+| T13 | Planner part 5: collisions, foreign check, invariant | T12 | none | `route-checks.ts`, `route-build.ts`, tests |
+| T15 | Planner part 6: real crossings, shaft, capacity, sizes | T12 | none | `route-plan-warnings.ts`, `route-build.ts`, tests |
+| T16 | The chain on real rooms (test only) and the re-run | T13, T15, T02 | none | `route-run.test.ts` |
+| T14 | Browser setup `r6-lib.mjs` (move it early: it needs T01 only) | T01 | none | `.claude/roadmap/browser/r6-lib.mjs` |
+| T17 | Scene: `planRoute` and the preview layer | T16, T14, T09a | none | `scene.ts`, `routePreviewLayer.ts`, `index.ts` |
+| T18 | Scene: `applyRoute` | T14, T17 | none | `scene.ts`, `r6-t18-check.mjs` |
+| T19 | Scene browser check: undo, adoption, networks | T18 | none | `r6-t19-check.mjs` |
 | T20 | Texts and line builders | T15 | none | `routeBuildPlan.ts`, `routeBuildPlan.test.ts` |
 | T21 | Dialog: preview section | T17, T20 | none | `RouteBuildSection.tsx`, `RouteDialog.tsx`, `theme.css` |
-| T22 | Dialog: off-graph switch, sizing check box, Place, result | T18, T21 | Q-R6-01, Q-R6-04 | `RouteBuildSection.tsx`, `routeBuildPlan.ts`, `r6-t22-check.mjs` |
-| T23 | Re-run, edits and paste (browser) | T03, T22 | Q-R6-01, Q-R6-02 | `r6-t23-check.mjs` |
-| T24 | Save, load and PDF round trip (browser) | T22 | Q-R6-01 | `r6-t24-check.mjs` |
-| T25 | Water, extension, foreign type (browser) | T22 | Q-R6-01 | `r6-t25-check.mjs` |
-| T26 | The part check | all | Q-R6-01, Q-R6-02, Q-R6-04 | `.claude/roadmap/browser/r6-check.mjs` |
+| T22 | Dialog: sizing check box, Place, result | T18, T21 | none | `RouteBuildSection.tsx`, `routeBuildPlan.ts`, `r6-t22-check.mjs` |
+| T23 | Re-run, edits and paste (browser) | T03, T22 | none | `r6-t23-check.mjs` |
+| T24 | Save, load and PDF round trip (browser) | T22 | none | `r6-t24-check.mjs` |
+| T25 | Water, extension, foreign type (browser) | T22 | none | `r6-t25-check.mjs` |
+| T26 | The part check | all | none | `.claude/roadmap/browser/r6-check.mjs` |
 
-**Order for the director.** Only these tasks can run without an answer: **T04 to T11, T09a and T20** (T20 reads only the plan shape of the warning codes; it needs T15 for its final field names, so it runs last of this group or after T15 with the answer). T01 and every task that writes or reads the mark wait for Q-R6-01: T01, T02, T03, T12 and, because they depend on those, T13, T14, T15, T16 and T17 to T26. If the user has not answered when T12 is next, the director stops the part at T12. **The director may use answer B of Q-R6-01 (`'route'`) and the recommendations of Q-R6-02 (A) and Q-R6-04 (B) provisionally** and record them on the dashboard. A later change of Q-R6-01 costs the re-run of T01, T02 and T24. The task numbers T14 and T15 are out of order on purpose: run T14 right after T01 (it needs T01 only), because T03 and T17 need it for their browser checks.
+**Order for the director.** All five questions are answered (Q-R6-01 B, Q-R6-02 A, Q-R6-03 A, Q-R6-04 A, Q-R6-05 A). No task waits for an answer and the stop rule at T12 is gone. T01 to T03, T12 and T14 onward are unblocked. T09 to T11 are in progress and keep their order. Tasks follow the dependency column. T20 reads only the plan shape of the warning codes; it needs T15 for its final field names, so it runs after T15. If two runs overlap during the tests (Q-R6-05 A), the director alerts the user. The task numbers T14 and T15 are out of order on purpose: run T14 right after T01 (it needs T01 only), because T03 and T17 need it for their browser checks.
 
 Jobs on the same file run one after another, in the order of the task numbers (T14 after T01, T15 after T13): T05 and T06 (`route-layout.ts`); `route-build.ts` in T09, T10, T12, T13, T15; `route-plan-warnings.ts` in T09 and T15; T17 and T18 (`scene.ts`); T21 and T22 (`RouteBuildSection.tsx`). `packages/core/src/index.ts` is a shared file: each task adds its export lines, one task after another. T07 runs in parallel with T04 to T06. T20 runs in parallel with T17 to T19.
 
 ### T01. The mark: type, schema step 21, clean-up
-- **Depends on:** none. **Waits for Q-R6-01.**
+- **Depends on:** none.
 - **Files:** `packages/core/src/network.ts`, `packages/core/src/project.ts`, `packages/core/src/project.test.ts`, `packages/core/src/group-networks.test.ts` (lines 74-75 expect schema 20), `packages/core/src/index.ts`. The implementer searches `packages` for other tests that name 20 (`grep -rn "schemaVersion\|CURRENT_SCHEMA_VERSION"`).
 - **Shapes:** section 4.1. `RoutedMark`, `ROUTED_MARK`, the optional field on `Segment` and `Fitting`. `CURRENT_SCHEMA_VERSION = 21`. The step `{ fromVersion: 20, toVersion: 21, ... }` with a comment in the style of the step 19 to 20 (`project.ts:320`-`:330`). `withCleanRoutedMark(item)` for segments and fittings in `loadProject`.
 - **Must not touch:** the other steps, `serializeProject`, the scene, `networkSizing`.
@@ -503,7 +501,7 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Size:** about 30 lines and 60 of tests.
 
 ### T02. Mark rules in core: merge, paste, the walk, the clear helper
-- **Depends on:** T01. **Waits for Q-R6-01.**
+- **Depends on:** T01.
 - **Files:** `packages/core/src/segmentTool.ts`, `packages/core/src/segmentPaste.ts`, `packages/core/src/route-marks.ts` (new), their tests, `index.ts`.
 - **Shapes:** section 4.2 `routedRunOf`, `clearRoutedMarks`. `mergeSegmentsAtFitting` keeps `routedBy` only when `first` and `second` both have it. `pasteSegments` deletes `routedBy` from each pasted segment. `routedRunOf(state, startStampId, startPortId)` walks as step 2 of section 4.3 says. It returns sorted ids.
 - **Must not touch:** `splitSegmentAtFitting` (it keeps the mark by the spread; a test pins it), `computeNetworks`.
@@ -512,7 +510,7 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Size:** about 80 lines and 120 of tests.
 
 ### T03. The hand drag clears the mark; browser check
-- **Depends on:** T02, T14. **Waits for Q-R6-01 and Q-R6-02.**
+- **Depends on:** T02, T14. **Waits for nothing (Q-R6-01 and Q-R6-02 are answered).**
 - **Files:** `packages/render/src/tools/selectTool.ts`, `packages/render/src/scene.ts` (only if the tool needs a scene call), `r6-t03-check.mjs` (work folder).
 - **What it changes:** at the drag site (`selectTool.ts:176`-`:197`), after `applyConnectivityCascade`, clear `routedBy` on each fitting in `fittingOriginals` (the fittings that the drag moves) and on each segment attached to one of them (`segmentsAtFitting`). It does not clear a segment whose geometry changed because a stamp port moved. The implementer reads the drag code first and reports the exact place. A move of a stamp keeps the marks (P-R6-MOVE).
 - **Must not touch:** the cascade, `recomputeAttachedSegments`, the stamp move code.
@@ -601,11 +599,11 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Size:** about 120 lines and 110 of tests.
 
 ### T12. Planner part 4: off-graph, topology, items, marks
-- **Depends on:** T02, T11. **Waits for Q-R6-01.**
+- **Depends on:** T02, T11.
 - **Files:** `packages/core/src/route-topology.ts` (new), `packages/core/src/route-build.ts`, tests.
 - **Shapes:** steps 8 and 11. The off-graph connection (`elbowPath` + jog rule from the nearest point of the built route). The graph of all planned paths: merge equal vertices (within 1e-6 mm), split a leg at a vertex that lies on it, remove a degree-2 node on a straight line, give each remaining node a fitting kind, make the segments with the endpoints, the sizes, the page and the mark. The ids come from the factories in the order: fittings sorted by (x, y), then segments sorted by the pair of end ids.
 - **Must not touch:** the mark constant (it comes from T01).
-- **Tests (core):** the 4-grille room with the trunk of section 4.7 gives 6 new segments, 3 new fittings (the tee on the trunk, a cross and a tee in the room) and no fitting on a port; off graph: with `includeOffGraph` false a room with no connected entry is skipped, listed in `rooms-skipped`, and its ports are not in the plan; with it true the room gets an off-graph connection and `room-off-graph` shows; a Heating Water run gets `diameter` 25 on each new segment, a Supply Air run 200; a Y junction gives a `tee`; four legs at a point give a `cross`; a bend gives an `elbow`; two collinear legs merge with no fitting; every planned item has `routedBy`; the end of the first segment is the start port `{ kind: 'port', ... }`; the ends at target ports use the port; no planned item has the id of an existing item; the ids are the same for the same input and counters; every planned leg is an `axis` or a `diagonal` leg except those in `free-angle`; the sum of the segment lengths equals the sum of the path lengths within 1e-6.
+- **Tests (core):** the 4-grille room with the trunk of section 4.7 gives 6 new segments, 3 new fittings (the tee on the trunk, a cross and a tee in the room) and no fitting on a port; off graph (the default): a room with no connected entry gets an off-graph connection from the nearest point of the built route, `room-off-graph` lists it (Warning) and its ports are in the plan; hand value: trunk leg on `y = 0` from `x = 0` to `x = 10000`, room entry-less with one port at `(4000, 3000)`: the nearest point is `(4000, 0)` and the connection is one vertical leg of 3000 mm with a tee on the trunk; each wall that `crossingsAlongPath` finds on the connection adds one to the `wall-crossings` count; a second room that sits behind a foreign-type segment on both layouts is skipped, listed in `rooms-skipped`, and its ports are not in the plan; a room with no target port is not listed; a Heating Water run gets `diameter` 25 on each new segment, a Supply Air run 200; a Y junction gives a `tee`; four legs at a point give a `cross`; a bend gives an `elbow`; two collinear legs merge with no fitting; every planned item has `routedBy`; the end of the first segment is the start port `{ kind: 'port', ... }`; the ends at target ports use the port; no planned item has the id of an existing item; the ids are the same for the same input and counters; every planned leg is an `axis` or a `diagonal` leg except those in `free-angle`; the sum of the segment lengths equals the sum of the path lengths within 1e-6.
 - **Verify:** core tests; `pnpm build`.
 - **Size:** about 140 lines and 130 of tests.
 
@@ -628,21 +626,21 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Size:** about 100 lines and 110 of tests.
 
 ### T16. The chain on real rooms (test only) and the re-run
-- **Depends on:** T13, T15, T02. **Waits for Q-R6-01.**
+- **Depends on:** T13, T15, T02.
 - **Files:** `packages/core/src/route-run.test.ts` (new). No product code, unless the test finds a defect (then the lead reports it and adds a task).
 - **What it does:** it loads the first floor with `loadFirstFloorRooms` (`route-area-fixture.testutil.ts`), computes the route area, builds a start stamp in the largest corridor and one target port in each served room (the label point), and runs `planRoute`. It prints and asserts: (1) every plan leg is a layout leg except those in `free-angle`; the share of free legs by length is under 5 % (the measured value is printed and the floor is set from it, as R4 T12 did); (2) every port that the plan connects is reached by a walk over the planned items; (3) `internal-join` does not fire; (4) the total `wall-crossings` count is printed and compared to the number of served rooms with an entry (each should be about 1, the R4 consistency of 16 of 18 is the reference); (5) the time of `planRoute` is printed (limit 500 ms); (6) the re-run: apply the plan to a state, run `routedRunOf`, compute the target ports on the reduced state (with `portChoice: 'order'`), run `planRoute` with that `removal`: the new plan has the same counts as the first and the removal set equals the first plan's items; the same with a hand-drawn stub at the start port (the stub case of section 4.7); (7) a hand-drawn segment added on a routed fitting stays after the re-run and the fitting stays; (8) the plan does not change the input (deep equal). The test prints each failing room for review. A floor below 50 % of any share is a defect to send back.
 - **Verify:** core tests; `pnpm build`.
 - **Size:** about 150 lines of tests.
 
 ### T14. Browser setup `r6-lib.mjs`
-- **Depends on:** T01. **Waits for Q-R6-01** (it writes the mark in the setup of T03).
+- **Depends on:** T01. **Waits for nothing** (it writes the mark in the setup of T03).
 - **Files:** `.claude/roadmap/browser/r6-lib.mjs` (new).
 - **Shapes:** it imports `lib.mjs`, `r4-lib.mjs` (`setupRooms`, `screenOf`, `baseline`, `sameAsBaseline`) and `r5-lib.mjs`. `buildRoutingProject(t, { type, targets, capacities })`: detects rooms on the first floor (scale `50`), sets the corridor type, makes an equipment stamp with the port `out` in the largest corridor, makes one terminal stamp with the routing target for each of `targets` rooms (the label point of the room, the port `in`), adopts the network type, writes capacities, and loads the project with `loadProjectFromJson`. `buildRoutedSample(t)`: a small routed run with marks written by the scene API (for T03 only). Helpers: `exportRun(page)`, `legAngles(page)` (the independent angle test), `reachFromStart(page)` (the independent union-find walk), `markedIds(page)`.
 - **Verify:** a small check `r6-t14-check.mjs` that builds the project and prints the counts. No product code.
 - **Size:** about 150 lines.
 
 ### T17. Scene: `planRoute` and the preview layer
-- **Depends on:** T16, T14, T09a. **Waits for Q-R6-01.**
+- **Depends on:** T16, T14, T09a.
 - **Files:** `packages/render/src/scene.ts`, `packages/render/src/routePreviewLayer.ts` (new), `packages/render/src/index.ts`, `r6-t17-check.mjs` (work folder).
 - **Shapes:** section 4.5. `planRoute` takes the scope inputs of the dialog (not a port list), computes `routedRunOf`, builds `S'` with its `portSegmentTypes`, calls `findRoutePorts` with `portChoice: 'order'`, and calls the core planner with counters that it does not advance. `setRoutePreview` draws in `redrawOverlay`. The preview is never dirty.
 - **Must not touch:** `serializeDocument`, the PDF export, `applyNetworkSizes`.
@@ -650,7 +648,7 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Size:** about 120 lines.
 
 ### T18. Scene: `applyRoute`
-- **Depends on:** T14, T17. **Waits for Q-R6-01.**
+- **Depends on:** T14, T17.
 - **Files:** `packages/render/src/scene.ts`, `r6-t18-check.mjs` (work folder).
 - **Shapes:** section 4.5. One `Transaction` named "Route network". `adoptNetworkTypes` first. The invariant check before the commit. The optional sizes. The emits. The removed ids leave `doc.selectedIds` (a check selects a routed segment, runs again, and `getSelection()` holds no removed id).
 - **Must not touch:** the plan function, `applyNetworkSizes`.
@@ -658,7 +656,7 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Size:** about 70 lines.
 
 ### T19. Scene browser check: undo, adoption, networks
-- **Depends on:** T18. **Waits for Q-R6-01.**
+- **Depends on:** T18.
 - **Files:** `r6-t19-check.mjs` (work folder).
 - **What it checks:** (1) rule 4: a project whose `networkTypes` is empty, with `supply-air` as the routing target: after `applyRoute`, `exportProject().networkTypes` holds `supply-air` and a screenshot shows the line in the library color, not the default; (2) rule 1/2: a second network of another type is drawn before the run, touching the corridor in 2D; after the run, the independent union-find gives the old network unchanged (same segment ids) and the new run as one network; (3) a foreign segment on the start port gives `refused` with `port-foreign-type` and writes nothing; (4) a stub case: a hand-drawn stub at the start port is kept and the route starts at its far end; (5) `planRoute` twice gives equal plans (ids and counts); (6) no page error.
 - **Size:** about 120 lines of check.
@@ -680,15 +678,15 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Verify:** UI tests (the pure parts); `pnpm build`. The browser steps run in T22 (the dialog opens through the real menu item that exists).
 - **Size:** about 110 lines.
 
-### T22. Dialog: off-graph switch, sizing check box, Place, result
-- **Depends on:** T18, T21. **Waits for Q-R6-01 and Q-R6-04** (the default of the switch; the director may use B provisionally).
+### T22. Dialog: sizing check box, Place, result
+- **Depends on:** T18, T21.
 - **Files:** `packages/ui/src/components/RouteBuildSection.tsx`, `packages/ui/src/components/routeBuildPlan.ts`, `theme.css`, `r6-t22-check.mjs` (work folder).
-- **What it adds:** `route-build-offgraph` (the check box, off by default; it feeds `includeOffGraph`), `route-build-size` (shown when `getNetworkSizing` returns an entry for the run key; default on), `route-place`, `route-build-result`. Place calls `scene.applyRoute(plan, { size })` and then shows the result line. A second press of Place is possible after a change (the plan is recalculated and now removes the routed items of the first press).
+- **What it adds:** `route-build-size` (shown when `getNetworkSizing` returns an entry for the run key; default on), `route-place`, `route-build-result`. Place calls `scene.applyRoute(plan, { size })` and then shows the result line. A second press of Place is possible after a change (the plan is recalculated and now removes the routed items of the first press).
 - **Must not touch:** the plan, the scene.
 - **Verify:** UI tests; `pnpm build`. Browser check `r6-t22-check.mjs` through real clicks and typing (menu item `^\s*Route network…\s*$`; the controls `route-start`, `route-type`, `route-port`, `route-scope`):
   1. Open the dialog on the T14 project. Pick the start stamp, the port `out`, the type Supply Air, the scope "rooms" with the rooms of the project. `route-build-pending` shows and then `route-build-summary` shows. The numbers equal `planRoute` through the scene API.
   2. `route-place` is enabled. The preview shows on the plan (pixels of the type color).
-  3. Clear one `route-room` check box of the R2 scope (the existing control): the summary changes and that room is not in the plan. Turn `route-build-offgraph` on in a project with one off-graph room: the room joins the plan, `route-build-line-room-off-graph` shows (Warning); turn it off: `route-build-line-rooms-skipped` shows (Note).
+  3. Clear one `route-room` check box of the R2 scope (the existing control): the summary changes and that room is not in the plan. In a project with one off-graph room: the room is in the plan, `route-build-line-room-off-graph` shows (Warning) and lists the room, and no `route-build-offgraph` control exists. In a project where a room cannot be joined without joining another network: `route-build-line-rooms-skipped` shows (Note).
   4. Click `route-place`. `route-build-result` reads "Placed N segments and M fittings." with N and M equal to the export difference. The open-port count in the status bar goes down.
   5. Click `.mep-rail-btn[title="Undo"]`. The export equals the baseline.
   6. The size check box: with no limits saved it does not show, and `route-build-line-no-limits` shows as a Warning with the text "Segments are not sized. Sizes shown are placeholders." (the segments in the export of a Heating Water run have `diameter` 25); After `setNetworkSizing` in the setup (limits for the run key), it shows; Place with it on writes sizes (the Properties panel of a clicked segment shows a size); Undo removes all.
@@ -701,7 +699,7 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Size:** about 100 lines.
 
 ### T23. Re-run, edits and paste (browser)
-- **Depends on:** T03, T22. **Waits for Q-R6-01 and Q-R6-02.**
+- **Depends on:** T03, T22. **Waits for nothing (Q-R6-01 and Q-R6-02 are answered).**
 - **Files:** `r6-t23-check.mjs` (work folder).
 - **What it checks (real DOM; the canvas actions use real mouse moves):**
   0. The stub case: draw a hand stub from the start port to a fitting G with the segment tool, run (the route starts at G), run again with the same inputs: `route-build-remove` counts the routed run only (not the stub), the stub and G are in the export after Place, and the new run is not doubled (the segment count equals the count after the first run).
@@ -719,20 +717,20 @@ Jobs on the same file run one after another, in the order of the task numbers (T
 - **Size:** about 150 lines of check.
 
 ### T24. Save, load and PDF round trip (browser)
-- **Depends on:** T22. **Waits for Q-R6-01.**
+- **Depends on:** T22.
 - **Files:** `r6-t24-check.mjs` (work folder).
 - **What it checks:** run and Place; Save through the OPFS handles of `lib.mjs`; reload the page; Open the saved file; the export equals the one before (marks included, `schemaVersion` 21); a re-run offers the same removal count; a schema 20 file (the same project with `schemaVersion: 20` and no marks) loads without error and a run on it removes nothing; a file with a bad `routedBy` loads with the field removed. The PDF export keeps the embedded JSON with the marks (read `mepapp-project.json` from the exported PDF as R2 to R4 checks do, if they do; the implementer reads `lib.mjs` and reports if there is no helper).
 - **Size:** about 90 lines of check.
 
 ### T25. Water, extension, foreign type (browser)
-- **Depends on:** T22. **Waits for Q-R6-01.**
+- **Depends on:** T22.
 - **Files:** `r6-t25-check.mjs` (work folder).
 - **What it checks:** (1) Extension: a hand-drawn stub at the start port is kept and keeps its size after a run with limits saved; the route starts at its far end; the dialog shows `route-build-line-extends-stub` (Note) and `route-build-line-hand-kept-size` (Note); a re-run removes the routed part only. (7) Gravity: a Sanitary Waste run shows `route-build-line-gravity-not-routed` (Error) and `route-place` is disabled. (8) Capacity unit: with the library type that has no flow unit, the capacity line is a Note and not a Warning. (2) The foreign case of the overview: a second network of another type runs through the corridor; Place leaves it unchanged (independent union-find). (3) The capacity warning: set the start capacity to 300 and four terminals to 100: `route-build-line-capacity-over` shows with 400 and 300; set the start capacity to 500: the line is gone. (4) Water, Q-R6-03 A: a boiler with the ports `Flow` and `Return` and radiators with two ports each, all with the routing target Heating Water (Auto-place or the scene setup): run 1 from `Flow` connects the first port (stamp port order) of each radiator, with radiators rotated differently; the second run from `Return` finds the other port of each radiator, so the sides match across all radiators (the check reads the port id of each segment end in the export); after both runs the independent walk shows two separate networks and each radiator has one segment on each port. (5) `shaft-crossing`: a start in a shaft room shows the line with the fire hint (the 10A drawing, local; the check skips this step with a message when the PDF is absent). (6) A run in a drawing with no corridor shows `route-build-line-area-empty`.
 - **Screenshots:** `T25-water-two-runs`, `T25-capacity-over`, `T25-extends-stub`.
 - **Size:** about 150 lines of check.
 
 ### T26. The part check
-- **Depends on:** all tasks above. **Waits for Q-R6-01 and Q-R6-02.**
+- **Depends on:** all tasks above. **Waits for nothing (Q-R6-01 and Q-R6-02 are answered).**
 - **Files:** `.claude/roadmap/browser/r6-check.mjs` (new). No product code.
 - **What it does** (run 1: 1600 by 1000, English, `01_arch_first_floor.pdf`):
   1. Setup with `buildRoutingProject` for 6 served rooms. Baseline: the export JSON, `canUndo`, `isDirty`.
@@ -802,10 +800,10 @@ R6 gives: the routed marks (schema step 21), the walk and the removal, the layou
   - drains (gravity networks): R6 refuses them with the error `gravity-not-routed` (P-R6-GRAVITY). A drain needs a slope and 45 degree joints. A later part can force the joints and show a no-slope warning;
   - balancing dampers, regulating valves and other control fittings: R6 places none;
   - a lateral lane for a second run in the same corridor (Q-R6-05 B);
-  - routing through neighbour rooms (Q-R6-04 C);
+  - routing through neighbour rooms (Q-R6-04 C; R6 serves off-graph rooms with the free orthogonal connection and warnings, Q-R6-04 A, and has no switch for it);
   - a grid angle for a building that is rotated on the sheet (R-2);
   - a pipe side on a water port (Q-R6-03 B);
-  - routing through a neighbor room for rooms behind rooms (R4 plan R-4); R6 uses the off-graph connection with warnings;
+  - a dialog switch to skip off-graph rooms (the user chose to serve them, Q-R6-04 A);
   - a second route type of the same run (for example a trunk with a lateral split into two floors);
   - reducers: a fitting of kind `reducer` where the size changes (R5 sizes by segment; the kind stays `elbow` or `tee`);
   - a size label on the plan (the Label feature);
@@ -817,7 +815,7 @@ R6 gives: the routed marks (schema step 21), the walk and the removal, the layou
 - **R-1 The straightening of the center line is the least tested step.** The R4 center line is a guide with free angles. The tolerance rules (P-R6-JOG, P-R6-STEP) are planner values. T16 measures the share of free legs and the fallbacks on the first floor. If the share is high, the lead reports it before the UI tasks start.
 - **R-2 A building that is rotated on the sheet.** "Orthogonal" is relative to the page axes (P-R6-AXES). A building at 20 degrees gets a zig-zag of 45 degree and 90 degree legs, and many warnings. The first floor and the 10A drawing are not rotated (not verified: R4 probes do not say). A grid angle is a later task.
 - **R-3 The heuristic is not optimal.** The Takahashi and Matsuyama tree is within a factor 2 of the optimum, and usually much closer (not verified here). T07 tests the bound on small graphs. The Hanan grid result for a room is checked by hand in section 4.7.
-- **R-4 Many rooms are off graph.** On the first floor, 15 of 33 rooms have no wall with a corridor. With the default of Q-R6-04 B the planner skips them and lists them, so a run serves only about half of the rooms until the user turns the switch on. With the switch on, those rooms get a long connection that crosses other rooms; the plan counts the walls and warns, and the result can look poor. This is the main product risk, and the user decides in Q-R6-04.
+- **R-4 Many rooms are off graph.** On the first floor, 15 of 33 rooms have no wall with a corridor. The user chose (Q-R6-04 A) to serve them. Those rooms get a long free orthogonal connection from the nearest point of the route. The connection crosses other rooms; the plan counts the walls, lists the rooms in `room-off-graph` and warns, and the result can look poor. About half of the rooms of the first floor use this path, so this is the main product risk. There is no switch to turn it off. The user removes a room from the run with the R2 room list. T16 and T26 report the share of off-graph rooms and the wall count to the lead.
 - **R-4a Two runs on one center line.** The second run of the same type lies on the first (Q-R6-05 A). The Note says so once. The user moves one run by hand.
 - **R-4b Pipe sides depend on the port order of the stamp definition.** A definition with the flow port second makes the first run the return (Q-R6-03 A).
 - **R-5 Quality depends on room detection.** Wrong or open room outlines (`open: true`) move center lines and entries (R4 plan R-3). The region test can then block good paths. The off-graph connection is the fallback.
@@ -840,3 +838,4 @@ R6 gives: the routed marks (schema step 21), the walk and the removal, the layou
 |---|---|
 | 2026-10-18 | First version by the road map planner. 26 tasks (T01 to T26, T14 and T15 out of order on purpose). Three questions for the user (Q-R6-01 value of the mark, Q-R6-02 what a hand edit clears, Q-R6-03 pipe side), 20 provisional choices. |
 | 2026-10-18 | **Revision 1** after the audit (5 high) and the domain check. Walk: starts at the far fitting of an unmarked stub, and crosses a port only at the start port (H1, H2). The scene finds the targets on the reduced state with the scope inputs, not a port list (H3). `removal` is a planner input, so T09 does not need T02; the order paragraph and the Q-R6-01 block list are rewritten, and the director may use B provisionally (H4, M6). The 4-grille example is recomputed with ports as leaves: 6 segments, 2 room fittings, 3 new fittings, 9000 mm (H5). `entryDir` tie-break for the Hanan search (M1). Link gap accepted in the region test (M2). Entry and link connectors told apart by id prefix, terminal = tap node (M3). R6 room list removed; the R2 scope is used (M4). T03 clears only fittings in `fittingOriginals` and their segments, and checks a stamp drag (M5). T09a added (side rule). T01 lists `group-networks.test.ts` (M7). `legClass` calls `resolveAngleSnap` (M8). New questions Q-R6-04 (off-graph rooms), Q-R6-05 (lane); Q-R6-03 now has a side rule (D-H1). Placeholder sizes by discipline and `no-limits` as a warning (D-M3). Sizing writes marked segments only (D-M6, L4). Same-type join is a warning (D-M5). Fire hint text extended (D-M7). Gravity networks refused (D-M8). Capacity warning only with a flow unit (D-M9). `short-leg`, tap rules, no balancing valves (D-L10 to D-L12). Line numbers fixed (L1). Check scripts renamed `r6-t..` (L3). Selection pruning (L5). Schema numbering note (L6). 27 tasks (T09a added). |
+| 2026-10-18 | **Revision 2** after the user answers: Q-R6-01 B (`routedBy: 'route'`), Q-R6-02 A (geometry edit only), Q-R6-03 A (first open port in stamp port order), Q-R6-04 A (off-graph rooms are served; this replaces the recommended B), Q-R6-05 A (no lateral lane; the director alerts the user if two runs overlap in tests). The provisional wording and the stop rule at T12 are removed; no task waits. Q-R6-04 A: no dialog switch, no `includeOffGraph` input; the off-graph connection is the default (P-R6-OFFGRAPH, step 8, T12 tests with a hand value, T22 without the switch and its browser step, R-4, section 8, texts `buildOffGraph` removed). `rooms-skipped` stays only for a room whose both orthogonal connections would join a foreign network. 27 tasks, same numbers. |
