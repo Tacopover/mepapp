@@ -8,6 +8,7 @@ import {
   rotateAnnotationGeometry,
   annotationBoundsWorld,
   markAutoPlacedMoved,
+  clearRoutedMarks,
   type Vec2,
 } from '@mepapp/core';
 import type { DrawingState } from '../document.js';
@@ -194,7 +195,22 @@ export class SelectTool implements Tool {
               fittings[id] = { ...fittings[id], position: { x: original.x + dx, y: original.y + dy } };
               changed.push({ kind: 'fitting', fittingId: id });
             }
-            return ctx.applyConnectivityCascade({ ...state, stamps, annotations, fittings }, changed);
+            const next = ctx.applyConnectivityCascade({ ...state, stamps, annotations, fittings }, changed);
+            if (Object.keys(fittingOriginals).length === 0) return next;
+            // A hand move drops the route mark on moved fittings and their attached segments (Q-R6-02 A).
+            const movedIds = new Set(Object.keys(fittingOriginals));
+            const segmentIds = new Set(
+              Object.values(next.segments)
+                .filter((s) => s.routedBy !== undefined && [s.endpointA, s.endpointB].some((e) => e.kind === 'fitting' && movedIds.has(e.fittingId)))
+                .map((s) => s.id),
+            );
+            const fittingIds = new Set(Object.values(next.fittings).filter((f) => f.routedBy !== undefined && movedIds.has(f.id)).map((f) => f.id));
+            if (segmentIds.size === 0 && fittingIds.size === 0) return next;
+            return {
+              ...next,
+              fittings: Object.fromEntries(clearRoutedMarks(Object.values(next.fittings), fittingIds).map((f) => [f.id, f])),
+              segments: Object.fromEntries(clearRoutedMarks(Object.values(next.segments), segmentIds).map((s) => [s.id, s])),
+            };
           });
           ctx.syncDrawingLayer(true);
         }

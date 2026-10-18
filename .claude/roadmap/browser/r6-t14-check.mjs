@@ -26,7 +26,7 @@ try {
         const port = st.ports[0];
         const sx = st.transform.scale?.x ?? 1;
         const sy = st.transform.scale?.y ?? 1;
-        return { x: st.transform.position.x + port.fractionX * st.nativeWidth * sx, y: st.transform.position.y + port.fractionY * st.nativeHeight * sy };
+        return { x: st.transform.position.x + (port.fractionX - 0.5) * st.nativeWidth * sx, y: st.transform.position.y + (port.fractionY - 0.5) * st.nativeHeight * sy };
       };
       const roomsNow = s.listRooms();
       const ring = (id) => roomsNow.find((r) => r.id === id).polygon.outer;

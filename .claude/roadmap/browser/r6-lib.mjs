@@ -50,7 +50,7 @@ export async function buildRoutingProject(t, { type = 'supply-air', targets = 3,
       const scaleOf = (s) => [s.transform.scale?.x ?? 1, s.transform.scale?.y ?? 1];
       const placeAt = (s, port, at) => {
         const [sx, sy] = scaleOf(s);
-        return { x: at.x - port.fractionX * s.nativeWidth * sx, y: at.y - port.fractionY * s.nativeHeight * sy };
+        return { x: at.x - (port.fractionX - 0.5) * s.nativeWidth * sx, y: at.y - (port.fractionY - 0.5) * s.nativeHeight * sy };
       };
       const outPort = { id: 'out', name: 'Out', fractionX: 1, fractionY: 0.5 };
       const inPort = { id: 'in', name: 'In', fractionX: 0, fractionY: 0.5 };
@@ -103,7 +103,7 @@ export async function buildRoutedSample(t) {
       const portAt = (s, port) => {
         const sx = s.transform.scale?.x ?? 1;
         const sy = s.transform.scale?.y ?? 1;
-        return { x: s.transform.position.x + port.fractionX * s.nativeWidth * sx, y: s.transform.position.y + port.fractionY * s.nativeHeight * sy };
+        return { x: s.transform.position.x + (port.fractionX - 0.5) * s.nativeWidth * sx, y: s.transform.position.y + (port.fractionY - 0.5) * s.nativeHeight * sy };
       };
       const add = (o, dx, dy) => ({ x: o.x + dx, y: o.y + dy });
       const out = portAt(eq, eq.ports[0]);
