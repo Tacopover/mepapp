@@ -1,8 +1,65 @@
 # R5 plan: sizing of the network (a flow unit and a sizing method on each network type)
 
-Status: written 2026-10-17 by the road map planner, on the branch `worktree-agent-framework` after R4 (R4 done, last commit `179a88e`). Not yet audited.
+Status: DONE 2026-10-18 (on branch `worktree-agent-framework`, not merged; the user tests on Windows first). The schema is at step 20. Written 2026-10-17 by the road map planner after R4 (R4 done, last commit `179a88e`).
 Origin: `roadmap-overview.md` (R5 text, sections 0 to 6, gaps G4, G5, G6, G13, G14, G15, G16, decisions D-R5-01 to D-R5-05), `auto-routing-r4.md` and `auto-routing-r3.md` (format, and what they built), `.claude/roadmap/rules.md`, `.claude/roadmap/protocol.md`.
 **Revision 2 (2026-10-18):** Q-R5-04 is answered **B** (section 12). The sizing limits are saved per network in the project file, not on the network type. Where section 12 and sections 0 to 11 disagree, section 12 wins. Q-R5-01 = E, Q-R5-02 = B and Q-R5-03 = A are answered (ledger seq 367 to 369).
+**Answers (final):** Q-R5-01 E (keep the unit on each type and ask before a conversion). Q-R5-02 B (segment sizes are in millimetres). Q-R5-03 A (no role on the network type). Q-R5-04 B (limits per network, schema step 20).
+
+| Task | Commit | Verification |
+|---|---|---|
+| T01 flow units and conversion table | `0ac7500` | core unit tests |
+| T02 hydraulics | `f47f20e` | core unit tests |
+| T03 size series | `300f0d1` | core unit tests |
+| T04 sizing settings and `NetworkType` fields | `5137759` | core unit tests |
+| T05 schema step 19 and clean-up on load | `b6b17bc` | core unit tests |
+| T06a air size, round | `f0b5df4` | core unit tests |
+| T06b air size, rectangular | `5b0f635` | core unit tests |
+| T07 water size and flow from a power | `aee7e15` | core unit tests |
+| T08a network of the start port, flows in SI | `f19c5ce` | core unit tests |
+| T08b `sizeNetwork` and the problems | `3492aa4` | core unit tests |
+| T09 store flow unit and sizing, copy by value | `e18685d` | typecheck, build, tests |
+| T10a `r5-lib.mjs` browser setup | `e8b70a6` | browser setup |
+| T10b `planNetworkSizes` | `18d8305` | browser check `t10-check` |
+| T11 `applyNetworkSizes` | `e707c84` | browser check `t11-check` |
+| T12 Auto-place writes capacity in the type unit | `7d64eda` | browser check `t12-autoplace-unit` 12, 0 failed |
+| T13 texts and line builders | `a5fa5c2` | UI unit tests |
+| T14a editor: flow unit, method, air fields | `59d8bd3` | typecheck, build, screenshots |
+| T14b editor: water fields, suggested values | `02ead09` | typecheck, build, screenshots |
+| T14c convert stored capacities on a unit change | `477400c` | browser check `t14c-convert` 19, 0 failed |
+| T15a Size dialog: inputs and checks | `b08e89f` | UI tests, screenshots |
+| T15b Size dialog: result and Size button | `ac42a2c` | UI tests, screenshots |
+| T16 menu item and dialog wiring; redraw and Undo refresh | `10d530a`, `77f5317` | browser check `t16-size`, 0 failed |
+| T17 unit labels in the Properties panel | `3a64cb3` | browser check `t17`, 0 failed |
+| T18 part check | `acefd97` (record `7ea60a3`) | `r5-check` 45 and 3 passed, 0 failed |
+| T19 per-network sizing list and schema step 20 | `887aee7` | core unit tests |
+| T20 method from the type, limits from the network | `e18d07a` | core unit tests |
+| T21 scene: store, save and load the limits | `213084e` | browser check `t21`, 0 failed |
+| T22 Size dialog edits and saves the limits | `3720b87` | browser check `t22`, 0 failed |
+| T23 editor keeps only flow unit and method | `008d73b` | browser check `t23`, 0 failed |
+| T24 convert unrouted stamps on a unit change; report kept Auto-place units | `d4231c8` | browser checks `t14c-convert` and `t12-autoplace-unit`, 0 failed |
+
+Verification summary (last runs): core 74 files, 1315 tests. UI 22 files, 311 tests. Forced typecheck and build: 18 of 18. Browser checks r2, r3, r4, r5 (45 and 3), t21, t22, t23, t16-size, t17, t14c-convert (19) and t12-autoplace-unit (12): all 0 failed. Speed on the 10A PDF at 300 segments: `planNetworkSizes` 31.5 ms, `applyNetworkSizes` 5.2 ms.
+
+**Open at the end of R5.** The low items are also in `auto-routing-r5-small-fixes.md`.
+- Medium:
+  - (a) The EN 1505 preferred side list for rectangular ducts is not applied. Rectangular ducts use a 50 mm grid from 100 to 2000 mm. The standard was not read. The user must decide.
+- Low:
+  - Total flow can count a capacity twice when the start stamp has its own capacity (`sizing-network.ts:207`, `flow.ts:49-55`).
+  - The free series has a 70 mm minimum and a hidden 1250 mm cap (`sizing-air.ts:84-85`).
+  - `withCleanSizing` does not check `sizingMethod` (`project.ts:449-458`).
+  - DN is used as the inner diameter, and the DN list stops at DN300.
+  - Water is fixed at 20 C with one roughness.
+  - "Use suggested values" for water clears a saved delta T (plan D-R5-05 says the field stays empty).
+  - An empty delta T field has no red border when `no-delta-t` shows.
+  - `setNetworkSizing(undefined)` on a pair with no entry marks the document dirty.
+  - Capacity writes are not undoable, and `setTerminalCapacity` and `setCapacityForSelection` may not call `markDirty`.
+  - The Auto-place "kept the unit" line (`ap-unit-note`) is not checked through the real DOM.
+  - Limits are not copied on paste or duplicate.
+  - R6 needs a saved network entry for its start pair.
+  - The T22 "Use suggested values" and limits screens: three screenshot files had identical sizes (maybe the same state).
+  - The sources for EN 1506, EN 1505, the water limits, EN 806-3 and EN 12056-2 are not verified.
+  - The capacity conversion skips mixed-type stamps.
+
 Answers of the user that bind this plan (final):
 - **Q-R5-04 B (2026-10-18).** The limits (maximum velocity, maximum pressure drop, shape, aspect ratio, series, delta T) are not on the network type. They are saved for each network, keyed by the start stamp and the start port, and the Size dialog shows and edits them. The flow unit and the sizing method stay on the network type. This replaces D-R5-03 for the limits. Schema step 20 is new.
 - **D-R5-01 C.** A flow unit on each network type, with a conversion table in core.
@@ -1000,7 +1057,7 @@ The Properties labels do not read the limits. T17 depends on T11 only and needs 
 - Step 5 (water): delta T typed in the dialog.
 - Step 6 (unadopted type): `no-method` then `no-sizing`.
 - Step 7 (round trip): `schemaVersion` is **20**; the sizes, `flowUnit`, `sizingMethod` and `networkSizing` are the same after save and load.
-- Step 8: a file of schema 18 loads (no `networkSizing`, shown as `no-flow-unit`) **and** a file of schema 19 with `sizing` on a type loads as 20 (T16 step 24).
+- Step 8: a file of schema 18 loads (no `networkSizing`, shown as `no-method`; both `no-method` and `no-flow-unit` refuse sizing) **and** a file of schema 19 with `sizing` on a type loads as 20 (T16 step 24).
 - New step: two networks with different limits give the sizes of section 12.6 for the same flow.
 - Screenshots: add `T18-size-limits`. The regression scripts `r2-check.mjs`, `r3-check.mjs` and `r4-check.mjs` run again. `r3-check.mjs:151` (schema 20) is fixed in T19.
 

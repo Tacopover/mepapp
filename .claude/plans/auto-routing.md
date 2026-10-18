@@ -214,7 +214,7 @@ Each part gets its own plan. No detailed design here.
 - Open questions: mains only in corridors? Branches only through doors, or through any wall above the ceiling? Can the user draw "route zones" by hand?
 - Research: a corridor skeleton (medial axis) from room polygons; door detection (`room-auto-placement.md` Phase 7); path search (A* on a grid or a visibility graph).
 
-**R5 — Sizing.**
+**R5 — Sizing. DONE 2026-10-18 (see `auto-routing-r5.md`).** The text below is the old draft.
 - Exists: auto-place writes the capacity of each stamp; `solveFlow` adds the capacities along the segments. Segments have `diameter`, `width`, `height`, but MepApp calculates no size (`flow.ts`: "There is no pressure drop, velocity, or duct/pipe sizing computed anywhere here").
 - Missing: sizing rules for each network type (max velocity or pressure drop), series of standard sizes, a unit for the capacity (a capacity is a number without a unit; a network type has only a display label such as "CFM").
 - Open questions: the unit of the flow (the rules write dm³/s or m³/h, the library types say CFM or GPM); round or rectangular; when to size (after routing, on each change).
