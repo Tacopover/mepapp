@@ -121,6 +121,9 @@ import {
   computeRouteArea,
   DEFAULT_ROUTE_AREA_TYPE_IDS,
   routeAreaWarnings,
+  sizeNetwork,
+  type FlowUnitId,
+  type SizeNetworkResult,
 } from '@mepapp/core';
 import { PATH_KIND, type AnnotationGeometry as PdfAnnotationGeometry, type PdfDocumentHandle, type StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
@@ -477,6 +480,13 @@ export interface ConnectivityView {
   segments: Segment[];
   fittings: Fitting[];
   portGroups: PortGroup[];
+}
+
+export interface NetworkSizePlan {
+  networkTypeId: string | null;
+  networkTypeName: string | null;
+  flowUnit: FlowUnitId | null;
+  result: SizeNetworkResult;
 }
 
 /** One derived network, resolved against its NetworkType for display — the Layers panel's read model. Recomputed from live topology on every call, same as DrawingSummary. */
@@ -1542,6 +1552,36 @@ export class SketchScene {
       segments: Object.values(state.segments),
       fittings: Object.values(state.fittings),
       portGroups: this.doc.portGroups.map((g) => ({ ...g, portIds: [...g.portIds] })),
+    };
+  }
+
+  /** Sizes the network at a start port with the flow unit and sizing settings of the network type of the segment at that port. Read-only: adopts no type and emits no event. */
+  planNetworkSizes(startStampId: string, startPortId: string): NetworkSizePlan {
+    const state = this.doc.drawingHistory.getState();
+    const segments = Object.values(state.segments);
+    const fittings = Object.values(state.fittings);
+    const capacities = Object.fromEntries(this.doc.terminalCapacities);
+    const elementCategories = Object.fromEntries(Object.values(state.stamps).map((stamp) => [stamp.id, stamp.category]));
+    const isStartPort = (point: ConnectionPoint) => point.kind === 'port' && point.elementId === startStampId && point.portId === startPortId;
+    const startSegment = segments.find((s) => isStartPort(s.endpointA) || isStartPort(s.endpointB));
+    const type = startSegment ? this.doc.networkTypes.find((t) => t.id === startSegment.networkTypeId) ?? getNetworkTypeFromLibrary(startSegment.networkTypeId) : undefined;
+    const networkType: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizing'> = type ?? { id: '', discipline: 'other' };
+    const result = sizeNetwork({
+      segments,
+      fittings,
+      portGroups: this.doc.portGroups,
+      terminalCapacities: capacities,
+      capacityUnitOf: () => networkType.flowUnit ?? null,
+      elementCategories,
+      startStampId,
+      startPortId,
+      networkType: { id: networkType.id, discipline: networkType.discipline, flowUnit: networkType.flowUnit, sizing: networkType.sizing },
+    });
+    return {
+      networkTypeId: type?.id ?? null,
+      networkTypeName: type?.name ?? null,
+      flowUnit: type?.flowUnit ?? null,
+      result,
     };
   }
 
