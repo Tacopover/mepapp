@@ -13,7 +13,7 @@
 
 import { closestPointOnSegment, distance, pointInRotatedRect, type Vec2 } from './geometry.js';
 import { getStampHalfExtents, getStampWorldPorts, type PlacedStamp } from './stamp.js';
-import type { ConnectionPoint, Fitting, Segment } from './network.js';
+import { ROUTED_MARK, type ConnectionPoint, type Fitting, type Segment } from './network.js';
 
 export type SegmentEndpointTarget =
   | { kind: 'existing'; point: ConnectionPoint; worldPosition: Vec2 }
@@ -148,14 +148,15 @@ export function mergeSegmentsAtFitting(
     : { point: second.endpointA, position: second.geometry[0] };
   if (sameConnectionPoint(farOfFirst.point, farOfSecond.point)) return null;
 
-  return {
-    merged: {
-      ...first,
-      id: newId,
-      endpointA: farOfFirst.point,
-      endpointB: farOfSecond.point,
-      geometry: [farOfFirst.position, farOfSecond.position],
-    },
-    removed: [first, second],
+  const merged: Segment = {
+    ...first,
+    id: newId,
+    endpointA: farOfFirst.point,
+    endpointB: farOfSecond.point,
+    geometry: [farOfFirst.position, farOfSecond.position],
   };
+  if (first.routedBy !== ROUTED_MARK || second.routedBy !== ROUTED_MARK) {
+    delete merged.routedBy;
+  }
+  return { merged, removed: [first, second] };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mergeSegmentsAtFitting, resolveSegmentEndpoint, segmentsAtFitting, splitSegmentAtFitting } from './segmentTool.js';
-import type { Fitting, Segment } from './network.js';
+import { ROUTED_MARK, type Fitting, type Segment } from './network.js';
 import { SYNTHETIC_CENTER_PORT_ID, type PlacedStamp } from './stamp.js';
 
 const stamp: PlacedStamp = {
@@ -119,6 +119,16 @@ describe('splitSegmentAtFitting', () => {
     expect(segmentB.endpointA).toEqual({ kind: 'fitting', fittingId: 'f-new' });
     expect(segmentB.endpointB).toEqual(existingSegment.endpointB);
   });
+
+  it('keeps the route mark on both pieces and gives the new fitting none', () => {
+    const marked: Segment = { ...existingSegment, routedBy: ROUTED_MARK };
+    const newFitting: Fitting = { id: 'f-new', pageIndex: 0, position: { x: 400, y: 100 }, kind: 'junction' };
+    const { segmentA, segmentB } = splitSegmentAtFitting(marked, newFitting, { x: 400, y: 100 }, { segmentA: 's1-a', segmentB: 's1-b' });
+
+    expect(segmentA.routedBy).toBe(ROUTED_MARK);
+    expect(segmentB.routedBy).toBe(ROUTED_MARK);
+    expect(Object.keys(newFitting)).not.toContain('routedBy');
+  });
 });
 
 describe('mergeSegmentsAtFitting', () => {
@@ -163,6 +173,30 @@ describe('mergeSegmentsAtFitting', () => {
   it('refuses a segment that starts and ends on the fitting', () => {
     const selfLoop: Segment = { ...segmentA, endpointA: { kind: 'fitting', fittingId: 'f-new' } };
     expect(mergeSegmentsAtFitting('f-new', [selfLoop, segmentB], 'm')).toBeNull();
+  });
+
+  it('keeps the route mark when both pieces have it', () => {
+    const markedA: Segment = { ...segmentA, routedBy: ROUTED_MARK };
+    const markedB: Segment = { ...segmentB, routedBy: ROUTED_MARK };
+    const result = mergeSegmentsAtFitting('f-new', [markedA, markedB], 'm');
+    expect(result?.merged.routedBy).toBe(ROUTED_MARK);
+  });
+
+  it('drops the route mark when only the first piece has it', () => {
+    const markedA: Segment = { ...segmentA, routedBy: ROUTED_MARK };
+    const result = mergeSegmentsAtFitting('f-new', [markedA, segmentB], 'm');
+    expect(Object.keys(result!.merged)).not.toContain('routedBy');
+  });
+
+  it('drops the route mark when only the second piece has it', () => {
+    const markedB: Segment = { ...segmentB, routedBy: ROUTED_MARK };
+    const result = mergeSegmentsAtFitting('f-new', [segmentA, markedB], 'm');
+    expect(Object.keys(result!.merged)).not.toContain('routedBy');
+  });
+
+  it('has no route mark when neither piece has one', () => {
+    const result = mergeSegmentsAtFitting('f-new', [segmentA, segmentB], 'm');
+    expect(Object.keys(result!.merged)).not.toContain('routedBy');
   });
 });
 

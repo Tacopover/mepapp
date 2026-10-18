@@ -51,13 +51,15 @@ export function pasteSegments(input: SegmentPasteInput): { segments: Segment[]; 
   const segments = input.segments.map((segment): Segment => {
     const first = segment.geometry[0];
     const last = segment.geometry[segment.geometry.length - 1];
-    return {
+    const pasted: Segment = {
       ...segment,
       id: input.newSegmentId(),
       endpointA: remapEndpoint(segment.endpointA, first, segment.pageIndex),
       endpointB: remapEndpoint(segment.endpointB, last, segment.pageIndex),
       geometry: segment.geometry.map(shift),
     };
+    delete pasted.routedBy;
+    return pasted;
   });
 
   return { segments, fittings: [...pastedFittings.values(), ...extraFittings] };

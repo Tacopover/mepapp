@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pasteSegments } from './segmentPaste.js';
-import type { Fitting, Segment } from './network.js';
+import { ROUTED_MARK, type Fitting, type Segment } from './network.js';
 
 const f1: Fitting = { id: 'f1', pageIndex: 0, position: { x: 100, y: 100 }, kind: 'elbow' };
 const f2: Fitting = { id: 'f2', pageIndex: 0, position: { x: 300, y: 100 }, kind: 'junction' };
@@ -69,6 +69,17 @@ describe('pasteSegments', () => {
     expect(endpoint.kind).toBe('fitting');
     const detached = result.fittings.find((f) => endpoint.kind === 'fitting' && f.id === endpoint.fittingId);
     expect(detached).toEqual({ id: expect.any(String), pageIndex: 0, position: { x: 120, y: 120 }, kind: 'junction' });
+  });
+
+  it('pastes a route-marked segment and its new fitting without the route mark', () => {
+    const marked: Segment = { ...base, routedBy: ROUTED_MARK };
+    const markedFittingsById = { f1: { ...f1, routedBy: ROUTED_MARK }, f2: { ...f2, routedBy: ROUTED_MARK } };
+    const result = pasteSegments({ segments: [marked], fittingsById: markedFittingsById, stampIdMap: new Map(), offset: { x: 20, y: 20 }, ...counters() });
+    expect(Object.keys(result.segments[0])).not.toContain('routedBy');
+    expect(result.fittings).toHaveLength(2);
+    for (const fitting of result.fittings) {
+      expect(Object.keys(fitting)).not.toContain('routedBy');
+    }
   });
 
   it('does not change the copied inputs', () => {
