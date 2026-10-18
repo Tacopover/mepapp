@@ -127,6 +127,11 @@ import {
   isFlowUnitId,
   type SizeNetworkResult,
   type SizedSegment,
+  type SizingMethod,
+  type SizingSettings,
+  findNetworkSizing,
+  parseSizingSettings,
+  withNetworkSizing,
 } from '@mepapp/core';
 import { PATH_KIND, type AnnotationGeometry as PdfAnnotationGeometry, type PdfDocumentHandle, type StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
@@ -489,6 +494,8 @@ export interface NetworkSizePlan {
   networkTypeId: string | null;
   networkTypeName: string | null;
   flowUnit: FlowUnitId | null;
+  sizingMethod: SizingMethod | null;
+  sizing: SizingSettings | null;
   result: SizeNetworkResult;
 }
 
@@ -562,6 +569,8 @@ interface SketchSceneEvents {
   circuitsChanged: [];
   /** The active document's rooms changed: added, edited, deleted, replaced by detect-all, undone/redone or loaded. Re-read with listRooms(). */
   roomsChanged: [];
+  /** The stored sizing limits of a network were set or removed (setNetworkSizing). Re-read with getNetworkSizing(). */
+  networkSizingChanged: [];
   roomsVisibleChanged: [visible: boolean];
   /** The dots of the open ports were shown or hidden (setOpenPortsVisible). */
   openPortsVisibleChanged: [visible: boolean];
@@ -1569,6 +1578,7 @@ export class SketchScene {
     const startSegment = segments.find((s) => isStartPort(s.endpointA) || isStartPort(s.endpointB));
     const type = startSegment ? this.doc.networkTypes.find((t) => t.id === startSegment.networkTypeId) ?? getNetworkTypeFromLibrary(startSegment.networkTypeId) : undefined;
     const networkType: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizingMethod'> = type ?? { id: '', discipline: 'other' };
+    const sizing = findNetworkSizing(this.doc.networkSizing, startStampId, startPortId);
     const result = sizeNetwork({
       segments,
       fittings,
@@ -1579,11 +1589,14 @@ export class SketchScene {
       startStampId,
       startPortId,
       networkType: { id: networkType.id, discipline: networkType.discipline, flowUnit: networkType.flowUnit, sizingMethod: networkType.sizingMethod },
+      sizing,
     });
     return {
       networkTypeId: type?.id ?? null,
       networkTypeName: type?.name ?? null,
       flowUnit: type?.flowUnit ?? null,
+      sizingMethod: type?.sizingMethod ?? null,
+      sizing: sizing !== undefined ? structuredClone(sizing) : null,
       result,
     };
   }
@@ -3008,6 +3021,22 @@ export class SketchScene {
     return removeIds.length;
   }
 
+  /** The sizing limits that are stored for the network at a start port, as a copy. Undefined when none are stored. */
+  getNetworkSizing(startStampId: string, startPortId: string): SizingSettings | undefined {
+    const found = findNetworkSizing(this.doc.networkSizing, startStampId, startPortId);
+    return found !== undefined ? structuredClone(found) : undefined;
+  }
+
+  /** Not an undo step. Marks dirty. undefined removes the entry. Returns false and writes nothing when `settings` does not parse (parseSizingSettings). Emits networkSizingChanged. */
+  setNetworkSizing(startStampId: string, startPortId: string, settings: SizingSettings | undefined): boolean {
+    const parsed = settings === undefined ? undefined : parseSizingSettings(settings);
+    if (settings !== undefined && parsed === undefined) return false;
+    this.doc.networkSizing = withNetworkSizing(this.doc.networkSizing, startStampId, startPortId, parsed);
+    this.markDirty();
+    this.emitter.emit('networkSizingChanged');
+    return true;
+  }
+
   /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
   setTerminalCapacity(elementId: string, capacity: number): void {
     this.doc.terminalCapacities.set(elementId, capacity);
@@ -4009,7 +4038,7 @@ export class SketchScene {
       annotations: Object.values(state.annotations),
       customStampDefinitions: customStampDefinitionsToSave(doc.customStampDefinitions, Object.values(state.stamps)),
       terminalCapacities: Object.fromEntries(doc.terminalCapacities),
-      networkSizing: [],
+      networkSizing: doc.networkSizing.filter((entry) => state.stamps[entry.startStampId] !== undefined).map((entry) => structuredClone(entry)),
       circuits: Object.values(state.circuits),
       panels: Object.values(state.panels),
       panelSections: Object.values(state.panelSections),
@@ -4107,6 +4136,7 @@ export class SketchScene {
     for (const [elementId, capacity] of Object.entries(doc.terminalCapacities)) {
       target.terminalCapacities.set(elementId, capacity);
     }
+    target.networkSizing = (doc.networkSizing ?? []).map((entry) => structuredClone(entry));
     // The solve itself isn't persisted (see ProjectDocument's terminalCapacities doc
     // comment) — clear the stale overlay from before the load. If target is the
     // active document, syncDrawingLayer below immediately recomputes it fresh

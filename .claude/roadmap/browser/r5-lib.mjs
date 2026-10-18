@@ -30,12 +30,12 @@ export const screenOf = (page, p) =>
  * Returns { equipmentId, startPortId, terminalIds, segmentIds, mainSegmentId, clickPoints } where clickPoints maps a
  * segment id to a page point on it.
  */
-export async function buildSizingProject(t, { type = 'air', capacities = [100, 150, 50, 100] } = {}) {
+export async function buildSizingProject(t, { type = 'air', capacities = [100, 150, 50, 100], sizing = null, sizingMethod = null } = {}) {
   const { page, idle } = t;
   const stampCount = await page.evaluate(() => window.__mepSketchScene.exportProject().stamps.length);
   if (stampCount === 0) await placeOneStamp(t);
   const built = await page.evaluate(
-    ([type, capacities, types]) => {
+    ([type, capacities, types, sizing, sizingMethod]) => {
       const scene = window.__mepSketchScene;
       const p = scene.exportProject();
       const a = p.stamps[0];
@@ -93,7 +93,9 @@ export async function buildSizingProject(t, { type = 'air', capacities = [100, 1
       p.portGroups = [];
       p.stamps = [a, ...terms];
       p.terminalCapacities = Object.fromEntries(terms.map((s, i) => [s.id, capacities[i]]));
-      p.networkTypes = [...new Set(branchTypes.concat(mainType))].map((id) => types[id]);
+      p.networkTypes = [...new Set(branchTypes.concat(mainType))].map((id) => (sizingMethod ? { ...types[id], sizingMethod } : types[id]));
+      p.networkSizing = sizing ? [{ startStampId: a.id, startPortId: 'out', settings: sizing }] : [];
+      p.schemaVersion = 20;
       const clickPoints = {};
       for (const s of p.segments) {
         const g = s.geometry;
@@ -101,7 +103,7 @@ export async function buildSizingProject(t, { type = 'air', capacities = [100, 1
       }
       return { project: p, equipmentId: a.id, terminalIds: terms.map((s) => s.id), segmentIds: p.segments.map((s) => s.id), mainSegmentId: 'segment-1', clickPoints };
     },
-    [type, capacities, TYPES],
+    [type, capacities, TYPES, sizing, sizingMethod],
   );
   if (!built) throw new Error('buildSizingProject: no stamp was placed');
   await page.evaluate((raw) => window.__mepSketchScene.loadProjectFromJson(JSON.parse(raw)), JSON.stringify(built.project));

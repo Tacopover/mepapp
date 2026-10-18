@@ -11,6 +11,7 @@ import {
   type CircuitType,
   type Fitting,
   type FlowResult,
+  type NetworkSizingEntry,
   type NetworkType,
   type Panel,
   type PanelSection,
@@ -149,6 +150,8 @@ export class SketchDocument {
   /** Ceiling height per room type id in this drawing, mm (ProjectDocument.roomTypeCeilingHeightsMm). */
   readonly roomTypeCeilingHeightsMm: Record<string, number> = {};
   readonly terminalCapacities = new Map<string, number>();
+  /** Sizing limits per network, keyed by the start port (ProjectDocument.networkSizing). A list, replaced as a whole. */
+  networkSizing: NetworkSizingEntry[] = [];
   pdfSyncIds = new Set<string>();
   nextStampSeq = 1;
   nextFittingSeq = 1;
