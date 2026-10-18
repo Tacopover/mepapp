@@ -1,4 +1,5 @@
 import type { Discipline, FlowUnitId, NetworkType, SizingSettings } from '@mepapp/core';
+import { SUGGESTED_AIR_SIZING, SUGGESTED_FLOW_UNIT, SUGGESTED_WATER_SIZING } from '@mepapp/core';
 
 export type SizingMethodChoice = 'none' | 'air' | 'water';
 
@@ -62,6 +63,31 @@ export function draftFromType(type: Pick<NetworkType, 'flowUnit' | 'sizing'>): S
     };
   }
   return draft;
+}
+
+export function applySuggested(draft: SizingDraft, method: 'air' | 'water'): SizingDraft {
+  if (method === 'air') {
+    return {
+      ...draft,
+      flowUnit: SUGGESTED_FLOW_UNIT.air,
+      air: {
+        maxVelocity: String(SUGGESTED_AIR_SIZING.maxVelocityMs),
+        maxDrop: String(SUGGESTED_AIR_SIZING.maxPressureDropPaPerM),
+        shape: SUGGESTED_AIR_SIZING.shape,
+        aspect: String(SUGGESTED_AIR_SIZING.maxAspectRatio ?? ''),
+        series: SUGGESTED_AIR_SIZING.series,
+      },
+    };
+  }
+  return {
+    ...draft,
+    flowUnit: SUGGESTED_FLOW_UNIT.water,
+    water: {
+      maxVelocity: String(SUGGESTED_WATER_SIZING.maxVelocityMs),
+      maxDrop: String(SUGGESTED_WATER_SIZING.maxPressureDropPaPerM),
+      deltaT: '',
+    },
+  };
 }
 
 export function coerceMethod(draft: SizingDraft, discipline: Discipline): SizingDraft {

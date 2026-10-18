@@ -3,7 +3,7 @@ import type { Discipline, FlowUnitId, LinePattern, NetworkType } from '@mepapp/c
 import { FLOW_UNITS } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { ColorPicker } from './ColorPicker.js';
-import { coerceMethod, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingMethodChoice } from './sizingDraft.js';
+import { applySuggested, coerceMethod, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingMethodChoice } from './sizingDraft.js';
 import { sizeText, type SizeTextKey } from './sizePlan.js';
 
 export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline' | 'flowUnit' | 'sizing'>>;
@@ -209,6 +209,58 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, onCl
             </div>
             <p className="mep-nt-note">{sizeText('velocityNote')}</p>
             <p className="mep-nt-note">{sizeText('fluidAir')}</p>
+          </>
+        )}
+        {sizingDraft.method === 'water' && (
+          <>
+            <div className="mep-field-row">
+              <label>{sizeText('maxVelocity')}</label>
+              <input
+                data-testid="nt-water-max-velocity"
+                type="number"
+                step="any"
+                value={sizingDraft.water.maxVelocity}
+                onChange={(e) => setSizingDraft((d) => ({ ...d, water: { ...d.water, maxVelocity: e.target.value } }))}
+              />
+            </div>
+            {errors.waterMaxVelocity && <p className="mep-field-error" data-testid="nt-error-water-max-velocity">{sizeText('valueNotPositive')}</p>}
+            <div className="mep-field-row">
+              <label>{sizeText('maxDrop')}</label>
+              <input
+                data-testid="nt-water-max-drop"
+                type="number"
+                step="any"
+                value={sizingDraft.water.maxDrop}
+                onChange={(e) => setSizingDraft((d) => ({ ...d, water: { ...d.water, maxDrop: e.target.value } }))}
+              />
+            </div>
+            {errors.waterMaxDrop && <p className="mep-field-error" data-testid="nt-error-water-max-drop">{sizeText('valueNotPositive')}</p>}
+            <div className="mep-field-row">
+              <label>{sizeText('deltaT')}</label>
+              <input
+                data-testid="nt-water-delta-t"
+                type="number"
+                step="any"
+                value={sizingDraft.water.deltaT}
+                onChange={(e) => setSizingDraft((d) => ({ ...d, water: { ...d.water, deltaT: e.target.value } }))}
+              />
+            </div>
+            <p className="mep-nt-note">{sizeText('deltaTHint')}</p>
+            {errors.waterDeltaT && <p className="mep-field-error" data-testid="nt-error-water-delta-t">{sizeText('valueNotPositive')}</p>}
+            <p className="mep-nt-note">{sizeText('pipeNote')}</p>
+            <p className="mep-nt-note">{sizeText('fluidWater')}</p>
+          </>
+        )}
+        {sizingDraft.method !== 'none' && (
+          <>
+            <button
+              type="button"
+              data-testid="nt-suggest"
+              onClick={() => setSizingDraft((d) => applySuggested(d, d.method as 'air' | 'water'))}
+            >
+              {sizeText('suggest')}
+            </button>
+            <p className="mep-nt-note">{sizeText('sizesSourceHint')}</p>
           </>
         )}
       </div>

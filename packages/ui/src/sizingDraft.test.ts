@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Discipline, NetworkType } from '@mepapp/core';
 import {
-  coerceMethod, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingDraft,
+  applySuggested, coerceMethod, draftErrors, draftFromType, draftHasErrors, draftToPatch, methodsForDiscipline, type SizingDraft,
 } from './components/sizingDraft.js';
 
 const airDraft = (patch: Partial<SizingDraft['air']> = {}): SizingDraft => ({
@@ -133,6 +133,35 @@ describe('draftErrors', () => {
     expect(errors.airAspect).toBe(false);
     expect(errors.waterMaxVelocity).toBe(true);
     expect(draftHasErrors(errors)).toBe(true);
+  });
+});
+
+describe('applySuggested', () => {
+  it('fills the air fields with the suggested values', () => {
+    const draft = applySuggested({ ...airDraft({ maxVelocity: '9', maxDrop: '9', shape: 'rectangular', aspect: '2', series: 'free' }), flowUnit: '' }, 'air');
+    expect(draft.flowUnit).toBe('dm³/s');
+    expect(draft.method).toBe('air');
+    expect(draft.air).toEqual({ maxVelocity: '5', maxDrop: '1', shape: 'round', aspect: '4', series: 'standard' });
+  });
+
+  it('fills the water fields and leaves deltaT empty', () => {
+    const draft = applySuggested(waterDraft({ deltaT: '10' }), 'water');
+    expect(draft.flowUnit).toBe('kW');
+    expect(draft.method).toBe('water');
+    expect(draft.water).toEqual({ maxVelocity: '1', maxDrop: '200', deltaT: '' });
+  });
+
+  it('leaves the fields of the other method unchanged', () => {
+    const start = { ...airDraft({ maxVelocity: '7' }), water: { maxVelocity: '3', maxDrop: '4', deltaT: '5' } };
+    expect(applySuggested(start, 'air').water).toEqual(start.water);
+    expect(applySuggested(waterDraft(), 'water').air).toEqual(waterDraft().air);
+  });
+
+  it('does not mutate the input draft', () => {
+    const start = waterDraft({ deltaT: '10' });
+    const snapshot = structuredClone(start);
+    applySuggested(start, 'water');
+    expect(start).toEqual(snapshot);
   });
 });
 
