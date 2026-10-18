@@ -22,7 +22,6 @@ export interface RouteBuildInput {
   mmPerPt: number | null; pageIndex: number;
   /** The number of pages of the file. Default 1. More than 1 gives the error multi-page. */
   pageCount?: number;
-  includeOffGraph: boolean;
   limits?: SizingSettings;
   newSegmentId: () => string; newFittingId: () => string;
 }

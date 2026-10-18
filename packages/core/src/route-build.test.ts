@@ -64,7 +64,6 @@ function input(overrides: Partial<RouteBuildInput> = {}): RouteBuildInput {
     area: AREA,
     mmPerPt: 10,
     pageIndex: 0,
-    includeOffGraph: false,
     newSegmentId: () => `new-s${counter++}`,
     newFittingId: () => `new-f${counter++}`,
     ...overrides,
