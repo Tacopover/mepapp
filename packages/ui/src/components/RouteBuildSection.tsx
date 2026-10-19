@@ -7,6 +7,7 @@ export interface RouteBuildSectionProps {
   /** The inputs of the run. null hides the section. */
   request: RouteRequest | null;
   roomName: (roomId: string) => string;
+  stampName?: (stampId: string) => string;
 }
 
 const DEBOUNCE_MS = 300;
@@ -17,7 +18,7 @@ export function routeRequestKey(request: RouteRequest): string {
   return JSON.stringify([request.startStampId, request.startPortId, request.networkTypeId, request.scope.kind, ids, request.includeOutsideRooms, request.portsPerStamp]);
 }
 
-export function RouteBuildSection({ sceneRef, request, roomName }: RouteBuildSectionProps) {
+export function RouteBuildSection({ sceneRef, request, roomName, stampName }: RouteBuildSectionProps) {
   const scene = sceneRef.current;
   const [view, setView] = useState<RoutePlanView | null>(null);
   const [pending, setPending] = useState(false);
@@ -68,7 +69,7 @@ export function RouteBuildSection({ sceneRef, request, roomName }: RouteBuildSec
 
   if (!scene || !request) return null;
 
-  const lines = view ? routeBuildLines(view.plan, { room: roomName, unit: view.flowUnit ?? '' }) : [];
+  const lines = view ? routeBuildLines(view.plan, { room: roomName, stamp: stampName, unit: view.flowUnit ?? '' }) : [];
   const hasNoLimitsLine = view?.plan.warnings.some((w) => w.code === 'no-limits') ?? false;
   const sizeAvailable = !!view && view.status === 'ok' && view.hasLimits && !hasNoLimitsLine;
   const canPlace = !!view && view.status === 'ok' && view.plan.segments.length > 0 && !pending;

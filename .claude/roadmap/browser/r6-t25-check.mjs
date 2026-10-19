@@ -173,6 +173,13 @@ try {
          s.transform = { ...s.transform, rotationDegrees: rotations[i % 3] };
        });`,
     );
+    await openRun('heating-water', [], 'flow');
+    const multi = await H.lineOf('multi-port-stamps');
+    console.log(`multi-port-stamps: ${JSON.stringify(multi)}`);
+    check(multi && multi.severity === 'info' && multi.text.includes('(port 1 of 2)') && multi.text.includes('Flow and return depend on the run order'), '4: the Note multi-port-stamps names the used port and says the sides depend on the run order', JSON.stringify(multi));
+    await H.scrollTo('route-build-line-multi-port-stamps', 'center');
+    await shot('T25-multi-port');
+    await H.closeDialog();
     const r1 = await H.placeRun({ type: 'heating-water', port: 'flow' });
     const e1 = await H.exp();
     const endsOn = (e, id) => e.segs.filter((s) => [s.endpointA, s.endpointB].some((x) => x.kind === 'port' && x.elementId === id));

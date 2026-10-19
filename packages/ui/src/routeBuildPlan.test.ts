@@ -4,7 +4,7 @@ import { buildText, routeBuildLines, routeBuildSeverityLabel, routeBuildSummary,
 
 const SAMPLE_PARAMS: Record<string, string | number> = {
   n: 1234, count: 1234, length: 1234, segments: '1234 segments', fittings: '1234 fittings', rooms: 'Shaft A, Shaft B, Shaft C, Stair D, Stair E, Office F, Office G',
-  ports: '1234 ports', b90: '1234 bends of 90 degrees', b45: '1234 bends of 45 degrees', total: 1234, cap: 1234, unit: 'dm³/s', times: '1234 times', room: 'Shaft A',
+  stamps: 'Radiator 1 (port 1 of 2), and 12 more', ports: '1234 ports', b90: '1234 bends of 90 degrees', b45: '1234 bends of 45 degrees', total: 1234, cap: 1234, unit: 'dm³/s', times: '1234 times', room: 'Shaft A',
 };
 const DUTCH_WORDS = ['de ', 'het ', 'een ', 'niet ', 'kamer'];
 
@@ -19,7 +19,7 @@ const ALL_CODES: RoutePlanWarningCode[] = [
   'multi-page', 'no-calibration', 'area-empty', 'gravity-not-routed', 'start-error', 'foreign-start', 'no-targets', 'start-unreachable', 'internal-join',
   'free-angle', 'wall-crossings', 'shaft-crossing', 'room-off-graph', 'ports-left', 'existing-crossings', 'existing-overlap',
   'same-type-join', 'short-leg', 'capacity-over', 'capacity-unit', 'no-limits',
-  'removes-routed', 'extends-stub', 'rooms-skipped', 'shares-lane', 'hand-kept-size', 'held-by-hand', 'draft-2d',
+  'removes-routed', 'extends-stub', 'rooms-skipped', 'shares-lane', 'hand-kept-size', 'held-by-hand', 'multi-port-stamps', 'draft-2d',
 ];
 
 describe('build texts', () => {
@@ -70,6 +70,15 @@ describe('routeBuildLines', () => {
     const warnings = ALL_CODES.map((code) => ({ code, severity: 'warning' as const, count: 2, ids: ['a'] }));
     const hinted = routeBuildLines({ warnings }, names).filter((line) => line.hint !== '').map((line) => line.code);
     expect(hinted).toEqual(['wall-crossings', 'shaft-crossing']);
+  });
+
+  it('names the first stamp with its used port and counts the others for multi-port-stamps', () => {
+    const named = { room: names.room, unit: '', stamp: (id: string) => `Radiator ${id}` };
+    const [one] = routeBuildLines({ warnings: [{ code: 'multi-port-stamps', severity: 'info', count: 1, ids: ['7'], stamps: [{ id: '7', used: 1, open: 2 }] }] }, named);
+    const [many] = routeBuildLines({ warnings: [{ code: 'multi-port-stamps', severity: 'info', count: 4, ids: ['7', '8', '9', '10'], stamps: [{ id: '7', used: 2, open: 3 }, { id: '8', used: 1, open: 2 }] }] }, named);
+    expect(one!.text).toBe('A stamp with several open ports: Radiator 7 (port 1 of 2). Flow and return depend on the run order.');
+    expect(many!.text).toBe('Stamps with several open ports: Radiator 7 (port 2 of 3), and 3 more. Flow and return depend on the run order.');
+    expect(many!.text.length).toBeLessThanOrEqual(140);
   });
 
   it('counts the routed segments that hand-edited items still hold', () => {

@@ -11,12 +11,12 @@ import { elbowPath, insideRouteArea } from './route-layout.js';
 import { buildRouteItems, connectLoosePorts, type TopologyPort } from './route-topology.js';
 import { checkRouteStart } from './route-start.js';
 import { canJoinPoint, checkExisting, checkInvariant, distanceToPiece, makeCrossesExisting, NEAR_ITEM_MM } from './route-checks.js';
-import type { RoutePort, RouteStamp } from './route-ports.js';
+import { openPortsOf, type RoutePort, type RouteStamp } from './route-ports.js';
 import type { RouteArea } from './route-area.js';
 import type { Room } from './rooms/room.js';
 import type { SizingSettings } from './sizing-settings.js';
 import { ROUTE_GRAVITY_TYPE_IDS } from './route-plan-warnings.js';
-import type { RoutePlanWarning } from './route-plan-warnings.js';
+import type { MultiPortStamp, RoutePlanWarning } from './route-plan-warnings.js';
 import { crossingsAlongPath } from './route-crossings.js';
 import { solveFlow } from './flow.js';
 import { sizeNetwork, type SizedSegment } from './sizing-network.js';
@@ -162,6 +162,20 @@ export function resolveStart(input: RouteBuildInput, reduced: { segments: Segmen
     return { ok: false };
   }
   return { ok: true, pointMm: { x: fitting.position.x * mmPerPt, y: fitting.position.y * mmPerPt }, stubSegmentId: stub.id, stubFittingId: fitting.id };
+}
+
+/** The connected target stamps that have more than one open port of the routed type, with the position of the used port among the open ports. Sorted by stamp id. */
+function multiPortStamps(stamps: readonly RouteStamp[], networkTypeId: string, startStampId: string, connected: readonly RoutePort[]): MultiPortStamp[] {
+  const open = openPortsOf(stamps).filter((port) => port.networkTypeId === networkTypeId && port.stampId !== startStampId);
+  const result: MultiPortStamp[] = [];
+  for (const stampId of [...new Set(connected.map((port) => port.stampId))].sort()) {
+    const ofStamp = open.filter((port) => port.stampId === stampId);
+    if (ofStamp.length < 2) continue;
+    const used = connected.find((port) => port.stampId === stampId)!;
+    const index = ofStamp.findIndex((port) => port.portId === used.portId);
+    result.push({ id: stampId, used: index < 0 ? 1 : index + 1, open: ofStamp.length });
+  }
+  return result;
 }
 
 /** The marked segments that are joined to the start by segments and fittings (port groups left out) and that the removal leaves in place: a hand-drawn or hand-edited item holds them. */
@@ -464,6 +478,8 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
   if (!sized) warnings.push({ code: 'no-limits', severity: 'warning' });
   const shortLegs = shortLegCount(items.segments, sizes, mmPerPt);
   if (shortLegs > 0) warnings.push({ code: 'short-leg', severity: 'warning', count: shortLegs });
+  const multiPort = multiPortStamps(input.state.stamps, input.networkTypeId, input.startStampId, connectedPorts);
+  if (multiPort.length > 0) warnings.push({ code: 'multi-port-stamps', severity: 'info', count: multiPort.length, ids: multiPort.map((entry) => entry.id), stamps: multiPort });
   warnings.push({ code: 'draft-2d', severity: 'info' });
 
   const roomsWithPorts = new Set(connectedPorts.map((port) => port.roomId).filter((id): id is string => id !== null && grouped.byRoom.has(id)));

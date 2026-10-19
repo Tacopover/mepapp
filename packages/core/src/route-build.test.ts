@@ -254,6 +254,30 @@ describe('groupTargetPorts', () => {
   });
 });
 
+describe('planRoute multi-port stamps', () => {
+  const rad = { ...stamp('rad', 'terminal', [{ id: 'a', name: 'A', fractionX: 0, fractionY: 0 }, { id: 'b', name: 'B', fractionX: 1, fractionY: 1 }]), routingTargets: { a: 'supply-air', b: 'supply-air' } };
+  const radTarget: RoutePort = { stampId: 'rad', portId: 'a', networkTypeId: 'supply-air', world: { x: 0, y: 0 }, roomId: 'r1' };
+
+  it('gives an info line with the used port and the open ports of a stamp with two open ports', () => {
+    const result = planRoute(input({ state: withState({ stamps: [ahu, rad] }), targetPorts: [radTarget] }));
+    expect(result.status).toBe('ok');
+    expect(result.plan.warnings).toContainEqual({ code: 'multi-port-stamps', severity: 'info', count: 1, ids: ['rad'], stamps: [{ id: 'rad', used: 1, open: 2 }] });
+    expect(codes(result).at(-1)).toBe('draft-2d');
+  });
+
+  it('gives no line when the other port of the stamp already has a segment', () => {
+    const held = { ...rad, portSegmentTypes: { a: 'supply-air' } };
+    const second: RoutePort = { ...radTarget, portId: 'b' };
+    const result = planRoute(input({ state: withState({ stamps: [ahu, held] }), targetPorts: [second] }));
+    expect(codes(result)).not.toContain('multi-port-stamps');
+  });
+
+  it('gives no line for a stamp with one open port', () => {
+    const result = planRoute(input());
+    expect(codes(result)).not.toContain('multi-port-stamps');
+  });
+});
+
 describe('planRoute result', () => {
   it('counts rooms and ports in the stats', () => {
     const targetPorts = [target('a', 'r1'), target('b', 'r1'), target('c', 'r2'), target('d', null)];

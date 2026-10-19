@@ -396,6 +396,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
             <RouteBuildSection
               sceneRef={sceneRef}
               request={buildRequest}
+              stampName={(id) => { const s = stamps.find((x) => x.id === id); return s ? labelOf(s) : id; }}
               roomName={(id) => {
                 const index = rooms.findIndex((r) => r.id === id);
                 if (index < 0) return id;

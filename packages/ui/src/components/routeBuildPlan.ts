@@ -66,7 +66,9 @@ export const TEXTS = {
   'w_shares-lane_one': 'This route runs on top of 1 segment of an earlier run. Move one run by hand.',
   'w_hand-kept-size': '{count} hand-drawn segments of this network keep their size.',
   'w_hand-kept-size_one': '1 hand-drawn segment of this network keeps its size.',
-  'w_held-by-hand': '{count} routed segments stay joined to the start through hand-edited items. They are not removed.',
+  'w_multi-port-stamps': 'Stamps with several open ports: {stamps}. Flow and return depend on the run order.',
+  'w_multi-port-stamps_one': 'A stamp with several open ports: {stamps}. Flow and return depend on the run order.',
+  'w_held-by-hand':'{count} routed segments stay joined to the start through hand-edited items. They are not removed.',
   'w_held-by-hand_one': '1 routed segment stays joined to the start through hand-edited items. It is not removed.',
 } as const;
 
@@ -88,6 +90,8 @@ export interface RouteBuildLine {
 
 export interface RouteBuildNames {
   room: (roomId: string) => string;
+  /** The name of a stamp for the line multi-port-stamps. Default: the stamp id. */
+  stamp?: (stampId: string) => string;
   /** The flow unit text. May be ''. */
   unit: string;
 }
@@ -196,6 +200,14 @@ function warningText(warning: RoutePlanWarning, names: RouteBuildNames): { text:
       return { text: buildText(one ? 'w_shares-lane_one' : 'w_shares-lane', { count }), hint: '' };
     case 'hand-kept-size':
       return { text: buildText(one ? 'w_hand-kept-size_one' : 'w_hand-kept-size', { count }), hint: '' };
+    case 'multi-port-stamps': {
+      const [first] = warning.stamps ?? [];
+      const name = first ? (names.stamp ? names.stamp(first.id) : first.id) : '';
+      const entry = first ? `${name.length > 14 ? `${name.slice(0, 13)}…` : name} (port ${first.used} of ${first.open})` : '';
+      const more = count - 1;
+      const stamps = more > 0 ? `${entry}${buildText('moreRooms', { n: more })}` : entry;
+      return { text: buildText(one ? 'w_multi-port-stamps_one' : 'w_multi-port-stamps', { stamps }), hint: '' };
+    }
     case 'held-by-hand':
       return { text: buildText(one ? 'w_held-by-hand_one' : 'w_held-by-hand', { count }), hint: '' };
     case 'draft-2d':
