@@ -26,13 +26,13 @@ Terms (the terms of the overview apply). New terms:
 
 Rule of the brief: a stored field, a changed meaning of a stored value, or a choice that the roadmap does not cover is a question. The planner does not decide it. Each question has options, a recommendation and, only when the choice is easy to reverse, a provisional default that the director may take without a stop.
 
-Three questions change stored data ([data model]: Q-R7-01, Q-R7-02 option B, Q-R7-07 option B). The tasks that depend on them are marked "Waits for" in section 6. Q-R7-01, Q-R7-02 and Q-R7-07 block T01. Q-R7-04 blocks T02. The tasks T03, T05 and T14 can start before any answer.
+Five choices change stored data ([data model]: Q-R7-01 every option, Q-R7-02 B, Q-R7-03 C, Q-R7-07 B, Q-R7-08 B). All of them join the single schema step 22, so the step is written once. Only Q-R7-01 blocks T01: the provisional defaults Q-R7-02 A, Q-R7-03 A, Q-R7-07 A and Q-R7-08 A store nothing. If the user picks one of the other four options, that answer also blocks T01 and its field joins step 22. Q-R7-04 blocks T02. The tasks T03, T05, T06, T07, T09, T14 and T15 can start before any answer.
 
 ### Q-R7-01 [data model]. What are the new fields on `CircuitType` and what do they mean?
 
 D-R7-01 A names "`maxTerminals`, `diversity`". It does not say the exact names, the types, or what `diversity` does. `Circuit` already has `diversityPercent` (`circuit.ts:44`), which is a per-circuit value that inherits from the panel.
 
-- **A.** Two optional fields on `CircuitType`: `maxTerminals?: number` (a whole number of 1 or more) and `diversityPercent?: number` (above 0, at most 100). `defaultCapacity` is the load limit in `units`. R7 writes `diversityPercent` of the type into each new circuit only when the circuit would otherwise inherit nothing. The limit check uses the load times `diversityPercent` ÷ 100. Schema step 22.
+- **A.** Two optional fields on `CircuitType`: `maxTerminals?: number` (a whole number of 1 or more) and `diversityPercent?: number` (above 0, at most 100). `defaultCapacity` is the load limit in `units`. R7 does not write the `diversityPercent` of the type into the new circuits; a new circuit inherits from its panel. The type value is a planning factor: the limit check uses the load times `diversityPercent` ÷ 100. Schema step 22.
 - **B.** Only `maxTerminals?`. `defaultCapacity` stays the load limit. No diversity on the type. Schema step 22.
 - **C.** A new object `limits?: { maxTerminals?: number; maxLoad?: number; diversityPercent?: number }` on `CircuitType`, and `defaultCapacity` is not used as a limit. This departs from D-R7-01 A.
 
@@ -54,7 +54,7 @@ Auto-place writes a capacity only for flow, power and amount needs (`placement-r
 
 - **A.** R7 v1 limits by count (`maxTerminals`). It limits by load only with the terminals that have a capacity that the user typed (`setTerminalCapacity`). A terminal without a capacity adds 0 to the load, and the plan shows the Note "N terminals have no power. The load limit counts only terminals with a power."
 - **B.** R7 refuses a terminal without a capacity. The dialog asks the user to enter a power first.
-- **C.** [data model] A default power for each stamp definition (a new field). Not recommended in R7.
+- **C.** [data model] A default power for each stamp definition (a new field, in schema step 22). Not recommended in R7.
 
 **Recommendation: A.** It works on a real drawing today and does not claim a load that nobody entered. **Provisional default: A.**
 
@@ -63,10 +63,10 @@ Auto-place writes a capacity only for flow, power and amount needs (`placement-r
 The library values of `defaultCapacity` are not circuit loads: "Lighting 200 W" and "Fire Alarm 100 W" are the load of one terminal or one small device (`circuit-type-library.ts:12`, `:18`). If R7 used them as a load limit, a lighting circuit would hold 200 W, which is 3 or 4 luminaires of 50 W. The roadmap says "Not verified: the default values."
 
 - **A.** No built-in limit. A type with no `maxTerminals` and a `defaultCapacity` that the user did not set is refused by the dialog ("Set a limit for Lighting first"), with a link to the Circuit types dialog.
-- **B.** Built-in `maxTerminals` for two types, labelled "design practice, not a standard": Lighting 20, Socket Outlets 8. Every other type gets 1 terminal per circuit (an own circuit for each). The load limit is used only when the user edited `defaultCapacity` in the document copy of the type. The library value alone is not a limit.
+- **B.** Built-in `maxTerminals` for four types, labelled "design practice, not a standard": Lighting 20, Socket Outlets 8, Fire Alarm 30, Emergency Lighting 20. Every other library type (Kitchen Appliance, Water Heater, HVAC Unit, EV Charger) gets 1 terminal per circuit, because each is a fixed appliance with an own circuit. A type that the user made has no limit, and the plan shows the Note `no-limit`. The load limit is used only when the user edited `defaultCapacity` in the document copy of the type. The library value alone is not a limit.
 - **C.** Take the library `defaultCapacity` as the load limit (D-R7-01 A read literally).
 
-**Recommendation: B.** It runs at once, and it states in the dialog that the numbers are design practice. The values 20 and 8 are not from a source (not verified); the user changes them in the Circuit types dialog. C would make circuits of 3 luminaires. A blocks a first run. **Provisional default: B** (reversible: the values are one constant each, `DEFAULT_MAX_TERMINALS`).
+**Recommendation: B.** It runs at once, and it states in the dialog that the numbers are design practice. A limit of 1 would be wrong for Fire Alarm and Emergency Lighting: these circuits serve many small devices, so they get a high limit and not an own circuit for each. The values 20, 8, 30 and 20 are not from a source (not verified); the user changes them in the Circuit types dialog. C would make circuits of 3 luminaires. A blocks a first run. **Provisional default: B** (reversible: the values are one constant each, `DEFAULT_MAX_TERMINALS`).
 
 ### Q-R7-05. May one circuit serve more than one room?
 
@@ -102,7 +102,7 @@ R6 marks the items it makes (`routedBy`) so a re-run can remove them. R7 can do 
 Both are "user-editable" in the overview. The room types live in the browser, not in the file (`packages/ui/src/roomTypeStorage.ts:6`).
 
 - **A.** Browser preferences, as P-R4-01 did for the route area (a key such as `mepapp.circuitPrefs.v1`: the list of wet room type ids and the threshold). Not in the file. No schema step.
-- **B.** [data model] Fields on `ProjectDocument`. A schema step.
+- **B.** [data model] Fields on `ProjectDocument`, in schema step 22.
 - **C.** Constants in code, no editing.
 
 **Recommendation: A.** The list changes how the plan is calculated. The result is circuits in the file. **Provisional default: A** (reversible).
@@ -130,7 +130,7 @@ Both are "user-editable" in the overview. The room types live in the browser, no
 | P-R7-ONE | One undo step. It holds all new circuits and all assignments. The strict `addTerminalToCircuitCommand` is the guard for each terminal (it returns null for a terminal that is already on another circuit). Notices follow `createCircuitFromTerminals` (`scene.ts:2021`): one notice for the whole run. | Reuse of the Transaction pattern. |
 | P-R7-PAGE | The command works on the active page and refuses a multi-page file with `routePageProblem` (`packages/core/src/route-input.ts`). | Gap G1 (stamps have no page). The same refusal as R2. |
 | P-R7-SCOPE | The scope is the R2 scope: rooms (a list with check boxes, all checked at first) or the selected stamps. A check box "Include terminals outside rooms" is on. The room list is extracted from `RouteDialog` into a shared component (T14). | Reuse before new (rule 3). |
-| P-R7-LEFT | "Left" is calculated: the unassigned candidates in the chosen scope that the plan does not place, plus the unassigned terminals outside the scope. It is a count, not stored. | Overview: "40 rooms: 22 on panel A, 18 left". |
+| P-R7-LEFT | "Left" is a count of terminals. It is calculated: the unassigned candidates in the chosen scope that the plan does not place, plus the unassigned terminals outside the scope. It is not stored. The dialog says "N terminals on panel A, M terminals left" (the overview wrote "40 rooms: 22 on panel A, 18 left"; the unit is terminals, not rooms). | Overview section 1, R7 example. |
 | P-R7-MENU | The menu item "Make circuits…" goes next to "Route network…" and "Size network…" (`packages/ui/src/components/MenuButton.tsx:170`-`:185`). It has no icon of its own beyond the menu style. | Same place as the other commands. |
 | P-R7-UNITS | The load unit is the `units` text of the circuit type. R7 does not convert units. The dialog shows the unit. | The model has no unit on `terminalCapacities` (gap G16). A type in W with a terminal capacity in another unit is a risk (section 9, R-7). |
 
@@ -138,7 +138,7 @@ Both are "user-editable" in the overview. The room types live in the browser, no
 
 The user opens "Make circuits…", picks a panel, picks the rooms (or the selected terminals), and sees a preview. The preview says how many circuits the command makes for each circuit type, how many terminals each circuit holds, which terminals stay without a circuit and why, and how many unassigned terminals are left for another panel. The user presses "Make circuits". The app creates the circuits on the panel and assigns the terminals. This is one undo step. The new circuits show in the Networks tree and in Circuits mode.
 
-Example (the office floor of the overview). The floor has 40 luminaires and 30 sockets. The user picks panel "A" and the west-wing rooms. With the start limits (Lighting 20, Sockets 8) the command makes light circuits and socket circuits. Every socket circuit and every circuit of a toilet gets a 30 mA device. The dialog says "40 rooms: 22 on panel A, 18 left". The user picks panel "B" and the east-wing rooms. The command assigns only terminals that have no circuit, so it never touches panel A.
+Example (the office floor of the overview). The floor has 40 luminaires and 30 sockets. The user picks panel "A" and the west-wing rooms. With the start limits (Lighting 20, Sockets 8) the command makes light circuits and socket circuits. Every socket circuit and every circuit of a toilet gets a 30 mA device. The dialog says "40 terminals: 22 on panel A, 18 left". The user picks panel "B" and the east-wing rooms. The command assigns only terminals that have no circuit, so it never touches panel A.
 
 Where R7 stops: R7 makes circuits. It does not draw cables, route conduit, balance phases, size breakers or cables, check the total against the main device of the panel, or make a schematic. It changes no network type, no routing target and no segment.
 
@@ -158,16 +158,16 @@ Where R7 stops: R7 makes circuits. It does not draw cables, route conduit, balan
 | Auto-place capacity rule | `packages/core/src/rooms/placement-rule.ts:529` | Light and Sockets get no capacity (Q-R7-03). |
 | `autoPlaced.ruleId` | `packages/core/src/stamp.ts:27` | The classification of an auto-placed stamp (Q-R7-02 A). |
 | The Route dialog, its room list and the multi-page refusal | `packages/ui/src/components/RouteDialog.tsx:316`-`:366`, `packages/core/src/route-input.ts` | The room list is extracted (T14). The refusal is reused. |
-| Menu items and dialog wiring | `packages/ui/src/components/MenuButton.tsx:170`-`:185`, `packages/ui/src/App.tsx:456`, `:1674` | The new menu item and dialog. |
-| Circuit types dialog | `packages/ui/src/components/CircuitTypesDialog.tsx`, opened at `App.tsx:1558` | The dialog edits the new fields (T08). |
+| Menu items and dialog wiring | `packages/ui/src/components/MenuButton.tsx:170`-`:185`, `packages/ui/src/App.tsx:456` (the Route dialog state) and `:1674` (its render) | The model for the new menu item and dialog. |
+| Circuit types dialog | `packages/ui/src/components/CircuitTypesDialog.tsx`, state at `App.tsx:396`, rendered at `:1871`-`:1872`, opened through the prop at `:1558` | The dialog edits the new fields (T08). |
 | Schema | `packages/core/src/project.ts:22` (21), clean-up pattern at `:445`-`:470` (`withCleanRoutedMark`, `withCleanRoutingTargets`, `withCleanSizing`) | Step 22 follows this pattern. |
 | Browser helpers | `.claude/roadmap/browser/lib.mjs`, `r4-lib.mjs` (`setupRooms`), `r6-lib.mjs`, `r6-ui-lib.mjs` | A new `r7-lib.mjs` builds the project. |
 
-Search results (the implementers repeat them): a search of `packages` for `maxTerminals` finds nothing. A search for a function that reads `defaultCapacity` as a limit finds the library, the validation and the dialog only (`packages/ui/src/components/CircuitTypesDialog.tsx`). Not verified: that no other file reads it. T02 runs the search again.
+Search results (the implementers repeat them): a search of `packages` for `maxTerminals` finds nothing. A search of `packages` for `defaultCapacity` finds these files that use it: `circuit.ts`, `circuit-type-library.ts` (library and validation), `CircuitTypesDialog.tsx`, `scene.ts` and `document.ts` (create and copy of types), `network.ts` and `network-type-library.ts` (network types, another field), and tests. The check did not read each hit, so the claim "no code reads it as a limit" is not verified for `scene.ts` and `document.ts`. T02 reads each hit and reports.
 
 ## 3. Research
 
-No new source is needed for the algorithm. The planner is a first-fit packing of rooms in a repeatable order.
+No new source is needed for the algorithm. The planner is a next-fit packing of rooms in a repeatable order.
 
 Sources for the limits (all "design practice"):
 - NEN 1010:2020 no longer sets a count of sockets or luminaires per circuit. IEC 60364 does not set it either. Source named in the roadmap: Techniek Nederland, webinar NEN 1010:2020, https://technieknederland.nl/stream/presentatie-webinar-13-oktober-2021-wat-is-nieuw-in-de-norm-nen-10102020. Not read again in this plan.
@@ -205,11 +205,11 @@ export interface CircuitType {
 
 ```ts
 // packages/core/src/circuit-limits.ts (new)
-export const DEFAULT_MAX_TERMINALS: Readonly<Record<string, number>> = { lighting: 20, sockets: 8 };   // Q-R7-04 B
+export const DEFAULT_MAX_TERMINALS: Readonly<Record<string, number>> = { lighting: 20, sockets: 8, 'fire-alarm': 30, 'emergency-lighting': 20 };   // Q-R7-04 B
 export const OWN_CIRCUIT_DEFAULT_THRESHOLD = 2000;                                                     // P-R7-OWN
 export const RCD_DEFAULT_MILLIAMPS = 30;                                                               // P-R7-RCD
-export interface CircuitLimits { maxTerminals: number | null; maxLoad: number | null; diversityPercent: number; units: string }
-/** The limits of a circuit type. `library` is the type with the same id in CIRCUIT_TYPE_LIBRARY, if any. The load limit counts only when the document copy has a defaultCapacity that differs from the library value (Q-R7-04 B). */
+// The interface `CircuitLimits { maxTerminals: number | null; maxLoad: number | null; diversityPercent: number; units: string }` is declared in circuit-plan.ts (T06), so T06 does not depend on T02. circuit-limits.ts imports it.
+/** The limits of a circuit type. `library` is the type with the same id in CIRCUIT_TYPE_LIBRARY, if any. `maxLoad` is null when the type has no library entry, when `defaultCapacity` is 0 or less, or when it equals the library value. Else it is `defaultCapacity` (Q-R7-04 B). */
 export function circuitLimitsOf(type: CircuitType, library: CircuitType | undefined): CircuitLimits;
 /** The reason a limit value is not acceptable, or null. */
 export function validateCircuitLimits(fields: { maxTerminals?: number; diversityPercent?: number }): string | null;
@@ -229,8 +229,7 @@ export interface CircuitPlanInput {
   panel: { id: string; position: Vec2 };
   candidates: readonly CircuitCandidate[];
   classify: Readonly<Record<string, string | null>>;           // candidate id -> circuit type id, null = no type
-  types: readonly CircuitType[];                                // the effective list (listCircuitTypes)
-  libraryTypes: readonly CircuitType[];
+  limits: Readonly<Record<string, CircuitLimits>>;              // circuit type id -> ready limits (the scene calls circuitLimitsOf, T10)
   rooms: readonly Room[];                                       // for the label points and the room names
   wetRoomTypeIds: ReadonlySet<string>;
   ownCircuitThreshold: number;
@@ -247,7 +246,7 @@ Rules of `planCircuits` (all pure; the same input gives the same output):
 1. Group the candidates by (circuit type, wet flag). A candidate with no type goes to `unplaced` with `no-type`.
 2. A type with no limit (`maxTerminals` null and `maxLoad` null) puts each candidate on an own circuit and gives the warning `no-limit` (Q-R7-04 B makes this rare).
 3. A candidate with a capacity above the threshold gets an own circuit (`reason: 'own'`).
-4. In each group, sort the rooms by P-R7-ORDER. Pack with first-fit: add the next whole room while the count and the load (times the diversity) stay within the limits. A room that alone is above a limit is split (`room-split`), and the split follows the nearest-neighbour order of its terminals. With `spanRooms` false, every room starts a new circuit.
+4. In each group, sort the rooms by P-R7-ORDER. Pack with next-fit: add the next whole room to the open circuit while the count and the load (times the diversity) stay within the limits. When a room does not fit, close the open circuit and start a new one with that room. A closed circuit is never reopened (next-fit, not first-fit: a later small room does not jump back to an earlier circuit, so circuits stay near each other). A room that alone is above a limit is split (`room-split`), and the split follows the nearest-neighbour order of its terminals. With `spanRooms` false, every room starts a new circuit.
 5. Every candidate appears once: in one circuit or in `unplaced`. The total count in the circuits plus `unplaced` equals the count of candidates.
 6. `rcdMilliamps` is set (30) for a circuit of the type `sockets` and for a wet circuit when `rcd` is true.
 7. A terminal that is not a candidate (already on a circuit) never appears in the plan.
@@ -305,37 +304,37 @@ Phases: **A** the model (T01, T02), **B** the engines in core (T03 to T07), **C*
 
 | Task | Title | Depends on | Waits for | Files (main) |
 |---|---|---|---|---|
-| T01 | Schema step 22: the `CircuitType` limit fields and the clean-up | none | Q-R7-01, Q-R7-02, Q-R7-07 | `circuit.ts`, `project.ts`, `project.test.ts` |
+| T01 | Schema step 22: the `CircuitType` limit fields and the clean-up | none | Q-R7-01 (and any other [data model] answer that is not the provisional default) | `circuit.ts`, `project.ts`, `project.test.ts` |
 | T02 | Limits: `circuitLimitsOf`, the defaults, the validation | T01 | Q-R7-04 | `circuit-limits.ts`, `circuit-type-library.ts`, tests |
 | T03 | Candidate finder | none | none | `circuit-candidates.ts`, tests |
 | T04 | Classification input and the rule-need lookup | T03 | Q-R7-02 | `circuit-candidates.ts`, tests |
-| T05 | The packing function (rooms, first-fit, nearest-first) | none | none | `circuit-pack.ts`, tests |
-| T06 | `planCircuits`: groups, own circuits, wet rooms, limits | T02, T03, T05 | Q-R7-03, Q-R7-05, Q-R7-06 | `circuit-plan.ts`, tests |
+| T05 | The packing function (rooms, next-fit, nearest-first) | none | none | `circuit-pack.ts`, tests |
+| T06 | `planCircuits`: groups, own circuits, wet rooms, limits (declares `CircuitLimits`, takes ready limits as input) | T03, T05 | none (uses the provisional defaults of Q-R7-03, -05, -06) | `circuit-plan.ts`, tests |
 | T07 | `planCircuits`: the RCD device, warnings, invariants | T06 | Q-R7-09 | `circuit-plan.ts`, tests |
 | T08 | Circuit types dialog: the two new fields | T01, T02 | none | `CircuitTypesDialog.tsx`, UI tests |
 | T09 | Preference storage: wet room types and the threshold | none | Q-R7-08 | `circuitPrefsStorage.ts`, UI tests |
-| T10 | Scene: `planCircuits` (read only) | T04, T07 | none | `scene.ts`, `index.ts` |
+| T10 | Scene: `planCircuits` (read only; calls `circuitLimitsOf`) | T02, T04, T07 | none | `scene.ts`, `index.ts` |
 | T11 | Scene: `applyCircuits` | T10 | none | `scene.ts` |
 | T12 | Browser setup `r7-lib.mjs` and the scene check | T11 | none | `.claude/roadmap/browser/r7-lib.mjs`, `r7-t12-check.mjs` |
 | T13 | Scene check: undo, exclusivity, second panel, library types | T12 | none | `r7-t13-check.mjs` |
 | T14 | Extract the room list from `RouteDialog` | none | none | `RoomScopeList.tsx`, `RouteDialog.tsx`, regression check |
 | T15 | Texts and line builders | T07 | none | `circuitPlan.ts`, `circuitPlan.test.ts` |
 | T16 | Dialog: inputs, scope, panel, classification table | T10, T14, T09 | none | `MakeCircuitsDialog.tsx`, `theme.css` |
-| T17 | Dialog: preview section | T15, T16 | none | `MakeCircuitsDialog.tsx` |
-| T18 | Dialog: Place, the RCD and span check boxes, result | T11, T17 | none | `MakeCircuitsDialog.tsx`, `r7-t18-check.mjs` |
-| T19 | Menu item and App wiring | T16 | none | `MenuButton.tsx`, `App.tsx` |
+| T19 | Menu item and App wiring (runs right after T16) | T16 | none | `MenuButton.tsx`, `App.tsx` |
+| T17 | Dialog: preview section | T15, T16, T19 | none | `MakeCircuitsDialog.tsx` |
+| T18 | Dialog: Place, the RCD and span check boxes, result | T11, T17, T19 | none | `MakeCircuitsDialog.tsx`, `r7-t18-check.mjs` |
 | T20 | Browser: second panel, leftovers, edits, Circuits mode | T18, T19 | none | `r7-t20-check.mjs` |
 | T21 | Browser: save, load, PDF round trip, schema 21 file | T18 | none | `r7-t21-check.mjs` |
 | T22 | Browser: wet rooms, own circuits, no-power note, narrow, dark | T18 | none | `r7-t22-check.mjs` |
 | T23 | Circuit types dialog check and screenshots | T08 | none | `r7-t23-check.mjs` |
 | T24 | The part check | all | none | `.claude/roadmap/browser/r7-check.mjs` |
 
-**Order for the director.** The questions are open. Start T03, T05, T14 and T09 (no wait on a data-model answer; T09 needs only Q-R7-08, which has a provisional default). T01 and T02 wait for Q-R7-01, Q-R7-02 and Q-R7-07, because the three answers decide what schema step 22 holds. Do not write step 22 twice. If the user is slow, the director may take the provisional defaults (Q-R7-02 A, Q-R7-07 A) and the recommendation of Q-R7-01 (A) only if the user agreed to run without waiting; Q-R7-01 has no provisional default, so T01 stays blocked. T06 and T07 can start with the provisional defaults of Q-R7-03, -05, -06 and -09, because each one is a parameter of the planner and not a stored value. R7 needs nothing from R2 to R6 except two reused functions. R6 is done, so the schema number 22 is right. The director reads `CURRENT_SCHEMA_VERSION` at the start of T01 and uses the next number if it is not 21.
+**Order for the director.** The questions are open. Start T03, T05, T14 and T09 (no wait on a data-model answer; T09 needs only Q-R7-08, which has a provisional default). T01 waits for Q-R7-01 only, because the provisional defaults of the other [data model] questions (Q-R7-02 A, -03 A, -07 A, -08 A) store nothing. If the user answers one of those with a stored option, that field joins step 22 and T01 waits for that answer too. Do not write step 22 twice. Q-R7-01 has no provisional default, so T01 stays blocked until the user answers. T02 waits for Q-R7-04 and depends on T01. The free tasks, with no dependency on T01 or T02, are: T03, T05, T06 (the planner takes ready `CircuitLimits`; the test inputs are hand-made), T07, T09, T14 and T15. T04 and T08 follow their own dependencies. T06 and T07 use the provisional defaults of Q-R7-03, -05, -06 and -09, because each one is a parameter of the planner and not a stored value. The scene tasks T10 and T11 and everything after them need T02, so they wait for T01. R7 needs nothing from R2 to R6 except two reused functions. R6 is done, so the schema number 22 is right. The director reads `CURRENT_SCHEMA_VERSION` at the start of T01 and uses the next number if it is not 21.
 
-Jobs on the same file run one after another, in the order of the task numbers: T06 and T07 (`circuit-plan.ts`); T10 and T11 (`scene.ts`); T16, T17 and T18 (`MakeCircuitsDialog.tsx`). `packages/core/src/index.ts` is a shared file: each task adds its export lines, one task after another.
+Jobs on the same file run one after another, in the order of the task numbers: T06 and T07 (`circuit-plan.ts`); T10 and T11 (`scene.ts`); T16, T17 and T18 (`MakeCircuitsDialog.tsx`; T19 runs between T16 and T17 and edits other files). `packages/core/src/index.ts` is a shared file: each task adds its export lines, one task after another.
 
 ### T01. Schema step 22: the `CircuitType` limit fields and the clean-up
-- **Depends on:** none. **Waits for:** Q-R7-01, Q-R7-02, Q-R7-07.
+- **Depends on:** none. **Waits for:** Q-R7-01 only (Q-R7-02 A, -03 A, -07 A and -08 A store nothing; a stored option of one of them joins this task).
 - **Files:** `packages/core/src/circuit.ts`, `packages/core/src/project.ts`, `packages/core/src/project.test.ts`, `packages/core/src/index.ts`. The implementer searches `packages` for tests that name 21 (`grep -rn "schemaVersion\|CURRENT_SCHEMA_VERSION"`).
 - **Shapes:** section 4.1. `CURRENT_SCHEMA_VERSION = 22`. The step `{ fromVersion: 21, toVersion: 22, ... }` with a comment in the style of the step 20 to 21. `withCleanCircuitLimits(type)` in `loadProject`.
 - **Must not touch:** the other steps, `serializeProject`, the scene, the circuit commands.
@@ -346,18 +345,18 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 ### T02. Limits: `circuitLimitsOf`, the defaults, the validation
 - **Depends on:** T01. **Waits for:** Q-R7-04.
 - **Files:** `packages/core/src/circuit-limits.ts` (new), `packages/core/src/circuit-type-library.ts` (`validateCircuitTypeFields` gets the two fields), tests, `index.ts`.
-- **Shapes:** section 4.2. `circuitLimitsOf(type, library)`: `maxTerminals` from the type, else `DEFAULT_MAX_TERMINALS[type.id]`, else 1 for a library type, else null for a type the user made (Q-R7-04 B). `maxLoad` is `defaultCapacity` only when it differs from the library value; else null. `diversityPercent` defaults to 100.
+- **Shapes:** section 4.2. `circuitLimitsOf(type, library)`: `maxTerminals` from the type, else `DEFAULT_MAX_TERMINALS[type.id]`, else 1 for a library type, else null for a type the user made (Q-R7-04 B). `maxLoad` is `defaultCapacity` only when the type has a library entry, `defaultCapacity` is above 0, and it differs from the library value; else null. (`createCircuitType` sets `defaultCapacity` 0 for a new type, `scene.ts:1846`, so 0 must mean "no load limit".) `diversityPercent` defaults to 100.
 - **Must not touch:** `CIRCUIT_TYPE_LIBRARY` values, `computeCircuitCapacity`.
-- **Tests (core):** the library type `sockets` gives 8 and no load limit; `lighting` gives 20; `kitchen-appliance` gives 1; a user type with no field gives null; a document copy of `sockets` with `defaultCapacity` 3000 gives `maxLoad` 3000; `maxTerminals` of the type wins over the default; `validateCircuitTypeFields` refuses `maxTerminals` 0 and 2.5 and `diversityPercent` 0 and 101, and accepts absent values. Re-run the search for readers of `defaultCapacity` and report any (section 2).
+- **Tests (core):** the library type `sockets` gives 8 and no load limit; `lighting` gives 20; `kitchen-appliance` gives 1; `fire-alarm` gives 30; a user type with no field gives null `maxTerminals`; a user type with `defaultCapacity` 0 gives null `maxLoad`; a user type with `defaultCapacity` 500 and no library entry gives null `maxLoad`; a library type whose copy has `defaultCapacity` 0 gives null `maxLoad`; a document copy of `sockets` with `defaultCapacity` 3000 gives `maxLoad` 3000; `maxTerminals` of the type wins over the default; `validateCircuitTypeFields` refuses `maxTerminals` 0 and 2.5 and `diversityPercent` 0 and 101, and accepts absent values. Re-run the search for readers of `defaultCapacity` and report any (section 2).
 - **Verify:** core tests; `pnpm build`.
 - **Size:** about 60 lines and 70 of tests.
 
 ### T03. Candidate finder
 - **Depends on:** none.
 - **Files:** `packages/core/src/circuit-candidates.ts` (new), `circuit-candidates.test.ts`, `index.ts`.
-- **Shapes:** section 4.2 `findCircuitCandidates`. A candidate is a stamp with `category: 'terminal'` that `findCircuitForTerminal` does not find. The room is `roomsAtPoint(rooms, stamp.transform.position, pageIndex)[0]` (the smallest room). Scope `rooms`: the terminal is in when its room is checked, or when it has no room and `includeOutside` is true. Scope `stamps`: the ids in the list. `equipmentSkipped` counts stamps with `category: 'equipment'` in the scope. `outsideScopeUnassigned` counts unassigned terminals not in the scope. `capacity` is the entry of `terminalCapacities` or null.
+- **Shapes:** section 4.2 `findCircuitCandidates`. A candidate is a stamp with `category: 'terminal'` that `findCircuitForTerminal` does not find. The room is `roomsAtPoint(rooms, stamp.transform.position, pageIndex)[0]` (the smallest room). Scope `rooms`: the terminal is in when its room is checked, or when it has no room and `includeOutside` is true. Scope `stamps`: the ids in the list. `equipmentSkipped` counts stamps with `category: 'equipment'` in the scope, except a stamp that backs a `Panel` (the input holds the set of panel stamp ids, `Panel.equipmentStampId`): a panel is not an appliance and is not counted. `outsideScopeUnassigned` counts unassigned terminals not in the scope. `capacity` is the entry of `terminalCapacities` or null.
 - **Must not touch:** the circuit commands, the scene.
-- **Tests (core):** a terminal on a circuit is never a candidate; a terminal in two nested rooms takes the smaller room; a terminal outside all rooms is in only with `includeOutside`; the `stamps` scope ignores the rooms; equipment is counted and not returned; a terminal on another page is out; the counts add up (`candidates + outsideScopeUnassigned` equals all unassigned terminals on the page).
+- **Tests (core):** a terminal on a circuit is never a candidate; a terminal in two nested rooms takes the smaller room; a terminal outside all rooms is in only with `includeOutside`; the `stamps` scope ignores the rooms; equipment is counted and not returned; an equipment stamp that backs a panel is not counted; a terminal on another page is out; the counts add up (`candidates + outsideScopeUnassigned` equals all unassigned terminals on the page).
 - **Verify:** core tests; `pnpm build`.
 - **Size:** about 70 lines and 90 of tests.
 
@@ -373,25 +372,25 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 ### T05. The packing function
 - **Depends on:** none.
 - **Files:** `packages/core/src/circuit-pack.ts` (new), `circuit-pack.test.ts`, `index.ts`.
-- **Shapes:** `packRooms(units: { roomId: string; terminalIds: string[]; loads: number[]; distance: number }[], limits: { maxTerminals: number | null; maxLoad: number | null; diversityPercent: number }, options: { spanRooms: boolean }): { terminalIds: string[]; roomIds: string[]; reason: 'pack' | 'room-split' }[]`. Rooms sort by `distance`, then id. First-fit as in section 4.2 rule 4. The split of one room uses the order that the caller gives in `terminalIds` (the caller sorts by nearest neighbour). A limit of null does not limit.
+- **Shapes:** `packRooms(units: { roomId: string; terminalIds: string[]; loads: number[]; distance: number }[], limits: { maxTerminals: number | null; maxLoad: number | null; diversityPercent: number }, options: { spanRooms: boolean }): { terminalIds: string[]; roomIds: string[]; reason: 'pack' | 'room-split' }[]`. Rooms sort by `distance`, then id. Next-fit as in section 4.2 rule 4 (the open circuit takes the next whole room if it fits, else it closes and a new one opens; a closed circuit never reopens). The split of one room uses the order that the caller gives in `terminalIds` (the caller sorts by nearest neighbour). A limit of null does not limit.
 - **Must not touch:** the circuit types, the scene.
-- **Tests (core):** hand-checked values (section 4.7); every terminal appears once; no circuit passes a limit; `spanRooms: false` gives one room per circuit; a room above the limit splits and the pieces keep the given order; a null limit packs everything in one circuit; a load limit with diversity 50 admits twice the raw load; an empty input gives an empty result; the same input twice gives the same output.
+- **Tests (core):** hand-checked values (section 6a); a next-fit test where first-fit gives another result: rooms of 3, 3 and 1 terminals with limit 4 and `spanRooms` true give the circuits {room 1} and {room 2, room 3} (first-fit would give {room 1, room 3} and {room 2}); every terminal appears once; no circuit passes a limit; `spanRooms: false` gives one room per circuit; a room above the limit splits and the pieces keep the given order; a null limit packs everything in one circuit; a load limit with diversity 50 admits twice the raw load; an empty input gives an empty result; the same input twice gives the same output.
 - **Verify:** core tests; `pnpm build`.
 - **Size:** about 70 lines and 100 of tests.
 
 ### T06. `planCircuits`: groups, own circuits, wet rooms, limits
-- **Depends on:** T02, T03, T05. **Waits for:** Q-R7-03, Q-R7-05, Q-R7-06 (provisional defaults A, B and A).
+- **Depends on:** T03, T05. It does not depend on T02. **Waits for:** nothing (it uses the provisional defaults of Q-R7-03, -05 and -06: A, B and A).
 - **Files:** `packages/core/src/circuit-plan.ts` (new), `circuit-plan.test.ts`, `index.ts`.
-- **Shapes:** section 4.2 without the RCD and the warning list (T07). Rules 1 to 5 and 7.
+- **Shapes:** section 4.2 without the RCD and the warning list (T07). Rules 1 to 5 and 7. `CircuitPlanInput.limits` holds ready `CircuitLimits` for each circuit type id. This task declares the `CircuitLimits` interface (T02 imports it). The tests build the limits by hand.
 - **Must not touch:** `circuit-pack.ts`, the scene.
-- **Tests (core):** a candidate with no type is in `unplaced` with `no-type`; wet and dry candidates of one type never share a circuit; a capacity above the threshold gives an own circuit with `reason: 'own'`; the terminals of two types never share a circuit; the packing cases of the hand-checked values 1 to 3 and 5 to 6 (section "4.7 Hand-checked values"); a type with no limit gives one circuit per candidate; the sum of the circuit sizes plus `unplaced` equals the count of candidates; a candidate that is not in the input never appears.
+- **Tests (core):** a candidate with no type is in `unplaced` with `no-type`; wet and dry candidates of one type never share a circuit; a capacity above the threshold gives an own circuit with `reason: 'own'`; the terminals of two types never share a circuit; the packing cases of the hand-checked values 1 to 3 and 5 to 6 (section 6a); a type with no limit gives one circuit per candidate; the sum of the circuit sizes plus `unplaced` equals the count of candidates; a candidate that is not in the input never appears.
 - **Verify:** core tests; `pnpm build`.
 - **Size:** about 110 lines and 120 of tests.
 
 ### T07. `planCircuits`: the RCD device, warnings, invariants
 - **Depends on:** T06. **Waits for:** Q-R7-09 (A is the provisional default).
 - **Files:** `packages/core/src/circuit-plan.ts`, `circuit-plan.test.ts`.
-- **Shapes:** `rcdMilliamps` (rule 6), the warning codes and severities of section 4.2: `no-type` Warning, `no-limit` Note, `terminal-without-power` Note, `over-load-limit` Warning (an own circuit above the load limit), `equipment-skipped` Note, `none-to-place` Error (the Place button is disabled), `multi-page` Error. `stats.left` follows P-R7-LEFT.
+- **Shapes:** `rcdMilliamps` (rule 6), the warning codes and severities of section 4.2: `no-type` Warning, `no-limit` Note, `terminal-without-power` Note, `over-load-limit` Warning (an own circuit above the load limit), `equipment-skipped` Note, `none-to-place` Error (the Place button is disabled), `multi-page` Error. `stats.left` follows P-R7-LEFT (a count of terminals).
 - **Must not touch:** the packing.
 - **Tests (core):** a socket circuit has 30; a wet light circuit has 30; a dry light circuit has none; `rcd: false` sets none; the warning counts match; `none-to-place` appears for an empty candidate list; an invariant test over 200 random inputs (seeded): every candidate once, no limit passed except an own circuit, and the output is stable.
 - **Verify:** core tests; `pnpm build`.
@@ -400,7 +399,8 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 ### T08. Circuit types dialog: the two new fields
 - **Depends on:** T01, T02.
 - **Files:** `packages/ui/src/components/CircuitTypesDialog.tsx`, its UI test, `theme.css` only if the layout needs it.
-- **What it adds:** two number inputs, "Most terminals" and "Diversity (%)", with the start values of the library type shown as the placeholder, and the text of `validateCircuitLimits` on a wrong value. A note under the fields: "These limits are design practice, not a standard. NEN 1010 and IEC 60364 set no count of sockets or luminaires for a circuit." The save calls the existing update method of the scene, which already writes the document copy (`scene.ts:1860`-`:1862`).
+- **What it adds:** two number inputs, "Most terminals" and "Diversity (%)", with the start values of the library type shown as the placeholder, and the text of `validateCircuitLimits` on a wrong value. A note under the fields: "These limits are design practice, not a standard. NEN 1010 and IEC 60364 set no count of sockets or luminaires for a circuit." The save calls the existing update method of the scene, which already writes the document copy (`scene.ts:1860`-`:1862`). A clearing of a field must pass an explicit `undefined` (`{ ...type, maxTerminals: undefined }`), because a plain merge keeps the old value. Next to the "Default capacity" field the dialog says: "A Default capacity that you change acts as a load limit for Make circuits." (Q-R7-04 B).
+  The new fields join the five state places of `CircuitTypeForm` (`CircuitTypesDialog.tsx:78`-`:135`), none of which may be missed: (1) a `useState` for each field (`:79`-`:84`); (2) `changedFromBuiltIn` (`:87`), which decides if "Reset to built-in" is on; (3) `dirty` (`:94`), which enables Save and Revert; (4) `revert` (`:103`), which resets each field; (5) the `key` of the form at `:56`, which must hold the two saved values so the form re-seeds after a save. The scene method `resetCircuitType` (`scene.ts:1884`) must also drop the two fields when it restores the built-in values.
 - **Must not touch:** the circuit commands, the other fields.
 - **Verify:** UI tests (the pure validation text); `pnpm build`. The browser check is T23.
 - **Size:** about 50 lines.
@@ -415,9 +415,9 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 - **Size:** about 40 lines and 50 of tests.
 
 ### T10. Scene: `planCircuits` (read only)
-- **Depends on:** T04, T07.
+- **Depends on:** T02, T04, T07.
 - **Files:** `packages/render/src/scene.ts`, `packages/core/src/index.ts`.
-- **Shapes:** section 4.3 `planCircuits`. It builds the input from the state: stamps, circuits, panels, `listCircuitTypes()`, `CIRCUIT_TYPE_LIBRARY`, the rooms of the active page, `terminalCapacities`. The panel position is the position of `panel.equipmentStampId`. It returns the `problem` text for a multi-page file and for a missing panel.
+- **Shapes:** section 4.3 `planCircuits`. It builds the input from the state: stamps, circuits, panels, the rooms of the active page, `terminalCapacities`, and the ready limits: for each type of `listCircuitTypes()` it calls `circuitLimitsOf(type, library entry)` (T02) and passes the result as `limits`. It also passes the set of panel stamp ids to the finder. The panel position is the position of `panel.equipmentStampId`. It returns the `problem` text for a multi-page file and for a missing panel.
 - **Must not touch:** the circuit commands, the undo state.
 - **Verify:** `pnpm typecheck`; `pnpm build`. `git diff --stat` shows no change in `project.ts`. The browser check is in T12.
 - **Size:** about 70 lines.
@@ -425,7 +425,7 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 ### T11. Scene: `applyCircuits`
 - **Depends on:** T10.
 - **Files:** `packages/render/src/scene.ts`.
-- **Shapes:** section 4.3 `applyCircuits`. One `Transaction` named "Make circuits". The device uses `{ ...getEffectiveDevice(circuit, panel), kind: 'breaker', rcdMilliamps }` (P-R7-RCD). The strict add command is the guard; skipped terminals are counted. One notice: "Made N circuits with M terminals on <panel name>." One `circuitsChanged` emit. The selection is cleared of ids that no longer exist (none are removed, so this is a check only).
+- **Shapes:** section 4.3 `applyCircuits`. One `Transaction` named "Make circuits". The device uses `{ ...getEffectiveDevice(circuit, panel), kind: 'breaker', rcdMilliamps }` (P-R7-RCD). The strict add command is the guard; skipped terminals are counted. One notice: "Made N circuits with M terminals on <panel name>." One `notifyCircuitsChanged()` call at the end (`scene.ts:1693`; this method emits the event `circuitsChanged`). The selection needs no clean-up (no id is removed). Diversity: a new circuit gets no `diversityPercent` of its own, so it inherits from the panel (`getEffectiveDiversityPercent`). The `diversityPercent` of the circuit type is used only by the limit check of the planner, as a factor on the load. The planner and the circuit therefore can use different factors when the panel default differs from the type; the Note `diversity-differs` is not built in R7 (listed in section 9, R-15). (This is the "recommend A" reading of Q-R7-01: the type value is a planning factor, not a value that R7 writes to the circuit.)
 - **Must not touch:** `planCircuits`, `createCircuitFromTerminals`, `assignTerminalToCircuit`.
 - **Verify:** `pnpm typecheck`; `pnpm build`. The browser check is T12 and T13.
 - **Size:** about 80 lines.
@@ -433,7 +433,7 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 ### T12. Browser setup `r7-lib.mjs` and the scene check
 - **Depends on:** T11.
 - **Files:** `.claude/roadmap/browser/r7-lib.mjs` (new), `r7-t12-check.mjs` (work folder).
-- **What it builds:** `buildCircuitProject(h, options)`: detects rooms with `setupRooms`, places a panel stamp (an equipment stamp converted with `createPanel`), 4 toilet and office rooms with luminaires and sockets (some auto-placed with a rule, some by hand), and typed capacities on two terminals. It returns the ids.
+- **What it builds:** `buildCircuitProject(h, options)`: detects rooms with `setupRooms`, places a panel stamp (an equipment stamp, converted with `convertStampToPanel(stampId, name)`, `scene.ts:2289`), 4 toilet and office rooms with luminaires and sockets (some auto-placed with a rule, some by hand), and typed capacities on two terminals. It returns the ids.
 - **What it checks (scene API, setup and reading only):** `planCircuits` returns the planned counts; `applyCircuits` writes them; the independent proofs (1) to (4) and (6) of section 6 hold; Undo restores the export exactly; Redo gives the same counts; a project with `circuitTypes` empty shows the library type name in `listCircuitTypes()` (rule 4); a multi-page file gives `problem`; no page error.
 - **Size:** about 150 lines of lib and 120 of check.
 
@@ -446,7 +446,7 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 ### T14. Extract the room list from `RouteDialog`
 - **Depends on:** none.
 - **Files:** `packages/ui/src/components/RoomScopeList.tsx` (new), `packages/ui/src/components/RouteDialog.tsx`, `theme.css` only if needed.
-- **What it does:** moves the room list (`RouteDialog.tsx:316`-`:366`: the "all" and "none" buttons, the head, the rows, the "include outside" check box) into a component with the same `data-testid` names (`route-rooms-all`, `route-rooms-none`, `route-room`, `route-outside`). It takes the rooms, the unchecked set and the callbacks as props. The Route dialog behaves the same.
+- **What it does:** moves the room list (`RouteDialog.tsx:316`-`:366`: the "all" and "none" buttons, the head, the rows, the "include outside" check box) into a component with the same `data-testid` names (`route-rooms-all`, `route-rooms-none`, `route-room`, `route-outside`). It takes the rooms, the unchecked set and the callbacks as props. It also takes props for the labels (the Route dialog passes its translated texts through `routeText(language, ...)`, so the component holds no text of its own) and a prop for an optional count column (for each room, a number and a header text; the Make circuits dialog shows "Terminals", the Route dialog shows its ports column as before). The new dialog passes English texts only. The Route dialog behaves the same.
 - **Must not touch:** the logic of the Route dialog, its texts, its test ids.
 - **Verify:** UI tests; `pnpm build`; regression: `node .claude/roadmap/browser/with-server.mjs .claude/roadmap/browser/r2-check.mjs` exits 0, and `r6-check.mjs` exits 0 (one command each).
 - **Size:** about 80 changed lines. The test ids of the new dialog use the prefix `circuits-` through a prop `testIdPrefix`.
@@ -469,7 +469,7 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 - **Size:** about 140 lines.
 
 ### T17. Dialog: preview section
-- **Depends on:** T15, T16.
+- **Depends on:** T15, T16, T19.
 - **Files:** `MakeCircuitsDialog.tsx`.
 - **What it adds:** the pending line, the summary, the lines, a table "Circuits by type" (type name, circuits, terminals, the limit and its unit), the left count. It calls `scene.planCircuits` 300 ms after the last change and on the events `drawingChanged`, `circuitsChanged`, `roomsChanged`, `pageChanged` and `documentActivated`.
 - **Must not touch:** the inputs of T16.
@@ -477,11 +477,11 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 - **Size:** about 100 lines.
 
 ### T18. Dialog: Place, the RCD and span check boxes, result
-- **Depends on:** T11, T17.
+- **Depends on:** T11, T17, T19.
 - **Files:** `MakeCircuitsDialog.tsx`, `circuitPlan.ts`, `theme.css`, `r7-t18-check.mjs` (work folder).
 - **What it adds:** `circuits-span`, `circuits-rcd`, `circuits-place` (disabled on an error), `circuits-result` ("Made N circuits with M terminals on <panel>.").
 - **Verify:** UI tests; `pnpm build`. Browser check `r7-t18-check.mjs` through real clicks and typing:
-  1. Open the dialog through the menu item `^\s*Make circuits…\s*$` (T19 must be done first; if it is not, the check opens the dialog through the App state and reports it).
+  1. Open the dialog through the menu item `^\s*Make circuits…\s*$` (T19 is a dependency of this task, so the menu item exists).
   2. Pick the panel, the scope "rooms". `circuits-summary` shows after the pending line. The numbers equal `planCircuits` through the scene API.
   3. Uncheck one room: the summary changes and the terminals of that room are not in the plan.
   4. Switch the scope to "selected stamps" with a canvas selection: the summary counts the selection.
@@ -492,11 +492,13 @@ Jobs on the same file run one after another, in the order of the task numbers: T
   9. Close the dialog, click `.mep-rail-btn[title="Undo"]`: the export equals the baseline.
   10. A drawing with no panel shows the message and no `circuits-place`. A multi-page file shows the refusal (if no real multi-page fixture exists, the check reports NEEDS_CONTEXT for this step and nobody makes a fake PDF).
   11. A 400 px run: `scrollWidth <= clientWidth` of `.mep-modal--circuits`. No page error.
-  Screenshots: `T18-circuits-preview`, `T18-circuits-classify`, `T18-circuits-placed`, `T18-circuits-nopanel`, `T18-circuits-narrow`.
+  12. The Settings section: open it, change the wet room types and the threshold with the real controls, and watch the plan change.
+  13. The "Calculating…" state: type in a field and take the screenshot inside the 300 ms wait (the check stubs the plan call with a delay of 600 ms through the page, or reads the pending line with a poll).
+  Screenshots: `T18-circuits-preview`, `T18-circuits-classify`, `T18-circuits-placed`, `T18-circuits-nopanel`, `T18-circuits-narrow`, `T18-circuits-settings`, `T18-circuits-calculating`.
 - **Size:** about 90 lines.
 
 ### T19. Menu item and App wiring
-- **Depends on:** T16.
+- **Depends on:** T16. Runs right after T16 and before T17 and T18.
 - **Files:** `packages/ui/src/components/MenuButton.tsx`, `packages/ui/src/App.tsx`.
 - **What it does:** the prop `onOpenCircuits`, the menu item "Make circuits…" after "Size network…" (P-R7-MENU), the state `circuitsOpen`, and the render of `MakeCircuitsDialog` with the rules from the placement rule storage as `ruleNeedByRuleId` (a map from rule id to `needId`).
 - **Must not touch:** the other menu items.
@@ -553,17 +555,18 @@ Jobs on the same file run one after another, in the order of the task numbers: T
   6. **No regression:** `r2-check.mjs`, `r3-check.mjs`, `r4-check.mjs`, `r5-check.mjs` and `r6-check.mjs`, one command each, each exits 0.
 - **After the check:** the director marks R7 done in this file, with the commit of each task and the verification, in the style of `auto-routing-r6.md`. The director changes §8 of `auto-routing.md` for R7.
 
-## 4.7 Hand-checked values
+## 6a. Hand-checked values
 
-(This section is named 4.7 as in the R6 plan, but it stands after section 6. The test authors copy these values; they do not compute them with the code under test.)
+(The test authors copy these values; they do not compute them with the code under test.)
 
-1. **Packing, spanRooms true, maxTerminals 4.** Three dry rooms A, B, C at distance 5 m, 8 m and 12 m from the panel. A has 2 sockets, B has 2, C has 3. First-fit in distance order: circuit 1 = A + B (4 terminals). C does not fit in circuit 1 (7 > 4), so circuit 2 = C (3 terminals). Result: 2 circuits, 7 terminals.
+1. **Packing, spanRooms true, maxTerminals 4.** Three dry rooms A, B, C at distance 5 m, 8 m and 12 m from the panel. A has 2 sockets, B has 2, C has 3. Next-fit in distance order: circuit 1 = A + B (4 terminals). C does not fit in circuit 1 (7 > 4), so circuit 2 = C (3 terminals). Result: 2 circuits, 7 terminals.
 2. **Same input, spanRooms false.** Three circuits: A (2), B (2), C (3).
-3. **Room split.** One room with 10 sockets and maxTerminals 4, spanRooms true: circuits of 4, 4 and 2 terminals, all with `room-split`. The first circuit holds the 4 terminals nearest to the panel in the nearest-neighbour order.
+3. **Room split.** One room with 10 sockets and maxTerminals 4, spanRooms true: circuits of 4, 4 and 2 terminals, all with `room-split`. The first circuit holds the first 4 terminals of the nearest-neighbour chain, which starts at the terminal nearest to the panel.
 4. **Wet and dry.** Lighting limit 20. A toilet (wet) with 2 luminaires and an office (dry) with 3. Result: 2 circuits (2 and 3 terminals), not 1 circuit of 5. The toilet circuit has `rcdMilliamps` 30. The office circuit has none.
 5. **Load with diversity.** maxLoad 1000, diversityPercent 50, terminals of 300 each in one room: the raw limit is 2000, so 6 terminals fit (6 x 300 = 1800 <= 2000) and a 7th (2100) does not. Result: circuits of 6 and the rest.
 6. **Own circuit.** Threshold 2000, a socket with capacity 3500 and 5 plain sockets in the same room, maxTerminals 8: 2 circuits: one with the 3500 socket (`own`) and one with the 5 sockets.
 7. **No power.** 4 auto-placed luminaires with no capacity and a load limit 100: the load is 0, the limit is not reached, and the Note `terminal-without-power` counts 4.
+8. **Next-fit against first-fit.** Rooms R1 (3), R2 (3), R3 (1) in distance order, maxTerminals 4, spanRooms true. Next-fit: R1 opens circuit 1 (3). R2 does not fit (6 > 4), so circuit 1 closes and circuit 2 opens with R2 (3). R3 fits circuit 2 (3 + 1 = 4). Result: {R1} and {R2, R3}. First-fit would give {R1, R3} and {R2}.
 
 ## 7. Verification summary
 
@@ -596,7 +599,7 @@ Jobs on the same file run one after another, in the order of the task numbers: T
 
 The check scripts live in the work folder of the task, except `r7-lib.mjs` and `r7-check.mjs`, which stay in `.claude/roadmap/browser/`.
 
-Dialogs that are new or changed, and their screenshots for the dashboard: the Make circuits dialog (`T18-circuits-preview`, `T18-circuits-classify`, `T18-circuits-placed`, `T18-circuits-nopanel`, `T18-circuits-narrow`, `T20-second-panel`, `T20-none-to-place`, `T22-wet-circuits`, `T22-own-circuit`, `T22-notes`, `T22-dark`, `T22-narrow`, `T24-dialog`, `T24-dark`, `T24-narrow`), the Circuit types dialog (`T23-types-limits`, `T23-types-error`), the plan on the canvas (`T20-circuit-lines`, `T24-placed`, `T24-10A`) and the Route dialog after the T14 extraction (`r2-check.mjs` screenshots, unchanged).
+Dialogs that are new or changed, and their screenshots for the dashboard: the Make circuits dialog (`T18-circuits-preview`, `T18-circuits-classify`, `T18-circuits-placed`, `T18-circuits-nopanel`, `T18-circuits-narrow`, `T18-circuits-settings`, `T18-circuits-calculating`, `T20-second-panel`, `T20-none-to-place`, `T22-wet-circuits`, `T22-own-circuit`, `T22-notes`, `T22-dark`, `T22-narrow`, `T24-dialog`, `T24-dark`, `T24-narrow`), the Circuit types dialog (`T23-types-limits`, `T23-types-error`), the plan on the canvas (`T20-circuit-lines`, `T24-placed`, `T24-10A`) and the Route dialog after the T14 extraction (`r2-check.mjs` screenshots, unchanged).
 
 ## 8. Where R7 stops and what comes after
 
@@ -620,7 +623,7 @@ Not in R7 (later, after the main routing feature):
 - **R-2 No power on auto-placed terminals.** Light and Sockets get no capacity from Auto-place (`placement-rule.ts:529`). The load limit does nothing for them. Only the count limit works (Q-R7-03 A). A user who expects a load limit sees a Note.
 - **R-3 Classification is manual for hand-placed terminals.** With Q-R7-02 A, a drawing with only hand-placed terminals needs a choice for each stamp definition at each run. The dialog keeps the choices in memory for the session only.
 - **R-4 Room quality.** Wrong room outlines (`open: true`) put a terminal in the wrong room or in no room. The "outside rooms" check box covers the second case. 13 of 34 room shapes of the 10A drawing are within 15 % (memory note "Room detection Phase 8"; not verified here).
-- **R-5 The device is a whole-object override.** A plain `{ rcdMilliamps: 30 }` would drop the curve and the rating of the panel default (`circuit.ts:26`). T11 and T13 step 5 cover it.
+- **R-5 The device is a whole-object override.** A plain `{ rcdMilliamps: 30 }` would drop the curve and the rating of the panel default (`circuit.ts:26`). T11 and T13 step 5 cover it. A side effect: the whole-object override also pins the `ratingA` of the panel default on the circuit (the merged device copies it), so a later change of the panel default rating does not reach these circuits. The Make circuits dialog says so in the check box hint.
 - **R-6 The RCD rule comes from a secondary source.** IEC 60364-4-41 clause 411.3.3 was not read in the original. The wet-room clause is not verified. The check box lets the user turn the default off.
 - **R-7 Units.** `terminalCapacities` has no unit (gap G16). A circuit type in W with a terminal capacity in another unit adds numbers of different units. R7 shows the unit of the type and does not convert (P-R7-UNITS). Capacities of Auto-place before R5 can be in another unit.
 - **R-8 Circuit types are not in undo.** `ProjectDocument.circuitTypes` is a plain array (`project.ts:42`). Undo of a run does not touch it, and R7 does not change it. T23 checks the dialog separately.
@@ -630,9 +633,11 @@ Not in R7 (later, after the main routing feature):
 - **R-12 Multi-page PDF.** The refusal needs a real multi-page fixture for the browser check. A fixture may not exist (D-R2-03). The tester then reports NEEDS_CONTEXT for that step.
 - **R-13 Not verified.** The default values (section 3), the claim that no code reads `defaultCapacity` as a limit (T02 repeats the search), the wet room clause, and the 10A numbers (local file only).
 - **R-14 Stacked dialogs.** One Escape closes stacked dialogs (R5 R-22). Not changed.
+- **R-15 Two diversity factors.** The planner uses the `diversityPercent` of the circuit type. The new circuit inherits the one of its panel (T11). If they differ, the circuit load that the user sees in the tree uses the panel value, and the limit check used the type value. R7 shows no Note for this.
 
 ## 10. Revision log
 
 | Date | Change |
 |---|---|
+| 2026-10-19 | **Revision 1** after the audit (18 findings). `planCircuits` takes ready `CircuitLimits`; T06 and T07 do not depend on T02; only Q-R7-01 blocks T01. `maxLoad` is null for `defaultCapacity` 0 or no library entry. T08 lists the five state places. Next-fit replaces first-fit (value 8). T14 gets label and count-column props. T19 runs before T17 and T18. Diversity rule stated (T11, R-15). T12 uses `convertStampToPanel`. All [data model] options join step 22. Fire Alarm 30 and Emergency Lighting 20 in Q-R7-04. Panel stamps are not counted as equipment. Settings and "Calculating…" screenshots added. "Left" is a count of terminals. R-5 notes the pinned `ratingA`. Search claim, App line numbers and section 6a fixed. Changed question text: Q-R7-01 A (diversity), Q-R7-03 C and Q-R7-08 B (step 22), Q-R7-04 B (four limits). |
 | 2026-10-19 | First version by the road map planner. 24 tasks (T01 to T24), nine questions for the user (Q-R7-01 to Q-R7-09), twelve provisional choices (P-R7-*). Nothing is started. |
