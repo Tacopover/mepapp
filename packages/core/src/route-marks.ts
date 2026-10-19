@@ -14,7 +14,9 @@ function isFittingEnd(point: ConnectionPoint, fittingId: string): boolean {
 
 /**
  * The walk of auto-routing-r6.md section 4.3 step 2. Starts at the one segment that ends on the
- * start port, follows marked segments through marked fittings, and stops at every stamp port.
+ * start port. With two or more segments at the start port, it starts when at least one is marked
+ * (a drag cleared the mark of the others): the marked ones go and each unmarked one is passed
+ * like a stub. It follows marked segments through marked fittings, and stops at every stamp port.
  * A hand-drawn stub at the start port is passed through once, when it ends on a fitting. Returns
  * sorted ids. A fitting is returned only when it is marked and no segment outside the run uses it.
  */
@@ -26,8 +28,8 @@ export function routedRunOf(
   const empty = { segmentIds: [], fittingIds: [] };
   const segments = state.segments as Segment[];
   const atStart = segments.filter((s) => isPortEnd(s.endpointA, startStampId, startPortId) || isPortEnd(s.endpointB, startStampId, startPortId));
-  const allMarked = atStart.length >= 2 && atStart.every((s) => s.routedBy === ROUTED_MARK);
-  if (atStart.length !== 1 && !allMarked) return empty;
+  const anyMarked = atStart.some((s) => s.routedBy === ROUTED_MARK);
+  if (atStart.length !== 1 && !anyMarked) return empty;
 
   const runIds = new Set<string>();
   const pending: ConnectionPoint[] = [];

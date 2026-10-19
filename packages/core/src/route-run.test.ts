@@ -254,6 +254,38 @@ describe('planRoute on the first floor', () => {
     expect(second.plan.removeFittingIds).toEqual(removal.fittingIds);
   }, 60000);
 
+  it('re-runs after a drag cleared the mark of one of two segments at the start port', () => {
+    const { plan } = firstRun();
+    const state1 = apply(baseState(), plan);
+    const atStart = state1.segments.filter((x) => [x.endpointA, x.endpointB].some((e) => e.kind === 'port' && e.elementId === START_ID));
+    expect(atStart.length, 'the first plan has two segments at the start port').toBeGreaterThanOrEqual(2);
+    const dragged = atStart[0]!;
+    const far = [dragged.endpointA, dragged.endpointB].find((e) => e.kind === 'fitting');
+    expect(far?.kind).toBe('fitting');
+    const fittingId = far!.kind === 'fitting' ? far!.fittingId : '';
+    const unmark = <T extends { routedBy?: unknown }>(item: T): T => {
+      const copy = { ...item };
+      delete copy.routedBy;
+      return copy;
+    };
+    const attached = (s: Segment): boolean => [s.endpointA, s.endpointB].some((e) => e.kind === 'fitting' && e.fittingId === fittingId);
+    const state2: State = {
+      ...state1,
+      segments: state1.segments.map((s) => (attached(s) ? unmark(s) : s)),
+      fittings: state1.fittings.map((f) => (f.id === fittingId ? unmark(f) : f)),
+    };
+    const removal = routedRunOf(state2, START_ID, 'out');
+    console.log(`drag at the start: removal ${removal.segmentIds.length} segments, ${removal.fittingIds.length} fittings`);
+    expect(removal.segmentIds.length).toBeGreaterThan(0);
+    expect(removal.segmentIds).not.toContain(dragged.id);
+    const reduced = reducedState(state2, removal);
+    const stamps2 = withSegmentTypes(baseStamps, reduced.segments);
+    const second = runPlan({ ...state2, stamps: stamps2 }, removal, targetPortsOf(stamps2));
+    console.log(`re-run status ${second.status}, warnings ${codeCounts(second.plan)}`);
+    expect(second.plan.warnings.some((w) => w.code === 'start-error')).toBe(false);
+    expect(second.status).toBe('ok');
+  }, 60000);
+
   it('re-runs with a hand-drawn stub: the routed items go, the stub and its fitting stay', () => {
     const { stub, g } = stubOf();
     expect(polygonContainsPoint(startRoom.polygon, g.position), 'G lies in the start room').toBe(true);

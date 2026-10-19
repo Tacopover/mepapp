@@ -82,10 +82,32 @@ describe('routedRunOf', () => {
     expect(routedRunOf(state, 'ahu', 'out')).toEqual({ segmentIds: ['s1', 's2', 's3', 's4'], fittingIds: ['f1', 'f2'] });
   });
 
-  it('returns empty arrays when two segments end on the start port and one has no mark', () => {
+  it('removes the marked segment and walks behind the unmarked one when two segments end on the start port and one has no mark', () => {
     const state = {
-      segments: [seg('s1', portEnd('ahu', 'out'), fitEnd('f1')), seg('s2', portEnd('ahu', 'out'), fitEnd('f2'), false)],
+      segments: [
+        seg('s1', portEnd('ahu', 'out'), fitEnd('f1')),
+        seg('s2', portEnd('ahu', 'out'), fitEnd('f2'), false),
+        seg('s3', fitEnd('f1'), portEnd('t1', 'p')),
+        seg('s4', fitEnd('f2'), portEnd('t2', 'p')),
+      ],
       fittings: [fit('f1'), fit('f2')],
+    };
+    // The dragged branch (s2) keeps its mark off and stays. The marked branch (s1, s3) goes. The marked s4 behind s2 is reached through the unmarked segment.
+    expect(routedRunOf(state, 'ahu', 'out')).toEqual({ segmentIds: ['s1', 's3', 's4'], fittingIds: ['f1'] });
+  });
+
+  it('returns empty arrays when two unmarked segments end on the start port', () => {
+    const state = {
+      segments: [seg('s1', portEnd('ahu', 'out'), fitEnd('f1'), false), seg('s2', portEnd('ahu', 'out'), fitEnd('f2'), false)],
+      fittings: [fit('f1', false), fit('f2', false)],
+    };
+    expect(routedRunOf(state, 'ahu', 'out')).toEqual({ segmentIds: [], fittingIds: [] });
+  });
+
+  it('returns empty arrays when an unmarked segment at a start port with two segments ends on a port', () => {
+    const state = {
+      segments: [seg('s1', portEnd('ahu', 'out'), fitEnd('f1')), seg('s2', portEnd('ahu', 'out'), portEnd('t9', 'p'), false)],
+      fittings: [fit('f1')],
     };
     expect(routedRunOf(state, 'ahu', 'out')).toEqual({ segmentIds: [], fittingIds: [] });
   });
