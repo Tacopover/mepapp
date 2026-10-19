@@ -36,6 +36,8 @@ export * from './network-type-library.js';
 export * from './flow.js';
 export * from './circuit.js';
 export * from './circuit-type-library.js';
+export * from './circuit-pack.js';
+export * from './circuit-candidates.js';
 export * from './schematic-expression.js';
 export * from './schematic-template.js';
 export * from './schematic-template-library.js';
