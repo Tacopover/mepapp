@@ -8,6 +8,8 @@ import { distance, type Vec2 } from './geometry.js';
 import { nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
 import { legClass } from './route-layout.js';
 import type { Room } from './rooms/room.js';
+import { sizeNetwork } from './sizing-network.js';
+import { SUGGESTED_AIR_SIZING } from './sizing-settings.js';
 
 const OUT = { id: 'out', name: 'Out', fractionX: 0, fractionY: 0 };
 const OUT2 = { id: 'out2', name: 'Out 2', fractionX: 1, fractionY: 0 };
@@ -519,5 +521,145 @@ describe('planRoute existing segments', () => {
       if (network.segmentIds.some((id) => newIds.has(id))) expect(network.segmentIds.every((id) => newIds.has(id))).toBe(true);
     }
     expect(networks.find((network) => network.segmentIds.includes('fx'))!.segmentIds).toEqual(['fx']);
+  });
+});
+
+const AIR_TYPE = { id: 'supply-air', discipline: 'ventilation', flowUnit: 'dm³/s', sizingMethod: 'air' } as const;
+const NO_UNIT_TYPE = { id: 'supply-air', discipline: 'ventilation' } as const;
+
+function capacityScene(overrides: Partial<RouteBuildInput> = {}): RouteBuildInput {
+  return { ...corridorScene(), networkType: AIR_TYPE, terminalCapacities: { t1: 100, t2: 100, t3: 100, t4: 100, ahu: 300 }, ...overrides };
+}
+
+describe('planRoute capacity', () => {
+  it('warns when the terminals need more than the start stamp gives', () => {
+    const result = planRoute(capacityScene());
+    expect(result.plan.stats.ports).toBe(4);
+    expect(result.plan.warnings).toContainEqual({ code: 'capacity-over', severity: 'warning', numbers: { total: 400, cap: 300 } });
+  });
+
+  it('gives no warning when the start stamp has enough capacity', () => {
+    const result = planRoute(capacityScene({ terminalCapacities: { t1: 100, t2: 100, t3: 100, t4: 100, ahu: 500 } }));
+    expect(codes(result)).not.toContain('capacity-over');
+    expect(codes(result)).not.toContain('capacity-unit');
+  });
+
+  it('gives no warning when the start stamp has no capacity', () => {
+    const result = planRoute(capacityScene({ terminalCapacities: { t1: 100, t2: 100, t3: 100, t4: 100 } }));
+    expect(codes(result)).not.toContain('capacity-over');
+    expect(codes(result)).not.toContain('capacity-unit');
+  });
+
+  it('gives the note capacity-unit when the type has no flow unit', () => {
+    const result = planRoute(capacityScene({ networkType: NO_UNIT_TYPE }));
+    expect(result.plan.warnings).toContainEqual({ code: 'capacity-unit', severity: 'info', numbers: { total: 400, cap: 300 } });
+    expect(codes(result)).not.toContain('capacity-over');
+  });
+});
+
+describe('planRoute sizes', () => {
+  const limits = SUGGESTED_AIR_SIZING;
+  const units = { capacityUnitOf: () => 'dm³/s' as const };
+
+  it('shows no-limits and no sizes without limits', () => {
+    const result = planRoute(capacityScene(units));
+    expect(result.plan.sizes).toEqual([]);
+    expect(result.plan.warnings).toContainEqual({ code: 'no-limits', severity: 'warning' });
+  });
+
+  it('keeps the sizes of sizeNetwork for the new segments', () => {
+    const data = capacityScene({ ...units, limits });
+    const result = planRoute(data);
+    expect(codes(result)).not.toContain('no-limits');
+    expect(result.plan.sizes.length).toBeGreaterThan(0);
+    const expected = sizeNetwork({
+      segments: [...data.state.segments, ...result.plan.segments],
+      fittings: [...data.state.fittings, ...result.plan.fittings],
+      portGroups: [],
+      terminalCapacities: data.terminalCapacities!,
+      capacityUnitOf: units.capacityUnitOf,
+      startStampId: 'ahu',
+      startPortId: 'out',
+      networkType: AIR_TYPE,
+      sizing: limits,
+    });
+    expect(expected.status).toBe('ok');
+    const newIds = new Set(result.plan.segments.map((s) => s.id));
+    expect(result.plan.sizes).toEqual(expected.sizes.filter((size) => newIds.has(size.segmentId)));
+    expect(result.plan.segments.every((s) => s.diameter === 200)).toBe(true);
+  });
+
+  it('keeps the hand-drawn stub segments out of the sizes and counts them', () => {
+    const data = capacityScene({ ...units, limits });
+    const stubs = [
+      segment('h1', 'supply-air', port('ahu', 'out'), { kind: 'fitting', fittingId: 'hf1' }),
+      segment('h2', 'supply-air', { kind: 'fitting', fittingId: 'hf1' }, { kind: 'fitting', fittingId: 'hf2' }),
+    ];
+    const state = { ...data.state, segments: stubs, fittings: [fitting('hf1', 50, -30), fitting('hf2', 100, -30)] };
+    const result = planRoute({ ...data, state });
+    expect(result.status).toBe('ok');
+    expect(codes(result)).toContain('extends-stub');
+    expect(result.plan.sizes.length).toBeGreaterThan(0);
+    expect(result.plan.sizes.some((size) => size.segmentId === 'h1' || size.segmentId === 'h2')).toBe(false);
+    expect(result.plan.warnings).toContainEqual({ code: 'hand-kept-size', severity: 'info', count: 2 });
+  });
+
+  it('shows no-limits when the type has no sizing method', () => {
+    const result = planRoute(capacityScene({ ...units, limits, networkType: NO_UNIT_TYPE }));
+    expect(result.plan.sizes).toEqual([]);
+    expect(codes(result)).toContain('no-limits');
+  });
+});
+
+describe('planRoute real crossings', () => {
+  function pair(gapMm: number, areaKind: 'path' | 'shaft' = 'path'): RouteBuildInput {
+    const stamps = [placed('ahu', 'equipment', 500, 500), placed('t1', 'terminal', 5500, 500)];
+    const rooms = [rect('A', 0, 0, 1000, 1000), rect('B', 1000 + gapMm, 0, 6000, 1000)];
+    const area: RouteArea = { ...AREA, rooms: [...AREA.rooms, ...(areaKind === 'shaft' ? [{ roomId: 'B', kind: 'shaft' as const, typeId: 'shaft', open: false, name: null }] : [])] };
+    return input({ state: { stamps, segments: [], fittings: [], portGroups: [] }, rooms, area, mmPerPt: MM_PER_PT, targetPorts: [targetAt('t1', 5500, 500, 'B')] });
+  }
+
+  it('counts one wall between two rooms', () => {
+    const result = planRoute(pair(200));
+    expect(result.status).toBe('ok');
+    const wall = result.plan.warnings.find((w) => w.code === 'wall-crossings')!;
+    expect(wall).toMatchObject({ severity: 'warning', count: 1 });
+    expect(wall.points).toHaveLength(1);
+    expect(codes(result)).not.toContain('shaft-crossing');
+    expect(result.plan.stats.wallCrossings).toBe(1);
+  });
+
+  it('reports a shaft crossing and no wall crossing', () => {
+    const result = planRoute(pair(200, 'shaft'));
+    const shaft = result.plan.warnings.find((w) => w.code === 'shaft-crossing')!;
+    expect(shaft).toMatchObject({ severity: 'warning', count: 1, ids: ['B'] });
+    expect(codes(result)).not.toContain('wall-crossings');
+    expect(result.plan.stats.wallCrossings).toBe(1);
+  });
+
+  it('does not count an open run as a crossing', () => {
+    const result = planRoute(pair(1500));
+    expect(result.status).toBe('ok');
+    expect(codes(result)).not.toContain('wall-crossings');
+    expect(codes(result)).not.toContain('shaft-crossing');
+    expect(result.plan.stats.wallCrossings).toBe(0);
+  });
+});
+
+describe('planRoute order of the lines', () => {
+  it('puts warnings before info and draft-2d last', () => {
+    const result = planRoute(capacityScene({ terminalCapacities: { t1: 100, t2: 100, t3: 100, t4: 100, ahu: 300 } }));
+    const rank = { error: 0, warning: 1, info: 2 } as const;
+    const ranks = result.plan.warnings.map((w) => rank[w.severity]);
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    expect(codes(result).at(-1)).toBe('draft-2d');
+  });
+
+  it('does not change its input', () => {
+    const data = capacityScene({ capacityUnitOf: () => 'dm³/s', limits: SUGGESTED_AIR_SIZING });
+    const { newSegmentId, newFittingId, capacityUnitOf, ...plain } = data;
+    const before = structuredClone(plain);
+    planRoute(data);
+    expect(plain).toEqual(before);
   });
 });

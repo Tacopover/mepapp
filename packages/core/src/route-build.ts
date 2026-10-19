@@ -17,6 +17,12 @@ import type { Room } from './rooms/room.js';
 import type { SizingSettings } from './sizing-settings.js';
 import { ROUTE_GRAVITY_TYPE_IDS } from './route-plan-warnings.js';
 import type { RoutePlanWarning } from './route-plan-warnings.js';
+import { crossingsAlongPath } from './route-crossings.js';
+import { solveFlow } from './flow.js';
+import { sizeNetwork, type SizedSegment } from './sizing-network.js';
+import type { FlowUnitId } from './flow-units.js';
+import type { StampCategory } from './stamp-library.js';
+import { capacityWarnings, orderWarnings, shortLegCount } from './route-finish.js';
 
 export interface RouteBuildInput {
   startStampId: string; startPortId: string; networkTypeId: string;
@@ -31,11 +37,16 @@ export interface RouteBuildInput {
   limits?: SizingSettings;
   /** The network type of the run. Default: the type of the library with `networkTypeId`; none found gives discipline 'other'. */
   networkType?: Pick<NetworkType, 'id' | 'discipline' | 'flowUnit' | 'sizingMethod'>;
+  /** The capacity of each element by id. Default {}. */
+  terminalCapacities?: Record<string, number>;
+  /** The unit of the capacity of one element, or null. Default: always null. */
+  capacityUnitOf?: (elementId: string) => FlowUnitId | null;
+  elementCategories?: Record<string, StampCategory>;
   newSegmentId: () => string; newFittingId: () => string;
 }
 
 export interface RouteStats { segments: number; fittings: number; lengthMm: number; bends90: number; bends45: number; freeLegs: number; rooms: number; ports: number; portsLeft: number; wallCrossings: number; existingCrossings: number; removedSegments: number; removedFittings: number }
-export interface PlannedRoute { segments: Segment[]; fittings: Fitting[]; removeSegmentIds: string[]; removeFittingIds: string[]; warnings: RoutePlanWarning[]; stats: RouteStats }
+export interface PlannedRoute { segments: Segment[]; fittings: Fitting[]; removeSegmentIds: string[]; removeFittingIds: string[]; warnings: RoutePlanWarning[]; stats: RouteStats; sizes: SizedSegment[] }
 
 export interface GroupedPorts {
   /** Ports in a served room (a room that is not in the route area). Key = room id. Map insertion order = room ids sorted. Ports keep the input order. */
@@ -112,6 +123,7 @@ function refused(warnings: RoutePlanWarning[]): { status: 'refused'; plan: Plann
       removeFittingIds: [],
       warnings: [...warnings, { code: 'draft-2d', severity: 'info' }],
       stats: emptyStats(),
+      sizes: [],
     },
   };
 }
@@ -351,7 +363,6 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
   if (existingCrossings > 0) warnings.push({ code: 'existing-crossings', severity: 'warning', count: existingCrossings, points: [...checked.crossingPoints, ...checked.nearPoints] });
   if (checked.overlaps > 0) warnings.push({ code: 'existing-overlap', severity: 'warning', count: checked.overlaps, ids: checked.overlapIds });
   if (checked.lane > 0) warnings.push({ code: 'shares-lane', severity: 'info', count: checked.lane, ids: checked.laneIds });
-  warnings.push({ code: 'draft-2d', severity: 'info' });
 
   const broken = checkInvariant({
     reducedSegments: reduced.segments,
@@ -362,7 +373,71 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
     networkTypeId: input.networkTypeId,
     growableSegmentIds: [...growable],
   });
-  if (broken.length > 0) return refused([...warnings.filter((warning) => warning.code !== 'draft-2d'), { code: 'internal-join', severity: 'error', ids: broken }]);
+  if (broken.length > 0) return refused([...warnings, { code: 'internal-join', severity: 'error', ids: broken }]);
+
+  const shaftRoomIds = new Set(input.area.rooms.filter((room) => room.kind === 'shaft').map((room) => room.roomId));
+  const wallPoints: Vec2[] = [];
+  const shaftPoints: Vec2[] = [];
+  const shaftIds = new Set<string>();
+  for (const planned of items.segments) {
+    for (const crossing of crossingsAlongPath(input.rooms, planned.geometry, { mmPerPt, pageIndex: input.pageIndex }).crossings) {
+      const shaftSides = [crossing.fromRoomId, crossing.toRoomId].filter((id): id is string => id !== null && shaftRoomIds.has(id));
+      if (shaftSides.length > 0) {
+        for (const id of shaftSides) shaftIds.add(id);
+        shaftPoints.push(crossing.point);
+      } else wallPoints.push(crossing.point);
+    }
+  }
+  if (wallPoints.length > 0) warnings.push({ code: 'wall-crossings', severity: 'warning', count: wallPoints.length, points: wallPoints });
+  if (shaftPoints.length > 0) warnings.push({ code: 'shaft-crossing', severity: 'warning', count: shaftPoints.length, ids: [...shaftIds].sort(), points: shaftPoints });
+
+  const terminalCapacities = input.terminalCapacities ?? {};
+  const capacityUnitOf = input.capacityUnitOf ?? (() => null);
+  const planState = {
+    segments: [...reduced.segments, ...items.segments],
+    fittings: [...reduced.fittings, ...items.fittings],
+    portGroups: [...input.state.portGroups],
+  };
+  const newSegmentIds = new Set(items.segments.map((s) => s.id));
+  const runNetwork = computeNetworks(planState).find((network) => network.segmentIds.some((id) => newSegmentIds.has(id)));
+  const runType = input.networkType ?? getNetworkTypeFromLibrary(input.networkTypeId);
+  if (runNetwork) {
+    const flow = solveFlow({
+      network: runNetwork,
+      ...planState,
+      terminalCapacities,
+      rootElementId: input.startStampId,
+      rootPortId: input.startPortId,
+      elementCategories: input.elementCategories,
+    });
+    const capacity = capacityWarnings(terminalCapacities[input.startStampId] ?? 0, flow.totalCapacity, Boolean(runType?.flowUnit));
+    if (capacity) warnings.push(capacity);
+  }
+
+  let sizes: SizedSegment[] = [];
+  let sized = false;
+  if (runNetwork && input.limits && runType?.flowUnit && runType.sizingMethod) {
+    const result = sizeNetwork({
+      ...planState,
+      terminalCapacities,
+      capacityUnitOf,
+      elementCategories: input.elementCategories,
+      startStampId: input.startStampId,
+      startPortId: input.startPortId,
+      networkType: runType,
+      sizing: input.limits,
+    });
+    if (result.status === 'ok') {
+      sized = true;
+      sizes = result.sizes.filter((size) => newSegmentIds.has(size.segmentId));
+      const handKept = runNetwork.segmentIds.filter((id) => !newSegmentIds.has(id)).length;
+      if (handKept > 0) warnings.push({ code: 'hand-kept-size', severity: 'info', count: handKept });
+    }
+  }
+  if (!sized) warnings.push({ code: 'no-limits', severity: 'warning' });
+  const shortLegs = shortLegCount(items.segments, sizes, mmPerPt);
+  if (shortLegs > 0) warnings.push({ code: 'short-leg', severity: 'warning', count: shortLegs });
+  warnings.push({ code: 'draft-2d', severity: 'info' });
 
   const roomsWithPorts = new Set(connectedPorts.map((port) => port.roomId).filter((id): id is string => id !== null && grouped.byRoom.has(id)));
   return {
@@ -372,7 +447,8 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
       fittings: items.fittings,
       removeSegmentIds: [...input.removal.segmentIds].sort(),
       removeFittingIds: [...input.removal.fittingIds].sort(),
-      warnings,
+      warnings: orderWarnings(warnings),
+      sizes,
       stats: {
         ...emptyStats(),
         segments: items.segments.length,
@@ -384,6 +460,7 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
         rooms: roomsWithPorts.size,
         ports: connectedPorts.length,
         portsLeft: leftCount,
+        wallCrossings: wallPoints.length + shaftPoints.length,
         existingCrossings,
         removedSegments: input.removal.segmentIds.length,
         removedFittings: input.removal.fittingIds.length,
