@@ -394,7 +394,10 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
               request={buildRequest}
               roomName={(id) => {
                 const index = rooms.findIndex((r) => r.id === id);
-                return index < 0 ? id : roomLabel(rooms[index], index, 'en');
+                if (index < 0) return id;
+                const label = roomLabel(rooms[index], index, 'en');
+                const number = rooms[index].number?.trim();
+                return number && number !== label ? `${number} ${label}` : label;
               }}
             />
           )}

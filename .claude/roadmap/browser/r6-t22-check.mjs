@@ -64,6 +64,10 @@ const centerOn = async (p, x = 450) => {
   }, [p, x]);
   await idle(500);
 };
+const scrollTo = async (id, block) => {
+  await tid(id).first().evaluate((el, b) => el.scrollIntoView({ block: b }), block);
+  await idle(300);
+};
 const scrollToSection = async () => {
   await tid('route-build').scrollIntoViewIfNeeded();
   await idle(300);
@@ -98,14 +102,16 @@ try {
   const px = await colorPixelsIn(page, await screenOf(page, mid), isSupply);
   console.log(`type-colored pixels at the longest planned segment: ${px}`);
   check(px > 5, '2: the preview draws in the type color', String(px));
-  await scrollToSection();
+  await scrollTo('route-build-summary', 'start');
   await shot('T22-route-preview');
 
   // 3. Off-graph rooms are served with warnings; no off-graph switch exists.
   const off = await lineOf('room-off-graph');
   check(off && off.severity === 'warning', '3: room-off-graph line is a Warning', JSON.stringify(off));
   check(off && /rooms? (is|are) outside the route area/.test(off.text), '3: the off-graph line text', off?.text);
+  check(off && off.text.includes('The route serves them anyway:') && /\d\.\d+ /.test(off.text), '3: the off-graph line says the rooms are served and names them with the room number', off?.text);
   check((await tid('route-build-offgraph').count()) === 0 && (await page.locator(`${R} [data-testid*="offgraph"]`).count()) === 0, '3: no off-graph control exists');
+  await scrollTo('route-build-line-room-off-graph', 'center');
   await shot('T22-route-offgraph');
 
   // 4. Warnings: wall crossings with label and fire hint.
@@ -115,6 +121,7 @@ try {
   check(wallText.startsWith('Warning'), '8: the label reads Warning', wallText);
   const hintText = await page.locator(`${R} [data-testid="route-build-lines"]`).innerText();
   check(hintText.includes('Corridor and shaft walls are often fire rated.'), '8: the fire hint shows');
+  await scrollTo('route-place', 'end');
   await shot('T22-route-warnings');
 
   // 5. Clear one R2 room check box: the summary changes and that room leaves the plan.
@@ -159,13 +166,15 @@ try {
   await tid('route-build-remove').waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
   const removeText = (await tid('route-build-remove').count()) > 0 ? (await tid('route-build-remove').innerText()).trim() : '';
   console.log(`remove line: ${removeText}`);
-  check(removeText.includes(`removes ${after.s - before.s} segments and ${after.f - before.f} fittings. Hand-drawn segments stay.`), '11: the remove line counts the placed run', removeText);
+  check(removeText.includes(`Place route first removes ${after.s - before.s} segments and ${after.f - before.f} fittings of the earlier run. Hand-drawn segments stay.`), '11: the remove line counts the placed run', removeText);
   const portsAfter = (await tid('route-build-ports-after').count()) > 0 ? (await tid('route-build-ports-after').innerText()).trim() : '';
   check(portsAfter === 'After the removal, 3 ports are open for this run.', '11: ports-after line', portsAfter);
   const sum4 = await summaryNumbers();
   check(sum4.ports === 3, '11: the re-run plan still holds all ports of the run', String(sum4.ports));
   await scrollToSection();
   await shot('T22-route-placed');
+  await scrollTo('route-build-remove', 'center');
+  await shot('T22-route-rerun-note');
 
   // 8. Undo.
   // The backdrop of the dialog covers the rail, so the dialog closes before Undo (a user does the same).
@@ -210,6 +219,7 @@ try {
   const skipped = await lineOf('rooms-skipped');
   console.log(`rooms-skipped line: ${JSON.stringify(skipped)}; ports-left: ${JSON.stringify(await lineOf('ports-left'))}`);
   check(skipped && skipped.severity === 'info' && skipped.text.startsWith('Note'), '3: rooms-skipped shows as a Note', JSON.stringify(skipped));
+  check(skipped && skipped.text.includes('would join another network: ') && /\d\.\d+ /.test(skipped.text), '3: rooms-skipped names the room with its number', skipped?.text);
   await scrollToSection();
   await shot('T22-route-skipped');
   await closeDialog();

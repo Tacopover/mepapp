@@ -22,7 +22,7 @@ export const TEXTS = {
   bend90_one: '1 bend of 90 degrees',
   bend45: '{n} bends of 45 degrees',
   bend45_one: '1 bend of 45 degrees',
-  buildRemove: 'This run removes {segments} and {fittings}. Hand-drawn segments stay.',
+  buildRemove: 'Place route first removes {segments} and {fittings} of the earlier run. Hand-drawn segments stay.',
   buildExtends: 'The route starts at the end of a hand-drawn segment. That segment stays.',
   buildPortsAfter: 'After the removal, {n} ports are open for this run.',
   buildPortsAfter_one: 'After the removal, 1 port is open for this run.',
@@ -45,8 +45,8 @@ export const TEXTS = {
   'w_shaft-crossing': 'The route crosses the wall of the shaft {room} {times}.',
   nTimes: '{n} times',
   nTimes_one: '1 time',
-  'w_room-off-graph': '{count} rooms are outside the route area. Their branches cross more walls: {rooms}.',
-  'w_room-off-graph_one': '1 room is outside the route area. Its branch crosses more walls: {rooms}.',
+  'w_room-off-graph': '{count} rooms are outside the route area. The route serves them anyway: {rooms}.',
+  'w_room-off-graph_one': '1 room is outside the route area. The route serves it anyway: {rooms}.',
   moreRooms: ', and {n} more',
   'w_ports-left': '{count} ports could not be reached. They stay open.',
   'w_ports-left_one': '1 port could not be reached. It stays open.',
@@ -60,8 +60,8 @@ export const TEXTS = {
   'w_capacity-over': 'The ports total {total} {unit}. The start has {cap} {unit}.',
   'w_capacity-unit': 'The ports total {total}. The start has {cap}. The unit is not set, so the numbers are not compared.',
   'w_no-limits': 'Segments are not sized. Sizes shown are placeholders. Use Size network… after you place.',
-  'w_rooms-skipped': '{count} rooms cannot be joined without joining another network. Their ports stay open.',
-  'w_rooms-skipped_one': '1 room cannot be joined without joining another network. Its ports stay open.',
+  'w_rooms-skipped': '{count} rooms would join another network: {rooms}. Their ports stay open.',
+  'w_rooms-skipped_one': '1 room would join another network: {rooms}. Its ports stay open.',
   'w_shares-lane': 'This route runs on top of {count} segments of earlier runs. Move one run by hand.',
   'w_shares-lane_one': 'This route runs on top of 1 segment of an earlier run. Move one run by hand.',
   'w_hand-kept-size': '{count} hand-drawn segments of this network keep their size.',
@@ -189,7 +189,7 @@ function warningText(warning: RoutePlanWarning, names: RouteBuildNames): { text:
     case 'extends-stub':
       return plain('buildExtends');
     case 'rooms-skipped':
-      return { text: buildText(one ? 'w_rooms-skipped_one' : 'w_rooms-skipped', { count }), hint: '' };
+      return { text: buildText(one ? 'w_rooms-skipped_one' : 'w_rooms-skipped', { count, rooms: roomList(warning.ids ?? [], names) }), hint: '' };
     case 'shares-lane':
       return { text: buildText(one ? 'w_shares-lane_one' : 'w_shares-lane', { count }), hint: '' };
     case 'hand-kept-size':

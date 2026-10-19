@@ -89,7 +89,24 @@ describe('routeBuildLines', () => {
   it('lists two room names and then the rest for room-off-graph', () => {
     const ids = ['1', '2', '3', '4', '5', '6', '7'];
     const [line] = routeBuildLines({ warnings: [{ code: 'room-off-graph', severity: 'warning', count: 7, ids }] }, names);
-    expect(line!.text).toBe('7 rooms are outside the route area. Their branches cross more walls: Shaft 1, Shaft 2, and 5 more.');
+    expect(line!.text).toBe('7 rooms are outside the route area. The route serves them anyway: Shaft 1, Shaft 2, and 5 more.');
+  });
+
+  it('says that an off-graph room is served and names it', () => {
+    const [line] = routeBuildLines({ warnings: [{ code: 'room-off-graph', severity: 'warning', count: 1, ids: ['9'] }] }, { room: () => '1.04 Werkplek', unit: '' });
+    expect(line!.text).toBe('1 room is outside the route area. The route serves it anyway: 1.04 Werkplek.');
+  });
+
+  it('names the skipped rooms for rooms-skipped', () => {
+    const [one] = routeBuildLines({ warnings: [{ code: 'rooms-skipped', severity: 'info', count: 1, ids: ['9'] }] }, { room: () => '1.04 Werkplek', unit: '' });
+    const [many] = routeBuildLines({ warnings: [{ code: 'rooms-skipped', severity: 'info', count: 3, ids: ['1', '2', '3'] }] }, names);
+    expect(one!.text).toBe('1 room would join another network: 1.04 Werkplek. Its ports stay open.');
+    expect(many!.text).toBe('3 rooms would join another network: Shaft 1, Shaft 2, and 1 more. Their ports stay open.');
+  });
+
+  it('words the removal line as a note about the earlier run', () => {
+    const [line] = routeBuildLines({ warnings: [{ code: 'removes-routed', severity: 'info', numbers: { segments: 9, fittings: 1 } }] }, names);
+    expect(line!.text).toBe('Place route first removes 9 segments and 1 fitting of the earlier run. Hand-drawn segments stay.');
   });
 
   it('cuts long room names to 20 characters and keeps the text within 140 characters', () => {
