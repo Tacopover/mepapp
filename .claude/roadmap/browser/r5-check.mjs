@@ -57,7 +57,7 @@ async function run1() {
   const b0 = await buildSizingProject(t, { type: 'air', capacities: [100, 0, 0, 0], sizingMethod: 'air', sizing: AIR });
   await updateType('supply-air', { flowUnit: 'dm³/s' });
   const exp = await S(() => window.__mepSketchScene.exportProject());
-  check(exp.schemaVersion === 20, 'step 1: exportProject has schemaVersion 20', String(exp.schemaVersion));
+  check(exp.schemaVersion === 21, 'step 1: exportProject has schemaVersion 21', String(exp.schemaVersion));
   check(Array.isArray(exp.networkSizing) && exp.networkSizing.length === 1, 'step 1: the export holds one networkSizing entry');
   const v19 = await S(() => {
     const s = window.__mepSketchScene;
@@ -73,7 +73,7 @@ async function run1() {
     const type = s.getNetworkTypes().find((x) => x.id === 'supply-air');
     return { type: JSON.parse(JSON.stringify(type)), out: s.exportProject() };
   });
-  check(v19.out.schemaVersion === 20 && v19.type.sizingMethod === 'air' && !('sizing' in v19.type) && v19.type.flowUnit === 'dm³/s', 'step 2: a v19 file loads as 20; the type keeps the method and loses sizing', JSON.stringify(v19.type));
+  check(v19.out.schemaVersion === 21 && v19.type.sizingMethod === 'air' && !('sizing' in v19.type) && v19.type.flowUnit === 'dm³/s', 'step 2: a v19 file loads as 21; the type keeps the method and loses sizing', JSON.stringify(v19.type));
   check(Array.isArray(v19.out.networkSizing) && v19.out.networkSizing.length === 0, 'step 2: a v19 file gives an empty networkSizing');
   await idle(1200);
   await openDialog();
@@ -95,7 +95,7 @@ async function run1() {
     return s.exportProject().schemaVersion;
   });
   await idle(1200);
-  check(v18 === 20, 'step 3: a v18 file loads as schema 20', String(v18));
+  check(v18 === 21, 'step 3: a v18 file loads as schema 21', String(v18));
   await openDialog();
   const l18 = (await count('size-line-no-flow-unit')) + (await count('size-line-no-method'));
   check(l18 === 1 && (await q('size-apply').isDisabled()), 'step 3: the dialog of a v18 file shows a flow-unit or method line and the button is off');
@@ -288,7 +288,7 @@ async function run1() {
   await idle(1500);
   const after12 = await S(() => window.__mepSketchScene.exportProject());
   const ty = (p) => p.networkTypes.find((x) => x.id === 'supply-air');
-  check(after12.schemaVersion === 20 && before12.schemaVersion === 20, 'step 12: schemaVersion is 20 before and after');
+  check(after12.schemaVersion === 21 && before12.schemaVersion === 21, 'step 12: schemaVersion is 21 before and after');
   check(JSON.stringify(after12.segments.map((s) => [s.id, s.diameter])) === JSON.stringify(before12.segments.map((s) => [s.id, s.diameter])), 'step 12: the sizes are the same after save and load');
   check(ty(after12).flowUnit === 'dm³/s' && ty(after12).sizingMethod === 'air' && JSON.stringify(after12.networkSizing) === JSON.stringify(before12.networkSizing), 'step 12: flowUnit, sizingMethod and networkSizing are the same after save and load');
   void bR;
