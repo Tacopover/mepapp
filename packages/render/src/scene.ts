@@ -3013,6 +3013,74 @@ export class SketchScene {
     this.redrawOverlay();
   }
 
+  /** Writes a planned route as one undo step ("Route network"): removes the old routed items of the plan, adds the new segments and fittings, and with options.size writes plan.sizes to the new segments. Returns null and writes nothing when the plan is empty, an id collides, or the result would join two network types. */
+  applyRoute(plan: PlannedRoute, options: { size: boolean }): { segments: number; fittings: number; removedSegments: number; removedFittings: number } | null {
+    if (plan.segments.length === 0) return null;
+    const state = this.doc.drawingHistory.getState();
+    const removedSegmentIds = plan.removeSegmentIds.filter((id) => state.segments[id] !== undefined);
+    const removedFittingIds = plan.removeFittingIds.filter((id) => state.fittings[id] !== undefined);
+    const removedSegmentSet = new Set(removedSegmentIds);
+    const removedFittingSet = new Set(removedFittingIds);
+    const planSegmentIds = new Set(plan.segments.map((s) => s.id));
+    const collides =
+      plan.segments.some((s) => state.segments[s.id] !== undefined && !removedSegmentSet.has(s.id)) ||
+      plan.fittings.some((f) => state.fittings[f.id] !== undefined && !removedFittingSet.has(f.id));
+    if (collides) return null;
+    const nextSegments = [...Object.values(state.segments).filter((s) => !removedSegmentSet.has(s.id)), ...plan.segments];
+    const nextFittings = [...Object.values(state.fittings).filter((f) => !removedFittingSet.has(f.id)), ...plan.fittings];
+    const nextFittingIds = new Set(nextFittings.map((f) => f.id));
+    const dangling = nextSegments.some(
+      (s) => (s.endpointA.kind === 'fitting' && !nextFittingIds.has(s.endpointA.fittingId)) || (s.endpointB.kind === 'fitting' && !nextFittingIds.has(s.endpointB.fittingId)),
+    );
+    if (dangling) return null;
+    const segmentsById = new Map(nextSegments.map((s) => [s.id, s]));
+    const networks = computeNetworks({ segments: nextSegments, fittings: nextFittings, portGroups: this.doc.portGroups });
+    const mixed = networks.some((network) => {
+      if (!network.segmentIds.some((id) => planSegmentIds.has(id))) return false;
+      const typeId = segmentsById.get(network.segmentIds[0])?.networkTypeId;
+      return network.segmentIds.some((id) => segmentsById.get(id)?.networkTypeId !== typeId);
+    });
+    if (mixed) return null;
+    this.adoptNetworkTypes([...new Set(plan.segments.map((s) => s.networkTypeId))]);
+    const tx = new Transaction(this.doc.drawingHistory, 'Route network');
+    tx.update((s) => {
+      const segments = { ...s.segments };
+      const fittings = { ...s.fittings };
+      for (const id of removedSegmentIds) delete segments[id];
+      for (const id of removedFittingIds) delete fittings[id];
+      for (const segment of plan.segments) segments[segment.id] = { ...segment };
+      for (const fitting of plan.fittings) fittings[fitting.id] = { ...fitting };
+      if (options.size) {
+        for (const size of plan.sizes) {
+          if (!planSegmentIds.has(size.segmentId)) continue;
+          const segment: Segment = { ...segments[size.segmentId], shape: size.shape };
+          if (size.shape === 'round') {
+            segment.diameter = size.diameterMm;
+            delete segment.width;
+            delete segment.height;
+          } else {
+            segment.width = size.widthMm;
+            segment.height = size.heightMm;
+            delete segment.diameter;
+          }
+          segments[size.segmentId] = segment;
+        }
+      }
+      return { ...s, segments, fittings };
+    });
+    tx.commit();
+    const seqOf = (id: string): number => Number(id.slice(id.lastIndexOf('-') + 1));
+    this.doc.nextSegmentSeq = Math.max(this.doc.nextSegmentSeq, Math.max(-1, ...plan.segments.map((s) => seqOf(s.id))) + 1);
+    this.doc.nextFittingSeq = Math.max(this.doc.nextFittingSeq, Math.max(-1, ...plan.fittings.map((f) => seqOf(f.id))) + 1);
+    const removedAny = removedSegmentIds.length + removedFittingIds.length > 0;
+    for (const id of [...removedSegmentIds, ...removedFittingIds]) this.doc.selectedIds.delete(id);
+    if (removedAny) this.emitter.emit('selectionChanged', this.getSelection());
+    this.setRoutePreview(null);
+    this.syncDrawingLayer();
+    this.markDirty();
+    return { segments: plan.segments.length, fittings: plan.fittings.length, removedSegments: removedSegmentIds.length, removedFittings: removedFittingIds.length };
+  }
+
   /**
    * Places the stamps of auto-placement (room-auto-placement.md Phase 4) as ONE undo step, the way
    * the stamp tool places one: a new id, the definition's ports and port groups, the remembered
