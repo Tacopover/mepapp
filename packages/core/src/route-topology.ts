@@ -282,15 +282,37 @@ function cleanPath(path: readonly Vec2[]): Vec2[] {
   return out;
 }
 
-function nearestTap(port: Vec2, paths: readonly (readonly Vec2[])[], startPoint: Vec2, targetKeys: ReadonlySet<string>): Tap {
+function distanceToPieceMm(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.min(Math.max(((p.x - a.x) * dx + (p.y - a.y) * dy) / len2, 0), 1);
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+const OVER_PORT_MM = 1;
+
+/** True when another target port point lies within 1 mm of a leg of the path. The end point of the path is the port itself. */
+function runsOverOtherPort(path: readonly Vec2[], targetPoints: readonly Vec2[]): boolean {
+  const end = path[path.length - 1]!;
+  return targetPoints.some((t) => {
+    if (Math.hypot(t.x - end.x, t.y - end.y) <= OVER_PORT_MM) return false;
+    for (let i = 1; i < path.length; i++) if (distanceToPieceMm(t, path[i - 1]!, path[i]!) <= OVER_PORT_MM) return true;
+    return false;
+  });
+}
+
+/** All tap candidates for a loose port, nearest first (tie: leg order). The vertices of the route count only when it has no axis leg. */
+function tapCandidates(port: Vec2, paths: readonly (readonly Vec2[])[], startPoint: Vec2, targetKeys: ReadonlySet<string>): Tap[] {
   const points: Vec2[] = [startPoint];
   for (const path of paths) points.push(...path);
-  const consider = (best: Tap | null, point: Vec2, perpendicular: 'x' | 'y' | null): Tap => {
-    const distance = Math.hypot(port.x - point.x, port.y - point.y);
-    return !best || distance < best.distance - 1e-9 ? { point, distance, perpendicular } : best;
+  const axisTaps: Tap[] = [];
+  const vertexTaps: Tap[] = [];
+  const consider = (list: Tap[], point: Vec2, perpendicular: 'x' | 'y' | null): void => {
+    list.push({ point, distance: Math.hypot(port.x - point.x, port.y - point.y), perpendicular });
   };
+  const byDistance = (a: Tap, b: Tap): number => (Math.abs(a.distance - b.distance) <= 1e-9 ? 0 : a.distance - b.distance);
 
-  let best: Tap | null = null;
   let hasAxisLeg = false;
   for (const path of paths) {
     for (let i = 1; i < path.length; i++) {
@@ -301,7 +323,7 @@ function nearestTap(port: Vec2, paths: readonly (readonly Vec2[])[], startPoint:
       hasAxisLeg = true;
       if (len < 2 * MIN_LEG_MM) {
         for (const end of [a, b]) {
-          if (!targetKeys.has(keyOf(end))) best = consider(best, copyPoint(end), null);
+          if (!targetKeys.has(keyOf(end))) consider(axisTaps, copyPoint(end), null);
         }
         continue;
       }
@@ -317,14 +339,15 @@ function nearestTap(port: Vec2, paths: readonly (readonly Vec2[])[], startPoint:
       }
       const s = placeTapPosition(len, preferred, blockers, MIN_LEG_MM);
       const point = horizontal ? { x: a.x + dx * s, y: a.y } : { x: a.x, y: a.y + dy * s };
-      best = consider(best, point, horizontal ? 'y' : 'x');
+      consider(axisTaps, point, horizontal ? 'y' : 'x');
     }
   }
-  if (hasAxisLeg && best) return best;
   for (const p of points) {
-    if (!targetKeys.has(keyOf(p))) best = consider(best, copyPoint(p), null);
+    if (!targetKeys.has(keyOf(p))) consider(vertexTaps, copyPoint(p), null);
   }
-  return best ?? { point: copyPoint(startPoint), distance: Math.hypot(port.x - startPoint.x, port.y - startPoint.y), perpendicular: null };
+  const ordered = hasAxisLeg && axisTaps.length > 0 ? axisTaps.sort(byDistance) : vertexTaps.sort(byDistance);
+  if (ordered.length > 0) return ordered;
+  return [{ point: copyPoint(startPoint), distance: Math.hypot(port.x - startPoint.x, port.y - startPoint.y), perpendicular: null }];
 }
 
 /** Joins each loose port to the nearest point of the built route, one port at a time (nearest first, tie: lower id). */
@@ -339,34 +362,38 @@ export function connectLoosePorts(input: ConnectLooseInput): ConnectLooseResult 
 
   while (pending.length > 0) {
     let bestIndex = -1;
-    let bestTap: Tap | null = null;
+    let bestCandidates: Tap[] = [];
     for (let i = 0; i < pending.length; i++) {
-      const tap = nearestTap(pending[i]!.point, built, input.startPoint, targetKeys);
+      const candidates = tapCandidates(pending[i]!.point, built, input.startPoint, targetKeys);
+      const tap = candidates[0]!;
+      const bestTap = bestCandidates[0];
       const better = !bestTap || tap.distance < bestTap.distance - 1e-9 || (Math.abs(tap.distance - bestTap.distance) <= 1e-9 && pending[i]!.id < pending[bestIndex]!.id);
       if (better) {
         bestIndex = i;
-        bestTap = tap;
+        bestCandidates = candidates;
       }
     }
     const port = pending.splice(bestIndex, 1)[0]!;
-    const tap = bestTap!;
-    const dx = port.point.x - tap.point.x;
-    const dy = port.point.y - tap.point.y;
-    const longer: 'x' | 'y' = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
-    const first = tap.perpendicular ?? longer;
-    const second: 'x' | 'y' = first === 'x' ? 'y' : 'x';
 
     let chosen: Vec2[] | null = null;
     const tried: string[] = [];
-    for (const axis of [first, second]) {
-      const path = cleanPath(elbowPath(tap.point, port.point, axis));
-      const signature = path.map(keyOf).join(';');
-      if (tried.includes(signature)) continue;
-      tried.push(signature);
-      if (path.length >= 2 && accepts(path, port.id)) {
-        chosen = path;
-        break;
+    for (const tap of bestCandidates) {
+      const dx = port.point.x - tap.point.x;
+      const dy = port.point.y - tap.point.y;
+      const longer: 'x' | 'y' = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+      const first = tap.perpendicular ?? longer;
+      const second: 'x' | 'y' = first === 'x' ? 'y' : 'x';
+      for (const axis of [first, second]) {
+        const path = cleanPath(elbowPath(tap.point, port.point, axis));
+        const signature = path.map(keyOf).join(';');
+        if (tried.includes(signature)) continue;
+        tried.push(signature);
+        if (path.length >= 2 && accepts(path, port.id) && !runsOverOtherPort(path, input.targetPoints)) {
+          chosen = path;
+          break;
+        }
       }
+      if (chosen) break;
     }
     if (!chosen) {
       left.push(port.id);

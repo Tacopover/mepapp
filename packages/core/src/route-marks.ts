@@ -26,19 +26,21 @@ export function routedRunOf(
   const empty = { segmentIds: [], fittingIds: [] };
   const segments = state.segments as Segment[];
   const atStart = segments.filter((s) => isPortEnd(s.endpointA, startStampId, startPortId) || isPortEnd(s.endpointB, startStampId, startPortId));
-  if (atStart.length !== 1) return empty;
+  const allMarked = atStart.length >= 2 && atStart.every((s) => s.routedBy === ROUTED_MARK);
+  if (atStart.length !== 1 && !allMarked) return empty;
 
-  const first = atStart[0];
   const runIds = new Set<string>();
   const pending: ConnectionPoint[] = [];
-  const otherEnd = isPortEnd(first.endpointA, startStampId, startPortId) ? first.endpointB : first.endpointA;
-  if (first.routedBy === ROUTED_MARK) {
-    runIds.add(first.id);
-    pending.push(otherEnd);
-  } else if (otherEnd.kind === 'fitting') {
-    pending.push(otherEnd);
-  } else {
-    return empty;
+  for (const first of atStart) {
+    const otherEnd = isPortEnd(first.endpointA, startStampId, startPortId) ? first.endpointB : first.endpointA;
+    if (first.routedBy === ROUTED_MARK) {
+      runIds.add(first.id);
+      pending.push(otherEnd);
+    } else if (otherEnd.kind === 'fitting') {
+      pending.push(otherEnd);
+    } else {
+      return empty;
+    }
   }
 
   const visited = new Set<string>();

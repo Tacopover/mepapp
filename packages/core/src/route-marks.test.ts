@@ -69,9 +69,22 @@ describe('routedRunOf', () => {
     expect(routedRunOf(state, 'ahu', 'out')).toEqual({ segmentIds: [], fittingIds: [] });
   });
 
-  it('returns empty arrays when two segments end on the start port', () => {
+  it('walks from both segments when two marked segments end on the start port', () => {
     const state = {
-      segments: [seg('s1', portEnd('ahu', 'out'), fitEnd('f1')), seg('s2', portEnd('ahu', 'out'), fitEnd('f2'))],
+      segments: [
+        seg('s1', portEnd('ahu', 'out'), fitEnd('f1')),
+        seg('s2', portEnd('ahu', 'out'), fitEnd('f2')),
+        seg('s3', fitEnd('f1'), portEnd('t1', 'p')),
+        seg('s4', fitEnd('f2'), portEnd('t2', 'p')),
+      ],
+      fittings: [fit('f1'), fit('f2')],
+    };
+    expect(routedRunOf(state, 'ahu', 'out')).toEqual({ segmentIds: ['s1', 's2', 's3', 's4'], fittingIds: ['f1', 'f2'] });
+  });
+
+  it('returns empty arrays when two segments end on the start port and one has no mark', () => {
+    const state = {
+      segments: [seg('s1', portEnd('ahu', 'out'), fitEnd('f1')), seg('s2', portEnd('ahu', 'out'), fitEnd('f2'), false)],
       fittings: [fit('f1'), fit('f2')],
     };
     expect(routedRunOf(state, 'ahu', 'out')).toEqual({ segmentIds: [], fittingIds: [] });

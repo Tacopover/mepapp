@@ -210,6 +210,18 @@ describe('connectLoosePorts', () => {
     expect(result.paths[0]![0]).toEqual(v(10000, 0));
   });
 
+  it('rejects a connection leg that runs over another target port and takes another layout or candidate', () => {
+    const p = v(6000, 3000);
+    const other = v(6000, 2000);
+    const base = { paths: [[v(0, 0), v(10000, 0)], [v(10000, 0), v(10000, 2000)]], startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p, other], noTapPoints: [v(0, 0)] };
+    const result = connectLoosePorts(base);
+    expect(result.paths).toEqual([[v(10000, 1700), v(10000, 3000), v(6000, 3000)]]);
+    expect(result.left).toEqual([]);
+    const free = connectLoosePorts({ ...base, targetPoints: [p] });
+    expect(free.paths).toEqual([[v(6000, 0), v(6000, 3000)]]);
+    expect(connectLoosePorts({ ...base, targetPoints: [p, other, v(8000, 3000)] }).left).toEqual(['p']);
+  });
+
   it('takes the second layout when the stub rejects the first, and leaves the port when it rejects both', () => {
     const p = v(2000, 1000);
     const paths = [[v(0, 0), v(500, 0)]];

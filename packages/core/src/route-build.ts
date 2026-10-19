@@ -364,6 +364,18 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
   if (checked.overlaps > 0) warnings.push({ code: 'existing-overlap', severity: 'warning', count: checked.overlaps, ids: checked.overlapIds });
   if (checked.lane > 0) warnings.push({ code: 'shares-lane', severity: 'info', count: checked.lane, ids: checked.laneIds });
 
+  const targetKeys = new Set(connectedPorts.map(portKey));
+  const endpointCount = new Map<string, number>();
+  for (const planned of items.segments) {
+    for (const end of [planned.endpointA, planned.endpointB]) {
+      if (end.kind !== 'port') continue;
+      const key = `${end.elementId}:${end.portId}`;
+      if (targetKeys.has(key)) endpointCount.set(key, (endpointCount.get(key) ?? 0) + 1);
+    }
+  }
+  const crowded = [...endpointCount].filter(([, count]) => count > 1).map(([key]) => key).sort();
+  if (crowded.length > 0) return refused([...warnings, { code: 'internal-join', severity: 'error', ids: crowded }]);
+
   const broken = checkInvariant({
     reducedSegments: reduced.segments,
     reducedFittings: reduced.fittings,
