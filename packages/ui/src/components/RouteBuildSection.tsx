@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { RoutePlanView, RouteRequest, SketchScene } from '@mepapp/render';
-import { buildText, routeBuildLines, routeBuildSeverityLabel, routeBuildSummary } from './routeBuildPlan.js';
+import { buildText, countPhrase, routeBuildLines, routeBuildSeverityLabel, routeBuildSummary } from './routeBuildPlan.js';
 
 export interface RouteBuildSectionProps {
   sceneRef: RefObject<SketchScene | null>;
@@ -22,6 +22,9 @@ export function RouteBuildSection({ sceneRef, request, roomName }: RouteBuildSec
   const [view, setView] = useState<RoutePlanView | null>(null);
   const [pending, setPending] = useState(false);
   const [tick, setTick] = useState(0);
+  const [size, setSize] = useState(true);
+  const [result, setResult] = useState<{ segments: number; fittings: number } | null>(null);
+  const [failed, setFailed] = useState(false);
   const key = request ? routeRequestKey(request) : null;
 
   useEffect(() => {
@@ -49,6 +52,11 @@ export function RouteBuildSection({ sceneRef, request, roomName }: RouteBuildSec
   }, [scene, key, tick]);
 
   useEffect(() => {
+    setResult(null);
+    setFailed(false);
+  }, [key]);
+
+  useEffect(() => {
     if (!scene) return;
     scene.setRoutePreview(view && view.status === 'ok' && view.plan.segments.length > 0 ? view.plan : null);
   }, [scene, view]);
@@ -61,6 +69,18 @@ export function RouteBuildSection({ sceneRef, request, roomName }: RouteBuildSec
   if (!scene || !request) return null;
 
   const lines = view ? routeBuildLines(view.plan, { room: roomName, unit: view.flowUnit ?? '' }) : [];
+  const hasNoLimitsLine = view?.plan.warnings.some((w) => w.code === 'no-limits') ?? false;
+  const sizeAvailable = !!view && view.status === 'ok' && view.hasLimits && !hasNoLimitsLine;
+  const canPlace = !!view && view.status === 'ok' && view.plan.segments.length > 0 && !pending;
+
+  const place = () => {
+    if (!view || !request) return;
+    const useSize = sizeAvailable && size;
+    let done = scene.applyRoute(view.plan, { size: useSize });
+    if (done === null) done = scene.applyRoute(scene.planRoute(request).plan, { size: useSize });
+    setFailed(done === null);
+    setResult(done);
+  };
 
   return (
     <div className="mep-route-build" data-testid="route-build">
@@ -86,6 +106,19 @@ export function RouteBuildSection({ sceneRef, request, roomName }: RouteBuildSec
           ))}
         </div>
       )}
+      {sizeAvailable && (
+        <label className="mep-route-check">
+          <input type="checkbox" data-testid="route-build-size" checked={size} onChange={(event) => setSize(event.target.checked)} />
+          <span>{buildText('buildSizeAfter')}</span>
+        </label>
+      )}
+      <div className="mep-route-build-actions">
+        <button type="button" data-testid="route-place" disabled={!canPlace} onClick={place}>{buildText('buildPlace')}</button>
+      </div>
+      {result && (
+        <p className="mep-route-text mep-route-main" data-testid="route-build-result" aria-live="polite">{buildText('buildPlaced', { segments: countPhrase('nSegments', result.segments), fittings: countPhrase('nFittings', result.fittings) })}</p>
+      )}
+      {failed && <p className="mep-route-text mep-route-check-error" data-testid="route-build-failed">{buildText('buildPlaceFailed')}</p>}
     </div>
   );
 }

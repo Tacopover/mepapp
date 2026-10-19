@@ -3749,6 +3749,14 @@
   margin: 0 0 10px;
 }
 .mep-modal--route .mep-route-build-title { font-weight: 700; margin-bottom: 6px; }
+.mep-modal--route .mep-route-build .mep-route-check { margin-top: 6px; }
+.mep-modal--route .mep-route-build-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
 .mep-modal-backdrop--route {
   background: transparent;
   justify-content: flex-end;

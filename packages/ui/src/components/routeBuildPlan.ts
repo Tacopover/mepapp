@@ -27,6 +27,7 @@ export const TEXTS = {
   buildPortsAfter: 'After the removal, {n} ports are open for this run.',
   buildPortsAfter_one: 'After the removal, 1 port is open for this run.',
   buildPlaced: 'Placed {segments} and {fittings}.',
+  buildPlaceFailed: 'The route could not be placed. Nothing changed. Try again.',
   'w_multi-page': 'This file has more than one page. Route one page at a time.',
   'w_no-calibration': 'The drawing has no scale. Set the scale first.',
   'w_area-empty': 'The route area is empty. Add a room type or detect rooms.',
@@ -90,7 +91,7 @@ export interface RouteBuildNames {
 }
 
 /** A count with its noun: '3 segments', or '1 segment' for a count of 1. */
-function countPhrase(key: 'nSegments' | 'nFittings' | 'nRooms' | 'nPorts' | 'bend90' | 'bend45', n: number): string {
+export function countPhrase(key: 'nSegments' | 'nFittings' | 'nRooms' | 'nPorts' | 'bend90' | 'bend45', n: number): string {
   return n === 1 ? buildText(`${key}_one` as BuildTextKey) : buildText(key, { n });
 }
 
