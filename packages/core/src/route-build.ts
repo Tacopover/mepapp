@@ -355,7 +355,8 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
     newFittingId: input.newFittingId,
   });
 
-  if (trunk.freeEdges.length > 0) warnings.push({ code: 'free-angle', severity: 'warning', count: trunk.freeEdges.length, points: trunk.freeEdges.map((edge) => toPage(edge.pointMm)) });
+  if (items.freeLegs > 0) warnings.push({ code: 'free-angle', severity: 'warning', count: items.freeLegs, points: items.freePoints });
+  else if (trunk.freeEdges.length > 0) warnings.push({ code: 'free-angle', severity: 'warning', count: trunk.freeEdges.length, points: trunk.freeEdges.map((edge) => toPage(edge.pointMm)) });
   if (trunk.offGraphRoomIds.length > 0) warnings.push({ code: 'room-off-graph', severity: 'warning', ids: [...trunk.offGraphRoomIds].sort(), count: trunk.offGraphRoomIds.length });
   const leftCount = connected.left.length + refusedPorts.length;
   if (leftCount > 0) {

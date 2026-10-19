@@ -21,7 +21,7 @@ export interface TopologyInput {
   networkTypeId: string; discipline: Discipline; pageIndex: number; mmPerPt: number;
   newSegmentId: () => string; newFittingId: () => string;
 }
-export interface TopologyResult { segments: Segment[]; fittings: Fitting[]; lengthMm: number; bends90: number; bends45: number; freeLegs: number }
+export interface TopologyResult { segments: Segment[]; fittings: Fitting[]; lengthMm: number; bends90: number; bends45: number; freeLegs: number; freePoints: Vec2[] }
 
 const KEY_SCALE = 1e4;
 const NEAR_MM = 1e-6;
@@ -213,11 +213,15 @@ export function buildRouteItems(input: TopologyInput): TopologyResult {
   const segments: Segment[] = [];
   let lengthMm = 0;
   let freeLegs = 0;
+  const freePoints: Vec2[] = [];
   for (const item of planned) {
     const va = vertices.get(item.a)!;
     const vb = vertices.get(item.b)!;
     lengthMm += Math.hypot(vb.x - va.x, vb.y - va.y);
-    if (legClass(va, vb) === 'free') freeLegs++;
+    if (legClass(va, vb) === 'free') {
+      freeLegs++;
+      freePoints.push({ x: (item.ea.page.x + item.eb.page.x) / 2, y: (item.ea.page.y + item.eb.page.y) / 2 });
+    }
     segments.push({
       id: input.newSegmentId(),
       pageIndex: input.pageIndex,
@@ -248,7 +252,7 @@ export function buildRouteItems(input: TopologyInput): TopologyResult {
     else if (Math.abs(deflection - 45) <= 1) bends45++;
   }
 
-  return { segments, fittings, lengthMm, bends90, bends45, freeLegs };
+  return { segments, fittings, lengthMm, bends90, bends45, freeLegs, freePoints };
 }
 
 export interface LoosePort { id: string; point: Vec2 }

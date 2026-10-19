@@ -155,6 +155,10 @@ describe('buildRouteItems', () => {
     const result = buildRouteItems(make([[v(0, 0), v(1000, 300), v(2000, 1300)]], [port('a', v(0, 0)), port('b', v(2000, 1300))], v(0, 0)));
     expect(result.segments).toHaveLength(2);
     expect(result.freeLegs).toBe(1);
+    expect(result.freePoints).toHaveLength(1);
+    // The free leg is (0,0)-(1000,300) mm; its middle is (500,150) mm, which is (50,15) pt at 10 mm per pt.
+    expect(result.freePoints[0]!.x).toBeCloseTo(50, 9);
+    expect(result.freePoints[0]!.y).toBeCloseTo(15, 9);
   });
 
   it('starts at a stub fitting with no new fitting', () => {

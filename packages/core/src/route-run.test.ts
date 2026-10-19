@@ -191,6 +191,7 @@ describe('planRoute on the first floor', () => {
     console.log(`planRoute time ${ms.toFixed(0)} ms`);
     expect(status).toBe('ok');
     expect(plan.warnings.some((w) => w.code === 'internal-join')).toBe(false);
+    expect(plan.warnings.some((w) => w.code === 'free-angle'), 'free-angle shows exactly when the plan has free legs').toBe(plan.stats.freeLegs > 0);
     expect(ms).toBeLessThan(500);
 
     let freeLen = 0;
