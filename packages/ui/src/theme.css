@@ -3743,6 +3743,12 @@
   margin-top: 4px;
   margin-bottom: 4px;
 }
+.mep-modal--route .mep-route-build {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin: 0 0 10px;
+}
+.mep-modal--route .mep-route-build-title { font-weight: 700; margin-bottom: 6px; }
 .mep-modal-backdrop--route {
   background: transparent;
   justify-content: flex-end;

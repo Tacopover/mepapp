@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
-import type { RouteMarker, SketchScene, StampInfo } from '@mepapp/render';
+import type { RouteMarker, RouteRequest, SketchScene, StampInfo } from '@mepapp/render';
 import { checkRouteStart, findRoutePorts, getNetworkTypeFromLibrary, getStampWorldPorts, roomTypeLabel, routePageProblem, type RoomType } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { RouteAreaSection } from './RouteAreaSection.js';
+import { RouteBuildSection, routeRequestKey } from './RouteBuildSection.js';
 import { includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startCheckLines, startPortChoices, typeChoices, typeNameInText, typeOptionText } from './routePlan.js';
 
 export interface RouteDialogProps {
@@ -50,6 +51,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
   const [unchecked, setUncheckedRooms] = useState<ReadonlySet<string>>(() => new Set());
   const [includeOutside, setIncludeOutside] = useState(true);
   const [allPorts, setAllPorts] = useState(false);
+  const [lastRequest, setLastRequest] = useState<RouteRequest | null>(null);
   useEffect(() => {
     if (!scene) return;
     const refresh = () => {
@@ -110,6 +112,21 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
     })
     : null;
   const checkedRoomCount = rooms.filter((r) => !unchecked.has(r.id)).length;
+  const liveRequest: RouteRequest | null = startStamp && selectedPort && selectedType && choices.length > 0
+    ? {
+      startStampId: startStamp.id, startPortId: selectedPort, networkTypeId: selectedType,
+      scope: effectiveScope === 'rooms'
+        ? { kind: 'rooms', roomIds: new Set(rooms.filter((r) => !unchecked.has(r.id)).map((r) => r.id)) }
+        : { kind: 'stamps', stampIds: new Set(selectionOthers) },
+      includeOutsideRooms: includeOutside,
+      portsPerStamp: allPorts ? 'all' : 'one',
+    }
+    : null;
+  const liveKey = liveRequest ? routeRequestKey(liveRequest) : null;
+  useEffect(() => {
+    if (liveRequest) setLastRequest(liveRequest);
+  }, [liveKey]);
+  const buildRequest = liveRequest ?? (choices.length === 0 && lastRequest && stamps.some((s) => s.id === lastRequest.startStampId) ? lastRequest : null);
   useEffect(() => {
     if (!scene) return;
     const markers: RouteMarker[] = [];
@@ -370,6 +387,16 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                 </>
               )}
             </>
+          )}
+          {candidates.length > 0 && (
+            <RouteBuildSection
+              sceneRef={sceneRef}
+              request={buildRequest}
+              roomName={(id) => {
+                const index = rooms.findIndex((r) => r.id === id);
+                return index < 0 ? id : roomLabel(rooms[index], index, 'en');
+              }}
+            />
           )}
           <RouteAreaSection sceneRef={sceneRef} roomTypes={roomTypes} language={language} onRouteTypeIdsChange={onRouteTypeIdsChange} />
         </div>
