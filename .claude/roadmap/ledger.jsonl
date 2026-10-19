@@ -455,3 +455,10 @@
 {"seq":455,"at":"2026-10-19T01:25:42.841Z","type":"task","id":"R6-T15","state":"done","commit":"6fcc537"}
 {"seq":456,"at":"2026-10-19T01:25:42.885Z","type":"task","id":"R6-T16","state":"done","commit":"bcb84fd"}
 {"seq":457,"at":"2026-10-19T01:25:42.926Z","type":"now","id":"R6-T17","text":"R6-T17, T18, T19, T20 (scene planRoute and applyRoute, browser check, texts) running"}
+{"seq":458,"at":"2026-10-19T02:44:09.651Z","type":"task","id":"R6-T17","state":"done","commit":"a4f83b2"}
+{"seq":459,"at":"2026-10-19T02:44:09.693Z","type":"task","id":"R6-T18","state":"done","commit":"ef099e5"}
+{"seq":460,"at":"2026-10-19T02:44:09.736Z","type":"task","id":"R6-T19","state":"done","commit":"0ea11e5"}
+{"seq":461,"at":"2026-10-19T02:44:09.779Z","type":"task","id":"R6-T20","state":"done","commit":"1d8d61a"}
+{"seq":462,"at":"2026-10-19T02:44:09.819Z","type":"shot","id":"R6-T17-preview-overlay","part":"R6","task":"R6-T17","caption":"Route preview: dashed line in the network type colour","assetId":"a023e9ae588874fbf92191e6afe20444","url":"/_blob/a023e9ae588874fbf92191e6afe20444"}
+{"seq":463,"at":"2026-10-19T02:44:09.860Z","type":"shot","id":"R6-T19-adopted-color","part":"R6","task":"R6-T19","caption":"After the run: a library type the drawing had not adopted is drawn in its own colour","assetId":"c019d8f811fba983bd8ca5b2f32701e3","url":"/_blob/c019d8f811fba983bd8ca5b2f32701e3"}
+{"seq":464,"at":"2026-10-19T02:44:09.904Z","type":"now","id":"R6-T21","text":"R6-T21 and T22 (Route dialog section, Place button) running"}
