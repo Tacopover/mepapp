@@ -450,3 +450,8 @@
 {"seq":450,"at":"2026-10-18T21:28:34.604Z","type":"shot","id":"R6-T14-routing-project","part":"R6","task":"R6-T14","caption":"Browser setup: a routed sample project with marked segments and fittings","assetId":"da94df27f8a2929852ff184f90dc6231","url":"/_blob/da94df27f8a2929852ff184f90dc6231"}
 {"seq":451,"at":"2026-10-18T21:28:34.646Z","type":"shot","id":"R6-T03-after-drags","part":"R6","task":"R6-T03","caption":"After hand drags: dragged items lose the routed mark, the rest keep it","assetId":"8266f6e547c47903ffa157e2a6d87c9a","url":"/_blob/8266f6e547c47903ffa157e2a6d87c9a"}
 {"seq":452,"at":"2026-10-18T21:28:34.688Z","type":"now","id":"R6-T12","text":"R6-T12, T13, T15, T16 (route planner wiring, checks, real-room test) running"}
+{"seq":453,"at":"2026-10-19T01:25:42.752Z","type":"task","id":"R6-T12","state":"done","commit":"dc91928"}
+{"seq":454,"at":"2026-10-19T01:25:42.800Z","type":"task","id":"R6-T13","state":"done","commit":"1622ecf"}
+{"seq":455,"at":"2026-10-19T01:25:42.841Z","type":"task","id":"R6-T15","state":"done","commit":"6fcc537"}
+{"seq":456,"at":"2026-10-19T01:25:42.885Z","type":"task","id":"R6-T16","state":"done","commit":"bcb84fd"}
+{"seq":457,"at":"2026-10-19T01:25:42.926Z","type":"now","id":"R6-T17","text":"R6-T17, T18, T19, T20 (scene planRoute and applyRoute, browser check, texts) running"}
