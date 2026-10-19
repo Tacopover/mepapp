@@ -48,7 +48,15 @@ export type RoomInput = Omit<Room, 'id'>;
 
 export const roomId = (seq: number): string => `room-${seq}`;
 
-const flat = (ring: readonly Vec2[]): number[] => ring.flatMap((p) => [p.x, p.y]);
+const flatCache = new WeakMap<readonly Vec2[], number[]>();
+/** The ring as [x0, y0, x1, y1, ...]. Cached for each ring array, because a point test calls it for every sample. A ring with another length than the cached one is flattened again. */
+const flat = (ring: readonly Vec2[]): number[] => {
+  const cached = flatCache.get(ring);
+  if (cached && cached.length === ring.length * 2) return cached;
+  const flattened = ring.flatMap((p) => [p.x, p.y]);
+  flatCache.set(ring, flattened);
+  return flattened;
+};
 
 function ringAreaPt2(ring: readonly Vec2[]): number {
   let s = 0;

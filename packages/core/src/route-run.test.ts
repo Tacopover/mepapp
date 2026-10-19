@@ -191,7 +191,7 @@ describe('planRoute on the first floor', () => {
     console.log(`planRoute time ${ms.toFixed(0)} ms`);
     expect(status).toBe('ok');
     expect(plan.warnings.some((w) => w.code === 'internal-join')).toBe(false);
-    expect(ms).toBeLessThan(5000);
+    expect(ms).toBeLessThan(500);
 
     let freeLen = 0;
     let totalLen = 0;
@@ -259,7 +259,8 @@ describe('planRoute on the first floor', () => {
     expect(polygonContainsPoint(startRoom.polygon, g.position), 'G lies in the start room').toBe(true);
     const base = baseState([stub], [g]);
     const run1 = runPlan(base, { segmentIds: [], fittingIds: [] }, targetPortsOf(baseStamps));
-    console.log(`stub run status ${run1.status}, counts ${JSON.stringify(counts(run1.plan))}, warnings ${codeCounts(run1.plan)}`);
+    console.log(`stub run status ${run1.status}, counts ${JSON.stringify(counts(run1.plan))}, warnings ${codeCounts(run1.plan)}, ms ${run1.ms.toFixed(0)}`);
+    expect(run1.ms).toBeLessThan(1000);
     expect(run1.status).toBe('ok');
     expect(run1.plan.warnings.some((w) => w.code === 'extends-stub')).toBe(true);
     const state1 = apply(base, run1.plan);
