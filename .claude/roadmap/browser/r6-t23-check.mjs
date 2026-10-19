@@ -47,9 +47,9 @@ const walk = (e, stampId, portId) => {
   return { segments: reached.size, fittings: removable.length, segIds: [...reached], fitIds: removable };
 };
 
-const fresh = async (targets = 4) => {
+const fresh = async (targets = 3) => {
   const b = await buildRoutingProject(t, { targets });
-  return { ...b, off: b.roomIds.slice(3) };
+  return { ...b, off: [] };
 };
 const inCanvas = async (p) => {
   const at = await screenOf(page, p);
@@ -92,6 +92,10 @@ try {
     const e1 = await H.exp();
     check(e1.marked.segments.length === r1.segments && e1.marked.fittings.length === r1.fittings, '1: run 1 marks exactly the placed items', JSON.stringify({ r1, m: [e1.marked.segments.length, e1.marked.fittings.length] }));
     await H.openDialog();
+    const typeOptions = await tid('route-type').evaluate((el) => Array.from(el.options).map((o) => ({ value: o.value, text: o.text })));
+    console.log(`type list after a full run, dialog reopened: ${JSON.stringify(typeOptions)}`);
+    check(typeOptions.some((o) => o.value === 'supply-air' && o.text.includes('(0 open ports)')), '1: after a full run and a closed dialog the type list still offers the routed type with 0 open ports', JSON.stringify(typeOptions));
+    check((await page.locator(`${R} [data-testid="route-no-ports"]`).count()) === 0, '1: the dialog does not say that no port waits for routing');
     await H.selectInputs('supply-air');
     await H.setRooms(b.off, false);
     const rem = await H.removeNumbers();
@@ -220,6 +224,34 @@ try {
     const e3 = await H.exp();
     const kept = e3.fits.find((f) => f.id === F.id);
     check(kept && Math.abs(kept.position.x - f2.position.x) < 1e-6 && attached.size > 0 && [...attached].every((id) => e3.segs.some((s) => s.id === id)), '3: the dragged items stay after Place');
+  });
+
+  await section('3c. routed segments held by a hand-edited fitting', async () => {
+    const b = await fresh();
+    await H.placeRun({ roomsOff: b.off });
+    const e1 = await H.exp();
+    const outP = await H.portPoint('ahu', 'out');
+    const degOf = (f) => e1.segs.filter((s) => [s.endpointA, s.endpointB].some((x) => x.kind === 'fitting' && x.fittingId === f.id)).length;
+    const dist = (f) => Math.hypot(f.position.x - outP.x, f.position.y - outP.y);
+    const F = e1.fits.filter((f) => degOf(f) >= 3 && dist(f) > 60).sort((x, y) => dist(x) - dist(y))[0];
+    await H.tool('Select');
+    await H.centerOn(F.position, 800, 500);
+    await H.drag(await screenOf(page, F.position), 60, 50);
+    const e2 = await H.exp();
+    const want = walk(e2, 'ahu', 'out');
+    const held = e2.marked.segments.length;
+    console.log(`marked segments left after the drag: ${held}; independent walk ${JSON.stringify({ s: want.segments, f: want.fittings })}`);
+    await H.openDialog();
+    await H.selectInputs('supply-air');
+    await H.waitPlan();
+    const line = await H.lineOf('held-by-hand');
+    const err = await H.lineOf('no-targets');
+    console.log(`lines: ${JSON.stringify(await H.lineCodes())}; held-by-hand ${JSON.stringify(line)}`);
+    check(line && line.severity === 'info' && line.text.includes(`${held - want.segments} routed segment`), '3c: the Note held-by-hand counts the routed segments that stay', JSON.stringify(line));
+    check(err && err.severity === 'error', '3c: the no-targets Error shows with it');
+    await H.scrollTo('route-build-line-held-by-hand', 'center');
+    await shot('T23-held-by-hand');
+    await H.closeDialog();
   });
 
   await section('4. a deleted routed segment', async () => {
@@ -363,8 +395,8 @@ try {
        p.portGroups = [{ elementId: 'term-1', portIds: ['in', 'in2'] }];`,
     );
     await H.addSecondEquipment(0, 0);
-    const offA = [b.roomIds[2], b.roomIds[3]];
-    const offB = [b.roomIds[1], b.roomIds[3]];
+    const offA = [b.roomIds[2]];
+    const offB = [b.roomIds[1]];
     await H.placeRun({ roomsOff: offA });
     const eA = await H.exp();
     await H.openDialog();
