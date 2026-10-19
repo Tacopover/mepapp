@@ -8,7 +8,7 @@ export type RoutePlanWarningCode =
   | 'multi-page' | 'no-calibration' | 'area-empty' | 'gravity-not-routed' | 'start-error' | 'foreign-start' | 'no-targets' | 'start-unreachable' | 'internal-join'
   | 'free-angle' | 'wall-crossings' | 'shaft-crossing' | 'room-off-graph' | 'ports-left' | 'existing-crossings' | 'existing-overlap'
   | 'same-type-join' | 'short-leg' | 'capacity-over' | 'capacity-unit' | 'no-limits'
-  | 'removes-routed' | 'extends-stub' | 'rooms-skipped' | 'shares-lane' | 'hand-kept-size' | 'draft-2d';
+  | 'removes-routed' | 'extends-stub' | 'rooms-skipped' | 'shares-lane' | 'hand-kept-size' | 'held-by-hand' | 'draft-2d';
 
 export interface RoutePlanWarning {
   code: RoutePlanWarningCode;

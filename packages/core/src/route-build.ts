@@ -2,7 +2,7 @@
 
 import type { Vec2 } from './geometry.js';
 import { computeNetworks } from './network.js';
-import type { ConnectionPoint, Fitting, NetworkType, PortGroup, Segment } from './network.js';
+import { ROUTED_MARK, type ConnectionPoint, type Fitting, type NetworkType, type PortGroup, type Segment } from './network.js';
 import { getNetworkTypeFromLibrary } from './network-type-library.js';
 import { getStampWorldPorts } from './stamp.js';
 import { buildTrunk } from './route-trunk.js';
@@ -164,6 +164,18 @@ export function resolveStart(input: RouteBuildInput, reduced: { segments: Segmen
   return { ok: true, pointMm: { x: fitting.position.x * mmPerPt, y: fitting.position.y * mmPerPt }, stubSegmentId: stub.id, stubFittingId: fitting.id };
 }
 
+/** The marked segments that are joined to the start by segments and fittings (port groups left out) and that the removal leaves in place: a hand-drawn or hand-edited item holds them. */
+function routedHeldByHand(input: RouteBuildInput): number {
+  const own = segmentsOnPort(input.state.segments, input.startStampId, input.startPortId);
+  if (own.length === 0) return 0;
+  const networks = computeNetworks({ segments: [...input.state.segments], fittings: [...input.state.fittings], portGroups: [] });
+  const network = networks.find((candidate) => candidate.segmentIds.includes(own[0]!.id));
+  if (!network) return 0;
+  const byId = new Map(input.state.segments.map((segment) => [segment.id, segment] as const));
+  const removed = new Set(input.removal.segmentIds);
+  return network.segmentIds.filter((id) => !removed.has(id) && byId.get(id)?.routedBy === ROUTED_MARK).length;
+}
+
 export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; plan: PlannedRoute } {
   const warnings: RoutePlanWarning[] = [];
   const errors: RoutePlanWarning[] = [];
@@ -189,6 +201,8 @@ export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; p
   if (startCodes.length > 0) errors.push({ code: 'start-error', severity: 'error', ids: startCodes });
   const sameType = problems.find((problem) => problem.code === 'group-same-type');
   if (sameType) errors.push({ code: 'same-type-join', severity: 'warning', ids: sameType.portIds ?? [] });
+  const heldByHand = routedHeldByHand(input);
+  if (heldByHand > 0) errors.push({ code: 'held-by-hand', severity: 'info', count: heldByHand });
   if (input.targetPorts.length === 0) errors.push({ code: 'no-targets', severity: 'error' });
   if (errors.some((warning) => warning.severity === 'error')) return refused(errors);
   warnings.push(...errors);

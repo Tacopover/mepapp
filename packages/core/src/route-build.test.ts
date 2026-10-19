@@ -166,6 +166,32 @@ describe('planRoute start', () => {
     expect(result.plan.warnings).toContainEqual({ code: 'extends-stub', severity: 'info', ids: ['s1', 'f1'] });
   });
 
+  it('counts the marked segments that stay joined to the start through a hand-drawn segment', () => {
+    const marked = (id: string, a: ConnectionPoint, b: ConnectionPoint): Segment => ({ ...segment(id, 'supply-air', a, b), routedBy: 'route' });
+    const f1: ConnectionPoint = { kind: 'fitting', fittingId: 'f1' };
+    const f2: ConnectionPoint = { kind: 'fitting', fittingId: 'f2' };
+    const segments = [segment('s1', 'supply-air', port('ahu', 'out'), f1), marked('m1', f1, f2), marked('m2', f2, port('grille', 'out'))];
+    const result = planRoute(input({ state: withState({ segments, fittings: [fitting('f1'), fitting('f2')] }), targetPorts: [] }));
+    expect(result.plan.warnings).toContainEqual({ code: 'held-by-hand', severity: 'info', count: 2 });
+    expectRefused(result, 'no-targets');
+  });
+
+  it('counts the marked segments behind a hand-edited segment when the start segment is removed', () => {
+    const marked = (id: string, a: ConnectionPoint, b: ConnectionPoint): Segment => ({ ...segment(id, 'supply-air', a, b), routedBy: 'route' });
+    const f1: ConnectionPoint = { kind: 'fitting', fittingId: 'f1' };
+    const f2: ConnectionPoint = { kind: 'fitting', fittingId: 'f2' };
+    const segments = [marked('m0', port('ahu', 'out'), f1), segment('h1', 'supply-air', f1, f2), marked('m2', f2, port('grille', 'out'))];
+    const removal = { segmentIds: ['m0'], fittingIds: [] };
+    const result = planRoute(input({ state: withState({ segments, fittings: [fitting('f1'), fitting('f2')] }), removal, targetPorts: [] }));
+    expect(result.plan.warnings).toContainEqual({ code: 'held-by-hand', severity: 'info', count: 1 });
+  });
+
+  it('gives no held-by-hand line for a plain stub', () => {
+    const segments = [segment('s1', 'supply-air', port('ahu', 'out'), { kind: 'fitting', fittingId: 'f1' })];
+    const result = planRoute(input({ state: withState({ segments, fittings: [fitting('f1', 30, 40)] }) }));
+    expect(codes(result)).not.toContain('held-by-hand');
+  });
+
   it('refuses a stub whose far end is a port', () => {
     const segments = [segment('s1', 'supply-air', port('ahu', 'out'), port('grille', 'out'))];
     expectRefused(planRoute(input({ state: withState({ segments }) })), 'start-unreachable');

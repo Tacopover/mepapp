@@ -66,6 +66,8 @@ export const TEXTS = {
   'w_shares-lane_one': 'This route runs on top of 1 segment of an earlier run. Move one run by hand.',
   'w_hand-kept-size': '{count} hand-drawn segments of this network keep their size.',
   'w_hand-kept-size_one': '1 hand-drawn segment of this network keeps its size.',
+  'w_held-by-hand': '{count} routed segments stay joined to the start through hand-edited items. They are not removed.',
+  'w_held-by-hand_one': '1 routed segment stays joined to the start through hand-edited items. It is not removed.',
 } as const;
 
 export type BuildTextKey = keyof typeof TEXTS;
@@ -194,6 +196,8 @@ function warningText(warning: RoutePlanWarning, names: RouteBuildNames): { text:
       return { text: buildText(one ? 'w_shares-lane_one' : 'w_shares-lane', { count }), hint: '' };
     case 'hand-kept-size':
       return { text: buildText(one ? 'w_hand-kept-size_one' : 'w_hand-kept-size', { count }), hint: '' };
+    case 'held-by-hand':
+      return { text: buildText(one ? 'w_held-by-hand_one' : 'w_held-by-hand', { count }), hint: '' };
     case 'draft-2d':
       return plain('buildDraft');
   }

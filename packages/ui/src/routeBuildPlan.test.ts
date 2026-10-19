@@ -19,7 +19,7 @@ const ALL_CODES: RoutePlanWarningCode[] = [
   'multi-page', 'no-calibration', 'area-empty', 'gravity-not-routed', 'start-error', 'foreign-start', 'no-targets', 'start-unreachable', 'internal-join',
   'free-angle', 'wall-crossings', 'shaft-crossing', 'room-off-graph', 'ports-left', 'existing-crossings', 'existing-overlap',
   'same-type-join', 'short-leg', 'capacity-over', 'capacity-unit', 'no-limits',
-  'removes-routed', 'extends-stub', 'rooms-skipped', 'shares-lane', 'hand-kept-size', 'draft-2d',
+  'removes-routed', 'extends-stub', 'rooms-skipped', 'shares-lane', 'hand-kept-size', 'held-by-hand', 'draft-2d',
 ];
 
 describe('build texts', () => {
@@ -70,6 +70,13 @@ describe('routeBuildLines', () => {
     const warnings = ALL_CODES.map((code) => ({ code, severity: 'warning' as const, count: 2, ids: ['a'] }));
     const hinted = routeBuildLines({ warnings }, names).filter((line) => line.hint !== '').map((line) => line.code);
     expect(hinted).toEqual(['wall-crossings', 'shaft-crossing']);
+  });
+
+  it('counts the routed segments that hand-edited items still hold', () => {
+    const [one] = routeBuildLines({ warnings: [{ code: 'held-by-hand', severity: 'info', count: 1 }] }, names);
+    const [many] = routeBuildLines({ warnings: [{ code: 'held-by-hand', severity: 'info', count: 7 }] }, names);
+    expect(one!.text).toBe('1 routed segment stays joined to the start through hand-edited items. It is not removed.');
+    expect(many!.text).toBe('7 routed segments stay joined to the start through hand-edited items. They are not removed.');
   });
 
   it('uses the singular for ports-left with count 1 and the plural with count 2', () => {
