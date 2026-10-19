@@ -1,6 +1,53 @@
 # R6 plan: the shape of the network (route a main, a branch for each room and a sub-branch for each port)
 
-Status: PLANNED 2026-10-18 by the road map planner. Revision 1 on 2026-10-18 after the audit (section 10). R5 is done (last commit `3cb9919`). The schema is at step 20 (`packages/core/src/project.ts:22`). R6 makes step 21 (the routed marks). R7 is step 22. The numbers 19 to 21 hold on this branch only: `origin/master` is at schema 16 (R5 section 12.1).
+Status: DONE 2026-10-19. The tasks T01 to T26 and the fix round are finished. See "Status table" and "Verification summary" below. Open low items: `auto-routing-r6-small-fixes.md`.
+
+## Status table
+
+| Task | Commit |
+|---|---|
+| T01 | 17c3980 |
+| T02 | e0da3a8 |
+| T03 | f79faee |
+| T04 | ddfa017 |
+| T05 | a5fdf9a |
+| T06 | 62c0c7f |
+| T07 | b58aee7 |
+| T08 | 514dc07 |
+| T09a | 7e32ce3 |
+| T09 | f83537c |
+| T10 | 4543d65 |
+| T11 | 0225e51 |
+| T12 | dc91928 |
+| T13 | 1622ecf |
+| T14 | 67964db |
+| T15 | 6fcc537 |
+| T16 | bcb84fd |
+| T17 | a4f83b2 |
+| T18 | ef099e5 |
+| T19 | 0ea11e5 |
+| T20 | 1d8d61a |
+| T21 | c668cb0 |
+| T22 | 7f3a6a2 |
+| T23 | e21a734 |
+| T24 | a2dd09b |
+| T25 | c27ac18 |
+| T26 | c177173 |
+| Fix round: speed cache | fdce615 |
+| Fix round: re-run walk start | 2fa810c |
+| Fix round: free-angle | 037049e |
+| Fix round: multi-port Note | d3e2ef5 |
+| Fix round: plan record | f2625ed |
+
+## Verification summary
+
+- Core: 1573 tests pass. UI: 331 tests pass. Typecheck 17/17. Build 9/9.
+- Browser checks r2 to r5 and all R6 checks: 0 failed (r6-check: 30 passed).
+- `planRoute` takes 144 to 155 ms on the first floor and 93 ms on the 10A drawing.
+- Audit: PASS_WITH_FINDINGS. Domain check: PASS_WITH_FINDINGS (no rule break).
+- Open items: `auto-routing-r6-small-fixes.md`.
+
+Planned 2026-10-18 by the road map planner. Revision 1 on 2026-10-18 after the audit (section 10). R5 is done (last commit `3cb9919`). The schema is at step 20 (`packages/core/src/project.ts:22`). R6 makes step 21 (the routed marks). R7 is step 22. The numbers 19 to 21 hold on this branch only: `origin/master` is at schema 16 (R5 section 12.1).
 Origin: `roadmap-overview.md` (R6 text, "Layout rule of the routed segments", the cases (a) to (d), the schema paragraph, gaps G7, G8, G11), `auto-routing.md`, `auto-routing-r2.md` to `auto-routing-r5.md`, `.claude/roadmap/rules.md`, `.claude/roadmap/protocol.md`, `.claude/roadmap/director-prompt.md`. The brief said `.claude/domain/rules.md`. That file does not exist. The domain rules are in `.claude/roadmap/rules.md` section 3. This plan uses that file.
 
 **Answers that bind this plan (final):**

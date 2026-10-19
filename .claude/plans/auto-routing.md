@@ -220,7 +220,7 @@ Each part gets its own plan. No detailed design here.
 - Open questions: the unit of the flow (the rules write dm³/s or m³/h, the library types say CFM or GPM); round or rectangular; when to size (after routing, on each change).
 - Research: the equal friction and velocity methods; standard round duct sizes (EN 1506) and rectangular sizes; pipe sizing tables for water.
 
-**R6 — The shape of the network.**
+**R6 — The shape of the network. DONE 2026-10-19 (see `auto-routing-r6.md`; open low items in `auto-routing-r6-small-fixes.md`).** The text below is the old draft.
 - Exists: segments, fittings (junction, elbow, tee, reducer, cross), the segment tool and the cascade.
 - Missing: the algorithm (a main along the corridor, a branch to each room, a sub-branch to each open port), fittings at the joints, a list of open ports by type (the network tree panel).
 - Open questions: one branch per terminal or per room? Can the user lock a drawn main and let routing add only the branches? What does a re-run do with routed segments (the same question as moved stamps)?
