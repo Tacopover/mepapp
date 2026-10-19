@@ -128,6 +128,18 @@ describe('typeChoices', () => {
   it('leaves out sanitary-waste', () => {
     expect(typeChoices(stamps).some((choice) => choice.networkTypeId === 'sanitary-waste')).toBe(false);
   });
+
+  it('adds the type of a routed run with a count of 0 when no port of that type is open', () => {
+    const choices = typeChoices(stamps, ['return-air', 'supply-air', 'sanitary-waste']);
+    expect(choices).toContainEqual({ networkTypeId: 'return-air', count: 0 });
+    expect(choices.find((choice) => choice.networkTypeId === 'supply-air')!.count).toBe(2);
+    expect(choices.some((choice) => choice.networkTypeId === 'sanitary-waste')).toBe(false);
+    expect(choices.at(-1)).toEqual({ networkTypeId: 'return-air', count: 0 });
+  });
+
+  it('gives a routed type even when no stamp has an open port', () => {
+    expect(typeChoices([], ['supply-air'])).toEqual([{ networkTypeId: 'supply-air', count: 0 }]);
+  });
 });
 
 describe('startPortChoices', () => {

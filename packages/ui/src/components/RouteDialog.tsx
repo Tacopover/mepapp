@@ -82,7 +82,11 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
       ? selectionStart
       : (candidates[0]?.stamp.id ?? null);
   const startStamp = candidates.find((c) => c.stamp.id === selectedStart)?.stamp;
-  const choices = typeChoices(stamps);
+  const routedTypeIds = useMemo(
+    () => [...new Set(connectivity.segments.filter((s) => s.routedBy === 'route').map((s) => s.networkTypeId))].sort(),
+    [connectivity],
+  );
+  const choices = typeChoices(stamps, routedTypeIds);
   const selectedType = choices.some((c) => c.networkTypeId === typeId) ? typeId : (choices[0]?.networkTypeId ?? null);
   const portChoices = startStamp && selectedType ? startPortChoices(startStamp, selectedType) : [];
   const selectedPort = portChoices.some((p) => p.portId === portId) ? portId : (portChoices[0]?.portId ?? null);

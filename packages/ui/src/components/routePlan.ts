@@ -33,12 +33,17 @@ export function presetStart(selection: readonly RouteStamp[]): string | null {
 /**
  * Open ports (use openPortsOf) counted per networkTypeId, gravity types (GRAVITY_TYPE_IDS) left out,
  * largest count first, a tie sorted by networkTypeId (plain < compare).
+ * A type in routedTypeIds (the types of routed runs) with no open port is added with a count of 0, so a run can be routed again.
  */
-export function typeChoices(stamps: readonly RouteStamp[]): { networkTypeId: string; count: number }[] {
+export function typeChoices(stamps: readonly RouteStamp[], routedTypeIds: readonly string[] = []): { networkTypeId: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const port of openPortsOf(stamps)) {
     if (GRAVITY_TYPE_IDS.includes(port.networkTypeId)) continue;
     counts.set(port.networkTypeId, (counts.get(port.networkTypeId) ?? 0) + 1);
+  }
+  for (const id of routedTypeIds) {
+    if (GRAVITY_TYPE_IDS.includes(id) || counts.has(id)) continue;
+    counts.set(id, 0);
   }
   return [...counts.entries()]
     .map(([networkTypeId, count]) => ({ networkTypeId, count }))
