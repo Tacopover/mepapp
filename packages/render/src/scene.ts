@@ -119,6 +119,11 @@ import {
   type Transform2D,
   type Vec2,
   computeRouteArea,
+  routedRunOf,
+  findRoutePorts,
+  planRoute as planRouteCore,
+  type PlannedRoute,
+  type RouteScope,
   DEFAULT_ROUTE_AREA_TYPE_IDS,
   routeAreaWarnings,
   sizeNetwork,
@@ -143,6 +148,7 @@ import { applyTransformToSprite, computeStampBaseScale } from './stampSprite.js'
 import { RoomDetectionClient, polygonAreaPt2, roomAreaWarning, mergePolygons, splitPolygon, nearestVertex, nearestEdge, removeVertices, verticesInBox, roomBounds, type VertexRef, type RoomPolygon, roomAreaM2, roomsAtPoint, roomFromFill, detectRoomAtWithLabels, polygonDifference, polygonContainsPoint, rectPolygon, pushVerticesOut, wrapAroundRooms, planRoomOverlaps, type RoomOverlapPlan, type RoomDetectionCache, type WallCandidateSegments, type DetectAllPhase, type LeakRegion, type RoomDetectionParams, filterWallSegments } from '@mepapp/core';
 import { drawRooms } from './roomLayer.js';
 import { drawRouteArea, type RouteAreaView } from './routeAreaLayer.js';
+import { drawRoutePreview, type RoutePreviewView } from './routePreviewLayer.js';
 import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroupVisibility, type WallDebugGroup, type WallLineInfo } from './wallDebugLayer.js';
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
@@ -487,6 +493,17 @@ const ROUTE_MARKER_COLOR = 0xe6007e;
 /** A route marker on the overlay: the start port (square) or a target port (ring). */
 export interface RouteMarker { world: Vec2; kind: 'start' | 'target' }
 
+export interface RouteRequest {
+  startStampId: string; startPortId: string; networkTypeId: string;
+  scope: RouteScope; includeOutsideRooms: boolean; portsPerStamp: 'one' | 'all';
+}
+export interface RoutePlanView {
+  status: 'ok' | 'refused'; plan: PlannedRoute;
+  networkTypeName: string | null; flowUnit: FlowUnitId | null; hasLimits: boolean;
+  /** The number of target ports found on the state without the old routed run. */
+  portsAfterRemoval: number;
+}
+
 export interface ConnectivityView {
   segments: Segment[];
   fittings: Fitting[];
@@ -660,6 +677,8 @@ export class SketchScene {
   private autoPlacePreviewHidden: Sprite[] = [];
   /** Scene-level: the route markers of the route dialog (route-ports). Not part of the document, never saved. */
   private routeMarkers: RouteMarker[] = [];
+  /** Scene-level: the planned route shown on the overlay. Not part of the document, never saved. */
+  private routePreview: RoutePreviewView | null = null;
   private autoPlaceUnitNotes: { reason: AutoPlaceUnitNoteReason; count: number }[] = [];
   /** The stamp-placement preview's current rotation (Space advances this by 45°) — persists across repeated placements of the same stamp until Escape, a tool switch, or a different stamp pick resets it to 0. Also becomes the next placed stamp's initial rotationDegrees (see placeStamp). */
   private stampGhostRotationDegrees = 0;
@@ -762,6 +781,7 @@ export class SketchScene {
     this.emitter.on('roomsChanged', () => this.pruneRoomSelection());
     for (const event of ['pageChanged', 'documentActivated', 'calibrationSet'] as const) this.emitter.on(event, () => void this.refreshWallDebug());
     for (const event of ['pageChanged', 'documentActivated'] as const) this.emitter.on(event, () => this.clearRouteMarkers());
+    for (const event of ['pageChanged', 'documentActivated'] as const) this.emitter.on(event, () => this.setRoutePreview(null));
     this.emitter.on('zoomChanged', () => drawWallDebugHighlight(this.wallDebugLayer, this.wallDebugData, this.wallDebugHover, WALL_DEBUG_HIGHLIGHT_PX / this.world.scale.x));
     this.emitter.on('roomsChanged', () => {
       if (!this.routeAreaVisible) return;
@@ -1289,9 +1309,9 @@ export class SketchScene {
   }
 
   /** The network type of the segment on each connected port, by stamp id, then port id. The first segment of a port wins. */
-  private portSegmentTypes(): Map<string, Record<string, string>> {
+  private portSegmentTypes(segments: Iterable<Segment> = Object.values(this.doc.drawingHistory.getState().segments)): Map<string, Record<string, string>> {
     const byStamp = new Map<string, Record<string, string>>();
-    for (const segment of Object.values(this.doc.drawingHistory.getState().segments)) {
+    for (const segment of segments) {
       for (const end of [segment.endpointA, segment.endpointB]) {
         if (end.kind !== 'port') continue;
         const ports = byStamp.get(end.elementId) ?? {};
@@ -2909,6 +2929,87 @@ export class SketchScene {
   clearRouteMarkers(): void {
     if (this.routeMarkers.length === 0) return;
     this.routeMarkers = [];
+    this.redrawOverlay();
+  }
+
+  /** Plans a route from a start port. Read-only: the drawing, the history and the document counters stay unchanged. The target ports are found without the old routed run, so a re-run keeps its targets. */
+  planRoute(request: RouteRequest): RoutePlanView {
+    const state = this.doc.drawingHistory.getState();
+    const segments = Object.values(state.segments);
+    const fittings = Object.values(state.fittings);
+    const removal = routedRunOf({ segments, fittings }, request.startStampId, request.startPortId);
+    const removedSegmentIds = new Set(removal.segmentIds);
+    const reducedSegments = segments.filter((segment) => !removedSegmentIds.has(segment.id));
+    const portTypes = this.portSegmentTypes(reducedSegments);
+    const stamps = Object.values(state.stamps).map((d) => this.toStampInfo(d, portTypes));
+    const rooms = Object.values(state.rooms);
+    const pageIndex = this.doc.pageIndex;
+    const cal = this.getCalibration();
+    const mmPerPt = cal ? 1 / cal.pageUnitsPerRealUnit : null;
+    const { ports: targetPorts } = findRoutePorts({
+      stamps, networkTypeId: request.networkTypeId, scope: request.scope, startStampId: request.startStampId, startPortId: request.startPortId,
+      rooms, pageIndex, includeOutsideRooms: request.includeOutsideRooms, portsPerStamp: request.portsPerStamp, portChoice: 'order',
+    });
+    const area = this.getRouteArea().area;
+    const sizing = this.getNetworkSizing(request.startStampId, request.startPortId);
+    const limits = sizing === undefined ? undefined : structuredClone(sizing);
+    const networkType = this.doc.networkTypes.find((t) => t.id === request.networkTypeId) ?? getNetworkTypeFromLibrary(request.networkTypeId);
+    const elementCategories = Object.fromEntries(Object.values(state.stamps).map((stamp) => [stamp.id, stamp.category]));
+    let segmentSeq = this.doc.nextSegmentSeq;
+    let fittingSeq = this.doc.nextFittingSeq;
+    const result = planRouteCore({
+      startStampId: request.startStampId,
+      startPortId: request.startPortId,
+      networkTypeId: request.networkTypeId,
+      targetPorts,
+      state: { stamps, segments, fittings, portGroups: this.doc.portGroups },
+      removal,
+      rooms,
+      area,
+      mmPerPt,
+      pageIndex,
+      pageCount: this.getPageCount(),
+      limits,
+      networkType: networkType ? { id: networkType.id, discipline: networkType.discipline, flowUnit: networkType.flowUnit, sizingMethod: networkType.sizingMethod } : undefined,
+      terminalCapacities: Object.fromEntries(this.doc.terminalCapacities),
+      capacityUnitOf: () => networkType?.flowUnit ?? null,
+      elementCategories,
+      newSegmentId: () => `segment-${segmentSeq++}`,
+      newFittingId: () => `fitting-${fittingSeq++}`,
+    });
+    return {
+      status: result.status,
+      plan: result.plan,
+      networkTypeName: networkType?.name ?? null,
+      flowUnit: networkType?.flowUnit ?? null,
+      hasLimits: limits !== undefined,
+      portsAfterRemoval: targetPorts.length,
+    };
+  }
+
+  /** Shows a planned route on the overlay, or clears it with null. A preview is not an edit: it never marks the document dirty and never enters the history. */
+  setRoutePreview(plan: PlannedRoute | null): void {
+    if (plan === null) {
+      if (this.routePreview === null) return;
+      this.routePreview = null;
+      this.redrawOverlay();
+      return;
+    }
+    const state = this.doc.drawingHistory.getState();
+    const removed: Vec2[][] = [];
+    for (const id of plan.removeSegmentIds) {
+      const segment = state.segments[id];
+      if (segment) removed.push(segment.geometry.map((p) => ({ x: p.x, y: p.y })));
+    }
+    const pointsOf = (code: string): Vec2[] => plan.warnings.filter((w) => w.code === code).flatMap((w) => (w.points ?? []).map((p) => ({ x: p.x, y: p.y })));
+    this.routePreview = {
+      color: this.resolveNetworkTypeVisuals(plan.segments[0]?.networkTypeId ?? '').color,
+      paths: plan.segments.map((s) => s.geometry.map((p) => ({ x: p.x, y: p.y }))),
+      removed,
+      freePoints: pointsOf('free-angle'),
+      wallPoints: pointsOf('wall-crossings'),
+      shaftPoints: pointsOf('shaft-crossing'),
+    };
     this.redrawOverlay();
   }
 
@@ -5589,6 +5690,7 @@ export class SketchScene {
         this.overlay.circle(marker.world.x, marker.world.y, markerRadius).stroke({ width: 2 / this.world.scale.x, color: ROUTE_MARKER_COLOR });
       }
     }
+    if (this.routePreview) drawRoutePreview(this.overlay, this.routePreview, 1 / this.world.scale.x);
     for (const id of this.doc.selectedIds) {
       const stampData = state.stamps[id];
       if (stampData) {

@@ -13,7 +13,7 @@ export interface RouteAreaView { area: RouteArea; warnings: RouteAreaWarning[] }
 
 const flat = (ring: readonly Vec2[]): number[] => ring.flatMap((p) => [p.x, p.y]);
 
-function dashedPolyline(g: Graphics, points: readonly Vec2[], dashPt: number, gapPt: number): void {
+export function dashedPolyline(g: Graphics, points: readonly Vec2[], dashPt: number, gapPt: number): void {
   let on = true;
   let left = dashPt;
   for (let i = 1; i < points.length; i++) {
