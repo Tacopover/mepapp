@@ -1,0 +1,456 @@
+# Q1 plan: better auto-routes (metrics, baseline and prototypes)
+
+Status: PLANNED 2026-10-25 by the road map planner. No task is started. No product code changed.
+Origin: `auto-routing-feedback-prompt.md` (comment 2 of the user test of R1-R6), `auto-routing-r6.md`, `.claude/roadmap/rules.md`. This plan covers comment 2 only. Comment 3 (presets) is in `route-layout-presets.md`. Comments 1, 4, 5 are in `ui-cleanup-rail-i18n.md`.
+
+Code claims carry `path:line`. Paths start at the repository root. The lines are from branch `worktree-routing-feedback` (R1-R6). Numbers marked "measured" come from a test run on 2026-10-25 (section 2.3).
+
+Terms (the terms of `auto-routing.md` and R6 apply). New terms:
+- **Metric**: one number that describes a planned route, for example the total length.
+- **Baseline**: the metrics of today's planner on a fixed input. Later numbers are compared with it.
+- **Prototype**: code that tries one idea. It is off by default. With its layout option off, the plan equals the baseline.
+- **Off-graph room**: a served room that the trunk does not reach (section 2.3 defines the two counts that were mixed up).
+- **Graph part**: a set of corridor graph nodes that are joined by edges. `area.parts` counts them (`packages/core/src/route-area.ts:66`).
+- **Heading state**: the pair (node, direction of the last leg). A search on heading states can charge a price for each bend.
+- **Rip-up and reroute**: remove one path of a finished plan and plan it again with a price on the spots that other paths use.
+
+## 0. Open questions and what is assumed
+
+All questions are in section 9 (ids Q-Q1-01 to Q-Q1-08). Tasks Q1-T01 to Q1-T06 need no answer. Q1-T07 and later wait for Q-Q1-02 and Q-Q1-04 only where the task says so.
+
+Assumptions (easy to reverse):
+- A prototype changes the plan only when its field in `RouteLayoutOptions` is set. The default output stays byte-equal to the baseline. Q1 does not make a second options type or a second candidate list: `route-layout-presets.md` (P1) owns them.
+- No new dependency. All code is TypeScript in `@mepapp/core`. The `pnpm add` command is not used.
+- The user answers in the dashboard. The director posts the questions.
+
+## 1. Goal
+
+Find out, with numbers, which ideas make the auto-route better from an engineering view. Build the measuring tool first. Then try five ideas as prototypes, one by one, behind a layout option. At the end the user sees before/after screenshots and a table, and chooses which ideas become the default (part Q2, not in this plan).
+
+Example (first floor drawing, 33 rooms, one port in each room, the air handling unit in the largest corridor room). Today the plan has 109 segments, 151 m of duct, 26 wall crossings, and 28 of 33 rooms are joined by a long free L-shaped duct that crosses other rooms (measured). After the best prototype the table should show fewer off-graph rooms and fewer wall crossings at about the same length. The user compares two screenshots.
+
+Where Q1 stops: Q1 adds a metrics module, a report test, a baseline, and prototypes that are off by default. It changes no dialog, no stored data and no default result. Q2 (a later plan) switches the chosen ideas on and removes the others. Q1 uses the P1 seam `planRoute(input, options?: RouteLayoutOptions)` (section 4). Q1 does not run gate G1 of P1. P1 runs G1 after Q1-T07 to Q1-T09 are done.
+
+## 2. What exists now (verified against the code)
+
+### 2.1 The planner steps, as the code does them
+
+| Step | Where | What it does |
+|---|---|---|
+| Entry | `packages/core/src/route-build.ts:193` `planRoute(input)` | One function with no options object. It returns `{ status, plan }`. |
+| Start leg | `route-build.ts:281-287` | An L-shaped `elbowPath` from the start point to the trunk root. The first axis is the longer side. |
+| Trunk | `packages/core/src/route-trunk.ts:101` `buildTrunk` | Takahashi-Matsuyama Steiner tree (`route-steiner.ts:16`) on the corridor graph. The edge cost is `lengthMm` only (`route-trunk.ts:134-136`). Entry connectors (`rc-ry-`) are not in the graph. The terminal of a room is the tap node of its entry. If the tree does not reach a tap, the room tries its next entry (`route-trunk.ts:139-153`). A room with no reached tap is off graph (`route-trunk.ts:215-227`). |
+| Straightening | `route-trunk.ts:196-197`, `route-layout.ts` | Each tree edge becomes axis and 45 degree legs (`straightenPolyline`). |
+| Branches | `packages/core/src/route-branch.ts:182` `planBranches` | Rooms are sorted by room id (`:185`). Each branch taps the nearest trunk leg. Later taps keep 300 mm from earlier taps (`placeTapPosition`, `:110`), so the id order moves the taps. The branch is a straight leg or a jog (`:156-171`). |
+| Room spine | `packages/core/src/route-hanan.ts:95` `roomSpine` | Takahashi-Matsuyama again, on a Hanan grid of the entry and the ports. Each path search is on heading states (node x 4 headings, `:170-213`). The price is length + `BEND_PENALTY_MM` (500, `:3`) for a turn + `CROSSING_PENALTY_MM` (1000, `:4`) for each existing foreign segment that the grid edge crosses (`:205`). Grid edges that leave the room are blocked (`:123-128`). The ports are leaves (`:194`). The tree source has all four headings at cost 0 (`:179-185`), so a bend where a new path leaves the tree is free. |
+| Off-graph connection | `packages/core/src/route-topology.ts:358` `connectLoosePorts` | Loose ports are ports of off-graph rooms, ports in no room, ports in a corridor room, and ports that the spine could not reach (`route-build.ts:289-312`). It joins them one at a time, nearest first, to the nearest point of the route that exists so far, including earlier loose links (`route-topology.ts:367-381`). It tries the tap candidates, and for each one two L-shapes (`:384-401`). The only test is `accepts` (`route-build.ts:342-346`): no vertex within `NEAR_ITEM_MM` of a foreign item. There is no test for walls, rooms or bends. |
+| Checks and numbers | `route-build.ts:383-406`, `route-crossings.ts:51` | `checkExisting`, `checkInvariant`, and the wall crossings along the final paths (`crossingsAlongPath`). These only report. They do not steer the search. |
+
+### 2.2 What this means for engineering quality
+
+- The bend price and the crossing price exist only inside one room. The trunk uses length only. The off-graph links use no price at all.
+- No search step counts a wall crossing. Walls are counted only after the plan is done.
+- The room Hanan grid has only the lines through the entry and the ports (`route-hanan.ts:99-100`). It has no lines for door posts or room corners, so a room with an L-shape can leave a port unreached (the port then becomes a loose port).
+- The code already has a search on heading states (`route-hanan.ts:170-213`) and a heap with a fixed tie-break (`:37-93`). A prototype reuses it. It does not write a second one (rule 3).
+
+### 2.3 The two counts "15" and "28" (answer)
+
+Both counts are right. They count different things.
+
+| Count | Definition | Where | Value |
+|---|---|---|---|
+| **15** | Rooms that have no wall with a route-area room within the wall limit (500 mm run). It is a property of the drawing only. The name in the code is `area.unreached`. | `packages/core/src/route-area-real.test.ts:12` (comment: "18 primary entries of 33 served rooms (15 unreached)"); R4 plan R-4; R6 plan `auto-routing-r6.md:102`, `:116` | 15 of 33 |
+| **28** | Rooms that the trunk tree does not reach from the chosen start. It is a property of the drawing and of the start point. The name in the code is `trunk.offGraphRoomIds`. The dialog shows it as the warning `room-off-graph`. | `route-trunk.ts:215-227`; `route-build.ts:374`; printed by `packages/core/src/route-run.test.ts:188-190` | 28 of 33 (measured, 84.8 %) |
+
+Why 28 is larger than 15 (measured with a scratch script on 2026-10-25, first floor, start in the largest corridor room):
+- The route area has 5 rooms and **4 graph parts** (`area.parts` = 4), and only 1 link between rooms. The corridors are not joined to each other in the graph.
+- 18 rooms have a primary entry. Only 5 of them lie in the part of the start. 13 rooms have an entry but sit in other parts. So 15 (no entry) + 13 (entry in another part) = 28.
+- This is the main finding of this plan. The biggest lever may not be the search. It may be the join of the graph parts (idea 0, task Q1-T07).
+
+Which one the user sees: the user sees the **28 type**, in the dialog warning `room-off-graph`, when the start is in the part that serves few rooms. The 15 type never shows in the dialog. With another start room the 28 changes. Not verified: the count for a start in another corridor, and for 10A. Task Q1-T04 measures several starts.
+
+### 2.4 Corrections to the earlier findings (`auto-routing-feedback-prompt.md`, section "Findings: algorithms")
+
+1. The earlier text says the bend and crossing prices belong to "room paths on a Hanan grid". True, but the text implies they are used for routing in general. They are used only in `roomSpine` (section 2.2). The crossing price counts existing foreign segments, not walls.
+2. The earlier text says "off-graph rooms get a fixed L-shaped elbow from the nearest built point" and "rooms are routed one by one in id order". Correction: the id order holds for the branches (`route-branch.ts:185`). The off-graph links go **nearest first**, one port at a time, and the id only breaks a tie (`route-topology.ts:374-381`). A link can start at an earlier link, not only at the trunk.
+3. The elbow is not "fixed". It tries both axes for each of several tap candidates, and it takes the first one that `accepts` (`route-topology.ts:384-401`). The test checks only the nearness to foreign items.
+4. The ranked idea 1 says "a bend-aware search on (node, heading) states". A search like that already exists for the room spine (`route-hanan.ts:170-213`). Idea 1 is to reuse it for the trunk and the links, not to invent it.
+5. The earlier text does not mention the 4 graph parts. They explain most off-graph rooms (section 2.3). A new idea 0 is added (join the parts).
+6. "Planning takes about 150 ms": confirmed. Measured 167 ms in one cold test run (`route-run.test.ts:191`). The R6 summary says 144 to 155 ms on the first floor and 93 ms on 10A (`auto-routing-r6.md:47`). The test limit is 500 ms (`route-run.test.ts:195`).
+7. "Takahashi-Matsuyama on a corridor graph with length-only cost": confirmed (`route-trunk.ts:134-142`). "Bend penalty 500, crossing penalty 1000": the values are confirmed (`route-hanan.ts:3-4`).
+
+### 2.5 Baseline numbers that exist (measured 2026-10-25, first floor, `route-run.test.ts` set-up)
+
+The set-up puts one terminal in each of the 33 served rooms, at the room label point (`route-run.test.ts:33-49`), and the start stamp at the label point of the largest corridor room (`:27-31`). It is a synthetic input: one port per room, no stamp art.
+
+| Metric | Value |
+|---|---|
+| Segments / fittings | 109 / 76 |
+| Length | 151 366 mm |
+| Bends 90 / 45 degrees | 35 / 10 |
+| Free-angle legs | 0 |
+| Rooms / ports / ports left | 33 / 33 / 0 |
+| Wall crossings | 26 |
+| Existing crossings | 0 |
+| Off-graph rooms | 28 |
+| Warnings | `room-off-graph`=28, `wall-crossings`=26, `no-limits`, `draft-2d` |
+| `planRoute` time (cold, one run) | 167 ms |
+
+The 10A drawing has no stored fixture. It exists only in the browser check (`.claude/roadmap/browser/r6-check.mjs:12`, `:239-273`). It is a local-only PDF (`rules.md` section 2).
+
+## 3. Research
+
+I checked only two licence claims on the web (2026-10-25). All other sources come from memory and are **not verified**. A person must open them before the report to the user.
+
+Verified by a web search (snippet only, the licence text was not read in full):
+- **libavoid** (Adaptagrams, orthogonal connector routing): LGPL 2.1 or later, with a separate commercial licence. See https://github.com/cmears/adaptagrams and https://www.adaptagrams.org/documentation/libavoid.html. It is C++, so it needs WASM. AGPLv3 does not forbid LGPL, but the build and link rules are a risk. Decision: not used. It routes around boxes, and MepApp has its own search.
+- **CGAL straight skeleton**: the package page for CGAL 4.7 lists GPL (https://doc.cgal.org/4.7/Straight_skeleton_2/group__PkgStraightSkeleton2.html). The licence of the current CGAL release is not verified. Decision: not used. A straight skeleton is also not an engineer's trunk line.
+
+Not verified (planner's memory; each needs a page to read):
+- **Hanan grid.** Hanan (1966), SIAM J. Appl. Math. A shortest rectilinear Steiner tree exists on the grid through the terminals. MepApp uses it (`route-hanan.ts:99-107`).
+- **Exact Steiner tree for few terminals.** Dreyfus and Wagner (1971), Networks 1(3). The cost grows with 3^k for k terminals. For k up to 6 on a Hanan grid of about 50 nodes, this is small. Idea 2 uses it. The ports must stay leaves. The dynamic program must not merge or pass at a port node.
+- **Steiner heuristic.** Takahashi and Matsuyama (1980). Used today (`route-steiner.ts:1`). Bound: at most about 2 times the optimal length.
+- **Rip-up and reroute with history costs.** McMurchie and Ebeling (1995), "PathFinder", FPGA routing. Idea 4 copies the method. The program plans one path again with a price on spots that other paths use. It raises the price each round. Chip routing uses the method widely. The fit to duct layout is a guess.
+- **Maze routing with bends.** Lee (1961) and Hadlock (1977) for the grid search. The bend price on heading states is the standard way to get fewer bends. Used in `route-hanan.ts` already.
+- **Revit "Generate Layout".** It offers the topologies Network, Perimeter and Intersection, not an optimiser. Source: Autodesk Revit help, not opened for this plan. Used for the preset plan only.
+- **Duct and pipe practice.** Fewer fittings, fewer bends, parallel runs in a bundle, and a run that keeps clear of fire walls. This comes from the user brief and general practice. No standard was read. The weights in section 5 are planner values, not from a source.
+
+What MepApp can use: its own code. The heading-state search, the heap, `crossingsAlongPath`, `checkExisting`, `checkInvariant`, `steinerTree`, `connectedParts` (`route-graph.ts:77`), `nearestOnEdges` (`route-graph.ts:15`), `splitEdgeAt` (`route-graph.ts:44`).
+
+## 4. The model
+
+No stored data changes. No schema step. No new field in a file. The plan, the metrics and the baseline are not stored in a drawing.
+
+New types in `@mepapp/core` (all exported from `packages/core/src/index.ts`, which already exports `route-build`, line 21):
+
+```ts
+// packages/core/src/route-metrics.ts (new, pure)
+export interface RouteMetrics {
+  lengthMm: number;                 // sum of the leg lengths
+  lengthTrunkMm: number;            // legs that carry no mark of a branch or a spine: trunk + start leg
+  lengthBranchMm: number;           // branch legs
+  lengthRoomMm: number;             // spine legs inside rooms
+  lengthLinkMm: number;             // off-graph links
+  segments: number;
+  fittings: number;                 // elbows + tees + crosses (plan.fittings by kind)
+  bends90: number;
+  bends45: number;
+  freeLegs: number;
+  wallCrossings: number;            // crossingsAlongPath count (gap up to 600 mm)
+  openRuns: number;                 // crossingsAlongPath openRuns
+  shaftCrossings: number;
+  existingCrossings: number;
+  existingOverlaps: number;
+  offGraphRooms: number;            // trunk.offGraphRoomIds, the "28" type
+  noEntryRooms: number;             // area.unreached, the "15" type
+  portsLeft: number;
+  corridorShare: number;            // length inside route-area rooms / lengthMm, 0..1
+  longestPathMm: number;            // longest path from the start port to a target port along the tree
+  meanPathMm: number;
+  branchLengthSpreadMm: number;     // longest minus shortest start-to-port path of ONE network. A proxy for balance, not a flow or pressure value. Never computed across supply plus return.
+  freeLegsShare: number;            // length of free legs / lengthMm
+}
+export function routeMetrics(input: {
+  plan: PlannedRoute; rooms: readonly Room[]; area: RouteArea; mmPerPt: number; pageIndex: number;
+  startStampId: string; startPortId: string;
+}): RouteMetrics;
+
+// packages/core/src/route-layout.ts or route-presets.md's file: the P1 type, created by P1-T01.
+// Q1-T06 only ADDS these optional fields. An absent field means today's behaviour.
+export interface RouteLayoutOptions {
+  /* fields of P1 (route-layout-presets.md section 4.2) */
+  /** Idea 0: add bridge edges between the graph parts. */
+  bridgeParts?: { penaltyMm: number };
+  /** Idea 1a: price a bend and a fitting in the trunk search. */
+  trunkBends?: { bendMm: number; fittingMm: number };
+  /** Idea 1b: search for the off-graph links on heading states with a wall price. */
+  linkSearch?: { bendMm: number; wallMm: number };
+  /** Idea 2: exact Steiner tree in a room for at most maxPorts ports, then a bend-merge pass. */
+  exactSpine?: { maxPorts: number };
+  /** Idea 4: rip-up and reroute rounds. */
+  ripUp?: { rounds: number };
+}
+// The core seam is planRoute(input, options?: RouteLayoutOptions) (P1-T01). RouteBuildInput gets no new field.
+```
+
+Corridor-share and path metrics need the leg origin (trunk, branch, spine, link). `planRoute` does not return that today. Q1-T01 derives it from the geometry (a leg is in the trunk when it lies in a route-area room). If that is too weak, Q1-T01 adds an optional `origin` list to the plan (`PlannedRoute` is not stored, so this is no schema change). The task says which one it chose.
+
+## 5. The score (used by metrics and by idea 3)
+
+One function `scoreRoute(metrics, weights)` returns a number. Lower is better. The first weights (planner values, **not verified**, to be tuned with the user):
+
+| Term | Weight | Reason |
+|---|---|---|
+| Wall crossing | 3000 mm each | Every crossing is a "penetration, check fire rating" (the model has no wall rating, see Q-Q1-02). Not a free bridge. |
+| Open run (gap above 600 mm) | 3000 mm each | Same. |
+| Off-graph room | 1500 mm each | A long free duct through other rooms. |
+| Bend 90 | 500 mm each (placeholder, tune with a loss table) | Same value as `BEND_PENALTY_MM`. |
+| Bend 45 | 250 mm each (placeholder, tune with a loss table) | A 45 degree fitting is cheaper. |
+| Fitting | 300 mm each | A tee costs work. |
+| Existing crossing | 1000 mm each | Same value as `CROSSING_PENALTY_MM`. |
+| Existing overlap | 2000 mm each | Planner value. |
+| Free-angle leg | 2000 mm each | The layout rule says free angles are rare. |
+| Branch length spread, one network | 0.2 per mm | A proxy for balance. It is computed per network, never across supply plus return. See Q-Q1-01. |
+| Length | 1 per mm | Base. |
+
+## 6. How the design keeps the domain rules (`rules.md` section 3)
+
+1. **The segment defines the network type of a port.** Prototypes change only the path geometry. They do not set a network type on a port or a stamp. The join checks stay: `canJoinPoint` (`route-build.ts:247-263`) and `checkInvariant` (`route-build.ts:408`). Every task that adds a prototype runs `checkInvariant` on its output in a test (no `internal-join`, no foreign network joined).
+2. **The cascade invariant.** No task changes a network type. A bridge edge (idea 0) and a link (idea 1b) must not end at a foreign fitting or port: the `accepts` test (`route-build.ts:342-346`) stays and a new test builds a case with a foreign segment in the way.
+3. **Reuse before new.** The tasks reuse `roomSpine` heading states, `steinerTree`, `crossingsAlongPath`, `checkExisting`. The metrics function reads `PlannedRoute.stats` where the field exists (`route-build.ts:48`) and adds only the missing numbers. The layout options are one object (`RouteLayoutOptions` of P1), not a copy of the planner and not a second candidate list.
+4. **The adoption trap.** No task sets a `networkTypeId` on a drawing. The apply path (`scene.applyRoute`) is not touched.
+5. **DOM wiring.** Q1 changes no input. The one browser check (Q1-T15) drives the existing Route dialog through the real inputs. The scene API is used for set-up and to read the result only.
+6. **Merge lesson.** After a merge of Q1 with R7 or with the UI plans, run `pnpm build` at the root.
+
+R7 work (the files `circuit-plan.ts`, `RoomScopeList.tsx`, and the edit of `RouteDialog.tsx` in the worktree `agent-framework`) is not touched. Q1 edits `route-build.ts`, `route-trunk.ts`, `route-topology.ts`, `route-hanan.ts` and `route-branch.ts` in core only. Not verified: whether R7 edits the same core files. The director checks `git status` of the R7 worktree before the first merge.
+
+## 7. Phases and tasks
+
+Size: S = under 60 changed lines, M = 60 to 150, L = more (split it). Every task ends with the core tests green. A task that changes `packages/core` also ends with `pnpm build` (root) green. `pnpm build` is not needed for a plan-only task.
+
+Order (P1-T01 must be done before Q1-T06): T01 > T02 > T03 > T04 > T05, T06 (T05 and T06 are independent) > T07 to T12 (each needs T04 and T06, they are independent of each other, run them in the order listed) > T13 > T14 > T15 > T16.
+
+### Phase A. Measure (no change of the result)
+
+#### Q1-T01. Metrics module [M]
+- Files: `packages/core/src/route-metrics.ts` (new), `route-metrics.test.ts` (new), `packages/core/src/index.ts` (one export line).
+- Shapes: `RouteMetrics`, `routeMetrics(...)` (section 4), `scoreRoute(metrics: RouteMetrics, weights?: ScoreWeights): number`, `DEFAULT_SCORE_WEIGHTS` (section 5).
+- Work: reuse `plan.stats` (`route-build.ts:48`) for segments, fittings, bends, free legs, crossings. Add: length by part, fittings by kind, shaft crossings, open runs (from `crossingsAlongPath`), corridor share, path lengths from the start along the planned tree (walk the segments from the start port, as `walk` in `route-run.test.ts:112`), spread.
+- Must not touch: `planRoute`, the dialog, the stored model.
+- Verification: core tests. A hand-built plan of 3 legs gives exact numbers (length, 2 bends, 0 crossings). A plan with one wall crossing gives `wallCrossings` 1. The metrics of the first-floor plan agree with `plan.stats` for the shared fields (equal). `pnpm build`.
+- Depends on: none.
+
+#### Q1-T02. Scenarios and the report test [M]
+- Files: `packages/core/src/route-scenario.testutil.ts` (new, test helper, excluded from the build like `route-area-fixture.testutil.ts`; `packages/core/tsconfig.json:8`), `packages/core/src/route-quality.test.ts` (new).
+- Work: move the set-up of `route-run.test.ts:12-110` (start stamp, one terminal per served room, `runPlan`) into the helper without a change of behaviour. Do not edit `route-run.test.ts` in this task (it keeps its own copy until Q2; the copy is a risk, see section 8). Add scenario B: four ports in each room, on a deterministic inset grid inside the room polygon (not verified: a helper for this may exist in the Auto-place code. The task searches `packages/core/src` for it first and reuses it; rule 3). The test prints one table per scenario with the metrics of section 4 and the score.
+- Must not touch: product code.
+- Verification: core tests. The scenario A numbers equal section 2.5 (109, 76, 151 366, 35, 10, 26, 28). `pnpm build`.
+- Depends on: T01.
+
+#### Q1-T03. The 10A fixture, local only [S]
+- Files: `scripts/export-route-area-fixture.mjs` (take the source PDF, the scale and the output path as arguments; the default stays the first floor), `.gitignore` (add the line `packages/core/fixtures/route-area/local/`). Checked 2026-10-25: `git check-ignore -v packages/core/fixtures/route-area/local/10A-rooms.json` returns nothing, so no rule covers it today.
+- Work: export the rooms of `fixtures/pdfs/plattegrond begane grond 10A.pdf` to `packages/core/fixtures/route-area/local/10A-rooms.json`. The scale of the 10A drawing is 1:100 (R6 plan, example of section 1); not verified in the code, read it from `r6-check.mjs`. `route-quality.test.ts` runs the 10A scenarios when the file exists and prints "SKIP" when it does not.
+- Must not touch: the tracked first-floor JSON. Never commit the 10A PDF or its JSON (`rules.md` section 2).
+- Verification: run the script (needs `pnpm build`, the script header says so). The 10A scenario runs and prints its table. `git check-ignore -v packages/core/fixtures/route-area/local/10A-rooms.json` prints the new rule. `git status` shows no 10A file.
+- Depends on: T02.
+
+#### Q1-T04. Baseline table, determinism and runtime [M]
+- Files: `packages/core/src/route-quality.test.ts` (extend), this plan (fill section 10 "Baseline table").
+- Work: measure scenarios A and B on the first floor and on 10A (if present), for **three start rooms** each (the largest corridor room and the two next ones; this answers the question of section 2.3). Write the table into section 10.
+  - Determinism: (a) run `planRoute` twice in one process and compare with `toEqual`; (b) run it with the rooms, the stamps and the target ports in a shuffled order (a fixed shuffle, no `Math.random`) and compare; (c) run the report in two separate Node processes and compare a hash of the plan JSON. The ids come from the factories `newSegmentId` and `newFittingId` of `RouteBuildInput`. No reset function exists in core (checked: the only counter is the module variable `idCounter` at `route-run.test.ts:80`). So the helper of T02 exports `makeIdFactories()`, which returns a fresh pair that starts at 0. Each run calls it. T02 adds this function.
+  - Runtime: 2 warm-up runs, then the median and the maximum of 7 runs, from `performance.now()`.
+- Must not touch: product code. If (a), (b) or (c) fails, stop and report: that is a defect in the planner, not in the test.
+- Verification: core tests. The table is in section 10. The determinism tests pass. Runtime numbers are in the table. `pnpm build`.
+- Depends on: T02 (T03 for the 10A column).
+
+#### Q1-T05. Defect catalogue from the user screenshots [S]
+- Files: this plan (section 11), no code.
+- Work: when the user sends 2 or 3 screenshots (section 8, request R-Q1-01), look at each one and write: what is wrong in plain words (long free duct through rooms, many bends, tap too close, parallel runs, route leaves the corridor, other). Link each defect to the metric that would show it. If a defect has no metric, add the metric to T01 (a note to the director). Until the screenshots arrive, the section lists the defects that the metrics already show (the 28 off-graph rooms, the 26 wall crossings).
+- Verification: the section lists one defect for each screenshot with a metric name. No code check.
+- Depends on: none (it runs when the screenshots arrive). T14 needs it.
+
+#### Q1-T06. Prototype fields in `RouteLayoutOptions` [S]
+- Files: the file that P1-T01 makes for `RouteLayoutOptions` (add the optional fields of section 4; `DEFAULT_LAYOUT_OPTIONS` stays equal to today), `route-build.ts` (pass the options to `buildTrunk`, `planBranches`, `connectLoosePorts`; no use yet), `route-build.test.ts`. No field on `RouteBuildInput`.
+- Must not touch: any default behaviour. No change of `BEND_PENALTY_MM` or `CROSSING_PENALTY_MM`.
+- Verification: core tests. A test runs scenario A with `options` absent, with `{}` and with `DEFAULT_LAYOUT_OPTIONS`, and checks `toEqual` with the T04 baseline JSON (committed as `packages/core/fixtures/route-quality/baseline-first-floor-a.json`). `pnpm build`. `git diff --stat` shows no other file.
+- Depends on: T04 (the baseline JSON) and P1-T01 (`route-layout-presets.md`: the type and the second argument of `planRoute`). If P1-T01 is not done, the director runs P1-T01 first. Q1 does not make its own type.
+
+### Phase B. Prototypes (each one off by default)
+
+Each prototype task has the same closing steps: (1) add its numbers to section 10 (the "Prototype results" table, one row for the first floor and one for 10A, scenarios A and B); (2) a test that the output with the option off still equals the baseline JSON; (3) `checkInvariant` and `internal-join` tests as in section 6, rules 1 and 2; (4) the determinism test (a) and (b) of T04 with the option on; (5) the runtime median with the option on. The order below follows the expected gain. T04 may change the order (the director decides).
+
+#### Q1-T07. Idea 0, join the graph parts [M]
+- Why: 13 rooms with an entry are off graph only because the corridors are in other graph parts (section 2.3).
+- Files: `packages/core/src/route-trunk.ts` (build bridge edges before the tree), `route-graph.ts` (helper that finds, for two parts, the nearest pair of nodes or edge points; reuse `nearestOnEdges` and `splitEdgeAt`), tests.
+- Shape: `options.bridgeParts = { penaltyMm }`. A bridge edge has id `rb-<n>`, cost = its length + `penaltyMm`, kind `link`. It joins the nearest points of two parts. The steiner tree then decides whether to use it. A bridge must not be used when the straight leg passes a foreign item (reuse the `accepts` test); the check is a parameter of `buildTrunk`.
+- Output: a bridge leg becomes an ordinary trunk leg, and `crossingsAlongPath` counts its walls.
+- Must not touch: `computeRouteArea` (the R4 area stays as it is; the user saw it in the "Show route area" overlay).
+- Verification: core tests (a hand-built area with two parts and one room in the second part: baseline marks the room off graph, the prototype serves it through a bridge with penalty; with a huge penalty the result equals the baseline). Table: off-graph rooms and wall crossings on the first floor; must be reported even if worse. Open question Q-Q1-02 sets the default penalty.
+- Depends on: T06.
+
+#### Q1-T08. Idea 1a, bends and fittings in the trunk search [M]
+- Files: `packages/core/src/route-steiner.ts` (a second function `steinerTreeWithTurns` that searches on heading states; the old function stays), `route-trunk.ts`, tests.
+- Shape: `options.trunkBends = { bendMm, fittingMm }`. The cost of an edge is its length. A turn at a node adds `bendMm` (the angle between the last leg of the incoming edge and the first leg of the next edge, from the graph polyline). A node of degree 3 or more in the tree adds `fittingMm`. This is an approximation: the real bends appear after `straightenPolyline`. Task note: compare the counted bends with `bends90 + bends45` of the final plan and report the difference.
+- Reuse: the heap from `route-hanan.ts:37-93` (move it to a shared file `route-heap.ts`, exported, no change of behaviour; the move is part of this task and its test is the unchanged `route-hanan.test.ts`).
+- Verification: core tests (a graph where the shortest path has 3 turns and a slightly longer one has 1: baseline picks the short one, the prototype the long one; with `bendMm` 0 the result equals `steinerTree`). Table: bends, fittings, length.
+- Depends on: T06.
+
+#### Q1-T09. Idea 1b, a search for the off-graph links [M]
+- Files: `packages/core/src/route-link.ts` (new), `route-topology.ts` (call it from `connectLoosePorts` when its option is set), tests.
+- Shape: `options.linkSearch = { bendMm, wallMm }`. For one loose port, build a grid from the lines through the port, the tap candidates, and the corner points of the rooms between them (the corner lines are new: they let the duct run along a wall instead of through it). Search on heading states (shared heap). The cost of a grid edge = length + `bendMm` per turn + `wallMm` per wall crossing of that edge (sampled with the same step as `crossingsAlongPath`, 100 mm). Targets: any point of the built route (a leg point, not only a vertex). Tie-break: lower node index. The `accepts` test of `route-build.ts:342-346` stays.
+- Fallback: when the search finds no path, the old L-shape is used.
+- Verification: core tests (a port behind a wall with an opening: the L-shape crosses the wall, the search goes through the opening when `wallMm` is large; with `wallMm` 0 and `bendMm` 0 the length is not longer than the L-shape). Table: wall crossings, bends, length, runtime (the grid may be large: report the max runtime).
+- Depends on: T06, T08 (shared heap).
+
+#### Q1-T10. Idea 2, exact Steiner tree in a room [M]
+- Files: `packages/core/src/route-exact.ts` (new), `route-hanan.ts` (call it when `ports.length <= maxPorts`), tests.
+- Shape: `options.exactSpine = { maxPorts }`. Dreyfus-Wagner on the same Hanan grid and the same blocked edges as `roomSpine`. The entry is the root terminal. Ports are leaves: no merge and no pass at a port node. The result is the shortest length. A second step, the bend-merge pass, slides a leg onto a parallel leg of the same tree when the length stays equal and the number of bends goes down. If the exact tree has more bends than the heuristic tree for the same length, the tie goes to fewer bends. The old heuristic stays for more than `maxPorts` ports and as the check in tests.
+- Verification: core tests (4 ports in a square room: the exact length is not above the heuristic length for 200 random but fixed-seed layouts; the ports stay leaves; the result is deterministic). Table: room length sum (scenario B), bends.
+- Depends on: T06, T08 (heap).
+
+#### Q1-T11. Idea 3, a score and candidate layouts [M]
+- Files: `packages/core/src/route-candidates.ts` (new), tests.
+- Shape: `planBestRoute(input: RouteBuildInput, candidates: readonly RouteLayoutOptions[], weights?: ScoreWeights): { best: number; results: { options: RouteLayoutOptions; plan: PlannedRoute; metrics: RouteMetrics; score: number }[] }`. The list type is the same as the P1 preset table (`ROUTE_PRESETS[].options`). P1 owns the preset list. Q1-T11 owns the scoring only and makes no second candidate list. The function calls `planRoute(input, options)` once per candidate, in the given order, and picks the lowest score. A tie goes to the lower index. It uses `routeMetrics` and `scoreRoute` from T01.
+- This is the base of the presets in `route-layout-presets.md`: report that plan the shape (it can become the preset table).
+- Verification: core tests (two fake candidates with known scores; the lower one wins; equal scores pick the first). Table: the score of each of the 4 candidate sets (baseline, bridge, bridge + link search, all) on the first floor and 10A. Total runtime of 4 candidates (must stay under the limit of Q-Q1-08).
+- Depends on: T07, T08, T09, T10 (it needs at least two real candidates; if one of them was dropped, use those that exist).
+
+#### Q1-T12. Idea 4, rip-up and reroute [M]
+- Files: `packages/core/src/route-ripup.ts` (new), tests.
+- Shape: `options.ripUp = { rounds }`. After the first plan, find the rooms (branch + spine) whose paths have an existing crossing, an overlap, or a wall crossing in the link. For each one, in room id order, remove it and plan it again with `crossesExisting` extended by the other new paths of the same plan and with a history price that grows by 500 mm per round on the spots that were bad. At most `rounds` rounds (default 3). Stop early when a round changes nothing.
+- Fit: today the plan has 0 existing crossings on the first floor (section 2.5), so the gain is not visible there. The task builds a test drawing with foreign segments in the corridor. It reports the 10A result.
+- Verification: core tests (a foreign segment across the only direct line: the first plan crosses it, the rip-up plan crosses it fewer times or not at all; the result is deterministic; with `rounds` 0 the result equals the baseline). Table: existing crossings, length, runtime.
+- Depends on: T06.
+
+#### Q1-T13. Idea 5, spike: is a better region test needed? [S]
+- Files: this plan (section 10), a measuring test only.
+- Work: measure how well the trunk is centred and how often the region test fails: the number of free edges (`trunk.freeEdges`, `route-trunk.ts:207`), the share of trunk samples that lie closer than 150 mm to a corridor wall, the number of trunk legs shorter than 300 mm. If all three are small, write "idea 5 is not needed now" in section 10. If not, write an estimate (size L) and the licence-safe method (our own polygon offset by a distance; no CGAL, no libavoid).
+- Verification: the numbers are in section 10. No product code.
+- Depends on: T04.
+
+### Phase C. Compare and decide
+
+#### Q1-T14. Comparison table [S]
+- Files: this plan (section 10).
+- Work: one table: baseline, each prototype alone, the combination chosen by the scores, on the first floor and 10A, scenarios A and B. Columns: the metrics of section 4, the score, the runtime median, determinism pass/fail. Mark each acceptance number of section 8 as met or not. Add the defect catalogue (T05): which prototype fixes which defect.
+- Verification: the table is complete. Every cell has a number or "not measured because ...".
+- Depends on: T05, T07 to T13.
+
+#### Q1-T15. Browser check and screenshots [M]
+- Files: `.claude/roadmap/browser/q1-check.mjs` (new; copy the shape of `r6-check.mjs`), no product code.
+- Work: the check opens the first floor PDF, detects rooms, places the start stamp and the terminals (the set-up of `r6-check.mjs`), opens the Route dialog, and for each variant passes the layout through the scene request field `layout` (P1-T09) and reads the plan. Variants: baseline, best combination. It types into the real dialog fields for the start and the target, as `rules.md` section 3 rule 5 asks. It takes a screenshot of the preview for each variant.
+- Screenshots (names `Q1-T15-<name>`, uploaded to the dashboard right after the task): `Q1-T15-first-floor-baseline`, `Q1-T15-first-floor-best`, `Q1-T15-10A-baseline`, `Q1-T15-10A-best` (10A: local only, do not commit; upload to the dashboard only).
+- Verification: `node .claude/roadmap/browser/with-server.mjs <work>/q1-check.mjs` prints 0 failed. The off-graph warning count in the dialog equals the metric of the prototype. One Chromium page at a time.
+- Depends on: T14 and **P1-T09** (the scene field `layout?: RoutePresetId | RouteLayoutOptions` on `RouteRequest`). Until P1-T09 is done, Q1-T15 may use the debug path (Q-Q1-04 B, a hidden call behind the flag `mepapp.debugTools`) and the director says so in the report. Without both, the browser shows only the baseline and the table comes from core tests.
+
+#### Q1-T16. Decision gate and hand-over [S]
+- Files: this plan (status table), the road map dashboard.
+- Work: post the table and the four screenshots on the dashboard. Ask the user which ideas become the default. Write the plan Q2 for the chosen ideas (size, order). Mark Q1 done in the status table with the commit hashes.
+- Verification: the dashboard has the table and the screenshots. The user has answered.
+- Depends on: T15.
+
+## 8. Acceptance numbers, determinism and runtime
+
+Proposed (the user can change them, question Q-Q1-03). All numbers are on scenario A and B of the first floor, and on 10A when the file exists. "Baseline" is the table of section 10.
+
+| Id | Rule | Why |
+|---|---|---|
+| A1 | A prototype is **accepted** when, against the baseline, it lowers the score of section 5 by at least 10 %. No single metric may get worse by more than 2 %: ports left, free-angle legs, existing crossings. Length is the exception: A3 overrides A1 for length. | A fix for one defect must not hide a new one. |
+| A2 | The best combination lowers off-graph rooms from 28 to 14 or fewer, **or** wall crossings from 26 to 18 or fewer, on the first floor scenario A. **Fewer crossings alone is not enough**: the wall crossings must not rise when off-graph rooms fall, and the model has no wall rating (Q-Q1-02), so every crossing counts as "penetration, check fire rating". Idea 0 must never choose a wall as a free bridge. | The two numbers the user can see in the dialog. A route that avoids a crossing by a longer detour through a rated wall opening is not scored better by this number alone. |
+| A3 | Length may grow by at most 10 % when it lowers off-graph rooms or wall crossings. A3 overrides the length part of A1 (A1 allows 2 %). | A longer duct that avoids a wall is a fair trade. |
+| A4 | Free-angle legs stay 0 on the first floor. `internal-join` never appears. `checkInvariant` returns no id. | Layout rule of R6 and domain rules 1 and 2. |
+| D1 | Two runs in one process: `toEqual`. | Determinism. |
+| D2 | Shuffled input order: `toEqual` of the plan geometry (ids may differ only through the counters, so the test compares the geometry and the kinds). | The planner must not depend on the input order. |
+| D3 | Two Node processes give the same hash of the plan JSON. | Catches a hidden global state. |
+| D4 | No `Math.random`, no `Date`, no `Map` iteration that depends on a insertion order of unsorted input. A test greps the new files for `Math.random` and `Date.now`. | The same input gives the same output. |
+| T1 | `planRoute` with one prototype on: median at most 300 ms on the first floor and on 10A (median of 7 runs after 2 warm-up runs). | The dialog waits 300 ms before it plans (`auto-routing-r6.md` P-R6-PREVIEW). The test limit today is 500 ms (`route-run.test.ts:195`). |
+| T2 | Four candidates (T11) at most 1200 ms in total, one macrotask each in the UI. | A worker is not needed below this (feedback prompt, presets findings). |
+
+Risks of these numbers: the 10 %, 14 and 18 limits are planner choices, not from a source. The first-floor input has one port in each room, which is easy. Scenario B (four ports) and 10A are the harder checks.
+
+## 9. Open questions (the user decides; the planner recommends)
+
+Each question has options A, B and C and a recommendation. None blocks T01 to T06.
+
+- **Q-Q1-01. What counts most in "good from an engineering view"?** Needed for the weights of section 5.
+  - A. Wall crossings and off-graph rooms first, then bends and fittings, then length.
+  - B. Length and bends first (the cheapest installation).
+  - C. Balance of branch lengths first, per network (a proxy only, not a flow or pressure value).
+  - **Recommend A.** It matches the two warnings the user sees in the dialog (`room-off-graph`, `wall-crossings`) and the fire rule. C is a later metric for sizing. Not verified: what the user means. The screenshots (R-Q1-01) will show it.
+- **Q-Q1-02. May the trunk cross a wall to join two corridor parts (idea 0)? And how do rated (fire) walls count?** The model has no door data and no wall rating (not verified: no door or rating object is in `packages/core`). A bridge is a wall crossing that the planner chooses. Until a rating exists, every crossing is called "penetration, check fire rating". The planner never treats a wall as a free bridge.
+  - A. Yes, with a price (`penaltyMm` 3000). The dialog counts every bridge as a wall penetration with the hint "check fire rating", as for any other crossing.
+  - B. No. The off-graph links stay the only crossing.
+  - C. Yes, but only through walls that are known not to be rated. This needs wall rating data that does not exist. It is a separate part (data model, not in Q1).
+  - **Recommend A.** A trunk with taps looks like an engineer's layout. A long free link does not. The user keeps control because the dialog counts and flags each penetration. C is right in the end, but it needs new data. A2 does not reward fewer crossings alone.
+- **Q-Q1-03. Which acceptance numbers?**
+  - A. Section 8 as written.
+  - B. Stricter: score down 20 %, off-graph rooms 10 or fewer.
+  - C. No limits. Only report the numbers.
+  - **Recommend A.** The limits are easy to change after the first table. C does not give a stop rule.
+- **Q-Q1-04. How does the layout option reach the UI?** [no data model] The core seam is fixed: `planRoute(input, options?: RouteLayoutOptions)` of P1 (director decision 2026-10-25). The scene seam is fixed too: the field `layout` on `RouteRequest`, made in P1-T09. The question is only what the user sees.
+  - A. Core only. The browser check shows the baseline and a core table. Q2 wires the UI.
+  - B. Use the P1-T09 field `layout` with a hidden entry behind the debug flag `localStorage mepapp.debugTools` (memory: reference-debug-tools-flag). Until P1-T09 exists, no UI.
+  - C. Wait for the preset chips of P1 (P1-T11 to P1-T13) and show the prototypes as presets. This is the longest wait.
+  - **Recommend B.** It lets the user see the prototypes in the real app on Windows once P1-T09 is done (about 30 lines, `route-layout-presets.md`). C blocks Q1 on the P1 UI. The R7 work edits `RouteDialog.tsx` (uncommitted in `agent-framework`), so the director must merge with care.
+- **Q-Q1-05. Is 10A a local-only case?**
+  - A. Yes. Its numbers go in the table and on the dashboard, never in git or in CI.
+  - B. Make a small public drawing as a second fixture.
+  - C. Do not use 10A.
+  - **Recommend A.** `rules.md` section 2 forbids the commit of an ignored PDF. B costs time. First floor alone has one very shallow corridor graph.
+- **Q-Q1-06. Do the prototypes wait for the user screenshots (R-Q1-01)?**
+  - A. Wait. Do T01 to T06 first, then pause.
+  - B. Go on with T07 to T13 on the metrics. T14 waits for the screenshots.
+  - C. Do not wait. Skip T05.
+  - **Recommend B.** The metrics already show two big problems (28 and 26). The screenshots may change the order and the weights, so the final choice (T14) waits for them.
+- **Q-Q1-07. Do idea 5 (exact region tests, graph from wall corners) now?**
+  - A. Only the spike T13. Build it later if the numbers ask for it.
+  - B. Build it in Q1 as a prototype.
+  - C. Never.
+  - **Recommend A.** The first floor has no free trunk edges today (0 free-angle legs, section 2.5), so the gain is not shown. Size is L.
+- **Q-Q1-08. How long may one plan take?**
+  - A. 300 ms for one plan, 1200 ms for four candidates (section 8).
+  - B. 150 ms (as today).
+  - C. 1000 ms for one plan, with a worker.
+  - **Recommend A.** The dialog waits 300 ms before it plans, so one plan up to 300 ms keeps the preview calm. A worker is a large change with no need yet.
+
+Request to the user:
+- **R-Q1-01. Please send 2 or 3 screenshots of routes you dislike.** For each one, tell me in one line what is wrong, and which drawing, start stamp and network type you used. Photos of the screen are fine. The planner puts them in section 11 and picks the metrics that must show the defect. Please send them through the road map dashboard. Please also say if one of them is on the first floor drawing (then I can reproduce it).
+
+## 10. Results (to be filled by the tasks)
+
+### Baseline table (T04)
+
+| Scenario | Start room | Segments | Fittings | Length mm | Bends 90 / 45 | Wall crossings | Off-graph rooms | Score | Median ms | Max ms |
+|---|---|---|---|---|---|---|---|---|---|---|
+| First floor A (33 x 1 port) | largest corridor | 109 | 76 | 151 366 | 35 / 10 | 26 | 28 | to measure | to measure (one cold run: 167) | to measure |
+| First floor A | 2nd start | to measure | | | | | | | | |
+| First floor A | 3rd start | to measure | | | | | | | | |
+| First floor B (33 x 4 ports) | largest corridor | to measure | | | | | | | | |
+| 10A A | to measure | to measure | | | | | | | | |
+| 10A B | to measure | to measure | | | | | | | | |
+
+The first row is measured on 2026-10-25 (section 2.5). The other cells are for T04.
+
+### Prototype results (T07 to T13)
+
+To be filled by each task: one row per prototype and drawing, same columns as the baseline, plus "acceptance A1 met" and "determinism D1 to D3".
+
+## 11. Defect catalogue from the user screenshots (T05)
+
+To be filled when the screenshots arrive (R-Q1-01). Until then:
+- D-1. Many rooms are joined by a long free duct across other rooms (28 of 33). Metric: `offGraphRooms`, `wallCrossings`, `lengthLinkMm`.
+- D-2. The corridors are not joined in the graph (4 parts). Metric: `area.parts` (to be added to the report).
+- D-3. Not yet known: bends, taps, parallel runs. Metrics: `bends90`, `fittings`, `existingOverlaps`.
+
+## 12. Risks and what is not verified
+
+- **R-1 The test input is synthetic.** One port at each room label, no stamp art, one start room (`route-run.test.ts:33-49`). The real user input is different. Scenario B, three start rooms and 10A reduce this risk. They do not remove it. The user screenshots are the real check.
+- **R-2 Two copies of the set-up.** T02 copies the set-up of `route-run.test.ts` into a helper and leaves the old test as it is. The two can drift. Q2 removes the copy (the test then uses the helper).
+- **R-3 Score weights are guesses.** Section 5 weights are planner values. A wrong weight picks a wrong "best". A table of single metrics (section 10) is always shown next to the score.
+- **R-4 Prototype on a trunk approximation.** Idea 1a counts bends on the graph polyline, but the final bends come after straightening (`route-trunk.ts:197`). The task reports the gap. If it is large, a second pass on the straightened path is needed.
+- **R-5 Exact Steiner with leaf ports.** The leaf rule makes the dynamic program less standard. If the exact tree is not shorter than the heuristic in the tests, drop idea 2.
+- **R-6 Merge with R7 and with the UI plans.** Q1 edits core files only, except an optional wiring (Q-Q1-04 B). `RouteDialog.tsx` is edited by the R7 work (uncommitted) and by the UI cleanup plan. Run `pnpm build` after each merge (`rules.md` section 3 rule 6).
+- **R-7 Licences.** The two checks of section 3 used search snippets only. No dependency is added, so the risk is low. Any later use of a library needs a read of its licence text.
+- **R-8 A better plan may not look better.** A lower score can still look odd to the user. T15 and T16 put the screenshots in front of the user before any default changes.
+- **Not verified:** the count of off-graph rooms for other starts and for 10A (T04); a helper for a port grid inside a room (T02); the scale of 10A in the code (T03); whether `scene.planRoute` can pass `layout` (made by P1-T09) (T15); the content of every source in section 3 except the two licence snippets.
+
+## 13. Status table
+
+| Task | Size | Commit |
+|---|---|---|
+| Q1-T01 | M | |
+| Q1-T02 | M | |
+| Q1-T03 | S | |
+| Q1-T04 | M | |
+| Q1-T05 | S | |
+| Q1-T06 | S | |
+| Q1-T07 | M | |
+| Q1-T08 | M | |
+| Q1-T09 | M | |
+| Q1-T10 | M | |
+| Q1-T11 | M | |
+| Q1-T12 | M | |
+| Q1-T13 | S | |
+| Q1-T14 | S | |
+| Q1-T15 | M | |
+| Q1-T16 | S | |
