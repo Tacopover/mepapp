@@ -17,3 +17,6 @@ fixtures/schematics/
 fixtures/pdfs/*
 !fixtures/pdfs/.gitkeep
 !fixtures/pdfs/README.md
+
+# Local-only fixtures made from ignored PDFs
+packages/core/fixtures/route-area/local/
