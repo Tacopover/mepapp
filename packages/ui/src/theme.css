@@ -5146,3 +5146,91 @@
 .mep-guide-chain .cr.blocked {
   color: var(--guide-warn);
 }
+
+/* Icon buttons, icon toggles, severity marks (U1-T04) */
+.mep-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.mep-icon-button:hover:not(:disabled) {
+  background: var(--accent-soft, var(--surface));
+}
+.mep-icon-button.on {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 1.5px 1.5px 0 var(--accent-ink);
+}
+.mep-icon-button.on:hover:not(:disabled) {
+  background: var(--accent);
+}
+.mep-icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.mep-icon-button:focus-visible {
+  outline: 2px solid var(--accent-ink);
+}
+.mep-icon-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.mep-icon-toggle > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.mep-icon-toggle.on {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 1.5px 1.5px 0 var(--accent-ink);
+}
+.mep-icon-toggle.on:hover {
+  background: var(--accent);
+}
+.mep-icon-toggle.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.mep-icon-toggle.disabled > input {
+  cursor: not-allowed;
+}
+.mep-icon-toggle:has(> input:focus-visible) {
+  outline: 2px solid var(--accent-ink);
+}
+.mep-severity {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.mep-severity--error {
+  color: #b3261e;
+}
+.mep-severity--warning {
+  color: #8a5a00;
+}
+.mep-severity--info {
+  opacity: 0.75;
+}

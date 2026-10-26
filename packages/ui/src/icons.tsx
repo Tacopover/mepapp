@@ -501,3 +501,59 @@ export const IconZoomFit = (props: IconProps) => (
     <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
   </Svg>
 );
+
+export const IconRouting = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="5" cy="6" r="2.5" />
+    <circle cx="19" cy="18" r="2.5" />
+    <path d="M7.5 6H14v12h2.5" />
+  </Svg>
+);
+
+export const IconRoute = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="5" cy="19" r="2" fill="currentColor" stroke="none" />
+    <path d="M7 17C11 13 9 8 13 7.5S17 5 18 4" />
+    <path d="M14.5 3.5 18.5 4 17.8 8" />
+  </Svg>
+);
+
+export const IconSizeNetwork = (props: IconProps) => (
+  <Svg {...props}>
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="8" x2="3" y2="16" />
+    <line x1="21" y1="8" x2="21" y2="16" />
+    <path d="M6 18.5h12M6 18.5l2-1.6M6 18.5l2 1.6M18 18.5l-2-1.6M18 18.5l-2 1.6" />
+  </Svg>
+);
+
+export const IconRouteArea = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="1.5" strokeDasharray="3 2.5" />
+    <path d="M7 16c3-1 2-6 6-6.5s3-2.5 4-3" />
+  </Svg>
+);
+
+export const IconSeverityError = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="9.5" />
+    <line x1="12" y1="7" x2="12" y2="13.2" />
+    <circle cx="12" cy="16.8" r="0.9" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const IconSeverityWarning = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M12 3.2 22 20.5H2z" />
+    <line x1="12" y1="10" x2="12" y2="14.5" />
+    <circle cx="12" cy="17.6" r="0.9" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const IconSeverityInfo = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="9.5" />
+    <line x1="12" y1="11" x2="12" y2="17" />
+    <circle cx="12" cy="7.6" r="0.9" fill="currentColor" stroke="none" />
+  </Svg>
+);
