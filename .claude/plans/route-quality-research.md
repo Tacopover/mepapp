@@ -492,6 +492,60 @@ Reading of the table:
 - Ports left in scenario B (1 on the first floor) are the same with the option on and off.
 - A bridge elbow is rebuilt from the real position of its parent node after the straightening of the previous edge. The rebuilt elbow is not checked again against foreign items (`bridgeAccepts` checks the first elbow only). Not verified: a case with a foreign segment near a rebuilt elbow.
 
+#### Idea 1a, bends and fittings in the trunk search (Q1-T08, measured 2026-10-26)
+
+Option: `trunkBends = { bendMm, fittingMm }`. Test: `route-turns-report.test.ts`, full mode (`MEPAPP_QUALITY_FULL=1`: 2 warm-up runs, 7 runs, 6 variants). The variants are "off", "turns500" (`bendMm` 500, `fittingMm` 300), "turns2000" (`bendMm` 2000, `fittingMm` 1000), "bridge" (`bridgeParts` with `penaltyMm` 0), "bridgeTurns500" and "bridgeTurns2000" (the bridge option with the two trunk prices). Raw output: `/tmp/claude-0/-root-MepApp/0119519d-6cb5-4465-8095-715236bd031d/scratchpad/Q1-T08/turns-full.txt` (not in git).
+
+| Scenario | Start | Variant | Segments | Length mm | Bends 90 / 45 | Wall crossings | Off-graph rooms | Ports left | Score | Median ms |
+|---|---|---|---|---|---|---|---|---|---|---|
+| First floor A | 0 | off | 109 | 151 366 | 35 / 10 | 26 | 28 | 0 | 263 044 | 62 |
+| First floor A | 0 | turns500 | 109 | 151 366 | 35 / 10 | 26 | 28 | 0 | 263 044 | 55 |
+| First floor A | 0 | turns2000 | 109 | 151 366 | 35 / 10 | 26 | 28 | 0 | 263 044 | 52 |
+| First floor A | 0 | bridge | 147 | 177 907 | 62 / 21 | 29 | 15 | 0 | 291 169 | 70 |
+| First floor A | 0 | bridgeTurns500 | 147 | 177 907 | 62 / 21 | 29 | 15 | 0 | 291 169 | 71 |
+| First floor A | 0 | bridgeTurns2000 | 147 | 177 907 | 62 / 21 | 29 | 15 | 0 | 291 169 | 71 |
+| First floor B | 0 | off | 309 | 269 867 | 60 / 10 | 31 | 28 | 1 | 430 531 | 2 122 |
+| First floor B | 0 | turns500 | 309 | 269 867 | 60 / 10 | 31 | 28 | 1 | 430 531 | 2 207 |
+| First floor B | 0 | turns2000 | 309 | 269 867 | 60 / 10 | 31 | 28 | 1 | 430 531 | 2 320 |
+| First floor B | 0 | bridge | 335 | 306 891 | 78 / 21 | 38 | 15 | 1 | 461 007 | 4 189 |
+| First floor B | 0 | bridgeTurns500 | 335 | 306 891 | 78 / 21 | 38 | 15 | 1 | 461 007 | 3 888 |
+| First floor B | 0 | bridgeTurns2000 | 335 | 306 891 | 78 / 21 | 38 | 15 | 1 | 461 007 | 4 322 |
+| 10A A (local-only) | 0 | off | 95 | 210 331 | 27 / 16 | 18 | 19 | 0 | 305 976 | 50 |
+| 10A A (local-only) | 0 | turns500 | 95 | 210 331 | 27 / 16 | 18 | 19 | 0 | 305 976 | 84 |
+| 10A A (local-only) | 0 | turns2000 | 95 | 210 331 | 27 / 16 | 18 | 19 | 0 | 305 976 | 80 |
+| 10A A (local-only) | 0 | bridge | 114 | 226 122 | 41 / 20 | 20 | 13 | 0 | 319 693 | 86 |
+| 10A A (local-only) | 0 | bridgeTurns500 | 114 | 226 122 | 41 / 20 | 20 | 13 | 0 | 319 693 | 100 |
+| 10A A (local-only) | 0 | bridgeTurns2000 | 114 | 226 122 | 41 / 20 | 20 | 13 | 0 | 319 693 | 103 |
+| 10A A (local-only) | 1 | off | 70 | 178 304 | 17 / 0 | 16 | 26 | 0 | 273 035 | 40 |
+| 10A A (local-only) | 1 | turns500 | 70 | 178 304 | 17 / 0 | 16 | 26 | 0 | 273 035 | 42 |
+| 10A A (local-only) | 1 | turns2000 | 70 | 178 304 | 17 / 0 | 16 | 26 | 0 | 273 035 | 43 |
+| 10A A (local-only) | 1 | bridge | 115 | 225 481 | 38 / 24 | 20 | 13 | 0 | 319 192 | 74 |
+| 10A A (local-only) | 1 | bridgeTurns500 | 115 | 225 481 | 38 / 24 | 20 | 13 | 0 | 319 192 | 90 |
+| 10A A (local-only) | 1 | bridgeTurns2000 | 115 | 225 481 | 38 / 24 | 20 | 13 | 0 | 319 192 | 102 |
+| 10A B (local-only) | 0 | off | 265 | 333 449 | 45 / 16 | 22 | 19 | 0 | 478 449 | 1 930 |
+| 10A B (local-only) | 0 | turns500 | 265 | 333 449 | 45 / 16 | 22 | 19 | 0 | 478 449 | 2 537 |
+| 10A B (local-only) | 0 | turns2000 | 265 | 333 449 | 45 / 16 | 22 | 19 | 0 | 478 449 | 2 670 |
+| 10A B (local-only) | 0 | bridge | 271 | 356 917 | 47 / 22 | 25 | 13 | 0 | 483 170 | 2 116 |
+| 10A B (local-only) | 0 | bridgeTurns500 | 271 | 356 917 | 47 / 22 | 25 | 13 | 0 | 483 170 | 1 670 |
+| 10A B (local-only) | 0 | bridgeTurns2000 | 271 | 356 917 | 47 / 22 | 25 | 13 | 0 | 483 170 | 2 003 |
+| Ground floor w_rooms A (local-only) | 0 | off | 141 | 207 563 | 47 / 10 | 33 | 33 | 0 | 342 577 | 110 |
+| Ground floor w_rooms A (local-only) | 0 | turns500 | 141 | 207 563 | 47 / 10 | 33 | 33 | 0 | 342 577 | 111 |
+| Ground floor w_rooms A (local-only) | 0 | turns2000 | 141 | 207 563 | 47 / 10 | 33 | 33 | 0 | 342 577 | 110 |
+| Ground floor w_rooms A (local-only) | 0 | bridge | 141 | 207 563 | 47 / 10 | 33 | 33 | 0 | 342 577 | 134 |
+| Ground floor w_rooms A (local-only) | 0 | bridgeTurns500 | 141 | 207 563 | 47 / 10 | 33 | 33 | 0 | 342 577 | 111 |
+| Ground floor w_rooms A (local-only) | 0 | bridgeTurns2000 | 141 | 207 563 | 47 / 10 | 33 | 33 | 0 | 342 577 | 112 |
+
+Reading of the table:
+- Every turns row equals the off row, and every bridgeTurns row equals the bridge row, in all 48 pairs of all drawings and starts in the file (12 groups, 4 pairs each; segments, length, bends, crossings, score). The option changes nothing on these drawings.
+- Cause (measured with a scratch script on the first floor): the corridor graph of the route area has 23 edges and 0 independent cycles (it is a forest). Each terminal has exactly one path to the tree, so a price on bends cannot change the tree. With `bendMm` 100000 and `fittingMm` 100000 the trunk has the same 8 edges as without the option. Not measured: the 10A graph (its rows are equal too, so it is probably a forest as well). The bridge edges of idea 0 add few edges, but the rows stay equal.
+- So the 62 bends 90 of the bridge variant (35 before) do not come from the choice of trunk path. They come from the elbows of the bridge edges, the straightening of the edges, and the branches and links. The next candidates are idea 1b (link search) and a bend-aware bridge elbow. This is a reasoned conclusion, not measured.
+- Unit tests show that the search works: on a graph with two paths, the short path with 3 turns and a longer path with 1 turn, the option picks the longer path; with both prices 0 the tree equals `steinerTree` (random graphs, fixed seeds); trees stay trees with large prices (200 random graphs). The comparison of counted bends with the bends of the final plan was not made, because the trunk tree is the same in all rows (difference is 0 by construction).
+- Acceptance, `trunkBends` alone, first floor A start 0: A1 not met (score change 0 %). A2 not met (off-graph rooms 28, crossings 26). A3 met in the trivial sense (length +0 %). A4 met (free legs 0, no `internal-join`, checked in the report test). T1 met in scenario A (first floor A start 0: median 55 ms and 52 ms, limit 300 ms); not met in scenario B (first floor B start 0: 2 207 ms and 2 320 ms; the baseline is 2 122 ms). Together with `bridgeParts`: the same numbers as `bridgeParts` alone (A1, A2, A3 not met as in T07; A4 met; T1 met in A with 71 ms).
+- Determinism D1 (two runs, `toEqual`) passes with the option on in all rows (the report test checks it). D2 and D3 with the option on are not measured.
+- Runtime: the option adds no measurable time on first floor A start 0 (medians 55 ms and 52 ms, against 62 ms off). On 10A A start 0 the medians rise from 50 ms (off) to 84 ms and 80 ms. This is not explained (not verified). The full-mode run takes 27 minutes, so it is not for the normal test run.
+- Heap: `StateHeap` moved to `route-heap.ts` with no change.
+- Safety net: the search forbids a path that visits one node twice (a loop could lower the bend price).
+
 ## 11. Defect catalogue from the user screenshots (T05)
 
 To be filled when the screenshots arrive (R-Q1-01). Until then:

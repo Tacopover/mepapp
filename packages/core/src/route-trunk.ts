@@ -4,7 +4,7 @@ import type { RouteArea, RouteEdge, RouteEntry, RouteNode } from './route-area.j
 import { bridgeParts } from './route-bridge.js';
 import { nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
 import { elbowPath, insideRouteArea, straightenPolyline, withWallGaps, type RouteLayoutOptions } from './route-layout.js';
-import { steinerTree } from './route-steiner.js';
+import { steinerTree, steinerTreeWithTurns } from './route-steiner.js';
 
 export interface TrunkInput {
   area: RouteArea;
@@ -103,6 +103,20 @@ function entriesOf(area: RouteArea, roomId: string): RouteEntry[] {
     });
 }
 
+function legDirection(a: Vec2, b: Vec2): Vec2 | null {
+  const d = distance(a, b);
+  if (d === 0) return null;
+  return { x: (b.x - a.x) / d, y: (b.y - a.y) / d };
+}
+
+function legDirections(points: readonly Vec2[]): { startDir: Vec2 | null; endDir: Vec2 | null } {
+  let startDir: Vec2 | null = null;
+  for (let i = 1; i < points.length && startDir === null; i++) startDir = legDirection(points[i - 1]!, points[i]!);
+  let endDir: Vec2 | null = null;
+  for (let i = points.length - 1; i > 0 && endDir === null; i--) endDir = legDirection(points[i - 1]!, points[i]!);
+  return { startDir, endDir };
+}
+
 export function buildTrunk(input: TrunkInput): TrunkResult {
   const { area, rooms, mmPerPt, startPointMm, servedRoomIds } = input;
   if (area.status !== 'ok' || area.nodes.length === 0) return emptyTrunk(servedRoomIds);
@@ -145,13 +159,17 @@ export function buildTrunk(input: TrunkInput): TrunkResult {
       from: e.from,
       to: e.to,
       cost: e.id.startsWith('rb-') ? e.lengthMm + bridgePenaltyMm : e.lengthMm,
+      ...legDirections(e.points),
     }));
   const steinerGraph = { nodeIds: graph.nodes.map((n) => n.id), edges: steinerEdges };
+  const trunkBends = input.options?.trunkBends;
 
   let treeEdgeIds: string[] = [];
   for (;;) {
     const terminals = roomIds.filter(active).map(tapOf);
-    const tree = steinerTree(steinerGraph, rootId, terminals);
+    const tree = trunkBends
+      ? steinerTreeWithTurns(steinerGraph, rootId, terminals, trunkBends)
+      : steinerTree(steinerGraph, rootId, terminals);
     treeEdgeIds = tree.edgeIds;
     const unreached = new Set(tree.unreached);
     let changed = false;

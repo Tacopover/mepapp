@@ -182,6 +182,14 @@ describe('buildTrunk', () => {
     }
   });
 
+  it('gives the same tree with zero trunk bend costs and no change with empty options', () => {
+    const input = threeRoomScene();
+    const plain = buildTrunk(input);
+    const zero = buildTrunk({ ...input, options: { trunkBends: { bendMm: 0, fittingMm: 0 } } });
+    expect(zero.edges.map((e) => e.id)).toEqual(plain.edges.map((e) => e.id));
+    expect(buildTrunk({ ...input, options: {} })).toEqual(plain);
+  });
+
   describe('links between corridors', () => {
     function linkScene(c2Start: number, wallX: number): TrunkInput {
       const graph: GraphData = {
