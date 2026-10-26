@@ -1,6 +1,8 @@
 // Test helper: the route scenarios of the route quality report (route-quality.test.ts). Excluded from the build, see tsconfig.json.
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { ConnectionPoint } from './network.js';
 import { layoutGrid } from './rooms/placement-layout.js';
 import { polygonAreaPt2, roomLabelPoint, type Room } from './rooms/room.js';
 import { loadFirstFloorRooms } from './rooms/route-area-fixture.testutil.js';
@@ -152,12 +154,6 @@ export function measureScenario(s: Scenario, run: ScenarioRun, label: string): S
 
 type MetricColumn = Exclude<keyof RouteMetrics, 'fittingsByKind'>;
 
-const METRIC_COLUMNS: MetricColumn[] = [
-  'lengthMm', 'lengthTrunkMm', 'lengthBranchMm', 'lengthRoomMm', 'segments', 'fittings', 'bends90', 'bends45', 'freeLegs',
-  'wallCrossings', 'openRuns', 'shaftCrossings', 'existingCrossings', 'existingOverlaps', 'offGraphRooms', 'noEntryRooms',
-  'portsLeft', 'corridorShare', 'longestPathMm', 'meanPathMm', 'branchLengthSpreadMm', 'freeLegsShare',
-];
-
 function cell(key: MetricColumn, value: number): string {
   return key.endsWith('Share') ? value.toFixed(3) : String(Math.round(value));
 }
@@ -166,14 +162,84 @@ function formatLine(cells: readonly string[], widths: readonly number[]): string
   return cells.map((c, i) => (i === 0 ? c.padEnd(widths[i] ?? 0) : c.padStart(widths[i] ?? 0))).join('  ');
 }
 
-export function formatTable(rows: readonly ScenarioRow[]): string {
-  const header = ['scenario', ...METRIC_COLUMNS, 'score', 'ms'];
-  const body = rows.map((row) => [
-    row.label,
-    ...METRIC_COLUMNS.map((key) => cell(key, row.metrics[key])),
-    String(Math.round(row.score)),
-    String(Math.round(row.ms)),
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function seededShuffle<T>(items: readonly T[], seed: number): T[] {
+  const next = mulberry32(seed);
+  const out = items.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    const tmp = out[i] as T;
+    out[i] = out[j] as T;
+    out[j] = tmp;
+  }
+  return out;
+}
+
+export function shuffledScenario(drawing: Drawing, kind: ScenarioKind, startIndex: number, seed: number): Scenario | null {
+  const s = buildScenario({ ...drawing, rooms: seededShuffle(drawing.rooms, seed) }, kind, startIndex);
+  if (s === null) return null;
+  return { ...s, stamps: seededShuffle(s.stamps, seed + 1), targetPorts: seededShuffle(s.targetPorts, seed + 2) };
+}
+
+function sortByJson<T>(items: readonly T[]): T[] {
+  return items
+    .map((item) => ({ key: JSON.stringify(item), item }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map((entry) => entry.item);
+}
+
+export function planGeometry(plan: PlannedRoute): unknown {
+  const fittingPositions = new Map(plan.fittings.map((f) => [f.id, f.position]));
+  const endpoint = (p: ConnectionPoint): unknown => (p.kind === 'fitting' ? { kind: p.kind, position: fittingPositions.get(p.fittingId) } : p);
+  const segmentForms = plan.segments.map((s) => ({ shape: s.shape, networkTypeId: s.networkTypeId, pageIndex: s.pageIndex, material: s.material, diameter: s.diameter, width: s.width, height: s.height, endpointA: endpoint(s.endpointA), endpointB: endpoint(s.endpointB), geometry: s.geometry }));
+  const segmentKeys = new Map(plan.segments.map((s, i) => [s.id, JSON.stringify(segmentForms[i])]));
+  return {
+    segments: sortByJson(segmentForms),
+    fittings: sortByJson(plan.fittings.map((f) => ({ kind: f.kind, position: f.position }))),
+    sizes: sortByJson(plan.sizes.map(({ segmentId, ...size }) => ({ segment: segmentKeys.get(segmentId) ?? null, ...size }))),
+    stats: plan.stats,
+    warnings: plan.warnings.map((w) => w.code).sort(),
+  };
+}
+
+export function planHash(plan: PlannedRoute): string {
+  return createHash('sha256').update(JSON.stringify(plan)).digest('hex');
+}
+
+export interface RuntimeStats { medianMs: number; maxMs: number }
+
+export function measureRuntime(s: Scenario, warmups = 2, runs = 7): RuntimeStats {
+  for (let i = 0; i < warmups; i++) runScenario(s, makeIdFactories());
+  const times = Array.from({ length: runs }, () => runScenario(s, makeIdFactories()).ms).sort((a, b) => a - b);
+  return { medianMs: times[Math.floor(times.length / 2)] ?? 0, maxMs: times[times.length - 1] ?? 0 };
+}
+
+export interface BaselineRow { scenario: string; startIndex: number; startRoomId: string; row: ScenarioRow; runtime: RuntimeStats }
+
+const BASELINE_COLUMNS: MetricColumn[] = ['segments', 'fittings', 'lengthMm', 'bends90', 'bends45', 'wallCrossings', 'offGraphRooms', 'noEntryRooms', 'portsLeft'];
+
+export function formatBaselineTable(rows: readonly BaselineRow[], runtimeMode = ''): string {
+  const header = ['scenario', 'start', 'start room', 'segments', 'fittings', 'length mm', 'bends90', 'bends45', 'wallCrossings', 'offGraphRooms', 'noEntryRooms', 'portsLeft', 'score', 'median ms', 'max ms'];
+  const body = rows.map((r) => [
+    r.scenario,
+    String(r.startIndex),
+    r.startRoomId,
+    ...BASELINE_COLUMNS.map((key) => cell(key, r.row.metrics[key])),
+    String(Math.round(r.row.score)),
+    String(Math.round(r.runtime.medianMs)),
+    String(Math.round(r.runtime.maxMs)),
   ]);
   const widths = header.map((h, i) => Math.max(h.length, ...body.map((line) => (line[i] ?? '').length)));
-  return [formatLine(header, widths), ...body.map((line) => formatLine(line, widths))].join('\n');
+  const headerLine = formatLine(header, widths) + (runtimeMode === '' ? '' : `  runtime: ${runtimeMode}`);
+  return [headerLine, ...body.map((line) => formatLine(line, widths))].join('\n');
 }

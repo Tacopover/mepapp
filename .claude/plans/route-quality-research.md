@@ -400,16 +400,42 @@ Request to the user:
 
 ### Baseline table (T04)
 
-| Scenario | Start room | Segments | Fittings | Length mm | Bends 90 / 45 | Wall crossings | Off-graph rooms | Score | Median ms | Max ms |
-|---|---|---|---|---|---|---|---|---|---|---|
-| First floor A (33 x 1 port) | largest corridor | 109 | 76 | 151 366 | 35 / 10 | 26 | 28 | to measure | to measure (one cold run: 167) | to measure |
-| First floor A | 2nd start | to measure | | | | | | | | |
-| First floor A | 3rd start | to measure | | | | | | | | |
-| First floor B (33 x 4 ports) | largest corridor | to measure | | | | | | | | |
-| 10A A | to measure | to measure | | | | | | | | |
-| 10A B | to measure | to measure | | | | | | | | |
+Measured on 2026-10-26 by `route-quality.test.ts` (task Q1-T04, branch `worktree-routing-feedback`). Start k is the k-th largest corridor room (start 0 is the largest). Scenario A has one port in each served room. Scenario B has four ports in each served room. Runtime is the median and the maximum of 7 runs after 2 warm-up runs. The score is the score of section 5 with the default weights.
 
-The first row is measured on 2026-10-25 (section 2.5). The other cells are for T04.
+| Scenario | Start | Segments | Fittings | Length mm | Bends 90 / 45 | Wall crossings | Off-graph rooms | No-entry rooms | Ports left | Score | Median ms | Max ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| First floor A | 0 (room-0) | 109 | 76 | 151 366 | 35 / 10 | 26 | 28 | 15 | 0 | 263 044 | 69 | 98 |
+| First floor A | 1 (room-31) | 97 | 64 | 150 978 | 31 / 2 | 26 | 30 | 15 | 0 | 261 550 | 42 | 44 |
+| First floor A | 2 (room-32) | 98 | 65 | 153 079 | 30 / 4 | 28 | 30 | 15 | 0 | 259 342 | 44 | 52 |
+| First floor B | 0 (room-0) | 309 | 184 | 269 867 | 60 / 10 | 31 | 28 | 15 | 1 | 430 531 | 1 994 | 3 833 |
+| First floor B | 1 (room-31) | 298 | 173 | 271 968 | 58 / 2 | 28 | 30 | 15 | 1 | 437 627 | 2 175 | 3 707 |
+| First floor B | 2 (room-32) | 293 | 168 | 264 828 | 51 / 4 | 39 | 30 | 15 | 1 | 420 412 | 1 637 | 2 107 |
+| Ground floor w_rooms A (local-only) | 0 (room-34) | 141 | 98 | 207 563 | 47 / 10 | 33 | 33 | 33 | 0 | 342 577 | 105 | 109 |
+| Ground floor w_rooms B (local-only) | 0 (room-34) | 436 | 264 | 387 830 | 93 / 10 | 53 | 33 | 33 | 0 | 605 612 | 8 449 | 10 508 |
+| 10A A (local-only) | 0 (room-18) | 95 | 68 | 210 331 | 27 / 16 | 18 | 19 | 13 | 0 | 305 976 | 41 | 51 |
+| 10A A (local-only) | 1 (room-31) | 70 | 43 | 178 304 | 17 / 0 | 16 | 26 | 13 | 0 | 273 035 | 26 | 28 |
+| 10A B (local-only) | 0 (room-18) | 265 | 160 | 333 449 | 45 / 16 | 22 | 19 | 13 | 0 | 478 449 | 1 074 | 1 081 |
+| 10A B (local-only) | 1 (room-31) | 262 | 157 | 312 354 | 55 / 0 | 28 | 26 | 13 | 0 | 469 471 | 941 | 1 019 |
+
+Notes:
+- The ground floor w_rooms and 10A rows are local-only numbers. Their PDFs and fixtures are not in git (`rules.md` section 2). The test prints "SKIP" when the fixtures are missing.
+- The ground floor w_rooms has only one corridor room, so only start 0 exists. 10A has two corridor rooms, so start 2 does not exist. The test skips these starts.
+- The first floor start 0 agrees with section 2.5 (109, 76, 151 366, 35 / 10, 26, 28).
+- Answer to the question of section 2.3: the off-graph count depends on the start. On the first floor it is 28 for start 0 and 30 for starts 1 and 2. On 10A it is 19 for start 0 and 26 for start 1. The no-entry count (15 on the first floor, 13 on 10A) does not depend on the start. On the ground floor w_rooms all 33 rooms are off-graph and all 33 have no entry.
+- Runtime against limit T1 (300 ms): scenario A is below the limit in all rows (26 ms to 105 ms). Scenario B is far above it: 941 ms to 2 175 ms on the first floor and 10A, and 8 449 ms on the ground floor w_rooms. Limit T1 can hold for scenario A only. The decision gate must decide this. The machine was shared with other work, so the times vary.
+- Scenario B leaves 1 port unreached on the first floor (`Ports left` = 1).
+- These times come from the full mode (2 warm-up runs and 7 runs, `MEPAPP_QUALITY_FULL=1`). The default mode of the test uses 1 warm-up run and 3 runs, to save time. The test file still takes about 5 minutes in the default mode. The two child processes of D3 (about 2 minutes) and the shuffled plans built at collection time use most of that time. A later task can move the D3 probe to its own small test file.
+
+### Determinism (T04)
+
+| Check | Result |
+|---|---|
+| D1. Two runs in one process: `toEqual` of the full plan, ids included | Pass on all drawings, A and B. |
+| D2 (counts). Shuffled input order (seeds 1 and 2): same counts of segments, fittings, bends and wall crossings, same off-graph count, same warning codes, length within 0.1 % | Pass on all drawings, A and B. |
+| D2 (geometry). Shuffled input order (seeds 1 and 2): same geometry, same endpoints, same sizes | **Fails in 4 cases**: first floor A seed 1, first floor B seed 1, first floor B seed 2, 10A B seed 2 (local-only). Passes in all other cases. |
+| D3. Two Node processes: same hash of the plan JSON | Pass (first floor A and B). |
+
+Defect found: the plan depends on the input order of the rooms, stamps and ports. On the first floor A and B (seed 1) the first difference is a shift of 0.108 pt in one path point (sorted segment 70 in A). On first floor B seed 2 a non-geometry field of sorted segment 56 differs. On 10A B seed 2 the planner picks another terminal port of the same room (`term-room-30-0` against `term-room-30-2`) with equal geometry. The counts stay equal. The tests for these 4 cases are marked `it.fails` (list `KNOWN_D2_DEFECTS` in `route-quality.test.ts`), so each turns red when somebody fixes its defect. T04 does not change product code. The director decides if a task must remove this order dependence before the prototypes are compared. The cause is not found (not verified).
 
 ### Prototype results (T07 to T13)
 
