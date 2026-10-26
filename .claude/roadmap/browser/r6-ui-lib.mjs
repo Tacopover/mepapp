@@ -9,8 +9,7 @@ export function helpers(t) {
   const tid = (id) => page.locator(`${R} [data-testid="${id}"]`);
 
   const openDialog = async () => {
-    await page.locator('button.mep-menu-btn').click();
-    await page.locator('button.mep-menu-item', { hasText: /^\s*Route network…\s*$/ }).click();
+    await t.openRoute();
     await page.locator(R).waitFor({ state: 'visible', timeout: 5000 });
     await idle(600);
   };

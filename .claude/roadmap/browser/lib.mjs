@@ -80,6 +80,28 @@ export async function open({ width = 1600, height = 1000, seed = {}, dark = fals
     await menu('Auto-place stamps…');
     await idle(800);
   }
+  /** Clicks a locator. At a narrow viewport the dock covers the rail, so the click event goes straight to the element. */
+  async function railClick(locator) {
+    if ((page.viewportSize()?.width ?? 1600) < 600) await locator.dispatchEvent('click');
+    else await locator.click({ timeout: 180000 });
+  }
+  /** Clicks the "Routing" row of the rail, then one action of its list (route, size, route-area). */
+  async function railAction(action) {
+    await railClick(page.locator('[data-testid="rail-routing"]'));
+    await railClick(page.locator(`[data-testid="rail-action-${action}"]`));
+  }
+  async function openRoute() { await railAction('route'); }
+  async function openSize() { await railAction('size'); }
+  /** Clicks the route area action once (it is a toggle). */
+  async function toggleRouteArea() { await railAction('route-area'); }
+  /** Sets the route area switch to `on`. Reads aria-pressed of the action button first. */
+  async function setRouteArea(on) {
+    await railClick(page.locator('[data-testid="rail-routing"]'));
+    const button = page.locator('[data-testid="rail-action-route-area"]');
+    const pressed = (await button.getAttribute('aria-pressed')) === 'true';
+    if (pressed !== on) await railClick(button);
+    else await railClick(page.locator('[data-testid="rail-routing"]'));
+  }
   async function detect(scale = '50') {
     await page.locator(`${D} select.mep-scale-select`).selectOption(scale);
     await idle(400);
@@ -102,5 +124,5 @@ export async function open({ width = 1600, height = 1000, seed = {}, dark = fals
     await browser.close();
   }
   const nav = `${D} nav[data-testid=ap-nav]`;
-  return { browser, context, page, errors, check, menu, until, idle, start, openPdf, openAutoPlace, detect, shot, finish, statusText, nav };
+  return { browser, context, page, errors, check, menu, until, idle, start, openPdf, openAutoPlace, openRoute, openSize, toggleRouteArea, setRouteArea, railAction, detect, shot, finish, statusText, nav };
 }

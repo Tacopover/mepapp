@@ -32,7 +32,7 @@ async function run1() {
   };
   const entries = () => S(() => window.__mepSketchScene.exportProject().networkSizing);
   const openDialog = async () => {
-    await t.menu('Size network…');
+    await t.openSize();
     await page.locator(Z).waitFor({ timeout: 20000 });
     await idle(500);
   };

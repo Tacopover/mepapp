@@ -57,10 +57,8 @@ const helpers = (t) => {
   const stored = () => page.evaluate((k) => localStorage.getItem(k), KEY);
   const chipIds = async () => (await tid('route-area-type').evaluateAll((els) => els.map((e) => e.getAttribute('data-type-id')))).sort();
   const firstInt = (s) => Number((s.match(/\d+/) ?? ['-1'])[0]);
-  const menuItem = (re) => page.locator('button.mep-menu-item', { hasText: re });
   const openDialog = async () => {
-    await page.locator('button.mep-menu-btn').click();
-    await menuItem(/^\s*Route network…\s*$/).click();
+    await t.openRoute();
     await page.locator(R).waitFor({ state: 'visible', timeout: 5000 });
     await idle(600);
   };
@@ -70,7 +68,7 @@ const helpers = (t) => {
       return s.listRooms().filter((r) => r.pageIndex === s.getPageIndex() && types.includes(r.roomTypeId)).length;
     }, types);
   const lineText = async (code) => ((await tid(`route-area-line-${code}`).count()) > 0 ? (await tid(`route-area-line-${code}`).first().innerText()).trim() : null);
-  return { tid, view, flag, stored, chipIds, firstInt, menuItem, openDialog, countOf, lineText };
+  return { tid, view, flag, stored, chipIds, firstInt, openDialog, countOf, lineText };
 };
 
 // ---------------------------------------------------------------- Run 1
@@ -152,8 +150,7 @@ const helpers = (t) => {
   check((await countIn(page, CANVAS_CLIP, isPurple)) === 0, 'no purple pixel before the switch');
 
   // Step 3: the menu switch with real clicks
-  await page.locator('button.mep-menu-btn').click();
-  await h.menuItem(/^\s*Show route area\s*$/).click();
+  await t.toggleRouteArea();
   await idle(900);
   check(await h.flag(), 'menu switch: the flag is true after the click');
   const purpleOn = await colorPixelsIn(page, q, isPurple);
@@ -161,8 +158,7 @@ const helpers = (t) => {
   const tealAll = await countIn(page, CANVAS_CLIP, isTeal);
   check(tealAll > 0, 'menu switch: teal route-area fill shows', String(tealAll));
   await t.shot('T20-area-first-floor');
-  await page.locator('button.mep-menu-btn').click();
-  await h.menuItem(/^\s*Hide route area\s*$/).click();
+  await t.toggleRouteArea();
   await idle(700);
   check(!(await h.flag()) && (await countIn(page, CANVAS_CLIP, isPurple)) === 0, 'menu switch: the second click hides the overlay');
 
@@ -356,8 +352,7 @@ if (!existsSync(PDF10A)) {
   if (pathN < 1) finding(`10A: no path room found (expected at least 1; the probe found "gang"). Found ${area.rooms.length} route-area rooms.`);
   if (shaftN < 1) finding('10A: no shaft room found (expected at least 1; the probe found 3 "schacht").');
   if (pathN >= 1 && shaftN >= 1) console.log(`10A: path rooms ${pathN}, shaft rooms ${shaftN} (the probe expectation holds)`);
-  await page.locator('button.mep-menu-btn').click();
-  await h.menuItem(/^\s*Show route area\s*$/).click();
+  await t.toggleRouteArea();
   await idle(1500);
   check(await h.flag(), '10A: the menu switch sets the flag');
   const px = (await countIn(page, { x: 0, y: 60, width: 1600, height: 900 }, isPurple)) + (await countIn(page, { x: 0, y: 60, width: 1600, height: 900 }, isTeal));

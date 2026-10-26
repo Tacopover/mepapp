@@ -42,7 +42,7 @@ await page.keyboard.press('Escape');
 await idle(600);
 
 // ---------- Route dialog ----------
-await t.menu('Route network…');
+await t.openRoute();
 await idle(800);
 const R = '.mep-modal--route';
 body = await text(R);
@@ -53,7 +53,7 @@ await page.keyboard.press('Escape');
 await idle(500);
 
 // ---------- Size dialog ----------
-await t.menu('Size network…');
+await t.openSize();
 await idle(800);
 body = await text(R);
 check(!DUTCH.test(body), 'Size dialog has no Dutch word', (body.match(DUTCH) ?? [])[0]);

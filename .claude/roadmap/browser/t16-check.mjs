@@ -1,4 +1,4 @@
-// T16: the menu switch "Show route area" / "Hide route area", driven through real clicks on the menu.
+// T16: the rail switch "Show route area" / "Hide route area", driven through real clicks on the rail flyout.
 // Run: node .claude/roadmap/browser/with-server.mjs .claude/roadmap/browser/t16-check.mjs
 import { open, setupRooms, screenOf, clipPixels, colorPixelsIn, isPurple, baseline, sameAsBaseline } from './r4-lib.mjs';
 
@@ -27,24 +27,27 @@ let worst = 0;
   const node = visible.find((n) => n.kind === 'junction') ?? visible[0];
   const q = await screenOf(page, node.point);
 
-  const showItem = page.locator('button.mep-menu-item', { hasText: /^\s*Show route area\s*$/ });
-  const hideItem = page.locator('button.mep-menu-item', { hasText: /^\s*Hide route area\s*$/ });
-  const routeItem = page.locator('button.mep-menu-item', { hasText: /^\s*Route network…\s*$/ });
+  const routingBtn = page.locator('[data-testid="rail-routing"]');
+  const showBtn = page.locator('[data-testid="rail-action-route-area"]');
+  const routeBtn = page.locator('[data-testid="rail-action-route"]');
   check(!(await page.evaluate(() => window.__mepSketchScene.isRouteAreaVisible())), 'flag is false at first');
   const off = await clipPixels(page, q);
   const purpleOff = await colorPixelsIn(page, q, isPurple);
   check(purpleOff === 0, 'no purple pixel before the switch', String(purpleOff));
 
-  await page.locator('button.mep-menu-btn').click();
-  check((await showItem.count()) === 1, 'the menu item reads "Show route area"');
-  check(await showItem.isEnabled(), 'the item is enabled with a PDF');
-  const order = await page.locator('button.mep-menu-item').allInnerTexts();
-  const iRoute = order.findIndex((x) => /^\s*Route network…\s*$/.test(x));
-  const iShow = order.findIndex((x) => /^\s*Show route area\s*$/.test(x));
-  check(iRoute >= 0 && iShow === iRoute + 1, 'the item sits directly after "Route network…"', JSON.stringify(order));
-  check((await routeItem.count()) === 1, 'Route network… still there');
+  await routingBtn.click();
+  check((await showBtn.count()) === 1 && (await showBtn.getAttribute('aria-label')) === 'Show route area', 'the rail action reads "Show route area"');
+  check(await showBtn.isEnabled(), 'the action is enabled with a PDF');
+  const flyoutIds = [];
+  for (const el of await page.locator('.mep-rail-flyout [data-testid^="rail-action-"]').all()) flyoutIds.push(await el.getAttribute('data-testid'));
+  check(
+    JSON.stringify(flyoutIds) === JSON.stringify(['rail-action-route', 'rail-action-size', 'rail-action-route-area']),
+    'the flyout holds route, size and route-area in this order',
+    JSON.stringify(flyoutIds),
+  );
+  check((await routeBtn.count()) === 1, 'Route action still there');
   await t.shot('T16-menu');
-  await showItem.click();
+  await showBtn.click();
   await idle(600);
   check(await page.evaluate(() => window.__mepSketchScene.isRouteAreaVisible()), 'scene flag is true after the click');
   const purpleOn = await colorPixelsIn(page, q, isPurple);
@@ -52,19 +55,19 @@ let worst = 0;
   check(purpleOn > 0, 'purple pixels appear around a center node', String(purpleOn));
   check(JSON.stringify(on) !== JSON.stringify(off), 'the pixel buffer changed');
   await t.shot('T16-route-area-shown');
-  await page.locator('button.mep-menu-btn').click();
-  check((await hideItem.count()) === 1 && (await showItem.count()) === 0, 'the item now reads "Hide route area"');
-  await hideItem.click();
+  await routingBtn.click();
+  check((await showBtn.getAttribute('aria-label')) === 'Hide route area' && (await showBtn.getAttribute('aria-pressed')) === 'true', 'the rail action now reads "Hide route area" and is pressed');
+  await showBtn.click();
   await idle(600);
   check(!(await page.evaluate(() => window.__mepSketchScene.isRouteAreaVisible())), 'scene flag is false after the second click');
   check(JSON.stringify(await clipPixels(page, q)) === JSON.stringify(off), 'the buffer is the first buffer again');
   check(await sameAsBaseline(page, base), 'project JSON, canUndo and isDirty are unchanged');
-  // the scene API changes the flag: the menu text follows
+  // the scene API changes the flag: the rail label follows
   await page.evaluate(() => window.__mepSketchScene.setRouteAreaVisible(true));
   await idle(300);
-  await page.locator('button.mep-menu-btn').click();
-  check((await hideItem.count()) === 1, 'the menu text follows a scene flag change');
-  await page.keyboard.press('Escape');
+  await routingBtn.click();
+  check((await showBtn.getAttribute('aria-label')) === 'Hide route area', 'the rail label follows a scene flag change');
+  await routingBtn.click();
   await t.finish();
   worst = Math.max(worst, process.exitCode ?? 0);
 }
@@ -74,10 +77,11 @@ let worst = 0;
   const t = await open();
   const { page, check } = t;
   await t.start();
-  await page.locator('button.mep-menu-btn').click();
-  const item = page.locator('button.mep-menu-item', { hasText: /^\s*Show route area\s*$/ });
-  check((await item.count()) === 1, 'no PDF: the item exists');
-  check(await item.isDisabled(), 'no PDF: the item is disabled');
+  const routingBtn = page.locator('[data-testid="rail-routing"]');
+  const item = page.locator('[data-testid="rail-action-route-area"]');
+  await routingBtn.click();
+  check((await item.count()) === 1, 'no PDF: the action exists');
+  check(await item.isDisabled(), 'no PDF: the action is disabled');
   await t.finish();
   worst = Math.max(worst, process.exitCode ?? 0);
 }

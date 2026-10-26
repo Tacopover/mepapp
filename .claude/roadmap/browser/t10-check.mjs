@@ -59,7 +59,7 @@ function helpers(t) {
   const select = (id) => page.evaluate((id) => window.__mepSketchScene.selectStampById(id), id);
   const project = () => page.evaluate(() => JSON.stringify(window.__mepSketchScene.exportProject()));
   const openRoute = async () => {
-    await t.menu('Route network…');
+    await t.openRoute();
     await page.locator(R).waitFor({ timeout: 20000 });
     await idle(500);
   };

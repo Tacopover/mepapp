@@ -41,7 +41,7 @@ const screenOf = (p) =>
     return { x: r.left + g.x, y: r.top + g.y };
   }, p);
 const openRoute = async () => {
-  await t.menu('Route network…');
+  await t.openRoute();
   await page.locator(R).waitFor({ timeout: 20000 });
   await idle(500);
 };
@@ -423,7 +423,7 @@ for (const name of ALL_PDFS) {
     if (n > 1 && counts.filter((c) => c.n > 1).length === 1) {
       t = tp;
       ({ page, check, idle } = tp);
-      await tp.menu('Route network…');
+      await tp.openRoute();
       await page.locator(R).waitFor({ timeout: 20000 });
       const text = await page.locator(`${R} [data-testid=route-refusal]`).innerText();
       check(text.includes(String(n)), `real multi-page PDF ${name}: the dialog shows the refusal`, text);

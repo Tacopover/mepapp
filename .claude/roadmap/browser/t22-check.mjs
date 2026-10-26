@@ -21,7 +21,7 @@ await t.start();
 await t.openPdf();
 const b = await buildSizingProject(t, { type: 'air', sizingMethod: 'air' });
 await page.evaluate(() => window.__mepSketchScene.updateNetworkType('supply-air', { flowUnit: 'dm³/s' }));
-await t.menu('Size network…');
+await t.openSize();
 await page.locator(Z).waitFor({ timeout: 20000 });
 await idle(500);
 

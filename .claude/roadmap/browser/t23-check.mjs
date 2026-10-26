@@ -17,7 +17,7 @@ await t.start();
 await t.openPdf();
 
 async function openEditor() {
-  await t.menu('Size network…');
+  await t.openSize();
   await page.locator(Z).waitFor({ timeout: 20000 });
   await idle(500);
   await q('size-edit-type').click();

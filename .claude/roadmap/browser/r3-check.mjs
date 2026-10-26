@@ -72,7 +72,7 @@ function helpers(t) {
   const canUndo = () => page.evaluate(() => window.__mepSketchScene.getDrawingSummary().canUndo);
   const lsKeys = () => page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort()));
   const openRoute = async () => {
-    await t.menu('Route network…');
+    await t.openRoute();
     await page.locator(R).waitFor({ timeout: 20000 });
     await idle(500);
   };

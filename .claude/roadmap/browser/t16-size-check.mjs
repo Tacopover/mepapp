@@ -27,17 +27,15 @@ const scene = (fn, arg) => page.evaluate(fn, arg);
 async function main() {
   await t.start();
 
-  // 1: item disabled before a PDF is open
-  await page.locator('button.mep-menu-btn').click();
-  const disabledBefore = await page.locator('button.mep-menu-item', { hasText: /^\s*Size network…\s*$/ }).isDisabled();
-  check(disabledBefore, 'step 1: menu item "Size network…" is disabled before a PDF is open');
-  await page.keyboard.press('Escape');
-  await page.locator('button.mep-menu-btn').click().catch(() => {});
-  await page.keyboard.press('Escape');
+  // 1: rail action disabled before a PDF is open
+  await page.locator('[data-testid="rail-routing"]').click();
+  const disabledBefore = await page.locator('[data-testid="rail-action-size"]').isDisabled();
+  check(disabledBefore, 'step 1: rail action "Size network…" is disabled before a PDF is open');
+  await page.locator('[data-testid="rail-routing"]').click();
   await t.openPdf(PDF);
 
   const openDialog = async () => {
-    await t.menu('Size network…');
+    await t.openSize();
     await page.locator(Z).waitFor({ timeout: 20000 });
     await idle(500);
   };
@@ -52,15 +50,11 @@ async function main() {
 
   // ---- air case, type has no sizing ----
   const built = await buildSizingProject(t, { type: 'air', capacities: [100, 150, 50, 100] });
-  await page.locator('button.mep-menu-btn').click();
-  check(!(await page.locator('button.mep-menu-item', { hasText: /^\s*Size network…\s*$/ }).isDisabled()), 'step 2: menu item is enabled after the PDF opens');
+  await page.locator('[data-testid="rail-routing"]').click();
+  check(!(await page.locator('[data-testid="rail-action-size"]').isDisabled()), 'step 2: rail action is enabled after the PDF opens');
   await shot('T16-menu');
-  await page.keyboard.press('Escape');
+  await page.locator('[data-testid="rail-routing"]').click();
   await idle(300);
-  if ((await page.locator('button.mep-menu-item').count()) > 0) {
-    await page.locator('button.mep-menu-btn').click();
-    await idle(300);
-  }
 
   const base0 = await baseline(page);
   await openDialog();

@@ -11,8 +11,7 @@ const isSupply = (r, g, b) => b > 200 && g > 120 && g < 180 && r < 80;
 const SUGGESTED_AIR = { method: 'air', maxVelocityMs: 5, maxPressureDropPaPerM: 1.0, shape: 'round', maxAspectRatio: 4, series: 'standard' };
 
 const openDialog = async () => {
-  await page.locator('button.mep-menu-btn').click();
-  await page.locator('button.mep-menu-item', { hasText: /^\s*Route network…\s*$/ }).click();
+  await t.openRoute();
   await page.locator(R).waitFor({ state: 'visible', timeout: 5000 });
   await idle(600);
 };
