@@ -7,7 +7,7 @@ import { getNetworkTypeFromLibrary } from './network-type-library.js';
 import { getStampWorldPorts } from './stamp.js';
 import { buildTrunk } from './route-trunk.js';
 import { planBranches, type BranchRoomInput } from './route-branch.js';
-import { elbowPath, insideRouteArea } from './route-layout.js';
+import { DEFAULT_LAYOUT_OPTIONS, elbowPath, insideRouteArea, type RouteLayoutOptions } from './route-layout.js';
 import { buildRouteItems, connectLoosePorts, type TopologyPort } from './route-topology.js';
 import { checkRouteStart } from './route-start.js';
 import { canJoinPoint, checkExisting, checkInvariant, distanceToPiece, makeCrossesExisting, NEAR_ITEM_MM } from './route-checks.js';
@@ -190,7 +190,10 @@ function routedHeldByHand(input: RouteBuildInput): number {
   return network.segmentIds.filter((id) => !removed.has(id) && byId.get(id)?.routedBy === ROUTED_MARK).length;
 }
 
-export function planRoute(input: RouteBuildInput): { status: 'ok' | 'refused'; plan: PlannedRoute } {
+export function planRoute(
+  input: RouteBuildInput,
+  options: RouteLayoutOptions = DEFAULT_LAYOUT_OPTIONS,
+): { status: 'ok' | 'refused'; plan: PlannedRoute } {
   const warnings: RoutePlanWarning[] = [];
   const errors: RoutePlanWarning[] = [];
   const reduced = reducedState(input.state, input.removal);

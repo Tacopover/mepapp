@@ -6,7 +6,8 @@ import type { RoutePort, RouteStamp } from './route-ports.js';
 import type { RouteArea, RouteAreaRoom, RouteEdge, RouteEntry, RouteNode } from './route-area.js';
 import { distance, type Vec2 } from './geometry.js';
 import { nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
-import { legClass } from './route-layout.js';
+import { DEFAULT_LAYOUT_OPTIONS, legClass, SMALL_JUMP_MM } from './route-layout.js';
+import { BEND_PENALTY_MM, CROSSING_PENALTY_MM } from './route-hanan.js';
 import type { Room } from './rooms/room.js';
 import { sizeNetwork } from './sizing-network.js';
 import { SUGGESTED_AIR_SIZING } from './sizing-settings.js';
@@ -711,5 +712,27 @@ describe('planRoute order of the lines', () => {
     const before = structuredClone(plain);
     planRoute(data);
     expect(plain).toEqual(before);
+  });
+});
+
+describe('planRoute layout options', () => {
+  it('gives the same plan with no options, the default options and an empty object', () => {
+    const plain = planRoute(corridorScene());
+    expect(planRoute(corridorScene(), DEFAULT_LAYOUT_OPTIONS)).toEqual(plain);
+    expect(planRoute(corridorScene(), {})).toEqual(plain);
+  });
+
+  it('does not change its input when options are given', () => {
+    const value = corridorScene();
+    const { newSegmentId, newFittingId, ...data } = value;
+    const before = { ...structuredClone(data), newSegmentId, newFittingId };
+    planRoute(value, DEFAULT_LAYOUT_OPTIONS);
+    expect(value).toEqual(before);
+  });
+
+  it('defaults to the penalties and the small jump of the module constants', () => {
+    expect(DEFAULT_LAYOUT_OPTIONS.bendPenaltyMm).toBe(BEND_PENALTY_MM);
+    expect(DEFAULT_LAYOUT_OPTIONS.crossingPenaltyMm).toBe(CROSSING_PENALTY_MM);
+    expect(DEFAULT_LAYOUT_OPTIONS.jogSmallJumpMm).toBe(SMALL_JUMP_MM);
   });
 });

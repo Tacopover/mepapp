@@ -2,9 +2,32 @@ import type { Vec2 } from './geometry.js';
 import { resolveAngleSnap } from './angle-snap.js';
 import { polygonContainsPoint, type Room } from './rooms/room.js';
 import { distanceToRing } from './route-wall.js';
+import { BEND_PENALTY_MM, CROSSING_PENALTY_MM } from './route-hanan.js';
 
 export const ROUTE_ANGLE_INCREMENT_DEGREES = 45;
 export const SMALL_JUMP_MM = 1000;
+export interface RouteLayoutOptions {
+  /** Cost of one turn in the room search, mm. Default BEND_PENALTY_MM. */
+  bendPenaltyMm?: number;
+  /** Cost of one crossing of an existing foreign segment in the room search, mm. Default CROSSING_PENALTY_MM. */
+  crossingPenaltyMm?: number;
+  /** Largest jump that uses a pair of 45 degree bends, mm. Default SMALL_JUMP_MM. 0 = no 45 degree jumps. */
+  jogSmallJumpMm?: number;
+  /** true = no 45 degree leg at all. Default false. */
+  orthogonalOnly?: boolean;
+  /** Which entry of a room the trunk tries first. Default 'primary-longest'. */
+  entryRule?: 'primary-longest' | 'shortest-branch';
+  /** Which axis an off-graph link tries first. Default 'longer'. */
+  offGraphAxis?: 'longer' | 'perpendicular-first';
+}
+export const DEFAULT_LAYOUT_OPTIONS: Readonly<Required<RouteLayoutOptions>> = {
+  bendPenaltyMm: BEND_PENALTY_MM,
+  crossingPenaltyMm: CROSSING_PENALTY_MM,
+  jogSmallJumpMm: SMALL_JUMP_MM,
+  orthogonalOnly: false,
+  entryRule: 'primary-longest',
+  offGraphAxis: 'longer',
+};
 export const MIN_LEG_MM = 300;
 export const MIN_JOG_MM = 150;
 export const MAX_DRIFT_MM = 300;
