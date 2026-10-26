@@ -1630,10 +1630,9 @@ export function MepSketchApp({
           rules={placementRules}
           roomTypes={roomTypes}
           roomNeeds={roomNeeds}
-          language={labelLanguage}
           stampName={(id) => {
             const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
-            return definition ? stampLabelFor(definition, labelLanguage) : null;
+            return definition ? stampLabelFor(definition, 'en') : null;
           }}
           stampDefinition={findStampDefinition}
           stampScale={stampScaleOf}
@@ -1677,7 +1676,7 @@ export function MepSketchApp({
           roomTypes={roomTypes}
           stampName={(id) => {
             const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
-            return definition ? stampLabelFor(definition, labelLanguage) : null;
+            return definition ? stampLabelFor(definition, 'en') : null;
           }}
           onRouteTypeIdsChange={setRouteRoomTypeIds}
           onClose={() => setRouteOpen(false)}
@@ -1689,7 +1688,7 @@ export function MepSketchApp({
           sceneRef={sceneRef}
           stampName={(id) => {
             const definition = getStampDefinition(id, [...customStampDefinitions, ...userStampLibrary.definitions]);
-            return definition ? stampLabelFor(definition, labelLanguage) : null;
+            return definition ? stampLabelFor(definition, 'en') : null;
           }}
           onEditNetworkType={(id) => {
             const type = sceneRef.current?.getNetworkTypes().find((t) => t.id === id) ?? getNetworkTypeFromLibrary(id);

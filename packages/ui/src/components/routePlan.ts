@@ -300,7 +300,7 @@ export function routeAreaSummaryLine(area: RouteArea): string {
 }
 
 /**
- * One item per library type in the library order: { id: type.id, label: roomTypeLabel(type, 'en'), inList: ids.includes(type.id) }.
+ * One item per library type in the library order: { id: type.id, label: roomTypeLabel(type), inList: ids.includes(type.id) }.
  * Then one item per id in `ids` that matches no library type, in the order of `ids` with doubles removed: { id, label: id, inList: true }.
  */
 export function routeAreaTypeChoices(
@@ -308,7 +308,7 @@ export function routeAreaTypeChoices(
   ids: readonly string[],
 ): { id: string; label: string; inList: boolean }[] {
   const libraryIds = new Set(roomTypes.map((type) => type.id));
-  const libraryChoices = roomTypes.map((type) => ({ id: type.id, label: roomTypeLabel(type, 'en'), inList: ids.includes(type.id) }));
+  const libraryChoices = roomTypes.map((type) => ({ id: type.id, label: roomTypeLabel(type), inList: ids.includes(type.id) }));
   const unknownChoices = [...new Set(ids)].filter((id) => !libraryIds.has(id)).map((id) => ({ id, label: id, inList: true }));
   return [...libraryChoices, ...unknownChoices];
 }

@@ -36,7 +36,6 @@ export interface AutoPlaceDialogProps {
   roomTypes: RoomType[];
   /** The own needs of the user library (room-type-calculations.md §3.1). */
   roomNeeds: RoomNeed[];
-  language: 'en' | 'nl';
   /** The name of a stamp definition, or null when the id is unknown. */
   stampName: (definitionId: string) => string | null;
   /** A stamp definition by id, for its size; undefined when it is not found. */
@@ -160,7 +159,6 @@ export function AutoPlaceDialog({
   rules,
   roomTypes,
   roomNeeds,
-  language,
   stampName,
   stampDefinition,
   stampScale,
@@ -230,7 +228,7 @@ export function AutoPlaceDialog({
   const valuesOf = useCallback((room: Room) => valuesById.get(room.id) ?? scene!.getRoomValues(room), [valuesById, scene]);
   const typeName = (id: string | undefined) => {
     const type = id === undefined ? undefined : types.find((t) => t.id === id);
-    return type ? roomTypeLabel(type, language) : (id ?? '–');
+    return type ? roomTypeLabel(type) : (id ?? '–');
   };
 
   const [item, setItem] = useState<Item>(() => ({ kind: calibration && pageRooms.length > 0 ? 'place' : 'drawing' }));
@@ -730,7 +728,6 @@ export function AutoPlaceDialog({
           sceneRef={sceneRef}
           pageRooms={pageRooms}
           types={types}
-          language={language}
           library={roomTypes}
           fileOnlyTypes={fileOnlyTypes}
           needs={roomNeeds}
@@ -755,7 +752,6 @@ export function AutoPlaceDialog({
         heights={heights}
         pageRooms={pageRooms}
         types={types}
-        language={language}
         volumeRules={volumeRules}
         pickedId={pickedId}
         onPick={setPickedId}
@@ -1021,7 +1017,6 @@ export function AutoPlaceDialog({
             others={rules.filter((r) => r.id !== openRule.id)}
             roomTypes={roomTypes}
             needs={needs}
-            language={language}
             sceneRef={sceneRef}
             stampName={stampName}
             stampDefinition={stampDefinition}
@@ -1118,7 +1113,7 @@ export function AutoPlaceDialog({
                   {item.kind === 'types' &&
                     pageTypes.slice(0, TYPE_FILLS.length).map((t) => (
                       <span key={t.id} style={{ ['--sw' as string]: typeFill({ roomTypeId: t.id } as Room)! }}>
-                        {roomTypeLabel(t, language)}
+                        {roomTypeLabel(t)}
                       </span>
                     ))}
                   {item.kind === 'heights' &&

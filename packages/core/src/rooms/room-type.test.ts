@@ -11,6 +11,7 @@ import {
   ROOM_TYPE_DEMAND_EXAMPLES,
   ROOM_TYPE_LIBRARY,
   roomTextWords,
+  roomTypeLabel,
   validateRoomTypeFields,
   type RoomDemand,
   type RoomType,
@@ -261,5 +262,15 @@ describe('oldDemandFieldTerm', () => {
     expect(oldDemandFieldTerm('socketsFixed')).toEqual({ needId: 'sockets', basis: 'room' });
     expect(oldDemandFieldTerm('workingPlaneHeightM')).toBeUndefined();
     expect(oldDemandFieldTerm('toString')).toBeUndefined();
+  });
+});
+
+describe('roomTypeLabel', () => {
+  it('returns the English name for a type without a Dutch name', () => {
+    expect(roomTypeLabel({ id: 'lab', name: 'Lab', keywords: [] })).toBe('Lab');
+  });
+
+  it('returns the English name also for a type with a Dutch name', () => {
+    expect(roomTypeLabel({ id: 'lab', name: 'Lab', nameNl: 'Laboratorium', keywords: [] })).toBe('Lab');
   });
 });

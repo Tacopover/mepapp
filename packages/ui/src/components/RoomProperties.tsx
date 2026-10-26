@@ -38,17 +38,16 @@ interface RoomTypeSelectProps {
   sceneRef: RefObject<SketchScene | null>;
   rooms: Room[];
   roomTypes: (RoomType & { inLibrary: boolean })[];
-  language: 'en' | 'nl';
 }
 
 /** Room type of one or more rooms. "By name" gives the rooms back to name matching; any other choice is kept when names change. */
-function RoomTypeSelect({ sceneRef, rooms, roomTypes, language }: RoomTypeSelectProps) {
+function RoomTypeSelect({ sceneRef, rooms, roomTypes }: RoomTypeSelectProps) {
   const choices = new Set(rooms.map(roomTypeChoice));
   const value = choices.size === 1 ? [...choices][0]! : MIXED;
   const nameOf = (id: string | undefined) => {
     if (id === undefined) return null;
     const type = roomTypes.find((t) => t.id === id);
-    return type ? roomTypeLabel(type, language) : id;
+    return type ? roomTypeLabel(type) : id;
   };
   const matched = rooms.length === 1 && rooms[0]!.roomTypeSource !== 'user' ? nameOf(rooms[0]!.roomTypeId) : null;
   const unknownIds = [...new Set(rooms.flatMap((r) => (r.roomTypeId && !roomTypes.some((t) => t.id === r.roomTypeId) ? [r.roomTypeId] : [])))];
@@ -72,7 +71,7 @@ function RoomTypeSelect({ sceneRef, rooms, roomTypes, language }: RoomTypeSelect
         <option value={NONE}>No type</option>
         {roomTypes.map((type) => (
           <option key={type.id} value={type.id}>
-            {roomTypeLabel(type, language)}
+            {roomTypeLabel(type)}
             {type.inLibrary ? '' : ' (this drawing only)'}
           </option>
         ))}
@@ -104,16 +103,15 @@ interface RoomValueFieldsProps {
   sceneRef: RefObject<SketchScene | null>;
   room: Room;
   roomTypes: (RoomType & { inLibrary: boolean })[];
-  language: 'en' | 'nl';
 }
 
 /** Perimeter, length × width, ceiling height with its level, volume and people of one room (room-auto-placement.md Phase 2). */
-function RoomValueFields({ sceneRef, room, roomTypes, language }: RoomValueFieldsProps) {
+function RoomValueFields({ sceneRef, room, roomTypes }: RoomValueFieldsProps) {
   const scene = sceneRef.current;
   if (!scene) return null;
   const values = scene.getRoomValues(room);
   const type = roomTypes.find((t) => t.id === room.roomTypeId);
-  const typeName = type ? roomTypeLabel(type, language) : (room.roomTypeId ?? null);
+  const typeName = type ? roomTypeLabel(type) : (room.roomTypeId ?? null);
   const inherited = resolveCeilingHeight({ ...(room.roomTypeId !== undefined ? { roomTypeId: room.roomTypeId } : {}) }, scene.getCeilingHeights());
   const inheritedPeople = roomPeople({}, values.areaM2, type);
   const set = (patch: Parameters<SketchScene['setRoomValues']>[1]) => scene.setRoomValues([room.id], patch);
@@ -222,11 +220,10 @@ export interface RoomPropertiesProps {
   customPropertyDefinitions: CustomPropertyDefinition[];
   /** Room types to choose from: the user library, then the types only the drawing's file holds. */
   roomTypes?: (RoomType & { inLibrary: boolean })[];
-  language?: 'en' | 'nl';
 }
 
 /** Properties of the rooms selected with the edit-room tool. */
-export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDefinitions, roomTypes = [], language = 'en' }: RoomPropertiesProps) {
+export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDefinitions, roomTypes = [] }: RoomPropertiesProps) {
   const remove = () => sceneRef.current?.deleteRooms(rooms.map((r) => r.id));
   if (rooms.length > 1) {
     const total = calibration ? rooms.reduce((sum, r) => sum + roomAreaM2(r, calibration), 0) : null;
@@ -240,7 +237,7 @@ export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDef
             <label>Total area</label>
             <input type="text" value={total !== null ? `${total.toFixed(1)} m²` : 'Not calibrated'} disabled />
           </div>
-          <RoomTypeSelect sceneRef={sceneRef} rooms={rooms} roomTypes={roomTypes} language={language} />
+          <RoomTypeSelect sceneRef={sceneRef} rooms={rooms} roomTypes={roomTypes} />
           <MultiRoomValueFields sceneRef={sceneRef} rooms={rooms} />
           {rooms.length === 2 && (
             <button type="button" onClick={() => sceneRef.current?.mergeSelectedRooms()}>
@@ -272,7 +269,7 @@ export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDef
           <label>Name</label>
           <CommitInput value={room.name ?? ''} onCommit={(v) => update({ name: v.trim() === '' ? null : v.trim() })} />
         </div>
-        <RoomTypeSelect sceneRef={sceneRef} rooms={rooms} roomTypes={roomTypes} language={language} />
+        <RoomTypeSelect sceneRef={sceneRef} rooms={rooms} roomTypes={roomTypes} />
         {room.roomTypeId === undefined && <p className="mep-settings-hint">This room has no type. Choose one, or add a keyword in Menu › Auto-place stamps › Room types.</p>}
         <div className="mep-field-row">
           <label>Area</label>
@@ -285,7 +282,7 @@ export function RoomProperties({ sceneRef, rooms, calibration, customPropertyDef
           </div>
         )}
         {warning && <p className="mep-settings-hint">The computed area differs {Math.round(warning.deviation * 100)}% from the area printed in the drawing. Check the outline.</p>}
-        <RoomValueFields sceneRef={sceneRef} room={room} roomTypes={roomTypes} language={language} />
+        <RoomValueFields sceneRef={sceneRef} room={room} roomTypes={roomTypes} />
         <div className="mep-field-row">
           <label>Needs review</label>
           <input type="checkbox" checked={room.open} onChange={(e) => update({ open: e.target.checked })} />

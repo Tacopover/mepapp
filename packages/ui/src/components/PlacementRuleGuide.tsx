@@ -56,7 +56,6 @@ export interface PlacementRuleGuideBodyProps {
   roomTypes: RoomType[];
   /** The built-in needs, the own needs and the own needs of the drawing's file. */
   needs: RoomNeed[];
-  language: 'en' | 'nl';
   sceneRef: RefObject<SketchScene | null>;
   stampName: (definitionId: string) => string | null;
   stampDefinition: (definitionId: string) => StampDefinition | undefined;
@@ -262,7 +261,6 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
     others,
     roomTypes,
     needs,
-    language,
     sceneRef,
     stampName,
     stampDefinition,
@@ -360,7 +358,7 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
   const types = useMemo(() => (scene ? scene.getRoomTypes() : roomTypes.map((t) => ({ ...t, inLibrary: true }))), [scene, roomTypes, version]);
   const typeName = (id: string | undefined) => {
     const type = id === undefined ? undefined : types.find((t) => t.id === id);
-    return type ? roomTypeLabel(type, language) : (id ?? 'No type');
+    return type ? roomTypeLabel(type) : (id ?? 'No type');
   };
 
   const definition = draft.stampDefinitionId ? stampDefinition(draft.stampDefinitionId) : undefined;
@@ -729,10 +727,10 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                   className={`mep-guide-chip${on ? ' on' : ''}${lacks ? ' lacks' : ''}`}
                   aria-pressed={on}
                   data-type={t.id}
-                  title={lacks ? `${roomTypeLabel(t, language)} has no ${need.name}` : undefined}
+                  title={lacks ? `${roomTypeLabel(t)} has no ${need.name}` : undefined}
                   onClick={() => update({ roomTypeIds: on ? draft.roomTypeIds.filter((id) => id !== t.id) : [...draft.roomTypeIds, t.id] })}
                 >
-                  {roomTypeLabel(t, language)}
+                  {roomTypeLabel(t)}
                   <span className="c">{countOf(t.id)}</span>
                 </button>
               );

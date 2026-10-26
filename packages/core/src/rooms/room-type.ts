@@ -370,7 +370,7 @@ export function parseRoomTypes(raw: unknown): RoomType[] | null {
   return types;
 }
 
-/** The name to show in the label language. */
-export function roomTypeLabel(type: RoomType, language: 'en' | 'nl' = 'en'): string {
-  return language === 'nl' && type.nameNl ? type.nameNl : type.name;
+/** The name to show in the UI. The Dutch name (nameNl) is kept as data only. */
+export function roomTypeLabel(type: RoomType): string {
+  return type.name;
 }

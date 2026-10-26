@@ -138,7 +138,7 @@ export function PropertiesPanel({
   roomTypes = [],
 }: PropertiesPanelProps) {
   if (selectedRooms.length > 0)
-    return <RoomProperties sceneRef={sceneRef} rooms={selectedRooms} calibration={calibration} customPropertyDefinitions={customPropertyDefs.room} roomTypes={roomTypes} language={labelLanguage} />;
+    return <RoomProperties sceneRef={sceneRef} rooms={selectedRooms} calibration={calibration} customPropertyDefinitions={customPropertyDefs.room} roomTypes={roomTypes} />;
   if (selectedCircuitId) {
     const circuit = circuits.find((c) => c.id === selectedCircuitId);
     if (circuit) {

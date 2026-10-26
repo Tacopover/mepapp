@@ -351,7 +351,7 @@ export function RouteDialog({ sceneRef, roomTypes, stampName, onRouteTypeIdsChan
                                   })}
                                 />
                                 <span className="mep-route-room-name">{roomLabel(room, index)}</span>
-                                <span className="mep-route-room-type">{type ? roomTypeLabel(type, 'en') : ''}</span>
+                                <span className="mep-route-room-type">{type ? roomTypeLabel(type) : ''}</span>
                                 <span className="mep-route-room-count">{result.perRoom.find((p) => p.roomId === room.id)?.count ?? 0}</span>
                               </label>
                             );

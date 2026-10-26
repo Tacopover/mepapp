@@ -88,7 +88,6 @@ export interface RoomTypesCardProps {
   pageRooms: readonly Room[];
   /** The room types of the drawing: the library and the copies in the drawing. */
   types: readonly RoomType[];
-  language: 'en' | 'nl';
   library: RoomType[];
   fileOnlyTypes: RoomType[];
   /** The own needs of the user library. */
@@ -109,7 +108,7 @@ export interface RoomTypesCardProps {
 }
 
 /** Room types: the type of each room of the page, and the room-type library with the needs of each type. */
-export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, fileOnlyTypes, needs, fileOnlyNeeds, onChangeLibrary, onChangeNeeds, onExportLibrary, onLibraryDirtyChange, pickedId, onPick, focus, onTabChange, footer }: RoomTypesCardProps) {
+export function RoomTypesCard({ sceneRef, pageRooms, types, library, fileOnlyTypes, needs, fileOnlyNeeds, onChangeLibrary, onChangeNeeds, onExportLibrary, onLibraryDirtyChange, pickedId, onPick, focus, onTabChange, footer }: RoomTypesCardProps) {
   const untyped = pageRooms.filter((r) => r.roomTypeId === undefined);
   const [tab, setTab] = useState<'rooms' | 'library'>(focus ? 'library' : 'rooms');
   useEffect(() => {
@@ -122,7 +121,7 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
   const scene = sceneRef.current;
   const typeName = (id: string | undefined) => {
     const type = id === undefined ? undefined : types.find((t) => t.id === id);
-    return type ? roomTypeLabel(type, language) : null;
+    return type ? roomTypeLabel(type) : null;
   };
   const list = filter === 'untyped' ? untyped : pageRooms;
   const matchAgain = () => {
@@ -207,7 +206,7 @@ export function RoomTypesCard({ sceneRef, pageRooms, types, language, library, f
                             <option value={NONE}>No type</option>
                             {types.map((t) => (
                               <option key={t.id} value={t.id}>
-                                {roomTypeLabel(t, language)}
+                                {roomTypeLabel(t)}
                               </option>
                             ))}
                           </select>
@@ -260,7 +259,6 @@ export interface CeilingHeightsCardProps {
   heights: (CeilingHeightContext & { roomTypeMm: Record<string, number> }) | null;
   pageRooms: readonly Room[];
   types: readonly RoomType[];
-  language: 'en' | 'nl';
   /** The number of checked rules that use the room volume. */
   volumeRules: number;
   pickedId: string | null;
@@ -269,7 +267,7 @@ export interface CeilingHeightsCardProps {
 }
 
 /** Ceiling heights: the four levels, each above the next. An empty box uses the level above it. */
-export function CeilingHeightsCard({ sceneRef, heights, pageRooms, types, language, volumeRules, pickedId, onPick, footer }: CeilingHeightsCardProps) {
+export function CeilingHeightsCard({ sceneRef, heights, pageRooms, types, volumeRules, pickedId, onPick, footer }: CeilingHeightsCardProps) {
   const [showAll, setShowAll] = useState(false);
   const scene = sceneRef.current;
   if (!heights) return null;
@@ -324,7 +322,7 @@ export function CeilingHeightsCard({ sceneRef, heights, pageRooms, types, langua
           {shownTypes.map((t) => (
             <div className="mep-autoplace-level-row" key={t.id}>
               <label htmlFor={`ap-h-type-${t.id}`}>
-                {roomTypeLabel(t, language)} <span className="mep-guide-note">{plural(counts.get(t.id) ?? 0, 'room')}</span>
+                {roomTypeLabel(t)} <span className="mep-guide-note">{plural(counts.get(t.id) ?? 0, 'room')}</span>
               </label>
               <OptionalNumberInput id={`ap-h-type-${t.id}`} value={heights.roomTypeMm[t.id]} placeholder={String(above3)} allow={allowHeight} onCommit={(mm) => scene?.setRoomTypeCeilingHeight(t.id, mm)} />
             </div>
