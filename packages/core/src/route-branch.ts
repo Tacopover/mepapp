@@ -1,5 +1,6 @@
 import type { Vec2 } from './geometry.js';
-import { roomSpine } from './route-hanan.js';
+import { exactRoomSpine, spineScore } from './route-exact.js';
+import { BEND_PENALTY_MM, roomSpine, type SpineInput, type SpineResult } from './route-hanan.js';
 import { applyJogRule, elbowPath, jogPath, legClass, MIN_LEG_MM, type LegClass, type RouteLayoutOptions } from './route-layout.js';
 
 export interface BranchTrunkEdge {
@@ -24,7 +25,9 @@ export interface BranchInput {
   rooms: readonly BranchRoomInput[];
   crossesExisting?: (a: Vec2, b: Vec2) => number;
   stepMm?: number;
-  /** Layout options, passed on by planRoute. This step reads no field yet. */
+  /** The region test of the route-area rooms in mm (tolerant at the wall). Off when absent. */
+  insideCorridor?: (p: Vec2) => boolean;
+  /** Layout options, passed on by planRoute. This step reads exactSpine. */
   options?: RouteLayoutOptions;
 }
 
@@ -62,6 +65,17 @@ interface PlacedTap {
 
 const EPS = 1e-9;
 const SAME_LINE_TOL = 1e-6;
+const SCORE_TOL = 1e-6;
+const REACH_EXTRA_MM = 2000;
+const REACH_MAX_EXTRA = 4;
+const REACH_SAMPLE_MM = 100;
+
+interface ReachCandidate {
+  tapMm: Vec2;
+  tapLeg: Leg | null;
+  s: number;
+  branch: Vec2[];
+}
 
 function nearestOnSegment(p: Vec2, a: Vec2, b: Vec2): { point: Vec2; distance: number } {
   const dx = b.x - a.x;
@@ -181,14 +195,148 @@ function lastDir(path: readonly Vec2[]): Vec2 | null {
   return null;
 }
 
+function nearestTapLeg(legs: readonly Leg[], e: Vec2): Leg {
+  const leg = nearestLeg(legs, e)!;
+  if (leg.cls !== 'diagonal') return leg;
+  const sameEdge = legs.filter((l) => l.edgeId === leg.edgeId && l.cls === 'axis');
+  return nearestLeg(sameEdge, e) ?? nearestLeg(legs.filter((l) => l.cls === 'axis'), e) ?? leg;
+}
+
+function reachCandidate(leg: Leg, e: Vec2, placed: readonly PlacedTap[]): ReachCandidate {
+  const s = leg.cls === 'axis' ? placeOnAxisLeg(leg, e, placed) : 0;
+  const tapMm = leg.cls === 'axis' ? pointAt(leg, s) : nearestOnSegment(e, leg.a, leg.b).point;
+  return { tapMm, tapLeg: leg, s, branch: branchPath(tapMm, e, leg) };
+}
+
+function branchInside(branch: readonly Vec2[], inside: (p: Vec2) => boolean): boolean {
+  for (let i = 1; i < branch.length; i++) {
+    const a = branch[i - 1]!;
+    const b = branch[i]!;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / REACH_SAMPLE_MM));
+    for (let k = 0; k <= n; k++) {
+      if (!inside({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n })) return false;
+    }
+  }
+  return true;
+}
+
+function branchBendCost(branch: readonly Vec2[], bendMm: number): number {
+  let cost = 0;
+  for (let i = 1; i < branch.length - 1; i++) {
+    const a = branch[i - 1]!;
+    const b = branch[i]!;
+    const c = branch[i + 1]!;
+    const l1 = Math.hypot(b.x - a.x, b.y - a.y);
+    const l2 = Math.hypot(c.x - b.x, c.y - b.y);
+    if (l1 <= EPS || l2 <= EPS) continue;
+    const cos = Math.min(1, Math.max(-1, ((b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y)) / (l1 * l2)));
+    const angle = (Math.acos(cos) * 180) / Math.PI;
+    if (angle >= 67.5) cost += bendMm;
+    else if (angle >= 22.5) cost += bendMm / 2;
+  }
+  return cost;
+}
+
+function planReachRoom(
+  room: BranchRoomInput,
+  legs: readonly Leg[],
+  input: BranchInput,
+  placed: PlacedTap[],
+  crossesExisting: (a: Vec2, b: Vec2) => number,
+  maxPorts: number,
+): RoomBranch {
+  const e = room.entryPointMm;
+  const candidates: ReachCandidate[] = [];
+  if (legs.length === 0) {
+    const root = { x: input.rootPointMm.x, y: input.rootPointMm.y };
+    candidates.push({ tapMm: root, tapLeg: null, s: 0, branch: branchPath(root, e, null) });
+  } else {
+    const first = nearestTapLeg(legs, e);
+    candidates.push(reachCandidate(first, e, placed));
+    const inside = input.insideCorridor;
+    if (inside) {
+      const limit = nearestOnSegment(e, first.a, first.b).distance + REACH_EXTRA_MM;
+      const extras = legs
+        .filter((leg) => leg !== first && leg.cls === 'axis')
+        .map((leg) => ({ leg, distance: nearestOnSegment(e, leg.a, leg.b).distance }))
+        .filter((x) => x.distance <= limit)
+        .sort((x, y) => x.distance - y.distance)
+        .slice(0, REACH_MAX_EXTRA);
+      for (const { leg } of extras) {
+        const candidate = reachCandidate(leg, e, placed);
+        if (branchInside(candidate.branch, inside)) candidates.push(candidate);
+      }
+    }
+  }
+
+  const spineCache = new Map<string, SpineResult>();
+  const spineOf = (entryDir: Vec2): SpineResult => {
+    if (room.ports.length === 0) return { paths: [], unreachedPortIds: [], lengthMm: 0 };
+    const key = `${entryDir.x},${entryDir.y}`;
+    let spine = spineCache.get(key);
+    if (!spine) {
+      const spineInput: SpineInput = {
+        root: e,
+        entryDir,
+        ports: room.ports,
+        inside: room.inside,
+        crossesExisting,
+        ...(input.stepMm !== undefined ? { stepMm: input.stepMm } : {}),
+      };
+      spine = room.ports.length <= maxPorts ? exactRoomSpine(spineInput) : roomSpine(spineInput);
+      spineCache.set(key, spine);
+    }
+    return spine;
+  };
+  const entryOf = (branch: readonly Vec2[]): Vec2 =>
+    lastDir(branch) ?? (room.ports.length > 0 ? unitDirOf(e, room.ports[0]!.point) : { x: 0, y: 1 });
+
+  let best = 0;
+  let bestScore = Infinity;
+  candidates.forEach((candidate, i) => {
+    const entryDir = entryOf(candidate.branch);
+    const spine = spineOf(entryDir);
+    const score =
+      pathLength(candidate.branch) +
+      branchBendCost(candidate.branch, BEND_PENALTY_MM) +
+      spineScore(spine.paths, spine.lengthMm, { root: e, entryDir, crossesExisting });
+    if (i === 0 || score < bestScore - SCORE_TOL) {
+      best = i;
+      bestScore = score;
+    }
+  });
+
+  const chosen = candidates[best]!;
+  if (chosen.tapLeg && chosen.tapLeg.cls === 'axis') {
+    placed.push({ edgeId: chosen.tapLeg.edgeId, index: chosen.tapLeg.index, s: chosen.s });
+  }
+  const entryDir = entryOf(chosen.branch);
+  const spine = spineOf(entryDir);
+  return {
+    roomId: room.roomId,
+    tapMm: chosen.tapMm,
+    tapEdgeId: chosen.tapLeg ? chosen.tapLeg.edgeId : null,
+    branch: chosen.branch,
+    entryDir,
+    spine: spine.paths,
+    offGraphPortIds: spine.unreachedPortIds,
+    lengthMm: pathLength(chosen.branch) + spine.lengthMm,
+  };
+}
+
 export function planBranches(input: BranchInput): { rooms: RoomBranch[] } {
   const legs = collectLegs(input.trunk);
   const crossesExisting = input.crossesExisting ?? (() => 0);
   const rooms = [...input.rooms].sort((a, b) => (a.roomId < b.roomId ? -1 : a.roomId > b.roomId ? 1 : 0));
   const placed: PlacedTap[] = [];
   const result: RoomBranch[] = [];
+  const exactSpine = input.options?.exactSpine;
 
   for (const room of rooms) {
+    if (exactSpine) {
+      result.push(planReachRoom(room, legs, input, placed, crossesExisting, exactSpine.maxPorts));
+      continue;
+    }
     const e = room.entryPointMm;
     let tapMm: Vec2;
     let tapEdgeId: string | null = null;

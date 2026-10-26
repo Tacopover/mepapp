@@ -774,7 +774,6 @@ describe('planRoute layout options', () => {
     const defaults = runScenario(scenario!, makeIdFactories(), DEFAULT_LAYOUT_OPTIONS);
     const prototype = runScenario(scenario!, makeIdFactories(), {
       trunkBends: { bendMm: 1, fittingMm: 1 },
-      exactSpine: { maxPorts: 4 },
       ripUp: { rounds: 1 },
     });
     expect(empty.plan).toEqual(absent.plan);
@@ -797,6 +796,16 @@ describe('planRoute layout options', () => {
     const bridged = runScenario(scenario!, makeIdFactories(), { bridgeParts: { penaltyMm: 0 } });
     expect(bridged.plan.stats.freeLegs).toBe(0);
     expect(bridged.plan.warnings.some((w) => w.code === 'free-angle')).toBe(false);
+  });
+
+  it('plans the first floor with the exact spine and keeps the ports left of the absent option', () => {
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const absent = runScenario(scenario!, makeIdFactories());
+    const exact = runScenario(scenario!, makeIdFactories(), { exactSpine: { maxPorts: 6 } });
+    expect(exact.status).toBe('ok');
+    expect(exact.plan.warnings.some((w) => w.code === 'internal-join')).toBe(false);
+    expect(exact.plan.stats.freeLegs).toBe(0);
+    expect(exact.plan.stats.portsLeft).toBe(absent.plan.stats.portsLeft);
   });
 });
 

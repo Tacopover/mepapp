@@ -648,6 +648,61 @@ Reading of the table:
 
 Next experiment (proposal only, not implemented): **Q1-T09c, a bend-priced room reach.** For each served room, search the path from the trunk through the entry to all its ports on heading states, with the cost: length plus `bendMm` for each turn, as in Q1-T09. The entry (door) stays a fixed point on the path. The search may choose the tap point on the trunk edge, so that the branch runs straight through the door and the spine starts in line with the port. Compare with the bridge row: the aim is to bring the branch plus spine bends from about 1.8 for each room to about 1. The check is the same table with this split.
 
+#### Idea 2, exact Steiner tree in a room, and the room reach (Q1-T10, measured 2026-10-26)
+
+Option: `exactSpine = { maxPorts }`. Code: `route-exact.ts` (`exactRoomSpine`, `spineScore`), `route-branch.ts` (`planReachRoom`), `route-build.ts` (passes `insideCorridor`). Test: `route-exact-report.test.ts`, fast mode (1 warm-up run, 3 runs; the full mode with scenario B was not run). Raw output: `/tmp/claude-0/-root-MepApp/0119519d-6cb5-4465-8095-715236bd031d/scratchpad/Q1-T10/exact-report-fast.log` (not in git).
+
+Scope: the T10 text covers only the spine in the room. The scope is extended, as the T09b finding asks, to the reach through the door. With the option on, `planBranches` picks the tap on the trunk together with the spine. Candidate 0 is today's tap (nearest leg). Up to 4 more axis legs (at most 2000 mm farther from the door) are candidates. A candidate must keep its branch inside the corridor rooms (region test sampled every 100 mm). The score is branch length + bend price of the branch (90 degrees = 500 mm, 45 degrees = 250 mm) + the score of the spine (length, crossings, bends, and the bend at the door). The lowest score wins; a tie goes to candidate 0. The spine is the exact tree (Dreyfus-Wagner on the Hanan grid of `roomSpine`, ports are leaves, then a corner-flip pass that lowers the bends at equal cost) for rooms with at most `maxPorts` ports. The exact tree is used only when its score is strictly lower than the heuristic tree of `roomSpine`. The tree and the choice use the same grid and blocked edges as `roomSpine`.
+
+Variants: "exact6" = `exactSpine` with `maxPorts` 6. "bridge" = `bridgeParts` (`penaltyMm` 0). "bridgeLink" = bridge plus `linkSearch` (500 / 3000).
+
+| Scenario | Start | Variant | Segments | Fittings | Length mm | Bends 90 / 45 | Wall crossings | Off-graph rooms | Ports left | Score | Median ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| First floor A | 0 | off | 109 | 76 | 151 366 | 35 / 10 | 26 | 28 | 0 | 263 044 | 67 |
+| First floor A | 0 | exact6 | 109 | 76 | 151 533 | 35 / 10 | 26 | 28 | 0 | 263 323 | 72 |
+| First floor A | 0 | bridge | 147 | 114 | 177 907 | 62 / 21 | 29 | 15 | 0 | 291 169 | 118 |
+| First floor A | 0 | bridge + exact6 | 140 | 107 | 177 574 | 57 / 19 | 28 | 15 | 0 | 285 736 | 79 |
+| First floor A | 0 | bridgeLink | 140 | 107 | 174 974 | 57 / 19 | 28 | 15 | 0 | 283 004 | 154 |
+| First floor A | 0 | bridgeLink + exact6 | 133 | 100 | 174 642 | 52 / 17 | 27 | 15 | 0 | 277 572 | 143 |
+| First floor A | 0 | link + exact6 (no bridge) | 108 | 75 | 153 309 | 34 / 10 | 25 | 28 | 0 | 261 895 | 132 |
+| First floor A | 1 | off | 97 | 64 | 150 978 | 31 / 2 | 26 | 30 | 0 | 261 550 | 41 |
+| First floor A | 1 | bridge | 146 | 113 | 177 761 | 63 / 18 | 27 | 15 | 0 | 287 978 | 73 |
+| First floor A | 1 | bridge + exact6 | 140 | 107 | 176 511 | 58 / 18 | 27 | 15 | 0 | 282 427 | 82 |
+| First floor A | 2 | off | 98 | 65 | 153 079 | 30 / 4 | 28 | 30 | 0 | 259 342 | 44 |
+| First floor A | 2 | bridge | 145 | 112 | 176 939 | 62 / 18 | 28 | 15 | 0 | 288 998 | 74 |
+| First floor A | 2 | bridge + exact6 | 139 | 106 | 175 801 | 57 / 18 | 28 | 15 | 0 | 283 561 | 85 |
+| w_rooms A (local-only) | 0 | off | 141 | 98 | 207 563 | 47 / 10 | 33 | 33 | 0 | 342 577 | 113 |
+| w_rooms A (local-only) | 0 | exact6 | 141 | 98 | 207 276 | 44 / 14 | 33 | 33 | 0 | 341 774 | 118 |
+| 10A A (local-only) | 0 | off | 95 | 68 | 210 331 | 27 / 16 | 18 | 19 | 0 | 305 976 | 38 |
+| 10A A (local-only) | 0 | exact6 | 95 | 68 | 210 331 | 27 / 16 | 18 | 19 | 0 | 305 976 | 40 |
+| 10A A (local-only) | 0 | bridge | 114 | 87 | 226 122 | 41 / 20 | 20 | 13 | 0 | 319 693 | 43 |
+| 10A A (local-only) | 0 | bridge + exact6 | 111 | 84 | 223 758 | 42 / 16 | 20 | 13 | 0 | 315 929 | 50 |
+| 10A A (local-only) | 0 | bridgeLink | 112 | 85 | 225 848 | 40 / 19 | 18 | 13 | 0 | 327 069 | 79 |
+| 10A A (local-only) | 0 | bridgeLink + exact6 | 106 | 79 | 221 148 | 38 / 15 | 19 | 13 | 0 | 318 569 | 88 |
+
+Split by leg origin, first floor A start 0 (bends 90 / bends 45, length in metres, fittings):
+
+| Origin | bridge | bridge + exact6 | bridgeLink | bridgeLink + exact6 |
+|---|---|---|---|---|
+| trunk | 8 / 7, 37.8, 17 | 8 / 7, 37.8, 18 | 8 / 7, 37.8, 17 | 8 / 7, 37.8, 18 |
+| bridge | 4 / 0, 16.4, 4 | 3 / 0, 16.4, 3 | 4 / 0, 16.4, 4 | 3 / 0, 16.4, 3 |
+| branch | 15 / 14, 20.5, 43 | 14 / 12, 20.1, 39 | 13 / 12, 18.0, 37 | 12 / 10, 17.7, 33 |
+| spine | 14 / 0, 31.0, 14 | 11 / 0, 31.0, 11 | 13 / 0, 31.0, 13 | 10 / 0, 31.0, 10 |
+| link | 21 / 0, 72.2, 36 | 21 / 0, 72.2, 36 | 19 / 0, 71.7, 36 | 19 / 0, 71.7, 36 |
+| total | 62 / 21, 177.9, 114 | 57 / 19, 177.6, 107 | 57 / 19, 175.0, 107 | 52 / 17, 174.6, 100 |
+
+Reading of the table:
+- `exactSpine` alone does nothing useful on the first floor and on 10A. Without the bridge only 7 rooms have a branch, and the plan is the same except for 167 mm of length and a tap shift (the score rises by 0.1 %). On w_rooms A it trades 3 bends 90 for 4 bends 45 (score minus 0.2 %).
+- With the bridge, the option takes 5 bends 90 and 2 bends 45 off on the first floor A start 0 (62 / 21 to 57 / 19): spine minus 3, branch minus 1 (and minus 2 bends 45), bridge minus 1. The branch plus spine part had 29 bends 90 in the "bridge" column and has 25 now. The rooms that the bridge adds need about 1 bend each in the spine, because one port is seldom in line with the door; no tree can remove that bend. So the lower bound is near: the remaining spine bends (11 for 13 new rooms) are mostly that one bend.
+- With the bridge and the link search, the option gives 52 / 17 (bridgeLink 57 / 19). That is the best result so far on the first floor A start 0: 52 bends 90 against 62 (bridge) and 35 (off). It is still 17 bends 90 above "off".
+- The extra bends of the bridge are not removed. The branch keeps 14 bends 90 and 12 bends 45 for 13 new rooms. A part of them comes from the elbows at the trunk edges (the branch must leave a diagonal or an axis trunk leg), which the tap choice does not change. Not examined (not verified).
+- Length: the option shortens by 0.2 % to 1.0 % against the bridge column. It does not close the +17 % length of the bridge.
+- Acceptance (section 8), first floor A start 0, `exactSpine` with `bridgeParts` and `linkSearch` (the best row): A1 **not met** (score 277 572 against 263 044 for "off": plus 5.5 %; against "bridge": minus 4.7 %). A2 **not met** (off-graph rooms 15, the limit is 14 or fewer; crossings 27, the limit is 18 or fewer). A3 **not met** (length plus 15.4 % against "off"). A4 met (free legs 0, no `internal-join`, checked in the report test). T1 met in scenario A (median 143 ms against the limit of 300 ms; exact6 alone 72 ms). T1 for scenario B is not measured because the full mode was not run; the baseline already has 1 935 ms there.
+- Other drawings: 10A A start 0, bridgeLink + exact6 against bridgeLink: bends 90 40 to 38, bends 45 19 to 15, length minus 2.1 %, score minus 2.6 %; the median is 88 ms. w_rooms A: no bridge leg exists, so only the spine changes.
+- Determinism D1 (two runs, `toEqual`) passes with the option on in all rows. D2 and D3 with the option on are not measured.
+- Unit tests: in 200 seeded 4-port layouts the exact tree is better (shorter, or equal length with fewer bends) in 177 layouts and never worse by the score. The tree keeps the ports as leaves. The never-worse rule holds for the score of one room; for several rooms the shared tap spacing can change a later room.
+- Limit: the check "exact length is not above the heuristic length" holds by construction when no foreign segment is crossed (Dreyfus-Wagner is exact for the length). The bend gain comes only from the choice of the equal-length trees and from the corner-flip pass.
+
 ## 11. Defect catalogue from the user screenshots (T05)
 
 To be filled when the screenshots arrive (R-Q1-01). Until then:

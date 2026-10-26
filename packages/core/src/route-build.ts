@@ -353,6 +353,7 @@ export function planRoute(
     rootPointMm: trunk.rootPointMm ?? start.pointMm,
     rooms: branchRooms,
     options,
+    ...(options.exactSpine ? { insideCorridor: insideRouteArea(input.rooms.filter((r) => input.area.rooms.some((a) => a.roomId === r.id)), mmPerPt) } : {}),
   }).rooms) {
     paths.push(branch.branch, ...branch.spine);
     tag('branch', branch.branch);

@@ -19,9 +19,24 @@ export interface SpineResult {
   lengthMm: number;
 }
 
+export interface SpineGrid {
+  xs: number[];
+  ys: number[];
+  nx: number;
+  ny: number;
+  nodeCount: number;
+  rootNode: number;
+  portNodes: number[];
+  isPortNode: Uint8Array;
+  nodeAt(p: Vec2): number;
+  pointOf(n: number): Vec2;
+  edgeInfo(u: number, v: number): { blocked: boolean; crossings: number };
+  neighbour(n: number, h: number): number;
+}
+
 const DEFAULT_STEP_MM = 100;
 
-function headingOf(dir: Vec2): number {
+export function headingOf(dir: Vec2): number {
   if (Math.abs(dir.x) >= Math.abs(dir.y)) return dir.x >= 0 ? 0 : 1;
   return dir.y >= 0 ? 2 : 3;
 }
@@ -35,7 +50,7 @@ interface EdgeInfo {
   crossings: number;
 }
 
-export function roomSpine(input: SpineInput): SpineResult {
+export function makeSpineGrid(input: SpineInput): SpineGrid {
   const { root, ports, inside, crossesExisting } = input;
   const stepMm = input.stepMm && input.stepMm > 0 ? input.stepMm : DEFAULT_STEP_MM;
 
@@ -81,6 +96,90 @@ export function roomSpine(input: SpineInput): SpineResult {
     if (h === 2) return j + 1 < ny ? i * ny + j + 1 : -1;
     return j > 0 ? i * ny + j - 1 : -1;
   };
+
+  return {
+    xs,
+    ys,
+    nx,
+    ny,
+    nodeCount,
+    rootNode,
+    portNodes,
+    isPortNode,
+    nodeAt,
+    pointOf,
+    edgeInfo,
+    neighbour,
+  };
+}
+
+export function treeLengthMm(grid: SpineGrid, treeAdj: Map<number, Set<number>>): number {
+  let lengthMm = 0;
+  for (const [u, set] of treeAdj) {
+    for (const v of set) {
+      if (u < v) {
+        const a = grid.pointOf(u);
+        const b = grid.pointOf(v);
+        lengthMm += Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+      }
+    }
+  }
+  return lengthMm;
+}
+
+export function spinePaths(
+  grid: SpineGrid,
+  treeAdj: Map<number, Set<number>>,
+  reachedPortNode: Uint8Array,
+): Vec2[][] {
+  const { nodeCount, rootNode, pointOf } = grid;
+  const paths: Vec2[][] = [];
+  const isBreak = (n: number): boolean =>
+    n === rootNode || reachedPortNode[n] === 1 || (treeAdj.get(n)?.size ?? 0) !== 2;
+  const usedEdges = new Set<number>();
+  const edgeKey = (u: number, v: number): number =>
+    u < v ? u * nodeCount + v : v * nodeCount + u;
+
+  const walk = (start: number): void => {
+    const neighbours = [...(treeAdj.get(start) ?? [])].sort((a, b) => a - b);
+    for (const first of neighbours) {
+      if (usedEdges.has(edgeKey(start, first))) continue;
+      const chain = [start];
+      let prev = start;
+      let cur = first;
+      usedEdges.add(edgeKey(prev, cur));
+      chain.push(cur);
+      while (!isBreak(cur)) {
+        let nextNode = -1;
+        for (const m of treeAdj.get(cur)!) if (m !== prev) nextNode = m;
+        usedEdges.add(edgeKey(cur, nextNode));
+        prev = cur;
+        cur = nextNode;
+        chain.push(cur);
+      }
+      const pts: Vec2[] = [];
+      for (let idx = 0; idx < chain.length; idx++) {
+        const p = pointOf(chain[idx]!);
+        if (idx > 0 && idx < chain.length - 1) {
+          const a = pointOf(chain[idx - 1]!);
+          const b = pointOf(chain[idx + 1]!);
+          const straight = (a.x === p.x && p.x === b.x) || (a.y === p.y && p.y === b.y);
+          if (straight) continue;
+        }
+        pts.push(p);
+      }
+      paths.push(pts);
+      walk(cur);
+    }
+  };
+  walk(rootNode);
+  return paths;
+}
+
+export function roomSpine(input: SpineInput): SpineResult {
+  const { ports } = input;
+  const grid = makeSpineGrid(input);
+  const { nodeCount, rootNode, portNodes, isPortNode, neighbour, pointOf, edgeInfo } = grid;
 
   const inTree = new Uint8Array(nodeCount);
   const isTreeSource = new Uint8Array(nodeCount);
@@ -197,61 +296,9 @@ export function roomSpine(input: SpineInput): SpineResult {
   const unreachedPortIds: string[] = [];
   for (let k = 0; k < ports.length; k++) if (!reached[k]) unreachedPortIds.push(ports[k]!.id);
 
-  let lengthMm = 0;
-  for (const [u, set] of treeAdj) {
-    for (const v of set) {
-      if (u < v) {
-        const a = pointOf(u);
-        const b = pointOf(v);
-        lengthMm += Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
-      }
-    }
-  }
+  const reachedPortNode = new Uint8Array(nodeCount);
+  for (let k = 0; k < ports.length; k++) if (reached[k]) reachedPortNode[portNodes[k]!] = 1;
+  const paths = treeAdj.size > 0 ? spinePaths(grid, treeAdj, reachedPortNode) : [];
 
-  const paths: Vec2[][] = [];
-  if (treeAdj.size > 0) {
-    const reachedPortNode = new Uint8Array(nodeCount);
-    for (let k = 0; k < ports.length; k++) if (reached[k]) reachedPortNode[portNodes[k]!] = 1;
-    const isBreak = (n: number): boolean =>
-      n === rootNode || reachedPortNode[n] === 1 || (treeAdj.get(n)?.size ?? 0) !== 2;
-    const usedEdges = new Set<number>();
-    const edgeKey = (u: number, v: number): number =>
-      u < v ? u * nodeCount + v : v * nodeCount + u;
-
-    const walk = (start: number): void => {
-      const neighbours = [...(treeAdj.get(start) ?? [])].sort((a, b) => a - b);
-      for (const first of neighbours) {
-        if (usedEdges.has(edgeKey(start, first))) continue;
-        const chain = [start];
-        let prev = start;
-        let cur = first;
-        usedEdges.add(edgeKey(prev, cur));
-        chain.push(cur);
-        while (!isBreak(cur)) {
-          let nextNode = -1;
-          for (const m of treeAdj.get(cur)!) if (m !== prev) nextNode = m;
-          usedEdges.add(edgeKey(cur, nextNode));
-          prev = cur;
-          cur = nextNode;
-          chain.push(cur);
-        }
-        const pts: Vec2[] = [];
-        for (let idx = 0; idx < chain.length; idx++) {
-          const p = pointOf(chain[idx]!);
-          if (idx > 0 && idx < chain.length - 1) {
-            const a = pointOf(chain[idx - 1]!);
-            const b = pointOf(chain[idx + 1]!);
-            const straight = (a.x === p.x && p.x === b.x) || (a.y === p.y && p.y === b.y);
-            if (straight) continue;
-          }
-          pts.push(p);
-        }
-        paths.push(pts);
-        walk(cur);
-      }
-    };
-    walk(rootNode);
-  }
-
-  return { paths, unreachedPortIds, lengthMm };
+  return { paths, unreachedPortIds, lengthMm: treeLengthMm(grid, treeAdj) };
 }
