@@ -703,6 +703,44 @@ Reading of the table:
 - Unit tests: in 200 seeded 4-port layouts the exact tree is better (shorter, or equal length with fewer bends) in 177 layouts and never worse by the score. The tree keeps the ports as leaves. The never-worse rule holds for the score of one room; for several rooms the shared tap spacing can change a later room.
 - Limit: the check "exact length is not above the heuristic length" holds by construction when no foreign segment is crossed (Dreyfus-Wagner is exact for the length). The bend gain comes only from the choice of the equal-length trees and from the corner-flip pass.
 
+#### Idea 3, a score and candidate layouts (Q1-T11, measured 2026-10-26)
+
+Function: `planBestRoute(input, candidates, weights?)` in `route-candidates.ts`. It plans each candidate with `planRoute`, scores it with `scoreRoute`, and returns `best` (the index of the lowest score; a tie goes to the lower index) and `results`. Each result holds `options`, `status`, `plan`, `metrics`, `score` and `signature`. The signature is a hash of the geometry (rounded to 0.01 pt, ids left out), so two plans with equal geometry have equal signatures. A refused plan has the score infinity. The function has no candidate list: the caller owns it. Test: `route-candidates-report.test.ts`, fast mode (1 warm-up run, 3 runs; scenario A only, because one plan of scenario B takes seconds). The candidates in this test are a local list: "base" (`{}`), "bridge" (`bridgeParts` 0), "bridgeLink" (bridge + `linkSearch` 500/3000) and "all" (bridgeLink + `exactSpine` 6). Raw output: `/tmp/claude-0/-root-MepApp/0119519d-6cb5-4465-8095-715236bd031d/scratchpad/Q1-T11/report-out.txt` (not in git). The sensitivity row "bends" has `bend90` 1500 and `bend45` 750. All other weights are the default values of section 5 (wall crossing 0, answer Q-Q1-02).
+
+| Drawing | Start | Weights | Winner | base | bridge | bridgeLink | all | Different geometries |
+|---|---|---|---|---|---|---|---|---|
+| First floor A | 0 | default | base | 263 044 | 291 169 | 283 004 | 277 572 | 4 |
+| First floor A | 0 | bends | base | 303 044 | 363 669 | 349 504 | 338 072 | 4 |
+| First floor A | 1 | default | base | 261 550 | 287 978 | 283 569 | 278 019 | 4 |
+| First floor A | 1 | bends | base | 293 550 | 359 978 | 352 569 | 342 019 | 4 |
+| First floor A | 2 | default | base | 259 342 | 288 998 | 284 589 | 279 152 | 4 |
+| First floor A | 2 | bends | base | 291 342 | 359 998 | 352 589 | 342 152 | 4 |
+| Ground floor w_rooms A (local-only) | 0 | default | base | 342 577 | 342 577 | 352 702 | 351 899 | 3 |
+| Ground floor w_rooms A (local-only) | 0 | bends | base | 394 577 | 394 577 | 405 702 | 403 899 | 3 |
+| 10A A (local-only) | 0 | default | base | 305 976 | 319 693 | 327 069 | 318 569 | 4 |
+| 10A A (local-only) | 0 | bends | base | 340 976 | 370 693 | 376 569 | 364 069 | 4 |
+
+Runtime of `planBestRoute` with the 4 candidates (default weights, median and maximum of 3 runs after 1 warm-up run). Limit T2 (Q-Q1-08 A): 1200 ms in total.
+
+| Drawing | Start | Median ms | Max ms | Limit 1200 ms |
+|---|---|---|---|---|
+| First floor A | 0 | 911 | 963 | met |
+| First floor A | 1 | 862 | 1 083 | met |
+| First floor A | 2 | 886 | 1 271 | met by the median; the maximum of one run is above the limit |
+| Ground floor w_rooms A (local-only) | 0 | 769 | 789 | met |
+| 10A A (local-only) | 0 | 306 | 382 | met |
+
+Reading of the tables:
+- The baseline wins in all 10 rows, with the default weights and with the raised bend weights. No candidate gets a lower score than the baseline. The score of section 5 prefers the shorter route with fewer bends. The extra length and bends of the bridge, the link search and the exact spine cost more than the off-graph rooms that they remove (1500 each).
+- The raised bend weights make the baseline win by a larger margin, not a smaller one. Every prototype adds bends (section 10, idea 0). So these bend weights cannot change the winner here. A higher weight for an off-graph room was not tried.
+- Among the three prototypes, "all" has the lowest score on the first floor and on 10A. The second best is "bridgeLink" on the first floor and "bridge" on 10A. The order is not the same on every drawing.
+- On the ground floor w_rooms, "bridge" gives the same plan as "base" (equal signature), because no room has an entry there. Only 3 geometries are different.
+- The score does not contain `portsLeft`. A candidate that leaves a port unreached can win. All candidates in scenario A reached all ports (the test checks status "ok" and `freeLegs` 0, and there is no `internal-join`).
+- The "base" candidate has the same geometry as `planRoute(input, {})` (equal signature). Determinism: two calls give equal scores and signatures. `planRoute` is unchanged.
+- Runtime: the median of 4 candidates is under 1200 ms in all rows. The first-floor start 2 has one run of 1 271 ms in 3 runs. The machine was shared with other work, so the times vary. Scenario B is not measured: one plan takes 1 to 2 s on the first floor, so 4 candidates are above the limit there (section 10, idea 0 shows 2 to 4 s for one plan with the bridge).
+- `planBestRoute` does not pass `startFittingId` to `routeMetrics`. A start with an existing stub uses the port as the start of the path metrics. This changes only the path metrics (longest path, spread), which are small in the score. P1 must pass the stub start if it needs them.
+- The ids of the later candidates continue the counter of the id functions of the input. The best plan can have ids with gaps. The signature does not use ids.
+
 ## 11. Defect catalogue from the user screenshots (T05)
 
 To be filled when the screenshots arrive (R-Q1-01). Until then:
