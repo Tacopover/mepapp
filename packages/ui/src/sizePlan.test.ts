@@ -11,6 +11,7 @@ const PLAIN_KEYS: SizeTextKey[] = [
   'suggest', 'flowSection', 'flowUnit', 'flowUnitNotSet', 'sizingMethod', 'methodNone', 'methodAir', 'methodWater',
   'maxVelocity', 'maxDrop', 'airShape', 'shapeRound', 'shapeRect', 'maxAspect', 'airSeries', 'seriesStandard', 'seriesFree',
   'deltaT', 'valueNotPositive', 'valueAtLeastOne', 'editorTitle', 'limitsSection', 'clearLimits', 'limitsNote',
+  'disciplineNotSizedMore', 'notesLabel', 'disciplineInfoLabel', 'limitsInfoLabel', 'unitReadInfoLabel',
 ];
 
 const PROBLEM_CODES: SizingProblemCode[] = [
@@ -30,7 +31,6 @@ const ALL_KEYS: SizeTextKey[] = [...PLAIN_KEYS, ...PROBLEM_KEYS];
 const SAMPLE_PARAMS = {
   unit: 'dm³/s', flow: '400 dm³/s', n: 12, count: 3, size: 'Ø 400', name: 'Supply air', old: 'm³/h', new: 'kW',
 };
-const SKIPPED_LENGTH_KEYS: SizeTextKey[] = ['disciplineNotSized', 'problem_discipline-not-sized'];
 
 const pick = (patch: Partial<SizePick> & Pick<SizePick, 'shape'>): SizePick => ({
   velocityMs: 3, pressureDropPaPerM: 1, governedBy: 'velocity', ...patch,
@@ -47,9 +47,8 @@ describe('sizeText', () => {
     for (const key of ALL_KEYS) expect(sizeText(key).length).toBeGreaterThan(0);
   });
 
-  it('keeps every text within 140 characters with sample params, except the discipline texts', () => {
+  it('keeps every text within 140 characters with sample params', () => {
     for (const key of ALL_KEYS) {
-      if (SKIPPED_LENGTH_KEYS.includes(key)) continue;
       expect(sizeText(key, SAMPLE_PARAMS).length, key).toBeLessThanOrEqual(140);
     }
   });

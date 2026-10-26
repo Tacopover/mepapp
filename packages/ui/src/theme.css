@@ -5225,6 +5225,13 @@
 .mep-icon-toggle:has(> input:focus-visible) {
   outline: 2px solid var(--accent-ink);
 }
+.mep-btn-icon-text { display: inline-flex; align-items: center; gap: 6px; }
+.mep-size-note { display: block; }
+.mep-size-note + .mep-size-note { margin-top: 4px; }
+.mep-size-limits-actions .mep-icon-button { flex: none; }
+.mep-nt-note .mep-infotip { vertical-align: middle; margin-left: 4px; }
+.mep-route-text[data-testid="size-type"] { display: flex; align-items: center; gap: 6px; }
+.mep-route-text[data-testid="size-type"] [data-testid="size-notes"] { margin-left: auto; }
 .mep-severity {
   display: inline-flex;
   vertical-align: middle;
@@ -5239,3 +5246,4 @@
 .mep-severity--info {
   opacity: 0.75;
 }
+.mep-nt-note-tip { margin-left: 6px; display: inline-flex; align-items: center; }

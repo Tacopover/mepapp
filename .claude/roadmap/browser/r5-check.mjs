@@ -23,6 +23,7 @@ async function run1() {
   const f = (id) => page.locator(`${M} [data-testid=${id}]`);
   const count = (id) => q(id).count();
   const text = (id) => q(id).innerText();
+  const hoverNotes = async () => { await page.locator(`${Z} [data-testid=size-notes] .mep-infotip`).hover(); await idle(250); };
   const typeInto = async (id, value) => {
     await q(id).click();
     await page.keyboard.press('Control+A');
@@ -186,7 +187,10 @@ async function run1() {
   const pl7 = await plan(bAir.equipmentId);
   const velOk = pl7.result.sizes.every((s) => s.velocityMs <= 5 + 1e-9 && Math.abs(s.velocityMs - (s.flowM3s / (Math.PI * (s.diameterMm / 1000) ** 2 / 4))) < 1e-6);
   check(pl7.result.status === 'ok' && velOk, 'step 7: every size meets the velocity limit; velocity equals q / area', JSON.stringify(pl7.result.sizes.map((s) => [s.diameterMm, s.velocityMs])));
+  await hoverNotes();
   check((await count('size-riser-note')) === 1 && (await count('size-draft-note')) === 1, 'step 7: the riser note and the draft note show');
+  await page.mouse.move(5, 5);
+  await idle(200);
   await shot('T18-size-dialog');
   const sizesBefore = await segmentSizes(page);
   const beforeApply = await baseline(page);

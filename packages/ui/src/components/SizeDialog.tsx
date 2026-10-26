@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { SketchScene, StampInfo } from '@mepapp/render';
 import { getStampPorts, networkOfStartPort } from '@mepapp/core';
+import { IconClose, IconSizeNetwork, IconSuggest } from '../icons.js';
 import { Dialog } from './Dialog.js';
+import { IconButton } from './IconButton.js';
+import { InfoTip } from './InfoTip.js';
 import { startCandidates } from './routePlan.js';
 import { SizingLimitsFields } from './SizingLimitsFields.js';
 import { emptyLimitsDraft, limitsDraftFromSettings, limitsErrors, limitsToSettings, suggestedLimitsDraft, type LimitsDraft, type LimitsErrors } from './sizingDraft.js';
@@ -151,6 +154,7 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
         <>
           <button
             type="button"
+            className="mep-btn-icon-text"
             data-testid="size-apply"
             disabled={!canApply || showConfirm}
             onClick={() => {
@@ -158,10 +162,10 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
               else apply();
             }}
           >
-            {sizeText('size')}
+            <IconSizeNetwork size={14} />{' '}{sizeText('size')}
           </button>
-          <button type="button" data-testid="size-close" onClick={onClose}>
-            {sizeText('close')}
+          <button type="button" className="mep-btn-icon-text" data-testid="size-close" onClick={onClose}>
+            <IconClose size={14} />{' '}{sizeText('close')}
           </button>
         </>
       }
@@ -199,7 +203,18 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
               </select>
             </label>
             <p className="mep-route-text" data-testid="size-type">
-              {sizeText('networkType')}: {plan?.networkTypeName ?? ''}
+              <span>{sizeText('networkType')}: {plan?.networkTypeName ?? ''}</span>
+              <span data-testid="size-notes">
+                <InfoTip label={sizeText('notesLabel')}>
+                  {method === 'air' && <span className="mep-size-note" data-testid="size-velocity-note">{sizeText('velocityNote')}</span>}
+                  {method && <span className="mep-size-note" data-testid="size-fluid">{sizeText(method === 'air' ? 'fluidAir' : 'fluidWater')}</span>}
+                  {method === 'water' && <span className="mep-size-note" data-testid="size-return-note">{sizeText('returnNote')}</span>}
+                  {method === 'water' && <span className="mep-size-note" data-testid="size-pipe-note">{sizeText('pipeNote')}</span>}
+                  {twoFlows && <span className="mep-size-note" data-testid="size-two-flows-note">{sizeText('twoFlowsNote')}</span>}
+                  <span className="mep-size-note" data-testid="size-riser-note">{sizeText('riserNote')}</span>
+                  <span className="mep-size-note" data-testid="size-draft-note">{sizeText('draftNote')}</span>
+                </InfoTip>
+              </span>
             </p>
             {plan?.flowUnit && (
               <p className="mep-route-text" data-testid="size-unit">{sizeText('capacityUnitNote', { unit: plan.flowUnit })}</p>
@@ -210,6 +225,9 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
                   <div key={line.code} className="mep-route-check-line">
                     <p className={`mep-route-text mep-route-check-${line.severity}`} data-testid={`size-line-${line.code}`} data-severity={line.severity}>
                       <strong className="mep-route-severity">{sizeText(SEVERITY_KEY[line.severity])}</strong>{' '}{line.text}
+                      {line.code === 'discipline-not-sized' && (
+                        <>{' '}<InfoTip label={sizeText('disciplineInfoLabel')}>{sizeText('disciplineNotSizedMore')}</InfoTip></>
+                      )}
                     </p>
                     {line.hint !== '' && <p className="mep-route-text mep-route-hint">{line.hint}</p>}
                   </div>
@@ -228,12 +246,8 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
                 <p className="mep-size-limits-title">{sizeText('limitsSection')}</p>
                 <SizingLimitsFields method={method} draft={limits} onChange={saveLimits} showErrors={limitsShown} />
                 <div className="mep-size-limits-actions">
-                  <button type="button" data-testid="size-limits-suggest" onClick={() => saveLimits(suggestedLimitsDraft(method))}>
-                    {sizeText('suggest')}
-                  </button>
-                  <button type="button" data-testid="size-limits-clear" disabled={!hasSaved} onClick={clearLimits}>
-                    {sizeText('clearLimits')}
-                  </button>
+                  <IconButton Icon={IconSuggest} label={sizeText('suggest')} testId="size-limits-suggest" onClick={() => saveLimits(suggestedLimitsDraft(method))} />
+                  <IconButton Icon={IconClose} label={sizeText('clearLimits')} testId="size-limits-clear" disabled={!hasSaved} onClick={clearLimits} />
                 </div>
               </div>
             )}
@@ -258,15 +272,6 @@ export function SizeDialog({ sceneRef, stampName, onEditNetworkType, onClose }: 
                 </div>
               </div>
             )}
-            <div data-testid="size-notes">
-              {method === 'air' && <p className="mep-route-text mep-route-hint" data-testid="size-velocity-note">{sizeText('velocityNote')}</p>}
-              {method && <p className="mep-route-text mep-route-hint" data-testid="size-fluid">{sizeText(method === 'air' ? 'fluidAir' : 'fluidWater')}</p>}
-              {method === 'water' && <p className="mep-route-text mep-route-hint" data-testid="size-return-note">{sizeText('returnNote')}</p>}
-              {method === 'water' && <p className="mep-route-text mep-route-hint" data-testid="size-pipe-note">{sizeText('pipeNote')}</p>}
-              {twoFlows && <p className="mep-route-text mep-route-hint" data-testid="size-two-flows-note">{sizeText('twoFlowsNote')}</p>}
-              <p className="mep-route-text mep-route-hint" data-testid="size-riser-note">{sizeText('riserNote')}</p>
-              <p className="mep-route-text mep-route-hint" data-testid="size-draft-note">{sizeText('draftNote')}</p>
-            </div>
           </>
         )}
       </div>

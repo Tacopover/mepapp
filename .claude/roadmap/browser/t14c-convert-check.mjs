@@ -4,6 +4,7 @@ import { open, buildSizingProject } from './r5-lib.mjs';
 const M = '.mep-modal';
 const t = await open();
 const { page, check, idle, shot } = t;
+const hoverTip = async (id) => { await page.locator(`${M} [data-testid=${id}] .mep-infotip`).hover(); await idle(250); };
 
 async function main() {
   await t.start();
@@ -79,8 +80,11 @@ async function main() {
   await setUnit(undefined);
   await openEditor();
   await page.locator(`${M} [data-testid=nt-flow-unit]`).selectOption('dm³/s');
+  await hoverTip('nt-unit-read-note');
   const note = await page.locator(`${M} [data-testid=nt-unit-read-note]`).innerText();
   check(/read as dm³\/s/.test(note), 'step 4: the Note shows', note);
+  await page.mouse.move(5, 5);
+  await idle(200);
   await shot('T14c-unit-read-note');
   await save().click();
   await idle(400);

@@ -22,6 +22,7 @@ const typeInto = async (id, value) => {
 };
 const entries = () => page.evaluate(() => window.__mepSketchScene.exportProject().networkSizing);
 const text = (id) => q(id).innerText();
+const hoverNotes = async () => { await page.locator(`${Z} [data-testid=size-notes] .mep-infotip`).hover(); await idle(250); };
 const scene = (fn, arg) => page.evaluate(fn, arg);
 
 async function main() {
@@ -69,7 +70,10 @@ async function main() {
   const bodyText = await page.locator(Z).innerText();
   check(!/door|crossing/i.test(bodyText) && !/\b(netwerk|maat|toevoer|afvoer|lucht)\b/i.test(bodyText), 'step 3: no door or crossing word and no Dutch word');
   check(await count('size-edit-type') === 1, 'step 3: size-edit-type shows');
+  await hoverNotes();
   check(await count('size-riser-note') === 1 && await count('size-draft-note') === 1, 'notes: riser note and draft note show');
+  await page.mouse.move(5, 5);
+  await idle(200);
   await shot('T16-size-dialog-error');
 
   // 4: the editor on top, then the dialog behind updates
@@ -105,9 +109,15 @@ async function main() {
   check(sum === 400 && new RegExp(`Total flow: ${sum} dm³/s`).test(resultText), 'step 5: total flow equals the independent sum', resultText);
   const segCount = await scene(() => window.__mepSketchScene.exportProject().segments.length);
   check(new RegExp(`${segCount} segments sized\\.`).test(resultText), 'step 5: sized count equals the segment count', resultText);
+  await hoverNotes();
   check(await count('size-velocity-note') === 1 && /Air at 20 °C\./.test(await text('size-fluid')), 'step 16: velocity note and the air fluid line show');
+  await page.mouse.move(5, 5);
+  await idle(200);
+  await hoverNotes();
   check(await count('size-return-note') === 0 && await count('size-pipe-note') === 0, 'step 16: no water notes for the air type');
   check(!(await q('size-apply').isDisabled()), 'step 5: size-apply is enabled');
+  await page.mouse.move(5, 5);
+  await idle(200);
   await shot('T16-size-dialog-ok');
   await shot('T16-size-result');
   await shot('T16-size-limits');
@@ -320,8 +330,14 @@ async function main() {
   const waterResult = await text('size-result');
   console.log('WATER', waterResult.replace(/\n+/g, ' | '));
   check(/DN \d+/.test(waterResult) && /Total flow: [\d.]+ l\/s/.test(waterResult), 'step 8: the result shows DN sizes and a total flow in l/s', waterResult);
+  await hoverNotes();
   check(await count('size-return-note') === 1 && /Supply and return pipes must be separate networks\./.test(await text('size-return-note')) && await count('size-pipe-note') === 1 && /Water at 20 °C, no glycol\./.test(await text('size-fluid')), 'step 16: water notes show');
+  await page.mouse.move(5, 5);
+  await idle(200);
+  await hoverNotes();
   check(await count('size-velocity-note') === 0, 'step 16: no velocity note for water');
+  await page.mouse.move(5, 5);
+  await idle(200);
   await shot('T16-size-water');
   await q('size-apply').click();
   await idle(600);
@@ -342,7 +358,13 @@ async function main() {
   const b17 = await baseline(page);
   await openDialog();
   const dtext = await text('size-line-discipline-not-sized').catch(() => '');
-  check(dtext.includes('This network type has no sizing method. Sizing is for ventilation and heating/cooling water only. Plumbing, drains and fire protection are not sized by this command.'), 'step 17: the discipline text shows in full', dtext);
+  check(dtext.includes('This network type has no sizing method.'), 'step 17: the discipline text shows', dtext);
+  await q('size-line-discipline-not-sized').locator('.mep-infotip').hover();
+  await idle(250);
+  const dfull = await text('size-line-discipline-not-sized');
+  check(dfull.includes('Sizing is for ventilation and heating/cooling water only. Plumbing, drains and fire protection are not sized by this command.'), 'step 17: the discipline tip shows the full text', dfull);
+  await page.mouse.move(5, 5);
+  await idle(200);
   check(await q('size-apply').isDisabled() && await count('size-edit-type') === 0, 'step 17: size-apply is disabled and size-edit-type is not shown');
   await shot('T16-size-discipline');
   await closeDialog();

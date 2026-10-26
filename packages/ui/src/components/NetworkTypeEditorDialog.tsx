@@ -3,6 +3,7 @@ import type { Discipline, FlowUnitId, LinePattern, NetworkType } from '@mepapp/c
 import { FLOW_UNITS } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { ColorPicker } from './ColorPicker.js';
+import { InfoTip } from './InfoTip.js';
 import { coerceMethod, draftFromType, convertPanelOf, draftToPatch, methodsForDiscipline, type SizingMethodChoice } from './sizingDraft.js';
 import { sizeText, type SizeTextKey } from './sizePlan.js';
 
@@ -145,10 +146,12 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, capa
               </option>
             ))}
           </select>
+          {networkType.flowUnit === undefined && sizingDraft.flowUnit !== '' && (
+            <span data-testid="nt-unit-read-note" className="mep-nt-note-tip">
+              <InfoTip label={sizeText('unitReadInfoLabel')}>{sizeText('unitReadNote', { unit: sizingDraft.flowUnit })}</InfoTip>
+            </span>
+          )}
         </div>
-        {networkType.flowUnit === undefined && sizingDraft.flowUnit !== '' && (
-          <p className="mep-nt-note" data-testid="nt-unit-read-note">{sizeText('unitReadNote', { unit: sizingDraft.flowUnit })}</p>
-        )}
         <div className="mep-field-row">
           <label>{sizeText('sizingMethod')}</label>
           <select
@@ -162,9 +165,18 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, capa
               </option>
             ))}
           </select>
+          {sizingDraft.method !== 'none' && (
+            <span data-testid="nt-limits-note" className="mep-nt-note-tip">
+              <InfoTip label={sizeText('limitsInfoLabel')}>{sizeText('limitsNote')}</InfoTip>
+            </span>
+          )}
         </div>
-        {methods.length === 1 && <p className="mep-nt-note" data-testid="nt-discipline-note">{sizeText('disciplineNotSized')}</p>}
-        {sizingDraft.method !== 'none' && <p className="mep-nt-note" data-testid="nt-limits-note">{sizeText('limitsNote')}</p>}
+        {methods.length === 1 && (
+          <p className="mep-nt-note" data-testid="nt-discipline-note">
+            {sizeText('disciplineNotSized')}
+            <InfoTip label={sizeText('disciplineInfoLabel')}>{sizeText('disciplineNotSizedMore')}</InfoTip>
+          </p>
+        )}
       </div>
       {showConvert && panel !== 'none' && networkType.flowUnit && sizingDraft.flowUnit && (
         <div className="mep-nt-convert" data-testid="nt-convert-panel">
