@@ -4,12 +4,11 @@ import { checkRouteStart, findRoutePorts, getNetworkTypeFromLibrary, getStampWor
 import { Dialog } from './Dialog.js';
 import { RouteAreaSection } from './RouteAreaSection.js';
 import { RouteBuildSection, routeRequestKey } from './RouteBuildSection.js';
-import { includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startCheckLines, startPortChoices, typeChoices, typeNameInText, typeOptionText } from './routePlan.js';
+import { includeOutsideText, looksLikeLoad, presetStart, roomLabel, routeSummaryLines, routeText, startCandidates, startCheckLines, startPortChoices, typeChoices, typeOptionText } from './routePlan.js';
 
 export interface RouteDialogProps {
   sceneRef: RefObject<SketchScene | null>;
   roomTypes: RoomType[];
-  language: 'en' | 'nl';
   stampName: (definitionId: string) => string | null;
   onRouteTypeIdsChange: (ids: string[]) => void;
   onClose: () => void;
@@ -36,7 +35,7 @@ function uniqueLabels(stamps: readonly StampInfo[], labelOf: (stamp: StampInfo) 
   return labels;
 }
 
-export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteTypeIdsChange, onClose }: RouteDialogProps) {
+export function RouteDialog({ sceneRef, roomTypes, stampName, onRouteTypeIdsChange, onClose }: RouteDialogProps) {
   const scene = sceneRef.current;
   const [pageCount, setPageCount] = useState(() => scene?.getPageCount() ?? 1);
   const [stamps, setStamps] = useState(() => scene?.listStamps() ?? []);
@@ -73,7 +72,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
     };
   }, [scene]);
 
-  const problem = routePageProblem(pageCount, language);
+  const problem = routePageProblem(pageCount);
 
   const candidates = startCandidates(stamps);
   const selectedStart = candidates.some((c) => c.stamp.id === startId)
@@ -151,19 +150,19 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
   const startLabels = uniqueLabels(candidates.map((c) => c.stamp), labelOf);
   const stampNameOf = (id: string) => startLabels.get(id) ?? (() => { const s = stamps.find((x) => x.id === id); return s ? labelOf(s) : id; })();
   const portNameOf = (id: string) => startStamp ? (startPortChoices(startStamp, selectedType ?? '').find((p) => p.portId === id)?.name ?? id) : id;
-  const checkLines = startCheckLines(problems, { type: (id) => typeNameInText(id, nameOf(id), language), stamp: stampNameOf, port: portNameOf }, language);
+  const checkLines = startCheckLines(problems, { type: (id) => nameOf(id), stamp: stampNameOf, port: portNameOf });
   const selectedOnly = selectionIds.length === 1 ? stamps.find((s) => s.id === selectionIds[0]) : undefined;
   const selectionNote = selectionStart === null && selectedOnly && selectedOnly.category !== 'equipment' ? selectedOnly : null;
   const selectionNoteBlock = selectionNote && (
     <div data-testid="route-selection-note">
-      <p className="mep-route-text mep-route-note">{routeText(language, 'selectionNotEquipment', { stamp: labelOf(selectionNote) })}</p>
-      <p className="mep-route-text mep-route-hint">{routeText(language, 'selectionRiserNote')}</p>
+      <p className="mep-route-text mep-route-note">{routeText('selectionNotEquipment', { stamp: labelOf(selectionNote) })}</p>
+      <p className="mep-route-text mep-route-hint">{routeText('selectionRiserNote')}</p>
     </div>
   );
   const sources = candidates.filter((c) => c.likelySource);
   const waiting = candidates.filter((c) => !c.likelySource);
   const lines = result && selectedType
-    ? routeSummaryLines(result, effectiveScope, typeNameInText(selectedType, nameOf(selectedType), language), checkedRoomCount, language, {
+    ? routeSummaryLines(result, effectiveScope, nameOf(selectedType), checkedRoomCount, {
       portsPerStamp: allPorts ? 'all' : 'one',
       includeOutsideRooms: includeOutside,
     })
@@ -171,14 +170,14 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
 
   return (
     <Dialog
-      title={routeText(language, 'title')}
+      title={routeText('title')}
       className="mep-modal--route"
       backdropClassName="mep-modal-backdrop--route"
       closeOnBackdropClick={false}
       onClose={onClose}
       actions={
         <button type="button" onClick={onClose}>
-          {routeText(language, 'close')}
+          {routeText('close')}
         </button>
       }
     >
@@ -188,14 +187,14 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
         <div data-testid="route-body">
           {candidates.length === 0 ? (
             <>
-              <p className="mep-route-text">{routeText(language, 'noEquipment')}</p>
+              <p className="mep-route-text">{routeText('noEquipment')}</p>
               {selectionNoteBlock}
             </>
           ) : (
             <>
               {selectionNoteBlock}
               <label className="mep-route-field">
-                <span>{routeText(language, 'startStamp')}</span>
+                <span>{routeText('startStamp')}</span>
                 <select
                   data-testid="route-start"
                   value={selectedStart ?? ''}
@@ -205,14 +204,14 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                   }}
                 >
                   {sources.length > 0 && (
-                    <optgroup label={routeText(language, 'groupSources')}>
+                    <optgroup label={routeText('groupSources')}>
                       {sources.map((c) => (
                         <option key={c.stamp.id} value={c.stamp.id}>{startLabels.get(c.stamp.id)}</option>
                       ))}
                     </optgroup>
                   )}
                   {waiting.length > 0 && (
-                    <optgroup label={routeText(language, 'groupWaiting')}>
+                    <optgroup label={routeText('groupWaiting')}>
                       {waiting.map((c) => (
                         <option key={c.stamp.id} value={c.stamp.id}>{startLabels.get(c.stamp.id)}</option>
                       ))}
@@ -222,11 +221,11 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
               </label>
               {startStamp && selectedType && looksLikeLoad(startStamp, selectedType) && (
                 <p className="mep-route-text mep-route-note" data-testid="route-start-warning">
-                  {routeText(language, 'startWarning', { type: typeNameInText(selectedType, nameOf(selectedType), language) })}
+                  {routeText('startWarning', { type: nameOf(selectedType) })}
                 </p>
               )}
               <label className="mep-route-field">
-                <span>{routeText(language, 'networkType')}</span>
+                <span>{routeText('networkType')}</span>
                 <select
                   data-testid="route-type"
                   value={selectedType ?? ''}
@@ -237,14 +236,14 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                   }}
                 >
                   {choices.length === 0 ? (
-                    <option value="">{routeText(language, 'noChoice')}</option>
+                    <option value="">{routeText('noChoice')}</option>
                   ) : choices.map((c) => (
-                    <option key={c.networkTypeId} value={c.networkTypeId}>{typeOptionText(language, nameOf(c.networkTypeId), c.count)}</option>
+                    <option key={c.networkTypeId} value={c.networkTypeId}>{typeOptionText(nameOf(c.networkTypeId), c.count)}</option>
                   ))}
                 </select>
               </label>
               <label className="mep-route-field">
-                <span>{routeText(language, 'startPort')}</span>
+                <span>{routeText('startPort')}</span>
                 <select
                   data-testid="route-port"
                   value={selectedPort ?? ''}
@@ -252,7 +251,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                   onChange={(event) => setPortId(event.target.value)}
                 >
                   {portChoices.length === 0 ? (
-                    <option value="">{routeText(language, 'noChoice')}</option>
+                    <option value="">{routeText('noChoice')}</option>
                   ) : portChoices.map((p) => (
                     <option key={p.portId} value={p.portId}>{p.name}</option>
                   ))}
@@ -260,9 +259,9 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
               </label>
               {selectedType && port && port.routingTarget !== null && !port.matches && (
                 <p className="mep-route-text mep-route-note" data-testid="route-port-note">
-                  {routeText(language, 'portNote', {
-                    target: typeNameInText(port.routingTarget, nameOf(port.routingTarget), language),
-                    type: typeNameInText(selectedType, nameOf(selectedType), language),
+                  {routeText('portNote', {
+                    target: nameOf(port.routingTarget),
+                    type: nameOf(selectedType),
                   })}
                 </p>
               )}
@@ -270,19 +269,19 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                 <div className="mep-route-checks" data-testid="route-checks">
                   {checkLines.map((line) => (
                     <div key={line.code} className="mep-route-check-line">
-                      <p className={`mep-route-text mep-route-check-${line.severity}`} data-testid={`route-check-${line.code}`} data-severity={line.severity}><strong className="mep-route-severity">{routeText(language, line.severity === 'error' ? 'severityError' : line.severity === 'warning' ? 'severityWarning' : 'severityInfo')}</strong>{' '}{line.text}</p>
+                      <p className={`mep-route-text mep-route-check-${line.severity}`} data-testid={`route-check-${line.code}`} data-severity={line.severity}><strong className="mep-route-severity">{routeText(line.severity === 'error' ? 'severityError' : line.severity === 'warning' ? 'severityWarning' : 'severityInfo')}</strong>{' '}{line.text}</p>
                       {line.hint !== '' && <p className="mep-route-text mep-route-hint">{line.hint}</p>}
                     </div>
                   ))}
                 </div>
               )}
               {choices.length === 0 && (
-                <p className="mep-route-text" data-testid="route-no-ports">{routeText(language, 'noOpenPorts')}</p>
+                <p className="mep-route-text" data-testid="route-no-ports">{routeText('noOpenPorts')}</p>
               )}
               {choices.length > 0 && startStamp && result && (
                 <>
                   <fieldset className="mep-route-scope" data-testid="route-scope">
-                    <legend>{routeText(language, 'scope')}</legend>
+                    <legend>{routeText('scope')}</legend>
                     <label className="mep-route-radio">
                       <input
                         type="radio"
@@ -291,7 +290,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                         checked={effectiveScope === 'rooms'}
                         onChange={() => setScopeKind('rooms')}
                       />
-                      <span>{routeText(language, 'scopeRooms')}</span>
+                      <span>{routeText('scopeRooms')}</span>
                     </label>
                     <label className={`mep-route-radio${stampsEnabled ? '' : ' mep-route-radio--disabled'}`}>
                       <input
@@ -302,37 +301,37 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                         checked={effectiveScope === 'stamps'}
                         onChange={() => setScopeKind('stamps')}
                       />
-                      <span>{routeText(language, 'scopeStamps')}</span>
+                      <span>{routeText('scopeStamps')}</span>
                     </label>
                   </fieldset>
                   {effectiveScope === 'stamps' && (
-                    <p className="mep-route-text mep-route-hint" data-testid="route-stamps-note">{routeText(language, 'scopeStampsNote')}</p>
+                    <p className="mep-route-text mep-route-hint" data-testid="route-stamps-note">{routeText('scopeStampsNote')}</p>
                   )}
                   {!stampsEnabled && (
-                    <p className="mep-route-text mep-route-hint" data-testid="route-stamps-hint">{routeText(language, 'scopeStampsHint')}</p>
+                    <p className="mep-route-text mep-route-hint" data-testid="route-stamps-hint">{routeText('scopeStampsHint')}</p>
                   )}
                   {effectiveScope === 'rooms' && (
                     rooms.length === 0 ? (
-                      <p className="mep-route-text" data-testid="route-no-rooms">{routeText(language, 'noRooms')}</p>
+                      <p className="mep-route-text" data-testid="route-no-rooms">{routeText('noRooms')}</p>
                     ) : (
                       <>
                         <div className="mep-route-room-actions">
                           <button type="button" data-testid="route-rooms-all" onClick={() => setUncheckedRooms(new Set())}>
-                            {routeText(language, 'roomsAll')}
+                            {routeText('roomsAll')}
                           </button>
                           <button
                             type="button"
                             data-testid="route-rooms-none"
                             onClick={() => setUncheckedRooms(new Set(rooms.map((r) => r.id)))}
                           >
-                            {routeText(language, 'roomsNone')}
+                            {routeText('roomsNone')}
                           </button>
                         </div>
                         <div className="mep-route-room mep-route-room-head" data-testid="route-rooms-head">
                           <span className="mep-route-room-spacer" />
-                          <span className="mep-route-room-name">{routeText(language, 'roomsColRoom')}</span>
-                          <span className="mep-route-room-type">{routeText(language, 'roomsColType')}</span>
-                          <span className="mep-route-room-count" title={routeText(language, 'roomsColPortsTitle')}>{routeText(language, 'roomsColPorts')}</span>
+                          <span className="mep-route-room-name">{routeText('roomsColRoom')}</span>
+                          <span className="mep-route-room-type">{routeText('roomsColType')}</span>
+                          <span className="mep-route-room-count" title={routeText('roomsColPortsTitle')}>{routeText('roomsColPorts')}</span>
                         </div>
                         <div className="mep-route-rooms" data-testid="route-rooms">
                           {rooms.map((room, index) => {
@@ -351,8 +350,8 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                                     return next;
                                   })}
                                 />
-                                <span className="mep-route-room-name">{roomLabel(room, index, language)}</span>
-                                <span className="mep-route-room-type">{type ? roomTypeLabel(type, language) : ''}</span>
+                                <span className="mep-route-room-name">{roomLabel(room, index)}</span>
+                                <span className="mep-route-room-type">{type ? roomTypeLabel(type, 'en') : ''}</span>
                                 <span className="mep-route-room-count">{result.perRoom.find((p) => p.roomId === room.id)?.count ?? 0}</span>
                               </label>
                             );
@@ -369,7 +368,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                         checked={includeOutside}
                         onChange={(event) => setIncludeOutside(event.target.checked)}
                       />
-                      <span>{includeOutsideText(language, result.outsideRooms)}</span>
+                      <span>{includeOutsideText(result.outsideRooms)}</span>
                     </label>
                   )}
                   {result.multiPortStamps > 0 && (
@@ -380,7 +379,7 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
                         checked={allPorts}
                         onChange={(event) => setAllPorts(event.target.checked)}
                       />
-                      <span>{routeText(language, 'useAllPorts')}</span>
+                      <span>{routeText('useAllPorts')}</span>
                     </label>
                   )}
                   <div data-testid="route-summary" aria-live="polite">
@@ -400,13 +399,13 @@ export function RouteDialog({ sceneRef, roomTypes, language, stampName, onRouteT
               roomName={(id) => {
                 const index = rooms.findIndex((r) => r.id === id);
                 if (index < 0) return id;
-                const label = roomLabel(rooms[index], index, 'en');
+                const label = roomLabel(rooms[index], index);
                 const number = rooms[index].number?.trim();
                 return number && number !== label ? `${number} ${label}` : label;
               }}
             />
           )}
-          <RouteAreaSection sceneRef={sceneRef} roomTypes={roomTypes} language={language} onRouteTypeIdsChange={onRouteTypeIdsChange} />
+          <RouteAreaSection sceneRef={sceneRef} roomTypes={roomTypes} onRouteTypeIdsChange={onRouteTypeIdsChange} />
         </div>
       )}
     </Dialog>

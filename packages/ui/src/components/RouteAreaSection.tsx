@@ -6,13 +6,12 @@ import { roomLabel, routeAreaLines, routeAreaSummaryLine, routeAreaTypeChoices, 
 export interface RouteAreaSectionProps {
   sceneRef: RefObject<SketchScene | null>;
   roomTypes: RoomType[];
-  language: 'en' | 'nl';
   onRouteTypeIdsChange: (ids: string[]) => void;
 }
 
 const legendSwatches = ['fill', 'center', 'branch', 'shaft'] as const;
 
-export function RouteAreaSection({ sceneRef, roomTypes, language, onRouteTypeIdsChange }: RouteAreaSectionProps) {
+export function RouteAreaSection({ sceneRef, roomTypes, onRouteTypeIdsChange }: RouteAreaSectionProps) {
   const scene = sceneRef.current;
   const [view, setView] = useState<RouteAreaView | null>(() => scene?.getRouteArea() ?? null);
   const [rooms, setRooms] = useState(() => (scene ? scene.listRooms().filter((r) => r.pageIndex === scene.getPageIndex()) : []));
@@ -58,13 +57,13 @@ export function RouteAreaSection({ sceneRef, roomTypes, language, onRouteTypeIds
 
   const roomNameOf = (id: string) => {
     const index = rooms.findIndex((r) => r.id === id);
-    return index < 0 ? id : roomLabel(rooms[index], index, language);
+    return index < 0 ? id : roomLabel(rooms[index], index);
   };
-  const lines = routeAreaLines(view.warnings, { room: roomNameOf }, language);
-  const allTypeChoices = routeAreaTypeChoices(roomTypes, typeIds, language);
+  const lines = routeAreaLines(view.warnings, { room: roomNameOf });
+  const allTypeChoices = routeAreaTypeChoices(roomTypes, typeIds);
   const typeChoices = allTypeChoices.filter((c) => c.inList);
   const addChoices = allTypeChoices.filter((c) => !c.inList);
-  const legendLabels = routeText(language, 'areaLegend').split(', ');
+  const legendLabels = routeText('areaLegend').split(', ');
   // With the overlay on, App's effect pushes the list and the scene emits routeAreaChanged. With the overlay off the scene emits nothing, so the list is set here at once.
   const changeTypes = (next: string[]) => {
     const overlayOn = scene.isRouteAreaVisible();
@@ -75,36 +74,36 @@ export function RouteAreaSection({ sceneRef, roomTypes, language, onRouteTypeIds
 
   return (
     <details open className="mep-route-area" data-testid="route-area">
-      <summary className="mep-route-area-title">{routeText(language, 'areaTitle')}</summary>
+      <summary className="mep-route-area-title">{routeText('areaTitle')}</summary>
       <label className="mep-route-check">
         <input type="checkbox" data-testid="route-area-show" checked={visible} onChange={(e) => scene.setRouteAreaVisible(e.target.checked)} />
-        <span>{routeText(language, 'areaShow')}</span>
+        <span>{routeText('areaShow')}</span>
       </label>
-      {pending && <p className="mep-route-text mep-route-note" data-testid="route-area-calculating">{routeText(language, 'areaCalculating')}</p>}
-      <p className="mep-route-text mep-route-main" data-testid="route-area-summary">{routeAreaSummaryLine(view.area, language)}</p>
+      {pending && <p className="mep-route-text mep-route-note" data-testid="route-area-calculating">{routeText('areaCalculating')}</p>}
+      <p className="mep-route-text mep-route-main" data-testid="route-area-summary">{routeAreaSummaryLine(view.area)}</p>
       <div data-testid="route-area-types-block">
-        <p className="mep-route-text">{routeText(language, 'areaTypes')}</p>
+        <p className="mep-route-text">{routeText('areaTypes')}</p>
         <ul className="mep-route-area-types" data-testid="route-area-types">
           {typeChoices.map((c) => (
             <li key={c.id} data-testid="route-area-type" data-type-id={c.id}>
               <span>{c.label}</span>
-              <button type="button" data-testid="route-area-remove" aria-label={routeText(language, 'areaRemove', { type: c.label })} onClick={() => changeTypes(typeIds.filter((id) => id !== c.id))}>×</button>
+              <button type="button" data-testid="route-area-remove" aria-label={routeText('areaRemove', { type: c.label })} onClick={() => changeTypes(typeIds.filter((id) => id !== c.id))}>×</button>
             </li>
           ))}
         </ul>
-        <select className="mep-route-area-add" data-testid="route-area-add" value="" aria-label={routeText(language, 'areaAdd')} disabled={addChoices.length === 0}
+        <select className="mep-route-area-add" data-testid="route-area-add" value="" aria-label={routeText('areaAdd')} disabled={addChoices.length === 0}
           onChange={(e) => { if (e.target.value) changeTypes([...typeIds, e.target.value]); }}>
-          <option value="">{routeText(language, 'areaAdd')}</option>
+          <option value="">{routeText('areaAdd')}</option>
           {addChoices.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
-        <p className="mep-route-text mep-route-hint" data-testid="route-area-types-hint">{routeText(language, 'areaTypesHint')}</p>
-        <button type="button" className="mep-route-area-reset" data-testid="route-area-reset" onClick={() => changeTypes([...DEFAULT_ROUTE_AREA_TYPE_IDS])}>{routeText(language, 'areaReset')}</button>
+        <p className="mep-route-text mep-route-hint" data-testid="route-area-types-hint">{routeText('areaTypesHint')}</p>
+        <button type="button" className="mep-route-area-reset" data-testid="route-area-reset" onClick={() => changeTypes([...DEFAULT_ROUTE_AREA_TYPE_IDS])}>{routeText('areaReset')}</button>
       </div>
       {lines.length > 0 && (
         <div className="mep-route-checks" data-testid="route-area-lines">
           {lines.map((line, index) => (
             <div key={`${line.code}-${index}`} className="mep-route-check-line">
-              <p className={`mep-route-text mep-route-check-${line.severity}`} data-testid={`route-area-line-${line.code}`} data-severity={line.severity}><strong className="mep-route-severity">{routeText(language, line.severity === 'error' ? 'severityError' : line.severity === 'warning' ? 'severityWarning' : 'severityInfo')}</strong>{' '}{line.text}</p>
+              <p className={`mep-route-text mep-route-check-${line.severity}`} data-testid={`route-area-line-${line.code}`} data-severity={line.severity}><strong className="mep-route-severity">{routeText(line.severity === 'error' ? 'severityError' : line.severity === 'warning' ? 'severityWarning' : 'severityInfo')}</strong>{' '}{line.text}</p>
               {line.hint !== '' && <p className="mep-route-text mep-route-hint">{line.hint}</p>}
             </div>
           ))}
@@ -118,7 +117,7 @@ export function RouteAreaSection({ sceneRef, roomTypes, language, onRouteTypeIds
           </span>
         ))}
       </div>
-      <p className="mep-route-text mep-route-hint mep-route-area-guide">{routeText(language, 'areaLegendGuide')}</p>
+      <p className="mep-route-text mep-route-hint mep-route-area-guide">{routeText('areaLegendGuide')}</p>
     </details>
   );
 }

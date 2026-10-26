@@ -225,7 +225,7 @@ export function routeBuildLines(plan: { warnings: readonly RoutePlanWarning[] },
 
 /** The English label of a severity: 'Error', 'Warning' or 'Note'. */
 export function routeBuildSeverityLabel(severity: 'error' | 'warning' | 'info'): string {
-  if (severity === 'error') return routeText('en', 'severityError');
-  if (severity === 'warning') return routeText('en', 'severityWarning');
-  return routeText('en', 'severityInfo');
+  if (severity === 'error') return routeText('severityError');
+  if (severity === 'warning') return routeText('severityWarning');
+  return routeText('severityInfo');
 }
