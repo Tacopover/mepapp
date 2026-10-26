@@ -190,9 +190,15 @@ function routedHeldByHand(input: RouteBuildInput): number {
   return network.segmentIds.filter((id) => !removed.has(id) && byId.get(id)?.routedBy === ROUTED_MARK).length;
 }
 
+export type RouteLegOrigin = 'trunk' | 'bridge' | 'branch' | 'spine' | 'link';
+
+/** Read-only record of the paths that planRoute joins, with the stage that made each path. Paths are in mm. */
+export interface RouteTrace { paths: { origin: RouteLegOrigin; path: Vec2[] }[] }
+
 export function planRoute(
   input: RouteBuildInput,
   options: RouteLayoutOptions = DEFAULT_LAYOUT_OPTIONS,
+  trace?: RouteTrace,
 ): { status: 'ok' | 'refused'; plan: PlannedRoute } {
   const warnings: RoutePlanWarning[] = [];
   const errors: RoutePlanWarning[] = [];
@@ -308,12 +314,22 @@ export function planRoute(
   const trunk = buildTrunk({ area: input.area, rooms: input.rooms, mmPerPt, startPointMm: start.pointMm, servedRoomIds, options, bridgeAccepts: accepts });
 
   const paths: Vec2[][] = [];
+  const tag = (origin: RouteLegOrigin, path: readonly Vec2[]): void => {
+    trace?.paths.push({ origin, path: path.map((p) => ({ x: p.x, y: p.y })) });
+  };
   if (trunk.rootPointMm) {
     const dx = trunk.rootPointMm.x - start.pointMm.x;
     const dy = trunk.rootPointMm.y - start.pointMm.y;
-    if (Math.hypot(dx, dy) > 1e-6) paths.push(elbowPath(start.pointMm, trunk.rootPointMm, Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'));
+    if (Math.hypot(dx, dy) > 1e-6) {
+      const root = elbowPath(start.pointMm, trunk.rootPointMm, Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y');
+      paths.push(root);
+      tag('trunk', root);
+    }
   }
-  for (const edge of trunk.edges) paths.push(edge.path);
+  for (const edge of trunk.edges) {
+    paths.push(edge.path);
+    tag(edge.id.startsWith('rb-') ? 'bridge' : 'trunk', edge.path);
+  }
 
   // A port in a route-area room (inArea) is treated like an outside port: it gets the off-graph connection. Provisional rule, the plan has none yet.
   const loosePorts: RoutePort[] = [];
@@ -339,6 +355,8 @@ export function planRoute(
     options,
   }).rooms) {
     paths.push(branch.branch, ...branch.spine);
+    tag('branch', branch.branch);
+    for (const spine of branch.spine) tag('spine', spine);
     for (const id of branch.offGraphPortIds) loosePorts.push(portById.get(id)!);
   }
 
@@ -367,6 +385,7 @@ export function planRoute(
     ...(options.linkSearch ? { roomAt: roomAtMm, roomCorners: roomCornersMm } : {}),
   });
   paths.push(...connected.paths);
+  for (const path of connected.paths) tag('link', path);
   const leftIds = new Set(connected.left);
   const connectedPorts = targetPorts.filter((port) => !leftIds.has(portKey(port)));
 

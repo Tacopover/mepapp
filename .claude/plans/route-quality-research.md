@@ -292,6 +292,14 @@ Each prototype task has the same closing steps: (1) add its numbers to section 1
 - Verification: core tests (a port behind a wall with an opening: the L-shape crosses the wall, the search goes through the opening when `wallMm` is large; with `wallMm` 0 and `bendMm` 0 the length is not longer than the L-shape). Table: wall crossings, bends, length, runtime (the grid may be large: report the max runtime).
 - Depends on: T06, T08 (shared heap).
 
+#### Q1-T09b. Split the bends by leg origin [S] (measure only)
+- Why: Q1-T07 (`bridgeParts`) cuts the off-graph rooms from 28 to 15 on the first floor, but the 90 degree bends rise from 35 to 62 and the length by 17.5 %. Q1-T08 changed nothing. Q1-T09 removed 4 of the 27 extra bends. The part of the plan that makes the extra bends is not known.
+- Files: `packages/core/src/route-build.ts` (an optional third argument `trace?: RouteTrace` of `planRoute`; with no trace the code does the same as before), `packages/core/src/route-origin.ts` (new, `splitByOrigin`), `packages/core/src/route-origin-report.test.ts` (new).
+- Origins: `trunk` (start elbow and trunk edges), `bridge` (edge id `rb-`), `branch` (trunk to room entry), `spine` (room path inside the room), `link` (off-graph connection, `connectLoosePorts`).
+- Rules of the split: a plan segment takes its length from the trace legs that cover it, in trace order (a segment can span two paths, because `buildRouteItems` merges collinear legs). A fitting belongs to the origin of highest rank among the paths that have a vertex at the fitting (rank order: trunk, bridge, branch, spine, link). A bend is an elbow fitting of 90 or 45 degrees.
+- Verification: the plan with a trace equals the plan without a trace (JSON text); the sums of the split equal `plan.stats` (length within 1 mm, fittings, bends); no unassigned segment or fitting. Result: section 10, "Split of the bends by leg origin".
+- Depends on: Q1-T07, Q1-T09.
+
 #### Q1-T10. Idea 2, exact Steiner tree in a room [M]
 - Files: `packages/core/src/route-exact.ts` (new), `route-hanan.ts` (call it when `ports.length <= maxPorts`), tests.
 - Shape: `options.exactSpine = { maxPorts }`. Dreyfus-Wagner on the same Hanan grid and the same blocked edges as `roomSpine`. The entry is the root terminal. Ports are leaves: no merge and no pass at a port node. The result is the shortest length. A second step, the bend-merge pass, slides a leg onto a parallel leg of the same tree when the length stays equal and the number of bends goes down. If the exact tree has more bends than the heuristic tree for the same length, the tie goes to fewer bends. The old heuristic stays for more than `maxPorts` ports and as the check in tests.
@@ -593,6 +601,53 @@ Reading of the table:
 - Not done on purpose: a bend-aware bridge elbow. The table shows that the bridge elbows are not the main source of the extra bends (the link search, which removes only link bends, changes 4 to 5 of the 27). A split of the extra bends by leg type (trunk, bridge, branch, spine, link) would show the real source; it needs a leg origin in the plan (see section 4). This is the suggested next step.
 - Known limits: the 100 mm sample step can miss a wall thinner than 100 mm. The link search does not check legs shorter than 300 mm.
 
+#### Split of the bends by leg origin (Q1-T09b, measured 2026-10-26)
+
+Test: `route-origin-report.test.ts`. One run for each variant, scenario A, start 0. Raw output: `/tmp/claude-0/-root-MepApp/0119519d-6cb5-4465-8095-715236bd031d/scratchpad/Q1-T09b/origin-report.txt` (not in git). Variants: "off", "bridge" (`bridgeParts`, `penaltyMm` 0), "bridge + link" (the bridge option with `linkSearch` 500 / 3000). Columns: bends 90 / bends 45, length in metres, fittings. The plan with a trace is equal to the plan without a trace in all rows. The totals equal `plan.stats`.
+
+| Drawing | Origin | off | bridge | bridge + link |
+|---|---|---|---|---|
+| First floor A | trunk | 5 / 6, 10.4 m, 11 | 8 / 7, 37.8 m, 17 | 8 / 7, 37.8 m, 17 |
+| First floor A | bridge | 0 / 0, 0 m, 0 | 4 / 0, 16.4 m, 4 | 4 / 0, 16.4 m, 4 |
+| First floor A | branch | 4 / 4, 8.6 m, 11 | 15 / 14, 20.5 m, 43 | 13 / 12, 18.0 m, 37 |
+| First floor A | spine | 2 / 0, 7.2 m, 2 | 14 / 0, 31.0 m, 14 | 13 / 0, 31.0 m, 13 |
+| First floor A | link | 24 / 0, 125.2 m, 52 | 21 / 0, 72.2 m, 36 | 19 / 0, 71.7 m, 36 |
+| First floor A | total | 35 / 10, 151.4 m, 76 | 62 / 21, 177.9 m, 114 | 57 / 19, 175.0 m, 107 |
+| w_rooms A | trunk | 5 / 2, 19.0 m, 9 | 5 / 2, 19.0 m, 9 | 5 / 2, 19.0 m, 9 |
+| w_rooms A | bridge | 0 / 0, 0 m, 0 | 0 / 0, 0 m, 0 | 0 / 0, 0 m, 0 |
+| w_rooms A | branch | 10 / 8, 24.1 m, 25 | 10 / 8, 24.1 m, 25 | 10 / 8, 24.1 m, 25 |
+| w_rooms A | spine | 12 / 0, 28.0 m, 12 | 12 / 0, 28.0 m, 12 | 12 / 0, 28.0 m, 12 |
+| w_rooms A | link | 20 / 0, 136.5 m, 52 | 20 / 0, 136.5 m, 52 | 21 / 0, 129.8 m, 54 |
+| w_rooms A | total | 47 / 10, 207.6 m, 98 | 47 / 10, 207.6 m, 98 | 48 / 10, 200.8 m, 100 |
+| 10A A | trunk | 3 / 2, 25.3 m, 6 | 3 / 6, 30.8 m, 10 | 3 / 6, 30.8 m, 10 |
+| 10A A | bridge | 0 / 0, 0 m, 0 | 4 / 0, 54.8 m, 7 | 4 / 0, 54.8 m, 7 |
+| 10A A | branch | 1 / 14, 9.4 m, 21 | 9 / 14, 14.5 m, 31 | 9 / 13, 14.5 m, 30 |
+| 10A A | spine | 7 / 0, 36.9 m, 7 | 16 / 0, 59.7 m, 16 | 17 / 0, 59.7 m, 17 |
+| 10A A | link | 16 / 0, 138.8 m, 34 | 9 / 0, 66.3 m, 23 | 7 / 0, 66.1 m, 21 |
+| 10A A | total | 27 / 16, 210.3 m, 68 | 41 / 20, 226.1 m, 87 | 40 / 19, 225.8 m, 85 |
+
+(w_rooms A: the bridge option adds no bridge leg, so the plan is the same as "off". The link search changes only the link part. The totals of 10A A and w_rooms A in this table come from one run each and agree with the totals of the Q1-T09 table, except the bridge row of 10A A, which Q1-T09 did not list.)
+
+Change from "off" to "bridge" (bends 90 / bends 45, length in metres), first floor A:
+
+| Origin | Bends 90 | Bends 45 | Length m | Fittings |
+|---|---|---|---|---|
+| trunk | +3 | +1 | +27.5 | +6 |
+| bridge | +4 | 0 | +16.4 | +4 |
+| branch | +11 | +10 | +11.9 | +32 |
+| spine | +12 | 0 | +23.8 | +12 |
+| link | -3 | 0 | -53.0 | -16 |
+| total | +27 | +11 | +26.5 | +38 |
+
+Reading of the table:
+- The branches and the room spines make most of the extra bends. On the first floor they add 23 of the 27 extra bends 90 (85 %) and 10 of the 11 extra bends 45. The trunk and the bridge add 7 bends 90. The link part takes off only 3. The bridge itself is not the source.
+- 10A A, "off" to "bridge": bends 90 plus 14 = bridge +4, branch +8, spine +9, link -7 (trunk 0). Branch and spine again add 17 of the 21 bends that are not taken off by the links.
+- The rooms that the bridge adds (13 on the first floor) change from a link to a branch plus a spine. A link cost about 1 bend 90 for each port (24 bends for the 28 links of "off", about 125 m). A room that is now served by a branch and a spine costs about 2 bends 90 and also bends 45 (23 bends 90 and 10 bends 45 for 13 rooms), and the branch and spine parts add 44 fittings while the link part loses 16. This follows from the table. The cause inside the branch and spine code (the door position against the port position) is not examined (not verified).
+- The link search (the "bridge + link" column) changes only the link, branch and spine parts by 1 to 2 bends each. It cannot remove the bends that the branches and spines make.
+- Limits: scenario A has one port in each room. The split ranks a fitting to the origin of highest rank at that point, so a bend at the join of a branch and a trunk edge counts for the branch. Scenario B is not split (not measured). The split does not handle a start with an existing stub fitting (the stub is not in the plan fittings; the scenarios have no stub). It is a measuring tool for the report test, not for the product.
+
+Next experiment (proposal only, not implemented): **Q1-T09c, a bend-priced room reach.** For each served room, search the path from the trunk through the entry to all its ports on heading states, with the cost: length plus `bendMm` for each turn, as in Q1-T09. The entry (door) stays a fixed point on the path. The search may choose the tap point on the trunk edge, so that the branch runs straight through the door and the spine starts in line with the port. Compare with the bridge row: the aim is to bring the branch plus spine bends from about 1.8 for each room to about 1. The check is the same table with this split.
+
 ## 11. Defect catalogue from the user screenshots (T05)
 
 To be filled when the screenshots arrive (R-Q1-01). Until then:
@@ -626,6 +681,7 @@ To be filled when the screenshots arrive (R-Q1-01). Until then:
 | Q1-T07 | M | |
 | Q1-T08 | M | |
 | Q1-T09 | M | |
+| Q1-T09b | S | |
 | Q1-T10 | M | |
 | Q1-T11 | M | |
 | Q1-T12 | M | |
