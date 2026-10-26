@@ -13,7 +13,7 @@ import { checkRouteStart } from './route-start.js';
 import { canJoinPoint, checkExisting, checkInvariant, distanceToPiece, makeCrossesExisting, NEAR_ITEM_MM } from './route-checks.js';
 import { openPortsOf, type RoutePort, type RouteStamp } from './route-ports.js';
 import type { RouteArea } from './route-area.js';
-import type { Room } from './rooms/room.js';
+import { polygonAreaPt2, polygonContainsPoint, roomBounds, type Room } from './rooms/room.js';
 import type { SizingSettings } from './sizing-settings.js';
 import { ROUTE_GRAVITY_TYPE_IDS } from './route-plan-warnings.js';
 import type { MultiPortStamp, RoutePlanWarning } from './route-plan-warnings.js';
@@ -342,6 +342,20 @@ export function planRoute(
     for (const id of branch.offGraphPortIds) loosePorts.push(portById.get(id)!);
   }
 
+  const linkRooms = options.linkSearch
+    ? input.rooms
+        .filter((room) => room.pageIndex === input.pageIndex)
+        .map((room) => ({ room, bounds: roomBounds(room), area: polygonAreaPt2(room.polygon) }))
+        .sort((x, y) => x.area - y.area)
+    : [];
+  const roomAtMm = (p: Vec2): string | null => {
+    const q = toPage(p);
+    const hit = linkRooms.find(
+      (r) => q.x >= r.bounds.minX && q.x <= r.bounds.maxX && q.y >= r.bounds.minY && q.y <= r.bounds.maxY && polygonContainsPoint(r.room.polygon, q),
+    );
+    return hit?.room.id ?? null;
+  };
+  const roomCornersMm = linkRooms.flatMap((r) => r.room.polygon.outer.map(toMm));
   const connected = connectLoosePorts({
     paths,
     startPoint: start.pointMm,
@@ -350,6 +364,7 @@ export function planRoute(
     noTapPoints: start.stubFittingId === null ? [start.pointMm] : [],
     accepts,
     options,
+    ...(options.linkSearch ? { roomAt: roomAtMm, roomCorners: roomCornersMm } : {}),
   });
   paths.push(...connected.paths);
   const leftIds = new Set(connected.left);

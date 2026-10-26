@@ -546,6 +546,53 @@ Reading of the table:
 - Heap: `StateHeap` moved to `route-heap.ts` with no change.
 - Safety net: the search forbids a path that visits one node twice (a loop could lower the bend price).
 
+#### Idea 1b, a search for the off-graph links (Q1-T09, measured 2026-10-26)
+
+Option: `linkSearch = { bendMm, wallMm }`. Code: `route-link.ts` (`searchLink`), called from `connectLoosePorts` in `route-topology.ts`. The old L-shape stays as the fallback when the search finds no path or `accepts` refuses the path. Test: `route-link-report.test.ts`, full mode (`MEPAPP_QUALITY_FULL=1`: 2 warm-up runs, 7 runs; scenario A starts 0, 1, 2 and scenario B start 0). Raw output: `/tmp/claude-0/-root-MepApp/0119519d-6cb5-4465-8095-715236bd031d/scratchpad/Q1-T09/link-full.txt` (not in git). The variants are "off", "link500" (`bendMm` 500, `wallMm` 0), "link500w" (`bendMm` 500, `wallMm` 3000), "link2000w" (`bendMm` 2000, `wallMm` 3000), "bridge" (`bridgeParts` with `penaltyMm` 0), and "bridgeLink500", "bridgeLink500w", "bridgeLink2000w" (the bridge option with the three link prices). A "wall" in the link search is one exit from a room, sampled every 100 mm. The model has no wall rating, so this is a count of penetrations to check, as in T07.
+
+How the search works: a grid with the lines through the port, through up to 8 tap candidates, and through room corners (200 mm to each side, at most 20 lines on each axis). The search runs on heading states with the heap `StateHeap`. The price is the length, `bendMm` for each turn, and `wallMm` for each room exit. An edge that touches the built route is blocked, except at the tap. The first floor A start 0 rows of the main variants (all rows are in the raw file):
+
+| Scenario | Start | Variant | Segments | Fittings | Length mm | Bends 90 / 45 | Wall crossings (penetrations to check) | Off-graph rooms | Ports left | Free legs | Score | Median ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| First floor A | 0 | off | 109 | 76 | 151 366 | 35 / 10 | 26 | 28 | 0 | 0 | 263 044 | 60 |
+| First floor A | 0 | link500 | 109 | 76 | 150 650 | 35 / 10 | 26 | 28 | 0 | 0 | 265 328 | 158 |
+| First floor A | 0 | link500w | 108 | 75 | 153 142 | 34 / 10 | 25 | 28 | 0 | 0 | 261 616 | 153 |
+| First floor A | 0 | link2000w | 108 | 75 | 153 142 | 34 / 10 | 25 | 28 | 0 | 0 | 261 616 | 125 |
+| First floor A | 0 | bridge | 147 | 114 | 177 907 | 62 / 21 | 29 | 15 | 0 | 0 | 291 169 | 71 |
+| First floor A | 0 | bridgeLink500 | 141 | 108 | 175 054 | 58 / 19 | 29 | 15 | 0 | 0 | 287 016 | 133 |
+| First floor A | 0 | bridgeLink500w | 140 | 107 | 174 974 | 57 / 19 | 28 | 15 | 0 | 0 | 283 004 | 129 |
+| First floor A | 0 | bridgeLink2000w | 140 | 107 | 174 974 | 57 / 19 | 28 | 15 | 0 | 0 | 283 004 | 128 |
+| First floor A | 1 | off | 97 | 64 | 150 978 | 31 / 2 | 26 | 30 | 0 | 0 | 261 550 | 50 |
+| First floor A | 1 | link500w | 96 | 63 | 152 125 | 30 / 2 | 24 | 30 | 0 | 0 | 260 028 | 180 |
+| First floor A | 2 | off | 98 | 65 | 153 079 | 30 / 4 | 28 | 30 | 0 | 0 | 259 342 | 42 |
+| First floor A | 2 | link500w | 100 | 67 | 152 192 | 31 / 4 | 23 | 30 | 0 | 0 | 266 807 | 189 |
+| First floor B | 0 | off | 309 | 184 | 269 867 | 60 / 10 | 31 | 28 | 1 | 0 | 430 531 | 1 935 |
+| First floor B | 0 | link500w | 327 | 201 | 271 649 | 82 / 10 | 26 | 28 | 0 | 0 | 447 802 | 2 257 |
+| First floor B | 0 | link2000w | 317 | 191 | 270 509 | 72 / 8 | 25 | 28 | 0 | 0 | 438 803 | 2 244 |
+| Ground floor w_rooms A (local-only) | 0 | off | 141 | 98 | 207 563 | 47 / 10 | 33 | 33 | 0 | 0 | 342 577 | 111 |
+| Ground floor w_rooms A (local-only) | 0 | link500w | 143 | 100 | 200 838 | 48 / 10 | 32 | 33 | 0 | 0 | 352 702 | 232 |
+| Ground floor w_rooms B (local-only) | 0 | off | 436 | 264 | 387 830 | 93 / 10 | 53 | 33 | 0 | 0 | 605 612 | 6 825 |
+| Ground floor w_rooms B (local-only) | 0 | link500w | 436 | 264 | 356 854 | 98 / 10 | 40 | 33 | 0 | 0 | 563 917 | 9 254 |
+| 10A A (local-only) | 0 | off | 95 | 68 | 210 331 | 27 / 16 | 18 | 19 | 0 | 0 | 305 976 | 68 |
+| 10A A (local-only) | 0 | link500w | 98 | 71 | 200 035 | 30 / 15 | 14 | 19 | 0 | 0 | 307 748 | 289 |
+| 10A A (local-only) | 0 | link2000w | 94 | 67 | 205 866 | 26 / 15 | 13 | 19 | 0 | 0 | 313 246 | 332 |
+| 10A A (local-only) | 0 | bridgeLink500w | 112 | 85 | 225 848 | 40 / 19 | 18 | 13 | 0 | 0 | 327 069 | 150 |
+| 10A B (local-only) | 0 | off | 265 | 160 | 333 449 | 45 / 16 | 22 | 19 | 0 | 0 | 478 449 | 964 |
+| 10A B (local-only) | 0 | link500w | 264 | 159 | 318 383 | 46 / 16 | 15 | 19 | 0 | 0 | 457 703 | 1 116 |
+
+Reading of the table:
+- `linkSearch` alone does **not** cut bends. On the first floor A start 0 the change is 0 or minus 1 bend 90. On 10A A start 0 it is minus 1 to plus 2. In scenario B the bends rise (first floor B plus 10 to plus 22; w_rooms B plus 4 to plus 10). So the extra bends of idea 0 do not come from the off-graph links. This answers the open point of T08.
+- With `bridgeParts` on, the link search takes 4 to 5 bends 90 and 2 bends 45 off (first floor A start 0: 62 / 21 to 57 / 19), and 7 fittings off, but the plan still has 22 more bends 90 than "off" (57 against 35). So most of the extra bends of idea 0 come from the branches and the room spines of the 13 rooms that the trunk now serves. This is a reasoned conclusion from the table. It is not measured with a split by leg type.
+- The link search does cut length and wall crossings on the harder drawings: w_rooms B length minus 8.0 % and crossings 53 to 40; 10A A start 0 length minus 4.9 % and crossings 18 to 14; 10A B length minus 4.5 % and crossings 22 to 15. On the first floor A the effect is small (crossings 26 to 25, length plus 1.2 %).
+- The link search serves the port that scenario B left over on the first floor (ports left 1 to 0).
+- `wallMm` 3000 and 2000/3000 give the same plan in several rows. `bendMm` 500 against 2000 changes little. Not examined (not verified).
+- The off-graph count does not change (28, or 15 with the bridge). The link search joins the same rooms by a different path. The count is a count of trunk reach, not of link quality.
+- Acceptance (section 8), first floor A start 0, `linkSearch` alone (link500w): A1 **not met** (score minus 0.5 %, the limit is minus 10 %). A2 **not met** (off-graph 28; crossings 25, the limit is 18 or fewer). A3 met in the trivial sense (length plus 1.2 %). A4 met (free legs 0, no `internal-join`, checked in the report test). T1 met on the first floor A (medians 125 to 189 ms, limit 300 ms). T1 is **at the limit** on 10A A start 0 (289 and 332 ms with `linkSearch` alone; 150 ms with the bridge). T1 is not met in scenario B (about 2 200 ms on the first floor, 9 254 ms on w_rooms; the baseline is already 1 935 ms and 6 825 ms). Together with `bridgeParts` (bridgeLink500w): A1 not met (score plus 7.6 % against "off", minus 2.8 % against "bridge"); A2 not met (off-graph 15, crossings 28); A3 not met (length plus 15.6 %); A4 met; T1 met (129 ms).
+- Runtime: `linkSearch` adds about 70 to 130 ms on the first floor A and 100 to 250 ms on 10A A start 0. The first version took 650 ms on the first floor A start 0. A profile showed that the room lookup took 40 % of the time; a lookup with a bounding-box test and rooms sorted by area, and a cap of 20 corner lines, brought it to about 150 ms with the same plan. The machine was shared with other work, so the times vary.
+- Determinism D1 (two runs, `toEqual`) passes with the option on in all rows (the report test checks it). D2 and D3 with the option on are not measured.
+- Not done on purpose: a bend-aware bridge elbow. The table shows that the bridge elbows are not the main source of the extra bends (the link search, which removes only link bends, changes 4 to 5 of the 27). A split of the extra bends by leg type (trunk, bridge, branch, spine, link) would show the real source; it needs a leg origin in the plan (see section 4). This is the suggested next step.
+- Known limits: the 100 mm sample step can miss a wall thinner than 100 mm. The link search does not check legs shorter than 300 mm.
+
 ## 11. Defect catalogue from the user screenshots (T05)
 
 To be filled when the screenshots arrive (R-Q1-01). Until then:

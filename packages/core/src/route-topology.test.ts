@@ -274,4 +274,39 @@ describe('connectLoosePorts', () => {
     const result = connectLoosePorts({ paths: [], startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p] });
     expect(result.paths).toEqual([[v(0, 0), v(1000, 0), v(1000, 500)]]);
   });
+
+  it('takes a detour below a wall when a wall price is set', () => {
+    const p = v(12000, 3000);
+    const room = (q: Vec2): string | null => (q.x >= 9500 && q.x <= 9900 && q.y >= 1000 && q.y <= 2000 ? 'A' : null);
+    const corners = [v(9500, 1000), v(9900, 1000), v(9900, 2000), v(9500, 2000)];
+    const base = { paths: trunk, startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p] };
+    const linked = connectLoosePorts({ ...base, options: { linkSearch: { bendMm: 500, wallMm: 5000 } }, roomAt: room, roomCorners: corners });
+    const path = linked.paths[0]!;
+    expect(linked.connectedIds).toEqual(['p']);
+    expect(path.length).toBe(4);
+    expect(path[1]!.x).toBe(9700);
+    expect(path[1]!.y).toBeLessThanOrEqual(1000);
+    expect(path[path.length - 1]).toEqual(p);
+    expect(path).not.toEqual(connectLoosePorts(base).paths[0]);
+  });
+
+  it('gives the same paths with no options and with an empty options object', () => {
+    const p = v(4000, 3000);
+    const base = { paths: trunk, startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p] };
+    expect(connectLoosePorts({ ...base, options: {} })).toEqual(connectLoosePorts(base));
+  });
+
+  it('takes the L-shape when accepts rejects the link path that leaves the tap vertically', () => {
+    const p = v(12000, 3000);
+    const base = { paths: trunk, startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p] };
+    const result = connectLoosePorts({ ...base, options: { linkSearch: { bendMm: 500, wallMm: 0 } }, accepts: (path) => path[0]!.x !== path[1]!.x });
+    expect(result.connectedIds).toEqual(['p']);
+    expect(result.paths).toEqual([[v(9700, 0), v(12000, 0), v(12000, 3000)]]);
+  });
+
+  it('gives the same result for two calls with the link search', () => {
+    const p = v(4000, 3000);
+    const input = { paths: trunk, startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p], options: { linkSearch: { bendMm: 500, wallMm: 0 } } };
+    expect(connectLoosePorts(input)).toEqual(connectLoosePorts(input));
+  });
 });

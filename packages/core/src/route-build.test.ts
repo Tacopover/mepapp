@@ -739,6 +739,19 @@ describe('planRoute layout options', () => {
     expect(planRoute(corridorScene(), {})).toEqual(plain);
   });
 
+  it('plans with the link search and gives the same plan with absent options and an empty object', () => {
+    const plain = planRoute(corridorScene());
+    expect(planRoute(corridorScene(), {})).toEqual(plain);
+    const linked = planRoute(corridorScene(), { linkSearch: { bendMm: 500, wallMm: 0 } });
+    expect(linked.status).toBe('ok');
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const absent = runScenario(scenario!, makeIdFactories());
+    const walled = runScenario(scenario!, makeIdFactories(), { linkSearch: { bendMm: 500, wallMm: 3000 } });
+    expect(walled.status).toBe('ok');
+    expect(walled.plan.warnings.some((w) => w.code === 'internal-join')).toBe(false);
+    expect(walled.plan).not.toEqual(absent.plan);
+  });
+
   it('does not change its input when options are given', () => {
     const value = corridorScene();
     const { newSegmentId, newFittingId, ...data } = value;
@@ -761,7 +774,6 @@ describe('planRoute layout options', () => {
     const defaults = runScenario(scenario!, makeIdFactories(), DEFAULT_LAYOUT_OPTIONS);
     const prototype = runScenario(scenario!, makeIdFactories(), {
       trunkBends: { bendMm: 1, fittingMm: 1 },
-      linkSearch: { bendMm: 1, wallMm: 1 },
       exactSpine: { maxPorts: 4 },
       ripUp: { rounds: 1 },
     });

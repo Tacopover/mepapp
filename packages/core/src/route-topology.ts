@@ -5,6 +5,7 @@ import type { Vec2 } from './geometry.js';
 import { ROUTED_MARK, type ConnectionPoint, type Discipline, type Fitting, type FittingKind, type Segment } from './network.js';
 import { placeTapPosition } from './route-branch.js';
 import { elbowPath, legClass, MIN_LEG_MM, type RouteLayoutOptions } from './route-layout.js';
+import { searchLink } from './route-link.js';
 
 export const PLACEHOLDER_DIAMETER_MM: Record<Discipline, number> =
   { ventilation: 200, heatingAndCooling: 25, plumbing: 25, fireProtection: 50, electrical: 25, other: 50 };
@@ -25,6 +26,7 @@ export interface TopologyResult { segments: Segment[]; fittings: Fitting[]; leng
 
 const KEY_SCALE = 1e4;
 const NEAR_MM = 1e-6;
+const LINK_TAP_LIMIT = 8;
 
 interface Vertex { x: number; y: number; rx: number; ry: number }
 
@@ -267,8 +269,12 @@ export interface ConnectLooseInput {
   noTapPoints?: readonly Vec2[];
   /** The collision hook of T13. Default: accept all. */
   accepts?: (path: Vec2[], portId: string) => boolean;
-  /** Layout options, passed on by planRoute. This step reads no field yet. */
+  /** Layout options, passed on by planRoute. This step reads linkSearch. */
   options?: RouteLayoutOptions;
+  /** Room id at a point (mm), or null in a wall or outside. Used by the link search. Absent: no room, so no wall price. */
+  roomAt?: (p: Vec2) => string | null;
+  /** Room corner points (mm) for the link search. */
+  roomCorners?: readonly Vec2[];
 }
 export interface ConnectLooseResult { paths: Vec2[][]; connectedIds: string[]; left: string[] }
 
@@ -365,6 +371,7 @@ export function connectLoosePorts(input: ConnectLooseInput): ConnectLooseResult 
   const connectedIds: string[] = [];
   const left: string[] = [];
   const pending = [...input.loose];
+  const roomCache = new Map<string, string | null>();
 
   while (pending.length > 0) {
     let bestIndex = -1;
@@ -382,24 +389,43 @@ export function connectLoosePorts(input: ConnectLooseInput): ConnectLooseResult 
     const port = pending.splice(bestIndex, 1)[0]!;
 
     let chosen: Vec2[] | null = null;
-    const tried: string[] = [];
-    for (const tap of bestCandidates) {
-      const dx = port.point.x - tap.point.x;
-      const dy = port.point.y - tap.point.y;
-      const longer: 'x' | 'y' = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
-      const first = tap.perpendicular ?? longer;
-      const second: 'x' | 'y' = first === 'x' ? 'y' : 'x';
-      for (const axis of [first, second]) {
-        const path = cleanPath(elbowPath(tap.point, port.point, axis));
-        const signature = path.map(keyOf).join(';');
-        if (tried.includes(signature)) continue;
-        tried.push(signature);
-        if (path.length >= 2 && accepts(path, port.id) && !runsOverOtherPort(path, input.targetPoints)) {
-          chosen = path;
-          break;
-        }
+    const linkSearch = input.options?.linkSearch;
+    if (linkSearch) {
+      const found = searchLink({
+        port: port.point,
+        taps: bestCandidates.slice(0, LINK_TAP_LIMIT).map((t) => ({ point: t.point, perpendicular: t.perpendicular })),
+        built,
+        corners: input.roomCorners ?? [],
+        roomAt: input.roomAt ?? (() => null),
+        bendMm: linkSearch.bendMm,
+        wallMm: linkSearch.wallMm,
+        roomCache,
+      });
+      if (found) {
+        const path = cleanPath(found);
+        if (path.length >= 2 && accepts(path, port.id) && !runsOverOtherPort(path, input.targetPoints)) chosen = path;
       }
-      if (chosen) break;
+    }
+    if (!chosen) {
+      const tried: string[] = [];
+      for (const tap of bestCandidates) {
+        const dx = port.point.x - tap.point.x;
+        const dy = port.point.y - tap.point.y;
+        const longer: 'x' | 'y' = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+        const first = tap.perpendicular ?? longer;
+        const second: 'x' | 'y' = first === 'x' ? 'y' : 'x';
+        for (const axis of [first, second]) {
+          const path = cleanPath(elbowPath(tap.point, port.point, axis));
+          const signature = path.map(keyOf).join(';');
+          if (tried.includes(signature)) continue;
+          tried.push(signature);
+          if (path.length >= 2 && accepts(path, port.id) && !runsOverOtherPort(path, input.targetPoints)) {
+            chosen = path;
+            break;
+          }
+        }
+        if (chosen) break;
+      }
     }
     if (!chosen) {
       left.push(port.id);
