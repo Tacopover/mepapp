@@ -675,9 +675,12 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
             </select>
           </div>
           <p className="mep-guide-note" data-testid="pg-serves-note">
-            {need
-              ? `The room types give the demand of each room: ${plural(typesWithNeed.length, 'room type')} of ${types.length} ${typesWithNeed.length === 1 ? 'has' : 'have'} ${need.name}. Step 3 asks what one stamp gives.`
-              : countBy === 'perRoom'
+            {need ? (
+              <>
+                {`${plural(typesWithNeed.length, 'room type')} of ${types.length} ${typesWithNeed.length === 1 ? 'has' : 'have'} ${need.name}.`}
+                <InfoTip label="More about the demand">The room types give the demand of each room. Step 3 asks what one stamp gives.</InfoTip>
+              </>
+            ) : countBy === 'perRoom'
                 ? 'Each room of the rule gets the same number of stamps, for example one thermostat in each room.'
                 : countBy === 'coverage'
                   ? 'The stamps cover each point of the room, for example smoke detectors.'
@@ -740,7 +743,12 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
             {draft.roomTypeIds.length > 0
               ? `${plural(draft.roomTypeIds.length, 'room type')} chosen. The numbers count the rooms of this page.`
               : need
-                ? `No type chosen: the rule applies to every room type that has ${need.name} (${typesWithNeed.length} of ${types.length}). A dashed type has no ${need.name}.`
+                ? (
+                  <>
+                    {`No type chosen: the rule applies to every room type that has ${need.name} (${typesWithNeed.length} of ${types.length}).`}
+                    <InfoTip label="More about the chosen types">{`A dashed type has no ${need.name}.`}</InfoTip>
+                  </>
+                )
                 : 'No type chosen: the rule applies to every room.'}
           </p>
         </div>
@@ -924,7 +932,10 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
         )}
         {need && typesWithNeed.length === 0 && (
           <div className="mep-guide-callout" data-testid="pg-no-type-has-need">
-            <span>No room type has {need.name} yet. Add it to the room types, or fill in the example values in Room types.</span>
+            <span>
+              No room type has {need.name} yet.
+              <InfoTip label="More about the missing demand">Add it to the room types, or fill in the example values in Room types.</InfoTip>
+            </span>
             <button type="button" onClick={() => onOpenRoomTypes()}>
               Open Room types
             </button>
@@ -1184,7 +1195,10 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
               <input className="mep-guide-num" id="pg-wallOffset" type="text" inputMode="decimal" placeholder="0" value={draft.wallOffset} onChange={field('wallOffset')} />
               <span>m</span>
             </div>
-            <span className="mep-guide-note">The orange band on the plan. The distance is from the wall to the center of the stamp. It is a minimum: for the Grid layout, step 5 sets if the outer stamps are at this distance or half the spacing from the wall.</span>
+            <span className="mep-guide-note">
+              The orange band on the plan. A minimum, from the wall to the stamp center.
+              <InfoTip label="More about the wall distance">For the Grid layout, step 5 sets if the outer stamps are at this distance or half the spacing from the wall.</InfoTip>
+            </span>
           </div>
           <div className="mep-guide-limit">
             <SpacingDiagram kind="gap" />
@@ -1367,7 +1381,8 @@ export const PlacementRuleGuideBody = forwardRef<PlacementRuleGuideHandle, Place
                 </div>
               )}
               <p className="mep-guide-note">
-                The grid is centered in the room and follows its long side. Each stamp moves to the center of the nearest free tile, at the min distance to the walls or more. The number of stamps does not change.
+                The grid is centered in the room and follows its long side.
+                <InfoTip label="More about the grid">Each stamp moves to the center of the nearest free tile, at the min distance to the walls or more. The number of stamps does not change.</InfoTip>
               </p>
             </>
           )}

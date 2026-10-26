@@ -1,4 +1,5 @@
 import { getNetworkTypeFromLibrary, routingTargetDefaultOf, ruleRoutingTargets, SYNTHETIC_CENTER_PORT_ID, type NetworkType, type PortSpec, type RoomNeed, type StampDefinition } from '@mepapp/core';
+import { InfoTip } from './InfoTip.js';
 import { networkTypeCopiesOf, type Draft } from './placementRuleDraft.js';
 
 /** The ports that a stamp of the definition gets the routing targets for: its own ports, or the center (core's getStampPorts). */
@@ -62,7 +63,10 @@ export function RuleRoutingSection({ draft, definition, need, offered, drawingTy
   return (
     <div className="mep-guide-section" data-testid="pg-routing">
       <h3>Routing target</h3>
-      <p className="mep-guide-note">Routing connects each placed stamp to a network of this type later. A segment that you connect to a port defines the network type of the port.</p>
+      <p className="mep-guide-note">
+        Routing connects each placed stamp to a network of this type later.
+        <InfoTip label="More about the routing target">A segment that you connect to a port defines the network type of the port.</InfoTip>
+      </p>
       {!perPort && (
         <div className="mep-guide-field">
           <label htmlFor="pg-routing">Network type</label>
