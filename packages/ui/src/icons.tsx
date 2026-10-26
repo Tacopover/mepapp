@@ -520,17 +520,14 @@ export const IconRoute = (props: IconProps) => (
 
 export const IconSizeNetwork = (props: IconProps) => (
   <Svg {...props}>
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="8" x2="3" y2="16" />
-    <line x1="21" y1="8" x2="21" y2="16" />
-    <path d="M6 18.5h12M6 18.5l2-1.6M6 18.5l2 1.6M18 18.5l-2-1.6M18 18.5l-2 1.6" />
+    <path d="M3 12h18M6.5 9.5 3 12l3.5 2.5M17.5 9.5 21 12l-3.5 2.5" />
   </Svg>
 );
 
 export const IconRouteArea = (props: IconProps) => (
   <Svg {...props}>
-    <rect x="3" y="4" width="18" height="16" rx="1.5" strokeDasharray="3 2.5" />
-    <path d="M7 16c3-1 2-6 6-6.5s3-2.5 4-3" />
+    <rect x="3" y="4" width="18" height="16" rx="1.5" strokeDasharray="4 2.5" />
+    <path d="M7 15.5 10.5 11.5 13.5 13.5 17 9" />
   </Svg>
 );
 

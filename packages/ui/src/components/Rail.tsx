@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { isCircuitsTool, type SketchScene, type SketchTool } from '@mepapp/render';
-import { RAIL_ROWS, isRoomTool, type RoomToolId } from '../toolRegistry.js';
-import { IconChevRight, IconCopy, IconRedo, IconSelect, IconTrash, IconUndo } from '../icons.js';
+import { RAIL_ROWS, isRoomTool, type RailActionId, type RoomToolId } from '../toolRegistry.js';
+import { IconChevRight, IconCopy, IconRedo, IconRouting, IconSelect, IconTrash, IconUndo } from '../icons.js';
 
 export interface RailProps {
   tool: SketchTool;
@@ -15,6 +15,9 @@ export interface RailProps {
   onOpenSettings: () => void;
   /** Stamp clicked with no active definition yet — auto-picks the first stamp shown in the MEP tab's grid. */
   onPickDefaultStamp: () => void;
+  pdfLoaded: boolean;
+  routeAreaVisible: boolean;
+  onRailAction: (action: RailActionId) => void;
 }
 
 function needsStamp(t: SketchTool | null): boolean {
@@ -28,7 +31,7 @@ function needsStamp(t: SketchTool | null): boolean {
  * listing the rest. Members with `tool: null` (toolRegistry.ts) are reserved
  * slots for tools nobody has built yet — they render disabled.
  */
-export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRedo, onUndo, onRedo, onOpenSettings, onPickDefaultStamp }: RailProps) {
+export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRedo, onUndo, onRedo, onOpenSettings, onPickDefaultStamp, pdfLoaded, routeAreaVisible, onRailAction }: RailProps) {
   const [lastPickedByRow, setLastPickedByRow] = useState<Record<string, string>>({});
   const [openRow, setOpenRow] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -63,16 +66,23 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
         const isStampRow = row.id === 'place';
         const stampRowActive = tool === 'place-terminal' || tool === 'place-equipment';
         const isRoomsRow = row.id === 'rooms';
+        const isActionRow = row.actionList === true;
 
         return (
           <div key={row.id} className="mep-rail-row">
             <div className="mep-rail-row-main">
               <button
                 type="button"
-                className={`mep-rail-btn${(isStampRow ? stampRowActive : isRoomsRow ? isRoomTool(tool) : row.id === 'circuits' ? isCircuitsTool(tool) : tool === current.tool) ? ' active' : ''}`}
-                title={current.tool === null ? `${current.label} — coming soon` : current.label}
-                disabled={isStampRow ? false : current.tool === null || (needsStamp(current.tool) && !stampReady)}
+                className={`mep-rail-btn${!isActionRow && (isStampRow ? stampRowActive : isRoomsRow ? isRoomTool(tool) : row.id === 'circuits' ? isCircuitsTool(tool) : tool === current.tool) ? ' active' : ''}`}
+                title={isActionRow ? 'Routing' : current.tool === null ? `${current.label} — coming soon` : current.label}
+                aria-label={isActionRow ? 'Routing' : undefined}
+                data-testid={isActionRow ? 'rail-routing' : undefined}
+                disabled={isStampRow || isActionRow ? false : current.tool === null || (needsStamp(current.tool) && !stampReady)}
                 onClick={() => {
+                  if (isActionRow) {
+                    setOpenRow(isOpen ? null : row.id);
+                    return;
+                  }
                   if (isStampRow) {
                     if (stampReady) sceneRef.current?.setTool(lastStampTool);
                     else onPickDefaultStamp();
@@ -85,9 +95,9 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
                   current.tool && sceneRef.current?.setTool(current.tool);
                 }}
               >
-                <current.Icon size={18} />
+                {isActionRow ? <IconRouting size={18} /> : <current.Icon size={18} />}
               </button>
-              {!row.singleton && (
+              {!row.singleton && !isActionRow && (
                 <button
                   type="button"
                   className={`mep-rail-chev${isOpen ? ' open' : ''}`}
@@ -101,7 +111,30 @@ export function Rail({ tool, sceneRef, stampReady, hasSelection, canUndo, canRed
 
             {isOpen && (
               <div className="mep-rail-flyout">
-                {flyoutMembers.map((m) => {
+                {isActionRow ? row.members.map((m) => {
+                  const isRouteArea = m.action === 'route-area';
+                  const text = isRouteArea ? (routeAreaVisible ? 'Hide route area' : 'Show route area') : m.label;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`mep-rail-flyout-btn${isRouteArea && routeAreaVisible ? ' on' : ''}`}
+                      data-testid={`rail-action-${m.action}`}
+                      title={text}
+                      aria-label={text}
+                      aria-pressed={isRouteArea ? routeAreaVisible : undefined}
+                      disabled={!pdfLoaded}
+                      onClick={() => {
+                        if (!m.action) return;
+                        onRailAction(m.action);
+                        setOpenRow(null);
+                      }}
+                    >
+                      <m.Icon size={16} />
+                      <span>{text}</span>
+                    </button>
+                  );
+                }) : flyoutMembers.map((m) => {
                   const isSnapAngle = m.id === 'snap-angle';
                   const comingSoon = m.tool === null && !isSnapAngle;
                   return (

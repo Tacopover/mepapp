@@ -484,6 +484,11 @@
 .mep-rail-flyout-btn:hover:not(:disabled) {
   background: var(--surface-2);
 }
+.mep-rail-flyout-btn.on {
+  background: var(--surface-2);
+  color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .mep-rail-flyout-btn:disabled {
   color: var(--muted);
   opacity: 0.5;

@@ -22,8 +22,13 @@ import {
   IconFillRoom,
   IconEditRoom,
   IconSplitRoom,
+  IconRoute,
+  IconRouteArea,
+  IconSizeNetwork,
   type IconProps,
 } from './icons.js';
+
+export type RailActionId = 'route' | 'size' | 'route-area';
 
 export interface ToolEntry {
   /** Stable id, unique across every row — a real SketchTool's own id when `tool` is set, otherwise a UI-only placeholder id. */
@@ -32,6 +37,8 @@ export interface ToolEntry {
   Icon: (props: IconProps) => ReactElement;
   /** The SketchTool this activates, or null for a reserved-but-not-yet-built slot (renders disabled, "Coming soon"). */
   tool: SketchTool | null;
+  /** The rail action this member calls, for a row with `actionList`. */
+  action?: RailActionId;
 }
 
 export interface RailRow {
@@ -40,6 +47,8 @@ export interface RailRow {
   members: ToolEntry[];
   /** Pan: exactly one member, no chevron/flyout. */
   singleton?: boolean;
+  /** Every member calls a rail action instead of activating a tool. */
+  actionList?: boolean;
 }
 
 export const RAIL_ROWS: RailRow[] = [
@@ -87,6 +96,15 @@ export const RAIL_ROWS: RailRow[] = [
     id: 'rooms',
     singleton: true,
     members: [{ id: 'rooms', label: 'Rooms', Icon: IconFillRoom, tool: 'fill-room' }],
+  },
+  {
+    id: 'routing',
+    actionList: true,
+    members: [
+      { id: 'route', label: 'Route network', Icon: IconRoute, tool: null, action: 'route' },
+      { id: 'size', label: 'Size network', Icon: IconSizeNetwork, tool: null, action: 'size' },
+      { id: 'route-area', label: 'Route area', Icon: IconRouteArea, tool: null, action: 'route-area' },
+    ],
   },
   {
     // Circuits mode (electrical-circuits-model.md Phase E4). Rail.tsx lights this row for every tool in the circuits family, not just 'circuits'.

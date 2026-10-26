@@ -32,6 +32,7 @@ import { useSketchScene } from './useSketchScene.js';
 import { WallDebugPanel } from './components/WallDebugPanel.js';
 import { loadDefinitionBitmap } from './stampBitmap.js';
 import { Rail } from './components/Rail.js';
+import type { RailActionId } from './toolRegistry.js';
 import { CanvasContextMenu } from './components/CanvasContextMenu.js';
 import { DockPanel, type DockTabDef } from './components/DockPanel.js';
 import { classifyStampsForDelete, bulkDeleteMessage } from './stampBulkDelete.js';
@@ -321,6 +322,13 @@ export function MepSketchApp({
   }, [ready, sceneRef]);
   const [routeAreaVisible, setRouteAreaVisible] = useState(false);
   const handleToggleRouteArea = useCallback(() => sceneRef.current?.setRouteAreaVisible(!sceneRef.current.isRouteAreaVisible()), [sceneRef]);
+  const handleRailAction = (action: RailActionId) => {
+    switch (action) {
+      case 'route': setRouteOpen(true); break;
+      case 'size': setSizeOpen(true); break;
+      case 'route-area': handleToggleRouteArea(); break;
+    }
+  };
   useEffect(() => {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
@@ -1514,6 +1522,9 @@ export function MepSketchApp({
                 onRedo={() => sceneRef.current?.redoDrawing()}
                 onOpenSettings={() => setSettingsOpen(true)}
                 onPickDefaultStamp={handlePickDefaultStamp}
+                pdfLoaded={pdfHandle !== null}
+                routeAreaVisible={routeAreaVisible}
+                onRailAction={handleRailAction}
               />
               <WallDebugPanel sceneRef={sceneRef} ready={ready} />
               {textboxPrompt && (
