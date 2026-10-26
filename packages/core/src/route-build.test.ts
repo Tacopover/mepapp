@@ -11,6 +11,7 @@ import { BEND_PENALTY_MM, CROSSING_PENALTY_MM } from './route-hanan.js';
 import type { Room } from './rooms/room.js';
 import { sizeNetwork } from './sizing-network.js';
 import { SUGGESTED_AIR_SIZING } from './sizing-settings.js';
+import { buildScenario, firstFloorDrawing, makeIdFactories, runScenario } from './route-scenario.testutil.js';
 
 const OUT = { id: 'out', name: 'Out', fractionX: 0, fractionY: 0 };
 const OUT2 = { id: 'out2', name: 'Out 2', fractionX: 1, fractionY: 0 };
@@ -734,5 +735,25 @@ describe('planRoute layout options', () => {
     expect(DEFAULT_LAYOUT_OPTIONS.bendPenaltyMm).toBe(BEND_PENALTY_MM);
     expect(DEFAULT_LAYOUT_OPTIONS.crossingPenaltyMm).toBe(CROSSING_PENALTY_MM);
     expect(DEFAULT_LAYOUT_OPTIONS.jogSmallJumpMm).toBe(SMALL_JUMP_MM);
+  });
+
+  it('gives the same first floor plan with the prototype fields absent and set', () => {
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    expect(scenario).not.toBeNull();
+    const absent = runScenario(scenario!, makeIdFactories());
+    const empty = runScenario(scenario!, makeIdFactories(), {});
+    const defaults = runScenario(scenario!, makeIdFactories(), DEFAULT_LAYOUT_OPTIONS);
+    const prototype = runScenario(scenario!, makeIdFactories(), {
+      bridgeParts: { penaltyMm: 1 },
+      trunkBends: { bendMm: 1, fittingMm: 1 },
+      linkSearch: { bendMm: 1, wallMm: 1 },
+      exactSpine: { maxPorts: 4 },
+      ripUp: { rounds: 1 },
+    });
+    expect(empty.plan).toEqual(absent.plan);
+    expect(defaults.plan).toEqual(absent.plan);
+    expect(prototype.plan).toEqual(absent.plan);
+    expect(absent.plan.stats.segments).toBe(109);
+    expect(Math.round(absent.plan.stats.lengthMm)).toBe(151366);
   });
 });

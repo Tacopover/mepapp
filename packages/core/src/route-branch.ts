@@ -1,6 +1,6 @@
 import type { Vec2 } from './geometry.js';
 import { roomSpine } from './route-hanan.js';
-import { applyJogRule, elbowPath, jogPath, legClass, MIN_LEG_MM, type LegClass } from './route-layout.js';
+import { applyJogRule, elbowPath, jogPath, legClass, MIN_LEG_MM, type LegClass, type RouteLayoutOptions } from './route-layout.js';
 
 export interface BranchTrunkEdge {
   id: string;
@@ -24,6 +24,8 @@ export interface BranchInput {
   rooms: readonly BranchRoomInput[];
   crossesExisting?: (a: Vec2, b: Vec2) => number;
   stepMm?: number;
+  /** Layout options. No field is read yet. */
+  options?: RouteLayoutOptions;
 }
 
 export interface RoomBranch {

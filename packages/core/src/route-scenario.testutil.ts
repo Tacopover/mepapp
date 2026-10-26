@@ -8,6 +8,7 @@ import { polygonAreaPt2, roomLabelPoint, type Room } from './rooms/room.js';
 import { loadFirstFloorRooms } from './rooms/route-area-fixture.testutil.js';
 import { DEFAULT_ROUTE_AREA_TYPE_IDS, computeRouteArea, type RouteArea } from './route-area.js';
 import { planRoute, type PlannedRoute, type RouteBuildInput } from './route-build.js';
+import type { RouteLayoutOptions } from './route-layout.js';
 import { routeMetrics, scoreRoute, type RouteMetrics } from './route-metrics.js';
 import { findRoutePorts, type RoutePort, type RouteStamp } from './route-ports.js';
 
@@ -117,7 +118,7 @@ export function buildScenario(drawing: Drawing, kind: ScenarioKind, startIndex =
 
 export interface ScenarioRun { status: 'ok' | 'refused'; plan: PlannedRoute; ms: number }
 
-export function runScenario(s: Scenario, ids: ReturnType<typeof makeIdFactories> = makeIdFactories()): ScenarioRun {
+export function runScenario(s: Scenario, ids: ReturnType<typeof makeIdFactories> = makeIdFactories(), options?: RouteLayoutOptions): ScenarioRun {
   const input: RouteBuildInput = {
     startStampId: s.startStampId,
     startPortId: s.startPortId,
@@ -133,7 +134,7 @@ export function runScenario(s: Scenario, ids: ReturnType<typeof makeIdFactories>
     newFittingId: ids.newFittingId,
   };
   const start = performance.now();
-  const result = planRoute(input);
+  const result = planRoute(input, options);
   return { status: result.status, plan: result.plan, ms: performance.now() - start };
 }
 

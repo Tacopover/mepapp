@@ -279,7 +279,7 @@ export function planRoute(
   const portKey = (port: RoutePort): string => `${port.stampId}:${port.portId}`;
 
   const servedRoomIds = [...grouped.byRoom.keys()];
-  const trunk = buildTrunk({ area: input.area, rooms: input.rooms, mmPerPt, startPointMm: start.pointMm, servedRoomIds });
+  const trunk = buildTrunk({ area: input.area, rooms: input.rooms, mmPerPt, startPointMm: start.pointMm, servedRoomIds, options });
 
   const paths: Vec2[][] = [];
   if (trunk.rootPointMm) {
@@ -310,6 +310,7 @@ export function planRoute(
     trunk: trunk.edges.map((edge) => ({ id: edge.id, path: edge.path })),
     rootPointMm: trunk.rootPointMm ?? start.pointMm,
     rooms: branchRooms,
+    options,
   }).rooms) {
     paths.push(branch.branch, ...branch.spine);
     for (const id of branch.offGraphPortIds) loosePorts.push(portById.get(id)!);
@@ -347,6 +348,7 @@ export function planRoute(
       if (index === 0) return true;
       return !foreignPieces.some(([a, b]) => distanceToPiece(vertex, a, b) <= NEAR_ITEM_MM);
     }),
+    options,
   });
   paths.push(...connected.paths);
   const leftIds = new Set(connected.left);

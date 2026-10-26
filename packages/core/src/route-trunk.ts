@@ -2,7 +2,7 @@ import { distance, type Vec2 } from './geometry.js';
 import type { Room } from './rooms/room.js';
 import type { RouteArea, RouteEdge, RouteEntry, RouteNode } from './route-area.js';
 import { nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
-import { insideRouteArea, straightenPolyline, withWallGaps } from './route-layout.js';
+import { insideRouteArea, straightenPolyline, withWallGaps, type RouteLayoutOptions } from './route-layout.js';
 import { steinerTree } from './route-steiner.js';
 
 export interface TrunkInput {
@@ -14,6 +14,8 @@ export interface TrunkInput {
   startPointMm: Vec2;
   /** The rooms that need a branch (rooms with target ports that are not in the route area). */
   servedRoomIds: readonly string[];
+  /** Layout options. No field is read yet. */
+  options?: RouteLayoutOptions;
 }
 export interface TrunkEdge {
   /** The id of the graph edge (a split edge has an id with '~'). */

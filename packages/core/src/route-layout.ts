@@ -19,8 +19,19 @@ export interface RouteLayoutOptions {
   entryRule?: 'primary-longest' | 'shortest-branch';
   /** Which axis an off-graph link tries first. Default 'longer'. */
   offGraphAxis?: 'longer' | 'perpendicular-first';
+  /** Idea 0: bridge edges between graph parts. Off when absent. */
+  bridgeParts?: { penaltyMm: number };
+  /** Idea 1a: trunk bends. Off when absent. */
+  trunkBends?: { bendMm: number; fittingMm: number };
+  /** Idea 1b: link search. Off when absent. */
+  linkSearch?: { bendMm: number; wallMm: number };
+  /** Idea 2: exact spine. Off when absent. */
+  exactSpine?: { maxPorts: number };
+  /** Idea 4: rip-up rounds. Off when absent. */
+  ripUp?: { rounds: number };
 }
-export const DEFAULT_LAYOUT_OPTIONS: Readonly<Required<RouteLayoutOptions>> = {
+type PrototypeLayoutKey = 'bridgeParts' | 'trunkBends' | 'linkSearch' | 'exactSpine' | 'ripUp';
+export const DEFAULT_LAYOUT_OPTIONS: Readonly<Required<Omit<RouteLayoutOptions, PrototypeLayoutKey>>> = {
   bendPenaltyMm: BEND_PENALTY_MM,
   crossingPenaltyMm: CROSSING_PENALTY_MM,
   jogSmallJumpMm: SMALL_JUMP_MM,

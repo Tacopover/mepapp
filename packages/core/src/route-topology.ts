@@ -4,7 +4,7 @@
 import type { Vec2 } from './geometry.js';
 import { ROUTED_MARK, type ConnectionPoint, type Discipline, type Fitting, type FittingKind, type Segment } from './network.js';
 import { placeTapPosition } from './route-branch.js';
-import { elbowPath, legClass, MIN_LEG_MM } from './route-layout.js';
+import { elbowPath, legClass, MIN_LEG_MM, type RouteLayoutOptions } from './route-layout.js';
 
 export const PLACEHOLDER_DIAMETER_MM: Record<Discipline, number> =
   { ventilation: 200, heatingAndCooling: 25, plumbing: 25, fireProtection: 50, electrical: 25, other: 50 };
@@ -267,6 +267,8 @@ export interface ConnectLooseInput {
   noTapPoints?: readonly Vec2[];
   /** The collision hook of T13. Default: accept all. */
   accepts?: (path: Vec2[], portId: string) => boolean;
+  /** Layout options. No field is read yet. */
+  options?: RouteLayoutOptions;
 }
 export interface ConnectLooseResult { paths: Vec2[][]; connectedIds: string[]; left: string[] }
 
