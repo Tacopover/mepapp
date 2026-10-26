@@ -100,7 +100,7 @@ export function connectedParts(graph: GraphData): string[][] {
   return [...parts.values()];
 }
 
-function polylineLength(points: Vec2[]): number {
+export function polylineLength(points: Vec2[]): number {
   let total = 0;
   for (let i = 0; i + 1 < points.length; i++) total += distance(points[i]!, points[i + 1]!);
   return total;

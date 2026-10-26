@@ -24,7 +24,7 @@ export interface BranchInput {
   rooms: readonly BranchRoomInput[];
   crossesExisting?: (a: Vec2, b: Vec2) => number;
   stepMm?: number;
-  /** Layout options. No field is read yet. */
+  /** Layout options, passed on by planRoute. This step reads no field yet. */
   options?: RouteLayoutOptions;
 }
 

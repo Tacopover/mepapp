@@ -451,6 +451,47 @@ Defect found: the plan depends on the input order of the rooms, stamps and ports
 
 To be filled by each task: one row per prototype and drawing, same columns as the baseline, plus "acceptance A1 met" and "determinism D1 to D3".
 
+#### Idea 0, join the graph parts (Q1-T07, measured 2026-10-26)
+
+Option: `bridgeParts = { penaltyMm }`. Test: `route-bridge-report.test.ts`, full mode (`MEPAPP_QUALITY_FULL=1`: 2 warm-up runs, 7 runs). "off" is the baseline. "on" is `penaltyMm` 0. The result with `penaltyMm` 3000 is equal to the result with 0 in every row, so only one "on" row is shown. Crossings in this table are **penetrations to check** (the model has no wall rating). The bridge has no price for a crossing (answer Q-Q1-02). The count is a metric only.
+
+| Scenario | Start | Option | Segments | Length mm | Bends 90 / 45 | Wall crossings (penetrations to check) | Off-graph rooms | Ports left | Free legs | Score | Median ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| First floor A | 0 | off | 109 | 151 366 | 35 / 10 | 26 | 28 | 0 | 0 | 263 044 | 59 |
+| First floor A | 0 | on | 147 | 177 907 | 62 / 21 | 29 | 15 | 0 | 0 | 291 169 | 83 |
+| First floor A | 1 | off | 97 | 150 978 | 31 / 2 | 26 | 30 | 0 | 0 | 261 550 | 52 |
+| First floor A | 1 | on | 146 | 177 761 | 63 / 18 | 27 | 15 | 0 | 0 | 287 978 | 74 |
+| First floor A | 2 | off | 98 | 153 079 | 30 / 4 | 28 | 30 | 0 | 0 | 259 342 | 42 |
+| First floor A | 2 | on | 145 | 176 939 | 62 / 18 | 28 | 15 | 0 | 0 | 288 998 | 77 |
+| First floor B | 0 | off | 309 | 269 867 | 60 / 10 | 31 | 28 | 1 | 0 | 430 531 | 1 963 |
+| First floor B | 0 | on | 335 | 306 891 | 78 / 21 | 38 | 15 | 1 | 0 | 461 007 | 2 066 |
+| First floor B | 1 | off | 298 | 271 968 | 58 / 2 | 28 | 30 | 1 | 0 | 437 627 | 1 645 |
+| First floor B | 1 | on | 339 | 309 241 | 84 / 18 | 36 | 15 | 1 | 0 | 464 552 | 2 055 |
+| First floor B | 2 | off | 293 | 264 828 | 51 / 4 | 39 | 30 | 1 | 0 | 420 412 | 1 732 |
+| First floor B | 2 | on | 339 | 310 202 | 84 / 18 | 36 | 15 | 1 | 0 | 467 522 | 2 058 |
+| Ground floor w_rooms A (local-only) | 0 | off | 141 | 207 563 | 47 / 10 | 33 | 33 | 0 | 0 | 342 577 | 177 |
+| Ground floor w_rooms A (local-only) | 0 | on | 141 | 207 563 | 47 / 10 | 33 | 33 | 0 | 0 | 342 577 | 167 |
+| Ground floor w_rooms B (local-only) | 0 | off | 436 | 387 830 | 93 / 10 | 53 | 33 | 0 | 0 | 605 612 | 7 891 |
+| Ground floor w_rooms B (local-only) | 0 | on | 436 | 387 830 | 93 / 10 | 53 | 33 | 0 | 0 | 605 612 | 9 635 |
+| 10A A (local-only) | 0 | off | 95 | 210 331 | 27 / 16 | 18 | 19 | 0 | 0 | 305 976 | 72 |
+| 10A A (local-only) | 0 | on | 114 | 226 122 | 41 / 20 | 20 | 13 | 0 | 0 | 319 693 | 112 |
+| 10A A (local-only) | 1 | off | 70 | 178 304 | 17 / 0 | 16 | 26 | 0 | 0 | 273 035 | 41 |
+| 10A A (local-only) | 1 | on | 115 | 225 481 | 38 / 24 | 20 | 13 | 0 | 0 | 319 192 | 66 |
+| 10A B (local-only) | 0 | off | 265 | 333 449 | 45 / 16 | 22 | 19 | 0 | 0 | 478 449 | 2 202 |
+| 10A B (local-only) | 0 | on | 271 | 356 917 | 47 / 22 | 25 | 13 | 0 | 0 | 483 170 | 1 583 |
+| 10A B (local-only) | 1 | off | 262 | 312 354 | 55 / 0 | 28 | 26 | 0 | 0 | 469 471 | 1 406 |
+| 10A B (local-only) | 1 | on | 271 | 356 160 | 44 / 26 | 24 | 13 | 0 | 0 | 479 850 | 1 071 |
+
+Reading of the table:
+- The option does what it should. Off-graph rooms fall from 28 or 30 to 15 on the first floor, and from 19 or 26 to 13 on 10A. The remaining count is equal to the no-entry count (15 and 13), so every room that has an entry is now reached by the trunk. The option cannot go below that count.
+- The cost is high. On the first floor scenario A start 0, the length grows by 17.5 % (151 366 to 177 907 mm), the bends 90 grow from 35 to 62, and the penetrations to check grow from 26 to 29. The score of section 5 rises by 10.7 % (it is worse, because the extra length and bends cost more than the 13 rooms that leave the off-graph list). On 10A start 0 the score rises by 4.5 % and the length by 7.5 %.
+- Acceptance (section 8), first floor A start 0: A2 is **not met** (off-graph rooms 15, the limit is 14 or fewer; penetrations to check rose, the limit is 18 or fewer). A3 is **not met** (length +17.5 %, the limit is +10 %). A1 is **not met** (the score does not fall by 10 %). A4 is met (free legs 0, no `internal-join` in the test). T1 is met in scenario A (median 83 ms, limit 300 ms). T1 is not met in scenario B (2 066 ms), which equals the baseline problem (1 963 ms off).
+- The ground floor w_rooms drawing does not change: it has no entry at all (33 rooms with no entry), so no bridge can serve a room.
+- `penaltyMm` 3000 gives the same plan as 0 in all rows. A price on a bridge does not change the choice. The cause is not examined (not verified).
+- Determinism D1 (two runs, `toEqual`) passes with the option on in all rows. D2 and D3 with the option on are not measured.
+- Ports left in scenario B (1 on the first floor) are the same with the option on and off.
+- A bridge elbow is rebuilt from the real position of its parent node after the straightening of the previous edge. The rebuilt elbow is not checked again against foreign items (`bridgeAccepts` checks the first elbow only). Not verified: a case with a foreign segment near a rebuilt elbow.
+
 ## 11. Defect catalogue from the user screenshots (T05)
 
 To be filled when the screenshots arrive (R-Q1-01). Until then:

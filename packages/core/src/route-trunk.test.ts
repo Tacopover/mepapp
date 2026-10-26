@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { distance, type Vec2 } from './geometry.js';
 import type { RouteArea, RouteAreaRoom, RouteEdge, RouteEntry, RouteLink, RouteNode, RouteNodeKind } from './route-area.js';
-import { nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
+import { bridgeParts } from './route-bridge.js';
+import { connectedParts, nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
 import { isLayoutPath } from './route-layout.js';
 import { buildTrunk, type TrunkInput, type TrunkResult } from './route-trunk.js';
 
@@ -362,5 +363,105 @@ describe('buildTrunk', () => {
     expect(result.nodePointsMm).toEqual({});
     expect(result.served).toEqual([]);
     expect(result.offGraphRoomIds).toEqual(['a', 'b']);
+  });
+
+  describe('bridge edges', () => {
+    /** Corridor c1 (0 to 10000 mm) and corridor c2 (12000 to 30000 mm) are two graph parts. r1 has its entry in c2, and in c1 when withFirstEntry is true. */
+    function twoPartScene(withFirstEntry: boolean): TrunkInput {
+      const graph: GraphData = {
+        nodes: [pathNode('c1', 0, 0, 0), pathNode('c1', 1, 10000, 0), pathNode('c2', 0, 12000, 0), pathNode('c2', 1, 30000, 0)],
+        edges: [
+          pathEdge('c1', 0, 'rn-c1-0', 'rn-c1-1', [{ x: 0, y: 0 }, { x: 10000, y: 0 }]),
+          pathEdge('c2', 0, 'rn-c2-0', 'rn-c2-1', [{ x: 12000, y: 0 }, { x: 30000, y: 0 }]),
+        ],
+      };
+      const entries = [addEntry(graph, 'r1', 'c2', { x: 25000, y: 1000 })];
+      if (withFirstEntry) entries.push(addEntry(graph, 'r1', 'c1', { x: 5000, y: 1000 }));
+      return {
+        area: makeArea([areaRoom('c1'), areaRoom('c2')], graph, entries),
+        rooms: [rect('c1', 0, -1000, 10000, 1000), rect('c2', 12000, -1000, 30000, 1000)],
+        mmPerPt: MM_PER_PT,
+        startPointMm: { x: 0, y: -100 },
+        servedRoomIds: ['r1'],
+      };
+    }
+
+    it('leaves the room off the graph without the option', () => {
+      const result = buildTrunk(twoPartScene(false));
+      expect(result.offGraphRoomIds).toEqual(['r1']);
+      expect(result.edges.some((e) => e.id.startsWith('rb-'))).toBe(false);
+    });
+
+    // penaltyMm only adds to the cost of an rb- edge; it matters when the tree can choose between a bridge and another path.
+    it('serves the room through a bridge edge with the option', () => {
+      const result = buildTrunk({ ...twoPartScene(false), options: { bridgeParts: { penaltyMm: 0 } } });
+      expect(result.offGraphRoomIds).toEqual([]);
+      expect(result.served.map((s) => s.roomId)).toEqual(['r1']);
+      const bridges = result.edges.filter((e) => e.id.startsWith('rb-'));
+      expect(bridges).toHaveLength(1);
+      expect(bridges[0]!.kind).toBe('link');
+      expect(bridges[0]!.free).toBe(false);
+      expect(result.edges.every((e) => isLayoutPath(e.path))).toBe(true);
+    });
+
+    it('adds no bridge when bridgeAccepts refuses every path', () => {
+      const input = twoPartScene(false);
+      const result = buildTrunk({ ...input, options: { bridgeParts: { penaltyMm: 0 } }, bridgeAccepts: () => false });
+      expect(result).toEqual(buildTrunk(input));
+    });
+
+    it('gives the same trunk with empty options', () => {
+      const input = twoPartScene(false);
+      expect(buildTrunk({ ...input, options: {} })).toEqual(buildTrunk(input));
+    });
+
+    it('chains two bridges through three parts', () => {
+      const graph: GraphData = {
+        nodes: [
+          pathNode('c1', 0, 0, 0),
+          pathNode('c1', 1, 10000, 0),
+          pathNode('c2', 0, 12000, 0),
+          pathNode('c2', 1, 20000, 0),
+          pathNode('c3', 0, 22000, 0),
+          pathNode('c3', 1, 30000, 0),
+        ],
+        edges: [
+          pathEdge('c1', 0, 'rn-c1-0', 'rn-c1-1', [{ x: 0, y: 0 }, { x: 10000, y: 0 }]),
+          pathEdge('c2', 0, 'rn-c2-0', 'rn-c2-1', [{ x: 12000, y: 0 }, { x: 20000, y: 0 }]),
+          pathEdge('c3', 0, 'rn-c3-0', 'rn-c3-1', [{ x: 22000, y: 0 }, { x: 30000, y: 0 }]),
+        ],
+      };
+      const entry = addEntry(graph, 'r1', 'c3', { x: 26000, y: 1000 });
+      const result = buildTrunk({
+        area: makeArea([areaRoom('c1'), areaRoom('c2'), areaRoom('c3')], graph, [entry]),
+        rooms: [rect('c1', 0, -1000, 10000, 1000), rect('c2', 12000, -1000, 20000, 1000), rect('c3', 22000, -1000, 30000, 1000)],
+        mmPerPt: MM_PER_PT,
+        startPointMm: { x: 0, y: -100 },
+        servedRoomIds: ['r1'],
+        options: { bridgeParts: { penaltyMm: 0 } },
+      });
+      expect(result.served.map((s) => s.roomId)).toEqual(['r1']);
+      expect(result.edges.filter((e) => e.id.startsWith('rb-')).map((e) => e.id)).toEqual(['rb-0', 'rb-1']);
+    });
+  });
+
+  describe('bridgeParts', () => {
+    it('joins two parts with one bridge edge and adds none to one part', () => {
+      const graph: GraphData = {
+        nodes: [pathNode('a', 0, 0, 0), pathNode('a', 1, 1000, 0), pathNode('b', 0, 5000, 0), pathNode('b', 1, 6000, 0)],
+        edges: [
+          pathEdge('a', 0, 'rn-a-0', 'rn-a-1', [{ x: 0, y: 0 }, { x: 1000, y: 0 }]),
+          pathEdge('b', 0, 'rn-b-0', 'rn-b-1', [{ x: 5000, y: 0 }, { x: 6000, y: 0 }]),
+        ],
+      };
+      expect(connectedParts(graph)).toHaveLength(2);
+      expect(bridgeParts(graph, 'rn-a-0', MM_PER_PT)).toEqual(['rb-0']);
+      expect(connectedParts(graph)).toHaveLength(1);
+      const single: GraphData = {
+        nodes: [pathNode('a', 0, 0, 0), pathNode('a', 1, 1000, 0)],
+        edges: [pathEdge('a', 0, 'rn-a-0', 'rn-a-1', [{ x: 0, y: 0 }, { x: 1000, y: 0 }])],
+      };
+      expect(bridgeParts(single, 'rn-a-0', MM_PER_PT)).toEqual([]);
+    });
   });
 });

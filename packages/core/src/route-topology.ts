@@ -267,7 +267,7 @@ export interface ConnectLooseInput {
   noTapPoints?: readonly Vec2[];
   /** The collision hook of T13. Default: accept all. */
   accepts?: (path: Vec2[], portId: string) => boolean;
-  /** Layout options. No field is read yet. */
+  /** Layout options, passed on by planRoute. This step reads no field yet. */
   options?: RouteLayoutOptions;
 }
 export interface ConnectLooseResult { paths: Vec2[][]; connectedIds: string[]; left: string[] }

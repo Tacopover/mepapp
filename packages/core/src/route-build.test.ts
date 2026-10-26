@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { groupTargetPorts, planRoute, reducedState, resolveStart, type RouteBuildInput } from './route-build.js';
 import type { RoutePlanWarning } from './route-plan-warnings.js';
 import { computeNetworks, type ConnectionPoint, type Fitting, type Segment } from './network.js';
@@ -12,6 +12,22 @@ import type { Room } from './rooms/room.js';
 import { sizeNetwork } from './sizing-network.js';
 import { SUGGESTED_AIR_SIZING } from './sizing-settings.js';
 import { buildScenario, firstFloorDrawing, makeIdFactories, runScenario } from './route-scenario.testutil.js';
+import * as trunk from './route-trunk.js';
+import * as branch from './route-branch.js';
+import * as topology from './route-topology.js';
+
+vi.mock('./route-trunk.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./route-trunk.js')>();
+  return { ...actual, buildTrunk: vi.fn(actual.buildTrunk) };
+});
+vi.mock('./route-branch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./route-branch.js')>();
+  return { ...actual, planBranches: vi.fn(actual.planBranches) };
+});
+vi.mock('./route-topology.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./route-topology.js')>();
+  return { ...actual, connectLoosePorts: vi.fn(actual.connectLoosePorts) };
+});
 
 const OUT = { id: 'out', name: 'Out', fractionX: 0, fractionY: 0 };
 const OUT2 = { id: 'out2', name: 'Out 2', fractionX: 1, fractionY: 0 };
@@ -744,7 +760,6 @@ describe('planRoute layout options', () => {
     const empty = runScenario(scenario!, makeIdFactories(), {});
     const defaults = runScenario(scenario!, makeIdFactories(), DEFAULT_LAYOUT_OPTIONS);
     const prototype = runScenario(scenario!, makeIdFactories(), {
-      bridgeParts: { penaltyMm: 1 },
       trunkBends: { bendMm: 1, fittingMm: 1 },
       linkSearch: { bendMm: 1, wallMm: 1 },
       exactSpine: { maxPorts: 4 },
@@ -755,5 +770,29 @@ describe('planRoute layout options', () => {
     expect(prototype.plan).toEqual(absent.plan);
     expect(absent.plan.stats.segments).toBe(109);
     expect(Math.round(absent.plan.stats.lengthMm)).toBe(151366);
+  });
+
+  it('leaves no more off-graph rooms with bridgeParts and no penalty on the first floor', () => {
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const absent = runScenario(scenario!, makeIdFactories());
+    const bridged = runScenario(scenario!, makeIdFactories(), { bridgeParts: { penaltyMm: 0 } });
+    const offGraph = (run: typeof absent) => run.plan.warnings.find((w) => w.code === 'room-off-graph')?.count ?? 0;
+    expect(offGraph(bridged)).toBeLessThanOrEqual(offGraph(absent));
+  });
+
+  it('gives no free leg with bridgeParts and no penalty on the first floor', () => {
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const bridged = runScenario(scenario!, makeIdFactories(), { bridgeParts: { penaltyMm: 0 } });
+    expect(bridged.plan.stats.freeLegs).toBe(0);
+    expect(bridged.plan.warnings.some((w) => w.code === 'free-angle')).toBe(false);
+  });
+});
+
+describe('planRoute option reach', () => {
+  it('passes the layout options to the trunk, branch and topology helpers', () => {
+    planRoute(corridorScene(), { bendPenaltyMm: 123 });
+    expect(vi.mocked(trunk.buildTrunk).mock.calls.at(-1)![0].options).toEqual({ bendPenaltyMm: 123 });
+    expect(vi.mocked(branch.planBranches).mock.calls.at(-1)![0].options).toEqual({ bendPenaltyMm: 123 });
+    expect(vi.mocked(topology.connectLoosePorts).mock.calls.at(-1)![0].options).toEqual({ bendPenaltyMm: 123 });
   });
 });

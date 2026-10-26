@@ -1,8 +1,9 @@
 import { distance, type Vec2 } from './geometry.js';
 import type { Room } from './rooms/room.js';
 import type { RouteArea, RouteEdge, RouteEntry, RouteNode } from './route-area.js';
+import { bridgeParts } from './route-bridge.js';
 import { nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
-import { insideRouteArea, straightenPolyline, withWallGaps, type RouteLayoutOptions } from './route-layout.js';
+import { elbowPath, insideRouteArea, straightenPolyline, withWallGaps, type RouteLayoutOptions } from './route-layout.js';
 import { steinerTree } from './route-steiner.js';
 
 export interface TrunkInput {
@@ -14,8 +15,10 @@ export interface TrunkInput {
   startPointMm: Vec2;
   /** The rooms that need a branch (rooms with target ports that are not in the route area). */
   servedRoomIds: readonly string[];
-  /** Layout options. No field is read yet. */
+  /** Layout options. This step reads bridgeParts. */
   options?: RouteLayoutOptions;
+  /** Accepts a bridge path (mm). Absent: every bridge path is accepted. */
+  bridgeAccepts?: (pathMm: Vec2[]) => boolean;
 }
 export interface TrunkEdge {
   /** The id of the graph edge (a split edge has an id with '~'). */
@@ -112,6 +115,8 @@ export function buildTrunk(input: TrunkInput): TrunkResult {
   const startPt = { x: startPointMm.x / mmPerPt, y: startPointMm.y / mmPerPt };
   const rootId = chooseRoot(graph, startPt);
   if (rootId === null) return emptyTrunk(servedRoomIds);
+  if (input.options?.bridgeParts) bridgeParts(graph, rootId, mmPerPt, input.bridgeAccepts);
+  const bridgePenaltyMm = input.options?.bridgeParts?.penaltyMm ?? 0;
   const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
   const edgeById = new Map(graph.edges.map((e) => [e.id, e]));
   const rootNode = nodeById.get(rootId)!;
@@ -135,7 +140,12 @@ export function buildTrunk(input: TrunkInput): TrunkResult {
 
   const steinerEdges = graph.edges
     .filter((e) => !e.id.startsWith('rc-ry-'))
-    .map((e) => ({ id: e.id, from: e.from, to: e.to, cost: e.lengthMm }));
+    .map((e) => ({
+      id: e.id,
+      from: e.from,
+      to: e.to,
+      cost: e.id.startsWith('rb-') ? e.lengthMm + bridgePenaltyMm : e.lengthMm,
+    }));
   const steinerGraph = { nodeIds: graph.nodes.map((n) => n.id), edges: steinerEdges };
 
   let treeEdgeIds: string[] = [];
@@ -196,7 +206,13 @@ export function buildTrunk(input: TrunkInput): TrunkResult {
         if (end && end.kind === 'wall') wallPoints.push(toMm(end.point));
       }
       const inside = wallPoints.length > 0 ? withWallGaps(baseInside, wallPoints) : baseInside;
-      const { path, free } = straightenPolyline(polyline, inside);
+      const bridge = edge.id.startsWith('rb-');
+      const bridgeStart = polyline[0]!;
+      const bridgeEnd = polyline[polyline.length - 1]!;
+      const bridgeAxis = Math.abs(bridgeEnd.x - bridgeStart.x) >= Math.abs(bridgeEnd.y - bridgeStart.y) ? 'x' : 'y';
+      const { path, free } = bridge
+        ? { path: elbowPath(bridgeStart, bridgeEnd, bridgeAxis), free: false }
+        : straightenPolyline(polyline, inside);
       nodePointsMm[childId] = { ...path[path.length - 1]! };
       edges.push({
         id: edge.id,

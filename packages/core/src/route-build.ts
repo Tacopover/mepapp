@@ -278,8 +278,34 @@ export function planRoute(
   const toPage = (p: Vec2): Vec2 => ({ x: p.x / mmPerPt, y: p.y / mmPerPt });
   const portKey = (port: RoutePort): string => `${port.stampId}:${port.portId}`;
 
+  // Provisional: "would join an item of another network type" is read as a geometric nearness (NEAR_ITEM_MM) to a foreign item. It checks vertices only; a leg along a foreign segment is reported by checkExisting.
+  const foreignSegments = existing.segments.filter((s) => s.networkTypeId !== input.networkTypeId);
+  const foreignFittingIds = new Set<string>();
+  const foreignPortKeys = new Set<string>();
+  for (const s of foreignSegments) {
+    for (const end of [s.endpointA, s.endpointB]) {
+      if (end.kind === 'fitting') foreignFittingIds.add(end.fittingId);
+      else foreignPortKeys.add(`${end.elementId}:${end.portId}`);
+    }
+  }
+  const foreignPoints: Vec2[] = existing.fittings.filter((f) => foreignFittingIds.has(f.id)).map((f) => toMm(f.position));
+  for (const stampItem of input.state.stamps) {
+    for (const stampPort of getStampWorldPorts(stampItem)) {
+      if (foreignPortKeys.has(`${stampItem.id}:${stampPort.id}`)) foreignPoints.push(toMm(stampPort.world));
+    }
+  }
+  const foreignPieces: [Vec2, Vec2][] = [];
+  for (const s of foreignSegments) {
+    for (let i = 1; i < s.geometry.length; i++) foreignPieces.push([toMm(s.geometry[i - 1]!), toMm(s.geometry[i]!)]);
+  }
+  const accepts = (path: Vec2[]) => path.every((vertex, index) => {
+    if (foreignPoints.some((p) => Math.hypot(p.x - vertex.x, p.y - vertex.y) <= NEAR_ITEM_MM)) return false;
+    if (index === 0) return true;
+    return !foreignPieces.some(([a, b]) => distanceToPiece(vertex, a, b) <= NEAR_ITEM_MM);
+  });
+
   const servedRoomIds = [...grouped.byRoom.keys()];
-  const trunk = buildTrunk({ area: input.area, rooms: input.rooms, mmPerPt, startPointMm: start.pointMm, servedRoomIds, options });
+  const trunk = buildTrunk({ area: input.area, rooms: input.rooms, mmPerPt, startPointMm: start.pointMm, servedRoomIds, options, bridgeAccepts: accepts });
 
   const paths: Vec2[][] = [];
   if (trunk.rootPointMm) {
@@ -316,38 +342,13 @@ export function planRoute(
     for (const id of branch.offGraphPortIds) loosePorts.push(portById.get(id)!);
   }
 
-  // Provisional: "would join an item of another network type" is read as a geometric nearness (NEAR_ITEM_MM) to a foreign item. It checks vertices only; a leg along a foreign segment is reported by checkExisting.
-  const foreignSegments = existing.segments.filter((s) => s.networkTypeId !== input.networkTypeId);
-  const foreignFittingIds = new Set<string>();
-  const foreignPortKeys = new Set<string>();
-  for (const s of foreignSegments) {
-    for (const end of [s.endpointA, s.endpointB]) {
-      if (end.kind === 'fitting') foreignFittingIds.add(end.fittingId);
-      else foreignPortKeys.add(`${end.elementId}:${end.portId}`);
-    }
-  }
-  const foreignPoints: Vec2[] = existing.fittings.filter((f) => foreignFittingIds.has(f.id)).map((f) => toMm(f.position));
-  for (const stampItem of input.state.stamps) {
-    for (const stampPort of getStampWorldPorts(stampItem)) {
-      if (foreignPortKeys.has(`${stampItem.id}:${stampPort.id}`)) foreignPoints.push(toMm(stampPort.world));
-    }
-  }
-  const foreignPieces: [Vec2, Vec2][] = [];
-  for (const s of foreignSegments) {
-    for (let i = 1; i < s.geometry.length; i++) foreignPieces.push([toMm(s.geometry[i - 1]!), toMm(s.geometry[i]!)]);
-  }
-
   const connected = connectLoosePorts({
     paths,
     startPoint: start.pointMm,
     loose: loosePorts.map((port) => ({ id: portKey(port), point: toMm(port.world) })),
     targetPoints: targetPorts.map((port) => toMm(port.world)),
     noTapPoints: start.stubFittingId === null ? [start.pointMm] : [],
-    accepts: (path) => path.every((vertex, index) => {
-      if (foreignPoints.some((p) => Math.hypot(p.x - vertex.x, p.y - vertex.y) <= NEAR_ITEM_MM)) return false;
-      if (index === 0) return true;
-      return !foreignPieces.some(([a, b]) => distanceToPiece(vertex, a, b) <= NEAR_ITEM_MM);
-    }),
+    accepts,
     options,
   });
   paths.push(...connected.paths);
