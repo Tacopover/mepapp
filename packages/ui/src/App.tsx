@@ -1479,10 +1479,6 @@ export function MepSketchApp({
           onCancelRoomDetection={handleCancelRoomDetection}
           onExportRooms={handleExportRooms}
           onOpenAutoPlace={() => setAutoPlaceOpen(true)}
-          onOpenRoute={() => setRouteOpen(true)}
-          onOpenSize={() => setSizeOpen(true)}
-          routeAreaVisible={routeAreaVisible}
-          onToggleRouteArea={handleToggleRouteArea}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
         />
