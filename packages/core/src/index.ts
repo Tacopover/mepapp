@@ -19,6 +19,7 @@ export * from './route-steiner.js';
 export * from './route-hanan.js';
 export * from './route-plan-warnings.js';
 export * from './route-build.js';
+export * from './route-metrics.js';
 export * from './route-trunk.js';
 export * from './route-branch.js';
 export * from './route-topology.js';
