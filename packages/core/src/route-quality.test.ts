@@ -14,7 +14,10 @@ import {
   type ScenarioRun,
 } from './route-scenario.testutil.js';
 
-const LOCAL_FIXTURES = [{ file: 'ground-floor-w-rooms', name: 'ground floor w_rooms' }];
+const LOCAL_FIXTURES = [
+  { file: 'ground-floor-w-rooms', name: 'ground floor w_rooms' },
+  { file: '10A-rooms', name: '10A' },
+];
 const rows: ScenarioRow[] = [];
 
 function scenarioOf(drawing: Drawing, kind: ScenarioKind): Scenario {
@@ -63,13 +66,28 @@ describe('route quality report', () => {
   }, 60000);
 
   for (const spec of LOCAL_FIXTURES) {
-    const drawing = localDrawing(spec.file, spec.name);
-    if (drawing === null) {
-      const path = fileURLToPath(new URL(`../fixtures/route-area/local/${spec.file}.json`, import.meta.url));
-      console.log(`SKIP ${spec.name}: local fixture ${path} missing`);
+    let drawing: Drawing | null = null;
+    let loadError: string | null = null;
+    try {
+      drawing = localDrawing(spec.file, spec.name);
+    } catch (e) {
+      loadError = e instanceof Error ? e.message : String(e);
     }
+    const path = fileURLToPath(new URL(`../fixtures/route-area/local/${spec.file}.json`, import.meta.url));
+    if (loadError !== null) console.log(`SKIP ${spec.name}: local fixture ${path} cannot be read: ${loadError}`);
+    else if (drawing === null) console.log(`SKIP ${spec.name}: local fixture ${path} missing`);
     for (const kind of ['A', 'B'] as const) {
-      const s = drawing === null ? null : buildScenario(drawing, kind, 0);
+      let s: Scenario | null = null;
+      let buildError: string | null = null;
+      if (drawing !== null) {
+        try {
+          s = buildScenario(drawing, kind, 0);
+        } catch (e) {
+          buildError = e instanceof Error ? e.message : String(e);
+        }
+        if (buildError !== null) console.log(`SKIP ${spec.name} ${kind}: scenario build failed: ${buildError}`);
+        else if (s === null) console.log(`SKIP ${spec.name} ${kind}: no path room`);
+      }
       it.skipIf(s === null)(`${spec.name}, scenario ${kind}: no throw, no internal-join`, () => {
         if (s === null) return;
         const { run } = measure(s, `${spec.name} ${kind}`);

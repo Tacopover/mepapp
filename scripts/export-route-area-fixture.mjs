@@ -63,4 +63,4 @@ const ratios = result.rooms
   .sort((a, b) => a - b);
 const mid = Math.floor(ratios.length / 2);
 const median = ratios.length % 2 === 1 ? ratios[mid] : (ratios[mid - 1] + ratios[mid]) / 2;
-console.log(`median area ratio (polygon m2 / printed m2): ${median.toFixed(3)}`);
+console.log(`median area ratio (polygon m2 / printed m2): ${ratios.length > 0 ? median.toFixed(3) : 'n/a (no label has an area)'}`);
