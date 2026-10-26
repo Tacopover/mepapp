@@ -45,6 +45,8 @@ const FULL_RUNTIME = process.env[FULL_ENV] === '1';
 const RUNTIME_MODE = FULL_RUNTIME ? 'full (2 warm-ups, 7 runs)' : 'fast (1 warm-up, 3 runs)';
 const RUNTIME_WARMUPS = FULL_RUNTIME ? 2 : 1;
 const RUNTIME_RUNS = FULL_RUNTIME ? 7 : 3;
+// default run: scenario A in the loops (plus the first floor scenario B check); set MEPAPP_QUALITY_FULL=1 for the full scenario B runs, the D3 hash test and the full runtime table
+const KINDS: ScenarioKind[] = FULL_RUNTIME ? ['A', 'B'] : ['A'];
 
 function scenarioOf(drawing: Drawing, kind: ScenarioKind): Scenario {
   const s = buildScenario(drawing, kind, 0);
@@ -164,7 +166,7 @@ describe('route quality report', () => {
   }, 60000);
 
   for (const source of sources) {
-    for (const kind of ['A', 'B'] as const) {
+    for (const kind of KINDS) {
       for (const startIndex of START_INDEXES) {
         it.skipIf(source.drawing === null)(`${source.name}, scenario ${kind}, start ${startIndex}: no internal-join, baseline row`, () => {
           const drawing = source.drawing;
@@ -196,7 +198,7 @@ describe('route quality report', () => {
   }
 
   for (const source of sources) {
-    for (const kind of ['A', 'B'] as const) {
+    for (const kind of KINDS) {
       it.skipIf(source.drawing === null)(`${source.name}, scenario ${kind}: determinism D1, two runs give the same plan`, () => {
         const drawing = source.drawing;
         if (drawing === null) return;
@@ -210,16 +212,18 @@ describe('route quality report', () => {
         expect(planA).toEqual(planB);
       }, TEST_TIMEOUT);
 
-      const geometries = source.drawing === null ? null : shuffledGeometries(source.drawing, kind);
+      let geometries: ReturnType<typeof shuffledGeometries> | null = null;
       for (const seed of [1, 2]) {
         const d2Name = `${source.name}, scenario ${kind}, seed ${seed}: determinism D2, shuffled input gives the same geometry`;
         const d2 = (): void => {
-          if (geometries === null) return;
+          const drawing = source.drawing;
+          if (drawing === null) return;
+          if (geometries === null) geometries = shuffledGeometries(drawing, kind);
           const diff = firstGeometryDifference(geometries.expected, geometries.actual[seed - 1].geometry);
           if (diff !== null) console.log(`first geometry difference, ${source.name} ${kind} seed ${seed}: ${diff}`);
           expect(diff, `seed ${seed}`).toBeNull();
         };
-        if (geometries === null) it.skip(d2Name, d2, TEST_TIMEOUT);
+        if (source.drawing === null) it.skip(d2Name, d2, TEST_TIMEOUT);
         else if (KNOWN_D2_DEFECTS.some((d) => d.drawing === source.name && d.kind === kind && d.seed === seed)) {
           // known defect: planner is order dependent (sub-mm geometry shift; other terminal port or other non-geometry field in scenario B), see plan section 10
           it.fails(d2Name, d2, TEST_TIMEOUT);
@@ -246,7 +250,7 @@ describe('route quality report', () => {
     }
   }
 
-  it.skipIf(process.env[HASH_ENV] !== undefined)('determinism D3, two processes give the same plan hash', () => {
+  it.skipIf(process.env[HASH_ENV] !== undefined || !FULL_RUNTIME)('determinism D3, two processes give the same plan hash', () => {
     const dir = mkdtempSync(join(tmpdir(), 'route-hash-'));
     try {
       const hashes: unknown[] = [];

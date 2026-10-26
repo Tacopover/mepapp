@@ -243,6 +243,16 @@ Order (P1-T01 must be done before Q1-T06): T01 > T02 > T03 > T04 > T05, T06 (T05
 - Verification: core tests. The table is in section 10. The determinism tests pass. Runtime numbers are in the table. `pnpm build`.
 - Depends on: T02 (T03 for the 10A column).
 
+#### Q1-T04b. Make `route-quality.test.ts` fast by default [S]
+- Files: `packages/core/src/route-quality.test.ts`.
+- Work: after T04 the file took about 320 s and the core suite about 400 s. A normal core test run must stay fast. The default run of the file must finish in under 30 s. Only the time when each assertion runs changes. No assertion is removed.
+  - The D3 hash probe (two child Node processes) runs only when `MEPAPP_QUALITY_FULL=1`.
+  - The shuffled plans are built inside their tests, not at collection time.
+  - The default run uses scenario A only for the determinism checks and the baseline rows, and fewer runtime runs. Scenario B (except the first floor check) and the full runtime table run only with `MEPAPP_QUALITY_FULL=1`.
+- Must not touch: planner code. The `KNOWN_D2_DEFECTS` list stays as it is.
+- Verification: the default run time of the file, the full run with `MEPAPP_QUALITY_FULL=1`, and the whole core suite (under 2 minutes).
+- Depends on: T04.
+
 #### Q1-T05. Defect catalogue from the user screenshots [S]
 - Files: this plan (section 11), no code.
 - Work: when the user sends 2 or 3 screenshots (section 8, request R-Q1-01), look at each one and write: what is wrong in plain words (long free duct through rooms, many bends, tap too close, parallel runs, route leaves the corridor, other). Link each defect to the metric that would show it. If a defect has no metric, add the metric to T01 (a note to the director). Until the screenshots arrive, the section lists the defects that the metrics already show (the 28 off-graph rooms, the 26 wall crossings).
@@ -468,6 +478,7 @@ To be filled when the screenshots arrive (R-Q1-01). Until then:
 | Q1-T02 | M | |
 | Q1-T03 | S | |
 | Q1-T04 | M | |
+| Q1-T04b | S | |
 | Q1-T05 | S | |
 | Q1-T06 | S | |
 | Q1-T07 | M | |
