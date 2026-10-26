@@ -3990,7 +3990,7 @@
 .mep-rt-details .mep-field-row {
   flex-wrap: wrap;
 }
-.mep-rt-demand-head .mep-rt-remove {
+.mep-rt-demand-head .mep-icon-button {
   margin-left: auto;
 }
 .mep-rt-tag {
@@ -5247,3 +5247,4 @@
   opacity: 0.75;
 }
 .mep-nt-note-tip { margin-left: 6px; display: inline-flex; align-items: center; }
+.mep-rt-details .mep-field-row .mep-infotip { margin-left: 6px; align-self: flex-start; }

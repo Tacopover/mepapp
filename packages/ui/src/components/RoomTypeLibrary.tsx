@@ -39,6 +39,9 @@ import {
   totalUnit,
   type DemandDraft,
 } from './roomDemandText.js';
+import { IconClose } from '../icons.js';
+import { IconButton } from './IconButton.js';
+import { InfoTip } from './InfoTip.js';
 
 /** A room of the page with the type: its values give the result lines of the details. */
 export interface RoomTypeSample {
@@ -671,8 +674,8 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
       <div className="mep-field-row">
         <label htmlFor="rt-keywords">Keywords</label>
         <textarea id="rt-keywords" className="mep-room-types-keywords" rows={3} value={draft.keywords} onChange={(e) => setField('keywords')(e.target.value)} />
+        <InfoTip label="More about keywords">Separate keywords with commas. A keyword matches a word of the room name that starts or ends with it (“toilet” matches “toiletruimte”). A keyword of 3 letters or less must be the whole word.</InfoTip>
       </div>
-      <p className="mep-settings-hint">Separate keywords with commas. A keyword matches a word of the room name that starts or ends with it (“toilet” matches “toiletruimte”). A keyword of 3 letters or less must be the whole word.</p>
       <h5 className="mep-room-types-group">Persons</h5>
       <div className="mep-guide-formula" data-demand={PERSONS}>
         <div className="mep-guide-term">
@@ -740,7 +743,7 @@ function RoomTypeForm({ type, others, needs, focusNeed, sample, onDirtyChange, o
           <button type="button" onClick={fillExample} data-testid="rt-fill-example">
             Fill in the example values
           </button>{' '}
-          Only the empty values. Dutch new build (Bbl, NEN-EN 12464-1, practice): check the values against the rules of your project.
+          <InfoTip label="More about the example values">Only the empty values. Dutch new build (Bbl, NEN-EN 12464-1, practice): check the values against the rules of your project.</InfoTip>
         </p>
       )}
       {error && (
@@ -799,9 +802,7 @@ function DemandEditor({ need, typeName, draft, sample, people, onChange }: Deman
         <b>{need.name}</b>
         <span className="mep-guide-note">{need.unit}</span>
         {need.own && <span className="mep-rt-tag">your demand type</span>}
-        <button type="button" className="mep-guide-link mep-rt-remove" onClick={() => onChange(null)} data-testid={`${id}-remove`}>
-          Remove {need.name}
-        </button>
+        <IconButton Icon={IconClose} label={`Remove ${need.name}`} testId={`${id}-remove`} onClick={() => onChange(null)} />
       </div>
       {need.kind === 'light' ? (
         <div className="mep-guide-term">
