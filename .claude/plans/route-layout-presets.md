@@ -407,7 +407,8 @@ Rules for every core report test of revision 2: use the harness `route-scenario.
 - **Must not touch:** `wallCrossings` (same value), the warnings, any geometry.
 - **Verify:** core tests: the sum equals `wallCrossings` on the first floor; a hand plan with one corridor wall and one room wall gives 1 and 1. `pnpm --filter @mepapp/core test`, `pnpm typecheck`, `pnpm build`. No browser check.
 
-#### P1-T03. Corner mode `right` (90 only)
+#### P1-T03. Corner mode `right` (90 only) — DONE (commit `ece219c`)
+- **Result:** core tests 1750 passed, 2 skipped; typecheck and `pnpm build` pass. Plan JSON for `both` and absent is byte-equal before and after (first floor and w_rooms, `cmp`). Printed, `right` / `both`: first floor bends90 43/35, lengthMm 152441/151366, wallCrossings 26/26; w_rooms bends90 66/47, lengthMm 214330/207563, wallCrossings 31/33. No plan-level trunk region test (unit test only).
 - **Size:** M (about 140 lines). **Depends on:** P1-T23. **No longer waits for a gate** (revision 2: the user wants the control, so the mode is built always).
 - **Files:** `route-layout.ts` (`applyJogRule(path, smallJumpMm = SMALL_JUMP_MM)`; `walkPolyline` and `straightenPolyline` get a parameter `corners` and, for `right`, replace a `diagonal` leg by a right-angle Z or an L that stays in the region), `route-branch.ts` (`branchPath` passes the value), `route-trunk.ts`, `route-build.ts`, tests.
 - **Shapes:** `applyJogRule(path: readonly Vec2[], smallJumpMm?: number): Vec2[]`; `straightenPolyline(points, insideRegion, corners?: CornerMode)`; `TrunkInput.options.corners` (already reachable through `options`).
