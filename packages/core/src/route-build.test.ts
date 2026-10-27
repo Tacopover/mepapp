@@ -764,6 +764,8 @@ describe('planRoute layout options', () => {
     expect(DEFAULT_LAYOUT_OPTIONS.bendPenaltyMm).toBe(BEND_PENALTY_MM);
     expect(DEFAULT_LAYOUT_OPTIONS.crossingPenaltyMm).toBe(CROSSING_PENALTY_MM);
     expect(DEFAULT_LAYOUT_OPTIONS.jogSmallJumpMm).toBe(SMALL_JUMP_MM);
+    expect(DEFAULT_LAYOUT_OPTIONS.corners).toBe('both');
+    expect('orthogonalOnly' in DEFAULT_LAYOUT_OPTIONS).toBe(false);
   });
 
   it('gives the same first floor plan with the prototype fields absent and set', () => {
@@ -772,12 +774,14 @@ describe('planRoute layout options', () => {
     const absent = runScenario(scenario!, makeIdFactories());
     const empty = runScenario(scenario!, makeIdFactories(), {});
     const defaults = runScenario(scenario!, makeIdFactories(), DEFAULT_LAYOUT_OPTIONS);
+    const both = runScenario(scenario!, makeIdFactories(), { corners: 'both' });
     const prototype = runScenario(scenario!, makeIdFactories(), {
       trunkBends: { bendMm: 1, fittingMm: 1 },
       ripUp: { rounds: 1 },
     });
     expect(empty.plan).toEqual(absent.plan);
     expect(defaults.plan).toEqual(absent.plan);
+    expect(both.plan).toEqual(absent.plan);
     expect(prototype.plan).toEqual(absent.plan);
     expect(absent.plan.stats.segments).toBe(109);
     expect(Math.round(absent.plan.stats.lengthMm)).toBe(151366);

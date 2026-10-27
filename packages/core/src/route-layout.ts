@@ -6,6 +6,7 @@ import { BEND_PENALTY_MM, CROSSING_PENALTY_MM } from './route-hanan.js';
 
 export const ROUTE_ANGLE_INCREMENT_DEGREES = 45;
 export const SMALL_JUMP_MM = 1000;
+export type CornerMode = 'both' | 'right' | 'diagonal';
 export interface RouteLayoutOptions {
   /** Cost of one turn in the room search, mm. Default BEND_PENALTY_MM. */
   bendPenaltyMm?: number;
@@ -13,8 +14,8 @@ export interface RouteLayoutOptions {
   crossingPenaltyMm?: number;
   /** Largest jump that uses a pair of 45 degree bends, mm. Default SMALL_JUMP_MM. 0 = no 45 degree jumps. */
   jogSmallJumpMm?: number;
-  /** true = no 45 degree leg at all. Default false. */
-  orthogonalOnly?: boolean;
+  /** Which corners a leg may make: 'both' = 90 and 45 degrees, 'right' = 90 degrees only, 'diagonal' = 45 degrees (chamfer). Default 'both'. No planner code reads it yet. */
+  corners?: CornerMode;
   /** Which entry of a room the trunk tries first. Default 'primary-longest'. */
   entryRule?: 'primary-longest' | 'shortest-branch';
   /** Which axis an off-graph link tries first. Default 'longer'. */
@@ -35,7 +36,7 @@ export const DEFAULT_LAYOUT_OPTIONS: Readonly<Required<Omit<RouteLayoutOptions, 
   bendPenaltyMm: BEND_PENALTY_MM,
   crossingPenaltyMm: CROSSING_PENALTY_MM,
   jogSmallJumpMm: SMALL_JUMP_MM,
-  orthogonalOnly: false,
+  corners: 'both',
   entryRule: 'primary-longest',
   offGraphAxis: 'longer',
 };
