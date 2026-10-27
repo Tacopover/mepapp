@@ -805,7 +805,7 @@ Notes on the numbers:
 | Q1-T03 | S | |
 | Q1-T04 | M | |
 | Q1-T04b | S | |
-| Q1-T05 | S | |
+| Q1-T05 | S | 19ebf98 |
 | Q1-T06 | S | |
 | Q1-T07 | M | |
 | Q1-T08 | M | |
