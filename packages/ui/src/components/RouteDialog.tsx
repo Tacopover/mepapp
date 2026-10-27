@@ -172,7 +172,7 @@ export function RouteDialog({ sceneRef, roomTypes, stampName, onRouteTypeIdsChan
     <Dialog
       title={routeText('title')}
       className="mep-modal--route"
-      backdropClassName="mep-modal-backdrop--route"
+      backdropClassName="mep-modal-backdrop--route mep-modal-backdrop--through"
       closeOnBackdropClick={false}
       onClose={onClose}
       actions={
