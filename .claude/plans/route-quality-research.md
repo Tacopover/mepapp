@@ -743,10 +743,46 @@ Reading of the tables:
 
 ## 11. Defect catalogue from the user screenshots (T05)
 
-To be filled when the screenshots arrive (R-Q1-01). Until then:
-- D-1. Many rooms are joined by a long free duct across other rooms (28 of 33). Metric: `offGraphRooms`, `wallCrossings`, `lengthLinkMm`.
-- D-2. The corridors are not joined in the graph (4 parts). Metric: `area.parts` (to be added to the report).
-- D-3. Not yet known: bends, taps, parallel runs. Metrics: `bends90`, `fittings`, `existingOverlaps`.
+Source: the screenshot `fixtures/pdfs/00_arch_ground_floor_w_rooms_route_2.png` (local only, git-ignored). It shows the auto-route of the latest build on the w_rooms PDF. The user placed the rooms by hand and used terminals for the default supply air rule only. The user drew six notes. The user says each note is a defect class that repeats over the whole floor, not only at the arrow.
+
+How the counts were made (Q1-T05, measured 2026-10-27 by `route-defects-report.test.ts`). The run uses the local fixture `ground-floor-w-rooms.json`, start 0, default options. Scenario A has one terminal at the label point of each served room. Scenario B has four terminals in each served room. The scenarios are not the same as the user input: the scenario puts a terminal in all 43 served rooms, and the user placed terminals in fewer rooms, some with 2 to 6 terminals. So the counts show the size of each class. They are not a copy of the screenshot. The first floor and 10A are in the same test as a cross check. Two terms: a *served room* is a room that is not part of the route area (the corridors). A *bend* is an elbow fitting. A *chain* is a served room that a duct enters directly from another served room.
+
+| Id | Defect in plain words | Example spot (note) | Metric |
+|---|---|---|---|
+| D-1 | A room has no main branch. Each terminal has its own link into the room, so the room has many entries. The user wants one main branch from the corridor, then similar branches to the terminals. | Top right room is the good example. The room left of it is the bad one (note 1). | `multiEntryRooms` (new), `roomsWithBends` (new). Scenario B only. |
+| D-2 | A link from a room to the corridor has bends that a straighter link would not need (90 and 45 degrees). | The link from the top left room to the corridor (note 2). | `bendsRoom90`, `bendsRoom45`, `bendsOutside` (new). |
+| D-3 | Bends of 45 degrees in the open hall that do not follow the walls. | The hall in the middle of the floor (note 3). | `bendsArea45`, `bendsArea90` (new), `bends45`. |
+| D-4 | A terminal gets an extra bend where one straight segment from the corridor could reach it. | The room right of the middle (note 4). | `roomsWithBends` (new), `bendsRoom90` (new). The metric shows rooms with a bend, not if a straight way exists. |
+| D-5 | Rooms are chained: one room is connected through another room, not from the corridor. | The two rooms on the left (note 5). | `chainedRooms` (new). |
+| D-6 | A long diagonal leg across open space. The user did not note it. It is probably a bridge between two corridor parts. | The long diagonals in the middle of the floor. | `longDiagonalLegs` (new, longer than 3 000 mm), `diagonalLegs` (new). |
+| D-7 | Many rooms are joined by a long free duct across other rooms. | Many rooms on the whole floor. | `offGraphRooms`, `wallCrossings`, `lengthLinkMm`. |
+| D-8 | The corridors are not joined in the graph (4 parts). | The long diagonals join the parts. | `area.parts` (not yet in the report). |
+
+Counts on the ground floor w_rooms (local-only, 43 served rooms, start 0). The bends in the route area are all corridor bends, split into 90 and 45 degrees.
+
+| Class | Metric | Scenario A | Scenario B |
+|---|---|---|---|
+| D-1 | `multiEntryRooms` (rooms with more than one entry) | 4 | 15 |
+| D-1, D-4 | `roomsWithBends` (served rooms with at least one bend) | 20 | 36 |
+| D-2 | `bendsRoom90` / `bendsRoom45` (bends inside served rooms) | 22 / 2 | 66 / 2 |
+| D-2 | `bendsOutside` (bends in no room, for example in a door gap) | 16 | 18 |
+| D-3 | `bendsArea90` / `bendsArea45` (bends in the route area) | 12 / 5 | 12 / 5 |
+| D-3 | Bends of 45 degrees in the whole plan (`bends45`) | 10 | 10 |
+| D-5 | `chainedRooms` | 20 | 25 |
+| D-6 | `diagonalLegs` / `longDiagonalLegs` (longer than 3 000 mm) | 6 / 2 | 6 / 2 |
+| D-7 | `offGraphRooms` | 33 | 33 |
+| All | `bends90` / `bends45` (total) | 47 / 10 | 93 / 10 |
+
+Cross check on the other two drawings (scenario A / scenario B): first floor: `chainedRooms` 18 / 18, `multiEntryRooms` 1 / 4, `roomsWithBends` 16 / 24, `bendsArea45` 10 / 10, `longDiagonalLegs` 0 / 0. 10A: `chainedRooms` 9 / 11, `multiEntryRooms` 2 / 9, `roomsWithBends` 12 / 21, `bendsArea45` 16 / 16, `longDiagonalLegs` 0 / 0. So D-2, D-3 and D-5 repeat on all three drawings. D-6 shows on the ground floor w_rooms only.
+
+Notes on the numbers:
+- The bend metrics add up: for example `bendsArea90 + bendsArea45 + bendsRoom90 + bendsRoom45 + bendsOutside` is 57 for the ground floor A, and `bends90 + bends45` is 57.
+- The 45 degree bends come from the corridor (D-3), not from the rooms: on all three drawings the 45 degree bends in served rooms are 0 or 2. Some bends in the route area also come from straightening (R-4).
+- `chainedRooms` is high because scenario A puts a terminal in every served room. The user input has terminals in fewer rooms, so the real count is likely lower (not verified). It is still the largest class by room count.
+- `multiEntryRooms` counts the entry points that are more than 1 000 mm apart. A fitting that sits in the wall gap can give two entries for one door. This is a known limit of the metric (not verified on the screenshot).
+- D-4 has no exact metric. A test for "a straight segment from the corridor would serve this terminal" needs a line of sight check from the route area to each terminal. A task (Q1-T10 or Q1-T11) can add it if the director wants it.
+- D-8: `area.parts` is still not in the report.
+- Not verified: that the counts match the screenshot room by room. The user placed the terminals by hand and the fixture has no stamps.
 
 ## 12. Risks and what is not verified
 

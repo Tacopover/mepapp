@@ -157,6 +157,46 @@ describe('routeMetrics', () => {
     expect(metrics.branchLengthSpreadMm).toBe(0);
   });
 
+  const defectArea: RouteArea = { ...EMPTY_AREA, rooms: [{ roomId: 'C', kind: 'path', typeId: 'corridor', open: false, name: null }] };
+  const defectRooms = [room('C', 0, 0, 2000, 1000), room('A', 2200, 0, 4200, 1000), room('B', 4400, 0, 6400, 1000)];
+  const S = { kind: 'port', elementId: 'S', portId: 'out' } as const;
+  const T = { kind: 'port', elementId: 'T', portId: 'in' } as const;
+
+  it('counts a room that a segment enters directly from another served room, and a second entry', () => {
+    const plan: PlannedRoute = {
+      ...threeLegPlan(),
+      segments: [
+        segment('w1', S, T, [{ x: 500, y: 500 }, { x: 5800, y: 500 }]),
+        segment('w2', { kind: 'port', elementId: 'U', portId: 'in' }, T, [{ x: 4000, y: -500 }, { x: 4000, y: 500 }]),
+      ],
+      fittings: [],
+    };
+    const metrics = routeMetrics(threeLegInput(plan, defectRooms, defectArea));
+    expect(metrics.chainedRooms).toBe(1);
+    expect(metrics.multiEntryRooms).toBe(1);
+  });
+
+  it('splits the bends by place and angle and counts long diagonal legs', () => {
+    const plan: PlannedRoute = {
+      ...threeLegPlan(),
+      segments: [
+        segment('s1', S, { kind: 'fitting', fittingId: 'e1' }, [{ x: 500, y: 500 }, { x: 2500, y: 500 }]),
+        segment('s2', { kind: 'fitting', fittingId: 'e1' }, { kind: 'fitting', fittingId: 'e2' }, [{ x: 2500, y: 500 }, { x: 2500, y: 900 }]),
+        segment('s3', { kind: 'fitting', fittingId: 'e2' }, { kind: 'fitting', fittingId: 'e3' }, [{ x: 2500, y: 900 }, { x: 3000, y: 1400 }]),
+        segment('s4', { kind: 'fitting', fittingId: 'e3' }, T, [{ x: 3000, y: 1400 }, { x: 7000, y: 5400 }]),
+      ],
+      fittings: [elbow('e1', 2500, 500), elbow('e2', 2500, 900), elbow('e3', 3000, 1400)],
+    };
+    const metrics = routeMetrics(threeLegInput(plan, defectRooms, defectArea));
+    expect(metrics.bendsRoom90).toBe(1);
+    expect(metrics.bendsRoom45).toBe(1);
+    expect(metrics.bendsOutside).toBe(0);
+    expect(metrics.bendsArea90 + metrics.bendsArea45).toBe(0);
+    expect(metrics.roomsWithBends).toBe(1);
+    expect(metrics.diagonalLegs).toBe(2);
+    expect(metrics.longDiagonalLegs).toBe(1);
+  });
+
   it('gives zeros and no NaN for an empty plan', () => {
     const plan: PlannedRoute = { ...threeLegPlan(), segments: [], fittings: [] };
     const metrics = routeMetrics(threeLegInput(plan));

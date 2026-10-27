@@ -39,10 +39,54 @@ export interface RouteMetrics {
   meanPathMm: number;
   branchLengthSpreadMm: number;
   freeLegsShare: number;
+  /** Elbows by place and angle. A bend is an elbow fitting; its place is the room that holds it (route area, served room, or no room). */
+  bendsArea90: number;
+  bendsArea45: number;
+  bendsRoom90: number;
+  bendsRoom45: number;
+  bendsOutside: number;
+  /** Served rooms with at least one bend inside. */
+  roomsWithBends: number;
+  /** Served rooms that a segment enters directly from another served room (a chain). */
+  chainedRooms: number;
+  /** Served rooms with more than one entry point (entry points less than ENTRY_CLUSTER_MM apart count once). */
+  multiEntryRooms: number;
+  /** Legs at 45 degrees, and those longer than LONG_DIAGONAL_MM. */
+  diagonalLegs: number;
+  longDiagonalLegs: number;
 }
+
+/** A diagonal leg longer than this is a long diagonal. */
+export const LONG_DIAGONAL_MM = 3000;
+/** Entry points into one room closer than this count as one entry. */
+export const ENTRY_CLUSTER_MM = 1000;
 
 function legLengthMm(a: Vec2, b: Vec2, mmPerPt: number): number {
   return Math.hypot(b.x - a.x, b.y - a.y) * mmPerPt;
+}
+
+function deflectionDegrees(u: Vec2, w: Vec2): number {
+  return (Math.atan2(Math.abs(u.x * w.y - u.y * w.x), u.x * w.x + u.y * w.y) * 180) / Math.PI;
+}
+
+function entryPoints(rooms: readonly Room[], path: readonly Vec2[], mmPerPt: number, pageIndex: number): { roomId: string; point: Vec2 }[] {
+  const out: { roomId: string; point: Vec2 }[] = [];
+  const stepPt = 100 / mmPerPt;
+  let previous: string | null = null;
+  let previousPoint: Vec2 | null = null;
+  const sample = (p: Vec2): void => {
+    const roomId = roomsAtPoint(rooms, p, pageIndex)[0]?.id ?? null;
+    if (roomId !== null && roomId !== previous && previousPoint !== null) out.push({ roomId, point: p });
+    previous = roomId;
+    previousPoint = p;
+  };
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1]!;
+    const b = path[i]!;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / stepPt));
+    for (let k = i === 1 ? 0 : 1; k <= n; k++) sample({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+  }
+  return out;
 }
 
 function endpointKey(point: ConnectionPoint): string {
@@ -109,6 +153,76 @@ export function routeMetrics(input: {
     openRuns += walked.openRuns.length;
     for (const crossing of walked.crossings) {
       if ([crossing.fromRoomId, crossing.toRoomId].some((id) => id !== null && shaftRoomIds.has(id))) shaftCrossings++;
+    }
+  }
+
+  const servedRoomOf = (id: string | null): id is string => id !== null && !areaRoomIds.has(id);
+  const chained = new Set<string>();
+  const entriesByRoom = new Map<string, Vec2[]>();
+  let diagonalLegs = 0;
+  let longDiagonalLegs = 0;
+  for (const segment of plan.segments) {
+    const path = segment.geometry;
+    for (let i = 1; i < path.length; i++) {
+      if (legClass(path[i - 1]!, path[i]!) === 'diagonal') {
+        diagonalLegs++;
+        if (legLengthMm(path[i - 1]!, path[i]!, mmPerPt) > LONG_DIAGONAL_MM) longDiagonalLegs++;
+      }
+    }
+    for (const crossing of crossingsAlongPath(rooms, path, { mmPerPt, pageIndex }).crossings) {
+      if (servedRoomOf(crossing.fromRoomId) && servedRoomOf(crossing.toRoomId) && crossing.fromRoomId !== crossing.toRoomId) chained.add(crossing.toRoomId);
+    }
+    for (const entry of entryPoints(rooms, path, mmPerPt, pageIndex)) {
+      if (!servedRoomOf(entry.roomId)) continue;
+      const list = entriesByRoom.get(entry.roomId);
+      if (list) list.push(entry.point);
+      else entriesByRoom.set(entry.roomId, [entry.point]);
+    }
+  }
+  let multiEntryRooms = 0;
+  for (const points of entriesByRoom.values()) {
+    const clusters: Vec2[] = [];
+    for (const p of points) {
+      if (!clusters.some((c) => legLengthMm(c, p, mmPerPt) < ENTRY_CLUSTER_MM)) clusters.push(p);
+    }
+    if (clusters.length > 1) multiEntryRooms++;
+  }
+
+  const ends = new Map<string, Vec2[]>();
+  for (const segment of plan.segments) {
+    const g = segment.geometry;
+    if (g.length < 2) continue;
+    for (const [end, from, next] of [[segment.endpointA, g[0]!, g[1]!], [segment.endpointB, g[g.length - 1]!, g[g.length - 2]!]] as const) {
+      if (end.kind !== 'fitting') continue;
+      const list = ends.get(end.fittingId);
+      const away = { x: next.x - from.x, y: next.y - from.y };
+      if (list) list.push(away);
+      else ends.set(end.fittingId, [away]);
+    }
+  }
+  let bendsArea90 = 0;
+  let bendsArea45 = 0;
+  let bendsRoom90 = 0;
+  let bendsRoom45 = 0;
+  let bendsOutside = 0;
+  const bentRooms = new Set<string>();
+  for (const fitting of plan.fittings) {
+    if (fitting.kind !== 'elbow') continue;
+    const away = ends.get(fitting.id);
+    if (!away || away.length !== 2) continue;
+    const deflection = deflectionDegrees({ x: -away[0]!.x, y: -away[0]!.y }, away[1]!);
+    const is90 = Math.abs(deflection - 90) <= 1;
+    const is45 = Math.abs(deflection - 45) <= 1;
+    if (!is90 && !is45) continue;
+    const roomId = roomsAtPoint(rooms, fitting.position, pageIndex)[0]?.id ?? null;
+    if (roomId === null) bendsOutside++;
+    else if (areaRoomIds.has(roomId)) {
+      if (is90) bendsArea90++;
+      else bendsArea45++;
+    } else {
+      bentRooms.add(roomId);
+      if (is90) bendsRoom90++;
+      else bendsRoom45++;
     }
   }
 
@@ -181,6 +295,16 @@ export function routeMetrics(input: {
     meanPathMm: allPaths.length > 0 ? allPaths.reduce((sum, d) => sum + d, 0) / allPaths.length : 0,
     branchLengthSpreadMm,
     freeLegsShare: lengthMm > 0 ? freeLengthMm / lengthMm : 0,
+    bendsArea90,
+    bendsArea45,
+    bendsRoom90,
+    bendsRoom45,
+    bendsOutside,
+    roomsWithBends: bentRooms.size,
+    chainedRooms: chained.size,
+    multiEntryRooms,
+    diagonalLegs,
+    longDiagonalLegs,
   };
 }
 
