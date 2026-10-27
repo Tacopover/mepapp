@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Vec2 } from './geometry.js';
 import {
   MIN_LEG_MM,
+  ROUTE_SAMPLE_STEP_MM,
+  SMALL_JUMP_MM,
   applyJogRule,
   elbowPath,
   insideRouteArea,
@@ -155,6 +157,17 @@ describe('applyJogRule', () => {
     const path = applyJogRule(z);
     expect(path).toEqual(z);
     expect(pathLength(path)).toBeCloseTo(17001, 6);
+  });
+
+  it('keeps the Z for a jump of 600 when the small jump is 0', () => {
+    const z = jogPath({ x: 0, y: 0 }, { x: 10000, y: 600 });
+    expect(applyJogRule(z)).not.toEqual(z);
+    expect(applyJogRule(z, 0)).toEqual(z);
+  });
+
+  it('uses SMALL_JUMP_MM when no small jump is given', () => {
+    const z = jogPath({ x: 0, y: 0 }, { x: 16000, y: 1000 });
+    expect(applyJogRule(z, SMALL_JUMP_MM)).toEqual(applyJogRule(z));
   });
 
   it('keeps the Z for a jump of 1500', () => {
@@ -454,6 +467,70 @@ describe('straightenPolyline', () => {
     const jogCopy = jogInput.map((v) => ({ ...v }));
     straightenPolyline(jogInput, always);
     expect(jogInput).toEqual(jogCopy);
+  });
+
+  it('corners right turns a 800 mm offset into a 90 degree Z', () => {
+    const result = straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 800 }], always, 'right');
+    expect(result.free).toBe(false);
+    expect(result.path).toEqual([{ x: 0, y: 0 }, { x: 5000, y: 0 }, { x: 5000, y: 800 }, { x: 10000, y: 800 }]);
+    expect(result.path.every((_, i) => i === 0 || legClass(result.path[i - 1]!, result.path[i]!) === 'axis')).toBe(true);
+  });
+
+  it('corners right replaces a 45 degree leg with axis legs', () => {
+    const result = straightenPolyline([{ x: 0, y: 0 }, { x: 6000, y: 6000 }], always, 'right');
+    expect(result.free).toBe(false);
+    expect(result.path[0]).toEqual({ x: 0, y: 0 });
+    expect(result.path[result.path.length - 1]).toEqual({ x: 6000, y: 6000 });
+    expect(isLayoutPath(result.path)).toBe(true);
+    for (let i = 1; i < result.path.length; i++) {
+      expect(legClass(result.path[i - 1]!, result.path[i]!)).toBe('axis');
+    }
+  });
+
+  it('corners right gives only axis legs for a free leg with the same end points', () => {
+    const points = [{ x: 0, y: 0 }, { x: 10000, y: 6000 }];
+    const result = straightenPolyline(points, always, 'right');
+    expect(result.free).toBe(false);
+    expect(result.path[0]).toEqual({ x: 0, y: 0 });
+    expect(result.path[result.path.length - 1]).toEqual({ x: 10000, y: 6000 });
+    expect(isLayoutPath(result.path)).toBe(true);
+    for (let i = 1; i < result.path.length; i++) {
+      expect(legClass(result.path[i - 1]!, result.path[i]!)).toBe('axis');
+    }
+  });
+
+  it('keeps the 45 degree leg for corners both, undefined and diagonal', () => {
+    const points = [{ x: 0, y: 0 }, { x: 6000, y: 6000 }];
+    const today = straightenPolyline(points, always);
+    expect(today).toEqual({ path: [{ x: 0, y: 0 }, { x: 6000, y: 6000 }], free: false });
+    expect(straightenPolyline(points, always, 'both')).toEqual(today);
+    expect(straightenPolyline(points, always, undefined)).toEqual(today);
+    expect(straightenPolyline(points, always, 'diagonal')).toEqual(today);
+  });
+
+  it('corners right returns the input unchanged and free when the region excludes everything', () => {
+    const points = [{ x: 0, y: 0 }, { x: 6000, y: 6000 }];
+    expect(straightenPolyline(points, () => false, 'right')).toEqual({
+      path: [{ x: 0, y: 0 }, { x: 6000, y: 6000 }],
+      free: true,
+    });
+  });
+
+  it('corners right keeps every sample inside an L-shaped region', () => {
+    const inside = (p: Vec2): boolean =>
+      (Math.abs(p.y) <= 100 && p.x >= 0 && p.x <= 10000) || (p.x >= 9900 && p.x <= 10100 && p.y >= 0 && p.y <= 8000);
+    const result = straightenPolyline([{ x: 0, y: 0 }, { x: 10000, y: 8000 }], inside, 'right');
+    expect(result.free).toBe(false);
+    for (let i = 1; i < result.path.length; i++) {
+      const a = result.path[i - 1]!;
+      const b = result.path[i]!;
+      expect(legClass(a, b)).toBe('axis');
+      const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / ROUTE_SAMPLE_STEP_MM));
+      for (let k = 0; k <= n; k++) {
+        const t = k / n;
+        expect(inside({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })).toBe(true);
+      }
+    }
   });
 });
 

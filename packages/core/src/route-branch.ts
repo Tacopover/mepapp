@@ -169,7 +169,7 @@ function pathLength(path: readonly Vec2[]): number {
   return total;
 }
 
-function branchPath(t: Vec2, e: Vec2, tapLeg: Leg | null): Vec2[] {
+function branchPath(t: Vec2, e: Vec2, tapLeg: Leg | null, smallJumpMm?: number): Vec2[] {
   if (Math.abs(t.x - e.x) <= SAME_LINE_TOL || Math.abs(t.y - e.y) <= SAME_LINE_TOL) {
     return [{ x: t.x, y: t.y }, { x: e.x, y: e.y }];
   }
@@ -183,7 +183,7 @@ function branchPath(t: Vec2, e: Vec2, tapLeg: Leg | null): Vec2[] {
       p = elbowPath(t, e, horizontalLeg ? 'y' : 'x');
     }
   }
-  return applyJogRule(p).map((q) => ({ x: q.x, y: q.y }));
+  return applyJogRule(p, smallJumpMm).map((q) => ({ x: q.x, y: q.y }));
 }
 
 function lastDir(path: readonly Vec2[]): Vec2 | null {
@@ -202,10 +202,10 @@ function nearestTapLeg(legs: readonly Leg[], e: Vec2): Leg {
   return nearestLeg(sameEdge, e) ?? nearestLeg(legs.filter((l) => l.cls === 'axis'), e) ?? leg;
 }
 
-function reachCandidate(leg: Leg, e: Vec2, placed: readonly PlacedTap[]): ReachCandidate {
+function reachCandidate(leg: Leg, e: Vec2, placed: readonly PlacedTap[], smallJumpMm?: number): ReachCandidate {
   const s = leg.cls === 'axis' ? placeOnAxisLeg(leg, e, placed) : 0;
   const tapMm = leg.cls === 'axis' ? pointAt(leg, s) : nearestOnSegment(e, leg.a, leg.b).point;
-  return { tapMm, tapLeg: leg, s, branch: branchPath(tapMm, e, leg) };
+  return { tapMm, tapLeg: leg, s, branch: branchPath(tapMm, e, leg, smallJumpMm) };
 }
 
 function branchInside(branch: readonly Vec2[], inside: (p: Vec2) => boolean): boolean {
@@ -247,14 +247,15 @@ function planReachRoom(
 ): RoomBranch {
   const e = room.entryPointMm;
   const bendMm = input.options?.bendPenaltyMm ?? BEND_PENALTY_MM;
+  const smallJumpMm = input.options?.corners === 'right' ? 0 : undefined;
   const crossingMm = input.options?.crossingPenaltyMm;
   const candidates: ReachCandidate[] = [];
   if (legs.length === 0) {
     const root = { x: input.rootPointMm.x, y: input.rootPointMm.y };
-    candidates.push({ tapMm: root, tapLeg: null, s: 0, branch: branchPath(root, e, null) });
+    candidates.push({ tapMm: root, tapLeg: null, s: 0, branch: branchPath(root, e, null, smallJumpMm) });
   } else {
     const first = nearestTapLeg(legs, e);
-    candidates.push(reachCandidate(first, e, placed));
+    candidates.push(reachCandidate(first, e, placed, smallJumpMm));
     const inside = input.insideCorridor;
     if (inside) {
       const limit = nearestOnSegment(e, first.a, first.b).distance + REACH_EXTRA_MM;
@@ -265,7 +266,7 @@ function planReachRoom(
         .sort((x, y) => x.distance - y.distance)
         .slice(0, REACH_MAX_EXTRA);
       for (const { leg } of extras) {
-        const candidate = reachCandidate(leg, e, placed);
+        const candidate = reachCandidate(leg, e, placed, smallJumpMm);
         if (branchInside(candidate.branch, inside)) candidates.push(candidate);
       }
     }
@@ -345,6 +346,7 @@ export function planBranches(input: BranchInput): { rooms: RoomBranch[] } {
   const placed: PlacedTap[] = [];
   const result: RoomBranch[] = [];
   const exactSpine = input.options?.exactSpine;
+  const smallJumpMm = input.options?.corners === 'right' ? 0 : undefined;
 
   for (const room of rooms) {
     if (exactSpine) {
@@ -376,7 +378,7 @@ export function planBranches(input: BranchInput): { rooms: RoomBranch[] } {
       }
     }
 
-    const branch = branchPath(tapMm, e, tapLeg);
+    const branch = branchPath(tapMm, e, tapLeg, smallJumpMm);
     const entryDir = lastDir(branch) ?? (room.ports.length > 0 ? unitDirOf(e, room.ports[0]!.point) : { x: 0, y: 1 });
 
     let spine: Vec2[][] = [];

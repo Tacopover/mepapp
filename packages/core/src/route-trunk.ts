@@ -230,7 +230,7 @@ export function buildTrunk(input: TrunkInput): TrunkResult {
       const bridgeAxis = Math.abs(bridgeEnd.x - bridgeStart.x) >= Math.abs(bridgeEnd.y - bridgeStart.y) ? 'x' : 'y';
       const { path, free } = bridge
         ? { path: elbowPath(bridgeStart, bridgeEnd, bridgeAxis), free: false }
-        : straightenPolyline(polyline, inside);
+        : straightenPolyline(polyline, inside, input.options?.corners);
       nodePointsMm[childId] = { ...path[path.length - 1]! };
       edges.push({
         id: edge.id,

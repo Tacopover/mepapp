@@ -6,12 +6,20 @@ import type { RoutePort, RouteStamp } from './route-ports.js';
 import type { RouteArea, RouteAreaRoom, RouteEdge, RouteEntry, RouteNode } from './route-area.js';
 import { distance, type Vec2 } from './geometry.js';
 import { nearestOnEdges, splitEdgeAt, type GraphData } from './route-graph.js';
-import { DEFAULT_LAYOUT_OPTIONS, legClass, SMALL_JUMP_MM } from './route-layout.js';
+import { DEFAULT_LAYOUT_OPTIONS, isLayoutPath, legClass, SMALL_JUMP_MM } from './route-layout.js';
 import { BEND_PENALTY_MM, CROSSING_PENALTY_MM } from './route-hanan.js';
 import type { Room } from './rooms/room.js';
 import { sizeNetwork } from './sizing-network.js';
 import { SUGGESTED_AIR_SIZING } from './sizing-settings.js';
-import { buildScenario, firstFloorDrawing, makeIdFactories, runScenario } from './route-scenario.testutil.js';
+import {
+  buildScenario,
+  firstFloorDrawing,
+  localDrawing,
+  makeIdFactories,
+  measureScenario,
+  runScenario,
+  type Drawing,
+} from './route-scenario.testutil.js';
 import * as trunk from './route-trunk.js';
 import * as branch from './route-branch.js';
 import * as topology from './route-topology.js';
@@ -820,4 +828,66 @@ describe('planRoute option reach', () => {
     expect(vi.mocked(branch.planBranches).mock.calls.at(-1)![0].options).toEqual({ bendPenaltyMm: 123 });
     expect(vi.mocked(topology.connectLoosePorts).mock.calls.at(-1)![0].options).toEqual({ bendPenaltyMm: 123 });
   });
+});
+
+describe('planRoute corner mode right', () => {
+  const sources: [string, () => Drawing | null][] = [
+    ['first floor', () => firstFloorDrawing()],
+    [
+      'ground floor w_rooms',
+      () => {
+        try {
+          return localDrawing('ground-floor-w-rooms', 'ground floor w_rooms');
+        } catch {
+          return null;
+        }
+      },
+    ],
+  ];
+  for (const [name, load] of sources) {
+    const drawing = load();
+    it.skipIf(drawing === null)(
+      `${name}: no 45 degree leg or bend, same result for both and absent, deterministic`,
+      () => {
+        const scenario = buildScenario(drawing!, 'A', 0);
+        expect(scenario).not.toBeNull();
+        const s = scenario!;
+        const absent = runScenario(s, makeIdFactories());
+        const both = runScenario(s, makeIdFactories(), { corners: 'both' });
+        const right = runScenario(s, makeIdFactories(), { corners: 'right' });
+        const rightAgain = runScenario(s, makeIdFactories(), { corners: 'right' });
+        expect(both.plan).toEqual(absent.plan);
+        expect(right.status).toBe('ok');
+        expect(rightAgain.plan).toEqual(right.plan);
+
+        const bothMetrics = measureScenario(s, both, 'both').metrics;
+        const rightMetrics = measureScenario(s, right, 'right').metrics;
+        expect(rightMetrics.freeLegs).toBeLessThanOrEqual(bothMetrics.freeLegs);
+        expect(rightMetrics.portsLeft).toBeLessThanOrEqual(bothMetrics.portsLeft);
+        const freeAngle = right.plan.warnings.some((w) => w.code === 'free-angle');
+        if (freeAngle) {
+          expect(rightMetrics.bends45).toBeLessThanOrEqual(bothMetrics.bends45);
+          expect(rightMetrics.diagonalLegs).toBeLessThanOrEqual(bothMetrics.diagonalLegs);
+        } else {
+          expect(rightMetrics.bends45).toBe(0);
+          expect(rightMetrics.diagonalLegs).toBe(0);
+        }
+        for (const segment of right.plan.segments) {
+          const path = segment.geometry;
+          for (let i = 1; i < path.length; i++) {
+            const a = path[i - 1]!;
+            const b = path[i]!;
+            const cls = legClass(a, b);
+            if (cls !== 'free') expect(isLayoutPath([a, b])).toBe(true);
+            // A diagonal leg is allowed only with a free-angle warning, because a free edge keeps its polyline.
+            if (!freeAngle) expect(cls).toBe('axis');
+          }
+        }
+        console.log(
+          `corners right vs both: bends90 ${rightMetrics.bends90}/${bothMetrics.bends90}, lengthMm ${Math.round(rightMetrics.lengthMm)}/${Math.round(bothMetrics.lengthMm)}, wallCrossings ${rightMetrics.wallCrossings}/${bothMetrics.wallCrossings}`,
+        );
+      },
+      60000,
+    );
+  }
 });

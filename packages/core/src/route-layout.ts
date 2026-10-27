@@ -14,7 +14,7 @@ export interface RouteLayoutOptions {
   crossingPenaltyMm?: number;
   /** Largest jump that uses a pair of 45 degree bends, mm. Default SMALL_JUMP_MM. 0 = no 45 degree jumps. */
   jogSmallJumpMm?: number;
-  /** Which corners a leg may make: 'both' = 90 and 45 degrees, 'right' = 90 degrees only, 'diagonal' = 45 degrees (chamfer). Default 'both'. No planner code reads it yet. */
+  /** Which corners a leg may make: 'both' = 90 and 45 degrees, 'right' = 90 degrees only, 'diagonal' = 45 degrees (chamfer). Default 'both'. */
   corners?: CornerMode;
   /** Which entry of a room the trunk tries first. Default 'primary-longest'. */
   entryRule?: 'primary-longest' | 'shortest-branch';
@@ -120,14 +120,14 @@ function zStep(
   return null;
 }
 
-export function applyJogRule(path: readonly Vec2[]): Vec2[] {
+export function applyJogRule(path: readonly Vec2[], smallJumpMm: number = SMALL_JUMP_MM): Vec2[] {
   const p = [...path];
   let i = 0;
   while (i + 3 < p.length) {
     const z = zStep(p[i]!, p[i + 1]!, p[i + 2]!, p[i + 3]!);
     if (
       z &&
-      z.j <= SMALL_JUMP_MM &&
+      z.j <= smallJumpMm &&
       z.lenA >= z.j / 2 + MIN_LEG_MM &&
       z.lenB >= z.j / 2 + MIN_LEG_MM
     ) {
@@ -176,13 +176,18 @@ function copyVec(p: Vec2): Vec2 {
   return { x: p.x, y: p.y };
 }
 
-/** Walks the vertices. A free leg is drift-fixed or replaced by the points that jogLeg returns, which end at the next vertex. */
-function walkPolyline(points: readonly Vec2[], jogLeg: (cur: Vec2, b: Vec2) => Vec2[]): Vec2[] {
+/** Walks the vertices. A free leg is drift-fixed or replaced by the points that jogLeg returns, which end at the next vertex. With replaceDiagonal a 45 degree leg is handled like a free leg. */
+function walkPolyline(
+  points: readonly Vec2[],
+  jogLeg: (cur: Vec2, b: Vec2) => Vec2[],
+  replaceDiagonal = false,
+): Vec2[] {
   const out: Vec2[] = [copyVec(points[0]!)];
   let cur = points[0]!;
   for (let i = 1; i < points.length; i++) {
     const b = points[i]!;
-    if (legClass(cur, b) !== 'free') {
+    const cls = legClass(cur, b);
+    if (cls !== 'free' && !(replaceDiagonal && cls === 'diagonal')) {
       out.push(copyVec(b));
       cur = b;
       continue;
@@ -240,13 +245,15 @@ function legsInside(path: readonly Vec2[], insideRegion: (p: Vec2) => boolean): 
   return true;
 }
 
-/** Straightens a corridor centre line into axis and 45 degree legs. free is true when no such path stays inside the region; then the path is a copy of the input. */
+/** Straightens a corridor centre line into axis and 45 degree legs (axis only with corners 'right'). free is true when no such path stays inside the region; then the path is a copy of the input. */
 export function straightenPolyline(
   points: readonly Vec2[],
   insideRegion: (p: Vec2) => boolean,
+  corners?: CornerMode,
 ): { path: Vec2[]; free: boolean } {
   if (points.length < 2) return { path: points.map(copyVec), free: false };
-  const jog = (cur: Vec2, b: Vec2): Vec2[] => applyJogRule(jogPath(cur, b)).slice(1);
+  const right = corners === 'right';
+  const jog = (cur: Vec2, b: Vec2): Vec2[] => applyJogRule(jogPath(cur, b), right ? 0 : undefined).slice(1);
   const shortJog = (cur: Vec2, b: Vec2): Vec2[] => {
     const dx = b.x - cur.x;
     const dy = b.y - cur.y;
@@ -255,13 +262,17 @@ export function straightenPolyline(
     }
     return jog(cur, b);
   };
-  const first = joinLegs(walkPolyline(points, shortJog));
+  const first = joinLegs(walkPolyline(points, shortJog, right));
   if (legsInside(first, insideRegion)) return { path: first, free: false };
   const second = joinLegs(
-    walkPolyline(points, (cur, b) => {
-      const alternatives = [jog(cur, b), elbowPath(cur, b, 'x').slice(1), elbowPath(cur, b, 'y').slice(1)];
-      return alternatives.find((alt) => legsInside([cur, ...alt], insideRegion)) ?? alternatives[0]!;
-    }),
+    walkPolyline(
+      points,
+      (cur, b) => {
+        const alternatives = [jog(cur, b), elbowPath(cur, b, 'x').slice(1), elbowPath(cur, b, 'y').slice(1)];
+        return alternatives.find((alt) => legsInside([cur, ...alt], insideRegion)) ?? alternatives[0]!;
+      },
+      right,
+    ),
   );
   if (legsInside(second, insideRegion)) return { path: second, free: false };
   return { path: points.map(copyVec), free: true };
