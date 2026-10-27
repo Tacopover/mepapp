@@ -1,6 +1,6 @@
 # P1 plan: route layout presets (a few layouts of one route, each with a preview, before the user places it)
 
-Status: REVISION 3 on 2026-10-27 by the road map planner (audit and domain review applied). P1-T01 is built (commit `7d3d255`). P1-T23 is built (commit `ee4a244`). All other tasks are open. Part prefix: P1. Task ids: P1-T01 to P1-T24. Question ids: Q-P1-01 to Q-P1-12 (Q-P1-01 to Q-P1-08 are answered; Q-P1-09 to Q-P1-12 are open).
+Status: REVISION 3 on 2026-10-27 by the road map planner (audit and domain review applied). P1-T01 is built (commit `7d3d255`). P1-T23 is built (commit `ee4a244`). P1-T16 is built (commit `54930b2`; the stop rule fires, see section 12). All other tasks are open. Part prefix: P1. Task ids: P1-T01 to P1-T24. Question ids: Q-P1-01 to Q-P1-12 (Q-P1-01 to Q-P1-08 are answered; Q-P1-09 to Q-P1-12 are open).
 
 Origin: comment 3 of the user test of R1 to R6 ("offer a few preloaded route layouts with a preview before the user places the route, like Revit Generate Layout"). Revision 2 adds the user screenshot of the auto-route on the w_rooms floor (defect classes D-1 to D-8, `route-quality-research.md` section 11) and the corner choice. Sources: `auto-routing-feedback-prompt.md` (section "Findings: presets"), `auto-routing-r6.md`, `.claude/roadmap/rules.md`, the code at the commit of branch `worktree-routing-feedback`.
 
@@ -323,13 +323,14 @@ Rules for every core report test of revision 2: use the harness `route-scenario.
 
 ### Phase N. The room branch (core only)
 
-#### P1-T16. Diagnosis: where do chains and many entries come from?
+#### P1-T16. Diagnosis: where do chains and many entries come from? — DONE (commit `54930b2`)
 - **Size:** S (about 90 lines of test, no product code). **Depends on:** P1-T01 (the trace exists). Needs no other task. **Run first in phase N.**
 - **Files:** `packages/core/src/route-room-origin-report.test.ts` (new; copy the shape of `route-origin-report.test.ts` and `route-defects-report.test.ts`).
 - **What it does:** with `RouteTrace` (`route-build.ts:196`) and default options it prints, for the first floor, w_rooms (local) and 10A (local), scenarios A and B, start 0: (a) the number of rooms in `chainedRooms` and `multiEntryRooms` whose crossing leg has origin `link`, `branch`, `spine` or `trunk`; (b) the number of rooms served by the trunk (`trunk.served`) against rooms served by links; (c) the origin of each `longDiagonalLegs` leg (answers correction 13); (d) for each chained room, the room on the other side of the crossing and whether a straight axis path from the nearest trunk leg to the room wall stays out of all other served rooms (a clear way exists: yes/no). Revision 3 adds: (e) for each drawing, the number of off-graph rooms (`trunk.offGraphRoomIds`), the number of rooms with a real entry in another graph part, and the `area.unreached` distances (`UnreachedRoom.distanceMm`, `route-area.ts:55`); (f) the number of off-graph rooms that have a synthetic candidate (a wall stretch that touches a route-area room, P1-T17 rule) and the number that have a clear axis path from a tree carrier to such a candidate; (g) the share S = rooms with a clear way / (chained rooms + multi-entry rooms + off-graph rooms with 2 or more ports).
 - **Stop rule for phase N (a number):** (1) if fewer than half of the chained and multi-entry rooms come from `link` legs on the first floor, the reading of section 4.6 is wrong: stop and report. (2) If S (item g) is below 0.3 on the drawing that G0 asserts on (see P1-T20), the new algorithm cannot move the metrics by design: stop after T16 and report the numbers to the director, who asks the user (Q-P1-12). The numbers 0.5 and 0.3 are planner values, not verified.
 - **Must not touch:** product code.
 - **Verify:** `pnpm --filter @mepapp/core test`; the printed numbers go into section 12 of this file. No browser check.
+- **Result (2026-10-27, test `route-room-origin-report.test.ts`, start 0):** the numbers are in section 12. Rule (1) passes: 85 to 100 percent of the chained and multi-entry rooms come from `link` legs, so the reading of section 4.6 is right. Rule (2) fires: S is below 0.3 on the first floor (0.06 for A, 0.19 for B) and on w_rooms (0.13). Only 10A scenario A reaches 0.33.
 
 #### P1-T17. Entry candidates for a room (pure function)
 - **Size:** S (about 110 lines with tests). **Depends on:** P1-T16 (gate passed).
@@ -694,7 +695,31 @@ Defaults that I assume (change them if wrong): the preset order is fixed (Balanc
 
 | Gate | Date | Result | Table or numbers |
 |---|---|---|---|
-| Diagnosis (P1-T16) | not run | not run | |
+| Diagnosis (P1-T16) | 2026-10-27 | Rule (1) passes. Rule (2) FIRES: S below 0.3 on the first floor and on w_rooms. Work on T17 to T19 waits for the director (Q-P1-12). | See the table under this one. |
 | G0 (P1-T20) | not run | not run | |
 | G1 (P1-T07) | not run | not run | |
 | G2 (P1-T08) | not run | not run | |
+
+**Numbers of P1-T16** (commit `54930b2`; start 0; default options; A = one terminal for each room, B = grid terminals). S = rooms with a clear way / rooms in the union of chained rooms, multi-entry rooms and off-graph rooms with 2 or more ports. A clear way: an axis path with at most one bend from a tap on the trunk tree (trunk and bridge paths) to a real entry (or, when the room has none, to a synthetic candidate on a wall stretch that touches a route-area room), with no sample of 100 mm inside another served room. The search takes the 10 nearest taps within 20 m. With 80 nearest taps within 80 m the result stays below 0.3 on the first floor for A (0.11) and rises to 0.26 for B.
+
+| Drawing, scenario | Served rooms | Served by trunk | Off graph | Off graph with real entry | Off graph with synthetic candidate | Off graph with clear way | `area.unreached` (distance mm, median / max) |
+|---|---|---|---|---|---|---|---|
+| first floor A and B | 33 | 5 | 28 | 13 | 10 | 3 | 15 (4220 / 9370) |
+| w_rooms A and B | 43 | 10 | 33 | 0 | 0 | 0 | 33 (8730 / 18780) |
+| 10A A and B | 27 | 8 | 19 | 6 | 6 | 1 | 13 (3230 / 5410) |
+
+| Drawing, scenario | Chained rooms | Multi-entry rooms | Origin of the chained rooms | Origin of the multi-entry rooms | Long diagonal legs (origin) | Union / with clear way / with no candidate | S |
+|---|---|---|---|---|---|---|---|
+| first floor A | 18 | 1 | link 18 | link 1 | 0 | 18 / 1 / 9 | 0.06 |
+| first floor B | 18 | 4 | link 18 | link 2, spine 2 | 0 | 31 / 6 / 15 | 0.19 |
+| w_rooms A | 20 | 4 | link 20 | link 1, branch 2, trunk 1 | 1 (trunk) | 23 / 3 / 20 | 0.13 |
+| w_rooms B | 25 | 15 | link 25 | link 10, spine 4, branch 1 | 1 (trunk) | 38 / 5 / 33 | 0.13 |
+| 10A A | 9 | 2 | link 9 | link 1, spine 1 | 0 | 9 / 3 / 6 | 0.33 |
+| 10A B | 11 | 9 | link 11 | link 6, spine 3 | 0 | 22 / 4 / 13 | 0.18 |
+
+Notes:
+- The origin is the stage with the shortest distance to the event point (a wall crossing for a chained room, a room entry for a multi-entry room). The metrics `chainedRooms` and `multiEntryRooms` equal the counts of the test in all six runs.
+- The share of items whose dominant origin is `link` is 0.85 to 1.00 (rule 1 needs 0.5). Items with at least one `link` leg: 0.90 to 1.00.
+- The long diagonals (D-6) on the two drawings that have any come from the trunk (straightened corridor edges), not from `link`, `branch` or `bridge`. The test finds 1 long diagonal leg on w_rooms where the metric finds 2: probably the plan splits one long leg into two segments (not verified). The first floor and 10A have none at the default options.
+- Most rooms of the union have no candidate at all (no real entry and no wall stretch that touches a route-area room): 9 of 18 and 15 of 31 on the first floor, 20 of 23 and 33 of 38 on w_rooms (no served room touches a corridor there: the nearest is 1890 mm away), 6 of 9 and 13 of 22 on 10A. The new algorithm of section 4.6 has no entry to use for these rooms.
+- Limits of the measure: carriers are the trunk tree only (decision of section 4.6); parts of earlier room branches are not carriers; the probe is 300 mm; a sample cell is 50 mm. These are measurement choices of the test, not verified values.
