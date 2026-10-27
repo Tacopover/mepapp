@@ -300,7 +300,7 @@ Rules for every core report test of revision 2: use the harness `route-scenario.
 - **Must not touch:** the planner, the other fields, any output. The options must still pass through to `buildTrunk`, `planBranches` and `connectLoosePorts` unchanged: the tests read them at `route-build.test.ts:764-766` and `:814-817` and must stay green.
 - **Verify:** core test: `DEFAULT_LAYOUT_OPTIONS.corners === 'both'` and the key `orthogonalOnly` is gone; the first floor plan with default options equals the plan with `{ corners: 'both' }` (deep-equal). `pnpm --filter @mepapp/core test`, `pnpm typecheck`, `pnpm build`. No browser check.
 
-#### P1-T02. Penalties reach the room search
+#### P1-T02. Penalties reach the room search — DONE (commit `ab8c54d`)
 - **Size:** S (about 60 lines). **Depends on:** P1-T01. Q1-T08 moved the heap to `route-heap.ts` (built), so the order against Q1-T08 is settled.
 - **Files:** `route-hanan.ts` (`SpineInput` gets optional `bendPenaltyMm`, `crossingPenaltyMm`; the constants stay as defaults), `route-branch.ts` (`BranchInput` passes them), `route-build.ts`, tests `route-hanan.test.ts`, `route-branch.test.ts`, `route-build.test.ts`.
 - **Shapes:** `SpineInput.bendPenaltyMm?: number`; `SpineInput.crossingPenaltyMm?: number`; `BranchInput` the same two fields. `exactRoomSpine(input, bendMm)` already takes a bend price (`route-exact.ts:68`, default `BEND_PENALTY_MM` at `:49`/`:68`) but `planReachRoom` calls it with the default, and `roomSpine` is used for rooms with more than `maxPorts` ports (`route-branch.ts:286`). So this task passes `options.bendPenaltyMm` to `exactRoomSpine` and to `spineScore` too. Without this, the preset "Fewest bends" (bend price 3000 plus `exactSpine`) would change the large rooms only.
