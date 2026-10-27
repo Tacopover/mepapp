@@ -1,6 +1,6 @@
 # P1 plan: route layout presets (a few layouts of one route, each with a preview, before the user places it)
 
-Status: REVISION 3 on 2026-10-27 by the road map planner (audit and domain review applied). P1-T01 is built (commit `7d3d255`). All other tasks are open. Part prefix: P1. Task ids: P1-T01 to P1-T24. Question ids: Q-P1-01 to Q-P1-12 (Q-P1-01 to Q-P1-08 are answered; Q-P1-09 to Q-P1-12 are open).
+Status: REVISION 3 on 2026-10-27 by the road map planner (audit and domain review applied). P1-T01 is built (commit `7d3d255`). P1-T23 is built (commit `ee4a244`). All other tasks are open. Part prefix: P1. Task ids: P1-T01 to P1-T24. Question ids: Q-P1-01 to Q-P1-12 (Q-P1-01 to Q-P1-08 are answered; Q-P1-09 to Q-P1-12 are open).
 
 Origin: comment 3 of the user test of R1 to R6 ("offer a few preloaded route layouts with a preview before the user places the route, like Revit Generate Layout"). Revision 2 adds the user screenshot of the auto-route on the w_rooms floor (defect classes D-1 to D-8, `route-quality-research.md` section 11) and the corner choice. Sources: `auto-routing-feedback-prompt.md` (section "Findings: presets"), `auto-routing-r6.md`, `.claude/roadmap/rules.md`, the code at the commit of branch `worktree-routing-feedback`.
 
@@ -293,7 +293,7 @@ Rules for every core report test of revision 2: use the harness `route-scenario.
 - **Left for revision 2:** the boolean `orthogonalOnly` becomes `corners` in P1-T23.
 - **Not verified in revision 2:** the test that the default call and an explicit default call are equal (the test file `route-build.test.ts` was not re-read).
 
-#### P1-T23. `corners` replaces `orthogonalOnly` (type and default only)
+#### P1-T23. `corners` replaces `orthogonalOnly` (type and default only) — DONE (commit `ee4a244`)
 - **Size:** S (about 25 lines). **Depends on:** P1-T01.
 - **Files:** `packages/core/src/route-layout.ts` (type `CornerMode`, field `corners?`, remove `orthogonalOnly`, default `corners: 'both'`), `packages/core/src/route-build.test.ts`. `index.ts` needs no edit: it has `export * from './route-layout.js'` (`index.ts:17`).
 - **Shapes:** section 4.2. No planner code reads `corners` yet.
