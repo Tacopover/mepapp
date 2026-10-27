@@ -177,6 +177,45 @@ describe('exactRoomSpine', () => {
     expect(bendsOf(exact, input)).toBe(1);
   });
 
+  it('the bend price of the input changes the bends of the tree', () => {
+    const base: SpineInput = {
+      root: P(0, 5900),
+      entryDir: P(1, 0),
+      ports: [
+        { id: 'a', point: P(5400, 3300) },
+        { id: 'b', point: P(2000, 1100) },
+        { id: 'c', point: P(3800, 500) },
+        { id: 'd', point: P(400, 4300) },
+      ],
+      inside: always,
+      crossesExisting: noCross,
+    };
+    const cheap = exactRoomSpine({ ...base, bendPenaltyMm: 500 });
+    const dear = exactRoomSpine({ ...base, bendPenaltyMm: 3000 });
+    expect(cheap.lengthMm).toBe(13000);
+    expect(bendsOf(cheap, base)).toBe(2);
+    expect(dear.lengthMm).toBe(14600);
+    expect(bendsOf(dear, base)).toBe(1);
+    expect(exactRoomSpine(base)).toEqual(cheap);
+  });
+
+  it('an explicit bend price argument wins over the input field', () => {
+    const base: SpineInput = {
+      root: P(0, 5900),
+      entryDir: P(1, 0),
+      ports: [
+        { id: 'a', point: P(5400, 3300) },
+        { id: 'b', point: P(2000, 1100) },
+        { id: 'c', point: P(3800, 500) },
+        { id: 'd', point: P(400, 4300) },
+      ],
+      inside: always,
+      crossesExisting: noCross,
+    };
+    expect(exactRoomSpine({ ...base, bendPenaltyMm: 3000 }, 500)).toEqual(exactRoomSpine(base, 500));
+    expect(exactRoomSpine({ ...base, bendPenaltyMm: 500 }, 3000)).toEqual(exactRoomSpine(base, 3000));
+  });
+
   it('no Math.random and no Date in route-exact.ts', () => {
     const text = readFileSync(new URL('./route-exact.ts', import.meta.url), 'utf8');
     expect(text).not.toContain('Math.random');

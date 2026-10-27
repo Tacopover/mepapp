@@ -45,7 +45,7 @@ function removeTreeEdge(tree: TreeAdj, u: number, v: number): void {
 export function spineScore(
   paths: readonly (readonly Vec2[])[],
   lengthMm: number,
-  input: Pick<SpineInput, 'root' | 'entryDir' | 'crossesExisting'>,
+  input: Pick<SpineInput, 'root' | 'entryDir' | 'crossesExisting' | 'crossingPenaltyMm'>,
   bendMm: number = BEND_PENALTY_MM,
 ): number {
   const entryHeading = headingOf(input.entryDir);
@@ -62,16 +62,20 @@ export function spineScore(
       if (headingOf({ x: leg.x - first.x, y: leg.y - first.y }) !== entryHeading) bends++;
     }
   }
-  return lengthMm + CROSSING_PENALTY_MM * crossings + bendMm * bends;
+  return lengthMm + (input.crossingPenaltyMm ?? CROSSING_PENALTY_MM) * crossings + bendMm * bends;
 }
 
-export function exactRoomSpine(input: SpineInput, bendMm: number = BEND_PENALTY_MM): SpineResult {
+export function exactRoomSpine(
+  input: SpineInput,
+  bendMm: number = input.bendPenaltyMm ?? BEND_PENALTY_MM,
+): SpineResult {
   const heuristic = roomSpine(input);
   if (heuristic.unreachedPortIds.length > 0 || input.ports.length === 0) return heuristic;
 
   const grid: SpineGrid = makeSpineGrid(input);
   const { nodeCount, ny, rootNode, portNodes, isPortNode, neighbour, pointOf, edgeInfo } = grid;
   const entryHeading = headingOf(input.entryDir);
+  const crossingMm = input.crossingPenaltyMm ?? CROSSING_PENALTY_MM;
 
   const terminals = [...new Set(portNodes.filter((n) => n !== rootNode))].sort((a, b) => a - b);
   const k = terminals.length;
@@ -84,7 +88,7 @@ export function exactRoomSpine(input: SpineInput, bendMm: number = BEND_PENALTY_
   const edgeCost = (u: number, v: number): number => {
     const a = pointOf(u);
     const b = pointOf(v);
-    return Math.abs(b.x - a.x) + Math.abs(b.y - a.y) + CROSSING_PENALTY_MM * edgeInfo(u, v).crossings;
+    return Math.abs(b.x - a.x) + Math.abs(b.y - a.y) + crossingMm * edgeInfo(u, v).crossings;
   };
 
   const adj: { v: number; w: number }[][] = [];

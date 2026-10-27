@@ -11,6 +11,10 @@ export interface SpineInput {
   inside: (p: Vec2) => boolean;
   crossesExisting: (a: Vec2, b: Vec2) => number;
   stepMm?: number;
+  /** Cost of one bend, mm. Default BEND_PENALTY_MM. */
+  bendPenaltyMm?: number;
+  /** Cost of one crossing, mm. Default CROSSING_PENALTY_MM. */
+  crossingPenaltyMm?: number;
 }
 
 export interface SpineResult {
@@ -189,6 +193,8 @@ export function roomSpine(input: SpineInput): SpineResult {
   const reached = new Array<boolean>(ports.length).fill(false);
   let firstIteration = true;
   const entryHeading = headingOf(input.entryDir);
+  const bendMm = input.bendPenaltyMm ?? BEND_PENALTY_MM;
+  const crossingMm = input.crossingPenaltyMm ?? CROSSING_PENALTY_MM;
 
   const settleCoincident = (): void => {
     for (let k = 0; k < ports.length; k++) {
@@ -244,7 +250,7 @@ export function roomSpine(input: SpineInput): SpineResult {
         const b = pointOf(v);
         const len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
         const next =
-          cost + len + (h2 !== h ? BEND_PENALTY_MM : 0) + CROSSING_PENALTY_MM * info.crossings;
+          cost + len + (h2 !== h ? bendMm : 0) + crossingMm * info.crossings;
         const ns = v * 4 + h2;
         if (next < dist[ns]!) {
           dist[ns] = next;

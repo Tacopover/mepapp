@@ -246,6 +246,8 @@ function planReachRoom(
   maxPorts: number,
 ): RoomBranch {
   const e = room.entryPointMm;
+  const bendMm = input.options?.bendPenaltyMm ?? BEND_PENALTY_MM;
+  const crossingMm = input.options?.crossingPenaltyMm;
   const candidates: ReachCandidate[] = [];
   if (legs.length === 0) {
     const root = { x: input.rootPointMm.x, y: input.rootPointMm.y };
@@ -282,6 +284,8 @@ function planReachRoom(
         inside: room.inside,
         crossesExisting,
         ...(input.stepMm !== undefined ? { stepMm: input.stepMm } : {}),
+        ...(input.options?.bendPenaltyMm !== undefined ? { bendPenaltyMm: input.options.bendPenaltyMm } : {}),
+        ...(crossingMm !== undefined ? { crossingPenaltyMm: crossingMm } : {}),
       };
       spine = room.ports.length <= maxPorts ? exactRoomSpine(spineInput) : roomSpine(spineInput);
       spineCache.set(key, spine);
@@ -298,8 +302,18 @@ function planReachRoom(
     const spine = spineOf(entryDir);
     const score =
       pathLength(candidate.branch) +
-      branchBendCost(candidate.branch, BEND_PENALTY_MM) +
-      spineScore(spine.paths, spine.lengthMm, { root: e, entryDir, crossesExisting });
+      branchBendCost(candidate.branch, bendMm) +
+      spineScore(
+        spine.paths,
+        spine.lengthMm,
+        {
+          root: e,
+          entryDir,
+          crossesExisting,
+          ...(crossingMm !== undefined ? { crossingPenaltyMm: crossingMm } : {}),
+        },
+        bendMm,
+      );
     if (i === 0 || score < bestScore - SCORE_TOL) {
       best = i;
       bestScore = score;
@@ -376,6 +390,10 @@ export function planBranches(input: BranchInput): { rooms: RoomBranch[] } {
         inside: room.inside,
         crossesExisting,
         ...(input.stepMm !== undefined ? { stepMm: input.stepMm } : {}),
+        ...(input.options?.bendPenaltyMm !== undefined ? { bendPenaltyMm: input.options.bendPenaltyMm } : {}),
+        ...(input.options?.crossingPenaltyMm !== undefined
+          ? { crossingPenaltyMm: input.options.crossingPenaltyMm }
+          : {}),
       });
       spine = spineResult.paths;
       offGraphPortIds = spineResult.unreachedPortIds;

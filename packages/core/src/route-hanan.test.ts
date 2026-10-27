@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from './geometry.js';
-import { roomSpine } from './route-hanan.js';
+import { headingOf, roomSpine } from './route-hanan.js';
 
 const P = (x: number, y: number): Vec2 => ({ x, y });
 const always = (): boolean => true;
@@ -217,5 +217,83 @@ describe('roomSpine', () => {
       expect(inner.has(key(port.point))).toBe(false);
     }
     expect(pathsLength(r.paths)).toBe(r.lengthMm);
+  });
+});
+
+describe('roomSpine penalties', () => {
+  const bendCount = (paths: Vec2[][], root: Vec2, entryDir: Vec2): number => {
+    let count = 0;
+    for (const path of paths) {
+      count += corners(path);
+      const first = path[0]!;
+      const leg = path[1];
+      if (leg && first.x === root.x && first.y === root.y) {
+        if (headingOf(P(leg.x - first.x, leg.y - first.y)) !== headingOf(entryDir)) count++;
+      }
+    }
+    return count;
+  };
+
+  it('the default prices equal the explicit default prices', () => {
+    const base = {
+      root: P(0, 0),
+      entryDir: P(1, 0),
+      ports: [
+        { id: 'a', point: P(4000, 3000) },
+        { id: 'b', point: P(1000, 1000) },
+      ],
+      inside: always,
+      crossesExisting: noCross,
+    };
+    expect(roomSpine({ ...base, bendPenaltyMm: 500, crossingPenaltyMm: 1000 })).toEqual(roomSpine(base));
+  });
+
+  it('a bend price picks the route with fewer bends at equal length', () => {
+    const base = {
+      root: P(0, 0),
+      entryDir: P(1, 0),
+      ports: [{ id: 'p', point: P(4000, 3000) }],
+      inside: always,
+      crossesExisting: noCross,
+    };
+    const free = roomSpine({ ...base, bendPenaltyMm: 0 });
+    const dear = roomSpine({ ...base, bendPenaltyMm: 3000 });
+    expect(free.lengthMm).toBe(7000);
+    expect(dear.lengthMm).toBe(7000);
+    expect(bendCount(free.paths, base.root, base.entryDir)).toBe(2);
+    expect(bendCount(dear.paths, base.root, base.entryDir)).toBe(1);
+    expect(dear.paths[0]).toEqual([P(0, 0), P(4000, 0), P(4000, 3000)]);
+  });
+
+  it('a crossing price decides between the two routes of equal length', () => {
+    const crossing = (a: Vec2, b: Vec2): number => (a.y === 0 && b.y === 0 ? 1 : 0);
+    const base = {
+      root: P(0, 0),
+      entryDir: P(1, 0),
+      ports: [{ id: 'p', point: P(4000, 3000) }],
+      inside: always,
+      crossesExisting: crossing,
+    };
+    const free = roomSpine({ ...base, crossingPenaltyMm: 0 });
+    expect(free.paths[0]).toEqual([P(0, 0), P(4000, 0), P(4000, 3000)]);
+    const costly = roomSpine({ ...base, crossingPenaltyMm: 5000 });
+    expect(costly.paths[0]).toEqual([P(0, 0), P(0, 3000), P(4000, 3000)]);
+    expect(costly.lengthMm).toBe(7000);
+  });
+
+  it('gives equal output for the same input with prices set', () => {
+    const input = {
+      root: P(0, 0),
+      entryDir: P(1, 0),
+      ports: [
+        { id: 'a', point: P(4000, 3000) },
+        { id: 'b', point: P(1000, 1000) },
+      ],
+      inside: always,
+      crossesExisting: noCross,
+      bendPenaltyMm: 3000,
+      crossingPenaltyMm: 2000,
+    };
+    expect(roomSpine(input)).toEqual(roomSpine(input));
   });
 });
