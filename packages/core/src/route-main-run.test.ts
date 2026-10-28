@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { distance, type Vec2 } from './geometry.js';
+import { closestPointOnSegment, distance, type Vec2 } from './geometry.js';
 import { insideRouteArea, withWallGaps } from './route-layout.js';
 import { mainRunLines, planMainRun, type MainDemand, type MainLine, type MainLineInput } from './route-main-run.js';
 import { roomEntryCandidates } from './route-room-entry.js';
@@ -438,7 +438,7 @@ describe('planMainRun', () => {
     expect(run.paths).toHaveLength(2);
     expect(run.paths[1]).toEqual([{ x: 5000, y: 1000 }, { x: 5000, y: 3000 }]);
     expect(run.unreachedRoomIds).toEqual([]);
-    expect(countBends(run.paths)).toBeLessThanOrEqual(1);
+    expect(countBends(run.paths)).toBe(0);
   });
 
   it('keeps one hit for a room with two doors and no branch to the far hit', () => {
@@ -503,10 +503,36 @@ describe('planMainRun', () => {
     expect(planMainRun(teeScene())).toEqual(planMainRun(teeScene()));
   });
 
-  it('gives no more bends with a bend price of 10000 than with 0', () => {
-    const free = countBends(planMainRun(planInput({ ...teeScene(), bendMm: 0 })).paths);
-    const dear = countBends(planMainRun(planInput({ ...teeScene(), bendMm: 10000 })).paths);
-    expect(dear).toBeLessThanOrEqual(free);
+  it('prefers the 1-turn route to an equal-length 2-turn route when a bend has a price', () => {
+    const staircase = (bendMm: number): PlanInput =>
+      planInput({
+        lines: [hLine('h0', 0, 0, 10000), vLine('vT', 10000, 0, 5000), vLine('v4', 4000, 0, 5000), hLine('h5', 5000, 4000, 10000)],
+        startMm: { x: 0, y: 0 },
+        demands: [demand('T', [door(11000, 5000, { x: -1, y: 0 })])],
+        bendMm,
+      });
+    const lengthOf = (paths: readonly Vec2[][]): number => paths.reduce((sum, p) => sum + distance(p[0]!, p[1]!), 0);
+    for (const bendMm of [500, 10000]) {
+      const run = planMainRun(staircase(bendMm));
+      expect(countBends(run.paths)).toBe(1);
+      expect(lengthOf(run.paths)).toBe(15000);
+      expect(run.paths.flat().some((p) => p.x === 4000)).toBe(false);
+    }
+    expect(lengthOf(planMainRun(staircase(0)).paths)).toBe(15000);
+  });
+
+  it('keeps the 1-turn way and does not take a longer detour that the graph offers', () => {
+    const run = planMainRun(
+      planInput({
+        lines: [hLine('h0', 0, 0, 12000), vLine('vT', 10000, 0, 8000), vLine('vD', 12000, 0, 8000), hLine('hD', 8000, 10000, 12000)],
+        startMm: { x: 0, y: 0 },
+        demands: [demand('T', [door(11000, 4000, { x: -1, y: 0 })])],
+      }),
+    );
+    expect(countBends(run.paths)).toBe(1);
+    expect(run.paths.reduce((sum, p) => sum + distance(p[0]!, p[1]!), 0)).toBe(14000);
+    expect(run.paths.flat().some((p) => p.x === 12000)).toBe(false);
+    expect(run.paths.flat().some((p) => p.y === 8000)).toBe(false);
   });
 
   it('gives no path and every room unreached when there are no lines', () => {
@@ -515,6 +541,100 @@ describe('planMainRun', () => {
     expect(run.paths).toEqual([]);
     expect(run.rootPointMm).toEqual(far);
     expect(run.unreachedRoomIds).toEqual(['A', 'B']);
+  });
+});
+
+describe('planMainRun across a wall gap', () => {
+  const gapInside = insideRects([
+    [0, 0, 10000, 2000],
+    [11000, 0, 21000, 2000],
+  ]);
+  const gapScene = (demands: MainDemand[], startMm: Vec2 = { x: 1000, y: 1000 }): PlanInput =>
+    planInput({
+      lines: [hLine('a', 1000, 0, 10000), hLine('b', 1000, 11000, 21000)],
+      startMm,
+      demands,
+      inside: gapInside,
+    });
+  const r1 = demand('R1', [door(5000, 1500, { x: 0, y: -1 })]);
+  const r2 = demand('R2', [door(15000, 1500, { x: 0, y: -1 })]);
+
+  it('joins the second component when a room needs it, across the gap', () => {
+    const run = planMainRun(gapScene([r1, r2]));
+    expect(run.unreachedRoomIds).toEqual([]);
+    expect(run.joins).toHaveLength(1);
+    expect(run.joins[0]!.crossesWall).toBe(true);
+    expect(run.joins[0]!.path).toEqual([
+      { x: 10000, y: 1000 },
+      { x: 11000, y: 1000 },
+    ]);
+  });
+
+  it('gives no join and no point beyond the gap when no room needs the second component', () => {
+    const run = planMainRun(gapScene([r1]));
+    expect(run.joins).toEqual([]);
+    expect(run.paths.flat().some((p) => p.x >= 11000)).toBe(false);
+  });
+
+  it('takes the root on the second component when the start lies there and that component is nearer', () => {
+    const run = planMainRun(gapScene([r1, r2], { x: 15000, y: 1000 }));
+    expect(run.rootPointMm).toEqual({ x: 15000, y: 1000 });
+    expect(run.stubCrossesWall).toBe(false);
+  });
+
+  it('gives a stub across the gap to the first component when the start lies in the gap', () => {
+    const run = planMainRun(gapScene([r1], { x: 10500, y: 1000 }));
+    expect(run.rootPointMm).toEqual({ x: 10000, y: 1000 });
+    expect(run.stubCrossesWall).toBe(true);
+    expect(run.paths[run.paths.length - 1]).toEqual([
+      { x: 10500, y: 1000 },
+      { x: 10000, y: 1000 },
+    ]);
+  });
+
+  it('takes the root on the component with more rooms, although the other is nearer', () => {
+    const run = planMainRun(
+      gapScene(
+        [
+          demand('R1', [door(2000, 1500, { x: 0, y: -1 })]),
+          demand('R2', [door(4000, 1500, { x: 0, y: -1 })]),
+          demand('R3', [door(7000, 1500, { x: 0, y: -1 })]),
+          demand('R4', [door(15000, 1500, { x: 0, y: -1 })]),
+        ],
+        { x: 10600, y: 1000 },
+      ),
+    );
+    expect(run.rootPointMm).toEqual({ x: 10000, y: 1000 });
+    expect(run.unreachedRoomIds).toEqual([]);
+    expect(run.joins).toHaveLength(1);
+  });
+
+  it('gives the same joins and root when the lines and demands are reversed', () => {
+    const base = gapScene([r1, r2]);
+    const shuffled = planInput({ ...base, lines: [...base.lines].reverse(), demands: [...base.demands].reverse() });
+    const run = planMainRun(base);
+    const again = planMainRun(shuffled);
+    expect(summary(again)).toEqual(summary(run));
+    expect(again.joins).toEqual(run.joins);
+    expect(again.rootPointMm).toEqual(run.rootPointMm);
+  });
+
+  it('reports the rooms that the join passes through', () => {
+    const roomIdAt = (p: Vec2): string | null => (p.x <= 10000 ? 'left' : p.x >= 11000 ? 'right' : null);
+    const run = planMainRun({ ...gapScene([r1, r2]), roomIdAt });
+    expect(run.joins[0]!.roomIds).toEqual(['left', 'right']);
+  });
+
+  it('reports the rooms that the stub passes through', () => {
+    const roomIdAt = (p: Vec2): string | null => (p.x <= 10000 ? 'left' : p.x >= 11000 ? 'right' : null);
+    const run = planMainRun({ ...gapScene([r1], { x: 10500, y: 1000 }), roomIdAt });
+    expect(run.stubRoomIds).toEqual(['left']);
+  });
+
+  it('gives no room ids when no roomIdAt is passed', () => {
+    const run = planMainRun(gapScene([r1, r2]));
+    expect(run.joins[0]!.roomIds).toEqual([]);
+    expect(run.stubRoomIds).toEqual([]);
   });
 });
 
@@ -557,29 +677,60 @@ describe('planMainRun on the manual fixture', () => {
       });
       return { roomId: room.id, doorsMm: candidates.map((c) => ({ pointMm: c.pointMm, outward: c.outward })) };
     });
-    const run = planMainRun({ lines, startMm, demands, inside, bendMm: 500, reachMm: 4800 });
+    const roomIdAt = (p: Vec2): string | null =>
+      areaRoomObjects.find((r) => roomContainsPoint(r, { x: p.x / mmPerPt, y: p.y / mmPerPt }))?.id ?? null;
+    const run = planMainRun({ lines, startMm, demands, inside, bendMm: 500, reachMm: 4800, roomIdAt });
 
     const hasStub = distance(startMm, run.rootPointMm) > 1;
     const tree = hasStub ? run.paths.slice(0, -1) : run.paths;
     const treeLength = tree.reduce((sum, p) => sum + distance(p[0]!, p[1]!), 0);
     const bends = countBends(tree);
+    const reached = demands.length - run.unreachedRoomIds.length;
+    const pt = (p: Vec2): string => `(${p.x.toFixed(0)}, ${p.y.toFixed(0)})`;
+    const nearestLine = (p: Vec2): { id: string; dist: number } => {
+      let best = { id: 'none', dist: Infinity };
+      for (const l of lines) {
+        const dist = distance(p, closestPointOnSegment(p, l.a, l.b).point);
+        if (dist < best.dist) best = { id: l.id, dist };
+      }
+      return best;
+    };
+    const stubLength = hasStub ? distance(startMm, run.rootPointMm) : 0;
+    const stubPath = hasStub ? run.paths[run.paths.length - 1]! : null;
     console.log(
       [
         `P2 T06-1: planMainRun on the manual fixture (${lines.length} input lines, ${demands.length} served rooms)`,
         ...run.lines.map((l) => `${l.id}  (${l.a.x.toFixed(0)}, ${l.a.y.toFixed(0)}) -> (${l.b.x.toFixed(0)}, ${l.b.y.toFixed(0)})`),
         `tree length ${(treeLength / 1000).toFixed(2)} m`,
         `bends ${bends}`,
+        `rooms reached ${reached} of ${demands.length}`,
         `unreached rooms ${run.unreachedRoomIds.length}: ${run.unreachedRoomIds.join(' ')}`,
-        'chosen hit per room:',
-        ...[...run.chosenHitByRoom].map(([id, p]) => `${id}: (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`),
+        'chosen hit per room (nearest input line):',
+        ...[...run.chosenHitByRoom].map(([id, p]) => {
+          const near = nearestLine(p);
+          return `${id}: ${pt(p)} on ${near.id} at ${near.dist.toFixed(0)} mm`;
+        }),
+        `stub crosses wall ${run.stubCrossesWall}`,
+        `stub rooms: ${run.stubRoomIds.join(' ') || 'none'}`,
+        `joins ${run.joins.length}`,
+        ...run.joins.map(
+          (j) => `join ${pt(j.path[0]!)} -> ${pt(j.path[1]!)} crosses wall ${j.crossesWall} rooms ${j.roomIds.join(' ') || 'none'}`,
+        ),
+        `stub length ${(stubLength / 1000).toFixed(2)} m: ${stubPath ? `${pt(stubPath[0]!)} -> ${pt(stubPath[1]!)}` : 'none'}`,
       ].join('\n'),
     );
 
+    expect(tree.length).toBeGreaterThan(0);
+    expect(treeLength).toBeGreaterThan(0);
+    expect(reached).toBeGreaterThanOrEqual(18);
     expect(bends).toBeLessThanOrEqual(8);
     expect(treeLength).toBeLessThanOrEqual(1.1 * 89300);
     for (const [roomId, p] of run.chosenHitByRoom) {
+      expect(run.unreachedRoomIds).not.toContain(roomId);
       const doors = demands.find((d) => d.roomId === roomId)!.doorsMm;
       expect(Math.min(...doors.map((d) => distance(d.pointMm, p)))).toBeLessThanOrEqual(4800);
     }
+    expect(run.chosenHitByRoom.size + run.unreachedRoomIds.length).toBe(demands.length);
+    expect(run.stubRoomIds.length).toBeGreaterThanOrEqual(2);
   }, 60000);
 });
