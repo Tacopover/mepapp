@@ -1,7 +1,7 @@
 import { closestPointOnSegment, distance, type Vec2 } from './geometry.js';
 import { steinerTreeWithTurns, type SteinerTurnEdge, type SteinerTurnGraph } from './route-steiner.js';
 
-export interface MainLine { id: string; a: Vec2; b: Vec2; bridge?: boolean; crossedRoomId?: string }   // axis aligned, a to b, a before b along the axis
+export interface MainLine { id: string; a: Vec2; b: Vec2; bridge?: boolean; crossedRoomId?: string; crossedRoomIds?: string[] }   // axis aligned, a to b, a before b along the axis; crossedRoomId = first crossed room, crossedRoomIds = all, from the corridor end
 
 export interface MainLineInput {
   /** Rings of the route-area rooms, mm. Shaft rooms (ids in shaftRoomIds) give no line. */
@@ -18,6 +18,11 @@ export interface MainLineInput {
 
 export const MAIN_LINE_MIN_EDGE_MM = 2000;
 export const MAIN_LINE_MERGE_MM = 200;
+
+/** Price per wall crossing. Same value as DEFAULT_WALL_MM of route-room-reach.ts (copied, not imported). */
+export const BRIDGE_WALL_MM = 3000;
+export const BRIDGE_MAX_LENGTH_MM = 25000;
+export const DEFAULT_NEVER_CROSS_WORDS: readonly string[] = ['stair', 'lift', 'elevator', 'kitchen', 'shaft', 'residential', 'bedroom', 'apartment'];
 
 const AXIS_DELTA_MM = 400;
 const AXIS_DELTA_RATIO = 0.02;
@@ -38,6 +43,7 @@ const SWITCH_ROUNDS = 2;
 const STRAIGHT_DOT = -0.99;   // below this dot, two edges run opposite ways
 const JOIN_PENALTY_MM = 5000;
 const WALL_SAMPLE_MM = 100;
+const BRIDGE_STEP_MM = 50;
 
 type Orient = 'h' | 'v';
 
@@ -317,9 +323,9 @@ export interface MainDemand { roomId: string; doorsMm: readonly { pointMm: Vec2;
 export interface MainJoin { path: Vec2[]; crossesWall: boolean; roomIds: string[] }   // straight path of 2 points
 export interface MainRun { lines: MainLine[]; paths: Vec2[][]; rootPointMm: Vec2; unreachedRoomIds: string[]; chosenHitByRoom: Map<string, Vec2>; stubCrossesWall: boolean; stubRoomIds: string[]; joins: MainJoin[] }
 
-interface Track extends Span { orient: Orient; coord: number }
+interface Track extends Span { orient: Orient; coord: number; bridgeRoomIds?: string[] }
 interface Hit { lineIdx: number; d: number; point: Vec2 }
-interface Edge { a: number; b: number; cost: number; dir: Vec2 }   // node indices; dir = unit direction from a to b
+interface Edge { a: number; b: number; cost: number; dir: Vec2; bridgeRoomIds?: string[] }   // node indices; dir = unit direction from a to b
 interface TreeSolve { edgeIds: string[]; unreached: Set<number> }
 type Adj = { to: number; cost: number }[][];
 
@@ -334,12 +340,14 @@ function trackOf(line: MainLine): Track {
   const orient: Orient = line.a.y === line.b.y ? 'h' : 'v';
   const s = alongOf(line.a, orient);
   const e = alongOf(line.b, orient);
-  return { orient, coord: acrossOf(line.a, orient), lo: Math.min(s, e), hi: Math.max(s, e) };
+  const bridgeRoomIds = line.bridge ? (line.crossedRoomIds ?? (line.crossedRoomId ? [line.crossedRoomId] : [])) : undefined;
+  return { orient, coord: acrossOf(line.a, orient), lo: Math.min(s, e), hi: Math.max(s, e), bridgeRoomIds };
 }
 
 function sortTracks(tracks: readonly Track[]): Track[] {
   return [...tracks].sort((p, q) =>
-    (p.orient === q.orient ? 0 : p.orient === 'h' ? -1 : 1) || p.coord - q.coord || p.lo - q.lo || p.hi - q.hi,
+    (p.orient === q.orient ? 0 : p.orient === 'h' ? -1 : 1) || p.coord - q.coord || p.lo - q.lo || p.hi - q.hi ||
+    Number(p.bridgeRoomIds !== undefined) - Number(q.bridgeRoomIds !== undefined),
   );
 }
 
@@ -355,7 +363,7 @@ function hitOf(door: { pointMm: Vec2; outward: Vec2 }, tracks: readonly Track[],
   let best: { lineIdx: number; d: number } | null = null;
   for (let i = 0; i < tracks.length; i++) {
     const t = tracks[i]!;
-    if (t.orient !== perp) continue;
+    if (t.orient !== perp || t.bridgeRoomIds !== undefined) continue;
     const d = (t.coord - alongOf(door.pointMm, axis)) * sign;
     const s = alongOf(door.pointMm, perp);
     if (d <= RAY_EPS_MM || s < t.lo - DOOR_SPAN_MM || s > t.hi + DOOR_SPAN_MM) continue;
@@ -364,6 +372,19 @@ function hitOf(door: { pointMm: Vec2; outward: Vec2 }, tracks: readonly Track[],
   if (best === null || best.d > reachMm) return null;
   const { d, lineIdx } = best;
   return { lineIdx, d, point: { x: door.pointMm.x + door.outward.x * d, y: door.pointMm.y + door.outward.y * d } };
+}
+
+/** The hits of a door: each bridge track that ends at the door point, or else the nearest corridor track ahead. */
+function hitsOfDoor(door: { pointMm: Vec2; outward: Vec2 }, tracks: readonly Track[], reachMm: number): Hit[] {
+  const bridgeHits: Hit[] = [];
+  tracks.forEach((t, i) => {
+    if (t.bridgeRoomIds === undefined) return;
+    const ends = [at(t.orient, t.coord, t.lo), at(t.orient, t.coord, t.hi)];
+    if (ends.some((e) => distance(e, door.pointMm) <= ON_TRACK_MM)) bridgeHits.push({ lineIdx: i, d: 0, point: { ...door.pointMm } });
+  });
+  if (bridgeHits.length > 0) return bridgeHits;
+  const hit = hitOf(door, tracks, reachMm);
+  return hit === null ? [] : [hit];
 }
 
 function unitOf(p: Vec2, q: Vec2): Vec2 {
@@ -414,48 +435,53 @@ function roomIdsOf(a: Vec2, b: Vec2, roomIdAt: ((p: Vec2) => string | null) | un
   return ids;
 }
 
+function sameRooms(p: string[] | undefined, q: string[] | undefined): boolean {
+  return p === undefined || q === undefined ? p === q : p.join('|') === q.join('|');
+}
+
 /** Joins the tree edges that meet straight through a node, and returns one path per joined chain. */
-function straightPaths(edgeIds: readonly string[], info: ReadonlyMap<string, Edge>, nodePts: readonly Vec2[]): Vec2[][] {
+function straightPaths(edgeIds: readonly string[], info: ReadonlyMap<string, Edge>, nodePts: readonly Vec2[]): { path: Vec2[]; bridgeRoomIds?: string[] }[] {
   const parent = edgeIds.map((_, k) => k);
   const find = (k: number): number => {
     let r = k;
     while (parent[r] !== r) r = parent[r]!;
     return r;
   };
-  const incident = new Map<number, { k: number; out: Vec2 }[]>();
-  const attach = (node: number, item: { k: number; out: Vec2 }): void => {
+  const incident = new Map<number, { k: number; out: Vec2; rooms?: string[] }[]>();
+  const attach = (node: number, item: { k: number; out: Vec2; rooms?: string[] }): void => {
     incident.set(node, [...(incident.get(node) ?? []), item]);
   };
   edgeIds.forEach((id, k) => {
     const e = info.get(id)!;
-    attach(e.a, { k, out: e.dir });
-    attach(e.b, { k, out: { x: -e.dir.x, y: -e.dir.y } });
+    attach(e.a, { k, out: e.dir, rooms: e.bridgeRoomIds });
+    attach(e.b, { k, out: { x: -e.dir.x, y: -e.dir.y }, rooms: e.bridgeRoomIds });
   });
   for (const list of incident.values()) {
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
         const p = list[i]!;
         const q = list[j]!;
-        if (p.out.x * q.out.x + p.out.y * q.out.y < STRAIGHT_DOT) parent[find(p.k)] = find(q.k);
+        if (p.out.x * q.out.x + p.out.y * q.out.y < STRAIGHT_DOT && sameRooms(p.rooms, q.rooms)) parent[find(p.k)] = find(q.k);
       }
     }
   }
-  const chains = new Map<number, { pts: Vec2[]; dir: Vec2 }>();
+  const chains = new Map<number, { pts: Vec2[]; dir: Vec2; rooms?: string[] }>();
   edgeIds.forEach((id, k) => {
     const e = info.get(id)!;
     const r = find(k);
-    const chain = chains.get(r) ?? { pts: [], dir: e.dir };
+    const chain = chains.get(r) ?? { pts: [], dir: e.dir, rooms: e.bridgeRoomIds };
     chain.pts.push(nodePts[e.a]!, nodePts[e.b]!);
     chains.set(r, chain);
   });
   return [...chains.values()]
-    .map(({ pts, dir }) => {
+    .map(({ pts, dir, rooms }) => {
       const axis: Orient = dir.x !== 0 ? 'h' : 'v';
       const lo = pts.reduce((m, p) => (alongOf(p, axis) < alongOf(m, axis) ? p : m));
       const hi = pts.reduce((m, p) => (alongOf(p, axis) > alongOf(m, axis) ? p : m));
-      return lexLess(hi, lo) ? [{ ...hi }, { ...lo }] : [{ ...lo }, { ...hi }];
+      const path = lexLess(hi, lo) ? [{ ...hi }, { ...lo }] : [{ ...lo }, { ...hi }];
+      return rooms === undefined ? { path } : { path, bridgeRoomIds: rooms };
     })
-    .sort((p, q) => p[0]!.x - q[0]!.x || p[0]!.y - q[0]!.y || p[1]!.x - q[1]!.x || p[1]!.y - q[1]!.y);
+    .sort((p, q) => p.path[0]!.x - q.path[0]!.x || p.path[0]!.y - q.path[0]!.y || p.path[1]!.x - q.path[1]!.x || p.path[1]!.y - q.path[1]!.y);
 }
 
 export function planMainRun(input: {
@@ -470,7 +496,7 @@ export function planMainRun(input: {
   const { startMm } = input;
   const demands = [...input.demands].sort((p, q) => (p.roomId < q.roomId ? -1 : p.roomId > q.roomId ? 1 : 0));
   const tracks = sortTracks(input.lines.map(trackOf));
-  if (tracks.length === 0) {
+  if (!tracks.some((t) => t.bridgeRoomIds === undefined)) {
     return {
       lines: [],
       paths: [],
@@ -485,7 +511,7 @@ export function planMainRun(input: {
 
   const hitsOf = new Map<string, Hit[]>();
   for (const demand of demands) {
-    const hits = demand.doorsMm.map((door) => hitOf(door, tracks, input.reachMm)).filter((h): h is Hit => h !== null);
+    const hits = demand.doorsMm.flatMap((door) => hitsOfDoor(door, tracks, input.reachMm));
     hitsOf.set(demand.roomId, hits);
   }
   const parent = tracks.map((_, i) => i);
@@ -514,22 +540,23 @@ export function planMainRun(input: {
   });
   const nearOf = tracks.map((t) => nearestOnTrack(startMm, t));
   const nearPt: Vec2[] = [];
-  tracks.forEach((_, i) => {
+  tracks.forEach((t, i) => {
+    if (t.bridgeRoomIds !== undefined) return;
     const c = compOf[i]!;
     if (nearPt[c] === undefined || distance(startMm, nearOf[i]!) < distance(startMm, nearPt[c]!)) nearPt[c] = nearOf[i]!;
   });
-  const roomCount = new Array<number>(nearPt.length).fill(0);
+  const roomCount = new Array<number>(compIdx.size).fill(0);
   for (const demand of demands) {
     for (const c of new Set(hitsOf.get(demand.roomId)!.map((h) => compOf[h.lineIdx]!))) roomCount[c]!++;
   }
   const rootComp = nearPt.reduce((best, _, c) => {
     if (roomCount[c] !== roomCount[best]) return roomCount[c]! > roomCount[best]! ? c : best;
     return distance(startMm, nearPt[c]!) < distance(startMm, nearPt[best]!) ? c : best;
-  }, 0);
+  }, nearPt.findIndex((p) => p !== undefined));
   const rootPt = nearPt[rootComp]!;
 
   const onTrack: Vec2[][] = tracks.map((t) => [at(t.orient, t.coord, t.lo), at(t.orient, t.coord, t.hi)]);
-  const gaps: [Vec2, Vec2][] = [];
+  const gaps: [Vec2, Vec2, number, number][] = [];
   tracks.forEach((p, i) =>
     tracks.forEach((q, j) => {
       if (p.orient === 'h' && q.orient === 'v') {
@@ -540,7 +567,7 @@ export function planMainRun(input: {
         }
       }
       if (i !== j && p.orient === q.orient && Math.abs(p.coord - q.coord) <= ON_TRACK_MM && q.lo >= p.hi && q.lo - p.hi <= NODE_TOL_MM) {
-        gaps.push([at(p.orient, p.coord, p.hi), at(q.orient, q.coord, q.lo)]);
+        gaps.push([at(p.orient, p.coord, p.hi), at(q.orient, q.coord, q.lo), i, j]);
       }
     }),
   );
@@ -554,9 +581,9 @@ export function planMainRun(input: {
     for (let q = p + 1; q < nearPt.length; q++) {
       let best: { d: number; ta: number; tb: number; pa: Vec2; pb: Vec2 } | null = null;
       for (let i = 0; i < tracks.length; i++) {
-        if (compOf[i] !== p) continue;
+        if (compOf[i] !== p || tracks[i]!.bridgeRoomIds !== undefined) continue;
         for (let j = 0; j < tracks.length; j++) {
-          if (compOf[j] !== q) continue;
+          if (compOf[j] !== q || tracks[j]!.bridgeRoomIds !== undefined) continue;
           const ta = tracks[i]!;
           const tb = tracks[j]!;
           const cands: [Vec2, Vec2][] = [];
@@ -586,30 +613,38 @@ export function planMainRun(input: {
   const nodePts = [...reps.values()].sort((p, q) => p.x - q.x || p.y - q.y);
   const nodeOf = new Map<string, number>(nodePts.map((p, i) => [keyOf(p), i] as const));
 
-  const pairs: [number, number][] = [];
+  const pairs: [number, number, number[]][] = [];
   tracks.forEach((t, i) => {
     const idx = [...new Set(onTrack[i]!.map((p) => nodeOf.get(keyOf(p))!))].sort(
       (x, y) => alongOf(nodePts[x]!, t.orient) - alongOf(nodePts[y]!, t.orient),
     );
-    for (let k = 1; k < idx.length; k++) pairs.push([idx[k - 1]!, idx[k]!]);
+    for (let k = 1; k < idx.length; k++) pairs.push([idx[k - 1]!, idx[k]!, [i]]);
   });
-  for (const [p, q] of gaps) pairs.push([nodeOf.get(keyOf(p))!, nodeOf.get(keyOf(q))!]);
-  const unique = new Map<string, [number, number]>();
-  for (const [a, b] of pairs) {
+  for (const [p, q, i, j] of gaps) pairs.push([nodeOf.get(keyOf(p))!, nodeOf.get(keyOf(q))!, [i, j]]);
+  const unique = new Map<string, [number, number, number[]]>();
+  for (const [a, b, src] of pairs) {
     const k = `${Math.min(a, b)}:${Math.max(a, b)}`;
-    if (a !== b && !unique.has(k)) unique.set(k, [a, b]);
+    if (a === b) continue;
+    const cur = unique.get(k);
+    if (cur) cur[2].push(...src);
+    else unique.set(k, [a, b, [...src]]);
   }
   const ordered = [...unique.values()].sort(
     ([a, b], [c, d]) => Math.min(a, b) - Math.min(c, d) || Math.max(a, b) - Math.max(c, d),
   );
   const edges: SteinerTurnEdge[] = [];
   const info = new Map<string, Edge>();
-  ordered.forEach(([a, b], k) => {
+  ordered.forEach(([a, b, src], k) => {
     const id = `e-${k}`;
     const dir = unitOf(nodePts[a]!, nodePts[b]!);
-    const cost = distance(nodePts[a]!, nodePts[b]!);
+    const len = distance(nodePts[a]!, nodePts[b]!);
+    const bridge = src.every((t) => tracks[t]!.bridgeRoomIds !== undefined) ? tracks[src[0]!]! : undefined;
+    const bridgeRoomIds = bridge?.bridgeRoomIds;
+    const cost = bridge && bridgeRoomIds
+      ? len + (BRIDGE_WALL_MM * (bridgeRoomIds.length + 1) * len) / (bridge.hi - bridge.lo)
+      : len;
     edges.push({ id, from: nodeId(a), to: nodeId(b), cost, startDir: dir, endDir: dir });
-    info.set(id, { a, b, cost, dir });
+    info.set(id, { a, b, cost, dir, bridgeRoomIds });
   });
   const joinIds: string[] = [];
   connectors.forEach(({ pa, pb }, j) => {
@@ -698,8 +733,13 @@ export function planMainRun(input: {
       roomIds: roomIdsOf(pa, pb, input.roomIdAt),
     }));
   const treePaths = straightPaths(solved.edgeIds, info, nodePts);
-  const lines: MainLine[] = treePaths.map((p, i) => ({ id: `mr-${i}`, a: p[0]!, b: p[1]! }));
-  const paths = [...treePaths];
+  const lines: MainLine[] = treePaths.map(({ path: p, bridgeRoomIds: ids }, i): MainLine => {
+    if (ids === undefined) return { id: `mr-${i}`, a: p[0]!, b: p[1]! };
+    return ids.length > 0
+      ? { id: `mr-${i}`, a: p[0]!, b: p[1]!, bridge: true, crossedRoomId: ids[0], crossedRoomIds: ids }
+      : { id: `mr-${i}`, a: p[0]!, b: p[1]!, bridge: true, crossedRoomIds: ids };
+  });
+  const paths = treePaths.map(({ path }) => path);
   if (distance(startMm, rootPt) > STUB_MIN_MM) paths.push([{ ...startMm }, { ...rootPt }]);
   const chosenHitByRoom = new Map<string, Vec2>();
   for (const [roomId, n] of [...picks].sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0))) {
@@ -715,4 +755,119 @@ export function planMainRun(input: {
     stubRoomIds: distance(startMm, rootPt) > STUB_MIN_MM ? roomIdsOf(startMm, rootPt, input.roomIdAt) : [],
     joins,
   };
+}
+
+export interface BridgeRoom {
+  roomId: string;
+  name: string | null;
+  typeId: string | null;
+  typeName: string | null;
+  hasTerminal: boolean;   // the room has a terminal of ANY routing target (D3)
+  inRouteArea: boolean;
+  isShaft: boolean;
+}
+
+export interface MainBridgeInput {
+  lines: readonly MainLine[];                  // the corridor lines (no bridges)
+  demands: readonly MainDemand[];              // MainDemand is defined later in the file; fine in TS
+  rooms: readonly BridgeRoom[];                // all rooms of the page
+  roomIdAt: (p: Vec2) => string | null;        // any room, area rooms too
+  crossRooms: { maxRooms: number };
+  neverCrossTypeIds?: readonly string[];
+  blockers: readonly (readonly Vec2[])[];
+  clearanceMm: number;
+  maxLengthMm?: number;                        // default BRIDGE_MAX_LENGTH_MM
+}
+
+const wordsOf = (text: string | null): string[] => (text ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 0);
+
+/** A room may be crossed when it has no terminal, is not in the route area, is not a shaft, and is not banned. */
+export function bridgeRoomAllowed(room: BridgeRoom, neverCrossTypeIds?: readonly string[]): boolean {
+  if (room.hasTerminal || room.inRouteArea || room.isShaft) return false;
+  if (neverCrossTypeIds !== undefined) return room.typeId === null || !neverCrossTypeIds.includes(room.typeId);
+  const banned = (text: string | null): boolean =>
+    wordsOf(text).some((w) => DEFAULT_NEVER_CROSS_WORDS.some((word) => w.startsWith(word)));
+  return !banned(room.name) && !banned(room.typeName);
+}
+
+function pointAlong(door: { pointMm: Vec2; outward: Vec2 }, t: number): Vec2 {
+  return { x: door.pointMm.x + door.outward.x * t, y: door.pointMm.y + door.outward.y * t };
+}
+
+/** The rooms that a bridge from the door crosses, in order from the corridor end. Null when the bridge is not allowed. */
+function bridgeCrossings(
+  demandRoomId: string,
+  door: { pointMm: Vec2; outward: Vec2 },
+  lengthMm: number,
+  input: MainBridgeInput,
+  roomsById: ReadonlyMap<string, BridgeRoom>,
+  maxRooms: number,
+): string[] | null {
+  const ids: string[] = [];
+  for (let t = BRIDGE_STEP_MM / 2; t < lengthMm; t += BRIDGE_STEP_MM) {
+    const id = input.roomIdAt(pointAlong(door, t));
+    if (id !== null && !ids.includes(id)) ids.push(id);
+  }
+  const crossed: string[] = [];
+  for (const id of ids) {
+    if (id === demandRoomId) continue;
+    const room = roomsById.get(id);
+    if (room === undefined) return null;
+    if (room.inRouteArea) continue;
+    if (!bridgeRoomAllowed(room, input.neverCrossTypeIds)) return null;
+    crossed.push(id);
+  }
+  return crossed.length === 0 || crossed.length > maxRooms ? null : crossed.reverse();
+}
+
+function bridgeClear(door: { pointMm: Vec2; outward: Vec2 }, lengthMm: number, input: MainBridgeInput): boolean {
+  const ts: number[] = [];
+  for (let t = 0; t < lengthMm; t += BRIDGE_STEP_MM) ts.push(t);
+  ts.push(lengthMm);
+  return ts.every((t) => {
+    const p = pointAlong(door, t);
+    return input.blockers.every((path) => pathDistance(p, path) >= input.clearanceMm);
+  });
+}
+
+/** Bridge lines from the corridor lines to the doors. The caller passes only doors that may get a bridge. Deterministic. */
+export function mainBridgeLines(input: MainBridgeInput): MainLine[] {
+  const tracks = sortTracks(input.lines.map(trackOf));
+  const roomsById = new Map(input.rooms.map((room) => [room.roomId, room] as const));
+  const maxLengthMm = input.maxLengthMm ?? BRIDGE_MAX_LENGTH_MM;
+  const maxRooms = Number.isFinite(input.crossRooms.maxRooms) ? Math.max(0, Math.floor(input.crossRooms.maxRooms)) : 0;
+  const demands = [...input.demands].sort((p, q) => (p.roomId < q.roomId ? -1 : p.roomId > q.roomId ? 1 : 0));
+  const found: { orient: Orient; a: Vec2; b: Vec2; crossed: string[] }[] = [];
+  const keys = new Set<string>();
+  for (const demand of demands) {
+    for (const door of demand.doorsMm) {
+      const hit = hitOf(door, tracks, maxLengthMm);
+      if (hit === null) continue;
+      const crossed = bridgeCrossings(demand.roomId, door, hit.d, input, roomsById, maxRooms);
+      if (crossed === null || !bridgeClear(door, hit.d, input)) continue;
+      const orient: Orient = Math.abs(door.outward.x) >= Math.abs(door.outward.y) ? 'h' : 'v';
+      const coord = acrossOf(door.pointMm, orient);
+      const p0 = alongOf(door.pointMm, orient);
+      const p1 = alongOf(hit.point, orient);
+      const a = at(orient, coord, Math.min(p0, p1));
+      const b = at(orient, coord, Math.max(p0, p1));
+      const key = JSON.stringify([keyOf(a), keyOf(b), crossed]);
+      if (keys.has(key)) continue;
+      keys.add(key);
+      found.push({ orient, a, b, crossed });
+    }
+  }
+  found.sort((p, q) =>
+    (p.orient === q.orient ? 0 : p.orient === 'h' ? -1 : 1) ||
+    acrossOf(p.a, p.orient) - acrossOf(q.a, q.orient) ||
+    alongOf(p.a, p.orient) - alongOf(q.a, q.orient),
+  );
+  return found.map(({ a, b, crossed }, i) => ({
+    id: `bridge-${i}`,
+    a,
+    b,
+    bridge: true,
+    crossedRoomId: crossed[0],
+    crossedRoomIds: crossed,
+  }));
 }

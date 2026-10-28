@@ -49,6 +49,8 @@ export const TEXTS = {
   'w_room-off-graph_one': '1 room is outside the route area. The route serves it anyway: {rooms}.',
   'w_room-chained': '{count} rooms are fed through another room: {rooms}.',
   'w_room-chained_one': '1 room is fed through another room: {rooms}.',
+  'w_main-crosses-room': 'The main run crosses {count} rooms: {rooms}. Check the fire walls.',
+  'w_main-crosses-room_one': 'The main run crosses 1 room: {rooms}. Check the fire wall.',
   moreRooms: ', and {n} more',
   'w_ports-left': '{count} ports could not be reached. They stay open.',
   'w_ports-left_one': '1 port could not be reached. It stays open.',
@@ -173,6 +175,10 @@ function warningText(warning: RoutePlanWarning, names: RouteBuildNames): { text:
     case 'room-chained': {
       const rooms = roomList(warning.ids ?? [], names);
       return { text: buildText(one ? 'w_room-chained_one' : 'w_room-chained', { count, rooms }), hint: '' };
+    }
+    case 'main-crosses-room': {
+      const rooms = roomList(warning.ids ?? [], names);
+      return { text: buildText(one ? 'w_main-crosses-room_one' : 'w_main-crosses-room', { count, rooms }), hint: buildText('hintFireWalls') };
     }
     case 'ports-left':
       return { text: buildText(one ? 'w_ports-left_one' : 'w_ports-left', { count }), hint: '' };

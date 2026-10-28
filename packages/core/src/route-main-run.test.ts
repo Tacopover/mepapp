@@ -1,8 +1,20 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { closestPointOnSegment, distance, type Vec2 } from './geometry.js';
 import { insideRouteArea, withWallGaps } from './route-layout.js';
-import { mainRunLines, planMainRun, type MainDemand, type MainLine, type MainLineInput } from './route-main-run.js';
+import {
+  bridgeRoomAllowed,
+  mainBridgeLines,
+  mainRunLines,
+  planMainRun,
+  type BridgeRoom,
+  type MainBridgeInput,
+  type MainDemand,
+  type MainLine,
+  type MainLineInput,
+} from './route-main-run.js';
+import { roomDoorCandidates } from './route-room-doors.js';
 import { roomEntryCandidates } from './route-room-entry.js';
+import { mainCrossesRoomWarning } from './route-plan-warnings.js';
 import { manualScenario } from './route-scenario.testutil.js';
 import { roomContainsPoint } from './rooms/room.js';
 import { pointInRing } from './rooms/polygon.js';
@@ -542,6 +554,20 @@ describe('planMainRun', () => {
     expect(run.rootPointMm).toEqual(far);
     expect(run.unreachedRoomIds).toEqual(['A', 'B']);
   });
+
+  it('keeps a bridge piece apart from a collinear corridor piece at a shared node', () => {
+    const run = planMainRun(
+      planInput({
+        lines: [hLine('c', 1000, 0, 5000), { ...hLine('b', 1000, 5000, 9000), bridge: true, crossedRoomIds: ['E'] }],
+        startMm: TEE_START,
+        demands: [demand('F', [door(9000, 1000, { x: 0, y: 1 })])],
+      }),
+    );
+    expect(run.unreachedRoomIds).toEqual([]);
+    expect(run.lines).toHaveLength(2);
+    expect('bridge' in run.lines[0]!).toBe(false);
+    expect(run.lines[1]).toMatchObject({ bridge: true, crossedRoomIds: ['E'] });
+  });
 });
 
 describe('planMainRun across a wall gap', () => {
@@ -732,5 +758,346 @@ describe('planMainRun on the manual fixture', () => {
     }
     expect(run.chosenHitByRoom.size + run.unreachedRoomIds.length).toBe(demands.length);
     expect(run.stubRoomIds.length).toBeGreaterThanOrEqual(2);
+  }, 60000);
+});
+
+type NamedBox = { id: string; box: Box };
+const roomAt = (boxes: readonly NamedBox[]) => (p: Vec2): string | null =>
+  boxes.find(({ box: [x0, y0, x1, y1] }) => p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1)?.id ?? null;
+
+const BRIDGE_START: Vec2 = { x: 0, y: 1000 };
+const BRIDGE_DOOR = door(6000, 5200, { x: 0, y: -1 });
+const CORRIDOR_LINE = hLine('c', 1000, 0, 20000);
+const ROOM_C: Box = [0, 0, 20000, 2000];
+const ROOM_E: Box = [4000, 2200, 8000, 5000];
+const ROOM_F: Box = [4000, 5200, 8000, 9000];
+
+const bridgeRoom = (id: string, over: Partial<BridgeRoom> = {}): BridgeRoom => ({
+  roomId: id,
+  name: null,
+  typeId: null,
+  typeName: null,
+  hasTerminal: false,
+  inRouteArea: false,
+  isShaft: false,
+  ...over,
+});
+
+const bridgeInput = (over: Partial<MainBridgeInput> = {}): MainBridgeInput => ({
+  lines: [CORRIDOR_LINE],
+  demands: [demand('F', [BRIDGE_DOOR])],
+  rooms: [bridgeRoom('C', { inRouteArea: true }), bridgeRoom('E'), bridgeRoom('F')],
+  roomIdAt: roomAt([
+    { id: 'C', box: ROOM_C },
+    { id: 'E', box: ROOM_E },
+    { id: 'F', box: ROOM_F },
+  ]),
+  crossRooms: { maxRooms: 2 },
+  blockers: [],
+  clearanceMm: 150,
+  ...over,
+});
+
+const bridgeRunOf = (input: MainBridgeInput) => {
+  const bridges = mainBridgeLines(input);
+  const run = planMainRun(
+    planInput({ lines: [...input.lines, ...bridges], startMm: BRIDGE_START, demands: input.demands, reachMm: 4000 }),
+  );
+  return { bridges, run };
+};
+
+describe('mainBridgeLines', () => {
+  it('gives a bridge from the door of a far room across an empty room to the corridor', () => {
+    const bridges = mainBridgeLines(bridgeInput());
+    expect(bridges).toHaveLength(1);
+    expect(bridges[0]).toMatchObject({ bridge: true, crossedRoomId: 'E', crossedRoomIds: ['E'] });
+    expect(bridges[0]!.a).toEqual({ x: 6000, y: 1000 });
+    expect(bridges[0]!.b).toEqual({ x: 6000, y: 5200 });
+
+    const run = planMainRun(
+      planInput({ lines: [CORRIDOR_LINE, ...bridges], startMm: BRIDGE_START, demands: [demand('F', [BRIDGE_DOOR])], reachMm: 4000 }),
+    );
+    expect(run.unreachedRoomIds).toEqual([]);
+    expect(run.lines.some((l) => l.bridge === true && l.crossedRoomIds?.join() === 'E')).toBe(true);
+    expect(run.paths).toContainEqual([
+      { x: 6000, y: 1000 },
+      { x: 6000, y: 5200 },
+    ]);
+
+    const without = planMainRun(
+      planInput({ lines: [CORRIDOR_LINE], startMm: BRIDGE_START, demands: [demand('F', [BRIDGE_DOOR])], reachMm: 4000 }),
+    );
+    expect(without.unreachedRoomIds).toEqual(['F']);
+    expect(without.lines.some((l) => 'bridge' in l)).toBe(false);
+  });
+
+  it('never crosses a room that has a terminal', () => {
+    expect(mainBridgeLines(bridgeInput({ rooms: [bridgeRoom('C', { inRouteArea: true }), bridgeRoom('E', { hasTerminal: true }), bridgeRoom('F')] }))).toEqual([]);
+  });
+
+  it('bans the banned room words in the room name and the type name, and allows other names', () => {
+    const withE = (over: Partial<BridgeRoom>, extra: Partial<MainBridgeInput> = {}) =>
+      mainBridgeLines(bridgeInput({ rooms: [bridgeRoom('C', { inRouteArea: true }), bridgeRoom('E', over), bridgeRoom('F')], ...extra }));
+    expect(withE({ name: 'Stair' })).toEqual([]);
+    expect(withE({ name: 'Kitchen' })).toEqual([]);
+    expect(withE({ name: 'Lift-1' })).toEqual([]);
+    expect(withE({ typeName: 'stairs' })).toEqual([]);
+    expect(withE({ name: 'Shifts' })).toHaveLength(1);
+  });
+
+  it('replaces the word list with neverCrossTypeIds when that list is given', () => {
+    const withE = (over: Partial<BridgeRoom>, extra: Partial<MainBridgeInput> = {}) =>
+      mainBridgeLines(bridgeInput({ rooms: [bridgeRoom('C', { inRouteArea: true }), bridgeRoom('E', over), bridgeRoom('F')], ...extra }));
+    expect(withE({ name: 'Stair' }, { neverCrossTypeIds: [] })).toHaveLength(1);
+    expect(withE({ typeId: 'office' }, { neverCrossTypeIds: ['office'] })).toEqual([]);
+  });
+
+  it('allows a room only when it is not a shaft, not in the route area, has no terminal and is not banned', () => {
+    expect(bridgeRoomAllowed(bridgeRoom('X'))).toBe(true);
+    expect(bridgeRoomAllowed(bridgeRoom('X', { isShaft: true }))).toBe(false);
+    expect(bridgeRoomAllowed(bridgeRoom('X', { inRouteArea: true }))).toBe(false);
+    expect(bridgeRoomAllowed(bridgeRoom('X', { hasTerminal: true }))).toBe(false);
+    expect(bridgeRoomAllowed(bridgeRoom('X', { name: 'Stair' }))).toBe(false);
+  });
+
+  it('gives no bridge across more rooms than maxRooms allows', () => {
+    const rooms = [bridgeRoom('C', { inRouteArea: true }), bridgeRoom('E'), bridgeRoom('E2'), bridgeRoom('F')];
+    const twoRooms = roomAt([
+      { id: 'C', box: ROOM_C },
+      { id: 'E', box: [4000, 2200, 8000, 3600] },
+      { id: 'E2', box: [4000, 3800, 8000, 5000] },
+      { id: 'F', box: ROOM_F },
+    ]);
+    expect(mainBridgeLines(bridgeInput({ rooms, roomIdAt: twoRooms, crossRooms: { maxRooms: 1 } }))).toEqual([]);
+    const bridges = mainBridgeLines(bridgeInput({ rooms, roomIdAt: twoRooms, crossRooms: { maxRooms: 2 } }));
+    expect(bridges).toHaveLength(1);
+    expect(bridges[0]!.crossedRoomIds).toEqual(['E', 'E2']);
+  });
+
+  it('gives no bridge when maxRooms is not a finite number', () => {
+    expect(mainBridgeLines(bridgeInput({ crossRooms: { maxRooms: NaN } }))).toEqual([]);
+    expect(mainBridgeLines(bridgeInput({ crossRooms: { maxRooms: Infinity } }))).toEqual([]);
+  });
+
+  it('gives no bridge through a blocker that lies across the ray', () => {
+    expect(mainBridgeLines(bridgeInput({ blockers: [[{ x: 5000, y: 3000 }, { x: 7000, y: 3000 }]] }))).toEqual([]);
+  });
+
+  it('gives no bridge for a door that faces the corridor with no room between', () => {
+    const roomDoor = door(6000, 1500, { x: 0, y: -1 });
+    const roomIdAt = roomAt([{ id: 'C', box: ROOM_C }]);
+    expect(mainBridgeLines(bridgeInput({ demands: [demand('F', [roomDoor])], roomIdAt }))).toEqual([]);
+  });
+
+  it('uses the bridge for a door with a normal hit inside reachMm when its ray crosses a room', () => {
+    const bridges = mainBridgeLines(bridgeInput());
+    expect(bridges).toHaveLength(1);
+    const run = planMainRun(
+      planInput({ lines: [CORRIDOR_LINE, ...bridges], startMm: BRIDGE_START, demands: [demand('F', [BRIDGE_DOOR])], reachMm: 5000 }),
+    );
+    expect(run.lines.some((l) => l.bridge === true)).toBe(true);
+    expect(run.chosenHitByRoom.get('F')).toEqual({ x: 6000, y: 5200 });
+  });
+
+  it('takes the normal way to a far room when it costs less than the bridge, although a bridge is shorter', () => {
+    // Costs from the root (0, 1000) in mm. Bridge hit: corridor 6000 + bridge 4200 + 3000 * (1 + 1) = 16200 priced, 10200 unpriced.
+    // Door 2 hit: corridor 3000 + vertical line 7000 + ray 1000 = 11000. So 10200 < 11000 < 16200.
+    const lines = [CORRIDOR_LINE, vLine('v', 3000, 1000, 9500)];
+    const doors = [BRIDGE_DOOR, door(4000, 8000, { x: -1, y: 0 })];
+    const bridges = mainBridgeLines(bridgeInput({ lines, demands: [demand('F', doors)] }));
+    expect(bridges).toHaveLength(1);
+    const run = planMainRun(
+      planInput({ lines: [...lines, ...bridges], startMm: BRIDGE_START, demands: [demand('F', doors)], reachMm: 4000 }),
+    );
+    expect(run.chosenHitByRoom.get('F')).toEqual({ x: 3000, y: 8000 });
+    expect(run.lines.some((l) => l.bridge === true)).toBe(false);
+  });
+
+  it('gives the same bridges and plan for shuffled lines, rooms and demands, and on a second call', () => {
+    const demands = [demand('F', [BRIDGE_DOOR, door(4000, 8000, { x: -1, y: 0 })]), demand('E', [door(6000, 2200, { x: 0, y: -1 })])];
+    const base = bridgeInput({ lines: [CORRIDOR_LINE, vLine('v', 3000, 1000, 9500)], demands });
+    const shuffled = bridgeInput({
+      lines: [...base.lines].reverse(),
+      demands: [...demands].reverse(),
+      rooms: [...base.rooms].reverse(),
+    });
+    expect(bridgeRunOf(shuffled)).toEqual(bridgeRunOf(base));
+    expect(bridgeRunOf(base)).toEqual(bridgeRunOf(base));
+  });
+});
+
+describe('mainCrossesRoomWarning', () => {
+  it('gives null when there is no bridge', () => {
+    expect(mainCrossesRoomWarning([])).toBeNull();
+    expect(mainCrossesRoomWarning([{ bridge: false, crossedRoomIds: ['a'] }])).toBeNull();
+  });
+
+  it('counts the rooms of each bridge plus one wall crossing for each bridge', () => {
+    // Rule: a bridge makes (rooms + 1) wall crossings. Here (2 + 1) + (1 + 1) = 5.
+    const warning = mainCrossesRoomWarning([
+      { bridge: true, crossedRoomIds: ['b', 'a'] },
+      { bridge: true, crossedRoomId: 'a' },
+      { crossedRoomIds: ['z'] },
+    ]);
+    expect(warning).toMatchObject({
+      code: 'main-crosses-room',
+      count: 2,
+      ids: ['a', 'b'],
+      numbers: { bridges: 2, wallCrossings: 5 },
+    });
+  });
+
+  it('lists the room and two wall crossings of the bridge from the synthetic scene', () => {
+    const [bridge] = mainBridgeLines(bridgeInput());
+    expect(mainCrossesRoomWarning([bridge!])).toMatchObject({
+      code: 'main-crosses-room',
+      count: 1,
+      ids: ['E'],
+      numbers: { bridges: 1, wallCrossings: 2 },
+    });
+  });
+});
+
+describe('mainBridgeLines on the manual fixture', () => {
+  it('P2 T07-1: gives bridges for far rooms that the corridor does not reach, within the rules', () => {
+    const fixture = manualScenario();
+    if (fixture === null) return;
+    const { scenario: s } = fixture;
+    const { mmPerPt } = s.drawing;
+    const toMm = (p: Vec2): Vec2 => ({ x: p.x * mmPerPt, y: p.y * mmPerPt });
+    const areaRoomObjects = s.drawing.rooms.filter((r) => s.area.rooms.some((a) => a.roomId === r.id));
+    const areaRooms = areaRoomObjects.map((room) => ({ roomId: room.id, ringMm: room.polygon.outer.map(toMm) }));
+    const shaftRoomIds = new Set(s.area.rooms.filter((r) => r.kind === 'shaft').map((r) => r.roomId));
+    const linkPointsMm = s.area.links.filter((l) => !l.shaft).map((l) => toMm(l.point));
+    const inside = withWallGaps(insideRouteArea(areaRoomObjects, mmPerPt), linkPointsMm);
+    const startStamp = s.stamps.find((st) => st.id === s.startStampId);
+    const startPort = startStamp ? getStampWorldPorts(startStamp).find((p) => p.id === s.startPortId)?.world : undefined;
+    if (!startPort) throw new Error('manual fixture: no start port');
+    const startMm = toMm(startPort);
+    const lines = mainRunLines({
+      areaRooms,
+      inside,
+      startMm,
+      offsetMm: 1000,
+      blockers: [],
+      shaftRoomIds,
+      ductWidthMm: 400,
+      clearanceMm: 150,
+    });
+    const corridorAt = (p: Vec2): boolean =>
+      areaRoomObjects.some((r) => roomContainsPoint(r, { x: p.x / mmPerPt, y: p.y / mmPerPt }));
+    const roomIdAt = (p: Vec2): string | null =>
+      s.drawing.rooms.find((r) => roomContainsPoint(r, { x: p.x / mmPerPt, y: p.y / mmPerPt }))?.id ?? null;
+    const demands: MainDemand[] = s.servedRooms.map((room) => {
+      const candidates = roomEntryCandidates({
+        room,
+        mmPerPt,
+        areaEntries: s.area.entries.filter((e) => e.roomId === room.id),
+        corridorAt,
+        portsMm: s.targetPorts.filter((p) => p.roomId === room.id).map((p) => toMm(p.world)),
+        alignedInGap: true,
+      });
+      return { roomId: room.id, doorsMm: candidates.map((c) => ({ pointMm: c.pointMm, outward: c.outward })) };
+    });
+    const before = planMainRun({ lines, startMm, demands, inside, bendMm: 500, reachMm: 4800, roomIdAt });
+
+    const needy = new Set([...demands.filter((d) => d.doorsMm.length === 0).map((d) => d.roomId), ...before.unreachedRoomIds]);
+    const bridgeCands: MainDemand[] = demands.flatMap((d) => {
+      if (!needy.has(d.roomId)) return [];
+      const room = s.servedRooms.find((r) => r.id === d.roomId)!;
+      const portsMm = s.targetPorts.filter((p) => p.roomId === d.roomId).map((p) => toMm(p.world));
+      const extra = roomDoorCandidates({
+        room,
+        mmPerPt,
+        corridorAt,
+        portsMm,
+        blockers: [],
+        clearanceMm: 150,
+        doorMarginMm: 200,
+        probeMm: 15000,
+      });
+      return [{ roomId: d.roomId, doorsMm: extra.map((c) => ({ pointMm: c.door.pointMm, outward: c.door.outward })) }];
+    });
+    const bridgeRooms: BridgeRoom[] = s.drawing.rooms.map((room) => ({
+      roomId: room.id,
+      name: room.name,
+      typeId: room.roomTypeId ?? null,
+      typeName: room.roomTypeId ?? null,
+      hasTerminal: s.targetPorts.some((p) => p.roomId === room.id),
+      inRouteArea: s.area.rooms.some((r) => r.roomId === room.id),
+      isShaft: s.area.rooms.some((r) => r.roomId === room.id && r.kind === 'shaft'),
+    }));
+    const bridgeById = new Map(bridgeRooms.map((r) => [r.roomId, r] as const));
+    const bridges = mainBridgeLines({
+      lines,
+      demands: bridgeCands,
+      rooms: bridgeRooms,
+      roomIdAt,
+      crossRooms: { maxRooms: 2 },
+      blockers: [],
+      clearanceMm: 150,
+    });
+    const isBridgeEnd = (door: Vec2): boolean => bridges.some((b) => distance(b.a, door) <= 1 || distance(b.b, door) <= 1);
+    const afterDemands: MainDemand[] = demands.map((d) => {
+      const cand = bridgeCands.find((c) => c.roomId === d.roomId);
+      if (!cand) return d;
+      return { roomId: d.roomId, doorsMm: [...d.doorsMm, ...cand.doorsMm.filter((door) => isBridgeEnd(door.pointMm))] };
+    });
+    const after = planMainRun({ lines: [...lines, ...bridges], startMm, demands: afterDemands, inside, bendMm: 500, reachMm: 4800, roomIdAt });
+
+    const total = demands.length;
+    const reachedOf = (run: ReturnType<typeof planMainRun>): number => total - run.unreachedRoomIds.length;
+    const hasStubOf = (run: ReturnType<typeof planMainRun>): boolean => distance(startMm, run.rootPointMm) > 1;
+    const treeOf = (run: ReturnType<typeof planMainRun>): Vec2[][] => (hasStubOf(run) ? run.paths.slice(0, -1) : run.paths);
+    const treeLengthOf = (run: ReturnType<typeof planMainRun>): number =>
+      treeOf(run).reduce((sum, p) => sum + distance(p[0]!, p[1]!), 0);
+    const pt = (p: Vec2): string => `(${p.x.toFixed(0)}, ${p.y.toFixed(0)})`;
+    const label = (id: string): string => {
+      const room = bridgeById.get(id);
+      return `${id} (name ${room?.name ?? 'none'}, type ${room?.typeName ?? 'none'})`;
+    };
+    const describeLine = (l: MainLine): string =>
+      `${l.id} ${pt(l.a)} -> ${pt(l.b)} length ${(distance(l.a, l.b) / 1000).toFixed(2)} m crosses ${(l.crossedRoomIds ?? []).map(label).join('; ') || 'none'}`;
+    const bridgesIn = after.lines.filter((l) => l.bridge === true);
+    const candidateDoors = bridgeCands.reduce((n, c) => n + c.doorsMm.length, 0);
+    const room33Lines: string[] = [];
+    const room33 = bridgeCands.find((c) => c.roomId === 'room-33');
+    if (room33 === undefined) room33Lines.push('room-33: not a bridge candidate');
+    else if (!room33.doorsMm.some((door) => isBridgeEnd(door.pointMm))) {
+      for (const door of room33.doorsMm) {
+        const ids: string[] = [];
+        for (let t = 25; t <= 15000; t += 50) {
+          const id = roomIdAt({ x: door.pointMm.x + door.outward.x * t, y: door.pointMm.y + door.outward.y * t });
+          if (id !== null && !ids.includes(id)) ids.push(id);
+        }
+        const rays = ids.map((id) => `${label(id)} hasTerminal ${bridgeById.get(id)?.hasTerminal ?? false}`);
+        room33Lines.push(`room-33 door ${pt(door.pointMm)} ray rooms: ${rays.join('; ') || 'none'}`);
+      }
+    }
+    console.log(
+      [
+        `P2 T07-1: bridges on the manual fixture (${total} served rooms, ${candidateDoors} candidate doors, ${bridges.length} emitted bridges)`,
+        `rooms reached before ${reachedOf(before)} of ${total}`,
+        `rooms reached after ${reachedOf(after)} of ${total}`,
+        `unreached after ${after.unreachedRoomIds.length}: ${after.unreachedRoomIds.join(' ') || 'none'}`,
+        `bridge lines in the run ${bridgesIn.length}`,
+        ...bridgesIn.map(describeLine),
+        `emitted bridges before the solver chose:`,
+        ...bridges.map(describeLine),
+        ...room33Lines,
+        `tree length before ${(treeLengthOf(before) / 1000).toFixed(2)} m, after ${(treeLengthOf(after) / 1000).toFixed(2)} m`,
+        `bends before ${countBends(treeOf(before))}, after ${countBends(treeOf(after))}`,
+      ].join('\n'),
+    );
+
+    expect(reachedOf(after)).toBeGreaterThanOrEqual(reachedOf(before));
+    expect(bridgesIn.length).toBeLessThanOrEqual(2);
+    for (const l of bridgesIn) {
+      for (const id of l.crossedRoomIds ?? []) {
+        const room = bridgeById.get(id)!;
+        expect(bridgeRoomAllowed(room)).toBe(true);
+        expect(room.hasTerminal).toBe(false);
+      }
+    }
   }, 60000);
 });
