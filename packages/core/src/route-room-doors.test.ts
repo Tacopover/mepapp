@@ -3,16 +3,23 @@ import type { Vec2 } from './geometry.js';
 import { roomContainsPoint, type Room } from './rooms/room.js';
 import { dist, distanceToPath } from './route-feed-helpers.js';
 import { manualScenario } from './route-scenario.testutil.js';
+import { insideRouteArea } from './route-layout.js';
 import {
   MAX_OWN_DOORS,
+  roomBlockRuns,
   roomDoorCandidates,
+  segmentsMeet,
   roomDoorRuns,
   wallStretches,
+  type RoomBlockInput,
+  type RoomBlockPlan,
   type RoomDoorInput,
   type RoomDoorRun,
   type RoomDoorRunsInput,
   type WallStretch,
 } from './route-room-doors.js';
+import type { EntryCandidate } from './route-room-entry.js';
+import { roomFeed, type RoomFeed } from './route-room-feed.js';
 import type { RoomRun } from './route-room-runs.js';
 import { BEND_PENALTY_MM } from './route-hanan.js';
 
@@ -40,6 +47,12 @@ const DIAGONAL_ROOM: Pick<Room, 'id' | 'polygon'> = {
 };
 
 const WIDE_ROOM: Pick<Room, 'id' | 'polygon'> = { id: 'room-wide', polygon: { outer: rectRing(0, 0, 200000, 4000), holes: [] } };
+
+const SQUARE: Pick<Room, 'id' | 'polygon'> = { id: 'room-square', polygon: { outer: rectRing(0, 0, 6000, 6000), holes: [] } };
+
+const WEST_ONLY = (p: Vec2): boolean => p.x < 0;
+
+const SOUTH_ONLY = (p: Vec2): boolean => p.y > 6000;
 
 const CORNERS: Vec2[] = [
   { x: 0, y: 0 },
@@ -84,6 +97,24 @@ const projectionOf = (stretch: WallStretch, p: Vec2): number => {
   const len = dist(stretch.a, stretch.b);
   return ((p.x - stretch.a.x) * (stretch.b.x - stretch.a.x) + (p.y - stretch.a.y) * (stretch.b.y - stretch.a.y)) / len;
 };
+
+const sampledOf = (piece: readonly Vec2[]): Vec2[] =>
+  piece.flatMap((p, i) => (i === 0 ? [p] : [{ x: (piece[i - 1]!.x + p.x) / 2, y: (piece[i - 1]!.y + p.y) / 2 }, p]));
+
+const segmentCrossing = (p: Vec2, r: Vec2, q: Vec2, s: Vec2): Vec2 | null => {
+  const rx = r.x - p.x;
+  const ry = r.y - p.y;
+  const sx = s.x - q.x;
+  const sy = s.y - q.y;
+  const den = rx * sy - ry * sx;
+  if (Math.abs(den) < 1e-12) return null;
+  const t = ((q.x - p.x) * sy - (q.y - p.y) * sx) / den;
+  const u = ((q.x - p.x) * ry - (q.y - p.y) * rx) / den;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return { x: p.x + t * rx, y: p.y + t * ry };
+};
+
+const HOLE_CLUSTER_MM = 300;
 
 describe('wallStretches', () => {
   it('gives one stretch on the top edge with the thickness of the corridor wall', () => {
@@ -261,6 +292,144 @@ describe('roomDoorRuns', () => {
   });
 });
 
+describe('roomBlockRuns', () => {
+  const EIGHT_IN_FOUR_ROWS = [
+    at('A', 2000, 700),
+    at('B', 4400, 700),
+    at('C', 2000, 2500),
+    at('D', 4400, 2500),
+    at('E', 2000, 3500),
+    at('F', 4400, 3500),
+    at('G', 2000, 5300),
+    at('H', 4400, 5300),
+  ];
+  const SIX_IN_THREE_ROWS = [at('A', 2000, 700), at('B', 4400, 700), at('C', 2000, 2500), at('D', 4400, 2500), at('E', 2000, 5300), at('F', 4400, 5300)];
+
+  const blockScene = (ports: { id: string; point: Vec2 }[], overrides: Partial<RoomBlockInput> = {}): RoomBlockInput => ({
+    ...runScene(ports, { room: SQUARE, corridorAt: WEST_ONLY }),
+    splitFromTerminals: 6,
+    ...overrides,
+  });
+
+  const servedBy = (plan: RoomBlockPlan, ports: { id: string; point: Vec2 }[]): number[] =>
+    plan.blocks.map((block) => ports.filter((p) => endsAt(block.run, p.point) === 1).length);
+
+  it('splits eight terminals in 4 rows of 2 into 2 blocks of 4 with one door each', () => {
+    const plans = roomBlockRuns(blockScene(EIGHT_IN_FOUR_ROWS));
+    expect(plans).toHaveLength(1);
+    const [plan] = plans;
+    expect(plan!.holes).toBe(2);
+    expect(plan!.blocks).toHaveLength(2);
+    expect(dist(plan!.blocks[0]!.door.pointMm, plan!.blocks[1]!.door.pointMm)).toBeGreaterThanOrEqual(800);
+    for (const block of plan!.blocks) {
+      expect(block.run.pattern).toBe('blocks');
+      expect(block.run.bends).toBe(0);
+    }
+    expect(servedBy(plan!, EIGHT_IN_FOUR_ROWS).sort((p, q) => p - q)).toEqual([4, 4]);
+    const served = plan!.blocks.flatMap((block) => EIGHT_IN_FOUR_ROWS.filter((p) => endsAt(block.run, p.point) === 1));
+    expect(new Set(served.map((p) => p.id)).size).toBe(8);
+  });
+
+  it('splits six terminals in 3 rows into a block of 4 and a block of 2', () => {
+    const plans = roomBlockRuns(blockScene(SIX_IN_THREE_ROWS));
+    expect(plans).toHaveLength(1);
+    expect(servedBy(plans[0]!, SIX_IN_THREE_ROWS).sort((p, q) => p - q)).toEqual([2, 4]);
+    for (const block of plans[0]!.blocks) expect(block.run.pattern).toBe('blocks');
+  });
+
+  it('gives no plan when the split is off', () => {
+    expect(roomBlockRuns(blockScene(SIX_IN_THREE_ROWS, { splitFromTerminals: Infinity }))).toEqual([]);
+  });
+
+  it('gives no plan when the door wall is perpendicular to the columns', () => {
+    expect(roomBlockRuns(blockScene(SIX_IN_THREE_ROWS, { corridorAt: SOUTH_ONLY }))).toEqual([]);
+  });
+
+  it('calls the fallback hook for every door when the comb and the L fail', () => {
+    const calls: EntryCandidate[] = [];
+    const feed: RoomFeed = { stub: [], junctionMm: { x: 0, y: 0 }, spine: [], leftPortIds: ['A', 'B'], lengthMm: 0, bends: 0 };
+    const input = runScene([at('A', 2000, 0), at('B', 2800, 2000)], {
+      roomFeedFallback: (door) => {
+        calls.push(door);
+        return feed;
+      },
+    });
+    const runs = roomDoorRuns(input);
+    expect(runs.length).toBeGreaterThan(0);
+    expect(calls).toHaveLength(roomDoorCandidates(input).length);
+    for (const r of runs) {
+      expect(r.run.pattern).toBe('fallback');
+      expect(r.run.leftPortIds).toEqual(['A', 'B']);
+    }
+  });
+
+  it('keeps every block piece inside the room and shares no piece between two blocks', () => {
+    const [plan] = roomBlockRuns(blockScene(EIGHT_IN_FOUR_ROWS));
+    expect(plan).toBeDefined();
+    const inside = insideRouteArea([SQUARE], 1);
+    for (const block of plan!.blocks) {
+      for (const piece of piecesOf(block.run)) {
+        for (const p of sampledOf(piece)) expect(inside(p)).toBe(true);
+      }
+    }
+    const [first, second] = plan!.blocks;
+    for (const piece of piecesOf(first!.run)) {
+      for (const other of piecesOf(second!.run)) {
+        for (let i = 1; i < piece.length; i++) {
+          for (let j = 1; j < other.length; j++) {
+            expect(segmentsMeet(piece[i - 1]!, piece[i]!, other[j - 1]!, other[j]!)).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('gives no plan when one block has no door', () => {
+    const ports = [at('A', 2000, 700), at('B', 4400, 700), at('C', 2000, 2500), at('D', 4400, 2500), at('F', 0, 3500), at('G', 2000, 5300), at('H', 4400, 5300)];
+    expect(roomBlockRuns(blockScene(ports))).toEqual([]);
+  });
+
+  it('gives no plan when no two doors of the blocks are far enough apart', () => {
+    expect(roomBlockRuns(blockScene(EIGHT_IN_FOUR_ROWS, { minDoorGapMm: 10000 }))).toEqual([]);
+  });
+
+  it('keeps the doors of the blocks at least minDoorGapMm apart when a plan is found', () => {
+    const plans = roomBlockRuns(blockScene(EIGHT_IN_FOUR_ROWS, { minDoorGapMm: 2000 }));
+    for (const plan of plans) {
+      expect(dist(plan.blocks[0]!.door.pointMm, plan.blocks[1]!.door.pointMm)).toBeGreaterThanOrEqual(2000);
+    }
+  });
+
+  it('takes the comb with no bend for two terminals in a row', () => {
+    const best = bestOf(runScene([at('A', 2000, 2000), at('B', 2800, 2000)]));
+    expect(best.run.pattern).toBe('comb');
+    expect(best.run.bends).toBe(0);
+    expect(best.costMm).toBeCloseTo(best.run.lengthMm, 6);
+  });
+});
+
+describe('segmentsMeet', () => {
+  const p = (x: number, y: number): Vec2 => ({ x, y });
+
+  it('finds a crossing of two segments', () => {
+    expect(segmentsMeet(p(0, 0), p(10, 10), p(0, 10), p(10, 0))).toBe(true);
+  });
+
+  it('finds a touch at an end point', () => {
+    expect(segmentsMeet(p(0, 0), p(10, 0), p(10, 0), p(10, 10))).toBe(true);
+  });
+
+  it('finds an overlap of two parallel segments on one line', () => {
+    expect(segmentsMeet(p(0, 0), p(10, 0), p(5, 0), p(20, 0))).toBe(true);
+  });
+
+  it('gives no meeting for parallel segments on two lines and for disjoint segments', () => {
+    expect(segmentsMeet(p(0, 0), p(10, 0), p(0, 5), p(10, 5))).toBe(false);
+    expect(segmentsMeet(p(0, 0), p(10, 0), p(11, -5), p(11, 5))).toBe(false);
+    expect(segmentsMeet(p(0, 0), p(10, 0), p(20, 0), p(30, 0))).toBe(false);
+  });
+});
+
 describe('roomDoorRuns on the manual fixture', () => {
   it('plans the served rooms with their own doors and prints the report', () => {
     const fixture = manualScenario();
@@ -288,9 +457,9 @@ describe('roomDoorRuns on the manual fixture', () => {
       return sum;
     };
 
-    const planRoom = (room: Room) => {
+    const inputOf = (room: Room): RoomDoorRunsInput => {
       const ports = s.targetPorts.filter((p) => p.roomId === room.id);
-      const input: RoomDoorRunsInput = {
+      return {
         room,
         mmPerPt,
         corridorAt,
@@ -301,6 +470,10 @@ describe('roomDoorRuns on the manual fixture', () => {
         clearanceMm: 150,
         doorMarginMm: 200,
       };
+    };
+    const planRoom = (room: Room) => {
+      const ports = s.targetPorts.filter((p) => p.roomId === room.id);
+      const input = inputOf(room);
       return {
         room,
         ports,
@@ -416,6 +589,88 @@ describe('roomDoorRuns on the manual fixture', () => {
       }
     }
     console.log(['P2 T08b room-33', ...room33Lines].join('\n'));
+
+    const handHolesOf = (room: Room): number => {
+      const ringMm = room.polygon.outer.map(toMm);
+      const crossings: Vec2[] = [];
+      for (const path of manual.room) {
+        for (let i = 1; i < path.length; i++) {
+          const a = toMm(path[i - 1]!);
+          const b = toMm(path[i]!);
+          for (let e = 0; e < ringMm.length; e++) {
+            const p = segmentCrossing(a, b, ringMm[e]!, ringMm[(e + 1) % ringMm.length]!);
+            if (p) crossings.push(p);
+          }
+        }
+      }
+      const clusters: Vec2[][] = [];
+      for (const p of crossings) {
+        const hit = clusters.find((k) => dist(k[0]!, p) <= HOLE_CLUSTER_MM);
+        if (hit) hit.push(p);
+        else clusters.push([p]);
+      }
+      return clusters.length;
+    };
+    const feedFallbackOf = (room: Room, input: RoomDoorRunsInput) => (door: EntryCandidate): RoomFeed =>
+      roomFeed({
+        entry: door,
+        ports: input.ports,
+        ringMm: [...room.polygon.outer.map(toMm), toMm(room.polygon.outer[0]!)],
+        inside: insideRouteArea([room], mmPerPt),
+        roomContains: (p) => roomContainsPoint(room, toPt(p)),
+        crossesExisting: () => 0,
+      });
+    const blockPlanById = new Map<string, RoomBlockPlan | undefined>(
+      served.map(({ room }) => {
+        const input = inputOf(room);
+        const plan = roomBlockRuns({ ...input, splitFromTerminals: 6, roomFeedFallback: feedFallbackOf(room, input) })[0];
+        return [room.id, plan];
+      }),
+    );
+    const hookedRunsOf = (room: Room): RoomDoorRun[] => {
+      const input = inputOf(room);
+      return roomDoorRuns({ ...input, roomFeedFallback: feedFallbackOf(room, input) });
+    };
+    const blockRows = served.map(({ room, ports }) => {
+      const label = `${room.id} (${room.number ?? '-'})`;
+      const best = hookedRunsOf(room)[0];
+      const plan = blockPlanById.get(room.id);
+      const blockCell = plan
+        ? `(${plan.outward.x}, ${plan.outward.y}), holes ${plan.holes}, branch ${(plan.blocks.reduce((sum, b) => sum + b.run.lengthMm, 0) / 1000).toFixed(2)} m, bends ${plan.blocks.reduce((sum, b) => sum + b.run.bends, 0)}`
+        : '-';
+      return [
+        label,
+        String(ports.length),
+        best ? best.run.pattern : 'no door',
+        best ? '1' : '0',
+        best ? String(best.run.bends) : '-',
+        best ? (best.run.lengthMm / 1000).toFixed(2) : '-',
+        best ? String(best.run.leftPortIds.length) : '-',
+        String(handHolesOf(room)),
+        (handLengthMm(room) / 1000).toFixed(2),
+        blockCell,
+      ].join(' | ');
+    });
+    console.log(
+      [
+        'P2 T09 rooms',
+        'room | terminals | best single-door pattern | holes | bends | branch m | left ports | hand holes | hand route m | block plan (outward, holes, branch m, bends)',
+        ...blockRows,
+      ].join('\n'),
+    );
+
+    expect(blockPlanById.get('room-26')?.blocks).toHaveLength(2);
+    for (const { room, runs } of served) {
+      const inside = insideRouteArea([room], mmPerPt);
+      const runsToCheck = runs.filter((r) => r.run.pattern !== 'fallback').map((r) => r.run);
+      const plan = blockPlanById.get(room.id);
+      if (plan) runsToCheck.push(...plan.blocks.map((b) => b.run));
+      for (const run of runsToCheck) {
+        for (const piece of piecesOf(run)) {
+          for (const p of sampledOf(piece)) expect(inside(p)).toBe(true);
+        }
+      }
+    }
 
     expect(s.servedRooms.length).toBeGreaterThan(0);
     expect(served.some((p) => p.runs.length > 0)).toBe(true);

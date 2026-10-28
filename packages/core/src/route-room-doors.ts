@@ -3,7 +3,10 @@ import { roomContainsPoint, type Room } from './rooms/room.js';
 import type { EntryCandidate } from './route-room-entry.js';
 import { BEND_PENALTY_MM } from './route-hanan.js';
 import { LEFT_PORT_MM } from './route-feeds.js';
-import { roomRunFor, doorAllowed, type RoomRun } from './route-room-runs.js';
+import type { RoomFeed } from './route-room-feed.js';
+import { dist } from './route-feed-helpers.js';
+import { runsOverOtherPort } from './route-topology.js';
+import { roomRunFor, doorAllowed, splitIntoBlocks, type RoomRun } from './route-room-runs.js';
 
 export const DOOR_PROBE_MM = 450;     // planner value: the thickest wall measured on the manual fixture is 425 mm
 export const DOOR_STEP_MM = 500;      // planner value: grid step of extra door points along a stretch
@@ -48,6 +51,8 @@ export interface RoomDoorRunsInput extends RoomDoorInput {
   ports: readonly { id: string; point: Vec2 }[];  // portsMm is taken from these points; the caller still passes portsMm = ports points
   bendMm?: number;                                // default BEND_PENALTY_MM from './route-hanan.js'
   stubMm?: number;                                // given to roomRunFor
+  wallParallelToRows?: boolean;                   // given to roomRunFor
+  roomFeedFallback?: (door: EntryCandidate) => RoomFeed;   // given to roomRunFor
 }
 
 export interface RoomDoorRun {
@@ -57,6 +62,20 @@ export interface RoomDoorRun {
   run: RoomRun;
   costMm: number;
 }
+
+export interface RoomBlockInput extends RoomDoorRunsInput {
+  splitFromTerminals: number;     // blocks apply from this many terminals (see splitIntoBlocks)
+  minDoorGapMm?: number;          // default 2 * doorMarginMm + 400: two doors of one room keep this distance
+}
+
+export interface RoomBlockPlan {
+  outward: Vec2;                  // the door wall of every block
+  blocks: RoomDoorRun[];          // one entry for each block, in lateral order; run.pattern is 'blocks'
+  costMm: number;                 // sum of the block costs
+  holes: number;                  // blocks.length
+}
+
+interface PlannedRun { candidate: EntryCandidate; entry: RoomDoorRun }
 
 const axisOf = (nx: number, ny: number): Vec2 => (Math.abs(nx) >= Math.abs(ny) ? { x: Math.sign(nx), y: 0 } : { x: 0, y: Math.sign(ny) });
 
@@ -170,13 +189,19 @@ export function roomDoorCandidates(input: RoomDoorInput): OwnDoor[] {
   return [...fixed, ...thinEvenly(ring, MAX_OWN_DOORS - fixed.length)].sort(doorOrder);
 }
 
-export function roomDoorRuns(input: RoomDoorRunsInput): RoomDoorRun[] {
-  const ports = [...input.ports].sort(
-    (p, q) => (p.id < q.id ? -1 : p.id > q.id ? 1 : 0) || p.point.x - q.point.x || p.point.y - q.point.y,
-  );
+const sortedPorts = (ports: readonly { id: string; point: Vec2 }[]): { id: string; point: Vec2 }[] =>
+  [...ports].sort((p, q) => (p.id < q.id ? -1 : p.id > q.id ? 1 : 0) || p.point.x - q.point.x || p.point.y - q.point.y);
+
+const byCost = (p: PlannedRun, q: PlannedRun): number =>
+  p.entry.costMm - q.entry.costMm ||
+  p.entry.run.bends - q.entry.run.bends ||
+  sourceRank(p.candidate.source) - sourceRank(q.candidate.source) ||
+  p.candidate.pointMm.x - q.candidate.pointMm.x ||
+  p.candidate.pointMm.y - q.candidate.pointMm.y;
+
+function runsForDoors(input: RoomDoorRunsInput, ports: readonly { id: string; point: Vec2 }[], candidates: readonly OwnDoor[]): PlannedRun[] {
   const bendMm = input.bendMm ?? BEND_PENALTY_MM;
-  const candidates = roomDoorCandidates({ ...input, portsMm: ports.map((p) => p.point) });
-  const out: { candidate: EntryCandidate; entry: RoomDoorRun }[] = [];
+  const out: PlannedRun[] = [];
   for (const { door, fraction, edgeIndex } of candidates) {
     const [run] = roomRunFor({
       room: input.room,
@@ -187,19 +212,98 @@ export function roomDoorRuns(input: RoomDoorRunsInput): RoomDoorRun[] {
       clearanceMm: input.clearanceMm,
       doorMarginMm: input.doorMarginMm,
       stubMm: input.stubMm,
+      bendMm: input.bendMm,
+      wallParallelToRows: input.wallParallelToRows,
+      roomFeedFallback: input.roomFeedFallback,
     });
     if (!run) continue;
     const costMm = run.lengthMm + run.bends * bendMm + run.leftPortIds.length * LEFT_PORT_MM;
     out.push({ candidate: door, entry: { door: run.door, fraction, edgeIndex, run, costMm } });
   }
-  return out
-    .sort(
-      (p, q) =>
-        p.entry.costMm - q.entry.costMm ||
-        p.entry.run.bends - q.entry.run.bends ||
-        sourceRank(p.candidate.source) - sourceRank(q.candidate.source) ||
-        p.candidate.pointMm.x - q.candidate.pointMm.x ||
-        p.candidate.pointMm.y - q.candidate.pointMm.y,
-    )
-    .map(({ entry }) => entry);
+  return out;
+}
+
+export function roomDoorRuns(input: RoomDoorRunsInput): RoomDoorRun[] {
+  const ports = sortedPorts(input.ports);
+  const candidates = roomDoorCandidates({ ...input, portsMm: ports.map((p) => p.point) });
+  return runsForDoors(input, ports, candidates).sort(byCost).map(({ entry }) => entry);
+}
+
+const EPS_MM = 1e-6;
+
+const turnOf = (o: Vec2, p: Vec2, q: Vec2): number => {
+  const v = (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  return v > EPS_MM ? 1 : v < -EPS_MM ? -1 : 0;
+};
+
+const withinBox = (p: Vec2, q: Vec2, r: Vec2): boolean =>
+  Math.min(p.x, q.x) <= r.x && r.x <= Math.max(p.x, q.x) && Math.min(p.y, q.y) <= r.y && r.y <= Math.max(p.y, q.y);
+
+/** True when the closed segments a-b and c-d share a point. A touch or an overlap counts. */
+export function segmentsMeet(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
+  const d1 = turnOf(c, d, a);
+  const d2 = turnOf(c, d, b);
+  const d3 = turnOf(a, b, c);
+  const d4 = turnOf(a, b, d);
+  if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+  return (d1 === 0 && withinBox(c, d, a)) || (d2 === 0 && withinBox(c, d, b)) || (d3 === 0 && withinBox(a, b, c)) || (d4 === 0 && withinBox(a, b, d));
+}
+
+const piecesOfRun = (run: RoomRun): Vec2[][] => [run.lead, run.stem, ...run.teeth].filter((p) => p.length >= 2);
+
+const piecesMeet = (p: Vec2[], q: Vec2[]): boolean =>
+  p.some((a, i) => i > 0 && q.some((c, j) => j > 0 && segmentsMeet(p[i - 1]!, a, q[j - 1]!, c)));
+
+/** True when a run of one block runs over a terminal of the other block, or crosses one of its pieces. */
+function clashes(run: RoomRun, terminals: readonly Vec2[], other: { run: RoomRun; terminals: readonly Vec2[] }): boolean {
+  const mine = piecesOfRun(run);
+  const theirs = piecesOfRun(other.run);
+  if (mine.some((piece) => runsOverOtherPort(piece, other.terminals))) return true;
+  if (theirs.some((piece) => runsOverOtherPort(piece, terminals))) return true;
+  return mine.some((piece) => theirs.some((other) => piecesMeet(piece, other)));
+}
+
+/** One plan for each door wall that splits the terminals into 2 blocks or more. Each block takes its best non-fallback door, at least minDoorGapMm from the doors already taken and clear of the other blocks. Sorted by cost, then holes, then outward. */
+export function roomBlockRuns(input: RoomBlockInput): RoomBlockPlan[] {
+  const ports = sortedPorts(input.ports);
+  const minDoorGapMm = input.minDoorGapMm ?? 2 * input.doorMarginMm + 400;
+  const outwards = new Map<string, Vec2>();
+  for (const c of roomDoorCandidates({ ...input, portsMm: ports.map((p) => p.point) })) {
+    outwards.set(`${c.door.outward.x},${c.door.outward.y}`, c.door.outward);
+  }
+  const plans: RoomBlockPlan[] = [];
+  for (const outward of outwards.values()) {
+    const blocks = splitIntoBlocks(ports, outward, input.splitFromTerminals);
+    if (blocks.length < 2) continue;
+    const picked: PlannedRun[] = [];
+    const pickedPoints: Vec2[][] = [];
+    for (const block of blocks) {
+      const blockPorts = sortedPorts(block);
+      const points = blockPorts.map((p) => p.point);
+      const candidates = roomDoorCandidates({ ...input, portsMm: points }).filter(
+        (c) => c.door.outward.x === outward.x && c.door.outward.y === outward.y,
+      );
+      const pick = runsForDoors(input, blockPorts, candidates)
+        .sort(byCost)
+        .find(
+          (p) =>
+            p.entry.run.pattern !== 'fallback' &&
+            picked.every(
+              (q, j) =>
+                dist(q.entry.door.pointMm, p.entry.door.pointMm) >= minDoorGapMm &&
+                !clashes(p.entry.run, points, { run: q.entry.run, terminals: pickedPoints[j]! }),
+            ),
+        );
+      if (!pick) break;
+      picked.push(pick);
+      pickedPoints.push(points);
+    }
+    if (picked.length !== blocks.length) continue;
+    const blockRuns: RoomDoorRun[] = picked.map(({ entry }) => ({ ...entry, run: { ...entry.run, pattern: 'blocks' as const } }));
+    plans.push({ outward, blocks: blockRuns, costMm: blockRuns.reduce((sum, b) => sum + b.costMm, 0), holes: blockRuns.length });
+  }
+  return plans.sort(
+    (p, q) =>
+      p.costMm - q.costMm || p.holes - q.holes || p.outward.x - q.outward.x || p.outward.y - q.outward.y,
+  );
 }

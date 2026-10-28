@@ -3,8 +3,9 @@ import type { Vec2 } from './geometry.js';
 import { roomContainsPoint, type Room } from './rooms/room.js';
 import { dist, distanceToPath } from './route-feed-helpers.js';
 import { insideRouteArea } from './route-layout.js';
+import type { RoomFeed } from './route-room-feed.js';
 import { roomEntryCandidates, type EntryCandidate } from './route-room-entry.js';
-import { ROOM_STUB_MM, doorAllowed, roomRunFor, type RoomRun, type RoomRunInput } from './route-room-runs.js';
+import { ROOM_STUB_MM, doorAllowed, roomRunFor, splitIntoBlocks, type RoomRun, type RoomRunInput } from './route-room-runs.js';
 import { manualScenario, seededShuffle } from './route-scenario.testutil.js';
 import { runsOverOtherPort } from './route-topology.js';
 
@@ -160,10 +161,10 @@ describe('roomRunFor', () => {
     expect(run.leftPortIds).toEqual(['A', 'B', 'C']);
   });
 
-  it('falls back when two terminals on one side of the stem share a depth', () => {
+  it('uses the L when two terminals share a depth on different laterals', () => {
     const run = one(scene([at('A', 2000, 2000), at('B', 1000, 2000)]));
-    expect(run.pattern).toBe('fallback');
-    expect(run.leftPortIds).toEqual(['A', 'B']);
+    expect(run.pattern).toBe('l');
+    expect(run.bends).toBe(1);
   });
 
   it('gives each port exactly one connected end', () => {
@@ -263,6 +264,101 @@ describe('roomRunFor', () => {
 
   it('gives no run without ports', () => {
     expect(roomRunFor(scene([]))).toEqual([]);
+  });
+});
+
+describe('roomRunFor with the L, the feed fallback and blocks', () => {
+  const lScene = scene([at('A', 1500, 2000), at('B', 2000, 3000), at('C', 2500, 2000), at('D', 3000, 2000)], { door: top(1000) });
+  const feed: RoomFeed = {
+    stub: [{ x: 1000, y: 0 }, { x: 1000, y: 200 }],
+    junctionMm: { x: 1000, y: 200 },
+    spine: [[{ x: 1000, y: 200 }, { x: 1000, y: 3000 }]],
+    leftPortIds: ['T2', 'T1'],
+    lengthMm: 3200,
+    bends: 0,
+  };
+  const uPorts = [at('T1', 5000, 1000), at('T2', 5000, 3000)];
+  const wallGrid = (xs: number[], ys: number[]): { id: string; point: Vec2 }[] =>
+    xs.flatMap((x) => ys.map((y) => ({ id: `${x},${y}`, point: { x, y } })));
+  const along: Vec2 = { x: -1, y: 0 };
+  const across: Vec2 = { x: 0, y: 1 };
+
+  it('runs an L past four terminals on four laterals when no comb reaches them', () => {
+    const run = one(lScene);
+    expect(run.pattern).toBe('l');
+    expect(run.bends).toBe(1);
+    for (const port of lScene.ports) expect(endsAt(run, port.point)).toBe(1);
+    const inside = insideRouteArea([ROOM], 1);
+    for (const piece of piecesOf(run)) expect(sampled(piece, 100).filter((p) => !inside(p))).toEqual([]);
+  });
+
+  it('keeps the comb when the L also reaches all terminals and the comb is as cheap', () => {
+    const run = one(scene([at('A', 4000, 1000), at('B', 5000, 2000)], { door: top(3000), roomFeedFallback: () => { throw new Error('not called'); } }));
+    expect(run.pattern).toBe('comb');
+    expect(run.bends).toBe(0);
+  });
+
+  it('gives no L when wallParallelToRows is false', () => {
+    expect(one({ ...lScene, wallParallelToRows: false }).pattern).toBe('fallback');
+  });
+
+  it('calls the feed fallback when no pattern reaches the terminals', () => {
+    const calls: EntryCandidate[] = [];
+    const run = one(scene(uPorts, { room: U_ROOM, door: top(1000), roomFeedFallback: (door) => (calls.push(door), feed) }));
+    expect(calls).toHaveLength(1);
+    expect(run.pattern).toBe('fallback');
+    expect(run.leftPortIds).toEqual(['T1', 'T2']);
+    expect(run.lead).toEqual(feed.stub);
+    expect(run.teeth).toEqual(feed.spine);
+    expect(run.stem).toEqual([]);
+    expect(run.lengthMm).toBe(3200);
+    expect(run.bends).toBe(0);
+  });
+
+  it('leaves every terminal to the fallback when no feed hook is given', () => {
+    const run = one(scene(uPorts, { room: U_ROOM, door: top(1000) }));
+    expect(run.pattern).toBe('fallback');
+    expect(run.leftPortIds).toEqual(['T1', 'T2']);
+    expect(run.lengthMm).toBe(0);
+  });
+
+  it('does not run an L tooth past a terminal on the same lateral', () => {
+    const blocked = scene([at('A', 4000, 1000), at('B', 4000, 2000), at('C', 5000, 1000)], { door: top(3000) });
+    expect(one(blocked).pattern).toBe('fallback');
+    const run = one(scene([at('A', 4000, 1000), at('C', 5000, 1000)], { door: top(3000) }));
+    expect(run.pattern).toBe('l');
+    for (const port of [at('A', 4000, 1000), at('C', 5000, 1000)]) expect(endsAt(run, port.point)).toBe(1);
+  });
+
+  it('splits eight terminals in two columns of four into two blocks of four', () => {
+    const ports = wallGrid([1000, 3400], [1000, 2800, 5200, 7000]);
+    const blocks = splitIntoBlocks(ports, along, 6);
+    expect(blocks.map((b) => b.length)).toEqual([4, 4]);
+  });
+
+  it('splits six terminals in two columns of three into blocks of four and two', () => {
+    const ports = wallGrid([1000, 3400], [1000, 2800, 5200]);
+    expect(splitIntoBlocks(ports, along, 6).map((b) => b.length)).toEqual([4, 2]);
+  });
+
+  it('keeps six terminals in one block when the wall is perpendicular to the columns', () => {
+    const ports = wallGrid([1000, 3400], [1000, 2800, 5200]);
+    expect(splitIntoBlocks(ports, across, 6).map((b) => b.length)).toEqual([6]);
+  });
+
+  it('keeps eight terminals in one block when splitFromTerminals is infinite', () => {
+    const ports = wallGrid([1000, 3400], [1000, 2800, 5200, 7000]);
+    expect(splitIntoBlocks(ports, along, Infinity).map((b) => b.length)).toEqual([8]);
+  });
+
+  it('keeps five terminals in one block when the threshold is six', () => {
+    const ports = wallGrid([1000, 3400], [1000, 2800, 5200]).slice(0, 5);
+    expect(splitIntoBlocks(ports, along, 6).map((b) => b.length)).toEqual([5]);
+  });
+
+  it('gives the same blocks for a shuffled input', () => {
+    const ports = wallGrid([1000, 3400], [1000, 2800, 5200, 7000]);
+    expect(splitIntoBlocks(seededShuffle(ports, 7), along, 6)).toEqual(splitIntoBlocks(ports, along, 6));
   });
 });
 
