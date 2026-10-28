@@ -744,3 +744,10 @@
 {"seq":744,"at":"2026-10-28T13:59:35.219Z","type":"decision","id":"Q-P2-07","part":"P2","kind":"new","status":"open","question":"After the gate, what happens to the default route?","options":[{"key":"A","label":"Two-level stays one chip next to the others. The default output stays equal."},{"key":"B","label":"Two-level becomes the first and default chip. The default output changes."},{"key":"C","label":"Two-level replaces Branch per room and the old modules are removed later."}],"recommendation":"A","reason":"Decide B or C after you test on Windows. Q-P2-03 (chain depth) is the same question as Q-P1-16: answer it once."}
 {"seq":745,"at":"2026-10-28T13:59:36.899Z","type":"run","id":"run","status":"waiting","branch":"worktree-routing-feedback","note":"P2 plan is ready. The run waits for the answers to Q-P2-01, 02, 04, 07, 09."}
 {"seq":746,"at":"2026-10-28T13:59:39.333Z","type":"part","id":"P2","state":"audited","plan":".claude/plans/auto-routing-two-level.md","commit":"c300a34","summary":"Plan audited by the auditor and the domain checker (round 1 fixed). 18+ tasks in 4 phases. Waits for Q-P2-01, 02, 04, 07, 09 and Q-P1-16."}
+{"seq":747,"at":"2026-10-28T14:11:28.542Z","type":"decision","id":"Q-P2-01","status":"answered","answer":"A","by":"user"}
+{"seq":748,"at":"2026-10-28T14:11:28.890Z","type":"decision","id":"Q-P2-02","status":"answered","answer":"B","by":"user"}
+{"seq":749,"at":"2026-10-28T14:11:29.038Z","type":"decision","id":"Q-P2-04","status":"answered","answer":"B","by":"user"}
+{"seq":750,"at":"2026-10-28T14:11:29.162Z","type":"decision","id":"Q-P2-09","status":"answered","answer":"A","by":"user"}
+{"seq":751,"at":"2026-10-28T14:11:29.703Z","type":"decision","id":"Q-P2-07","status":"answered","answer":"Open. The user must see the result of each chip first. Keep two-level as a separate chip for now.","by":"user"}
+{"seq":752,"at":"2026-10-28T14:11:30.138Z","type":"decision","id":"Q-P1-15","status":"answered","answer":"A","by":"user"}
+{"seq":753,"at":"2026-10-28T14:11:30.545Z","type":"decision","id":"Q-P1-16","status":"answered","answer":"C","by":"user"}

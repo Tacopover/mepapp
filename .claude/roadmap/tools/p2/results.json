@@ -1,0 +1,1365 @@
+{
+ "manual": {
+  "label": "manual",
+  "graph_edges": 117,
+  "length_m": 234.0,
+  "bends90": 12,
+  "bends45": 0,
+  "tees": 37,
+  "crosses": 10,
+  "ends": 59,
+  "bends_loc": {
+   "corridor": 5,
+   "served": 6,
+   "other": 1
+  },
+  "tees_loc": {
+   "corridor": 22,
+   "served": 24,
+   "other": 1
+  },
+  "length_by_class_m": {
+   "corridor": 96.4,
+   "wall": 6.0,
+   "served": 121.5,
+   "other": 10.2
+  },
+  "terminals_unmatched": [],
+  "source_node": [
+   904.8,
+   2458.98
+  ],
+  "rooms": [
+   {
+    "room": "room-5",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 6,
+    "crossings": [
+     {
+      "pt": [
+       1326.0,
+       839.2
+      ],
+      "edge_len_m": 5.28,
+      "nb": "room-53",
+      "nb_type": "corridor",
+      "nb_name": "verkeersruimte",
+      "stretch_m": 5.28,
+      "pos_from_stretch_start_m": 2.64,
+      "pos_from_stretch_end_m": 2.64,
+      "frac": 0.5
+     }
+    ],
+    "inside_len_m": 12.4,
+    "inside_bends": 0,
+    "inside_tees": 3,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-6",
+    "name": "Concentratie",
+    "type": "office",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1677.8,
+       2485.2
+      ],
+      "edge_len_m": 3.16,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 3.1,
+      "pos_from_stretch_start_m": 1.53,
+      "pos_from_stretch_end_m": 1.58,
+      "frac": 0.49
+     }
+    ],
+    "inside_len_m": 1.1,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-7",
+    "name": "Concentratie",
+    "type": "office",
+    "terms": 2,
+    "crossings": [
+     {
+      "pt": [
+       1481.3,
+       2306.5
+      ],
+      "edge_len_m": 1.0,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 1.0,
+      "pos_from_stretch_start_m": 0.2,
+      "pos_from_stretch_end_m": 0.79,
+      "frac": 0.2
+     }
+    ],
+    "inside_len_m": 5.2,
+    "inside_bends": 1,
+    "inside_tees": 1,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-8",
+    "name": "Belplek",
+    "type": "office",
+    "terms": 2,
+    "crossings": [
+     {
+      "pt": [
+       1345.1,
+       2309.4
+      ],
+      "edge_len_m": 2.25,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.25,
+      "pos_from_stretch_start_m": 0.47,
+      "pos_from_stretch_end_m": 1.78,
+      "frac": 0.21
+     }
+    ],
+    "inside_len_m": 5.2,
+    "inside_bends": 1,
+    "inside_tees": 1,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-9",
+    "name": "Belplek",
+    "type": "office",
+    "terms": 2,
+    "crossings": [
+     {
+      "pt": [
+       1206.8,
+       2309.6
+      ],
+      "edge_len_m": 2.38,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.38,
+      "pos_from_stretch_start_m": 0.53,
+      "pos_from_stretch_end_m": 1.85,
+      "frac": 0.22
+     }
+    ],
+    "inside_len_m": 5.2,
+    "inside_bends": 1,
+    "inside_tees": 1,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-20",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 6,
+    "crossings": [
+     {
+      "pt": [
+       785.2,
+       2054.3
+      ],
+      "edge_len_m": 7.04,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 7.04,
+      "pos_from_stretch_start_m": 6.63,
+      "pos_from_stretch_end_m": 0.41,
+      "frac": 0.94
+     }
+    ],
+    "inside_len_m": 15.0,
+    "inside_bends": 1,
+    "inside_tees": 3,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-22",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 6,
+    "crossings": [
+     {
+      "pt": [
+       1673.6,
+       2118.0
+      ],
+      "edge_len_m": 7.38,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 7.38,
+      "pos_from_stretch_start_m": 4.93,
+      "pos_from_stretch_end_m": 2.44,
+      "frac": 0.67
+     },
+     {
+      "pt": [
+       1674.8,
+       2294.3
+      ],
+      "edge_len_m": 7.38,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 7.38,
+      "pos_from_stretch_start_m": 1.82,
+      "pos_from_stretch_end_m": 5.55,
+      "frac": 0.25
+     }
+    ],
+    "inside_len_m": 13.5,
+    "inside_bends": 1,
+    "inside_tees": 3,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-24",
+    "name": "Kantoor",
+    "type": "office",
+    "terms": 6,
+    "crossings": [
+     {
+      "pt": [
+       1852.3,
+       840.5
+      ],
+      "edge_len_m": 4.48,
+      "nb": "room-53",
+      "nb_type": "corridor",
+      "nb_name": "verkeersruimte",
+      "stretch_m": 4.37,
+      "pos_from_stretch_start_m": 2.17,
+      "pos_from_stretch_end_m": 2.21,
+      "frac": 0.5
+     }
+    ],
+    "inside_len_m": 8.8,
+    "inside_bends": 0,
+    "inside_tees": 3,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-26",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 8,
+    "crossings": [
+     {
+      "pt": [
+       1671.7,
+       1603.0
+      ],
+      "edge_len_m": 8.87,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 8.87,
+      "pos_from_stretch_start_m": 6.51,
+      "pos_from_stretch_end_m": 2.37,
+      "frac": 0.73
+     },
+     {
+      "pt": [
+       1671.7,
+       1841.0
+      ],
+      "edge_len_m": 8.87,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 8.87,
+      "pos_from_stretch_start_m": 2.31,
+      "pos_from_stretch_end_m": 6.56,
+      "frac": 0.26
+     }
+    ],
+    "inside_len_m": 15.1,
+    "inside_bends": 0,
+    "inside_tees": 4,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-27",
+    "name": "Brainstorm",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1670.8,
+       1361.8
+      ],
+      "edge_len_m": 3.56,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 1.91,
+      "pos_from_stretch_start_m": 1.77,
+      "pos_from_stretch_end_m": 0.15,
+      "frac": 0.92
+     }
+    ],
+    "inside_len_m": 2.7,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-29",
+    "name": "Concentratie",
+    "type": "office",
+    "terms": 3,
+    "crossings": [
+     {
+      "pt": [
+       775.9,
+       2512.7
+      ],
+      "edge_len_m": 2.3,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.14,
+      "pos_from_stretch_start_m": 0.46,
+      "pos_from_stretch_end_m": 1.68,
+      "frac": 0.22
+     }
+    ],
+    "inside_len_m": 7.1,
+    "inside_bends": 1,
+    "inside_tees": 2,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-30",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       621.7,
+       845.5
+      ],
+      "edge_len_m": 5.43,
+      "nb": "room-15",
+      "nb_type": "entrance",
+      "nb_name": "Entree",
+      "stretch_m": 4.15,
+      "pos_from_stretch_start_m": 2.65,
+      "pos_from_stretch_end_m": 1.5,
+      "frac": 0.64
+     }
+    ],
+    "inside_len_m": 3.5,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-31",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 5,
+    "crossings": [
+     {
+      "pt": [
+       734.3,
+       2331.0
+      ],
+      "edge_len_m": 3.79,
+      "nb": "room-18",
+      "nb_type": "technical",
+      "nb_name": "Kast MER/SER",
+      "stretch_m": 3.57,
+      "pos_from_stretch_start_m": 1.05,
+      "pos_from_stretch_end_m": 2.52,
+      "frac": 0.29
+     }
+    ],
+    "inside_len_m": 9.2,
+    "inside_bends": 0,
+    "inside_tees": 3,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-32",
+    "name": "Concentratie",
+    "type": "office",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1878.1,
+       2485.2
+      ],
+      "edge_len_m": 3.66,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 3.6,
+      "pos_from_stretch_start_m": 1.83,
+      "pos_from_stretch_end_m": 1.77,
+      "frac": 0.51
+     }
+    ],
+    "inside_len_m": 1.1,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-33",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       734.5,
+       1361.8
+      ],
+      "edge_len_m": 1.8750329555126248,
+      "nb": null
+     }
+    ],
+    "inside_len_m": 2.0,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-34",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       734.8,
+       1571.0
+      ],
+      "edge_len_m": 1.8897597740824976,
+      "nb": null
+     }
+    ],
+    "inside_len_m": 2.0,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-36",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1103.5,
+       2213.5
+      ],
+      "edge_len_m": 2.71,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.71,
+      "pos_from_stretch_start_m": 1.33,
+      "pos_from_stretch_end_m": 1.37,
+      "frac": 0.49
+     }
+    ],
+    "inside_len_m": 2.1,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-37",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       942.5,
+       2213.5
+      ],
+      "edge_len_m": 2.7,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.7,
+      "pos_from_stretch_start_m": 1.34,
+      "pos_from_stretch_end_m": 1.36,
+      "frac": 0.5
+     }
+    ],
+    "inside_len_m": 2.1,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-39",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       865.4,
+       1841.0
+      ],
+      "edge_len_m": 4.63,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 4.63,
+      "pos_from_stretch_start_m": 2.3,
+      "pos_from_stretch_end_m": 2.33,
+      "frac": 0.5
+     }
+    ],
+    "inside_len_m": 2.7,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-42",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1569.0,
+       1550.0
+      ],
+      "edge_len_m": 4.3,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 4.3,
+      "pos_from_stretch_start_m": 2.18,
+      "pos_from_stretch_end_m": 2.11,
+      "frac": 0.51
+     }
+    ],
+    "inside_len_m": 2.6,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-43",
+    "name": "EHBO/kolf",
+    "type": "office",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1569.0,
+       1336.8
+      ],
+      "edge_len_m": 1.79,
+      "nb": "room-53",
+      "nb_type": "corridor",
+      "nb_name": "verkeersruimte",
+      "stretch_m": 1.46,
+      "pos_from_stretch_start_m": 1.36,
+      "pos_from_stretch_end_m": 0.11,
+      "frac": 0.93
+     }
+    ],
+    "inside_len_m": 1.5,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-44",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1462.5,
+       2213.5
+      ],
+      "edge_len_m": 4.22,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 4.22,
+      "pos_from_stretch_start_m": 2.09,
+      "pos_from_stretch_end_m": 2.13,
+      "frac": 0.49
+     }
+    ],
+    "inside_len_m": 1.2,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   }
+  ],
+  "chained_rooms": 0,
+  "multi_entry_rooms": 2,
+  "rooms_with_bends": 6
+ },
+ "auto": {
+  "label": "auto",
+  "graph_edges": 202,
+  "length_m": 278.4,
+  "bends90": 70,
+  "bends45": 19,
+  "tees": 51,
+  "crosses": 4,
+  "ends": 57,
+  "bends_loc": {
+   "served": 23,
+   "corridor": 61,
+   "wall": 5
+  },
+  "tees_loc": {
+   "served": 32,
+   "corridor": 21,
+   "wall": 2
+  },
+  "length_by_class_m": {
+   "served": 127.6,
+   "corridor": 135.4,
+   "wall": 15.4
+  },
+  "terminals_unmatched": [],
+  "source_node": [
+   903.09,
+   2458.11
+  ],
+  "rooms": [
+   {
+    "room": "room-5",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 6,
+    "crossings": [
+     {
+      "pt": [
+       1380.7,
+       839.2
+      ],
+      "edge_len_m": 5.28,
+      "nb": "room-53",
+      "nb_type": "corridor",
+      "nb_name": "verkeersruimte",
+      "stretch_m": 5.28,
+      "pos_from_stretch_start_m": 1.67,
+      "pos_from_stretch_end_m": 3.6,
+      "frac": 0.32
+     },
+     {
+      "pt": [
+       1363.7,
+       839.2
+      ],
+      "edge_len_m": 5.28,
+      "nb": "room-53",
+      "nb_type": "corridor",
+      "nb_name": "verkeersruimte",
+      "stretch_m": 5.28,
+      "pos_from_stretch_start_m": 1.97,
+      "pos_from_stretch_end_m": 3.3,
+      "frac": 0.37
+     }
+    ],
+    "inside_len_m": 13.7,
+    "inside_bends": 1,
+    "inside_tees": 4,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-6",
+    "name": "Concentratie",
+    "type": "office",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1678.5,
+       2485.2
+      ],
+      "edge_len_m": 3.16,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 3.1,
+      "pos_from_stretch_start_m": 1.54,
+      "pos_from_stretch_end_m": 1.56,
+      "frac": 0.5
+     }
+    ],
+    "inside_len_m": 1.4,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-7",
+    "name": "Concentratie",
+    "type": "office",
+    "terms": 2,
+    "crossings": [
+     {
+      "pt": [
+       1581.0,
+       2325.5
+      ],
+      "edge_len_m": 2.95,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.9,
+      "pos_from_stretch_start_m": 0.27,
+      "pos_from_stretch_end_m": 2.62,
+      "frac": 0.09
+     },
+     {
+      "pt": [
+       1453.1,
+       2531.3
+      ],
+      "edge_len_m": 5.41,
+      "nb": "room-8",
+      "nb_type": "office",
+      "nb_name": "Belplek",
+      "stretch_m": 5.36,
+      "pos_from_stretch_start_m": 1.46,
+      "pos_from_stretch_end_m": 3.9,
+      "frac": 0.27
+     }
+    ],
+    "inside_len_m": 3.5,
+    "inside_bends": 2,
+    "inside_tees": 0,
+    "passes_through_other_served": [
+     "room-8"
+    ]
+   },
+   {
+    "room": "room-8",
+    "name": "Belplek",
+    "type": "office",
+    "terms": 2,
+    "crossings": [
+     {
+      "pt": [
+       1381.1,
+       2309.4
+      ],
+      "edge_len_m": 2.25,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.25,
+      "pos_from_stretch_start_m": 1.1,
+      "pos_from_stretch_end_m": 1.14,
+      "frac": 0.49
+     },
+     {
+      "pt": [
+       1446.0,
+       2531.3
+      ],
+      "edge_len_m": 5.42,
+      "nb": "room-7",
+      "nb_type": "office",
+      "nb_name": "Concentratie",
+      "stretch_m": 5.37,
+      "pos_from_stretch_start_m": 3.91,
+      "pos_from_stretch_end_m": 1.46,
+      "frac": 0.73
+     }
+    ],
+    "inside_len_m": 5.5,
+    "inside_bends": 0,
+    "inside_tees": 2,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-9",
+    "name": "Belplek",
+    "type": "office",
+    "terms": 2,
+    "crossings": [
+     {
+      "pt": [
+       1248.8,
+       2309.6
+      ],
+      "edge_len_m": 2.38,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.38,
+      "pos_from_stretch_start_m": 1.28,
+      "pos_from_stretch_end_m": 1.1,
+      "frac": 0.54
+     }
+    ],
+    "inside_len_m": 4.6,
+    "inside_bends": 1,
+    "inside_tees": 1,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-20",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 6,
+    "crossings": [
+     {
+      "pt": [
+       783.4,
+       1871.2
+      ],
+      "edge_len_m": 7.04,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 7.04,
+      "pos_from_stretch_start_m": 3.4,
+      "pos_from_stretch_end_m": 3.64,
+      "frac": 0.48
+     }
+    ],
+    "inside_len_m": 11.6,
+    "inside_bends": 2,
+    "inside_tees": 6,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-22",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 6,
+    "crossings": [
+     {
+      "pt": [
+       1881.3,
+       1979.9
+      ],
+      "edge_len_m": 5.43,
+      "nb": "room-26",
+      "nb_type": "office",
+      "nb_name": "Werkplek",
+      "stretch_m": 5.43,
+      "pos_from_stretch_start_m": 3.68,
+      "pos_from_stretch_end_m": 1.75,
+      "frac": 0.68
+     },
+     {
+      "pt": [
+       1675.1,
+       2340.6
+      ],
+      "edge_len_m": 7.38,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 7.38,
+      "pos_from_stretch_start_m": 1.01,
+      "pos_from_stretch_end_m": 6.37,
+      "frac": 0.14
+     }
+    ],
+    "inside_len_m": 15.0,
+    "inside_bends": 2,
+    "inside_tees": 6,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-24",
+    "name": "Kantoor",
+    "type": "office",
+    "terms": 6,
+    "crossings": [
+     {
+      "pt": [
+       1806.5,
+       840.4
+      ],
+      "edge_len_m": 4.48,
+      "nb": "room-53",
+      "nb_type": "corridor",
+      "nb_name": "verkeersruimte",
+      "stretch_m": 4.37,
+      "pos_from_stretch_start_m": 2.97,
+      "pos_from_stretch_end_m": 1.4,
+      "frac": 0.68
+     }
+    ],
+    "inside_len_m": 9.5,
+    "inside_bends": 1,
+    "inside_tees": 4,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-26",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 8,
+    "crossings": [
+     {
+      "pt": [
+       1881.3,
+       1972.0
+      ],
+      "edge_len_m": 5.46,
+      "nb": "room-22",
+      "nb_type": "office",
+      "nb_name": "Werkplek",
+      "stretch_m": 5.36,
+      "pos_from_stretch_start_m": 1.71,
+      "pos_from_stretch_end_m": 3.64,
+      "frac": 0.32
+     },
+     {
+      "pt": [
+       1671.7,
+       1890.5
+      ],
+      "edge_len_m": 8.87,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 8.87,
+      "pos_from_stretch_start_m": 1.44,
+      "pos_from_stretch_end_m": 7.44,
+      "frac": 0.16
+     },
+     {
+      "pt": [
+       1671.7,
+       1723.2
+      ],
+      "edge_len_m": 8.87,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 8.87,
+      "pos_from_stretch_start_m": 4.39,
+      "pos_from_stretch_end_m": 4.49,
+      "frac": 0.49
+     },
+     {
+      "pt": [
+       1671.7,
+       1550.4
+      ],
+      "edge_len_m": 8.87,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 8.87,
+      "pos_from_stretch_start_m": 7.44,
+      "pos_from_stretch_end_m": 1.44,
+      "frac": 0.84
+     }
+    ],
+    "inside_len_m": 16.0,
+    "inside_bends": 1,
+    "inside_tees": 3,
+    "passes_through_other_served": [
+     "room-22"
+    ]
+   },
+   {
+    "room": "room-27",
+    "name": "Brainstorm",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1777.4,
+       1260.2
+      ],
+      "edge_len_m": 5.3,
+      "nb": "room-53",
+      "nb_type": "corridor",
+      "nb_name": "verkeersruimte",
+      "stretch_m": 5.25,
+      "pos_from_stretch_start_m": 1.88,
+      "pos_from_stretch_end_m": 3.37,
+      "frac": 0.36
+     }
+    ],
+    "inside_len_m": 2.8,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-29",
+    "name": "Concentratie",
+    "type": "office",
+    "terms": 3,
+    "crossings": [
+     {
+      "pt": [
+       776.0,
+       2548.7
+      ],
+      "edge_len_m": 2.3,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.14,
+      "pos_from_stretch_start_m": 1.1,
+      "pos_from_stretch_end_m": 1.04,
+      "frac": 0.51
+     }
+    ],
+    "inside_len_m": 5.9,
+    "inside_bends": 1,
+    "inside_tees": 2,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-30",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       775.0,
+       597.3
+      ],
+      "edge_len_m": 6.98,
+      "nb": "room-50",
+      "nb_type": "corridor",
+      "nb_name": "gang",
+      "stretch_m": 5.17,
+      "pos_from_stretch_start_m": 2.6,
+      "pos_from_stretch_end_m": 2.57,
+      "frac": 0.5
+     }
+    ],
+    "inside_len_m": 3.9,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-31",
+    "name": "Werkplek",
+    "type": "office",
+    "terms": 5,
+    "crossings": [
+     {
+      "pt": [
+       553.6,
+       2183.2
+      ],
+      "edge_len_m": 5.49,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 5.44,
+      "pos_from_stretch_start_m": 1.49,
+      "pos_from_stretch_end_m": 3.95,
+      "frac": 0.27
+     },
+     {
+      "pt": [
+       661.0,
+       2183.2
+      ],
+      "edge_len_m": 5.49,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 5.44,
+      "pos_from_stretch_start_m": 3.39,
+      "pos_from_stretch_end_m": 2.05,
+      "frac": 0.62
+     }
+    ],
+    "inside_len_m": 9.2,
+    "inside_bends": 0,
+    "inside_tees": 2,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-32",
+    "name": "Concentratie",
+    "type": "office",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1881.8,
+       2485.2
+      ],
+      "edge_len_m": 3.66,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 3.6,
+      "pos_from_stretch_start_m": 1.9,
+      "pos_from_stretch_end_m": 1.7,
+      "frac": 0.53
+     }
+    ],
+    "inside_len_m": 1.5,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-33",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       620.9,
+       1461.8
+      ],
+      "edge_len_m": 4.74,
+      "nb": "room-34",
+      "nb_type": "meeting",
+      "nb_name": "Overleg",
+      "stretch_m": 4.74,
+      "pos_from_stretch_start_m": 2.0,
+      "pos_from_stretch_end_m": 2.74,
+      "frac": 0.42
+     }
+    ],
+    "inside_len_m": 1.5,
+    "inside_bends": 0,
+    "inside_tees": 0,
+    "passes_through_other_served": [
+     "room-34"
+    ]
+   },
+   {
+    "room": "room-34",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       777.2,
+       1619.2
+      ],
+      "edge_len_m": 1.66,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 1.66,
+      "pos_from_stretch_start_m": 0.76,
+      "pos_from_stretch_end_m": 0.9,
+      "frac": 0.46
+     },
+     {
+      "pt": [
+       621.0,
+       1468.9
+      ],
+      "edge_len_m": 4.74,
+      "nb": "room-33",
+      "nb_type": "meeting",
+      "nb_name": "Overleg",
+      "stretch_m": 4.74,
+      "pos_from_stretch_start_m": 2.74,
+      "pos_from_stretch_end_m": 2.0,
+      "frac": 0.58
+     }
+    ],
+    "inside_len_m": 5.7,
+    "inside_bends": 2,
+    "inside_tees": 2,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-36",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1179.1,
+       2171.8
+      ],
+      "edge_len_m": 4.14,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 4.14,
+      "pos_from_stretch_start_m": 3.4,
+      "pos_from_stretch_end_m": 0.74,
+      "frac": 0.82
+     }
+    ],
+    "inside_len_m": 2.9,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-37",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       865.6,
+       2175.7
+      ],
+      "edge_len_m": 4.14,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 4.14,
+      "pos_from_stretch_start_m": 0.67,
+      "pos_from_stretch_end_m": 3.47,
+      "frac": 0.16
+     }
+    ],
+    "inside_len_m": 2.5,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-39",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1178.5,
+       1839.6
+      ],
+      "edge_len_m": 4.64,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 4.64,
+      "pos_from_stretch_start_m": 2.3,
+      "pos_from_stretch_end_m": 2.34,
+      "frac": 0.5
+     }
+    ],
+    "inside_len_m": 3.0,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-42",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1302.3,
+       1669.8
+      ],
+      "edge_len_m": 5.31,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 5.31,
+      "pos_from_stretch_start_m": 4.71,
+      "pos_from_stretch_end_m": 0.6,
+      "frac": 0.89
+     }
+    ],
+    "inside_len_m": 3.9,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-43",
+    "name": "EHBO/kolf",
+    "type": "office",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1482.3,
+       1259.9
+      ],
+      "edge_len_m": 3.19,
+      "nb": "room-53",
+      "nb_type": "corridor",
+      "nb_name": "verkeersruimte",
+      "stretch_m": 3.19,
+      "pos_from_stretch_start_m": 1.66,
+      "pos_from_stretch_end_m": 1.53,
+      "frac": 0.52
+     }
+    ],
+    "inside_len_m": 1.7,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   },
+   {
+    "room": "room-44",
+    "name": "Overleg",
+    "type": "meeting",
+    "terms": 1,
+    "crossings": [
+     {
+      "pt": [
+       1581.0,
+       2144.1
+      ],
+      "edge_len_m": 2.42,
+      "nb": "room-35",
+      "nb_type": "corridor",
+      "nb_name": "Verkeersruimte",
+      "stretch_m": 2.42,
+      "pos_from_stretch_start_m": 1.2,
+      "pos_from_stretch_end_m": 1.22,
+      "frac": 0.49
+     }
+    ],
+    "inside_len_m": 2.3,
+    "inside_bends": 1,
+    "inside_tees": 0,
+    "passes_through_other_served": []
+   }
+  ],
+  "chained_rooms": 3,
+  "multi_entry_rooms": 7,
+  "rooms_with_bends": 19
+ }
+}
