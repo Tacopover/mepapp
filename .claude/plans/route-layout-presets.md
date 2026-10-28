@@ -1,6 +1,6 @@
 # P1 plan: route layout presets (a few layouts of one route, each with a preview, before the user places it)
 
-Status: REVISION 3 on 2026-10-27 by the road map planner (audit and domain review applied). P1-T01 is built (commit `7d3d255`). P1-T23 is built (commit `ee4a244`). P1-T16 is built (commit `54930b2`; the stop rule fires, see section 12). All other tasks are open. Part prefix: P1. Task ids: P1-T01 to P1-T24. Question ids: Q-P1-01 to Q-P1-12 (Q-P1-01 to Q-P1-08 are answered; Q-P1-09 to Q-P1-12 are open).
+Status: REVISION 3 on 2026-10-27 by the road map planner (audit and domain review applied). P1-T01 is built (commit `7d3d255`). P1-T05 is built (commit `7e3c0e7`). P1-T23 is built (commit `ee4a244`). P1-T16 is built (commit `54930b2`; the stop rule fires, see section 12). All other tasks are open. Part prefix: P1. Task ids: P1-T01 to P1-T24. Question ids: Q-P1-01 to Q-P1-12 (Q-P1-01 to Q-P1-08 are answered; Q-P1-09 to Q-P1-12 are open).
 
 Origin: comment 3 of the user test of R1 to R6 ("offer a few preloaded route layouts with a preview before the user places the route, like Revit Generate Layout"). Revision 2 adds the user screenshot of the auto-route on the w_rooms floor (defect classes D-1 to D-8, `route-quality-research.md` section 11) and the corner choice. Sources: `auto-routing-feedback-prompt.md` (section "Findings: presets"), `auto-routing-r6.md`, `.claude/roadmap/rules.md`, the code at the commit of branch `worktree-routing-feedback`.
 
@@ -41,7 +41,7 @@ Eight corrections from revision 1 (still true), then the corrections of revision
 **Corrections of revision 2 (checked against the code):**
 
 9. **P1-T01 is built.** `planRoute(input, options = DEFAULT_LAYOUT_OPTIONS, trace?)` is at `route-build.ts:198-202`. `RouteLayoutOptions` is at `route-layout.ts:9-32`. The earlier text said the fields are required and that `ripUp` is a Q1 comment. In the code **every field is optional**, and `DEFAULT_LAYOUT_OPTIONS` has type `Readonly<Required<Omit<RouteLayoutOptions, PrototypeLayoutKey>>>` (`route-layout.ts:33-41`). Section 4.2 now shows the real type.
-10. **The fields `orthogonalOnly`, `entryRule`, `offGraphAxis`, `jogSmallJumpMm`, `bendPenaltyMm` and `crossingPenaltyMm` exist in the type but no planner code reads them.** A search finds them in `route-layout.ts` and in one test line (`route-build.test.ts:766`) only. P1-T02 to P1-T05 still have to wire them.
+10. **The fields `orthogonalOnly`, `entryRule`, `jogSmallJumpMm`, `bendPenaltyMm` and `crossingPenaltyMm` exist in the type but no planner code reads them.** A search finds them in `route-layout.ts` and in one test line (`route-build.test.ts:766`) only. P1-T02 to P1-T05 still have to wire them. P1-T05 wired offGraphAxis.
 11. **A signature function exists.** `routeSignature` (`route-candidates.ts:31`) hashes the geometry rounded to 0.01 pt, ids left out. The old plan wanted a new `planSignature` (10 mm grid). P1-T06 reuses `routeSignature`. It makes no second one (rule 3 of `rules.md` section 3).
 12. **The chip lists of revision 1 did not contain "Fewer crossings".** The four start presets included it, but the lists of `presetsForDiscipline` did not. Section 4.2 fixes this.
 13. **The long diagonals of the screenshot (D-6) do not come from `bridgeParts`.** `bridgeParts` is off by default (`route-trunk.ts:132`), and the user plan used the default. The `research` plan says "probably a bridge" (section 11, D-6). That cannot be. The long diagonal legs come from the trunk edges of the corridor graph (kind `link` edges between area rooms, or straightened centre edges). P1-T16 measures the origin with the existing trace (`route-build.ts:196`).
@@ -315,12 +315,13 @@ Rules for every core report test of revision 2: use the harness `route-scenario.
 - **Must not touch:** the retry with the next entry when the tap is not reached (`route-trunk.ts:174-188`).
 - **Verify:** core tests: default equals today's result; a hand room with two entries picks the other entry under the other rule; a room with one entry is the same; deterministic. Core tests, typecheck, build.
 
-#### P1-T05. Off-graph axis
+#### P1-T05. Off-graph axis — DONE (commit `7e3c0e7`)
 - **Size:** S (about 40 lines). **Depends on:** P1-T01.
 - **Files:** `route-topology.ts` (`ConnectLooseInput.options.offGraphAxis`; the field `options` exists, `route-topology.ts:385`), `route-build.ts`, `route-topology.test.ts`.
 - **Shapes:** `offGraphAxis: 'perpendicular' | 'longer'`. `'perpendicular'` is today's rule: `tap.perpendicular ?? longer` (`route-topology.ts:415`). `'longer'` is the new mode: the longer side first, then the other. The two modes differ wherever the longer side is not the perpendicular axis of the tap. The task measures on the first floor and on w_rooms (local) how many loose links change, and reports. If no link changes, the field leaves the type and the task ends with a note (no code kept).
 - **Must not touch:** the rule that both axes are tried; `runsOverOtherPort`; the `accepts` check.
 - **Verify:** core tests as in T04; a printed count of loose links on the first floor for each rule. Core tests, typecheck, build.
+- **Result (2026-10-28):** the option is wired and kept: default 'perpendicular' equals today (6 plan JSON files, cmp identical), 'longer' differs. Links that differ / links, perpendicular -> longer (bends90, lengthMm, wallCrossings, chainedRooms): first floor A 7/30 (35, 151366, 26, 18 -> 33, 150420, 26, 16); first floor B 15/121 (60, 269867, 31, 18 -> 56, 267121, 30, 17); w_rooms A 0/33 and B 0/137 (same); 10A A 0/20 (same); 10A B 14/79 (45, 333449, 22, 11 -> 42, 333584, 20, 11). 'longer' is better or equal on bends and crossings; no preset uses it yet. Tests: 1760 passed, 2 skipped; typecheck clean; pnpm build 9 of 9.
 
 ### Phase N. The room branch (core only)
 
@@ -617,7 +618,7 @@ U1 keeps text on the main buttons (Q-U1-06 A). The chips and the corner buttons 
 - **R-11 "45 only" may mean something else to the user.** Q-P1-09 asks. P1-T21 waits for the answer only in the sense that the planner builds reading A.
 - **R-13 A branch or chain through a toilet, kitchen, shaft, stair or electrical room.** The cost has no such term unless the room type library marks these types. `Room.roomTypeId` exists (`rooms/room.ts:38`) and `RouteBuildInput.rooms` holds `Room`, so a penalty is possible (section 4.6 rule 6). Which `roomTypeId` values mean these types: not verified. If no mark exists, the risk stays open and the chain warning (Q-P1-11) is the only guard.
 - **R-14 G0 may fail by design.** Off-graph rooms usually have another room between them and the corridor (section 4.6, limit). The stop rule of P1-T16 (number S) and Q-P1-12 handle it.
-- **R-12 Not verified.** The sources of section 3.1; whether the mode `longer` of the off-graph axis changes any link (P1-T05 measures); the share of the plan time that the room spine uses; the 10A and w_rooms numbers (local files only); whether `r6-ui-lib.mjs` was changed by U1-T07; the test list of `route-build.test.ts` for P1-T01 (not re-read); the exact fixture "first floor with 25 targets" used by `r6-time-check.mjs` against the harness scenarios A/B.
+- **R-12 Not verified.** The sources of section 3.1; the share of the plan time that the room spine uses; the 10A and w_rooms numbers (local files only); whether `r6-ui-lib.mjs` was changed by U1-T07; the test list of `route-build.test.ts` for P1-T01 (not re-read); the exact fixture "first floor with 25 targets" used by `r6-time-check.mjs` against the harness scenarios A/B.
 
 ## 10. Questions for the user (options A, B, C; recommendation marked)
 
