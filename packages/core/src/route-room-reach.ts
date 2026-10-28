@@ -111,12 +111,13 @@ export function bestRoomReach(input: {
   wallMm?: number;          // default DEFAULT_WALL_MM
   roomPenaltyMm?: number;   // default 0
   pathPenaltyMm?: (path: readonly Vec2[], carrierId: string, entry: EntryCandidate) => number;   // default 0, added after pathOk
+  extraCostMm?: (reach: RoomReach) => number;   // >= 0, called only for a pair that passed pathOk; when given, the half-bend portPenalty proxy is NOT added
 }): RoomReach | null {
   const bendMm = input.bendMm ?? BEND_PENALTY_MM;
   const wallMm = input.wallMm ?? DEFAULT_WALL_MM;
   const roomPenaltyMm = input.roomPenaltyMm ?? 0;
   const pathPenaltyMm = input.pathPenaltyMm ?? (() => 0);
-  let best: Reach | null = null;
+  const pairs: Reach[] = [];
   for (const carrier of input.carriers) {
     const dx = carrier.b.x - carrier.a.x;
     const dy = carrier.b.y - carrier.a.y;
@@ -139,14 +140,22 @@ export function bestRoomReach(input: {
         : kind === 'horizontal' ? { x: carrier.a.x + Math.sign(dx) * sMm, y: carrier.a.y }
         : { x: carrier.a.x, y: carrier.a.y + Math.sign(dy) * sMm };
       for (const [variant, path] of pathVariants(tap, entry, kind).entries()) {
-        if (path.length < 2 || !input.pathOk(path, carrier.id, entry)) continue;
+        if (path.length < 2) continue;
         const costMm =
           pathLength(path) + bendCount(path) * bendMm + entryBend(path, entry) * bendMm + (entry.source === 'area-entry' ? 0 : wallMm)
-          + roomPenaltyMm + portPenalty(path, entry, input.portsMm, bendMm) + pathPenaltyMm(path, carrier.id, entry);
-        const reach: Reach = { entry, carrierId: carrier.id, tapMm: tap, branch: path, costMm, sMm, variant };
-        if (beats(reach, best)) best = reach;
+          + roomPenaltyMm + (input.extraCostMm ? 0 : portPenalty(path, entry, input.portsMm, bendMm)) + pathPenaltyMm(path, carrier.id, entry);
+        pairs.push({ entry, carrierId: carrier.id, tapMm: tap, branch: path, costMm, sMm, variant });
       }
     }
+  }
+  pairs.sort((p, q) => (beats(p, q) ? -1 : beats(q, p) ? 1 : 0));
+  let best: Reach | null = null;
+  for (const pair of pairs) {
+    if (best && pair.costMm > best.costMm + EPS) break;
+    if (!input.pathOk(pair.branch, pair.carrierId, pair.entry)) continue;
+    const total: Reach = input.extraCostMm ? { ...pair, costMm: pair.costMm + input.extraCostMm(pair) } : pair;
+    if (beats(total, best)) best = total;
+    if (!input.extraCostMm) break;
   }
   if (!best) return null;
   const won: Reach = best;

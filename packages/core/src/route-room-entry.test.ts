@@ -154,4 +154,42 @@ describe('roomEntryCandidates', () => {
     const ports = [{ x: 1000.2, y: 1500.3 }, { x: 1000.1, y: 1500.1 }];
     expect(roomEntryCandidates({ ...args, portsMm: ports })).toEqual(roomEntryCandidates({ ...args, portsMm: [...ports].reverse() }));
   });
+
+  it('adds the aligned point of a terminal inside the door gap on a horizontal wall', () => {
+    const out = roomEntryCandidates({
+      room: rect(4000, 3000), mmPerPt: 1, areaEntries: [{ ...entry({ x: 2000, y: 0 }), gapMm: 1000 }],
+      corridorAt: always, portsMm: [{ x: 2300, y: 500 }, { x: 2800, y: 500 }], alignedInGap: true,
+    });
+    expect(out).toEqual([
+      { pointMm: { x: 2000, y: 0 }, outward: { x: 0, y: -1 }, source: 'area-entry' },
+      { pointMm: { x: 2300, y: 0 }, outward: { x: 0, y: -1 }, source: 'area-entry' },
+    ]);
+  });
+
+  it('adds the aligned point of a terminal inside the door gap on a vertical wall', () => {
+    const out = roomEntryCandidates({
+      room: rect(4000, 3000), mmPerPt: 1, areaEntries: [{ ...entry({ x: 4000, y: 1500 }), gapMm: 1000 }],
+      corridorAt: always, portsMm: [{ x: 3500, y: 1800 }], alignedInGap: true,
+    });
+    expect(out).toEqual([
+      { pointMm: { x: 4000, y: 1500 }, outward: { x: 1, y: 0 }, source: 'area-entry' },
+      { pointMm: { x: 4000, y: 1800 }, outward: { x: 1, y: 0 }, source: 'area-entry' },
+    ]);
+  });
+
+  it('adds no aligned point inside the door gap when alignedInGap is absent', () => {
+    const out = roomEntryCandidates({
+      room: rect(4000, 3000), mmPerPt: 1, areaEntries: [{ ...entry({ x: 2000, y: 0 }), gapMm: 1000 }],
+      corridorAt: always, portsMm: [{ x: 2300, y: 500 }, { x: 2800, y: 500 }],
+    });
+    expect(out).toEqual([{ pointMm: { x: 2000, y: 0 }, outward: { x: 0, y: -1 }, source: 'area-entry' }]);
+  });
+
+  it('adds no aligned point when the terminal is beyond the door gap limit', () => {
+    const out = roomEntryCandidates({
+      room: rect(4000, 3000), mmPerPt: 1, areaEntries: [{ ...entry({ x: 2000, y: 0 }), gapMm: 358 }],
+      corridorAt: always, portsMm: [{ x: 2150, y: 500 }],
+    });
+    expect(out).toEqual([{ pointMm: { x: 2000, y: 0 }, outward: { x: 0, y: -1 }, source: 'area-entry' }]);
+  });
 });

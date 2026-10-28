@@ -135,6 +135,58 @@ describe('planRoomFeeds', () => {
     expect(out.unfedRoomIds).toEqual(['R']);
   });
 
+  it('picks the entry with the cheaper room feed, not the entry with the cheaper branch', () => {
+    const out = planRoomFeeds(
+      feedInput({
+        rooms: [box('R', 0, 0, 4000, 3000)],
+        servedRooms: [served('R')],
+        portsByRoom: new Map([
+          [
+            'R',
+            [
+              { id: 'r1', point: { x: 1000, y: 1500 } },
+              { id: 'r2', point: { x: 3000, y: 1000 } },
+              { id: 'r3', point: { x: 3000, y: 2200 } },
+            ],
+          ],
+        ]),
+        areaEntries: [
+          { ...wallEntry('R', { x: 500, y: 0 }), id: 'e-R-a', nodeId: 'n-R-a' },
+          { ...wallEntry('R', { x: 2000, y: 0 }), id: 'e-R-b', nodeId: 'n-R-b' },
+        ],
+        options: { roomBranches: { searchMm: 30000, fewRoomBends: true } },
+      }),
+    );
+    expect(out.unfedRoomIds).toEqual([]);
+    expect(out.rooms.map((r) => r.roomId)).toEqual(['R']);
+    expect(out.rooms[0]!.branch[1]).toEqual({ x: 2000, y: 0 });
+  });
+
+  it('picks the entry with the cheaper branch when fewRoomBends is absent', () => {
+    const out = planRoomFeeds(
+      feedInput({
+        rooms: [box('R', 0, 0, 4000, 3000)],
+        servedRooms: [served('R')],
+        portsByRoom: new Map([
+          [
+            'R',
+            [
+              { id: 'r1', point: { x: 1000, y: 1500 } },
+              { id: 'r2', point: { x: 3000, y: 1000 } },
+              { id: 'r3', point: { x: 3000, y: 2200 } },
+            ],
+          ],
+        ]),
+        areaEntries: [
+          { ...wallEntry('R', { x: 500, y: 0 }), id: 'e-R-a', nodeId: 'n-R-a' },
+          { ...wallEntry('R', { x: 2000, y: 0 }), id: 'e-R-b', nodeId: 'n-R-b' },
+        ],
+      }),
+    );
+    expect(out.unfedRoomIds).toEqual([]);
+    expect(out.rooms[0]!.branch[1]).toEqual({ x: 500, y: 0 });
+  });
+
   describe('chain pass', () => {
     const legDist = (p: Vec2, a: Vec2, b: Vec2): number => {
       const dx = b.x - a.x;
@@ -242,6 +294,32 @@ describe('planRoomFeeds', () => {
       const build = (maxChainDepth?: number) =>
         planRoomFeeds(chainInput({ options: { roomBranches: maxChainDepth === undefined ? { searchMm: 30000 } : { searchMm: 30000, maxChainDepth } } }, extra, ['G'], [['G', { x: 10000, y: 2500 }]]));
       expect(build()).toEqual(build(1));
+    });
+
+    it('feeds a far room whose wall gives more candidate entries than the feed cap', () => {
+      const out = planRoomFeeds(
+        feedInput({
+          rooms: [box('N', 0, -2000, 4000, 5000), box('F', 4000, -1500, 10000, 4500)],
+          servedRooms: [served('N'), served('F')],
+          portsByRoom: new Map([
+            ['N', [{ id: 'n1', point: { x: 1000, y: 1500 } }]],
+            ['F', [{ id: 'f1', point: { x: 6000, y: 1500 } }]],
+          ]),
+          areaEntries: [wallEntry('N', { x: 500, y: 0 })],
+          options: { roomBranches: { searchMm: 30000, fewRoomBends: true } },
+        }),
+      );
+      expect(out.unfedRoomIds).toEqual([]);
+      const f = out.rooms.find((r) => r.roomId === 'F')!;
+      expect(f.chain).toEqual({ viaRoomId: 'N', depth: 1 });
+      expect(f.branch.flatMap((p) => [p.x, p.y]).every(Number.isFinite)).toBe(true);
+      expect(Number.isFinite(f.lengthMm)).toBe(true);
+    });
+
+    it('chains a far room with fewRoomBends and leaves no terminal unreached', () => {
+      const out = planRoomFeeds(chainInput({ options: { roomBranches: { searchMm: 30000, fewRoomBends: true } } }));
+      expect(out.unfedRoomIds).toEqual([]);
+      expect(out.rooms.find((r) => r.roomId === 'F')!.chain).toEqual({ viaRoomId: 'N', depth: 1 });
     });
   });
 });

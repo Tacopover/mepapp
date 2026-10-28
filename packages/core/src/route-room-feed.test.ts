@@ -3,7 +3,7 @@ import { distance, type Vec2 } from './geometry.js';
 import { roomContainsPoint, type Room } from './rooms/room.js';
 import { insideRouteArea } from './route-layout.js';
 import { roomSpine } from './route-hanan.js';
-import { ENTRY_DEPTH_MM, ringDistanceMm, roomFeed, SPINE_WALL_MARGIN_MM, type RoomFeedInput } from './route-room-feed.js';
+import { ENTRY_DEPTH_MM, feedBends, ringDistanceMm, roomFeed, SPINE_WALL_MARGIN_MM, type RoomFeedInput } from './route-room-feed.js';
 import { roomEntryCandidates } from './route-room-entry.js';
 import { buildScenario, localDrawing } from './route-scenario.testutil.js';
 
@@ -232,6 +232,54 @@ describe('roomFeed', () => {
       { id: 'b', point: P(500, 3500) },
     ]);
     expect(roomFeed(input)).toEqual(roomFeed(input));
+  });
+
+  it('counts the interior vertices of a spine path as bends', () => {
+    const J = P(100, 0);
+    const stub = [P(0, 0), J];
+    const dir = P(1, 0);
+    expect(feedBends(stub, J, dir, [[P(500, 0), P(500, 500), P(1000, 500), P(1000, 1000)]])).toBe(2);
+  });
+
+  it('adds one bend when the one spine path from the junction starts perpendicular to the stub', () => {
+    const J = P(100, 0);
+    const stub = [P(0, 0), J];
+    const dir = P(1, 0);
+    expect(feedBends(stub, J, dir, [[J, P(100, 400), P(600, 400)]])).toBe(2);
+    expect(feedBends(stub, J, dir, [[J, P(600, 0)]])).toBe(0);
+  });
+
+  it('adds no bend for a tee at the junction with two spine paths leaving it', () => {
+    const J = P(100, 0);
+    const stub = [P(0, 0), J];
+    const dir = P(1, 0);
+    expect(feedBends(stub, J, dir, [[J, P(100, 400)], [J, P(100, -400)]])).toBe(0);
+  });
+
+  it('keeps the spine of a 2 x 2 terminal group in the middle line with at most one bend', () => {
+    const ring = rectRing(4000, 3000);
+    const E = P(0, 1500);
+    const ports = [
+      { id: 'a', point: P(2000, 1000) },
+      { id: 'b', point: P(2000, 2000) },
+      { id: 'c', point: P(3000, 1000) },
+      { id: 'd', point: P(3000, 2000) },
+    ];
+    const feed = roomFeed(feedInput(ring, E, P(-1, 0), ports, { middleLines: true }));
+    expect(feed.leftPortIds).toEqual([]);
+    expect(feed.bends).toBeLessThanOrEqual(1);
+  });
+
+  it('gives the same feed without middleLines as with middleLines false', () => {
+    const ring = rectRing(4000, 3000);
+    const E = P(0, 1500);
+    const ports = [
+      { id: 'a', point: P(2000, 1000) },
+      { id: 'b', point: P(2000, 2000) },
+      { id: 'c', point: P(3000, 1000) },
+      { id: 'd', point: P(3000, 2000) },
+    ];
+    expect(roomFeed(feedInput(ring, E, P(-1, 0), ports))).toEqual(roomFeed(feedInput(ring, E, P(-1, 0), ports, { middleLines: false })));
   });
 
   it('gives no spine and no left ports for zero ports', () => {

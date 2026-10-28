@@ -259,6 +259,43 @@ describe('bestRoomReach', () => {
     expect(r!.costMm).toBe(2500);
   });
 
+  it('calls pathOk lazily and returns the cheapest passing pair', () => {
+    let calls = 0;
+    const r = bestRoomReach({
+      ...base,
+      bendMm: 100,
+      candidates: [real(1000, 500), real(2000, 1500), real(500, 2500)],
+      carriers: [junction('a', 0, 0), junction('b', 0, 300)],
+      pathOk: (path) => {
+        calls++;
+        return path[path.length - 1]!.x !== 1000;
+      },
+    });
+    expect(r!.carrierId).toBe('b');
+    expect(r!.entry.pointMm).toEqual({ x: 500, y: 2500 });
+    expect(r!.branch).toEqual([{ x: 0, y: 300 }, { x: 500, y: 300 }, { x: 500, y: 2500 }]);
+    expect(r!.costMm).toBeCloseTo(2800, 6);
+    expect(calls).toBeLessThan(12);
+  });
+
+  it('adds extraCostMm to passing pairs and stops before a pair whose base cost is above the best total', () => {
+    const ends: Vec2[] = [];
+    const r = bestRoomReach({
+      ...base,
+      bendMm: 0,
+      candidates: [real(1000, 0), real(0, 1500), real(0, 4000)],
+      carriers: [junction('j', 0, 0)],
+      extraCostMm: (reach) => (reach.entry.pointMm.x === 1000 ? 5000 : 0),
+      pathOk: (path) => {
+        ends.push(path[path.length - 1]!);
+        return true;
+      },
+    });
+    expect(r!.entry.pointMm).toEqual({ x: 0, y: 1500 });
+    expect(r!.costMm).toBeCloseTo(1500, 6);
+    expect(ends).toEqual([{ x: 1000, y: 0 }, { x: 0, y: 1500 }]);
+  });
+
   it('gives null beyond searchMm and a result at searchMm', () => {
     const input = { ...base, candidates: [real(0, 1000)], carriers: [junction('j', 0, 0)] };
     expect(bestRoomReach({ ...input, searchMm: 999 })).toBeNull();

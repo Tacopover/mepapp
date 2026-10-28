@@ -4,6 +4,7 @@ import type { RouteEntry } from './route-area.js';
 
 export interface EntryCandidate { pointMm: Vec2; outward: Vec2; source: 'area-entry' | 'ring' | 'port-line' }   // outward = unit axis vector pointing away from the room
 export const MAX_ENTRY_CANDIDATES = 120;
+const GAP_EDGE_MARGIN_MM = 100;               // the pipe keeps this distance from the door post
 
 const SOURCE_ORDER: Record<EntryCandidate['source'], number> = { 'area-entry': 0, ring: 1, 'port-line': 2 };
 
@@ -25,8 +26,10 @@ export function roomEntryCandidates(input: {
   probeMm?: number;                              // default 300
   portsMm: readonly Vec2[];                      // the terminals of the room
   stepMm?: number;                               // default 500
+  alignedInGap?: boolean;                        // default false: add the aligned points of the terminals inside the door gap
 }): EntryCandidate[] {
   const { room, mmPerPt, areaEntries, corridorAt } = input;
+  const alignedInGap = input.alignedInGap === true;
   const portsMm = [...input.portsMm].sort((p, q) => p.x - q.x || p.y - q.y);
   const probeMm = input.probeMm ?? 300;
   const stepMm = input.stepMm !== undefined && Number.isFinite(input.stepMm) && input.stepMm > 0 ? input.stepMm : 500;
@@ -65,6 +68,22 @@ export function roomEntryCandidates(input: {
       }
       if (!best) continue;
       out.push({ pointMm: toMm(entry.point), outward: outwardAt(best.a, best.b, best.foot), source: 'area-entry' });
+      const { a, b, foot } = best;
+      if (a.y !== b.y && a.x !== b.x) continue;
+      const horizontal = a.y === b.y;
+      const middleMm = toMm(entry.point);
+      const footMm = toMm(foot);
+      const [lo, hi] = horizontal ? [Math.min(a.x, b.x), Math.max(a.x, b.x)] : [Math.min(a.y, b.y), Math.max(a.y, b.y)];
+      for (const port of alignedInGap ? portsMm : []) {
+        const tangentMm = horizontal ? Math.abs(port.x - footMm.x) : Math.abs(port.y - footMm.y);
+        if (tangentMm > entry.gapMm / 2 - GAP_EDGE_MARGIN_MM) continue;
+        const aligned = horizontal ? { x: port.x / mmPerPt, y: foot.y } : { x: foot.x, y: port.y / mmPerPt };
+        const along = horizontal ? aligned.x : aligned.y;
+        if (along < lo || along > hi) continue;
+        const alignedMm = toMm(aligned);
+        if (Math.hypot(alignedMm.x - middleMm.x, alignedMm.y - middleMm.y) < 1) continue;
+        out.push({ pointMm: alignedMm, outward: outwardAt(a, b, aligned), source: 'area-entry' });
+      }
     }
     return out;
   };
