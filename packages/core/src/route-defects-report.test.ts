@@ -7,6 +7,7 @@ const TEST_TIMEOUT = 120000;
 const SOURCES: { name: string; drawing: Drawing | null }[] = [
   { name: 'first floor', drawing: firstFloorDrawing() },
   { name: 'ground floor w_rooms (local-only)', drawing: localDrawing('ground-floor-w-rooms', 'ground floor w_rooms') },
+  { name: 'ground floor w_rooms-2 (local-only)', drawing: localDrawing('ground-floor-w-rooms-2', 'ground floor w_rooms-2') },
   { name: '10A (local-only)', drawing: localDrawing('10A-rooms', '10A') },
 ];
 

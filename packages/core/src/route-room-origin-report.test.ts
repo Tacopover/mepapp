@@ -21,6 +21,7 @@ import {
 
 const LOCAL_FIXTURES = [
   { file: 'ground-floor-w-rooms', name: 'w_rooms' },
+  { file: 'ground-floor-w-rooms-2', name: 'w_rooms-2' },
   { file: '10A-rooms', name: '10A' },
 ];
 const TEST_TIMEOUT = 300000;
