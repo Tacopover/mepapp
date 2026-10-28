@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Vec2 } from './geometry.js';
+import { closestPointOnSegment, distance, type Vec2 } from './geometry.js';
 import { roomContainsPoint, type Room } from './rooms/room.js';
 import { insideRouteArea } from './route-layout.js';
 import { roomSpine } from './route-hanan.js';
-import { ENTRY_DEPTH_MM, roomFeed, type RoomFeedInput } from './route-room-feed.js';
+import { ENTRY_DEPTH_MM, roomFeed, SPINE_WALL_MARGIN_MM, type RoomFeedInput } from './route-room-feed.js';
 import { roomEntryCandidates } from './route-room-entry.js';
 import { buildScenario, localDrawing } from './route-scenario.testutil.js';
 
@@ -28,6 +28,14 @@ function polygonContains(ring: readonly Vec2[], p: Vec2): boolean {
     if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
   }
   return inside;
+}
+
+function ringDistance(ring: readonly Vec2[], p: Vec2): number {
+  let best = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    best = Math.min(best, distance(p, closestPointOnSegment(p, ring[i]!, ring[(i + 1) % ring.length]!).point));
+  }
+  return best;
 }
 
 function growRect(w: number, h: number, tol: number): (p: Vec2) => boolean {
@@ -98,6 +106,33 @@ describe('roomFeed', () => {
     for (const path of feed.spine) {
       for (const p of path) {
         if (p.x === E.x) expect(ports.some((q) => key(q.point) === key(p) && q.point.x - E.x < ENTRY_DEPTH_MM)).toBe(true);
+      }
+    }
+  });
+
+  it('keeps the spine SPINE_WALL_MARGIN_MM off the room ring, except at terminals', () => {
+    const ring = rectRing(4000, 3000);
+    const E = P(0, 1500);
+    const ports = [
+      { id: 'a', point: P(3000, 500) },
+      { id: 'b', point: P(3000, 2500) },
+      { id: 'c', point: P(3900, 1500) },
+    ];
+    const feed = roomFeed(feedInput(ring, E, P(-1, 0), ports));
+    expect(feed.leftPortIds).toEqual([]);
+    expect(feed.spine.length).toBeGreaterThan(0);
+    const isPort = (p: Vec2): boolean => ports.some((q) => key(q.point) === key(p));
+    for (const path of feed.spine) {
+      for (let i = 0; i < path.length; i++) {
+        const v = path[i]!;
+        if (!isPort(v)) expect(ringDistance(ring, v), `vertex ${key(v)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
+        if (i === 0) continue;
+        const a = path[i - 1]!;
+        const len = distance(a, v);
+        for (let d = 50; d < len; d += 50) {
+          const s = P(a.x + ((v.x - a.x) * d) / len, a.y + ((v.y - a.y) * d) / len);
+          if (!isPort(s)) expect(ringDistance(ring, s), `sample ${key(s)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
+        }
       }
     }
   });
@@ -210,6 +245,12 @@ describe('roomFeed', () => {
       });
       console.log(`room ${room.id} entry ${entry.source} ${JSON.stringify(entry.pointMm)} ports ${ports.length} left ${JSON.stringify(feed.leftPortIds)}`);
       expect(feed.leftPortIds, `room ${room.id}`).toEqual([]);
+      const portKeys = new Set(ports.map((q) => key(q.point)));
+      for (const path of feed.spine) {
+        for (const v of path) {
+          if (!portKeys.has(key(v))) expect(ringDistance(ringMm, v), `room ${room.id} vertex ${key(v)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
+        }
+      }
       checked++;
     }
     console.log(`w_rooms-2 checked ${checked} of ${FIXTURE_ROOM_SUFFIXES.length} rooms`);
