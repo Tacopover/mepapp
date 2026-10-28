@@ -30,8 +30,10 @@ export interface RouteLayoutOptions {
   exactSpine?: { maxPorts: number };
   /** Idea 4: rip-up rounds. Off when absent. */
   ripUp?: { rounds: number };
+  /** P1-T19a. Room feed. Off when absent. */
+  roomBranches?: { searchMm: number; maxChainDepth?: number; slideRun?: boolean };
 }
-type PrototypeLayoutKey = 'bridgeParts' | 'trunkBends' | 'linkSearch' | 'exactSpine' | 'ripUp';
+type PrototypeLayoutKey = 'bridgeParts' | 'trunkBends' | 'linkSearch' | 'exactSpine' | 'ripUp' | 'roomBranches';
 export const DEFAULT_LAYOUT_OPTIONS: Readonly<Required<Omit<RouteLayoutOptions, PrototypeLayoutKey>>> = {
   bendPenaltyMm: BEND_PENALTY_MM,
   crossingPenaltyMm: CROSSING_PENALTY_MM,

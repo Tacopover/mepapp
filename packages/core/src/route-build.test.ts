@@ -17,7 +17,9 @@ import {
   localDrawing,
   makeIdFactories,
   measureScenario,
+  planHash,
   runScenario,
+  shuffledScenario,
   type Drawing,
 } from './route-scenario.testutil.js';
 import * as trunk from './route-trunk.js';
@@ -843,6 +845,70 @@ describe('planRoute option reach', () => {
     expect(vi.mocked(branch.planBranches).mock.calls.at(-1)![0].options).toEqual({ bendPenaltyMm: 123 });
     expect(vi.mocked(topology.connectLoosePorts).mock.calls.at(-1)![0].options).toEqual({ bendPenaltyMm: 123 });
   });
+});
+
+describe('planRoute room feed', () => {
+  it('gives the same first floor plan with the room feed absent, undefined and empty', () => {
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const absent = runScenario(scenario!, makeIdFactories());
+    expect(runScenario(scenario!, makeIdFactories(), {}).plan).toEqual(absent.plan);
+    expect(runScenario(scenario!, makeIdFactories(), { roomBranches: undefined }).plan).toEqual(absent.plan);
+    expect(planHash(absent.plan).slice(0, 12)).toBe('03b3135ca4c7');   // hash recorded at the commit before P1-T19a
+  });
+
+  for (const kind of ['A', 'B'] as const) {
+    it(`feeds the first floor scenario ${kind} and leaves no port unplaced without a count`, () => {
+      const scenario = buildScenario(firstFloorDrawing(), kind, 0);
+      const run = runScenario(scenario!, makeIdFactories(), { roomBranches: { searchMm: 30000 } });
+      expect(run.status).toBe('ok');
+      expect(run.plan.stats.portsLeft).toBeLessThanOrEqual(run.plan.stats.ports);
+      expect(run.plan.warnings.find((w) => w.code === 'ports-left')?.count ?? 0).toBe(run.plan.stats.portsLeft);
+    });
+  }
+
+  it('gives the same plan hash for the same input and the same counts for a shuffled port order', () => {
+    const options = { roomBranches: { searchMm: 30000 } };
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const first = runScenario(scenario!, makeIdFactories(), options);
+    const again = runScenario(scenario!, makeIdFactories(), options);
+    expect(planHash(again.plan)).toBe(planHash(first.plan));
+    const shuffled = shuffledScenario(firstFloorDrawing(), 'A', 0, 7);
+    const other = runScenario(shuffled!, makeIdFactories(), options);
+    expect(other.plan.stats.segments).toBe(first.plan.stats.segments);
+    expect(other.plan.stats.portsLeft).toBe(first.plan.stats.portsLeft);
+  });
+
+  it('plans the first floor with the room feed and the exact spine', () => {
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const run = runScenario(scenario!, makeIdFactories(), { roomBranches: { searchMm: 30000 }, exactSpine: { maxPorts: 8 } });
+    expect(run.status).toBe('ok');
+  });
+});
+
+describe('planRoute room feed report', () => {
+  const local = (() => {
+    try {
+      return localDrawing('ground-floor-w-rooms-2', 'w_rooms-2');
+    } catch {
+      return null;
+    }
+  })();
+  for (const kind of ['A', 'B'] as const) {
+    it.skipIf(local === null)(`prints the room feed numbers on w_rooms-2 scenario ${kind}, start 0`, () => {
+      const scenario = buildScenario(local!, kind, 0);
+      expect(scenario).not.toBeNull();
+      const cases = [
+        { label: 'absent', options: {} },
+        { label: 'room feed', options: { roomBranches: { searchMm: 30000 } } },
+      ];
+      for (const { label, options } of cases) {
+        const run = runScenario(scenario!, makeIdFactories(), options);
+        const row = measureScenario(scenario!, run, label);
+        console.log(`${kind} ${label} ms=${run.ms} portsLeft=${run.plan.stats.portsLeft} lengthMm=${run.plan.stats.lengthMm}`, row.metrics);
+        expect(run.status).toBe('ok');
+      }
+    });
+  }
 });
 
 describe('planRoute corner mode right', () => {

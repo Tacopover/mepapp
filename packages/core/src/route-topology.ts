@@ -305,7 +305,7 @@ function distanceToPieceMm(p: Vec2, a: Vec2, b: Vec2): number {
 const OVER_PORT_MM = 1;
 
 /** True when another target port point lies within 1 mm of a leg of the path. The end point of the path is the port itself. */
-function runsOverOtherPort(path: readonly Vec2[], targetPoints: readonly Vec2[]): boolean {
+export function runsOverOtherPort(path: readonly Vec2[], targetPoints: readonly Vec2[]): boolean {
   const end = path[path.length - 1]!;
   return targetPoints.some((t) => {
     if (Math.hypot(t.x - end.x, t.y - end.y) <= OVER_PORT_MM) return false;

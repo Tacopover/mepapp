@@ -9,6 +9,7 @@ import { buildTrunk } from './route-trunk.js';
 import { planBranches, type BranchRoomInput } from './route-branch.js';
 import { DEFAULT_LAYOUT_OPTIONS, elbowPath, insideRouteArea, type RouteLayoutOptions } from './route-layout.js';
 import { buildRouteItems, connectLoosePorts, type TopologyPort } from './route-topology.js';
+import { planRoomFeeds } from './route-feeds.js';
 import { checkRouteStart } from './route-start.js';
 import { canJoinPoint, checkExisting, checkInvariant, distanceToPiece, makeCrossesExisting, NEAR_ITEM_MM } from './route-checks.js';
 import { openPortsOf, type RoutePort, type RouteStamp } from './route-ports.js';
@@ -347,18 +348,44 @@ export function planRoute(
     };
   });
   const portById = new Map(input.targetPorts.map((port) => [portKey(port), port] as const));
-  for (const branch of planBranches({
-    crossesExisting: makeCrossesExisting(existing.segments, mmPerPt),
-    trunk: trunk.edges.map((edge) => ({ id: edge.id, path: edge.path })),
-    rootPointMm: trunk.rootPointMm ?? start.pointMm,
-    rooms: branchRooms,
-    options,
-    ...(options.exactSpine ? { insideCorridor: insideRouteArea(input.rooms.filter((r) => input.area.rooms.some((a) => a.roomId === r.id)), mmPerPt) } : {}),
-  }).rooms) {
-    paths.push(branch.branch, ...branch.spine);
-    tag('branch', branch.branch);
-    for (const spine of branch.spine) tag('spine', spine);
-    for (const id of branch.offGraphPortIds) loosePorts.push(portById.get(id)!);
+  if (options.roomBranches) {
+    const portsByRoom = new Map([...grouped.byRoom].map(([roomId, ports]) => [roomId, ports.map((port) => ({ id: portKey(port), point: toMm(port.world) }))] as const));
+    const feeds = planRoomFeeds({
+      rooms: input.rooms,
+      servedRooms: trunk.served,
+      portsByRoom,
+      areaEntries: input.area.entries,
+      areaRoomIds: new Set(input.area.rooms.map((room) => room.roomId)),
+      trunkEdges: trunk.edges,
+      rootPointMm: trunk.rootPointMm ?? start.pointMm,
+      startPointMm: start.pointMm,
+      mmPerPt,
+      accepts,
+      targetPointsMm: targetPorts.map((port) => toMm(port.world)),
+      crossesExisting: makeCrossesExisting(existing.segments, mmPerPt),
+      options,
+    });
+    for (const feed of feeds.rooms) {
+      paths.push(feed.branch, ...feed.spine);
+      tag('branch', feed.branch);
+      for (const spine of feed.spine) tag('spine', spine);
+      for (const id of feed.leftPortIds) loosePorts.push(portById.get(id)!);
+    }
+    for (const roomId of feeds.unfedRoomIds) loosePorts.push(...(grouped.byRoom.get(roomId) ?? []));
+  } else {
+    for (const branch of planBranches({
+      crossesExisting: makeCrossesExisting(existing.segments, mmPerPt),
+      trunk: trunk.edges.map((edge) => ({ id: edge.id, path: edge.path })),
+      rootPointMm: trunk.rootPointMm ?? start.pointMm,
+      rooms: branchRooms,
+      options,
+      ...(options.exactSpine ? { insideCorridor: insideRouteArea(input.rooms.filter((r) => input.area.rooms.some((a) => a.roomId === r.id)), mmPerPt) } : {}),
+    }).rooms) {
+      paths.push(branch.branch, ...branch.spine);
+      tag('branch', branch.branch);
+      for (const spine of branch.spine) tag('spine', spine);
+      for (const id of branch.offGraphPortIds) loosePorts.push(portById.get(id)!);
+    }
   }
 
   const linkRooms = options.linkSearch
