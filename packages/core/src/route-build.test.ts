@@ -883,6 +883,16 @@ describe('planRoute room feed', () => {
     const run = runScenario(scenario!, makeIdFactories(), { roomBranches: { searchMm: 30000 }, exactSpine: { maxPorts: 8 } });
     expect(run.status).toBe('ok');
   });
+
+  it('reports the rooms fed by a chain only with the room feed on', () => {
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const on = runScenario(scenario!, makeIdFactories(), { roomBranches: { searchMm: 30000 } });
+    const chained = on.plan.warnings.find((w) => w.code === 'room-chained');
+    expect((chained?.ids ?? []).length).toBe(chained?.count ?? 0);
+    expect(chained?.ids).toEqual([...(chained?.ids ?? [])].sort());
+    const off = runScenario(scenario!, makeIdFactories());
+    expect(off.plan.warnings.find((w) => w.code === 'room-chained')).toBeUndefined();
+  });
 });
 
 describe('planRoute room feed report', () => {
@@ -899,13 +909,28 @@ describe('planRoute room feed report', () => {
       expect(scenario).not.toBeNull();
       const cases = [
         { label: 'absent', options: {} },
-        { label: 'room feed', options: { roomBranches: { searchMm: 30000 } } },
+        { label: 'feed only', options: { roomBranches: { searchMm: 30000, maxChainDepth: 0 } } },
+        { label: 'feed + chain 1', options: { roomBranches: { searchMm: 30000 } } },
+        { label: 'feed + chain 2', options: { roomBranches: { searchMm: 30000, maxChainDepth: 2 } } },
       ];
+      const runs = new Map<string, ReturnType<typeof runScenario>>();
       for (const { label, options } of cases) {
         const run = runScenario(scenario!, makeIdFactories(), options);
+        runs.set(label, run);
         const row = measureScenario(scenario!, run, label);
         console.log(`${kind} ${label} ms=${run.ms} portsLeft=${run.plan.stats.portsLeft} lengthMm=${run.plan.stats.lengthMm}`, row.metrics);
+        console.log(`${kind} ${label} room-chained ids=`, run.plan.warnings.find((w) => w.code === 'room-chained')?.ids);
+        console.log(`${kind} ${label} room-off-graph count=`, run.plan.warnings.find((w) => w.code === 'room-off-graph')?.count);
         expect(run.status).toBe('ok');
+      }
+      if (kind === 'B') {
+        const chain = runs.get('feed + chain 1')!;
+        const chained = chain.plan.warnings.find((w) => w.code === 'room-chained');
+        expect(chained).toBeDefined();
+        expect(chained!.count).toBe(chained!.ids!.length);
+        const offGraphIds = chain.plan.warnings.find((w) => w.code === 'room-off-graph')?.ids ?? [];
+        for (const id of chained!.ids!) expect(offGraphIds).toContain(id);
+        expect(chain.plan.stats.portsLeft).toBeLessThanOrEqual(runs.get('feed only')!.plan.stats.portsLeft);
       }
     });
   }

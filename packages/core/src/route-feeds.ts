@@ -1,19 +1,23 @@
 import type { Vec2 } from './geometry.js';
 import type { RouteEntry } from './route-area.js';
 import { insideRouteArea, legClass, type RouteLayoutOptions } from './route-layout.js';
-import { roomEntryCandidates } from './route-room-entry.js';
-import { bestRoomReach, type PlacedTapAt, type ReachCarrier } from './route-room-reach.js';
+import { roomEntryCandidates, type EntryCandidate } from './route-room-entry.js';
+import { bestRoomReach, type PlacedTapAt, type ReachCarrier, type RoomReach } from './route-room-reach.js';
 import { roomFeed } from './route-room-feed.js';
+import { distanceToPiece } from './route-checks.js';
 import { runsOverOtherPort } from './route-topology.js';
 import type { TrunkServedRoom } from './route-trunk.js';
 import { roomBounds, roomContainsPoint, type Room } from './rooms/room.js';
 
 const SAMPLE_MM = 100;
 const ENTRY_CLEAR_MM = 500;
+const CHAIN_CLEAR_MM = 60;
+export const DEFAULT_MAX_CHAIN_DEPTH = 1;
 
 export interface RoomFeedsInput {
   rooms: readonly Room[];
   servedRooms: readonly TrunkServedRoom[];
+  offGraphRoomIds?: readonly string[];
   portsByRoom: ReadonlyMap<string, { id: string; point: Vec2 }[]>;
   areaEntries: readonly RouteEntry[];
   areaRoomIds: ReadonlySet<string>;
@@ -27,7 +31,7 @@ export interface RoomFeedsInput {
   options: RouteLayoutOptions;
 }
 
-export interface RoomFeedResult { roomId: string; branch: Vec2[]; spine: Vec2[][]; leftPortIds: string[]; lengthMm: number }
+export interface RoomFeedResult { roomId: string; branch: Vec2[]; spine: Vec2[][]; leftPortIds: string[]; lengthMm: number; chain?: { viaRoomId: string; depth: number } }
 export interface RoomFeedsResult { rooms: RoomFeedResult[]; unfedRoomIds: string[] }
 
 const dist = (p: Vec2, q: Vec2): number => Math.hypot(q.x - p.x, q.y - p.y);
@@ -38,6 +42,12 @@ const pathLength = (path: readonly Vec2[]): number => {
   return total;
 };
 
+function distanceToPath(p: Vec2, path: readonly Vec2[]): number {
+  let best = Infinity;
+  for (let i = 1; i < path.length; i++) best = Math.min(best, distanceToPiece(p, path[i - 1]!, path[i]!));
+  return best;
+}
+
 function legSamples(a: Vec2, b: Vec2): Vec2[] {
   const n = Math.max(1, Math.ceil(dist(a, b) / SAMPLE_MM));
   return Array.from({ length: n + 1 }, (_, k) => ({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n }));
@@ -46,6 +56,7 @@ function legSamples(a: Vec2, b: Vec2): Vec2[] {
 export function planRoomFeeds(input: RoomFeedsInput): RoomFeedsResult {
   const branches = input.options.roomBranches;
   if (!branches) throw new Error('planRoomFeeds needs options.roomBranches');
+  const maxDepth = branches.maxChainDepth ?? DEFAULT_MAX_CHAIN_DEPTH;
   const { mmPerPt } = input;
   const toMm = (p: Vec2): Vec2 => ({ x: p.x * mmPerPt, y: p.y * mmPerPt });
   const toPage = (p: Vec2): Vec2 => ({ x: p.x / mmPerPt, y: p.y / mmPerPt });
@@ -55,6 +66,8 @@ export function planRoomFeeds(input: RoomFeedsInput): RoomFeedsResult {
   const portRooms = input.rooms
     .filter((room) => input.portsByRoom.has(room.id))
     .map((room) => ({ room, bounds: roomBounds(room) }));
+  const inPortRoom = (q: Vec2, excluded: ReadonlySet<string>): boolean =>
+    portRooms.some((o) => !excluded.has(o.room.id) && q.x >= o.bounds.minX && q.x <= o.bounds.maxX && q.y >= o.bounds.minY && q.y <= o.bounds.maxY && roomContainsPoint(o.room, q));
 
   const carriers: ReachCarrier[] = [];
   for (const edge of input.trunkEdges) {
@@ -78,27 +91,57 @@ export function planRoomFeeds(input: RoomFeedsInput): RoomFeedsResult {
     .map((served) => ({ roomId: served.roomId, d: centreDistance(served.roomId) }))
     .sort((p, q) => p.d - q.d || (p.roomId < q.roomId ? -1 : p.roomId > q.roomId ? 1 : 0));
 
+  const feedRoom = (
+    room: Room,
+    ports: readonly { id: string; point: Vec2 }[],
+    reach: RoomReach,
+  ): { row: RoomFeedResult; paths: Vec2[][]; junctionMm: Vec2 } => {
+    const feed = roomFeed({
+      entry: reach.entry,
+      ports,
+      ringMm: room.polygon.outer.map(toMm),
+      inside: insideRouteArea([room], mmPerPt),
+      roomContains: (p) => roomContainsPoint(room, toPage(p)),
+      crossesExisting: input.crossesExisting,
+      bendMm: input.options.bendPenaltyMm,
+      crossingMm: input.options.crossingPenaltyMm,
+      exactMaxPorts: input.options.exactSpine?.maxPorts,
+    });
+    const branch = feed.stub.length === 2 ? [...reach.branch, feed.stub[1]!] : reach.branch;
+    return {
+      row: {
+        roomId: room.id,
+        branch,
+        spine: feed.spine,
+        leftPortIds: feed.leftPortIds,
+        lengthMm: pathLength(branch) + feed.spine.reduce((total, path) => total + pathLength(path), 0),
+      },
+      paths: feed.stub.length === 2 ? [feed.stub, ...feed.spine] : [...feed.spine],
+      junctionMm: feed.junctionMm,
+    };
+  };
+
   const placedTaps: PlacedTapAt[] = [];
   const rooms: RoomFeedResult[] = [];
-  const unfedRoomIds: string[] = [];
+  const far: string[] = [];
+  const fed = new Map<string, { depth: number; junctionMm: Vec2; paths: Vec2[][] }>();
 
   for (const { roomId } of order) {
     const room = roomById.get(roomId);
     const ports = input.portsByRoom.get(roomId) ?? [];
     const areaEntries = input.areaEntries.filter((entry) => entry.roomId === roomId);
     if (!room || areaEntries.length === 0) {
-      unfedRoomIds.push(roomId);
+      far.push(roomId);
       continue;
     }
     const portsMm = ports.map((port) => port.point);
     const candidates = roomEntryCandidates({ room, mmPerPt, areaEntries, corridorAt, portsMm });
-    const others = portRooms.filter((other) => other.room.id !== roomId);
+    const excluded = new Set([roomId]);
     const hitsOtherRoom = (path: readonly Vec2[], entryMm: Vec2): boolean => {
       for (let i = 1; i < path.length; i++) {
         for (const p of legSamples(path[i - 1]!, path[i]!)) {
           if (dist(p, entryMm) < ENTRY_CLEAR_MM) continue;
-          const q = toPage(p);
-          if (others.some((o) => q.x >= o.bounds.minX && q.x <= o.bounds.maxX && q.y >= o.bounds.minY && q.y <= o.bounds.maxY && roomContainsPoint(o.room, q))) return true;
+          if (inPortRoom(toPage(p), excluded)) return true;
         }
       }
       return false;
@@ -114,31 +157,92 @@ export function planRoomFeeds(input: RoomFeedsInput): RoomFeedsResult {
       portsMm,
     });
     if (!reach) {
-      unfedRoomIds.push(roomId);
+      far.push(roomId);
       continue;
     }
     const carrier = carrierById.get(reach.carrierId);
     if (carrier && dist(carrier.a, carrier.b) > 0) placedTaps.push({ carrierId: reach.carrierId, sMm: dist(carrier.a, reach.tapMm) });
 
-    const feed = roomFeed({
-      entry: reach.entry,
-      ports,
-      ringMm: room.polygon.outer.map(toMm),
-      inside: insideRouteArea([room], mmPerPt),
-      roomContains: (p) => roomContainsPoint(room, toPage(p)),
-      crossesExisting: input.crossesExisting,
-      bendMm: input.options.bendPenaltyMm,
-      crossingMm: input.options.crossingPenaltyMm,
-      exactMaxPorts: input.options.exactSpine?.maxPorts,
-    });
-    const branch = feed.stub.length === 2 ? [...reach.branch, feed.stub[1]!] : reach.branch;
-    rooms.push({
-      roomId,
-      branch,
-      spine: feed.spine,
-      leftPortIds: feed.leftPortIds,
-      lengthMm: pathLength(branch) + feed.spine.reduce((total, path) => total + pathLength(path), 0),
-    });
+    const fedRoom = feedRoom(room, ports, reach);
+    rooms.push(fedRoom.row);
+    fed.set(roomId, { depth: 0, junctionMm: fedRoom.junctionMm, paths: fedRoom.paths });
   }
-  return { rooms, unfedRoomIds };
+
+  const tryChain = (roomId: string): boolean => {
+    const room = roomById.get(roomId);
+    if (!room) return false;
+    const ports = input.portsByRoom.get(roomId) ?? [];
+    const portsMm = ports.map((port) => port.point);
+    const hosts = [...fed.entries()]
+      .filter(([, host]) => host.depth + 1 <= maxDepth)
+      .sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0));
+    if (hosts.length === 0) return false;
+    const hostRooms = hosts.map(([hostId]) => roomById.get(hostId)!);
+    const chainCarriers: ReachCarrier[] = hosts.map(([hostId, host]) => ({
+      id: `chain:${hostId}`,
+      a: { ...host.junctionMm },
+      b: { ...host.junctionMm },
+    }));
+    const inHostAt = (p: Vec2): boolean => hostRooms.some((host) => roomContainsPoint(host, toPage(p)));
+    const chainPathOk = (path: readonly Vec2[], carrierId: string, entry: EntryCandidate): boolean => {
+      if (!input.accepts([...path]) || runsOverOtherPort(path, input.targetPointsMm)) return false;
+      const hostId = carrierId.slice('chain:'.length);
+      const host = fed.get(hostId);
+      const hostRoom = roomById.get(hostId);
+      if (!host || !hostRoom) return false;
+      const hostExcluded = new Set([hostId, roomId]);
+      for (let i = 1; i < path.length; i++) {
+        for (const p of legSamples(path[i - 1]!, path[i]!)) {
+          const fromJunction = dist(p, host.junctionMm);
+          if (fromJunction < 1) continue;
+          if (dist(p, entry.pointMm) >= ENTRY_CLEAR_MM) {
+            if (!roomContainsPoint(hostRoom, toPage(p))) return false;
+          } else if (inPortRoom(toPage(p), hostExcluded)) return false;
+          if (fromJunction > CHAIN_CLEAR_MM && host.paths.some((own) => distanceToPath(p, own) <= CHAIN_CLEAR_MM)) return false;
+        }
+      }
+      return true;
+    };
+    let reach: RoomReach | null = null;
+    for (const probeMm of [300, 700]) {
+      const candidates = roomEntryCandidates({ room, mmPerPt, areaEntries: [], corridorAt: inHostAt, portsMm, probeMm });
+      reach = bestRoomReach({
+        candidates,
+        carriers: chainCarriers,
+        placedTaps: [],
+        pathOk: chainPathOk,
+        bendMm: input.options.bendPenaltyMm,
+        searchMm: branches.searchMm,
+        portsMm,
+      });
+      if (reach) break;
+    }
+    if (!reach) return false;
+    const hostId = reach.carrierId.slice('chain:'.length);
+    const host = fed.get(hostId)!;
+    const fedRoom = feedRoom(room, ports, reach);
+    rooms.push({ ...fedRoom.row, chain: { viaRoomId: hostId, depth: host.depth + 1 } });
+    fed.set(roomId, { depth: host.depth + 1, junctionMm: fedRoom.junctionMm, paths: fedRoom.paths });
+    host.paths.push(reach.branch);
+    return true;
+  };
+
+  const farRooms = [...new Set([...far, ...(input.offGraphRoomIds ?? []).filter((roomId) => input.portsByRoom.has(roomId))])]
+    .map((roomId) => ({ roomId, d: centreDistance(roomId) }))
+    .sort((p, q) => p.d - q.d || (p.roomId < q.roomId ? -1 : p.roomId > q.roomId ? 1 : 0))
+    .map((item) => item.roomId);
+
+  let pending = farRooms;
+  if (maxDepth >= 1 && farRooms.length > 0) {
+    let placedAny = true;
+    while (placedAny) {
+      placedAny = false;
+      pending = pending.filter((roomId) => {
+        if (!tryChain(roomId)) return true;
+        placedAny = true;
+        return false;
+      });
+    }
+  }
+  return { rooms, unfedRoomIds: pending };
 }

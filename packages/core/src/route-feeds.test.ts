@@ -134,4 +134,114 @@ describe('planRoomFeeds', () => {
     expect(out.rooms).toEqual([]);
     expect(out.unfedRoomIds).toEqual(['R']);
   });
+
+  describe('chain pass', () => {
+    const legDist = (p: Vec2, a: Vec2, b: Vec2): number => {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lenSq = dx * dx + dy * dy;
+      const t = lenSq === 0 ? 0 : Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+      return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
+    };
+    const chainInput = (over: Partial<RoomFeedsInput> = {}, extra: Room[] = [], servedExtra: string[] = [], ports: [string, Vec2][] = []) =>
+      feedInput({
+        rooms: [box('N', 0, 0, 4000, 3000), box('F', 4000, 0, 8000, 3000), ...extra],
+        servedRooms: [served('N'), served('F'), ...servedExtra.map(served)],
+        portsByRoom: new Map<string, { id: string; point: Vec2 }[]>([
+          ['N', [{ id: 'n1', point: { x: 1000, y: 1500 } }]],
+          ['F', [{ id: 'f1', point: { x: 6000, y: 2500 } }]],
+          ...ports.map(([id, point]) => [id, [{ id: `${id}-p`, point }]] as const),
+        ]),
+        areaEntries: [wallEntry('N', { x: 2000, y: 0 })],
+        ...over,
+      });
+
+    it('feeds a far room by a chain from a fed neighbour', () => {
+      const out = planRoomFeeds(chainInput());
+      expect(out.unfedRoomIds).toEqual([]);
+      const n = out.rooms.find((r) => r.roomId === 'N')!;
+      const f = out.rooms.find((r) => r.roomId === 'F')!;
+      expect(f.chain).toEqual({ viaRoomId: 'N', depth: 1 });
+      expect(f.branch[0]).toEqual(n.branch[n.branch.length - 1]);
+      expect(f.branch.slice(0, -1).length - 1).toBeLessThanOrEqual(2);
+      expect(f.leftPortIds).toEqual([]);
+    });
+
+    it('starts the chain at the junction of the neighbour and not on its spine', () => {
+      const out = planRoomFeeds(chainInput());
+      const n = out.rooms.find((r) => r.roomId === 'N')!;
+      const f = out.rooms.find((r) => r.roomId === 'F')!;
+      const hostLegs = [...n.spine, n.branch];
+      const chainPoints = f.branch.slice(1);
+      for (const p of chainPoints) {
+        for (const path of hostLegs) {
+          for (let i = 1; i < path.length; i++) expect(legDist(p, path[i - 1]!, path[i]!)).toBeGreaterThan(60);
+        }
+      }
+    });
+
+    it('stops the chain at the depth limit', () => {
+      const extra = [box('G', 8000, 0, 12000, 3000)];
+      const withG = (over: Partial<RoomFeedsInput> = {}) => chainInput(over, extra, ['G'], [['G', { x: 10000, y: 2500 }]]);
+      const one = planRoomFeeds(withG({ options: { roomBranches: { searchMm: 30000, maxChainDepth: 1 } } }));
+      expect(one.unfedRoomIds).toEqual(['G']);
+      const two = planRoomFeeds(withG({ options: { roomBranches: { searchMm: 30000, maxChainDepth: 2 } } }));
+      expect(two.unfedRoomIds).toEqual([]);
+      expect(two.rooms.find((r) => r.roomId === 'G')!.chain).toEqual({ viaRoomId: 'F', depth: 2 });
+      const zero = planRoomFeeds(withG({ options: { roomBranches: { searchMm: 30000, maxChainDepth: 0 } } }));
+      expect(zero.unfedRoomIds).toEqual(['F', 'G']);
+    });
+
+    it('leaves the far room unfed when accepts refuses every chain path', () => {
+      const out = planRoomFeeds(chainInput({ accepts: (path: Vec2[]) => path.every((v) => v.x <= 3500) }));
+      expect(out.unfedRoomIds).toEqual(['F']);
+      expect(out.rooms.map((r) => r.roomId)).toEqual(['N']);
+    });
+
+    it('leaves the far room unfed when the spine of its neighbour cuts every chain path', () => {
+      const out = planRoomFeeds(
+        chainInput({
+          portsByRoom: new Map([
+            ['N', [{ id: 'n1', point: { x: 1000, y: 1500 } }, { id: 'n2', point: { x: 3500, y: 250 } }]],
+            ['F', [{ id: 'f1', point: { x: 6000, y: 2500 } }]],
+          ]),
+        }),
+      );
+      expect(out.unfedRoomIds).toEqual(['F']);
+      const control = planRoomFeeds(chainInput());
+      expect(control.rooms.find((r) => r.roomId === 'F')!.chain).toEqual({ viaRoomId: 'N', depth: 1 });
+    });
+
+    it('does not chain the far room through a served room that has ports next to the shared wall', () => {
+      const out = planRoomFeeds(chainInput({}, [box('T', 3750, 0, 4250, 3000)], ['T'], [['T', { x: 4000, y: 1500 }]]));
+      expect(out.unfedRoomIds).toEqual(['F']);
+      expect(planRoomFeeds(chainInput()).unfedRoomIds).toEqual([]);
+    });
+
+    it('chains an off-graph room that has ports and is not served', () => {
+      const out = planRoomFeeds(chainInput({ servedRooms: [served('N')], offGraphRoomIds: ['F'] }));
+      expect(out.unfedRoomIds).toEqual([]);
+      expect(out.rooms.find((r) => r.roomId === 'F')!.chain).toEqual({ viaRoomId: 'N', depth: 1 });
+    });
+
+    it('ignores an off-graph room that has no ports', () => {
+      const out = planRoomFeeds(chainInput({ servedRooms: [served('N')], offGraphRoomIds: ['Q'] }, [box('Q', 20000, 0, 24000, 3000)]));
+      expect(out.unfedRoomIds).toEqual([]);
+      expect(out.rooms.map((r) => r.roomId)).toEqual(['N']);
+    });
+
+    it('gives the same result for the same input and for another order of served rooms', () => {
+      const input = chainInput();
+      expect(planRoomFeeds(input)).toEqual(planRoomFeeds(input));
+      const reversed = planRoomFeeds({ ...input, servedRooms: [...input.servedRooms].reverse() });
+      expect(reversed.rooms.filter((r) => r.chain).map((r) => r.roomId)).toEqual(['F']);
+    });
+
+    it('uses a chain depth of 1 when maxChainDepth is absent', () => {
+      const extra = [box('G', 8000, 0, 12000, 3000)];
+      const build = (maxChainDepth?: number) =>
+        planRoomFeeds(chainInput({ options: { roomBranches: maxChainDepth === undefined ? { searchMm: 30000 } : { searchMm: 30000, maxChainDepth } } }, extra, ['G'], [['G', { x: 10000, y: 2500 }]]));
+      expect(build()).toEqual(build(1));
+    });
+  });
 });

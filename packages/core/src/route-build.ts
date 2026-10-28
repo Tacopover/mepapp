@@ -334,7 +334,7 @@ export function planRoute(
 
   // A port in a route-area room (inArea) is treated like an outside port: it gets the off-graph connection. Provisional rule, the plan has none yet.
   const loosePorts: RoutePort[] = [];
-  for (const roomId of trunk.offGraphRoomIds) loosePorts.push(...(grouped.byRoom.get(roomId) ?? []));
+  if (!options.roomBranches) for (const roomId of trunk.offGraphRoomIds) loosePorts.push(...(grouped.byRoom.get(roomId) ?? []));
   loosePorts.push(...grouped.outside, ...grouped.inArea);
 
   const roomById = new Map(input.rooms.map((room) => [room.id, room] as const));
@@ -348,11 +348,13 @@ export function planRoute(
     };
   });
   const portById = new Map(input.targetPorts.map((port) => [portKey(port), port] as const));
+  let chainedRoomIds: string[] = [];
   if (options.roomBranches) {
     const portsByRoom = new Map([...grouped.byRoom].map(([roomId, ports]) => [roomId, ports.map((port) => ({ id: portKey(port), point: toMm(port.world) }))] as const));
     const feeds = planRoomFeeds({
       rooms: input.rooms,
       servedRooms: trunk.served,
+      offGraphRoomIds: trunk.offGraphRoomIds,
       portsByRoom,
       areaEntries: input.area.entries,
       areaRoomIds: new Set(input.area.rooms.map((room) => room.roomId)),
@@ -365,6 +367,7 @@ export function planRoute(
       crossesExisting: makeCrossesExisting(existing.segments, mmPerPt),
       options,
     });
+    chainedRoomIds = feeds.rooms.filter((r) => r.chain).map((r) => r.roomId).sort();
     for (const feed of feeds.rooms) {
       paths.push(feed.branch, ...feed.spine);
       tag('branch', feed.branch);
@@ -440,6 +443,7 @@ export function planRoute(
   if (items.freeLegs > 0) warnings.push({ code: 'free-angle', severity: 'warning', count: items.freeLegs, points: items.freePoints });
   else if (trunk.freeEdges.length > 0) warnings.push({ code: 'free-angle', severity: 'warning', count: trunk.freeEdges.length, points: trunk.freeEdges.map((edge) => toPage(edge.pointMm)) });
   if (trunk.offGraphRoomIds.length > 0) warnings.push({ code: 'room-off-graph', severity: 'warning', ids: [...trunk.offGraphRoomIds].sort(), count: trunk.offGraphRoomIds.length });
+  if (chainedRoomIds.length > 0) warnings.push({ code: 'room-chained', severity: 'warning', ids: chainedRoomIds, count: chainedRoomIds.length });
   const leftCount = connected.left.length + refusedPorts.length;
   if (leftCount > 0) {
     warnings.push({ code: 'ports-left', severity: 'warning', count: leftCount });
