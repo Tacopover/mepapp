@@ -1,8 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Vec2 } from './geometry.js';
+import { distance, type Vec2 } from './geometry.js';
 import { insideRouteArea, withWallGaps } from './route-layout.js';
-import { mainRunLines, type MainLine, type MainLineInput } from './route-main-run.js';
+import { mainRunLines, planMainRun, type MainDemand, type MainLine, type MainLineInput } from './route-main-run.js';
+import { roomEntryCandidates } from './route-room-entry.js';
 import { manualScenario } from './route-scenario.testutil.js';
+import { roomContainsPoint } from './rooms/room.js';
 import { pointInRing } from './rooms/polygon.js';
 import { getStampWorldPorts } from './stamp.js';
 
@@ -336,4 +338,248 @@ describe('mainRunLines on the manual fixture', () => {
     });
     console.log(['P2 T05-2: mainRunLines on the manual fixture', ...rows, 'nearest to each hand line:', ...nearest].join('\n'));
   });
+});
+
+type PlanInput = Parameters<typeof planMainRun>[0];
+
+const hLine = (id: string, y: number, x0: number, x1: number): MainLine => ({ id, a: { x: x0, y }, b: { x: x1, y } });
+const vLine = (id: string, x: number, y0: number, y1: number): MainLine => ({ id, a: { x, y: y0 }, b: { x, y: y1 } });
+const door = (x: number, y: number, outward: Vec2): MainDemand['doorsMm'][number] => ({ pointMm: { x, y }, outward });
+const demand = (roomId: string, doorsMm: MainDemand['doorsMm']): MainDemand => ({ roomId, doorsMm });
+const planInput = (over: Partial<PlanInput>): PlanInput => ({
+  lines: [],
+  startMm: far,
+  demands: [],
+  inside: () => true,
+  bendMm: 500,
+  reachMm: 4800,
+  ...over,
+});
+
+const keyOfPt = (p: Vec2): string => `${Math.round(p.x)},${Math.round(p.y)}`;
+
+/** Count the pieces of the paths after splitting each path at every end of another path that touches it, and the distinct points. */
+function treeCounts(paths: readonly Vec2[][]): { pieces: number; points: number } {
+  const ends = paths.flatMap((p) => [p[0]!, p[1]!]);
+  const points = new Set<string>();
+  let pieces = 0;
+  for (const [a, b] of paths as Vec2[][]) {
+    const horizontal = a!.y === b!.y;
+    const along = (p: Vec2): number => (horizontal ? p.x : p.y);
+    const across = (p: Vec2): number => (horizontal ? p.y : p.x);
+    const lo = Math.min(along(a!), along(b!));
+    const hi = Math.max(along(a!), along(b!));
+    const cuts = [lo, hi, ...ends.filter((e) => Math.abs(across(e) - across(a!)) <= 1 && along(e) > lo + 1 && along(e) < hi - 1).map(along)];
+    const ts = [...new Set(cuts.map((t) => Math.round(t)))].sort((p, q) => p - q);
+    pieces += ts.length - 1;
+    for (const t of ts) points.add(keyOfPt(horizontal ? { x: t, y: across(a!) } : { x: across(a!), y: t }));
+  }
+  return { pieces, points: points.size };
+}
+
+/** Count the points where exactly two path ends meet at a right angle. */
+function countBends(paths: readonly Vec2[][]): number {
+  const dirsAt = new Map<string, Vec2[]>();
+  const add = (p: Vec2, dir: Vec2): void => {
+    dirsAt.set(keyOfPt(p), [...(dirsAt.get(keyOfPt(p)) ?? []), dir]);
+  };
+  for (const [a, b] of paths as Vec2[][]) {
+    const len = distance(a!, b!);
+    const dir = { x: (b!.x - a!.x) / len, y: (b!.y - a!.y) / len };
+    add(a!, dir);
+    add(b!, { x: -dir.x, y: -dir.y });
+  }
+  let bends = 0;
+  for (const dirs of dirsAt.values()) {
+    if (dirs.length !== 2) continue;
+    if (Math.abs(dirs[0]!.x * dirs[1]!.x + dirs[0]!.y * dirs[1]!.y) < 0.5) bends++;
+  }
+  return bends;
+}
+
+const summary = (run: ReturnType<typeof planMainRun>) => ({
+  paths: run.paths,
+  lines: run.lines,
+  unreachedRoomIds: run.unreachedRoomIds,
+  chosen: [...run.chosenHitByRoom].sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0)),
+});
+
+const TEE_START: Vec2 = { x: 0, y: 1000 };
+const teeScene = (): PlanInput =>
+  planInput({
+    lines: [hLine('h', 1000, 0, 10000), vLine('v', 5000, 1000, 5000)],
+    startMm: TEE_START,
+    demands: [
+      demand('A', [door(8000, 1500, { x: 0, y: -1 })]),
+      demand('B', [door(4000, 3000, { x: 1, y: 0 })]),
+      demand('C', [door(3000, 1500, { x: 0, y: -1 })]),
+    ],
+  });
+
+describe('planMainRun', () => {
+  it('gives one straight path for two rooms whose doors face one line', () => {
+    const run = planMainRun(
+      planInput({
+        lines: [hLine('h', 1000, 0, 10000)],
+        startMm: TEE_START,
+        demands: [demand('A', [door(2000, 1500, { x: 0, y: -1 })]), demand('B', [door(6000, 1500, { x: 0, y: -1 })])],
+      }),
+    );
+    expect(run.paths).toEqual([[{ x: 0, y: 1000 }, { x: 6000, y: 1000 }]]);
+    expect(run.unreachedRoomIds).toEqual([]);
+    expect([...run.chosenHitByRoom]).toEqual([
+      ['A', { x: 2000, y: 1000 }],
+      ['B', { x: 6000, y: 1000 }],
+    ]);
+  });
+
+  it('adds one tee path when a door hits a second perpendicular line', () => {
+    const run = planMainRun(teeScene());
+    expect(run.paths).toHaveLength(2);
+    expect(run.paths[1]).toEqual([{ x: 5000, y: 1000 }, { x: 5000, y: 3000 }]);
+    expect(run.unreachedRoomIds).toEqual([]);
+    expect(countBends(run.paths)).toBeLessThanOrEqual(1);
+  });
+
+  it('keeps one hit for a room with two doors and no branch to the far hit', () => {
+    const run = planMainRun(
+      planInput({
+        lines: [hLine('h', 1000, 0, 10000)],
+        startMm: TEE_START,
+        demands: [demand('R', [door(2000, 1500, { x: 0, y: -1 }), door(9000, 1500, { x: 0, y: -1 })])],
+      }),
+    );
+    expect(run.chosenHitByRoom.size).toBe(1);
+    expect(run.chosenHitByRoom.get('R')).toEqual({ x: 2000, y: 1000 });
+    expect(run.paths.flat().some((p) => p.x === 9000)).toBe(false);
+  });
+
+  it('moves a room to its second hit when the first hit lies off the tree of the other rooms', () => {
+    const base = planInput({
+      lines: [hLine('main', 1000, 0, 10000), vLine('spine', 0, 1000, 5000), hLine('far', 5000, 0, 10000)],
+      startMm: TEE_START,
+      demands: [
+        demand('A', [door(1000, 4500, { x: 0, y: 1 }), door(6000, 1700, { x: 0, y: -1 })]),
+        demand('B', [door(6000, 1500, { x: 0, y: -1 })]),
+      ],
+    });
+    const run = planMainRun(base);
+    expect(run.chosenHitByRoom.get('A')).toEqual({ x: 6000, y: 1000 });
+    expect(run.paths.some((p) => p.some((q) => q.x === 1000 && q.y === 5000))).toBe(false);
+    const shuffled = planInput({ ...base, lines: [...base.lines].reverse(), demands: [...base.demands].reverse() });
+    expect(summary(planMainRun(shuffled))).toEqual(summary(run));
+  });
+
+  it('puts a room in unreachedRoomIds when its hits stop beyond reachMm or hit no line', () => {
+    const run = planMainRun(
+      planInput({
+        lines: [hLine('h', 1000, 0, 10000)],
+        startMm: TEE_START,
+        reachMm: 1000,
+        demands: [
+          demand('far', [door(2000, 3000, { x: 0, y: -1 })]),
+          demand('none', [door(2000, 1500, { x: 0, y: 1 })]),
+        ],
+      }),
+    );
+    expect(run.unreachedRoomIds).toEqual(['far', 'none']);
+    expect(run.chosenHitByRoom.size).toBe(0);
+    expect(run.paths).toEqual([]);
+  });
+
+  it('gives a tree whose distinct points are its pieces plus one', () => {
+    const run = planMainRun(teeScene());
+    const counts = treeCounts(run.paths);
+    expect(counts.points).toBe(counts.pieces + 1);
+  });
+
+  it('gives the same output for shuffled demands and lines', () => {
+    const base = teeScene();
+    const shuffled = planInput({ ...base, lines: [...base.lines].reverse(), demands: [...base.demands].reverse() });
+    expect(summary(planMainRun(shuffled))).toEqual(summary(planMainRun(base)));
+  });
+
+  it('gives the same output on a second call', () => {
+    expect(planMainRun(teeScene())).toEqual(planMainRun(teeScene()));
+  });
+
+  it('gives no more bends with a bend price of 10000 than with 0', () => {
+    const free = countBends(planMainRun(planInput({ ...teeScene(), bendMm: 0 })).paths);
+    const dear = countBends(planMainRun(planInput({ ...teeScene(), bendMm: 10000 })).paths);
+    expect(dear).toBeLessThanOrEqual(free);
+  });
+
+  it('gives no path and every room unreached when there are no lines', () => {
+    const run = planMainRun(planInput({ demands: [demand('B', []), demand('A', [])] }));
+    expect(run.lines).toEqual([]);
+    expect(run.paths).toEqual([]);
+    expect(run.rootPointMm).toEqual(far);
+    expect(run.unreachedRoomIds).toEqual(['A', 'B']);
+  });
+});
+
+describe('planMainRun on the manual fixture', () => {
+  it('builds one tree within the bend and length gates', () => {
+    const fixture = manualScenario();
+    if (fixture === null) return;
+    const { scenario: s } = fixture;
+    const { mmPerPt } = s.drawing;
+    const toMm = (p: Vec2): Vec2 => ({ x: p.x * mmPerPt, y: p.y * mmPerPt });
+    const areaRoomObjects = s.drawing.rooms.filter((r) => s.area.rooms.some((a) => a.roomId === r.id));
+    const areaRooms = areaRoomObjects.map((room) => ({ roomId: room.id, ringMm: room.polygon.outer.map(toMm) }));
+    const shaftRoomIds = new Set(s.area.rooms.filter((r) => r.kind === 'shaft').map((r) => r.roomId));
+    const linkPointsMm = s.area.links.filter((l) => !l.shaft).map((l) => toMm(l.point));
+    const inside = withWallGaps(insideRouteArea(areaRoomObjects, mmPerPt), linkPointsMm);
+    const startStamp = s.stamps.find((st) => st.id === s.startStampId);
+    const startPort = startStamp ? getStampWorldPorts(startStamp).find((p) => p.id === s.startPortId)?.world : undefined;
+    if (!startPort) throw new Error('manual fixture: no start port');
+    const startMm = toMm(startPort);
+    const lines = mainRunLines({
+      areaRooms,
+      inside,
+      startMm,
+      offsetMm: 1000,
+      blockers: [],
+      shaftRoomIds,
+      ductWidthMm: 400,
+      clearanceMm: 150,
+    });
+    const corridorAt = (p: Vec2): boolean =>
+      areaRoomObjects.some((r) => roomContainsPoint(r, { x: p.x / mmPerPt, y: p.y / mmPerPt }));
+    const demands: MainDemand[] = s.servedRooms.map((room) => {
+      const candidates = roomEntryCandidates({
+        room,
+        mmPerPt,
+        areaEntries: s.area.entries.filter((e) => e.roomId === room.id),
+        corridorAt,
+        portsMm: s.targetPorts.filter((p) => p.roomId === room.id).map((p) => toMm(p.world)),
+        alignedInGap: true,
+      });
+      return { roomId: room.id, doorsMm: candidates.map((c) => ({ pointMm: c.pointMm, outward: c.outward })) };
+    });
+    const run = planMainRun({ lines, startMm, demands, inside, bendMm: 500, reachMm: 4800 });
+
+    const hasStub = distance(startMm, run.rootPointMm) > 1;
+    const tree = hasStub ? run.paths.slice(0, -1) : run.paths;
+    const treeLength = tree.reduce((sum, p) => sum + distance(p[0]!, p[1]!), 0);
+    const bends = countBends(tree);
+    console.log(
+      [
+        `P2 T06-1: planMainRun on the manual fixture (${lines.length} input lines, ${demands.length} served rooms)`,
+        ...run.lines.map((l) => `${l.id}  (${l.a.x.toFixed(0)}, ${l.a.y.toFixed(0)}) -> (${l.b.x.toFixed(0)}, ${l.b.y.toFixed(0)})`),
+        `tree length ${(treeLength / 1000).toFixed(2)} m`,
+        `bends ${bends}`,
+        `unreached rooms ${run.unreachedRoomIds.length}: ${run.unreachedRoomIds.join(' ')}`,
+        'chosen hit per room:',
+        ...[...run.chosenHitByRoom].map(([id, p]) => `${id}: (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`),
+      ].join('\n'),
+    );
+
+    expect(bends).toBeLessThanOrEqual(8);
+    expect(treeLength).toBeLessThanOrEqual(1.1 * 89300);
+    for (const [roomId, p] of run.chosenHitByRoom) {
+      const doors = demands.find((d) => d.roomId === roomId)!.doorsMm;
+      expect(Math.min(...doors.map((d) => distance(d.pointMm, p)))).toBeLessThanOrEqual(4800);
+    }
+  }, 60000);
 });

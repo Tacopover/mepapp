@@ -1,4 +1,5 @@
 import { closestPointOnSegment, distance, type Vec2 } from './geometry.js';
+import { steinerTreeWithTurns, type SteinerTurnEdge, type SteinerTurnGraph } from './route-steiner.js';
 
 export interface MainLine { id: string; a: Vec2; b: Vec2; bridge?: boolean; crossedRoomId?: string }   // axis aligned, a to b, a before b along the axis
 
@@ -28,6 +29,13 @@ const START_REACH_MM = 100;
 const DUCT_OVERLAP_MM = 500;
 const RAY_EPS_MM = 1e-6;
 const MAX_PASSES = 1000;
+const NODE_TOL_MM = 200;
+const ON_TRACK_MM = 1;
+const DOOR_SPAN_MM = 50;
+const STUB_MIN_MM = 1;
+const SWITCH_EPS_MM = 1e-6;
+const SWITCH_ROUNDS = 2;
+const STRAIGHT_DOT = -0.99;   // below this dot, two edges run opposite ways
 
 type Orient = 'h' | 'v';
 
@@ -301,4 +309,292 @@ export function mainRunLines(input: MainLineInput): MainLine[] {
     a: at(line.orient, line.coord, line.lo),
     b: at(line.orient, line.coord, line.hi),
   }));
+}
+
+export interface MainDemand { roomId: string; doorsMm: readonly { pointMm: Vec2; outward: Vec2 }[] }   // outward = unit axis vector
+export interface MainRun { lines: MainLine[]; paths: Vec2[][]; rootPointMm: Vec2; unreachedRoomIds: string[]; chosenHitByRoom: Map<string, Vec2> }
+
+interface Track extends Span { orient: Orient; coord: number }
+interface Hit { lineIdx: number; d: number; point: Vec2 }
+interface Edge { a: number; b: number; cost: number; dir: Vec2 }   // node indices; dir = unit direction from a to b
+interface TreeSolve { edgeIds: string[]; unreached: Set<number> }
+type Adj = { to: number; cost: number }[][];
+
+const alongOf = (p: Vec2, orient: Orient): number => (orient === 'h' ? p.x : p.y);
+const acrossOf = (p: Vec2, orient: Orient): number => (orient === 'h' ? p.y : p.x);
+const keyOf = (p: Vec2): string => `${Math.round(p.x)},${Math.round(p.y)}`;
+const nodeId = (i: number): string => `n-${i}`;
+const within = (v: number, t: Span): boolean => v >= t.lo - NODE_TOL_MM && v <= t.hi + NODE_TOL_MM;
+const lexLess = (p: Vec2, q: Vec2): boolean => p.x < q.x || (p.x === q.x && p.y < q.y);
+
+function trackOf(line: MainLine): Track {
+  const orient: Orient = line.a.y === line.b.y ? 'h' : 'v';
+  const s = alongOf(line.a, orient);
+  const e = alongOf(line.b, orient);
+  return { orient, coord: acrossOf(line.a, orient), lo: Math.min(s, e), hi: Math.max(s, e) };
+}
+
+function sortTracks(tracks: readonly Track[]): Track[] {
+  return [...tracks].sort((p, q) =>
+    (p.orient === q.orient ? 0 : p.orient === 'h' ? -1 : 1) || p.coord - q.coord || p.lo - q.lo || p.hi - q.hi,
+  );
+}
+
+function nearestOnTrack(p: Vec2, t: Track): Vec2 {
+  return at(t.orient, t.coord, Math.min(t.hi, Math.max(t.lo, alongOf(p, t.orient))));
+}
+
+/** The nearest track ahead of the door along its ray, when the hit lies within reachMm. */
+function hitOf(door: { pointMm: Vec2; outward: Vec2 }, tracks: readonly Track[], reachMm: number): Hit | null {
+  const axis: Orient = Math.abs(door.outward.x) >= Math.abs(door.outward.y) ? 'h' : 'v';
+  const perp: Orient = axis === 'h' ? 'v' : 'h';
+  const sign = Math.sign(alongOf(door.outward, axis));
+  let best: { lineIdx: number; d: number } | null = null;
+  for (let i = 0; i < tracks.length; i++) {
+    const t = tracks[i]!;
+    if (t.orient !== perp) continue;
+    const d = (t.coord - alongOf(door.pointMm, axis)) * sign;
+    const s = alongOf(door.pointMm, perp);
+    if (d <= RAY_EPS_MM || s < t.lo - DOOR_SPAN_MM || s > t.hi + DOOR_SPAN_MM) continue;
+    if (best === null || d < best.d) best = { lineIdx: i, d };
+  }
+  if (best === null || best.d > reachMm) return null;
+  const { d, lineIdx } = best;
+  return { lineIdx, d, point: { x: door.pointMm.x + door.outward.x * d, y: door.pointMm.y + door.outward.y * d } };
+}
+
+function unitOf(p: Vec2, q: Vec2): Vec2 {
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  return Math.abs(dx) >= Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+}
+
+function distancesFrom(sources: readonly number[], adj: Adj): number[] {
+  const dist = new Array<number>(adj.length).fill(Infinity);
+  for (const s of sources) dist[s] = 0;
+  const done = new Array<boolean>(adj.length).fill(false);
+  for (;;) {
+    let u = -1;
+    for (let i = 0; i < dist.length; i++) {
+      if (!done[i] && dist[i]! < Infinity && (u < 0 || dist[i]! < dist[u]!)) u = i;
+    }
+    if (u < 0) return dist;
+    done[u] = true;
+    for (const { to, cost } of adj[u]!) {
+      if (dist[u]! + cost < dist[to]!) dist[to] = dist[u]! + cost;
+    }
+  }
+}
+
+/** Joins the tree edges that meet straight through a node, and returns one path per joined chain. */
+function straightPaths(edgeIds: readonly string[], info: ReadonlyMap<string, Edge>, nodePts: readonly Vec2[]): Vec2[][] {
+  const parent = edgeIds.map((_, k) => k);
+  const find = (k: number): number => {
+    let r = k;
+    while (parent[r] !== r) r = parent[r]!;
+    return r;
+  };
+  const incident = new Map<number, { k: number; out: Vec2 }[]>();
+  const attach = (node: number, item: { k: number; out: Vec2 }): void => {
+    incident.set(node, [...(incident.get(node) ?? []), item]);
+  };
+  edgeIds.forEach((id, k) => {
+    const e = info.get(id)!;
+    attach(e.a, { k, out: e.dir });
+    attach(e.b, { k, out: { x: -e.dir.x, y: -e.dir.y } });
+  });
+  for (const list of incident.values()) {
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const p = list[i]!;
+        const q = list[j]!;
+        if (p.out.x * q.out.x + p.out.y * q.out.y < STRAIGHT_DOT) parent[find(p.k)] = find(q.k);
+      }
+    }
+  }
+  const chains = new Map<number, { pts: Vec2[]; dir: Vec2 }>();
+  edgeIds.forEach((id, k) => {
+    const e = info.get(id)!;
+    const r = find(k);
+    const chain = chains.get(r) ?? { pts: [], dir: e.dir };
+    chain.pts.push(nodePts[e.a]!, nodePts[e.b]!);
+    chains.set(r, chain);
+  });
+  return [...chains.values()]
+    .map(({ pts, dir }) => {
+      const axis: Orient = dir.x !== 0 ? 'h' : 'v';
+      const lo = pts.reduce((m, p) => (alongOf(p, axis) < alongOf(m, axis) ? p : m));
+      const hi = pts.reduce((m, p) => (alongOf(p, axis) > alongOf(m, axis) ? p : m));
+      return lexLess(hi, lo) ? [{ ...hi }, { ...lo }] : [{ ...lo }, { ...hi }];
+    })
+    .sort((p, q) => p[0]!.x - q[0]!.x || p[0]!.y - q[0]!.y || p[1]!.x - q[1]!.x || p[1]!.y - q[1]!.y);
+}
+
+export function planMainRun(input: {
+  lines: readonly MainLine[];
+  startMm: Vec2;
+  demands: readonly MainDemand[];
+  inside: (p: Vec2) => boolean;
+  bendMm: number;
+  reachMm: number;
+}): MainRun {
+  const { startMm } = input;
+  const demands = [...input.demands].sort((p, q) => (p.roomId < q.roomId ? -1 : p.roomId > q.roomId ? 1 : 0));
+  const tracks = sortTracks(input.lines.map(trackOf));
+  if (tracks.length === 0) {
+    return {
+      lines: [],
+      paths: [],
+      rootPointMm: { ...startMm },
+      unreachedRoomIds: demands.map((d) => d.roomId),
+      chosenHitByRoom: new Map(),
+    };
+  }
+
+  const hitsOf = new Map<string, Hit[]>();
+  for (const demand of demands) {
+    const hits = demand.doorsMm.map((door) => hitOf(door, tracks, input.reachMm)).filter((h): h is Hit => h !== null);
+    hitsOf.set(demand.roomId, hits);
+  }
+  const rootPt = tracks.map((t) => nearestOnTrack(startMm, t)).reduce((m, q) => (distance(startMm, q) < distance(startMm, m) ? q : m));
+
+  const onTrack: Vec2[][] = tracks.map((t) => [at(t.orient, t.coord, t.lo), at(t.orient, t.coord, t.hi)]);
+  const gaps: [Vec2, Vec2][] = [];
+  tracks.forEach((p, i) =>
+    tracks.forEach((q, j) => {
+      if (p.orient === 'h' && q.orient === 'v') {
+        const cross = { x: q.coord, y: p.coord };
+        if (within(cross.x, p) && within(cross.y, q)) {
+          onTrack[i]!.push(cross);
+          onTrack[j]!.push(cross);
+        }
+      }
+      if (i !== j && p.orient === q.orient && Math.abs(p.coord - q.coord) <= ON_TRACK_MM && q.lo >= p.hi && q.lo - p.hi <= NODE_TOL_MM) {
+        gaps.push([at(p.orient, p.coord, p.hi), at(q.orient, q.coord, q.lo)]);
+      }
+    }),
+  );
+  for (const hits of hitsOf.values()) for (const h of hits) onTrack[h.lineIdx]!.push(h.point);
+  tracks.forEach((t, i) => {
+    if (Math.abs(acrossOf(rootPt, t.orient) - t.coord) <= ON_TRACK_MM && within(alongOf(rootPt, t.orient), t)) onTrack[i]!.push(rootPt);
+  });
+
+  const reps = new Map<string, Vec2>();
+  for (const pts of onTrack) {
+    for (const p of pts) {
+      const cur = reps.get(keyOf(p));
+      if (!cur || lexLess(p, cur)) reps.set(keyOf(p), p);
+    }
+  }
+  const nodePts = [...reps.values()].sort((p, q) => p.x - q.x || p.y - q.y);
+  const nodeOf = new Map<string, number>(nodePts.map((p, i) => [keyOf(p), i] as const));
+
+  const pairs: [number, number][] = [];
+  tracks.forEach((t, i) => {
+    const idx = [...new Set(onTrack[i]!.map((p) => nodeOf.get(keyOf(p))!))].sort(
+      (x, y) => alongOf(nodePts[x]!, t.orient) - alongOf(nodePts[y]!, t.orient),
+    );
+    for (let k = 1; k < idx.length; k++) pairs.push([idx[k - 1]!, idx[k]!]);
+  });
+  for (const [p, q] of gaps) pairs.push([nodeOf.get(keyOf(p))!, nodeOf.get(keyOf(q))!]);
+  const unique = new Map<string, [number, number]>();
+  for (const [a, b] of pairs) {
+    const k = `${Math.min(a, b)}:${Math.max(a, b)}`;
+    if (a !== b && !unique.has(k)) unique.set(k, [a, b]);
+  }
+  const ordered = [...unique.values()].sort(
+    ([a, b], [c, d]) => Math.min(a, b) - Math.min(c, d) || Math.max(a, b) - Math.max(c, d),
+  );
+  const edges: SteinerTurnEdge[] = [];
+  const info = new Map<string, Edge>();
+  ordered.forEach(([a, b], k) => {
+    const id = `e-${k}`;
+    const dir = unitOf(nodePts[a]!, nodePts[b]!);
+    const cost = distance(nodePts[a]!, nodePts[b]!);
+    edges.push({ id, from: nodeId(a), to: nodeId(b), cost, startDir: dir, endDir: dir });
+    info.set(id, { a, b, cost, dir });
+  });
+  const graph: SteinerTurnGraph = { nodeIds: nodePts.map((_, i) => nodeId(i)), edges };
+  const adj: Adj = nodePts.map(() => []);
+  for (const e of info.values()) {
+    adj[e.a]!.push({ to: e.b, cost: e.cost });
+    adj[e.b]!.push({ to: e.a, cost: e.cost });
+  }
+
+  const rootI = nodeOf.get(keyOf(rootPt))!;
+  const rootDist = distancesFrom([rootI], adj);
+  const solve = (picked: readonly number[]): TreeSolve => {
+    const r = steinerTreeWithTurns(graph, nodeId(rootI), picked.map(nodeId), { bendMm: input.bendMm, fittingMm: 0 });
+    return { edgeIds: r.edgeIds, unreached: new Set(r.unreached.map((id) => Number(id.slice(2)))) };
+  };
+  const treeNodes = (edgeIds: readonly string[]): number[] => [
+    rootI,
+    ...edgeIds.flatMap((id) => [info.get(id)!.a, info.get(id)!.b]),
+  ];
+
+  const hitNodes = new Map<string, Map<number, number>>();
+  const picks = new Map<string, number>();
+  const lost = new Set<string>();
+  for (const demand of demands) {
+    const m = new Map<number, number>();
+    for (const h of hitsOf.get(demand.roomId)!) {
+      const n = nodeOf.get(keyOf(h.point))!;
+      if (!m.has(n) || h.d < m.get(n)!) m.set(n, h.d);
+    }
+    if (m.size === 0) {
+      lost.add(demand.roomId);
+      continue;
+    }
+    hitNodes.set(demand.roomId, m);
+    const costOf = (n: number): number => rootDist[n]! + m.get(n)!;
+    picks.set(demand.roomId, [...m.keys()].sort((x, y) => x - y).reduce((best, n) => (costOf(n) < costOf(best) ? n : best)));
+  }
+
+  const reconcile = (): TreeSolve => {
+    for (;;) {
+      const solved = solve([...picks.values()]);
+      const gone = [...picks].filter(([, n]) => solved.unreached.has(n)).map(([roomId]) => roomId);
+      if (gone.length === 0) return solved;
+      for (const roomId of gone) {
+        picks.delete(roomId);
+        lost.add(roomId);
+      }
+    }
+  };
+
+  let solved = reconcile();
+  for (let round = 0; round < SWITCH_ROUNDS; round++) {
+    const changes: [string, number][] = [];
+    for (const [roomId, pick] of picks) {
+      const m = hitNodes.get(roomId)!;
+      if (m.size < 2) continue;
+      const others = [...picks].filter(([r]) => r !== roomId).map(([, n]) => n);
+      const dist = distancesFrom(treeNodes(solve(others).edgeIds), adj);
+      const score = (n: number): number => dist[n]! + m.get(n)!;
+      let best = -1;
+      for (const n of [...m.keys()].sort((x, y) => x - y)) {
+        if (n !== pick && (best < 0 || score(n) < score(best))) best = n;
+      }
+      if (best >= 0 && score(best) < score(pick) - SWITCH_EPS_MM) changes.push([roomId, best]);
+    }
+    if (changes.length === 0) break;
+    for (const [roomId, n] of changes) picks.set(roomId, n);
+    solved = reconcile();
+  }
+
+  const treePaths = straightPaths(solved.edgeIds, info, nodePts);
+  const lines: MainLine[] = treePaths.map((p, i) => ({ id: `mr-${i}`, a: p[0]!, b: p[1]! }));
+  const paths = [...treePaths];
+  if (distance(startMm, rootPt) > STUB_MIN_MM) paths.push([{ ...startMm }, { ...rootPt }]);
+  const chosenHitByRoom = new Map<string, Vec2>();
+  for (const [roomId, n] of [...picks].sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0))) {
+    chosenHitByRoom.set(roomId, { ...nodePts[n]! });
+  }
+  return {
+    lines,
+    paths,
+    rootPointMm: { ...rootPt },
+    unreachedRoomIds: [...lost].sort(),
+    chosenHitByRoom,
+  };
 }
