@@ -812,6 +812,15 @@ describe('planRoute layout options', () => {
     expect(Math.round(absent.plan.stats.lengthMm)).toBe(151366);
   });
 
+  it('has no twoLevel default and gives the same first floor plan with an empty twoLevel', () => {
+    expect('twoLevel' in DEFAULT_LAYOUT_OPTIONS).toBe(false);
+    const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
+    const defaults = runScenario(scenario!, makeIdFactories(), DEFAULT_LAYOUT_OPTIONS);
+    const empty = runScenario(scenario!, makeIdFactories(), { ...DEFAULT_LAYOUT_OPTIONS, twoLevel: {} });
+    expect(empty.plan).toEqual(defaults.plan);
+    expect(planHash(empty.plan)).toBe(planHash(defaults.plan));
+  });
+
   it('leaves no more off-graph rooms with bridgeParts and no penalty on the first floor', () => {
     const scenario = buildScenario(firstFloorDrawing(), 'A', 0);
     const absent = runScenario(scenario!, makeIdFactories());

@@ -7,6 +7,26 @@ import { BEND_PENALTY_MM, CROSSING_PENALTY_MM } from './route-hanan.js';
 export const ROUTE_ANGLE_INCREMENT_DEGREES = 45;
 export const SMALL_JUMP_MM = 1000;
 export type CornerMode = 'both' | 'right' | 'diagonal';
+export interface TwoLevelOptions {
+  /** Distance of a main line from the corridor wall, mm. Default 1000. Hand route: 600 to 1400. */
+  mainOffsetMm?: number;
+  /** A terminal farther than this from a main line makes the room get a bridge or a link, mm. Default 6000. Hand route: 4800. */
+  reachMm?: number;
+  /** Main run may cross a room with no terminal that is not in the route area. Default false (Q-P2-02). */
+  crossRooms?: { maxRooms: number };
+  /** Far rooms: how many chain steps from a fed room. Default 0. */
+  maxChainDepth?: number;
+  /** A room may get several doors when it has this many terminals or more (blocks of 2 by 2). Default Infinity (one hole per room). */
+  splitFromTerminals?: number;
+  /** Minimum distance of a wall hole (door) to the end of a wall, a column or a corner, mm. Default 200. */
+  doorMarginMm?: number;
+  /** Minimum distance between two tees on one main line, mm. Default: max(300, one duct width, 1.5 x DN of the branch); 600 when sizing is not known at this step. */
+  teeSpacingMm?: number;
+  /** Room type ids that a main run never crosses. */
+  neverCrossTypeIds?: readonly string[];
+  /** Clearance to segments of other networks, mm. Default 150. */
+  clearanceMm?: number;
+}
 export interface RouteLayoutOptions {
   /** Cost of one turn in the room search, mm. Default BEND_PENALTY_MM. */
   bendPenaltyMm?: number;
@@ -32,8 +52,10 @@ export interface RouteLayoutOptions {
   ripUp?: { rounds: number };
   /** P1-T19a room feed. P1-T27 saves bends in rooms: middle spine lines, spine-aware entry choice, aligned door entries. Off when absent. */
   roomBranches?: { searchMm: number; maxChainDepth?: number; slideRun?: boolean; fewRoomBends?: boolean };
+  /** P2 two-level route: main run in the corridor, room runs in the rooms. Off when absent. Wins over roomBranches when both are set. */
+  twoLevel?: TwoLevelOptions;
 }
-type PrototypeLayoutKey = 'bridgeParts' | 'trunkBends' | 'linkSearch' | 'exactSpine' | 'ripUp' | 'roomBranches';
+type PrototypeLayoutKey = 'bridgeParts' | 'trunkBends' | 'linkSearch' | 'exactSpine' | 'ripUp' | 'roomBranches' | 'twoLevel';
 export const DEFAULT_LAYOUT_OPTIONS: Readonly<Required<Omit<RouteLayoutOptions, PrototypeLayoutKey>>> = {
   bendPenaltyMm: BEND_PENALTY_MM,
   crossingPenaltyMm: CROSSING_PENALTY_MM,
