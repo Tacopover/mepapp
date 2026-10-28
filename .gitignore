@@ -20,3 +20,6 @@ fixtures/pdfs/*
 
 # Local-only fixtures made from ignored PDFs
 packages/core/fixtures/route-area/local/
+
+# Flag file of the P2 gate tests (see auto-routing-two-level.md T12)
+.claude/roadmap/tools/p2/assert.flag
