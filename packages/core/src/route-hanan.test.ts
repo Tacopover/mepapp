@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from './geometry.js';
-import { headingOf, roomSpine } from './route-hanan.js';
+import { headingOf, makeSpineGrid, roomSpine } from './route-hanan.js';
 
 const P = (x: number, y: number): Vec2 => ({ x, y });
 const always = (): boolean => true;
@@ -295,5 +295,31 @@ describe('roomSpine penalties', () => {
       crossingPenaltyMm: 2000,
     };
     expect(roomSpine(input)).toEqual(roomSpine(input));
+  });
+
+  it('keeps the grid lines of the ports and root when no extra lines are given', () => {
+    const grid = makeSpineGrid({
+      root: P(0, 0),
+      entryDir: P(1, 0),
+      ports: [{ id: 'a', point: P(4000, 3000) }],
+      inside: always,
+      crossesExisting: noCross,
+    });
+    expect(grid.xs).toEqual([0, 4000]);
+    expect(grid.ys).toEqual([0, 3000]);
+  });
+
+  it('adds the extra grid lines to the grid', () => {
+    const grid = makeSpineGrid({
+      root: P(0, 0),
+      entryDir: P(1, 0),
+      ports: [{ id: 'a', point: P(4000, 3000) }],
+      inside: always,
+      crossesExisting: noCross,
+      gridXs: [1000, 4000],
+      gridYs: [1500],
+    });
+    expect(grid.xs).toEqual([0, 1000, 4000]);
+    expect(grid.ys).toEqual([0, 1500, 3000]);
   });
 });

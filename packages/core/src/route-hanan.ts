@@ -15,6 +15,10 @@ export interface SpineInput {
   bendPenaltyMm?: number;
   /** Cost of one crossing, mm. Default CROSSING_PENALTY_MM. */
   crossingPenaltyMm?: number;
+  /** Extra grid lines in x, mm. */
+  gridXs?: readonly number[];
+  /** Extra grid lines in y, mm. */
+  gridYs?: readonly number[];
 }
 
 export interface SpineResult {
@@ -58,8 +62,8 @@ export function makeSpineGrid(input: SpineInput): SpineGrid {
   const { root, ports, inside, crossesExisting } = input;
   const stepMm = input.stepMm && input.stepMm > 0 ? input.stepMm : DEFAULT_STEP_MM;
 
-  const xs = uniqueSorted([root.x, ...ports.map((p) => p.point.x)]);
-  const ys = uniqueSorted([root.y, ...ports.map((p) => p.point.y)]);
+  const xs = uniqueSorted([root.x, ...ports.map((p) => p.point.x), ...(input.gridXs ?? [])]);
+  const ys = uniqueSorted([root.y, ...ports.map((p) => p.point.y), ...(input.gridYs ?? [])]);
   const nx = xs.length;
   const ny = ys.length;
   const nodeCount = nx * ny;
