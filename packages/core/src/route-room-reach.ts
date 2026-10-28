@@ -70,6 +70,11 @@ function bendCount(path: readonly Vec2[]): number {
   return bends;
 }
 
+function entryBend(path: readonly Vec2[], entry: EntryCandidate): number {
+  const u = unitOf(path[path.length - 2]!, path[path.length - 1]!);
+  return Math.abs(u.x * entry.outward.y - u.y * entry.outward.x) > EPS ? 1 : 0;
+}
+
 function portPenalty(path: readonly Vec2[], entry: EntryCandidate, portsMm: readonly Vec2[], bendMm: number): number {
   const last = unitOf(path[path.length - 2]!, path[path.length - 1]!);
   let penalty = 0;
@@ -137,8 +142,8 @@ export function bestRoomReach(input: {
       for (const [variant, path] of pathVariants(tap, entry, kind).entries()) {
         if (path.length < 2 || !input.pathOk(path, carrier.id, entry)) continue;
         const costMm =
-          pathLength(path) + bendCount(path) * bendMm + (entry.source === 'area-entry' ? 0 : wallMm) + roomPenaltyMm
-          + portPenalty(path, entry, input.portsMm, bendMm) + pathPenaltyMm(path, carrier.id, entry);
+          pathLength(path) + bendCount(path) * bendMm + entryBend(path, entry) * bendMm + (entry.source === 'area-entry' ? 0 : wallMm)
+          + roomPenaltyMm + portPenalty(path, entry, input.portsMm, bendMm) + pathPenaltyMm(path, carrier.id, entry);
         const reach: Reach = { entry, carrierId: carrier.id, tapMm: tap, branch: path, costMm, sMm, variant };
         if (beats(reach, best)) best = reach;
       }

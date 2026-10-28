@@ -99,7 +99,7 @@ describe('bestRoomReach', () => {
     const r = bestRoomReach({
       ...base,
       wallMm: 0,
-      candidates: [synthetic(0, 1000), real(1000, 0)],
+      candidates: [synthetic(0, 1000), { ...real(1000, 0), outward: { x: 1, y: 0 } }],
       carriers: [junction('j', 0, 0)],
     });
     expect(r!.entry.source).toBe('area-entry');
@@ -151,6 +151,41 @@ describe('bestRoomReach', () => {
     });
     expect(r!.branch).toHaveLength(3);
     expect(r!.costMm).toBe(2000);
+  });
+
+  it('prices the bend where an L branch meets the room stub', () => {
+    const r = bestRoomReach({
+      ...base,
+      bendMm: 100,
+      candidates: [real(1000, 1000)],
+      carriers: [junction('j', 0, 0)],
+      portsMm: [{ x: 0, y: 1000 }],
+    });
+    expect(r!.branch).toEqual([{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 1000 }]);
+    expect(r!.costMm).toBe(2150);
+  });
+
+  it('gives a straight arrival its length alone', () => {
+    const r = bestRoomReach({
+      ...base,
+      bendMm: 100,
+      candidates: [real(0, 1000)],
+      carriers: [junction('j', 0, 0)],
+    });
+    expect(r!.branch).toEqual([{ x: 0, y: 0 }, { x: 0, y: 1000 }]);
+    expect(r!.costMm).toBe(1000);
+  });
+
+  it('adds one bend price to a single leg that runs along the wall', () => {
+    const r = bestRoomReach({
+      ...base,
+      bendMm: 100,
+      wallMm: 0,
+      candidates: [real(2000, 0)],
+      carriers: [junction('j', 0, 0)],
+    });
+    expect(r!.branch).toEqual([{ x: 0, y: 0 }, { x: 2000, y: 0 }]);
+    expect(r!.costMm).toBe(2100);
   });
 
   it('gives the same result for shuffled candidates and carriers', () => {
