@@ -1,6 +1,6 @@
 # P1 plan: route layout presets (a few layouts of one route, each with a preview, before the user places it)
 
-Status: REVISION 3 on 2026-10-27 by the road map planner (audit and domain review applied). P1-T01 is built (commit `7d3d255`). P1-T05 is built (commit `7e3c0e7`). P1-T23 is built (commit `ee4a244`). P1-T16 is built (commit `54930b2`; the stop rule fires, see section 12). P1-T02 is built (commit `ab8c54d`). P1-T03 is built (commit `ece219c`). P1-T04 is built (commit `aa06cc5`). P1-T24 is built (commit `ed43e30`). Done: T01, T02, T03, T04, T05, T16, T23, T24. All other tasks are open. Part prefix: P1. Task ids: P1-T01 to P1-T24. Question ids: Q-P1-01 to Q-P1-12 (Q-P1-01 to Q-P1-12 are answered, the last four on 2026-10-28).
+Status: REVISION 3 on 2026-10-27 by the road map planner (audit and domain review applied). P1-T01 is built (commit `7d3d255`). P1-T05 is built (commit `7e3c0e7`). P1-T23 is built (commit `ee4a244`). P1-T16 is built (commit `54930b2`; the stop rule fires, see section 12). P1-T02 is built (commit `ab8c54d`). P1-T03 is built (commit `ece219c`). P1-T04 is built (commit `aa06cc5`). P1-T24 is built (commit `ed43e30`). P1-T17 is built (commit `cdfae0e`). Done: T01, T02, T03, T04, T05, T16, T17, T23, T24. All other tasks are open. Part prefix: P1. Task ids: P1-T01 to P1-T24. Question ids: Q-P1-01 to Q-P1-12 (Q-P1-01 to Q-P1-12 are answered, the last four on 2026-10-28).
 
 Origin: comment 3 of the user test of R1 to R6 ("offer a few preloaded route layouts with a preview before the user places the route, like Revit Generate Layout"). Revision 2 adds the user screenshot of the auto-route on the w_rooms floor (defect classes D-1 to D-8, `route-quality-research.md` section 11) and the corner choice. Sources: `auto-routing-feedback-prompt.md` (section "Findings: presets"), `auto-routing-r6.md`, `.claude/roadmap/rules.md`, the code at the commit of branch `worktree-routing-feedback`.
 
@@ -334,7 +334,7 @@ Rules for every core report test of revision 2: use the harness `route-scenario.
 - **Verify:** `pnpm --filter @mepapp/core test`; the printed numbers go into section 12 of this file. No browser check.
 - **Result (2026-10-27, test `route-room-origin-report.test.ts`, start 0):** the numbers are in section 12. Rule (1) passes: 85 to 100 percent of the chained and multi-entry rooms come from `link` legs, so the reading of section 4.6 is right. Rule (2) fires: S is below 0.3 on the first floor (0.06 for A, 0.19 for B) and on w_rooms (0.13). Only 10A scenario A reaches 0.33.
 
-#### P1-T17. Entry candidates for a room (pure function)
+#### P1-T17. Entry candidates for a room (pure function) — DONE (commit `cdfae0e`)
 - **Size:** S (about 110 lines with tests). **Depends on:** P1-T16 (gate passed).
 - **Files:** `packages/core/src/route-room-entry.ts` (new), `packages/core/src/route-room-entry.test.ts` (new).
 - **Shapes:**
@@ -351,6 +351,7 @@ Rules for every core report test of revision 2: use the harness `route-scenario.
   ```
   The function returns the real entries first, then ring points every `stepMm` on the axis-aligned wall edges (an edge that is not axis-aligned gives points with the nearest axis direction) **but only where the point `probeMm` outside the wall satisfies `corridorAt`** (so never on an outer wall and never on a wall between two served rooms), then the points where the horizontal and vertical line through each terminal meets such a wall stretch. The list is sorted by source, then x, then y (deterministic) and holds at most 120 points.
 - **Must not touch:** the planner. No call from `route-build.ts` yet.
+- **Result (2026-10-28):** built in `route-room-entry.ts` (export `MAX_ENTRY_CANDIDATES` = 120). Tests: `pnpm --filter @mepapp/core exec vitest run src/route-room-entry.test.ts` gives 14 passed; `pnpm --filter @mepapp/core exec tsc --noEmit` gives no output. Code review: 0 high findings; 4 low findings fixed (port order, `stepMm` guard, tests). Details for T18: with a real entry the function returns every real entry of the room (T18 picks one); ports are sorted inside; `outward` is tested per point. On w_rooms-2 (scenarios A and B alike): 47 served rooms, 39 have a real entry, 0 have only synthetic candidates, 8 have none. The 8 rooms with none are exactly the 8 off-graph rooms (room-2, 11, 13, 14, 16, 17, 25, 33): none has a wall that touches a route-area room, so the chain rule of T19 must serve them.
 - **Verify:** core tests: a rectangle room with one terminal gives the four points of the terminal lines; a room with a real entry returns only that entry (exactly one hole per room); a wall whose outside is another served room or the open (no room) gives no candidate; an L-shaped room gives no point inside the room; same input twice gives the same list. Core tests, typecheck, build.
 
 #### P1-T18. Reach search: the best tap and entry for one room (pure function)
