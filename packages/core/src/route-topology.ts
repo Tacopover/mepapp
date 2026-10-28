@@ -269,7 +269,7 @@ export interface ConnectLooseInput {
   noTapPoints?: readonly Vec2[];
   /** The collision hook of T13. Default: accept all. */
   accepts?: (path: Vec2[], portId: string) => boolean;
-  /** Layout options, passed on by planRoute. This step reads linkSearch. */
+  /** Layout options, passed on by planRoute. This step reads linkSearch and offGraphAxis. */
   options?: RouteLayoutOptions;
   /** Room id at a point (mm), or null in a wall or outside. Used by the link search. Absent: no room, so no wall price. */
   roomAt?: (p: Vec2) => string | null;
@@ -407,12 +407,13 @@ export function connectLoosePorts(input: ConnectLooseInput): ConnectLooseResult 
       }
     }
     if (!chosen) {
+      const axisMode = input.options?.offGraphAxis ?? 'perpendicular';
       const tried: string[] = [];
       for (const tap of bestCandidates) {
         const dx = port.point.x - tap.point.x;
         const dy = port.point.y - tap.point.y;
         const longer: 'x' | 'y' = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
-        const first = tap.perpendicular ?? longer;
+        const first = axisMode === 'longer' ? longer : (tap.perpendicular ?? longer);
         const second: 'x' | 'y' = first === 'x' ? 'y' : 'x';
         for (const axis of [first, second]) {
           const path = cleanPath(elbowPath(tap.point, port.point, axis));

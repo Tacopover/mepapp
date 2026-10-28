@@ -309,4 +309,23 @@ describe('connectLoosePorts', () => {
     const input = { paths: trunk, startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p], options: { linkSearch: { bendMm: 500, wallMm: 0 } } };
     expect(connectLoosePorts(input)).toEqual(connectLoosePorts(input));
   });
+
+  it('gives the same paths with the default offGraphAxis and with perpendicular', () => {
+    const p = v(4000, 3000);
+    const base = { paths: trunk, startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p] };
+    expect(connectLoosePorts({ ...base, options: { offGraphAxis: 'perpendicular' } })).toEqual(connectLoosePorts(base));
+  });
+
+  it('takes the perpendicular axis first by default and the longer side first with offGraphAxis longer', () => {
+    const p = v(100, 1000);
+    const base = { paths: [[v(0, 0), v(0, 1000)]], startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p] };
+    expect(connectLoosePorts(base).paths).toEqual([[v(0, 700), v(100, 700), v(100, 1000)]]);
+    expect(connectLoosePorts({ ...base, options: { offGraphAxis: 'longer' } }).paths).toEqual([[v(0, 700), v(0, 1000), v(100, 1000)]]);
+  });
+
+  it('gives the same result for two calls with offGraphAxis longer', () => {
+    const p = v(100, 1000);
+    const input = { paths: [[v(0, 0), v(0, 1000)]], startPoint: v(0, 0), loose: [{ id: 'p', point: p }], targetPoints: [p], options: { offGraphAxis: 'longer' as const } };
+    expect(connectLoosePorts(input)).toEqual(connectLoosePorts(input));
+  });
 });

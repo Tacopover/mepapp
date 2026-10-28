@@ -18,8 +18,8 @@ export interface RouteLayoutOptions {
   corners?: CornerMode;
   /** Which entry of a room the trunk tries first. Default 'primary-longest'. */
   entryRule?: 'primary-longest' | 'shortest-branch';
-  /** Which axis an off-graph link tries first. Default 'longer'. */
-  offGraphAxis?: 'longer' | 'perpendicular-first';
+  /** Which axis an off-graph link tries first. 'perpendicular' = the perpendicular axis of the tap, then the longer side (default); 'longer' = the longer side first. */
+  offGraphAxis?: 'perpendicular' | 'longer';
   /** Idea 0: bridge edges between graph parts. Off when absent. */
   bridgeParts?: { penaltyMm: number };
   /** Idea 1a: trunk bends. Off when absent. */
@@ -38,7 +38,7 @@ export const DEFAULT_LAYOUT_OPTIONS: Readonly<Required<Omit<RouteLayoutOptions, 
   jogSmallJumpMm: SMALL_JUMP_MM,
   corners: 'both',
   entryRule: 'primary-longest',
-  offGraphAxis: 'longer',
+  offGraphAxis: 'perpendicular',
 };
 export const MIN_LEG_MM = 300;
 export const MIN_JOG_MM = 150;
