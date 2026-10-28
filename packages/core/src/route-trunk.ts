@@ -93,10 +93,16 @@ function chooseRoot(graph: GraphData, startPt: Vec2): string | null {
   return splitEdgeAt(graph, edgeNear.edgeId, edgeNear.segment, edgeNear.point, 'rt-root');
 }
 
-function entriesOf(area: RouteArea, roomId: string): RouteEntry[] {
+function entriesOf(area: RouteArea, roomId: string, tapDistance?: (entry: RouteEntry) => number): RouteEntry[] {
   return area.entries
     .filter((e) => e.roomId === roomId)
     .sort((a, b) => {
+      if (tapDistance) {
+        const da = tapDistance(a);
+        const db = tapDistance(b);
+        if (da !== db) return da < db ? -1 : 1;
+        return compareText(a.id, b.id);
+      }
       if (a.primary !== b.primary) return a.primary ? -1 : 1;
       if (a.runMm !== b.runMm) return b.runMm - a.runMm;
       return compareText(a.id, b.id);
@@ -139,10 +145,17 @@ export function buildTrunk(input: TrunkInput): TrunkResult {
 
   // Entries of each served room, and the tap node of the current entry.
   const roomIds = [...new Set(servedRoomIds)].sort(compareText);
+  const shortest = input.options?.entryRule === 'shortest-branch';
+  const tapDistanceOf = (entry: RouteEntry): number => {
+    const connector = edgeById.get(`rc-${entry.id}-0`);
+    const tapNode = connector ? nodeById.get(connector.to) : undefined;
+    if (!tapNode) return Number.POSITIVE_INFINITY;
+    return distance(entry.point, tapNode.point);
+  };
   const entryLists = new Map<string, { entry: RouteEntry; tapNodeId: string }[]>();
   for (const roomId of roomIds) {
     const list: { entry: RouteEntry; tapNodeId: string }[] = [];
-    for (const entry of entriesOf(area, roomId)) {
+    for (const entry of entriesOf(area, roomId, shortest ? tapDistanceOf : undefined)) {
       const connector = edgeById.get(`rc-${entry.id}-0`);
       if (connector) list.push({ entry, tapNodeId: connector.to });
     }

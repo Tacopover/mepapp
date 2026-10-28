@@ -58,9 +58,9 @@ function connect(graph: GraphData, areaRoomId: string, wallNode: RouteNode, tapN
   });
 }
 
-function addEntry(graph: GraphData, servedRoomId: string, areaRoomId: string, wallMm: Vec2, runMm = 1000, primary = true): RouteEntry {
-  const entryId = `ry-${servedRoomId}-${areaRoomId}`;
-  const wallNode: RouteNode = { id: `rw-${servedRoomId}-${areaRoomId}`, point: pt(wallMm), kind: 'wall', roomId: servedRoomId };
+function addEntry(graph: GraphData, servedRoomId: string, areaRoomId: string, wallMm: Vec2, runMm = 1000, primary = true, tag = ''): RouteEntry {
+  const entryId = `ry-${servedRoomId}-${areaRoomId}${tag}`;
+  const wallNode: RouteNode = { id: `rw-${servedRoomId}-${areaRoomId}${tag}`, point: pt(wallMm), kind: 'wall', roomId: servedRoomId };
   connect(graph, areaRoomId, wallNode, `rt-${entryId}-0`, `rc-${entryId}-0`);
   return {
     id: entryId,
@@ -470,6 +470,88 @@ describe('buildTrunk', () => {
         edges: [pathEdge('a', 0, 'rn-a-0', 'rn-a-1', [{ x: 0, y: 0 }, { x: 1000, y: 0 }])],
       };
       expect(bridgeParts(single, 'rn-a-0', MM_PER_PT)).toEqual([]);
+    });
+  });
+
+  describe('entryRule', () => {
+    function twoEntryScene(secondPrimary: boolean): { input: TrunkInput; a: RouteEntry; b: RouteEntry } {
+      const { graph, rooms } = straightCorridor();
+      const a = addEntry(graph, 'r1', 'c1', { x: 5000, y: -1000 }, 3000, true);
+      const b = addEntry(graph, 'r1', 'c1', { x: 15000, y: -400 }, 1000, secondPrimary, 'b');
+      return {
+        input: {
+          area: makeArea([areaRoom('c1')], graph, [a, b]),
+          rooms,
+          mmPerPt: MM_PER_PT,
+          startPointMm: { x: 0, y: -100 },
+          servedRoomIds: ['r1'],
+        },
+        a,
+        b,
+      };
+    }
+
+    it('keeps the primary longest entry by default and with primary-longest', () => {
+      const { input, a } = twoEntryScene(false);
+      const byDefault = buildTrunk(input);
+      expect(byDefault.served[0]!.entryId).toBe(a.id);
+      expect(buildTrunk({ ...input, options: { entryRule: 'primary-longest' } })).toEqual(byDefault);
+    });
+
+    it('serves the entry with the shortest branch to its tap node under shortest-branch', () => {
+      const { input, b } = twoEntryScene(false);
+      const result = buildTrunk({ ...input, options: { entryRule: 'shortest-branch' } });
+      expect(result.served.map((s) => s.entryId)).toEqual([b.id]);
+    });
+
+    it('gives the same result for a room with one entry under every rule', () => {
+      const input = threeRoomScene();
+      const byDefault = buildTrunk(input);
+      expect(buildTrunk({ ...input, options: { entryRule: 'primary-longest' } })).toEqual(byDefault);
+      expect(buildTrunk({ ...input, options: { entryRule: 'shortest-branch' } })).toEqual(byDefault);
+    });
+
+    it('breaks equal distances by entry id under shortest-branch', () => {
+      const { graph, rooms } = straightCorridor();
+      const a = addEntry(graph, 'r1', 'c1', { x: 5000, y: -1000 }, 1000, false);
+      const b = addEntry(graph, 'r1', 'c1', { x: 5000, y: 1000 }, 1000, true, 'b');
+      const input: TrunkInput = {
+        area: makeArea([areaRoom('c1')], graph, [b, a]),
+        rooms,
+        mmPerPt: MM_PER_PT,
+        startPointMm: { x: 0, y: -100 },
+        servedRoomIds: ['r1'],
+      };
+      expect(buildTrunk({ ...input, options: { entryRule: 'shortest-branch' } }).served[0]!.entryId).toBe(a.id);
+      expect(buildTrunk(input).served[0]!.entryId).toBe(b.id);
+    });
+
+    it('keeps the retry to the next entry under shortest-branch', () => {
+      const { graph, rooms } = straightCorridor();
+      graph.nodes.push(pathNode('c3', 0, 0, 50000), pathNode('c3', 1, 10000, 50000));
+      graph.edges.push(pathEdge('c3', 0, 'rn-c3-0', 'rn-c3-1', [{ x: 0, y: 50000 }, { x: 10000, y: 50000 }]));
+      rooms.push(rect('c3', 0, 49000, 10000, 51000));
+      const entries = [
+        addEntry(graph, 'r9', 'c3', { x: 5000, y: 49000 }),
+        addEntry(graph, 'r8', 'c3', { x: 3000, y: 49000 }, 5000, true),
+        addEntry(graph, 'r8', 'c1', { x: 3000, y: 3000 }, 2000, false),
+      ];
+      const result = buildTrunk({
+        area: makeArea([areaRoom('c1'), areaRoom('c3')], graph, entries),
+        rooms,
+        mmPerPt: MM_PER_PT,
+        startPointMm: { x: 0, y: 0 },
+        servedRoomIds: ['r9', 'r8', 'r7'],
+        options: { entryRule: 'shortest-branch' },
+      });
+      expect(result.served.map((s) => [s.roomId, s.entryId])).toEqual([['r8', 'ry-r8-c1']]);
+      expect(result.offGraphRoomIds).toEqual(['r7', 'r9']);
+    });
+
+    it('gives equal results on two calls under shortest-branch', () => {
+      const { input } = twoEntryScene(false);
+      const shortest = { ...input, options: { entryRule: 'shortest-branch' as const } };
+      expect(buildTrunk(shortest)).toEqual(buildTrunk(shortest));
     });
   });
 });
