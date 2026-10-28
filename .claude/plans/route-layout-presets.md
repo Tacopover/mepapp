@@ -307,7 +307,8 @@ Rules for every core report test of revision 2: use the harness `route-scenario.
 - **Must not touch:** the order of the search, the tie-breaks (determinism), the exported constants, the default price of `exactRoomSpine` when the option is absent.
 - **Verify:** core tests: default call equals today's result; a hand case where a bend penalty of 0 gives a shorter path with more bends and a penalty of 3000 gives the opposite; a hand case where a high crossing penalty avoids an existing segment; a hand room with `exactSpine` where `bendPenaltyMm` 3000 gives fewer bends than 500. Same input twice gives the same output. Core tests, typecheck, build. No browser check.
 
-#### P1-T04. Entry rule
+#### P1-T04. Entry rule — DONE (commit `aa06cc5`)
+- **Result:** core tests 1757 passed, 2 skipped; typecheck and `pnpm build` pass. Plan JSON for the default is byte-equal before and after (first floor and w_rooms, `cmp`). `shortest-branch` sorts by the distance from `entry.point` to the tap node of the connector `rc-<entry id>-0` (pt units), then by id. Printed, default / `shortest-branch`: first floor bends90 35/35, lengthMm 151366/151366, wallCrossings 26/26, multiEntryRooms 1/1; w_rooms bends90 47/47, lengthMm 207563/207563, wallCrossings 33/33, multiEntryRooms 4/4. So the rule changes no plan on these two drawings.
 - **Size:** S (about 50 lines). **Depends on:** P1-T01.
 - **Files:** `route-trunk.ts` (`entriesOf` gets the rule), `route-build.ts`, `route-trunk.test.ts`.
 - **Shapes:** `TrunkInput.options.entryRule` (the field `options?: RouteLayoutOptions` exists, `route-trunk.ts:19`). `'shortest-branch'` sorts the entries of a room by the distance from the entry point to the nearest corridor tap node, then by id. A room that has one entry gives the same result for every rule.
