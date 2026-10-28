@@ -45,7 +45,7 @@ export interface RouteBuildInput {
   newSegmentId: () => string; newFittingId: () => string;
 }
 
-export interface RouteStats { segments: number; fittings: number; lengthMm: number; bends90: number; bends45: number; freeLegs: number; rooms: number; ports: number; portsLeft: number; wallCrossings: number; existingCrossings: number; removedSegments: number; removedFittings: number }
+export interface RouteStats { segments: number; fittings: number; lengthMm: number; bends90: number; bends45: number; freeLegs: number; rooms: number; ports: number; portsLeft: number; wallCrossings: number; wallCrossingsRoom: number; wallCrossingsCorridor: number; existingCrossings: number; removedSegments: number; removedFittings: number }
 export interface PlannedRoute { segments: Segment[]; fittings: Fitting[]; removeSegmentIds: string[]; removeFittingIds: string[]; warnings: RoutePlanWarning[]; stats: RouteStats; sizes: SizedSegment[] }
 
 export interface GroupedPorts {
@@ -90,7 +90,7 @@ export function groupTargetPorts(ports: readonly RoutePort[], areaRoomIds: Reado
 }
 
 function emptyStats(): RouteStats {
-  return { segments: 0, fittings: 0, lengthMm: 0, bends90: 0, bends45: 0, freeLegs: 0, rooms: 0, ports: 0, portsLeft: 0, wallCrossings: 0, existingCrossings: 0, removedSegments: 0, removedFittings: 0 };
+  return { segments: 0, fittings: 0, lengthMm: 0, bends90: 0, bends45: 0, freeLegs: 0, rooms: 0, ports: 0, portsLeft: 0, wallCrossings: 0, wallCrossingsRoom: 0, wallCrossingsCorridor: 0, existingCrossings: 0, removedSegments: 0, removedFittings: 0 };
 }
 
 function isPortEndpoint(point: ConnectionPoint, stampId: string, portId: string): boolean {
@@ -461,9 +461,14 @@ export function planRoute(
   const wallPoints: Vec2[] = [];
   const shaftPoints: Vec2[] = [];
   const shaftIds = new Set<string>();
+  const areaRoomIds = new Set(input.area.rooms.map((room) => room.roomId));
+  let wallCrossingsRoom = 0;
+  let wallCrossingsCorridor = 0;
   for (const planned of items.segments) {
     for (const crossing of crossingsAlongPath(input.rooms, planned.geometry, { mmPerPt, pageIndex: input.pageIndex }).crossings) {
       const shaftSides = [crossing.fromRoomId, crossing.toRoomId].filter((id): id is string => id !== null && shaftRoomIds.has(id));
+      if ([crossing.fromRoomId, crossing.toRoomId].some((id) => id !== null && areaRoomIds.has(id))) wallCrossingsCorridor++;
+      else wallCrossingsRoom++;
       if (shaftSides.length > 0) {
         for (const id of shaftSides) shaftIds.add(id);
         shaftPoints.push(crossing.point);
@@ -545,6 +550,8 @@ export function planRoute(
         ports: connectedPorts.length,
         portsLeft: leftCount,
         wallCrossings: wallPoints.length + shaftPoints.length,
+        wallCrossingsRoom,
+        wallCrossingsCorridor,
         existingCrossings,
         removedSegments: input.removal.segmentIds.length,
         removedFittings: input.removal.fittingIds.length,

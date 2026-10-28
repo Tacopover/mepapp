@@ -52,7 +52,7 @@ function threeLegPlan(): PlannedRoute {
     removeSegmentIds: [],
     removeFittingIds: [],
     warnings: [],
-    stats: { segments: 3, fittings: 2, lengthMm: 4000, bends90: 2, bends45: 0, freeLegs: 0, rooms: 0, ports: 1, portsLeft: 0, wallCrossings: 0, existingCrossings: 0, removedSegments: 0, removedFittings: 0 },
+    stats: { segments: 3, fittings: 2, lengthMm: 4000, bends90: 2, bends45: 0, freeLegs: 0, rooms: 0, ports: 1, portsLeft: 0, wallCrossings: 0, wallCrossingsRoom: 0, wallCrossingsCorridor: 0, existingCrossings: 0, removedSegments: 0, removedFittings: 0 },
     sizes: [],
   };
 }

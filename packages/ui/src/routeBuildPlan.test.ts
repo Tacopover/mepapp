@@ -9,7 +9,7 @@ const SAMPLE_PARAMS: Record<string, string | number> = {
 const DUTCH_WORDS = ['de ', 'het ', 'een ', 'niet ', 'kamer'];
 
 const stats = (patch: Partial<RouteStats>): RouteStats => ({
-  segments: 0, fittings: 0, lengthMm: 0, bends90: 0, bends45: 0, freeLegs: 0, rooms: 0, ports: 0, portsLeft: 0, wallCrossings: 0, existingCrossings: 0, removedSegments: 0, removedFittings: 0,
+  segments: 0, fittings: 0, lengthMm: 0, bends90: 0, bends45: 0, freeLegs: 0, rooms: 0, ports: 0, portsLeft: 0, wallCrossings: 0, wallCrossingsRoom: 0, wallCrossingsCorridor: 0, existingCrossings: 0, removedSegments: 0, removedFittings: 0,
   ...patch,
 });
 

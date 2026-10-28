@@ -695,6 +695,11 @@ describe('planRoute real crossings', () => {
     return input({ state: { stamps, segments: [], fittings: [], portGroups: [] }, rooms, area, mmPerPt: MM_PER_PT, targetPorts: [targetAt('t1', 5500, 500, 'B')] });
   }
 
+  function corridorPair(gapMm: number): RouteBuildInput {
+    const data = pair(gapMm);
+    return { ...data, area: { ...data.area, rooms: [...data.area.rooms, { roomId: 'A', kind: 'path', typeId: 'corridor', open: false, name: null }] } };
+  }
+
   it('counts one wall between two rooms', () => {
     const result = planRoute(pair(200));
     expect(result.status).toBe('ok');
@@ -703,6 +708,16 @@ describe('planRoute real crossings', () => {
     expect(wall.points).toHaveLength(1);
     expect(codes(result)).not.toContain('shaft-crossing');
     expect(result.plan.stats.wallCrossings).toBe(1);
+    expect(result.plan.stats.wallCrossingsRoom).toBe(1);
+    expect(result.plan.stats.wallCrossingsCorridor).toBe(0);
+  });
+
+  it('counts a wall next to a route-area room as a corridor crossing', () => {
+    const result = planRoute(corridorPair(200));
+    expect(result.status).toBe('ok');
+    expect(result.plan.stats.wallCrossings).toBe(1);
+    expect(result.plan.stats.wallCrossingsCorridor).toBe(1);
+    expect(result.plan.stats.wallCrossingsRoom).toBe(0);
   });
 
   it('reports a shaft crossing and no wall crossing', () => {
