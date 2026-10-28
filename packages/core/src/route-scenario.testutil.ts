@@ -2,15 +2,17 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { Vec2 } from './geometry.js';
 import type { ConnectionPoint } from './network.js';
 import { layoutGrid } from './rooms/placement-layout.js';
-import { polygonAreaPt2, roomLabelPoint, type Room } from './rooms/room.js';
+import { polygonAreaPt2, roomLabelPoint, roomsAtPoint, type Room } from './rooms/room.js';
 import { loadFirstFloorRooms } from './rooms/route-area-fixture.testutil.js';
 import { DEFAULT_ROUTE_AREA_TYPE_IDS, computeRouteArea, type RouteArea } from './route-area.js';
 import { planRoute, type PlannedRoute, type RouteBuildInput, type RouteTrace } from './route-build.js';
 import type { RouteLayoutOptions } from './route-layout.js';
 import { routeMetrics, scoreRoute, type RouteMetrics } from './route-metrics.js';
 import { findRoutePorts, type RoutePort, type RouteStamp } from './route-ports.js';
+import { getStampWorldPorts } from './stamp.js';
 
 const TYPE = 'supply-air';
 const START_ID = 'start-ahu';
@@ -113,6 +115,54 @@ export function buildScenario(drawing: Drawing, kind: ScenarioKind, startIndex =
     startStampId: START_ID,
     startPortId: 'out',
     networkTypeId: TYPE,
+  };
+}
+
+export interface ManualRoute { main: Vec2[][]; room: Vec2[][] }
+
+interface ManualFile {
+  source: string;
+  mmPerPt: number;
+  pageIndex: number;
+  rooms: Room[];
+  networkTypeId: string;
+  startStampId: string;
+  startPortId: string;
+  stamps: RouteStamp[];
+  manual: ManualRoute;
+}
+
+export function manualScenario(): { scenario: Scenario; manual: ManualRoute } | null {
+  const file = `${LOCAL_DIR}w-rooms-manual.json`;
+  if (!existsSync(file)) {
+    console.log('SKIP: manual fixture missing (run .claude/roadmap/tools/p2/extract-manual.mjs)');
+    return null;
+  }
+  const data = JSON.parse(readFileSync(file, 'utf8')) as ManualFile;
+  const { rooms, mmPerPt, pageIndex, stamps, networkTypeId, startStampId, startPortId } = data;
+  const drawing: Drawing = { name: 'manual', mmPerPt, rooms };
+  const area = computeRouteArea(rooms, { roomTypeIds: DEFAULT_ROUTE_AREA_TYPE_IDS, mmPerPt, pageIndex });
+  const terminalIds = new Set(stamps.filter((s) => s.category === 'terminal').map((s) => s.id));
+  const targetPorts = findRoutePorts({
+    stamps,
+    networkTypeId,
+    scope: { kind: 'stamps', stampIds: terminalIds },
+    startStampId,
+    startPortId,
+    rooms,
+    pageIndex,
+    portChoice: 'order',
+  }).ports;
+  const servedIds = new Set(targetPorts.map((p) => p.roomId));
+  const servedRooms = rooms.filter((r) => servedIds.has(r.id));
+  const startStamp = stamps.find((s) => s.id === startStampId);
+  const startWorld = startStamp ? getStampWorldPorts(startStamp).find((p) => p.id === startPortId)?.world : undefined;
+  const startRoom = startWorld ? roomsAtPoint(rooms, startWorld, pageIndex)[0] : undefined;
+  if (!startRoom) throw new Error(`manual fixture: no room holds the start port ${startStampId} ${startPortId}`);
+  return {
+    // The kind field has no meaning for the manual route.
+    scenario: { drawing, kind: 'A', pageIndex, area, startRoom, servedRooms, stamps, targetPorts, startStampId, startPortId, networkTypeId },
+    manual: data.manual,
   };
 }
 
