@@ -1,6 +1,7 @@
 // route room branch report and gate G0 (P1-T20)
 // The default run prints the table, the PASS/FAIL line of each criterion and the rooms behind each FAIL.
 // The criterion tests assert only when MEPAPP_G0_ASSERT=1 (the thresholds are the ones of the plan; they are not moved).
+// Time is printed in the table (the ms column) and is not asserted; the time limit moved to gate G2.
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from './geometry.js';
@@ -221,11 +222,6 @@ function evaluate(cases: readonly Case[]): Criterion[] {
     add(5, 'wallCrossings <= 125 %', c, m.wallCrossings <= 1.25 * b.wallCrossings, `${m.wallCrossings} vs ${b.wallCrossings} (${((m.wallCrossings / Math.max(1, b.wallCrossings)) * 100).toFixed(1)} %)`);
     const fedMulti = multiEntryRooms(c.branch).filter((id) => c.branch.fed.has(id));
     add(6, 'fed rooms with more than one entry == 0', c, fedMulti.length === 0, `${fedMulti.length} [${fedMulti.join(', ')}]`);
-    if (c.kind === 'A') {
-      const bm = c.balanced.medianMs;
-      const tm = c.branch.medianMs;
-      add(7, 'median time <= 1.5 x Balanced and <= 600 ms', c, tm <= 1.5 * bm && tm <= 600, `${Math.round(tm)} ms vs Balanced ${Math.round(bm)} ms`);
-    }
   }
   return out;
 }
@@ -335,7 +331,6 @@ describe('route room branch report (G0, P1-T20)', () => {
     'C4 portsLeft and offGraphRooms not higher than Balanced',
     'C5 lengthMm <= 120 % and wallCrossings <= 125 % of Balanced',
     'C6 every fed room has one entry',
-    'C7 time of scenario A <= 1.5 x Balanced and <= 600 ms',
   ];
   names.forEach((name, i) => {
     it.skipIf(!ASSERT)(name, () => {

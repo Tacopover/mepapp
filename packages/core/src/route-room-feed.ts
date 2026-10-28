@@ -10,7 +10,13 @@ const STUB_STEP_MM = 50;
 const STUB_MAX_MM = 1500;
 const DEPTH_EPS_MM = 1e-6;
 
-function ringDistanceMm(ring: readonly Vec2[], p: Vec2): number {
+type Segment = readonly [Vec2, Vec2];
+
+function ringSegments(ring: readonly Vec2[]): Segment[] {
+  return ring.map((a, i) => [a, ring[(i + 1) % ring.length]!] as const);
+}
+
+export function ringDistanceMm(ring: readonly Vec2[], p: Vec2): number {
   let best = Infinity;
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]!;
@@ -62,10 +68,18 @@ export function roomFeed(input: RoomFeedInput): RoomFeed {
   const stub = stubLengthMm > 0 ? [entry.pointMm, junctionMm] : [entry.pointMm];
 
   const closePorts = ports.filter((q) => depthOf(q.point) < ENTRY_DEPTH_MM - DEPTH_EPS_MM);
+  const segments = ringSegments(ringMm);
+  const nearRing = (p: Vec2): boolean =>
+    segments.some(([a, b]) => distance(p, closestPointOnSegment(p, a, b).point) < SPINE_WALL_MARGIN_MM);
+  const isTerminal = (p: Vec2): boolean => ports.some((q) => q.point.x === p.x && q.point.y === p.y);
+  const isRoot = (p: Vec2): boolean => junctionMm.x === p.x && junctionMm.y === p.y;
+  const offWall = (p: Vec2): boolean => !nearRing(p);
+  const depthOk = (p: Vec2): boolean =>
+    depthOf(p) >= ENTRY_DEPTH_MM - DEPTH_EPS_MM || closePorts.some((q) => q.point.x === p.x && q.point.y === p.y);
   const spineInside = (p: Vec2): boolean =>
     inside(p) &&
-    (!depthRule || depthOf(p) >= ENTRY_DEPTH_MM - DEPTH_EPS_MM || closePorts.some((q) => q.point.x === p.x && q.point.y === p.y)) &&
-    (!depthRule || ports.some((q) => q.point.x === p.x && q.point.y === p.y) || (junctionMm.x === p.x && junctionMm.y === p.y) || ringDistanceMm(ringMm, p) >= SPINE_WALL_MARGIN_MM);
+    (!depthRule || depthOk(p)) &&
+    (!depthRule || isTerminal(p) || isRoot(p) || offWall(p));
 
   const gridOffsetsMm = depthRule ? [0, SPINE_INSET_MM, -SPINE_INSET_MM] : [0];
   const spineInput: SpineInput = {

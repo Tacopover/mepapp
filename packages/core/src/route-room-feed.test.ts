@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { closestPointOnSegment, distance, type Vec2 } from './geometry.js';
+import { distance, type Vec2 } from './geometry.js';
 import { roomContainsPoint, type Room } from './rooms/room.js';
 import { insideRouteArea } from './route-layout.js';
 import { roomSpine } from './route-hanan.js';
-import { ENTRY_DEPTH_MM, roomFeed, SPINE_WALL_MARGIN_MM, type RoomFeedInput } from './route-room-feed.js';
+import { ENTRY_DEPTH_MM, ringDistanceMm, roomFeed, SPINE_WALL_MARGIN_MM, type RoomFeedInput } from './route-room-feed.js';
 import { roomEntryCandidates } from './route-room-entry.js';
 import { buildScenario, localDrawing } from './route-scenario.testutil.js';
 
@@ -28,14 +28,6 @@ function polygonContains(ring: readonly Vec2[], p: Vec2): boolean {
     if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
   }
   return inside;
-}
-
-function ringDistance(ring: readonly Vec2[], p: Vec2): number {
-  let best = Infinity;
-  for (let i = 0; i < ring.length; i++) {
-    best = Math.min(best, distance(p, closestPointOnSegment(p, ring[i]!, ring[(i + 1) % ring.length]!).point));
-  }
-  return best;
 }
 
 function growRect(w: number, h: number, tol: number): (p: Vec2) => boolean {
@@ -125,13 +117,55 @@ describe('roomFeed', () => {
     for (const path of feed.spine) {
       for (let i = 0; i < path.length; i++) {
         const v = path[i]!;
-        if (!isPort(v)) expect(ringDistance(ring, v), `vertex ${key(v)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
+        if (!isPort(v)) expect(ringDistanceMm(ring, v), `vertex ${key(v)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
         if (i === 0) continue;
         const a = path[i - 1]!;
         const len = distance(a, v);
         for (let d = 50; d < len; d += 50) {
           const s = P(a.x + ((v.x - a.x) * d) / len, a.y + ((v.y - a.y) * d) / len);
-          if (!isPort(s)) expect(ringDistance(ring, s), `sample ${key(s)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
+          if (!isPort(s)) expect(ringDistanceMm(ring, s), `sample ${key(s)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
+        }
+      }
+    }
+  });
+
+  it('keeps the spine off the ring when a terminal lies within the margin of the wall', () => {
+    const ring = rectRing(4000, 3000);
+    const E = P(0, 1500);
+    const ports = [
+      { id: 'a', point: P(4000 - 3, 1500) },
+      { id: 'b', point: P(3000, 500) },
+    ];
+    const feed = roomFeed(feedInput(ring, E, P(-1, 0), ports));
+    expect(feed.leftPortIds).toEqual([]);
+    expect(feed.spine.length).toBeGreaterThan(0);
+    const isPort = (p: Vec2): boolean => ports.some((q) => key(q.point) === key(p));
+    for (const path of feed.spine) {
+      for (const v of path) {
+        if (!isPort(v)) expect(ringDistanceMm(ring, v), `vertex ${key(v)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
+      }
+    }
+  });
+
+  it('keeps every spine leg sample off the ring when the ring grid lines run near the terminals', () => {
+    const ring = rectRing(4000, 3000);
+    const E = P(0, 1500);
+    const ports = [
+      { id: 'a', point: P(3900, 1000) },
+      { id: 'b', point: P(2000, 100) },
+    ];
+    const feed = roomFeed(feedInput(ring, E, P(-1, 0), ports));
+    expect(feed.leftPortIds).toEqual([]);
+    expect(feed.spine.length).toBeGreaterThan(0);
+    const isPort = (p: Vec2): boolean => ports.some((q) => key(q.point) === key(p));
+    for (const path of feed.spine) {
+      for (let i = 1; i < path.length; i++) {
+        const a = path[i - 1]!;
+        const v = path[i]!;
+        const len = distance(a, v);
+        for (let d = 25; d < len; d += 25) {
+          const s = P(a.x + ((v.x - a.x) * d) / len, a.y + ((v.y - a.y) * d) / len);
+          if (!isPort(s)) expect(ringDistanceMm(ring, s), `sample ${key(s)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
         }
       }
     }
@@ -248,7 +282,7 @@ describe('roomFeed', () => {
       const portKeys = new Set(ports.map((q) => key(q.point)));
       for (const path of feed.spine) {
         for (const v of path) {
-          if (!portKeys.has(key(v))) expect(ringDistance(ringMm, v), `room ${room.id} vertex ${key(v)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
+          if (!portKeys.has(key(v))) expect(ringDistanceMm(ringMm, v), `room ${room.id} vertex ${key(v)}`).toBeGreaterThanOrEqual(SPINE_WALL_MARGIN_MM);
         }
       }
       checked++;
