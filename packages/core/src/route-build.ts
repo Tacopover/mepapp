@@ -24,6 +24,7 @@ import { sizeNetwork, type SizedSegment } from './sizing-network.js';
 import type { FlowUnitId } from './flow-units.js';
 import type { StampCategory } from './stamp-library.js';
 import { capacityWarnings, orderWarnings, shortLegCount } from './route-finish.js';
+import { planTwoLevel, terminalRoomIdsOf } from './route-two-level.js';
 
 export interface RouteBuildInput {
   startStampId: string; startPortId: string; networkTypeId: string;
@@ -312,29 +313,49 @@ export function planRoute(
   });
 
   const servedRoomIds = [...grouped.byRoom.keys()];
-  const trunk = buildTrunk({ area: input.area, rooms: input.rooms, mmPerPt, startPointMm: start.pointMm, servedRoomIds, options, bridgeAccepts: accepts });
+  const portKeyedByRoom = new Map([...grouped.byRoom].map(([roomId, ports]) => [roomId, ports.map((port) => ({ id: portKey(port), point: toMm(port.world) }))] as const));
+  const two = options.twoLevel
+    ? planTwoLevel({
+        options: options.twoLevel,
+        bendMm: options.bendPenaltyMm ?? DEFAULT_LAYOUT_OPTIONS.bendPenaltyMm,
+        rooms: input.rooms, area: input.area, mmPerPt, pageIndex: input.pageIndex, startMm: start.pointMm,
+        portsByRoom: portKeyedByRoom,
+        terminalRoomIds: terminalRoomIdsOf(input.state.stamps, input.rooms, input.pageIndex),
+        blockers: [],   // T11b
+        accepts,
+        crossesExisting: makeCrossesExisting(existing.segments, mmPerPt),
+      })
+    : null;
+  const trunk = two ? two.trunk : buildTrunk({ area: input.area, rooms: input.rooms, mmPerPt, startPointMm: start.pointMm, servedRoomIds, options, bridgeAccepts: accepts });
 
   const paths: Vec2[][] = [];
   const tag = (origin: RouteLegOrigin, path: readonly Vec2[]): void => {
     trace?.paths.push({ origin, path: path.map((p) => ({ x: p.x, y: p.y })) });
   };
-  if (trunk.rootPointMm) {
-    const dx = trunk.rootPointMm.x - start.pointMm.x;
-    const dy = trunk.rootPointMm.y - start.pointMm.y;
-    if (Math.hypot(dx, dy) > 1e-6) {
-      const root = elbowPath(start.pointMm, trunk.rootPointMm, Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y');
-      paths.push(root);
-      tag('trunk', root);
+  if (two) {
+    for (const path of two.mainPaths) {
+      paths.push(path);
+      tag('trunk', path);
     }
-  }
-  for (const edge of trunk.edges) {
-    paths.push(edge.path);
-    tag(edge.id.startsWith('rb-') ? 'bridge' : 'trunk', edge.path);
+  } else {
+    if (trunk.rootPointMm) {
+      const dx = trunk.rootPointMm.x - start.pointMm.x;
+      const dy = trunk.rootPointMm.y - start.pointMm.y;
+      if (Math.hypot(dx, dy) > 1e-6) {
+        const root = elbowPath(start.pointMm, trunk.rootPointMm, Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y');
+        paths.push(root);
+        tag('trunk', root);
+      }
+    }
+    for (const edge of trunk.edges) {
+      paths.push(edge.path);
+      tag(edge.id.startsWith('rb-') ? 'bridge' : 'trunk', edge.path);
+    }
   }
 
   // A port in a route-area room (inArea) is treated like an outside port: it gets the off-graph connection. Provisional rule, the plan has none yet.
   const loosePorts: RoutePort[] = [];
-  if (!options.roomBranches) for (const roomId of trunk.offGraphRoomIds) loosePorts.push(...(grouped.byRoom.get(roomId) ?? []));
+  if (!options.roomBranches && !options.twoLevel) for (const roomId of trunk.offGraphRoomIds) loosePorts.push(...(grouped.byRoom.get(roomId) ?? []));
   loosePorts.push(...grouped.outside, ...grouped.inArea);
 
   const roomById = new Map(input.rooms.map((room) => [room.id, room] as const));
@@ -349,7 +370,15 @@ export function planRoute(
   });
   const portById = new Map(input.targetPorts.map((port) => [portKey(port), port] as const));
   let chainedRoomIds: string[] = [];
-  if (options.roomBranches) {
+  if (two) {
+    chainedRoomIds = two.chainedRoomIds;
+    for (const piece of two.pieces) {
+      paths.push(piece.path);
+      tag(piece.origin, piece.path);
+    }
+    loosePorts.push(...two.leftPortIds.map((id) => portById.get(id)).filter((port): port is RoutePort => port !== undefined));
+    for (const roomId of two.unfedRoomIds) loosePorts.push(...(grouped.byRoom.get(roomId) ?? []));
+  } else if (options.roomBranches) {
     const portsByRoom = new Map([...grouped.byRoom].map(([roomId, ports]) => [roomId, ports.map((port) => ({ id: portKey(port), point: toMm(port.world) }))] as const));
     const feeds = planRoomFeeds({
       rooms: input.rooms,
@@ -391,7 +420,12 @@ export function planRoute(
     }
   }
 
-  const linkRooms = options.linkSearch
+  const withoutLinkSearch = (layout: RouteLayoutOptions): RouteLayoutOptions => {
+    const { linkSearch: _linkSearch, ...rest } = layout;
+    return rest;
+  };
+  const looseOptions = two ? withoutLinkSearch(options) : options;
+  const linkRooms = looseOptions.linkSearch
     ? input.rooms
         .filter((room) => room.pageIndex === input.pageIndex)
         .map((room) => ({ room, bounds: roomBounds(room), area: polygonAreaPt2(room.polygon) }))
@@ -412,8 +446,8 @@ export function planRoute(
     targetPoints: targetPorts.map((port) => toMm(port.world)),
     noTapPoints: start.stubFittingId === null ? [start.pointMm] : [],
     accepts,
-    options,
-    ...(options.linkSearch ? { roomAt: roomAtMm, roomCorners: roomCornersMm } : {}),
+    options: looseOptions,
+    ...(looseOptions.linkSearch ? { roomAt: roomAtMm, roomCorners: roomCornersMm } : {}),
   });
   paths.push(...connected.paths);
   for (const path of connected.paths) tag('link', path);

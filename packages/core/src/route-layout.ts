@@ -14,9 +14,9 @@ export interface TwoLevelOptions {
   reachMm?: number;
   /** Main run may cross a room with no terminal that is not in the route area. Default false (Q-P2-02). */
   crossRooms?: { maxRooms: number };
-  /** Far rooms: how many chain steps from a fed room. Default 0. */
+  /** Far rooms: how many chain steps from a fed room. Default 2 (answer C of Q-P1-16). 0 = no chain pass. */
   maxChainDepth?: number;
-  /** A room may get several doors when it has this many terminals or more (blocks of 2 by 2). Default Infinity (one hole per room). */
+  /** A room may get several doors when it has this many terminals or more (blocks of 2 by 2). Default 6 (answer B of Q-P2-04; Infinity = one hole for each room). */
   splitFromTerminals?: number;
   /** Minimum distance of a wall hole (door) to the end of a wall, a column or a corner, mm. Default 200. */
   doorMarginMm?: number;
