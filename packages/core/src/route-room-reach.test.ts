@@ -188,6 +188,24 @@ describe('bestRoomReach', () => {
     expect(r!.costMm).toBe(2100);
   });
 
+  it('takes a horizontal-first L from a vertical carrier that arrives along the outward axis', () => {
+    const r = bestRoomReach({
+      ...base,
+      carriers: [leg('v', { x: 0, y: 0 }, { x: 0, y: 1000 })],
+      candidates: [real(1000, 3000)],
+    });
+    expect(r!.branch).toEqual([{ x: 0, y: 700 }, { x: 1000, y: 700 }, { x: 1000, y: 3000 }]);
+  });
+
+  it('takes a vertical-first L from a horizontal carrier that arrives along the outward axis', () => {
+    const r = bestRoomReach({
+      ...base,
+      carriers: [leg('h', { x: 0, y: 0 }, { x: 1000, y: 0 })],
+      candidates: [{ pointMm: { x: 3000, y: 1000 }, outward: { x: 1, y: 0 }, source: 'area-entry' }],
+    });
+    expect(r!.branch).toEqual([{ x: 700, y: 0 }, { x: 700, y: 1000 }, { x: 3000, y: 1000 }]);
+  });
+
   it('gives the same result for shuffled candidates and carriers', () => {
     const input = {
       ...base,

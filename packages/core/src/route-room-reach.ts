@@ -48,8 +48,7 @@ function pathVariants(tap: Vec2, entry: EntryCandidate, kind: CarrierKind): Vec2
   if (Math.abs(tap.x - e.x) <= ALIGN_TOL_MM || Math.abs(tap.y - e.y) <= ALIGN_TOL_MM) return [cleanPath([tap, e])];
   const horizontalFirst = cleanPath([tap, { x: e.x, y: tap.y }, e]);
   const verticalFirst = cleanPath([tap, { x: tap.x, y: e.y }, e]);
-  if (kind === 'horizontal') return [horizontalFirst];
-  if (kind === 'vertical') return [verticalFirst];
+  if (kind === 'vertical') return [verticalFirst, horizontalFirst];
   return [horizontalFirst, verticalFirst];
 }
 
