@@ -33,6 +33,7 @@ export interface RoomDoorInput {
   mmPerPt: number;
   corridorAt: (pointMm: Vec2) => boolean;       // true in a route-area room
   otherRoomAt?: (pointMm: Vec2) => boolean;     // true in any other room that is not a route-area room; a probe ray that meets one first does not count
+  passableRoomAt?: (pointMm: Vec2) => boolean;  // true in a room that may be crossed (no terminal, not banned, see bridgeRoomAllowed); a probe ray passes it even when otherRoomAt is true there
   portsMm: readonly Vec2[];                     // the terminals of the room
   blockers: readonly (readonly Vec2[])[];       // polylines of segments of other networks, mm
   clearanceMm: number;                          // caller default 150
@@ -87,16 +88,16 @@ function thinEvenly<T>(list: readonly T[], keep: number): T[] {
 
 const sourceRank = (source: EntryCandidate['source']): number => (source === 'port-line' ? 0 : 1);
 
-function hitDistance(p: Vec2, outward: Vec2, input: Pick<RoomDoorInput, 'corridorAt' | 'otherRoomAt'>, probeMm: number): number | null {
+function hitDistance(p: Vec2, outward: Vec2, input: Pick<RoomDoorInput, 'corridorAt' | 'otherRoomAt' | 'passableRoomAt'>, probeMm: number): number | null {
   for (let d = PROBE_STEP_MM; d <= probeMm; d += PROBE_STEP_MM) {
     const q = { x: p.x + outward.x * d, y: p.y + outward.y * d };
-    if (input.otherRoomAt?.(q)) return null;
+    if (input.otherRoomAt?.(q) && !input.passableRoomAt?.(q)) return null;
     if (input.corridorAt(q)) return d;
   }
   return null;
 }
 
-export function wallStretches(input: Pick<RoomDoorInput, 'room' | 'mmPerPt' | 'corridorAt' | 'otherRoomAt' | 'probeMm'>): WallStretch[] {
+export function wallStretches(input: Pick<RoomDoorInput, 'room' | 'mmPerPt' | 'corridorAt' | 'otherRoomAt' | 'passableRoomAt' | 'probeMm'>): WallStretch[] {
   const { room, mmPerPt } = input;
   const probeMm = input.probeMm ?? DOOR_PROBE_MM;
   const outer = room.polygon.outer;

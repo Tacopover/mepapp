@@ -147,6 +147,25 @@ describe('wallStretches', () => {
     expect(wallStretches(scene({ otherRoomAt }))).toEqual([]);
     expect(wallStretches(scene())).toHaveLength(1);
   });
+
+  it('passes a room in the probe ray when passableRoomAt is true there', () => {
+    const otherRoomAt = (p: Vec2): boolean => p.y >= -200 && p.y <= -100;
+    const passableRoomAt = (p: Vec2): boolean => p.y >= -200 && p.y <= -100;
+    const [stretch] = wallStretches(scene({ otherRoomAt, passableRoomAt }));
+    expect(stretch).toBeDefined();
+    expect(stretch!.thicknessMm).toBe(300);
+  });
+
+  it('still hides the stretch when passableRoomAt is absent', () => {
+    const otherRoomAt = (p: Vec2): boolean => p.y >= -200 && p.y <= -100;
+    expect(wallStretches(scene({ otherRoomAt }))).toEqual([]);
+  });
+
+  it('still hides the stretch when passableRoomAt is false in the probe ray', () => {
+    const otherRoomAt = (p: Vec2): boolean => p.y >= -200 && p.y <= -100;
+    const passableRoomAt = (): boolean => false;
+    expect(wallStretches(scene({ otherRoomAt, passableRoomAt }))).toEqual([]);
+  });
 });
 
 describe('roomDoorCandidates', () => {
