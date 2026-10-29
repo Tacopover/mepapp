@@ -42,6 +42,7 @@ export interface CombineInput {
   blockers: readonly (readonly Vec2[])[];             // for roomRunFor in the chain pass
   clearanceMm: number;
   doorMarginMm: number;
+  portDoorMarginMm?: number;                          // margin of a port-line door to a ring vertex; default doorMarginMm
   stubMm?: number;
   wallParallelToRows?: boolean;
   roomFeedFallback?: (room: Room, door: EntryCandidate) => RoomFeed;
@@ -178,6 +179,7 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
       blockers: input.blockers,
       clearanceMm: input.clearanceMm,
       doorMarginMm: input.doorMarginMm,
+      portDoorMarginMm: input.portDoorMarginMm,
       stubMm: input.stubMm,
       bendMm: input.bendMm,
       wallParallelToRows: input.wallParallelToRows,

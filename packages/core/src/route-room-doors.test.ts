@@ -213,6 +213,28 @@ describe('roomDoorCandidates', () => {
     const doors = roomDoorCandidates(scene({ portsMm: [{ x: 2500, y: 2000 }], stepMm: 0 }));
     expect(doors.length).toBeGreaterThan(0);
   });
+
+  it('puts a port-line door 150 mm from a corner only with portDoorMarginMm 100', () => {
+    const isLine = (c: { door: EntryCandidate }): boolean =>
+      c.door.source === 'port-line' && c.door.pointMm.x === 150 && c.door.pointMm.y === 0;
+    const ports = [{ x: 150, y: 2000 }];
+    expect(roomDoorCandidates(scene({ portsMm: ports })).some(isLine)).toBe(false);
+    const narrow = roomDoorCandidates(scene({ portsMm: ports, portDoorMarginMm: 100 }));
+    expect(narrow.some(isLine)).toBe(true);
+    for (const c of narrow) for (const corner of CORNERS) expect(dist(c.door.pointMm, corner)).toBeGreaterThanOrEqual(c.door.source === 'port-line' ? 100 : 200);
+  });
+
+  it('finds a port-line door at a terminal projection that no probed stretch covers', () => {
+    const strip = (p: Vec2): boolean => band(p) && p.x >= 1010 && p.x <= 1040;
+    const isLine = (c: { door: EntryCandidate }): boolean =>
+      c.door.source === 'port-line' && c.door.pointMm.x === 1025 && c.door.pointMm.y === 0;
+    const ports = [{ x: 1025, y: 2000 }];
+    expect(roomDoorCandidates(scene({ corridorAt: strip, portsMm: ports })).some(isLine)).toBe(false);
+    const narrow = roomDoorCandidates(scene({ corridorAt: strip, portsMm: ports, portDoorMarginMm: 100 }));
+    const found = narrow.find(isLine);
+    expect(found).toBeDefined();
+    expect(found!.door.outward).toEqual({ x: 0, y: -1 });
+  });
 });
 
 describe('roomDoorRuns', () => {

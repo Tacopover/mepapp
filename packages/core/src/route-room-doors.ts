@@ -38,6 +38,7 @@ export interface RoomDoorInput {
   blockers: readonly (readonly Vec2[])[];       // polylines of segments of other networks, mm
   clearanceMm: number;                          // caller default 150
   doorMarginMm: number;                         // caller default 200
+  portDoorMarginMm?: number;                    // margin of a port-line door to a ring vertex; default doorMarginMm
   probeMm?: number;                             // default DOOR_PROBE_MM
   stepMm?: number;                              // default DOOR_STEP_MM
 }
@@ -152,6 +153,8 @@ const doorOrder = (p: OwnDoor, q: OwnDoor): number =>
 export function roomDoorCandidates(input: RoomDoorInput): OwnDoor[] {
   const { room, mmPerPt, blockers, clearanceMm, doorMarginMm, portsMm } = input;
   const stepMm = input.stepMm !== undefined && Number.isFinite(input.stepMm) && input.stepMm > 0 ? input.stepMm : DOOR_STEP_MM;
+  const portMarginMm = Math.min(doorMarginMm, input.portDoorMarginMm ?? doorMarginMm);
+  const narrow = portMarginMm < doorMarginMm;
   const found = new Map<string, OwnDoor>();
   for (const stretch of wallStretches(input)) {
     const { a, b, outward, loMm, hiMm } = stretch;
@@ -159,18 +162,23 @@ export function roomDoorCandidates(input: RoomDoorInput): OwnDoor[] {
     const e = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
     const lo = loMm + doorMarginMm;
     const hi = hiMm - doorMarginMm;
-    if (lo > hi) continue;
+    const pLo = loMm + portMarginMm;
+    const pHi = hiMm - portMarginMm;
+    if (lo > hi && (!narrow || pLo > pHi)) continue;
     const proj = (p: Vec2): number => (p.x - a.x) * e.x + (p.y - a.y) * e.y;
-    const clamp = (s: number): number => Math.min(hi, Math.max(lo, s));
+    const clamp = (s: number): number => Math.min(pHi, Math.max(pLo, s));
     const projs = portsMm.map(proj);
-    const positions: { s: number; source: EntryCandidate['source'] }[] = [{ s: (lo + hi) / 2, source: 'ring' }];
+    const positions: { s: number; source: EntryCandidate['source'] }[] = [];
+    if (lo <= hi) positions.push({ s: (lo + hi) / 2, source: 'ring' });
     for (const s of projs) positions.push({ s: clamp(s), source: 'port-line' });
     for (let i = 0; i < projs.length; i++) {
       for (let j = i + 1; j < projs.length; j++) positions.push({ s: clamp((projs[i]! + projs[j]!) / 2), source: 'port-line' });
     }
     if (projs.length > 0) positions.push({ s: clamp(projs.reduce((sum, s) => sum + s, 0) / projs.length), source: 'port-line' });
-    for (let s = lo; s < hi; s += stepMm) positions.push({ s, source: 'ring' });
-    positions.push({ s: hi, source: 'ring' });
+    if (lo <= hi) {
+      for (let s = lo; s < hi; s += stepMm) positions.push({ s, source: 'ring' });
+      positions.push({ s: hi, source: 'ring' });
+    }
     for (const { s, source } of positions) {
       const pointMm = { x: a.x + e.x * s, y: a.y + e.y * s };
       const key = `${Math.round(pointMm.x)},${Math.round(pointMm.y)},${outward.x},${outward.y}`;
@@ -180,8 +188,36 @@ export function roomDoorCandidates(input: RoomDoorInput): OwnDoor[] {
       found.set(key, { door: { pointMm, outward, source }, fraction, edgeIndex: stretch.edgeIndex });
     }
   }
+  if (narrow) {
+    const probeMm = input.probeMm ?? DOOR_PROBE_MM;
+    const outer = room.polygon.outer;
+    for (let i = 0; i < outer.length; i++) {
+      const pa = outer[i]!;
+      const pb = outer[(i + 1) % outer.length]!;
+      const a = { x: pa.x * mmPerPt, y: pa.y * mmPerPt };
+      const b = { x: pb.x * mmPerPt, y: pb.y * mmPerPt };
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len < MIN_EDGE_MM || Math.min(Math.abs(dx), Math.abs(dy)) > AXIS_EDGE_TOL_MM) continue;
+      const e = { x: dx / len, y: dy / len };
+      const nx = -e.y;
+      const ny = e.x;
+      const middle = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+      const sign = roomContainsPoint(room, { x: middle.x + nx / mmPerPt, y: middle.y + ny / mmPerPt }) ? -1 : 1;
+      const outward = axisOf(sign * nx, sign * ny);
+      for (const port of portsMm) {
+        const s = (port.x - a.x) * e.x + (port.y - a.y) * e.y;
+        if (s < 0 || s > len) continue;
+        const pointMm = { x: a.x + e.x * s, y: a.y + e.y * s };
+        if (hitDistance(pointMm, outward, input, probeMm) === null) continue;
+        const key = `${Math.round(pointMm.x)},${Math.round(pointMm.y)},${outward.x},${outward.y}`;
+        if (!found.has(key)) found.set(key, { door: { pointMm, outward, source: 'port-line' }, fraction: s / len, edgeIndex: i });
+      }
+    }
+  }
   const allowed = [...found.values()].filter((d) =>
-    doorAllowed({ room, mmPerPt, door: d.door, blockers, clearanceMm, doorMarginMm }),
+    doorAllowed({ room, mmPerPt, door: d.door, blockers, clearanceMm, doorMarginMm, portDoorMarginMm: input.portDoorMarginMm }),
   );
   const sorted = allowed.sort(doorOrder);
   if (sorted.length <= MAX_OWN_DOORS) return sorted;
@@ -212,6 +248,7 @@ function runsForDoors(input: RoomDoorRunsInput, ports: readonly { id: string; po
       blockers: input.blockers,
       clearanceMm: input.clearanceMm,
       doorMarginMm: input.doorMarginMm,
+      portDoorMarginMm: input.portDoorMarginMm,
       stubMm: input.stubMm,
       bendMm: input.bendMm,
       wallParallelToRows: input.wallParallelToRows,

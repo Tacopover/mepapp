@@ -23,6 +23,7 @@ export const TWO_LEVEL_DEFAULTS = {
   splitFromTerminals: 6,
   clearanceMm: 150,
   doorMarginMm: 200,
+  portDoorMarginMm: 100,
   ductWidthMm: 400,
   bridgeProbeMm: 15000,
 } as const;
@@ -143,6 +144,7 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
       blockers,
       clearanceMm,
       doorMarginMm,
+      portDoorMarginMm: TWO_LEVEL_DEFAULTS.portDoorMarginMm,
       bendMm,
     };
   };
@@ -242,6 +244,7 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
     blockers,
     clearanceMm,
     doorMarginMm,
+    portDoorMarginMm: TWO_LEVEL_DEFAULTS.portDoorMarginMm,
     teeSpacingMm: options.teeSpacingMm,
     roomFeedFallback: (room, door) => hooks.get(room.id)!(door),
   });

@@ -27,6 +27,7 @@ export interface RoomRunInput {
   blockers: readonly (readonly Vec2[])[];        // polylines of segments of other networks, mm
   clearanceMm: number;                           // caller default 150
   doorMarginMm: number;                          // caller default 200
+  portDoorMarginMm?: number;                     // margin of a port-line door to a ring vertex; default doorMarginMm
   stubMm?: number;                               // default ROOM_STUB_MM
   bendMm?: number;                                       // default BEND_PENALTY_MM, price of a bend when patterns compete
   wallParallelToRows?: boolean;                          // false: do not try the L. undefined or true: try it
@@ -83,11 +84,12 @@ function pieceOk(path: readonly Vec2[], input: RoomRunInput, portPoints: readonl
   return clear && !runsOverOtherPort(path, portPoints);
 }
 
-export function doorAllowed(input: Pick<RoomRunInput, 'room' | 'mmPerPt' | 'door' | 'blockers' | 'clearanceMm' | 'doorMarginMm'>): boolean {
+export function doorAllowed(input: Pick<RoomRunInput, 'room' | 'mmPerPt' | 'door' | 'blockers' | 'clearanceMm' | 'doorMarginMm' | 'portDoorMarginMm'>): boolean {
   const { room, mmPerPt, door } = input;
+  const marginMm = door.source === 'port-line' ? Math.min(input.doorMarginMm, input.portDoorMarginMm ?? input.doorMarginMm) : input.doorMarginMm;
   for (const ring of [room.polygon.outer, ...room.polygon.holes]) {
     for (const v of ring) {
-      if (dist(door.pointMm, { x: v.x * mmPerPt, y: v.y * mmPerPt }) < input.doorMarginMm) return false;
+      if (dist(door.pointMm, { x: v.x * mmPerPt, y: v.y * mmPerPt }) < marginMm) return false;
     }
   }
   return input.blockers.every((blocker) => distanceToPath(door.pointMm, blocker) >= input.clearanceMm);
