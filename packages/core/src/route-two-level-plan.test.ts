@@ -189,6 +189,20 @@ function piecesMm(segments: readonly Segment[], mmPerPt: number): [Vec2, Vec2][]
   return pieces;
 }
 
+function acrossLinkOffsetsMm(at: Vec2, pieces: readonly [Vec2, Vec2][], gapMm: number): Vec2[] {
+  const piece = pieces.find(([a, b]) => distanceMm(a, at) <= 1 || distanceMm(b, at) <= 1);
+  if (!piece) return [];
+  const [a, b] = piece;
+  const len = distanceMm(a, b);
+  if (len === 0) return [];
+  const nx = -(b.y - a.y) / len;
+  const ny = (b.x - a.x) / len;
+  return [
+    { x: nx * gapMm, y: ny * gapMm },
+    { x: -nx * gapMm, y: -ny * gapMm },
+  ];
+}
+
 function samplesOf(path: readonly Vec2[], stepMm: number): Vec2[] {
   const out: Vec2[] = [];
   for (let i = 0; i < path.length; i++) {
@@ -329,20 +343,25 @@ describe('two-level plan of a return network after the supply', () => {
     const mmPerPt = s.drawing.mmPerPt;
     const supply = planRequest(s, supplyRequest(s), { twoLevel: {} });
     expect(supply.status).toBe('ok');
+    const supplyPieces = piecesMm(supply.plan.segments, mmPerPt);
 
-    // the return start must not lie on the supply stub, and a return terminal must not lie in line with a supply terminal, else the first leg of any run lies on the supply pipe
+    // the return start must not lie on the supply stub, and a return terminal is offset across the supply link, else the first leg of any run lies on the supply pipe
     const startAt = roomLabelPoint(s.startRoom);
     const retStart: Vec2 = { x: startAt.x, y: startAt.y + 1000 / mmPerPt };
     const retStamps: RouteStamp[] = [stampAt('ret-ahu', 'equipment', 'out', retStart)];
     const retTerminalIds = new Set<string>();
-    const offsets = [
+    const alongOffsets = [
       { x: 0, y: 500 / mmPerPt },
       { x: 0, y: -500 / mmPerPt },
     ];
+    const gapMm = Math.max(500, CLEARANCE_MM + 100);
     for (const room of s.servedRooms) {
       const supplyTerminal = s.stamps.find((stamp) => stamp.id === `term-${room.id}`);
       if (!supplyTerminal) continue;
       const base = supplyTerminal.transform.position;
+      const terminalMm = portMmOf(s.stamps, supplyTerminal.id, 'in', mmPerPt);
+      const acrossOffsets = acrossLinkOffsetsMm(terminalMm, supplyPieces, gapMm).map((o) => ({ x: o.x / mmPerPt, y: o.y / mmPerPt }));
+      const offsets = acrossOffsets.length > 0 ? acrossOffsets : alongOffsets;
       const at = offsets.map((o) => ({ x: base.x + o.x, y: base.y + o.y })).find((p) => roomContainsPoint(room, p));
       if (!at) continue;
       const id = `ret-${room.id}`;
@@ -371,7 +390,6 @@ describe('two-level plan of a return network after the supply', () => {
     );
     if (ret.status === 'refused') expect.fail(`return plan refused: ${refusedMessage(ret.plan.warnings)}`);
 
-    const supplyPieces = piecesMm(supply.plan.segments, mmPerPt);
     const returnPieces = piecesMm(ret.plan.segments, mmPerPt);
     let worstOverlap = 0;
     for (const piece of returnPieces) {
