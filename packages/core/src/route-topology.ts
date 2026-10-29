@@ -6,6 +6,7 @@ import { ROUTED_MARK, type ConnectionPoint, type Discipline, type Fitting, type 
 import { placeTapPosition } from './route-branch.js';
 import { elbowPath, legClass, MIN_LEG_MM, type RouteLayoutOptions } from './route-layout.js';
 import { searchLink } from './route-link.js';
+import { crossesBlocker } from './route-main-run.js';
 
 export const PLACEHOLDER_DIAMETER_MM: Record<Discipline, number> =
   { ventilation: 200, heatingAndCooling: 25, plumbing: 25, fireProtection: 50, electrical: 25, other: 50 };
@@ -275,6 +276,9 @@ export interface ConnectLooseInput {
   roomAt?: (p: Vec2) => string | null;
   /** Room corner points (mm) for the link search. */
   roomCorners?: readonly Vec2[];
+  /** Polylines (mm) that a link must keep clear of, by clearanceMm. Absent: no check. */
+  blockers?: readonly (readonly Vec2[])[];
+  clearanceMm?: number;
 }
 export interface ConnectLooseResult { paths: Vec2[][]; connectedIds: string[]; left: string[] }
 
@@ -372,6 +376,9 @@ export function connectLoosePorts(input: ConnectLooseInput): ConnectLooseResult 
   const left: string[] = [];
   const pending = [...input.loose];
   const roomCache = new Map<string, string | null>();
+  const blockers = input.blockers;
+  const clearanceMm = input.clearanceMm ?? 0;
+  const blocked = (path: Vec2[]): boolean => blockers !== undefined && path.some((vertex, i) => i > 0 && crossesBlocker(path[i - 1]!, vertex, blockers, clearanceMm));
 
   while (pending.length > 0) {
     let bestIndex = -1;
@@ -403,7 +410,7 @@ export function connectLoosePorts(input: ConnectLooseInput): ConnectLooseResult 
       });
       if (found) {
         const path = cleanPath(found);
-        if (path.length >= 2 && accepts(path, port.id) && !runsOverOtherPort(path, input.targetPoints)) chosen = path;
+        if (path.length >= 2 && accepts(path, port.id) && !runsOverOtherPort(path, input.targetPoints) && !blocked(path)) chosen = path;
       }
     }
     if (!chosen) {
@@ -420,7 +427,7 @@ export function connectLoosePorts(input: ConnectLooseInput): ConnectLooseResult 
           const signature = path.map(keyOf).join(';');
           if (tried.includes(signature)) continue;
           tried.push(signature);
-          if (path.length >= 2 && accepts(path, port.id) && !runsOverOtherPort(path, input.targetPoints)) {
+          if (path.length >= 2 && accepts(path, port.id) && !runsOverOtherPort(path, input.targetPoints) && !blocked(path)) {
             chosen = path;
             break;
           }

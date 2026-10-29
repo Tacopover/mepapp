@@ -24,7 +24,7 @@ import { sizeNetwork, type SizedSegment } from './sizing-network.js';
 import type { FlowUnitId } from './flow-units.js';
 import type { StampCategory } from './stamp-library.js';
 import { capacityWarnings, orderWarnings, shortLegCount } from './route-finish.js';
-import { planTwoLevel, terminalRoomIdsOf } from './route-two-level.js';
+import { planTwoLevel, terminalRoomIdsOf, TWO_LEVEL_DEFAULTS } from './route-two-level.js';
 
 export interface RouteBuildInput {
   startStampId: string; startPortId: string; networkTypeId: string;
@@ -47,7 +47,7 @@ export interface RouteBuildInput {
   newSegmentId: () => string; newFittingId: () => string;
 }
 
-export interface RouteStats { segments: number; fittings: number; lengthMm: number; bends90: number; bends45: number; freeLegs: number; rooms: number; ports: number; portsLeft: number; wallCrossings: number; wallCrossingsRoom: number; wallCrossingsCorridor: number; existingCrossings: number; removedSegments: number; removedFittings: number }
+export interface RouteStats { segments: number; fittings: number; lengthMm: number; bends90: number; bends45: number; freeLegs: number; rooms: number; ports: number; portsLeft: number; wallCrossings: number; wallCrossingsRoom: number; wallCrossingsCorridor: number; existingCrossings: number; removedSegments: number; removedFittings: number; corridorGapCrossings?: number; holesPerRoom?: Record<string, number> }
 export interface PlannedRoute { segments: Segment[]; fittings: Fitting[]; removeSegmentIds: string[]; removeFittingIds: string[]; warnings: RoutePlanWarning[]; stats: RouteStats; sizes: SizedSegment[] }
 
 export interface GroupedPorts {
@@ -312,6 +312,7 @@ export function planRoute(
     return !foreignPieces.some(([a, b]) => distanceToPiece(vertex, a, b) <= NEAR_ITEM_MM);
   });
 
+  const foreignBlockers = foreignSegments.map((s) => s.geometry.map(toMm));
   const servedRoomIds = [...grouped.byRoom.keys()];
   const portKeyedByRoom = new Map([...grouped.byRoom].map(([roomId, ports]) => [roomId, ports.map((port) => ({ id: portKey(port), point: toMm(port.world) }))] as const));
   const two = options.twoLevel
@@ -321,7 +322,7 @@ export function planRoute(
         rooms: input.rooms, area: input.area, mmPerPt, pageIndex: input.pageIndex, startMm: start.pointMm,
         portsByRoom: portKeyedByRoom,
         terminalRoomIds: terminalRoomIdsOf(input.state.stamps, input.rooms, input.pageIndex),
-        blockers: [],   // T11b
+        blockers: foreignBlockers,
         accepts,
         crossesExisting: makeCrossesExisting(existing.segments, mmPerPt),
       })
@@ -448,6 +449,7 @@ export function planRoute(
     accepts,
     options: looseOptions,
     ...(looseOptions.linkSearch ? { roomAt: roomAtMm, roomCorners: roomCornersMm } : {}),
+    ...(two ? { blockers: foreignBlockers, clearanceMm: options.twoLevel?.clearanceMm ?? TWO_LEVEL_DEFAULTS.clearanceMm } : {}),
   });
   paths.push(...connected.paths);
   for (const path of connected.paths) tag('link', path);
@@ -478,6 +480,7 @@ export function planRoute(
   else if (trunk.freeEdges.length > 0) warnings.push({ code: 'free-angle', severity: 'warning', count: trunk.freeEdges.length, points: trunk.freeEdges.map((edge) => toPage(edge.pointMm)) });
   if (trunk.offGraphRoomIds.length > 0) warnings.push({ code: 'room-off-graph', severity: 'warning', ids: [...trunk.offGraphRoomIds].sort(), count: trunk.offGraphRoomIds.length });
   if (chainedRoomIds.length > 0) warnings.push({ code: 'room-chained', severity: 'warning', ids: chainedRoomIds, count: chainedRoomIds.length });
+  if (two) warnings.push(...two.warnings);
   const leftCount = connected.left.length + refusedPorts.length;
   if (leftCount > 0) {
     warnings.push({ code: 'ports-left', severity: 'warning', count: leftCount });
@@ -620,6 +623,7 @@ export function planRoute(
         existingCrossings,
         removedSegments: input.removal.segmentIds.length,
         removedFittings: input.removal.fittingIds.length,
+        ...(two ? { corridorGapCrossings: two.corridorGapCrossings, holesPerRoom: two.holesPerRoom } : {}),
       },
     },
   };

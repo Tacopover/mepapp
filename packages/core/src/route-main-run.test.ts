@@ -664,6 +664,33 @@ describe('planMainRun across a wall gap', () => {
   });
 });
 
+describe('planMainRun with a blocker between two lines of one row', () => {
+  const blocker: Vec2[] = [
+    { x: 10500, y: -5000 },
+    { x: 10500, y: 5000 },
+  ];
+  const cutScene = (over: Partial<PlanInput> = {}): PlanInput =>
+    planInput({
+      lines: [hLine('a', 1000, 0, 10000), hLine('b', 1000, 11000, 21000)],
+      startMm: { x: 1000, y: 1000 },
+      demands: [demand('R1', [door(5000, 1500, { x: 0, y: -1 })]), demand('R2', [door(15000, 1500, { x: 0, y: -1 })])],
+      ...over,
+    });
+
+  it('joins the two lines straight through the blocker when no blockers are given', () => {
+    const run = planMainRun(cutScene());
+    expect(run.joins).toHaveLength(1);
+    expect(run.unreachedRoomIds).toEqual([]);
+  });
+
+  it('does not join the two lines through the blocker when blockers are given', () => {
+    const run = planMainRun(cutScene({ blockers: [blocker], clearanceMm: 150 }));
+    expect(run.joins).toEqual([]);
+    expect(run.unreachedRoomIds).toEqual(['R2']);
+    expect(run.paths.flat().some((p) => p.x > 10000)).toBe(false);
+  });
+});
+
 describe('planMainRun on the manual fixture', () => {
   it('builds one tree within the bend and length gates', () => {
     const fixture = manualScenario();

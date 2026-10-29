@@ -120,6 +120,22 @@ describe('routeBuildLines', () => {
     expect(many!.text).toBe('3 rooms would join another network: Shaft 1, Shaft 2, and 1 more. Their ports stay open.');
   });
 
+  it('gives the gap count for corridor-gap-crossed', () => {
+    const [many] = routeBuildLines({ warnings: [{ code: 'corridor-gap-crossed', severity: 'warning', count: 3 }] }, names);
+    const [one] = routeBuildLines({ warnings: [{ code: 'corridor-gap-crossed', severity: 'warning', count: 1 }] }, names);
+    expect(many!.text).toContain('passes 3 gaps');
+    expect(one!.text).toContain('passes 1 gap between');
+    expect(many!.hint).toBe('');
+  });
+
+  it('names the shaft and the room count for start-stub-through-wall', () => {
+    const [two] = routeBuildLines({ warnings: [{ code: 'start-stub-through-wall', severity: 'warning', count: 2, ids: ['a', 'b'] }] }, names);
+    const [one] = routeBuildLines({ warnings: [{ code: 'start-stub-through-wall', severity: 'warning', count: 1, ids: ['a'] }] }, names);
+    expect(two!.text).toContain('crosses a wall of 2 rooms');
+    expect(two!.text).toContain('Shaft a');
+    expect(one!.text).toContain('crosses a wall of 1 room:');
+  });
+
   it('words the removal line as a note about the earlier run', () => {
     const [line] = routeBuildLines({ warnings: [{ code: 'removes-routed', severity: 'info', numbers: { segments: 9, fittings: 1 } }] }, names);
     expect(line!.text).toBe('Place route first removes 9 segments and 1 fitting of the earlier run. Hand-drawn segments stay.');

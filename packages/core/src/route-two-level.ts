@@ -6,11 +6,12 @@ import { ROOM_TYPE_LIBRARY } from './rooms/room-type.js';
 import type { RouteArea } from './route-area.js';
 import { combineRoomRuns, DEFAULT_CHAIN_DEPTH } from './route-combine.js';
 import { elbowPath, insideRouteArea, withWallGaps, type TwoLevelOptions } from './route-layout.js';
-import { bridgeRoomAllowed, mainBridgeLines, mainRunLines, planMainRun, type BridgeRoom, type MainDemand, type MainLine, type MainRun } from './route-main-run.js';
+import { bridgeRoomAllowed, crossesBlocker, mainBridgeLines, mainRunLines, planMainRun, type BridgeRoom, type MainDemand, type MainLine, type MainRun } from './route-main-run.js';
 import type { RouteStamp } from './route-ports.js';
 import type { EntryCandidate } from './route-room-entry.js';
 import { roomFeed, type RoomFeed } from './route-room-feed.js';
 import { roomBlockRuns, roomDoorCandidates, roomDoorRuns, type RoomBlockPlan, type RoomDoorRun, type RoomDoorRunsInput } from './route-room-doors.js';
+import { mainCrossesRoomWarning, type RoutePlanWarning } from './route-plan-warnings.js';
 import type { RoomRun } from './route-room-runs.js';
 import type { TrunkResult } from './route-trunk.js';
 import { getStampWorldPorts, routingTargetOf } from './stamp.js';
@@ -52,6 +53,8 @@ export interface TwoLevelPlan {
   chainedRoomIds: string[];      // rooms with row.chain, sorted
   unfedRoomIds: string[];        // combine.unfedRoomIds
   holesPerRoom: Record<string, number>;   // room id -> number of doors, keys sorted
+  warnings: RoutePlanWarning[];          // main-crosses-room, corridor-gap-crossed, start-stub-through-wall
+  corridorGapCrossings: number;          // runs of samples of the tree paths that lie outside the route area
 }
 
 export function terminalRoomIdsOf(stamps: readonly RouteStamp[], rooms: readonly Room[], pageIndex: number): Set<string> {
@@ -76,6 +79,7 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
   const splitFromTerminals = options.splitFromTerminals ?? TWO_LEVEL_DEFAULTS.splitFromTerminals;
   const maxChainDepth = options.maxChainDepth ?? DEFAULT_CHAIN_DEPTH;
   const ductWidthMm = TWO_LEVEL_DEFAULTS.ductWidthMm;
+  const gapStepMm = 100;
   const passable = options.crossRooms !== undefined;
 
   const toMm = (p: Vec2): Vec2 => ({ x: p.x * mmPerPt, y: p.y * mmPerPt });
@@ -121,7 +125,8 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
   const areaRoomObjects = pageRooms.filter((room) => areaIds.has(room.id));
   const areaRooms = areaRoomObjects.map((room) => ({ roomId: room.id, ringMm: room.polygon.outer.map(toMm) }));
   const linkPointsMm = area.links.filter((link) => !link.shaft).map((link) => toMm(link.point));
-  const inside = withWallGaps(insideRouteArea(areaRoomObjects, mmPerPt), linkPointsMm);
+  const plainInside = insideRouteArea(areaRoomObjects, mmPerPt);
+  const inside = withWallGaps(plainInside, linkPointsMm);
   const lines = mainRunLines({ areaRooms, inside, startMm, offsetMm, blockers, shaftRoomIds, ductWidthMm, clearanceMm });
 
   const ringMmOf = (room: Room): Vec2[] => [...room.polygon.outer.map(toMm), toMm(room.polygon.outer[0]!)];
@@ -151,7 +156,7 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
         ringMm: ringMmOf(room),
         inside: roomInside,
         roomContains: (p) => roomContainsPoint(room, toPt(p)),
-        crossesExisting,
+        crossesExisting: (a, b) => crossesExisting(a, b) + (crossesBlocker(a, b, blockers, clearanceMm) ? 100 : 0),
       });
   };
   const hooks = new Map<string, (door: EntryCandidate) => RoomFeed>();
@@ -176,7 +181,7 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
     return { roomId: room.id, doorsMm: [...doors.values()] };
   };
   const demands = served.map(demandOf);
-  const before = planMainRun({ lines, startMm, demands, inside, bendMm, reachMm, roomIdAt });
+  const before = planMainRun({ lines, startMm, demands, inside, bendMm, reachMm, roomIdAt, blockers, clearanceMm });
 
   let main = before;
   if (passable) {
@@ -203,7 +208,7 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
       if (!cand) return d;
       return { roomId: d.roomId, doorsMm: [...d.doorsMm, ...cand.doorsMm.filter((door) => isBridgeEnd(door.pointMm))] };
     });
-    main = planMainRun({ lines: [...lines, ...bridges], startMm, demands: afterDemands, inside, bendMm, reachMm, roomIdAt });
+    main = planMainRun({ lines: [...lines, ...bridges], startMm, demands: afterDemands, inside, bendMm, reachMm, roomIdAt, blockers, clearanceMm });
   }
 
   const root = main.rootPointMm;
@@ -212,7 +217,14 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
   const stubDx = root.x - startMm.x;
   const stubDy = root.y - startMm.y;
   if (hasStub && mainPaths.length > 0 && Math.abs(stubDx) > 1e-6 && Math.abs(stubDy) > 1e-6) {
-    mainPaths[mainPaths.length - 1] = elbowPath(startMm, root, Math.abs(stubDx) >= Math.abs(stubDy) ? 'x' : 'y');
+    const preferred = Math.abs(stubDx) >= Math.abs(stubDy) ? 'x' : 'y';
+    const other = preferred === 'x' ? 'y' : 'x';
+    const stubCrosses = (path: Vec2[]): boolean => {
+      for (let i = 1; i < path.length; i++) if (crossesBlocker(path[i - 1]!, path[i]!, blockers, clearanceMm, startMm)) return true;
+      return false;
+    };
+    const axis = blockers.length > 0 && stubCrosses(elbowPath(startMm, root, preferred)) && !stubCrosses(elbowPath(startMm, root, other)) ? other : preferred;
+    mainPaths[mainPaths.length - 1] = elbowPath(startMm, root, axis);
   }
   const treePaths = hasStub ? mainPaths.slice(0, -1) : mainPaths;
 
@@ -254,6 +266,33 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
     holesPerRoom[row.roomId] = row.doors.length;
   }
 
+  const gapPoints: Vec2[] = [];
+  let wasInGap = false;
+  for (const path of treePaths) {
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1]!;
+      const b = path[i]!;
+      const steps = Math.max(1, Math.ceil(distance(a, b) / gapStepMm));
+      for (let k = i === 1 ? 0 : 1; k <= steps; k++) {
+        const t = k / steps;
+        const sample = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        const inGap = !plainInside(sample) && findRoom(sample) === null;
+        if (inGap && !wasInGap) gapPoints.push(toPt(sample));
+        wasInGap = inGap;
+      }
+    }
+  }
+  const corridorGapCrossings = gapPoints.length;
+
+  const warnings: RoutePlanWarning[] = [];
+  const crossWarning = mainCrossesRoomWarning(main.lines);
+  if (crossWarning) warnings.push(crossWarning);
+  if (corridorGapCrossings > 0) warnings.push({ code: 'corridor-gap-crossed', severity: 'info', count: corridorGapCrossings, points: gapPoints });
+  if (main.stubCrossesWall) {
+    const ids = [...main.stubRoomIds].sort();
+    if (ids.length > 0) warnings.push({ code: 'start-stub-through-wall', severity: 'info', count: ids.length, ids });
+  }
+
   const trunk: TrunkResult = {
     rootNodeId: 'main-root',
     rootPointMm: { ...root },
@@ -274,5 +313,7 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
     chainedRoomIds,
     unfedRoomIds: combined.unfedRoomIds,
     holesPerRoom,
+    warnings,
+    corridorGapCrossings,
   };
 }

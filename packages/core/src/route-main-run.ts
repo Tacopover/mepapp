@@ -93,6 +93,17 @@ function pathDistance(p: Vec2, path: readonly Vec2[]): number {
   return best;
 }
 
+export function crossesBlocker(pa: Vec2, pb: Vec2, blockers: readonly (readonly Vec2[])[], clearanceMm: number, skip?: Vec2): boolean {
+  const steps = Math.max(1, Math.ceil(distance(pa, pb) / CUT_STEP_MM));
+  for (let k = 0; k <= steps; k++) {
+    const t = k / steps;
+    const p = { x: pa.x + (pb.x - pa.x) * t, y: pa.y + (pb.y - pa.y) * t };
+    if (skip !== undefined && distance(p, skip) < clearanceMm) continue;
+    if (blockers.some((path) => pathDistance(p, path) < clearanceMm)) return true;
+  }
+  return false;
+}
+
 function isFree(p: Vec2, ctx: Ctx): boolean {
   return ctx.inside(p) && ctx.blockers.every((path) => pathDistance(p, path) >= ctx.clearanceMm);
 }
@@ -492,8 +503,12 @@ export function planMainRun(input: {
   bendMm: number;
   reachMm: number;
   roomIdAt?: (p: Vec2) => string | null;
+  blockers?: readonly (readonly Vec2[])[];
+  clearanceMm?: number;
 }): MainRun {
   const { startMm } = input;
+  const blockers = input.blockers ?? [];
+  const clearanceMm = input.clearanceMm ?? 0;
   const demands = [...input.demands].sort((p, q) => (p.roomId < q.roomId ? -1 : p.roomId > q.roomId ? 1 : 0));
   const tracks = sortTracks(input.lines.map(trackOf));
   if (!tracks.some((t) => t.bridgeRoomIds === undefined)) {
@@ -591,6 +606,7 @@ export function planMainRun(input: {
           for (const e of [at(tb.orient, tb.coord, tb.lo), at(tb.orient, tb.coord, tb.hi)]) cands.push([nearestOnTrack(e, ta), e]);
           for (const [pa, pb] of cands) {
             if (Math.abs(pa.x - pb.x) > ON_TRACK_MM && Math.abs(pa.y - pb.y) > ON_TRACK_MM) continue;
+            if (blockers.length > 0 && crossesBlocker(pa, pb, blockers, clearanceMm)) continue;
             const d = distance(pa, pb);
             if (best === null || d < best.d) best = { d, ta: i, tb: j, pa, pb };
           }

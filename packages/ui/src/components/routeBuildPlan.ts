@@ -51,6 +51,10 @@ export const TEXTS = {
   'w_room-chained_one': '1 room is fed through another room: {rooms}.',
   'w_main-crosses-room': 'The main run crosses {count} rooms: {rooms}. Check the fire walls.',
   'w_main-crosses-room_one': 'The main run crosses 1 room: {rooms}. Check the fire wall.',
+  'w_corridor-gap-crossed': 'The main run passes {count} gaps between corridor rooms. Check for a fire opening or a wall.',
+  'w_corridor-gap-crossed_one': 'The main run passes 1 gap between corridor rooms. Check for a fire opening or a wall.',
+  'w_start-stub-through-wall': 'The start connection crosses a wall of {count} rooms: {rooms}.',
+  'w_start-stub-through-wall_one': 'The start connection crosses a wall of 1 room: {rooms}.',
   moreRooms: ', and {n} more',
   'w_ports-left': '{count} ports could not be reached. They stay open.',
   'w_ports-left_one': '1 port could not be reached. It stays open.',
@@ -179,6 +183,12 @@ function warningText(warning: RoutePlanWarning, names: RouteBuildNames): { text:
     case 'main-crosses-room': {
       const rooms = roomList(warning.ids ?? [], names);
       return { text: buildText(one ? 'w_main-crosses-room_one' : 'w_main-crosses-room', { count, rooms }), hint: buildText('hintFireWalls') };
+    }
+    case 'corridor-gap-crossed':
+      return { text: buildText(one ? 'w_corridor-gap-crossed_one' : 'w_corridor-gap-crossed', { count }), hint: '' };
+    case 'start-stub-through-wall': {
+      const rooms = roomList(warning.ids ?? [], names);
+      return { text: buildText(one ? 'w_start-stub-through-wall_one' : 'w_start-stub-through-wall', { count, rooms }), hint: buildText('hintFireWalls') };
     }
     case 'ports-left':
       return { text: buildText(one ? 'w_ports-left_one' : 'w_ports-left', { count }), hint: '' };
