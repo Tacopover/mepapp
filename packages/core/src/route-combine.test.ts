@@ -780,7 +780,7 @@ describe('combineRoomRuns on the manual fixture', () => {
       for (let i = 0; i < taps.length; i++) {
         for (let j = i + 1; j < taps.length; j++) minTap = Math.min(minTap, dist(taps[i]!, taps[j]!));
       }
-      // Taps on opposite sides of one leg may be DEFAULT_OPPOSITE_TEE_SPACING_MM apart (D-P2-11).
+      // Taps on opposite sides of one leg may be DEFAULT_OPPOSITE_TEE_SPACING_MM apart.
       expect(minTap).toBeGreaterThanOrEqual(DEFAULT_OPPOSITE_TEE_SPACING_MM - 1);
 
       expect(combineRoomRuns(combineInput)).toEqual(result);

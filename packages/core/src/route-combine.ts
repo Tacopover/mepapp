@@ -11,7 +11,7 @@ import { BEND_PENALTY_MM } from './route-hanan.js';
 import { runsOverOtherPort } from './route-topology.js';
 
 export const DEFAULT_TEE_SPACING_MM = 600;      // planner value
-export const DEFAULT_OPPOSITE_TEE_SPACING_MM = 395;   // planner value: tee spacing of two branches on opposite sides of one main line (hand route 437)
+export const DEFAULT_OPPOSITE_TEE_SPACING_MM = 395;  // planner value: tee spacing of two branches on opposite sides of one main line (hand route 437)
 export const DEFAULT_COMBINE_SEARCH_MM = 6000;  // planner value: a door counts only for a tree leg within this distance
 export const DEFAULT_CHAIN_DEPTH = 2;           // Q-P1-16 answer C
 

@@ -466,6 +466,17 @@ describe('planMainRun', () => {
     expect(run.paths.flat().some((p) => p.x === 9000)).toBe(false);
   });
 
+  it('picks the hit of the door with the lower costMm when both hit lines are equally far', () => {
+    const doors = (costA: number): MainDemand['doorsMm'] => [
+      { pointMm: { x: 2000, y: 1500 }, outward: { x: 0, y: -1 }, costMm: costA },
+      { pointMm: { x: 6000, y: 1500 }, outward: { x: 0, y: -1 }, costMm: 0 },
+    ];
+    const plan = (costA: number) =>
+      planMainRun(planInput({ lines: [hLine('h', 1000, 0, 10000)], startMm: { x: 4000, y: 1000 }, demands: [demand('R', doors(costA))] }));
+    expect(plan(0).chosenHitByRoom.get('R')).toEqual({ x: 2000, y: 1000 });
+    expect(plan(100).chosenHitByRoom.get('R')).toEqual({ x: 6000, y: 1000 });
+  });
+
   it('moves a room to its second hit when the first hit lies off the tree of the other rooms', () => {
     const base = planInput({
       lines: [hLine('main', 1000, 0, 10000), vLine('spine', 0, 1000, 5000), hLine('far', 5000, 0, 10000)],

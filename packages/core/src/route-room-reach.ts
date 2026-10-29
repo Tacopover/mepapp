@@ -169,6 +169,7 @@ export function bestRoomReach(input: {
         else if (gapped) {
           const spot = placeGappedTap(len, Math.min(Math.max(along, 0), len), gapped, MIN_LEG_MM);
           if (spot === null) continue;
+          if (len < 2 * MIN_LEG_MM && ((spot === 0 && !(input.tapAtFreeEnd && carrier.freeA)) || (spot === len && !(input.tapAtFreeEnd && carrier.freeB)))) continue;
           sMm = spot;
         } else sMm = placeTapPosition(len, Math.min(Math.max(along, 0), len), blockers, MIN_LEG_MM);
         if (gapped ? gapped.some((t) => Math.abs(t.s - sMm) < t.gap - EPS) : blockers.some((b) => Math.abs(b - sMm) < MIN_LEG_MM - EPS)) continue;

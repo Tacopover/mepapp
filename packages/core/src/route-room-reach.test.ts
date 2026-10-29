@@ -364,6 +364,26 @@ describe('bestRoomReach', () => {
     expect(clamped!.branch).toHaveLength(3);
   });
 
+  it('keeps a tap off a non-free start of a leg shorter than 600 mm, and allows it on a free start', () => {
+    const candidates = [real(100, 1500)];
+    const blocked = bestRoomReach({
+      ...base,
+      candidates,
+      carriers: [{ ...leg('h', { x: 0, y: 0 }, { x: 400, y: 0 }), freeA: false, freeB: true }],
+      tapAtFreeEnd: true,
+      tapGaps: { sameSideMm: 600, oppositeSideMm: 395 },
+    });
+    expect(blocked === null || blocked.tapMm.x !== 0).toBe(true);
+    const free = bestRoomReach({
+      ...base,
+      candidates,
+      carriers: [{ ...leg('h', { x: 0, y: 0 }, { x: 400, y: 0 }), freeA: true, freeB: true }],
+      tapAtFreeEnd: true,
+      tapGaps: { sameSideMm: 600, oppositeSideMm: 395 },
+    });
+    expect(free!.tapMm).toEqual({ x: 0, y: 0 });
+  });
+
   it('returns only accepted paths that start on a carrier and end at the entry (200 seeded cases)', () => {
     let found = 0;
     for (let c = 0; c < 200; c++) {
