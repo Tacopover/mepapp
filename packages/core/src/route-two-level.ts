@@ -171,13 +171,14 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
   }
 
   const demandOf = (room: Room): MainDemand => {
-    const doors = new Map<string, { pointMm: Vec2; outward: Vec2 }>();
-    const add = (run: RoomRun): void => {
+    const doors = new Map<string, { pointMm: Vec2; outward: Vec2; costMm: number }>();
+    const add = (run: RoomRun, costMm: number): void => {
       const key = `${Math.round(run.door.pointMm.x)},${Math.round(run.door.pointMm.y)},${run.door.outward.x},${run.door.outward.y}`;
-      if (!doors.has(key)) doors.set(key, { pointMm: run.door.pointMm, outward: run.door.outward });
+      const kept = doors.get(key);
+      if (!kept || costMm < kept.costMm) doors.set(key, { pointMm: run.door.pointMm, outward: run.door.outward, costMm });
     };
-    for (const d of singlesOf.get(room.id)!) if (d.run.pattern !== 'fallback') add(d.run);
-    for (const plan of plansOf.get(room.id)!) for (const block of plan.blocks) add(block.run);
+    for (const d of singlesOf.get(room.id)!) if (d.run.pattern !== 'fallback') add(d.run, d.costMm);
+    for (const plan of plansOf.get(room.id)!) for (const block of plan.blocks) add(block.run, block.costMm);
     return { roomId: room.id, doorsMm: [...doors.values()] };
   };
   const demands = served.map(demandOf);

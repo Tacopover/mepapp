@@ -330,7 +330,7 @@ export function mainRunLines(input: MainLineInput): MainLine[] {
   }));
 }
 
-export interface MainDemand { roomId: string; doorsMm: readonly { pointMm: Vec2; outward: Vec2 }[] }   // outward = unit axis vector
+export interface MainDemand { roomId: string; doorsMm: readonly { pointMm: Vec2; outward: Vec2; costMm?: number }[] }   // outward = unit axis vector; costMm = cost of the room run of the door, added to the hit distance in the pick (default 0)
 export interface MainJoin { path: Vec2[]; crossesWall: boolean; roomIds: string[] }   // straight path of 2 points
 export interface MainRun { lines: MainLine[]; paths: Vec2[][]; rootPointMm: Vec2; unreachedRoomIds: string[]; chosenHitByRoom: Map<string, Vec2>; stubCrossesWall: boolean; stubRoomIds: string[]; joins: MainJoin[] }
 
@@ -526,7 +526,7 @@ export function planMainRun(input: {
 
   const hitsOf = new Map<string, Hit[]>();
   for (const demand of demands) {
-    const hits = demand.doorsMm.flatMap((door) => hitsOfDoor(door, tracks, input.reachMm));
+    const hits = demand.doorsMm.flatMap((door) => hitsOfDoor(door, tracks, input.reachMm).map((h) => ({ ...h, d: h.d + (door.costMm ?? 0) })));
     hitsOf.set(demand.roomId, hits);
   }
   const parent = tracks.map((_, i) => i);
