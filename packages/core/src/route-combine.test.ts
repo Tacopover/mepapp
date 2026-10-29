@@ -220,6 +220,21 @@ describe('combineRoomRuns: tree legs and tee spacing', () => {
     const free = combine([rooms[0]!], { maxChainDepth: 0 });
     expect(rowOf(free.rooms, 'room-a').doors).toHaveLength(1);
   });
+
+  it('never taps at the start of the tree when a door foot lies beyond it', () => {
+    const roomC = roomOf('room-c', -1500, 0, 1000, 4000);
+    const rooms: CombineRoom[] = [
+      {
+        room: roomC,
+        ports: [{ id: 'c1', point: { x: -500, y: 2000 } }],
+        singles: [doorRunOf(roomC, topDoor(-500), [{ x: -500, y: 0 }, { x: -500, y: 2000 }])],
+        blockPlans: [],
+      },
+    ];
+    const result = combine(rooms, { maxChainDepth: 0 });
+    const [door] = rowOf(result.rooms, 'room-c').doors;
+    expect(dist(door!.tapMm, { x: 0, y: -1000 })).toBeGreaterThanOrEqual(300 - 1e-6);
+  });
 });
 
 describe('combineRoomRuns: the cheapest door', () => {

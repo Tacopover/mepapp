@@ -29,7 +29,7 @@ export interface CombineRoom {
 
 export interface CombineInput {
   tree: readonly (readonly Vec2[])[];                 // MainRun.paths
-  startMm: Vec2;                                      // for the room order only
+  startMm: Vec2;                                      // for the room order only; also: no tap at the start
   rooms: readonly CombineRoom[];
   allRooms: readonly Room[];                          // every room of the page (hitsOtherRoom, chain hosts)
   mmPerPt: number;
@@ -129,13 +129,15 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
       carriers.push({ id: `${pathIndex}#${i - 1}`, a, b });
     }
   });
-  const freeEnd = (carrier: ReachCarrier, end: Vec2): boolean =>
-    !carriers.some(
+  const freeEnd = (carrier: ReachCarrier, end: Vec2): boolean => {
+    if (dist(end, input.startMm) <= 1) return false;
+    return !carriers.some(
       (other) =>
         other.id !== carrier.id &&
         end.x >= Math.min(other.a.x, other.b.x) - 1 && end.x <= Math.max(other.a.x, other.b.x) + 1 &&
         end.y >= Math.min(other.a.y, other.b.y) - 1 && end.y <= Math.max(other.a.y, other.b.y) + 1,
     );
+  };
   for (const carrier of carriers) {
     carrier.freeA = freeEnd(carrier, carrier.a);
     carrier.freeB = freeEnd(carrier, carrier.b);
