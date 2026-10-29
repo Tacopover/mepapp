@@ -784,3 +784,5 @@
 {"seq":784,"at":"2026-10-28T23:00:36.996Z","type":"task","id":"P2-T11","state":"implementing"}
 {"seq":785,"at":"2026-10-29T08:19:32.253Z","type":"task","id":"P2-T11","state":"implementing","note":"T11a first: wiring and synthetic trunk. T11b later: blockers, stats, corridor-gap warning."}
 {"seq":786,"at":"2026-10-29T08:41:36.841Z","type":"task","id":"P2-T11","state":"done","commit":"6f3db7f","note":"twoLevel wired into planRoute (427188f + 6f3db7f). Manual fixture: status ok, 1.2 s, 228.1 m, 28 bends (11 rooms, 8 corridors), 2 chained by metric, 6 rooms with several entries by metric. Core 119 files 2060 passed, ui 342 passed, build 9 of 9."}
+{"seq":787,"at":"2026-10-29T10:07:30.042Z","type":"task","id":"P2-T12","state":"implementing"}
+{"seq":788,"at":"2026-10-29T10:28:00.204Z","type":"task","id":"P2-T12","state":"done","commit":"abcea10","note":"Gate G-P2 built; first run FAILS 9 of 15 asserts: G2a G2b G3a G4 G6 G7 G9 G11 G12. PASS: G1 G3b G5 G8 G13 G15. Metric fix T12b (multiEntry). Core 120 files 2067 passed."}
