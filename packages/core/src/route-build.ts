@@ -14,7 +14,7 @@ import { checkRouteStart } from './route-start.js';
 import { canJoinPoint, checkExisting, checkInvariant, distanceToPiece, makeCrossesExisting, NEAR_ITEM_MM } from './route-checks.js';
 import { openPortsOf, type RoutePort, type RouteStamp } from './route-ports.js';
 import type { RouteArea } from './route-area.js';
-import { polygonAreaPt2, polygonContainsPoint, roomBounds, type Room } from './rooms/room.js';
+import { polygonAreaPt2, polygonContainsPoint, roomBounds, roomContainsPoint, type Room } from './rooms/room.js';
 import type { SizingSettings } from './sizing-settings.js';
 import { ROUTE_GRAVITY_TYPE_IDS } from './route-plan-warnings.js';
 import type { MultiPortStamp, RoutePlanWarning } from './route-plan-warnings.js';
@@ -25,6 +25,7 @@ import type { FlowUnitId } from './flow-units.js';
 import type { StampCategory } from './stamp-library.js';
 import { capacityWarnings, orderWarnings, shortLegCount } from './route-finish.js';
 import { planTwoLevel, terminalRoomIdsOf, TWO_LEVEL_DEFAULTS } from './route-two-level.js';
+import { DEFAULT_CHAIN_DEPTH } from './route-combine.js';
 
 export interface RouteBuildInput {
   startStampId: string; startPortId: string; networkTypeId: string;
@@ -455,6 +456,36 @@ export function planRoute(
   for (const path of connected.paths) tag('link', path);
   const leftIds = new Set(connected.left);
   const connectedPorts = targetPorts.filter((port) => !leftIds.has(portKey(port)));
+  if (two && (options.twoLevel?.maxChainDepth ?? DEFAULT_CHAIN_DEPTH) >= 1) {
+    const extraChained: string[] = [];
+    for (const roomId of two.unfedRoomIds) {
+      const portPoints = (grouped.byRoom.get(roomId) ?? []).map((port) => toMm(port.world));
+      const linkPaths = connected.paths.filter((path) =>
+        [path[0]!, path[path.length - 1]!].some((end) => portPoints.some((p) => Math.hypot(p.x - end.x, p.y - end.y) <= 1)),
+      );
+      const onOtherServedRoom = (p: Vec2): boolean => {
+        const q = toPage(p);
+        return [...grouped.byRoom.keys()].some((id) => {
+          const room = roomById.get(id);
+          return id !== roomId && room !== undefined && roomContainsPoint(room, q);
+        });
+      };
+      const passesServedRoom = linkPaths.some((path) => {
+        for (let i = 1; i < path.length; i++) {
+          const a = path[i - 1]!;
+          const b = path[i]!;
+          const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 100));
+          for (let k = 0; k <= steps; k++) {
+            const t = k / steps;
+            if (onOtherServedRoom({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })) return true;
+          }
+        }
+        return false;
+      });
+      if (passesServedRoom) extraChained.push(roomId);
+    }
+    if (extraChained.length > 0) chainedRoomIds = [...new Set([...chainedRoomIds, ...extraChained])].sort();
+  }
 
   const stubFitting = start.stubFittingId === null ? undefined : reduced.fittings.find((fitting) => fitting.id === start.stubFittingId);
   const topologyPorts: TopologyPort[] = connectedPorts.map((port) => ({ point: toMm(port.world), pagePoint: port.world, stampId: port.stampId, portId: port.portId }));

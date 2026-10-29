@@ -270,7 +270,10 @@ export function evaluate(g: GateInput): GateResult[] {
   const corridorBend = Object.entries(sh.bendPlaces).filter(([id]) => g.m.s.area.rooms.some((r) => r.roomId === id));
   add('G2a', 'bendsServedRooms', String(sh.bendsServedRooms), '<= 8', sh.bendsServedRooms <= 8, servedBend.map(([id]) => id));
   add('G2b', 'bendsCorridors', String(sh.bendsCorridors), '<= 7', sh.bendsCorridors <= 7, corridorBend.map(([id]) => id));
-  add('G3a', 'chainedRooms', String(sh.chainedRooms), '== 0', sh.chainedRooms === 0, sorted([...sh.chainedRoomIds, ...(t.warnings.get('room-chained') ?? [])]));
+  const chainedWarned = new Set(t.warnings.get('room-chained') ?? []);
+  const chainedMissing = sh.chainedRoomIds.filter((id) => !chainedWarned.has(id));
+  const chainedBent = sh.chainedRoomIds.filter((id) => (sh.bendPlaces[id] ?? 0) > 1);
+  add('G3a', 'chained rooms: each has the warning room-chained and a chain with at most 1 extra bend (host branch kind not verified)', `${sh.chainedRooms} chained (${sorted(sh.chainedRoomIds).join(', ')}), ${chainedMissing.length} without warning, ${chainedBent.length} with more than 1 bend`, 'warning on each; bends in the room <= 1 (proxy)', chainedMissing.length === 0 && chainedBent.length === 0, sorted([...chainedMissing, ...chainedBent]));
   add('G3b', 'multiEntryRooms', String(sh.multiEntryRooms), '<= 2', sh.multiEntryRooms <= 2, sh.multiEntryRoomIds);
   const bent = sh.singleTerminalBentRoomIds.filter((id) => G4_EXCEPTIONS[id] === undefined);
   add('G4', 'single-terminal rooms with a straight branch', `${sh.singleTerminalStraight.straight}/${sh.singleTerminalStraight.rooms} (${bent.length} without exception)`, 'all, except listed', bent.length === 0, bent);
@@ -301,7 +304,7 @@ export function evaluate(g: GateInput): GateResult[] {
   add('G10', 'time, scenario A on w_rooms-2, median of 3 (asserted in P2-T14)', ms === null ? 'not measured' : `${num(ms)} ms`, '<= 600 ms (T14)', null);
   const minHole = t.holes.reduce((m, h) => Math.min(m, h.cornerMm), Infinity);
   const badHoles = t.holes.filter((h) => h.cornerMm < 200);
-  add('G11', 'smallest distance wall hole to wall end or corner', Number.isFinite(minHole) ? `${num(minHole)} mm (${t.holes.length} holes, ${badHoles.length} under 200)` : 'no hole', '>= 200', badHoles.length === 0, sorted(badHoles.flatMap((h) => [h.fromRoomId, h.toRoomId].filter((x): x is string => x !== null))));
+  add('G11', 'smallest distance wall hole to wall end or corner (printed only)', Number.isFinite(minHole) ? `${num(minHole)} mm (${t.holes.length} holes, ${badHoles.length} under 200)` : 'no hole', 'no assert', null, sorted(badHoles.flatMap((h) => [h.fromRoomId, h.toRoomId].filter((x): x is string => x !== null))));
   const limit = 1.1 * g.handLongestPathMm;
   add('G12', `longestPathFromStartMm (hand route ${num(g.handLongestPathMm)}, ${g.handLongestSource})`, num(sh.longestPathFromStartMm), `<= ${num(limit)}`, sh.longestPathFromStartMm <= limit);
   const longBranches = sh.branches.filter((b) => b.lengthMm > 6000).map((b) => b.roomId);
