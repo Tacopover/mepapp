@@ -320,6 +320,28 @@ describe('bestRoomReach', () => {
     expect(r).toBeNull();
   });
 
+  it('puts the tap at a free far end of a leg only when tapAtFreeEnd is set', () => {
+    const carriers = [{ ...leg('h', { x: 0, y: 0 }, { x: 5000, y: 0 }), freeB: true }];
+    const candidates = [{ ...real(5000, 1500), outward: { x: 0, y: -1 } }];
+    const free = bestRoomReach({ ...base, candidates, carriers, tapAtFreeEnd: true });
+    expect(free!.tapMm).toEqual({ x: 5000, y: 0 });
+    expect(free!.branch).toEqual([{ x: 5000, y: 0 }, { x: 5000, y: 1500 }]);
+    const clamped = bestRoomReach({ ...base, candidates, carriers });
+    expect(clamped!.tapMm).toEqual({ x: 4700, y: 0 });
+    expect(clamped!.branch).toHaveLength(3);
+  });
+
+  it('puts the tap at a free near end of a leg only when tapAtFreeEnd is set', () => {
+    const carriers = [{ ...leg('h', { x: 0, y: 0 }, { x: 5000, y: 0 }), freeA: true }];
+    const candidates = [{ ...real(0, 1500), outward: { x: 0, y: -1 } }];
+    const free = bestRoomReach({ ...base, candidates, carriers, tapAtFreeEnd: true });
+    expect(free!.tapMm).toEqual({ x: 0, y: 0 });
+    expect(free!.branch).toEqual([{ x: 0, y: 0 }, { x: 0, y: 1500 }]);
+    const clamped = bestRoomReach({ ...base, candidates, carriers });
+    expect(clamped!.tapMm).toEqual({ x: 300, y: 0 });
+    expect(clamped!.branch).toHaveLength(3);
+  });
+
   it('returns only accepted paths that start on a carrier and end at the entry (200 seeded cases)', () => {
     let found = 0;
     for (let c = 0; c < 200; c++) {

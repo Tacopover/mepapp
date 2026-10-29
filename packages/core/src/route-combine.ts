@@ -120,6 +120,17 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
       carriers.push({ id: `${pathIndex}#${i - 1}`, a, b });
     }
   });
+  const freeEnd = (carrier: ReachCarrier, end: Vec2): boolean =>
+    !carriers.some(
+      (other) =>
+        other.id !== carrier.id &&
+        end.x >= Math.min(other.a.x, other.b.x) - 1 && end.x <= Math.max(other.a.x, other.b.x) + 1 &&
+        end.y >= Math.min(other.a.y, other.b.y) - 1 && end.y <= Math.max(other.a.y, other.b.y) + 1,
+    );
+  for (const carrier of carriers) {
+    carrier.freeA = freeEnd(carrier, carrier.a);
+    carrier.freeB = freeEnd(carrier, carrier.b);
+  }
   const carrierById = new Map(carriers.map((carrier) => [carrier.id, carrier] as const));
 
   const distanceOf = (cr: CombineRoom): number => dist(input.startMm, centreOf(cr.room));
@@ -191,6 +202,7 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
       bendMm,
       searchMm,
       portsMm: cr.ports.map((port) => port.point),
+      tapAtFreeEnd: true,
       extraCostMm: (r) => runCostMm(runByKey.get(doorKey(r.entry.pointMm, r.entry.outward))!, bendMm),
     });
     if (!reach) return null;
@@ -214,6 +226,7 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
         bendMm,
         searchMm,
         portsMm,
+        tapAtFreeEnd: true,
         extraCostMm: () => runCostMm(block.run, bendMm),
       });
       if (reach) {

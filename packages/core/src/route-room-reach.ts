@@ -4,7 +4,7 @@ import { MIN_LEG_MM } from './route-layout.js';
 import { placeTapPosition } from './route-branch.js';
 import type { EntryCandidate } from './route-room-entry.js';
 
-export interface ReachCarrier { id: string; a: Vec2; b: Vec2 }   // axis leg; a equal to b is a junction point
+export interface ReachCarrier { id: string; a: Vec2; b: Vec2; freeA?: boolean; freeB?: boolean }   // axis leg; a equal to b is a junction point; freeA / freeB = no other carrier touches that end
 export interface PlacedTapAt { carrierId: string; sMm: number }  // sMm = distance from carrier.a along the leg
 export interface RoomReach { entry: EntryCandidate; carrierId: string; tapMm: Vec2; branch: Vec2[]; costMm: number }   // branch = tap to entry
 export const DEFAULT_WALL_MM = 3000;
@@ -112,6 +112,7 @@ export function bestRoomReach(input: {
   roomPenaltyMm?: number;   // default 0
   pathPenaltyMm?: (path: readonly Vec2[], carrierId: string, entry: EntryCandidate) => number;   // default 0, added after pathOk
   extraCostMm?: (reach: RoomReach) => number;   // >= 0, called only for a pair that passed pathOk; when given, the half-bend portPenalty proxy is NOT added
+  tapAtFreeEnd?: boolean;   // default false; a tap may sit at a free end of a carrier (s = 0 or len)
 }): RoomReach | null {
   const bendMm = input.bendMm ?? BEND_PENALTY_MM;
   const wallMm = input.wallMm ?? DEFAULT_WALL_MM;
@@ -132,7 +133,9 @@ export function bestRoomReach(input: {
       if (kind !== 'junction') {
         const sign = kind === 'horizontal' ? Math.sign(dx) : Math.sign(dy);
         const along = kind === 'horizontal' ? (entry.pointMm.x - carrier.a.x) * sign : (entry.pointMm.y - carrier.a.y) * sign;
-        sMm = placeTapPosition(len, Math.min(Math.max(along, 0), len), blockers, MIN_LEG_MM);
+        if (input.tapAtFreeEnd && carrier.freeB && along >= len - ALIGN_TOL_MM) sMm = len;
+        else if (input.tapAtFreeEnd && carrier.freeA && along <= ALIGN_TOL_MM) sMm = 0;
+        else sMm = placeTapPosition(len, Math.min(Math.max(along, 0), len), blockers, MIN_LEG_MM);
         if (blockers.some((b) => Math.abs(b - sMm) < MIN_LEG_MM - EPS)) continue;
       }
       const tap: Vec2 =
