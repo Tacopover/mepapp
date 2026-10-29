@@ -228,6 +228,24 @@ describe('shapeMetrics', () => {
     expect(m.singleTerminalStraight).toEqual({ rooms: 1, straight: 1 });
   });
 
+  it('a run along a wall that touches a corner is not an entry', () => {
+    const m = measure([[{ x: 0, y: 0 }, { x: 1500, y: 0 }], [{ x: 1000, y: -3000 }, { x: 1000, y: -500 }]], {
+      rooms: [rect('R', 1000, -500, 2000, 500)],
+      terminals: [terminal('t', 1500, 300, 'R')],
+    });
+    expect(m.multiEntryRooms).toBe(0);
+    expect(m.multiEntryRoomIds).toEqual([]);
+  });
+
+  it('a run along a wall that passes a corner is not an entry', () => {
+    const m = measure([[{ x: 0, y: 0 }, { x: 1500, y: 0 }], [{ x: 1000, y: -3000 }, { x: 1000, y: -200 }]], {
+      rooms: [rect('R', 1000, -500, 2000, 500)],
+      terminals: [terminal('t', 1500, 300, 'R')],
+    });
+    expect(m.multiEntryRooms).toBe(0);
+    expect(m.multiEntryRoomIds).toEqual([]);
+  });
+
   it('counts a terminal on a degree 2 node as a port with many ends', () => {
     const m = measure([[{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 2000, y: 0 }]], {
       terminals: [terminal('t1', 1000, 0), terminal('t2', 2000, 0)],

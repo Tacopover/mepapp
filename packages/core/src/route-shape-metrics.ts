@@ -327,13 +327,26 @@ export function shapeMetrics(input: {
   const servedRooms = rooms.filter((r) => servedIds.has(r.id));
   const ringSegments = (room: Room): [Vec2, Vec2][] =>
     [room.polygon.outer, ...room.polygon.holes].flatMap((ring) => ring.map((p, i) => [p, ring[(i + 1) % ring.length]!] as [Vec2, Vec2]));
+  const touchesAlongWall = (p: Vec2, q: Vec2, room: Room, point: Vec2): boolean =>
+    [room.polygon.outer, ...room.polygon.holes].some((ring) =>
+      ring.some((v, i) => {
+        if (distance(v, point) > NODE_TOL_PT) return false;
+        return [ring[(i - 1 + ring.length) % ring.length]!, ring[(i + 1) % ring.length]!].some((w) => {
+          const dx = w.x - v.x;
+          const dy = w.y - v.y;
+          const len = Math.hypot(dx, dy);
+          const offset = (x: Vec2): number => Math.abs((x.x - v.x) * dy - (x.y - v.y) * dx) / len;
+          return offset(p) <= NODE_TOL_PT && offset(q) <= NODE_TOL_PT;
+        });
+      }),
+    );
   const multiEntryPointsMm: Record<string, Vec2[]> = {};
   for (const room of servedRooms) {
     const crossings: Vec2[] = [];
     for (const [p, q] of edgesPt) {
       for (const [a, b] of ringSegments(room)) {
         const hit = intersect(p, q, a, b);
-        if (hit !== null && !crossings.some((c) => distance(c, hit.point) < ENTRY_TOL_PT)) crossings.push(hit.point);
+        if (hit !== null && !touchesAlongWall(p, q, room, hit.point) && !crossings.some((c) => distance(c, hit.point) < ENTRY_TOL_PT)) crossings.push(hit.point);
       }
     }
     if (crossings.length > 1) multiEntryPointsMm[room.id] = crossings.map((c) => ({ x: c.x * mmPerPt, y: c.y * mmPerPt }));
