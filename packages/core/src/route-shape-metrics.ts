@@ -14,8 +14,15 @@ export interface ShapeMetrics {
   meanBendsToTerminal: number; maxBendsToTerminal: number;
   pathToManhattan: number;                       // mean over terminals
   multiEntryRooms: number; chainedRooms: number;
+  chainedRoomIds: string[];                      // sorted
+  chainedVia: Record<string, string>;            // own room id -> id of the first other served room the path passes
+  multiEntryRoomIds: string[];
+  multiEntryPointsMm: Record<string, Vec2[]>;    // room id -> the crossings that made the count > 1
   singleTerminalStraight: { rooms: number; straight: number };
+  singleTerminalBentRoomIds: string[];
+  bendPlaces: Record<string, number>;            // room id -> number of bends whose node lies in it
   teeOffsetMm: { max: number; median: number };
+  branches: { roomId: string; teeMm: Vec2; alongMm: Vec2; doorMm: Vec2; offsetMm: number; lengthMm: number }[];
   longestPathFromStartMm: number;
   branchLengthP90Mm: number;
   portsWithManyEnds: number;
@@ -291,7 +298,7 @@ export function shapeMetrics(input: {
   }
 
   const step = SAMPLE_PT * mmPerPt;
-  const passesOtherServed = (path: number[], own: string): boolean => {
+  const passesOtherServed = (path: number[], own: string): string | null => {
     for (let i = 1; i < path.length; i++) {
       const a = g.pos[path[i - 1]!]!;
       const b = g.pos[path[i]!]!;
@@ -299,22 +306,28 @@ export function shapeMetrics(input: {
       for (let s = 0; s <= k; s++) {
         const q = { x: a.x + ((b.x - a.x) * s) / k, y: a.y + ((b.y - a.y) * s) / k };
         const id = roomsAtPoint(rooms, pt(q), pageIndex)[0]?.id;
-        if (id !== undefined && id !== own && servedIds.has(id)) return true;
+        if (id !== undefined && id !== own && servedIds.has(id)) return id;
       }
     }
-    return false;
+    return null;
   };
   const chained = new Set<string>();
+  const chainedVia: Record<string, string> = {};
   for (const r of reached) {
     const own = r.terminal.roomId;
-    if (own !== null && !chained.has(own) && passesOtherServed(r.path, own)) chained.add(own);
+    if (own === null || chained.has(own)) continue;
+    const via = passesOtherServed(r.path, own);
+    if (via !== null) {
+      chained.add(own);
+      chainedVia[own] = via;
+    }
   }
 
   const edgesPt = g.edges.map((e) => [pt(g.pos[e.a]!), pt(g.pos[e.b]!)] as [Vec2, Vec2]);
   const servedRooms = rooms.filter((r) => servedIds.has(r.id));
   const ringSegments = (room: Room): [Vec2, Vec2][] =>
     [room.polygon.outer, ...room.polygon.holes].flatMap((ring) => ring.map((p, i) => [p, ring[(i + 1) % ring.length]!] as [Vec2, Vec2]));
-  let multiEntryRooms = 0;
+  const multiEntryPointsMm: Record<string, Vec2[]> = {};
   for (const room of servedRooms) {
     const crossings: Vec2[] = [];
     for (const [p, q] of edgesPt) {
@@ -323,24 +336,32 @@ export function shapeMetrics(input: {
         if (hit !== null && !crossings.some((c) => distance(c, hit.point) < ENTRY_TOL_PT)) crossings.push(hit.point);
       }
     }
-    if (crossings.length > 1) multiEntryRooms++;
+    if (crossings.length > 1) multiEntryPointsMm[room.id] = crossings.map((c) => ({ x: c.x * mmPerPt, y: c.y * mmPerPt }));
   }
+  const multiEntryRoomIds = Object.keys(multiEntryPointsMm).sort();
 
   const terminalsPerRoom = new Map<string, number>();
   for (const t of input.terminalsMm) {
     if (t.roomId !== null) terminalsPerRoom.set(t.roomId, (terminalsPerRoom.get(t.roomId) ?? 0) + 1);
   }
   const bendRoomIds = new Set(bendPlaces.filter((id): id is string => id !== null));
+  const bendPlaceCounts: Record<string, number> = {};
+  for (const id of bendPlaces) {
+    if (id !== null) bendPlaceCounts[id] = (bendPlaceCounts[id] ?? 0) + 1;
+  }
   let singleRooms = 0;
   let singleStraight = 0;
+  const singleTerminalBentRoomIds: string[] = [];
   for (const [id, count] of terminalsPerRoom) {
     if (count !== 1) continue;
     singleRooms++;
     if (!bendRoomIds.has(id)) singleStraight++;
+    else singleTerminalBentRoomIds.push(id);
   }
+  singleTerminalBentRoomIds.sort();
 
   const servedSegments = servedRooms.flatMap(ringSegments);
-  const entryOnLeg = (A: Vec2, B: Vec2): Vec2 | null => {
+  const entryOnLeg = (A: Vec2, B: Vec2): { point: Vec2; roomId: string } | null => {
     const pa = pt(A);
     const pb = pt(B);
     const len = distance(pa, pb);
@@ -353,20 +374,21 @@ export function shapeMetrics(input: {
         x: hit.point.x + ((pb.x - pa.x) / len) * ENTER_PT,
         y: hit.point.y + ((pb.y - pa.y) / len) * ENTER_PT,
       };
-      if (roomsAtPoint(rooms, after, pageIndex).some((r) => servedIds.has(r.id))) {
-        return { x: hit.point.x * mmPerPt, y: hit.point.y * mmPerPt };
+      const found = roomsAtPoint(rooms, after, pageIndex).find((r) => servedIds.has(r.id));
+      if (found !== undefined) {
+        return { point: { x: hit.point.x * mmPerPt, y: hit.point.y * mmPerPt }, roomId: found.id };
       }
     }
     return null;
   };
-  const doorOf = (tee: number, first: number): { point: Vec2; length: number } | null => {
+  const doorOf = (tee: number, first: number): { point: Vec2; length: number; roomId: string } | null => {
     let from = tee;
     let edge = first;
     let walked = 0;
     for (let step = 0; step <= g.edges.length; step++) {
       const to = otherEnd(g, edge, from);
       const hit = entryOnLeg(g.pos[from]!, g.pos[to]!);
-      if (hit !== null) return { point: hit, length: walked + distance(g.pos[from]!, hit) };
+      if (hit !== null) return { point: hit.point, length: walked + distance(g.pos[from]!, hit.point), roomId: hit.roomId };
       walked += g.edges[edge]!.mm;
       if (deg(to) !== 2) return null;
       from = to;
@@ -376,6 +398,7 @@ export function shapeMetrics(input: {
   };
   const offsets: number[] = [];
   const doorLengths: number[] = [];
+  const branches: ShapeMetrics['branches'] = [];
   for (let n = 0; n < g.pos.length; n++) {
     const inc = g.inc[n]!;
     if (inc.length !== 3) continue;
@@ -398,8 +421,10 @@ export function shapeMetrics(input: {
     const L = distance(T, along);
     const ux = (along.x - T.x) / L;
     const uy = (along.y - T.y) / L;
-    offsets.push(Math.abs((door.point.x - T.x) * ux + (door.point.y - T.y) * uy));
+    const offset = Math.abs((door.point.x - T.x) * ux + (door.point.y - T.y) * uy);
+    offsets.push(offset);
     doorLengths.push(door.length);
+    branches.push({ roomId: door.roomId, teeMm: T, alongMm: { x: ux, y: uy }, doorMm: door.point, offsetMm: offset, lengthMm: door.length });
   }
   const sortedOffsets = [...offsets].sort((a, b) => a - b);
   const mid = Math.floor(sortedOffsets.length / 2);
@@ -423,10 +448,17 @@ export function shapeMetrics(input: {
     meanBendsToTerminal: mean(bendCounts),
     maxBendsToTerminal: bendCounts.length === 0 ? 0 : Math.max(...bendCounts),
     pathToManhattan: mean(manhattanRatios),
-    multiEntryRooms,
+    multiEntryRooms: multiEntryRoomIds.length,
     chainedRooms: chained.size,
+    chainedRoomIds: [...chained].sort(),
+    chainedVia,
+    multiEntryRoomIds,
+    multiEntryPointsMm,
     singleTerminalStraight: { rooms: singleRooms, straight: singleStraight },
+    singleTerminalBentRoomIds,
+    bendPlaces: bendPlaceCounts,
     teeOffsetMm: { max: offsets.length === 0 ? 0 : Math.max(...offsets), median: medianOffset },
+    branches,
     longestPathFromStartMm: reached.length === 0 ? 0 : Math.max(...reached.map((r) => r.length)),
     branchLengthP90Mm: sortedLengths.length === 0 ? 0 : sortedLengths[Math.ceil(0.9 * sortedLengths.length) - 1]!,
     portsWithManyEnds: terminals.filter((t) => t.node !== null && deg(t.node) > 1).length,

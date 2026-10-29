@@ -234,6 +234,49 @@ describe('shapeMetrics', () => {
     });
     expect(m.portsWithManyEnds).toBe(1);
   });
+
+  it('lists the multi-entry room', () => {
+    const m = measure([[{ x: 0, y: 0 }, { x: 3000, y: 0 }]], {
+      rooms: [rect('R', 1000, -500, 2000, 500)],
+      terminals: [terminal('t', 1500, 300, 'R')],
+    });
+    expect(m.multiEntryRoomIds).toEqual(['R']);
+    expect(m.multiEntryPointsMm.R).toHaveLength(2);
+  });
+
+  it('lists a tee with its door', () => {
+    const m = measure([[{ x: 0, y: 0 }, { x: 4000, y: 0 }], [{ x: 2000, y: 0 }, { x: 2000, y: 1000 }, { x: 2000, y: 1600 }]], {
+      rooms: [rect('R', 1500, 1000, 2500, 2000)],
+      terminals: [terminal('t', 2000, 1800, 'R')],
+    });
+    expect(m.branches).toHaveLength(1);
+    const [b] = m.branches;
+    expect(b!.roomId).toBe('R');
+    expect(b!.teeMm.x).toBeCloseTo(2000);
+    expect(b!.teeMm.y).toBeCloseTo(0);
+    expect(b!.doorMm.y).toBeCloseTo(1000, 0);
+    expect(b!.offsetMm).toBeCloseTo(0);
+    expect(b!.lengthMm).toBeCloseTo(1000, 0);
+  });
+
+  it('lists a bent single-terminal room and the bend place', () => {
+    const m = measure([[{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 1000 }]], {
+      rooms: [rect('R', 900, -100, 1100, 100)],
+      terminals: [terminal('t', 1050, 50, 'R')],
+    });
+    expect(m.singleTerminalBentRoomIds).toEqual(['R']);
+    expect(m.bendPlaces.R).toBe(1);
+  });
+
+  it('names the room that a path passes (chained)', () => {
+    const m = measure([[{ x: 0, y: 0 }, { x: 1500, y: 0 }, { x: 3000, y: 0 }]], {
+      rooms: [rect('A', 1000, -500, 2000, 500), rect('B', 2500, -500, 3500, 500)],
+      terminals: [terminal('tA', 1500, 0, 'A'), terminal('tB', 3000, 0, 'B')],
+    });
+    expect(m.chainedRoomIds).toEqual(['B']);
+    expect(m.chainedVia.B).toBe('A');
+    expect(m.chainedRooms).toBe(1);
+  });
 });
 
 describe('polylinesOfPlan', () => {
