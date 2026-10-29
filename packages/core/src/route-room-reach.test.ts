@@ -143,6 +143,28 @@ describe('bestRoomReach', () => {
     expect(r!.tapMm.x).toBeCloseTo(2300);
   });
 
+  it('keeps the opposite-side gap from a placed tap on the far side of the carrier', () => {
+    const r = bestRoomReach({
+      ...base,
+      candidates: [real(4000, -1500)],
+      carriers: [leg('h', { x: 0, y: 0 }, { x: 8000, y: 0 })],
+      placedTaps: [{ carrierId: 'h', sMm: 4000, side: 1 }],
+      tapGaps: { sameSideMm: 600, oppositeSideMm: 395 },
+    });
+    expect(r!.tapMm).toEqual({ x: 4395, y: 0 });
+  });
+
+  it('keeps the same-side gap from a placed tap on the near side of the carrier', () => {
+    const r = bestRoomReach({
+      ...base,
+      candidates: [real(4000, 1500)],
+      carriers: [leg('h', { x: 0, y: 0 }, { x: 8000, y: 0 })],
+      placedTaps: [{ carrierId: 'h', sMm: 4000, side: 1 }],
+      tapGaps: { sameSideMm: 600, oppositeSideMm: 395 },
+    });
+    expect(r!.tapMm).toEqual({ x: 4600, y: 0 });
+  });
+
   it('gives an L on a junction with one bend price', () => {
     const r = bestRoomReach({
       ...base,

@@ -20,7 +20,7 @@ import type { RoomRun } from './route-room-runs.js';
 import { BEND_PENALTY_MM } from './route-hanan.js';
 import { manualScenario, seededShuffle } from './route-scenario.testutil.js';
 import { getStampWorldPorts } from './stamp.js';
-import { combineRoomRuns, runCostMm, type CombineInput, type CombineRoom, type RoomDoorPlan, type RoomFeedMulti } from './route-combine.js';
+import { combineRoomRuns, DEFAULT_OPPOSITE_TEE_SPACING_MM, runCostMm, type CombineInput, type CombineRoom, type RoomDoorPlan, type RoomFeedMulti } from './route-combine.js';
 
 const rectRing = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
   { x: x0, y: y0 },
@@ -159,6 +159,31 @@ describe('combineRoomRuns: tree legs and tee spacing', () => {
     const wideB = rowOf(wide.rooms, 'room-b').doors[0]!.tapMm;
     expect(dist(wideA, wideB)).toBeGreaterThanOrEqual(900 - 1e-6);
     expectNoBranchAlongCarrier(wide.rooms, LEG_Y1000);
+  });
+
+  it('puts the tees of two rooms on opposite sides of one leg about 395 mm apart', () => {
+    const roomA = roomOf('room-a', 0, 0, 6000, 4000);
+    const roomB = roomOf('room-b', 0, -4000, 6000, -2000);
+    const bottomDoor = (x: number): EntryCandidate => ({ pointMm: { x, y: -2000 }, outward: { x: 0, y: 1 }, source: 'ring' });
+    const rooms: CombineRoom[] = [
+      {
+        room: roomA,
+        ports: [{ id: 'a1', point: { x: 1000, y: 2000 } }],
+        singles: [doorRunOf(roomA, topDoor(1000), [{ x: 1000, y: 0 }, { x: 1000, y: 2000 }])],
+        blockPlans: [],
+      },
+      {
+        room: roomB,
+        ports: [{ id: 'b1', point: { x: 1200, y: -3000 } }],
+        singles: [doorRunOf(roomB, bottomDoor(1200), [{ x: 1200, y: -2000 }, { x: 1200, y: -3000 }])],
+        blockPlans: [],
+      },
+    ];
+    const result = combine(rooms);
+    const tapA = rowOf(result.rooms, 'room-a').doors[0]!.tapMm;
+    const tapB = rowOf(result.rooms, 'room-b').doors[0]!.tapMm;
+    expect(dist(tapA, tapB)).toBeCloseTo(395, 6);
+    expectNoBranchAlongCarrier(result.rooms, LEG_Y1000);
   });
 
   it('does not serve a room from a line that is not in the tree', () => {
@@ -740,7 +765,8 @@ describe('combineRoomRuns on the manual fixture', () => {
       for (let i = 0; i < taps.length; i++) {
         for (let j = i + 1; j < taps.length; j++) minTap = Math.min(minTap, dist(taps[i]!, taps[j]!));
       }
-      expect(minTap).toBeGreaterThanOrEqual(600 - 1);
+      // Taps on opposite sides of one leg may be DEFAULT_OPPOSITE_TEE_SPACING_MM apart (D-P2-11).
+      expect(minTap).toBeGreaterThanOrEqual(DEFAULT_OPPOSITE_TEE_SPACING_MM - 1);
 
       expect(combineRoomRuns(combineInput)).toEqual(result);
       const counts = (r: ReturnType<typeof combineRoomRuns>): number[] => [

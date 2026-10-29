@@ -8,10 +8,10 @@ import { bestRoomReach, type PlacedTapAt, type ReachCarrier, type RoomReach } fr
 import { buildPortRoomsByCell, chainRoom, dist, hitsOtherRoom } from './route-feed-helpers.js';
 import { LEFT_PORT_MM } from './route-feeds.js';
 import { BEND_PENALTY_MM } from './route-hanan.js';
-import { MIN_LEG_MM } from './route-layout.js';
 import { runsOverOtherPort } from './route-topology.js';
 
 export const DEFAULT_TEE_SPACING_MM = 600;      // planner value
+export const DEFAULT_OPPOSITE_TEE_SPACING_MM = 395;   // planner value: tee spacing of two branches on opposite sides of one main line (hand route 437)
 export const DEFAULT_COMBINE_SEARCH_MM = 6000;  // planner value: a door counts only for a tree leg within this distance
 export const DEFAULT_CHAIN_DEPTH = 2;           // Q-P1-16 answer C
 
@@ -36,6 +36,7 @@ export interface CombineInput {
   bendMm?: number;                                    // default BEND_PENALTY_MM
   searchMm?: number;                                  // default DEFAULT_COMBINE_SEARCH_MM
   teeSpacingMm?: number;                              // default DEFAULT_TEE_SPACING_MM
+  oppositeTeeSpacingMm?: number;                      // default DEFAULT_OPPOSITE_TEE_SPACING_MM
   ductWidthMm?: number;                               // default 0; tee spacing = max(teeSpacingMm ?? 600, ductWidthMm)
   maxChainDepth?: number;                             // default DEFAULT_CHAIN_DEPTH; 0 = no chain pass
   accepts?: (path: Vec2[]) => boolean;                // default () => true
@@ -48,7 +49,7 @@ export interface CombineInput {
   roomFeedFallback?: (room: Room, door: EntryCandidate) => RoomFeed;
 }
 
-interface Placed { carrierId: string; sMm: number; point: Vec2 }
+interface Placed { carrierId: string; sMm: number; point: Vec2; side: -1 | 0 | 1 }
 interface Option { total: number; doors: RoomDoorPlan[]; leftPortIds: string[]; taps: Placed[] }
 interface Fed { depth: number; junctionMm: Vec2; paths: Vec2[][] }
 
@@ -66,6 +67,12 @@ const runsAlong = (p: Vec2, q: Vec2, carrier: ReachCarrier): boolean => {
   const vx = carrier.b.x - carrier.a.x;
   const vy = carrier.b.y - carrier.a.y;
   return Math.abs(ux * vy - uy * vx) <= EPS * Math.hypot(ux, uy) * Math.hypot(vx, vy);
+};
+
+const sideOn = (carrier: ReachCarrier, from: Vec2, to: Vec2): -1 | 0 | 1 => {
+  const horizontal = Math.abs(carrier.b.x - carrier.a.x) >= Math.abs(carrier.b.y - carrier.a.y);
+  const d = horizontal ? to.y - from.y : to.x - from.x;
+  return Math.abs(d) <= EPS ? 0 : d > 0 ? 1 : -1;
 };
 
 const piecesOf = (run: RoomRun): Vec2[][] => [run.lead, run.stem, ...run.teeth].filter((p) => p.length >= 2);
@@ -97,6 +104,7 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
   const maxChainDepth = input.maxChainDepth ?? DEFAULT_CHAIN_DEPTH;
   const accepts = input.accepts ?? (() => true);
   const spacing = Math.max(input.teeSpacingMm ?? DEFAULT_TEE_SPACING_MM, input.ductWidthMm ?? 0);
+  const oppositeSpacing = Math.min(spacing, input.oppositeTeeSpacingMm ?? DEFAULT_OPPOSITE_TEE_SPACING_MM);
   const { mmPerPt } = input;
   const toPage = (p: Vec2): Vec2 => ({ x: p.x / mmPerPt, y: p.y / mmPerPt });
   const centreOf = (room: Room): Vec2 => {
@@ -141,14 +149,10 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
 
   const usable = (cr: CombineRoom, run: RoomRun): boolean => run.leftPortIds.length < cr.ports.length;
 
-  const tapBlockers = (taken: readonly Placed[]): PlacedTapAt[] => {
-    const n = Math.ceil(spacing / MIN_LEG_MM);
-    const out: PlacedTapAt[] = [];
-    for (const tap of taken) {
-      for (let k = -(n - 1); k <= n - 1; k++) out.push({ carrierId: tap.carrierId, sMm: tap.sMm + k * MIN_LEG_MM });
-    }
-    return out;
-  };
+  const tapBlockers = (taken: readonly Placed[]): PlacedTapAt[] =>
+    taken.map((tap) => ({ carrierId: tap.carrierId, sMm: tap.sMm, side: tap.side }));
+
+  const tapGaps = { sameSideMm: spacing, oppositeSideMm: oppositeSpacing };
 
   const pathOk =
     (roomId: string, taken: readonly Placed[]) =>
@@ -156,17 +160,26 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
       const carrier = carrierById.get(carrierId);
       if (!carrier) return false;
       if (path.length >= 3 && runsAlong(path[0]!, path[1]!, carrier)) return false;
+      const side = sideOn(carrier, path[0]!, path[1]!);
       return (
         !hitsOtherRoom({ path, entryMm: entry.pointMm, excluded: new Set([roomId]), toPage, portRoomsByCell }) &&
         accepts([...path]) &&
         !runsOverOtherPort(path, targetPointsMm) &&
-        taken.every((tap) => dist(path[0]!, tap.point) >= spacing - EPS)
+        taken.every((tap) => {
+          const opposite = tap.carrierId === carrierId && side !== 0 && tap.side !== 0 && tap.side !== side;
+          return dist(path[0]!, tap.point) >= (opposite ? oppositeSpacing : spacing) - EPS;
+        })
       );
     };
 
   const placedOf = (reach: RoomReach): Placed => {
     const carrier = carrierById.get(reach.carrierId)!;
-    return { carrierId: reach.carrierId, sMm: dist(carrier.a, reach.tapMm), point: reach.tapMm };
+    return {
+      carrierId: reach.carrierId,
+      sMm: dist(carrier.a, reach.tapMm),
+      point: reach.tapMm,
+      side: sideOn(carrier, reach.branch[0]!, reach.branch[1]!),
+    };
   };
 
   const runsFor = (cr: CombineRoom, door: EntryCandidate): RoomRun[] => {
@@ -205,6 +218,7 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
       searchMm,
       portsMm: cr.ports.map((port) => port.point),
       tapAtFreeEnd: true,
+      tapGaps,
       extraCostMm: (r) => runCostMm(runByKey.get(doorKey(r.entry.pointMm, r.entry.outward))!, bendMm),
     });
     if (!reach) return null;
@@ -229,6 +243,7 @@ export function combineRoomRuns(input: CombineInput): TwoLevelFeedsResult {
         searchMm,
         portsMm,
         tapAtFreeEnd: true,
+        tapGaps,
         extraCostMm: () => runCostMm(block.run, bendMm),
       });
       if (reach) {

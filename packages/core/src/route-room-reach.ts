@@ -5,7 +5,7 @@ import { placeTapPosition } from './route-branch.js';
 import type { EntryCandidate } from './route-room-entry.js';
 
 export interface ReachCarrier { id: string; a: Vec2; b: Vec2; freeA?: boolean; freeB?: boolean }   // axis leg; a equal to b is a junction point; freeA / freeB = no other carrier touches that end
-export interface PlacedTapAt { carrierId: string; sMm: number }  // sMm = distance from carrier.a along the leg
+export interface PlacedTapAt { carrierId: string; sMm: number; side?: -1 | 0 | 1 }  // sMm = distance from carrier.a along the leg; side = branch side of that tap relative to the carrier line (0 or absent = unknown or along the carrier)
 export interface RoomReach { entry: EntryCandidate; carrierId: string; tapMm: Vec2; branch: Vec2[]; costMm: number }   // branch = tap to entry
 export const DEFAULT_WALL_MM = 3000;
 
@@ -100,6 +100,32 @@ function beats(p: Reach, q: Reach | null): boolean {
   return p.variant < q.variant;
 }
 
+const sideOf = (offsetMm: number): -1 | 0 | 1 => (offsetMm > EPS ? 1 : offsetMm < -EPS ? -1 : 0);
+
+const gapTo = (tap: PlacedTapAt, side: -1 | 0 | 1, gaps: { sameSideMm: number; oppositeSideMm: number }): number => {
+  const tapSide = tap.side ?? 0;
+  return side !== 0 && tapSide !== 0 && tapSide !== side ? gaps.oppositeSideMm : gaps.sameSideMm;
+};
+
+function placeGappedTap(len: number, preferred: number, taps: readonly { s: number; gap: number }[], endGapMm: number): number | null {
+  if (len < 2 * endGapMm) return preferred <= len / 2 ? 0 : len;
+  const clamped = Math.min(Math.max(preferred, endGapMm), len - endGapMm);
+  const candidates = [clamped];
+  for (const t of taps) candidates.push(t.s + t.gap, t.s - t.gap);
+  let best: number | null = null;
+  let bestDistance = Infinity;
+  for (const c of candidates) {
+    if (c < endGapMm - EPS || c > len - endGapMm + EPS) continue;
+    if (taps.some((t) => Math.abs(c - t.s) < t.gap - EPS)) continue;
+    const d = Math.abs(c - clamped);
+    if (best === null || d < bestDistance - EPS || (Math.abs(d - bestDistance) <= EPS && c > best)) {
+      best = c;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
 export function bestRoomReach(input: {
   candidates: readonly EntryCandidate[];
   carriers: readonly ReachCarrier[];
@@ -113,11 +139,13 @@ export function bestRoomReach(input: {
   pathPenaltyMm?: (path: readonly Vec2[], carrierId: string, entry: EntryCandidate) => number;   // default 0, added after pathOk
   extraCostMm?: (reach: RoomReach) => number;   // >= 0, called only for a pair that passed pathOk; when given, the half-bend portPenalty proxy is NOT added
   tapAtFreeEnd?: boolean;   // default false; a tap may sit at a free end of a carrier (s = 0 or len)
+  tapGaps?: { sameSideMm: number; oppositeSideMm: number };   // default absent = old behaviour (MIN_LEG_MM blockers)
 }): RoomReach | null {
   const bendMm = input.bendMm ?? BEND_PENALTY_MM;
   const wallMm = input.wallMm ?? DEFAULT_WALL_MM;
   const roomPenaltyMm = input.roomPenaltyMm ?? 0;
   const pathPenaltyMm = input.pathPenaltyMm ?? (() => 0);
+  const gaps = input.tapGaps;
   const pairs: Reach[] = [];
   for (const carrier of input.carriers) {
     const dx = carrier.b.x - carrier.a.x;
@@ -126,17 +154,24 @@ export function bestRoomReach(input: {
     if (!isPoint && Math.abs(dx) > EPS && Math.abs(dy) > EPS) continue;
     const kind: CarrierKind = isPoint ? 'junction' : Math.abs(dy) <= Math.abs(dx) ? 'horizontal' : 'vertical';
     const len = Math.hypot(dx, dy);
-    const blockers = input.placedTaps.filter((t) => t.carrierId === carrier.id).map((t) => t.sMm);
+    const onCarrier = input.placedTaps.filter((t) => t.carrierId === carrier.id);
+    const blockers = onCarrier.map((t) => t.sMm);
     for (const entry of input.candidates) {
       if (segmentDistance(entry.pointMm, carrier.a, carrier.b) > input.searchMm) continue;
       let sMm = 0;
       if (kind !== 'junction') {
         const sign = kind === 'horizontal' ? Math.sign(dx) : Math.sign(dy);
         const along = kind === 'horizontal' ? (entry.pointMm.x - carrier.a.x) * sign : (entry.pointMm.y - carrier.a.y) * sign;
+        const side = sideOf(kind === 'horizontal' ? entry.pointMm.y - carrier.a.y : entry.pointMm.x - carrier.a.x);
+        const gapped = gaps ? onCarrier.map((t) => ({ s: t.sMm, gap: gapTo(t, side, gaps) })) : null;
         if (input.tapAtFreeEnd && carrier.freeB && along >= len - ALIGN_TOL_MM) sMm = len;
         else if (input.tapAtFreeEnd && carrier.freeA && along <= ALIGN_TOL_MM) sMm = 0;
-        else sMm = placeTapPosition(len, Math.min(Math.max(along, 0), len), blockers, MIN_LEG_MM);
-        if (blockers.some((b) => Math.abs(b - sMm) < MIN_LEG_MM - EPS)) continue;
+        else if (gapped) {
+          const spot = placeGappedTap(len, Math.min(Math.max(along, 0), len), gapped, MIN_LEG_MM);
+          if (spot === null) continue;
+          sMm = spot;
+        } else sMm = placeTapPosition(len, Math.min(Math.max(along, 0), len), blockers, MIN_LEG_MM);
+        if (gapped ? gapped.some((t) => Math.abs(t.s - sMm) < t.gap - EPS) : blockers.some((b) => Math.abs(b - sMm) < MIN_LEG_MM - EPS)) continue;
       }
       const tap: Vec2 =
         kind === 'junction' ? { x: carrier.a.x, y: carrier.a.y }
