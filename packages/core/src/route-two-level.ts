@@ -26,6 +26,7 @@ export const TWO_LEVEL_DEFAULTS = {
   portDoorMarginMm: 100,
   ductWidthMm: 400,
   bridgeProbeMm: 15000,
+  crossRooms: { maxRooms: 1 },
 } as const;
 
 export interface TwoLevelPlanInput {
@@ -81,7 +82,8 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
   const maxChainDepth = options.maxChainDepth ?? DEFAULT_CHAIN_DEPTH;
   const ductWidthMm = TWO_LEVEL_DEFAULTS.ductWidthMm;
   const gapStepMm = 100;
-  const passable = options.crossRooms !== undefined;
+  const crossRooms = options.crossRooms ?? TWO_LEVEL_DEFAULTS.crossRooms;
+  const passable = crossRooms.maxRooms > 0;
 
   const toMm = (p: Vec2): Vec2 => ({ x: p.x * mmPerPt, y: p.y * mmPerPt });
   const toPt = (p: Vec2): Vec2 => ({ x: p.x / mmPerPt, y: p.y / mmPerPt });
@@ -131,14 +133,14 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
   const lines = mainRunLines({ areaRooms, inside, startMm, offsetMm, blockers, shaftRoomIds, ductWidthMm, clearanceMm });
 
   const ringMmOf = (room: Room): Vec2[] => [...room.polygon.outer.map(toMm), toMm(room.polygon.outer[0]!)];
-  const doorInputOf = (room: Room): RoomDoorRunsInput => {
+  const doorInputOf = (room: Room, probeBridges: boolean = passable): RoomDoorRunsInput => {
     const ports = portsOf(room);
     return {
       room,
       mmPerPt,
       corridorAt,
       otherRoomAt: otherRoomFor(room),
-      ...(passable ? { passableRoomAt, probeMm: TWO_LEVEL_DEFAULTS.bridgeProbeMm } : {}),
+      ...(probeBridges ? { passableRoomAt, probeMm: TWO_LEVEL_DEFAULTS.bridgeProbeMm } : {}),
       portsMm: ports.map((p) => p.point),
       ports,
       blockers,
@@ -166,10 +168,14 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
   const plansOf = new Map<string, RoomBlockPlan[]>();
   for (const room of served) {
     const doorInput = doorInputOf(room);
+    const plainInput = doorInputOf(room, false);
     const roomFeedFallback = feedHookOf(room);
     hooks.set(room.id, roomFeedFallback);
-    singlesOf.set(room.id, roomDoorRuns({ ...doorInput, roomFeedFallback }));
-    plansOf.set(room.id, roomBlockRuns({ ...doorInput, splitFromTerminals, roomFeedFallback }));
+    const plain = roomDoorRuns({ ...plainInput, roomFeedFallback });
+    const hasPlainDoor = plain.some((d) => d.run.pattern !== 'fallback');
+    singlesOf.set(room.id, passable && !hasPlainDoor ? roomDoorRuns({ ...doorInput, roomFeedFallback }) : plain);
+    const plainBlocks = roomBlockRuns({ ...plainInput, splitFromTerminals, roomFeedFallback });
+    plansOf.set(room.id, passable && plainBlocks.length === 0 && !hasPlainDoor ? roomBlockRuns({ ...doorInput, splitFromTerminals, roomFeedFallback }) : plainBlocks);
   }
 
   const demandOf = (room: Room): MainDemand => {
@@ -200,7 +206,7 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
       demands: bridgeCands,
       rooms: bridgeRooms,
       roomIdAt,
-      crossRooms: options.crossRooms!,
+      crossRooms,
       ...(options.neverCrossTypeIds !== undefined ? { neverCrossTypeIds: options.neverCrossTypeIds } : {}),
       blockers,
       clearanceMm,

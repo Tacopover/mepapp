@@ -12,7 +12,7 @@ export interface TwoLevelOptions {
   mainOffsetMm?: number;
   /** A terminal farther than this from a main line makes the room get a bridge or a link, mm. Default 6000. Hand route: 4800. */
   reachMm?: number;
-  /** Main run may cross a room with no terminal that is not in the route area. Default false (Q-P2-02). */
+  /** Main run may cross a room with no terminal that is not in the route area. Default { maxRooms: 1 } (P2-T13f). maxRooms 0 = no bridge. */
   crossRooms?: { maxRooms: number };
   /** Far rooms: how many chain steps from a fed room. Default 2 (answer C of Q-P1-16). 0 = no chain pass. */
   maxChainDepth?: number;
