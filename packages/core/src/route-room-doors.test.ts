@@ -38,9 +38,22 @@ const DIAGONAL_ROOM: Pick<Room, 'id' | 'polygon'> = {
     outer: [
       { x: 0, y: 0 },
       { x: 6000, y: 0 },
-      { x: 6000, y: 3900 },
-      { x: 5900, y: 4000 },
+      { x: 6000, y: 3700 },
+      { x: 5700, y: 4000 },
       { x: 0, y: 4000 },
+    ],
+    holes: [],
+  },
+};
+
+const SLANTED_EDGE_ROOM: Pick<Room, 'id' | 'polygon'> = {
+  id: 'room-slanted-edge',
+  polygon: {
+    outer: [
+      { x: 0, y: 0 },
+      { x: 4000, y: 60 },
+      { x: 4000, y: 3000 },
+      { x: 0, y: 3000 },
     ],
     holes: [],
   },
@@ -140,6 +153,12 @@ describe('wallStretches', () => {
     const stretches = wallStretches(scene({ room: DIAGONAL_ROOM, corridorAt: () => true }));
     expect(stretches.some((s) => s.edgeIndex === 2)).toBe(false);
     expect(stretches.some((s) => s.edgeIndex === 0)).toBe(true);
+  });
+
+  it('gives a stretch and door candidates on a long edge that is 60 mm off axis', () => {
+    const stretches = wallStretches(scene({ room: SLANTED_EDGE_ROOM }));
+    expect(stretches.filter((s) => s.edgeIndex === 0)).toHaveLength(1);
+    expect(roomDoorCandidates(scene({ room: SLANTED_EDGE_ROOM })).length).toBeGreaterThan(0);
   });
 
   it('hides the stretch when another room lies in the probe ray', () => {

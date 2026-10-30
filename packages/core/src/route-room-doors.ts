@@ -11,7 +11,7 @@ import { roomRunFor, doorAllowed, splitIntoBlocks, type RoomRun } from './route-
 export const DOOR_PROBE_MM = 450;     // planner value: the thickest wall measured on the manual fixture is 425 mm
 export const DOOR_STEP_MM = 500;      // planner value: grid step of extra door points along a stretch
 export const MAX_OWN_DOORS = 120;     // same cap as MAX_ENTRY_CANDIDATES
-export const AXIS_EDGE_TOL_MM = 30;   // an edge counts as axis aligned when its smaller coordinate change is at most this
+export const AXIS_EDGE_TOL_MM = 100;  // an edge counts as axis aligned when its smaller coordinate change is at most this (P2-T13f: 100 mm, was 30; a slanted ring edge up to 100 mm off axis still counts for wall stretches)
 
 const MIN_EDGE_MM = 100;
 const SAMPLE_STEP_MM = 50;
