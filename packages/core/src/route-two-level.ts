@@ -166,17 +166,27 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
   const hooks = new Map<string, (door: EntryCandidate) => RoomFeed>();
   const singlesOf = new Map<string, RoomDoorRun[]>();
   const plansOf = new Map<string, RoomBlockPlan[]>();
+  const plainOf = new Map<string, { singles: RoomDoorRun[]; plans: RoomBlockPlan[]; hasPlainDoor: boolean }>();
   for (const room of served) {
-    const doorInput = doorInputOf(room);
     const plainInput = doorInputOf(room, false);
     const roomFeedFallback = feedHookOf(room);
     hooks.set(room.id, roomFeedFallback);
     const plain = roomDoorRuns({ ...plainInput, roomFeedFallback });
-    const hasPlainDoor = plain.some((d) => d.run.pattern !== 'fallback');
-    singlesOf.set(room.id, passable && !hasPlainDoor ? roomDoorRuns({ ...doorInput, roomFeedFallback }) : plain);
     const plainBlocks = roomBlockRuns({ ...plainInput, splitFromTerminals, roomFeedFallback });
-    plansOf.set(room.id, passable && plainBlocks.length === 0 && !hasPlainDoor ? roomBlockRuns({ ...doorInput, splitFromTerminals, roomFeedFallback }) : plainBlocks);
+    plainOf.set(room.id, { singles: plain, plans: plainBlocks, hasPlainDoor: plain.some((d) => d.run.pattern !== 'fallback') });
+    singlesOf.set(room.id, plain);
+    plansOf.set(room.id, plainBlocks);
   }
+  const probeSingles = (room: Room): RoomDoorRun[] => roomDoorRuns({ ...doorInputOf(room), roomFeedFallback: hooks.get(room.id)! });
+  const probePlans = (room: Room): RoomBlockPlan[] => roomBlockRuns({ ...doorInputOf(room), splitFromTerminals, roomFeedFallback: hooks.get(room.id)! });
+  const setProbe = (room: Room): void => {
+    singlesOf.set(room.id, probeSingles(room));
+    if (plainOf.get(room.id)!.plans.length === 0) plansOf.set(room.id, probePlans(room));
+  };
+  const restorePlain = (room: Room): void => {
+    singlesOf.set(room.id, plainOf.get(room.id)!.singles);
+    plansOf.set(room.id, plainOf.get(room.id)!.plans);
+  };
 
   const demandOf = (room: Room): MainDemand => {
     const doors = new Map<string, { pointMm: Vec2; outward: Vec2; costMm: number }>();
@@ -189,8 +199,29 @@ export function planTwoLevel(input: TwoLevelPlanInput): TwoLevelPlan {
     for (const plan of plansOf.get(room.id)!) for (const block of plan.blocks) add(block.run, block.costMm);
     return { roomId: room.id, doorsMm: [...doors.values()] };
   };
-  const demands = served.map(demandOf);
-  const before = planMainRun({ lines, startMm, demands, inside, bendMm, reachMm, roomIdAt, blockers, clearanceMm });
+  const demands0 = served.map(demandOf);
+  const run0 = planMainRun({ lines, startMm, demands: demands0, inside, bendMm, reachMm, roomIdAt, blockers, clearanceMm });
+  let demands = demands0;
+  let before = run0;
+  if (passable) {
+    const unreached0 = new Set(run0.unreachedRoomIds);
+    const candidates = served.filter((room) => !plainOf.get(room.id)!.hasPlainDoor && unreached0.has(room.id));
+    if (candidates.length > 0) {
+      candidates.forEach(setProbe);
+      const demands1 = served.map(demandOf);
+      const run1 = planMainRun({ lines, startMm, demands: demands1, inside, bendMm, reachMm, roomIdAt, blockers, clearanceMm });
+      const unreached1 = new Set(run1.unreachedRoomIds);
+      const rejected = candidates.filter((room) => unreached1.has(room.id));
+      rejected.forEach(restorePlain);
+      if (rejected.length === 0) {
+        demands = demands1;
+        before = run1;
+      } else {
+        demands = served.map(demandOf);
+        before = planMainRun({ lines, startMm, demands, inside, bendMm, reachMm, roomIdAt, blockers, clearanceMm });
+      }
+    }
+  }
 
   let main = before;
   if (passable) {
