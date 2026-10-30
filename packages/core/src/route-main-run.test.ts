@@ -629,7 +629,18 @@ describe('planMainRun across a wall gap', () => {
     ]);
   });
 
-  it('takes the root on the component with more rooms, although the other is nearer', () => {
+  it('takes the root on the smaller component when the start lies nearer to it, although the other has more rooms', () => {
+    const run = planMainRun(
+      gapScene(
+        [r1, demand('R2', [door(15000, 1500, { x: 0, y: -1 })]), demand('R3', [door(16000, 1500, { x: 0, y: -1 })])],
+        { x: 9500, y: 1400 },
+      ),
+    );
+    expect(run.rootPointMm.y).toBe(1000);
+    expect(run.rootPointMm.x).toBeLessThanOrEqual(10000);
+  });
+
+  it('takes the root on the nearer component, although the other has more rooms', () => {
     const run = planMainRun(
       gapScene(
         [
@@ -641,7 +652,7 @@ describe('planMainRun across a wall gap', () => {
         { x: 10600, y: 1000 },
       ),
     );
-    expect(run.rootPointMm).toEqual({ x: 10000, y: 1000 });
+    expect(run.rootPointMm).toEqual({ x: 11000, y: 1000 });
     expect(run.unreachedRoomIds).toEqual([]);
     expect(run.joins).toHaveLength(1);
   });
@@ -699,6 +710,38 @@ describe('planMainRun with a blocker between two lines of one row', () => {
     expect(run.joins).toEqual([]);
     expect(run.unreachedRoomIds).toEqual(['R2']);
     expect(run.paths.flat().some((p) => p.x > 10000)).toBe(false);
+  });
+});
+
+describe('planMainRun root at the start', () => {
+  it('takes the root on the component with more rooms when the start is a corner that would fork', () => {
+    const run = planMainRun(
+      planInput({
+        lines: [hLine('ah', 0, 0, 5000), vLine('av', 0, 0, 5000), hLine('bh', 10000, 10000, 20000)],
+        startMm: { x: 0, y: 0 },
+        demands: [
+          demand('A1', [door(2500, 1500, { x: 0, y: -1 })]),
+          demand('A2', [door(1500, 2500, { x: -1, y: 0 })]),
+          demand('B1', [door(12000, 11500, { x: 0, y: -1 })]),
+          demand('B2', [door(15000, 11500, { x: 0, y: -1 })]),
+          demand('B3', [door(18000, 11500, { x: 0, y: -1 })]),
+        ],
+      }),
+    );
+    expect(run.rootPointMm).toEqual({ x: 10000, y: 10000 });
+  });
+
+  it('keeps the nearest rule when the start is the end of one straight line', () => {
+    const run = planMainRun(
+      planInput({
+        lines: [hLine('h', 1000, 0, 10000)],
+        startMm: { x: 10000, y: 1000 },
+        demands: [demand('R', [door(5000, 1500, { x: 0, y: -1 })])],
+      }),
+    );
+    expect(run.rootPointMm).toEqual({ x: 10000, y: 1000 });
+    expect(run.paths).toHaveLength(1);
+    expect(run.unreachedRoomIds).toEqual([]);
   });
 });
 
@@ -795,7 +838,7 @@ describe('planMainRun on the manual fixture', () => {
       expect(Math.min(...doors.map((d) => distance(d.pointMm, p)))).toBeLessThanOrEqual(4800);
     }
     expect(run.chosenHitByRoom.size + run.unreachedRoomIds.length).toBe(demands.length);
-    expect(run.stubRoomIds.length).toBeGreaterThanOrEqual(2);
+    expect(run.stubRoomIds.length).toBe(0);
   }, 60000);
 });
 

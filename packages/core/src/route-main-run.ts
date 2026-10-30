@@ -495,7 +495,7 @@ function straightPaths(edgeIds: readonly string[], info: ReadonlyMap<string, Edg
     .sort((p, q) => p.path[0]!.x - q.path[0]!.x || p.path[0]!.y - q.path[0]!.y || p.path[1]!.x - q.path[1]!.x || p.path[1]!.y - q.path[1]!.y);
 }
 
-export function planMainRun(input: {
+interface MainPlanInput {
   lines: readonly MainLine[];
   startMm: Vec2;
   demands: readonly MainDemand[];
@@ -505,7 +505,29 @@ export function planMainRun(input: {
   roomIdAt?: (p: Vec2) => string | null;
   blockers?: readonly (readonly Vec2[])[];
   clearanceMm?: number;
-}): MainRun {
+}
+
+/** True when the tree paths meet at the start point in two or more places, so the start port would get two segment ends. */
+function forksAtStart(run: MainRun, startMm: Vec2): boolean {
+  if (distance(startMm, run.rootPointMm) > STUB_MIN_MM) return false;
+  let touches = 0;
+  for (const path of run.paths) {
+    const first = path[0]!;
+    const last = path[path.length - 1]!;
+    if (distance(startMm, first) <= ON_TRACK_MM || distance(startMm, last) <= ON_TRACK_MM) touches += 1;
+    else if (pathDistance(startMm, path) <= ON_TRACK_MM) touches += 2;
+  }
+  return touches >= 2;
+}
+
+/** Plans the main run. The root component is the one nearest to the start (P2-T13f; before, the one with most rooms). When the tree would fork at the start port, the port would get two segment ends, so the rule of most rooms is used. A start with no line near it gets a root stub to that point. */
+export function planMainRun(input: MainPlanInput): MainRun {
+  const run = planMainRunWith(input, 'nearest');
+  const forks = forksAtStart(run, input.startMm);
+  return forks ? planMainRunWith(input, 'most-rooms') : run;
+}
+
+function planMainRunWith(input: MainPlanInput, rule: 'nearest' | 'most-rooms'): MainRun {
   const { startMm } = input;
   const blockers = input.blockers ?? [];
   const clearanceMm = input.clearanceMm ?? 0;
@@ -564,10 +586,12 @@ export function planMainRun(input: {
   for (const demand of demands) {
     for (const c of new Set(hitsOf.get(demand.roomId)!.map((h) => compOf[h.lineIdx]!))) roomCount[c]!++;
   }
-  const rootComp = nearPt.reduce((best, _, c) => {
-    if (roomCount[c] !== roomCount[best]) return roomCount[c]! > roomCount[best]! ? c : best;
-    return distance(startMm, nearPt[c]!) < distance(startMm, nearPt[best]!) ? c : best;
-  }, nearPt.findIndex((p) => p !== undefined));
+  const rootComp = rule === 'nearest'
+    ? nearPt.reduce((best, _, c) => (distance(startMm, nearPt[c]!) < distance(startMm, nearPt[best]!) ? c : best), nearPt.findIndex((p) => p !== undefined))
+    : nearPt.reduce((best, _, c) => {
+      if (roomCount[c] !== roomCount[best]) return roomCount[c]! > roomCount[best]! ? c : best;
+      return distance(startMm, nearPt[c]!) < distance(startMm, nearPt[best]!) ? c : best;
+    }, nearPt.findIndex((p) => p !== undefined));
   const rootPt = nearPt[rootComp]!;
 
   const onTrack: Vec2[][] = tracks.map((t) => [at(t.orient, t.coord, t.lo), at(t.orient, t.coord, t.hi)]);
