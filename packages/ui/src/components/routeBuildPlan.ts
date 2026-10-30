@@ -4,6 +4,8 @@ import type { RoutePlanWarning, RoutePlanWarningCode, RouteStats } from '@mepapp
 export const TEXTS = {
   buildTitle: 'Route',
   buildPending: 'Calculating the route…',
+  buildTwoLevel: 'Two-level',
+  buildTwoLevelHint: 'Plans one main run first, then a short branch in each room. Takes a few seconds on a large floor.',
   buildSizeAfter: 'Size the network after routing',
   buildPlace: 'Place route',
   buildRooms: 'Rooms to serve',

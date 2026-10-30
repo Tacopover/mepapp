@@ -15,7 +15,7 @@ const DEBOUNCE_MS = 300;
 /** A stable text for a request, so the section plans again only when an input changes. */
 export function routeRequestKey(request: RouteRequest): string {
   const ids = [...(request.scope.kind === 'rooms' ? request.scope.roomIds : request.scope.stampIds)].sort();
-  return JSON.stringify([request.startStampId, request.startPortId, request.networkTypeId, request.scope.kind, ids, request.includeOutsideRooms, request.portsPerStamp]);
+  return JSON.stringify([request.startStampId, request.startPortId, request.networkTypeId, request.scope.kind, ids, request.includeOutsideRooms, request.portsPerStamp, request.layout?.twoLevel ? 'two-level' : '']);
 }
 
 export function RouteBuildSection({ sceneRef, request, roomName, stampName }: RouteBuildSectionProps) {
@@ -26,7 +26,9 @@ export function RouteBuildSection({ sceneRef, request, roomName, stampName }: Ro
   const [size, setSize] = useState(true);
   const [result, setResult] = useState<{ segments: number; fittings: number } | null>(null);
   const [failed, setFailed] = useState(false);
-  const key = request ? routeRequestKey(request) : null;
+  const [twoLevel, setTwoLevel] = useState(false);
+  const effective = request && twoLevel ? { ...request, layout: { twoLevel: {} } } : request;
+  const key = effective ? routeRequestKey(effective) : null;
 
   useEffect(() => {
     if (!scene) return;
@@ -39,14 +41,14 @@ export function RouteBuildSection({ sceneRef, request, roomName, stampName }: Ro
   }, [scene]);
 
   useEffect(() => {
-    if (!scene || !request) {
+    if (!scene || !effective) {
       setView(null);
       setPending(false);
       return;
     }
     setPending(true);
     const timer = window.setTimeout(() => {
-      setView(scene.planRoute(request));
+      setView(scene.planRoute(effective));
       setPending(false);
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
@@ -75,10 +77,10 @@ export function RouteBuildSection({ sceneRef, request, roomName, stampName }: Ro
   const canPlace = !!view && view.status === 'ok' && view.plan.segments.length > 0 && !pending;
 
   const place = () => {
-    if (!view || !request) return;
+    if (!view || !effective) return;
     const useSize = sizeAvailable && size;
     let done = scene.applyRoute(view.plan, { size: useSize });
-    if (done === null) done = scene.applyRoute(scene.planRoute(request).plan, { size: useSize });
+    if (done === null) done = scene.applyRoute(scene.planRoute(effective).plan, { size: useSize });
     setFailed(done === null);
     setResult(done);
   };
@@ -86,6 +88,10 @@ export function RouteBuildSection({ sceneRef, request, roomName, stampName }: Ro
   return (
     <div className="mep-route-build" data-testid="route-build">
       <p className="mep-route-text mep-route-build-title">{buildText('buildTitle')}</p>
+      <label className="mep-route-check" title={buildText('buildTwoLevelHint')}>
+        <input type="checkbox" data-testid="route-build-two-level" checked={twoLevel} onChange={(event) => setTwoLevel(event.target.checked)} />
+        <span>{buildText('buildTwoLevel')}</span>
+      </label>
       {pending && <p className="mep-route-text mep-route-note" data-testid="route-build-pending">{buildText('buildPending')}</p>}
       {view && view.status === 'ok' && (
         <div data-testid="route-build-summary" aria-live="polite">

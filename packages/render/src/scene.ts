@@ -122,6 +122,7 @@ import {
   routedRunOf,
   findRoutePorts,
   planRoute as planRouteCore,
+  type RouteLayoutOptions,
   type PlannedRoute,
   type RouteScope,
   DEFAULT_ROUTE_AREA_TYPE_IDS,
@@ -496,6 +497,8 @@ export interface RouteMarker { world: Vec2; kind: 'start' | 'target' }
 export interface RouteRequest {
   startStampId: string; startPortId: string; networkTypeId: string;
   scope: RouteScope; includeOutsideRooms: boolean; portsPerStamp: 'one' | 'all';
+  /** The layout options of the planner. Absent: the default layout. */ // replaced by P1-T09
+  layout?: RouteLayoutOptions;
 }
 export interface RoutePlanView {
   status: 'ok' | 'refused'; plan: PlannedRoute;
@@ -2976,7 +2979,7 @@ export class SketchScene {
       elementCategories,
       newSegmentId: () => `segment-${segmentSeq++}`,
       newFittingId: () => `fitting-${fittingSeq++}`,
-    });
+    }, request.layout);
     return {
       status: result.status,
       plan: result.plan,

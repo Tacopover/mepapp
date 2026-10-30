@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { RoutePlanWarningCode, RouteStats } from '@mepapp/core';
 import { buildText, routeBuildLines, routeBuildSeverityLabel, routeBuildSummary, TEXTS, type BuildTextKey } from './components/routeBuildPlan.js';
+import { routeRequestKey } from './components/RouteBuildSection.js';
+import type { RouteRequest } from '@mepapp/render';
 
 const SAMPLE_PARAMS: Record<string, string | number> = {
   n: 1234, count: 1234, length: 1234, segments: '1234 segments', fittings: '1234 fittings', rooms: 'Shaft A, Shaft B, Shaft C, Stair D, Stair E, Office F, Office G',
@@ -161,6 +163,20 @@ describe('routeBuildLines', () => {
   it('gives no unit text for capacity-unit', () => {
     const [line] = routeBuildLines({ warnings: [{ code: 'capacity-unit', severity: 'warning', numbers: { total: 400, cap: 300 } }] }, names);
     expect(line!.text).toBe('The ports total 400. The start has 300. The unit is not set, so the numbers are not compared.');
+  });
+});
+
+describe('routeRequestKey', () => {
+  const request: RouteRequest = {
+    startStampId: 's1', startPortId: 'p1', networkTypeId: 'duct', scope: { kind: 'rooms', roomIds: new Set(['r2', 'r1']) }, includeOutsideRooms: false, portsPerStamp: 'one',
+  };
+
+  it('gives equal keys for two requests without a layout', () => {
+    expect(routeRequestKey(request)).toBe(routeRequestKey({ ...request }));
+  });
+
+  it('gives a different key when the layout is two-level', () => {
+    expect(routeRequestKey({ ...request, layout: { twoLevel: {} } })).not.toBe(routeRequestKey(request));
   });
 });
 
