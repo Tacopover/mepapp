@@ -743,6 +743,20 @@ describe('planMainRun root at the start', () => {
     expect(run.paths).toHaveLength(1);
     expect(run.unreachedRoomIds).toEqual([]);
   });
+
+  it('leaves the start in one direction when the start is an L corner of two lines', () => {
+    const start: Vec2 = { x: 0, y: 0 };
+    const run = planMainRun(
+      planInput({
+        lines: [hLine('h', 0, 0, 3000), vLine('v', 0, 0, 3000), vLine('v2', 3000, 0, 3000), hLine('h2', 3000, 0, 3000)],
+        startMm: start,
+        demands: [demand('A', [door(1500, 1000, { x: 0, y: -1 })]), demand('B', [door(1000, 1500, { x: -1, y: 0 })])],
+      }),
+    );
+    const touching = run.paths.filter((p) => distance(start, closestPointOnSegment(start, p[0]!, p[1]!).point) <= 1);
+    expect(touching).toHaveLength(1);
+    expect(run.unreachedRoomIds).toEqual([]);
+  });
 });
 
 describe('planMainRun on the manual fixture', () => {

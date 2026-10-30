@@ -35,6 +35,7 @@ const DUCT_OVERLAP_MM = 500;
 const RAY_EPS_MM = 1e-6;
 const MAX_PASSES = 1000;
 const NODE_TOL_MM = 200;
+const START_ARM_GAP_MM = 250;
 const ON_TRACK_MM = 1;
 const DOOR_SPAN_MM = 50;
 const STUB_MIN_MM = 1;
@@ -520,11 +521,64 @@ function forksAtStart(run: MainRun, startMm: Vec2): boolean {
   return touches >= 2;
 }
 
-/** Plans the main run. The root component is the one nearest to the start (P2-T13f; before, the one with most rooms). When the tree would fork at the start port, the port would get two segment ends, so the rule of most rooms is used. A start with no line near it gets a root stub to that point. */
+type Arm = { lineIdx: number; side: 'lo' | 'hi' };
+
+/** The arms at the start point: the part of a corridor line from its lo end to the start ('lo'), and from the start to its hi end ('hi'). */
+function armsAtStart(lines: readonly MainLine[], startMm: Vec2): Arm[] {
+  const arms: Arm[] = [];
+  lines.forEach((line, lineIdx) => {
+    if (line.bridge === true) return;
+    const t = trackOf(line);
+    if (Math.abs(acrossOf(startMm, t.orient) - t.coord) > ON_TRACK_MM) return;
+    const s = alongOf(startMm, t.orient);
+    if (s < t.lo - ON_TRACK_MM || s > t.hi + ON_TRACK_MM) return;
+    if (s > t.lo) arms.push({ lineIdx, side: 'lo' });
+    if (s < t.hi) arms.push({ lineIdx, side: 'hi' });
+  });
+  return arms;
+}
+
+/** The lines with the part within START_ARM_GAP_MM of the start cut off every arm except arms[keep]. */
+function trimArms(lines: readonly MainLine[], startMm: Vec2, arms: readonly Arm[], keep: number): MainLine[] {
+  const out: MainLine[] = [];
+  lines.forEach((line, lineIdx) => {
+    const sides = arms.flatMap((arm, k) => (arm.lineIdx === lineIdx && k !== keep ? [arm.side] : []));
+    if (sides.length === 0) {
+      out.push(line);
+      return;
+    }
+    const t = trackOf(line);
+    const s = alongOf(startMm, t.orient);
+    const cuts: Span[] = [];
+    if (sides.includes('lo')) cuts.push({ lo: s - START_ARM_GAP_MM, hi: s });
+    if (sides.includes('hi')) cuts.push({ lo: s, hi: s + START_ARM_GAP_MM });
+    let pieces: Span[] = [{ lo: t.lo, hi: t.hi }];
+    for (const cut of cuts) {
+      pieces = pieces
+        .flatMap((p) => [{ lo: p.lo, hi: Math.min(p.hi, cut.lo) }, { lo: Math.max(p.lo, cut.hi), hi: p.hi }])
+        .filter((p) => p.hi - p.lo > 0);
+    }
+    pieces.forEach((p, n) => out.push({ id: `${line.id}-t${n}`, a: at(t.orient, t.coord, p.lo), b: at(t.orient, t.coord, p.hi) }));
+  });
+  return out;
+}
+
+const pathLengthMm = (paths: readonly Vec2[][]): number =>
+  paths.reduce((sum, p) => sum + p.slice(1).reduce((s, q, i) => s + distance(p[i]!, q), 0), 0);
+
+/** Plans the main run. The root component is the one nearest to the start (P2-T13f; before, the one with most rooms). When the tree forks at the start port, the port would get two segment ends. Then the start arms are trimmed, one kept arm at a time, and the cheapest variant that does not fork is used. When no variant works, the rule of most rooms is used. A start with no line near it gets a root stub to that point. */
 export function planMainRun(input: MainPlanInput): MainRun {
   const run = planMainRunWith(input, 'nearest');
-  const forks = forksAtStart(run, input.startMm);
-  return forks ? planMainRunWith(input, 'most-rooms') : run;
+  if (!forksAtStart(run, input.startMm)) return run;
+  const arms = armsAtStart(input.lines, input.startMm);
+  let best: { run: MainRun; cost: number } | null = null;
+  for (let keep = 0; keep < arms.length; keep++) {
+    const variant = planMainRunWith({ ...input, lines: trimArms(input.lines, input.startMm, arms, keep) }, 'nearest');
+    if (forksAtStart(variant, input.startMm)) continue;
+    const cost = variant.unreachedRoomIds.length * 1e9 + pathLengthMm(variant.paths) + variant.joins.length * JOIN_PENALTY_MM;
+    if (best === null || cost < best.cost) best = { run: variant, cost };
+  }
+  return best?.run ?? planMainRunWith(input, 'most-rooms');
 }
 
 function planMainRunWith(input: MainPlanInput, rule: 'nearest' | 'most-rooms'): MainRun {
