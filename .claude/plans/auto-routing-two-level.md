@@ -403,6 +403,17 @@ The director writes them after the first run of P2-T12. Each has the form of the
 
   Final: G1, G2a, G3a, G5, G8, G13, G15 pass; G2b (8: room-35 5 bends, room-53 2, room-50 1), G3b (3: room-26, room-31, room-34), G4 (room-33 chained, 1 bend in the room), G6 5.02, G7 229 mm (room-20 comb tee), G9 (first floor A: bendsOutside 5 vs 4 and length 193.2 vs 151.4 m), G12 65.2 m fail. G10 about 1.2 s (asserted in T14). Chained: room-33 only (via room-34). Core suite and build ok (see the commit report). Residual causes, not fixed here: room-20 comb tee offset 229 mm; room-31 multi-entry with comb fallback; room-33 chain bend; G9 first-floor main-run length (T13d); G12 longest path; bridge doors of needy rooms carry no run cost in the pick (route-two-level.ts `bridgeCands`).
 
+- **Result (T13f, fixes applied; commits 6605b00 fix 2, 4ad1d2f fix 1, 4e9f06a fix 3 on this branch):** Fix 2: `AXIS_EDGE_TOL_MM` 30 to 100 (route-room-doors.ts): a ring edge up to 100 mm off axis gives wall stretches. Fix 1: `planMainRun` picks the root component by distance to the start; when the tree of that pick forks at the start (two segment ends at `start-ahu:out`, gate G15) it uses the old rule (most rooms). Result: no change on any drawing, because first floor A forks at the start. Without the fallback first floor A is 179.3 m but G15 fails; the user must choose (open). Fix 3: `TWO_LEVEL_DEFAULTS.crossRooms` `{ maxRooms: 1 }` (bridges on by default, 0 = off) and an adaptive door probe in `planTwoLevel`: a room gets doors through a passable room only when its plain probe gives no non-fallback door. Default and roomBranches plan hashes: all 16 equal after each fix. Table on the manual fixture (twoLevel):
+
+  | step | G2a (<=8) | G2b (<=7) | G3b (<=2) | G4 (12) | G5 m | G6 (<=5) | G7 mm | G9 over | G12 m | G10 ms |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | before (HEAD cc89758) | 7 | 8 | 3 | 11 | 224.6 | 5.02 | 229 | 2 | 65.2 | 1312 |
+  | after fix 2 | 5 | 7 | 2 | 11 | 221.8 | 4.50 | 0 | 2 | 65.2 | 1327 |
+  | after fix 1 | 5 | 7 | 2 | 11 | 221.8 | 4.50 | 0 | 2 | 65.2 | n/a |
+  | after fix 3 (final) | 2 | 6 | 1 | 12 | 222.8 | 4.36 | 0 | 3 | 65.2 | 2597 |
+
+  Final: G1, G2a, G2b, G3a, G3b, G4, G5, G6, G7, G8, G13, G15 pass. G9 fails (3 over: first floor A bendsOutside 7 vs 4, first floor A length 199.5 vs 151.4 m, first floor B length 339.2 vs 269.9 m; before fix 3: first floor A 193.2 m). G12 fails (65.2 m, limit 59.4 m; cause: main line broken at room-21, a served room, not changed by fix 1). G10 2597 ms (asserted in T14, limit 600 ms for scenario A on w_rooms-2). Core suite 2081 passed, build 9 of 9. Not touched: room-30 corner, room-7.
+
 #### P2-T14. Gate timing and the side tests of the mode
 - **Size:** S (about 80 lines). **Depends on:** P2-T12 passes.
 - **Files:** `packages/core/src/route-two-level-time.test.ts` (new), `route-two-level-report.test.ts` (adds the corner modes).
