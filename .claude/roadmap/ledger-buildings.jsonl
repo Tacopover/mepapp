@@ -13,3 +13,71 @@
 {"seq":13,"at":"2026-10-31T12:09:47.965Z","type":"decision","id":"D-B-08","part":"B2","question":"[data model] Stamps have no pageIndex. Add it (schema step) or scope the takeoff by document only?","options":[{"key":"A","label":"Add pageIndex to PlacedStamp."},{"key":"B","label":"Document-level scope only. A multi-page PDF counts stamps once."}],"recommendation":"A","reason":"One PDF can hold several levels (user answer). Without a page on stamps, a Level scope cannot split them.","status":"open","kind":"batch"}
 {"seq":14,"at":"2026-10-31T12:23:50.041Z","type":"decision","id":"D-B-07","status":"answered","answer":"A","by":"user"}
 {"seq":15,"at":"2026-10-31T12:23:50.079Z","type":"decision","id":"D-B-08","status":"answered","answer":"A","by":"user"}
+{"seq":16,"at":"2026-10-31T12:47:25.117Z","type":"decision","id":"D-B-09","part":"B1","question":"[data model/rule] Where is the building stored?","recommendation":"A","reason":"A file the user places, summaries beside it, no backend (AGPL network-use caution).","status":"open","kind":"new"}
+{"seq":17,"at":"2026-10-31T12:47:25.156Z","type":"decision","id":"D-B-10","part":"B1","question":"[data model/rule] Where do the sheet summaries go?","recommendation":"A","reason":"One flat file per project, <projectUuid>.summary.json beside the building file. Sub-folder if the B1-T16 spike shows it is cheap.","status":"open","kind":"new"}
+{"seq":18,"at":"2026-10-31T12:47:25.196Z","type":"decision","id":"D-B-11","part":"B1","question":"[data model/rule] Where does the document id (projectUuid) live?","recommendation":"A","reason":"In the embedded project JSON (schema v22). No engine change.","status":"open","kind":"new"}
+{"seq":19,"at":"2026-10-31T12:47:25.238Z","type":"decision","id":"D-B-12","part":"B1","question":"[data model/rule] Old multi-page files kept all elements on page 0, and should Save As make a new id?","recommendation":"A","reason":"Leave old elements on page 0 and say so in the release note. Save As makes a new id.","status":"open","kind":"new"}
+{"seq":20,"at":"2026-10-31T12:47:25.279Z","type":"decision","id":"D-B-13","part":"B4","question":"[data model/rule] A type change on a run that touches a riser: what happens?","recommendation":"A","reason":"Cascade to the riser and all levels with a pending retag for closed documents. B (refuse) is allowed as first release. C breaks rules.md section 3.","status":"open","kind":"new"}
+{"seq":21,"at":"2026-10-31T12:47:25.316Z","type":"decision","id":"D-B-14","part":"B4","question":"[data model/rule] Is the riser anchor \"same x,y\" in page points with a check of page size, rotation and scale?","recommendation":"A","reason":"Simple and checkable. Not verified that the sheets share one page size.","status":"open","kind":"new"}
+{"seq":22,"at":"2026-10-31T12:47:25.358Z","type":"decision","id":"D-B-18","part":"B4","question":"[data model/rule] Riser flow direction and source level?","recommendation":"A","reason":"Store them with default unknown. Flow is not summed across levels.","status":"open","kind":"new"}
+{"seq":23,"at":"2026-10-31T12:47:25.399Z","type":"decision","id":"D-B-20","part":"B4","question":"[data model/rule] Vertical cable length of a circuit across levels?","recommendation":"A","reason":"Add no length and write a warning.","status":"open","kind":"new"}
+{"seq":24,"at":"2026-10-31T12:47:25.439Z","type":"decision","id":"D-B-15","part":"B2","question":"One workbook with provenance columns?","recommendation":"A","reason":"The xlsx writer needs no change.","status":"provisional","kind":"new","by":"director"}
+{"seq":25,"at":"2026-10-31T12:47:25.476Z","type":"decision","id":"D-B-16","part":"B1","question":"Web support?","recommendation":"A","reason":"Web is read-only and last, with a dev-only store for browser checks.","status":"provisional","kind":"new","by":"director"}
+{"seq":26,"at":"2026-10-31T12:47:25.521Z","type":"decision","id":"D-B-17","part":"B3","question":"Where do unassigned pages live?","recommendation":"A","reason":"Only in dialog state.","status":"provisional","kind":"new","by":"director"}
+{"seq":27,"at":"2026-10-31T12:47:25.567Z","type":"decision","id":"D-B-19","part":"B4","question":"What does level elevation measure?","recommendation":"A","reason":"Finished-floor height, negative allowed. The riser column is Floor-to-floor length.","status":"provisional","kind":"new","by":"director"}
+{"seq":28,"at":"2026-10-31T12:47:25.609Z","type":"decision","id":"D-B-21","part":"B4","question":"Pending riser ops on a closed document?","recommendation":"A","reason":"Apply outside the undo stack and mark the document dirty.","status":"provisional","kind":"new","by":"director"}
+{"seq":29,"at":"2026-10-31T12:47:25.649Z","type":"decision","id":"D-B-22","part":"B4","question":"Two risers close on one level?","recommendation":"A","reason":"Warn when closer than 150 mm.","status":"provisional","kind":"new","by":"director"}
+{"seq":30,"at":"2026-10-31T12:47:25.690Z","type":"task","id":"B1-T20","part":"B1","order":1,"title":"render: vitest set-up","state":"planned"}
+{"seq":31,"at":"2026-10-31T12:47:25.735Z","type":"task","id":"B1-T21","part":"B1","order":2,"title":"dev-only web building store and loader","state":"planned"}
+{"seq":32,"at":"2026-10-31T12:47:25.772Z","type":"task","id":"B1-T01","part":"B1","order":3,"title":"core: schema v22","state":"planned"}
+{"seq":33,"at":"2026-10-31T12:47:25.812Z","type":"task","id":"B1-T02","part":"B1","order":4,"title":"core: id helpers","state":"planned"}
+{"seq":34,"at":"2026-10-31T12:47:25.851Z","type":"task","id":"B1-T03","part":"B1","order":5,"title":"render: the document holds the id","state":"planned"}
+{"seq":35,"at":"2026-10-31T12:47:25.891Z","type":"task","id":"B1-T04","part":"B1","order":6,"title":"render and ui: mint the id and Save As","state":"planned"}
+{"seq":36,"at":"2026-10-31T12:47:25.931Z","type":"task","id":"B1-T06","part":"B1","order":7,"title":"core: stamps carry the page; page helpers","state":"planned"}
+{"seq":37,"at":"2026-10-31T12:47:25.968Z","type":"task","id":"B1-T22","part":"B1","order":8,"title":"render: place tool writes the page","state":"planned"}
+{"seq":38,"at":"2026-10-31T12:47:26.008Z","type":"task","id":"B1-T23","part":"B1","order":9,"title":"render: auto-place writes the page","state":"planned"}
+{"seq":39,"at":"2026-10-31T12:47:26.047Z","type":"task","id":"B1-T24","part":"B1","order":10,"title":"render: paste and duplicate keep or set the page","state":"planned"}
+{"seq":40,"at":"2026-10-31T12:47:26.090Z","type":"task","id":"B1-T25","part":"B1","order":11,"title":"render: Replace stamp and project load keep the page","state":"planned"}
+{"seq":41,"at":"2026-10-31T12:47:26.129Z","type":"task","id":"B1-T07","part":"B1","order":12,"title":"render: segments and fittings carry the page","state":"planned"}
+{"seq":42,"at":"2026-10-31T12:47:26.167Z","type":"task","id":"B1-T08","part":"B1","order":13,"title":"render: annotations carry the page (polyline included)","state":"planned"}
+{"seq":43,"at":"2026-10-31T12:47:26.207Z","type":"task","id":"B1-T26","part":"B1","order":14,"title":"audit: page-blind readers","state":"planned"}
+{"seq":44,"at":"2026-10-31T12:47:26.248Z","type":"task","id":"B1-T09","part":"B1","order":15,"title":"render: the view filters by page","state":"planned"}
+{"seq":45,"at":"2026-10-31T12:47:26.289Z","type":"task","id":"B1-T10","part":"B1","order":16,"title":"render: connect, snap and paste stay on the page","state":"planned"}
+{"seq":46,"at":"2026-10-31T12:47:26.328Z","type":"task","id":"B1-T11","part":"B1","order":17,"title":"render: PDF annotation sync per page","state":"planned"}
+{"seq":47,"at":"2026-10-31T12:47:26.371Z","type":"task","id":"B1-T12","part":"B1","order":18,"title":"check: multi-page end to end","state":"planned"}
+{"seq":48,"at":"2026-10-31T12:47:26.412Z","type":"task","id":"B1-T13","part":"B1","order":19,"title":"core: building types, parse, validate","state":"planned"}
+{"seq":49,"at":"2026-10-31T12:47:26.453Z","type":"task","id":"B1-T14","part":"B1","order":20,"title":"core: sheet match, move, copy","state":"planned"}
+{"seq":50,"at":"2026-10-31T12:47:26.494Z","type":"task","id":"B1-T15","part":"B1","order":21,"title":"platform: `BuildingStore`, memory implementation, contract suite","state":"planned"}
+{"seq":51,"at":"2026-10-31T12:47:26.533Z","type":"task","id":"B1-T16","part":"B1","order":22,"title":"spike: Tauri scope and folder writes","state":"planned"}
+{"seq":52,"at":"2026-10-31T12:47:26.575Z","type":"task","id":"B1-T17","part":"B1","order":23,"title":"platform and platform-tauri: store logic, `statPath`, `readPath`","state":"planned"}
+{"seq":53,"at":"2026-10-31T12:47:26.616Z","type":"task","id":"B1-T18","part":"B1","order":24,"title":"ui: recent buildings and the import of the old registry","state":"planned"}
+{"seq":54,"at":"2026-10-31T12:47:26.655Z","type":"task","id":"B1-T19","part":"B1","order":25,"title":"platform-web: handle-based `BuildingStore` (optional, last)","state":"planned"}
+{"seq":55,"at":"2026-10-31T12:47:26.698Z","type":"task","id":"B2-T01","part":"B2","order":26,"title":"core: page filter and Page column for stamps","state":"planned"}
+{"seq":56,"at":"2026-10-31T12:47:26.739Z","type":"task","id":"B2-T02","part":"B2","order":27,"title":"core: merge tables with provenance","state":"planned"}
+{"seq":57,"at":"2026-10-31T12:47:26.778Z","type":"task","id":"B2-T03","part":"B2","order":28,"title":"core: `SheetSummary` type, build, parse","state":"planned"}
+{"seq":58,"at":"2026-10-31T12:47:26.821Z","type":"task","id":"B2-T04","part":"B2","order":29,"title":"core: `buildBuildingTakeoff`","state":"planned"}
+{"seq":59,"at":"2026-10-31T12:47:26.859Z","type":"task","id":"B2-T05","part":"B2","order":30,"title":"ui: write the summary on Save","state":"planned"}
+{"seq":60,"at":"2026-10-31T12:47:26.896Z","type":"task","id":"B2-T06","part":"B2","order":31,"title":"ui: \"Rebuild summaries\"","state":"planned"}
+{"seq":61,"at":"2026-10-31T12:47:26.935Z","type":"task","id":"B2-T07","part":"B2","order":32,"title":"ui: scope choice in Export quantities","state":"planned"}
+{"seq":62,"at":"2026-10-31T12:47:26.976Z","type":"task","id":"B2-T08","part":"B2","order":33,"title":"ui: part check on real files","state":"planned"}
+{"seq":63,"at":"2026-10-31T12:47:27.017Z","type":"task","id":"B3-T01","part":"B3","order":34,"title":"core: building edits","state":"planned"}
+{"seq":64,"at":"2026-10-31T12:47:27.056Z","type":"task","id":"B3-T02","part":"B3","order":35,"title":"ui: `useBuilding` hook and the dialog shell","state":"planned"}
+{"seq":65,"at":"2026-10-31T12:47:27.100Z","type":"task","id":"B3-T03","part":"B3","order":36,"title":"ui: levels","state":"planned"}
+{"seq":66,"at":"2026-10-31T12:47:27.140Z","type":"task","id":"B3-T04","part":"B3","order":37,"title":"ui: add PDFs and assign pages","state":"planned"}
+{"seq":67,"at":"2026-10-31T12:47:27.184Z","type":"task","id":"B3-T05","part":"B3","order":38,"title":"ui and platform: go to sheet","state":"planned"}
+{"seq":68,"at":"2026-10-31T12:47:27.223Z","type":"task","id":"B3-T06","part":"B3","order":39,"title":"ui: sheet status, relink and the copy/move dialog","state":"planned"}
+{"seq":69,"at":"2026-10-31T12:47:27.264Z","type":"task","id":"B3-T07","part":"B3","order":40,"title":"ui: current sheet in the status bar and the header","state":"planned"}
+{"seq":70,"at":"2026-10-31T12:47:27.304Z","type":"task","id":"B3-T08","part":"B3","order":41,"title":"ui: Rebuild summaries button and summary list","state":"planned"}
+{"seq":71,"at":"2026-10-31T12:47:27.342Z","type":"task","id":"B3-T09","part":"B3","order":42,"title":"ui: the old registry import prompt","state":"planned"}
+{"seq":72,"at":"2026-10-31T12:47:27.384Z","type":"task","id":"B3-T10","part":"B3","order":43,"title":"part check","state":"planned"}
+{"seq":73,"at":"2026-10-31T12:47:27.423Z","type":"task","id":"B4-T01","part":"B4","order":44,"title":"core: riser types and validation","state":"planned"}
+{"seq":74,"at":"2026-10-31T12:47:27.464Z","type":"task","id":"B4-T02","part":"B4","order":45,"title":"core: riser edits as pure functions","state":"planned"}
+{"seq":75,"at":"2026-10-31T12:47:27.502Z","type":"task","id":"B4-T03","part":"B4","order":46,"title":"core: riser length and network join","state":"planned"}
+{"seq":76,"at":"2026-10-31T12:47:27.542Z","type":"task","id":"B4-T04","part":"B4","order":47,"title":"render: riser marks and move sync","state":"planned"}
+{"seq":77,"at":"2026-10-31T12:47:27.588Z","type":"task","id":"B4-T05","part":"B4","order":48,"title":"render: guard and type events","state":"planned"}
+{"seq":78,"at":"2026-10-31T12:47:27.630Z","type":"task","id":"B4-T06","part":"B4","order":49,"title":"ui: Make riser, Attach, Detach","state":"planned"}
+{"seq":79,"at":"2026-10-31T12:47:27.675Z","type":"task","id":"B4-T07","part":"B4","order":50,"title":"ui: sync a move and apply pending ops","state":"planned"}
+{"seq":80,"at":"2026-10-31T12:47:27.714Z","type":"task","id":"B4-T08","part":"B4","order":51,"title":"ui and core: takeoff with risers","state":"planned"}
+{"seq":81,"at":"2026-10-31T12:47:27.754Z","type":"task","id":"B4-T09","part":"B4","order":52,"title":"ui: Risers tab in the building dialog","state":"planned"}
+{"seq":82,"at":"2026-10-31T12:47:27.793Z","type":"task","id":"B4-T10","part":"B4","order":53,"title":"part check","state":"planned"}
+{"seq":83,"at":"2026-10-31T12:47:27.833Z","type":"run","id":"run","status":"planned","branch":"worktree-buildings-model","note":"Spec and plans B1 to B4 written, audited and fixed. Waiting for the user to review and answer the open decisions."}
