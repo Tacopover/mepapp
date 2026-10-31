@@ -14,8 +14,12 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const dir = dirname(fileURLToPath(import.meta.url));
-const LEDGER = join(dir, 'ledger.jsonl');
-const MIRROR = join(dir, 'mirrored.json');
+// A second stream has its own files: pass `--stream <name>` before the command (ledger-<name>.jsonl, mirrored-<name>.json).
+const args = process.argv.slice(2);
+const streamAt = args.indexOf('--stream');
+const stream = streamAt >= 0 ? args.splice(streamAt, 2)[1] : null;
+const LEDGER = join(dir, stream ? `ledger-${stream}.jsonl` : 'ledger.jsonl');
+const MIRROR = join(dir, stream ? `mirrored-${stream}.json` : 'mirrored.json');
 
 const events = () =>
   existsSync(LEDGER)
@@ -27,7 +31,7 @@ const events = () =>
 const mirroredSeq = () => (existsSync(MIRROR) ? JSON.parse(readFileSync(MIRROR, 'utf8')).seq : 0);
 const docId = (e) => `e${String(e.seq).padStart(6, '0')}`;
 
-const [cmd, arg] = process.argv.slice(2);
+const [cmd, arg] = args;
 
 if (cmd === 'add') {
   const e = JSON.parse(arg);
