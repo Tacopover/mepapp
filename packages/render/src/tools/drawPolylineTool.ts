@@ -43,7 +43,7 @@ export class DrawPolylineTool implements Tool {
       if (this.pendingPoints.length >= 2) {
         const annotation: Annotation = {
           id: `annotation-${ctx.doc.nextAnnotationSeq++}`,
-          pageIndex: 0,
+          pageIndex: ctx.activePage(),
           geometry: { kind: 'polyline', points: this.pendingPoints },
         };
         ctx.doc.drawingHistory.execute(createAnnotationCommand(annotation));

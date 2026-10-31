@@ -19,7 +19,7 @@ export class DrawLineTool implements Tool {
     if (pendingPoints.length === 2) {
       const [from, to] = pendingPoints;
       ctx.setPendingPoints([]);
-      const annotation: Annotation = { id: `annotation-${ctx.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: isArrow ? 'arrow' : 'line', from, to } };
+      const annotation: Annotation = { id: `annotation-${ctx.doc.nextAnnotationSeq++}`, pageIndex: ctx.activePage(), geometry: { kind: isArrow ? 'arrow' : 'line', from, to } };
       ctx.doc.drawingHistory.execute(createAnnotationCommand(annotation));
       ctx.syncDrawingLayer();
       ctx.markDirty();

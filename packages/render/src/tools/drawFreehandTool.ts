@@ -29,7 +29,7 @@ export class DrawFreehandTool implements Tool {
       onEnd: (ctx) => {
         const drag = ctx.drag;
         if (drag.kind !== 'draw-freehand' || drag.points.length < 2) return;
-        const annotation: Annotation = { id: `annotation-${ctx.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: 'freehand', points: drag.points } };
+        const annotation: Annotation = { id: `annotation-${ctx.doc.nextAnnotationSeq++}`, pageIndex: ctx.activePage(), geometry: { kind: 'freehand', points: drag.points } };
         ctx.doc.drawingHistory.execute(createAnnotationCommand(annotation));
         ctx.syncDrawingLayer();
         ctx.markDirty();

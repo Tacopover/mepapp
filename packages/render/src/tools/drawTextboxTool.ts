@@ -16,7 +16,7 @@ export class DrawTextboxTool implements Tool {
       if (trimmed) {
         const annotation: Annotation = {
           id: `annotation-${ctx.doc.nextAnnotationSeq++}`,
-          pageIndex: 0,
+          pageIndex: ctx.activePage(),
           geometry: { kind: 'textbox', rect: { x0: world.x, y0: world.y, x1: world.x + DEFAULT_TEXTBOX_WIDTH_PT, y1: world.y + DEFAULT_TEXTBOX_HEIGHT_PT }, text: trimmed, rotationDegrees: 0 },
         };
         ctx.doc.drawingHistory.execute(createAnnotationCommand(annotation));

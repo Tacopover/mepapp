@@ -42,7 +42,7 @@ export class DrawHighlightTool implements Tool {
           x1: Math.max(startWorld.x, currentWorld.x),
           y1: Math.max(startWorld.y, currentWorld.y),
         };
-        const annotation: Annotation = { id: `annotation-${ctx.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry: { kind: 'highlight', rect } };
+        const annotation: Annotation = { id: `annotation-${ctx.doc.nextAnnotationSeq++}`, pageIndex: ctx.activePage(), geometry: { kind: 'highlight', rect } };
         ctx.doc.drawingHistory.execute(createAnnotationCommand(annotation));
         ctx.syncDrawingLayer();
         ctx.markDirty();

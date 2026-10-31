@@ -53,7 +53,7 @@ export class DrawShapeTool implements Tool {
                   y1: Math.max(startWorld.y, currentWorld.y),
                 },
               };
-        const annotation: Annotation = { id: `annotation-${ctx.doc.nextAnnotationSeq++}`, pageIndex: 0, geometry };
+        const annotation: Annotation = { id: `annotation-${ctx.doc.nextAnnotationSeq++}`, pageIndex: ctx.activePage(), geometry };
         ctx.doc.drawingHistory.execute(createAnnotationCommand(annotation));
         ctx.syncDrawingLayer();
         ctx.markDirty();

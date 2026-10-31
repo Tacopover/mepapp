@@ -13,7 +13,7 @@ export class DrawStickyNoteTool implements Tool {
       if (trimmed) {
         const annotation: Annotation = {
           id: `annotation-${ctx.doc.nextAnnotationSeq++}`,
-          pageIndex: 0,
+          pageIndex: ctx.activePage(),
           geometry: { kind: 'stickyNote', position: world, text: trimmed },
         };
         ctx.doc.drawingHistory.execute(createAnnotationCommand(annotation));
