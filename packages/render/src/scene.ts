@@ -3099,6 +3099,7 @@ export class SketchScene {
    */
   autoPlaceStamps(groups: readonly AutoPlaceGroup[], replaceIds: readonly string[] = []): string[] {
     this.clearAutoPlacePreview();
+    const page = this.doc.pageIndex;
     const targetIds = groups.flatMap((group) => group.stamps.flatMap((planned) => Object.values(planned.routingTargets ?? {})));
     const missing = new Set(this.adoptNetworkTypes(targetIds, groups.flatMap((group) => group.networkTypeCopies ?? [])));
     const placed: PlacedStamp[] = [];
@@ -3117,6 +3118,7 @@ export class SketchScene {
         const routingTargets = Object.fromEntries(Object.entries(planned.routingTargets ?? {}).filter(([, typeId]) => !missing.has(typeId)));
         const data: PlacedStamp = {
           id,
+          pageIndex: page,
           category: definition.category,
           transform: { position: { ...planned.position }, rotationDegrees: normalizeDegrees(planned.rotationDegrees), scale: { x: scale, y: scale } },
           nativeWidth,
