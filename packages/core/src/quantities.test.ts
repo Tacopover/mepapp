@@ -25,6 +25,7 @@ const base = {
   panels: [],
   capacities: {},
   stampTypeName: () => null,
+  stampImageName: () => null,
 };
 
 describe('buildQuantityTables', () => {
@@ -58,17 +59,17 @@ describe('buildQuantityTables', () => {
     const stamp = {
       id: 'e1',
       category: 'equipment',
-      transform: { position: { x: 0, y: 0 }, rotationDegrees: 90, scale: { x: 1, y: 1 } },
+      transform: { position: { x: 10.456, y: 20 }, rotationDegrees: 90, scale: { x: 1.5, y: 1.5 } },
       nativeWidth: 1,
       nativeHeight: 1,
       ports: [],
       definitionId: 'd',
       properties: { Brand: 'Acme', Id: 'x' },
     } as never;
-    const result = buildQuantityTables({ ...base, segments: [], stamps: [stamp], calibrationOf: () => null, stampTypeName: () => 'AHU' });
+    const result = buildQuantityTables({ ...base, segments: [], stamps: [stamp], calibrationOf: () => null, stampTypeName: () => 'AHU', stampImageName: () => 'ahu.svg' });
     expect(result.tables.map((t) => t.name)).toEqual(['Equipment']);
     const table = result.tables[0]!;
-    expect(table.headers).toEqual(['Id', 'Type', 'Capacity', 'Rotation (°)', 'Brand', 'Id (custom)']);
-    expect(table.rows[0]).toEqual(['e1', 'AHU', 0, 90, 'Acme', 'x']);
+    expect(table.headers).toEqual(['Id', 'Type', 'Capacity', 'X (pt)', 'Y (pt)', 'Rotation (°)', 'Scale', 'Image', 'Brand', 'Id (custom)']);
+    expect(table.rows[0]).toEqual(['e1', 'AHU', 0, 10.46, 20, 90, 1.5, 'ahu.svg', 'Acme', 'x']);
   });
 });

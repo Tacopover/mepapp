@@ -816,6 +816,10 @@ export function MepSketchApp({
         capacities: Object.fromEntries(scene.listStamps().map((stamp) => [stamp.id, stamp.capacity])),
         calibrationOf: (pageIndex) => scene.getCalibration(pageIndex),
         stampTypeName: (id) => getStampDefinition(id, customStampDefinitions)?.label ?? null,
+        stampImageName: (id) => {
+          const iconRef = getStampDefinition(id, customStampDefinitions)?.iconRef;
+          return iconRef && !iconRef.startsWith('data:') ? (iconRef.split(/[\\/]/).pop() ?? null) : null;
+        },
       });
       if (tables.length === 0) {
         setStatus('There are no segments or elements to export.');

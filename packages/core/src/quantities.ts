@@ -31,6 +31,8 @@ export interface QuantityInput {
   calibrationOf: (pageIndex: number) => Calibration | null;
   /** The display name of a stamp definition id, or null when unknown. */
   stampTypeName: (definitionId: string) => string | null;
+  /** The file name of the art of a stamp definition id, or null when it has none (an embedded image has no file name). */
+  stampImageName: (definitionId: string) => string | null;
 }
 
 export interface QuantityResult {
@@ -41,7 +43,10 @@ export interface QuantityResult {
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+/** X and Y of a point in page units (PDF points), as two cells; blank when there is no point. */
+const pointCells = (point: { x: number; y: number } | undefined): QuantityCell[] => (point ? [round2(point.x), round2(point.y)] : [null, null]);
+
+const collator =new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 /** Adds one column per custom property name found on `items`, in order of first appearance. A name that equals a fixed header gets " (custom)" appended, so it cannot hide a real column. */
 function withCustomColumns<T>(
@@ -91,7 +96,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const segments = [...input.segments].sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id));
   const segmentTable: QuantityTable = {
     name: 'Segments',
-    headers: ['Page', 'Id', 'Network', 'Network type', 'Shape', 'Diameter (mm)', 'Width (mm)', 'Height (mm)', 'Material', 'Length (m)', 'Routed'],
+    headers: ['Page', 'Id', 'Network', 'Network type', 'Shape', 'Diameter (mm)', 'Width (mm)', 'Height (mm)', 'Material', 'Length (m)', 'Routed', 'Start X (pt)', 'Start Y (pt)', 'End X (pt)', 'End Y (pt)'],
     rows: segments.map((segment) => {
       const calibration = input.calibrationOf(segment.pageIndex);
       // Blank, never 0 or raw page units: both read as real numbers in Excel and corrupt a takeoff.
@@ -109,6 +114,8 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
         segment.material ?? null,
         lengthM,
         segment.routedBy ? 'TRUE' : 'FALSE',
+        ...pointCells(segment.geometry[0]),
+        ...pointCells(segment.geometry[segment.geometry.length - 1]),
       ];
     }),
   };
@@ -123,7 +130,17 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
 
   const stampTable = (name: string, category: PlacedStamp['category']): QuantityTable => {
     const stamps = input.stamps.filter((s) => s.category === category);
-    const fixed = category === 'terminal' ? ['Id', 'Type', 'Capacity', 'Circuit', 'Rotation (°)'] : ['Id', 'Type', 'Capacity', 'Rotation (°)'];
+    const fixed = [
+      'Id',
+      'Type',
+      'Capacity',
+      ...(category === 'terminal' ? ['Circuit'] : []),
+      'X (pt)',
+      'Y (pt)',
+      'Rotation (°)',
+      'Scale',
+      'Image',
+    ];
     return withCustomColumns(
       name,
       fixed,
@@ -133,7 +150,10 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
         (stamp.definitionId ? input.stampTypeName(stamp.definitionId) ?? stamp.definitionId : null),
         input.capacities[stamp.id] ?? 0,
         ...(category === 'terminal' ? [circuitOf.get(stamp.id) ?? null] : []),
+        ...pointCells(stamp.transform.position),
         round2(stamp.transform.rotationDegrees),
+        round2(stamp.transform.scale.x),
+        (stamp.definitionId ? input.stampImageName(stamp.definitionId) : null),
       ],
       (stamp) => stamp.properties,
     );
@@ -142,8 +162,8 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const fittings = [...input.fittings].sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id));
   const fittingTable: QuantityTable = {
     name: 'Fittings',
-    headers: ['Page', 'Id', 'Kind', 'Routed'],
-    rows: fittings.map((f) => [f.pageIndex + 1, f.id, f.kind, f.routedBy ? 'TRUE' : 'FALSE']),
+    headers: ['Page', 'Id', 'Kind', 'Routed', 'X (pt)', 'Y (pt)'],
+    rows: fittings.map((f) => [f.pageIndex + 1, f.id, f.kind, f.routedBy ? 'TRUE' : 'FALSE', ...pointCells(f.position)]),
   };
 
   const tables = [segmentTable, stampTable('Terminals', 'terminal'), stampTable('Equipment', 'equipment'), fittingTable].filter((t) => t.rows.length > 0);
