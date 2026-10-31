@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planPdfSync, reconcilePdfSync } from './pdfSync.js';
+import { planPdfSync, reconcilePdfSync, syncPages } from './pdfSync.js';
 
 describe('reconcilePdfSync', () => {
   it('matches a domain id whose observed geometry is identical', () => {
@@ -98,5 +98,50 @@ describe('planPdfSync', () => {
     expect(plan.toCreate).toEqual([]);
     expect(plan.toUpdate).toEqual([]);
     expect(plan.toDelete).toEqual([]);
+  });
+
+  it('plans nothing across two pages when the observed list merges both pages', () => {
+    const domain = [
+      { id: 'seg-a', geometry: { x: 1 } },
+      { id: 'seg-b', geometry: { x: 2 } },
+    ];
+    const pageZero = [{ id: 'seg-a', geometry: { x: 1 } }];
+    const pageOne = [{ id: 'seg-b', geometry: { x: 2 } }];
+    const plan = planPdfSync(domain, [...pageZero, ...pageOne], new Set(['seg-a', 'seg-b']));
+    expect(plan.toCreate).toEqual([]);
+    expect(plan.toUpdate).toEqual([]);
+    expect(plan.toDelete).toEqual([]);
+  });
+
+  it('plans a duplicate create for a page-1 id when only page 0 is observed', () => {
+    const domain = [
+      { id: 'seg-a', geometry: { x: 1 } },
+      { id: 'seg-b', geometry: { x: 2 } },
+    ];
+    const pageZero = [{ id: 'seg-a', geometry: { x: 1 } }];
+    const plan = planPdfSync(domain, pageZero, new Set(['seg-a', 'seg-b']));
+    expect(plan.toCreate).toEqual(['seg-b']);
+  });
+});
+
+describe('syncPages', () => {
+  it('returns [0] for an empty domain', () => {
+    expect(syncPages([], 3)).toEqual([0]);
+  });
+
+  it('treats undefined as page 0', () => {
+    expect(syncPages([undefined, undefined], 3)).toEqual([0]);
+  });
+
+  it('removes duplicates and sorts ascending', () => {
+    expect(syncPages([2, 1, 2, undefined, 1], 3)).toEqual([0, 1, 2]);
+  });
+
+  it('skips pages outside the document', () => {
+    expect(syncPages([5, -1, 1.5, 1], 2)).toEqual([0, 1]);
+  });
+
+  it('returns an empty list when the document has no pages', () => {
+    expect(syncPages([0, 1, undefined], 0)).toEqual([]);
   });
 });

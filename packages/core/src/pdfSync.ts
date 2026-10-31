@@ -108,3 +108,14 @@ export function planPdfSync(domain: SyncedGeometry[], observed: SyncedGeometry[]
 
   return { toCreate, toUpdate, toDelete };
 }
+
+/** Sorted unique pages whose PDF annotations a sync must list: page 0 and every page of a domain entry that is inside the document. */
+export function syncPages(entryPages: Iterable<number | undefined>, pageCount: number): number[] {
+  if (pageCount <= 0) return [];
+  const pages = new Set<number>([0]);
+  for (const page of entryPages) {
+    const p = page ?? 0;
+    if (Number.isInteger(p) && p >= 0 && p < pageCount) pages.add(p);
+  }
+  return [...pages].sort((a, b) => a - b);
+}

@@ -61,6 +61,7 @@ import {
   pasteSegments,
   planPdfSync,
   planTerminalAssignment,
+  syncPages,
   pointInAxisAlignedRect,
   pointInRotatedRect,
   pointNearPolyline,
@@ -4468,7 +4469,7 @@ export class SketchScene {
   async exportToPdf(handle: PdfDocumentHandle, opts: { projectUuid?: string } = {}): Promise<PdfExportReceipt> {
     const doc = this.documentOwning(handle);
     const domainEntries = this.domainSyncEntries(doc);
-    const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
+    const observed = await this.observedAnnotations(handle, doc);
     const plan = planPdfSync(domainEntries, observed, doc.pdfSyncIds);
 
     for (const id of plan.toDelete) {
@@ -4509,7 +4510,7 @@ export class SketchScene {
     doc.projectUuid = ensureProjectUuid(doc.projectUuid, () => crypto.randomUUID());
 
     const domainEntries = this.domainSyncEntries(doc);
-    const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
+    const observed = await this.observedAnnotations(handle, doc);
     const report = reconcilePdfSync(domainEntries, observed);
 
     doc.pdfSyncIds = new Set([...report.matchedIds, ...report.drifted.map((d) => d.id)]);
@@ -4521,6 +4522,22 @@ export class SketchScene {
     const owner = this.documents.find((d) => d.pdfHandle === handle);
     if (!owner) throw new Error('This PDF is not open in any document.');
     return owner;
+  }
+
+  /** The observed annotations of every page a domain element uses (plus page 0), so an annotation on page 2 is matched by id instead of planned as a new create. */
+  private async observedAnnotations(handle: PdfDocumentHandle, doc: SketchDocument): Promise<SyncedGeometry[]> {
+    const state = doc.drawingHistory.getState();
+    const pages = [
+      ...Object.values(state.segments).map((segment) => segment.pageIndex),
+      ...Object.values(state.stamps).map((data) => data.pageIndex),
+      ...Object.values(state.annotations).map((annotation) => annotation.pageIndex),
+    ];
+    const observed: SyncedGeometry[] = [];
+    for (const page of syncPages(pages, handle.getPageCount())) {
+      const annotations = await handle.listAnnotations(page);
+      observed.push(...annotations.map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null));
+    }
+    return observed;
   }
 
   /** Fittings are deliberately excluded — they're editing-view-only (visible for the chain being drawn or selected, see computeVisibleFittingIds) and never written into the exported PDF. */
