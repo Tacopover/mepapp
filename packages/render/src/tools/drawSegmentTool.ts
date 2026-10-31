@@ -120,7 +120,7 @@ export class DrawSegmentTool implements Tool {
 
     const newSegment: Segment = {
       id: `segment-${ctx.doc.nextSegmentSeq++}`,
-      pageIndex: 0,
+      pageIndex: ctx.activePage(),
       networkTypeId: ctx.getActiveNetworkTypeId(),
       shape: 'round',
       diameter: 200,
@@ -157,7 +157,7 @@ export class DrawSegmentTool implements Tool {
     }
 
     if (target.kind === 'new-fitting') {
-      const fitting: Fitting = { id: `fitting-${ctx.doc.nextFittingSeq++}`, pageIndex: 0, position: target.worldPosition, kind: 'junction' };
+      const fitting: Fitting = { id: `fitting-${ctx.doc.nextFittingSeq++}`, pageIndex: ctx.activePage(), position: target.worldPosition, kind: 'junction' };
       return {
         point: { kind: 'fitting', fittingId: fitting.id },
         worldPosition: target.worldPosition,
