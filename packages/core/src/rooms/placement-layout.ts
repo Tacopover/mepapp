@@ -914,6 +914,7 @@ export function planAutoPlacement(
   const stampsOf = (ruleId: string, room: Room) =>
     placedStamps.filter(
       (s) =>
+        (s.pageIndex ?? 0) === room.pageIndex &&
         s.autoPlaced!.ruleId === ruleId &&
         (s.autoPlaced!.roomId === room.id || (!existing!.roomIds.has(s.autoPlaced!.roomId) && polygonContainsPoint(room.polygon, s.transform.position))),
     );

@@ -528,6 +528,16 @@ describe('planAutoPlacement', () => {
     expect(row.warnings).toEqual(['roomChanged']);
   });
 
+  it('does not match a stamp of another page to a room at the same position', () => {
+    const otherPage = { ...placedStamp('other', { x: 50, y: 100 }, { ruleId: 'r', roomId: 'gone', moved: false }), pageIndex: 1 };
+    const out = planAutoPlacement([base], [r], () => values, () => CAL, () => ({ width: 10, height: 10 }), {
+      stamps: [otherPage, placedStamp('same', { x: 60, y: 100 }, { ruleId: 'r', roomId: 'gone', moved: false })],
+      roomIds: new Set(['room-1']),
+    });
+    expect(out.rows[0]!.existing.replace).toEqual(['same']);
+    expect(out.stale).toEqual([]);
+  });
+
   it('lists the stamps of a rule that no longer applies to the room as stale', () => {
     const toiletOnly = { ...base, roomTypeIds: ['toilet'] };
     const out = planAutoPlacement([toiletOnly], [{ ...r, roomTypeId: 'office' }], () => values, () => CAL, () => ({ width: 10, height: 10 }), {

@@ -144,6 +144,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const stampTable = (name: string, category: PlacedStamp['category']): QuantityTable => {
     const stamps = input.stamps.filter((s) => s.category === category);
     const fixed = [
+      'Page',
       'Id',
       'Type',
       'Capacity',
@@ -159,6 +160,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
       fixed,
       stamps,
       (stamp) => [
+        stamp.pageIndex + 1,
         stamp.id,
         (stamp.definitionId ? input.stampTypeName(stamp.definitionId) ?? stamp.definitionId : null),
         input.capacities[stamp.id] || null,

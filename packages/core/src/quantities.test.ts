@@ -93,6 +93,7 @@ describe('buildQuantityTables', () => {
       transform: { position: { x: 10.456, y: 20 }, rotationDegrees: 90, scale: { x: 1.5, y: 1.5 } },
       nativeWidth: 1,
       nativeHeight: 1,
+      pageIndex: 0,
       ports: [],
       definitionId: 'd',
       properties: { Brand: 'Acme', Id: 'x' },
@@ -100,7 +101,24 @@ describe('buildQuantityTables', () => {
     const result = buildQuantityTables({ ...base, segments: [], stamps: [stamp], calibrationOf: () => null, stampTypeName: () => 'AHU', stampImageName: () => 'ahu.svg' });
     expect(result.tables.map((t) => t.name)).toEqual(['Equipment']);
     const table = result.tables[0]!;
-    expect(table.headers).toEqual(['Id', 'Type', 'Capacity', 'Panel', 'X (pt)', 'Y (pt)', 'Rotation (°)', 'Size (%)', 'Image', 'Brand', 'Id (custom)']);
-    expect(table.rows[0]).toEqual(['e1', 'AHU', null, null, 10.46, 20, 90, 150, 'ahu.svg', 'Acme', 'x']);
+    expect(table.headers).toEqual(['Page', 'Id', 'Type', 'Capacity', 'Panel', 'X (pt)', 'Y (pt)', 'Rotation (°)', 'Size (%)', 'Image', 'Brand', 'Id (custom)']);
+    expect(table.rows[0]).toEqual([1, 'e1', 'AHU', null, null, 10.46, 20, 90, 150, 'ahu.svg', 'Acme', 'x']);
+  });
+
+  it('shows the page of each terminal and equipment stamp', () => {
+    const stamp = (id: string, category: string) =>
+      ({ id, category, transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 1, nativeHeight: 1, pageIndex: 1, ports: [] }) as never;
+    const result = buildQuantityTables({
+      ...base,
+      segments: [],
+      stamps: [stamp('t1', 'terminal'), stamp('e1', 'equipment')],
+      calibrationOf: () => null,
+    });
+    const terminals = result.tables.find((t) => t.name === 'Terminals')!;
+    const equipment = result.tables.find((t) => t.name === 'Equipment')!;
+    expect(terminals.headers[0]).toBe('Page');
+    expect(terminals.rows[0]![0]).toBe(2);
+    expect(equipment.headers[0]).toBe('Page');
+    expect(equipment.rows[0]![0]).toBe(2);
   });
 });
