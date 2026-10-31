@@ -640,7 +640,7 @@ describe('customStampDefinitionsToSave', () => {
     id, label: id, discipline: 'other', category: 'terminal', nativeWidth: 40, nativeHeight: 40, ports: [], iconRef: 'data:image/png;base64,AAAA', source,
   });
   const stamp = (id: string, definitionId?: string): PlacedStamp => ({
-    id, category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 40, nativeHeight: 40, ports: [], definitionId,
+    id, category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 40, nativeHeight: 40, pageIndex: 0, ports: [], definitionId,
   });
 
   it('drops a user-library copy that no placed stamp uses', () => {

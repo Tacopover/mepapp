@@ -4,7 +4,7 @@ import type { StampInfo } from '@mepapp/render';
 import { buildSchematicTerminals } from './schematicTerminals.js';
 
 function stamp(id: string, overrides: Partial<StampInfo> = {}): StampInfo {
-  return { id, category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, ports: [], linkedPortIds: null, capacity: 0, ...overrides };
+  return { id, category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, ports: [], pageIndex: 0, linkedPortIds: null, capacity: 0, ...overrides };
 }
 
 describe('buildSchematicTerminals', () => {

@@ -9,6 +9,7 @@ const stamp: PlacedStamp = {
   transform: { position: { x: 100, y: 100 }, rotationDegrees: 0, scale: { x: 1, y: 1 } },
   nativeWidth: 40,
   nativeHeight: 20,
+  pageIndex: 0,
   ports: [{ id: 'p1', name: 'out', fractionX: 1, fractionY: 0.5 }],
 };
 

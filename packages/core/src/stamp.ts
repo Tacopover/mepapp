@@ -19,8 +19,8 @@ export interface PlacedStamp {
   properties?: CustomPropertyValues;
   /** Per-instance tint, hex (e.g. '#2196f3'). Absent means no tint — render at the stamp art's own native colors. */
   color?: string;
-  /** 0-based page of the sheet this stamp sits on. Optional for now; B1-T06 makes it required. */
-  pageIndex?: number;
+  /** 0-based page of the sheet this stamp sits on. */
+  pageIndex: number;
   /**
    * Set when auto-placement made this stamp (room-auto-placement.md §4.5): the rule and the room it was placed for.
    * `moved` = the user moved, rotated or edited it, so a re-run keeps it. `roomKey` = roomPlacementKey of the room

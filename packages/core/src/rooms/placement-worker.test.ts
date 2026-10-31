@@ -49,7 +49,7 @@ describe('runPlacementPlan', () => {
   });
 
   it('uses the existing stamps of a re-run', () => {
-    const stamp = { id: 's1', category: 'terminal' as const, transform: { position: { x: 50, y: 50 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, ports: [], definitionId: 'grille', autoPlaced: { ruleId: 'r', roomId: 'room-1' } };
+    const stamp = { id: 's1', category: 'terminal' as const, transform: { position: { x: 50, y: 50 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, pageIndex: 0, ports: [], definitionId: 'grille', autoPlaced: { ruleId: 'r', roomId: 'room-1' } };
     const plan = runPlacementPlan({ ...input, existing: { stamps: [stamp], roomIds: ['room-1'] } });
     expect(plan.rows[0]!.existing.replace).toEqual(['s1']);
   });

@@ -106,6 +106,7 @@ export function StampLabelsEditor({ category, nativeWidth, nativeHeight, renderA
     nativeWidth,
     nativeHeight,
     ports: [],
+    pageIndex: 0,
   };
 
   function publish() {

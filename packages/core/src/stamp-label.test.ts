@@ -10,6 +10,7 @@ function stamp(rotationDegrees: number, scale = { x: 1, y: 1 }): PlacedStamp {
     transform: { position: { x: 100, y: 200 }, rotationDegrees, scale },
     nativeWidth: 20,
     nativeHeight: 10,
+    pageIndex: 0,
     ports: [],
     definitionId: 'fire-hose-reel',
   };

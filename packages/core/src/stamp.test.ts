@@ -19,6 +19,7 @@ describe('PlacedStamp helpers', () => {
     transform: { position: { x: 100, y: 50 }, rotationDegrees: 0, scale: { x: 2, y: 3 } },
     nativeWidth: 40,
     nativeHeight: 20,
+    pageIndex: 0,
     ports: [{ id: 'p1', name: 'in', fractionX: 1, fractionY: 0.5 }],
   };
 

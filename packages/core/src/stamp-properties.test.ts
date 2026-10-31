@@ -20,6 +20,7 @@ function stamp(id: string, category: PlacedStamp['category'], extra: Partial<Pla
     transform: { position: { x: 0, y: 0 }, rotationDegrees: 90, scale: { x: 1, y: 1 } },
     nativeWidth: 10,
     nativeHeight: 10,
+    pageIndex: 0,
     ports: [],
     ...extra,
   };

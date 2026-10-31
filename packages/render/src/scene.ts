@@ -411,6 +411,8 @@ export interface StampInfo {
   nativeWidth: number;
   nativeHeight: number;
   ports: PortSpec[];
+  /** 0-based page of the sheet this stamp sits on — see PlacedStamp.pageIndex. */
+  pageIndex: number;
   /** This element's PortGroup membership (see core's PortGroup doc comment), or null if its ports aren't linked. */
   linkedPortIds: string[] | null;
   /** Set when this stamp was placed from the stamp palette rather than an ad hoc uploaded PNG — see PlacedStamp.definitionId. */
@@ -1304,6 +1306,7 @@ export class SketchScene {
       nativeWidth: data.nativeWidth,
       nativeHeight: data.nativeHeight,
       ports: data.ports,
+      pageIndex: data.pageIndex,
       linkedPortIds: this.doc.portGroups.find((g) => g.elementId === data.id)?.portIds ?? null,
       definitionId: data.definitionId,
       properties: data.properties,
@@ -4673,6 +4676,7 @@ export class SketchScene {
         nativeWidth,
         nativeHeight,
         ports: [],
+        pageIndex: this.doc.pageIndex,
       };
       newStamps[id] = data;
       const sprite = new Sprite(Texture.WHITE);

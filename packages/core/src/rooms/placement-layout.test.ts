@@ -471,7 +471,7 @@ describe('planAutoPlacement', () => {
     expect(noCal.warnings).toEqual(['noCalibration']);
   });
   const placedStamp = (id: string, position: Vec2, auto: PlacedStamp['autoPlaced']): PlacedStamp => ({
-    id, category: 'terminal', transform: { position, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, ports: [], definitionId: 'grille', ...(auto ? { autoPlaced: auto } : {}),
+    id, category: 'terminal', transform: { position, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, pageIndex: 0, ports: [], definitionId: 'grille', ...(auto ? { autoPlaced: auto } : {}),
   });
   const plan = (stamps: PlacedStamp[], roomIds = new Set(['room-1'])) =>
     planAutoPlacement([base], [r], () => values, () => CAL, () => ({ width: 10, height: 10 }), { stamps, roomIds }).rows[0]!;
@@ -573,7 +573,7 @@ describe('planAutoPlacement', () => {
 });
 
 describe('markAutoPlacedMoved', () => {
-  const stamp: PlacedStamp = { id: 's', category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 1, nativeHeight: 1, ports: [] };
+  const stamp: PlacedStamp = { id: 's', category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 1, nativeHeight: 1, pageIndex: 0, ports: [] };
 
   it('sets moved on an auto-placed stamp and leaves other stamps alone', () => {
     expect(markAutoPlacedMoved({ ...stamp, autoPlaced: { ruleId: 'r', roomId: 'x', moved: false } }).autoPlaced).toEqual({ ruleId: 'r', roomId: 'x', moved: true });

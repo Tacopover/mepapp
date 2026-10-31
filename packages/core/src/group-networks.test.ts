@@ -14,6 +14,7 @@ function stamp(id: string, category: PlacedStamp['category'], portIds: string[])
     transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } },
     nativeWidth: 10,
     nativeHeight: 10,
+    pageIndex: 0,
     ports: portIds.map((portId) => ({ id: portId, name: portId, fractionX: 0.5, fractionY: 0.5 })),
   };
 }

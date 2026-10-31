@@ -26,6 +26,7 @@ const stamp = (id: string, category: PlacedStamp['category'], x: number, y: numb
   id,
   category,
   transform: { position: { x, y }, rotationDegrees: 0, scale: { x: 1, y: 1 } },
+  pageIndex: 0,
   nativeWidth: 4,
   nativeHeight: 4,
   ports: [],
