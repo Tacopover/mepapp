@@ -1,7 +1,7 @@
 # B2 plan: sheet summaries and the Level and Building takeoff
 
 Status: planned 2026-10-31 by the road map planner. Not started. Not audited.
-Origin: `buildings-levels-sheets-spec.md`, sections 3.3, 4.1, 5. Decisions D-B-03 (answered) and D-B-08 A (answered: `PlacedStamp.pageIndex`) apply. Open in the spec: D-B-10 (where summaries go), D-B-15 (one workbook).
+Origin: `buildings-levels-sheets-spec.md`, sections 3.3, 4.1, 5. Decisions D-B-03 (answered) and D-B-08 A (answered: `PlacedStamp.pageIndex`) apply. Decided: D-B-10 A (one summary file for each project; user, 2026-10-31). Director default: D-B-15 (one workbook).
 Read `.claude/roadmap/rules.md` first. Paths start at the repository root. Line numbers can move.
 Terms: as in the spec, section 0. **Scope**: what the takeoff counts. This, Document, Level or Building.
 
@@ -144,7 +144,7 @@ Common verification: `pnpm --filter @mepapp/core test`, `pnpm --filter @mepapp/u
 
 ## 6. Order and parallel work
 
-T01 to T04 are core only and can run before B1 phase 4 is done, but they need `PlacedStamp.pageIndex` (B1-T06). T05 and T06 need the store. T07 needs T04 and T05. Without any user answer, B2 runs as written with D-B-10 A and D-B-15 A as provisional (easy to reverse: file names and one workbook). A change from A to C in D-B-10 touches only the store (B1-T17), not B2.
+T01 to T04 are core only and can run before B1 phase 4 is done, but they need `PlacedStamp.pageIndex` (B1-T06). T05 and T06 need the store. T07 needs T04 and T05. D-B-10 A is decided; D-B-15 A (one workbook) is a director default and easy to reverse. A later change of D-B-10 to a sub-folder (C) touches only the store (B1-T17), not B2.
 
 ## 7. Where B2 stops
 

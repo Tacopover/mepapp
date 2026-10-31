@@ -1,6 +1,6 @@
 # Spec: Buildings, Levels, Sheets, sheet summaries and risers
 
-Status: written 2026-10-31 by the road map planner. Not yet audited. Decisions D-B-01 to D-B-08 are final (user, 2026-10-31). The new open decisions are in section 6.
+Status: written 2026-10-31 by the road map planner. Not yet audited. Decisions D-B-01 to D-B-08 are final (user, 2026-10-31). The user answered D-B-09 to D-B-14, D-B-18 and D-B-20 on 2026-10-31 (section 6): all decided. No decision of the user is open.
 Branch: `worktree-buildings-model`, made from `worktree-quantities-export`. The quantities code (`packages/core/src/quantities.ts`, `packages/ui/src/quantitiesExport.ts`) is not on `master`.
 Plans of the parts: `buildings-b1.md`, `buildings-b2.md`, `buildings-b3.md`, `buildings-b4.md`.
 Read `.claude/roadmap/rules.md` first. Paths start at the repository root. A line number can move after a later commit.
@@ -13,7 +13,7 @@ Read `.claude/roadmap/rules.md` first. Paths start at the repository root. A lin
 - **Building**: a name, a list of levels, a list of risers. It lives in the **building file**.
 - **Building file**: a JSON file that the user puts anywhere (D-B-01 allows the PDFs anywhere; the building file follows the same rule). It stores for each sheet a location, not the PDF.
 - **Sheet summary**: the saved takeoff rows and scales of one document. MepApp writes it when the user saves the document. The Level and Building takeoff read it, so no second PDF opens (D-B-03).
-- **Riser**: one vertical run through levels. It has one anchor (x, y) and, for each level, the segments that end there (D-B-04, D-B-07 A).
+- **Riser**: one vertical run through levels. It has one anchor (x, y in real-world mm, D-B-14) and, for each level, the segments that end there (D-B-04, D-B-07 A).
 - **Stamp the id**: write the `projectUuid` into the document and save the file.
 - **Project id** (`projectUuid`): the UUID in the project JSON. It names the project across moves and renames. It is not the runtime id `doc-N` of `SketchDocument.id` (`packages/render/src/document.ts:91`) and not the `documentId` of the save receipt (`scene.ts:4460`). Every plan uses `projectUuid` for the saved id.
 
@@ -169,7 +169,7 @@ export interface Riser {
   shaftName?: string;                        // optional name of the physical shaft, for the takeoff
   networkTypeId: string;                     // the one type of the whole riser
   networkType: NetworkType;                  // a copy, so another document can adopt it (see below)
-  anchor: { x: number; y: number };          // page units (pt), the same on every level (D-B-04)
+  anchorMm: { xMm: number; yMm: number };    // real-world mm, the same on every level (D-B-04, D-B-14). The source of truth. Rounded to 0.01 mm when stored.
   flow: 'up' | 'down' | 'both' | 'unknown';  // D-B-18. Default 'unknown'.
   sourceLevelId?: string;                    // the level where the flow starts, when known
   topEnd: 'member' | 'open';                 // 'open' = a riser end with no member (roof or ground): length unknown or set by the user
@@ -184,14 +184,20 @@ export interface RiserMember {
   fittingId: string;                         // the fitting at the anchor in that document. Segments are found at run time (the segments that end at this fitting), never stored.
   connectionHeightMm?: number;               // height of the connection above the floor of its level. Default 0.
 }
-export interface RiserPendingOp { seq: number; sheetId: string; kind: 'move' | 'retag'; to?: { x: number; y: number }; networkTypeId?: string }
+export interface RiserPendingOp { seq: number; sheetId: string; kind: 'move' | 'retag'; toMm?: { xMm: number; yMm: number }; networkTypeId?: string }
 ```
 
 Why `fittingId` only (audit finding 7): a list of segment ids goes stale when the user inserts a fitting or splits a segment (`scene.ts:1460`). The fitting is the one stable thing. D-B-07 A says "the list of segments on each level"; the plan derives that list from the fitting. This is a change of form, not of the decision.
 Why a `networkType` copy (finding 8): a closed or newly opened document may not have the type. Before a retag or an attach, the scene calls `adoptNetworkTypes([id], [riser.networkType])` (`scene.ts:2529`, second argument = copies). The adoption trap of `rules.md` section 3 rule 4 is then closed for each member.
 Fitting marker (domain finding): a riser fitting stays a plain `Fitting` of kind `junction`. No new `FittingKind`, so no schema step in the project JSON. The Fittings table gets a column `Riser` (name or blank) from the building file (B4-T08).
 
-Explicit limit: the pt anchor is the same number on every level. This holds only when all sheets have the same page size, the same page rotation and the same scale (calibration), and the same origin (plans printed from one CAD model). `attach` compares page width and height, rotation, and `pageUnitsPerRealUnit` (tolerance 0.5 %). If one differs, `attach` refuses with a message. Not verified: that the user's sheets share one page size. See D-B-14.
+**The anchor is in real-world mm (D-B-14, user answer 2026-10-31).** Conversion, in `core` (`packages/core/src/riser-coords.ts`, B4-T02):
+- `xMm = xPt / pageUnitsPerRealUnit` and `yMm = yPt / pageUnitsPerRealUnit`. `pageUnitsPerRealUnit` is points per mm (`calibration.ts:56`, `:84`). The reverse: `xPt = xMm * pageUnitsPerRealUnit`.
+- The origin is the **top-left corner of the displayed page**, with y pointing down. This is the page space that the scene and the engine already use (`getVectorPaths` says "displayed page space"; `scene.ts:1100` sizes the backdrop at 0,0). The origin is not the CAD drawing origin and not the PDF crop box origin in its raw frame. Choice: the displayed page frame is the only frame the app has.
+- A page without a calibration cannot take part. `makeRiser` and `attachMember` refuse with the message "Set the scale of this page first." (`scale-unknown`).
+- Rounding: the mm value is the source of truth and is rounded to 0.01 mm once, when the user makes or moves the riser. Each other level gets `pt = mm * pageUnitsPerRealUnit` without rounding. The level where the user dropped the fitting keeps its own pt value. A member is "in conflict" only when the fitting, converted to mm, differs from the anchor by more than 0.5 mm.
+- Page size check (reduced): `attach` does not compare points or rotation. It compares the two page sizes **in mm** (width and height after calibration). If they differ by more than 1 %, it still attaches and shows a warning: "Page sizes differ: the sheets may not line up."
+- **Known limit, until B5:** two sheets line up only if both PDFs put the building at the same place on the page, with the same orientation (same origin at the top-left of the page, same rotation). Plans exported from one CAD model with the same sheet size and the same view usually do. Plans of different sizes or with a different view origin do not, and the riser then lands in the wrong place on one level. MepApp does not detect this. B5 (section 5.5) fixes it.
 
 What the elevation measures (D-B-19, default): `BuildingLevel.elevationMm` is the height of the **finished floor** of the level above a common datum (mm). Negative values are allowed (a basement). Two levels with the same elevation give a warning (not an error). The riser length between two members is the elevation difference of their levels, plus the connection heights, plus the end allowances. Name of the number in the takeoff: "Floor-to-floor length". It is **not** the pipe or duct length: bends and offsets in the shaft are not counted.
 
@@ -272,12 +278,27 @@ Where the summary files go: inside the building file (one file) is easy but too 
 3. **B3** Building management UI. Needs B1. Can run in parallel with B2 after B1-T15 (the store interface).
 4. **B4** Risers (second goal). Needs B1, B2 (summary and riser rows), B3 (levels and sheets in the UI).
 
+5. **B5 (later, deferred)** Shared coordinate system between sheets. Not planned in tasks. See 5.5.
+
 ### 5.2 What each part gives (the user's view)
 
 - **B1.** Nothing new on the toolbar, except: elements now belong to the page that is shown (drawing on page 2 of a PDF no longer shows on page 1). A Save also stamps a document id. A building file can be created and read in code.
 - **B2.** In Export quantities a scope choice: This sheet, This document, Level, Building. Example: an office block with `00_arch_ground_floor.pdf` as Level 0 and `01_arch_first_floor.pdf` as Level 1. "Building" gives one workbook with the columns Building, Level, Sheet, Document and a Warnings sheet. A missing PDF gives a warning and uses the saved summary.
 - **B3.** The Manage Buildings dialog: create or open a building file, add levels with elevation, add PDFs and assign each page to a level, relink a moved PDF, open a sheet from the list.
 - **B4.** Right-click a fitting: "Make riser". On the next level: "Attach to riser". Moving the riser on one level moves it on the others (an open document at once, a closed one on open). The takeoff gets a Riser table with the vertical length from the level elevations.
+
+### 5.5 B5 (later): shared coordinate system between sheets
+
+Deferred on purpose (user, D-B-14). No tasks yet.
+- **Goal:** the building file stores, for each sheet, an alignment to a shared building frame (an offset in mm, and a rotation), so PDFs with different origins or views line up. The riser anchor then lives in the building frame, and each sheet converts through its alignment and its calibration.
+- **Why:** in B4 the anchor is in mm from the top-left of each displayed page. This is right only when the PDFs share origin and orientation (section 3.4). Real projects mix sheet sizes and views.
+- **Open questions (for the B5 planning, not now):**
+  1. How does the user set the alignment: click the same two points (a grid crossing, a column) on two sheets, or type an offset?
+  2. Is a rotation or a mirror needed, or only an offset?
+  3. Does the alignment sit on the sheet entry (`BuildingSheet`) or on the level? (A level may have many sheets with different views.)
+  4. How do existing risers migrate? The B4 anchor is a point in the "page top-left" frame of the first member; the migration would set each alignment to zero.
+  5. Should the app detect that two sheets do not line up (for example by comparing a shared feature) and warn?
+  This is a change of the building file format (a new field on `BuildingSheet`), so it needs a user decision when planned.
 
 ### 5.3 Verification for the whole stream
 
@@ -288,29 +309,31 @@ Each task has its own check in the part plan. The shared proof is a building of 
 - **R-1 (high).** Page scoping (G2) touches many files and changes what old multi-page files show. Mitigation: one task per seam; the tools take the page from one function `activePage()`; a browser check on every tool.
 - **R-2 (high).** Tauri fs scope and the stored absolute paths (G12). A building file from another PC lists paths that are not in the scope. Mitigation: spike first (B1-T16), a "Grant access" folder pick with `recursive: true`, no new Rust command.
 - **R-3 (medium).** No multi-page fixture (G14).
-- **R-4 (medium).** The riser rule needs a user decision on the cascade (D-B-13).
+- **R-4 (medium).** The cascade (D-B-13 A) needs a pending queue for closed documents. Mitigation: B4-T05 and T07 build it with core tests first.
+- **R-7 (medium).** Sheets from different CAD views do not line up in mm (D-B-14). MepApp does not detect it. Mitigation: the known limit is shown in the Make riser dialog; B5 fixes it.
 - **R-5 (low).** Summary older than the PDF. Mitigation: size check and "Rebuild".
 - **R-6.** The quantities code is not on `master`. This branch must merge after `worktree-quantities-export`.
 
 ## 6. Open decisions
 
-D-B-01 to D-B-08 are answered and not repeated. Each new decision has a key, a recommendation and a reason. Decisions marked **USER** change the data model, the file format or a domain rule: the user must answer. The others the director may take (`protocol.md` section 3).
+D-B-01 to D-B-08 are answered and not repeated. On 2026-10-31 the user answered D-B-09, D-B-10, D-B-11, D-B-12, D-B-13, D-B-18 and D-B-20 with **A** (the recommendation), and D-B-14 with a custom answer (below). These are **decided**. The table shows "Decided" in the owner column. Each decision keeps its options and reason for the record. No decision of the user is open now. The rows owned by the "Director" are defaults that the director may change (`protocol.md` section 3).
 
 | Id | Owner | Question | Options | Recommendation |
 |---|---|---|---|---|
-| D-B-09 | **USER** [data model] | Where is the building stored? | A. A file the user places, with summary files beside it. B. A per-install registry as in the old app. C. A hosted backend. | **A.** Matches D-B-01 and D-B-05. B cannot be shared. C adds the AGPL network duty and a service to run. |
-| D-B-10 | **USER** [data model] | Where do the sheet summaries go? | A. One file per project (one PDF), named `<projectUuid>.summary.json`, beside the building file, flat in the folder. B. All inside the building file. C. A `summaries` sub-folder (needs `fs:allow-mkdir`). | **A.** B grows to tens of MB and each Save rewrites it. C needs a new permission and the spike may show it is cheap, so allow a switch to C. |
-| D-B-11 | **USER** [data model] | Where does the document id live? | A. In the embedded project JSON (schema v22). B. In the PDF catalog. C. Both. | **A.** No engine change. The id travels with the project that already travels in the PDF. |
-| D-B-12 | **USER** [data model] | What does the migration do with elements of old multi-page files, which were all saved with page 0? And does Save As make a new id? | Part 1: A. Keep page 0 and tell the user in the release note. B. Ask at open. Part 2: A. Save As makes a new id. B. Save As keeps the id. | Part 1 **A**: the app cannot know the page. Part 2 **A**: a copy with the same id breaks the sheet link. The duplicate check still covers a copy made in the file manager. |
-| D-B-13 | **USER** [domain rule] | A run that touches a riser changes its network type. What happens? | A. The riser type changes, the runs on all levels retag (open documents at once, closed ones as a pending op). B. The app refuses the change and tells the user to detach the riser first. C. Only the run changes. | **A**, because rule 2 says the whole connected run changes. C breaks the rule and is not an option. B is the cheap first step if the pending queue is late: allow B in the first release of B4. |
-| D-B-14 | **USER** [data model] | Is "same x and y on every level" in page units (pt)? | A. Yes, with a check that the pages have the same size, rotation and scale; if not, `attach` refuses with a message. B. Real-world mm from each page scale. | **A.** Two sheets from one CAD model share the pt frame. B needs both pages calibrated and moves the point by rounding. Not verified: that the user's sheets share one page size. |
+| D-B-09 | Decided A (user, 2026-10-31) [data model] | Where is the building stored? | A. A file the user places, with summary files beside it. B. A per-install registry as in the old app. C. A hosted backend. | **A.** Matches D-B-01 and D-B-05. B cannot be shared. C adds the AGPL network duty and a service to run. |
+| D-B-10 | Decided A (user, 2026-10-31) [data model] | Where do the sheet summaries go? | A. One file per project (one PDF), named `<projectUuid>.summary.json`, beside the building file, flat in the folder. B. All inside the building file. C. A `summaries` sub-folder (needs `fs:allow-mkdir`). | **A.** B grows to tens of MB and each Save rewrites it. C needs a new permission and the spike may show it is cheap, so allow a switch to C. |
+| D-B-11 | Decided A (user, 2026-10-31) [data model] | Where does the document id live? | A. In the embedded project JSON (schema v22). B. In the PDF catalog. C. Both. | **A.** No engine change. The id travels with the project that already travels in the PDF. |
+| D-B-12 | Decided A and A (user, 2026-10-31) [data model] | What does the migration do with elements of old multi-page files, which were all saved with page 0? And does Save As make a new id? | Part 1: A. Keep page 0 and tell the user in the release note. B. Ask at open. Part 2: A. Save As makes a new id. B. Save As keeps the id. | Part 1 **A**: the app cannot know the page. Part 2 **A**: a copy with the same id breaks the sheet link. The duplicate check still covers a copy made in the file manager. |
+| D-B-13 | Decided A (user, 2026-10-31) [domain rule] | A run that touches a riser changes its network type. What happens? | A. The riser type changes, the runs on all levels retag (open documents at once, closed ones as a pending op). B. The app refuses the change and tells the user to detach the riser first. C. Only the run changes. | **A**, because rule 2 says the whole connected run changes. C breaks the rule and is not an option. B is the cheap first step if the pending queue is late: allow B in the first release of B4. |
+| D-B-14 | Decided, custom answer (user, 2026-10-31) [data model] | Is "same x and y on every level" in page units (pt) or in real-world units? | A. pt, with a check of size, rotation and scale. B. Real-world mm from each page scale. | **User: B for now.** Answer: "Both pdf files need a shared coordinate system. File this as to do for a later phase. So for now the x and y should be the same in real world units, not in page units." The anchor is `anchorMm`, converted through each page's calibration (section 3.4). A shared coordinate system between sheets is deferred to **B5** (section 5.5). Known limit: the sheets line up only if the PDFs share origin and orientation. |
 | D-B-15 | Director | One workbook or one per level? | A. One workbook with provenance columns. B. One workbook per level. | **A** (assumed below). |
 | D-B-16 | Director | Does web write buildings? | A. No: web reads a building file and summaries only, last phase. B. Full. | **A**, in line with D-B-05. A dev-only web store (B1-T21) exists for checks. |
 | D-B-17 | Director | Where do unassigned pages live? (B3) | A. Only in the dialog state. B. As `levelId: null` entries. | **A.** `sheets` stays the one truth and each sheet has a level. |
-| D-B-18 | **USER** [domain rule, data model] | Has a riser a flow direction and a source level? (Supply goes up from the plant room, return goes down.) | A. Stored on the riser: `flow` and `sourceLevelId`, the user sets them, default `unknown`. B. Derived from the equipment: the level whose segments reach a start stamp (not verified: needs the routing start-stamp data, `auto-routing.md`). C. None. | **A.** Cheap, explicit, no hidden rule. B can fill the default later. The takeoff shows the direction and never sums flow across levels (see below). |
+| D-B-18 | Decided A (user, 2026-10-31) [domain rule, data model] | Has a riser a flow direction and a source level? (Supply goes up from the plant room, return goes down.) | A. Stored on the riser: `flow` and `sourceLevelId`, the user sets them, default `unknown`. B. Derived from the equipment: the level whose segments reach a start stamp (not verified: needs the routing start-stamp data, `auto-routing.md`). C. None. | **A.** Cheap, explicit, no hidden rule. B can fill the default later. The takeoff shows the direction and never sums flow across levels (see below). |
 | D-B-19 | Director | What does the elevation measure, and how long is a riser? | A. Finished floor height above a common datum, mm, negative allowed; floor-to-floor length = elevation difference + connection heights + end allowances; the column is named "Floor-to-floor length". B. Pipe length with offsets. | **A.** B needs 3D routing that MepApp does not have. |
-| D-B-20 | **USER** [domain rule] | A circuit (electrical) has terminals on several levels, so the cable has a vertical part. How does the takeoff treat it? | A. The Excel export adds no vertical cable length and writes a warning on the Warnings sheet for a circuit whose terminals are on more than one level. B. Add the vertical part from the elevation difference of the levels of the panel and each terminal. | **A.** MepApp counts no cable length today (not verified: the circuit table has no length column). B needs a rule for routing in a shaft. The warning keeps the number honest. |
+| D-B-20 | Decided A (user, 2026-10-31) [domain rule] | A circuit (electrical) has terminals on several levels, so the cable has a vertical part. How does the takeoff treat it? | A. The Excel export adds no vertical cable length and writes a warning on the Warnings sheet for a circuit whose terminals are on more than one level. B. Add the vertical part from the elevation difference of the levels of the panel and each terminal. | **A.** MepApp counts no cable length today (not verified: the circuit table has no length column). B needs a rule for routing in a shaft. The warning keeps the number honest. |
 | D-B-21 | Director | A pending riser op on a closed document: how does it apply? | A. It applies when the document opens, **outside the undo stack** (it is a sync, not an edit by the user), and the document becomes **dirty** so a Save writes the new place. A status line says "Riser <name> moved". B. Same, but one undo step. | **A.** Undo of a sync would split the riser from the building file. The dirty mark keeps the file and the building in agreement. |
+| D-B-23 | Director (default, final until B5) [data model] | Where is the origin of the mm frame? | A. Top-left corner of the displayed page, y down. B. The PDF crop box origin in its raw frame. C. A point the user clicks. | **A.** It is the one frame the scene and the engine share. C is B5. |
 | D-B-22 | Director | Minimum distance between two riser anchors on one level | A. Warn when two anchors on one level are closer than 150 mm (real units, from the calibration; skipped on an uncalibrated page). B. No check. | **A.** Supply and return risers sit side by side; two anchors on one point are a mistake. |
 
 ### Defaults that I assume (the director may change them; no user decision needed)

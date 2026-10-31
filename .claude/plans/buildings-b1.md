@@ -1,7 +1,7 @@
 # B1 plan: project identity, real pages, and the building file
 
 Status: planned 2026-10-31 by the road map planner. Revised after the audit and the domain check (round 1). Not started.
-Origin: `buildings-levels-sheets-spec.md` (all sections), `buildings-run-prompt.md`. Decisions D-B-01 to D-B-08 are final. D-B-09 to D-B-12 and D-B-16 are open in the spec, section 6.
+Origin: `buildings-levels-sheets-spec.md` (all sections), `buildings-run-prompt.md`. Decisions D-B-01 to D-B-08 are final. D-B-09 to D-B-12 are decided A (user, 2026-10-31). D-B-16 is a director default.
 Read `.claude/roadmap/rules.md` first. Paths start at the repository root. Line numbers can move after a later commit.
 Terms: as in the spec, section 0. **Project id** (`projectUuid`): the UUID in the project JSON. It is not the runtime id `doc-N` (`SketchDocument.id`) and not the `documentId` of the scene receipt (`scene.ts:4460`).
 
@@ -102,7 +102,7 @@ One task is one commit and one seam, at most about 150 changed lines. Common ver
 - Verify: `pnpm build` output has no `__mepBuilding` string (grep the `dist`); a browser check in dev loads a building by the hook and reads it back.
 - Depends on: T13, T15.
 
-### Phase 1: project identity (waits for D-B-11 A and D-B-12)
+### Phase 1: project identity (D-B-11 A and D-B-12 are decided)
 
 **B1-T01 core: schema v22.**
 - Files: `packages/core/src/project.ts`, `packages/core/src/stamp.ts`, the migration test file (search `fromVersion: 20`).
@@ -133,7 +133,7 @@ One task is one commit and one seam, at most about 150 changed lines. Common ver
 - Verify: unit test of the rule "mint once" and of `newProjectUuid`; browser check: open, `getProjectUuid()` is a UUID; Save As to OPFS gives another id in the embedded JSON and in the scene; a cancelled picker keeps the old id in both (picker stub returns undefined). No screenshot.
 - Depends on: T03.
 
-### Phase 2: pages are real (waits for D-B-12 part 1)
+### Phase 2: pages are real (D-B-12 part 1 A is decided)
 
 Pure page logic goes to `core` first. Each later task has a core test that needs no PDF.
 
@@ -234,7 +234,7 @@ Pure page logic goes to `core` first. Each later task has a core test that needs
 **B1-T16 spike: Tauri scope and folder writes.**
 - Answers: (a) with `recursive: true`, can the app write a new file in the picked folder? (b) with `false`? (c) is `fs:allow-mkdir` needed for a sub-folder? (d) are picked paths in the scope after a restart? (e) what does `stat` return for a path outside the scope (this decides `'no-access'`)?
 - Output: `.claude/plans/buildings-b1-spike.md` with answers and proof. If a headless run cannot drive a native dialog: NEEDS_CONTEXT and a script for a 5-minute Windows test.
-- Depends on: none. Decides D-B-10 A or C.
+- Depends on: none. D-B-10 A (flat files) is decided; the spike only proves that flat files work or names the capability line that is needed.
 
 **B1-T17 platform and platform-tauri: store logic, `statPath`, `readPath`.**
 - Files: `packages/platform/src/file-access.ts` (the optional members of section 4), `packages/platform/src/folder-building-store.ts` (new: the store logic over an injected adapter `FolderFiles { read(name): Promise<{ text: string; modifiedMs: number; sizeBytes: number } | undefined>; write(name, text): Promise<void>; list(): Promise<string[]> }`), `packages/platform/src/folder-building-store.test.ts` (runs the contract suite with an in-memory `FolderFiles`), `packages/platform-tauri/src/tauri-building-store.ts` (thin: builds `FolderFiles` from `@tauri-apps/plugin-fs` and the folder path), `tauri-file-access.ts` (`statPath` via `stat`, `readPath` via `readAsFile` at `:25`).
@@ -261,7 +261,7 @@ Pure page logic goes to `core` first. Each later task has a core test that needs
 3. Pages: T06 (helpers), T22, T23, T24, T25, then T06 final (required field), T07, T08, T26, T09, T10, T11, T12.
 4. T17, T18. T19 last.
 - B2-T06 needs T17 (`readPath`, `statPath`). B3 needs only B2's types, so there is no cycle.
-- Without answers: T01 to T04 need D-B-11 and D-B-12. They change the file format, so the run stops for them (`protocol.md` section 3). T20, T15, T16, T13 do not wait.
+- D-B-11 A and D-B-12 are decided, so T01 to T04 can start. The spike T16 still decides the sub-folder question of D-B-10 (the user chose A: flat files; a switch to a sub-folder is a director default).
 
 ## 7. Where B1 stops
 
