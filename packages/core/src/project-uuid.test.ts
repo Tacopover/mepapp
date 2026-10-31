@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isProjectUuid, makeProjectUuid, readProjectUuidFromJson } from './project-uuid.js';
+import { ensureProjectUuid, isProjectUuid, makeProjectUuid, readProjectUuidFromJson, wantsNewProjectUuid } from './project-uuid.js';
 
 const GOOD = '123e4567-e89b-42d3-a456-426614174000';
 
@@ -25,6 +25,38 @@ describe('makeProjectUuid', () => {
   it('throws when random() is not a UUID', () => {
     expect(() => makeProjectUuid(() => 'nope')).toThrow();
     expect(() => makeProjectUuid(() => GOOD.toUpperCase())).toThrow();
+  });
+});
+
+describe('ensureProjectUuid', () => {
+  it('keeps an existing id and does not call random()', () => {
+    let calls = 0;
+    expect(
+      ensureProjectUuid(GOOD, () => {
+        calls++;
+        return GOOD;
+      }),
+    ).toBe(GOOD);
+    expect(calls).toBe(0);
+  });
+  it('mints an id with random() when the id is null', () => {
+    let calls = 0;
+    expect(
+      ensureProjectUuid(null, () => {
+        calls++;
+        return GOOD;
+      }),
+    ).toBe(GOOD);
+    expect(calls).toBe(1);
+  });
+});
+
+describe('wantsNewProjectUuid', () => {
+  it('is true only for Save As on a document that has a file target', () => {
+    expect(wantsNewProjectUuid(true, true)).toBe(true);
+    expect(wantsNewProjectUuid(true, false)).toBe(false);
+    expect(wantsNewProjectUuid(false, true)).toBe(false);
+    expect(wantsNewProjectUuid(false, false)).toBe(false);
   });
 });
 

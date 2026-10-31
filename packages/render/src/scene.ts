@@ -141,6 +141,8 @@ import {
   findNetworkSizing,
   parseSizingSettings,
   withNetworkSizing,
+  ensureProjectUuid,
+  isProjectUuid,
 } from '@mepapp/core';
 import { PATH_KIND, type AnnotationGeometry as PdfAnnotationGeometry, type PdfDocumentHandle, type StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
@@ -4202,8 +4204,21 @@ export class SketchScene {
     return this.serializeDocument(this.doc);
   }
 
-  private serializeDocument(doc: SketchDocument): ProjectDocument {
+  getProjectUuid(): string | null {
+    return this.doc.projectUuid;
+  }
+
+  /** Stores the project id that exportToPdf wrote into a saved file. Call it after the write succeeded and before markSaved. */
+  commitProjectUuid(documentId: string, projectUuid: string): void {
+    if (!isProjectUuid(projectUuid)) throw new Error('commitProjectUuid: projectUuid is not a lowercase UUID');
+    const target = this.documents.find((d) => d.id === documentId);
+    if (!target) return;
+    target.projectUuid = projectUuid;
+  }
+
+  private serializeDocument(doc: SketchDocument, projectUuidOverride?: string): ProjectDocument {
     const state = doc.drawingHistory.getState();
+    const projectUuid = projectUuidOverride ?? doc.projectUuid;
     return serializeProject({
       networkTypes: doc.networkTypes,
       segments: Object.values(state.segments),
@@ -4226,7 +4241,7 @@ export class SketchScene {
       roomTypes: this.usedRoomTypes(doc, Object.values(state.rooms)),
       roomNeeds: this.usedRoomNeeds(doc),
       ...(doc.ceilingHeightMm !== undefined ? { ceilingHeightMm: doc.ceilingHeightMm } : {}),
-      ...(doc.projectUuid !== null ? { projectUuid: doc.projectUuid } : {}),
+      ...(projectUuid !== null ? { projectUuid } : {}),
       roomTypeCeilingHeightsMm: { ...doc.roomTypeCeilingHeightsMm },
     }) as unknown as ProjectDocument;
   }
@@ -4304,7 +4319,7 @@ export class SketchScene {
     target.roomTypes.splice(0, target.roomTypes.length, ...(parseRoomTypes(doc.roomTypes) ?? []));
     target.roomNeeds.splice(0, target.roomNeeds.length, ...(parseRoomNeeds(doc.roomNeeds) ?? []));
     target.ceilingHeightMm = doc.ceilingHeightMm;
-    target.projectUuid = doc.projectUuid ?? null;
+    target.projectUuid = ensureProjectUuid(doc.projectUuid ?? null, () => crypto.randomUUID());
     for (const key of Object.keys(target.roomTypeCeilingHeightsMm)) delete target.roomTypeCeilingHeightsMm[key];
     Object.assign(target.roomTypeCeilingHeightsMm, doc.roomTypeCeilingHeightsMm);
     target.calibrations.clear();
@@ -4435,8 +4450,10 @@ export class SketchScene {
    * stamp extraction yields to the browser, so the user can switch tabs
    * mid-save. Does not clear the unsaved-changes marker: pass the returned
    * receipt to markSaved once the bytes are actually on disk.
+   *
+   * opts.projectUuid writes that id into the file without committing it; see commitProjectUuid.
    */
-  async exportToPdf(handle: PdfDocumentHandle): Promise<PdfExportReceipt> {
+  async exportToPdf(handle: PdfDocumentHandle, opts: { projectUuid?: string } = {}): Promise<PdfExportReceipt> {
     const doc = this.documentOwning(handle);
     const domainEntries = this.domainSyncEntries(doc);
     const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);
@@ -4458,7 +4475,7 @@ export class SketchScene {
     }
 
     const editSeq = doc.editSeq;
-    await handle.setEmbeddedFile(EMBEDDED_PROJECT_FILENAME, new TextEncoder().encode(JSON.stringify(this.serializeDocument(doc))));
+    await handle.setEmbeddedFile(EMBEDDED_PROJECT_FILENAME, new TextEncoder().encode(JSON.stringify(this.serializeDocument(doc, opts.projectUuid))));
     return { documentId: doc.id, editSeq };
   }
 
@@ -4477,6 +4494,7 @@ export class SketchScene {
     if (embedded) {
       await this.loadProjectInto(doc, JSON.parse(new TextDecoder().decode(embedded)), resolveIconBitmap);
     }
+    doc.projectUuid = ensureProjectUuid(doc.projectUuid, () => crypto.randomUUID());
 
     const domainEntries = this.domainSyncEntries(doc);
     const observed = (await handle.listAnnotations(0)).map(annotationSyncEntry).filter((e): e is SyncedGeometry => e !== null);

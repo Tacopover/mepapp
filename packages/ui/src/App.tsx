@@ -6,6 +6,7 @@ import {
   DEFAULT_STAMP_LABEL_VISIBILITY,
   getStampDefinition,
   isLibraryStampId,
+  makeProjectUuid,
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
   DEFAULT_CEILING_HEIGHT_MM,
@@ -26,6 +27,7 @@ import {
   type StampDefinition,
   type StampLabel,
   type StampLabelVisibility,
+  wantsNewProjectUuid,
 } from '@mepapp/core';
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool, type PdfExportReceipt, type WallDebugState } from '@mepapp/render';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
@@ -710,12 +712,16 @@ export function MepSketchApp({
   // file bytes. Always runs first — otherwise a placed stamp/segment never
   // reaches the file if the user saves without an explicit sync step first
   // (see decisions log: this was shipping PDFs with no stamps).
-  const syncAndGetPdfBytes = useCallback(async (): Promise<{ bytes: Uint8Array<ArrayBuffer>; receipt: PdfExportReceipt } | null> => {
-    if (!sceneRef.current || !pdfHandle) return null;
-    const receipt = await sceneRef.current.exportToPdf(pdfHandle);
-    setReconciliation(null);
-    return { bytes: new Uint8Array(await pdfHandle.save()), receipt };
-  }, [pdfHandle, sceneRef]);
+  const syncAndGetPdfBytes = useCallback(
+    async (opts: { newProjectUuid?: boolean } = {}): Promise<{ bytes: Uint8Array<ArrayBuffer>; receipt: PdfExportReceipt; newProjectUuid: string | null } | null> => {
+      if (!sceneRef.current || !pdfHandle) return null;
+      const newProjectUuid = opts.newProjectUuid ? makeProjectUuid(() => crypto.randomUUID()) : null;
+      const receipt = await sceneRef.current.exportToPdf(pdfHandle, newProjectUuid ? { projectUuid: newProjectUuid } : {});
+      setReconciliation(null);
+      return { bytes: new Uint8Array(await pdfHandle.save()), receipt, newProjectUuid };
+    },
+    [pdfHandle, sceneRef],
+  );
 
   // Prompts for a new file location (or downloads a copy, on browsers without
   // the File System Access API) and remembers it as the document's save
@@ -749,7 +755,8 @@ export function MepSketchApp({
       fileTaskRef.current = { documentId: activeDocumentId };
       setStatus('Saving...');
       try {
-        const result = await syncAndGetPdfBytes();
+        const newProjectUuid = wantsNewProjectUuid(asNewFile, activeDocumentId !== null && fileTargetsRef.current.has(activeDocumentId));
+        const result = await syncAndGetPdfBytes({ newProjectUuid });
         if (!result) {
           setStatus('');
           return;
@@ -767,6 +774,7 @@ export function MepSketchApp({
           saved = await saveAsNewFile(result.bytes, documentId);
           if (!saved) setStatus('Save cancelled.');
         }
+        if (saved && result.newProjectUuid) sceneRef.current?.commitProjectUuid(documentId, result.newProjectUuid);
         if (saved) sceneRef.current?.markSaved(result.receipt);
       } catch (err) {
         setStatus(`Failed to save: ${(err as Error).message}`);

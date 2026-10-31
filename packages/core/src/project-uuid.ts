@@ -10,6 +10,14 @@ export function makeProjectUuid(random: () => string): string {
   return value;
 }
 
+export function ensureProjectUuid(current: string | null, random: () => string): string {
+  return current ?? makeProjectUuid(random);
+}
+
+export function wantsNewProjectUuid(asNewFile: boolean, hasFileTarget: boolean): boolean {
+  return asNewFile && hasFileTarget;
+}
+
 export function readProjectUuidFromJson(text: string): string | null {
   try {
     const parsed: unknown = JSON.parse(text);
