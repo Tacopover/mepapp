@@ -9,6 +9,7 @@ import {
   annotationBoundsWorld,
   markAutoPlacedMoved,
   clearRoutedMarks,
+  onPage,
   type Vec2,
 } from '@mepapp/core';
 import type { DrawingState } from '../document.js';
@@ -353,21 +354,21 @@ export class SelectTool implements Tool {
         const rectMax = { x: Math.max(startWorld.x, currentWorld.x), y: Math.max(startWorld.y, currentWorld.y) };
         const hits = new Set<string>();
         const state = ctx.doc.drawingHistory.getState();
-        for (const data of Object.values(state.stamps)) {
+        for (const data of onPage(Object.values(state.stamps), ctx.doc.pageIndex)) {
           const halfWidth = (data.nativeWidth / 2) * data.transform.scale.x;
           const halfHeight = (data.nativeHeight / 2) * data.transform.scale.y;
           if (rectIntersectsRotatedRect(rectMin, rectMax, data.transform, halfWidth, halfHeight)) {
             hits.add(data.id);
           }
         }
-        for (const annotation of Object.values(state.annotations)) {
+        for (const annotation of onPage(Object.values(state.annotations), ctx.doc.pageIndex)) {
           const bounds = annotationBoundsWorld(annotation.geometry, STICKY_NOTE_ICON_SIZE_PT);
           // Plain AABB overlap — annotations carry no rotation, so this needs none of rectIntersectsRotatedRect's separating-axis machinery.
           if (bounds.minX <= rectMax.x && bounds.maxX >= rectMin.x && bounds.minY <= rectMax.y && bounds.maxY >= rectMin.y) {
             hits.add(annotation.id);
           }
         }
-        for (const segment of Object.values(state.segments)) {
+        for (const segment of onPage(Object.values(state.segments), ctx.doc.pageIndex)) {
           const bounds = ctx.resolveSelectableBoundsWorld({ kind: 'segment', id: segment.id }, state);
           if (bounds && bounds.minX <= rectMax.x && bounds.maxX >= rectMin.x && bounds.minY <= rectMax.y && bounds.maxY >= rectMin.y) {
             hits.add(segment.id);

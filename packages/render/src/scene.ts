@@ -1100,8 +1100,9 @@ export class SketchScene {
   /**
    * Swaps the active document's backdrop to a different already-rendered
    * page of the same open PDF (status bar's page navigation, atlas §6).
-   * Placed items carry their page (pageIndex). This call only swaps the
-   * backdrop and the shown page. The view filter is a later task (T09).
+   * Placed items carry their page (pageIndex). The view, the hit-testing and
+   * the selection follow the shown page: an element on another page is not
+   * drawn, not hit and not selected.
    */
   setBackdropPage(bitmap: ImageBitmap, pageWidthPt: number, pageHeightPt: number, pageIndex: number): void {
     const old = this.doc.backdropSprite;
@@ -1118,9 +1119,12 @@ export class SketchScene {
     this.doc.pageIndex = pageIndex;
     // Rooms are per page; a kept selection would let Delete or the Properties panel act on a room that is no longer shown.
     this.clearRoomSelection();
+    this.clearOtherPageSelection();
     this.selectedRoomVertices = [];
     this.roomPreview = null;
+    this.circuitToolHover = null;
     if (this.tool === 'calibrate' || this.tool === 'measure') void this.loadSnapLines();
+    this.syncDrawingLayer();
     this.redrawOverlay();
     this.emitter.emit('pageChanged', pageIndex);
     this.emitter.emit('drawingChanged', this.getDrawingSummary());
@@ -1560,9 +1564,10 @@ export class SketchScene {
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
-  /** Programmatically selects one placed stamp by id and syncs the canvas highlight — the Networks tree's click-to-select-on-canvas action (every other selection path so far originated from a canvas hit-test). No-op if `id` isn't a placed stamp. */
+  /** Programmatically selects one placed stamp by id and syncs the canvas highlight — the Networks tree's click-to-select-on-canvas action (every other selection path so far originated from a canvas hit-test). No-op if `id` isn't a placed stamp on the shown page. */
   selectStampById(id: string): void {
-    if (!this.doc.drawingHistory.getState().stamps[id]) return;
+    const stamp = this.doc.drawingHistory.getState().stamps[id];
+    if (!stamp || (stamp.pageIndex ?? 0) !== this.doc.pageIndex) return;
     this.doc.selectedIds = new Set([id]);
     this.emitter.emit('selectionChanged', this.getSelection());
     this.redrawOverlay();
@@ -1756,7 +1761,7 @@ export class SketchScene {
     syncStampLabels(
       this.doc.labelLayer,
       this.doc.labelNodes,
-      Object.values(state.stamps),
+      onPage(Object.values(state.stamps), this.doc.pageIndex),
       (stamp) => (stamp.definitionId ? layouts[stamp.definitionId] : undefined),
       ctx,
       (stamp, label) => isStampLabelVisible(visibility, stamp.definitionId, label),
@@ -1787,10 +1792,16 @@ export class SketchScene {
       selectedStampIds: this.doc.selectedIds,
     });
     const scale = this.world.scale.x;
-    const positionOf = (id: string): Vec2 | undefined => state.stamps[id]?.transform.position;
+    const page = this.doc.pageIndex;
+    const positionOf = (id: string): Vec2 | undefined => {
+      const stamp = state.stamps[id];
+      return stamp && (stamp.pageIndex ?? 0) === page ? stamp.transform.position : undefined;
+    };
     for (const circuit of targets) {
       if (circuit.id === this.circuitLinesFocus.circuitId) this.drawCircuitHalos(state, circuit, scale);
       const panel = circuit.panelId ? state.panels[circuit.panelId] : undefined;
+      const equipment = panel ? state.stamps[panel.equipmentStampId] : undefined;
+      if (equipment && (equipment.pageIndex ?? 0) !== page) continue;
       const lines = getCircuitConnectionLines(circuit, panel ? positionOf(panel.equipmentStampId) : undefined, positionOf);
       const color = getCircuitLineColor(circuit.id);
       for (const line of lines) {
@@ -1804,7 +1815,7 @@ export class SketchScene {
     const color = getCircuitLineColor(circuit.id);
     for (const terminalId of circuit.terminalIds) {
       const stamp = state.stamps[terminalId];
-      if (!stamp) continue;
+      if (!stamp || (stamp.pageIndex ?? 0) !== this.doc.pageIndex) continue;
       const corners = this.stampCornersWorld(stamp);
       const cx = corners.reduce((sum, c) => sum + c.x, 0) / corners.length;
       const cy = corners.reduce((sum, c) => sum + c.y, 0) / corners.length;
@@ -3638,6 +3649,19 @@ export class SketchScene {
     this.selectRooms([]);
   }
 
+  /** Removes the selected ids whose element is on another page, or is not in the drawing state. Emits 'selectionChanged' only when the selection changed. */
+  private clearOtherPageSelection(): void {
+    const state = this.doc.drawingHistory.getState();
+    const page = this.doc.pageIndex;
+    const kept = [...this.doc.selectedIds].filter((id) => {
+      const element = state.stamps[id] ?? state.segments[id] ?? state.fittings[id] ?? state.annotations[id];
+      return element !== undefined && (element.pageIndex ?? 0) === page;
+    });
+    if (kept.length === this.doc.selectedIds.size) return;
+    this.doc.selectedIds = new Set(kept);
+    this.emitter.emit('selectionChanged', this.getSelection());
+  }
+
   /** Selects the smallest room of the current page under the point; Shift toggles it in the selection; a click on nothing clears the selection (unless Shift). */
   selectRoomAtPoint(point: Vec2, additive: boolean): void {
     const hit = roomsAtPoint(this.listRooms(), point, this.doc.pageIndex)[0];
@@ -4973,7 +4997,7 @@ export class SketchScene {
    */
   private hitTest(worldPoint: Vec2): SelectableRef | null {
     const state = this.doc.drawingHistory.getState();
-    const orderedStamps = Object.values(state.stamps).reverse();
+    const orderedStamps = onPage(Object.values(state.stamps), this.doc.pageIndex).reverse();
     for (const data of orderedStamps) {
       const halfWidth = (data.nativeWidth / 2) * data.transform.scale.x;
       const halfHeight = (data.nativeHeight / 2) * data.transform.scale.y;
@@ -4983,7 +5007,7 @@ export class SketchScene {
     }
 
     const fittingHitRadius = FITTING_MARKER_RADIUS_WORLD + FITTING_HIT_RADIUS_SCREEN_PX / this.world.scale.x;
-    const orderedFittings = Object.values(state.fittings).reverse();
+    const orderedFittings = onPage(Object.values(state.fittings), this.doc.pageIndex).reverse();
     for (const fitting of orderedFittings) {
       if (distance(worldPoint, fitting.position) <= fittingHitRadius) {
         return { kind: 'fitting', id: fitting.id };
@@ -4991,14 +5015,14 @@ export class SketchScene {
     }
 
     const threshold = ANNOTATION_STROKE_HIT_THRESHOLD_SCREEN_PX / this.world.scale.x;
-    const orderedSegments = Object.values(state.segments).reverse();
+    const orderedSegments = onPage(Object.values(state.segments), this.doc.pageIndex).reverse();
     for (const segment of orderedSegments) {
       if (pointNearPolyline(worldPoint, segment.geometry, threshold)) {
         return { kind: 'segment', id: segment.id };
       }
     }
 
-    const orderedAnnotations = Object.values(state.annotations).reverse();
+    const orderedAnnotations = onPage(Object.values(state.annotations), this.doc.pageIndex).reverse();
     for (const annotation of orderedAnnotations) {
       if (this.annotationHit(worldPoint, annotation.geometry, threshold)) {
         return { kind: 'annotation', id: annotation.id };
@@ -5555,8 +5579,9 @@ export class SketchScene {
     // counts are small enough that this isn't a real cost.
     for (const child of this.doc.annotationTextLayer.removeChildren()) child.destroy();
     const state = this.doc.drawingHistory.getState();
+    const page = this.doc.pageIndex;
     this.syncStampSprites(state);
-    for (const segment of Object.values(state.segments)) {
+    for (const segment of onPage(Object.values(state.segments), page)) {
       const [start, ...rest] = segment.geometry;
       if (!start || rest.length === 0) continue;
       const visuals = this.resolveNetworkTypeVisuals(segment.networkTypeId);
@@ -5569,11 +5594,11 @@ export class SketchScene {
       }
     }
     const visibleFittingIds = live ? (this.liveVisibleFittingIds ??= this.computeVisibleFittingIds(state)) : this.computeVisibleFittingIds(state);
-    for (const fitting of Object.values(state.fittings)) {
+    for (const fitting of onPage(Object.values(state.fittings), page)) {
       if (!visibleFittingIds.has(fitting.id)) continue;
       this.doc.drawingLayer.circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD).fill({ color: 0xffa726 });
     }
-    for (const annotation of Object.values(state.annotations)) {
+    for (const annotation of onPage(Object.values(state.annotations), page)) {
       this.drawAnnotation(annotation);
     }
     this.syncLabels();
@@ -5639,8 +5664,8 @@ export class SketchScene {
     if (this.tool === 'draw-segment' && activeChainAnchorId) anchorIds.add(activeChainAnchorId);
     if (anchorIds.size === 0) return visible;
 
-    const segments = Object.values(state.segments);
-    const fittings = Object.values(state.fittings);
+    const segments = onPage(Object.values(state.segments), this.doc.pageIndex);
+    const fittings = onPage(Object.values(state.fittings), this.doc.pageIndex);
     const networks = computeNetworks({ segments, fittings, portGroups: this.doc.portGroups });
     for (const network of networks) {
       const isRelevant = network.segmentIds.some((id) => anchorIds.has(id)) || network.fittingIds.some((id) => anchorIds.has(id));
@@ -5649,11 +5674,11 @@ export class SketchScene {
     return visible;
   }
 
-  /** Keeps each cached stamp sprite's transform and stampsLayer membership matching DrawingState.stamps — the render-only mirror of the source-of-truth data, the sprite counterpart to the segment/fitting Graphics redrawn just above. A sprite is detached (not destroyed) when its stamp isn't in state — deleteSelection relies on this to let an undo re-attach the same sprite instead of needing to re-fetch its texture, which is async and, for an ad hoc uploaded stamp with no saved bytes, sometimes impossible. */
+  /** Keeps each cached stamp sprite's transform and stampsLayer membership matching DrawingState.stamps — the render-only mirror of the source-of-truth data, the sprite counterpart to the segment/fitting Graphics redrawn just above. A sprite is detached (not destroyed) when its stamp isn't in state or on the shown page — deleteSelection relies on this to let an undo re-attach the same sprite instead of needing to re-fetch its texture, which is async and, for an ad hoc uploaded stamp with no saved bytes, sometimes impossible. */
   private syncStampSprites(state: DrawingState): void {
     for (const [id, entry] of this.doc.stamps) {
       const data = state.stamps[id];
-      if (!data) {
+      if (!data || (data.pageIndex ?? 0) !== this.doc.pageIndex) {
         if (entry.sprite.parent) this.doc.stampsLayer.removeChild(entry.sprite);
         continue;
       }
@@ -5814,6 +5839,8 @@ export class SketchScene {
     }
     if (this.routePreview) drawRoutePreview(this.overlay, this.routePreview, 1 / this.world.scale.x);
     for (const id of this.doc.selectedIds) {
+      const element = state.stamps[id] ?? state.segments[id] ?? state.fittings[id] ?? state.annotations[id];
+      if (!element || (element.pageIndex ?? 0) !== this.doc.pageIndex) continue;
       const stampData = state.stamps[id];
       if (stampData) {
         const corners = this.stampCornersWorld(stampData);

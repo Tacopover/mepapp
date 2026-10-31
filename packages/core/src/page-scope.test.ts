@@ -24,6 +24,14 @@ describe('onPage', () => {
   it('returns an empty list for a page with no items', () => {
     expect(onPage(items, 5)).toEqual([]);
   });
+
+  it('does not change its input array', () => {
+    const input = [{ id: 'a', pageIndex: 0 }, { id: 'b', pageIndex: 1 }, { id: 'c' }];
+    const before = JSON.stringify(input);
+    onPage(input, 1);
+    expect(JSON.stringify(input)).toBe(before);
+    expect(input).toHaveLength(3);
+  });
 });
 
 describe('withPage', () => {
