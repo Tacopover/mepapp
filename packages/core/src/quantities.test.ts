@@ -55,6 +55,37 @@ describe('buildQuantityTables', () => {
     expect(result.warnings[0]).toContain('Page 2');
   });
 
+  it('keeps millimetre precision and leaves a one-point segment blank', () => {
+    const calibration = calibrationFromScale(100);
+    const result = buildQuantityTables({
+      ...base,
+      segments: [segment('s1', 0, [{ x: 0, y: 0 }, { x: 4.4 * calibration.pageUnitsPerRealUnit, y: 0 }]), segment('s2', 0, [{ x: 0, y: 0 }])],
+      calibrationOf: () => calibration,
+    });
+    const table = result.tables[0]!;
+    const column = table.headers.indexOf('Length (m)');
+    expect(table.rows[0]![column]).toBe(0.004);
+    expect(table.rows[1]![column]).toBeNull();
+  });
+
+  it('shows the circuit of a terminal and the panel of an equipment stamp', () => {
+    const stamp = (id: string, category: string) =>
+      ({ id, category, transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 1, nativeHeight: 1, ports: [] }) as never;
+    const result = buildQuantityTables({
+      ...base,
+      segments: [],
+      stamps: [stamp('t1', 'terminal'), stamp('p1', 'equipment')],
+      circuits: [{ id: 'c', number: 3, terminalIds: ['t1'], isSpare: false, prefix: 'A' } as never],
+      panels: [{ id: 'pn', equipmentStampId: 'p1', name: 'Main board' } as never],
+      calibrationOf: () => null,
+    });
+    const terminals = result.tables.find((t) => t.name === 'Terminals')!;
+    const equipment = result.tables.find((t) => t.name === 'Equipment')!;
+    expect(terminals.rows[0]![terminals.headers.indexOf('Circuit')]).toBe('A3');
+    expect(terminals.rows[0]![terminals.headers.indexOf('Type')]).toBeNull();
+    expect(equipment.rows[0]![equipment.headers.indexOf('Panel')]).toBe('Main board');
+  });
+
   it('leaves out empty tables and adds custom property columns', () => {
     const stamp = {
       id: 'e1',
@@ -69,7 +100,7 @@ describe('buildQuantityTables', () => {
     const result = buildQuantityTables({ ...base, segments: [], stamps: [stamp], calibrationOf: () => null, stampTypeName: () => 'AHU', stampImageName: () => 'ahu.svg' });
     expect(result.tables.map((t) => t.name)).toEqual(['Equipment']);
     const table = result.tables[0]!;
-    expect(table.headers).toEqual(['Id', 'Type', 'Capacity', 'X (pt)', 'Y (pt)', 'Rotation (°)', 'Scale', 'Image', 'Brand', 'Id (custom)']);
-    expect(table.rows[0]).toEqual(['e1', 'AHU', 0, 10.46, 20, 90, 1.5, 'ahu.svg', 'Acme', 'x']);
+    expect(table.headers).toEqual(['Id', 'Type', 'Capacity', 'Panel', 'X (pt)', 'Y (pt)', 'Rotation (°)', 'Scale', 'Image', 'Brand', 'Id (custom)']);
+    expect(table.rows[0]).toEqual(['e1', 'AHU', 0, null, 10.46, 20, 90, 1.5, 'ahu.svg', 'Acme', 'x']);
   });
 });

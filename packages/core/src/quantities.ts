@@ -6,8 +6,8 @@ import type { Calibration } from './calibration.js';
 import { getCircuitLabel, type Circuit, type Panel } from './circuit.js';
 import { isReservedPropertyName, type CustomPropertyValues } from './custom-properties.js';
 import { computeNetworks, type Fitting, type NetworkType, type PortGroup, type Segment } from './network.js';
-import type { PlacedStamp } from './stamp.js';
 import { polylineLength } from './route-graph.js';
+import type { PlacedStamp } from './stamp.js';
 
 export type QuantityCell = string | number | boolean | null;
 
@@ -46,7 +46,7 @@ const round2 = (value: number): number => Math.round(value * 100) / 100;
 /** X and Y of a point in page units (PDF points), as two cells; blank when there is no point. */
 const pointCells = (point: { x: number; y: number } | undefined): QuantityCell[] => (point ? [round2(point.x), round2(point.y)] : [null, null]);
 
-const collator =new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 /** Adds one column per custom property name found on `items`, in order of first appearance. A name that equals a fixed header gets " (custom)" appended, so it cannot hide a real column. */
 function withCustomColumns<T>(
@@ -61,8 +61,10 @@ function withCustomColumns<T>(
   const columnOf = new Map<string, string>();
   for (const item of items) {
     for (const key of Object.keys(customOf(item) ?? {})) {
-      if (columnOf.has(key)) continue;
-      const column = taken.has(key.toLowerCase()) || isReservedPropertyName(key) ? `${key} (custom)` : key;
+      if (!key || columnOf.has(key)) continue;
+      let column = taken.has(key.toLowerCase()) || isReservedPropertyName(key) ? `${key} (custom)` : key;
+      while (taken.has(column.toLowerCase())) column += ' (custom)';
+      taken.add(column.toLowerCase());
       columnOf.set(key, column);
       customColumns.push(key);
     }
@@ -70,7 +72,7 @@ function withCustomColumns<T>(
   const headers = [...fixedHeaders, ...customColumns.map((key) => columnOf.get(key)!)];
   const rows = items.map((item) => {
     const values = customOf(item) ?? {};
-    return [...fixedRow(item), ...customColumns.map((key) => (key in values ? values[key]! : null))];
+    return [...fixedRow(item), ...customColumns.map((key) => (Object.hasOwn(values, key) ? values[key]! : null))];
   });
   return { name, headers, rows };
 }
@@ -81,15 +83,24 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const typeOf = new Map(input.networkTypes.map((t) => [t.id, t]));
   const typeName = (id: string) => typeOf.get(id)?.name ?? id;
 
-  // "Network" = the connected run a segment belongs to, numbered per network type in a stable order.
-  const networks = computeNetworks({ segments: [...input.segments], fittings: [...input.fittings], portGroups: [...input.portGroups] });
+  // "Network" = the connected run a segment belongs to, numbered per network type. Runs are ordered by their
+  // first segment (page, then id), so the numbers do not depend on the order of the input arrays.
+  const segmentById = new Map(input.segments.map((s) => [s.id, s]));
+  const firstSegmentOf = (ids: readonly string[]) =>
+    ids.map((id) => segmentById.get(id)).filter((s): s is Segment => !!s).sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id))[0];
+  const networks = computeNetworks({ segments: [...input.segments], fittings: [...input.fittings], portGroups: [...input.portGroups] })
+    .map((network) => ({ network, first: firstSegmentOf(network.segmentIds) }))
+    .sort((a, b) => (a.first?.pageIndex ?? 0) - (b.first?.pageIndex ?? 0) || collator.compare(a.first?.id ?? '', b.first?.id ?? ''))
+    .map((entry) => entry.network);
   const networkLabel = new Map<string, string>();
+  const fittingNetworkLabel = new Map<string, string>();
   const perType = new Map<string, number>();
   for (const network of networks) {
     const n = (perType.get(network.networkTypeId) ?? 0) + 1;
     perType.set(network.networkTypeId, n);
     const label = `${typeName(network.networkTypeId)} ${n}`;
     for (const id of network.segmentIds) networkLabel.set(id, label);
+    for (const id of network.fittingIds) fittingNetworkLabel.set(id, label);
   }
 
   const unscaledPages = new Set<number>();
@@ -101,7 +112,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
       const calibration = input.calibrationOf(segment.pageIndex);
       // Blank, never 0 or raw page units: both read as real numbers in Excel and corrupt a takeoff.
       if (!calibration) unscaledPages.add(segment.pageIndex);
-      const lengthM = calibration ? round2(polylineLength([...segment.geometry]) / calibration.pageUnitsPerRealUnit / 1000) : null;
+      const lengthM = calibration && segment.geometry.length >= 2 ? Math.round(polylineLength([...segment.geometry]) / calibration.pageUnitsPerRealUnit) / 1000 : null;
       return [
         segment.pageIndex + 1,
         segment.id,
@@ -128,13 +139,15 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
     for (const id of circuit.terminalIds) circuitOf.set(id, getCircuitLabel(circuit, input.panels.find((p) => p.id === circuit.panelId)));
   }
 
+  const panelOf = new Map(input.panels.map((panel) => [panel.equipmentStampId, panel.name]));
+
   const stampTable = (name: string, category: PlacedStamp['category']): QuantityTable => {
     const stamps = input.stamps.filter((s) => s.category === category);
     const fixed = [
       'Id',
       'Type',
       'Capacity',
-      ...(category === 'terminal' ? ['Circuit'] : []),
+      ...(category === 'terminal' ? ['Circuit'] : ['Panel']),
       'X (pt)',
       'Y (pt)',
       'Rotation (°)',
@@ -149,7 +162,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
         stamp.id,
         (stamp.definitionId ? input.stampTypeName(stamp.definitionId) ?? stamp.definitionId : null),
         input.capacities[stamp.id] ?? 0,
-        ...(category === 'terminal' ? [circuitOf.get(stamp.id) ?? null] : []),
+        category === 'terminal' ? (circuitOf.get(stamp.id) ?? null) : (panelOf.get(stamp.id) ?? null),
         ...pointCells(stamp.transform.position),
         round2(stamp.transform.rotationDegrees),
         round2(stamp.transform.scale.x),
@@ -162,8 +175,8 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const fittings = [...input.fittings].sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id));
   const fittingTable: QuantityTable = {
     name: 'Fittings',
-    headers: ['Page', 'Id', 'Kind', 'Routed', 'X (pt)', 'Y (pt)'],
-    rows: fittings.map((f) => [f.pageIndex + 1, f.id, f.kind, f.routedBy ? 'TRUE' : 'FALSE', ...pointCells(f.position)]),
+    headers: ['Page', 'Id', 'Network', 'Kind', 'Routed', 'X (pt)', 'Y (pt)'],
+    rows: fittings.map((f) => [f.pageIndex + 1, f.id, fittingNetworkLabel.get(f.id) ?? null, f.kind, f.routedBy ? 'TRUE' : 'FALSE', ...pointCells(f.position)]),
   };
 
   const tables = [segmentTable, stampTable('Terminals', 'terminal'), stampTable('Equipment', 'equipment'), fittingTable].filter((t) => t.rows.length > 0);

@@ -805,20 +805,23 @@ export function MepSketchApp({
     if (!scene) return;
     try {
       const { segments, fittings, portGroups } = scene.getConnectivity();
+      const stamps = scene.listStamps();
+      const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
       const { tables, warnings } = buildQuantityTables({
         segments,
         fittings,
         portGroups,
-        stamps: scene.listStamps(),
+        stamps,
         networkTypes: scene.getNetworkTypes(),
         circuits: scene.listCircuits(),
         panels: scene.listPanels(),
-        capacities: Object.fromEntries(scene.listStamps().map((stamp) => [stamp.id, stamp.capacity])),
+        capacities: Object.fromEntries(stamps.map((stamp) => [stamp.id, stamp.capacity])),
         calibrationOf: (pageIndex) => scene.getCalibration(pageIndex),
-        stampTypeName: (id) => getStampDefinition(id, customStampDefinitions)?.label ?? null,
+        stampTypeName: (id) => getStampDefinition(id, definitions)?.label ?? null,
         stampImageName: (id) => {
-          const iconRef = getStampDefinition(id, customStampDefinitions)?.iconRef;
-          return iconRef && !iconRef.startsWith('data:') ? (iconRef.split(/[\\/]/).pop() ?? null) : null;
+          const iconRef = getStampDefinition(id, definitions)?.iconRef;
+          // A data: or blob: reference is embedded art, not a file name.
+          return iconRef && !/^(data|blob):/.test(iconRef) ? (iconRef.split(/[\\/]/).pop() ?? null) : null;
         },
       });
       if (tables.length === 0) {
@@ -835,7 +838,7 @@ export function MepSketchApp({
     } catch (err) {
       setStatus(`Failed to export quantities: ${(err as Error).message}`);
     }
-  }, [activeDoc, customStampDefinitions, fileAccess, sceneRef]);
+  }, [activeDoc, customStampDefinitions, fileAccess, sceneRef, userStampLibrary.definitions]);
 
   const handleSave = useCallback(() => saveDocument(false), [saveDocument]);
   const handleSaveAs = useCallback(() => saveDocument(true), [saveDocument]);
