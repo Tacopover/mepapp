@@ -19,10 +19,12 @@ import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 21;
+export const CURRENT_SCHEMA_VERSION = 22;
 
 export interface ProjectDocument {
   schemaVersion: number;
+  /** Identity of this project across files (buildings spec 3.1). Absent until the project gets one. */
+  projectUuid?: string;
   networkTypes: NetworkType[];
   segments: Segment[];
   fittings: Fitting[];
@@ -339,7 +341,24 @@ const migrationSteps: MigrationStep[] = [
       schemaVersion: 21,
     }),
   },
+  {
+    fromVersion: 21,
+    toVersion: 22,
+    // Version 21 predates PlacedStamp.pageIndex (buildings spec B1). Every stamp of a version 21 save sits on page 0,
+    // so the step gives each stamp that has no page index the index 0.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 22,
+      stamps: Array.isArray(data.stamps) ? data.stamps.map(addPageIndex) : data.stamps,
+    }),
+  },
 ];
+
+function addPageIndex(stamp: unknown): unknown {
+  if (!stamp || typeof stamp !== 'object' || Array.isArray(stamp)) return stamp;
+  if (typeof (stamp as JsonRecord).pageIndex === 'number') return stamp;
+  return { ...(stamp as JsonRecord), pageIndex: 0 };
+}
 
 function moveSizingMethod(type: unknown): unknown {
   if (!type || typeof type !== 'object' || !('sizing' in type)) return type;
@@ -353,6 +372,11 @@ function migrateRoomTypeDemands(type: unknown): unknown {
   const { demands, ...rest } = type as JsonRecord;
   const next = parseRoomDemands(demands);
   return next ? { ...rest, demands: next } : rest;
+}
+
+function validateProjectUuid(data: JsonRecord): ValidationIssue[] {
+  if (data.projectUuid === undefined || (typeof data.projectUuid === 'string' && data.projectUuid !== '')) return [];
+  return [{ path: 'projectUuid', message: 'expected a non-empty string' }];
 }
 
 function requireArray(data: JsonRecord, field: string): ValidationIssue[] {
@@ -410,6 +434,7 @@ const validators = [
   (data: JsonRecord) => requireArray(data, 'roomTypes'),
   (data: JsonRecord) => requireArray(data, 'roomNeeds'),
   validateCeilingHeights,
+  validateProjectUuid,
 ];
 
 export function serializeProject(doc: Omit<ProjectDocument, 'schemaVersion'>): JsonRecord {

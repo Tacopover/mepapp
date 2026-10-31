@@ -441,9 +441,9 @@ describe('routing targets in the save format (auto-routing.md §4.5)', () => {
 
   it('loads a version 17 save with the stamps unchanged', () => {
     const loaded = loadProject({ ...v17, stamps: [stamp] });
-    expect(CURRENT_SCHEMA_VERSION).toBe(21);
-    expect(loaded.schemaVersion).toBe(21);
-    expect(loaded.stamps).toEqual([stamp]);
+    expect(CURRENT_SCHEMA_VERSION).toBe(22);
+    expect(loaded.schemaVersion).toBe(22);
+    expect(loaded.stamps).toEqual([{ ...stamp, pageIndex: 0 }]);
   });
 
   it('keeps the routing targets of a stamp through a save and a load', () => {
@@ -478,7 +478,7 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
 
   it('loads a version 18 save with two network types as version 19 with the types unchanged', () => {
     const loaded = loadProject({ ...v18, networkTypes: [airType, waterType] });
-    expect(loaded.schemaVersion).toBe(21);
+    expect(loaded.schemaVersion).toBe(22);
     expect(loaded.networkTypes).toEqual([airType, waterType]);
   });
 
@@ -508,8 +508,8 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
   });
 
-  it('refuses a save of a version newer than 21', () => {
-    expect(() => loadProject({ ...v18, schemaVersion: 22 })).toThrow(SchemaMigrationError);
+  it('refuses a save of a version newer than 22', () => {
+    expect(() => loadProject({ ...v18, schemaVersion: 23 })).toThrow(SchemaMigrationError);
   });
 });
 
@@ -527,7 +527,7 @@ describe('network sizing in the save format (auto-routing-r5.md §12.2)', () => 
     const bad = { ...base, id: 'bad', sizing: { method: 'x' } };
     const none = { ...base, id: 'none' };
     const loaded = loadProject({ ...v19, networkTypes: [air, water, bad, none] });
-    expect(loaded.schemaVersion).toBe(21);
+    expect(loaded.schemaVersion).toBe(22);
     expect(loaded.networkSizing).toEqual([]);
     expect(loaded.networkTypes[0]).toEqual({ ...base, id: 'supply-air', flowUnit: 'dm³/s', sizingMethod: 'air' });
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
@@ -567,9 +567,9 @@ describe('routed marks in the save format (auto-routing-r6.md section 4.1)', () 
     networkSizing: [],
   };
 
-  it('loads a version 20 save with an unmarked segment and fitting as version 21 with the items unchanged', () => {
+  it('loads a version 20 save with an unmarked segment and fitting as version 22 with the items unchanged', () => {
     const loaded = loadProject({ ...v20, segments: [segment], fittings: [fitting] });
-    expect(loaded.schemaVersion).toBe(21);
+    expect(loaded.schemaVersion).toBe(22);
     expect(loaded.segments).toEqual([segment]);
     expect(loaded.fittings).toEqual([fitting]);
   });
@@ -599,8 +599,39 @@ describe('routed marks in the save format (auto-routing-r6.md section 4.1)', () 
     expect(loaded.fittings[0]).toBe(fitting);
   });
 
-  it('refuses a save of a version newer than 21', () => {
-    expect(() => loadProject({ ...v20, schemaVersion: 22 })).toThrow(SchemaMigrationError);
+  it('refuses a save of a version newer than 22', () => {
+    expect(() => loadProject({ ...v20, schemaVersion: 23 })).toThrow(SchemaMigrationError);
+  });
+});
+
+describe('buildings fields in the save format (buildings-b1 B1-T01)', () => {
+  const v21 = {
+    schemaVersion: 21, networkTypes: [], segments: [], fittings: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {},
+    circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, rooms: [], calibrations: {}, roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {},
+    networkSizing: [],
+  };
+  const stampOf = (id: string, pageIndex?: number) => ({
+    id, category: 'terminal', transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 10, nativeHeight: 10, ports: [],
+    ...(pageIndex === undefined ? {} : { pageIndex }),
+  });
+
+  it('loads a version 21 save with the stamps on page 0 when they have no page index', () => {
+    const loaded = loadProject({ ...v21, stamps: [stampOf('a'), stampOf('b', 3)] });
+    expect(loaded.schemaVersion).toBe(22);
+    expect(loaded.stamps.map((s) => s.pageIndex)).toEqual([0, 3]);
+    expect(loaded.projectUuid).toBeUndefined();
+  });
+
+  it('keeps the project uuid and the page index through a save and a load', () => {
+    const { schemaVersion: _v, ...doc } = { ...v21, schemaVersion: 22, projectUuid: 'abc', stamps: [stampOf('a', 2)] };
+    const loaded = loadProject(JSON.parse(JSON.stringify(serializeProject(doc as never))));
+    expect(loaded.projectUuid).toBe('abc');
+    expect(loaded.stamps[0]!.pageIndex).toBe(2);
+  });
+
+  it('refuses a project uuid that is not a non-empty string', () => {
+    expect(() => loadProject({ ...v21, schemaVersion: 22, projectUuid: '' })).toThrow(ProjectLoadError);
+    expect(() => loadProject({ ...v21, schemaVersion: 22, projectUuid: 5 })).toThrow(ProjectLoadError);
   });
 });
 
