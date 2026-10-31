@@ -4226,6 +4226,7 @@ export class SketchScene {
       roomTypes: this.usedRoomTypes(doc, Object.values(state.rooms)),
       roomNeeds: this.usedRoomNeeds(doc),
       ...(doc.ceilingHeightMm !== undefined ? { ceilingHeightMm: doc.ceilingHeightMm } : {}),
+      ...(doc.projectUuid !== null ? { projectUuid: doc.projectUuid } : {}),
       roomTypeCeilingHeightsMm: { ...doc.roomTypeCeilingHeightsMm },
     }) as unknown as ProjectDocument;
   }
@@ -4303,6 +4304,7 @@ export class SketchScene {
     target.roomTypes.splice(0, target.roomTypes.length, ...(parseRoomTypes(doc.roomTypes) ?? []));
     target.roomNeeds.splice(0, target.roomNeeds.length, ...(parseRoomNeeds(doc.roomNeeds) ?? []));
     target.ceilingHeightMm = doc.ceilingHeightMm;
+    target.projectUuid = doc.projectUuid ?? null;
     for (const key of Object.keys(target.roomTypeCeilingHeightsMm)) delete target.roomTypeCeilingHeightsMm[key];
     Object.assign(target.roomTypeCeilingHeightsMm, doc.roomTypeCeilingHeightsMm);
     target.calibrations.clear();

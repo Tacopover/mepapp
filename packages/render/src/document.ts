@@ -91,6 +91,8 @@ export class SketchDocument {
   readonly id: string = `doc-${nextDocSeq++}`;
   fileKey: string | null = null;
   fileName = 'Untitled';
+  /** The id of the project this document holds; null until one is minted or loaded. Not the runtime `id` and not a receipt documentId. */
+  projectUuid: string | null = null;
   pdfHandle: PdfDocumentHandle | null = null;
   backdropSprite: Sprite | null = null;
   /** Which page of pdfHandle the backdrop currently shows (status bar page navigation) — view-only: placed elements aren't page-scoped yet (they still all record pageIndex: 0), see atlas §6 D4. */
