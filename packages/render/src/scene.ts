@@ -144,6 +144,7 @@ import {
   ensureProjectUuid,
   isProjectUuid,
   pasteOnPage,
+  onPage,
 } from '@mepapp/core';
 import { PATH_KIND, type AnnotationGeometry as PdfAnnotationGeometry, type PdfDocumentHandle, type StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
@@ -1097,11 +1098,9 @@ export class SketchScene {
 
   /**
    * Swaps the active document's backdrop to a different already-rendered
-   * page of the same open PDF (status bar's page navigation, atlas §6) —
-   * every placed stamp/segment/fitting/annotation is left untouched. They
-   * aren't page-scoped today (each still records pageIndex: 0 regardless of
-   * which page is shown, see D4) — this is a view-only page flip, not full
-   * multi-page domain support.
+   * page of the same open PDF (status bar's page navigation, atlas §6).
+   * Placed items carry their page (pageIndex). This call only swaps the
+   * backdrop and the shown page. The view filter is a later task (T09).
    */
   setBackdropPage(bitmap: ImageBitmap, pageWidthPt: number, pageHeightPt: number, pageIndex: number): void {
     const old = this.doc.backdropSprite;
@@ -1123,6 +1122,7 @@ export class SketchScene {
     if (this.tool === 'calibrate' || this.tool === 'measure') void this.loadSnapLines();
     this.redrawOverlay();
     this.emitter.emit('pageChanged', pageIndex);
+    this.emitter.emit('drawingChanged', this.getDrawingSummary());
   }
 
   /** The active document's currently-shown page (0-based) — status bar's "Page X of N". */
@@ -1580,18 +1580,22 @@ export class SketchScene {
     this.redrawOverlay();
   }
 
-  /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. */
-  listStamps(): StampInfo[] {
+  /** Every placed stamp, not just the current selection — the Layers panel's "Elements" list. `page`: only the stamps of that page. */
+  listStamps(page?: number): StampInfo[] {
     const portSegmentTypes = this.portSegmentTypes();
-    return Object.values(this.doc.drawingHistory.getState().stamps).map((d) => this.toStampInfo(d, portSegmentTypes));
+    const stamps = Object.values(this.doc.drawingHistory.getState().stamps);
+    const scoped = page === undefined ? stamps : onPage(stamps, page);
+    return scoped.map((d) => this.toStampInfo(d, portSegmentTypes));
   }
 
-  /** The segments, fittings and port groups of the active document. Copies of the arrays. The route dialog reads it for the start check. */
-  getConnectivity(): ConnectivityView {
+  /** The segments, fittings and port groups of the active document. Copies of the arrays. The route dialog reads it for the start check. `page`: only the segments and fittings of that page. */
+  getConnectivity(page?: number): ConnectivityView {
     const state = this.doc.drawingHistory.getState();
+    const segments = Object.values(state.segments);
+    const fittings = Object.values(state.fittings);
     return {
-      segments: Object.values(state.segments),
-      fittings: Object.values(state.fittings),
+      segments: page === undefined ? segments : onPage(segments, page),
+      fittings: page === undefined ? fittings : onPage(fittings, page),
       portGroups: this.doc.portGroups.map((g) => ({ ...g, portIds: [...g.portIds] })),
     };
   }
@@ -2439,7 +2443,7 @@ export class SketchScene {
   /** Each open port of the drawing (auto-routing.md §5 question 9): a port with a routing target and no segment. */
   private openPorts(state: DrawingState): { world: Vec2; networkTypeId: string }[] {
     const connected = this.portSegmentTypes();
-    const stamps = Object.values(state.stamps).map((stamp) => ({ ...stamp, portSegmentTypes: connected.get(stamp.id) }));
+    const stamps = onPage(Object.values(state.stamps), this.doc.pageIndex).map((stamp) => ({ ...stamp, portSegmentTypes: connected.get(stamp.id) }));
     return openPortsOf(stamps).map((open) => ({ world: open.world, networkTypeId: open.networkTypeId }));
   }
 
@@ -2945,15 +2949,16 @@ export class SketchScene {
   /** Plans a route from a start port. Read-only: the drawing, the history and the document counters stay unchanged. The target ports are found without the old routed run, so a re-run keeps its targets. */
   planRoute(request: RouteRequest): RoutePlanView {
     const state = this.doc.drawingHistory.getState();
-    const segments = Object.values(state.segments);
-    const fittings = Object.values(state.fittings);
+    const pageIndex = this.doc.pageIndex;
+    const segments = onPage(Object.values(state.segments), pageIndex);
+    const fittings = onPage(Object.values(state.fittings), pageIndex);
     const removal = routedRunOf({ segments, fittings }, request.startStampId, request.startPortId);
     const removedSegmentIds = new Set(removal.segmentIds);
     const reducedSegments = segments.filter((segment) => !removedSegmentIds.has(segment.id));
     const portTypes = this.portSegmentTypes(reducedSegments);
-    const stamps = Object.values(state.stamps).map((d) => this.toStampInfo(d, portTypes));
+    const pageStamps = onPage(Object.values(state.stamps), pageIndex);
+    const stamps = pageStamps.map((d) => this.toStampInfo(d, portTypes));
     const rooms = Object.values(state.rooms);
-    const pageIndex = this.doc.pageIndex;
     const cal = this.getCalibration();
     const mmPerPt = cal ? 1 / cal.pageUnitsPerRealUnit : null;
     const { ports: targetPorts } = findRoutePorts({
@@ -2964,7 +2969,7 @@ export class SketchScene {
     const sizing = this.getNetworkSizing(request.startStampId, request.startPortId);
     const limits = sizing === undefined ? undefined : structuredClone(sizing);
     const networkType = this.doc.networkTypes.find((t) => t.id === request.networkTypeId) ?? getNetworkTypeFromLibrary(request.networkTypeId);
-    const elementCategories = Object.fromEntries(Object.values(state.stamps).map((stamp) => [stamp.id, stamp.category]));
+    const elementCategories = Object.fromEntries(pageStamps.map((stamp) => [stamp.id, stamp.category]));
     let segmentSeq = this.doc.nextSegmentSeq;
     let fittingSeq = this.doc.nextFittingSeq;
     const result = planRouteCore({
@@ -4613,7 +4618,7 @@ export class SketchScene {
       // source texture's native pixel density regardless of its physical
       // placement size — the annotation's Rect (from stampWorldBounds below)
       // is what carries the physical size into the PDF.
-      const pageInfo = handle.getPageInfo(0);
+      const pageInfo = handle.getPageInfo(stampData.pageIndex);
       const extractionSprite = new Sprite(stampEntry.sprite.texture);
       extractionSprite.anchor.set(0.5);
       // Also compensates for the destination page's own /Rotate (see issue 3:
@@ -4631,7 +4636,7 @@ export class SketchScene {
       await handle.addAnnotation({
         id,
         kind: 'stamp',
-        pageIndex: 0,
+        pageIndex: stampData.pageIndex,
         geometry: {
           kind: 'stamp',
           position: { x: bounds.minX, y: bounds.minY },

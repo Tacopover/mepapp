@@ -95,7 +95,7 @@ export class SketchDocument {
   projectUuid: string | null = null;
   pdfHandle: PdfDocumentHandle | null = null;
   backdropSprite: Sprite | null = null;
-  /** Which page of pdfHandle the backdrop currently shows (status bar page navigation) — view-only: placed elements aren't page-scoped yet (they still all record pageIndex: 0), see atlas §6 D4. */
+  /** Which page of pdfHandle the backdrop currently shows (status bar page navigation). New items get this page. */
   pageIndex = 0;
   /** Room polygons and labels of the current page, rebuilt by SketchScene.syncRoomLayer. Below the stamps so elements stay clickable-looking on top. */
   readonly roomLayer = new Container();
