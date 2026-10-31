@@ -7,11 +7,15 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p .",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@mepapp/core": "workspace:*",
     "@mepapp/pdf-engine": "workspace:*",
     "pixi.js": "latest"
+  },
+  "devDependencies": {
+    "vitest": "^2"
   }
 }

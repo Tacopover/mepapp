@@ -144,6 +144,10 @@ importers:
       pixi.js:
         specifier: latest
         version: 8.20.1
+    devDependencies:
+      vitest:
+        specifier: ^2
+        version: 2.1.9(lightningcss@1.33.0)
 
   packages/ui:
     dependencies:
