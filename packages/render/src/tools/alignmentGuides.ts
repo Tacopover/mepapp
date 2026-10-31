@@ -89,7 +89,7 @@ export function resolveAlignmentSnap(
   const draggedYs = draggedCenterOnly ? [] : [draggedBounds.minY, draggedBounds.maxY];
 
   const candidates: SnapCandidate[] = [];
-  for (const ref of candidateRefs(state, excludeIds)) {
+  for (const ref of candidateRefs(state, excludeIds, ctx.activePage())) {
     const bounds = ctx.resolveSelectableBoundsWorld(ref, state);
     if (bounds) candidates.push({ bounds, centerOnly: ref.kind === 'fitting' });
   }
@@ -174,7 +174,7 @@ export function resolveRayAlignmentSnap(ctx: ToolContext, state: DrawingState, a
   const tolerance = GUIDE_SNAP_SCREEN_PX / ctx.getZoomScale();
 
   const matches: RayMatch[] = [];
-  for (const ref of candidateRefs(state, new Set())) {
+  for (const ref of candidateRefs(state, new Set(), ctx.activePage())) {
     const bounds = ctx.resolveSelectableBoundsWorld(ref, state);
     if (!bounds) continue;
     const centerOnly = ref.kind === 'fitting';
@@ -238,10 +238,11 @@ export function computeStampBoundsWorld(center: Vec2, nativeWidth: number, nativ
   };
 }
 
-function candidateRefs(state: DrawingState, excludeIds: ReadonlySet<string>): SelectableRef[] {
+function candidateRefs(state: DrawingState, excludeIds: ReadonlySet<string>, page: number): SelectableRef[] {
   const refs: SelectableRef[] = [];
-  for (const id of Object.keys(state.stamps)) if (!excludeIds.has(id)) refs.push({ kind: 'stamp', id });
-  for (const id of Object.keys(state.fittings)) if (!excludeIds.has(id)) refs.push({ kind: 'fitting', id });
-  for (const id of Object.keys(state.annotations)) if (!excludeIds.has(id)) refs.push({ kind: 'annotation', id });
+  const onShownPage = (item: { pageIndex?: number }): boolean => (item.pageIndex ?? 0) === page;
+  for (const [id, item] of Object.entries(state.stamps)) if (!excludeIds.has(id) && onShownPage(item)) refs.push({ kind: 'stamp', id });
+  for (const [id, item] of Object.entries(state.fittings)) if (!excludeIds.has(id) && onShownPage(item)) refs.push({ kind: 'fitting', id });
+  for (const [id, item] of Object.entries(state.annotations)) if (!excludeIds.has(id) && onShownPage(item)) refs.push({ kind: 'annotation', id });
   return refs;
 }

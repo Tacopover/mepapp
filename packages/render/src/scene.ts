@@ -988,9 +988,9 @@ export class SketchScene {
       const state = this.doc.drawingHistory.getState();
       const target = resolveSegmentEndpoint(
         world,
-        Object.values(state.stamps),
-        Object.values(state.fittings),
-        Object.values(state.segments),
+        onPage(Object.values(state.stamps), this.doc.pageIndex),
+        onPage(Object.values(state.fittings), this.doc.pageIndex),
+        onPage(Object.values(state.segments), this.doc.pageIndex),
         { radius: snapRadius },
       );
       if (target.kind === 'break') {

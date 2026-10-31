@@ -2,6 +2,7 @@ import type { FederatedPointerEvent } from 'pixi.js';
 import {
   CompositeCommand,
   getStampPorts,
+  onPage,
   resolveSegmentEndpoint,
   splitSegmentAtFitting,
   SYNTHETIC_CENTER_PORT_ID,
@@ -99,9 +100,9 @@ export class DrawSegmentTool implements Tool {
   private onDrawSegmentClick(ctx: ToolContext, world: Vec2, shiftKey: boolean): void {
     const snapRadius = ctx.getSnapRadiusScreenPx() / ctx.getZoomScale();
     const state = ctx.doc.drawingHistory.getState();
-    const stamps = Object.values(state.stamps);
-    const segments = Object.values(state.segments);
-    const fittings = Object.values(state.fittings);
+    const stamps = onPage(Object.values(state.stamps), ctx.activePage());
+    const segments = onPage(Object.values(state.segments), ctx.activePage());
+    const fittings = onPage(Object.values(state.fittings), ctx.activePage());
 
     const { point: snappedWorld } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart?.worldPosition, shiftKey });
     this.guides = [];
