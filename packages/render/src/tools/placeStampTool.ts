@@ -1,5 +1,5 @@
 import { Sprite } from 'pixi.js';
-import { getStampDefinition, normalizeDegrees, type PlacedStamp, type StampCategory, type Vec2 } from '@mepapp/core';
+import { getStampDefinition, normalizeDegrees, withPage, type PlacedStamp, type StampCategory, type Vec2 } from '@mepapp/core';
 import { applyStampColor } from '../colorize.js';
 import { createStampCommand } from '../drawingCommands.js';
 import { applyTransformToSprite, computeStampBaseScale } from '../stampSprite.js';
@@ -55,16 +55,19 @@ export class PlaceStampTool implements Tool {
     const definition = definitionId ? getStampDefinition(definitionId, ctx.doc.customStampDefinitions) : undefined;
     const ports = definition ? [...definition.ports] : [];
     const scaleFactor = appearanceDefault?.scale ?? 1;
-    const data: PlacedStamp = {
-      id,
-      category: this.category,
-      transform: { position: worldPosition, rotationDegrees: ctx.getStampGhostRotationDegrees(), scale: { x: scaleFactor, y: scaleFactor } },
-      nativeWidth,
-      nativeHeight,
-      ports,
-      definitionId,
-      color: appearanceDefault?.color,
-    };
+    const data: PlacedStamp = withPage(
+      {
+        id,
+        category: this.category,
+        transform: { position: worldPosition, rotationDegrees: ctx.getStampGhostRotationDegrees(), scale: { x: scaleFactor, y: scaleFactor } },
+        nativeWidth,
+        nativeHeight,
+        ports,
+        definitionId,
+        color: appearanceDefault?.color,
+      },
+      ctx.activePage(),
+    );
     const sprite = new Sprite(texture);
     sprite.anchor.set(0.5); // pivot = own center, matching the reference semantics
     const baseScale = computeStampBaseScale(nativeWidth, nativeHeight, texture);

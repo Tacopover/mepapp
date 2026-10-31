@@ -906,6 +906,7 @@ export class SketchScene {
       activateRoutingTargetOf: (point) => self.activateRoutingTargetOf(point),
       getSnapRadiusScreenPx: () => self.snapRadiusScreenPx,
       getAngleSnapDegrees: () => self.angleSnapDegrees,
+      activePage: () => self.doc.pageIndex,
       getPendingStampTexture: () => self.pendingStampTexture,
       adoptStampDefinition: (definition) => {
         if (!self.doc.customStampDefinitions.some((d) => d.id === definition.id)) self.addCustomStampDefinition(definition);

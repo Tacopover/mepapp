@@ -180,6 +180,9 @@ export interface ToolContext {
   /** Degrees a segment's heading snaps to while drawing (0/45/90° by default) — Settings-configurable, Shift disables it for the current drag. */
   getAngleSnapDegrees(): number;
 
+  /** The page (0-based) that the document shows. */
+  activePage(): number;
+
   /** The stamp-placement preview sprite/state, shared across place-terminal/place-equipment — see SketchScene's stamp-ghost fields. */
   getPendingStampTexture(): {
     texture: Texture;
