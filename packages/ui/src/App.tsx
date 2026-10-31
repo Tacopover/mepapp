@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  buildQuantityTables,
   buildRoomExportTable,
   buildStampPropertyContext,
   DEFAULT_STAMP_LABEL_VISIBILITY,
@@ -48,6 +49,7 @@ import { useNetworkTreeState } from './useNetworkTreeState.js';
 import { CircuitsToolbar } from './components/CircuitsToolbar.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
+import { quantityTablesToXlsx } from './quantitiesExport.js';
 import { roomTableToXlsx } from './roomExport.js';
 import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { RoomToolBar } from './components/RoomToolBar.js';
@@ -798,6 +800,39 @@ export function MepSketchApp({
     }
   }, [activeDoc, customPropertyDefs.room, fileAccess, sceneRef]);
 
+  const handleExportQuantities = useCallback(async () => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    try {
+      const { segments, fittings, portGroups } = scene.getConnectivity();
+      const { tables, warnings } = buildQuantityTables({
+        segments,
+        fittings,
+        portGroups,
+        stamps: scene.listStamps(),
+        networkTypes: scene.getNetworkTypes(),
+        circuits: scene.listCircuits(),
+        panels: scene.listPanels(),
+        capacities: Object.fromEntries(scene.listStamps().map((stamp) => [stamp.id, stamp.capacity])),
+        calibrationOf: (pageIndex) => scene.getCalibration(pageIndex),
+        stampTypeName: (id) => getStampDefinition(id, customStampDefinitions)?.label ?? null,
+      });
+      if (tables.length === 0) {
+        setStatus('There are no segments or elements to export.');
+        return;
+      }
+      const blob = await quantityTablesToXlsx(tables);
+      const suggestedName = `${(activeDoc?.fileName ?? 'quantities').replace(/\.pdf$/i, '')}-quantities.xlsx`;
+      const saved = await fileAccess.saveFileAs(suggestedName, XLSX_FILE_TYPES, blob);
+      if (!saved) return;
+      const rowCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
+      const summary = saved.target ? `Exported ${rowCount} rows to ${saved.name}.` : `Downloaded ${saved.name} (${rowCount} rows).`;
+      setStatus(warnings.length > 0 ? `${summary} Warning: ${warnings.join(' ')}` : summary);
+    } catch (err) {
+      setStatus(`Failed to export quantities: ${(err as Error).message}`);
+    }
+  }, [activeDoc, customStampDefinitions, fileAccess, sceneRef]);
+
   const handleSave = useCallback(() => saveDocument(false), [saveDocument]);
   const handleSaveAs = useCallback(() => saveDocument(true), [saveDocument]);
 
@@ -1478,6 +1513,7 @@ export function MepSketchApp({
           onDetectRooms={handleDetectRooms}
           onCancelRoomDetection={handleCancelRoomDetection}
           onExportRooms={handleExportRooms}
+          onExportQuantities={handleExportQuantities}
           onOpenAutoPlace={() => setAutoPlaceOpen(true)}
           wallDebugVisible={wallDebugVisible}
           onToggleWallDebug={handleToggleWallDebug}
