@@ -828,13 +828,15 @@ export function MepSketchApp({
         setStatus('There are no segments or elements to export.');
         return;
       }
-      const blob = await quantityTablesToXlsx(tables);
+      // The header status line is short and cuts long text, so the full warnings go on their own sheet.
+      const sheets = warnings.length > 0 ? [...tables, { name: 'Warnings', headers: ['Warning'], rows: warnings.map((w) => [w]) }] : tables;
+      const blob = await quantityTablesToXlsx(sheets);
       const suggestedName = `${(activeDoc?.fileName ?? 'quantities').replace(/\.pdf$/i, '')}-quantities.xlsx`;
       const saved = await fileAccess.saveFileAs(suggestedName, XLSX_FILE_TYPES, blob);
       if (!saved) return;
       const rowCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
       const summary = saved.target ? `Exported ${rowCount} rows to ${saved.name}.` : `Downloaded ${saved.name} (${rowCount} rows).`;
-      setStatus(warnings.length > 0 ? `${summary} Warning: ${warnings.join(' ')}` : summary);
+      setStatus(warnings.length > 0 ? `${summary} ${warnings.length} warning(s): see the Warnings sheet.` : summary);
     } catch (err) {
       setStatus(`Failed to export quantities: ${(err as Error).message}`);
     }

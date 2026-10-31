@@ -100,7 +100,7 @@ describe('buildQuantityTables', () => {
     const result = buildQuantityTables({ ...base, segments: [], stamps: [stamp], calibrationOf: () => null, stampTypeName: () => 'AHU', stampImageName: () => 'ahu.svg' });
     expect(result.tables.map((t) => t.name)).toEqual(['Equipment']);
     const table = result.tables[0]!;
-    expect(table.headers).toEqual(['Id', 'Type', 'Capacity', 'Panel', 'X (pt)', 'Y (pt)', 'Rotation (°)', 'Scale', 'Image', 'Brand', 'Id (custom)']);
-    expect(table.rows[0]).toEqual(['e1', 'AHU', 0, null, 10.46, 20, 90, 1.5, 'ahu.svg', 'Acme', 'x']);
+    expect(table.headers).toEqual(['Id', 'Type', 'Capacity', 'Panel', 'X (pt)', 'Y (pt)', 'Rotation (°)', 'Size (%)', 'Image', 'Brand', 'Id (custom)']);
+    expect(table.rows[0]).toEqual(['e1', 'AHU', null, null, 10.46, 20, 90, 150, 'ahu.svg', 'Acme', 'x']);
   });
 });

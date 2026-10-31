@@ -124,7 +124,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
         segment.height ?? null,
         segment.material ?? null,
         lengthM,
-        segment.routedBy ? 'TRUE' : 'FALSE',
+        !!segment.routedBy,
         ...pointCells(segment.geometry[0]),
         ...pointCells(segment.geometry[segment.geometry.length - 1]),
       ];
@@ -151,7 +151,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
       'X (pt)',
       'Y (pt)',
       'Rotation (°)',
-      'Scale',
+      'Size (%)',
       'Image',
     ];
     return withCustomColumns(
@@ -161,11 +161,11 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
       (stamp) => [
         stamp.id,
         (stamp.definitionId ? input.stampTypeName(stamp.definitionId) ?? stamp.definitionId : null),
-        input.capacities[stamp.id] ?? 0,
+        input.capacities[stamp.id] || null,
         category === 'terminal' ? (circuitOf.get(stamp.id) ?? null) : (panelOf.get(stamp.id) ?? null),
         ...pointCells(stamp.transform.position),
         round2(stamp.transform.rotationDegrees),
-        round2(stamp.transform.scale.x),
+        round2(stamp.transform.scale.x * 100),
         (stamp.definitionId ? input.stampImageName(stamp.definitionId) : null),
       ],
       (stamp) => stamp.properties,
@@ -176,7 +176,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const fittingTable: QuantityTable = {
     name: 'Fittings',
     headers: ['Page', 'Id', 'Network', 'Kind', 'Routed', 'X (pt)', 'Y (pt)'],
-    rows: fittings.map((f) => [f.pageIndex + 1, f.id, fittingNetworkLabel.get(f.id) ?? null, f.kind, f.routedBy ? 'TRUE' : 'FALSE', ...pointCells(f.position)]),
+    rows: fittings.map((f) => [f.pageIndex + 1, f.id, fittingNetworkLabel.get(f.id) ?? null, f.kind, !!f.routedBy, ...pointCells(f.position)]),
   };
 
   const tables = [segmentTable, stampTable('Terminals', 'terminal'), stampTable('Equipment', 'equipment'), fittingTable].filter((t) => t.rows.length > 0);
