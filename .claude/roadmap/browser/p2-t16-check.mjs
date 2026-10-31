@@ -22,29 +22,31 @@ try {
   await H.waitPlan();
   const toggle = tid('route-build-two-level');
   check((await toggle.count()) === 1, 'the Two-level toggle exists');
-  check(!(await toggle.isChecked()), 'the toggle is off by default');
+  check(await toggle.isChecked(), 'the toggle is on by default');
   check(((await toggle.locator('xpath=..').getAttribute('title')) ?? '').length > 0, 'the toggle has a tooltip');
-  const off1 = await H.summaryNumbers();
-  console.log('off:', off1.text);
-  await tid('route-build').scrollIntoViewIfNeeded().catch(() => {});
-  await shot('P2-T16-chip-off');
-
-  await toggle.check();
-  await idle(400);
-  const sawPending = (await tid('route-build-pending').count()) > 0;
-  console.log('pending seen right after click:', sawPending);
-  await H.waitPlan();
   const on = await H.summaryNumbers();
   console.log('on:', on.text);
-  console.log('codes on:', JSON.stringify(await H.lineCodes()));
-  check(typeof on.segments === 'number' && on.segments > 0, 'the plan with Two-level has segments', on.text);
   await tid('route-build').scrollIntoViewIfNeeded().catch(() => {});
   await shot('P2-T16-chip-on');
 
   await toggle.uncheck();
+  await idle(400);
+  await H.waitPlan();
+  const off1 = await H.summaryNumbers();
+  console.log('off:', off1.text);
+  console.log('codes on:', JSON.stringify(await H.lineCodes()));
+  check(typeof on.segments === 'number' && on.segments > 0, 'the plan with Two-level has segments', on.text);
+  await tid('route-build').scrollIntoViewIfNeeded().catch(() => {});
+  await shot('P2-T16-chip-off');
+
+  await toggle.check();
   await H.waitPlan();
   const off2 = await H.summaryNumbers();
-  check(off2.text === off1.text, 'toggle off again gives the same numbers as before', `${off1.text} | ${off2.text}`);
+  check(off2.text === on.text, 'toggle on again gives the same numbers as at the start', `${on.text} | ${off2.text}`);
+  await toggle.uncheck();
+  await H.waitPlan();
+  const off3 = await H.summaryNumbers();
+  check(off3.text === off1.text, 'toggle off again gives the same numbers', `${off1.text} | ${off3.text}`);
 
   await toggle.check();
   await H.waitPlan();

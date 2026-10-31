@@ -26,7 +26,7 @@ export function RouteBuildSection({ sceneRef, request, roomName, stampName }: Ro
   const [size, setSize] = useState(true);
   const [result, setResult] = useState<{ segments: number; fittings: number } | null>(null);
   const [failed, setFailed] = useState(false);
-  const [twoLevel, setTwoLevel] = useState(false);
+  const [twoLevel, setTwoLevel] = useState(true);
   const effective = request && twoLevel ? { ...request, layout: { twoLevel: {} } } : request;
   const key = effective ? routeRequestKey(effective) : null;
 
