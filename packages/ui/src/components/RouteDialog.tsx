@@ -38,8 +38,8 @@ function uniqueLabels(stamps: readonly StampInfo[], labelOf: (stamp: StampInfo) 
 export function RouteDialog({ sceneRef, roomTypes, stampName, onRouteTypeIdsChange, onClose }: RouteDialogProps) {
   const scene = sceneRef.current;
   const [pageCount, setPageCount] = useState(() => scene?.getPageCount() ?? 1);
-  const [stamps, setStamps] = useState(() => scene?.listStamps() ?? []);
-  const [connectivity, setConnectivity] = useState(() => scene?.getConnectivity() ?? { segments: [], fittings: [], portGroups: [] });
+  const [stamps, setStamps] = useState(() => scene?.listStamps(scene.getPageIndex()) ?? []);
+  const [connectivity, setConnectivity] = useState(() => scene?.getConnectivity(scene.getPageIndex()) ?? { segments: [], fittings: [], portGroups: [] });
   const [rooms, setRooms] = useState(() => (scene ? scene.listRooms().filter((r) => r.pageIndex === scene.getPageIndex()) : []));
   const [selectionIds] = useState<string[]>(() => (scene ? scene.getSelection().map((s) => s.id) : []));
   const [selectionStart] = useState(() => (scene ? presetStart(scene.getSelection()) : null));
@@ -55,8 +55,8 @@ export function RouteDialog({ sceneRef, roomTypes, stampName, onRouteTypeIdsChan
     if (!scene) return;
     const refresh = () => {
       setPageCount(scene.getPageCount());
-      setStamps(scene.listStamps());
-      setConnectivity(scene.getConnectivity());
+      setStamps(scene.listStamps(scene.getPageIndex()));
+      setConnectivity(scene.getConnectivity(scene.getPageIndex()));
       setRooms(scene.listRooms().filter((r) => r.pageIndex === scene.getPageIndex()));
     };
     refresh();
