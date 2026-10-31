@@ -143,6 +143,7 @@ import {
   withNetworkSizing,
   ensureProjectUuid,
   isProjectUuid,
+  pasteOnPage,
 } from '@mepapp/core';
 import { PATH_KIND, type AnnotationGeometry as PdfAnnotationGeometry, type PdfDocumentHandle, type StoredAnnotation } from '@mepapp/pdf-engine';
 import { textureFromImageBitmap } from './texture.js';
@@ -5425,18 +5426,19 @@ export class SketchScene {
       if (!this.doc.customStampDefinitions.some((d) => d.id === definition.id)) this.addCustomStampDefinition(definition);
     }
     for (const segment of pastedRun.segments) newSelection.add(segment.id);
+    const pageItems = pasteOnPage({ stamps: pastedStamps, segments: pastedRun.segments, fittings: pastedRun.fittings, annotations: pastedAnnotations }, this.doc.pageIndex);
 
     if (pastedStamps.length > 0 || pastedAnnotations.length > 0 || pastedRun.segments.length > 0) {
       const tx = new Transaction(this.doc.drawingHistory, `Paste ${pastedStamps.length + pastedAnnotations.length + pastedRun.segments.length} item(s)`);
       tx.update((s) => {
         const stamps = { ...s.stamps };
-        for (const stamp of pastedStamps) stamps[stamp.id] = stamp;
+        for (const stamp of pageItems.stamps) stamps[stamp.id] = stamp;
         const segments = { ...s.segments };
-        for (const segment of pastedRun.segments) segments[segment.id] = segment;
+        for (const segment of pageItems.segments) segments[segment.id] = segment;
         const fittings = { ...s.fittings };
-        for (const fitting of pastedRun.fittings) fittings[fitting.id] = fitting;
+        for (const fitting of pageItems.fittings) fittings[fitting.id] = fitting;
         const annotations = { ...s.annotations };
-        for (const annotation of pastedAnnotations) {
+        for (const annotation of pageItems.annotations) {
           const id = `annotation-${this.doc.nextAnnotationSeq++}`;
           annotations[id] = { ...annotation, id, geometry: translateAnnotationGeometry(annotation.geometry, OFFSET, OFFSET) };
           newSelection.add(id);
