@@ -32,6 +32,8 @@ export interface FileAccessCapabilities {
   readonly folders: boolean;
 }
 
+export type PathState = 'ok' | 'missing' | 'no-access';
+
 /** File and folder access for the app. Pickers must be the first await in a click handler: a browser grants them only to a fresh user gesture. */
 export interface FileAccess {
   readonly capabilities: FileAccessCapabilities;
@@ -48,6 +50,10 @@ export interface FileAccess {
   readFolder(folder: LibraryFolderRef, extensions: string[]): Promise<File[]>;
   /** Desktop only: files the OS asks the app to open ("Open with", a double-click in the file manager), the files passed at start included. Returns the unsubscribe. */
   onOpenRequest?(handler: (files: OpenedFile[]) => void): () => void;
+  /** Desktop only. Tells a missing file from a file outside the permission scope of the app. */
+  statPath?(path: string): Promise<{ state: PathState; sizeBytes?: number; modifiedMs?: number }>;
+  /** Desktop only. Undefined when the state of the path is not 'ok'. */
+  readPath?(path: string): Promise<OpenedFile | undefined>;
 }
 
 /** Yes/no questions to the user. Async, because a desktop dialog cannot block the page the way window.confirm does. */

@@ -1,9 +1,10 @@
-import type { FileAccess, FileAccessCapabilities, FileTarget, FileTypeFilter, LibraryFolderRef, OpenedFile, SavedFile } from '@mepapp/platform';
+import type { FileAccess, FileAccessCapabilities, FileTarget, FileTypeFilter, LibraryFolderRef, OpenedFile, PathState, SavedFile } from '@mepapp/platform';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { dirname, join } from '@tauri-apps/api/path';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile, stat, writeFile } from '@tauri-apps/plugin-fs';
+import { pathStateOfError } from './path-state.js';
 
 interface PathTarget extends FileTarget {
   readonly path: string;
@@ -65,6 +66,23 @@ export class TauriFileAccess implements FileAccess {
     const target: PathTarget = { name: baseName(path), path };
     await this.writeFile(target, data);
     return { name: target.name, target };
+  }
+
+  async statPath(path: string): Promise<{ state: PathState; sizeBytes?: number; modifiedMs?: number }> {
+    try {
+      const info = await stat(path);
+      return { state: 'ok', sizeBytes: info.size, modifiedMs: info.mtime?.getTime() };
+    } catch (err) {
+      return { state: pathStateOfError(err) };
+    }
+  }
+
+  async readPath(path: string): Promise<OpenedFile | undefined> {
+    const { state } = await this.statPath(path);
+    if (state !== 'ok') return undefined;
+    const type = /\.pdf$/i.test(path) ? 'application/pdf' : '';
+    const target: PathTarget = { name: baseName(path), path };
+    return { file: await readAsFile(path, type), target };
   }
 
   async pickFolder(): Promise<{ name: string; folder: LibraryFolderRef } | undefined> {
