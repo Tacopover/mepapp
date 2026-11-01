@@ -1,0 +1,93 @@
+import {
+  buildSheetSummary,
+  findSheets,
+  getStampDefinition,
+  parseBuildingFile,
+  serializeBuildingFile,
+  withProjectUuid,
+  type BuildingFile,
+  type ProjectDocument,
+  type StampDefinition,
+} from '@mepapp/core';
+import { StoreConflictError, type BuildingStore } from '@mepapp/platform';
+
+export type SummaryAfterSaveResult =
+  | { state: 'no-building' }
+  | { state: 'no-match' }
+  | { state: 'written'; projectUuid: string; patchedSheets: number };
+
+/** Writes the sheet summary of a saved document into the building store. Links unlinked matched sheets to the document's projectUuid. */
+export async function summaryAfterSave(args: {
+  store: BuildingStore;
+  project: ProjectDocument;
+  document: { fileName: string; path?: string; sizeBytes: number; modifiedMs: number };
+  pageInfos: readonly { widthPt: number; heightPt: number; rotationDegrees: number }[];
+  stampTypeName: (id: string) => string | null;
+  stampImageName: (id: string) => string | null;
+  now?: () => Date;
+}): Promise<SummaryAfterSaveResult> {
+  const { store, project, document } = args;
+  const stored = await store.read();
+  if (stored === undefined) return { state: 'no-building' };
+  const file = parseBuildingFile(JSON.parse(stored.json));
+  const projectUuid = project.projectUuid;
+  if (projectUuid === undefined) return { state: 'no-match' };
+
+  const matches = findSheets(file, { projectUuid, path: document.path, fileName: document.fileName, sizeBytes: document.sizeBytes }).filter(
+    (match) => match.strength !== 'weak',
+  );
+  if (matches.length === 0) return { state: 'no-match' };
+
+  const summary = buildSheetSummary({
+    project,
+    savedAt: (args.now ?? (() => new Date()))().toISOString(),
+    sourceSizeBytes: document.sizeBytes,
+    sourceModifiedMs: document.modifiedMs,
+    pageInfos: args.pageInfos,
+    stampTypeName: args.stampTypeName,
+    stampImageName: args.stampImageName,
+  });
+  await store.writeSummary(projectUuid, JSON.stringify(summary));
+
+  const unlinkedSheetIds = matches.filter((match) => match.sheet.projectUuid === null).map((match) => match.sheet.id);
+  let patchedSheets = 0;
+  if (unlinkedSheetIds.length > 0) {
+    try {
+      patchedSheets = await linkSheets(store, file, stored.revision, projectUuid, unlinkedSheetIds);
+    } catch (err) {
+      if (!(err instanceof StoreConflictError)) throw err;
+      const current = await store.read();
+      if (current !== undefined) {
+        patchedSheets = await linkSheets(store, parseBuildingFile(JSON.parse(current.json)), current.revision, projectUuid, unlinkedSheetIds);
+      }
+    }
+  }
+  return { state: 'written', projectUuid, patchedSheets };
+}
+
+async function linkSheets(store: BuildingStore, file: BuildingFile, revision: string, projectUuid: string, sheetIds: readonly string[]): Promise<number> {
+  let next = file;
+  let patched = 0;
+  for (const sheetId of sheetIds) {
+    const sheet = next.sheets.find((candidate) => candidate.id === sheetId);
+    if (sheet === undefined || sheet.projectUuid !== null) continue;
+    next = withProjectUuid(next, sheetId, projectUuid);
+    patched += 1;
+  }
+  if (patched === 0) return 0;
+  await store.write(serializeBuildingFile(next), revision);
+  return patched;
+}
+
+/** The two name lookups of the quantity tables, from a list of stamp definitions. Same rules as handleExportQuantities. */
+export function stampNameLookups(definitions: readonly StampDefinition[]): { stampTypeName: (id: string) => string | null; stampImageName: (id: string) => string | null } {
+  const list = [...definitions];
+  return {
+    stampTypeName: (id) => getStampDefinition(id, list)?.label ?? null,
+    stampImageName: (id) => {
+      const iconRef = getStampDefinition(id, list)?.iconRef;
+      // A data: or blob: reference is embedded art, not a file name.
+      return iconRef && !/^(data|blob):/.test(iconRef) ? (iconRef.split(/[\\/]/).pop() ?? null) : null;
+    },
+  };
+}

@@ -67,6 +67,7 @@ import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
+import { stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
 import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
@@ -97,7 +98,7 @@ import {
 import { useShowBuiltInStamps } from './builtInStampsSetting.js';
 import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
 import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
-import { libraryFolderOf, type AppDialogs, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore } from '@mepapp/platform';
+import { libraryFolderOf, type AppDialogs, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore } from '@mepapp/platform';
 import './theme.css';
 
 export interface PdfPageLoadResult {
@@ -133,6 +134,8 @@ export interface MepSketchAppProps {
   closeGuard: CloseGuard;
   /** Yes/no questions: window.confirm on the web, a native dialog on desktop. */
   dialogs: AppDialogs;
+  /** Storage of the building file. After a Save the sheet summary of the saved document is written here. */
+  buildingStore?: BuildingStore;
 }
 
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
@@ -233,6 +236,7 @@ export function MepSketchApp({
   fileAccess,
   closeGuard,
   dialogs,
+  buildingStore,
 }: MepSketchAppProps) {
   useEffect(() => setAppDialogs(dialogs), [dialogs]);
   const userStampLibrary = useUserStampLibrary(libraryStore, fileAccess.capabilities.folders);
@@ -744,6 +748,36 @@ export function MepSketchApp({
     [documents, fileAccess, sceneRef],
   );
 
+  // Writes the sheet summary of a just-saved document into the building store.
+  // Returns early when the document is no longer the active one. The project and
+  // page infos are read before the file stat await, so a tab switch cannot change them.
+  const writeBuildingSummary = useCallback(
+    async (documentId: string, target: FileTarget, sizeBytes: number) => {
+      const scene = sceneRef.current;
+      if (!buildingStore || !scene || !pdfHandle || scene.getActiveDocumentId() !== documentId) return;
+      const project = scene.exportProject();
+      const pageInfos = Array.from({ length: pdfHandle.getPageCount() }, (_, pageIndex) => pdfHandle.getPageInfo(pageIndex));
+      const rawPath: unknown = (target as { path?: unknown }).path;
+      const path = typeof rawPath === 'string' ? rawPath : undefined;
+      let modifiedMs = Date.now();
+      let documentSize = sizeBytes;
+      if (path !== undefined && fileAccess.statPath) {
+        const stat = await fileAccess.statPath(path);
+        modifiedMs = stat.modifiedMs ?? Date.now();
+        documentSize = stat.sizeBytes ?? documentSize;
+      }
+      const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
+      await summaryAfterSave({
+        store: buildingStore,
+        project,
+        document: { fileName: target.name, path, sizeBytes: documentSize, modifiedMs },
+        pageInfos,
+        ...stampNameLookups(definitions),
+      });
+    },
+    [buildingStore, customStampDefinitions, fileAccess, pdfHandle, sceneRef, userStampLibrary.definitions],
+  );
+
   // The unsaved-changes marker is cleared only after the bytes reach the
   // file, so a cancelled picker or a failed write keeps the close warning.
   const saveDocument = useCallback(
@@ -776,13 +810,23 @@ export function MepSketchApp({
         }
         if (saved && result.newProjectUuid) sceneRef.current?.commitProjectUuid(documentId, result.newProjectUuid);
         if (saved) sceneRef.current?.markSaved(result.receipt);
+        if (saved) {
+          const target = fileTargetsRef.current.get(documentId);
+          if (target) {
+            try {
+              await writeBuildingSummary(documentId, target, result.bytes.length);
+            } catch (err) {
+              setStatus(`Saved ${target.name}, but the building summary was not written: ${(err as Error).message}`);
+            }
+          }
+        }
       } catch (err) {
         setStatus(`Failed to save: ${(err as Error).message}`);
       } finally {
         fileTaskRef.current = null;
       }
     },
-    [activeDocumentId, fileAccess, saveAsNewFile, sceneRef, syncAndGetPdfBytes],
+    [activeDocumentId, fileAccess, saveAsNewFile, sceneRef, syncAndGetPdfBytes, writeBuildingSummary],
   );
 
   const handleExportRooms = useCallback(async () => {

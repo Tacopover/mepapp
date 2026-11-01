@@ -15,8 +15,8 @@ import { createPlacementWorker, createRoomDetectionClient } from './roomDetectio
 
 const BACKDROP_DPI = 150;
 
-if (import.meta.env.DEV) {
-  const devBuildingStore = createDevBuildingStore();
+const devBuildingStore = import.meta.env.DEV ? createDevBuildingStore() : undefined;
+if (devBuildingStore) {
   (window as unknown as { __mepBuilding: unknown }).__mepBuilding = {
     load: (json: string, summaries?: Record<string, string>) => devBuildingStore.load(json, summaries),
     read: () => devBuildingStore.read(),
@@ -69,6 +69,7 @@ if (container) {
         fileAccess={fileAccess}
         closeGuard={closeGuard}
         dialogs={dialogs}
+        buildingStore={devBuildingStore}
       />,
     );
   });
