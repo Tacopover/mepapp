@@ -7,6 +7,9 @@
 // items to build on top of this later, same shape as the old app's
 // Building -> Level -> Sheet model but one tier shallower.
 
+import { emptyBuilding } from '@mepapp/core';
+import type { BuildingFile, BuildingSheet, BuildingLevel as CoreBuildingLevel } from '@mepapp/core';
+
 export interface BuildingLevel {
   id: string;
   name: string;
@@ -54,4 +57,26 @@ export function assignDocumentToLevel(buildings: Building[], levelId: string, fi
       documentFileName: level.id === levelId ? fileName : level.documentFileName === fileName ? null : level.documentFileName,
     })),
   }));
+}
+
+/** Each old Building becomes an empty BuildingFile with the same id and name. Each old level keeps its id and name with elevationMm = 0. A level with documentFileName becomes one sheet: id `${level.id}-sheet`, levelId, projectUuid null, pageIndex 0, displayName = documentFileName, location { fileName: documentFileName }. Pure; does not touch localStorage. */
+export function importOldRegistry(v1: Building[]): BuildingFile[] {
+  return v1.map((building) => {
+    const file = emptyBuilding(building.id, building.name);
+    file.levels = building.levels.map((level): CoreBuildingLevel => ({ id: level.id, name: level.name, elevationMm: 0 }));
+    file.sheets = building.levels.flatMap((level): BuildingSheet[] => {
+      if (!level.documentFileName) return [];
+      return [
+        {
+          id: `${level.id}-sheet`,
+          levelId: level.id,
+          projectUuid: null,
+          pageIndex: 0,
+          displayName: level.documentFileName,
+          location: { fileName: level.documentFileName },
+        },
+      ];
+    });
+    return file;
+  });
 }
