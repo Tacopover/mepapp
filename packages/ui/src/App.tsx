@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   buildQuantityTables,
   buildRoomExportTable,
+  buildSheetSummary,
   buildStampPropertyContext,
   DEFAULT_STAMP_LABEL_VISIBILITY,
   getStampDefinition,
@@ -22,6 +23,7 @@ import {
   type PlacementRule,
   type NetworkType,
   type PlacementWorkerLike,
+  type QuantityResult,
   type RoomDetectionClient,
   type ReconciliationReport,
   type SchematicSymbol,
@@ -55,6 +57,8 @@ import { CircuitsToolbar } from './components/CircuitsToolbar.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { quantityTablesToXlsx } from './quantitiesExport.js';
+import { buildBuildingScopeTables, readSummaries, scopeFileName, statSheets, withWarningsSheet, type ExportScope } from './quantitiesScope.js';
+import { QuantitiesScopeDialog } from './components/QuantitiesScopeDialog.js';
 import { roomTableToXlsx } from './roomExport.js';
 import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { RoomToolBar } from './components/RoomToolBar.js';
@@ -70,7 +74,7 @@ import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
-import { stampNameLookups, summaryAfterSave } from './buildingContext.js';
+import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
 import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
@@ -411,6 +415,7 @@ export function MepSketchApp({
   const [customPropertyDefs, setCustomPropertyDefs] = useState<GlobalPropertyDefs>(loadCustomPropertyDefs);
   const [labelVisibility, setLabelVisibility] = useState<StampLabelVisibility>(loadLabelVisibility);
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
+  const [quantitiesScopeDialog, setQuantitiesScopeDialog] = useState<{ building?: BuildingFile } | null>(null);
   /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp opened for editing via its Stamps tab tile (see handleDuplicateStampDefinition — `seed` keeps the library entry's own id, so the save is an override that every stamp placed from it follows, and carries a self-contained iconRef). */
   const [elementEditorTarget, setElementEditorTarget] = useState<
     { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | { mode: 'edit-user'; definition: StampDefinition } | null
@@ -766,7 +771,7 @@ export function MepSketchApp({
       const scene = sceneRef.current;
       if (!buildingStore || !scene || !pdfHandle || scene.getActiveDocumentId() !== documentId) return;
       const project = scene.exportProject();
-      const pageInfos = Array.from({ length: pdfHandle.getPageCount() }, (_, pageIndex) => pdfHandle.getPageInfo(pageIndex));
+      const pageInfos = displayedPageInfos(pdfHandle);
       const rawPath: unknown = (target as { path?: unknown }).path;
       const path = typeof rawPath === 'string' ? rawPath : undefined;
       let modifiedMs = Date.now();
@@ -923,44 +928,85 @@ export function MepSketchApp({
   const handleExportQuantities = useCallback(async () => {
     const scene = sceneRef.current;
     if (!scene) return;
-    try {
-      const { segments, fittings, portGroups } = scene.getConnectivity();
-      const stamps = scene.listStamps();
-      const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
-      const { tables, warnings } = buildQuantityTables({
-        segments,
-        fittings,
-        portGroups,
-        stamps,
-        networkTypes: scene.getNetworkTypes(),
-        circuits: scene.listCircuits(),
-        panels: scene.listPanels(),
-        capacities: Object.fromEntries(stamps.map((stamp) => [stamp.id, stamp.capacity])),
-        calibrationOf: (pageIndex) => scene.getCalibration(pageIndex),
-        stampTypeName: (id) => getStampDefinition(id, definitions)?.label ?? null,
-        stampImageName: (id) => {
-          const iconRef = getStampDefinition(id, definitions)?.iconRef;
-          // A data: or blob: reference is embedded art, not a file name.
-          return iconRef && !/^(data|blob):/.test(iconRef) ? (iconRef.split(/[\\/]/).pop() ?? null) : null;
-        },
-      });
-      if (tables.length === 0) {
-        setStatus('There are no segments or elements to export.');
-        return;
+    let building: BuildingFile | undefined;
+    if (buildingStore) {
+      try {
+        const stored = await buildingStore.read();
+        building = stored === undefined ? undefined : parseBuildingFile(JSON.parse(stored.json));
+      } catch (err) {
+        setStatus(`Failed to read the building: ${(err as Error).message}`);
       }
-      // The header status line is short and cuts long text, so the full warnings go on their own sheet.
-      const sheets = warnings.length > 0 ? [...tables, { name: 'Warnings', headers: ['Warning'], rows: warnings.map((w) => [w]) }] : tables;
-      const blob = await quantityTablesToXlsx(sheets);
-      const suggestedName = `${(activeDoc?.fileName ?? 'quantities').replace(/\.pdf$/i, '')}-quantities.xlsx`;
-      const saved = await fileAccess.saveFileAs(suggestedName, XLSX_FILE_TYPES, blob);
-      if (!saved) return;
-      const rowCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
-      const summary = saved.target ? `Exported ${rowCount} rows to ${saved.name}.` : `Downloaded ${saved.name} (${rowCount} rows).`;
-      setStatus(warnings.length > 0 ? `${summary} ${warnings.length} warning(s): see the Warnings sheet.` : summary);
-    } catch (err) {
-      setStatus(`Failed to export quantities: ${(err as Error).message}`);
     }
-  }, [activeDoc, customStampDefinitions, fileAccess, sceneRef, userStampLibrary.definitions]);
+    setQuantitiesScopeDialog({ building });
+  }, [buildingStore, sceneRef]);
+
+  const runExportQuantities = useCallback(
+    async (scope: ExportScope, building?: BuildingFile) => {
+      const scene = sceneRef.current;
+      if (!scene) return;
+      try {
+        const { segments, fittings, portGroups } = scene.getConnectivity();
+        const stamps = scene.listStamps();
+        const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
+        let result: QuantityResult;
+        if (scope.kind === 'level' || scope.kind === 'building') {
+          if (!building || !buildingStore) {
+            setStatus('Open a building first.');
+            return;
+          }
+          const { summaries, problems } = await readSummaries(buildingStore);
+          const stats = await statSheets(building.sheets, fileAccess.statPath?.bind(fileAccess));
+          const live =
+            scene.getProjectUuid() !== null && pdfHandle
+              ? buildSheetSummary({
+                  project: scene.exportProject(),
+                  savedAt: new Date().toISOString(),
+                  sourceSizeBytes: 0,
+                  sourceModifiedMs: 0,
+                  pageInfos: displayedPageInfos(pdfHandle),
+                  ...stampNameLookups(definitions),
+                })
+              : undefined;
+          result = buildBuildingScopeTables({ building, scope, summaries, problems, stats, live });
+        } else {
+          result = buildQuantityTables({
+            segments,
+            fittings,
+            portGroups,
+            stamps,
+            networkTypes: scene.getNetworkTypes(),
+            circuits: scene.listCircuits(),
+            panels: scene.listPanels(),
+            capacities: Object.fromEntries(stamps.map((stamp) => [stamp.id, stamp.capacity])),
+            calibrationOf: (pageIndex) => scene.getCalibration(pageIndex),
+            ...stampNameLookups(definitions),
+            ...(scope.kind === 'sheet' ? { pages: new Set([scene.getPageIndex()]) } : {}),
+          });
+        }
+        const { tables, warnings } = result;
+        if (tables.length === 0) {
+          setStatus(
+            warnings.length > 0
+              ? `There are no segments or elements to export. ${warnings.length} warning(s): ${warnings[0]}`
+              : 'There are no segments or elements to export.',
+          );
+          return;
+        }
+        // The header status line is short and cuts long text, so the full warnings go on their own sheet.
+        const sheets = withWarningsSheet(tables, warnings);
+        const blob = await quantityTablesToXlsx(sheets);
+        const suggestedName = scopeFileName({ documentName: activeDoc?.fileName, scope, building });
+        const saved = await fileAccess.saveFileAs(suggestedName, XLSX_FILE_TYPES, blob);
+        if (!saved) return;
+        const rowCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
+        const summary = saved.target ? `Exported ${rowCount} rows to ${saved.name}.` : `Downloaded ${saved.name} (${rowCount} rows).`;
+        setStatus(warnings.length > 0 ? `${summary} ${warnings.length} warning(s): see the Warnings sheet.` : summary);
+      } catch (err) {
+        setStatus(`Failed to export quantities: ${(err as Error).message}`);
+      }
+    },
+    [activeDoc, buildingStore, customStampDefinitions, fileAccess, pdfHandle, sceneRef, userStampLibrary.definitions],
+  );
 
   const handleSave = useCallback(() => saveDocument(false), [saveDocument]);
   const handleSaveAs = useCallback(() => saveDocument(true), [saveDocument]);
@@ -1937,6 +1983,18 @@ export function MepSketchApp({
           onChange={handleChangeBuildings}
           currentDocumentFileName={sheetName}
           onClose={() => setManageBuildingsOpen(false)}
+        />
+      )}
+
+      {quantitiesScopeDialog && (
+        <QuantitiesScopeDialog
+          building={quantitiesScopeDialog.building && { name: quantitiesScopeDialog.building.name, levels: quantitiesScopeDialog.building.levels.map((level) => ({ id: level.id, name: level.name })) }}
+          onCancel={() => setQuantitiesScopeDialog(null)}
+          onExport={(scope) => {
+            const building = quantitiesScopeDialog.building;
+            setQuantitiesScopeDialog(null);
+            void runExportQuantities(scope, building);
+          }}
         />
       )}
 

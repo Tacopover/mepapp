@@ -55,9 +55,25 @@ async function createPlatform(): Promise<{ fileAccess: FileAccess; closeGuard: C
   return { fileAccess: new WebFileAccess(), closeGuard: new WebCloseGuard(), dialogs: new WebAppDialogs() };
 }
 
+// For dev browser checks only: stats a PDF by its file name in the OPFS root.
+async function devStatPath(path: string): ReturnType<NonNullable<FileAccess['statPath']>> {
+  try {
+    const root = await navigator.storage.getDirectory();
+    const file = await (await root.getFileHandle(path)).getFile();
+    return { state: 'ok', sizeBytes: file.size, modifiedMs: file.lastModified };
+  } catch (err) {
+    if ((err as Error).name === 'NotFoundError') return { state: 'missing' };
+    return { state: 'no-access' };
+  }
+}
+
 const container = document.getElementById('root');
 if (container) {
-  void createPlatform().then(({ fileAccess, closeGuard, dialogs }) => {
+  void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs }) => {
+    const fileAccess: FileAccess =
+      import.meta.env.DEV && platformFileAccess.statPath === undefined
+        ? Object.assign(Object.create(platformFileAccess), { statPath: devStatPath })
+        : platformFileAccess;
     createRoot(container).render(
       <MepSketchApp
         onLoadPdfPage={loadPdfPage}

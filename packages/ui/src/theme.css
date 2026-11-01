@@ -5251,3 +5251,20 @@
 }
 .mep-nt-note-tip { margin-left: 6px; display: inline-flex; align-items: center; }
 .mep-rt-details .mep-field-row .mep-infotip { margin-left: 6px; align-self: flex-start; }
+.mep-scope-level-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.mep-scope-level-row .mep-checkbox-row {
+  margin-bottom: 0;
+}
+.mep-scope-level-row select {
+  flex: 0 1 200px;
+  width: auto;
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 3px 6px;
+}
+.mep-modal .mep-checkbox-row input[type="radio"] { width: auto; margin: 0; padding: 0; border: none; flex: 0 0 auto; }

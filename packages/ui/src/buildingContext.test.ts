@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyBuilding, parseBuildingFile, parseSheetSummary, serializeBuildingFile, type BuildingSheet, type ProjectDocument, type StampDefinition } from '@mepapp/core';
 import { MemoryBuildingStore, StoreConflictError, type BuildingStore } from '@mepapp/platform';
-import { stampNameLookups, summaryAfterSave } from './buildingContext.js';
+import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 
 const PATH = 'C:/work/plan.pdf';
 
@@ -133,5 +133,40 @@ describe('stampNameLookups', () => {
     expect(lookups.stampTypeName('d-data')).toBe('Custom');
     expect(lookups.stampImageName('d-data')).toBeNull();
     expect(lookups.stampTypeName('unknown-id')).toBeNull();
+  });
+});
+
+describe('displayedPageInfos', () => {
+  type Page = { widthPt: number; heightPt: number; rotationDegrees: 0 | 90 | 180 | 270 };
+  const handleOf = (pages: Page[]) => ({
+    getPageCount: () => pages.length,
+    getPageInfo: (index: number) => pages[index] as Page,
+  });
+
+  it('swaps width and height of a page rotated by 90 degrees', () => {
+    const handle = handleOf([{ widthPt: 300, heightPt: 200, rotationDegrees: 90 }]);
+    expect(displayedPageInfos(handle)).toEqual([{ widthPt: 200, heightPt: 300, rotationDegrees: 90 }]);
+  });
+
+  it('keeps width and height of pages rotated by 0 or 180 degrees', () => {
+    const handle = handleOf([
+      { widthPt: 300, heightPt: 200, rotationDegrees: 0 },
+      { widthPt: 300, heightPt: 200, rotationDegrees: 180 },
+    ]);
+    expect(displayedPageInfos(handle)).toEqual([
+      { widthPt: 300, heightPt: 200, rotationDegrees: 0 },
+      { widthPt: 300, heightPt: 200, rotationDegrees: 180 },
+    ]);
+  });
+
+  it('returns one entry per page in page order', () => {
+    const handle = handleOf([
+      { widthPt: 300, heightPt: 200, rotationDegrees: 270 },
+      { widthPt: 595, heightPt: 842, rotationDegrees: 0 },
+    ]);
+    expect(displayedPageInfos(handle)).toEqual([
+      { widthPt: 200, heightPt: 300, rotationDegrees: 270 },
+      { widthPt: 595, heightPt: 842, rotationDegrees: 0 },
+    ]);
   });
 });

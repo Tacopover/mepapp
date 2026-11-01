@@ -1,5 +1,6 @@
 import {
   buildSheetSummary,
+  displayDimensions,
   findSheets,
   getStampDefinition,
   parseBuildingFile,
@@ -90,4 +91,15 @@ export function stampNameLookups(definitions: readonly StampDefinition[]): { sta
       return iconRef && !/^(data|blob):/.test(iconRef) ? (iconRef.split(/[\\/]/).pop() ?? null) : null;
     },
   };
+}
+
+/** The page sizes as displayed (after each page's own /Rotate). The engine returns the unrotated size. */
+export function displayedPageInfos(handle: {
+  getPageCount(): number;
+  getPageInfo(index: number): { widthPt: number; heightPt: number; rotationDegrees: 0 | 90 | 180 | 270 };
+}): { widthPt: number; heightPt: number; rotationDegrees: 0 | 90 | 180 | 270 }[] {
+  return Array.from({ length: handle.getPageCount() }, (_, pageIndex) => {
+    const info = handle.getPageInfo(pageIndex);
+    return { ...displayDimensions({ widthPt: info.widthPt, heightPt: info.heightPt }, info.rotationDegrees), rotationDegrees: info.rotationDegrees };
+  });
 }

@@ -1,6 +1,7 @@
 import { buildSheetSummary, loadProject, type BuildingFile, type BuildingSheet, type ProjectDocument } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { BuildingStore } from '@mepapp/platform';
+import { displayedPageInfos } from './buildingContext.js';
 
 const PROJECT_FILE_NAME = 'mepapp-project.json';
 
@@ -40,7 +41,7 @@ async function rebuildDocument(
     const project: ProjectDocument = loadProject(JSON.parse(new TextDecoder().decode(bytes)));
     if (project.projectUuid === undefined) return 'the document has no id yet. Save it again in MepApp';
     if (first.projectUuid !== null && first.projectUuid !== project.projectUuid) return 'the file holds another document id';
-    const pageInfos = Array.from({ length: handle.getPageCount() }, (_, pageIndex) => handle.getPageInfo(pageIndex));
+    const pageInfos = displayedPageInfos(handle);
     const summary = buildSheetSummary({
       project,
       savedAt: now().toISOString(),
