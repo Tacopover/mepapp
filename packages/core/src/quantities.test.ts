@@ -121,4 +121,70 @@ describe('buildQuantityTables', () => {
     expect(equipment.headers[0]).toBe('Page');
     expect(equipment.rows[0]![0]).toBe(2);
   });
+
+  describe('page filter', () => {
+    const fitting = (id: string, pageIndex: number) => ({ id, pageIndex, position: { x: 1000, y: 0 }, kind: 'junction' }) as never;
+    const pagedSegment = (id: string, pageIndex: number, fittingId: string): Segment => ({
+      id,
+      pageIndex,
+      networkTypeId: 't',
+      shape: 'round',
+      diameter: 200,
+      endpointA: { kind: 'port', elementId: `${id}-start`, portId: 'p' },
+      endpointB: { kind: 'fitting', fittingId },
+      geometry: [{ x: 0, y: 0 }, { x: 1000, y: 0 }],
+    });
+    const pagedStamp = (id: string, category: string, pageIndex: number) =>
+      ({ id, category, pageIndex, transform: { position: { x: 0, y: 0 }, rotationDegrees: 0, scale: { x: 1, y: 1 } }, nativeWidth: 1, nativeHeight: 1, ports: [] }) as never;
+    const twoPages = {
+      ...base,
+      segments: [pagedSegment('s0', 0, 'f0'), pagedSegment('s1', 1, 'f1')],
+      fittings: [fitting('f0', 0), fitting('f1', 1)],
+      stamps: [pagedStamp('t0', 'terminal', 0), pagedStamp('t1', 'terminal', 1), pagedStamp('e0', 'equipment', 0), pagedStamp('e1', 'equipment', 1)],
+      circuits: [{ id: 'c', number: 3, terminalIds: ['t0', 't1'], isSpare: false, prefix: 'A' } as never],
+      calibrationOf: () => null,
+    };
+
+    it('keeps only the rows of the chosen pages in every table', () => {
+      const result = buildQuantityTables({ ...twoPages, pages: new Set([1]) });
+      expect(result.tables.map((t) => t.name)).toEqual(['Segments', 'Terminals', 'Equipment', 'Fittings']);
+      const ids = result.tables.map((t) => [t.name, t.rows.length, t.rows[0]![0], t.rows[0]![1]]);
+      expect(ids).toEqual([
+        ['Segments', 1, 2, 's1'],
+        ['Terminals', 1, 2, 't1'],
+        ['Equipment', 1, 2, 'e1'],
+        ['Fittings', 1, 2, 'f1'],
+      ]);
+    });
+
+    it('restarts the network numbers on the chosen pages', () => {
+      const kept = buildQuantityTables({ ...twoPages, pages: new Set([1]) });
+      const segmentsKept = kept.tables.find((t) => t.name === 'Segments')!;
+      const fittingsKept = kept.tables.find((t) => t.name === 'Fittings')!;
+      expect(segmentsKept.rows[0]![segmentsKept.headers.indexOf('Network')]).toBe('Supply air 1');
+      expect(fittingsKept.rows[0]![fittingsKept.headers.indexOf('Network')]).toBe('Supply air 1');
+
+      const all = buildQuantityTables(twoPages);
+      const segmentsAll = all.tables.find((t) => t.name === 'Segments')!;
+      const column = segmentsAll.headers.indexOf('Network');
+      expect(segmentsAll.rows.map((row) => row[column])).toEqual(['Supply air 1', 'Supply air 2']);
+    });
+
+    it('keeps the circuit label of a terminal on a kept page', () => {
+      const result = buildQuantityTables({ ...twoPages, pages: new Set([1]) });
+      const terminals = result.tables.find((t) => t.name === 'Terminals')!;
+      expect(terminals.rows[0]![terminals.headers.indexOf('Circuit')]).toBe('A3');
+    });
+
+    it('counts every page when no page set is given', () => {
+      const result = buildQuantityTables(twoPages);
+      expect(result.tables.map((t) => t.rows.length)).toEqual([2, 2, 2, 2]);
+    });
+
+    it('warns only about a kept page without a scale', () => {
+      const result = buildQuantityTables({ ...twoPages, pages: new Set([1]) });
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toContain('Page 2');
+    });
+  });
 });

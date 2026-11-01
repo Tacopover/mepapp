@@ -33,6 +33,8 @@ export interface QuantityInput {
   stampTypeName: (definitionId: string) => string | null;
   /** The file name of the art of a stamp definition id, or null when it has none (an embedded image has no file name). */
   stampImageName: (definitionId: string) => string | null;
+  /** Count only elements on these 0-based pages. Absent = every page. */
+  pages?: ReadonlySet<number>;
 }
 
 export interface QuantityResult {
@@ -40,6 +42,8 @@ export interface QuantityResult {
   /** Problems the user must see: an export that leaves out lengths silently is worse than none. */
   warnings: string[];
 }
+
+export interface QuantityProvenance { building: string; level: string; sheet: string; document: string }
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
@@ -82,13 +86,17 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const warnings: string[] = [];
   const typeOf = new Map(input.networkTypes.map((t) => [t.id, t]));
   const typeName = (id: string) => typeOf.get(id)?.name ?? id;
+  const onPage = <T extends { pageIndex: number }>(item: T) => !input.pages || input.pages.has(item.pageIndex ?? 0);
+  const allSegments = input.segments.filter(onPage);
+  const allFittings = input.fittings.filter(onPage);
+  const allStamps = input.stamps.filter(onPage);
 
   // "Network" = the connected run a segment belongs to, numbered per network type. Runs are ordered by their
   // first segment (page, then id), so the numbers do not depend on the order of the input arrays.
-  const segmentById = new Map(input.segments.map((s) => [s.id, s]));
+  const segmentById = new Map(allSegments.map((s) => [s.id, s]));
   const firstSegmentOf = (ids: readonly string[]) =>
     ids.map((id) => segmentById.get(id)).filter((s): s is Segment => !!s).sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id))[0];
-  const networks = computeNetworks({ segments: [...input.segments], fittings: [...input.fittings], portGroups: [...input.portGroups] })
+  const networks = computeNetworks({ segments: [...allSegments], fittings: [...allFittings], portGroups: [...input.portGroups] })
     .map((network) => ({ network, first: firstSegmentOf(network.segmentIds) }))
     .sort((a, b) => (a.first?.pageIndex ?? 0) - (b.first?.pageIndex ?? 0) || collator.compare(a.first?.id ?? '', b.first?.id ?? ''))
     .map((entry) => entry.network);
@@ -104,7 +112,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   }
 
   const unscaledPages = new Set<number>();
-  const segments = [...input.segments].sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id));
+  const segments = [...allSegments].sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id));
   const segmentTable: QuantityTable = {
     name: 'Segments',
     headers: ['Page', 'Id', 'Network', 'Network type', 'Shape', 'Diameter (mm)', 'Width (mm)', 'Height (mm)', 'Material', 'Length (m)', 'Routed', 'Start X (pt)', 'Start Y (pt)', 'End X (pt)', 'End Y (pt)'],
@@ -142,7 +150,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const panelOf = new Map(input.panels.map((panel) => [panel.equipmentStampId, panel.name]));
 
   const stampTable = (name: string, category: PlacedStamp['category']): QuantityTable => {
-    const stamps = input.stamps.filter((s) => s.category === category);
+    const stamps = allStamps.filter((s) => s.category === category);
     const fixed = [
       'Page',
       'Id',
@@ -174,7 +182,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
     );
   };
 
-  const fittings = [...input.fittings].sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id));
+  const fittings = [...allFittings].sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id));
   const fittingTable: QuantityTable = {
     name: 'Fittings',
     headers: ['Page', 'Id', 'Network', 'Kind', 'Routed', 'X (pt)', 'Y (pt)'],
