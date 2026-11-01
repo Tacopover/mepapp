@@ -70,6 +70,7 @@ export * from './sizing-network.js';
 export * from './quantities.js';
 export * from './quantities-merge.js';
 export * from './sheet-summary.js';
+export * from './building-takeoff.js';
 export * from './project-uuid.js';
 export * from './page-scope.js';
 export * from './building.js';
