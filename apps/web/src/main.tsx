@@ -70,6 +70,15 @@ if (container) {
         closeGuard={closeGuard}
         dialogs={dialogs}
         buildingStore={devBuildingStore}
+        pdfEngine={engine}
+        onRebuildReady={
+          import.meta.env.DEV
+            ? (run) => {
+                const building = (window as unknown as { __mepBuilding?: Record<string, unknown> }).__mepBuilding;
+                if (building) building.rebuildSummaries = run;
+              }
+            : undefined
+        }
       />,
     );
   });

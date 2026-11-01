@@ -7,12 +7,15 @@ import {
   getStampDefinition,
   isLibraryStampId,
   makeProjectUuid,
+  parseBuildingFile,
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
   DEFAULT_CEILING_HEIGHT_MM,
   getNetworkTypeFromLibrary,
   STAMP_LIBRARY,
   SAVED_STAMPS_SOURCE_ID,
+  type BuildingFile,
+  type BuildingSheet,
   type Discipline,
   type RoomNeed,
   type RoomType,
@@ -30,7 +33,7 @@ import {
   wantsNewProjectUuid,
 } from '@mepapp/core';
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool, type PdfExportReceipt, type WallDebugState } from '@mepapp/render';
-import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
+import type { PdfDocumentHandle, PdfEngine } from '@mepapp/pdf-engine';
 import { useSketchScene } from './useSketchScene.js';
 import { WallDebugPanel } from './components/WallDebugPanel.js';
 import { loadDefinitionBitmap } from './stampBitmap.js';
@@ -68,6 +71,7 @@ import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { loadBuildings, saveBuildings, type Building } from './buildings.js';
 import { stampNameLookups, summaryAfterSave } from './buildingContext.js';
+import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
 import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
 import { loadRoomTypes, saveRoomTypes } from './roomTypeStorage.js';
@@ -136,6 +140,10 @@ export interface MepSketchAppProps {
   dialogs: AppDialogs;
   /** Storage of the building file. After a Save the sheet summary of the saved document is written here. */
   buildingStore?: BuildingStore;
+  /** Reads the PDFs of a building. Needed for Rebuild summaries. */
+  pdfEngine?: PdfEngine;
+  /** Gives the app shell the rebuild action (null on unmount). A browser check starts it from the dev console. */
+  onRebuildReady?: (run: ((read?: (sheet: BuildingSheet) => Promise<File | undefined>) => Promise<RebuildResult | undefined>) | null) => void;
 }
 
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
@@ -237,6 +245,8 @@ export function MepSketchApp({
   closeGuard,
   dialogs,
   buildingStore,
+  pdfEngine,
+  onRebuildReady,
 }: MepSketchAppProps) {
   useEffect(() => setAppDialogs(dialogs), [dialogs]);
   const userStampLibrary = useUserStampLibrary(libraryStore, fileAccess.capabilities.folders);
@@ -777,6 +787,64 @@ export function MepSketchApp({
     },
     [buildingStore, customStampDefinitions, fileAccess, pdfHandle, sceneRef, userStampLibrary.definitions],
   );
+
+  // Rebuilds the sheet summary of every document of the open building. The PDFs are read by
+  // their stored path unless the caller gives a read function.
+  const handleRebuildSummaries = useCallback(
+    async (readOverride?: (sheet: BuildingSheet) => Promise<File | undefined>): Promise<RebuildResult | undefined> => {
+      if (!buildingStore || !pdfEngine) {
+        setStatus('Open a building first.');
+        return undefined;
+      }
+      try {
+        const stored = await buildingStore.read();
+        if (stored === undefined) {
+          setStatus('Open a building first.');
+          return undefined;
+        }
+        const building: BuildingFile = parseBuildingFile(JSON.parse(stored.json));
+        const read = readOverride ?? (async (sheet: BuildingSheet) => {
+          const path = sheet.location.path;
+          if (path === undefined || !fileAccess.readPath) return undefined;
+          return (await fileAccess.readPath(path))?.file;
+        });
+        const whyUnreadable = async (sheet: BuildingSheet): Promise<string> => {
+          const path = sheet.location.path;
+          if (path === undefined) return 'no path is stored for this PDF';
+          if (!fileAccess.statPath) return 'this platform cannot read a PDF by path';
+          const stat = await fileAccess.statPath(path);
+          if (stat.state === 'missing') return 'PDF not found';
+          if (stat.state === 'no-access') return 'MepApp may not read the PDF (no access)';
+          return 'the PDF could not be read';
+        };
+        const result = await rebuildSummaries({
+          building,
+          engine: pdfEngine,
+          read,
+          whyUnreadable,
+          stampNames: (project) => stampNameLookups([...project.customStampDefinitions, ...userStampLibrary.definitions]),
+          store: buildingStore,
+          onProgress: (done, total, name) => setStatus(`Rebuilding summaries: ${done} of ${total}${name ? ` (${name})` : ''}`),
+          signal: new AbortController().signal,
+        });
+        const total = result.ok + result.failed.length;
+        const first = result.failed[0];
+        setStatus(
+          `Rebuilt ${result.ok} of ${total} summaries.${first ? ` ${result.failed.length} failed: ${first.sheet.displayName}: ${first.reason}` : ''}`,
+        );
+        return result;
+      } catch (err) {
+        setStatus(`Failed to rebuild summaries: ${(err as Error).message}`);
+        return undefined;
+      }
+    },
+    [buildingStore, fileAccess, pdfEngine, userStampLibrary.definitions],
+  );
+
+  useEffect(() => {
+    onRebuildReady?.(handleRebuildSummaries);
+    return () => onRebuildReady?.(null);
+  }, [handleRebuildSummaries, onRebuildReady]);
 
   // The unsaved-changes marker is cleared only after the bytes reach the
   // file, so a cancelled picker or a failed write keeps the close warning.
