@@ -4,10 +4,25 @@ import { displayDimensions } from '@mepapp/core';
 import { MupdfEngine } from '@mepapp/pdf-engine-mupdf';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
 import type { AppDialogs, CloseGuard, FileAccess } from '@mepapp/platform';
-import { IndexedDbLibraryStore, WebAppDialogs, WebCloseGuard, WebFileAccess } from '@mepapp/platform-web';
+import {
+  createDevBuildingStore,
+  IndexedDbLibraryStore,
+  WebAppDialogs,
+  WebCloseGuard,
+  WebFileAccess,
+} from '@mepapp/platform-web';
 import { createPlacementWorker, createRoomDetectionClient } from './roomDetectionClient';
 
 const BACKDROP_DPI = 150;
+
+if (import.meta.env.DEV) {
+  const devBuildingStore = createDevBuildingStore();
+  (window as unknown as { __mepBuilding: unknown }).__mepBuilding = {
+    load: (json: string, summaries?: Record<string, string>) => devBuildingStore.load(json, summaries),
+    read: () => devBuildingStore.read(),
+    store: devBuildingStore,
+  };
+}
 
 const engine = new MupdfEngine();
 const libraryStore = new IndexedDbLibraryStore();
