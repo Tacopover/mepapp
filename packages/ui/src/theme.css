@@ -1717,10 +1717,6 @@
   border-bottom: 1px solid var(--line-soft, var(--line));
   padding: 6px 0;
 }
-.mep-modal--buildings .mep-modal-title {
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-}
 .mep-rebuild-result ul {
   margin: 2px 0 8px;
   padding-left: 18px;
@@ -1730,7 +1726,250 @@
   overflow-wrap: anywhere;
 }
 .mep-modal--buildings {
-  width: min(900px, 94vw);
+  box-sizing: border-box;
+  width: min(1100px, 96vw);
+  height: min(760px, 88vh);
+  max-height: none;
+}
+.mep-modal--buildings .mep-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.mep-modal--buildings .mep-modal-header {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+.mep-modal--buildings .mep-modal-actions {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+}
+.mep-buildings-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.mep-buildings-header-top .mep-modal-title {
+  margin: 0;
+}
+.mep-buildings-header-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 8px;
+}
+.mep-buildings-header-info p {
+  margin: 0;
+}
+.mep-buildings-location {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 200px;
+  margin: 0;
+}
+.mep-buildings-counts {
+  font-size: 12px;
+  margin: 0;
+}
+.mep-buildings-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9a5b00;
+  border: 1.5px solid #9a5b00;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.mep-buildings-menu-dropdown {
+  left: auto;
+  right: 0;
+}
+.mep-buildings-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+}
+.mep-buildings-nav {
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  padding-right: 8px;
+}
+.mep-buildings-select {
+  margin-bottom: 0;
+}
+.mep-buildings-detail {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mep-buildings-strip,
+.mep-buildings-create,
+.mep-buildings-empty {
+  flex: none;
+}
+.mep-buildings-create {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.mep-modal .mep-buildings-create input {
+  flex: 1;
+  width: auto;
+  margin-bottom: 0;
+}
+.mep-buildings-tabs {
+  flex: none;
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.mep-buildings-tab {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+}
+.mep-buildings-tab.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.mep-buildings-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.mep-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mep-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+}
+.mep-tree-item--level {
+  margin-left: 18px;
+}
+.mep-tree-item:hover {
+  background: var(--surface-2);
+}
+.mep-tree-item--selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.mep-tree-arrow {
+  width: 14px;
+  flex: none;
+  color: var(--muted);
+}
+.mep-tree-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mep-tree-label {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-tree-detail {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-tree-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0 8px;
+  flex: none;
+}
+.mep-tree-item--selected .mep-tree-badge {
+  background: var(--surface);
+}
+.mep-tree-count {
+  font-size: 11px;
+  color: var(--muted);
+  flex: none;
+}
+.mep-tree-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b3261e;
+  flex: none;
+}
+.mep-tree-forget {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+  flex: none;
+  opacity: 0;
+}
+.mep-tree-item:hover .mep-tree-forget,
+.mep-tree-item:focus .mep-tree-forget {
+  opacity: 1;
+}
+.mep-tree-forget:focus-visible {
+  opacity: 1;
+}
+.mep-modal--buildings .mep-section h4 {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  border-bottom: none;
+  padding-bottom: 0;
+  margin: 0 0 6px;
+}
+.mep-modal--buildings :is(button, input, select, [role="treeitem"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mep-level-edit-row--selected {
+  background: var(--accent-soft);
+}
+@media (max-width: 899px) {
+  .mep-buildings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 10px;
+  }
+  .mep-buildings-nav {
+    border-right: none;
+    padding-right: 0;
+    overflow: visible;
+  }
 }
 .mep-level-edit-row {
   display: flex;

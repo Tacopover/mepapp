@@ -11,6 +11,10 @@ async function openDialog() {
   await dlg.waitFor({ state: 'visible', timeout: 8000 });
   await idle(300);
 }
+async function buildingMenu(item) {
+  await dlg.locator('button.mep-menu-btn').click();
+  await dlg.locator('[role=menuitem]', { hasText: item }).click();
+}
 
 await openDialog();
 check(/Manage Buildings/.test(await dlg.textContent()), 'dialog opens');
@@ -51,11 +55,11 @@ await page.locator('button.mep-onboarding-start').click({ timeout: 30000 }).catc
 await page.waitForFunction(() => window.__mepSketchScene !== undefined);
 await openDialog();
 const text2 = await dlg.textContent();
-check(/Recent buildings/.test(text2) && /Office block/.test(text2), 'recent list shows the building after a reload', text2.slice(0, 300));
+check((await dlg.locator('[role=treeitem][data-kind=building]', { hasText: 'Office block' }).count()) === 1 && /Office block/.test(text2), 'tree lists the building after a reload', text2.slice(0, 300));
 await shot('B3-T02-recent');
 
 // Open from recent: the dev store is empty after a reload, so the user sees a clear message.
-await dlg.locator('button', { hasText: /^Open$/ }).first().click();
+await dlg.locator('[role=treeitem][data-kind=building]', { hasText: 'Office block' }).click();
 await idle(400);
 const text3 = await dlg.textContent();
 check(/was not found/.test(text3), 'recent entry with no file gives a message', text3.slice(0, 300));
@@ -69,10 +73,12 @@ await dlg.locator('button', { hasText: /^Open building…$/ }).click();
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Office block' }).waitFor({ timeout: 8000 }).catch(() => {});
 check(/0 levels, 0 sheets/.test(await dlg.textContent()), 'Open building loads the file');
 
-// Remove from recent.
-await dlg.locator('button', { hasText: /^Remove from list$/ }).first().click();
+// Remove from recent: the Remove button shows only for a building that is not open, so close it first.
+await buildingMenu('Close building');
 await idle(300);
-check(!/Recent buildings/.test(await dlg.textContent()), 'Remove empties the recent list');
+await dlg.locator('button[aria-label="Remove Office block from the list"]').click();
+await idle(300);
+check((await dlg.locator('[role=treeitem][data-kind=building]').count()) === 0, 'Remove empties the building tree');
 
 // Dev hook still loads a building (used by the B2 checks).
 await page.evaluate(async () => {

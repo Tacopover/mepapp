@@ -27,6 +27,7 @@ export interface BuildingSheetsPaneProps {
   sheetStatus: Record<string, SheetStatus>;
   sheetSummary: Record<string, SheetSummaryInfo>;
   onRefreshStatus: () => void;
+  onPendingCountChange?: (count: number) => void;
 }
 
 interface RelinkAsk {
@@ -54,6 +55,7 @@ export function BuildingSheetsPane({
   sheetStatus,
   sheetSummary,
   onRefreshStatus,
+  onPendingCountChange,
 }: BuildingSheetsPaneProps) {
   const [pending, setPending] = useState<PendingPdf[]>([]);
   const [busy, setBusy] = useState(false);
@@ -66,6 +68,10 @@ export function BuildingSheetsPane({
   }, []);
 
   const groups = groupPdfs(file, pending);
+  const waitingPages = groups.filter((g) => g.pending).reduce((n, g) => n + g.rows.filter((row) => row.sheet === null).length, 0);
+  useEffect(() => {
+    onPendingCountChange?.(waitingPages);
+  }, [waitingPages]);
   const totals = pdfTotals(groups);
   const noEngineReason = engine === undefined ? 'PDF reading is not available in this version of the app.' : undefined;
   const disabled = busy || engine === undefined;

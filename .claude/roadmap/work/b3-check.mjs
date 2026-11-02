@@ -156,10 +156,11 @@ check((await groupOf('first2.pdf').locator('[data-testid="relink-pdf"]').count()
 await shot('B3-T10-6-relinked');
 
 // Step 7: close the building, open it again from the recent list.
-await dlg.locator('button', { hasText: /^Close building$/ }).click();
+await dlg.locator('button.mep-menu-btn').click();
+await dlg.locator('[role=menuitem]', { hasText: 'Close building' }).click();
 await idle(400);
 check(/No building is open/.test(await dlg.textContent()), 'step 7: building closed');
-await dlg.locator('.mep-buildings-recent button', { hasText: /^Open$/ }).first().click();
+await dlg.locator('[role=treeitem][data-kind=building]', { hasText: 'Office block' }).click();
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Office block' }).waitFor({ timeout: 8000 });
 await idle(600);
 s = await stored();

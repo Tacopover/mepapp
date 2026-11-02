@@ -14,12 +14,13 @@ import { countLabel, deleteBlockedReason, nextLevelElevation, sheetCount } from 
 export interface BuildingLevelsPaneProps {
   file: BuildingFile;
   update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
+  selectedLevelId?: string | null;
 }
 
 /**
  * Edits the levels of the open building. Every change goes through update, which writes the building file.
  */
-export function BuildingLevelsPane({ file, update }: BuildingLevelsPaneProps) {
+export function BuildingLevelsPane({ file, update, selectedLevelId }: BuildingLevelsPaneProps) {
   const isSorted = file.levels.every((level, index) => index === 0 || file.levels[index - 1]!.elevationMm <= level.elevationMm);
 
   return (
@@ -39,7 +40,12 @@ export function BuildingLevelsPane({ file, update }: BuildingLevelsPaneProps) {
         const blocked = deleteBlockedReason(file, level.id);
         const sheets = sheetCount(file, level.id);
         return (
-          <div key={level.id} className="mep-elem-row mep-level-edit-row" data-testid="level-row">
+          <div
+            key={level.id}
+            className={`mep-elem-row mep-level-edit-row${level.id === selectedLevelId ? ' mep-level-edit-row--selected' : ''}`}
+            aria-current={level.id === selectedLevelId ? 'true' : undefined}
+            data-testid="level-row"
+          >
             <LevelNameInput name={level.name} onRename={(name) => void update((f) => renameLevel(f, level.id, name))} />
             <LevelElevationInput
               value={level.elevationMm}

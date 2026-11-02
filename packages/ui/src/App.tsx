@@ -81,6 +81,7 @@ import { useBuilding } from './useBuilding.js';
 import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
 import { currentSheetLabel } from './buildingStatus.js';
+import { currentSheetLevelId } from './buildingTree.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { shouldWriteSummaryOnOpen } from './summaryOnOpen.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
@@ -2160,6 +2161,7 @@ export function MepSketchApp({
           pdfEngine={pdfEngine}
           onOpenSheet={openSheet}
           onRebuildSummaries={(run) => handleRebuildSummaries(undefined, run)}
+          activeSheetLevelId={currentSheetLevelId(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex)}
         />
       )}
 

@@ -99,12 +99,9 @@ check(/Page\s*2\s*of\s*3/.test(await pageChip()), 'switching back to the multi.p
 
 // Missing file: the status says so and the dialog stays open.
 await openDialog();
-await groupOf('gone.pdf').locator('[data-testid="open-sheet"]').click();
+check(await groupOf('gone.pdf').locator('[data-testid="open-sheet"]').isDisabled(), 'Open is disabled for a missing PDF (since B3-T06)');
 await idle(800);
 check((await dlg.count()) === 1, 'dialog stays open when the file is missing');
-const st = await statusText();
-check(/Could not open gone\.pdf/.test(st), 'status names the missing file', st);
-check(/Could not open gone\.pdf/.test((await dlg.locator('[data-testid="sheets-notice"]').textContent()) ?? ''), 'the Sheets pane shows the reason');
 await shot('B3-T05-missing');
 
 // Pick the file again (no path): the stub picker gives first.pdf.
