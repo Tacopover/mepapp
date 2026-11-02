@@ -145,6 +145,11 @@ The web dev server uses the web store (OPFS handles from `lib.mjs`). A desktop-o
 - Verify: from an empty profile: create a building, add two levels with elevation 0 and 3000, add the two fixtures, assign, rebuild summaries, open a sheet, delete and relink, close and reopen the dialog from the recent list. All with real clicks and typing. Screenshots of each step. Core and UI tests, typecheck, `pnpm build --force`.
 - Depends on: B3-T09.
 
+**B3-T11 ui: Building dialog overhaul (added 2026-11-02, runs before B4).**
+- Reason: the user finds the dialog too basic in looks and in use. Needs a list of the PDFs open in the viewer with one-step "Add to level", a structured overview of all buildings and levels with one-click switching, and a rethink of Rebuild (D-B-27).
+- Prompt for the session: `.claude/plans/buildings-b3-ui-prompt.md`. That session writes `buildings-b3-ui-review.md` and `buildings-b3-ui.md` and stops for the user before it implements.
+- Status: planned. T01 to T10 are done (commits in the ledger).
+
 ## 6. Open decision for B3 (director default)
 
 **D-B-17** (director, easy to reverse): where do unassigned pages live? Options: A. Only in the dialog state (recommended: `sheets` stays the one source of truth and each sheet has a level). B. As `levelId: null` entries in the file. Reason for A: B lets every reader (takeoff, riser) check for a null level.
