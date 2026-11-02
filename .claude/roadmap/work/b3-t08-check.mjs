@@ -53,7 +53,7 @@ await idle(800);
 
 check((await groupOf('ground.pdf').locator('[data-testid="sheet-summary"]').count()) === 0, 'before: ground.pdf has no summary text');
 check(/No summary/.test((await groupOf('ground.pdf').textContent()) ?? ''), 'before: ground.pdf status says "No summary"');
-check((await summaryOf('first.pdf')) === 'No summary', 'before: first.pdf says "No summary"');
+check((await groupOf('first.pdf').locator('[data-testid="sheet-summary"]').count()) === 0 && /No summary|Not saved yet/.test((await groupOf('first.pdf').locator('[data-testid="sheet-status"]').first().textContent()) ?? ''), 'before: first.pdf chip shows a no-summary state and no summary text');
 const rebuild = dlg.locator('[data-testid="rebuild-summaries"]');
 check((await rebuild.count()) === 1 && (await rebuild.isEnabled()), 'the Rebuild summaries button is enabled');
 await shot('B3-T08-before');

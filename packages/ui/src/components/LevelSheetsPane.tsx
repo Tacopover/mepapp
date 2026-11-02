@@ -175,8 +175,7 @@ export function LevelSheetsPane({
                       {statusLabel(status)}
                     </span>
                   )}
-                  {status === 'not-stamped' && <span className="mep-hint">{statusHint(status)}</span>}
-                  {status !== undefined && status !== 'no-summary' && (
+                  {(status === 'ok' || status === 'old-summary') && (
                     <span className="mep-hint" data-testid="sheet-summary">
                       {summaryText(sheetSummary[sheet.id])}
                     </span>
@@ -249,6 +248,11 @@ export function LevelSheetsPane({
                     Remove
                   </button>
                 </div>
+                {status === 'not-stamped' && (
+                  <p className="mep-hint mep-sheet-hint" data-testid="sheet-hint">
+                    {statusHint(status)}
+                  </p>
+                )}
                 {relinkAsk !== null && relinkAsk.sheetId === sheet.id && (
                   <div className="mep-buildings-actions">
                     <p className="mep-hint" data-testid="relink-confirm">

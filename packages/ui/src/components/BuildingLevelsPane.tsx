@@ -70,68 +70,70 @@ export function BuildingLevelsPane({
 
   return (
     <div className="mep-section">
-      <h4>Levels</h4>
+      <h4>Level settings</h4>
       {file.levels.length === 0 && <p className="mep-hint">No levels yet. Use + Add level.</p>}
       {selectedLevel !== null && (
         <div key={selectedLevel.id} className="mep-level-detail" data-testid="level-row">
-          <span>Name</span>
-          <LevelNameInput
-            name={selectedLevel.name}
-            onRename={(name) => void update((f) => renameLevel(f, selectedLevel.id, name))}
-            focusRequested={focusNameLevelId === selectedLevel.id}
-            onFocused={onNameFocused}
-          />
-          <span>Elevation</span>
-          <span className="mep-level-elevation">
-            <LevelElevationInput
-              value={selectedLevel.elevationMm}
-              onCommit={(value) => void update((f) => setLevelElevation(f, selectedLevel.id, value))}
+          <div className="mep-level-row">
+            <span>Name</span>
+            <LevelNameInput
+              name={selectedLevel.name}
+              onRename={(name) => void update((f) => renameLevel(f, selectedLevel.id, name))}
+              focusRequested={focusNameLevelId === selectedLevel.id}
+              onFocused={onNameFocused}
             />
-            <span>mm</span>
-          </span>
-          <span>Order</span>
-          <div className="mep-level-move">
-            <button
-              type="button"
-              aria-label="Move level up"
-              title="Move level up"
-              aria-disabled={selectedIndex === 0}
-              onClick={() => {
-                if (selectedIndex === 0) return;
-                void update((f) => moveLevel(f, selectedLevel.id, selectedIndex - 1));
-              }}
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              aria-label="Move level down"
-              title="Move level down"
-              aria-disabled={selectedIndex === file.levels.length - 1}
-              onClick={() => {
-                if (selectedIndex === file.levels.length - 1) return;
-                void update((f) => moveLevel(f, selectedLevel.id, selectedIndex + 1));
-              }}
-            >
-              ↓
-            </button>
+            <span>Elevation</span>
+            <span className="mep-level-elevation">
+              <LevelElevationInput
+                value={selectedLevel.elevationMm}
+                onCommit={(value) => void update((f) => setLevelElevation(f, selectedLevel.id, value))}
+              />
+              <span>mm</span>
+            </span>
           </div>
-          <span />
-          <div className="mep-level-delete">
-            <button
-              type="button"
-              aria-disabled={deleteBlocked !== null}
-              aria-describedby={deleteBlocked !== null ? 'mep-level-delete-reason' : undefined}
-              title={deleteBlocked ?? 'Delete level'}
-              onClick={() => deleteAt(selectedLevel, selectedIndex)}
-            >
-              Delete
-            </button>
-            {deleteBlocked !== null && (
-              <p id="mep-level-delete-reason" className="mep-hint" data-testid="delete-reason">
-                {deleteBlocked}
-              </p>
-            )}
+          <div className="mep-level-row">
+            <div className="mep-level-move">
+              <button
+                type="button"
+                aria-label="Move level up"
+                title="Move level up"
+                aria-disabled={selectedIndex === 0}
+                onClick={() => {
+                  if (selectedIndex === 0) return;
+                  void update((f) => moveLevel(f, selectedLevel.id, selectedIndex - 1));
+                }}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label="Move level down"
+                title="Move level down"
+                aria-disabled={selectedIndex === file.levels.length - 1}
+                onClick={() => {
+                  if (selectedIndex === file.levels.length - 1) return;
+                  void update((f) => moveLevel(f, selectedLevel.id, selectedIndex + 1));
+                }}
+              >
+                ↓
+              </button>
+            </div>
+            <div className="mep-level-delete">
+              <button
+                type="button"
+                aria-disabled={deleteBlocked !== null}
+                aria-describedby={deleteBlocked !== null ? 'mep-level-delete-reason' : undefined}
+                title={deleteBlocked ?? 'Delete level'}
+                onClick={() => deleteAt(selectedLevel, selectedIndex)}
+              >
+                Delete
+              </button>
+              {deleteBlocked !== null && (
+                <p id="mep-level-delete-reason" className="mep-hint" data-testid="delete-reason">
+                  {deleteBlocked}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -146,7 +148,7 @@ export function BuildingLevelsPane({
       {file.levels.length > 0 && (
         <>
           <h4>Level order</h4>
-          <div className="mep-buildings-actions">
+          <div className="mep-buildings-actions mep-level-sort">
             <button
               type="button"
               aria-disabled={sortBlocked !== null}
@@ -158,12 +160,12 @@ export function BuildingLevelsPane({
             >
               Sort by elevation
             </button>
+            {sortBlocked !== null && (
+              <p id="mep-level-sort-reason" className="mep-hint" data-testid="sort-reason">
+                {sortBlocked}
+              </p>
+            )}
           </div>
-          {sortBlocked !== null && (
-            <p id="mep-level-sort-reason" className="mep-hint" data-testid="sort-reason">
-              {sortBlocked}
-            </p>
-          )}
         </>
       )}
       {levelWarnings(file).map((warning) => (

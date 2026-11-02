@@ -429,15 +429,6 @@ export function ManageBuildingsDialog({
                   )}
                   {selected === NOT_PLACED_KEY && <p className="mep-hint">Pages without a level are kept only while this dialog is open.</p>}
                 </div>
-                <BuildingLevelsPane
-                  key={`${openBuilding.file.id}-levels`}
-                  file={openBuilding.file}
-                  update={building.update}
-                  selectedLevelId={selectedLevel?.id ?? null}
-                  focusNameLevelId={focusNameLevelId}
-                  onNameFocused={() => setFocusNameLevelId(null)}
-                  onSelectKey={onSelectKey}
-                />
                 <LevelSheetsPane
                   key={`${openBuilding.file.id}-level-sheets-${selectedLevel?.id ?? 'all'}`}
                   file={openBuilding.file}
@@ -455,6 +446,22 @@ export function ManageBuildingsDialog({
                   onRefreshStatus={building.refreshSheetStatus}
                   onNotice={onNotice}
                 />
+                <BuildingLevelsPane
+                  key={`${openBuilding.file.id}-levels`}
+                  file={openBuilding.file}
+                  update={building.update}
+                  selectedLevelId={selectedLevel?.id ?? null}
+                  focusNameLevelId={focusNameLevelId}
+                  onNameFocused={() => setFocusNameLevelId(null)}
+                  onSelectKey={onSelectKey}
+                />
+                {/* T11h replaces this pane */}
+                <BuildingSummariesPane
+                  key={`${openBuilding.file.id}-summaries`}
+                  hasSheets={openBuilding.file.sheets.length > 0}
+                  onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
+                  onDone={() => void building.refreshSheetStatus()}
+                />
                 {/* T11g replaces this pane */}
                 <BuildingSheetsPane
                   key={openBuilding.file.id}
@@ -465,13 +472,6 @@ export function ManageBuildingsDialog({
                   onRefreshStatus={building.refreshSheetStatus}
                   onPendingCountChange={setNotPlaced}
                   onNotice={onNotice}
-                />
-                {/* T11h replaces this pane */}
-                <BuildingSummariesPane
-                  key={`${openBuilding.file.id}-summaries`}
-                  hasSheets={openBuilding.file.sheets.length > 0}
-                  onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
-                  onDone={() => void building.refreshSheetStatus()}
                 />
               </div>
             </>

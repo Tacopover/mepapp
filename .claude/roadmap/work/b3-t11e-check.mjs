@@ -80,7 +80,7 @@ check(JSON.stringify(names) === JSON.stringify(['gone.pdf', 'nopath.pdf', 'orig.
 check((await chip('orig.pdf').textContent())?.trim() === 'OK', 'orig.pdf chip says OK', (await chip('orig.pdf').textContent()) ?? '');
 check((await chip('gone.pdf').textContent())?.trim() === 'Missing', 'gone.pdf chip says Missing', (await chip('gone.pdf').textContent()) ?? '');
 check((await chip('nopath.pdf').textContent())?.trim() === 'Not saved yet', 'nopath.pdf chip says Not saved yet', (await chip('nopath.pdf').textContent()) ?? '');
-check(/Save it in MepApp to link it/.test((await rowOf('nopath.pdf').textContent()) ?? ''), 'nopath.pdf row explains the next step');
+check(/Save it in MepApp to link it/.test((await dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]').filter({ hasText: 'nopath.pdf' }).textContent()) ?? ''), 'nopath.pdf group explains the next step');
 check(!/stamped/i.test((await dlg.textContent()) ?? ''), 'the word "stamped" is gone from the dialog');
 check((await rowOf('nopath.pdf').locator('[data-testid="open-sheet"]').textContent())?.trim() === 'Choose file…', 'a sheet with no path has "Choose file…"');
 check((await rowOf('orig.pdf').locator('[data-testid="open-sheet"]').textContent())?.trim() === 'Open', 'a sheet with a path has "Open"');
@@ -88,6 +88,40 @@ check((await rowOf('gone.pdf').locator('[data-testid="relink-pdf"]').count()) ==
 check((await rowOf('orig.pdf').locator('[data-testid="relink-pdf"]').count()) === 0, 'an OK sheet has no Relink');
 check(/1 of 3 sheets have a summary/.test((await dlg.locator('[data-testid="summary-count"]').textContent()) ?? ''), 'footer: 1 of 3 sheets have a summary', (await dlg.locator('[data-testid="summary-count"]').textContent()) ?? '');
 await shot('B3-T11e-ground');
+
+// The three sheet rows and the footer sit inside the detail pane; the pane does not scroll.
+const pane = () => page.locator('.mep-buildings-detail');
+const paneBox = await pane().boundingBox();
+const fitRows = dlg.locator('[data-testid="level-sheets"] [data-testid="page-row"], [data-testid="level-sheets"] [data-testid="summary-count"]');
+const fitBoxes = [];
+for (let i = 0; i < (await fitRows.count()); i += 1) fitBoxes.push(await fitRows.nth(i).boundingBox());
+const fitInside = fitBoxes.every((b) => b !== null && b.y >= paneBox.y - 1 && b.y + b.height <= paneBox.y + paneBox.height + 1);
+check(fitBoxes.length === 4 && fitInside, 'Ground floor: the sheet rows and the footer sit inside the detail pane', JSON.stringify({ paneBox, fitBoxes }));
+check((await pane().evaluate((el) => el.scrollTop)) === 0, 'Ground floor: the detail pane does not scroll');
+await shot('B3-T11e-ground3');
+
+// A sheet without a saved path: one hint line under its row, and no "No summary" text.
+check((await dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]').filter({ hasText: 'nopath.pdf' }).locator('[data-testid="sheet-hint"]').count()) === 1, 'nopath.pdf: one hint line under its row');
+check(!/No summary/.test((await rowOf('nopath.pdf').textContent()) ?? ''), 'nopath.pdf row does not say "No summary"');
+
+// Narrow window: the tree is a select, and the sheet rows fit the pane width.
+await page.setViewportSize({ width: 760, height: 640 });
+await idle(500);
+const picker = dlg.locator('select[aria-label="Building or level"]');
+const groundValue = await picker.locator('option').evaluateAll((opts) => opts.find((o) => o.textContent.trim().startsWith('Ground floor'))?.value ?? '');
+await picker.selectOption(groundValue);
+await idle(400);
+const widths = await pane().evaluate((el) => [el.scrollWidth, el.clientWidth]);
+check(widths[0] <= widths[1] + 1, 'narrow: the detail pane has no horizontal scroll', JSON.stringify(widths));
+const lastRow = dlg.locator('[data-testid="level-sheets"] [data-testid="page-row"]').last();
+await lastRow.scrollIntoViewIfNeeded();
+await idle(200);
+const lastBox = await lastRow.boundingBox();
+const narrowPaneBox = await pane().boundingBox();
+check(lastBox !== null && lastBox.x + lastBox.width <= narrowPaneBox.x + narrowPaneBox.width + 1, 'narrow: the last sheet row ends inside the pane', JSON.stringify({ lastBox, narrowPaneBox }));
+await shot('B3-T11e-narrow');
+await page.setViewportSize({ width: 1600, height: 1000 });
+await idle(500);
 
 // Move to: l1a.pdf from Level 1 to Ground floor.
 await levelItem('Level 1').click();
