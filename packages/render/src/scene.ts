@@ -4246,12 +4246,14 @@ export class SketchScene {
     return this.doc.projectUuid;
   }
 
-  /** Stores the project id that exportToPdf wrote into a saved file. Call it after the write succeeded and before markSaved. */
-  commitProjectUuid(documentId: string, projectUuid: string): void {
-    if (!isProjectUuid(projectUuid)) throw new Error('commitProjectUuid: projectUuid is not a lowercase UUID');
+  /** Stores the project id that exportToPdf wrote into a saved file. Call it after the write succeeded and before markSaved. Without a projectUuid, keeps the document's id and only records whether the file holds it (opts.inFile, true by default). */
+  commitProjectUuid(documentId: string, projectUuid?: string, opts: { inFile?: boolean } = {}): void {
+    if (projectUuid !== undefined && !isProjectUuid(projectUuid)) throw new Error('commitProjectUuid: projectUuid is not a lowercase UUID');
     const target = this.documents.find((d) => d.id === documentId);
     if (!target) return;
-    target.projectUuid = projectUuid;
+    if (projectUuid !== undefined) target.projectUuid = projectUuid;
+    if (target.projectUuid === null) return;
+    target.projectUuidInFile = opts.inFile ?? true;
     this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
@@ -4359,7 +4361,9 @@ export class SketchScene {
     target.roomNeeds.splice(0, target.roomNeeds.length, ...(parseRoomNeeds(doc.roomNeeds) ?? []));
     target.ceilingHeightMm = doc.ceilingHeightMm;
     const previousProjectUuid = target.projectUuid;
+    const previousProjectUuidInFile = target.projectUuidInFile;
     target.projectUuid = ensureProjectUuid(doc.projectUuid ?? null, () => crypto.randomUUID());
+    target.projectUuidInFile = typeof doc.projectUuid === 'string';
     for (const key of Object.keys(target.roomTypeCeilingHeightsMm)) delete target.roomTypeCeilingHeightsMm[key];
     Object.assign(target.roomTypeCeilingHeightsMm, doc.roomTypeCeilingHeightsMm);
     target.calibrations.clear();
@@ -4473,7 +4477,7 @@ export class SketchScene {
       this.emitter.emit('documentsChanged', this.getDocuments());
       this.emitter.emit('projectLoaded');
       this.emitter.emit('roomsChanged');
-    } else if (target.projectUuid !== previousProjectUuid) {
+    } else if (target.projectUuid !== previousProjectUuid || target.projectUuidInFile !== previousProjectUuidInFile) {
       this.emitter.emit('documentsChanged', this.getDocuments());
     }
   }
@@ -4537,8 +4541,12 @@ export class SketchScene {
       await this.loadProjectInto(doc, JSON.parse(new TextDecoder().decode(embedded)), resolveIconBitmap);
     }
     const previousProjectUuid = doc.projectUuid;
+    const previousProjectUuidInFile = doc.projectUuidInFile;
     doc.projectUuid = ensureProjectUuid(doc.projectUuid, () => crypto.randomUUID());
-    if (doc.projectUuid !== previousProjectUuid) this.emitter.emit('documentsChanged', this.getDocuments());
+    if (!embedded) doc.projectUuidInFile = false;
+    if (doc.projectUuid !== previousProjectUuid || doc.projectUuidInFile !== previousProjectUuidInFile) {
+      this.emitter.emit('documentsChanged', this.getDocuments());
+    }
 
     const domainEntries = this.domainSyncEntries(doc);
     const observed = await this.observedAnnotations(handle, doc);

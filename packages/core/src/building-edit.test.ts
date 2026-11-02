@@ -292,6 +292,18 @@ describe('building edit', () => {
     expect(unwrap(relinkSheet(sample(), 's0', { fileName: 'plan.pdf' }, 'u-1')).sheets[0]!.projectUuid).toBe('u-1');
   });
 
+  it('a duplicate that already exists elsewhere in the file does not block a relink of an unrelated sheet to a free id', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [
+        ...sample().sheets,
+        { id: 's2', levelId: 'l1', projectUuid: 'u-2', pageIndex: 0, displayName: 'Plan p1 b', location: { fileName: 'b.pdf' } },
+        { id: 's3', levelId: 'l1', projectUuid: 'u-2', pageIndex: 0, displayName: 'Plan p1 c', location: { fileName: 'c.pdf' } },
+      ],
+    };
+    expect(relinkSheet(file, 's0', { fileName: 'plan.pdf' }, 'u-9')).toMatchObject({ ok: true });
+  });
+
   it('sorts levels by elevation', () => {
     const file: BuildingFile = {
       ...emptyBuilding('b-1', 'Tower'),

@@ -17,9 +17,10 @@ export interface OpenDocumentRow {
   pages: OpenDocumentPage[];
   state: 'placed' | 'partly' | 'not-placed';
   needsSave: boolean;
+  sheetProjectUuid: string | null;
 }
 
-/** One row per open document, in the order of docs. A page takes the strongest sheet match for its page index. A name-and-size match counts only when the document has no path. */
+/** One row per open document, in the order of docs. A page takes the strongest sheet match for its page index. A name-and-size match counts only when the document has no path. An id counts only when the file holds it (projectUuidInFile); a minted id never matches a sheet, and needsSave is true until a Save writes it. */
 export function openDocumentRows(
   docs: readonly DocumentSummary[],
   targets: ReadonlyMap<string, FileTarget>,
@@ -29,11 +30,12 @@ export function openDocumentRows(
   return docs.map((doc) => {
     const path = targets.get(doc.id)?.path;
     const isActive = doc.id === active.documentId;
+    const sheetProjectUuid = doc.projectUuidInFile ? doc.projectUuid : null;
     const matches =
       file === null
         ? []
         : findSheets(file, {
-            projectUuid: doc.projectUuid,
+            projectUuid: sheetProjectUuid,
             ...(path !== undefined ? { path } : {}),
             fileName: doc.fileName,
             sizeBytes: doc.sizeBytes ?? Number.NaN,
@@ -51,7 +53,8 @@ export function openDocumentRows(
       displayName: doc.fileName,
       pages,
       state,
-      needsSave: doc.projectUuid === null,
+      needsSave: !doc.projectUuidInFile,
+      sheetProjectUuid,
     };
   });
 }

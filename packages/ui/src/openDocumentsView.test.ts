@@ -23,6 +23,7 @@ const docOf = (overrides: Partial<DocumentSummary> & Pick<DocumentSummary, 'id' 
   isDirty: false,
   hasPdf: true,
   projectUuid: null,
+  projectUuidInFile: false,
   pageCount: 1,
   sizeBytes: 1000,
   ...overrides,
@@ -33,14 +34,14 @@ const NO_ACTIVE = { documentId: null, pageIndex: null };
 describe('openDocumentRows', () => {
   it('reports placed when all pages match a sheet by id', () => {
     const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s2', 1, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s3', 2, 'a.pdf', { projectUuid: 'u1' })]);
-    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', pageCount: 3 })], new Map(), file, NO_ACTIVE);
+    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: true, pageCount: 3 })], new Map(), file, NO_ACTIVE);
     expect(row!.state).toBe('placed');
     expect(row!.pages.map((page) => page.sheet?.id)).toEqual(['s1', 's2', 's3']);
   });
 
   it('reports partly when 2 of 3 pages have a sheet', () => {
     const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s2', 2, 'a.pdf', { projectUuid: 'u1' })]);
-    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', pageCount: 3 })], new Map(), file, NO_ACTIVE);
+    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: true, pageCount: 3 })], new Map(), file, NO_ACTIVE);
     expect(row!.state).toBe('partly');
     expect(row!.pages.map((page) => page.sheet?.id ?? null)).toEqual(['s1', null, 's2']);
   });
@@ -95,13 +96,13 @@ describe('openDocumentRows', () => {
 
   it('never matches two different ids, even when the name matches', () => {
     const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1', sizeBytes: 1000 })]);
-    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u2', sizeBytes: 1000 })], new Map(), file, NO_ACTIVE);
+    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u2', projectUuidInFile: true, sizeBytes: 1000 })], new Map(), file, NO_ACTIVE);
     expect(row!.state).toBe('not-placed');
   });
 
   it('fills levelName from the level of the sheet, and null when the level is unknown', () => {
     const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1', levelId: 'L1' }), sheetOf('s2', 1, 'a.pdf', { projectUuid: 'u1', levelId: 'LX' })]);
-    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', pageCount: 2 })], new Map(), file, NO_ACTIVE);
+    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: true, pageCount: 2 })], new Map(), file, NO_ACTIVE);
     expect(row!.pages.map((page) => page.levelName)).toEqual(['Ground', null]);
   });
 
@@ -120,7 +121,7 @@ describe('openDocumentRows', () => {
 
   it('sets needsSave true when the document has no id and false when it has one', () => {
     const rows = openDocumentRows(
-      [docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: null }), docOf({ id: 'd2', fileName: 'b.pdf', projectUuid: 'u2' })],
+      [docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: null }), docOf({ id: 'd2', fileName: 'b.pdf', projectUuid: 'u2', projectUuidInFile: true })],
       new Map(),
       null,
       NO_ACTIVE,
@@ -158,5 +159,35 @@ describe('openDocumentRows', () => {
     const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', hasPdf: false, pageCount: 0 })], new Map(), file, NO_ACTIVE);
     expect(row!.pages).toEqual([]);
     expect(row!.state).toBe('not-placed');
+  });
+
+  it('does not match a minted id to a sheet of the same id when the path is unset', () => {
+    const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' })]);
+    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: false })], new Map(), file, NO_ACTIVE);
+    expect(row!.state).toBe('not-placed');
+    expect(row!.sheetProjectUuid).toBeNull();
+    expect(row!.needsSave).toBe(true);
+  });
+
+  it('still matches a minted id document by its path', () => {
+    const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1', path: 'C:/plans/a.pdf' })]);
+    const targets = new Map<string, FileTarget>([['d1', { name: 'a.pdf', path: 'C:/plans/a.pdf' }]]);
+    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: false })], targets, file, NO_ACTIVE);
+    expect(row!.state).toBe('placed');
+    expect(row!.sheetProjectUuid).toBeNull();
+  });
+
+  it('matches by id when the file holds the id, and clears needsSave', () => {
+    const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' })]);
+    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: true })], new Map(), file, NO_ACTIVE);
+    expect(row!.state).toBe('placed');
+    expect(row!.sheetProjectUuid).toBe('u1');
+    expect(row!.needsSave).toBe(false);
+  });
+
+  it('lets an id match win over a name and size match on one page', () => {
+    const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { sizeBytes: 1000 }), sheetOf('s2', 0, 'a.pdf', { projectUuid: 'u1' })]);
+    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: true, sizeBytes: 1000 })], new Map(), file, NO_ACTIVE);
+    expect(row!.pages[0]!.sheet?.id).toBe('s2');
   });
 });

@@ -996,7 +996,7 @@ export function MepSketchApp({
           saved = await saveAsNewFile(result.bytes, documentId);
           if (!saved) setStatus('Save cancelled.');
         }
-        if (saved && result.newProjectUuid) sceneRef.current?.commitProjectUuid(documentId, result.newProjectUuid);
+        if (saved) sceneRef.current?.commitProjectUuid(documentId, result.newProjectUuid ?? undefined);
         if (saved) sceneRef.current?.markSaved(result.receipt);
         if (saved) {
           const target = fileTargetsRef.current.get(documentId);
@@ -2113,7 +2113,7 @@ export function MepSketchApp({
           storedName={duplicatePrompt.storedName}
           storedPath={duplicatePrompt.storedPath}
           onUseAsCopy={() => {
-            sceneRef.current?.commitProjectUuid(duplicatePrompt.documentId, makeProjectUuid(() => crypto.randomUUID()));
+            sceneRef.current?.commitProjectUuid(duplicatePrompt.documentId, makeProjectUuid(() => crypto.randomUUID()), { inFile: false });
             setStatus(`${duplicatePrompt.fileName} is now a separate document. It gets its new id when you save it.`);
             setDuplicatePrompt(null);
           }}

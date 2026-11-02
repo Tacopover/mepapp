@@ -77,6 +77,7 @@ export interface DocumentSummary {
   isDirty: boolean;
   hasPdf: boolean;
   projectUuid: string | null;
+  projectUuidInFile: boolean;
   pageCount: number;
   sizeBytes: number | null;
 }
@@ -96,6 +97,8 @@ export class SketchDocument {
   fileName = 'Untitled';
   /** The id of the project this document holds; null until one is minted or loaded. Not the runtime `id` and not a receipt documentId. */
   projectUuid: string | null = null;
+  /** True when the id came from the embedded project or a successful Save wrote it into the file; false for an id minted at load and for a new blank document. */
+  projectUuidInFile = false;
   pdfHandle: PdfDocumentHandle | null = null;
   /** The size of the opened PDF file in bytes; null when the file was not opened from a file of known size. */
   sizeBytes: number | null = null;
@@ -200,6 +203,7 @@ export class SketchDocument {
       isDirty: this.isDirty,
       hasPdf: this.pdfHandle !== null,
       projectUuid: this.projectUuid,
+      projectUuidInFile: this.projectUuidInFile,
       pageCount: this.pdfHandle?.getPageCount() ?? 0,
       sizeBytes: this.sizeBytes,
     };
