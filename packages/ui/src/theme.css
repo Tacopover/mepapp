@@ -1670,41 +1670,28 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-.mep-buildings-layout {
+.mep-buildings-message {
+  color: #b3261e;
+}
+.mep-buildings-message button {
+  margin-left: 8px;
+}
+.mep-buildings-open-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 2px;
+}
+.mep-buildings-actions {
   display: flex;
-  gap: 0;
-  min-width: 460px;
-  max-height: 360px;
-  border: 1.5px solid var(--line);
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.mep-buildings-tree {
-  width: 180px;
-  flex: none;
-  overflow-y: auto;
-  border-right: 1.5px solid var(--line);
-  padding-bottom: 8px;
-}
-.mep-buildings-tree > button {
-  margin: 8px 10px 0;
-}
-.mep-buildings-tree .mep-elem-row {
-  padding: 7px 10px;
-  border-bottom: none;
-  font-size: 12px;
-}
-.mep-buildings-tree .mep-elem-row.mep-level-row {
-  padding-left: 24px;
-}
-.mep-buildings-detail {
-  flex: 1;
-  overflow-y: auto;
-  min-width: 0;
-}
-.mep-buildings-detail .mep-section {
-  border-bottom: none;
-}
-.mep-buildings-detail button {
-  margin: 0 6px 8px 0;
+.mep-buildings-recent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line-soft, var(--line));
+  padding: 6px 0;
 }
 .mep-modal .mep-modal-actions {
   display: flex;

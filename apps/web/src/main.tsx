@@ -3,7 +3,7 @@ import { MepSketchApp, type PdfPageLoadResult } from '@mepapp/ui';
 import { displayDimensions } from '@mepapp/core';
 import { MupdfEngine } from '@mepapp/pdf-engine-mupdf';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
-import type { AppDialogs, CloseGuard, FileAccess } from '@mepapp/platform';
+import type { AppDialogs, BuildingRef, BuildingStore, CloseGuard, FileAccess } from '@mepapp/platform';
 import {
   createDevBuildingStore,
   IndexedDbLibraryStore,
@@ -16,9 +16,13 @@ import { createPlacementWorker, createRoomDetectionClient } from './roomDetectio
 const BACKDROP_DPI = 150;
 
 const devBuildingStore = import.meta.env.DEV ? createDevBuildingStore() : undefined;
+let adoptBuilding: ((store: BuildingStore) => Promise<void>) | null = null;
 if (devBuildingStore) {
   (window as unknown as { __mepBuilding: unknown }).__mepBuilding = {
-    load: (json: string, summaries?: Record<string, string>) => devBuildingStore.load(json, summaries),
+    load: async (json: string, summaries?: Record<string, string>) => {
+      devBuildingStore.load(json, summaries);
+      await adoptBuilding?.(devBuildingStore);
+    },
     read: () => devBuildingStore.read(),
     store: devBuildingStore,
   };
@@ -47,12 +51,30 @@ const correspondingSourceUrl = `${REPO_URL}/tree/${__MEPAPP_COMMIT_SHA__}`;
 const isTauri = '__TAURI_INTERNALS__' in window;
 
 // The desktop build loads the Tauri platform as its own chunk, so the web build never runs Tauri code.
-async function createPlatform(): Promise<{ fileAccess: FileAccess; closeGuard: CloseGuard; dialogs: AppDialogs }> {
+async function createPlatform(): Promise<{
+  fileAccess: FileAccess;
+  closeGuard: CloseGuard;
+  dialogs: AppDialogs;
+  makeBuildingStore?: (ref: BuildingRef) => BuildingStore;
+}> {
   if (isTauri) {
-    const { TauriAppDialogs, TauriCloseGuard, TauriFileAccess } = await import('@mepapp/platform-tauri');
-    return { fileAccess: new TauriFileAccess(), closeGuard: new TauriCloseGuard(), dialogs: new TauriAppDialogs() };
+    const { TauriAppDialogs, TauriCloseGuard, TauriFileAccess, createTauriBuildingStore } = await import('@mepapp/platform-tauri');
+    return {
+      fileAccess: new TauriFileAccess(),
+      closeGuard: new TauriCloseGuard(),
+      dialogs: new TauriAppDialogs(),
+      makeBuildingStore: (ref) => {
+        const i = Math.max(ref.location.lastIndexOf('/'), ref.location.lastIndexOf('\\'));
+        return createTauriBuildingStore(ref.location.slice(0, i), ref.location.slice(i + 1));
+      },
+    };
   }
-  return { fileAccess: new WebFileAccess(), closeGuard: new WebCloseGuard(), dialogs: new WebAppDialogs() };
+  return {
+    fileAccess: new WebFileAccess(),
+    closeGuard: new WebCloseGuard(),
+    dialogs: new WebAppDialogs(),
+    makeBuildingStore: devBuildingStore ? () => devBuildingStore : undefined,
+  };
 }
 
 // For dev browser checks only: stats a PDF by its file name in the OPFS root.
@@ -69,7 +91,7 @@ async function devStatPath(path: string): ReturnType<NonNullable<FileAccess['sta
 
 const container = document.getElementById('root');
 if (container) {
-  void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs }) => {
+  void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs, makeBuildingStore }) => {
     const fileAccess: FileAccess =
       import.meta.env.DEV && platformFileAccess.statPath === undefined
         ? Object.assign(Object.create(platformFileAccess), { statPath: devStatPath })
@@ -85,7 +107,14 @@ if (container) {
         fileAccess={fileAccess}
         closeGuard={closeGuard}
         dialogs={dialogs}
-        buildingStore={devBuildingStore}
+        makeBuildingStore={makeBuildingStore}
+        onBuildingReady={
+          import.meta.env.DEV
+            ? (api) => {
+                adoptBuilding = api?.adopt ?? null;
+              }
+            : undefined
+        }
         pdfEngine={engine}
         onRebuildReady={
           import.meta.env.DEV

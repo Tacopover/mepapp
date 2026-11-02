@@ -1,161 +1,116 @@
 import { useState } from 'react';
 import { Dialog } from './Dialog.js';
-import { assignDocumentToLevel, newBuilding, newLevel, type Building } from '../buildings.js';
+import type { UseBuilding } from '../useBuilding.js';
 
 export interface ManageBuildingsDialogProps {
-  buildings: Building[];
-  onChange: (next: Building[]) => void;
-  /** The currently open document's file name, for "Assign current document" — null when nothing is open. */
-  currentDocumentFileName: string | null;
+  building: UseBuilding & { available: boolean };
   onClose: () => void;
 }
 
-type Selected = { kind: 'building'; buildingId: string } | { kind: 'level'; buildingId: string; levelId: string } | null;
-
 /**
- * Building/Level registry (ui-atlas-layout-mapping.md §4's "Manage
- * Buildings…" row) — Menu → Manage Buildings. Commits every change
- * immediately, same as the old app's non-modal management window (no
- * Save/Cancel step) — Close is the only action.
+ * Manage Buildings: creates, opens and closes the one open building file.
+ * The building file is stored by the platform (a file picker on desktop).
  */
-export function ManageBuildingsDialog({ buildings, onChange, currentDocumentFileName, onClose }: ManageBuildingsDialogProps) {
-  const [selected, setSelected] = useState<Selected>(null);
+export function ManageBuildingsDialog({ building, onClose }: ManageBuildingsDialogProps) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
 
-  const selectedBuilding = selected ? buildings.find((b) => b.id === selected.buildingId) ?? null : null;
-  const selectedLevel = selected?.kind === 'level' ? selectedBuilding?.levels.find((l) => l.id === selected.levelId) ?? null : null;
-
-  function handleAddBuilding() {
-    const building = newBuilding('New Building');
-    onChange([...buildings, building]);
-    setSelected({ kind: 'building', buildingId: building.id });
-  }
-
-  function handleRenameBuilding(buildingId: string, name: string) {
-    onChange(buildings.map((b) => (b.id === buildingId ? { ...b, name } : b)));
-  }
-
-  function handleDeleteBuilding(buildingId: string) {
-    onChange(buildings.filter((b) => b.id !== buildingId));
-    setSelected(null);
-  }
-
-  function handleAddLevel(buildingId: string) {
-    const level = newLevel('New Level');
-    onChange(buildings.map((b) => (b.id === buildingId ? { ...b, levels: [...b.levels, level] } : b)));
-    setSelected({ kind: 'level', buildingId, levelId: level.id });
-  }
-
-  function handleRenameLevel(buildingId: string, levelId: string, name: string) {
-    onChange(
-      buildings.map((b) =>
-        b.id === buildingId ? { ...b, levels: b.levels.map((l) => (l.id === levelId ? { ...l, name } : l)) } : b,
-      ),
-    );
-  }
-
-  function handleDeleteLevel(buildingId: string, levelId: string) {
-    onChange(buildings.map((b) => (b.id === buildingId ? { ...b, levels: b.levels.filter((l) => l.id !== levelId) } : b)));
-    setSelected({ kind: 'building', buildingId });
-  }
-
-  function handleAssignCurrentDocument(levelId: string) {
-    if (!currentDocumentFileName) return;
-    onChange(assignDocumentToLevel(buildings, levelId, currentDocumentFileName));
-  }
-
-  function handleUnassign(buildingId: string, levelId: string) {
-    onChange(
-      buildings.map((b) =>
-        b.id === buildingId ? { ...b, levels: b.levels.map((l) => (l.id === levelId ? { ...l, documentFileName: null } : l)) } : b,
-      ),
-    );
+  function handleCreate() {
+    if (building.busy) return;
+    void building.create(name);
+    setCreating(false);
+    setName('');
   }
 
   return (
-    <Dialog title="Manage Buildings" onClose={onClose} actions={<button onClick={onClose}>Close</button>}>
-      <div className="mep-buildings-layout">
-        <div className="mep-buildings-tree">
-          {buildings.map((building) => (
-            <div key={building.id}>
-              <div
-                className={`mep-elem-row selectable${selected?.kind === 'building' && selected.buildingId === building.id ? ' active' : ''}`}
-                onClick={() => setSelected({ kind: 'building', buildingId: building.id })}
-              >
-                <b>{building.name}</b>
-              </div>
-              {building.levels.map((level) => (
-                <div
-                  key={level.id}
-                  className={`mep-elem-row selectable mep-level-row${
-                    selected?.kind === 'level' && selected.levelId === level.id ? ' active' : ''
-                  }`}
-                  onClick={() => setSelected({ kind: 'level', buildingId: building.id, levelId: level.id })}
-                >
-                  <span>{level.name}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-          <button type="button" onClick={handleAddBuilding}>
-            + Building
+    <Dialog title="Manage Buildings" onClose={onClose} closeOnBackdropClick={false} actions={<button onClick={onClose}>Close</button>}>
+      {!building.available && <p>Building files are not available in this version of the app. Use the desktop app.</p>}
+
+      {building.available && building.message && (
+        <p className="mep-hint mep-buildings-message" role="alert">
+          {building.message} <button type="button" onClick={() => building.dismissMessage()}>Dismiss</button>
+        </p>
+      )}
+
+      {building.available && building.building && (
+        <div className="mep-section">
+          <h4>Open building</h4>
+          <p className="mep-buildings-open-name">{building.building.file.name}</p>
+          <p className="mep-hint">{building.building.ref.location}</p>
+          <p>
+            {building.building.file.levels.length} levels, {building.building.file.sheets.length} sheets
+          </p>
+          <button type="button" onClick={() => building.close()}>
+            Close building
           </button>
         </div>
+      )}
 
-        <div className="mep-buildings-detail">
-          {!selected && <p className="mep-empty-panel">Select a building or level, or add a new building.</p>}
+      {building.available && !building.building && (
+        <p className="mep-hint">No building is open. Create a building or open a building file.</p>
+      )}
 
-          {selectedBuilding && selected?.kind === 'building' && (
-            <div className="mep-section">
-              <h4>Building</h4>
-              <div className="mep-field-row">
-                <label>Name</label>
-                <input value={selectedBuilding.name} onChange={(e) => handleRenameBuilding(selectedBuilding.id, e.target.value)} />
-              </div>
-              <button type="button" onClick={() => handleAddLevel(selectedBuilding.id)}>
-                + Add Level
+      {building.available && (
+        <div className="mep-section">
+          <h4>Open or create</h4>
+          {creating && (
+            <div className="mep-field-row">
+              <input
+                placeholder="Building name (default: New building)"
+                aria-label="Building name"
+                autoFocus
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') handleCreate();
+                }}
+              />
+              <button type="button" disabled={building.busy} onClick={handleCreate}>
+                Create…
               </button>
-              <button type="button" onClick={() => handleDeleteBuilding(selectedBuilding.id)}>
-                Delete Building
-              </button>
-            </div>
-          )}
-
-          {selectedBuilding && selectedLevel && selected?.kind === 'level' && (
-            <div className="mep-section">
-              <h4>Level</h4>
-              <div className="mep-field-row">
-                <label>Name</label>
-                <input
-                  value={selectedLevel.name}
-                  onChange={(e) => handleRenameLevel(selectedBuilding.id, selectedLevel.id, e.target.value)}
-                />
-              </div>
-              <p className="mep-hint">
-                {selectedLevel.documentFileName
-                  ? `Assigned document: ${selectedLevel.documentFileName}`
-                  : 'No document assigned to this level.'}
-              </p>
-              {selectedLevel.documentFileName ? (
-                <button type="button" onClick={() => handleUnassign(selectedBuilding.id, selectedLevel.id)}>
-                  Unassign
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!currentDocumentFileName}
-                  onClick={() => handleAssignCurrentDocument(selectedLevel.id)}
-                  title={currentDocumentFileName ?? 'No document open'}
-                >
-                  Assign current document
-                </button>
-              )}
-              <button type="button" onClick={() => handleDeleteLevel(selectedBuilding.id, selectedLevel.id)}>
-                Delete Level
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating(false);
+                  setName('');
+                }}
+              >
+                Cancel
               </button>
             </div>
           )}
+          <div className="mep-buildings-actions">
+            {!creating && (
+              <button type="button" disabled={building.busy} onClick={() => setCreating(true)}>
+                New building
+              </button>
+            )}
+            <button type="button" disabled={building.busy} onClick={() => void building.open()}>
+              Open building…
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {building.available && building.recent.length > 0 && (
+        <div className="mep-section">
+          <h4>Recent buildings</h4>
+          {building.recent.map((entry) => (
+            <div key={entry.id} className="mep-elem-row mep-buildings-recent">
+              <div>
+                <b>{entry.name}</b>
+                <p className="mep-hint">{entry.location}</p>
+              </div>
+              <button type="button" onClick={() => void building.openRecent(entry)}>
+                Open
+              </button>
+              <button type="button" title="Remove from the list" onClick={() => building.forgetRecent(entry.id)}>
+                Remove from list
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </Dialog>
   );
 }

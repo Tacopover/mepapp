@@ -1,12 +1,3 @@
-// Per-installation Building/Level registry (ui-atlas-layout-mapping.md §4's
-// "Manage Buildings…" row) — a Building groups Levels, a Level can hold the
-// currently open document. First-slice scope: no per-sheet (PDF page)
-// assignment, no calibration override, no Takeoff integration — MepApp
-// doesn't track individual PDF pages as separate sheets yet, and Export
-// Takeoff to CSV doesn't exist yet either. Both are separate, larger atlas
-// items to build on top of this later, same shape as the old app's
-// Building -> Level -> Sheet model but one tier shallower.
-
 import { emptyBuilding } from '@mepapp/core';
 import type { BuildingFile, BuildingSheet, BuildingLevel as CoreBuildingLevel } from '@mepapp/core';
 
@@ -34,29 +25,6 @@ export function loadBuildings(): Building[] {
   } catch {
     return [];
   }
-}
-
-export function saveBuildings(buildings: Building[]): void {
-  localStorage.setItem(BUILDINGS_STORAGE_KEY, JSON.stringify(buildings));
-}
-
-export function newBuilding(name: string): Building {
-  return { id: crypto.randomUUID(), name, levels: [] };
-}
-
-export function newLevel(name: string): BuildingLevel {
-  return { id: crypto.randomUUID(), name, documentFileName: null };
-}
-
-/** Clears any existing assignment of fileName from every level, then assigns it to the given one — a document belongs to at most one level. */
-export function assignDocumentToLevel(buildings: Building[], levelId: string, fileName: string): Building[] {
-  return buildings.map((building) => ({
-    ...building,
-    levels: building.levels.map((level) => ({
-      ...level,
-      documentFileName: level.id === levelId ? fileName : level.documentFileName === fileName ? null : level.documentFileName,
-    })),
-  }));
 }
 
 /** Each old Building becomes an empty BuildingFile with the same id and name. Each old level keeps its id and name with elevationMm = 0. A level with documentFileName becomes one sheet: id `${level.id}-sheet`, levelId, projectUuid null, pageIndex 0, displayName = documentFileName, location { fileName: documentFileName }. Pure; does not touch localStorage. */

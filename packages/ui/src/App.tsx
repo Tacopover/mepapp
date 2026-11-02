@@ -73,7 +73,7 @@ import { StampPickerDialog } from './components/StampPickerDialog.js';
 import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
-import { loadBuildings, saveBuildings, type Building } from './buildings.js';
+import { useBuilding } from './useBuilding.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
@@ -106,7 +106,7 @@ import {
 import { useShowBuiltInStamps } from './builtInStampsSetting.js';
 import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
 import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
-import { libraryFolderOf, type AppDialogs, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore } from '@mepapp/platform';
+import { libraryFolderOf, type AppDialogs, type BuildingRef, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore } from '@mepapp/platform';
 import './theme.css';
 
 export interface PdfPageLoadResult {
@@ -142,8 +142,10 @@ export interface MepSketchAppProps {
   closeGuard: CloseGuard;
   /** Yes/no questions: window.confirm on the web, a native dialog on desktop. */
   dialogs: AppDialogs;
-  /** Storage of the building file. After a Save the sheet summary of the saved document is written here. */
-  buildingStore?: BuildingStore;
+  /** Creates the store of a building file from its ref. Without it the building features are unavailable. */
+  makeBuildingStore?: (ref: BuildingRef) => BuildingStore;
+  /** Gives the app shell the adopt action (null on unmount). The dev hook of the web app loads a building through it. */
+  onBuildingReady?: (api: { adopt: (store: BuildingStore) => Promise<void> } | null) => void;
   /** Reads the PDFs of a building. Needed for Rebuild summaries. */
   pdfEngine?: PdfEngine;
   /** Gives the app shell the rebuild action (null on unmount). A browser check starts it from the dev console. */
@@ -248,7 +250,8 @@ export function MepSketchApp({
   fileAccess,
   closeGuard,
   dialogs,
-  buildingStore,
+  makeBuildingStore,
+  onBuildingReady,
   pdfEngine,
   onRebuildReady,
 }: MepSketchAppProps) {
@@ -431,7 +434,12 @@ export function MepSketchApp({
   useEffect(() => saveCustomTemplates(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicTemplates), [customSchematicTemplates]);
   const [customSchematicSymbols, setCustomSchematicSymbols] = useState<SchematicSymbol[]>(() => loadCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicSymbols), [customSchematicSymbols]);
-  const [buildings, setBuildings] = useState<Building[]>(loadBuildings);
+  const buildingHook = useBuilding({ fileAccess, makeStore: makeBuildingStore });
+  const buildingStore = buildingHook.building?.store;
+  useEffect(() => {
+    onBuildingReady?.({ adopt: buildingHook.adopt });
+    return () => onBuildingReady?.(null);
+  }, [onBuildingReady, buildingHook.adopt]);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
     const saved = Number(localStorage.getItem(SNAP_RADIUS_STORAGE_KEY));
@@ -534,11 +542,6 @@ export function MepSketchApp({
     [sceneRef, customPropertyDefs],
   );
 
-  const handleChangeBuildings = useCallback((next: Building[]) => {
-    setBuildings(next);
-    saveBuildings(next);
-  }, []);
-
   /** Status bar's page nav — reuses the already-open PDF handle, no re-parse. View-only: see SketchScene.setBackdropPage. */
   const pageRequestRef = useRef(0);
   const handleChangePage = useCallback(
@@ -580,7 +583,6 @@ export function MepSketchApp({
   }, [textboxPrompt]);
 
   const activeDoc = documents.find((d) => d.id === activeDocumentId) ?? null;
-  const sheetName = activeDoc?.hasPdf ? activeDoc.fileName : null;
   const pdfHandle = activePdfHandle;
 
   // A document's FileTarget, when "Open"/"Save As" got one from fileAccess —
@@ -789,8 +791,9 @@ export function MepSketchApp({
         pageInfos,
         ...stampNameLookups(definitions),
       });
+      await buildingHook.reload();
     },
-    [buildingStore, customStampDefinitions, fileAccess, pdfHandle, sceneRef, userStampLibrary.definitions],
+    [buildingHook.reload, buildingStore, customStampDefinitions, fileAccess, pdfHandle, sceneRef, userStampLibrary.definitions],
   );
 
   // Rebuilds the sheet summary of every document of the open building. The PDFs are read by
@@ -832,6 +835,7 @@ export function MepSketchApp({
           onProgress: (done, total, name) => setStatus(`Rebuilding summaries: ${done} of ${total}${name ? ` (${name})` : ''}`),
           signal: new AbortController().signal,
         });
+        await buildingHook.reload();
         const total = result.ok + result.failed.length;
         const first = result.failed[0];
         setStatus(
@@ -843,7 +847,7 @@ export function MepSketchApp({
         return undefined;
       }
     },
-    [buildingStore, fileAccess, pdfEngine, userStampLibrary.definitions],
+    [buildingHook.reload, buildingStore, fileAccess, pdfEngine, userStampLibrary.definitions],
   );
 
   useEffect(() => {
@@ -1978,12 +1982,7 @@ export function MepSketchApp({
       )}
 
       {manageBuildingsOpen && (
-        <ManageBuildingsDialog
-          buildings={buildings}
-          onChange={handleChangeBuildings}
-          currentDocumentFileName={sheetName}
-          onClose={() => setManageBuildingsOpen(false)}
-        />
+        <ManageBuildingsDialog building={buildingHook} onClose={() => setManageBuildingsOpen(false)} />
       )}
 
       {quantitiesScopeDialog && (
