@@ -176,8 +176,9 @@ Common verification: `pnpm --filter @mepapp/core test`, `pnpm --filter @mepapp/u
 **B4-T09 ui: Risers tab in the building dialog.**
 - Files: `ManageBuildingsDialog.tsx`, `packages/ui/src/components/BuildingRisersPane.tsx` (new), tests.
 - Shapes: a list of risers: name, shaft name, type, members by level with a status (ok, pending, conflict), inputs for connection height of each member, a select for flow direction (`up`, `down`, `both`, `unknown`), a select for the source level, selects for top and bottom end (`member`, `open`), an input for the end allowance (mm), rename, delete, "Go to" a member (reuse B3-T05). Every input calls `setRiserProps` through `useBuilding.update`. The warnings of `riserWarnings` show under the list.
+- After B3-T11: the dialog is a tree with a detail pane that has a tab strip. This task adds the "Risers" tab to that strip (see `buildings-b3-ui.md`, T11c) and does not touch the old single-column layout.
 - Verify: browser check with real clicks; screenshot `B4-T09-tab`.
-- Depends on: B4-T07, B3-T05.
+- Depends on: B4-T07, B3-T05, B3-T11.
 
 **B4-T10 part check.**
 - Files: `<work>/b4-check.mjs`.
