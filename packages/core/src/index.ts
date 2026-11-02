@@ -74,5 +74,6 @@ export * from './building-takeoff.js';
 export * from './project-uuid.js';
 export * from './page-scope.js';
 export * from './building.js';
+export * from './building-edit.js';
 export * from './building-identity.js';
 export * from './riser.js';
