@@ -14,12 +14,24 @@ export interface BuildingTreeProps {
   onToggle: (key: string, expand: boolean) => void;
   /** Delete on a building that is not open, or a click on its remove button. */
   onForget: (node: TreeNode) => void;
+  /** Alt+ArrowUp or Alt+ArrowDown on a level: moves the level by delta (-1 up, 1 down). */
+  onMoveLevel?: (node: TreeNode, delta: -1 | 1) => void;
   /** Focus the tree when it mounts. */
   autoFocus: boolean;
 }
 
 /** The buildings and the levels of the open building as an ARIA tree (flat items with aria-level). */
-export function BuildingTree({ nodes, selectedKey, focusKey, onFocusKey, onActivate, onToggle, onForget, autoFocus }: BuildingTreeProps) {
+export function BuildingTree({
+  nodes,
+  selectedKey,
+  focusKey,
+  onFocusKey,
+  onActivate,
+  onToggle,
+  onForget,
+  onMoveLevel,
+  autoFocus,
+}: BuildingTreeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -43,6 +55,11 @@ export function BuildingTree({ nodes, selectedKey, focusKey, onFocusKey, onActiv
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>, node: TreeNode) {
     if (event.target !== event.currentTarget) return;
+    if (onMoveLevel && node.kind === 'level' && event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      onMoveLevel(node, event.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onActivate(node);
@@ -75,7 +92,7 @@ export function BuildingTree({ nodes, selectedKey, focusKey, onFocusKey, onActiv
           aria-selected={node.key === selectedKey}
           aria-expanded={node.expandable ? node.expanded : undefined}
           tabIndex={node.key === focusKey ? 0 : -1}
-          className={`mep-tree-item mep-tree-item--${node.kind}${node.key === selectedKey ? ' mep-tree-item--selected' : ''}`}
+          className={`mep-tree-item mep-tree-item--${node.kind === 'add-level' ? 'add' : node.kind}${node.key === selectedKey ? ' mep-tree-item--selected' : ''}`}
           onFocus={(event) => {
             if (event.target === event.currentTarget) onFocusKey(node.key);
           }}

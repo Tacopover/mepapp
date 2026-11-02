@@ -60,25 +60,30 @@ check(/0 levels, 0 sheets/.test(await dlg.textContent()), 'step 1: building crea
 await shot('B3-T10-1-created');
 
 // Step 2: two levels, elevation 0 and 3000, by typing.
-const add = dlg.locator('button', { hasText: /^Add level$/ });
+const items = (kind) => dlg.locator(`[role="treeitem"][data-kind="${kind}"]`);
+const add = dlg.locator('[data-testid="tree-add-level"]');
+const row = dlg.locator('[data-testid="level-row"]');
 await add.click();
 await idle(300);
 await add.click();
 await idle(300);
-const rows = dlg.locator('[data-testid="level-row"]');
-const n0 = rows.nth(0).locator('input[aria-label="Level name"]');
+await items('level').nth(0).click();
+await idle(300);
+const n0 = row.locator('input[aria-label="Level name"]');
 await n0.fill('Ground floor');
 await n0.press('Enter');
 await idle(300);
-const e0 = rows.nth(0).locator('input[aria-label="Elevation (mm)"]');
+const e0 = row.locator('input[aria-label="Elevation (mm)"]');
 await e0.fill('0');
 await e0.press('Enter');
 await idle(300);
-const n1 = rows.nth(1).locator('input[aria-label="Level name"]');
+await items('level').nth(1).click();
+await idle(300);
+const n1 = row.locator('input[aria-label="Level name"]');
 await n1.fill('Level 1');
 await n1.press('Tab');
 await idle(300);
-const e1 = rows.nth(1).locator('input[aria-label="Elevation (mm)"]');
+const e1 = row.locator('input[aria-label="Elevation (mm)"]');
 await e1.fill('3000');
 await e1.press('Enter');
 await idle(500);
@@ -165,7 +170,9 @@ await dlg.locator('.mep-buildings-open-name', { hasText: 'Office block' }).waitF
 await idle(600);
 s = await stored();
 check(/2 levels, 4 sheets/.test(await dlg.textContent()), 'step 7: reopened from the recent list with 2 levels and 4 sheets', (await dlg.textContent()).slice(0, 200));
-check((await dlg.locator('[data-testid="level-row"] input[aria-label="Elevation (mm)"]').nth(1).inputValue()) === '3000', 'step 7: elevation 3000 survived');
+await items('level').nth(1).click();
+await idle(300);
+check((await row.locator('input[aria-label="Elevation (mm)"]').inputValue()) === '3000', 'step 7: elevation 3000 survived');
 await shot('B3-T10-7-reopened');
 
 await t.finish();

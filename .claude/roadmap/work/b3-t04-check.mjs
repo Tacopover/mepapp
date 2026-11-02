@@ -41,17 +41,22 @@ check((await dlg.locator('[data-testid="sheets-pane"]').count()) === 1, 'sheets 
 check(/No PDFs yet/.test(await dlg.textContent()), 'empty hint shown');
 
 // Two levels by typing.
-const add = dlg.locator('button', { hasText: /^Add level$/ });
+const items = (kind) => dlg.locator(`[role="treeitem"][data-kind="${kind}"]`);
+const add = dlg.locator('[data-testid="tree-add-level"]');
 await add.click();
 await idle(300);
 await add.click();
 await idle(300);
-const rows = dlg.locator('[data-testid="level-row"]');
-const n0 = rows.nth(0).locator('input[aria-label="Level name"]');
+const row = dlg.locator('[data-testid="level-row"]');
+await items('level').nth(0).click();
+await idle(300);
+const n0 = row.locator('input[aria-label="Level name"]');
 await n0.fill('Ground floor');
 await n0.press('Enter');
 await idle(300);
-const n1 = rows.nth(1).locator('input[aria-label="Level name"]');
+await items('level').nth(1).click();
+await idle(300);
+const n1 = row.locator('input[aria-label="Level name"]');
 await n1.fill('Level 1');
 await n1.press('Tab');
 await idle(300);
@@ -87,7 +92,9 @@ check(/2 assigned/.test(await dlg.locator('[data-testid="sheets-totals"]').textC
 await shot('B3-T04-assign');
 
 // The level with a sheet cannot be deleted any more.
-check(await rows.nth(0).locator('button', { hasText: /^Delete$/ }).isDisabled(), 'level with a sheet: Delete disabled');
+await items('level').nth(0).click();
+await idle(300);
+check(await row.locator('button', { hasText: /^Delete$/ }).isDisabled(), 'level with a sheet: Delete disabled');
 
 // Multi-page PDF: three page rows; assign p1 and p2, leave p3.
 await addPdf('multi.pdf', 'Sample Project_multi_page.pdf');

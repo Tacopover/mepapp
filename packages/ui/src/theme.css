@@ -1868,6 +1868,10 @@
 .mep-tree-item--level {
   margin-left: 18px;
 }
+.mep-tree-item--add {
+  margin-left: 18px;
+  color: var(--muted);
+}
 .mep-tree-item:hover {
   background: var(--surface-2);
 }
@@ -1956,9 +1960,6 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.mep-level-edit-row--selected {
-  background: var(--accent-soft);
-}
 @media (max-width: 899px) {
   .mep-buildings-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -1971,44 +1972,47 @@
     overflow: visible;
   }
 }
-.mep-level-edit-row {
+.mep-level-detail {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  border-bottom: 1px solid var(--line-soft, var(--line));
+  padding: 6px 0 10px;
+}
+.mep-level-detail input[aria-label="Level name"] {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.mep-level-detail input[aria-label="Elevation (mm)"] {
+  width: 90px;
+  box-sizing: border-box;
+}
+.mep-level-elevation,
+.mep-level-move {
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--line-soft, var(--line));
-  padding: 6px 0;
+  gap: 6px;
 }
-.mep-level-edit-row input[aria-label="Level name"] {
-  flex: 1;
-  min-width: 0;
+.mep-level-delete {
+  margin-top: 8px;
 }
-.mep-level-edit-row input[aria-label="Elevation (mm)"] {
-  width: 90px;
+.mep-level-delete .mep-hint {
+  margin: 6px 0 0;
 }
-.mep-level-edit-head {
+.mep-level-detail button[aria-disabled='true'],
+.mep-level-move button[aria-disabled='true'],
+.mep-buildings-actions button[aria-disabled='true'] {
   color: var(--muted);
-  font-size: 11px;
+  opacity: 0.5;
+  cursor: default;
 }
-.mep-level-edit-head span:nth-child(1) {
-  flex: 1;
+.mep-level-undo {
+  color: var(--ink);
 }
-.mep-level-edit-head span:nth-child(2) {
-  width: 90px;
-}
-.mep-level-edit-head span:nth-child(3) {
-  width: 24px;
-}
-.mep-level-edit-head span:nth-child(4) {
-  min-width: 64px;
-}
-.mep-level-edit-head span:nth-child(5) {
-  width: 120px;
-}
-.mep-level-edit-row > span:nth-child(3) {
-  width: 24px;
-}
-.mep-level-edit-row > span:nth-child(4) {
-  min-width: 64px;
+.mep-level-undo button {
+  margin-left: 8px;
 }
 .mep-sheets-group {
   border-top: 1px solid var(--line-soft, var(--line));

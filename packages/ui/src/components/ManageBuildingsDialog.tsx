@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { BuildingFile, BuildingSheet } from '@mepapp/core';
+import { addLevel, moveLevel, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import type { UseBuilding } from '../useBuilding.js';
-import { countLabel, sheetCount } from '../buildingLevels.js';
+import { countLabel, defaultLevelName, nextLevelElevation, sheetCount } from '../buildingLevels.js';
 import { loadBuildings, loadImportedOldIds, pendingOldBuildings } from '../buildings.js';
 import {
   buildingKey,
@@ -101,6 +101,8 @@ export function ManageBuildingsDialog({
   const [notPlaced, setNotPlaced] = useState(0);
   const [selectedKey, setSelectedKey] = useState(initialKey);
   const [focusKey, setFocusKey] = useState(initialKey);
+  const [focusNameLevelId, setFocusNameLevelId] = useState<string | null>(null);
+  const navRef = useRef<HTMLElement | null>(null);
   const narrow = useNarrow();
 
   useEffect(() => {
@@ -158,8 +160,38 @@ export function ManageBuildingsDialog({
       setFocusKey(node.key);
       return;
     }
+    if (node.kind === 'add-level') {
+      if (openBuilding === null) return;
+      const id = crypto.randomUUID();
+      void building.update((f) => addLevel(f, defaultLevelName(f), nextLevelElevation(f), id));
+      setSelectedKey(levelKey(id));
+      setFocusKey(levelKey(id));
+      setFocusNameLevelId(id);
+      return;
+    }
     setSelectedKey(node.key);
     setFocusKey(node.key);
+  }
+
+  function onSelectKey(key: string) {
+    setSelectedKey(key);
+    setFocusKey(key);
+    requestAnimationFrame(() => navRef.current?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"], select')?.focus());
+  }
+
+  function onMoveLevel(node: TreeNode, delta: -1 | 1) {
+    if (openBuilding === null) return;
+    const level = openBuilding.file.levels.find((item) => levelKey(item.id) === node.key);
+    if (level === undefined) return;
+    const index = openBuilding.file.levels.indexOf(level);
+    const target = index + delta;
+    if (target < 0 || target > openBuilding.file.levels.length - 1) return;
+    void building.update((f) => moveLevel(f, level.id, target));
+    setSelectedKey(node.key);
+    setFocusKey(node.key);
+    requestAnimationFrame(() => {
+      navRef.current?.querySelector<HTMLElement>(`[role="treeitem"][data-key="${node.key}"]`)?.focus();
+    });
   }
 
   function onToggle(key: string, expand: boolean) {
@@ -223,7 +255,7 @@ export function ManageBuildingsDialog({
       }
     >
       <div className="mep-buildings-layout">
-        <nav className="mep-buildings-nav" aria-label="Buildings">
+        <nav ref={navRef} className="mep-buildings-nav" aria-label="Buildings">
           {narrow ? (
             <select
               aria-label="Building or level"
@@ -258,6 +290,7 @@ export function ManageBuildingsDialog({
               onActivate={onActivate}
               onToggle={onToggle}
               onForget={onForget}
+              onMoveLevel={onMoveLevel}
               autoFocus={nodes.length > 0}
             />
           )}
@@ -359,9 +392,7 @@ export function ManageBuildingsDialog({
                   {selectedLevel !== null ? (
                     <>
                       <h4>{selectedLevel.name}</h4>
-                      <p>
-                        Elevation {selectedLevel.elevationMm} mm, {countLabel(sheetCount(openBuilding.file, selectedLevel.id), 'sheet')}.
-                      </p>
+                      <p>{countLabel(sheetCount(openBuilding.file, selectedLevel.id), 'sheet')}.</p>
                       {selectedNode?.warning && (
                         <p className="mep-hint mep-buildings-message">A sheet of this level has a missing PDF or no access.</p>
                       )}
@@ -382,8 +413,15 @@ export function ManageBuildingsDialog({
                   )}
                   {selected === NOT_PLACED_KEY && <p className="mep-hint">Pages without a level are kept only while this dialog is open.</p>}
                 </div>
-                {/* T11d replaces this pane */}
-                <BuildingLevelsPane file={openBuilding.file} update={building.update} selectedLevelId={selectedLevel?.id ?? null} />
+                <BuildingLevelsPane
+                  key={`${openBuilding.file.id}-levels`}
+                  file={openBuilding.file}
+                  update={building.update}
+                  selectedLevelId={selectedLevel?.id ?? null}
+                  focusNameLevelId={focusNameLevelId}
+                  onNameFocused={() => setFocusNameLevelId(null)}
+                  onSelectKey={onSelectKey}
+                />
                 {/* T11h replaces this pane */}
                 <BuildingSummariesPane
                   key={`${openBuilding.file.id}-summaries`}

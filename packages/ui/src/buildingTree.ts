@@ -6,7 +6,10 @@ import type { RecentBuilding } from './recentBuildings.js';
 /** The key of the "Not placed" node. Keys of the other nodes: "b:<building id>" and "l:<level id>". */
 export const NOT_PLACED_KEY = 'p:not-placed';
 
-export type TreeNodeKind = 'building' | 'level' | 'not-placed';
+/** The key of the "+ Add level" node of the open building. The dialog never selects it. */
+export const ADD_LEVEL_KEY = 'a:add-level';
+
+export type TreeNodeKind = 'building' | 'level' | 'add-level' | 'not-placed';
 
 export interface TreeNode {
   key: string;
@@ -51,7 +54,7 @@ export function levelHasWarning(file: BuildingFile, levelId: string, sheetStatus
   });
 }
 
-/** The visible nodes in display order: every building, and under the open building its levels and the Not placed node. */
+/** The visible nodes in display order: every building, and under the open building its levels, the add-level node and the Not placed node. */
 export function buildTreeNodes(input: TreeInput): TreeNode[] {
   const { recent, open, sheetStatus, notPlacedCount, collapsed } = input;
   const entries =
@@ -92,6 +95,19 @@ export function buildTreeNodes(input: TreeInput): TreeNode[] {
         entry: null,
       });
     }
+    nodes.push({
+      key: ADD_LEVEL_KEY,
+      kind: 'add-level',
+      depth: 2,
+      parentKey: key,
+      label: '+ Add level',
+      detail: null,
+      isOpen: false,
+      expandable: false,
+      expanded: false,
+      warning: false,
+      entry: null,
+    });
     if (notPlacedCount > 0) {
       nodes.push({
         key: NOT_PLACED_KEY,

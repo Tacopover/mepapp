@@ -1,6 +1,7 @@
 import { addLevel, emptyBuilding, type BuildingFile } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
 import {
+  ADD_LEVEL_KEY,
   buildingKey,
   buildingWarnings,
   buildTreeNodes,
@@ -51,10 +52,43 @@ describe('buildTreeNodes', () => {
   it('expands the open building with its levels and sheet counts', () => {
     const file = withSheets(withLevels([0, 3000]), ['level-0', 'level-0', 'level-1']);
     const nodes = buildTreeNodes(input({ open: { file, location: 'C:/tower.json' } }));
-    expect(nodes.map((n) => n.key)).toEqual(['b:b1', 'l:level-0', 'l:level-1', 'b:b2']);
+    expect(nodes.map((n) => n.key)).toEqual(['b:b1', 'l:level-0', 'l:level-1', ADD_LEVEL_KEY, 'b:b2']);
     expect(nodes[0]).toMatchObject({ isOpen: true, expandable: true, expanded: true });
     expect(nodes[1]).toMatchObject({ kind: 'level', depth: 2, parentKey: 'b:b1', label: 'L0', detail: '2 sheets' });
     expect(nodes[2]!.detail).toBe('1 sheet');
+  });
+
+  it('adds the add-level node after the levels of the open building', () => {
+    const file = withLevels([0, 3000]);
+    const nodes = buildTreeNodes(input({ open: { file, location: 'x' } }));
+    const add = nodes.find((n) => n.key === ADD_LEVEL_KEY);
+    expect(add).toMatchObject({
+      kind: 'add-level',
+      depth: 2,
+      parentKey: 'b:b1',
+      label: '+ Add level',
+      detail: null,
+      isOpen: false,
+      expandable: false,
+      expanded: false,
+      warning: false,
+      entry: null,
+    });
+    expect(nodes.indexOf(add!)).toBe(3);
+  });
+
+  it('places the add-level node before the Not placed node', () => {
+    const file = withLevels([0]);
+    const nodes = buildTreeNodes(input({ open: { file, location: 'x' }, notPlacedCount: 2 }));
+    expect(nodes.map((n) => n.key)).toEqual(['b:b1', 'l:level-0', ADD_LEVEL_KEY, 'p:not-placed', 'b:b2']);
+  });
+
+  it('omits the add-level node when the building is collapsed or not open', () => {
+    const file = withLevels([0]);
+    const collapsed = buildTreeNodes(input({ open: { file, location: 'x' }, collapsed: new Set(['b:b1']) }));
+    expect(collapsed.some((n) => n.key === ADD_LEVEL_KEY)).toBe(false);
+    const closed = buildTreeNodes(input());
+    expect(closed.some((n) => n.key === ADD_LEVEL_KEY)).toBe(false);
   });
 
   it('takes the name of the open file for the open building', () => {
@@ -66,7 +100,7 @@ describe('buildTreeNodes', () => {
   it('adds the open building when the recent list does not hold it', () => {
     const file = withLevels([0], 'b9', 'Dev');
     const nodes = buildTreeNodes(input({ open: { file, location: 'dev' } }));
-    expect(nodes.map((n) => n.key)).toEqual(['b:b9', 'l:level-0', 'b:b1', 'b:b2']);
+    expect(nodes.map((n) => n.key)).toEqual(['b:b9', 'l:level-0', ADD_LEVEL_KEY, 'b:b1', 'b:b2']);
     expect(nodes[0]!.entry).toEqual({ id: 'b9', name: 'Dev', location: 'dev' });
   });
 
@@ -93,7 +127,7 @@ describe('buildTreeNodes', () => {
     const some = buildTreeNodes(input({ open: { file, location: 'x' }, notPlacedCount: 3 }));
     const node = some.find((n) => n.key === NOT_PLACED_KEY);
     expect(node).toMatchObject({ kind: 'not-placed', parentKey: 'b:b1', detail: '3' });
-    expect(some.indexOf(node!)).toBe(2);
+    expect(some.indexOf(node!)).toBe(3);
   });
 });
 
@@ -142,7 +176,7 @@ describe('buildingWarnings', () => {
 describe('moveFocus', () => {
   const file = withLevels([0, 3000]);
   const nodes = buildTreeNodes(input({ open: { file, location: 'x' } }));
-  // keys: b:b1, l:level-0, l:level-1, b:b2
+  // keys: b:b1, l:level-0, l:level-1, a:add-level, b:b2
 
   it('moves down and up and stops at the ends', () => {
     expect(moveFocus(nodes, 'b:b1', 'ArrowDown')).toEqual({ focusKey: 'l:level-0', toggle: null });

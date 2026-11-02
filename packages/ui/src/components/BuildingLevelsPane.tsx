@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  addLevel,
   deleteLevel,
   levelWarnings,
   moveLevel,
@@ -8,57 +7,99 @@ import {
   setLevelElevation,
   sortLevelsByElevation,
   type BuildingFile,
+  type BuildingLevel,
 } from '@mepapp/core';
-import { countLabel, deleteBlockedReason, nextLevelElevation, sheetCount } from '../buildingLevels.js';
+import { deleteBlockedText, restoreLevel, sortBlockedText } from '../buildingLevels.js';
+import { buildingKey, levelKey } from '../buildingTree.js';
+
+/** How long the Undo line stays after a level is deleted, in ms. */
+const UNDO_MS = 8000;
 
 export interface BuildingLevelsPaneProps {
   file: BuildingFile;
   update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
-  selectedLevelId?: string | null;
+  selectedLevelId: string | null;
+  /** Level whose name field takes the focus and selects its text (a level just added). */
+  focusNameLevelId: string | null;
+  onNameFocused: () => void;
+  /** Ask the dialog to select a node (key from levelKey/buildingKey) and move DOM focus to the tree. */
+  onSelectKey: (key: string) => void;
 }
 
 /**
- * Edits the levels of the open building. Every change goes through update, which writes the building file.
+ * Edits the selected level of the open building. Every change goes through update, which writes the building file.
  */
-export function BuildingLevelsPane({ file, update, selectedLevelId }: BuildingLevelsPaneProps) {
-  const isSorted = file.levels.every((level, index) => index === 0 || file.levels[index - 1]!.elevationMm <= level.elevationMm);
+export function BuildingLevelsPane({
+  file,
+  update,
+  selectedLevelId,
+  focusNameLevelId,
+  onNameFocused,
+  onSelectKey,
+}: BuildingLevelsPaneProps) {
+  const [undo, setUndo] = useState<{ level: BuildingLevel; index: number } | null>(null);
+  const selectedIndex = file.levels.findIndex((level) => level.id === selectedLevelId);
+  const selectedLevel = selectedIndex >= 0 ? file.levels[selectedIndex]! : null;
+  const deleteBlocked = selectedLevel !== null ? deleteBlockedText(file, selectedLevel.id) : null;
+  const sortBlocked = sortBlockedText(file);
+
+  useEffect(() => {
+    if (undo === null) return;
+    const timer = window.setTimeout(() => setUndo(null), UNDO_MS);
+    return () => window.clearTimeout(timer);
+  }, [undo]);
+
+  function deleteAt(level: BuildingLevel, index: number) {
+    if (deleteBlockedText(file, level.id) !== null) return;
+    const next = file.levels[index + 1] ?? file.levels[index - 1];
+    void update((f) => {
+      const result = deleteLevel(f, level.id);
+      return result.ok ? result.file : f;
+    });
+    setUndo({ level, index });
+    onSelectKey(next !== undefined ? levelKey(next.id) : buildingKey(file.id));
+  }
+
+  function undoDelete() {
+    if (undo === null) return;
+    const { level, index } = undo;
+    void update((f) => restoreLevel(f, level, index));
+    setUndo(null);
+    onSelectKey(levelKey(level.id));
+  }
 
   return (
     <div className="mep-section">
       <h4>Levels</h4>
-      {file.levels.length === 0 && <p className="mep-hint">No levels yet. Add a level to start.</p>}
-      {file.levels.length > 0 && (
-        <div className="mep-level-edit-row mep-level-edit-head" aria-hidden="true">
+      {file.levels.length === 0 && <p className="mep-hint">No levels yet. Use + Add level.</p>}
+      {selectedLevel !== null && (
+        <div key={selectedLevel.id} className="mep-level-detail" data-testid="level-row">
           <span>Name</span>
+          <LevelNameInput
+            name={selectedLevel.name}
+            onRename={(name) => void update((f) => renameLevel(f, selectedLevel.id, name))}
+            focusRequested={focusNameLevelId === selectedLevel.id}
+            onFocused={onNameFocused}
+          />
           <span>Elevation</span>
-          <span />
-          <span>Sheets</span>
-          <span />
-        </div>
-      )}
-      {file.levels.map((level, index) => {
-        const blocked = deleteBlockedReason(file, level.id);
-        const sheets = sheetCount(file, level.id);
-        return (
-          <div
-            key={level.id}
-            className={`mep-elem-row mep-level-edit-row${level.id === selectedLevelId ? ' mep-level-edit-row--selected' : ''}`}
-            aria-current={level.id === selectedLevelId ? 'true' : undefined}
-            data-testid="level-row"
-          >
-            <LevelNameInput name={level.name} onRename={(name) => void update((f) => renameLevel(f, level.id, name))} />
+          <span className="mep-level-elevation">
             <LevelElevationInput
-              value={level.elevationMm}
-              onCommit={(value) => void update((f) => setLevelElevation(f, level.id, value))}
+              value={selectedLevel.elevationMm}
+              onCommit={(value) => void update((f) => setLevelElevation(f, selectedLevel.id, value))}
             />
             <span>mm</span>
-            <span>{countLabel(sheets, 'sheet') + (blocked !== null ? ', cannot delete' : '')}</span>
+          </span>
+          <span>Order</span>
+          <div className="mep-level-move">
             <button
               type="button"
               aria-label="Move level up"
               title="Move level up"
-              disabled={index === 0}
-              onClick={() => void update((f) => moveLevel(f, level.id, index - 1))}
+              aria-disabled={selectedIndex === 0}
+              onClick={() => {
+                if (selectedIndex === 0) return;
+                void update((f) => moveLevel(f, selectedLevel.id, selectedIndex - 1));
+              }}
             >
               ↑
             </button>
@@ -66,39 +107,65 @@ export function BuildingLevelsPane({ file, update, selectedLevelId }: BuildingLe
               type="button"
               aria-label="Move level down"
               title="Move level down"
-              disabled={index === file.levels.length - 1}
-              onClick={() => void update((f) => moveLevel(f, level.id, index + 1))}
+              aria-disabled={selectedIndex === file.levels.length - 1}
+              onClick={() => {
+                if (selectedIndex === file.levels.length - 1) return;
+                void update((f) => moveLevel(f, selectedLevel.id, selectedIndex + 1));
+              }}
             >
               ↓
             </button>
+          </div>
+          <span />
+          <div className="mep-level-delete">
             <button
               type="button"
-              disabled={blocked !== null}
-              title={blocked ?? 'Delete level'}
-              onClick={() =>
-                void update((f) => {
-                  const result = deleteLevel(f, level.id);
-                  return result.ok ? result.file : f;
-                })
-              }
+              aria-disabled={deleteBlocked !== null}
+              aria-describedby={deleteBlocked !== null ? 'mep-level-delete-reason' : undefined}
+              title={deleteBlocked ?? 'Delete level'}
+              onClick={() => deleteAt(selectedLevel, selectedIndex)}
             >
               Delete
             </button>
+            {deleteBlocked !== null && (
+              <p id="mep-level-delete-reason" className="mep-hint" data-testid="delete-reason">
+                {deleteBlocked}
+              </p>
+            )}
           </div>
-        );
-      })}
-      <div className="mep-buildings-actions">
-        <button type="button" onClick={() => void update((f) => addLevel(f, '', nextLevelElevation(f)))}>
-          Add level
-        </button>
-        <button
-          type="button"
-          disabled={isSorted}
-          onClick={() => void update((f) => sortLevelsByElevation(f))}
-        >
-          Sort by elevation
-        </button>
-      </div>
+        </div>
+      )}
+      {undo !== null && (
+        <p role="status" data-testid="level-undo" className="mep-hint mep-level-undo">
+          {`Deleted level "${undo.level.name}". `}
+          <button type="button" onClick={undoDelete}>
+            Undo
+          </button>
+        </p>
+      )}
+      {file.levels.length > 0 && (
+        <>
+          <h4>Level order</h4>
+          <div className="mep-buildings-actions">
+            <button
+              type="button"
+              aria-disabled={sortBlocked !== null}
+              aria-describedby={sortBlocked !== null ? 'mep-level-sort-reason' : undefined}
+              title={sortBlocked ?? 'Sort levels by elevation'}
+              onClick={() => {
+                if (sortBlocked === null) void update((f) => sortLevelsByElevation(f));
+              }}
+            >
+              Sort by elevation
+            </button>
+          </div>
+          {sortBlocked !== null && (
+            <p id="mep-level-sort-reason" className="mep-hint" data-testid="sort-reason">
+              {sortBlocked}
+            </p>
+          )}
+        </>
+      )}
       {levelWarnings(file).map((warning) => (
         <p key={warning} className="mep-hint mep-buildings-message">
           {warning}
@@ -111,11 +178,22 @@ export function BuildingLevelsPane({ file, update, selectedLevelId }: BuildingLe
 interface LevelNameInputProps {
   name: string;
   onRename: (name: string) => void;
+  /** True when the field takes the focus and selects its text. */
+  focusRequested: boolean;
+  onFocused: () => void;
 }
 
 /** Keeps the typed text in a draft until blur or Enter. Escape drops the draft; a blank draft keeps the saved name. */
-function LevelNameInput({ name, onRename }: LevelNameInputProps) {
+function LevelNameInput({ name, onRename, focusRequested, onFocused }: LevelNameInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!focusRequested) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+    onFocused();
+  }, [focusRequested]);
 
   function commit() {
     if (draft === null) return;
@@ -126,6 +204,7 @@ function LevelNameInput({ name, onRename }: LevelNameInputProps) {
 
   return (
     <input
+      ref={inputRef}
       aria-label="Level name"
       value={draft ?? name}
       onChange={(event) => setDraft(event.target.value)}
