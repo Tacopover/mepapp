@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { addSheets, moveSheet, removeSheet, type BuildingFile } from '@mepapp/core';
+import { addSheets, moveSheet, removeSheet, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { countLabel } from '../buildingLevels.js';
@@ -14,12 +14,14 @@ import {
   type PdfGroup,
   type PendingPdf,
 } from '../buildingSheets.js';
+import type { SheetOpenResult } from './ManageBuildingsDialog.js';
 
 export interface BuildingSheetsPaneProps {
   file: BuildingFile;
   update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
   fileAccess: FileAccess;
   engine: PdfEngine | undefined;
+  onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
 }
 
 interface Notice {
@@ -31,7 +33,7 @@ interface Notice {
  * Lists the PDFs that the user added, one row per page, and picks a level for each page.
  * Every level choice goes through update, which writes the building file. Added PDFs that have no level yet stay in a list in this pane only.
  */
-export function BuildingSheetsPane({ file, update, fileAccess, engine }: BuildingSheetsPaneProps) {
+export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenSheet }: BuildingSheetsPaneProps) {
   const [pending, setPending] = useState<PendingPdf[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -136,6 +138,17 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine }: Buildin
     });
   }
 
+  async function openRow(row: PageRow, mode: 'path' | 'pick') {
+    if (row.sheet === null) return;
+    const result = await onOpenSheet(row.sheet, mode);
+    if (!result.ok && result.message !== null) {
+      const text = result.message.startsWith('Could not')
+        ? result.message
+        : `Could not open ${row.sheet.location.fileName}: ${result.message}`;
+      setNotice({ text, error: true });
+    }
+  }
+
   return (
     <div className="mep-section" data-testid="sheets-pane">
       <h4>Sheets</h4>
@@ -221,6 +234,21 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine }: Buildin
                       </option>
                     ))}
                   </select>
+                  {row.sheet !== null &&
+                    (row.sheet.location.path !== undefined && fileAccess.readPath !== undefined ? (
+                      <button type="button" data-testid="open-sheet" title="Open this sheet" onClick={() => void openRow(row, 'path')}>
+                        Open
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        data-testid="open-sheet"
+                        title="Open this sheet: pick the PDF file again"
+                        onClick={() => void openRow(row, 'pick')}
+                      >
+                        Pick the file again…
+                      </button>
+                    ))}
                 </div>
               ))}
           </div>

@@ -66,7 +66,7 @@ import { Dialog } from './components/Dialog.js';
 import { CalibrationDialog } from './components/CalibrationDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRenames } from './components/GlobalPropertiesDialog.js';
-import { ManageBuildingsDialog } from './components/ManageBuildingsDialog.js';
+import { ManageBuildingsDialog, type SheetOpenResult } from './components/ManageBuildingsDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
 import { StampLabelsDialog } from './components/StampLabelsDialog.js';
 import { StampPickerDialog } from './components/StampPickerDialog.js';
@@ -106,7 +106,7 @@ import {
 import { useShowBuiltInStamps } from './builtInStampsSetting.js';
 import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
 import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
-import { libraryFolderOf, type AppDialogs, type BuildingRef, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore } from '@mepapp/platform';
+import { libraryFolderOf, type AppDialogs, type BuildingRef, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore, type OpenedFile } from '@mepapp/platform';
 import './theme.css';
 
 export interface PdfPageLoadResult {
@@ -544,23 +544,41 @@ export function MepSketchApp({
 
   /** Status bar's page nav — reuses the already-open PDF handle, no re-parse. View-only: see SketchScene.setBackdropPage. */
   const pageRequestRef = useRef(0);
-  const handleChangePage = useCallback(
-    async (nextPageIndex: number) => {
-      if (!activePdfHandle) return;
+  // Shows one page of the active PDF. It reads the scene's own handle, so it works right after an open.
+  const showPage = useCallback(
+    async (pageIndex: number) => {
+      const scene = sceneRef.current;
+      const handle = scene?.getActivePdfHandle();
+      if (!scene || !handle) return;
+      const documentId = scene.getActiveDocumentId();
+      if (pageIndex >= handle.getPageCount()) {
+        setStatus(`Page ${pageIndex + 1} is not in this PDF (${handle.getPageCount()} pages).`);
+        return;
+      }
       const request = ++pageRequestRef.current;
+      if (pageIndex === scene.getPageIndex()) return;
       try {
-        const { bitmap, pageWidthPt, pageHeightPt } = await onLoadPdfPageAt(activePdfHandle, nextPageIndex);
+        const { bitmap, pageWidthPt, pageHeightPt } = await onLoadPdfPageAt(handle, pageIndex);
         // setBackdropPage acts on the active document, so a result that a later page click or a document switch overtook is dropped.
-        if (request !== pageRequestRef.current || sceneRef.current?.getActiveDocumentId() !== activeDocumentId) {
+        if (request !== pageRequestRef.current || scene.getActiveDocumentId() !== documentId) {
           bitmap.close();
           return;
         }
-        sceneRef.current?.setBackdropPage(bitmap, pageWidthPt, pageHeightPt, nextPageIndex);
+        scene.setBackdropPage(bitmap, pageWidthPt, pageHeightPt, pageIndex);
       } catch (err) {
-        setStatus(`Could not show page ${nextPageIndex + 1}: ${(err as Error).message}`);
+        setStatus(`Could not show page ${pageIndex + 1}: ${(err as Error).message}`);
       }
     },
-    [activeDocumentId, activePdfHandle, onLoadPdfPageAt, sceneRef],
+    [onLoadPdfPageAt, sceneRef],
+  );
+
+  /** Status bar's page nav — reuses the already-open PDF handle, no re-parse. View-only: see SketchScene.setBackdropPage. */
+  const handleChangePage = useCallback(
+    async (nextPageIndex: number) => {
+      if (!activePdfHandle) return;
+      await showPage(nextPageIndex);
+    },
+    [activePdfHandle, showPage],
   );
 
   // The scene resets its armed stamp and active network type on a document switch; the Stamps tab must not keep showing them.
@@ -662,6 +680,45 @@ export function MepSketchApp({
       }
     },
     [onLoadPdfPage, resolveStampIconBitmap, sceneRef],
+  );
+
+  // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
+  const openSheet = useCallback(
+    async (sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> => {
+      let opened: OpenedFile | undefined;
+      try {
+        if (mode === 'path') {
+          const path = sheet.location.path;
+          if (path === undefined || !fileAccess.readPath) {
+            const message = 'This sheet cannot be opened by its path. Pick the file again.';
+            setStatus(message);
+            return { ok: false, message };
+          }
+          opened = await fileAccess.readPath(path);
+          if (opened === undefined) {
+            const message = `Could not open ${sheet.location.fileName}: the file is missing or the app has no access to it.`;
+            setStatus(message);
+            return { ok: false, message };
+          }
+        } else {
+          opened = await fileAccess.openFile(PDF_FILE_TYPES);
+          if (opened === undefined) return { ok: false, message: null };
+        }
+      } catch (err) {
+        const message = `Could not open ${sheet.location.fileName}: ${(err as Error).message}`;
+        setStatus(message);
+        return { ok: false, message };
+      }
+      await openPdfFile(opened.file, opened.target);
+      const fileKey = `${opened.file.name}:${opened.file.size}:${opened.file.lastModified}`;
+      const scene = sceneRef.current;
+      const documentId = scene?.findDocumentByFileKey(fileKey);
+      if (!scene || !documentId) return { ok: false, message: 'The file could not be opened. See the header for details.' };
+      if (scene.getActiveDocumentId() !== documentId) scene.activateDocument(documentId);
+      await showPage(sheet.pageIndex);
+      return { ok: true };
+    },
+    [fileAccess, openPdfFile, sceneRef, showPage],
   );
 
   const handleOpenPdf = useCallback(async () => {
@@ -1987,6 +2044,7 @@ export function MepSketchApp({
           onClose={() => setManageBuildingsOpen(false)}
           fileAccess={fileAccess}
           pdfEngine={pdfEngine}
+          onOpenSheet={openSheet}
         />
       )}
 

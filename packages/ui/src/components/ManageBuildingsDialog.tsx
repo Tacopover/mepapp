@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { BuildingSheet } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
@@ -7,18 +8,22 @@ import { countLabel } from '../buildingLevels.js';
 import { BuildingLevelsPane } from './BuildingLevelsPane.js';
 import { BuildingSheetsPane } from './BuildingSheetsPane.js';
 
+/** The result of opening a sheet. A null message means the user cancelled the file picker. */
+export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
+
 export interface ManageBuildingsDialogProps {
   building: UseBuilding & { available: boolean };
   onClose: () => void;
   fileAccess: FileAccess;
   pdfEngine?: PdfEngine;
+  onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
 }
 
 /**
  * Manage Buildings: creates, opens and closes the one open building file.
  * The building file is stored by the platform (a file picker on desktop).
  */
-export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine }: ManageBuildingsDialogProps) {
+export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine, onOpenSheet }: ManageBuildingsDialogProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
 
@@ -54,6 +59,11 @@ export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine
             update={building.update}
             fileAccess={fileAccess}
             engine={pdfEngine}
+            onOpenSheet={async (sheet, mode) => {
+              const result = await onOpenSheet(sheet, mode);
+              if (result.ok) onClose();
+              return result;
+            }}
           />
           <button type="button" onClick={() => building.close()}>
             Close building

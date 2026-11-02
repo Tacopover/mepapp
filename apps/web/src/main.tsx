@@ -89,12 +89,23 @@ async function devStatPath(path: string): ReturnType<NonNullable<FileAccess['sta
   }
 }
 
+// For dev browser checks only: reads a PDF by its file name in the OPFS root.
+async function devReadPath(path: string): ReturnType<NonNullable<FileAccess['readPath']>> {
+  try {
+    const root = await navigator.storage.getDirectory();
+    const file = await (await root.getFileHandle(path)).getFile();
+    return { file };
+  } catch {
+    return undefined;
+  }
+}
+
 const container = document.getElementById('root');
 if (container) {
   void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs, makeBuildingStore }) => {
     const fileAccess: FileAccess =
       import.meta.env.DEV && platformFileAccess.statPath === undefined
-        ? Object.assign(Object.create(platformFileAccess), { statPath: devStatPath })
+        ? Object.assign(Object.create(platformFileAccess), { statPath: devStatPath, readPath: devReadPath })
         : platformFileAccess;
     createRoot(container).render(
       <MepSketchApp
