@@ -64,6 +64,8 @@ export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine
               if (result.ok) onClose();
               return result;
             }}
+            sheetStatus={building.building.sheetStatus}
+            onRefreshStatus={building.refreshSheetStatus}
           />
           <button type="button" onClick={() => building.close()}>
             Close building

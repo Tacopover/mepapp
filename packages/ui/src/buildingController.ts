@@ -1,4 +1,4 @@
-import { BuildingFileError, emptyBuilding, parseBuildingFile, serializeBuildingFile, type BuildingFile } from '@mepapp/core';
+import { BuildingFileError, emptyBuilding, parseBuildingFile, serializeBuildingFile, type BuildingFile, type SheetSummary } from '@mepapp/core';
 import {
   StoreConflictError,
   type BuildingRef,
@@ -9,6 +9,7 @@ import {
   type OpenedFile,
   type SavedFile,
 } from '@mepapp/platform';
+import { sheetStatusOf, type SheetProbe, type SheetStatus } from './buildingStatus.js';
 import {
   addRecentBuilding,
   loadRecentBuildings,
@@ -16,8 +17,9 @@ import {
   saveRecentBuildings,
   type RecentBuilding,
 } from './recentBuildings.js';
+import { readSummaries, statSheets, type SheetStat } from './quantitiesScope.js';
 
-export type SheetStatus = 'ok' | 'pdf-missing' | 'no-access' | 'not-stamped' | 'no-summary' | 'old-summary' | 'copy-suspected';
+export type { SheetStatus } from './buildingStatus.js';
 
 export interface OpenBuilding {
   file: BuildingFile;
@@ -26,7 +28,7 @@ export interface OpenBuilding {
   ref: BuildingRef;
   /** True while a write is queued or running. */
   dirty: boolean;
-  sheetStatus: Record<string, SheetStatus>;   // always {} in B3-T02
+  sheetStatus: Record<string, SheetStatus>;
 }
 
 export interface BuildingState {
@@ -182,6 +184,7 @@ export class BuildingController {
         dirty: false,
         sheetStatus: {},
       });
+      void this.refreshSheetStatus();
     } catch (error) {
       this.setState({ message: `Could not open the building: ${messageOf(error)}` });
     }
@@ -219,10 +222,39 @@ export class BuildingController {
       const file = parseBuildingFile(JSON.parse(stored.json));
       this.lastJson = serializeBuildingFile(file);
       this.setBuilding({ file, revision: stored.revision });
+      void this.refreshSheetStatus();
     } catch (error) {
       if (this.generation !== generation) return;
       this.setState({ message: `Could not read the building: ${messageOf(error)}` });
     }
+  }
+
+  /** Probes every sheet (statPath) and reads the summaries; stores the result in building.sheetStatus. Does nothing when no building is open. Ignores a result that a newer open of a building overtook (generation). Never throws: a failure leaves the old statuses and sets no message. */
+  async refreshSheetStatus(): Promise<void> {
+    const building = this.state.building;
+    if (building === null) return;
+    const generation = this.generation;
+    const { file } = building;
+    const withPath = file.sheets.filter((sheet) => sheet.location.path !== undefined);
+    const statPath = this.fileAccess.statPath?.bind(this.fileAccess);
+    const stats: Map<string, SheetStat> = statPath === undefined ? new Map() : await statSheets(withPath, statPath);
+    let summaries = new Map<string, SheetSummary>();
+    try {
+      summaries = (await readSummaries(building.store)).summaries;
+    } catch {
+      summaries = new Map();
+    }
+    if (this.generation !== generation) return;
+    const sheetStatus: Record<string, SheetStatus> = {};
+    for (const sheet of file.sheets) {
+      const stat = statPath === undefined ? undefined : stats.get(sheet.id);
+      const probe: SheetProbe = stat === undefined ? { state: 'unknown' } : { state: stat.state, sizeBytes: stat.sizeBytes };
+      const summary = sheet.projectUuid !== null ? summaries.get(sheet.projectUuid) : undefined;
+      sheetStatus[sheet.id] = sheetStatusOf(sheet, probe, summary);
+    }
+    const current = this.state.building;
+    if (current?.file !== file || JSON.stringify(current.sheetStatus) === JSON.stringify(sheetStatus)) return;
+    this.setBuilding({ sheetStatus });
   }
 
   dismissMessage(): void {
@@ -271,6 +303,7 @@ export class BuildingController {
       { file, revision: stored.revision, store, ref: { id: file.id, name: file.name, location: ref.location }, dirty: false, sheetStatus: {} },
       this.remember(entry),
     );
+    void this.refreshSheetStatus();
   }
 
   private remember(entry: RecentBuilding): RecentBuilding[] {
@@ -294,7 +327,10 @@ export class BuildingController {
       }
     } finally {
       this.pendingWrites -= 1;
-      if (this.pendingWrites === 0) this.setBuilding({ dirty: false });
+      if (this.pendingWrites === 0) {
+        this.setBuilding({ dirty: false });
+        void this.refreshSheetStatus();
+      }
     }
   }
 
@@ -320,10 +356,11 @@ export class BuildingController {
         const file = parseBuildingFile(JSON.parse(stored.json));
         this.lastJson = serializeBuildingFile(file);
         this.setBuilding({ file, revision: stored.revision });
+        void this.refreshSheetStatus();
       }
     } catch (error) {
       if (this.generation !== generation) return;
-      message = `Could not save the building: ${messageOf(error)}`;
+      message =`Could not save the building: ${messageOf(error)}`;
     }
     this.setState({ message });
     this.setBuilding({ dirty: false });

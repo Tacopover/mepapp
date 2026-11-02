@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { addSheets, moveSheet, removeSheet, type BuildingFile, type BuildingSheet } from '@mepapp/core';
+import { useEffect, useState } from 'react';
+import { addSheets, moveSheet, relinkSheet, removeSheet, type BuildingFile, type BuildingSheet, type SheetLocation } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { countLabel } from '../buildingLevels.js';
@@ -10,10 +10,12 @@ import {
   newSheetPage,
   pdfGroupKey,
   pdfTotals,
+  relinkWouldDuplicate,
   type PageRow,
   type PdfGroup,
   type PendingPdf,
 } from '../buildingSheets.js';
+import { statusLabel, statusTone, type SheetStatus } from '../buildingStatus.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
 
 export interface BuildingSheetsPaneProps {
@@ -22,6 +24,15 @@ export interface BuildingSheetsPaneProps {
   fileAccess: FileAccess;
   engine: PdfEngine | undefined;
   onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
+  sheetStatus: Record<string, SheetStatus>;
+  onRefreshStatus: () => void;
+}
+
+interface RelinkAsk {
+  groupKey: string;
+  location: SheetLocation;
+  projectUuid: string;
+  pickedName: string;
 }
 
 interface Notice {
@@ -33,11 +44,16 @@ interface Notice {
  * Lists the PDFs that the user added, one row per page, and picks a level for each page.
  * Every level choice goes through update, which writes the building file. Added PDFs that have no level yet stay in a list in this pane only.
  */
-export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenSheet }: BuildingSheetsPaneProps) {
+export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenSheet, sheetStatus, onRefreshStatus }: BuildingSheetsPaneProps) {
   const [pending, setPending] = useState<PendingPdf[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [relinkAsk, setRelinkAsk] = useState<RelinkAsk | null>(null);
+
+  useEffect(() => {
+    onRefreshStatus();
+  }, []);
 
   const groups = groupPdfs(file, pending);
   const totals = pdfTotals(groups);
@@ -122,6 +138,71 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenShe
     void update((f) => ids.reduce((acc, id) => removeSheet(acc, id), f));
   }
 
+  function groupHasStatus(group: PdfGroup, status: SheetStatus): boolean {
+    return group.rows.some((row) => row.sheet !== null && sheetStatus[row.sheet.id] === status);
+  }
+
+  async function relink(group: PdfGroup) {
+    const picked = await fileAccess.openFile(BUILDING_PDF_TYPES).catch((err: unknown) => {
+      notify(`Could not open the file picker: ${(err as Error).message}`);
+      return undefined;
+    });
+    if (picked === undefined) return;
+    const path = pathOfTarget(picked.target);
+    const location: SheetLocation = {
+      fileName: picked.file.name,
+      sizeBytes: picked.file.size,
+      ...(path !== undefined ? { path } : {}),
+    };
+    let projectUuid: string | null = null;
+    if (engine !== undefined) {
+      try {
+        projectUuid = (await readPdfInfo(picked.file, engine)).projectUuid;
+      } catch (err) {
+        notify(`Could not read ${picked.file.name}: ${(err as Error).message}`);
+        return;
+      }
+    }
+    if (
+      projectUuid !== null &&
+      group.rows.some((row) => row.sheet !== null && row.sheet.projectUuid !== null && row.sheet.projectUuid !== projectUuid)
+    ) {
+      setRelinkAsk({ groupKey: group.key, location, projectUuid, pickedName: picked.file.name });
+      return;
+    }
+    await applyRelink(group, location, projectUuid ?? undefined);
+  }
+
+  async function applyRelink(group: PdfGroup, location: SheetLocation, projectUuid: string | undefined) {
+    const ids = group.rows.flatMap((row) => (row.sheet === null ? [] : [row.sheet.id]));
+    if (relinkWouldDuplicate(file, ids, projectUuid)) {
+      setRelinkAsk(null);
+      setNotice({ text: 'Could not relink: another sheet already uses this document and page.', error: true });
+      return;
+    }
+    await update((f) => ids.reduce((acc, id) => relinkSheet(acc, id, location, projectUuid), f));
+    notify(`Relinked ${location.fileName}.`);
+  }
+
+  async function confirmRelink() {
+    const ask = relinkAsk;
+    setRelinkAsk(null);
+    const group = groups.find((item) => item.key === ask?.groupKey);
+    if (ask === null || group === undefined) return;
+    await applyRelink(group, ask.location, ask.projectUuid);
+  }
+
+  async function grantAccess() {
+    try {
+      const picked = await fileAccess.pickFolder();
+      if (picked === undefined) return;
+      onRefreshStatus();
+      notify(`Checked the files again after you picked ${picked.name}.`);
+    } catch (err) {
+      notify(`Could not open the file picker: ${(err as Error).message}`);
+    }
+  }
+
   function chooseLevel(group: PdfGroup, row: PageRow, levelId: string) {
     const sheet = row.sheet;
     if (levelId === '') {
@@ -161,6 +242,9 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenShe
             Add folder…
           </button>
         )}
+        <button type="button" data-testid="refresh-status" onClick={() => onRefreshStatus()}>
+          Check files again
+        </button>
       </div>
       <p className="mep-hint">Pages without a level are kept only while this dialog is open.</p>
       {busy && <p className="mep-hint" data-testid="sheets-busy">Reading PDFs…</p>}
@@ -201,10 +285,21 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenShe
               {assigned > 0 && (
                 <button
                   type="button"
+                  className="mep-sheets-remove"
                   title="Remove all sheets of this PDF from the building"
                   onClick={() => removeAllSheets(group)}
                 >
                   Remove sheets
+                </button>
+              )}
+              {groupHasStatus(group, 'pdf-missing') && (
+                <button type="button" data-testid="relink-pdf" onClick={() => void relink(group)}>
+                  Relink…
+                </button>
+              )}
+              {groupHasStatus(group, 'no-access') && (
+                <button type="button" data-testid="grant-access" onClick={() => void grantAccess()}>
+                  Grant access…
                 </button>
               )}
               {group.collapsedByDefault && (
@@ -217,9 +312,23 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenShe
                 </button>
               )}
             </div>
+            {relinkAsk !== null && relinkAsk.groupKey === group.key && (
+              <div className="mep-buildings-actions">
+                <p className="mep-hint" data-testid="relink-confirm">
+                  The file "{relinkAsk.pickedName}" is a different document than the sheets of {group.fileName}. Relink the sheets to
+                  it? They keep their levels.
+                </p>
+                <button type="button" onClick={() => void confirmRelink()}>
+                  Relink to this file
+                </button>
+                <button type="button" onClick={() => setRelinkAsk(null)}>
+                  Cancel
+                </button>
+              </div>
+            )}
             {showPages &&
               group.rows.map((row) => (
-                <div key={row.pageIndex} className="mep-elem-row mep-sheet-page-row" data-testid="page-row">
+                <div key={row.sheet?.id ?? `page-${row.pageIndex}`} className="mep-elem-row mep-sheet-page-row" data-testid="page-row">
                   <span>Page {row.pageIndex + 1}</span>
                   <select
                     aria-label={`Level for ${group.fileName} page ${row.pageIndex + 1}`}
@@ -236,7 +345,15 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenShe
                   </select>
                   {row.sheet !== null &&
                     (row.sheet.location.path !== undefined && fileAccess.readPath !== undefined ? (
-                      <button type="button" data-testid="open-sheet" title="Open this sheet" onClick={() => void openRow(row, 'path')}>
+                      <button
+                        type="button"
+                        data-testid="open-sheet"
+                        disabled={sheetStatus[row.sheet.id] === 'pdf-missing'}
+                        title={
+                          sheetStatus[row.sheet.id] === 'pdf-missing' ? 'The PDF is missing. Relink it first.' : 'Open this sheet'
+                        }
+                        onClick={() => void openRow(row, 'path')}
+                      >
                         Open
                       </button>
                     ) : (
@@ -249,6 +366,15 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenShe
                         Pick the file again…
                       </button>
                     ))}
+                  {row.sheet !== null && sheetStatus[row.sheet.id] !== undefined && (
+                    <span
+                      className={`mep-sheet-status mep-sheet-status--${statusTone(sheetStatus[row.sheet.id])}`}
+                      data-testid="sheet-status"
+                      data-status={sheetStatus[row.sheet.id]}
+                    >
+                      {statusLabel(sheetStatus[row.sheet.id])}
+                    </span>
+                  )}
                 </div>
               ))}
           </div>

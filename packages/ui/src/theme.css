@@ -1741,8 +1741,12 @@
   padding: 8px 0;
   margin: 8px 0 0;
 }
+.mep-sheets-remove {
+  margin-left: auto;
+}
 .mep-sheet-page-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--line-soft, var(--line));
@@ -1756,6 +1760,28 @@
   min-width: 0;
   width: auto;
   margin-bottom: 0;
+}
+.mep-sheet-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.mep-sheet-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.mep-sheet-status--ok::before {
+  background: #2f7d4f;
+}
+.mep-sheet-status--warn::before {
+  background: #9a5b00;
+}
+.mep-sheet-status--bad::before {
+  background: #b3261e;
 }
 .mep-modal .mep-modal-actions {
   display: flex;

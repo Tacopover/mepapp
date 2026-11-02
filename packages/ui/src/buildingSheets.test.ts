@@ -7,6 +7,7 @@ import {
   newSheetPage,
   pdfGroupKey,
   pdfTotals,
+  relinkWouldDuplicate,
   sheetDisplayName,
   type PendingPdf,
 } from './buildingSheets.js';
@@ -178,5 +179,33 @@ describe('pdfTotals', () => {
 
   it('returns zeros for no groups', () => {
     expect(pdfTotals([])).toEqual({ pdfs: 0, pages: 0, assigned: 0 });
+  });
+});
+
+describe('relinkWouldDuplicate', () => {
+  it('returns false when the document id is undefined or null', () => {
+    const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s2', 0, 'b.pdf')]);
+    expect(relinkWouldDuplicate(file, ['s2'], undefined)).toBe(false);
+    expect(relinkWouldDuplicate(file, ['s2'], null)).toBe(false);
+  });
+
+  it('returns true when a sheet outside the set has the id and the same page', () => {
+    const file = buildingOf([sheetOf('s1', 2, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s2', 2, 'b.pdf')]);
+    expect(relinkWouldDuplicate(file, ['s2'], 'u1')).toBe(true);
+  });
+
+  it('returns false when a sheet outside the set has the id but another page', () => {
+    const file = buildingOf([sheetOf('s1', 1, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s2', 2, 'b.pdf')]);
+    expect(relinkWouldDuplicate(file, ['s2'], 'u1')).toBe(false);
+  });
+
+  it('returns true when two sheets of the relinked set share a page index', () => {
+    const file = buildingOf([sheetOf('s1', 0, 'a.pdf'), sheetOf('s2', 0, 'a.pdf', { path: 'C:/a.pdf' }), sheetOf('s3', 1, 'b.pdf')]);
+    expect(relinkWouldDuplicate(file, ['s1', 's2'], 'u1')).toBe(true);
+  });
+
+  it('does not count a sheet that already has the id and is in the set against itself', () => {
+    const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s2', 1, 'b.pdf')]);
+    expect(relinkWouldDuplicate(file, ['s1'], 'u1')).toBe(false);
   });
 });

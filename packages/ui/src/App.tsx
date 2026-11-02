@@ -28,10 +28,12 @@ import {
   type ReconciliationReport,
   type SchematicSymbol,
   type SchematicTemplate,
+  type SheetLocation,
   type StampCategory,
   type StampDefinition,
   type StampLabel,
   type StampLabelVisibility,
+  withMovedLocation,
   wantsNewProjectUuid,
 } from '@mepapp/core';
 import { DEFAULT_SNAP_RADIUS_SCREEN_PX, DEFAULT_ANGLE_SNAP_DEGREES, isCircuitsTool, type PdfExportReceipt, type WallDebugState } from '@mepapp/render';
@@ -67,6 +69,7 @@ import { CalibrationDialog } from './components/CalibrationDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRenames } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog, type SheetOpenResult } from './components/ManageBuildingsDialog.js';
+import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
 import { StampLabelsDialog } from './components/StampLabelsDialog.js';
 import { StampPickerDialog } from './components/StampPickerDialog.js';
@@ -74,6 +77,8 @@ import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { useBuilding } from './useBuilding.js';
+import { checkOpenedDocument } from './documentIdentity.js';
+import { pathOfTarget } from './buildingPdfInfo.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
@@ -440,6 +445,18 @@ export function MepSketchApp({
     onBuildingReady?.({ adopt: buildingHook.adopt });
     return () => onBuildingReady?.(null);
   }, [onBuildingReady, buildingHook.adopt]);
+  const buildingRef = useRef(buildingHook.building);
+  buildingRef.current = buildingHook.building;
+  const updateRef = useRef(buildingHook.update);
+  updateRef.current = buildingHook.update;
+  const [duplicatePrompt, setDuplicatePrompt] = useState<{
+    documentId: string;
+    fileName: string;
+    storedName: string;
+    storedPath?: string;
+    projectUuid: string;
+    location: SheetLocation;
+  } | null>(null);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
     const saved = Number(localStorage.getItem(SNAP_RADIUS_STORAGE_KEY));
@@ -631,6 +648,8 @@ export function MepSketchApp({
     [resolveStampIconUrl],
   );
 
+  const documentOpenedRef = useRef<((args: { documentId: string; file: File; target: FileTarget | undefined }) => Promise<void>) | null>(null);
+
   const openPdfFile = useCallback(
     async (file: File, fileTarget: FileTarget | undefined) => {
       // Reopening a file already open elsewhere in the document list just
@@ -666,6 +685,7 @@ export function MepSketchApp({
           setReconciliation(report && (report.drifted.length > 0 || report.missingIds.length > 0) ? report : null);
         }
         setStatus(`Loaded ${file.name} (${pageWidthPt.toFixed(1)} x ${pageHeightPt.toFixed(1)} pt)`);
+        if (task.documentId) void documentOpenedRef.current?.({ documentId: task.documentId, file, target: fileTarget });
       } catch (err) {
         // Kept open, a document whose project failed to load (for example one
         // saved by a newer MepApp) shows an empty drawing, and a Save would
@@ -681,6 +701,35 @@ export function MepSketchApp({
     },
     [onLoadPdfPage, resolveStampIconBitmap, sceneRef],
   );
+
+  documentOpenedRef.current = async ({ documentId, file, target }) => {
+    const building = buildingRef.current;
+    if (building === null || sceneRef.current?.getActiveDocumentId() !== documentId) return;
+    const projectUuid = sceneRef.current.getProjectUuid();
+    const outcome = await checkOpenedDocument({
+      building: building.file,
+      doc: { projectUuid, path: pathOfTarget(target), fileName: file.name, sizeBytes: file.size, modifiedMs: file.lastModified },
+      statPath: fileAccess.statPath?.bind(fileAccess),
+    }).catch((err: unknown) => {
+      setStatus(`Could not check ${file.name} against the building: ${(err as Error).message}`);
+      return null;
+    });
+    if (buildingRef.current?.file.id !== building.file.id) return;
+    if (outcome === null) return;
+    if (outcome.kind === 'moved') {
+      await updateRef.current((f) => withMovedLocation(f, outcome.projectUuid, outcome.location));
+      setStatus(`Updated the location of ${outcome.sheetName} in ${building.file.name}.`);
+    } else if (outcome.kind === 'ask') {
+      setDuplicatePrompt({
+        documentId,
+        fileName: file.name,
+        storedName: outcome.storedName,
+        storedPath: outcome.storedPath,
+        projectUuid: outcome.projectUuid,
+        location: outcome.location,
+      });
+    }
+  };
 
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
   const openSheet = useCallback(
@@ -2045,6 +2094,25 @@ export function MepSketchApp({
           fileAccess={fileAccess}
           pdfEngine={pdfEngine}
           onOpenSheet={openSheet}
+        />
+      )}
+
+      {duplicatePrompt && (
+        <DuplicateDocumentDialog
+          fileName={duplicatePrompt.fileName}
+          storedName={duplicatePrompt.storedName}
+          storedPath={duplicatePrompt.storedPath}
+          onUseAsCopy={() => {
+            sceneRef.current?.commitProjectUuid(duplicatePrompt.documentId, makeProjectUuid(() => crypto.randomUUID()));
+            setStatus(`${duplicatePrompt.fileName} is now a separate document. It gets its new id when you save it.`);
+            setDuplicatePrompt(null);
+          }}
+          onSameFile={() => {
+            void updateRef.current((f) => withMovedLocation(f, duplicatePrompt.projectUuid, duplicatePrompt.location));
+            if (buildingRef.current !== null) setStatus(`Updated the location of ${duplicatePrompt.storedName} in ${buildingRef.current.file.name}.`);
+            setDuplicatePrompt(null);
+          }}
+          onCancel={() => setDuplicatePrompt(null)}
         />
       )}
 

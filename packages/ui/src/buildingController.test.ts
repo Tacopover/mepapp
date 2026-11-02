@@ -1,4 +1,4 @@
-import { addLevel, emptyBuilding, serializeBuildingFile } from '@mepapp/core';
+import { addLevel, emptyBuilding, serializeBuildingFile, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import { MemoryBuildingStore, type BuildingRef, type BuildingStore, type FileAccess } from '@mepapp/platform';
 import { describe, expect, it, vi } from 'vitest';
 import { BuildingController } from './buildingController.js';
@@ -347,5 +347,115 @@ describe('BuildingController save failures, reload and close', () => {
     await Promise.all([updating, closing]);
     expect(controller.getState().building).toBeNull();
     expect(controller.getState().message).toBeNull();
+  });
+});
+
+describe('BuildingController refreshSheetStatus', () => {
+  const summaryJson = (projectUuid: string, sourceSizeBytes: number) =>
+    JSON.stringify({ version: 1, projectUuid, savedAt: '2026-10-01T09:00:00.000Z', sourceSizeBytes, sourceModifiedMs: 5000, pages: {}, tables: [], warnings: [] });
+
+  const sheetAt = (id: string, path: string | undefined, projectUuid: string | null): BuildingSheet => ({
+    id,
+    levelId: 'L1',
+    projectUuid,
+    pageIndex: 0,
+    displayName: id,
+    location: { fileName: `${id}.pdf`, path },
+  });
+
+  const buildingWith = (sheets: BuildingSheet[]): BuildingFile => ({ ...addLevel(emptyBuilding('b-8', 'Tower'), 'Ground', 0, 'L1'), sheets });
+
+  const controllerWith = (fileAccess: Partial<FileAccess>) =>
+    new BuildingController({ fileAccess: fileAccess as FileAccess, makeStore: () => new MemoryBuildingStore(), storage: fakeStorage(), newId: () => 'b-8' });
+
+  it('gives the status of each sheet from its probe and its summary', async () => {
+    const statPath = async (path: string) => {
+      if (path === '/plans/missing.pdf') return { state: 'missing' as const };
+      if (path === '/plans/locked.pdf') return { state: 'no-access' as const };
+      return { state: 'ok' as const, sizeBytes: 500 };
+    };
+    const store = new MemoryBuildingStore({
+      json: serializeBuildingFile(
+        buildingWith([
+          sheetAt('s-missing', '/plans/missing.pdf', 'p-missing'),
+          sheetAt('s-locked', '/plans/locked.pdf', 'p-locked'),
+          sheetAt('s-ok', '/plans/ok.pdf', 'p-ok'),
+        ]),
+      ),
+      summaries: { 'p-ok': summaryJson('p-ok', 500) },
+    });
+    const controller = controllerWith({ statPath });
+    await controller.adopt(store);
+    await controller.refreshSheetStatus();
+    expect(controller.getState().building?.sheetStatus).toEqual({ 's-missing': 'pdf-missing', 's-locked': 'no-access', 's-ok': 'ok' });
+  });
+
+  it('gives not-stamped for a sheet with no path and no projectUuid', async () => {
+    const store = new MemoryBuildingStore({ json: serializeBuildingFile(buildingWith([sheetAt('s-1', undefined, null)])) });
+    const controller = controllerWith({ statPath: async () => ({ state: 'ok' as const }) });
+    await controller.adopt(store);
+    await controller.refreshSheetStatus();
+    expect(controller.getState().building?.sheetStatus).toEqual({ 's-1': 'not-stamped' });
+  });
+
+  it('treats every sheet as unknown and gives no throw when there is no statPath', async () => {
+    const store = new MemoryBuildingStore({
+      json: serializeBuildingFile(buildingWith([sheetAt('s-1', '/plans/a.pdf', 'p-1')])),
+      summaries: { 'p-1': summaryJson('p-1', 500) },
+    });
+    const controller = controllerWith({});
+    await controller.adopt(store);
+    await expect(controller.refreshSheetStatus()).resolves.toBeUndefined();
+    expect(controller.getState().building?.sheetStatus).toEqual({ 's-1': 'ok' });
+  });
+
+  it('does nothing when no building is open', async () => {
+    const statPath = vi.fn(async () => ({ state: 'ok' as const }));
+    const controller = controllerWith({ statPath });
+    const before = controller.getState();
+    await controller.refreshSheetStatus();
+    expect(statPath).not.toHaveBeenCalled();
+    expect(controller.getState()).toBe(before);
+  });
+
+  it('drops a result that a close and a newer open overtook', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const statPath = async () => {
+      await gate;
+      return { state: 'missing' as const };
+    };
+    const controller = controllerWith({ statPath });
+    await controller.adopt(new MemoryBuildingStore({ json: serializeBuildingFile(buildingWith([sheetAt('s-a', '/plans/a.pdf', 'p-a')])) }));
+    const pending = controller.refreshSheetStatus();
+    await controller.close();
+    await controller.adopt(new MemoryBuildingStore({ json: serializeBuildingFile(buildingWith([sheetAt('s-b', '/plans/b.pdf', 'p-b')])) }));
+    release();
+    await pending;
+    expect(controller.getState().building?.sheetStatus).not.toHaveProperty('s-a');
+  });
+
+  it('drops a result whose file an update replaced while the probe ran', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let hold = false;
+    const statPath = async (path: string) => {
+      if (hold && path === '/plans/old.pdf') await gate;
+      return path === '/plans/old.pdf' ? { state: 'missing' as const } : { state: 'ok' as const, sizeBytes: 500 };
+    };
+    const controller = controllerWith({ statPath });
+    await controller.adopt(new MemoryBuildingStore({ json: serializeBuildingFile(buildingWith([sheetAt('s-old', '/plans/old.pdf', null)])) }));
+    hold = true;
+    const pending = controller.refreshSheetStatus();
+    const updating = controller.update((file) => ({ ...file, sheets: [sheetAt('s-new', '/plans/new.pdf', null)] }));
+    await updating;
+    release();
+    await pending;
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(controller.getState().building?.sheetStatus).toEqual({ 's-new': 'not-stamped' });
   });
 });

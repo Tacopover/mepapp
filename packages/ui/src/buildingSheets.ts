@@ -119,3 +119,18 @@ export function pdfTotals(groups: readonly PdfGroup[]): { pdfs: number; pages: n
   }
   return { pdfs: groups.length, pages, assigned };
 }
+
+/** True when giving the sheets `sheetIds` the document id `projectUuid` would leave two sheets with the same non-null id and page index. projectUuid undefined or null -> false. Sheets outside sheetIds keep their id. */
+export function relinkWouldDuplicate(file: BuildingFile, sheetIds: readonly string[], projectUuid: string | null | undefined): boolean {
+  if (projectUuid === undefined || projectUuid === null) return false;
+  const relinked = new Set(sheetIds);
+  const seen = new Set<string>();
+  for (const sheet of file.sheets) {
+    const id = relinked.has(sheet.id) ? projectUuid : sheet.projectUuid;
+    if (id === null) continue;
+    const key = `${id}\u0000${sheet.pageIndex}`;
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
