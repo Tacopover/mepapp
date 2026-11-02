@@ -109,7 +109,7 @@ Common verification: `pnpm --filter @mepapp/core test`, `pnpm --filter @mepapp/u
   - A PDF with no embedded id gets a random id in memory at load (`ensureProjectUuid`, `scene.ts`), and `DocumentSummary.projectUuidInFile` is false (T11a fix `095792e`). Write no summary and link no sheet by that id on open. Such a sheet stays "Not saved yet" until a Save. A path match links without a size check, as Save does. Under B, skip `linkSheets` for a name-only match.
   - Do not add an effect on a building change that runs this check again (a loop: `writeBuildingSummary` ends with `buildingHook.reload()`).
 - Verify: UI tests with a stub store (match, no match, copy case, moved, summary fresh = no write, drifted = no write, conflict retry, two PDFs opened in quick succession write each summary under its own id). Browser check: add two saved PDFs to a building with no summaries (build the building through the dev hook), open each PDF from the viewer, the sheet row changes from "no summary" to a date, and Level export works without Rebuild.
-- Waits for: the answer to D-B-27 (the form above is A).
+- **DONE 2026-11-02, commit `ccdbea0`** (D-B-27 A, answered by the user). UI 578 tests, build 9/9, new check `b3-t11b-check.mjs` 19/19, old checks `b3-t08` 19/19, `b3-t06` 25/25, `b3-check` 22/22. Not run: Tauri paths. On web a path match cannot run in the browser (unit tests only). On web the first open after a Save may rewrite the summary once (harmless).
 - Depends on: none.
 
 ### Phase 2: the new dialog
