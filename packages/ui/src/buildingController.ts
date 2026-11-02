@@ -9,7 +9,7 @@ import {
   type OpenedFile,
   type SavedFile,
 } from '@mepapp/platform';
-import { sheetStatusOf, type SheetProbe, type SheetStatus } from './buildingStatus.js';
+import { sheetStatusOf, sheetSummaryInfo, type SheetProbe, type SheetStatus, type SheetSummaryInfo } from './buildingStatus.js';
 import {
   addRecentBuilding,
   loadRecentBuildings,
@@ -20,6 +20,7 @@ import {
 import { readSummaries, statSheets, type SheetStat } from './quantitiesScope.js';
 
 export type { SheetStatus } from './buildingStatus.js';
+export type { SheetSummaryInfo } from './buildingStatus.js';
 
 export interface OpenBuilding {
   file: BuildingFile;
@@ -29,6 +30,8 @@ export interface OpenBuilding {
   /** True while a write is queued or running. */
   dirty: boolean;
   sheetStatus: Record<string, SheetStatus>;
+  /** Only the sheets that have a saved summary, by sheet id. */
+  sheetSummary: Record<string, SheetSummaryInfo>;
 }
 
 export interface BuildingState {
@@ -183,6 +186,7 @@ export class BuildingController {
         ref: { id: file.id, name: file.name, location },
         dirty: false,
         sheetStatus: {},
+        sheetSummary: {},
       });
       void this.refreshSheetStatus();
     } catch (error) {
@@ -246,15 +250,23 @@ export class BuildingController {
     }
     if (this.generation !== generation) return;
     const sheetStatus: Record<string, SheetStatus> = {};
+    const sheetSummary: Record<string, SheetSummaryInfo> = {};
     for (const sheet of file.sheets) {
       const stat = statPath === undefined ? undefined : stats.get(sheet.id);
       const probe: SheetProbe = stat === undefined ? { state: 'unknown' } : { state: stat.state, sizeBytes: stat.sizeBytes };
       const summary = sheet.projectUuid !== null ? summaries.get(sheet.projectUuid) : undefined;
       sheetStatus[sheet.id] = sheetStatusOf(sheet, probe, summary);
+      const info = sheetSummaryInfo(sheet, summary);
+      if (info !== undefined) sheetSummary[sheet.id] = info;
     }
     const current = this.state.building;
-    if (current?.file !== file || JSON.stringify(current.sheetStatus) === JSON.stringify(sheetStatus)) return;
-    this.setBuilding({ sheetStatus });
+    if (
+      current?.file !== file ||
+      (JSON.stringify(current.sheetStatus) === JSON.stringify(sheetStatus) && JSON.stringify(current.sheetSummary) === JSON.stringify(sheetSummary))
+    ) {
+      return;
+    }
+    this.setBuilding({ sheetStatus, sheetSummary });
   }
 
   dismissMessage(): void {
@@ -300,7 +312,7 @@ export class BuildingController {
     const file = parseBuildingFile(JSON.parse(stored.json));
     const entry: RecentBuilding = { id: ref.id, name: ref.name, location: ref.location };
     this.showBuilding(
-      { file, revision: stored.revision, store, ref: { id: file.id, name: file.name, location: ref.location }, dirty: false, sheetStatus: {} },
+      { file, revision: stored.revision, store, ref: { id: file.id, name: file.name, location: ref.location }, dirty: false, sheetStatus: {}, sheetSummary: {} },
       this.remember(entry),
     );
     void this.refreshSheetStatus();

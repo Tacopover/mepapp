@@ -98,8 +98,10 @@ describe('rebuildSummaries', () => {
     const { engine, state } = stubEngine();
     const store = new MemoryBuildingStore();
     const progress = progressCalls();
+    const s1 = sheetOf('s1', 'C:/a.pdf', 0);
+    const s2 = sheetOf('s2', 'C:/b.pdf', 0);
     const result = await rebuildSummaries({
-      building: buildingOf([sheetOf('s1', 'C:/a.pdf', 0), sheetOf('s2', 'C:/b.pdf', 0)]),
+      building: buildingOf([s1, s2]),
       engine,
       read: readerOf({ 'C:/a.pdf': 'A', 'C:/b.pdf': 'B' }),
       stampNames,
@@ -108,7 +110,7 @@ describe('rebuildSummaries', () => {
       signal: new AbortController().signal,
       now: () => new Date('2026-11-01T10:00:00.000Z'),
     });
-    expect(result).toEqual({ ok: 2, failed: [] });
+    expect(result).toEqual({ ok: 2, failed: [], notLinked: [s1, s2], total: 2, cancelled: false });
     expect(await store.listSummaries()).toEqual(['uuid-a', 'uuid-b']);
     expect(progress.calls[0]).toEqual([0, 2, 'a.pdf']);
     expect(progress.calls[progress.calls.length - 1]).toEqual([2, 2, '']);
@@ -223,7 +225,28 @@ describe('rebuildSummaries', () => {
       signal: controller.signal,
     });
     expect(result.ok).toBe(1);
+    expect(result.cancelled).toBe(true);
+    expect(result.total).toBe(2);
     expect(await store.listSummaries()).toEqual(['uuid-a']);
     expect(state.opened).toBe(1);
+  });
+
+  it('lists a written summary as not linked when its sheet has no projectUuid', async () => {
+    const { engine } = stubEngine();
+    const store = new MemoryBuildingStore();
+    const unlinked = sheetOf('s1', 'C:/a.pdf', 0);
+    const linked = sheetOf('s2', 'C:/b.pdf', 0, 'uuid-b');
+    const result = await rebuildSummaries({
+      building: buildingOf([unlinked, linked]),
+      engine,
+      read: readerOf({ 'C:/a.pdf': 'A', 'C:/b.pdf': 'B' }),
+      stampNames,
+      store,
+      onProgress: () => undefined,
+      signal: new AbortController().signal,
+    });
+    expect(result.ok).toBe(2);
+    expect(result.notLinked).toEqual([unlinked]);
+    expect(await store.listSummaries()).toEqual(['uuid-a', 'uuid-b']);
   });
 });

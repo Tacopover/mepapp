@@ -15,7 +15,7 @@ import {
   type PdfGroup,
   type PendingPdf,
 } from '../buildingSheets.js';
-import { statusLabel, statusTone, type SheetStatus } from '../buildingStatus.js';
+import { statusLabel, statusTone, summaryText, type SheetStatus, type SheetSummaryInfo } from '../buildingStatus.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
 
 export interface BuildingSheetsPaneProps {
@@ -25,6 +25,7 @@ export interface BuildingSheetsPaneProps {
   engine: PdfEngine | undefined;
   onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
   sheetStatus: Record<string, SheetStatus>;
+  sheetSummary: Record<string, SheetSummaryInfo>;
   onRefreshStatus: () => void;
 }
 
@@ -44,7 +45,16 @@ interface Notice {
  * Lists the PDFs that the user added, one row per page, and picks a level for each page.
  * Every level choice goes through update, which writes the building file. Added PDFs that have no level yet stay in a list in this pane only.
  */
-export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenSheet, sheetStatus, onRefreshStatus }: BuildingSheetsPaneProps) {
+export function BuildingSheetsPane({
+  file,
+  update,
+  fileAccess,
+  engine,
+  onOpenSheet,
+  sheetStatus,
+  sheetSummary,
+  onRefreshStatus,
+}: BuildingSheetsPaneProps) {
   const [pending, setPending] = useState<PendingPdf[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -373,6 +383,11 @@ export function BuildingSheetsPane({ file, update, fileAccess, engine, onOpenShe
                       data-status={sheetStatus[row.sheet.id]}
                     >
                       {statusLabel(sheetStatus[row.sheet.id])}
+                    </span>
+                  )}
+                  {row.sheet !== null && sheetStatus[row.sheet.id] !== 'no-summary' && (
+                    <span className="mep-hint" data-testid="sheet-summary">
+                      {summaryText(sheetSummary[row.sheet.id])}
                     </span>
                   )}
                 </div>

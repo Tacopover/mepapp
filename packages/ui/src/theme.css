@@ -99,6 +99,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.mep-header-sheet {
+  font-size: 11px;
+  color: var(--ink);
+  white-space: nowrap;
+  max-width: 60ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .mep-menu {
   position: relative;
   flex: none;
@@ -1354,9 +1362,13 @@
   gap: 5px;
   white-space: nowrap;
 }
+.mep-status .mep-chip {
+  white-space: nowrap;
+}
 .mep-sheet-label-chip {
   white-space: nowrap;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 10ch;
   max-width: 60ch;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1704,6 +1716,21 @@
   gap: 8px;
   border-bottom: 1px solid var(--line-soft, var(--line));
   padding: 6px 0;
+}
+.mep-modal--buildings .mep-modal-title {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.mep-rebuild-result ul {
+  margin: 2px 0 8px;
+  padding-left: 18px;
+}
+.mep-rebuild-result li {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.mep-modal--buildings {
+  width: min(900px, 94vw);
 }
 .mep-level-edit-row {
   display: flex;

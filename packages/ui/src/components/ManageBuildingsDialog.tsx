@@ -7,6 +7,7 @@ import type { UseBuilding } from '../useBuilding.js';
 import { countLabel } from '../buildingLevels.js';
 import { BuildingLevelsPane } from './BuildingLevelsPane.js';
 import { BuildingSheetsPane } from './BuildingSheetsPane.js';
+import { BuildingSummariesPane, type BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
@@ -17,13 +18,14 @@ export interface ManageBuildingsDialogProps {
   fileAccess: FileAccess;
   pdfEngine?: PdfEngine;
   onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
+  onRebuildSummaries?: BuildingSummariesPaneProps['onRebuild'];
 }
 
 /**
  * Manage Buildings: creates, opens and closes the one open building file.
  * The building file is stored by the platform (a file picker on desktop).
  */
-export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine, onOpenSheet }: ManageBuildingsDialogProps) {
+export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine, onOpenSheet, onRebuildSummaries }: ManageBuildingsDialogProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
 
@@ -35,7 +37,13 @@ export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine
   }
 
   return (
-    <Dialog title="Manage Buildings" onClose={onClose} closeOnBackdropClick={false} actions={<button onClick={onClose}>Close</button>}>
+    <Dialog
+      title="Manage Buildings"
+      onClose={onClose}
+      closeOnBackdropClick={false}
+      className="mep-modal--buildings"
+      actions={<button onClick={onClose}>Close</button>}
+    >
       {!building.available && <p>Building files are not available in this version of the app. Use the desktop app.</p>}
 
       {building.available && building.message && (
@@ -53,6 +61,12 @@ export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine
             {countLabel(building.building.file.levels.length, 'level')}, {countLabel(building.building.file.sheets.length, 'sheet')}
           </p>
           <BuildingLevelsPane file={building.building.file} update={building.update} />
+          <BuildingSummariesPane
+            key={`${building.building.file.id}-summaries`}
+            hasSheets={building.building.file.sheets.length > 0}
+            onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
+            onDone={() => void building.refreshSheetStatus()}
+          />
           <BuildingSheetsPane
             key={building.building.file.id}
             file={building.building.file}
@@ -65,6 +79,7 @@ export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine
               return result;
             }}
             sheetStatus={building.building.sheetStatus}
+            sheetSummary={building.building.sheetSummary}
             onRefreshStatus={building.refreshSheetStatus}
           />
           <button type="button" onClick={() => building.close()}>

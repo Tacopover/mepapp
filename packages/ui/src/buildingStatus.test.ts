@@ -1,6 +1,6 @@
-import type { BuildingFile, BuildingSheet } from '@mepapp/core';
+import { calibrationFromScale, type BuildingFile, type BuildingSheet, type SheetSummary } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
-import { currentSheetLabel, sheetStatusOf, statusLabel, statusTone, type SheetStatus } from './buildingStatus.js';
+import { currentSheetLabel, sheetStatusOf, sheetSummaryInfo, statusLabel, statusTone, summaryText, type SheetStatus } from './buildingStatus.js';
 
 function sheet(overrides: Partial<BuildingSheet> = {}): BuildingSheet {
   return {
@@ -148,5 +148,48 @@ describe('statusTone', () => {
     expect(statusTone('copy-suspected')).toBe('warn');
     expect(statusTone('pdf-missing')).toBe('bad');
     expect(statusTone('no-access')).toBe('bad');
+  });
+});
+
+function summaryWith(pages: SheetSummary['pages'], savedAt = '2026-11-02T08:30:00.000Z'): SheetSummary {
+  return { version: 1, projectUuid: 'u-1', savedAt, sourceSizeBytes: 500, sourceModifiedMs: 5000, pages, tables: [], warnings: [] };
+}
+
+describe('sheetSummaryInfo', () => {
+  it('gives undefined when there is no summary', () => {
+    expect(sheetSummaryInfo(sheet(), undefined)).toBeUndefined();
+  });
+
+  it('gives the scale of a calibrated page', () => {
+    const summary = summaryWith({ '0': { calibrated: true, pageUnitsPerRealUnit: calibrationFromScale(100).pageUnitsPerRealUnit, widthPt: 842, heightPt: 595, rotationDegrees: 0 } });
+    expect(sheetSummaryInfo(sheet(), summary)).toEqual({ savedAt: '2026-11-02T08:30:00.000Z', scale: '1:100' });
+  });
+
+  it('gives no scale for an uncalibrated page', () => {
+    const summary = summaryWith({ '0': { calibrated: false, pageUnitsPerRealUnit: null, widthPt: 842, heightPt: 595, rotationDegrees: 0 } });
+    expect(sheetSummaryInfo(sheet(), summary)).toEqual({ savedAt: '2026-11-02T08:30:00.000Z', scale: null });
+  });
+
+  it('gives no scale when the summary has no entry for the page', () => {
+    const summary = summaryWith({ '1': { calibrated: true, pageUnitsPerRealUnit: calibrationFromScale(100).pageUnitsPerRealUnit, widthPt: 842, heightPt: 595, rotationDegrees: 0 } });
+    expect(sheetSummaryInfo(sheet(), summary)).toEqual({ savedAt: '2026-11-02T08:30:00.000Z', scale: null });
+  });
+});
+
+describe('summaryText', () => {
+  it('gives no summary for undefined', () => {
+    expect(summaryText(undefined)).toBe('No summary');
+  });
+
+  it('gives the date and the scale of a calibrated sheet', () => {
+    expect(summaryText({ savedAt: '2026-11-02T08:30:00.000Z', scale: '1:100' })).toBe('Summary saved 2026-11-02, scale 1:100');
+  });
+
+  it('gives the date and no scale for an uncalibrated sheet', () => {
+    expect(summaryText({ savedAt: '2026-11-02T08:30:00.000Z', scale: null })).toBe('Summary saved 2026-11-02, no scale');
+  });
+
+  it('gives the savedAt text as is when it is not a date', () => {
+    expect(summaryText({ savedAt: 'yesterday', scale: null })).toBe('Summary saved yesterday, no scale');
   });
 });

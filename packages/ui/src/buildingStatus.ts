@@ -1,4 +1,4 @@
-import type { BuildingFile, BuildingSheet } from '@mepapp/core';
+import { scaleDenominatorFromCalibration, type BuildingFile, type BuildingSheet, type SheetSummary } from '@mepapp/core';
 import type { PathState } from '@mepapp/platform';
 
 /** "<Building> / <Level> / <display name>" for the sheet with this projectUuid and pageIndex. Null when building is null, projectUuid is null, no sheet matches, or the level is missing. */
@@ -65,4 +65,29 @@ export function statusTone(status: SheetStatus): 'ok' | 'warn' | 'bad' {
     case 'copy-suspected':
       return 'warn';
   }
+}
+
+/** What the dialog shows about the saved summary of one sheet. scale is "1:N" (N rounded to an integer), or null when the page of the sheet is not calibrated or the summary has no entry for the page. */
+export interface SheetSummaryInfo {
+  savedAt: string;
+  scale: string | null;
+}
+
+/** undefined when summary is undefined. */
+export function sheetSummaryInfo(sheet: BuildingSheet, summary: SheetSummary | undefined): SheetSummaryInfo | undefined {
+  if (summary === undefined) return undefined;
+  const page = summary.pages[String(sheet.pageIndex)];
+  const unitsPerReal = page?.pageUnitsPerRealUnit;
+  const scale =
+    page?.calibrated === true && typeof unitsPerReal === 'number' && Number.isFinite(unitsPerReal) && unitsPerReal > 0
+      ? `1:${Math.round(scaleDenominatorFromCalibration({ pageUnitsPerRealUnit: unitsPerReal }))}`
+      : null;
+  return { savedAt: summary.savedAt, scale };
+}
+
+/** "No summary" for undefined; "Summary saved 2026-11-02, scale 1:100" or "Summary saved 2026-11-02, no scale". The date is the first 10 characters of savedAt when savedAt parses as a date, else the savedAt text as is. */
+export function summaryText(info: SheetSummaryInfo | undefined): string {
+  if (info === undefined) return 'No summary';
+  const date = Number.isNaN(Date.parse(info.savedAt)) ? info.savedAt : info.savedAt.slice(0, 10);
+  return info.scale === null ? `Summary saved ${date}, no scale` : `Summary saved ${date}, scale ${info.scale}`;
 }

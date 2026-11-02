@@ -398,6 +398,19 @@ describe('BuildingController refreshSheetStatus', () => {
     expect(controller.getState().building?.sheetStatus).toEqual({ 's-1': 'not-stamped' });
   });
 
+  it('gives the summary info of each sheet that has a summary and no entry for the others', async () => {
+    const store = new MemoryBuildingStore({
+      json: serializeBuildingFile(buildingWith([sheetAt('s-sum', '/plans/a.pdf', 'p-1'), sheetAt('s-none', '/plans/b.pdf', 'p-2')])),
+      summaries: { 'p-1': summaryJson('p-1', 500) },
+    });
+    const controller = controllerWith({ statPath: async () => ({ state: 'ok' as const, sizeBytes: 500 }) });
+    await controller.adopt(store);
+    await controller.refreshSheetStatus();
+    const sheetSummary = controller.getState().building?.sheetSummary;
+    expect(sheetSummary?.['s-sum']).toEqual({ savedAt: '2026-10-01T09:00:00.000Z', scale: null });
+    expect(sheetSummary).not.toHaveProperty('s-none');
+  });
+
   it('treats every sheet as unknown and gives no throw when there is no statPath', async () => {
     const store = new MemoryBuildingStore({
       json: serializeBuildingFile(buildingWith([sheetAt('s-1', '/plans/a.pdf', 'p-1')])),

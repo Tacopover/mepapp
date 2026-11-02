@@ -906,7 +906,10 @@ export function MepSketchApp({
   // Rebuilds the sheet summary of every document of the open building. The PDFs are read by
   // their stored path unless the caller gives a read function.
   const handleRebuildSummaries = useCallback(
-    async (readOverride?: (sheet: BuildingSheet) => Promise<File | undefined>): Promise<RebuildResult | undefined> => {
+    async (
+      readOverride?: (sheet: BuildingSheet) => Promise<File | undefined>,
+      run?: { signal?: AbortSignal; onProgress?: (done: number, total: number, name: string) => void },
+    ): Promise<RebuildResult | undefined> => {
       if (!buildingStore || !pdfEngine) {
         setStatus('Open a building first.');
         return undefined;
@@ -939,14 +942,16 @@ export function MepSketchApp({
           whyUnreadable,
           stampNames: (project) => stampNameLookups([...project.customStampDefinitions, ...userStampLibrary.definitions]),
           store: buildingStore,
-          onProgress: (done, total, name) => setStatus(`Rebuilding summaries: ${done} of ${total}${name ? ` (${name})` : ''}`),
-          signal: new AbortController().signal,
+          onProgress: (done, total, name) => {
+            setStatus(`Rebuilding summaries: ${done} of ${total}${name ? ` (${name})` : ''}`);
+            run?.onProgress?.(done, total, name);
+          },
+          signal: run?.signal ?? new AbortController().signal,
         });
         await buildingHook.reload();
-        const total = result.ok + result.failed.length;
         const first = result.failed[0];
         setStatus(
-          `Rebuilt ${result.ok} of ${total} summaries.${first ? ` ${result.failed.length} failed: ${first.sheet.displayName}: ${first.reason}` : ''}`,
+          `Rebuilt ${result.ok} of ${result.total} summaries.${result.cancelled ? ' Cancelled before the end.' : ''}${first ? ` ${result.failed.length} failed: ${first.sheet.displayName}: ${first.reason}` : ''}`,
         );
         return result;
       } catch (err) {
@@ -1782,6 +1787,8 @@ export function MepSketchApp({
     }
   }, [inCircuitsFamily, tool, setShowCircuitLines]);
 
+  const sheetLabel = currentSheetLabel(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex);
+
   return (
     <div className="mep-app">
       {!onboardingSeen && <WelcomeScreen onDismiss={handleDismissOnboarding} />}
@@ -1805,6 +1812,7 @@ export function MepSketchApp({
           onToggleWallDebug={handleToggleWallDebug}
         />
         <DocumentSwitcher documents={documents} activeDocumentId={activeDocumentId} onActivate={handleActivateDocument} onClose={handleCloseDocument} />
+        {sheetLabel && <span className="mep-header-sheet" data-testid="current-sheet-header" title={sheetLabel}>{sheetLabel}</span>}
         <RoomToolBar tool={tool} sceneRef={sceneRef} />
         <div className="mep-fill" />
         {status && <span className="mep-header-status">{status}</span>}
@@ -1916,7 +1924,7 @@ export function MepSketchApp({
         onRoomsVisibleChange={(visible) => sceneRef.current?.setRoomsVisible(visible)}
         openPortsVisible={openPortsVisible}
         onOpenPortsVisibleChange={(visible) => sceneRef.current?.setOpenPortsVisible(visible)}
-        sheetLabel={currentSheetLabel(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex)}
+        sheetLabel={sheetLabel}
       />
 
       {calibrationPrompt && (
@@ -2096,6 +2104,7 @@ export function MepSketchApp({
           fileAccess={fileAccess}
           pdfEngine={pdfEngine}
           onOpenSheet={openSheet}
+          onRebuildSummaries={(run) => handleRebuildSummaries(undefined, run)}
         />
       )}
 
