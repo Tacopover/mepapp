@@ -1,6 +1,6 @@
 import type { BuildingFile, BuildingSheet, SheetLocation } from './building.js';
 
-export type BuildingEditError = 'unknown-level' | 'level-has-sheets';
+export type BuildingEditError = 'unknown-level' | 'level-has-sheets' | 'duplicate-sheet';
 
 export interface NewSheetPage {
   projectUuid: string | null;
@@ -106,16 +106,31 @@ export function removeSheet(file: BuildingFile, sheetId: string): BuildingFile {
   return { ...file, sheets: file.sheets.filter((sheet) => sheet.id !== sheetId) };
 }
 
-/** Replaces location; when projectUuid is given (not undefined) also replaces projectUuid. Unknown sheet: unchanged. */
-export function relinkSheet(file: BuildingFile, sheetId: string, location: SheetLocation, projectUuid?: string | null): BuildingFile {
-  if (!file.sheets.some((sheet) => sheet.id === sheetId)) return file;
+/** Replaces location; when projectUuid is given (not undefined) also replaces projectUuid. Unknown sheet: `{ ok: true }` with the same file. A string projectUuid is refused with 'duplicate-sheet' when another sheet (other id) has that projectUuid and the same pageIndex. null or undefined never refuses. A refusal leaves the file unchanged. */
+export function relinkSheet(
+  file: BuildingFile,
+  sheetId: string,
+  location: SheetLocation,
+  projectUuid?: string | null,
+): { ok: true; file: BuildingFile } | { ok: false; error: BuildingEditError } {
+  const target = file.sheets.find((sheet) => sheet.id === sheetId);
+  if (target === undefined) return { ok: true, file };
+  if (typeof projectUuid === 'string') {
+    const duplicate = file.sheets.some(
+      (sheet) => sheet.id !== sheetId && sheet.projectUuid === projectUuid && sheet.pageIndex === target.pageIndex,
+    );
+    if (duplicate) return { ok: false, error: 'duplicate-sheet' };
+  }
   return {
-    ...file,
-    sheets: file.sheets.map((sheet) =>
-      sheet.id === sheetId
-        ? { ...sheet, location: structuredClone(location), ...(projectUuid === undefined ? {} : { projectUuid }) }
-        : sheet,
-    ),
+    ok: true,
+    file: {
+      ...file,
+      sheets: file.sheets.map((sheet) =>
+        sheet.id === sheetId
+          ? { ...sheet, location: structuredClone(location), ...(projectUuid === undefined ? {} : { projectUuid }) }
+          : sheet,
+      ),
+    },
   };
 }
 

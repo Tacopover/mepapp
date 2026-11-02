@@ -11,8 +11,14 @@ import {
   renameLevel,
   setLevelElevation,
   sortLevelsByElevation,
+  type BuildingEditError,
   type NewSheetPage,
 } from './building-edit.js';
+
+function unwrap(result: { ok: true; file: BuildingFile } | { ok: false; error: BuildingEditError }): BuildingFile {
+  if (!result.ok) throw new Error(`relink failed: ${result.error}`);
+  return result.file;
+}
 
 function sample(): BuildingFile {
   return {
@@ -221,20 +227,23 @@ describe('building edit', () => {
 
   it('relinks a sheet and keeps its projectUuid when none is given', () => {
     const location = { fileName: 'new.pdf', path: '/b/new.pdf' };
-    const sheet = relinkSheet(sample(), 's0', location).sheets[0]!;
+    const sheet = unwrap(relinkSheet(sample(), 's0', location)).sheets[0]!;
     expect(sheet.location).toEqual(location);
     expect(sheet.projectUuid).toBe('u-1');
   });
 
   it('relinks a sheet and replaces its projectUuid when one is given', () => {
     const location = { fileName: 'new.pdf' };
-    expect(relinkSheet(sample(), 's0', location, 'u-3').sheets[0]!.projectUuid).toBe('u-3');
-    expect(relinkSheet(sample(), 's0', location, null).sheets[0]!.projectUuid).toBeNull();
+    expect(unwrap(relinkSheet(sample(), 's0', location, 'u-3')).sheets[0]!.projectUuid).toBe('u-3');
+    expect(unwrap(relinkSheet(sample(), 's0', location, null)).sheets[0]!.projectUuid).toBeNull();
   });
 
   it('returns the same file for an unknown sheet on relink', () => {
     const file = sample();
-    expect(relinkSheet(file, 'nope', { fileName: 'new.pdf' }, 'u-3')).toBe(file);
+    const result = relinkSheet(file, 'nope', { fileName: 'new.pdf' }, 'u-3');
+    expect(result).toEqual({ ok: true, file });
+    if (!result.ok) throw new Error('relink failed');
+    expect(result.file).toBe(file);
   });
 
   it('does not change the input of a relink', () => {
@@ -242,6 +251,45 @@ describe('building edit', () => {
     const before = serializeBuildingFile(file);
     relinkSheet(file, 's0', { fileName: 'new.pdf', path: '/b/new.pdf' }, 'u-3');
     expect(serializeBuildingFile(file)).toBe(before);
+  });
+
+  it('refuses a relink that gives a sheet the projectUuid and page of another sheet', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [...sample().sheets, { id: 's2', levelId: 'l1', projectUuid: 'u-2', pageIndex: 0, displayName: 'Plan p1 b', location: { fileName: 'b.pdf' } }],
+    };
+    expect(relinkSheet(file, 's2', { fileName: 'plan.pdf' }, 'u-1')).toEqual({ ok: false, error: 'duplicate-sheet' });
+  });
+
+  it('does not change the file when it refuses a relink', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [...sample().sheets, { id: 's2', levelId: 'l1', projectUuid: 'u-2', pageIndex: 0, displayName: 'Plan p1 b', location: { fileName: 'b.pdf' } }],
+    };
+    const before = serializeBuildingFile(file);
+    relinkSheet(file, 's2', { fileName: 'plan.pdf' }, 'u-1');
+    expect(serializeBuildingFile(file)).toBe(before);
+  });
+
+  it('does not refuse a relink that gives the projectUuid of another sheet on a different page', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [...sample().sheets, { id: 's2', levelId: 'l1', projectUuid: 'u-2', pageIndex: 2, displayName: 'Plan p3', location: { fileName: 'b.pdf' } }],
+    };
+    expect(unwrap(relinkSheet(file, 's2', { fileName: 'plan.pdf' }, 'u-1')).sheets[2]!.projectUuid).toBe('u-1');
+  });
+
+  it('does not refuse a relink to null or to no projectUuid', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [...sample().sheets, { id: 's2', levelId: 'l1', projectUuid: 'u-2', pageIndex: 0, displayName: 'Plan p1 b', location: { fileName: 'b.pdf' } }],
+    };
+    expect(unwrap(relinkSheet(file, 's2', { fileName: 'plan.pdf' }, null)).sheets[2]!.projectUuid).toBeNull();
+    expect(unwrap(relinkSheet(file, 's2', { fileName: 'plan.pdf' })).sheets[2]!.projectUuid).toBe('u-2');
+  });
+
+  it('does not refuse a sheet relinked to its own projectUuid and page', () => {
+    expect(unwrap(relinkSheet(sample(), 's0', { fileName: 'plan.pdf' }, 'u-1')).sheets[0]!.projectUuid).toBe('u-1');
   });
 
   it('sorts levels by elevation', () => {
@@ -277,7 +325,7 @@ describe('building edit', () => {
     file = setLevelElevation(file, 'l1', -200);
     file = renameLevel(file, 'l0', 'Cellar');
     file = sortLevelsByElevation(file);
-    file = relinkSheet(file, 's0', { fileName: 'plan.pdf', path: '/c/plan.pdf' });
+    file = unwrap(relinkSheet(file, 's0', { fileName: 'plan.pdf', path: '/c/plan.pdf' }));
     expect(() => parseBuildingFile(JSON.parse(serializeBuildingFile(file)))).not.toThrow();
     expect(parseBuildingFile(JSON.parse(serializeBuildingFile(file)))).toEqual(file);
   });

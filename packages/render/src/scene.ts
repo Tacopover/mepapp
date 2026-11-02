@@ -1070,7 +1070,7 @@ export class SketchScene {
     bitmap: ImageBitmap,
     pageWidthPt: number,
     pageHeightPt: number,
-    opts: { fileKey: string; fileName: string; handle: PdfDocumentHandle },
+    opts: { fileKey: string; fileName: string; handle: PdfDocumentHandle; sizeBytes?: number },
   ): string {
     const reuse = this.doc.isEmpty() ? this.doc : null;
     const target = reuse ?? new SketchDocument();
@@ -1079,6 +1079,7 @@ export class SketchScene {
     target.fileKey = opts.fileKey;
     target.fileName = opts.fileName;
     target.pdfHandle = opts.handle;
+    target.sizeBytes = opts.sizeBytes ?? null;
     const sprite = new Sprite(textureFromImageBitmap(bitmap));
     sprite.anchor.set(0);
     sprite.width = pageWidthPt;
@@ -4251,6 +4252,7 @@ export class SketchScene {
     const target = this.documents.find((d) => d.id === documentId);
     if (!target) return;
     target.projectUuid = projectUuid;
+    this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
   private serializeDocument(doc: SketchDocument, projectUuidOverride?: string): ProjectDocument {
@@ -4356,6 +4358,7 @@ export class SketchScene {
     target.roomTypes.splice(0, target.roomTypes.length, ...(parseRoomTypes(doc.roomTypes) ?? []));
     target.roomNeeds.splice(0, target.roomNeeds.length, ...(parseRoomNeeds(doc.roomNeeds) ?? []));
     target.ceilingHeightMm = doc.ceilingHeightMm;
+    const previousProjectUuid = target.projectUuid;
     target.projectUuid = ensureProjectUuid(doc.projectUuid ?? null, () => crypto.randomUUID());
     for (const key of Object.keys(target.roomTypeCeilingHeightsMm)) delete target.roomTypeCeilingHeightsMm[key];
     Object.assign(target.roomTypeCeilingHeightsMm, doc.roomTypeCeilingHeightsMm);
@@ -4470,6 +4473,8 @@ export class SketchScene {
       this.emitter.emit('documentsChanged', this.getDocuments());
       this.emitter.emit('projectLoaded');
       this.emitter.emit('roomsChanged');
+    } else if (target.projectUuid !== previousProjectUuid) {
+      this.emitter.emit('documentsChanged', this.getDocuments());
     }
   }
 
@@ -4531,7 +4536,9 @@ export class SketchScene {
     if (embedded) {
       await this.loadProjectInto(doc, JSON.parse(new TextDecoder().decode(embedded)), resolveIconBitmap);
     }
+    const previousProjectUuid = doc.projectUuid;
     doc.projectUuid = ensureProjectUuid(doc.projectUuid, () => crypto.randomUUID());
+    if (doc.projectUuid !== previousProjectUuid) this.emitter.emit('documentsChanged', this.getDocuments());
 
     const domainEntries = this.domainSyncEntries(doc);
     const observed = await this.observedAnnotations(handle, doc);

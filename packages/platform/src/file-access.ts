@@ -1,6 +1,8 @@
 /** Where an opened or saved file lives: a FileSystemFileHandle on the web, a path on desktop. Only the implementation that made it looks inside. */
 export interface FileTarget {
   readonly name: string;
+  /** Desktop only: the absolute path. The web target has none. */
+  readonly path?: string;
 }
 
 export interface FileTypeFilter {

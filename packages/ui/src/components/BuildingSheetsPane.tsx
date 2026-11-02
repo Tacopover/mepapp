@@ -190,7 +190,21 @@ export function BuildingSheetsPane({
       setNotice({ text: 'Could not relink: another sheet already uses this document and page.', error: true });
       return;
     }
-    await update((f) => ids.reduce((acc, id) => relinkSheet(acc, id, location, projectUuid), f));
+    let refused = false;
+    await update((f) =>
+      ids.reduce((acc, id) => {
+        const result = relinkSheet(acc, id, location, projectUuid);
+        if (!result.ok) {
+          refused = true;
+          return acc;
+        }
+        return result.file;
+      }, f),
+    );
+    if (refused) {
+      setNotice({ text: 'Could not relink: another sheet already uses this document and page.', error: true });
+      return;
+    }
     notify(`Relinked ${location.fileName}.`);
   }
 

@@ -674,7 +674,7 @@ export function MepSketchApp({
       setStatus(`Loading ${file.name}...`);
       try {
         const { bitmap, pageWidthPt, pageHeightPt, handle } = await onLoadPdfPage(file);
-        task.documentId = sceneRef.current?.openDocument(bitmap, pageWidthPt, pageHeightPt, { fileKey, fileName: file.name, handle }) ?? null;
+        task.documentId = sceneRef.current?.openDocument(bitmap, pageWidthPt, pageHeightPt, { fileKey, fileName: file.name, handle, sizeBytes: file.size }) ?? null;
         if (task.documentId && fileTarget) fileTargetsRef.current.set(task.documentId, fileTarget);
         // Loads this PDF's own embedded project data (if any) and compares
         // its annotations against that domain model — see decisions log
@@ -881,8 +881,7 @@ export function MepSketchApp({
       if (!buildingStore || !scene || !pdfHandle || scene.getActiveDocumentId() !== documentId) return;
       const project = scene.exportProject();
       const pageInfos = displayedPageInfos(pdfHandle);
-      const rawPath: unknown = (target as { path?: unknown }).path;
-      const path = typeof rawPath === 'string' ? rawPath : undefined;
+      const path = target.path;
       let modifiedMs = Date.now();
       let documentSize = sizeBytes;
       if (path !== undefined && fileAccess.statPath) {

@@ -76,6 +76,9 @@ export interface DocumentSummary {
   fileName: string;
   isDirty: boolean;
   hasPdf: boolean;
+  projectUuid: string | null;
+  pageCount: number;
+  sizeBytes: number | null;
 }
 
 let nextDocSeq = 1;
@@ -94,6 +97,8 @@ export class SketchDocument {
   /** The id of the project this document holds; null until one is minted or loaded. Not the runtime `id` and not a receipt documentId. */
   projectUuid: string | null = null;
   pdfHandle: PdfDocumentHandle | null = null;
+  /** The size of the opened PDF file in bytes; null when the file was not opened from a file of known size. */
+  sizeBytes: number | null = null;
   backdropSprite: Sprite | null = null;
   /** Which page of pdfHandle the backdrop currently shows (status bar page navigation). New items get this page. */
   pageIndex = 0;
@@ -189,7 +194,15 @@ export class SketchDocument {
   }
 
   toSummary(): DocumentSummary {
-    return { id: this.id, fileName: this.fileName, isDirty: this.isDirty, hasPdf: this.pdfHandle !== null };
+    return {
+      id: this.id,
+      fileName: this.fileName,
+      isDirty: this.isDirty,
+      hasPdf: this.pdfHandle !== null,
+      projectUuid: this.projectUuid,
+      pageCount: this.pdfHandle?.getPageCount() ?? 0,
+      sizeBytes: this.sizeBytes,
+    };
   }
 
   /** Tears down this document's own PixiJS resources — used on close, not on a mere tab switch. Stamp base textures in `keepTextures` are still used by another document or the clipboard and survive. */

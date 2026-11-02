@@ -25,8 +25,7 @@ export async function readPdfInfo(file: File, engine: PdfEngine): Promise<PdfInf
 
 /** The absolute path inside a FileTarget of the desktop platform ({ name, path }); undefined for a web handle or no target. */
 export function pathOfTarget(target: FileTarget | undefined): string | undefined {
-  const path = (target as { path?: unknown } | undefined)?.path;
-  return typeof path === 'string' ? path : undefined;
+  return target?.path;
 }
 
 /** folderPath + separator + name. The separator is '\\' when folderPath contains a backslash, else '/'. No double separator when folderPath already ends with one. */
