@@ -18,6 +18,7 @@ import {
   type RecentBuilding,
 } from './recentBuildings.js';
 import { readSummaries, statSheets, type SheetStat } from './quantitiesScope.js';
+import { importOldRegistry, markOldImported, type Building } from './buildings.js';
 
 export type { SheetStatus } from './buildingStatus.js';
 export type { SheetSummaryInfo } from './buildingStatus.js';
@@ -146,6 +147,36 @@ export class BuildingController {
       const prefix = isInvalidFile(error) ? 'This is not a valid building file' : 'Could not open the building';
       this.setState({ message: `${prefix}: ${messageOf(error)}` });
     }
+  }
+
+  /** Saves each old building as a building file; the user picks the place for each one (saveFileAs). A cancelled picker skips that building (not marked). A saved one is added to the recent list and marked imported. A failure of one building does not stop the others. Does not open any building. */
+  async importOldBuildings(buildings: Building[]): Promise<{ saved: number; cancelled: number; failed: string[] }> {
+    const result = { saved: 0, cancelled: 0, failed: [] as string[] };
+    await this.busy(async () => {
+      for (const building of buildings) {
+        try {
+          const file = importOldRegistry([building])[0];
+          const json = serializeBuildingFile(file);
+          const suggested = `${building.name.replace(/[\\/:*?"<>|]/g, '-')}.building.json`;
+          const saved: SavedFile | undefined = await this.fileAccess.saveFileAs(
+            suggested,
+            BUILDING_FILE_TYPES,
+            new Blob([json], { type: 'application/json' }),
+          );
+          if (saved === undefined) {
+            result.cancelled += 1;
+            continue;
+          }
+          const entry: RecentBuilding = { id: file.id, name: file.name, location: locationOf(saved.target, saved.name) };
+          this.setState({ recent: this.remember(entry) });
+          markOldImported([building.id], this.storage);
+          result.saved += 1;
+        } catch (error) {
+          result.failed.push(`${building.name}: ${messageOf(error)}`);
+        }
+      }
+    });
+    return result;
   }
 
   async openRecent(entry: RecentBuilding): Promise<void> {

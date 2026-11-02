@@ -5,12 +5,22 @@ import type { FileAccess } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import type { UseBuilding } from '../useBuilding.js';
 import { countLabel } from '../buildingLevels.js';
+import { loadBuildings, loadImportedOldIds, pendingOldBuildings } from '../buildings.js';
 import { BuildingLevelsPane } from './BuildingLevelsPane.js';
 import { BuildingSheetsPane } from './BuildingSheetsPane.js';
 import { BuildingSummariesPane, type BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
+
+function importResultText(total: number, result: { saved: number; cancelled: number; failed: string[] }): string {
+  return (
+    `Imported ${result.saved} of ${total}. ` +
+    (result.cancelled > 0 ? `${result.cancelled} skipped. ` : '') +
+    (result.failed.length > 0 ? `Could not import: ${result.failed.join('; ')}. ` : '') +
+    (result.saved > 0 ? 'Open them from Recent buildings.' : '')
+  );
+}
 
 export interface ManageBuildingsDialogProps {
   building: UseBuilding & { available: boolean };
@@ -28,12 +38,22 @@ export interface ManageBuildingsDialogProps {
 export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine, onOpenSheet, onRebuildSummaries }: ManageBuildingsDialogProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
+  const [oldPending, setOldPending] = useState(() => pendingOldBuildings(loadBuildings(), loadImportedOldIds()));
+  const [importResult, setImportResult] = useState<string | null>(null);
 
   function handleCreate() {
     if (building.busy) return;
     void building.create(name);
     setCreating(false);
     setName('');
+  }
+
+  async function handleImportOld() {
+    if (building.busy) return;
+    const total = oldPending.length;
+    const result = await building.importOldBuildings(oldPending);
+    setOldPending(pendingOldBuildings(loadBuildings(), loadImportedOldIds()));
+    setImportResult(importResultText(total, result));
   }
 
   return (
@@ -90,6 +110,25 @@ export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine
 
       {building.available && !building.building && (
         <p className="mep-hint">No building is open. Create a building or open a building file.</p>
+      )}
+
+      {building.available && (oldPending.length > 0 || importResult !== null) && (
+        <div className="mep-section" data-testid="import-old">
+          <h4>Old buildings</h4>
+          {oldPending.length > 0 && (
+            <p>
+              <button type="button" data-testid="import-old-button" disabled={building.busy} onClick={() => void handleImportOld()}>
+                Import {countLabel(oldPending.length, 'old building')}
+              </button>
+            </p>
+          )}
+          <p className="mep-hint">MepApp asks where to save each building file. The old list stays unchanged.</p>
+          {importResult !== null && (
+            <p className="mep-hint" data-testid="import-old-result">
+              {importResult}
+            </p>
+          )}
+        </div>
       )}
 
       {building.available && (

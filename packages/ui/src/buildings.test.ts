@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { BUILDING_SCHEMA_VERSION, parseBuildingFile, serializeBuildingFile } from '@mepapp/core';
-import { importOldRegistry, type Building } from './buildings.js';
+import {
+  IMPORTED_OLD_BUILDINGS_KEY,
+  importOldRegistry,
+  loadBuildings,
+  loadImportedOldIds,
+  markOldImported,
+  pendingOldBuildings,
+  type Building,
+} from './buildings.js';
+
+function fakeStorage(initial: Record<string, string> = {}) {
+  const data = new Map<string, string>(Object.entries(initial));
+  return {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      data.set(key, value);
+    },
+    data,
+  };
+}
 
 describe('importOldRegistry', () => {
   const old: Building[] = [
@@ -53,5 +72,50 @@ describe('importOldRegistry', () => {
   it('gives a file that parseBuildingFile accepts after a serialize round trip', () => {
     const [file] = importOldRegistry(old);
     expect(() => parseBuildingFile(JSON.parse(serializeBuildingFile(file)))).not.toThrow();
+  });
+});
+
+describe('loadBuildings', () => {
+  it('reads the old list from the given storage', () => {
+    const storage = fakeStorage({ 'mepapp.buildings.v1': JSON.stringify([{ id: 'bld-1', name: 'Tower', levels: [] }]) });
+    expect(loadBuildings(storage)).toEqual([{ id: 'bld-1', name: 'Tower', levels: [] }]);
+  });
+
+  it('gives [] for bad JSON', () => {
+    expect(loadBuildings(fakeStorage({ 'mepapp.buildings.v1': '{bad' }))).toEqual([]);
+  });
+});
+
+describe('loadImportedOldIds and markOldImported', () => {
+  it('gives [] when nothing was imported', () => {
+    expect(loadImportedOldIds(fakeStorage())).toEqual([]);
+  });
+
+  it('gives [] for bad JSON', () => {
+    expect(loadImportedOldIds(fakeStorage({ [IMPORTED_OLD_BUILDINGS_KEY]: '{bad' }))).toEqual([]);
+  });
+
+  it('gives [] for a value that is not an array', () => {
+    expect(loadImportedOldIds(fakeStorage({ [IMPORTED_OLD_BUILDINGS_KEY]: '{"a":1}' }))).toEqual([]);
+  });
+
+  it('adds the ids to the stored list without duplicates', () => {
+    const storage = fakeStorage();
+    markOldImported(['bld-1'], storage);
+    markOldImported(['bld-1', 'bld-2'], storage);
+    expect(loadImportedOldIds(storage)).toEqual(['bld-1', 'bld-2']);
+    expect(JSON.parse(storage.data.get(IMPORTED_OLD_BUILDINGS_KEY) ?? '[]')).toEqual(['bld-1', 'bld-2']);
+  });
+});
+
+describe('pendingOldBuildings', () => {
+  it('gives the old buildings whose id is not imported', () => {
+    const all: Building[] = [
+      { id: 'bld-1', name: 'Tower', levels: [] },
+      { id: 'bld-2', name: 'Annex', levels: [] },
+    ];
+    expect(pendingOldBuildings(all, ['bld-1'])).toEqual([{ id: 'bld-2', name: 'Annex', levels: [] }]);
+    expect(pendingOldBuildings(all, [])).toEqual(all);
+    expect(pendingOldBuildings(all, ['bld-1', 'bld-2'])).toEqual([]);
   });
 });

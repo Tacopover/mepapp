@@ -3,7 +3,7 @@ import type { BuildingRef, BuildingStore, FileAccess } from '@mepapp/platform';
 import { BuildingController, type BuildingState } from './buildingController.js';
 
 export type UseBuilding = BuildingState &
-  Pick<BuildingController, 'create' | 'open' | 'openRecent' | 'forgetRecent' | 'adopt' | 'update' | 'reload' | 'refreshSheetStatus' | 'close' | 'dismissMessage'>;
+  Pick<BuildingController, 'create' | 'open' | 'openRecent' | 'importOldBuildings' | 'forgetRecent' | 'adopt' | 'update' | 'reload' | 'refreshSheetStatus' | 'close' | 'dismissMessage'>;
 
 const unavailableStore = (): BuildingStore => {
   throw new Error('Buildings are not available in this build.');
@@ -19,6 +19,7 @@ export function useBuilding(args: { fileAccess: FileAccess; makeStore?: (ref: Bu
       create: controller.create.bind(controller),
       open: controller.open.bind(controller),
       openRecent: controller.openRecent.bind(controller),
+      importOldBuildings: controller.importOldBuildings.bind(controller),
       forgetRecent: controller.forgetRecent.bind(controller),
       adopt: controller.adopt.bind(controller),
       update: controller.update.bind(controller),
@@ -34,6 +35,7 @@ export function useBuilding(args: { fileAccess: FileAccess; makeStore?: (ref: Bu
     create: api.create,
     open: api.open,
     openRecent: api.openRecent,
+    importOldBuildings: api.importOldBuildings,
     forgetRecent: api.forgetRecent,
     adopt: api.adopt,
     update: api.update,

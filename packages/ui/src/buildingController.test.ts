@@ -1,6 +1,7 @@
-import { addLevel, emptyBuilding, serializeBuildingFile, type BuildingFile, type BuildingSheet } from '@mepapp/core';
+import { addLevel, emptyBuilding, parseBuildingFile, serializeBuildingFile, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import { MemoryBuildingStore, type BuildingRef, type BuildingStore, type FileAccess } from '@mepapp/platform';
 import { describe, expect, it, vi } from 'vitest';
+import { IMPORTED_OLD_BUILDINGS_KEY, type Building } from './buildings.js';
 import { BuildingController } from './buildingController.js';
 import { RECENT_BUILDINGS_KEY } from './recentBuildings.js';
 
@@ -164,6 +165,39 @@ describe('BuildingController openRecent', () => {
     await controller.openRecent({ id: 'b-9', name: 'Other', location: 'x.building.json' });
     expect(controller.getState().building).toBeNull();
     expect(controller.getState().message).toBe('The building file "Other" was not found. Use Open building… to find it.');
+  });
+});
+
+describe('BuildingController importOldBuildings', () => {
+  const oldTower: Building = { id: 'old-1', name: 'Tower', levels: [{ id: 'lvl-1', name: 'Ground', documentFileName: null }] };
+  const oldAnnex: Building = { id: 'old-2', name: 'Annex', levels: [{ id: 'lvl-2', name: 'First', documentFileName: 'first.pdf' }] };
+
+  it('skips a cancelled picker, saves the other building, and marks only the saved one', async () => {
+    const { controller, fileAccess, storage } = setup({
+      saveFileAs: vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce({ name: 'Annex.building.json', target: undefined }),
+    });
+    const result = await controller.importOldBuildings([oldTower, oldAnnex]);
+    expect(result).toEqual({ saved: 1, cancelled: 1, failed: [] });
+    const [suggested, , blob] = fileAccess.saveFileAs.mock.calls[1] as [string, unknown, Blob];
+    expect(suggested).toBe('Annex.building.json');
+    const written = parseBuildingFile(JSON.parse(await blob.text()));
+    expect(written.id).toBe('old-2');
+    expect(written.levels).toEqual([{ id: 'lvl-2', name: 'First', elevationMm: 0 }]);
+    expect(controller.getState().recent).toEqual([{ id: 'old-2', name: 'Annex', location: 'Annex.building.json' }]);
+    expect(JSON.parse(storage.data.get(IMPORTED_OLD_BUILDINGS_KEY) ?? '[]')).toEqual(['old-2']);
+    expect(controller.getState().building).toBeNull();
+  });
+
+  it('reports the failure of one building and still saves the next one', async () => {
+    const { controller, storage } = setup({
+      saveFileAs: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('disk full'))
+        .mockResolvedValueOnce({ name: 'Annex.building.json', target: undefined }),
+    });
+    const result = await controller.importOldBuildings([oldTower, oldAnnex]);
+    expect(result).toEqual({ saved: 1, cancelled: 0, failed: ['Tower: disk full'] });
+    expect(JSON.parse(storage.data.get(IMPORTED_OLD_BUILDINGS_KEY) ?? '[]')).toEqual(['old-2']);
   });
 });
 
