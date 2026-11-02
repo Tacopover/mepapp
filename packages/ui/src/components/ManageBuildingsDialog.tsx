@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Dialog } from './Dialog.js';
 import type { UseBuilding } from '../useBuilding.js';
+import { countLabel } from '../buildingLevels.js';
+import { BuildingLevelsPane } from './BuildingLevelsPane.js';
 
 export interface ManageBuildingsDialogProps {
   building: UseBuilding & { available: boolean };
@@ -38,8 +40,9 @@ export function ManageBuildingsDialog({ building, onClose }: ManageBuildingsDial
           <p className="mep-buildings-open-name">{building.building.file.name}</p>
           <p className="mep-hint">{building.building.ref.location}</p>
           <p>
-            {building.building.file.levels.length} levels, {building.building.file.sheets.length} sheets
+            {countLabel(building.building.file.levels.length, 'level')}, {countLabel(building.building.file.sheets.length, 'sheet')}
           </p>
+          <BuildingLevelsPane file={building.building.file} update={building.update} />
           <button type="button" onClick={() => building.close()}>
             Close building
           </button>
