@@ -39,7 +39,7 @@ await idle(400);
 check(/No levels yet\. Use \+ Add level\./.test((await dlg.textContent()) ?? ''), 'empty: hint points to + Add level');
 check((await addItem().count()) === 1, 'tree: one + Add level item');
 check((await detail().count()) === 0, 'empty: no level detail');
-check((await dlg.locator('button', { hasText: /^Add level$/ }).count()) === 0, 'no Add level button in the right pane');
+check((await dlg.locator('button', { hasText: /^Add level$/ }).count()) === (await dlg.locator('[data-testid="open-documents"] button', { hasText: /^Add level$/ }).count()), 'no Add level button in the right pane outside the open documents section (T11f)');
 await shot('B3-T11d-empty');
 
 // Add level 1: selected, name field focused, default name selected.

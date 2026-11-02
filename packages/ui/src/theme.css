@@ -2062,6 +2062,57 @@
 .mep-sheet-hint {
   margin: 0 0 6px;
 }
+.mep-open-doc {
+  border-top: 1px solid var(--line-soft, var(--line));
+  padding: 6px 0;
+}
+.mep-open-doc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.mep-open-doc-head > b {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mep-open-doc-head select {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 12em;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.mep-open-doc-primary {
+  font-weight: 600;
+}
+.mep-open-doc-active {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+.mep-open-doc-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  max-height: 5.5em;
+  overflow-y: auto;
+}
+.mep-open-doc-chip {
+  padding: 1px 8px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+.mep-open-doc-chip.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mep-open-doc-note {
+  margin: 4px 0 0;
+}
 @media (max-width: 899px) {
   .mep-sheet-page-row > b {
     flex-basis: 100%;

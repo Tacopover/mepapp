@@ -22,6 +22,8 @@ import { BuildingSheetsPane } from './BuildingSheetsPane.js';
 import { BuildingSummariesPane, type BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 import { BuildingTree } from './BuildingTree.js';
 import { LevelSheetsPane } from './LevelSheetsPane.js';
+import { OpenDocumentsPane } from './OpenDocumentsPane.js';
+import type { OpenDocumentRow } from '../openDocumentsView.js';
 
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
@@ -76,6 +78,8 @@ export interface ManageBuildingsDialogProps {
   onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
   onRebuildSummaries?: BuildingSummariesPaneProps['onRebuild'];
   activeSheetLevelId?: string | null;
+  /** The documents open in the viewer, one row each (openDocumentRows). */
+  openDocuments?: readonly OpenDocumentRow[];
 }
 
 /**
@@ -90,6 +94,7 @@ export function ManageBuildingsDialog({
   onOpenSheet,
   onRebuildSummaries,
   activeSheetLevelId,
+  openDocuments = [],
 }: ManageBuildingsDialogProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -444,6 +449,13 @@ export function ManageBuildingsDialog({
                   sheetStatus={openBuilding.sheetStatus}
                   sheetSummary={openBuilding.sheetSummary}
                   onRefreshStatus={building.refreshSheetStatus}
+                  onNotice={onNotice}
+                />
+                <OpenDocumentsPane
+                  file={openBuilding.file}
+                  update={building.update}
+                  rows={openDocuments}
+                  levelId={selectedLevel?.id ?? null}
                   onNotice={onNotice}
                 />
                 <BuildingLevelsPane

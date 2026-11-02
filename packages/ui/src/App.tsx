@@ -83,6 +83,7 @@ import { pathOfTarget } from './buildingPdfInfo.js';
 import { currentSheetLabel } from './buildingStatus.js';
 import { currentSheetLevelId } from './buildingTree.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
+import { openDocumentRows } from './openDocumentsView.js';
 import { shouldWriteSummaryOnOpen } from './summaryOnOpen.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
@@ -2162,6 +2163,7 @@ export function MepSketchApp({
           onOpenSheet={openSheet}
           onRebuildSummaries={(run) => handleRebuildSummaries(undefined, run)}
           activeSheetLevelId={currentSheetLevelId(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex)}
+          openDocuments={openDocumentRows(documents, fileTargetsRef.current, buildingHook.building?.file ?? null, { documentId: activeDocumentId, pageIndex })}
         />
       )}
 
