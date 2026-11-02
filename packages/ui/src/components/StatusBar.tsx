@@ -23,6 +23,7 @@ export interface StatusBarProps {
   /** The dots of the open ports (auto-routing.md §5 question 9). */
   openPortsVisible: boolean;
   onOpenPortsVisibleChange: (visible: boolean) => void;
+  sheetLabel?: string | null;
 }
 
 export function StatusBar({
@@ -44,6 +45,7 @@ export function StatusBar({
   onRoomsVisibleChange,
   openPortsVisible,
   onOpenPortsVisibleChange,
+  sheetLabel,
 }: StatusBarProps) {
   const openPorts = drawingSummary.openPorts;
   const openTotal = openPorts.reduce((n, p) => n + p.count, 0);
@@ -70,6 +72,11 @@ export function StatusBar({
           <button type="button" disabled={pageIndex === pageCount - 1} onClick={() => onChangePage(pageIndex + 1)} title="Next page">
             ›
           </button>
+        </span>
+      )}
+      {sheetLabel && (
+        <span className="mep-chip mep-sheet-label-chip" data-testid="current-sheet" title={sheetLabel}>
+          <b>{sheetLabel}</b>
         </span>
       )}
       <span className="mep-chip">

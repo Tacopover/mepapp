@@ -1,5 +1,15 @@
-import type { BuildingSheet } from '@mepapp/core';
+import type { BuildingFile, BuildingSheet } from '@mepapp/core';
 import type { PathState } from '@mepapp/platform';
+
+/** "<Building> / <Level> / <display name>" for the sheet with this projectUuid and pageIndex. Null when building is null, projectUuid is null, no sheet matches, or the level is missing. */
+export function currentSheetLabel(building: BuildingFile | null, projectUuid: string | null, pageIndex: number): string | null {
+  if (building === null || projectUuid === null) return null;
+  const sheet = building.sheets.find((s) => s.projectUuid === projectUuid && s.pageIndex === pageIndex);
+  if (sheet === undefined) return null;
+  const level = building.levels.find((l) => l.id === sheet.levelId);
+  if (level === undefined) return null;
+  return `${building.name} / ${level.name} / ${sheet.displayName}`;
+}
 
 export type SheetStatus = 'ok' | 'pdf-missing' | 'no-access' | 'not-stamped' | 'no-summary' | 'old-summary' | 'copy-suspected';
 

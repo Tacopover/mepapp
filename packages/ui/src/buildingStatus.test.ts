@@ -1,6 +1,6 @@
-import type { BuildingSheet } from '@mepapp/core';
+import type { BuildingFile, BuildingSheet } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
-import { sheetStatusOf, statusLabel, statusTone, type SheetStatus } from './buildingStatus.js';
+import { currentSheetLabel, sheetStatusOf, statusLabel, statusTone, type SheetStatus } from './buildingStatus.js';
 
 function sheet(overrides: Partial<BuildingSheet> = {}): BuildingSheet {
   return {
@@ -15,6 +15,54 @@ function sheet(overrides: Partial<BuildingSheet> = {}): BuildingSheet {
 }
 
 const summary = { savedAt: '2026-10-01T10:00:00.000Z', sourceSizeBytes: 500 };
+
+function building(sheets: BuildingSheet[]): BuildingFile {
+  return {
+    schemaVersion: 1,
+    id: 'b-1',
+    name: 'Tower',
+    levels: [
+      { id: 'L1', name: 'Ground', elevationMm: 0 },
+      { id: 'L2', name: 'First', elevationMm: 3000 },
+    ],
+    sheets,
+    risers: [],
+  };
+}
+
+describe('currentSheetLabel', () => {
+  it('gives the building, level and display name of the matching sheet', () => {
+    expect(currentSheetLabel(building([sheet()]), 'u-1', 0)).toBe('Tower / Ground / A-101');
+  });
+
+  it('gives null for a page that is not a sheet of the building', () => {
+    expect(currentSheetLabel(building([sheet()]), 'u-1', 1)).toBeNull();
+  });
+
+  it('gives null for a projectUuid that is not a sheet of the building', () => {
+    expect(currentSheetLabel(building([sheet()]), 'u-2', 0)).toBeNull();
+  });
+
+  it('gives null when no building is open', () => {
+    expect(currentSheetLabel(null, 'u-1', 0)).toBeNull();
+  });
+
+  it('gives null when no document is open', () => {
+    expect(currentSheetLabel(building([sheet()]), null, 0)).toBeNull();
+  });
+
+  it('gives null for an unstamped sheet', () => {
+    expect(currentSheetLabel(building([sheet({ projectUuid: null })]), 'u-1', 0)).toBeNull();
+  });
+
+  it('uses the name of the level of the sheet', () => {
+    expect(currentSheetLabel(building([sheet({ id: 's-2', levelId: 'L2', projectUuid: 'u-2', displayName: 'A-201' })]), 'u-2', 0)).toBe('Tower / First / A-201');
+  });
+
+  it('gives null for a sheet whose level is not in the building', () => {
+    expect(currentSheetLabel(building([sheet({ levelId: 'L9' })]), 'u-1', 0)).toBeNull();
+  });
+});
 
 describe('sheetStatusOf', () => {
   it('gives ok for a found file with a summary of the same size', () => {

@@ -79,6 +79,7 @@ import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components
 import { useBuilding } from './useBuilding.js';
 import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
+import { currentSheetLabel } from './buildingStatus.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
@@ -1915,6 +1916,7 @@ export function MepSketchApp({
         onRoomsVisibleChange={(visible) => sceneRef.current?.setRoomsVisible(visible)}
         openPortsVisible={openPortsVisible}
         onOpenPortsVisibleChange={(visible) => sceneRef.current?.setOpenPortsVisible(visible)}
+        sheetLabel={currentSheetLabel(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex)}
       />
 
       {calibrationPrompt && (
