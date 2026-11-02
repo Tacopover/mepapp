@@ -5,6 +5,8 @@ import type { FileAccess } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import type { UseBuilding } from '../useBuilding.js';
 import { countLabel, defaultLevelName, nextLevelElevation, sheetCount } from '../buildingLevels.js';
+import { notPlacedAskText, sheetsWithoutSummary } from '../buildingStatus.js';
+import { useSheetRelink } from '../useSheetRelink.js';
 import { loadBuildings, loadImportedOldIds, pendingOldBuildings } from '../buildings.js';
 import {
   buildingKey,
@@ -28,6 +30,21 @@ import type { OpenDocumentRow } from '../openDocumentsView.js';
 
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
+
+type AskKind = 'close' | 'close-building' | 'switch' | 'open-sheet';
+
+/** An action that waits for the answer to the question about the pages that are not placed. */
+interface PendingAsk {
+  kind: AskKind;
+  run: () => void;
+}
+
+const ASK_BUTTON: Record<AskKind, string> = {
+  close: 'Close anyway',
+  'close-building': 'Close building',
+  switch: 'Switch building',
+  'open-sheet': 'Open sheet',
+};
 
 const NARROW_QUERY = '(max-width: 899px)';
 
@@ -107,7 +124,7 @@ export function ManageBuildingsDialog({
   const [importResult, setImportResult] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; error: boolean; id: number } | null>(null);
   const noticeCount = useRef(0);
-  const [closeAsk, setCloseAsk] = useState(false);
+  const [ask, setAsk] = useState<PendingAsk | null>(null);
   const openedFileId = building.building?.file.id ?? null;
   const openedIdRef = useRef<string | null>(openedFileId);
   const initialKey = building.building ? initialSelection(building.building.file, activeSheetLevelId ?? null) : '';
@@ -128,7 +145,9 @@ export function ManageBuildingsDialog({
     setFocusKey(key);
     setCollapsed(new Set());
     setNotice(null);
-    setCloseAsk(false);
+    setAsk(null);
+    setCreating(false);
+    setName('');
   }, [openedFileId]);
 
   useEffect(() => {
@@ -138,28 +157,72 @@ export function ManageBuildingsDialog({
   }, [notice?.id]);
 
   useEffect(() => {
-    if (notPlaced === 0) setCloseAsk(false);
+    if (notPlaced === 0) setAsk(null);
   }, [notPlaced]);
+
+  const refreshRef = useRef(building.refreshSheetStatus);
+  refreshRef.current = building.refreshSheetStatus;
+  const hasBuilding = openedFileId !== null;
+  useEffect(() => {
+    if (!hasBuilding) return;
+    const onFocus = () => void refreshRef.current();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [hasBuilding]);
+
+  const relinker = useSheetRelink({ file: building.building?.file ?? null, update: building.update, fileAccess, engine: pdfEngine, onNotice });
 
   function onNotice(text: string, error: boolean) {
     noticeCount.current += 1;
     setNotice({ text, error, id: noticeCount.current });
   }
 
-  /** Close button, Escape: with pages that have no level the dialog asks first. A second Escape answers "Keep working". */
-  function requestClose() {
+  /** Runs the action. With pages that have no level the dialog asks first, because the action drops them. */
+  function guard(kind: AskKind, run: () => void) {
     if (notPlaced === 0) {
-      onClose();
+      run();
       return;
     }
-    setCloseAsk((ask) => !ask);
+    setAsk({ kind, run });
+  }
+
+  /** Close button, Escape. A second Escape answers "Keep working". */
+  function requestClose() {
+    if (ask !== null) {
+      setAsk(null);
+      return;
+    }
+    guard('close', onClose);
+  }
+
+  /** Opens a sheet in the viewer. The dialog closes when it worked. */
+  async function openSheetNow(sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> {
+    const result = await onOpenSheet(sheet, mode);
+    if (result.ok) onClose();
+    return result;
+  }
+
+  /** The open action of the sheet rows: asks first when pages wait. The answer "Open sheet" runs it. */
+  async function openSheetGuarded(sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> {
+    if (notPlaced === 0) return openSheetNow(sheet, mode);
+    setAsk({
+      kind: 'open-sheet',
+      run: () => {
+        void openSheetNow(sheet, mode).then((result) => {
+          if (!result.ok && result.message !== null) onNotice(result.message.startsWith('Could not') ? result.message : `Could not open ${sheet.location.fileName}: ${result.message}`, true);
+        });
+      },
+    });
+    return { ok: false, message: null };
   }
 
   function handleCreate() {
     if (building.busy) return;
-    void building.create(name);
-    setCreating(false);
-    setName('');
+    guard('switch', () => {
+      void building.create(name);
+      setCreating(false);
+      setName('');
+    });
   }
 
   async function handleImportOld() {
@@ -196,8 +259,10 @@ export function ManageBuildingsDialog({
   function onActivate(node: TreeNode) {
     if (building.busy) return;
     if (node.kind === 'building' && !node.isOpen) {
-      void building.openRecent(node.entry!);
-      setFocusKey(node.key);
+      guard('switch', () => {
+        void building.openRecent(node.entry!);
+        setFocusKey(node.key);
+      });
       return;
     }
     if (node.kind === 'add-level') {
@@ -257,8 +322,8 @@ export function ManageBuildingsDialog({
           hasBuilding={openBuilding !== null}
           importLabel={oldPending.length > 0 ? `Import ${countLabel(oldPending.length, 'old building')}` : null}
           onNew={() => setCreating(true)}
-          onOpen={() => void building.open()}
-          onClose={() => building.close()}
+          onOpen={() => guard('switch', () => void building.open())}
+          onClose={() => guard('close-building', () => building.close())}
           onImport={() => void handleImportOld()}
         />
       </div>
@@ -289,13 +354,20 @@ export function ManageBuildingsDialog({
       className="mep-modal--buildings"
       header={header}
       actions={
-        closeAsk && notPlaced > 0 ? (
+        ask !== null && notPlaced > 0 ? (
           <div className="mep-buildings-close-ask" role="alert" data-testid="close-ask">
-            <span>{countLabel(notPlaced, 'page')} {notPlaced === 1 ? 'is' : 'are'} not placed. Close anyway?</span>
-            <button type="button" data-testid="close-anyway" onClick={onClose}>
-              Close anyway
+            <span>{notPlacedAskText(ask.kind, notPlaced)}</span>
+            <button
+              type="button"
+              data-testid="close-anyway"
+              onClick={() => {
+                setAsk(null);
+                ask.run();
+              }}
+            >
+              {ASK_BUTTON[ask.kind]}
             </button>
-            <button type="button" data-testid="keep-working" autoFocus onClick={() => setCloseAsk(false)}>
+            <button type="button" data-testid="keep-working" autoFocus onClick={() => setAsk(null)}>
               Keep working
             </button>
           </div>
@@ -380,7 +452,10 @@ export function ManageBuildingsDialog({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter') handleCreate();
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleCreate();
+                  }
                 }}
               />
               <button type="button" disabled={building.busy} onClick={handleCreate}>
@@ -391,6 +466,7 @@ export function ManageBuildingsDialog({
                 onClick={() => {
                   setCreating(false);
                   setName('');
+                  setAsk((current) => (current?.kind === 'switch' ? null : current));
                 }}
               >
                 Cancel
@@ -421,6 +497,17 @@ export function ManageBuildingsDialog({
 
           {openBuilding && (
             <>
+              <BuildingSummariesPane
+                key={`${openBuilding.file.id}-summaries`}
+                missing={sheetsWithoutSummary(openBuilding.file.sheets, openBuilding.sheetStatus, openBuilding.sheetSummary).length}
+                onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
+                onDone={() => void building.refreshSheetStatus()}
+                fileAccess={fileAccess}
+                relinker={relinker}
+                sheetStatus={openBuilding.sheetStatus}
+                onOpenSheet={openSheetGuarded}
+                onNotice={onNotice}
+              />
               {/* B4 adds a Risers tab here */}
               <div role="tablist" className="mep-buildings-tabs">
                 <button
@@ -478,13 +565,9 @@ export function ManageBuildingsDialog({
                   file={openBuilding.file}
                   update={building.update}
                   fileAccess={fileAccess}
-                  engine={pdfEngine}
                   levelId={selectedLevel?.id ?? null}
-                  onOpenSheet={async (sheet, mode) => {
-                    const result = await onOpenSheet(sheet, mode);
-                    if (result.ok) onClose();
-                    return result;
-                  }}
+                  onOpenSheet={openSheetGuarded}
+                  relinker={relinker}
                   sheetStatus={openBuilding.sheetStatus}
                   sheetSummary={openBuilding.sheetSummary}
                   onRefreshStatus={building.refreshSheetStatus}
@@ -518,13 +601,6 @@ export function ManageBuildingsDialog({
                   focusNameLevelId={focusNameLevelId}
                   onNameFocused={() => setFocusNameLevelId(null)}
                   onSelectKey={onSelectKey}
-                />
-                {/* T11h replaces this pane */}
-                <BuildingSummariesPane
-                  key={`${openBuilding.file.id}-summaries`}
-                  hasSheets={openBuilding.file.sheets.length > 0}
-                  onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
-                  onDone={() => void building.refreshSheetStatus()}
                 />
               </div>
               <div className="mep-buildings-status-line">

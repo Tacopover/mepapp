@@ -1883,6 +1883,31 @@
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+  background:
+    linear-gradient(var(--surface) 30%, transparent) top / 100% 24px no-repeat local,
+    linear-gradient(transparent, var(--surface) 70%) bottom / 100% 24px no-repeat local,
+    linear-gradient(rgba(0, 0, 0, 0.22), transparent) top / 100% 8px no-repeat scroll,
+    linear-gradient(transparent, rgba(0, 0, 0, 0.22)) bottom / 100% 8px no-repeat scroll;
+}
+.mep-summaries {
+  flex: none;
+  border-bottom: 1px solid var(--line-soft, var(--line));
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+.mep-summaries-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.mep-summaries .mep-rebuild-result {
+  max-height: 30vh;
+  overflow-y: auto;
+}
+.mep-summaries-fix {
+  display: inline-flex;
+  margin-left: 8px;
 }
 .mep-tree {
   display: flex;
@@ -2003,6 +2028,23 @@
     border-right: none;
     padding-right: 0;
     overflow: visible;
+  }
+  .mep-buildings-layout {
+    display: block;
+    overflow-y: auto;
+    padding-right: 4px;
+  background:
+    linear-gradient(var(--surface) 30%, transparent) top / 100% 24px no-repeat local,
+    linear-gradient(transparent, var(--surface) 70%) bottom / 100% 24px no-repeat local,
+    linear-gradient(rgba(0, 0, 0, 0.22), transparent) top / 100% 8px no-repeat scroll,
+    linear-gradient(transparent, rgba(0, 0, 0, 0.22)) bottom / 100% 8px no-repeat scroll;
+  }
+  .mep-buildings-detail {
+    display: block;
+  }
+  .mep-buildings-panel {
+    overflow: visible;
+    background: none;
   }
 }
 .mep-level-detail {

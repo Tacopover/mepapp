@@ -141,6 +141,8 @@ await shot('B3-T10-4-rebuilt');
 // Step 5: open a sheet.
 await showLevel('Level 1');
 await sheetGroupOf('first.pdf').locator('[data-testid="open-sheet"]').click();
+await idle(300);
+if ((await dlg.locator('[data-testid="close-ask"]').count()) === 1) await dlg.locator('[data-testid="close-anyway"]').click();
 await t.until(async () => (await dlg.count()) === 0, 'dialog closes after open', 60000);
 await idle(1500);
 const headerLabel = await page.locator('[data-testid="current-sheet-header"]').textContent().catch(() => '');

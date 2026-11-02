@@ -2,6 +2,10 @@ import { calibrationFromScale, type BuildingFile, type BuildingSheet, type Sheet
 import { describe, expect, it } from 'vitest';
 import {
   currentSheetLabel,
+  noSummaryText,
+  notPlacedAskText,
+  sheetsWithoutSummary,
+  shortText,
   sheetStatusOf,
   sheetSummaryInfo,
   statusHint,
@@ -243,5 +247,32 @@ describe('summaryText', () => {
 
   it('gives the savedAt text as is when it is not a date', () => {
     expect(summaryText({ savedAt: 'yesterday', scale: null })).toBe('Summary saved yesterday, no scale');
+  });
+});
+
+describe('summary repair helpers', () => {
+  it('counts only probed sheets with no summary', () => {
+    const sheets = [sheet({ id: 'a' }), sheet({ id: 'b' }), sheet({ id: 'c' })];
+    const status: Record<string, SheetStatus> = { a: 'no-summary', b: 'ok', d: 'pdf-missing' };
+    sheets.push(sheet({ id: 'd' }));
+    const found = sheetsWithoutSummary(sheets, status, { b: {} });
+    expect(found.map((item) => item.id)).toEqual(['a']);
+  });
+
+  it('writes the count with the right verb', () => {
+    expect(noSummaryText(1)).toBe('1 sheet has no summary');
+    expect(noSummaryText(2)).toBe('2 sheets have no summary');
+  });
+
+  it('adapts the question to the action', () => {
+    expect(notPlacedAskText('close', 1)).toBe('1 page is not placed. Close anyway?');
+    expect(notPlacedAskText('close-building', 3)).toBe('3 pages are not placed. Close the building anyway?');
+    expect(notPlacedAskText('switch', 2)).toBe('2 pages are not placed. Switch building anyway?');
+    expect(notPlacedAskText('open-sheet', 2)).toContain('Open the sheet anyway?');
+  });
+
+  it('shortens a long text', () => {
+    expect(shortText('short', 10)).toBe('short');
+    expect(shortText('a long failure text here', 10)).toBe('a long fa…');
   });
 });

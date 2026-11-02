@@ -80,7 +80,7 @@ import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components
 import { useBuilding } from './useBuilding.js';
 import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
-import { currentSheetLabel } from './buildingStatus.js';
+import { currentSheetLabel, shortText } from './buildingStatus.js';
 import { currentSheetLevelId } from './buildingTree.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { openDocumentRows } from './openDocumentsView.js';
@@ -1008,7 +1008,7 @@ export function MepSketchApp({
         await buildingHook.reload();
         const first = result.failed[0];
         setStatus(
-          `Rebuilt ${result.ok} of ${result.total} summaries.${result.cancelled ? ' Cancelled before the end.' : ''}${first ? ` ${result.failed.length} failed: ${first.sheet.displayName}: ${first.reason}` : ''}`,
+          `Rebuilt ${result.ok} of ${result.total} summaries.${result.cancelled ? ' Cancelled before the end.' : ''}${first ? ` ${result.failed.length} failed: ${shortText(first.sheet.displayName, 30)}: ${shortText(first.reason, 60)}. See Manage Buildings.` : ''}`,
         );
         return result;
       } catch (err) {

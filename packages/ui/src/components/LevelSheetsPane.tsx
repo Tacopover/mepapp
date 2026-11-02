@@ -1,9 +1,7 @@
-import { Fragment, useState } from 'react';
-import { moveSheet, relinkSheet, removeSheet, type BuildingFile, type BuildingSheet, type SheetLocation } from '@mepapp/core';
-import type { PdfEngine } from '@mepapp/pdf-engine';
+import { Fragment } from 'react';
+import { moveSheet, removeSheet, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { FileAccess } from '@mepapp/platform';
-import { BUILDING_PDF_TYPES, pathOfTarget, readPdfInfo } from '../buildingPdfInfo.js';
-import { relinkWouldDuplicate, sheetGroupsOfLevel, sheetsOfSamePdf } from '../buildingSheets.js';
+import { sheetGroupsOfLevel } from '../buildingSheets.js';
 import {
   statusHint,
   statusLabel,
@@ -13,13 +11,15 @@ import {
   type SheetStatus,
   type SheetSummaryInfo,
 } from '../buildingStatus.js';
+import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
+
+export const SHEETS_ORIGIN = 'sheets';
 
 export interface LevelSheetsPaneProps {
   file: BuildingFile;
   update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
   fileAccess: FileAccess;
-  engine: PdfEngine | undefined;
   /** null = building node: all sheets, each row also shows its level name. */
   levelId: string | null;
   onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
@@ -27,16 +27,8 @@ export interface LevelSheetsPaneProps {
   sheetSummary: Record<string, SheetSummaryInfo>;
   onRefreshStatus: () => void;
   onNotice: (text: string, error: boolean) => void;
+  relinker: SheetRelink;
 }
-
-interface RelinkAsk {
-  sheetId: string;
-  location: SheetLocation;
-  projectUuid: string;
-  pickedName: string;
-}
-
-const RELINK_REFUSED = 'Could not relink: another sheet already uses this document and page.';
 
 /**
  * Lists the sheets of the selected level, one row per sheet, and moves, removes, opens and relinks them.
@@ -46,83 +38,16 @@ export function LevelSheetsPane({
   file,
   update,
   fileAccess,
-  engine,
   levelId,
   onOpenSheet,
   sheetStatus,
   sheetSummary,
   onRefreshStatus,
   onNotice,
+  relinker,
 }: LevelSheetsPaneProps) {
-  const [relinkAsk, setRelinkAsk] = useState<RelinkAsk | null>(null);
-
   const groups = sheetGroupsOfLevel(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
-
-  async function relink(sheet: BuildingSheet) {
-    const picked = await fileAccess.openFile(BUILDING_PDF_TYPES).catch((err: unknown) => {
-      onNotice(`Could not open the file picker: ${(err as Error).message}`, true);
-      return undefined;
-    });
-    if (picked === undefined) return;
-    const path = pathOfTarget(picked.target);
-    const location: SheetLocation = {
-      fileName: picked.file.name,
-      sizeBytes: picked.file.size,
-      ...(path !== undefined ? { path } : {}),
-    };
-    let projectUuid: string | null = null;
-    if (engine !== undefined) {
-      try {
-        projectUuid = (await readPdfInfo(picked.file, engine)).projectUuid;
-      } catch (err) {
-        onNotice(`Could not read ${picked.file.name}: ${(err as Error).message}`, true);
-        return;
-      }
-    }
-    if (
-      projectUuid !== null &&
-      sheetsOfSamePdf(file, sheet).some((other) => other.projectUuid !== null && other.projectUuid !== projectUuid)
-    ) {
-      setRelinkAsk({ sheetId: sheet.id, location, projectUuid, pickedName: picked.file.name });
-      return;
-    }
-    await applyRelink(sheet, location, projectUuid ?? undefined);
-  }
-
-  async function applyRelink(sheet: BuildingSheet, location: SheetLocation, projectUuid: string | undefined) {
-    const ids = sheetsOfSamePdf(file, sheet).map((item) => item.id);
-    if (relinkWouldDuplicate(file, ids, projectUuid)) {
-      setRelinkAsk(null);
-      onNotice(RELINK_REFUSED, true);
-      return;
-    }
-    let refused = false;
-    await update((f) =>
-      ids.reduce((acc, id) => {
-        const result = relinkSheet(acc, id, location, projectUuid);
-        if (!result.ok) {
-          refused = true;
-          return acc;
-        }
-        return result.file;
-      }, f),
-    );
-    if (refused) {
-      onNotice(RELINK_REFUSED, true);
-      return;
-    }
-    onNotice(`Relinked ${location.fileName}.`, false);
-  }
-
-  async function confirmRelink() {
-    const ask = relinkAsk;
-    setRelinkAsk(null);
-    if (ask === null) return;
-    const sheet = file.sheets.find((item) => item.id === ask.sheetId);
-    if (sheet === undefined) return;
-    await applyRelink(sheet, ask.location, ask.projectUuid);
-  }
 
   async function grantAccess() {
     try {
@@ -157,6 +82,7 @@ export function LevelSheetsPane({
         <div key={group.key} className="mep-sheets-group" data-testid="pdf-group">
           {group.sheets.map((sheet) => {
             const status = sheetStatus[sheet.id];
+            const ask = relinker.askFor(sheet.id, SHEETS_ORIGIN);
             const levelName = file.levels.find((level) => level.id === sheet.levelId)?.name;
             const otherLevels = file.levels.filter((level) => level.id !== sheet.levelId);
             return (
@@ -207,7 +133,7 @@ export function LevelSheetsPane({
                       type="button"
                       data-testid="relink-pdf"
                       aria-label={`Relink ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                      onClick={() => void relink(sheet)}
+                      onClick={() => void relinker.relink(sheet, SHEETS_ORIGIN)}
                     >
                       Relink…
                     </button>
@@ -253,20 +179,7 @@ export function LevelSheetsPane({
                     {statusHint(status)}
                   </p>
                 )}
-                {relinkAsk !== null && relinkAsk.sheetId === sheet.id && (
-                  <div className="mep-buildings-actions">
-                    <p className="mep-hint" data-testid="relink-confirm">
-                      The file "{relinkAsk.pickedName}" is a different document than the sheets of {sheet.location.fileName}. Relink the
-                      sheets to it? They keep their levels.
-                    </p>
-                    <button type="button" onClick={() => void confirmRelink()}>
-                      Relink to this file
-                    </button>
-                    <button type="button" onClick={() => setRelinkAsk(null)}>
-                      Cancel
-                    </button>
-                  </div>
-                )}
+                {ask !== null && <RelinkConfirm relinker={relinker} sheet={sheet} askedName={ask.pickedName} />}
               </Fragment>
             );
           })}

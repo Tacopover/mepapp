@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BuildingFile } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
@@ -70,9 +70,15 @@ export interface BuildingSheetsPaneProps {
 export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshStatus, onAdded, onNotice }: BuildingSheetsPaneProps) {
   const [busy, setBusy] = useState(false);
   const { pending } = pendingPdfs;
+  /** False after the building changed (the dialog keys this pane by building). A read that ends later must not add its PDFs. */
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     onRefreshStatus();
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const noEngineReason = engine === undefined ? 'PDF reading is not available in this version of the app.' : undefined;
@@ -91,6 +97,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
     setBusy(true);
     try {
       const entry = await readEntry(opened.file, pathOfTarget(opened.target), engine);
+      if (!mountedRef.current) return;
       if (pending.some((other) => isSamePdf(other, entry))) {
         notify(`${opened.file.name} is already in the list.`);
         return;
@@ -99,6 +106,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
       onAdded?.();
       notify(`Added ${opened.file.name} (${countLabel(entry.pageCount, 'page')}). Place its pages on a level.`);
     } catch (err) {
+      if (!mountedRef.current) return;
       notify(`Could not read ${opened.file.name}: ${(err as Error).message}`);
     } finally {
       setBusy(false);
@@ -114,6 +122,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
     setBusy(true);
     try {
       const files = await fileAccess.readFolder(picked.folder, ['pdf']);
+      if (!mountedRef.current) return;
       if (files.length === 0) {
         notify(`No PDF files in ${picked.name}.`);
         return;
@@ -122,6 +131,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
       const failed: string[] = [];
       let skipped = 0;
       for (const item of files) {
+        if (!mountedRef.current) return;
         const path = 'folderPath' in picked.folder ? joinFolderPath(picked.folder.folderPath, item.name) : undefined;
         let entry: PendingPdf;
         try {
@@ -136,6 +146,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
         }
         added.push(entry);
       }
+      if (!mountedRef.current) return;
       if (added.length > 0) {
         pendingPdfs.add(added);
         onAdded?.();
@@ -161,8 +172,15 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
           Add folder…
         </button>
       )}
-      <button type="button" data-testid="refresh-status" onClick={() => onRefreshStatus()}>
-        Check files again
+      <button
+        type="button"
+        className="mep-icon-btn"
+        data-testid="refresh-status"
+        aria-label="Refresh"
+        title="Check the files again"
+        onClick={() => onRefreshStatus()}
+      >
+        ↻
       </button>
       {busy && (
         <span className="mep-hint" data-testid="sheets-busy">

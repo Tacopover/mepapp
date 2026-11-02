@@ -119,3 +119,33 @@ export function summaryCountText(sheets: readonly BuildingSheet[], summaries: Re
   const withSummary = sheets.filter((sheet) => Object.prototype.hasOwnProperty.call(summaries, sheet.id)).length;
   return total === 1 ? `${withSummary} of 1 sheet has a summary` : `${withSummary} of ${total} sheets have a summary`;
 }
+
+/** The sheets that have a probed status and no summary. A missing or no-access PDF is not counted: a read cannot fix it. A sheet with no status yet is not counted (the probe has not run). */
+export function sheetsWithoutSummary(sheets: readonly BuildingSheet[], status: Record<string, SheetStatus>, summaries: Record<string, unknown>): BuildingSheet[] {
+  return sheets.filter((sheet) => status[sheet.id] !== undefined && status[sheet.id] !== 'pdf-missing' && status[sheet.id] !== 'no-access' && !Object.prototype.hasOwnProperty.call(summaries, sheet.id));
+}
+
+/** "1 sheet has no summary" or "N sheets have no summary". */
+export function noSummaryText(count: number): string {
+  return count === 1 ? '1 sheet has no summary' : `${count} sheets have no summary`;
+}
+
+/** The text of the in-dialog question when an action drops the pages that wait for a level. */
+export function notPlacedAskText(action: 'close' | 'close-building' | 'switch' | 'open-sheet', pages: number): string {
+  const lead = `${pages} ${pages === 1 ? 'page is' : 'pages are'} not placed.`;
+  switch (action) {
+    case 'close':
+      return `${lead} Close anyway?`;
+    case 'close-building':
+      return `${lead} Close the building anyway?`;
+    case 'switch':
+      return `${lead} Switch building anyway?`;
+    case 'open-sheet':
+      return `${lead} Open the sheet anyway? The dialog closes.`;
+  }
+}
+
+/** A short form of a long text for the status bar: the first `max` characters, then an ellipsis. */
+export function shortText(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
