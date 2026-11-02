@@ -9,6 +9,10 @@ import {
   pdfTotals,
   relinkWouldDuplicate,
   sheetDisplayName,
+  sheetGroupsOfLevel,
+  sheetPdfKey,
+  sheetsOfSamePdf,
+  waitingGroups,
   type PendingPdf,
 } from './buildingSheets.js';
 
@@ -207,5 +211,127 @@ describe('relinkWouldDuplicate', () => {
   it('does not count a sheet that already has the id and is in the set against itself', () => {
     const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s2', 1, 'b.pdf')]);
     expect(relinkWouldDuplicate(file, ['s1'], 'u1')).toBe(false);
+  });
+});
+
+const twoLevels = (sheets: BuildingSheet[]): BuildingFile => ({
+  ...emptyBuilding('b1', 'Block'),
+  levels: [
+    { id: 'L1', name: 'Ground', elevationMm: 0 },
+    { id: 'L2', name: 'First', elevationMm: 3000 },
+  ],
+  sheets,
+});
+
+describe('sheetPdfKey', () => {
+  it('gives the key of the project id when the sheet has one', () => {
+    expect(sheetPdfKey(sheetOf('s1', 0, 'a.pdf', { projectUuid: 'uuid-a', path: 'C:/a.pdf' }))).toBe('u:uuid-a');
+  });
+
+  it('gives the key of the path when the sheet has no project id', () => {
+    expect(sheetPdfKey(sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }))).toBe('p:C:/a.pdf');
+  });
+});
+
+describe('sheetGroupsOfLevel', () => {
+  it('gives only the sheets of the level', () => {
+    const file = twoLevels([
+      { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' },
+      { ...sheetOf('s2', 0, 'b.pdf', { path: 'C:/b.pdf' }), levelId: 'L2' },
+    ]);
+    const groups = sheetGroupsOfLevel(file, 'L2');
+    expect(groups.map((group) => group.sheets.map((sheet) => sheet.id))).toEqual([['s2']]);
+  });
+
+  it('splits a 2-page PDF over two levels into one group per level', () => {
+    const file = twoLevels([
+      { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' },
+      { ...sheetOf('s2', 1, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L2' },
+    ]);
+    expect(sheetGroupsOfLevel(file, 'L1').map((group) => group.sheets.map((sheet) => sheet.id))).toEqual([['s1']]);
+    expect(sheetGroupsOfLevel(file, 'L2').map((group) => group.sheets.map((sheet) => sheet.id))).toEqual([['s2']]);
+  });
+
+  it('keeps the sheets of one PDF next to each other on a level', () => {
+    const file = twoLevels([
+      { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' },
+      { ...sheetOf('s2', 0, 'b.pdf', { path: 'C:/b.pdf' }), levelId: 'L1' },
+      { ...sheetOf('s3', 1, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' },
+    ]);
+    const groups = sheetGroupsOfLevel(file, 'L1');
+    expect(groups.map((group) => group.key)).toEqual(['p:C:/a.pdf', 'p:C:/b.pdf']);
+    expect(groups[0]!.sheets.map((sheet) => sheet.id)).toEqual(['s1', 's3']);
+  });
+
+  it('gives all sheets for a null level, in the level order of the file', () => {
+    const file = twoLevels([
+      { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L2' },
+      { ...sheetOf('s2', 0, 'b.pdf', { path: 'C:/b.pdf' }), levelId: 'L1' },
+    ]);
+    const groups = sheetGroupsOfLevel(file, null);
+    expect(groups.map((group) => group.sheets.map((sheet) => sheet.id))).toEqual([['s2'], ['s1']]);
+  });
+
+  it('gives the sheets of an unknown level last for a null level', () => {
+    const file = twoLevels([
+      { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L9' },
+      { ...sheetOf('s2', 0, 'b.pdf', { path: 'C:/b.pdf' }), levelId: 'L2' },
+    ]);
+    const groups = sheetGroupsOfLevel(file, null);
+    expect(groups.map((group) => group.sheets.map((sheet) => sheet.id))).toEqual([['s2'], ['s1']]);
+  });
+
+  it('gives no groups when the file has no sheets', () => {
+    expect(sheetGroupsOfLevel(twoLevels([]), null)).toEqual([]);
+    expect(sheetGroupsOfLevel(twoLevels([]), 'L1')).toEqual([]);
+  });
+});
+
+describe('sheetsOfSamePdf', () => {
+  it('gives the sheets of the same PDF on every level, including the sheet itself', () => {
+    const first = { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' };
+    const file = twoLevels([
+      first,
+      { ...sheetOf('s2', 1, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L2' },
+      { ...sheetOf('s3', 0, 'b.pdf', { path: 'C:/b.pdf' }), levelId: 'L1' },
+    ]);
+    expect(sheetsOfSamePdf(file, first).map((sheet) => sheet.id)).toEqual(['s1', 's2']);
+  });
+
+  it('gives only the sheet itself when no other sheet shares its PDF', () => {
+    const only = sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' });
+    expect(sheetsOfSamePdf(twoLevels([only]), only).map((sheet) => sheet.id)).toEqual(['s1']);
+  });
+});
+
+describe('waitingGroups', () => {
+  it('gives no groups when there is no pending PDF', () => {
+    expect(waitingGroups(twoLevels([sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' })]), [])).toEqual([]);
+  });
+
+  it('drops a pending PDF whose pages all have sheets', () => {
+    const file = twoLevels([
+      sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }),
+      sheetOf('s2', 1, 'a.pdf', { path: 'C:/a.pdf' }),
+    ]);
+    expect(waitingGroups(file, [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 2 })])).toEqual([]);
+  });
+
+  it('keeps only the open pages of a partly assigned PDF and keeps the full pageCount', () => {
+    const file = twoLevels([sheetOf('s1', 1, 'a.pdf', { path: 'C:/a.pdf' })]);
+    const groups = waitingGroups(file, [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 3 })]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.pageCount).toBe(3);
+    expect(groups[0]!.rows.map((row) => row.pageIndex)).toEqual([0, 2]);
+    expect(groups[0]!.rows.every((row) => row.sheet === null)).toBe(true);
+  });
+
+  it('gives the pending PDFs that have open pages, in the order given', () => {
+    const groups = waitingGroups(twoLevels([]), [
+      pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 1 }),
+      pendingOf({ fileName: 'b.pdf', path: 'C:/b.pdf', pageCount: 2 }),
+    ]);
+    expect(groups.map((group) => group.fileName)).toEqual(['a.pdf', 'b.pdf']);
+    expect(groups.every((group) => group.pending)).toBe(true);
   });
 });

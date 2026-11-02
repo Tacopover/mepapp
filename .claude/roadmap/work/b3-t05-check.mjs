@@ -48,6 +48,14 @@ await idle(400);
 const docCount = () => page.evaluate(() => window.__mepSketchScene.getDocuments().length);
 const groupOf = (n) => dlg.locator('[data-testid="pdf-group"]').filter({ hasText: n });
 const pageChip = () => page.locator('.mep-page-chip').textContent();
+const showLevel = async (name) => {
+  await dlg.locator('[role="treeitem"][data-kind="level"]', { hasText: name }).click();
+  await idle(300);
+};
+const showBuilding = async () => {
+  await dlg.locator('[role="treeitem"][data-kind="building"]').click();
+  await idle(300);
+};
 
 async function openDialog() {
   await menu('Manage Buildings…');
@@ -56,12 +64,14 @@ async function openDialog() {
 }
 
 await openDialog();
+await showBuilding();
 const buttons = await dlg.locator('[data-testid="open-sheet"]').allInnerTexts();
 check(buttons.filter((b) => /^Open$/.test(b.trim())).length === 3, 'three sheets with a path have "Open"', JSON.stringify(buttons));
-check(buttons.filter((b) => /Pick the file again/.test(b)).length === 1, 'the sheet with no path has "Pick the file again…"');
+check(buttons.filter((b) => /Choose file…/.test(b)).length === 1, 'the sheet with no path has "Choose file…"');
 await shot('B3-T05-dialog');
 
 // Open page 2 of multi.pdf.
+await showLevel('Level 1');
 await groupOf('multi.pdf').locator('[data-testid="open-sheet"]').click();
 await t.until(async () => (await docCount()) >= 1 && !(await dlg.count()), 'open multi', 60000);
 await idle(1200);
@@ -76,6 +86,7 @@ await shot('B3-T05-open');
 // Second click on the same sheet: no second tab.
 const before = await docCount();
 await openDialog();
+await showLevel('Level 1');
 await groupOf('multi.pdf').locator('[data-testid="open-sheet"]').click();
 await idle(1500);
 check((await docCount()) === before, 'a second open does not add a tab', `${before} -> ${await docCount()}`);
@@ -83,6 +94,7 @@ check(/Page\s*2\s*of\s*3/.test(await pageChip()), 'still page 2 of 3');
 
 // Another sheet: ground.pdf (1 page, no page chip).
 await openDialog();
+await showLevel('Ground floor');
 await groupOf('ground.pdf').locator('[data-testid="open-sheet"]').click();
 await t.until(async () => (await docCount()) === before + 1 && !(await dlg.count()), 'ground opens', 60000).catch(() => {});
 await idle(1000);
@@ -93,12 +105,14 @@ check((await page.evaluate(() => window.__mepSketchScene.getPageIndex())) === 0,
 // Back to multi.pdf with page 1 moved: opening the sheet again goes to page 2 although the tab shows another page.
 await page.evaluate(() => 0);
 await openDialog();
+await showLevel('Level 1');
 await groupOf('multi.pdf').locator('[data-testid="open-sheet"]').click();
 await idle(1500);
 check(/Page\s*2\s*of\s*3/.test(await pageChip()), 'switching back to the multi.pdf tab shows page 2');
 
 // Missing file: the status says so and the dialog stays open.
 await openDialog();
+await showLevel('Ground floor');
 check(await groupOf('gone.pdf').locator('[data-testid="open-sheet"]').isDisabled(), 'Open is disabled for a missing PDF (since B3-T06)');
 await idle(800);
 check((await dlg.count()) === 1, 'dialog stays open when the file is missing');
@@ -106,6 +120,7 @@ await shot('B3-T05-missing');
 
 // Pick the file again (no path): the stub picker gives first.pdf.
 const docs3 = await docCount();
+await showLevel('Level 1');
 await groupOf('first.pdf').locator('[data-testid="open-sheet"]').click();
 await t.until(async () => (await docCount()) === docs3 + 1 && !(await dlg.count()), 'pick again', 30000).catch(() => {});
 check((await docCount()) === docs3 + 1, 'pick again opens first.pdf in a new tab', `${docs3} -> ${await docCount()}`);

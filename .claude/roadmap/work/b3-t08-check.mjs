@@ -52,7 +52,7 @@ await dlg.waitFor({ state: 'visible', timeout: 8000 });
 await idle(800);
 
 check((await groupOf('ground.pdf').locator('[data-testid="sheet-summary"]').count()) === 0, 'before: ground.pdf has no summary text');
-check(/No summary yet/.test((await groupOf('ground.pdf').textContent()) ?? ''), 'before: ground.pdf status says "No summary yet"');
+check(/No summary/.test((await groupOf('ground.pdf').textContent()) ?? ''), 'before: ground.pdf status says "No summary"');
 check((await summaryOf('first.pdf')) === 'No summary', 'before: first.pdf says "No summary"');
 const rebuild = dlg.locator('[data-testid="rebuild-summaries"]');
 check((await rebuild.count()) === 1 && (await rebuild.isEnabled()), 'the Rebuild summaries button is enabled');

@@ -21,6 +21,7 @@ import { BuildingMenu } from './BuildingMenu.js';
 import { BuildingSheetsPane } from './BuildingSheetsPane.js';
 import { BuildingSummariesPane, type BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 import { BuildingTree } from './BuildingTree.js';
+import { LevelSheetsPane } from './LevelSheetsPane.js';
 
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
@@ -94,6 +95,7 @@ export function ManageBuildingsDialog({
   const [name, setName] = useState('');
   const [oldPending, setOldPending] = useState(() => pendingOldBuildings(loadBuildings(), loadImportedOldIds()));
   const [importResult, setImportResult] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
   const openedFileId = building.building?.file.id ?? null;
   const openedIdRef = useRef<string | null>(openedFileId);
   const initialKey = building.building ? initialSelection(building.building.file, activeSheetLevelId ?? null) : '';
@@ -113,7 +115,12 @@ export function ManageBuildingsDialog({
     setFocusKey(key);
     setCollapsed(new Set());
     setNotPlaced(0);
+    setNotice(null);
   }, [openedFileId]);
+
+  function onNotice(text: string, error: boolean) {
+    setNotice({ text, error });
+  }
 
   function handleCreate() {
     if (building.busy) return;
@@ -388,6 +395,15 @@ export function ManageBuildingsDialog({
                 aria-labelledby="mep-buildings-tab-levels"
                 className="mep-buildings-panel"
               >
+                {notice !== null && (
+                  <p
+                    className={notice.error ? 'mep-hint mep-buildings-message' : 'mep-hint mep-buildings-notice'}
+                    role="status"
+                    data-testid="sheets-notice"
+                  >
+                    {notice.text} <button type="button" onClick={() => setNotice(null)}>Dismiss</button>
+                  </p>
+                )}
                 <div className="mep-section" data-testid="selection-summary">
                   {selectedLevel !== null ? (
                     <>
@@ -422,20 +438,13 @@ export function ManageBuildingsDialog({
                   onNameFocused={() => setFocusNameLevelId(null)}
                   onSelectKey={onSelectKey}
                 />
-                {/* T11h replaces this pane */}
-                <BuildingSummariesPane
-                  key={`${openBuilding.file.id}-summaries`}
-                  hasSheets={openBuilding.file.sheets.length > 0}
-                  onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
-                  onDone={() => void building.refreshSheetStatus()}
-                />
-                {/* T11e and T11g replace this pane */}
-                <BuildingSheetsPane
-                  key={openBuilding.file.id}
+                <LevelSheetsPane
+                  key={`${openBuilding.file.id}-level-sheets-${selectedLevel?.id ?? 'all'}`}
                   file={openBuilding.file}
                   update={building.update}
                   fileAccess={fileAccess}
                   engine={pdfEngine}
+                  levelId={selectedLevel?.id ?? null}
                   onOpenSheet={async (sheet, mode) => {
                     const result = await onOpenSheet(sheet, mode);
                     if (result.ok) onClose();
@@ -444,7 +453,25 @@ export function ManageBuildingsDialog({
                   sheetStatus={openBuilding.sheetStatus}
                   sheetSummary={openBuilding.sheetSummary}
                   onRefreshStatus={building.refreshSheetStatus}
+                  onNotice={onNotice}
+                />
+                {/* T11g replaces this pane */}
+                <BuildingSheetsPane
+                  key={openBuilding.file.id}
+                  file={openBuilding.file}
+                  update={building.update}
+                  fileAccess={fileAccess}
+                  engine={pdfEngine}
+                  onRefreshStatus={building.refreshSheetStatus}
                   onPendingCountChange={setNotPlaced}
+                  onNotice={onNotice}
+                />
+                {/* T11h replaces this pane */}
+                <BuildingSummariesPane
+                  key={`${openBuilding.file.id}-summaries`}
+                  hasSheets={openBuilding.file.sheets.length > 0}
+                  onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
+                  onDone={() => void building.refreshSheetStatus()}
                 />
               </div>
             </>

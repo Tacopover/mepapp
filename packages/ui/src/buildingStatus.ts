@@ -38,17 +38,37 @@ export function statusLabel(status: SheetStatus): string {
     case 'ok':
       return 'OK';
     case 'pdf-missing':
-      return 'PDF missing';
+      return 'Missing';
     case 'no-access':
-      return 'No access to the PDF';
+      return 'No access';
     case 'not-stamped':
-      return 'Not stamped yet. Open and save it in MepApp.';
+      return 'Not saved yet';
     case 'no-summary':
-      return 'No summary yet';
+      return 'No summary';
     case 'old-summary':
-      return 'Summary is out of date';
+      return 'Out of date';
     case 'copy-suspected':
-      return 'May be a copy of another file';
+      return 'May be a copy';
+  }
+}
+
+/** A longer plain sentence for the title or hint of a chip. Empty string when the chip word is enough. */
+export function statusHint(status: SheetStatus): string {
+  switch (status) {
+    case 'ok':
+      return '';
+    case 'pdf-missing':
+      return 'The PDF is not at its saved place. Use Relink.';
+    case 'no-access':
+      return 'MepApp has no access to the folder of this PDF.';
+    case 'not-stamped':
+      return 'Not saved yet. Save it in MepApp to link it.';
+    case 'no-summary':
+      return 'MepApp has not saved a summary for this sheet yet.';
+    case 'old-summary':
+      return 'The PDF changed after the summary was saved.';
+    case 'copy-suspected':
+      return 'This PDF may be a copy of another file.';
   }
 }
 
@@ -90,4 +110,12 @@ export function summaryText(info: SheetSummaryInfo | undefined): string {
   if (info === undefined) return 'No summary';
   const date = Number.isNaN(Date.parse(info.savedAt)) ? info.savedAt : info.savedAt.slice(0, 10);
   return info.scale === null ? `Summary saved ${date}, no scale` : `Summary saved ${date}, scale ${info.scale}`;
+}
+
+/** "N of M sheets have a summary". N = sheets whose id is a key of `summaries`. M = sheets.length. "1 of 1 sheet has a summary" for M = 1 (singular: "sheet has"). "No sheets" for M = 0. */
+export function summaryCountText(sheets: readonly BuildingSheet[], summaries: Record<string, unknown>): string {
+  const total = sheets.length;
+  if (total === 0) return 'No sheets';
+  const withSummary = sheets.filter((sheet) => Object.prototype.hasOwnProperty.call(summaries, sheet.id)).length;
+  return total === 1 ? `${withSummary} of 1 sheet has a summary` : `${withSummary} of ${total} sheets have a summary`;
 }

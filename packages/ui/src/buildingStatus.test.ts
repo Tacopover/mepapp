@@ -1,6 +1,16 @@
 import { calibrationFromScale, type BuildingFile, type BuildingSheet, type SheetSummary } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
-import { currentSheetLabel, sheetStatusOf, sheetSummaryInfo, statusLabel, statusTone, summaryText, type SheetStatus } from './buildingStatus.js';
+import {
+  currentSheetLabel,
+  sheetStatusOf,
+  sheetSummaryInfo,
+  statusHint,
+  statusLabel,
+  statusTone,
+  summaryCountText,
+  summaryText,
+  type SheetStatus,
+} from './buildingStatus.js';
 
 function sheet(overrides: Partial<BuildingSheet> = {}): BuildingSheet {
   return {
@@ -126,16 +136,58 @@ describe('statusLabel', () => {
   it('gives the label of every status', () => {
     const labels: Record<SheetStatus, string> = {
       ok: 'OK',
-      'pdf-missing': 'PDF missing',
-      'no-access': 'No access to the PDF',
-      'not-stamped': 'Not stamped yet. Open and save it in MepApp.',
-      'no-summary': 'No summary yet',
-      'old-summary': 'Summary is out of date',
-      'copy-suspected': 'May be a copy of another file',
+      'pdf-missing': 'Missing',
+      'no-access': 'No access',
+      'not-stamped': 'Not saved yet',
+      'no-summary': 'No summary',
+      'old-summary': 'Out of date',
+      'copy-suspected': 'May be a copy',
     };
     for (const [status, label] of Object.entries(labels)) {
       expect(statusLabel(status as SheetStatus)).toBe(label);
     }
+  });
+});
+
+describe('statusHint', () => {
+  it('gives the hint of every status', () => {
+    const hints: Record<SheetStatus, string> = {
+      ok: '',
+      'pdf-missing': 'The PDF is not at its saved place. Use Relink.',
+      'no-access': 'MepApp has no access to the folder of this PDF.',
+      'not-stamped': 'Not saved yet. Save it in MepApp to link it.',
+      'no-summary': 'MepApp has not saved a summary for this sheet yet.',
+      'old-summary': 'The PDF changed after the summary was saved.',
+      'copy-suspected': 'This PDF may be a copy of another file.',
+    };
+    for (const [status, hint] of Object.entries(hints)) {
+      expect(statusHint(status as SheetStatus)).toBe(hint);
+    }
+  });
+});
+
+describe('summaryCountText', () => {
+  const sheets = [sheet({ id: 's-1' }), sheet({ id: 's-2' }), sheet({ id: 's-3' })];
+
+  it('counts the sheets that have a summary entry', () => {
+    expect(summaryCountText(sheets, { 's-1': {}, 's-3': {} })).toBe('2 of 3 sheets have a summary');
+  });
+
+  it('gives 0 of M when no sheet has a summary', () => {
+    expect(summaryCountText(sheets, {})).toBe('0 of 3 sheets have a summary');
+  });
+
+  it('ignores summary keys of sheets that are not in the list', () => {
+    expect(summaryCountText(sheets, { 'gone': {} })).toBe('0 of 3 sheets have a summary');
+  });
+
+  it('uses the singular for one sheet', () => {
+    expect(summaryCountText([sheet({ id: 's-1' })], { 's-1': {} })).toBe('1 of 1 sheet has a summary');
+    expect(summaryCountText([sheet({ id: 's-1' })], {})).toBe('0 of 1 sheet has a summary');
+  });
+
+  it('gives No sheets for an empty list', () => {
+    expect(summaryCountText([], {})).toBe('No sheets');
   });
 });
 

@@ -104,6 +104,53 @@ export function newSheetPage(group: PdfGroup, pageIndex: number): NewSheetPage {
   };
 }
 
+/** pdfGroupKey of the sheet (projectUuid, location.path, location.fileName). */
+export function sheetPdfKey(sheet: BuildingSheet): string {
+  return pdfGroupKey(sheet.projectUuid, sheet.location.path, sheet.location.fileName);
+}
+
+export interface SheetGroup {
+  key: string;
+  sheets: BuildingSheet[];
+}
+
+/** Groups the sheets by sheetPdfKey. Groups in the order of their first sheet, sheets in the order given. */
+function groupSheetsByPdf(sheets: readonly BuildingSheet[]): SheetGroup[] {
+  const groups = new Map<string, SheetGroup>();
+  for (const sheet of sheets) {
+    const key = sheetPdfKey(sheet);
+    const group = groups.get(key);
+    if (group !== undefined) group.sheets.push(sheet);
+    else groups.set(key, { key, sheets: [sheet] });
+  }
+  return [...groups.values()];
+}
+
+/** Sheets of one level in file order, then grouped so that sheets of one PDF sit next to each other (groups in the order of their first sheet). levelId null = all sheets, ordered by level order of file.levels (sheets of an unknown level last), then grouped the same way. */
+export function sheetGroupsOfLevel(file: BuildingFile, levelId: string | null): SheetGroup[] {
+  if (levelId !== null) {
+    return groupSheetsByPdf(file.sheets.filter((sheet) => sheet.levelId === levelId));
+  }
+  const known = new Set(file.levels.map((level) => level.id));
+  const ordered = file.levels.flatMap((level) => file.sheets.filter((sheet) => sheet.levelId === level.id));
+  const unknown = file.sheets.filter((sheet) => !known.has(sheet.levelId));
+  return groupSheetsByPdf([...ordered, ...unknown]);
+}
+
+/** Sheets of the whole file that share sheetPdfKey with `sheet` (includes `sheet`). */
+export function sheetsOfSamePdf(file: BuildingFile, sheet: BuildingSheet): BuildingSheet[] {
+  const key = sheetPdfKey(sheet);
+  return file.sheets.filter((other) => sheetPdfKey(other) === key);
+}
+
+/** Pending PDFs for the add pane: groupPdfs(file, pending) filtered to pending groups, rows filtered to rows with sheet === null (unassigned pages), groups with no such rows dropped. Other fields unchanged (pageCount stays the full count). */
+export function waitingGroups(file: BuildingFile, pending: readonly PendingPdf[]): PdfGroup[] {
+  return groupPdfs(file, pending)
+    .filter((group) => group.pending)
+    .map((group) => ({ ...group, rows: group.rows.filter((row) => row.sheet === null) }))
+    .filter((group) => group.rows.length > 0);
+}
+
 /** True when two pending entries name the same PDF (same pdfGroupKey). */
 export function isSamePdf(a: PendingPdf, b: PendingPdf): boolean {
   return pdfGroupKey(a.projectUuid, a.path, a.fileName) === pdfGroupKey(b.projectUuid, b.path, b.fileName);

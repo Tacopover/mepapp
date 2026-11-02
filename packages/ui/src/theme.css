@@ -2030,14 +2030,23 @@
   border-bottom: 1px solid var(--line-soft, var(--line));
   padding: 4px 0;
 }
+.mep-sheet-page-row > b {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .mep-sheet-page-row > span {
   min-width: 64px;
 }
 .mep-sheet-page-row select {
-  flex: 1;
+  flex: none;
+  width: 130px;
   min-width: 0;
-  width: auto;
   margin-bottom: 0;
+}
+@media (max-width: 899px) {
+  .mep-sheet-page-row > b {
+    flex-basis: 100%;
+  }
 }
 .mep-sheet-status {
   display: inline-flex;

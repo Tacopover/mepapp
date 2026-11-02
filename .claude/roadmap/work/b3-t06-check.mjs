@@ -73,7 +73,7 @@ await openDialog();
 check((await statusOf('orig.pdf')) === 'ok', 'orig.pdf: file found, summary current -> ok', await statusOf('orig.pdf'));
 check((await statusOf('gone.pdf')) === 'pdf-missing', 'gone.pdf: PDF missing', await statusOf('gone.pdf'));
 check((await statusOf('nopath.pdf')) === 'not-stamped', 'nopath.pdf: not stamped', await statusOf('nopath.pdf'));
-check(/PDF missing/.test(await groupOf('gone.pdf').textContent()), 'the row says "PDF missing"');
+check(/Missing/.test(await groupOf('gone.pdf').textContent()), 'the row says "Missing"');
 await shot('B3-T06-missing');
 
 // An old summary: another size in the stored summary.

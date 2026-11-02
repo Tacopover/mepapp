@@ -12,7 +12,13 @@ const dlg = page.locator('.mep-modal');
 const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBuilding.read()).json));
 const groups = () => dlg.locator('[data-testid="pdf-group"]');
 const groupOf = (n) => groups().filter({ hasText: n });
-const statusOf = async (n) => (await groupOf(n).locator('[data-testid="sheet-status"]').first().getAttribute('data-status')) ?? '';
+const showLevel = async (name) => { await dlg.locator('[role="treeitem"][data-kind="level"]', { hasText: name }).click(); await idle(300); };
+const sheetGroups = () => dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]');
+const sheetGroupOf = (n) => sheetGroups().filter({ hasText: n });
+const statusOf = async (level, n) => {
+  await showLevel(level);
+  return (await sheetGroupOf(n).locator('[data-testid="sheet-status"]').first().getAttribute('data-status')) ?? '';
+};
 const b64 = (file) => readFileSync(FIX + file).toString('base64');
 async function putFile(name, b64text) {
   await page.evaluate(
@@ -116,7 +122,8 @@ await shot('B3-T10-3-sheets');
 s.sheets = s.sheets.map((x) => ({ ...x, location: { ...x.location, path: x.location.fileName } }));
 await page.evaluate((j) => window.__mepBuilding.load(j), JSON.stringify(s));
 await idle(800);
-check((await statusOf('ground.pdf')) === 'no-summary', 'step 3: stamped file without summary says no summary', await statusOf('ground.pdf'));
+const noSummary = await statusOf('Ground floor', 'ground.pdf');
+check(noSummary === 'no-summary', 'step 3: stamped file without summary says no summary', noSummary);
 
 // Step 4: rebuild summaries.
 await dlg.locator('[data-testid="rebuild-summaries"]').click();
@@ -125,12 +132,15 @@ await idle(800);
 const result = (await dlg.locator('[data-testid="rebuild-result"]').textContent()) ?? '';
 check(/Rebuilt 2 of 3 summaries/.test(result), 'step 4: 2 of 3 summaries rebuilt', result);
 check(/multi\.pdf/.test((await dlg.locator('[data-testid="rebuild-failures"]').textContent().catch(() => '')) ?? ''), 'step 4: multi.pdf is in the failure list');
-check((await statusOf('ground.pdf')) === 'ok' && (await statusOf('first.pdf')) === 'ok', 'step 4: both stamped files are ok', `${await statusOf('ground.pdf')} ${await statusOf('first.pdf')}`);
-check(/Summary saved \d{4}-\d{2}-\d{2}/.test(await groupOf('first.pdf').textContent()), 'step 4: the row shows the summary date');
+const okGround = await statusOf('Ground floor', 'ground.pdf');
+const okFirst = await statusOf('Level 1', 'first.pdf');
+check(okGround === 'ok' && okFirst === 'ok', 'step 4: both stamped files are ok', `${okGround} ${okFirst}`);
+check(/Summary saved \d{4}-\d{2}-\d{2}/.test(await sheetGroupOf('first.pdf').textContent()), 'step 4: the row shows the summary date');
 await shot('B3-T10-4-rebuilt');
 
 // Step 5: open a sheet.
-await groupOf('first.pdf').locator('[data-testid="open-sheet"]').click();
+await showLevel('Level 1');
+await sheetGroupOf('first.pdf').locator('[data-testid="open-sheet"]').click();
 await t.until(async () => (await dlg.count()) === 0, 'dialog closes after open', 60000);
 await idle(1500);
 const headerLabel = await page.locator('[data-testid="current-sheet-header"]').textContent().catch(() => '');
@@ -150,14 +160,15 @@ await page.evaluate(async () => {
 await openDialog();
 await dlg.locator('[data-testid="refresh-status"]').click();
 await idle(800);
-check((await statusOf('first.pdf')) === 'pdf-missing', 'step 6: the deleted PDF shows "PDF missing"', await statusOf('first.pdf'));
+const missing = await statusOf('Level 1', 'first.pdf');
+check(missing === 'pdf-missing', 'step 6: the deleted PDF shows "PDF missing"', missing);
 await shot('B3-T10-6-missing');
-await groupOf('first.pdf').locator('[data-testid="relink-pdf"]').click();
+await sheetGroupOf('first.pdf').locator('[data-testid="relink-pdf"]').click();
 await idle(1500);
 s = await stored();
 check(s.sheets.some((x) => x.location.fileName === 'first2.pdf'), 'step 6: relink stored the new file name', JSON.stringify(s.sheets.map((x) => x.location.fileName)));
-await until(async () => (await statusOf('first2.pdf')) !== 'pdf-missing', 'status leaves pdf-missing', 15000).catch(() => {});
-check((await groupOf('first2.pdf').locator('[data-testid="relink-pdf"]').count()) === 0, 'step 6: no Relink button after the relink');
+await until(async () => (await statusOf('Level 1', 'first2.pdf')) !== 'pdf-missing', 'status leaves pdf-missing', 15000).catch(() => {});
+check((await sheetGroupOf('first2.pdf').locator('[data-testid="relink-pdf"]').count()) === 0, 'step 6: no Relink button after the relink');
 await shot('B3-T10-6-relinked');
 
 // Step 7: close the building, open it again from the recent list.

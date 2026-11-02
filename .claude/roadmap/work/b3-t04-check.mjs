@@ -10,6 +10,8 @@ await t.start();
 const dlg = page.locator('.mep-modal');
 const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBuilding.read()).json));
 const groups = () => dlg.locator('[data-testid="pdf-group"]');
+const sheetGroups = () => dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]');
+const showLevel = async (name) => { await dlg.locator('[role="treeitem"][data-kind="level"]', { hasText: name }).click(); await idle(300); };
 
 async function putFile(name, bytesB64) {
   await page.evaluate(
@@ -88,7 +90,7 @@ check(lvl(byName('ground.pdf')?.levelId) === 'Ground floor', 'ground.pdf sheet i
 check(lvl(byName('first.pdf')?.levelId) === 'Level 1', 'first.pdf sheet is on Level 1');
 check(byName('ground.pdf')?.pageIndex === 0 && byName('ground.pdf')?.displayName === 'ground.pdf', 'sheet page index 0 and display name', JSON.stringify(byName('ground.pdf')));
 check(/2 sheets/.test(await dlg.textContent()), 'dialog says 2 sheets');
-check(/2 assigned/.test(await dlg.locator('[data-testid="sheets-totals"]').textContent()), 'totals say 2 assigned');
+check((await dlg.locator('[data-testid="sheets-totals"]').count()) === 0, 'no totals line once every waiting PDF is assigned');
 await shot('B3-T04-assign');
 
 // The level with a sheet cannot be deleted any more.
@@ -108,20 +110,23 @@ s = await stored();
 const multiSheets = s.sheets.filter((x) => x.location.fileName === 'multi.pdf').sort((a, b) => a.pageIndex - b.pageIndex);
 check(multiSheets.length === 2 && multiSheets[0].pageIndex === 0 && multiSheets[1].pageIndex === 1, 'two multi-page sheets, page indexes 0 and 1', JSON.stringify(multiSheets.map((x) => x.pageIndex)));
 check(multiSheets[1].displayName === 'multi.pdf p2', 'display name has the page', multiSheets[1].displayName);
-check(/5 assigned|4 assigned/.test(await dlg.locator('[data-testid="sheets-totals"]').textContent()), 'totals count', await dlg.locator('[data-testid="sheets-totals"]').textContent());
+check(/2 assigned/.test(await dlg.locator('[data-testid="sheets-totals"]').textContent()), 'totals count', await dlg.locator('[data-testid="sheets-totals"]').textContent());
 
 // Move page 2 to Ground floor (moveSheet keeps the sheet id).
 const id2 = multiSheets[1].id;
-await multi.locator('select[aria-label="Level for multi.pdf page 2"]').selectOption({ label: 'Ground floor' });
+await showLevel('Level 1');
+await sheetGroups().filter({ hasText: 'multi.pdf' }).locator('select[aria-label="Move multi.pdf page 2 to level"]').selectOption({ label: 'Ground floor' });
 await idle(300);
 s = await stored();
 const moved = s.sheets.find((x) => x.id === id2);
 check(moved && lvl(moved.levelId) === 'Ground floor', 'page 2 moved to Ground floor with the same sheet id');
-// Not assigned removes the sheet.
-await multi.locator('select[aria-label="Level for multi.pdf page 2"]').selectOption({ label: 'Not assigned' });
+// Remove removes the sheet; its page waits in the add pane again.
+await showLevel('Ground floor');
+await sheetGroups().filter({ hasText: 'multi.pdf' }).locator('button[aria-label="Remove multi.pdf page 2"]').click();
 await idle(300);
 s = await stored();
-check(!s.sheets.some((x) => x.id === id2), 'Not assigned removes the sheet');
+check(!s.sheets.some((x) => x.id === id2), 'Remove removes the sheet');
+check((await multi.locator('select[aria-label="Level for multi.pdf page 2"]').count()) === 1, 'removed page 2 waits in the add pane');
 await shot('B3-T04-multi');
 
 // A file that is not a PDF: error notice, no group added.
@@ -140,17 +145,23 @@ await idle(300);
 await menu('Manage Buildings…');
 await dlg.waitFor({ state: 'visible', timeout: 8000 });
 await idle(300);
-const reopened = await groups().count();
+await items('building').first().click();
+await idle(300);
+const reopened = await sheetGroups().count();
 check(reopened === 3, 'after reopening: 3 groups from the stored sheets', String(reopened));
-check((await dlg.locator('select[aria-label="Level for multi.pdf page 1"]').inputValue()) !== '', 'multi.pdf page 1 is still assigned');
+check((await dlg.locator('select[aria-label="Move multi.pdf page 1 to level"]').count()) === 1, 'multi.pdf page 1 is still assigned');
 check((await dlg.locator('select[aria-label="Level for multi.pdf page 3"]').count()) === 0, 'unassigned page 3 is not listed after reopening');
 await shot('B3-T04-reopened');
 
-// Remove sheets: clears every sheet of one PDF.
+// Remove: one button for each sheet row. Clears every sheet of one PDF.
 const countBefore = (await stored()).sheets.length;
-await groups().filter({ hasText: "multi.pdf" }).locator("button", { hasText: /^Remove sheets$/ }).click();
-await idle(400);
-check((await stored()).sheets.length === countBefore - 1 && !(await stored()).sheets.some((x) => x.location.fileName === "multi.pdf"), "Remove sheets clears the PDF");
-check(/assigned page/.test(await dlg.textContent()), "sheets-only group says assigned pages");
+const multiRemove = dlg.locator('button[aria-label^="Remove multi.pdf page"]');
+const multiRows = await multiRemove.count();
+for (let i = 0; i < multiRows; i += 1) {
+  await multiRemove.first().click();
+  await idle(400);
+}
+check((await stored()).sheets.length === countBefore - multiRows && !(await stored()).sheets.some((x) => x.location.fileName === 'multi.pdf'), 'Remove on each row clears the PDF');
+check((await sheetGroups().filter({ hasText: 'multi.pdf' }).count()) === 0, 'no multi.pdf group left after the removal');
 
 await t.finish();

@@ -27,6 +27,10 @@ await idle(500);
 const dlg = page.locator('.mep-modal');
 const groupOf = (n) => dlg.locator('[data-testid="pdf-group"]').filter({ hasText: n });
 const summaryOf = async (n) => ((await groupOf(n).locator('[data-testid="sheet-summary"]').first().textContent().catch(() => '')) ?? '').trim();
+const showLevel = async (name) => {
+  await dlg.locator('[role="treeitem"][data-kind="level"]', { hasText: name }).click();
+  await idle(300);
+};
 async function showDialog() {
   await menu('Manage Buildings…');
   await dlg.waitFor({ state: 'visible', timeout: 8000 });
@@ -45,9 +49,11 @@ async function openSaved(name) {
 }
 
 await showDialog();
+await showLevel('Level 0');
 const gt = (await groupOf('ground.pdf').textContent()) ?? '';
-const ft = (await groupOf('first.pdf').textContent()) ?? '';
 check(/No summary/.test(gt) && (await summaryOf('ground.pdf')) === '', 'before: ground.pdf says "No summary" and has no summary text', gt);
+await showLevel('Level 1');
+const ft = (await groupOf('first.pdf').textContent()) ?? '';
 check(/No summary/.test(ft) && (await summaryOf('first.pdf')) === '', 'before: first.pdf says "No summary" and has no summary text', ft);
 await shot('B3-T11b-before');
 await closeDialog();
@@ -62,7 +68,9 @@ const dirty = await page.evaluate(() => window.__mepSketchScene.getDocuments().m
 check(dirty.every((x) => !x), 'opening did not make any document dirty', JSON.stringify(dirty));
 
 await showDialog();
+await showLevel('Level 0');
 const g = await summaryOf('ground.pdf');
+await showLevel('Level 1');
 const f = await summaryOf('first.pdf');
 check(/^Summary saved \d{4}-\d{2}-\d{2}/.test(g), 'after: ground.pdf row says "Summary saved <date>" with no Rebuild', g);
 check(/^Summary saved \d{4}-\d{2}-\d{2}/.test(f), 'after: first.pdf row says "Summary saved <date>" with no Rebuild', f);
