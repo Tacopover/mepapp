@@ -1697,6 +1697,39 @@
   font-size: 12px;
   color: var(--ink);
 }
+.mep-buildings-status-line {
+  flex: none;
+  min-height: 24px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+}
+.mep-buildings-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  animation: mep-status-fade 6s ease-in forwards;
+}
+.mep-buildings-status--error {
+  color: #b3261e;
+  animation-duration: 12s;
+}
+@keyframes mep-status-fade {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.mep-buildings-close-ask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .mep-buildings-message button {
   margin-left: 8px;
 }

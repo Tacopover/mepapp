@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { addLevel, type BuildingFile } from '@mepapp/core';
 import { defaultLevelName, nextLevelElevation } from '../buildingLevels.js';
 import { addOpenDocumentPages } from '../openDocumentAdd.js';
@@ -11,6 +11,8 @@ export interface OpenDocumentsPaneProps {
   /** The selected level. null (building node): the first level is the target. */
   levelId: string | null;
   onNotice: (text: string, error: boolean) => void;
+  /** The action row to add PDFs from disk. */
+  children?: ReactNode;
 }
 
 /** After an add the lists above grow and this section moves down. A second click inside this time would hit another row. */
@@ -30,7 +32,7 @@ function sheetsText(count: number): string {
  * Lists the documents that are open in the viewer. One click adds the pages of a document to the selected level.
  * The row state is read again inside the building update, so a second click adds nothing twice.
  */
-export function OpenDocumentsPane({ file, update, rows, levelId, onNotice }: OpenDocumentsPaneProps) {
+export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, children }: OpenDocumentsPaneProps) {
   const lastAddAt = useRef(0);
   const target = file.levels.find((level) => level.id === levelId) ?? file.levels[0] ?? null;
 
@@ -78,6 +80,7 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice }: Ope
     return (
       <div className="mep-section" data-testid="open-documents">
         <h4>Open in the viewer</h4>
+        {children}
         {(
           <div className="mep-buildings-actions">
             <p className="mep-hint" data-testid="open-doc-no-level">
@@ -101,6 +104,7 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice }: Ope
   return (
     <div className="mep-section" data-testid="open-documents">
       <h4>Open in the viewer</h4>
+      {children}
       {rows.length === 0 && <p className="mep-hint">No documents are open in the viewer.</p>}
       {rows.length > 1 && (
         <div className="mep-buildings-actions">
@@ -160,14 +164,14 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice }: Ope
               {otherLevels.length > 0 && (
                 <select
                   data-testid="open-doc-level"
-                  aria-label={`Add ${row.displayName} to another level`}
+                  aria-label={`${unplaced === 0 ? 'Move' : 'Add'} ${row.displayName} to another level`}
                   value=""
                   onChange={(event) => {
                     const id = event.target.value;
                     if (id !== '') void put(row, id, allPages(row), !multi || unplaced === 0);
                   }}
                 >
-                  <option value="">Other level…</option>
+                  <option value="">{unplaced === 0 ? 'Move to…' : 'Add to another level…'}</option>
                   {otherLevels.map((level) => (
                     <option key={level.id} value={level.id}>
                       {level.name}

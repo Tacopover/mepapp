@@ -126,10 +126,13 @@ function groupSheetsByPdf(sheets: readonly BuildingSheet[]): SheetGroup[] {
   return [...groups.values()];
 }
 
-/** Sheets of one level in file order, then grouped so that sheets of one PDF sit next to each other (groups in the order of their first sheet). levelId null = all sheets, ordered by level order of file.levels (sheets of an unknown level last), then grouped the same way. */
+/** Sheets of one level grouped so that sheets of one PDF sit next to each other (groups in the order of their first sheet, sheets of a group by page). levelId null = all sheets, ordered by level order of file.levels (sheets of an unknown level last), then grouped the same way. */
 export function sheetGroupsOfLevel(file: BuildingFile, levelId: string | null): SheetGroup[] {
   if (levelId !== null) {
-    return groupSheetsByPdf(file.sheets.filter((sheet) => sheet.levelId === levelId));
+    return groupSheetsByPdf(file.sheets.filter((sheet) => sheet.levelId === levelId)).map((group) => ({
+      ...group,
+      sheets: [...group.sheets].sort((a, b) => a.pageIndex - b.pageIndex),
+    }));
   }
   const known = new Set(file.levels.map((level) => level.id));
   const ordered = file.levels.flatMap((level) => file.sheets.filter((sheet) => sheet.levelId === level.id));

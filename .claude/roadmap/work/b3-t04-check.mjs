@@ -39,8 +39,8 @@ await nameInput.fill('Tower');
 await nameInput.press('Enter');
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Tower' }).waitFor({ timeout: 8000 });
 
-check((await dlg.locator('[data-testid="sheets-pane"]').count()) === 1, 'sheets pane is shown');
-check(/No PDFs yet/.test(await dlg.textContent()), 'empty hint shown');
+check((await dlg.locator('[data-testid="add-actions"]').count()) === 1, 'add action row is shown');
+check((await dlg.locator('[data-testid="sheets-pane"]').count()) === 0, 'no Not placed pane before an add');
 
 // Two levels by typing.
 const items = (kind) => dlg.locator(`[role="treeitem"][data-kind="${kind}"]`);
@@ -124,6 +124,8 @@ check(moved && lvl(moved.levelId) === 'Ground floor', 'page 2 moved to Ground fl
 await showLevel('Ground floor');
 await sheetGroups().filter({ hasText: 'multi.pdf' }).locator('button[aria-label="Remove multi.pdf page 2"]').click();
 await idle(300);
+await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).click();
+await idle(300);
 s = await stored();
 check(!s.sheets.some((x) => x.id === id2), 'Remove removes the sheet');
 check((await multi.locator('select[aria-label="Level for multi.pdf page 2"]').count()) === 1, 'removed page 2 waits in the add pane');
@@ -141,6 +143,8 @@ t.errors.length = 0; // the MuPDF messages of the deliberate non-PDF step are ex
 
 // Close and reopen: pending pages are gone, assigned sheets stay as groups.
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+await idle(300);
+await dlg.locator('[data-testid="close-anyway"]').click();
 await idle(300);
 await menu('Manage Buildings…');
 await dlg.waitFor({ state: 'visible', timeout: 8000 });

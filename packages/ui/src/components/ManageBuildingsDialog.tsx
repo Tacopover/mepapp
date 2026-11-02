@@ -18,10 +18,11 @@ import {
 } from '../buildingTree.js';
 import { BuildingLevelsPane } from './BuildingLevelsPane.js';
 import { BuildingMenu } from './BuildingMenu.js';
-import { BuildingSheetsPane } from './BuildingSheetsPane.js';
+import { BuildingSheetsPane, usePendingPdfs } from './BuildingSheetsPane.js';
 import { BuildingSummariesPane, type BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 import { BuildingTree } from './BuildingTree.js';
 import { LevelSheetsPane } from './LevelSheetsPane.js';
+import { NotPlacedPane } from './NotPlacedPane.js';
 import { OpenDocumentsPane } from './OpenDocumentsPane.js';
 import type { OpenDocumentRow } from '../openDocumentsView.js';
 
@@ -29,6 +30,10 @@ import type { OpenDocumentRow } from '../openDocumentsView.js';
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
 
 const NARROW_QUERY = '(max-width: 899px)';
+
+/** The time a notice stays in the status line. An error stays longer. */
+const NOTICE_MS = 6000;
+const NOTICE_ERROR_MS = 12000;
 
 function importResultText(total: number, result: { saved: number; cancelled: number; failed: string[] }): string {
   return (
@@ -100,17 +105,20 @@ export function ManageBuildingsDialog({
   const [name, setName] = useState('');
   const [oldPending, setOldPending] = useState(() => pendingOldBuildings(loadBuildings(), loadImportedOldIds()));
   const [importResult, setImportResult] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; error: boolean; id: number } | null>(null);
+  const noticeCount = useRef(0);
+  const [closeAsk, setCloseAsk] = useState(false);
   const openedFileId = building.building?.file.id ?? null;
   const openedIdRef = useRef<string | null>(openedFileId);
   const initialKey = building.building ? initialSelection(building.building.file, activeSheetLevelId ?? null) : '';
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const [notPlaced, setNotPlaced] = useState(0);
   const [selectedKey, setSelectedKey] = useState(initialKey);
   const [focusKey, setFocusKey] = useState(initialKey);
   const [focusNameLevelId, setFocusNameLevelId] = useState<string | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
   const narrow = useNarrow();
+  const pendingPdfs = usePendingPdfs(building.building?.file ?? null);
+  const notPlaced = pendingPdfs.waitingPages;
 
   useEffect(() => {
     if (openedFileId === openedIdRef.current) return;
@@ -119,12 +127,32 @@ export function ManageBuildingsDialog({
     setSelectedKey(key);
     setFocusKey(key);
     setCollapsed(new Set());
-    setNotPlaced(0);
     setNotice(null);
+    setCloseAsk(false);
   }, [openedFileId]);
 
+  useEffect(() => {
+    if (notice === null) return;
+    const timer = window.setTimeout(() => setNotice(null), notice.error ? NOTICE_ERROR_MS : NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice?.id]);
+
+  useEffect(() => {
+    if (notPlaced === 0) setCloseAsk(false);
+  }, [notPlaced]);
+
   function onNotice(text: string, error: boolean) {
-    setNotice({ text, error });
+    noticeCount.current += 1;
+    setNotice({ text, error, id: noticeCount.current });
+  }
+
+  /** Close button, Escape: with pages that have no level the dialog asks first. A second Escape answers "Keep working". */
+  function requestClose() {
+    if (notPlaced === 0) {
+      onClose();
+      return;
+    }
+    setCloseAsk((ask) => !ask);
   }
 
   function handleCreate() {
@@ -256,14 +284,26 @@ export function ManageBuildingsDialog({
   return (
     <Dialog
       title="Manage Buildings"
-      onClose={onClose}
+      onClose={requestClose}
       closeOnBackdropClick={false}
       className="mep-modal--buildings"
       header={header}
       actions={
-        <button type="button" onClick={onClose}>
-          Close
-        </button>
+        closeAsk && notPlaced > 0 ? (
+          <div className="mep-buildings-close-ask" role="alert" data-testid="close-ask">
+            <span>{countLabel(notPlaced, 'page')} {notPlaced === 1 ? 'is' : 'are'} not placed. Close anyway?</span>
+            <button type="button" data-testid="close-anyway" onClick={onClose}>
+              Close anyway
+            </button>
+            <button type="button" data-testid="keep-working" autoFocus onClick={() => setCloseAsk(false)}>
+              Keep working
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={requestClose}>
+            Close
+          </button>
+        )
       }
     >
       <div className="mep-buildings-layout">
@@ -400,14 +440,14 @@ export function ManageBuildingsDialog({
                 aria-labelledby="mep-buildings-tab-levels"
                 className="mep-buildings-panel"
               >
-                {notice !== null && (
-                  <p
-                    className={notice.error ? 'mep-hint mep-buildings-message' : 'mep-hint mep-buildings-notice'}
-                    role="status"
-                    data-testid="sheets-notice"
-                  >
-                    {notice.text} <button type="button" onClick={() => setNotice(null)}>Dismiss</button>
-                  </p>
+                {selected === NOT_PLACED_KEY && (
+                  <NotPlacedPane
+                    file={openBuilding.file}
+                    update={building.update}
+                    waiting={pendingPdfs.waiting}
+                    totals={pendingPdfs.totals}
+                    onRemove={pendingPdfs.remove}
+                  />
                 )}
                 <div className="mep-section" data-testid="selection-summary">
                   {selectedLevel !== null ? (
@@ -432,7 +472,6 @@ export function ManageBuildingsDialog({
                       )}
                     </>
                   )}
-                  {selected === NOT_PLACED_KEY && <p className="mep-hint">Pages without a level are kept only while this dialog is open.</p>}
                 </div>
                 <LevelSheetsPane
                   key={`${openBuilding.file.id}-level-sheets-${selectedLevel?.id ?? 'all'}`}
@@ -457,7 +496,20 @@ export function ManageBuildingsDialog({
                   rows={openDocuments}
                   levelId={selectedLevel?.id ?? null}
                   onNotice={onNotice}
-                />
+                >
+                  <BuildingSheetsPane
+                    key={openBuilding.file.id}
+                    fileAccess={fileAccess}
+                    engine={pdfEngine}
+                    pendingPdfs={pendingPdfs}
+                    onRefreshStatus={building.refreshSheetStatus}
+                    onAdded={() => {
+                      setSelectedKey(NOT_PLACED_KEY);
+                      setFocusKey(NOT_PLACED_KEY);
+                    }}
+                    onNotice={onNotice}
+                  />
+                </OpenDocumentsPane>
                 <BuildingLevelsPane
                   key={`${openBuilding.file.id}-levels`}
                   file={openBuilding.file}
@@ -474,17 +526,18 @@ export function ManageBuildingsDialog({
                   onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
                   onDone={() => void building.refreshSheetStatus()}
                 />
-                {/* T11g replaces this pane */}
-                <BuildingSheetsPane
-                  key={openBuilding.file.id}
-                  file={openBuilding.file}
-                  update={building.update}
-                  fileAccess={fileAccess}
-                  engine={pdfEngine}
-                  onRefreshStatus={building.refreshSheetStatus}
-                  onPendingCountChange={setNotPlaced}
-                  onNotice={onNotice}
-                />
+              </div>
+              <div className="mep-buildings-status-line">
+                {notice !== null && (
+                  <p
+                    key={notice.id}
+                    className={notice.error ? 'mep-buildings-status mep-buildings-status--error' : 'mep-buildings-status'}
+                    role="status"
+                    data-testid="sheets-notice"
+                  >
+                    {notice.text}
+                  </p>
+                )}
               </div>
             </>
           )}

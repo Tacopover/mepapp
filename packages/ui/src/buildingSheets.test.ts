@@ -263,6 +263,15 @@ describe('sheetGroupsOfLevel', () => {
     expect(groups[0]!.sheets.map((sheet) => sheet.id)).toEqual(['s1', 's3']);
   });
 
+  it('orders the sheets of a PDF on a level by page, not by the order they were added', () => {
+    const file = twoLevels([
+      { ...sheetOf('s1', 2, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' },
+      { ...sheetOf('s2', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' },
+      { ...sheetOf('s3', 1, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' },
+    ]);
+    expect(sheetGroupsOfLevel(file, 'L1')[0]!.sheets.map((sheet) => sheet.id)).toEqual(['s2', 's3', 's1']);
+  });
+
   it('gives all sheets for a null level, in the level order of the file', () => {
     const file = twoLevels([
       { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L2' },

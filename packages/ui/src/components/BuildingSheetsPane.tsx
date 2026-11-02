@@ -1,58 +1,39 @@
 import { useEffect, useState } from 'react';
-import { addSheets, type BuildingFile } from '@mepapp/core';
+import type { BuildingFile } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { countLabel } from '../buildingLevels.js';
 import { BUILDING_PDF_TYPES, joinFolderPath, pathOfTarget, readPdfInfo } from '../buildingPdfInfo.js';
-import {
-  groupPdfs,
-  isSamePdf,
-  newSheetPage,
-  pdfGroupKey,
-  pdfTotals,
-  waitingGroups,
-  type PageRow,
-  type PdfGroup,
-  type PendingPdf,
-} from '../buildingSheets.js';
+import { groupPdfs, isSamePdf, pdfGroupKey, pdfTotals, waitingGroups, type PdfGroup, type PendingPdf } from '../buildingSheets.js';
 
-export interface BuildingSheetsPaneProps {
-  file: BuildingFile;
-  update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
-  fileAccess: FileAccess;
-  engine: PdfEngine | undefined;
-  onRefreshStatus: () => void;
-  onPendingCountChange?: (count: number) => void;
-  onNotice: (text: string, error: boolean) => void;
+export interface PendingPdfsState {
+  pending: PendingPdf[];
+  /** The pending PDFs that still have pages with no level, rows filtered to those pages. */
+  waiting: PdfGroup[];
+  /** The pages with no level over all waiting PDFs. */
+  waitingPages: number;
+  /** PDFs, pages and assigned pages over all added PDFs, also the pages that already have a level. */
+  totals: { pdfs: number; pages: number; assigned: number };
+  add: (entries: PendingPdf[]) => void;
+  remove: (key: string) => void;
 }
 
 /**
- * Adds PDFs to the list of this dialog and picks a level for each page that has no level yet.
- * Every level choice goes through update, which writes the building file. Added PDFs that have no level yet stay in a list in this pane only.
+ * The PDFs that the user added from disk and that wait for a level. They live in this dialog only, not in the building file.
+ * A PDF leaves the list when every page of it is a sheet. The list is empty again when another building file opens.
  */
-export function BuildingSheetsPane({
-  file,
-  update,
-  fileAccess,
-  engine,
-  onRefreshStatus,
-  onPendingCountChange,
-  onNotice,
-}: BuildingSheetsPaneProps) {
+export function usePendingPdfs(file: BuildingFile | null): PendingPdfsState {
   const [pending, setPending] = useState<PendingPdf[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const fileId = file?.id ?? null;
 
   useEffect(() => {
-    onRefreshStatus();
-  }, []);
+    setPending([]);
+  }, [fileId]);
 
-  const groups = groupPdfs(file, pending);
-  const waiting = waitingGroups(file, pending);
+  const groups = file === null ? [] : groupPdfs(file, pending);
+  const waiting = file === null ? [] : waitingGroups(file, pending);
   const waitingPages = waiting.reduce((n, group) => n + group.rows.length, 0);
-  useEffect(() => {
-    onPendingCountChange?.(waitingPages);
-  }, [waitingPages]);
+
   useEffect(() => {
     const full = new Set(groups.filter((group) => group.pending && !group.rows.some((row) => row.sheet === null)).map((group) => group.key));
     if (full.size === 0) return;
@@ -61,7 +42,39 @@ export function BuildingSheetsPane({
       return next.length === list.length ? list : next;
     });
   }, [file, pending]);
-  const totals = pdfTotals(groups.filter((group) => group.pending));
+
+  return {
+    pending,
+    waiting,
+    waitingPages,
+    totals: pdfTotals(groups.filter((group) => group.pending)),
+    add: (entries) => setPending((list) => [...list, ...entries.filter((entry) => !list.some((other) => isSamePdf(other, entry)))]),
+    remove: (key) => setPending((list) => list.filter((pdf) => pdfGroupKey(pdf.projectUuid, pdf.path, pdf.fileName) !== key)),
+  };
+}
+
+export interface BuildingSheetsPaneProps {
+  fileAccess: FileAccess;
+  engine: PdfEngine | undefined;
+  pendingPdfs: PendingPdfsState;
+  onRefreshStatus: () => void;
+  /** Called after at least one PDF joined the not placed list. */
+  onAdded?: () => void;
+  onNotice: (text: string, error: boolean) => void;
+}
+
+/**
+ * The action row that adds PDFs from disk: "Add PDFs…" (one file at a time) and "Add folder…" (desktop only).
+ * The added PDFs wait in the Not placed list (NotPlacedPane).
+ */
+export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshStatus, onAdded, onNotice }: BuildingSheetsPaneProps) {
+  const [busy, setBusy] = useState(false);
+  const { pending } = pendingPdfs;
+
+  useEffect(() => {
+    onRefreshStatus();
+  }, []);
+
   const noEngineReason = engine === undefined ? 'PDF reading is not available in this version of the app.' : undefined;
   const disabled = busy || engine === undefined;
 
@@ -82,8 +95,9 @@ export function BuildingSheetsPane({
         notify(`${opened.file.name} is already in the list.`);
         return;
       }
-      setPending((list) => [...list, entry]);
-      notify(`Added ${opened.file.name} (${countLabel(entry.pageCount, 'page')}).`);
+      pendingPdfs.add([entry]);
+      onAdded?.();
+      notify(`Added ${opened.file.name} (${countLabel(entry.pageCount, 'page')}). Place its pages on a level.`);
     } catch (err) {
       notify(`Could not read ${opened.file.name}: ${(err as Error).message}`);
     } finally {
@@ -122,7 +136,10 @@ export function BuildingSheetsPane({
         }
         added.push(entry);
       }
-      setPending((list) => [...list, ...added]);
+      if (added.length > 0) {
+        pendingPdfs.add(added);
+        onAdded?.();
+      }
       const parts = [`Added ${countLabel(added.length, 'PDF')} from ${picked.name}.`];
       if (skipped > 0) parts.push(`${skipped} already in the list.`);
       if (failed.length > 0) parts.push(`Could not read ${failed.join(', ')}.`);
@@ -134,92 +151,24 @@ export function BuildingSheetsPane({
     }
   }
 
-  function removePending(group: PdfGroup) {
-    setPending((list) => list.filter((pdf) => pdfGroupKey(pdf.projectUuid, pdf.path, pdf.fileName) !== group.key));
-  }
-
-  function chooseLevel(group: PdfGroup, row: PageRow, levelId: string) {
-    if (levelId === '') return;
-    void update((f) => {
-      const result = addSheets(f, levelId, [newSheetPage(group, row.pageIndex)]);
-      return result.ok ? result.file : f;
-    });
-  }
-
   return (
-    <div className="mep-section" data-testid="sheets-pane">
-      <h4>Add PDFs</h4>
-      <div className="mep-buildings-actions">
-        <button type="button" disabled={disabled} title={noEngineReason} onClick={() => void addFile()}>
-          Add PDFs…
+    <div className="mep-buildings-actions" data-testid="add-actions">
+      <button type="button" disabled={disabled} title={noEngineReason} onClick={() => void addFile()}>
+        Add PDFs…
+      </button>
+      {fileAccess.capabilities.folders && (
+        <button type="button" disabled={disabled} title={noEngineReason} onClick={() => void addFolder()}>
+          Add folder…
         </button>
-        {fileAccess.capabilities.folders && (
-          <button type="button" disabled={disabled} title={noEngineReason} onClick={() => void addFolder()}>
-            Add folder…
-          </button>
-        )}
-        <button type="button" data-testid="refresh-status" onClick={() => onRefreshStatus()}>
-          Check files again
-        </button>
-      </div>
-      <p className="mep-hint">Pages without a level are kept only while this dialog is open.</p>
-      {busy && <p className="mep-hint" data-testid="sheets-busy">Reading PDFs…</p>}
-      {waiting.length === 0 && <p className="mep-hint">No PDFs yet. Add PDFs, then pick a level for each page.</p>}
-      {waiting.length > 0 && (
-        <p className="mep-hint" data-testid="sheets-totals">
-          {countLabel(totals.pdfs, 'PDF')}, {countLabel(totals.pages, 'page')}, {totals.assigned} assigned
-        </p>
       )}
-      {waiting.length > 0 && file.levels.length === 0 && (
-        <p className="mep-hint">Add a level first. Then you can pick a level for each page.</p>
+      <button type="button" data-testid="refresh-status" onClick={() => onRefreshStatus()}>
+        Check files again
+      </button>
+      {busy && (
+        <span className="mep-hint" data-testid="sheets-busy">
+          Reading PDFs…
+        </span>
       )}
-      {waiting.map((group) => {
-        const showPages = !group.collapsedByDefault || expanded[group.key] === true;
-        return (
-          <div key={group.key} className="mep-sheets-group" data-testid="pdf-group">
-            <div className="mep-buildings-actions">
-              <b>{group.fileName}</b>
-              {group.path !== undefined && <span className="mep-hint">{group.path}</span>}
-              <span className="mep-hint">{countLabel(group.pageCount, 'page')}</span>
-              <button
-                type="button"
-                title="Forget this PDF in this dialog. The file on disk does not change."
-                onClick={() => removePending(group)}
-              >
-                Remove from list
-              </button>
-              {group.collapsedByDefault && (
-                <button
-                  type="button"
-                  aria-expanded={showPages}
-                  onClick={() => setExpanded((map) => ({ ...map, [group.key]: !(map[group.key] === true) }))}
-                >
-                  {showPages ? 'Hide pages' : 'Show pages'}
-                </button>
-              )}
-            </div>
-            {showPages &&
-              group.rows.map((row) => (
-                <div key={`page-${row.pageIndex}`} className="mep-elem-row mep-sheet-page-row" data-testid="page-row">
-                  <span>Page {row.pageIndex + 1}</span>
-                  <select
-                    aria-label={`Level for ${group.fileName} page ${row.pageIndex + 1}`}
-                    value=""
-                    disabled={file.levels.length === 0}
-                    onChange={(event) => chooseLevel(group, row, event.target.value)}
-                  >
-                    <option value="">Not assigned</option>
-                    {file.levels.map((level) => (
-                      <option key={level.id} value={level.id}>
-                        {level.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-          </div>
-        );
-      })}
     </div>
   );
 }
