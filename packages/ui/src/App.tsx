@@ -1982,7 +1982,12 @@ export function MepSketchApp({
       )}
 
       {manageBuildingsOpen && (
-        <ManageBuildingsDialog building={buildingHook} onClose={() => setManageBuildingsOpen(false)} />
+        <ManageBuildingsDialog
+          building={buildingHook}
+          onClose={() => setManageBuildingsOpen(false)}
+          fileAccess={fileAccess}
+          pdfEngine={pdfEngine}
+        />
       )}
 
       {quantitiesScopeDialog && (

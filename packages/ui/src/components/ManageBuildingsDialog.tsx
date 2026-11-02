@@ -1,19 +1,24 @@
 import { useState } from 'react';
+import type { PdfEngine } from '@mepapp/pdf-engine';
+import type { FileAccess } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import type { UseBuilding } from '../useBuilding.js';
 import { countLabel } from '../buildingLevels.js';
 import { BuildingLevelsPane } from './BuildingLevelsPane.js';
+import { BuildingSheetsPane } from './BuildingSheetsPane.js';
 
 export interface ManageBuildingsDialogProps {
   building: UseBuilding & { available: boolean };
   onClose: () => void;
+  fileAccess: FileAccess;
+  pdfEngine?: PdfEngine;
 }
 
 /**
  * Manage Buildings: creates, opens and closes the one open building file.
  * The building file is stored by the platform (a file picker on desktop).
  */
-export function ManageBuildingsDialog({ building, onClose }: ManageBuildingsDialogProps) {
+export function ManageBuildingsDialog({ building, onClose, fileAccess, pdfEngine }: ManageBuildingsDialogProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
 
@@ -43,6 +48,13 @@ export function ManageBuildingsDialog({ building, onClose }: ManageBuildingsDial
             {countLabel(building.building.file.levels.length, 'level')}, {countLabel(building.building.file.sheets.length, 'sheet')}
           </p>
           <BuildingLevelsPane file={building.building.file} update={building.update} />
+          <BuildingSheetsPane
+            key={building.building.file.id}
+            file={building.building.file}
+            update={building.update}
+            fileAccess={fileAccess}
+            engine={pdfEngine}
+          />
           <button type="button" onClick={() => building.close()}>
             Close building
           </button>
