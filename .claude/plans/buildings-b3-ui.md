@@ -124,6 +124,7 @@ Common verification: `pnpm --filter @mepapp/core test`, `pnpm --filter @mepapp/u
 - Depends on: T11a.
 
 **B3-T11d: levels in the tree.**
+- **DONE 2026-11-02, commit `640c7c4`.** UI 612 tests, build 9/9, new check `b3-t11d-check.mjs` 51/51, all 15 old browser checks pass after the last change. Alt+Up/Down moves a level. Not run: Tauri paths, screen reader. Open: the "Building name" create input stays visible after a building is created (check in T11h); `deleteBlockedReason` (old) duplicates `deleteBlockedText`.
 - Files: `BuildingLevelsPane.tsx` (becomes the level detail), `BuildingTree.tsx`, `buildingLevels.ts`, tests.
 - Shapes: "+ Add level" under the levels in the tree. The new level is selected and its name field has the focus, with a default name "Level N" selected. The detail has name, elevation (mm), move up and down, delete. Delete shows the reason text when blocked ("Remove its 2 sheets first"). An empty level deletes with an Undo line (8 s). "Sort by elevation" shows the reason when disabled. Level order shows in the tree as the order of the file.
 - Fixes: R-12, R-13, R-22, F-B3-1.
