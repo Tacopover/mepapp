@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyBuilding, parseBuildingFile, parseSheetSummary, serializeBuildingFile, type BuildingSheet, type ProjectDocument, type StampDefinition } from '@mepapp/core';
+import { buildSheetSummary, emptyBuilding, parseBuildingFile, parseSheetSummary, serializeBuildingFile, type BuildingSheet, type ProjectDocument, type StampDefinition } from '@mepapp/core';
 import { MemoryBuildingStore, StoreConflictError, type BuildingStore } from '@mepapp/platform';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 
@@ -114,7 +114,87 @@ describe('summaryAfterSave', () => {
     const store = new MemoryBuildingStore({ json: buildingJson([sheetOf()]) });
     expect(await summaryAfterSave(args(store, projectOf(undefined)))).toEqual({ state: 'no-match' });
   });
+
+  it('onlyIfStale writes when no summary exists', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1' })]) });
+    expect(await summaryAfterSave(args(store, undefined, { onlyIfStale: true }))).toEqual({ state: 'written', projectUuid: 'proj-1', patchedSheets: 0 });
+    expect(await store.readSummary('proj-1')).toBeDefined();
+  });
+
+  it('onlyIfStale returns fresh and keeps the stored summary when size and time match', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1' })]) });
+    await summaryAfterSave(args(store));
+    const stored = await store.readSummary('proj-1');
+    const later = { now: () => new Date('2026-11-02T08:00:00.000Z'), onlyIfStale: true };
+    expect(await summaryAfterSave(args(store, undefined, later))).toEqual({ state: 'fresh', projectUuid: 'proj-1', patchedSheets: 0 });
+    expect(await store.readSummary('proj-1')).toBe(stored);
+  });
+
+  it('onlyIfStale writes when the modification time differs', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1' })]) });
+    await summaryAfterSave(args(store));
+    const changed = { document: { ...document, modifiedMs: 6000 }, onlyIfStale: true };
+    expect(await summaryAfterSave(args(store, undefined, changed))).toEqual({ state: 'written', projectUuid: 'proj-1', patchedSheets: 0 });
+    const summary = parseSheetSummary(JSON.parse((await store.readSummary('proj-1')) ?? 'null'));
+    expect(summary.sourceModifiedMs).toBe(6000);
+  });
+
+  it('onlyIfStale writes when the file size differs', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1' })]) });
+    await summaryAfterSave(args(store));
+    const changed = { document: { ...document, sizeBytes: 2000 }, onlyIfStale: true };
+    expect(await summaryAfterSave(args(store, undefined, changed))).toEqual({ state: 'written', projectUuid: 'proj-1', patchedSheets: 0 });
+    const summary = parseSheetSummary(JSON.parse((await store.readSummary('proj-1')) ?? 'null'));
+    expect(summary.sourceSizeBytes).toBe(2000);
+  });
+
+  it('onlyIfStale links an unlinked sheet even when the summary is fresh', async () => {
+    const stored = summaryOf(projectOf('proj-1'));
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf()]) });
+    await store.writeSummary('proj-1', stored);
+    expect(await summaryAfterSave(args(store, undefined, { onlyIfStale: true }))).toEqual({ state: 'fresh', projectUuid: 'proj-1', patchedSheets: 1 });
+    expect(await store.readSummary('proj-1')).toBe(stored);
+    const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
+    expect(file.sheets[0]?.projectUuid).toBe('proj-1');
+  });
+
+  it('onlyIfStale writes when the stored summary text is corrupt', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1' })]) });
+    await store.writeSummary('proj-1', '{not json');
+    expect(await summaryAfterSave(args(store, undefined, { onlyIfStale: true }))).toEqual({ state: 'written', projectUuid: 'proj-1', patchedSheets: 0 });
+    const summary = parseSheetSummary(JSON.parse((await store.readSummary('proj-1')) ?? 'null'));
+    expect(summary.projectUuid).toBe('proj-1');
+  });
+
+  it('onlyIfStale writes each of two documents under its own id', async () => {
+    const docA = { fileName: 'a.pdf', path: 'C:/work/a.pdf', sizeBytes: 1000, modifiedMs: 5000 };
+    const docB = { fileName: 'b.pdf', path: 'C:/work/b.pdf', sizeBytes: 1000, modifiedMs: 5000 };
+    const store = new MemoryBuildingStore({
+      json: buildingJson([
+        sheetOf({ id: 's1', location: { fileName: 'a.pdf', path: 'C:/work/a.pdf', sizeBytes: 1000 } }),
+        sheetOf({ id: 's2', location: { fileName: 'b.pdf', path: 'C:/work/b.pdf', sizeBytes: 1000 } }),
+      ]),
+    });
+    expect(await summaryAfterSave(args(store, projectOf('uuid-a'), { document: docA, onlyIfStale: true }))).toEqual({ state: 'written', projectUuid: 'uuid-a', patchedSheets: 1 });
+    expect(await summaryAfterSave(args(store, projectOf('uuid-b'), { document: docB, onlyIfStale: true }))).toEqual({ state: 'written', projectUuid: 'uuid-b', patchedSheets: 1 });
+    expect(await store.listSummaries()).toEqual(['uuid-a', 'uuid-b']);
+    const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
+    expect(file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['uuid-a', 'uuid-b']);
+  });
 });
+
+const summaryOf = (project: ProjectDocument): string =>
+  JSON.stringify(
+    buildSheetSummary({
+      project,
+      savedAt: '2026-11-01T10:00:00.000Z',
+      sourceSizeBytes: 1000,
+      sourceModifiedMs: 5000,
+      pageInfos: [{ widthPt: 595, heightPt: 842, rotationDegrees: 0 }],
+      stampTypeName: () => null,
+      stampImageName: () => null,
+    }),
+  );
 
 describe('stampNameLookups', () => {
   const definitions = [

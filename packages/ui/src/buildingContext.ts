@@ -4,6 +4,7 @@ import {
   findSheets,
   getStampDefinition,
   parseBuildingFile,
+  parseSheetSummary,
   serializeBuildingFile,
   withProjectUuid,
   type BuildingFile,
@@ -15,9 +16,10 @@ import { StoreConflictError, type BuildingStore } from '@mepapp/platform';
 export type SummaryAfterSaveResult =
   | { state: 'no-building' }
   | { state: 'no-match' }
-  | { state: 'written'; projectUuid: string; patchedSheets: number };
+  | { state: 'written'; projectUuid: string; patchedSheets: number }
+  | { state: 'fresh'; projectUuid: string; patchedSheets: number };
 
-/** Writes the sheet summary of a saved document into the building store. Links unlinked matched sheets to the document's projectUuid. */
+/** Writes the sheet summary of a saved document into the building store. Links unlinked matched sheets to the document's projectUuid. With onlyIfStale, the summary is written only when the stored one is missing, unreadable or made from another file size or time. */
 export async function summaryAfterSave(args: {
   store: BuildingStore;
   project: ProjectDocument;
@@ -26,6 +28,7 @@ export async function summaryAfterSave(args: {
   stampTypeName: (id: string) => string | null;
   stampImageName: (id: string) => string | null;
   now?: () => Date;
+  onlyIfStale?: boolean;
 }): Promise<SummaryAfterSaveResult> {
   const { store, project, document } = args;
   const stored = await store.read();
@@ -39,31 +42,46 @@ export async function summaryAfterSave(args: {
   );
   if (matches.length === 0) return { state: 'no-match' };
 
-  const summary = buildSheetSummary({
-    project,
-    savedAt: (args.now ?? (() => new Date()))().toISOString(),
-    sourceSizeBytes: document.sizeBytes,
-    sourceModifiedMs: document.modifiedMs,
-    pageInfos: args.pageInfos,
-    stampTypeName: args.stampTypeName,
-    stampImageName: args.stampImageName,
-  });
-  await store.writeSummary(projectUuid, JSON.stringify(summary));
+  const stale = args.onlyIfStale ? await isSummaryStale(store, projectUuid, document) : true;
+  if (stale) {
+    const summary = buildSheetSummary({
+      project,
+      savedAt: (args.now ?? (() => new Date()))().toISOString(),
+      sourceSizeBytes: document.sizeBytes,
+      sourceModifiedMs: document.modifiedMs,
+      pageInfos: args.pageInfos,
+      stampTypeName: args.stampTypeName,
+      stampImageName: args.stampImageName,
+    });
+    await store.writeSummary(projectUuid, JSON.stringify(summary));
+  }
 
   const unlinkedSheetIds = matches.filter((match) => match.sheet.projectUuid === null).map((match) => match.sheet.id);
-  let patchedSheets = 0;
-  if (unlinkedSheetIds.length > 0) {
-    try {
-      patchedSheets = await linkSheets(store, file, stored.revision, projectUuid, unlinkedSheetIds);
-    } catch (err) {
-      if (!(err instanceof StoreConflictError)) throw err;
-      const current = await store.read();
-      if (current !== undefined) {
-        patchedSheets = await linkSheets(store, parseBuildingFile(JSON.parse(current.json)), current.revision, projectUuid, unlinkedSheetIds);
-      }
-    }
+  const patchedSheets = unlinkedSheetIds.length > 0 ? await linkSheetsWithRetry(store, file, stored.revision, projectUuid, unlinkedSheetIds) : 0;
+  return { state: stale ? 'written' : 'fresh', projectUuid, patchedSheets };
+}
+
+async function isSummaryStale(store: BuildingStore, projectUuid: string, document: { sizeBytes: number; modifiedMs: number }): Promise<boolean> {
+  const text = await store.readSummary(projectUuid);
+  if (text === undefined) return true;
+  try {
+    const summary = parseSheetSummary(JSON.parse(text));
+    return summary.sourceSizeBytes !== document.sizeBytes || summary.sourceModifiedMs !== document.modifiedMs;
+  } catch {
+    return true;
   }
-  return { state: 'written', projectUuid, patchedSheets };
+}
+
+/** Links the sheets to projectUuid and writes the building file. On a StoreConflictError it re-reads the file and links once more. */
+export async function linkSheetsWithRetry(store: BuildingStore, file: BuildingFile, revision: string, projectUuid: string, sheetIds: readonly string[]): Promise<number> {
+  try {
+    return await linkSheets(store, file, revision, projectUuid, sheetIds);
+  } catch (err) {
+    if (!(err instanceof StoreConflictError)) throw err;
+    const current = await store.read();
+    if (current === undefined) return 0;
+    return linkSheets(store, parseBuildingFile(JSON.parse(current.json)), current.revision, projectUuid, sheetIds);
+  }
 }
 
 async function linkSheets(store: BuildingStore, file: BuildingFile, revision: string, projectUuid: string, sheetIds: readonly string[]): Promise<number> {

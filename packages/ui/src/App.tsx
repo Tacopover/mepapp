@@ -23,6 +23,7 @@ import {
   type PlacementRule,
   type NetworkType,
   type PlacementWorkerLike,
+  type ProjectDocument,
   type QuantityResult,
   type RoomDetectionClient,
   type ReconciliationReport,
@@ -81,6 +82,7 @@ import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
 import { currentSheetLabel } from './buildingStatus.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
+import { shouldWriteSummaryOnOpen } from './summaryOnOpen.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
 import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
@@ -114,6 +116,9 @@ import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
 import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
 import { libraryFolderOf, type AppDialogs, type BuildingRef, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore, type OpenedFile } from '@mepapp/platform';
 import './theme.css';
+
+// The project and the displayed page sizes of one document, read together.
+type DocumentSnapshot = { project: ProjectDocument; pageInfos: ReturnType<typeof displayedPageInfos> };
 
 export interface PdfPageLoadResult {
   bitmap: ImageBitmap;
@@ -457,6 +462,11 @@ export function MepSketchApp({
     storedPath?: string;
     projectUuid: string;
     location: SheetLocation;
+    snapshot: DocumentSnapshot | null;
+    file: File;
+    target: FileTarget | undefined;
+    projectUuidInFile: boolean;
+    loadMismatch: boolean;
   } | null>(null);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
   const [snapRadiusPx, setSnapRadiusPx] = useState(() => {
@@ -649,7 +659,40 @@ export function MepSketchApp({
     [resolveStampIconUrl],
   );
 
-  const documentOpenedRef = useRef<((args: { documentId: string; file: File; target: FileTarget | undefined }) => Promise<void>) | null>(null);
+  // Reads the project and the page sizes of one document in one synchronous step. Null when that document is not the active one.
+  const snapshotDocument = useCallback(
+    (documentId: string): DocumentSnapshot | null => {
+      const scene = sceneRef.current;
+      const handle = scene?.getActivePdfHandle() ?? null;
+      if (!scene || !handle || scene.getActiveDocumentId() !== documentId) return null;
+      return { project: scene.exportProject(), pageInfos: displayedPageInfos(handle) };
+    },
+    [sceneRef],
+  );
+
+  // Writes the sheet summary of a document that was just opened. Only writes when the stored summary is stale. Never throws.
+  const writeSummaryOnOpen = useCallback(
+    async (snapshot: DocumentSnapshot, file: File, target: FileTarget | undefined) => {
+      if (!buildingStore) return;
+      try {
+        const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
+        const result = await summaryAfterSave({
+          store: buildingStore,
+          project: snapshot.project,
+          document: { fileName: file.name, path: target?.path, sizeBytes: file.size, modifiedMs: file.lastModified },
+          pageInfos: snapshot.pageInfos,
+          ...stampNameLookups(definitions),
+          onlyIfStale: true,
+        });
+        if (result.state === 'written' || (result.state === 'fresh' && result.patchedSheets > 0)) await buildingHook.reload();
+      } catch (err) {
+        setStatus(`Could not write the building summary of ${file.name}: ${(err as Error).message}`);
+      }
+    },
+    [buildingHook.reload, buildingStore, customStampDefinitions, userStampLibrary.definitions],
+  );
+
+  const documentOpenedRef = useRef<((args: { documentId: string; file: File; target: FileTarget | undefined; loadMismatch: boolean }) => Promise<void>) | null>(null);
 
   const openPdfFile = useCallback(
     async (file: File, fileTarget: FileTarget | undefined) => {
@@ -682,11 +725,12 @@ export function MepSketchApp({
         // silently resolve either way. The user never sees this as a separate
         // "project file" — Open/Save hide it entirely, it's just "the PDF."
         const report = sceneRef.current ? await sceneRef.current.loadFromPdf(handle, resolveStampIconBitmap) : null;
+        const loadMismatch = report !== null && (report.drifted.length > 0 || report.missingIds.length > 0);
         if (sceneRef.current?.getActiveDocumentId() === task.documentId) {
           setReconciliation(report && (report.drifted.length > 0 || report.missingIds.length > 0) ? report : null);
         }
         setStatus(`Loaded ${file.name} (${pageWidthPt.toFixed(1)} x ${pageHeightPt.toFixed(1)} pt)`);
-        if (task.documentId) void documentOpenedRef.current?.({ documentId: task.documentId, file, target: fileTarget });
+        if (task.documentId) void documentOpenedRef.current?.({ documentId: task.documentId, file, target: fileTarget, loadMismatch });
       } catch (err) {
         // Kept open, a document whose project failed to load (for example one
         // saved by a newer MepApp) shows an empty drawing, and a Save would
@@ -703,9 +747,16 @@ export function MepSketchApp({
     [onLoadPdfPage, resolveStampIconBitmap, sceneRef],
   );
 
-  documentOpenedRef.current = async ({ documentId, file, target }) => {
+  documentOpenedRef.current = async ({ documentId, file, target, loadMismatch }) => {
     const building = buildingRef.current;
     if (building === null || sceneRef.current?.getActiveDocumentId() !== documentId) return;
+    let snapshot: DocumentSnapshot | null;
+    try {
+      snapshot = snapshotDocument(documentId);
+    } catch {
+      snapshot = null;
+    }
+    const projectUuidInFile = sceneRef.current.getDocuments().find((d) => d.id === documentId)?.projectUuidInFile ?? false;
     const projectUuid = sceneRef.current.getProjectUuid();
     const outcome = await checkOpenedDocument({
       building: building.file,
@@ -728,8 +779,15 @@ export function MepSketchApp({
         storedPath: outcome.storedPath,
         projectUuid: outcome.projectUuid,
         location: outcome.location,
+        snapshot,
+        file,
+        target,
+        projectUuidInFile,
+        loadMismatch,
       });
+      return;
     }
+    if (snapshot && shouldWriteSummaryOnOpen({ projectUuidInFile, loadMismatch, outcome })) await writeSummaryOnOpen(snapshot, file, target);
   };
 
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
@@ -877,10 +935,8 @@ export function MepSketchApp({
   // page infos are read before the file stat await, so a tab switch cannot change them.
   const writeBuildingSummary = useCallback(
     async (documentId: string, target: FileTarget, sizeBytes: number) => {
-      const scene = sceneRef.current;
-      if (!buildingStore || !scene || !pdfHandle || scene.getActiveDocumentId() !== documentId) return;
-      const project = scene.exportProject();
-      const pageInfos = displayedPageInfos(pdfHandle);
+      const snapshot = snapshotDocument(documentId);
+      if (!buildingStore || !snapshot) return;
       const path = target.path;
       let modifiedMs = Date.now();
       let documentSize = sizeBytes;
@@ -892,14 +948,14 @@ export function MepSketchApp({
       const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
       await summaryAfterSave({
         store: buildingStore,
-        project,
+        project: snapshot.project,
         document: { fileName: target.name, path, sizeBytes: documentSize, modifiedMs },
-        pageInfos,
+        pageInfos: snapshot.pageInfos,
         ...stampNameLookups(definitions),
       });
       await buildingHook.reload();
     },
-    [buildingHook.reload, buildingStore, customStampDefinitions, fileAccess, pdfHandle, sceneRef, userStampLibrary.definitions],
+    [buildingHook.reload, buildingStore, customStampDefinitions, fileAccess, snapshotDocument, userStampLibrary.definitions],
   );
 
   // Rebuilds the sheet summary of every document of the open building. The PDFs are read by
@@ -2118,9 +2174,15 @@ export function MepSketchApp({
             setDuplicatePrompt(null);
           }}
           onSameFile={() => {
-            void updateRef.current((f) => withMovedLocation(f, duplicatePrompt.projectUuid, duplicatePrompt.location));
+            const moved = updateRef.current((f) => withMovedLocation(f, duplicatePrompt.projectUuid, duplicatePrompt.location));
             if (buildingRef.current !== null) setStatus(`Updated the location of ${duplicatePrompt.storedName} in ${buildingRef.current.file.name}.`);
             setDuplicatePrompt(null);
+            void moved.then(async () => {
+              const { snapshot, documentId, file, target, projectUuidInFile, loadMismatch } = duplicatePrompt;
+              if (!snapshot || sceneRef.current?.getActiveDocumentId() !== documentId) return;
+              if (!shouldWriteSummaryOnOpen({ projectUuidInFile, loadMismatch, outcome: { kind: 'none' }, afterSameFile: true })) return;
+              await writeSummaryOnOpen(snapshot, file, target);
+            });
           }}
           onCancel={() => setDuplicatePrompt(null)}
         />

@@ -1,7 +1,7 @@
-import { buildSheetSummary, loadProject, type BuildingFile, type BuildingSheet, type ProjectDocument } from '@mepapp/core';
+import { buildSheetSummary, loadProject, parseBuildingFile, type BuildingFile, type BuildingSheet, type ProjectDocument } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { BuildingStore } from '@mepapp/platform';
-import { displayedPageInfos } from './buildingContext.js';
+import { displayedPageInfos, linkSheetsWithRetry } from './buildingContext.js';
 
 const PROJECT_FILE_NAME = 'mepapp-project.json';
 
@@ -13,28 +13,45 @@ export interface RebuildFailure {
 export interface RebuildResult {
   ok: number;
   failed: RebuildFailure[];
-  /** Documents whose summary was written but whose first sheet has projectUuid null: the sheet is not linked to the summary. */
-  notLinked: BuildingSheet[];
+  /** Sheets that were unlinked and are now linked to the id of their document. */
+  linked: number;
   total: number;       // number of documents
   cancelled: boolean;  // the signal aborted before all documents ran
+}
+
+/** The key of the file of an unlinked sheet: its path, or its file name when it has no path. */
+function fileKey(sheet: BuildingSheet): string {
+  return `file:${sheet.location.path ?? sheet.location.fileName}`;
 }
 
 /** One sheet per document: the first sheet of each group. That sheet reads the file. */
 function firstSheetPerDocument(sheets: readonly BuildingSheet[]): BuildingSheet[] {
   const firsts = new Map<string, BuildingSheet>();
   for (const sheet of sheets) {
-    const key = sheet.projectUuid !== null ? `id:${sheet.projectUuid}` : `file:${sheet.location.path ?? sheet.location.fileName}`;
+    const key = sheet.projectUuid !== null ? `id:${sheet.projectUuid}` : fileKey(sheet);
     if (!firsts.has(key)) firsts.set(key, sheet);
   }
   return [...firsts.values()];
 }
 
-/** Returns the reason the document failed. When the summary was written, notLinked tells if its first sheet has no projectUuid. */
+/** Links the unlinked sheets of the file of first to projectUuid. Reads the building file fresh from the store. Returns the number linked. */
+async function linkDocumentSheets(store: BuildingStore, first: BuildingSheet, projectUuid: string): Promise<number> {
+  const stored = await store.read();
+  if (stored === undefined) return 0;
+  const file: BuildingFile = parseBuildingFile(JSON.parse(stored.json));
+  const sameFile = (sheet: BuildingSheet): boolean =>
+    fileKey(sheet) === fileKey(first) && (first.location.path !== undefined || sheet.location.sizeBytes === first.location.sizeBytes);
+  const sheetIds = file.sheets.filter((sheet) => sheet.projectUuid === null && sameFile(sheet)).map((sheet) => sheet.id);
+  if (sheetIds.length === 0) return 0;
+  return linkSheetsWithRetry(store, file, stored.revision, projectUuid, sheetIds);
+}
+
+/** Returns the reason the document failed. When the summary was written, linked counts the sheets linked to it. */
 async function rebuildDocument(
   first: BuildingSheet,
   args: Pick<Parameters<typeof rebuildSummaries>[0], 'engine' | 'read' | 'whyUnreadable' | 'stampNames' | 'store'>,
   now: () => Date,
-): Promise<{ reason?: string; notLinked?: boolean }> {
+): Promise<{ reason?: string; linked?: number }> {
   const file = await args.read(first);
   if (file === undefined) return { reason: args.whyUnreadable ? await args.whyUnreadable(first) : 'the PDF could not be read' };
 
@@ -55,7 +72,8 @@ async function rebuildDocument(
       ...args.stampNames(project),
     });
     await args.store.writeSummary(project.projectUuid, JSON.stringify(summary));
-    return { notLinked: first.projectUuid === null };
+    if (first.projectUuid !== null) return { linked: 0 };
+    return { linked: await linkDocumentSheets(args.store, first, project.projectUuid) };
   } finally {
     handle.close();
   }
@@ -78,7 +96,7 @@ export async function rebuildSummaries(args: {
   const documents = firstSheetPerDocument(args.building.sheets);
   const total = documents.length;
   const now = args.now ?? (() => new Date());
-  const result: RebuildResult = { ok: 0, failed: [], notLinked: [], total, cancelled: false };
+  const result: RebuildResult = { ok: 0, failed: [], linked: 0, total, cancelled: false };
   let done = 0;
   for (const first of documents) {
     if (args.signal.aborted) {
@@ -86,7 +104,7 @@ export async function rebuildSummaries(args: {
       return result;
     }
     args.onProgress(done, total, first.location.fileName);
-    let outcome: { reason?: string; notLinked?: boolean };
+    let outcome: { reason?: string; linked?: number };
     try {
       outcome = await rebuildDocument(first, args, now);
     } catch (err) {
@@ -94,7 +112,7 @@ export async function rebuildSummaries(args: {
     }
     if (outcome.reason === undefined) {
       result.ok += 1;
-      if (outcome.notLinked) result.notLinked.push(first);
+      result.linked += outcome.linked ?? 0;
     } else {
       result.failed.push({ sheet: first, reason: outcome.reason });
     }

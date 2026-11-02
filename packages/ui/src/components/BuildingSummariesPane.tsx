@@ -84,7 +84,7 @@ export function BuildingSummariesPane({ hasSheets, onRebuild, onDone }: Building
             <p>The rebuild did not run. See the message in the header.</p>
           ) : (
             <>
-              <p>{`Rebuilt ${last.result.ok} of ${last.result.total} summaries.${last.result.cancelled ? ' Cancelled before the end.' : ''}`}</p>
+              <p>{`Rebuilt ${last.result.ok} of ${last.result.total} summaries.${last.result.linked > 0 ? ` ${last.result.linked} ${last.result.linked === 1 ? 'sheet' : 'sheets'} linked.` : ''}${last.result.cancelled ? ' Cancelled before the end.' : ''}`}</p>
               {last.result.failed.length > 0 && (
                 <>
                   <p className="mep-hint">
@@ -94,20 +94,6 @@ export function BuildingSummariesPane({ hasSheets, onRebuild, onDone }: Building
                     {last.result.failed.map((failure) => (
                       <li key={failure.sheet.id}>
                         <b>{failure.sheet.location.fileName}</b>: {failure.reason}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              {last.result.notLinked.length > 0 && (
-                <>
-                  <p className="mep-hint">
-                    <b>Saved, but not linked to the sheet ({last.result.notLinked.length})</b>
-                  </p>
-                  <ul data-testid="rebuild-notlinked">
-                    {last.result.notLinked.map((sheet) => (
-                      <li key={sheet.id}>
-                        <b>{sheet.location.fileName}</b>: summary saved, but the sheet is not linked to it. Open the file in MepApp and save it.
                       </li>
                     ))}
                   </ul>

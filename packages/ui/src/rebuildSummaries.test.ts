@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyBuilding, serializeProject, type BuildingFile, type BuildingSheet, type ProjectDocument } from '@mepapp/core';
+import { emptyBuilding, parseBuildingFile, serializeBuildingFile, serializeProject, type BuildingFile, type BuildingSheet, type ProjectDocument } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import { MemoryBuildingStore } from '@mepapp/platform';
 import { rebuildSummaries } from './rebuildSummaries.js';
@@ -42,7 +42,7 @@ const sheetOf = (id: string, path: string, pageIndex: number, projectUuid: strin
   location: { fileName: path.split('/').pop() ?? path, path, sizeBytes: 1000 },
 });
 
-const buildingOf = (sheets: BuildingSheet[]): BuildingFile => ({ ...emptyBuilding('b1', 'Block'), sheets });
+const buildingOf = (sheets: BuildingSheet[]): BuildingFile => ({ ...emptyBuilding('b1', 'Block'), levels: [{ id: 'L1', name: 'Ground', elevationMm: 0 }], sheets });
 
 /** The document text is the key of its embedded project and page count. */
 const documents: Record<string, { pages: number; embedded: string | null }> = {
@@ -96,10 +96,10 @@ const readerOf = (files: Record<string, string>, reads: string[] = []) => async 
 describe('rebuildSummaries', () => {
   it('writes one summary per document, one document at a time, and closes every handle', async () => {
     const { engine, state } = stubEngine();
-    const store = new MemoryBuildingStore();
-    const progress = progressCalls();
     const s1 = sheetOf('s1', 'C:/a.pdf', 0);
     const s2 = sheetOf('s2', 'C:/b.pdf', 0);
+    const store = new MemoryBuildingStore({ json: serializeBuildingFile(buildingOf([s1, s2])) });
+    const progress = progressCalls();
     const result = await rebuildSummaries({
       building: buildingOf([s1, s2]),
       engine,
@@ -110,7 +110,7 @@ describe('rebuildSummaries', () => {
       signal: new AbortController().signal,
       now: () => new Date('2026-11-01T10:00:00.000Z'),
     });
-    expect(result).toEqual({ ok: 2, failed: [], notLinked: [s1, s2], total: 2, cancelled: false });
+    expect(result).toEqual({ ok: 2, failed: [], linked: 2, total: 2, cancelled: false });
     expect(await store.listSummaries()).toEqual(['uuid-a', 'uuid-b']);
     expect(progress.calls[0]).toEqual([0, 2, 'a.pdf']);
     expect(progress.calls[progress.calls.length - 1]).toEqual([2, 2, '']);
@@ -231,11 +231,11 @@ describe('rebuildSummaries', () => {
     expect(state.opened).toBe(1);
   });
 
-  it('lists a written summary as not linked when its sheet has no projectUuid', async () => {
+  it('links the unlinked sheet of a written document and keeps a linked sheet as it is', async () => {
     const { engine } = stubEngine();
-    const store = new MemoryBuildingStore();
     const unlinked = sheetOf('s1', 'C:/a.pdf', 0);
     const linked = sheetOf('s2', 'C:/b.pdf', 0, 'uuid-b');
+    const store = new MemoryBuildingStore({ json: serializeBuildingFile(buildingOf([unlinked, linked])) });
     const result = await rebuildSummaries({
       building: buildingOf([unlinked, linked]),
       engine,
@@ -245,8 +245,55 @@ describe('rebuildSummaries', () => {
       onProgress: () => undefined,
       signal: new AbortController().signal,
     });
-    expect(result.ok).toBe(2);
-    expect(result.notLinked).toEqual([unlinked]);
+    expect(result).toEqual({ ok: 2, failed: [], linked: 1, total: 2, cancelled: false });
     expect(await store.listSummaries()).toEqual(['uuid-a', 'uuid-b']);
+    const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
+    expect(file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['uuid-a', 'uuid-b']);
+  });
+
+  it('links every unlinked sheet of one document', async () => {
+    const { engine } = stubEngine();
+    const first = sheetOf('s1', 'C:/a.pdf', 0);
+    const second = sheetOf('s2', 'C:/a.pdf', 1);
+    const store = new MemoryBuildingStore({ json: serializeBuildingFile(buildingOf([first, second])) });
+    const result = await rebuildSummaries({
+      building: buildingOf([first, second]),
+      engine,
+      read: readerOf({ 'C:/a.pdf': 'A' }),
+      stampNames,
+      store,
+      onProgress: () => undefined,
+      signal: new AbortController().signal,
+    });
+    expect(result).toEqual({ ok: 1, failed: [], linked: 2, total: 1, cancelled: false });
+    const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
+    expect(file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['uuid-a', 'uuid-a']);
+  });
+
+  it('links only the unlinked sheet of the same size when the first sheet has no path', async () => {
+    const { engine } = stubEngine();
+    const noPath = (id: string, sizeBytes: number): BuildingSheet => ({
+      id,
+      levelId: 'L1',
+      projectUuid: null,
+      pageIndex: 0,
+      displayName: `Sheet ${id}`,
+      location: { fileName: 'plan.pdf', sizeBytes },
+    });
+    const first = noPath('s1', 1000);
+    const other = noPath('s2', 2000);
+    const store = new MemoryBuildingStore({ json: serializeBuildingFile(buildingOf([first, other])) });
+    const result = await rebuildSummaries({
+      building: buildingOf([first, other]),
+      engine,
+      read: async () => new File(['A'], 'plan.pdf', { lastModified: 5000 }),
+      stampNames,
+      store,
+      onProgress: () => undefined,
+      signal: new AbortController().signal,
+    });
+    expect(result).toEqual({ ok: 1, failed: [], linked: 1, total: 1, cancelled: false });
+    const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
+    expect(file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['uuid-a', null]);
   });
 });
