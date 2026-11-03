@@ -72,6 +72,10 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
   const { pending } = pendingPdfs;
   /** False after the building changed (the dialog keys this pane by building). A read that ends later must not add its PDFs. */
   const mountedRef = useRef(true);
+  const addRef = useRef<HTMLButtonElement>(null);
+  const folderRef = useRef<HTMLButtonElement>(null);
+  /** The button that started a read. The button is disabled while the read runs, so the focus is restored to it after. */
+  const restoreRef = useRef<'add' | 'folder' | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -80,6 +84,14 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (busy || restoreRef.current === null) return;
+    if (!document.activeElement || document.activeElement === document.body) {
+      (restoreRef.current === 'add' ? addRef : folderRef).current?.focus();
+    }
+    restoreRef.current = null;
+  }, [busy]);
 
   const noEngineReason = engine === undefined ? 'PDF reading is not available in this version of the app.' : undefined;
   const disabled = busy || engine === undefined;
@@ -94,6 +106,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
       return null;
     });
     if (opened === null || opened === undefined || engine === undefined) return;
+    restoreRef.current = 'add';
     setBusy(true);
     try {
       const entry = await readEntry(opened.file, pathOfTarget(opened.target), engine);
@@ -119,6 +132,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
       return null;
     });
     if (picked === null || picked === undefined || engine === undefined) return;
+    restoreRef.current = 'folder';
     setBusy(true);
     try {
       const files = await fileAccess.readFolder(picked.folder, ['pdf']);
@@ -164,11 +178,11 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
 
   return (
     <div className="mep-buildings-actions" data-testid="add-actions">
-      <button type="button" disabled={disabled} title={noEngineReason} onClick={() => void addFile()}>
+      <button ref={addRef} type="button" disabled={disabled} title={noEngineReason} onClick={() => void addFile()}>
         Add PDFs…
       </button>
       {fileAccess.capabilities.folders && (
-        <button type="button" disabled={disabled} title={noEngineReason} onClick={() => void addFolder()}>
+        <button ref={folderRef} type="button" disabled={disabled} title={noEngineReason} onClick={() => void addFolder()}>
           Add folder…
         </button>
       )}

@@ -186,10 +186,16 @@ export function ManageBuildingsDialog({
     setAsk({ kind, run });
   }
 
+  /** Moves the focus into the navigation after the question closes, so the focus does not fall to the body. */
+  function focusNav() {
+    requestAnimationFrame(() => navRef.current?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"], select')?.focus());
+  }
+
   /** Close button, Escape. A second Escape answers "Keep working". */
   function requestClose() {
     if (ask !== null) {
       setAsk(null);
+      focusNav();
       return;
     }
     guard('close', onClose);
@@ -281,7 +287,7 @@ export function ManageBuildingsDialog({
   function onSelectKey(key: string) {
     setSelectedKey(key);
     setFocusKey(key);
-    requestAnimationFrame(() => navRef.current?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"], select')?.focus());
+    focusNav();
   }
 
   function onMoveLevel(node: TreeNode, delta: -1 | 1) {
@@ -362,12 +368,21 @@ export function ManageBuildingsDialog({
               data-testid="close-anyway"
               onClick={() => {
                 setAsk(null);
+                focusNav();
                 ask.run();
               }}
             >
               {ASK_BUTTON[ask.kind]}
             </button>
-            <button type="button" data-testid="keep-working" autoFocus onClick={() => setAsk(null)}>
+            <button
+              type="button"
+              data-testid="keep-working"
+              autoFocus
+              onClick={() => {
+                setAsk(null);
+                focusNav();
+              }}
+            >
               Keep working
             </button>
           </div>

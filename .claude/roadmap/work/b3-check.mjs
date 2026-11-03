@@ -130,7 +130,7 @@ await dlg.locator('[data-testid="rebuild-summaries"]').click();
 await dlg.locator('[data-testid="rebuild-result"]').waitFor({ timeout: 60000 });
 await idle(800);
 const result = (await dlg.locator('[data-testid="rebuild-result"]').textContent()) ?? '';
-check(/Rebuilt 2 of 3 summaries/.test(result), 'step 4: 2 of 3 summaries rebuilt', result);
+check(/Read 2 of 3 summaries/.test(result), 'step 4: 2 of 3 summaries rebuilt', result);
 check(/multi\.pdf/.test((await dlg.locator('[data-testid="rebuild-failures"]').textContent().catch(() => '')) ?? ''), 'step 4: multi.pdf is in the failure list');
 const okGround = await statusOf('Ground floor', 'ground.pdf');
 const okFirst = await statusOf('Level 1', 'first.pdf');

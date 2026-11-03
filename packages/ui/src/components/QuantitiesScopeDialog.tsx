@@ -40,6 +40,7 @@ export function QuantitiesScopeDialog({ building, recent, busy, message, onOpenR
   return (
     <Dialog
       title="Export quantities"
+      className="mep-modal--scope"
       closeOnBackdropClick={false}
       onClose={onCancel}
       actions={

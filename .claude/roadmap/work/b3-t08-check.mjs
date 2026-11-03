@@ -75,7 +75,7 @@ await rebuild.click();
 await until(async () => !/Cancelled/.test((await dlg.locator('[data-testid="rebuild-result"]').textContent().catch(() => '')) ?? ''), 'run result', 60000);
 await idle(800);
 result = (await dlg.locator('[data-testid="rebuild-result"]').textContent()) ?? '';
-check(/Rebuilt 2 of 4 summaries/.test(result), 'result: 2 of 4 rebuilt', result);
+check(/Read 2 of 4 summaries/.test(result), 'result: 2 of 4 rebuilt', result);
 const failures = (await dlg.locator('[data-testid="rebuild-failures"]').textContent().catch(() => '')) ?? '';
 check(/plain\.pdf/.test(failures) && /not saved yet/.test(failures), 'failure list names plain.pdf with its reason', failures);
 check(/gone\.pdf/.test(failures) && /PDF missing/.test(failures), 'failure list names gone.pdf with its reason', failures);

@@ -76,7 +76,7 @@ await shot('B3-T11h-n2');
 await rebuild().click();
 await dlg.locator('[data-testid="rebuild-result"]').waitFor({ timeout: 60000 });
 await until(async () => (await rebuild().count()) === 0, 'button gone after the run', 20000);
-check(/Rebuilt 2 of 2 summaries/.test((await dlg.locator('[data-testid="rebuild-result"]').textContent()) ?? ''), 'result: Rebuilt 2 of 2');
+check(/Read 2 of 2 summaries/.test((await dlg.locator('[data-testid="rebuild-result"]').textContent()) ?? ''), 'result: Read 2 of 2');
 check((await dlg.locator('[data-testid="rebuild-result"] [data-testid="rebuild-failures"]').count()) === 0, 'no failure list');
 await shot('B3-T11h-after-run');
 await closeDialog();

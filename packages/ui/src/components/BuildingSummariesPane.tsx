@@ -118,7 +118,7 @@ export function BuildingSummariesPane({ missing, onRebuild, onDone, fileAccess, 
             <p>The rebuild did not run. See the message in the header.</p>
           ) : (
             <>
-              <p>{`Rebuilt ${last.result.ok} of ${last.result.total} summaries.${last.result.linked > 0 ? ` ${last.result.linked} ${last.result.linked === 1 ? 'sheet' : 'sheets'} linked.` : ''}${last.result.cancelled ? ' Cancelled before the end.' : ''}`}</p>
+              <p>{`Read ${last.result.ok} of ${last.result.total} summaries.${last.result.linked > 0 ? ` ${last.result.linked} ${last.result.linked === 1 ? 'sheet' : 'sheets'} linked.` : ''}${last.result.cancelled ? ' Cancelled before the end.' : ''}`}</p>
               {last.result.failed.length > 0 && (
                 <>
                   <p className="mep-hint">
