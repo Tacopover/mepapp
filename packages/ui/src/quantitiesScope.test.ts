@@ -167,7 +167,7 @@ describe('buildBuildingScopeTables', () => {
       problems: new Map(),
       stats,
     });
-    expect(result.warnings.some((w) => w.includes('PDF not found. Using the summary'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('PDF missing. Using the summary'))).toBe(true);
     const table = result.tables.find((t) => t.name === 'Segments');
     expect(table?.rows.map((row) => row[row.length - 1])).toEqual([5]);
   });

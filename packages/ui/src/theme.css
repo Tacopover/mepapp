@@ -1372,6 +1372,13 @@
   max-width: 60ch;
   overflow: hidden;
   text-overflow: ellipsis;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.mep-sheet-label-chip:hover b {
+  text-decoration: underline;
 }
 .mep-zoom-chip button,
 .mep-page-chip button {
@@ -5775,5 +5782,12 @@
   min-width: 0;
   margin-bottom: 0;
   padding: 3px 6px;
+}
+.mep-scope-open-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
 }
 .mep-modal .mep-checkbox-row input[type="radio"] { width: auto; margin: 0; padding: 0; border: none; flex: 0 0 auto; }

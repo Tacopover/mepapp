@@ -103,7 +103,7 @@ check(/^(Open|Choose file…)$/.test(((await dlg.locator('[data-testid="repair-o
 check(await failures.filter({ hasText: 'gone.pdf' }).locator('[data-testid="repair-open"]').isDisabled(), 'Open is disabled for a missing file in the failure row');
 await shot('B3-T11h-failures');
 const statusBefore = await statusText();
-check(/Rebuilt 0 of 2 summaries\. 2 failed:/.test(statusBefore) && statusBefore.length < 160, 'the status bar text is short', statusBefore);
+check(/^Read 0 of 2 summaries\. 2 failed\. See Manage Buildings\.$/.test(statusBefore) && statusBefore.length < 160, 'the status bar text is short', statusBefore);
 
 // Relink gone.pdf to ground.pdf from the failure row.
 await nextFile('ground.pdf');

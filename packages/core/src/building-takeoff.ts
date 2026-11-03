@@ -60,7 +60,7 @@ export function buildBuildingTakeoff(args: {
     }
     const summary = summaryOf(sheet.projectUuid);
     if (!summary) {
-      warnings.push(`${label}: no saved summary. Open the file in MepApp and save it, or use Rebuild summaries. Left out.`);
+      warnings.push(`${label}: no saved summary. Open the file in MepApp and save it, or use Read summaries now. Left out.`);
       statuses.push({ sheetId: sheet.id, state: 'no-summary' });
       continue;
     }
@@ -70,10 +70,10 @@ export function buildBuildingTakeoff(args: {
     let state: TakeoffSheetStatus['state'];
     if (status.state === 'missing') {
       state = 'pdf-missing-using-summary';
-      warnings.push(`${label}: PDF not found. Using the summary saved ${date}.`);
+      warnings.push(`${label}: PDF missing. Using the summary saved ${date}.`);
     } else if (status.state === 'no-access') {
       state = 'pdf-no-access-using-summary';
-      warnings.push(`${label}: MepApp may not read the PDF (no access). Using the summary saved ${date}. Use Grant access in Manage Buildings.`);
+      warnings.push(`${label}: no access to the PDF. Using the summary saved ${date}. Use Grant access in Manage Buildings.`);
     } else if (
       (typeof status.sizeBytes === 'number' && status.sizeBytes !== summary.sourceSizeBytes) ||
       (typeof status.modifiedMs === 'number' && status.modifiedMs > summary.sourceModifiedMs)

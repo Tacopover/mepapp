@@ -80,7 +80,7 @@ import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components
 import { useBuilding } from './useBuilding.js';
 import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
-import { currentSheetLabel, shortText } from './buildingStatus.js';
+import { currentSheetLabel } from './buildingStatus.js';
 import { currentSheetLevelId } from './buildingTree.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { openDocumentRows } from './openDocumentsView.js';
@@ -159,7 +159,7 @@ export interface MepSketchAppProps {
   makeBuildingStore?: (ref: BuildingRef) => BuildingStore;
   /** Gives the app shell the adopt action (null on unmount). The dev hook of the web app loads a building through it. */
   onBuildingReady?: (api: { adopt: (store: BuildingStore) => Promise<void> } | null) => void;
-  /** Reads the PDFs of a building. Needed for Rebuild summaries. */
+  /** Reads the PDFs of a building. Needed for Read summaries now. */
   pdfEngine?: PdfEngine;
   /** Gives the app shell the rebuild action (null on unmount). A browser check starts it from the dev console. */
   onRebuildReady?: (run: ((read?: (sheet: BuildingSheet) => Promise<File | undefined>) => Promise<RebuildResult | undefined>) | null) => void;
@@ -324,6 +324,9 @@ export function MepSketchApp({
 
   const { toasts, pushToast, dismissToast } = useToasts();
   const [status, setStatus] = useState('');
+  useEffect(() => {
+    setStatus((s) => (/^Saved [^,]*\.$/.test(s) ? '' : s));
+  }, [activeDocumentId]);
   const handleDetectRooms = useCallback(async () => {
     const scene = sceneRef.current;
     if (!scene || !createRoomDetectionClient || roomAbortRef.current) return;
@@ -988,8 +991,8 @@ export function MepSketchApp({
           if (path === undefined) return 'no path is stored for this PDF';
           if (!fileAccess.statPath) return 'this platform cannot read a PDF by path';
           const stat = await fileAccess.statPath(path);
-          if (stat.state === 'missing') return 'PDF not found';
-          if (stat.state === 'no-access') return 'MepApp may not read the PDF (no access)';
+          if (stat.state === 'missing') return 'PDF missing';
+          if (stat.state === 'no-access') return 'no access to the PDF';
           return 'the PDF could not be read';
         };
         const result = await rebuildSummaries({
@@ -1000,15 +1003,14 @@ export function MepSketchApp({
           stampNames: (project) => stampNameLookups([...project.customStampDefinitions, ...userStampLibrary.definitions]),
           store: buildingStore,
           onProgress: (done, total, name) => {
-            setStatus(`Rebuilding summaries: ${done} of ${total}${name ? ` (${name})` : ''}`);
+            setStatus(`Reading summaries: ${done} of ${total}${name ? ` (${name})` : ''}`);
             run?.onProgress?.(done, total, name);
           },
           signal: run?.signal ?? new AbortController().signal,
         });
         await buildingHook.reload();
-        const first = result.failed[0];
         setStatus(
-          `Rebuilt ${result.ok} of ${result.total} summaries.${result.cancelled ? ' Cancelled before the end.' : ''}${first ? ` ${result.failed.length} failed: ${shortText(first.sheet.displayName, 30)}: ${shortText(first.reason, 60)}. See Manage Buildings.` : ''}`,
+          `Read ${result.ok} of ${result.total} summaries.${result.cancelled ? ' Cancelled before the end.' : ''}${result.failed.length > 0 ? ` ${result.failed.length} failed. See Manage Buildings.` : ''}`,
         );
         return result;
       } catch (err) {
@@ -1845,6 +1847,7 @@ export function MepSketchApp({
   }, [inCircuitsFamily, tool, setShowCircuitLines]);
 
   const sheetLabel = currentSheetLabel(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex);
+  const scopeBuilding = quantitiesScopeDialog?.building ?? buildingHook.building?.file;
 
   return (
     <div className="mep-app">
@@ -1982,6 +1985,7 @@ export function MepSketchApp({
         openPortsVisible={openPortsVisible}
         onOpenPortsVisibleChange={(visible) => sceneRef.current?.setOpenPortsVisible(visible)}
         sheetLabel={sheetLabel}
+        onOpenSheetLabel={() => setManageBuildingsOpen(true)}
       />
 
       {calibrationPrompt && (
@@ -2194,12 +2198,23 @@ export function MepSketchApp({
 
       {quantitiesScopeDialog && (
         <QuantitiesScopeDialog
-          building={quantitiesScopeDialog.building && { name: quantitiesScopeDialog.building.name, levels: quantitiesScopeDialog.building.levels.map((level) => ({ id: level.id, name: level.name })) }}
+          building={scopeBuilding && { name: scopeBuilding.name, levels: scopeBuilding.levels.map((level) => ({ id: level.id, name: level.name })) }}
+          recent={buildingHook.recent.map(({ id, name }) => ({ id, name }))}
+          busy={buildingHook.busy}
+          message={buildingHook.message}
+          onOpenRecent={(id) => {
+            const entry = buildingHook.recent.find((r) => r.id === id);
+            if (entry) void buildingHook.openRecent(entry);
+          }}
+          onOpenFile={() => void buildingHook.open()}
+          onManage={() => {
+            setQuantitiesScopeDialog(null);
+            setManageBuildingsOpen(true);
+          }}
           onCancel={() => setQuantitiesScopeDialog(null)}
           onExport={(scope) => {
-            const building = quantitiesScopeDialog.building;
             setQuantitiesScopeDialog(null);
-            void runExportQuantities(scope, building);
+            void runExportQuantities(scope, scopeBuilding);
           }}
         />
       )}

@@ -26,7 +26,7 @@ const gone = await exportScope(t, 'building');
 const g = gone.xlsx.sheets.Segments ?? [];
 const warn = gone.xlsx.sheets.Warnings ?? [];
 check(g.length === 3, 'rows of both levels are still there', JSON.stringify(g));
-check(warn.some((r) => /Ground: PDF not found\. Using the summary saved \d{4}-\d{2}-\d{2}\./.test(r[0] ?? '')), 'Warnings sheet has "PDF not found. Using the summary"', JSON.stringify(warn));
+check(warn.some((r) => /Ground: PDF missing\. Using the summary saved \d{4}-\d{2}-\d{2}\./.test(r[0] ?? '')), 'Warnings sheet has "PDF missing. Using the summary"', JSON.stringify(warn));
 check(/warning\(s\): see the Warnings sheet/.test(gone.status), 'status points to the Warnings sheet', gone.status);
 await shot('B2-T08-warnings');
 

@@ -60,7 +60,7 @@ await t.idle(300);
 seen.add(await statusText());
 console.log('status values seen:', JSON.stringify([...seen]));
 check(result.ok === 2 && result.failed.length === 0, 'rebuild ok for 2 documents', JSON.stringify(result));
-check(/Rebuilt 2 of 2 summaries\./.test(await statusText()), 'status reaches 2 of 2', await statusText());
+check(/Read 2 of 2 summaries\./.test(await statusText()), 'status reaches 2 of 2', await statusText());
 await shot('B2-T06-rebuilt');
 
 const sums = await page.evaluate(async ([a, b]) => {
@@ -89,7 +89,7 @@ const res2 = await page.evaluate(async () => {
 });
 check(res2.ok === 2 && res2.failed.length === 1 && res2.failed[0].id === 's3', 'missing PDF is one failure, others done', JSON.stringify(res2));
 const st = await statusText();
-check(/Rebuilt 2 of 3 summaries\. 1 failed: Gone: /.test(st), 'status names the failed sheet', st);
+check(/Read 2 of 3 summaries\. 1 failed\. See Manage Buildings\./.test(st), 'status names the failed sheet', st);
 await shot('B2-T06-one-failed');
 
 await t.finish();

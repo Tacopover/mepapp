@@ -145,14 +145,14 @@ describe('rebuildSummaries', () => {
       building: buildingOf([missing, sheetOf('s2', 'C:/b.pdf', 0)]),
       engine,
       read: readerOf({ 'C:/b.pdf': 'B' }),
-      whyUnreadable: async () => 'PDF not found',
+      whyUnreadable: async () => 'PDF missing',
       stampNames,
       store,
       onProgress: () => undefined,
       signal: new AbortController().signal,
     });
     expect(result.ok).toBe(1);
-    expect(result.failed).toEqual([{ sheet: missing, reason: 'PDF not found' }]);
+    expect(result.failed).toEqual([{ sheet: missing, reason: 'PDF missing' }]);
     expect(await store.listSummaries()).toEqual(['uuid-b']);
     expect(state.closed).toBe(state.opened);
   });
@@ -169,7 +169,7 @@ describe('rebuildSummaries', () => {
       signal: new AbortController().signal,
     });
     expect(result.ok).toBe(0);
-    expect(result.failed.map((failure) => failure.reason)).toEqual(['never saved in MepApp']);
+    expect(result.failed.map((failure) => failure.reason)).toEqual(['not saved yet']);
     expect(state.closed).toBe(1);
   });
 

@@ -24,6 +24,7 @@ export interface StatusBarProps {
   openPortsVisible: boolean;
   onOpenPortsVisibleChange: (visible: boolean) => void;
   sheetLabel?: string | null;
+  onOpenSheetLabel?: () => void;
 }
 
 export function StatusBar({
@@ -46,6 +47,7 @@ export function StatusBar({
   openPortsVisible,
   onOpenPortsVisibleChange,
   sheetLabel,
+  onOpenSheetLabel,
 }: StatusBarProps) {
   const openPorts = drawingSummary.openPorts;
   const openTotal = openPorts.reduce((n, p) => n + p.count, 0);
@@ -75,9 +77,9 @@ export function StatusBar({
         </span>
       )}
       {sheetLabel && (
-        <span className="mep-chip mep-sheet-label-chip" data-testid="current-sheet" title={sheetLabel}>
+        <button type="button" className="mep-chip mep-sheet-label-chip" data-testid="current-sheet" title={sheetLabel} onClick={onOpenSheetLabel}>
           <b>{sheetLabel}</b>
-        </span>
+        </button>
       )}
       <span className="mep-chip">
         Units <b>{calibration ? 'mm' : 'pt (uncalibrated)'}</b>

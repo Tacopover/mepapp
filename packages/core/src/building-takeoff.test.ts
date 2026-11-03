@@ -103,7 +103,7 @@ describe('buildBuildingTakeoff', () => {
   it('warns and leaves out a sheet without a saved summary', () => {
     const result = takeoff(building([sheet('s1', 'L1', 0, 'u9', 'Ground A', 'ground.pdf')]), summaries);
     expect(result.warnings).toEqual([
-      'Ground A: no saved summary. Open the file in MepApp and save it, or use Rebuild summaries. Left out.',
+      'Ground A: no saved summary. Open the file in MepApp and save it, or use Read summaries now. Left out.',
     ]);
     expect(result.sheets).toEqual([{ sheetId: 's1', state: 'no-summary' }]);
     expect(result.tables).toEqual([]);
@@ -132,7 +132,7 @@ describe('buildBuildingTakeoff', () => {
 
   it('warns that the PDF is missing and uses the summary', () => {
     const result = takeoff(building([sheet('s1', 'L1', 0, 'u1', 'Ground A', 'ground.pdf')]), summaries, { kind: 'building' }, () => ({ state: 'missing' }));
-    expect(result.warnings).toEqual(['Ground A: PDF not found. Using the summary saved 2026-10-01.']);
+    expect(result.warnings).toEqual(['Ground A: PDF missing. Using the summary saved 2026-10-01.']);
     expect(result.sheets).toEqual([{ sheetId: 's1', state: 'pdf-missing-using-summary' }]);
     expect(result.tables[0]!.rows).toHaveLength(1);
   });
@@ -140,7 +140,7 @@ describe('buildBuildingTakeoff', () => {
   it('warns that MepApp may not read the PDF and uses the summary', () => {
     const result = takeoff(building([sheet('s1', 'L1', 0, 'u1', 'Ground A', 'ground.pdf')]), summaries, { kind: 'building' }, () => ({ state: 'no-access' }));
     expect(result.warnings).toEqual([
-      'Ground A: MepApp may not read the PDF (no access). Using the summary saved 2026-10-01. Use Grant access in Manage Buildings.',
+      'Ground A: no access to the PDF. Using the summary saved 2026-10-01. Use Grant access in Manage Buildings.',
     ]);
     expect(result.sheets).toEqual([{ sheetId: 's1', state: 'pdf-no-access-using-summary' }]);
     expect(result.tables[0]!.rows).toHaveLength(1);

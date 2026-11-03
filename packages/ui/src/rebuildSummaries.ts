@@ -58,7 +58,7 @@ async function rebuildDocument(
   const handle = await args.engine.openDocument(new Uint8Array(await file.arrayBuffer()));
   try {
     const bytes = await handle.getEmbeddedFile(PROJECT_FILE_NAME);
-    if (bytes === null) return { reason: 'never saved in MepApp' };
+    if (bytes === null) return { reason: 'not saved yet' };
     const project: ProjectDocument = loadProject(JSON.parse(new TextDecoder().decode(bytes)));
     if (project.projectUuid === undefined) return { reason: 'the document has no id yet. Save it again in MepApp' };
     if (first.projectUuid !== null && first.projectUuid !== project.projectUuid) return { reason: 'the file holds another document id' };
