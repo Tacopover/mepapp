@@ -169,6 +169,7 @@ Common verification: `pnpm --filter @mepapp/core test`, `pnpm --filter @mepapp/u
 ### Phase 3: ways forward and close-out
 
 **B3-T11i: Export scope dead end, status label, stale text.**
+- **DONE 2026-11-03, commit `51a887a`.** Core 2179 tests, UI 651 tests, build 9/9, new check `b3-t11i-check.mjs` 28/28; the director ran all 21 dialog browser checks after the last change: 583 passed, 0 failed. Not run: Tauri paths, the real "Open building…" picker, keyboard walk, screen reader, dark theme. Open for T11j: the status bar is crowded at 1600 px (the chip shows "Tower / Level 1…", the header shows the full path); the dialog result text still says "Rebuilt N of M" (`BuildingSummariesPane.tsx:121`); the Export dialog width changes with the scope; the scope dialog message has no Dismiss.
 - Files: `QuantitiesScopeDialog.tsx`, `App.tsx`, the status-bar label component, tests.
 - Shapes: with no building open, the scope dialog shows a select "Building" over `recent` and a button "Open building…" (opens the file picker). Choosing one opens it through `building.openRecent`, then the Level and Building scopes enable. A link "Manage buildings…" opens the main dialog. The status-bar label opens the dialog at the shown level when clicked, and it shortens with an ellipsis and a full title text at narrow widths (F-B3-3). The header "Saved …" text clears when the active tab changes (F-B3-3).
 - Fixes: R-4, F-B3-3.
