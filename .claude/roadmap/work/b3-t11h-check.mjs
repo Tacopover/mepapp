@@ -123,6 +123,7 @@ check(before !== 'pdf-missing' && (await plainStatus()) === 'pdf-missing', 'a wi
 
 // 3. Asks. Add a PDF that waits.
 await nextFile('multi.pdf');
+await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await idle(1200);
 check((await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).count()) === 1, 'a page waits (Not placed node)');
@@ -132,15 +133,13 @@ await shot('B3-T11h-ask-close-building');
 await dlg.locator('[data-testid="keep-working"]').click();
 await idle(200);
 check((await ask().count()) === 0 && (await dlg.locator('.mep-buildings-open-name').count()) === 1, 'Keep working keeps the building');
-// Open a sheet asks first.
+// Open a sheet asks nothing: the dialog stays open.
 await dlg.locator('[role="treeitem"][data-kind="level"]').first().click();
 await idle(300);
 await dlg.locator('[data-testid="page-row"]', { hasText: 'ground.pdf' }).locator('[data-testid="open-sheet"]').click();
 await idle(300);
-check(/Open the sheet anyway\?/.test(await askText()), 'opening a sheet asks', await askText());
+check((await ask().count()) === 0, 'opening a sheet asks nothing');
 check((await dlg.count()) === 1, 'the dialog stays open behind the ask');
-await dlg.locator('[data-testid="keep-working"]').click();
-await idle(200);
 // Close building, answer yes.
 await buildingMenu('Close building');
 await dlg.locator('[data-testid="close-anyway"]').click();
@@ -178,6 +177,7 @@ await page.evaluate(() => {
   const orig = window.showOpenFilePicker;
   window.showOpenFilePicker = async (...a) => { await new Promise((r) => setTimeout(r, 3000)); return orig(...a); };
 });
+await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await buildingMenu('Close building');
 await dlg.locator('button', { hasText: /^New building$/ }).click();

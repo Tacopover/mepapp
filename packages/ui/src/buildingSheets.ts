@@ -1,4 +1,4 @@
-import type { BuildingFile, BuildingSheet, NewSheetPage, SheetLocation } from '@mepapp/core';
+import { addSheets, type BuildingFile, type BuildingSheet, type NewSheetPage, type SheetLocation } from '@mepapp/core';
 
 export const COLLAPSE_AFTER_PAGES = 20;
 
@@ -152,6 +152,21 @@ export function waitingGroups(file: BuildingFile, pending: readonly PendingPdf[]
     .filter((group) => group.pending)
     .map((group) => ({ ...group, rows: group.rows.filter((row) => row.sheet === null) }))
     .filter((group) => group.rows.length > 0);
+}
+
+/** Puts the pages of the entries that are not yet sheets on the level. A page that is already a sheet stays where it is and is counted in `already`. An unknown level changes nothing. */
+export function placeEntriesOnLevel(file: BuildingFile, entries: readonly PendingPdf[], levelId: string): { file: BuildingFile; placed: number; already: number } {
+  const pages: NewSheetPage[] = [];
+  let already = 0;
+  for (const group of groupPdfs(file, entries).filter((item) => item.pending)) {
+    for (const row of group.rows) {
+      if (row.sheet === null) pages.push(newSheetPage(group, row.pageIndex));
+      else already += 1;
+    }
+  }
+  const result = addSheets(file, levelId, pages);
+  if (!result.ok) return { file, placed: 0, already: 0 };
+  return { file: result.file, placed: pages.length - result.skipped.length, already };
 }
 
 /** True when two pending entries name the same PDF (same pdfGroupKey). */

@@ -126,6 +126,7 @@ const addPdf = async (name, file) => {
     }
     window.__nextFile = n;
   }, [file === null ? null : b64(file), name]);
+  await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
   await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
   await idle(900);
 };
@@ -203,7 +204,7 @@ a = await active();
 check(a.key.startsWith('b:'), 'Home: first node (a building)', JSON.stringify(a));
 await page.keyboard.press('End');
 a = await active();
-check(a.role === 'treeitem' && (await items('building').last().getAttribute('data-key')) === a.key, 'End: last node', JSON.stringify(a));
+check(a.role === 'treeitem' && a.key.startsWith('a:'), 'End: last node (Add level)', JSON.stringify(a));
 await page.keyboard.press('Home');
 const openKey = await dlg.locator('[role="treeitem"][data-kind="building"][aria-expanded="true"]').getAttribute('data-key');
 // Move to the open building, collapse and expand it.

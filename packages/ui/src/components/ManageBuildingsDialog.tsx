@@ -31,7 +31,7 @@ import type { OpenDocumentRow } from '../openDocumentsView.js';
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
 
-type AskKind = 'close' | 'close-building' | 'switch' | 'open-sheet';
+type AskKind = 'close' | 'close-building' | 'switch';
 
 /** An action that waits for the answer to the question about the pages that are not placed. */
 interface PendingAsk {
@@ -43,7 +43,6 @@ const ASK_BUTTON: Record<AskKind, string> = {
   close: 'Close anyway',
   'close-building': 'Close building',
   switch: 'Switch building',
-  'open-sheet': 'Open sheet',
 };
 
 const NARROW_QUERY = '(max-width: 899px)';
@@ -201,25 +200,11 @@ export function ManageBuildingsDialog({
     guard('close', onClose);
   }
 
-  /** Opens a sheet in the viewer. The dialog closes when it worked. */
-  async function openSheetNow(sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> {
+  /** The open action of the sheet rows. The dialog stays open, so the user can open more sheets. */
+  async function openSheetKeepOpen(sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> {
     const result = await onOpenSheet(sheet, mode);
-    if (result.ok) onClose();
+    if (result.ok) onNotice(`Opened ${sheet.displayName} in the viewer.`, false);
     return result;
-  }
-
-  /** The open action of the sheet rows: asks first when pages wait. The answer "Open sheet" runs it. */
-  async function openSheetGuarded(sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> {
-    if (notPlaced === 0) return openSheetNow(sheet, mode);
-    setAsk({
-      kind: 'open-sheet',
-      run: () => {
-        void openSheetNow(sheet, mode).then((result) => {
-          if (!result.ok && result.message !== null) onNotice(result.message.startsWith('Could not') ? result.message : `Could not open ${sheet.location.fileName}: ${result.message}`, true);
-        });
-      },
-    });
-    return { ok: false, message: null };
   }
 
   function handleCreate() {
@@ -504,7 +489,7 @@ export function ManageBuildingsDialog({
                 fileAccess={fileAccess}
                 relinker={relinker}
                 sheetStatus={openBuilding.sheetStatus}
-                onOpenSheet={openSheetGuarded}
+                onOpenSheet={openSheetKeepOpen}
                 onNotice={onNotice}
               />
               {/* B4 adds a Risers tab here */}
@@ -565,7 +550,7 @@ export function ManageBuildingsDialog({
                   update={building.update}
                   fileAccess={fileAccess}
                   levelId={selectedLevel?.id ?? null}
-                  onOpenSheet={openSheetGuarded}
+                  onOpenSheet={openSheetKeepOpen}
                   relinker={relinker}
                   sheetStatus={openBuilding.sheetStatus}
                   sheetSummary={openBuilding.sheetSummary}
@@ -584,6 +569,9 @@ export function ManageBuildingsDialog({
                     fileAccess={fileAccess}
                     engine={pdfEngine}
                     pendingPdfs={pendingPdfs}
+                    file={openBuilding.file}
+                    update={building.update}
+                    levelId={selectedLevel?.id ?? null}
                     onRefreshStatus={building.refreshSheetStatus}
                     onAdded={() => {
                       setSelectedKey(NOT_PLACED_KEY);

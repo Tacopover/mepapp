@@ -268,7 +268,6 @@ describe('summary repair helpers', () => {
     expect(notPlacedAskText('close', 1)).toBe('1 page is not placed. Close anyway?');
     expect(notPlacedAskText('close-building', 3)).toBe('3 pages are not placed. Close the building anyway?');
     expect(notPlacedAskText('switch', 2)).toBe('2 pages are not placed. Switch building anyway?');
-    expect(notPlacedAskText('open-sheet', 2)).toContain('Open the sheet anyway?');
   });
 
   it('shortens a long text', () => {

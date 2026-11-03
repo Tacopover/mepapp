@@ -131,7 +131,7 @@ export function noSummaryText(count: number): string {
 }
 
 /** The text of the in-dialog question when an action drops the pages that wait for a level. */
-export function notPlacedAskText(action: 'close' | 'close-building' | 'switch' | 'open-sheet', pages: number): string {
+export function notPlacedAskText(action: 'close' | 'close-building' | 'switch', pages: number): string {
   const lead = `${pages} ${pages === 1 ? 'page is' : 'pages are'} not placed.`;
   switch (action) {
     case 'close':
@@ -140,8 +140,6 @@ export function notPlacedAskText(action: 'close' | 'close-building' | 'switch' |
       return `${lead} Close the building anyway?`;
     case 'switch':
       return `${lead} Switch building anyway?`;
-    case 'open-sheet':
-      return `${lead} Open the sheet anyway? The dialog closes.`;
   }
 }
 

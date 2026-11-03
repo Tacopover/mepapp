@@ -4,7 +4,7 @@ import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { countLabel } from '../buildingLevels.js';
 import { BUILDING_PDF_TYPES, joinFolderPath, pathOfTarget, readPdfInfo } from '../buildingPdfInfo.js';
-import { groupPdfs, isSamePdf, pdfGroupKey, pdfTotals, waitingGroups, type PdfGroup, type PendingPdf } from '../buildingSheets.js';
+import { groupPdfs, isSamePdf, pdfGroupKey, pdfTotals, placeEntriesOnLevel, waitingGroups, type PdfGroup, type PendingPdf } from '../buildingSheets.js';
 
 export interface PendingPdfsState {
   pending: PendingPdf[];
@@ -57,17 +57,26 @@ export interface BuildingSheetsPaneProps {
   fileAccess: FileAccess;
   engine: PdfEngine | undefined;
   pendingPdfs: PendingPdfsState;
+  file: BuildingFile;
+  update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
+  /** The selected level. Null: the added PDFs wait in the Not placed list. */
+  levelId: string | null;
   onRefreshStatus: () => void;
   /** Called after at least one PDF joined the not placed list. */
   onAdded?: () => void;
   onNotice: (text: string, error: boolean) => void;
 }
 
+/** The text that tells how many pages were already sheets of the building. */
+function alreadyText(count: number): string {
+  return `${countLabel(count, 'page')} ${count === 1 ? 'was' : 'were'} already in the building.`;
+}
+
 /**
  * The action row that adds PDFs from disk: "Add PDFs…" (one file at a time) and "Add folder…" (desktop only).
- * The added PDFs wait in the Not placed list (NotPlacedPane).
+ * With a selected level the pages go to that level at once. Without one the added PDFs wait in the Not placed list (NotPlacedPane).
  */
-export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshStatus, onAdded, onNotice }: BuildingSheetsPaneProps) {
+export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, file, update, levelId, onRefreshStatus, onAdded, onNotice }: BuildingSheetsPaneProps) {
   const [busy, setBusy] = useState(false);
   const { pending } = pendingPdfs;
   /** False after the building changed (the dialog keys this pane by building). A read that ends later must not add its PDFs. */
@@ -101,6 +110,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
   }
 
   async function addFile() {
+    const level = levelId === null ? undefined : file.levels.find((item) => item.id === levelId);
     const opened = await fileAccess.openFile(BUILDING_PDF_TYPES).catch((err: unknown) => {
       notify(`Could not open the file picker: ${(err as Error).message}`);
       return null;
@@ -111,8 +121,22 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
     try {
       const entry = await readEntry(opened.file, pathOfTarget(opened.target), engine);
       if (!mountedRef.current) return;
-      if (pending.some((other) => isSamePdf(other, entry))) {
+      if (level === undefined && pending.some((other) => isSamePdf(other, entry))) {
         notify(`${opened.file.name} is already in the list.`);
+        return;
+      }
+      if (level !== undefined) {
+        let placed = 0;
+        let already = 0;
+        await update((current) => {
+          const result = placeEntriesOnLevel(current, [entry], level.id);
+          placed = result.placed;
+          already = result.already;
+          return result.file;
+        });
+        if (!mountedRef.current) return;
+        if (placed === 0 && already > 0) notify(`${opened.file.name}: every page is already in the building.`);
+        else notify(`Added ${countLabel(placed, 'page')} to ${level.name}.${already > 0 ? ` ${alreadyText(already)}` : ''}`);
         return;
       }
       pendingPdfs.add([entry]);
@@ -127,6 +151,7 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
   }
 
   async function addFolder() {
+    const level = levelId === null ? undefined : file.levels.find((item) => item.id === levelId);
     const picked = await fileAccess.pickFolder().catch((err: unknown) => {
       notify(`Could not open the file picker: ${(err as Error).message}`);
       return null;
@@ -154,18 +179,36 @@ export function BuildingSheetsPane({ fileAccess, engine, pendingPdfs, onRefreshS
           failed.push(item.name);
           continue;
         }
-        if (pending.some((other) => isSamePdf(other, entry)) || added.some((other) => isSamePdf(other, entry))) {
+        if ((level === undefined && pending.some((other) => isSamePdf(other, entry))) || added.some((other) => isSamePdf(other, entry))) {
           skipped += 1;
           continue;
         }
         added.push(entry);
       }
       if (!mountedRef.current) return;
-      if (added.length > 0) {
-        pendingPdfs.add(added);
-        onAdded?.();
+      let parts: string[];
+      if (level !== undefined && added.length > 0) {
+        let placed = 0;
+        let already = 0;
+        await update((current) => {
+          const result = placeEntriesOnLevel(current, added, level.id);
+          placed = result.placed;
+          already = result.already;
+          return result.file;
+        });
+        if (!mountedRef.current) return;
+        parts =
+          placed > 0
+            ? [`Added ${countLabel(placed, 'page')} from ${picked.name} (${countLabel(added.length, 'PDF')}) to ${level.name}.`]
+            : [`${picked.name}: every page is already in the building.`];
+        if (placed > 0 && already > 0) parts.push(alreadyText(already));
+      } else {
+        if (added.length > 0) {
+          pendingPdfs.add(added);
+          onAdded?.();
+        }
+        parts = [`Added ${countLabel(added.length, 'PDF')} from ${picked.name}.`];
       }
-      const parts = [`Added ${countLabel(added.length, 'PDF')} from ${picked.name}.`];
       if (skipped > 0) parts.push(`${skipped} already in the list.`);
       if (failed.length > 0) parts.push(`Could not read ${failed.join(', ')}.`);
       notify(parts.join(' '));

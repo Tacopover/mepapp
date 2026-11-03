@@ -7,6 +7,7 @@ import {
   newSheetPage,
   pdfGroupKey,
   pdfTotals,
+  placeEntriesOnLevel,
   relinkWouldDuplicate,
   sheetDisplayName,
   sheetGroupsOfLevel,
@@ -342,5 +343,37 @@ describe('waitingGroups', () => {
     ]);
     expect(groups.map((group) => group.fileName)).toEqual(['a.pdf', 'b.pdf']);
     expect(groups.every((group) => group.pending)).toBe(true);
+  });
+});
+
+describe('placeEntriesOnLevel', () => {
+  it('puts every page of a new PDF on the level', () => {
+    const file = twoLevels([]);
+    const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'c.pdf', path: 'C:/c.pdf', pageCount: 3 })], 'L1');
+    expect(result.placed).toBe(3);
+    expect(result.already).toBe(0);
+    expect(result.file.sheets.map((sheet) => sheet.levelId)).toEqual(['L1', 'L1', 'L1']);
+  });
+
+  it('counts the pages that are already sheets and leaves them where they are', () => {
+    const old = { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L2' };
+    const file = twoLevels([old]);
+    const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 3 })], 'L1');
+    expect(result.placed).toBe(2);
+    expect(result.already).toBe(1);
+    expect(result.file.sheets.find((sheet) => sheet.id === 's1')).toEqual(old);
+  });
+
+  it('changes nothing for an unknown level', () => {
+    const file = twoLevels([]);
+    const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'c.pdf', path: 'C:/c.pdf', pageCount: 2 })], 'missing');
+    expect(result).toEqual({ file, placed: 0, already: 0 });
+  });
+
+  it('names the new sheets from the PDF', () => {
+    const file = twoLevels([]);
+    const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'c.pdf', path: 'C:/c.pdf', pageCount: 2 })], 'L1');
+    expect(result.file.sheets[1]?.displayName).toBe('c.pdf p2');
+    expect(result.file.sheets[1]?.location.fileName).toBe('c.pdf');
   });
 });

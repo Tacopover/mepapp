@@ -27,6 +27,7 @@ async function putFile(name, bytesB64) {
 const b64 = (file) => readFileSync(FIX + file).toString('base64');
 async function addPdf(name, file) {
   await putFile(name, b64(file));
+  await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
   await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
   await idle(900);
 }
@@ -74,6 +75,8 @@ check(/2 PDFs, 2 pages, 0 assigned/.test(await dlg.locator('[data-testid="sheets
 
 // Adding the same PDF again is refused with a notice.
 await addPdf('ground.pdf', '00_arch_ground_floor.pdf');
+await dlg.locator('[role="treeitem"][data-kind="not-placed"]').click();
+await idle(300);
 check((await groups().count()) === 2, 'same PDF twice: still two groups');
 check(/already in the list/.test((await dlg.locator('[data-testid="sheets-notice"]').textContent()) ?? ''), 'notice for the duplicate');
 

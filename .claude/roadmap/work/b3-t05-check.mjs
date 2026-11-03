@@ -58,6 +58,7 @@ const showBuilding = async () => {
 };
 
 async function openDialog() {
+  if ((await dlg.count()) > 0) return;
   await menu('Manage Buildings…');
   await dlg.waitFor({ state: 'visible', timeout: 8000 });
   await idle(300);
@@ -73,9 +74,11 @@ await shot('B3-T05-dialog');
 // Open page 2 of multi.pdf.
 await showLevel('Level 1');
 await groupOf('multi.pdf').locator('[data-testid="open-sheet"]').click();
-await t.until(async () => (await docCount()) >= 1 && !(await dlg.count()), 'open multi', 60000);
+await t.until(async () => (await docCount()) >= 1, 'open multi', 60000);
 await idle(1200);
-check((await dlg.count()) === 0, 'the dialog closes after a successful open');
+check((await dlg.count()) === 1, 'the dialog stays open after a successful open');
+await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+await dlg.waitFor({ state: 'hidden', timeout: 5000 });
 let chip = await pageChip();
 check(/Page\s*2\s*of\s*3/.test(chip), 'status bar shows page 2 of 3', chip);
 const docs = await page.evaluate(() => window.__mepSketchScene.getDocuments().map((d) => d.fileName));
@@ -96,7 +99,7 @@ check(/Page\s*2\s*of\s*3/.test(await pageChip()), 'still page 2 of 3');
 await openDialog();
 await showLevel('Ground floor');
 await groupOf('ground.pdf').locator('[data-testid="open-sheet"]').click();
-await t.until(async () => (await docCount()) === before + 1 && !(await dlg.count()), 'ground opens', 60000).catch(() => {});
+await t.until(async () => (await docCount()) === before + 1, 'ground opens', 60000).catch(() => {});
 await idle(1000);
 const docs2 = await page.evaluate(() => window.__mepSketchScene.getDocuments().map((d) => d.fileName));
 check(docs2.includes('ground.pdf') && docs2.length === before + 1, 'ground.pdf opens in its own tab', JSON.stringify(docs2));
@@ -122,8 +125,8 @@ await shot('B3-T05-missing');
 const docs3 = await docCount();
 await showLevel('Level 1');
 await groupOf('first.pdf').locator('[data-testid="open-sheet"]').click();
-await t.until(async () => (await docCount()) === docs3 + 1 && !(await dlg.count()), 'pick again', 30000).catch(() => {});
+await t.until(async () => (await docCount()) === docs3 + 1, 'pick again', 30000).catch(() => {});
 check((await docCount()) === docs3 + 1, 'pick again opens first.pdf in a new tab', `${docs3} -> ${await docCount()}`);
-check((await dlg.count()) === 0, 'dialog closes after the pick');
+check((await dlg.count()) === 1, 'dialog stays open after the pick');
 
 await t.finish();

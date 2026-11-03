@@ -81,6 +81,7 @@ import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components
 import { useBuilding } from './useBuilding.js';
 import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
+import { findOpenDocumentByPath } from './openDocumentMatch.js';
 import { currentSheetLabel } from './buildingStatus.js';
 import { currentSheetLevelId } from './buildingTree.js';
 import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
@@ -701,7 +702,7 @@ export function MepSketchApp({
   const documentOpenedRef = useRef<((args: { documentId: string; file: File; target: FileTarget | undefined; loadMismatch: boolean }) => Promise<void>) | null>(null);
 
   const openPdfFile = useCallback(
-    async (file: File, fileTarget: FileTarget | undefined) => {
+    async (file: File, fileTarget: FileTarget | undefined): Promise<string | null> => {
       // Reopening a file already open elsewhere in the document list just
       // switches to its tab — no re-parse, no duplicate — see decisions log
       // 2026-09-07's multi-document plan, D3.
@@ -711,12 +712,22 @@ export function MepSketchApp({
         sceneRef.current?.activateDocument(existingId);
         if (fileTarget) fileTargetsRef.current.set(existingId, fileTarget);
         setStatus(`Switched to already-open ${file.name}.`);
-        return;
+        return existingId;
+      }
+
+      // A Save changes the file's size and modified time, so the fileKey no longer matches. The path still does.
+      const openIds = (sceneRef.current?.getDocuments() ?? []).map((d) => d.id);
+      const byPathId = findOpenDocumentByPath(fileTargetsRef.current, openIds, pathOfTarget(fileTarget));
+      if (byPathId) {
+        sceneRef.current?.activateDocument(byPathId);
+        if (fileTarget) fileTargetsRef.current.set(byPathId, fileTarget);
+        setStatus(`Switched to already-open ${file.name}.`);
+        return byPathId;
       }
 
       if (fileTaskRef.current) {
         setStatus(FILE_TASK_BUSY_STATUS);
-        return;
+        return null;
       }
       const task: { documentId: string | null } = { documentId: null };
       fileTaskRef.current = task;
@@ -737,6 +748,7 @@ export function MepSketchApp({
         }
         setStatus(`Loaded ${file.name} (${pageWidthPt.toFixed(1)} x ${pageHeightPt.toFixed(1)} pt)`);
         if (task.documentId) void documentOpenedRef.current?.({ documentId: task.documentId, file, target: fileTarget, loadMismatch });
+        return task.documentId;
       } catch (err) {
         // Kept open, a document whose project failed to load (for example one
         // saved by a newer MepApp) shows an empty drawing, and a Save would
@@ -746,6 +758,7 @@ export function MepSketchApp({
           sceneRef.current?.closeDocument(task.documentId);
         }
         setStatus(`Could not open ${file.name}: ${(err as Error).message}. The file was not changed.`);
+        return null;
       } finally {
         fileTaskRef.current = null;
       }
@@ -823,10 +836,8 @@ export function MepSketchApp({
         setStatus(message);
         return { ok: false, message };
       }
-      await openPdfFile(opened.file, opened.target);
-      const fileKey = `${opened.file.name}:${opened.file.size}:${opened.file.lastModified}`;
+      const documentId = await openPdfFile(opened.file, opened.target);
       const scene = sceneRef.current;
-      const documentId = scene?.findDocumentByFileKey(fileKey);
       if (!scene || !documentId) return { ok: false, message: 'The file could not be opened. See the header for details.' };
       if (scene.getActiveDocumentId() !== documentId) scene.activateDocument(documentId);
       await showPage(sheet.pageIndex);
@@ -851,7 +862,11 @@ export function MepSketchApp({
     if (!ready || !fileAccess.onOpenRequest) return;
     let queue = Promise.resolve();
     return fileAccess.onOpenRequest((files) => {
-      for (const opened of files) queue = queue.then(() => openPdfFileRef.current(opened.file, opened.target));
+      for (const opened of files) {
+        queue = queue.then(async () => {
+          await openPdfFileRef.current(opened.file, opened.target);
+        });
+      }
     });
   }, [fileAccess, ready]);
 

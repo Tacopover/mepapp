@@ -296,6 +296,8 @@ await page.keyboard.press('Enter');
 await idle(300);
 check((await dlg.locator('[data-testid="selection-summary"] h4').textContent())?.length > 0, 'Enter selects a node');
 // Ask: add a waiting PDF, then Close building -> ask -> focus checks.
+await items('building').filter({ hasText: 'Tower' }).click();
+await idle(300);
 await putFile('wait.pdf', 'arch_simple_A4.pdf');
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await idle(1500);

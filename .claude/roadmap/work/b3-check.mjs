@@ -34,6 +34,7 @@ async function putFile(name, b64text) {
 async function addPdf(name, file) {
   if (file === null) await page.evaluate((n) => { window.__nextFile = n; }, name);
   else await putFile(name, b64(file));
+await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
   await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
   await idle(900);
 }
@@ -143,7 +144,11 @@ await showLevel('Level 1');
 await sheetGroupOf('first.pdf').locator('[data-testid="open-sheet"]').click();
 await idle(300);
 if ((await dlg.locator('[data-testid="close-ask"]').count()) === 1) await dlg.locator('[data-testid="close-anyway"]').click();
-await t.until(async () => (await dlg.count()) === 0, 'dialog closes after open', 60000);
+await t.until(async () => ((await page.locator('[data-testid="current-sheet-header"]').textContent().catch(() => '')) ?? '') === 'Office block / Level 1 / first.pdf', 'header shows the opened sheet', 60000);
+check((await dlg.count()) === 1, 'the dialog stays open after Open');
+await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+if ((await dlg.locator('[data-testid="close-anyway"]').count()) > 0) await dlg.locator('[data-testid="close-anyway"]').click();
+await dlg.waitFor({ state: 'hidden', timeout: 5000 });
 await idle(1500);
 const headerLabel = await page.locator('[data-testid="current-sheet-header"]').textContent().catch(() => '');
 check(headerLabel === 'Office block / Level 1 / first.pdf', 'step 5: the header shows the opened sheet', headerLabel ?? '');
