@@ -2077,8 +2077,7 @@
   width: 90px;
   box-sizing: border-box;
 }
-.mep-level-elevation,
-.mep-level-move {
+.mep-level-elevation {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2093,7 +2092,6 @@
   margin: 0;
 }
 .mep-level-detail button[aria-disabled='true'],
-.mep-level-move button[aria-disabled='true'],
 .mep-buildings-actions button[aria-disabled='true'] {
   color: var(--muted);
   opacity: 0.5;
@@ -2104,12 +2102,6 @@
 }
 .mep-level-undo button {
   margin-left: 8px;
-}
-.mep-level-sort {
-  align-items: center;
-}
-.mep-level-sort .mep-hint {
-  margin: 0;
 }
 .mep-sheets-group {
   border-top: 1px solid var(--line-soft, var(--line));

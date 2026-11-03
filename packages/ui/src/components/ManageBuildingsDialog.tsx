@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { addLevel, moveLevel, type BuildingFile, type BuildingSheet } from '@mepapp/core';
+import { addLevel, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
@@ -290,21 +290,6 @@ export function ManageBuildingsDialog({
     focusNav();
   }
 
-  function onMoveLevel(node: TreeNode, delta: -1 | 1) {
-    if (openBuilding === null) return;
-    const level = openBuilding.file.levels.find((item) => levelKey(item.id) === node.key);
-    if (level === undefined) return;
-    const index = openBuilding.file.levels.indexOf(level);
-    const target = index + delta;
-    if (target < 0 || target > openBuilding.file.levels.length - 1) return;
-    void building.update((f) => moveLevel(f, level.id, target));
-    setSelectedKey(node.key);
-    setFocusKey(node.key);
-    requestAnimationFrame(() => {
-      navRef.current?.querySelector<HTMLElement>(`[role="treeitem"][data-key="${node.key}"]`)?.focus();
-    });
-  }
-
   function onToggle(key: string, expand: boolean) {
     setCollapsed((set) => {
       const next = new Set(set);
@@ -429,7 +414,6 @@ export function ManageBuildingsDialog({
               onActivate={onActivate}
               onToggle={onToggle}
               onForget={onForget}
-              onMoveLevel={onMoveLevel}
               autoFocus={nodes.length > 0}
             />
           )}

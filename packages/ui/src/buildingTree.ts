@@ -57,10 +57,12 @@ export function levelHasWarning(file: BuildingFile, levelId: string, sheetStatus
 /** The visible nodes in display order: every building, and under the open building its levels, the add-level node and the Not placed node. */
 export function buildTreeNodes(input: TreeInput): TreeNode[] {
   const { recent, open, sheetStatus, notPlacedCount, collapsed } = input;
-  const entries =
+  const listed =
     open !== null && !recent.some((entry) => entry.id === open.file.id)
       ? [{ id: open.file.id, name: open.file.name, location: open.location }, ...recent]
       : recent;
+  const labelOf = (entry: RecentBuilding): string => (open !== null && open.file.id === entry.id ? open.file.name : entry.name);
+  const entries = [...listed].sort((a, b) => labelOf(a).localeCompare(labelOf(b), undefined, { sensitivity: 'base' }));
   const nodes: TreeNode[] = [];
   for (const entry of entries) {
     const key = buildingKey(entry.id);

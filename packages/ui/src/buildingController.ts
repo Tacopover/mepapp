@@ -1,4 +1,12 @@
-import { BuildingFileError, emptyBuilding, parseBuildingFile, serializeBuildingFile, type BuildingFile, type SheetSummary } from '@mepapp/core';
+import {
+  BuildingFileError,
+  emptyBuilding,
+  parseBuildingFile,
+  serializeBuildingFile,
+  sortLevelsByElevation,
+  type BuildingFile,
+  type SheetSummary,
+} from '@mepapp/core';
 import {
   StoreConflictError,
   type BuildingRef,
@@ -228,7 +236,7 @@ export class BuildingController {
   async update(change: (file: BuildingFile) => BuildingFile): Promise<void> {
     const current = this.state.building;
     if (current === null) return;
-    const next = change(current.file);
+    const next = sortLevelsByElevation(change(current.file));
     if (next === current.file) return;
     this.setBuilding({ file: next, dirty: true });
     this.pendingWrites += 1;
@@ -254,7 +262,7 @@ export class BuildingController {
       const stored = await building.store.read();
       if (this.generation !== generation) return;
       if (stored === undefined || stored.revision === building.revision) return;
-      const file = parseBuildingFile(JSON.parse(stored.json));
+      const file = sortLevelsByElevation(parseBuildingFile(JSON.parse(stored.json)));
       this.lastJson = serializeBuildingFile(file);
       this.setBuilding({ file, revision: stored.revision });
       void this.refreshSheetStatus();
@@ -317,9 +325,10 @@ export class BuildingController {
   }
 
   private showBuilding(building: OpenBuilding, recent?: RecentBuilding[]): void {
+    const shown = { ...building, file: sortLevelsByElevation(building.file) };
     this.generation += 1;
-    this.lastJson = serializeBuildingFile(building.file);
-    this.setState({ building, message: null, recent: recent ?? this.state.recent });
+    this.lastJson = serializeBuildingFile(shown.file);
+    this.setState({ building: shown, message: null, recent: recent ?? this.state.recent });
   }
 
   private async busy(task: () => Promise<void>): Promise<void> {
@@ -396,7 +405,7 @@ export class BuildingController {
       const stored = await store.read();
       if (this.generation !== generation) return;
       if (stored !== undefined) {
-        const file = parseBuildingFile(JSON.parse(stored.json));
+        const file = sortLevelsByElevation(parseBuildingFile(JSON.parse(stored.json)));
         this.lastJson = serializeBuildingFile(file);
         this.setBuilding({ file, revision: stored.revision });
         void this.refreshSheetStatus();

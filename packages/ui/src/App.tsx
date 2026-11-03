@@ -9,6 +9,7 @@ import {
   isLibraryStampId,
   makeProjectUuid,
   parseBuildingFile,
+  sortLevelsByElevation,
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
   DEFAULT_CEILING_HEIGHT_MM,
@@ -1107,7 +1108,7 @@ export function MepSketchApp({
     if (buildingStore) {
       try {
         const stored = await buildingStore.read();
-        building = stored === undefined ? undefined : parseBuildingFile(JSON.parse(stored.json));
+        building = stored === undefined ? undefined : sortLevelsByElevation(parseBuildingFile(JSON.parse(stored.json)));
       } catch (err) {
         setStatus(`Failed to read the building: ${(err as Error).message}`);
       }

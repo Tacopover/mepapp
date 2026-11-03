@@ -29,12 +29,6 @@ export function deleteBlockedText(file: BuildingFile, levelId: string): string |
   return `Remove its ${countLabel(count, 'sheet')} first`;
 }
 
-/** null when sorting changes the order; else "Levels are already in order of elevation." (also when there are fewer than 2 levels). */
-export function sortBlockedText(file: BuildingFile): string | null {
-  const inOrder = file.levels.every((level, index) => index === 0 || file.levels[index - 1]!.elevationMm <= level.elevationMm);
-  return inOrder ? 'Levels are already in order of elevation.' : null;
-}
-
 /** Puts a deleted level back at index (clamped). Returns the file unchanged when a level with that id exists. */
 export function restoreLevel(file: BuildingFile, level: BuildingLevel, index: number): BuildingFile {
   if (file.levels.some((item) => item.id === level.id)) return file;

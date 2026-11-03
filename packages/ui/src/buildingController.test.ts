@@ -1,4 +1,12 @@
-import { addLevel, emptyBuilding, parseBuildingFile, serializeBuildingFile, type BuildingFile, type BuildingSheet } from '@mepapp/core';
+import {
+  addLevel,
+  emptyBuilding,
+  parseBuildingFile,
+  serializeBuildingFile,
+  setLevelElevation,
+  type BuildingFile,
+  type BuildingSheet,
+} from '@mepapp/core';
 import { MemoryBuildingStore, type BuildingRef, type BuildingStore, type FileAccess } from '@mepapp/platform';
 import { describe, expect, it, vi } from 'vitest';
 import { IMPORTED_OLD_BUILDINGS_KEY, type Building } from './buildings.js';
@@ -112,6 +120,16 @@ describe('BuildingController open', () => {
     expect(building?.file.levels.map((level) => level.name)).toEqual(['Ground', 'First']);
     expect(building?.ref.location).toBe('Tower.building.json');
     expect(controller.getState().message).toBeNull();
+  });
+
+  it('shows the levels of a file that is not in elevation order sorted by elevation', async () => {
+    const file = addLevel(addLevel(emptyBuilding('b-2', 'Tower'), 'First', 3000, 'L2'), 'Ground', 0, 'L1');
+    const json = serializeBuildingFile(file);
+    const { controller } = setup({
+      openFile: async () => ({ file: new File([json], 'Tower.building.json') }),
+    });
+    await controller.open();
+    expect(controller.getState().building?.file.levels.map((level) => level.name)).toEqual(['Ground', 'First']);
   });
 
   it('gives a message for invalid JSON', async () => {
@@ -254,6 +272,14 @@ describe('BuildingController update', () => {
     const before = controller.getState();
     await controller.update((file) => file);
     expect(controller.getState()).toBe(before);
+  });
+
+  it('re-sorts the levels after a change of elevation', async () => {
+    const { controller } = setup({ saveFileAs: savedAs('Tower.building.json') });
+    await controller.create('Tower');
+    await controller.update((file) => addLevel(addLevel(file, 'Ground', 0, 'L1'), 'First', 3000, 'L2'));
+    await controller.update((file) => setLevelElevation(file, 'L1', 6000));
+    expect(controller.getState().building?.file.levels.map((level) => level.name)).toEqual(['First', 'Ground']);
   });
 
   it('resolves with no open building', async () => {

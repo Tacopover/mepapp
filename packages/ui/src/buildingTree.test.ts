@@ -34,7 +34,7 @@ function withSheets(file: BuildingFile, levelIds: string[]): BuildingFile {
 
 const recent = [
   { id: 'b1', name: 'Tower', location: 'C:/tower.json' },
-  { id: 'b2', name: 'Annex', location: 'C:/annex.json' },
+  { id: 'b2', name: 'Zeta', location: 'C:/zeta.json' },
 ];
 
 function input(overrides: Partial<TreeInput> = {}): TreeInput {
@@ -128,6 +128,29 @@ describe('buildTreeNodes', () => {
     const node = some.find((n) => n.key === NOT_PLACED_KEY);
     expect(node).toMatchObject({ kind: 'not-placed', parentKey: 'b:b1', detail: '3' });
     expect(some.indexOf(node!)).toBe(3);
+  });
+
+  it('orders the buildings alphabetically, ignoring case, and does not change the recent list', () => {
+    const list = [
+      { id: 'z', name: 'Zeta', location: 'z.json' },
+      { id: 'a', name: 'alpha', location: 'a.json' },
+      { id: 'm', name: 'Mid', location: 'm.json' },
+    ];
+    const nodes = buildTreeNodes(input({ recent: list }));
+    expect(nodes.map((n) => n.key)).toEqual(['b:a', 'b:m', 'b:z']);
+    expect(list.map((entry) => entry.id)).toEqual(['z', 'a', 'm']);
+  });
+
+  it('keeps the alphabetical place of the open building', () => {
+    const list = [
+      { id: 'z', name: 'Zeta', location: 'z.json' },
+      { id: 'a', name: 'alpha', location: 'a.json' },
+      { id: 'm', name: 'Mid', location: 'm.json' },
+    ];
+    const closed = buildTreeNodes(input({ recent: list }));
+    const opened = buildTreeNodes(input({ recent: list, open: { file: withLevels([0], 'z', 'Zeta'), location: 'z.json' } }));
+    expect(closed.map((n) => n.key)).toEqual(['b:a', 'b:m', 'b:z']);
+    expect(opened.filter((n) => n.kind === 'building').map((n) => n.key)).toEqual(['b:a', 'b:m', 'b:z']);
   });
 });
 

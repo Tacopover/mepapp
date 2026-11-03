@@ -35,17 +35,6 @@ export function setLevelElevation(file: BuildingFile, levelId: string, elevation
   return { ...file, levels: file.levels.map((level) => (level.id === levelId ? { ...level, elevationMm } : level)) };
 }
 
-/** Moves the level to index toIndex (clamped to 0..levels.length-1) and keeps the order of the other levels. Unknown id: unchanged. */
-export function moveLevel(file: BuildingFile, levelId: string, toIndex: number): BuildingFile {
-  if (!Number.isFinite(toIndex)) return file;
-  const from = file.levels.findIndex((level) => level.id === levelId);
-  if (from < 0) return file;
-  const to = Math.min(Math.max(toIndex, 0), file.levels.length - 1);
-  const levels = file.levels.filter((level) => level.id !== levelId);
-  levels.splice(to, 0, file.levels[from]!);
-  return { ...file, levels };
-}
-
 /** Refuses when a sheet uses the level. */
 export function deleteLevel(
   file: BuildingFile,
@@ -134,7 +123,11 @@ export function relinkSheet(
   };
 }
 
-/** Stable sort by elevationMm ascending. */
+/** Sorts levels by elevationMm ascending. Equal elevations sort by name (case-insensitive), then keep their order. The same file object is returned when the levels are already in order. */
 export function sortLevelsByElevation(file: BuildingFile): BuildingFile {
-  return { ...file, levels: [...file.levels].sort((a, b) => a.elevationMm - b.elevationMm) };
+  const compare = (a: BuildingFile['levels'][number], b: BuildingFile['levels'][number]): number =>
+    a.elevationMm - b.elevationMm || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  const inOrder = file.levels.every((level, index) => index === 0 || compare(file.levels[index - 1]!, level) <= 0);
+  if (inOrder) return file;
+  return { ...file, levels: [...file.levels].sort(compare) };
 }

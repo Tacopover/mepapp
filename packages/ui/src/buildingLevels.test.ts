@@ -8,7 +8,6 @@ import {
   nextLevelElevation,
   restoreLevel,
   sheetCount,
-  sortBlockedText,
 } from './buildingLevels.js';
 
 function withLevels(elevations: number[]): BuildingFile {
@@ -114,23 +113,6 @@ describe('deleteBlockedText', () => {
   it('names several sheets in the plural', () => {
     const file = withSheets(withLevels([0]), ['level-0', 'level-0']);
     expect(deleteBlockedText(file, 'level-0')).toBe('Remove its 2 sheets first');
-  });
-});
-
-describe('sortBlockedText', () => {
-  const inOrder = 'Levels are already in order of elevation.';
-
-  it('returns null when the levels are not in order', () => {
-    expect(sortBlockedText(withLevels([3000, 0]))).toBeNull();
-  });
-
-  it('explains when the levels are already sorted', () => {
-    expect(sortBlockedText(withLevels([0, 3000]))).toBe(inOrder);
-  });
-
-  it('explains for one level or none', () => {
-    expect(sortBlockedText(withLevels([5]))).toBe(inOrder);
-    expect(sortBlockedText(withLevels([]))).toBe(inOrder);
   });
 });
 

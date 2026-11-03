@@ -4,7 +4,6 @@ import {
   addLevel,
   addSheets,
   deleteLevel,
-  moveLevel,
   moveSheet,
   relinkSheet,
   removeSheet,
@@ -31,13 +30,6 @@ function sample(): BuildingFile {
       { id: 's0', levelId: 'l0', projectUuid: 'u-1', pageIndex: 0, displayName: 'Plan p1', location: { fileName: 'plan.pdf', path: '/a/plan.pdf' } },
       { id: 's1', levelId: 'l1', projectUuid: 'u-1', pageIndex: 1, displayName: 'Plan p2', location: { fileName: 'plan.pdf', path: '/a/plan.pdf' } },
     ],
-  };
-}
-
-function fourLevels(): BuildingFile {
-  return {
-    ...emptyBuilding('b-1', 'Tower'),
-    levels: ['l0', 'l1', 'l2', 'l3'].map((id, index) => ({ id, name: id, elevationMm: index * 3000 })),
   };
 }
 
@@ -85,34 +77,6 @@ describe('building edit', () => {
     const file = sample();
     expect(setLevelElevation(file, 'l1', Number.NaN)).toBe(file);
     expect(setLevelElevation(file, 'nope', 1000)).toBe(file);
-  });
-
-  it('moves a level to the front', () => {
-    expect(moveLevel(fourLevels(), 'l2', 0).levels.map((level) => level.id)).toEqual(['l2', 'l0', 'l1', 'l3']);
-  });
-
-  it('moves a level to the end', () => {
-    expect(moveLevel(fourLevels(), 'l0', 3).levels.map((level) => level.id)).toEqual(['l1', 'l2', 'l3', 'l0']);
-  });
-
-  it('clamps the target index of a move', () => {
-    expect(moveLevel(fourLevels(), 'l1', 99).levels.map((level) => level.id)).toEqual(['l0', 'l2', 'l3', 'l1']);
-    expect(moveLevel(fourLevels(), 'l2', -5).levels.map((level) => level.id)).toEqual(['l2', 'l0', 'l1', 'l3']);
-  });
-
-  it('keeps the order of the other levels when it moves one', () => {
-    expect(moveLevel(fourLevels(), 'l1', 2).levels.map((level) => level.id)).toEqual(['l0', 'l2', 'l1', 'l3']);
-  });
-
-  it('returns the same file for an unknown id', () => {
-    const file = fourLevels();
-    expect(moveLevel(file, 'nope', 0)).toBe(file);
-  });
-
-  it('returns the same file for a target index that is not finite', () => {
-    const file = fourLevels();
-    expect(moveLevel(file, 'l1', Number.NaN)).toBe(file);
-    expect(moveLevel(file, 'l1', Number.POSITIVE_INFINITY)).toBe(file);
   });
 
   it('refuses to delete a level that a sheet uses', () => {
@@ -316,16 +280,33 @@ describe('building edit', () => {
     expect(sortLevelsByElevation(file).levels.map((level) => level.id)).toEqual(['c', 'b', 'a']);
   });
 
-  it('keeps the order of levels with equal elevation', () => {
+  it('orders levels with equal elevation by name', () => {
     const file: BuildingFile = {
       ...emptyBuilding('b-1', 'Tower'),
       levels: [
-        { id: 'x', name: 'X', elevationMm: 0 },
+        { id: 'x', name: 'Zeta', elevationMm: 0 },
         { id: 'y', name: 'Y', elevationMm: 3000 },
-        { id: 'z', name: 'Z', elevationMm: 0 },
+        { id: 'z', name: 'alpha', elevationMm: 0 },
       ],
     };
-    expect(sortLevelsByElevation(file).levels.map((level) => level.id)).toEqual(['x', 'z', 'y']);
+    expect(sortLevelsByElevation(file).levels.map((level) => level.id)).toEqual(['z', 'x', 'y']);
+  });
+
+  it('compares names case-insensitively and keeps the order of names that differ only by case', () => {
+    const file: BuildingFile = {
+      ...emptyBuilding('b-1', 'Tower'),
+      levels: [
+        { id: 'a', name: 'beta', elevationMm: 0 },
+        { id: 'b', name: 'Alpha', elevationMm: 0 },
+        { id: 'c', name: 'alpha', elevationMm: 0 },
+      ],
+    };
+    expect(sortLevelsByElevation(file).levels.map((level) => level.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('returns the same file when the levels are already in order', () => {
+    const file = sample();
+    expect(sortLevelsByElevation(file)).toBe(file);
   });
 
   it('keeps a file valid after a sequence of edits', () => {
@@ -333,7 +314,7 @@ describe('building edit', () => {
     const added = addSheets(file, 'l2', [page(0), page(1)]);
     if (!added.ok) throw new Error('add failed');
     file = moveSheet(added.file, added.file.sheets[2]!.id, 'l1');
-    file = moveLevel(file, 'l2', 0);
+    file = setLevelElevation(file, 'l2', -5000);
     file = setLevelElevation(file, 'l1', -200);
     file = renameLevel(file, 'l0', 'Cellar');
     file = sortLevelsByElevation(file);

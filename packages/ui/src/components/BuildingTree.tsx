@@ -14,8 +14,6 @@ export interface BuildingTreeProps {
   onToggle: (key: string, expand: boolean) => void;
   /** Delete on a building that is not open, or a click on its remove button. */
   onForget: (node: TreeNode) => void;
-  /** Alt+ArrowUp or Alt+ArrowDown on a level: moves the level by delta (-1 up, 1 down). */
-  onMoveLevel?: (node: TreeNode, delta: -1 | 1) => void;
   /** Focus the tree when it mounts. */
   autoFocus: boolean;
 }
@@ -29,7 +27,6 @@ export function BuildingTree({
   onActivate,
   onToggle,
   onForget,
-  onMoveLevel,
   autoFocus,
 }: BuildingTreeProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -55,11 +52,6 @@ export function BuildingTree({
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>, node: TreeNode) {
     if (event.target !== event.currentTarget) return;
-    if (onMoveLevel && node.kind === 'level' && event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-      event.preventDefault();
-      onMoveLevel(node, event.key === 'ArrowUp' ? -1 : 1);
-      return;
-    }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onActivate(node);

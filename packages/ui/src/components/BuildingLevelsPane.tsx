@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  deleteLevel,
-  levelWarnings,
-  moveLevel,
-  renameLevel,
-  setLevelElevation,
-  sortLevelsByElevation,
-  type BuildingFile,
-  type BuildingLevel,
-} from '@mepapp/core';
-import { deleteBlockedText, restoreLevel, sortBlockedText } from '../buildingLevels.js';
+import { deleteLevel, levelWarnings, renameLevel, setLevelElevation, type BuildingFile, type BuildingLevel } from '@mepapp/core';
+import { deleteBlockedText, restoreLevel } from '../buildingLevels.js';
 import { buildingKey, levelKey } from '../buildingTree.js';
 
 /** How long the Undo line stays after a level is deleted, in ms. */
@@ -41,7 +32,6 @@ export function BuildingLevelsPane({
   const selectedIndex = file.levels.findIndex((level) => level.id === selectedLevelId);
   const selectedLevel = selectedIndex >= 0 ? file.levels[selectedIndex]! : null;
   const deleteBlocked = selectedLevel !== null ? deleteBlockedText(file, selectedLevel.id) : null;
-  const sortBlocked = sortBlockedText(file);
 
   useEffect(() => {
     if (undo === null) return;
@@ -92,32 +82,6 @@ export function BuildingLevelsPane({
             </span>
           </div>
           <div className="mep-level-row">
-            <div className="mep-level-move">
-              <button
-                type="button"
-                aria-label="Move level up"
-                title="Move level up"
-                aria-disabled={selectedIndex === 0}
-                onClick={() => {
-                  if (selectedIndex === 0) return;
-                  void update((f) => moveLevel(f, selectedLevel.id, selectedIndex - 1));
-                }}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                aria-label="Move level down"
-                title="Move level down"
-                aria-disabled={selectedIndex === file.levels.length - 1}
-                onClick={() => {
-                  if (selectedIndex === file.levels.length - 1) return;
-                  void update((f) => moveLevel(f, selectedLevel.id, selectedIndex + 1));
-                }}
-              >
-                ↓
-              </button>
-            </div>
             <div className="mep-level-delete">
               <button
                 type="button"
@@ -144,29 +108,6 @@ export function BuildingLevelsPane({
             Undo
           </button>
         </p>
-      )}
-      {file.levels.length > 0 && (
-        <>
-          <h4>Level order</h4>
-          <div className="mep-buildings-actions mep-level-sort">
-            <button
-              type="button"
-              aria-disabled={sortBlocked !== null}
-              aria-describedby={sortBlocked !== null ? 'mep-level-sort-reason' : undefined}
-              title={sortBlocked ?? 'Sort levels by elevation'}
-              onClick={() => {
-                if (sortBlocked === null) void update((f) => sortLevelsByElevation(f));
-              }}
-            >
-              Sort by elevation
-            </button>
-            {sortBlocked !== null && (
-              <p id="mep-level-sort-reason" className="mep-hint" data-testid="sort-reason">
-                {sortBlocked}
-              </p>
-            )}
-          </div>
-        </>
       )}
       {levelWarnings(file).map((warning) => (
         <p key={warning} className="mep-hint mep-buildings-message">
