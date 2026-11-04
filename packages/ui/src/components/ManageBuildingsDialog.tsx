@@ -31,7 +31,7 @@ import type { OpenDocumentRow } from '../openDocumentsView.js';
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
 
-type AskKind = 'close' | 'close-building' | 'switch';
+type AskKind = 'close' | 'switch';
 
 /** An action that waits for the answer to the question about the pages that are not placed. */
 interface PendingAsk {
@@ -41,7 +41,6 @@ interface PendingAsk {
 
 const ASK_BUTTON: Record<AskKind, string> = {
   close: 'Close anyway',
-  'close-building': 'Close building',
   switch: 'Switch building',
 };
 
@@ -104,7 +103,7 @@ export interface ManageBuildingsDialogProps {
 }
 
 /**
- * Manage Buildings: creates, opens and closes the one open building file.
+ * Manage Buildings: creates and opens the one open building file.
  * The building file is stored by the platform (a file picker on desktop).
  */
 export function ManageBuildingsDialog({
@@ -295,11 +294,9 @@ export function ManageBuildingsDialog({
         <h3 className="mep-modal-title">Manage Buildings</h3>
         <BuildingMenu
           busy={building.busy}
-          hasBuilding={openBuilding !== null}
           importLabel={oldPending.length > 0 ? `Import ${countLabel(oldPending.length, 'old building')}` : null}
           onNew={() => setCreating(true)}
           onOpen={() => guard('switch', () => void building.open())}
-          onClose={() => guard('close-building', () => building.close())}
           onImport={() => void handleImportOld()}
         />
       </div>

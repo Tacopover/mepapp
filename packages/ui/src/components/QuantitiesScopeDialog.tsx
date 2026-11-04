@@ -4,13 +4,13 @@ import { Dialog } from './Dialog.js';
 
 export interface QuantitiesScopeDialogProps {
   /** Undefined when no building is open: Level and Building are disabled with the hint "Open a building first". */
-  building?: { name: string; levels: { id: string; name: string }[] };
-  /** Recent buildings; shown as a select when no building is open. */
-  recent?: { id: string; name: string }[];
+  building?: { id: string; name: string; levels: { id: string; name: string }[] };
+  /** The building choices, the open building first. Shown as the Building select when there is at least one. */
+  buildings?: { id: string; name: string }[];
   busy?: boolean;
   /** Error text from the building controller (shown under the select). */
   message?: string | null;
-  onOpenRecent?: (id: string) => void;
+  onSelectBuilding?: (id: string) => void;
   onOpenFile?: () => void;
   onManage?: () => void;
   onExport: (scope: ExportScope) => void;
@@ -23,7 +23,12 @@ export function effectiveLevelId(levels: { id: string }[], levelId: string): str
   return levels.some((level) => level.id === levelId) ? levelId : (levels[0]?.id ?? '');
 }
 
-export function QuantitiesScopeDialog({ building, recent, busy, message, onOpenRecent, onOpenFile, onManage, onExport, onCancel }: QuantitiesScopeDialogProps) {
+/** A building with no levels cannot give a Level or Building takeoff, so those kinds fall back to Document. */
+export function effectiveKind(kind: ScopeKind, buildingDisabled: boolean): ScopeKind {
+  return buildingDisabled && (kind === 'level' || kind === 'building') ? 'document' : kind;
+}
+
+export function QuantitiesScopeDialog({ building, buildings, busy, message, onSelectBuilding, onOpenFile, onManage, onExport, onCancel }: QuantitiesScopeDialogProps) {
   const [kind, setKind] = useState<ScopeKind>('document');
   const [levelId, setLevelId] = useState<string>('');
 
@@ -31,10 +36,11 @@ export function QuantitiesScopeDialog({ building, recent, busy, message, onOpenR
   const buildingDisabled = building === undefined || levels.length === 0;
   const hint = building === undefined ? 'Open a building first' : levels.length === 0 ? 'The building has no levels yet' : undefined;
   const selectedLevelId = effectiveLevelId(levels, levelId);
+  const shownKind = effectiveKind(kind, buildingDisabled);
 
   const submit = () => {
-    if (kind === 'level') onExport({ kind: 'level', levelId: selectedLevelId });
-    else onExport({ kind });
+    if (shownKind === 'level') onExport({ kind: 'level', levelId: selectedLevelId });
+    else onExport({ kind: shownKind });
   };
 
   return (
@@ -46,22 +52,39 @@ export function QuantitiesScopeDialog({ building, recent, busy, message, onOpenR
       actions={
         <>
           <button onClick={onCancel}>Cancel</button>
-          <button onClick={submit}>Export</button>
+          <button onClick={submit} disabled={busy}>Export</button>
         </>
       }
     >
       <label className="mep-checkbox-row">
-        <input type="radio" name="quantities-scope" checked={kind === 'sheet'} onChange={() => setKind('sheet')} /> This sheet (the current page only)
+        <input type="radio" name="quantities-scope" checked={shownKind === 'sheet'} onChange={() => setKind('sheet')} /> This sheet (the current page only)
       </label>
       <label className="mep-checkbox-row">
-        <input type="radio" name="quantities-scope" checked={kind === 'document'} onChange={() => setKind('document')} /> This document (all pages)
+        <input type="radio" name="quantities-scope" checked={shownKind === 'document'} onChange={() => setKind('document')} /> This document (all pages)
       </label>
+      {buildings && buildings.length > 0 && (
+        <div className="mep-scope-level-row">
+          <span className="mep-checkbox-row">Read from</span>
+          <select aria-label="Building" value={building?.id ?? ''} disabled={busy} onChange={(e) => onSelectBuilding?.(e.target.value)}>
+            {building === undefined && (
+              <option value="" disabled>
+                Choose a building…
+              </option>
+            )}
+            {buildings.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="mep-scope-level-row">
         <label className="mep-checkbox-row">
           <input
             type="radio"
             name="quantities-scope"
-            checked={kind === 'level'}
+            checked={shownKind === 'level'}
             disabled={buildingDisabled}
             onChange={() => setKind('level')}
           /> Level
@@ -80,7 +103,7 @@ export function QuantitiesScopeDialog({ building, recent, busy, message, onOpenR
         <input
           type="radio"
           name="quantities-scope"
-          checked={kind === 'building'}
+          checked={shownKind === 'building'}
           disabled={buildingDisabled}
           onChange={() => setKind('building')}
         /> Building
@@ -88,18 +111,6 @@ export function QuantitiesScopeDialog({ building, recent, busy, message, onOpenR
       {hint && <p className="mep-hint">{hint}</p>}
       {building === undefined && (
         <div className="mep-scope-open-row">
-          {recent && recent.length > 0 && (
-            <select aria-label="Building" value="" disabled={busy} onChange={(e) => onOpenRecent?.(e.target.value)}>
-              <option value="" disabled>
-                Choose a building…
-              </option>
-              {recent.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
-          )}
           <button type="button" disabled={busy} onClick={() => onOpenFile?.()}>
             Open building…
           </button>
@@ -108,7 +119,7 @@ export function QuantitiesScopeDialog({ building, recent, busy, message, onOpenR
           </button>
         </div>
       )}
-      {building === undefined && message && <p className="mep-hint">{message}</p>}
+      {message && <p className="mep-hint">{message}</p>}
       <p className="mep-calibration-hint">The Excel file gets one table for each kind of element.</p>
     </Dialog>
   );

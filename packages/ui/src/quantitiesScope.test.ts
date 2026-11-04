@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { emptyBuilding, serializeBuildingFile, type BuildingFile, type BuildingSheet, type SheetSummary } from '@mepapp/core';
 import { MemoryBuildingStore } from '@mepapp/platform';
-import { buildBuildingScopeTables, readSummaries, scopeFileName, statSheets, withWarningsSheet, type SheetStat } from './quantitiesScope.js';
+import {
+  buildBuildingScopeTables,
+  needsSaveBeforeExport,
+  readSummaries,
+  scopeBuildingChoices,
+  scopeFileName,
+  statSheets,
+  withWarningsSheet,
+  type ExportScope,
+  type SheetStat,
+} from './quantitiesScope.js';
 
 const summaryOf = (projectUuid: string, length: number): SheetSummary => ({
   version: 1,
@@ -69,6 +79,75 @@ describe('scopeFileName', () => {
     const building = { ...twoLevelBuilding(), name: 'A/B:C' };
     expect(scopeFileName({ documentName: undefined, scope: { kind: 'building' }, building })).toBe('A-B-C-all-quantities.xlsx');
     expect(scopeFileName({ documentName: 'x"y<z>.pdf', scope: { kind: 'document' }, building: undefined })).toBe('x-y-z--quantities.xlsx');
+  });
+});
+
+describe('scopeBuildingChoices', () => {
+  const recent = [
+    { id: 'b1', name: 'Block' },
+    { id: 'b2', name: 'Tower' },
+  ];
+
+  it('puts the open building first, then the recent ones', () => {
+    expect(scopeBuildingChoices({ id: 'b2', name: 'Tower' }, recent)).toEqual([
+      { id: 'b2', name: 'Tower' },
+      { id: 'b1', name: 'Block' },
+    ]);
+  });
+
+  it('removes the open id from the recent list', () => {
+    expect(scopeBuildingChoices({ id: 'b1', name: 'Block' }, recent)).toEqual([
+      { id: 'b1', name: 'Block' },
+      { id: 'b2', name: 'Tower' },
+    ]);
+  });
+
+  it('gives only the recent ones when no building is open', () => {
+    expect(scopeBuildingChoices(null, recent)).toEqual(recent);
+  });
+
+  it('gives the open building alone when nothing is recent', () => {
+    expect(scopeBuildingChoices({ id: 'b1', name: 'Block' }, [])).toEqual([{ id: 'b1', name: 'Block' }]);
+  });
+
+  it('gives an empty list when no building is open and nothing is recent', () => {
+    expect(scopeBuildingChoices(null, [])).toEqual([]);
+  });
+
+  it('keeps each id once when the recent list repeats an id', () => {
+    expect(scopeBuildingChoices(null, [...recent, { id: 'b1', name: 'Block' }])).toEqual(recent);
+  });
+});
+
+describe('needsSaveBeforeExport', () => {
+  const level: ExportScope = { kind: 'level', levelId: 'L1' };
+  const building: ExportScope = { kind: 'building' };
+  const document: ExportScope = { kind: 'document' };
+  const sheet: ExportScope = { kind: 'sheet' };
+  const saved = { projectUuidInFile: true };
+  const unsaved = { projectUuidInFile: false };
+
+  it('is true for a Level or Building scope of an unsaved drawing', () => {
+    expect(needsSaveBeforeExport(level, unsaved)).toBe(true);
+    expect(needsSaveBeforeExport(building, unsaved)).toBe(true);
+  });
+
+  it('is false for a Level or Building scope of a saved drawing', () => {
+    expect(needsSaveBeforeExport(level, saved)).toBe(false);
+    expect(needsSaveBeforeExport(building, saved)).toBe(false);
+  });
+
+  it('is false for a Level or Building scope when no document is open', () => {
+    expect(needsSaveBeforeExport(level, undefined)).toBe(false);
+    expect(needsSaveBeforeExport(building, undefined)).toBe(false);
+  });
+
+  it('is false for the Sheet and Document scopes in every case', () => {
+    for (const scope of [sheet, document]) {
+      expect(needsSaveBeforeExport(scope, unsaved)).toBe(false);
+      expect(needsSaveBeforeExport(scope, saved)).toBe(false);
+      expect(needsSaveBeforeExport(scope, undefined)).toBe(false);
+    }
   });
 });
 

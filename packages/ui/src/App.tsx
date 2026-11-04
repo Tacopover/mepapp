@@ -61,8 +61,18 @@ import { CircuitsToolbar } from './components/CircuitsToolbar.js';
 import { NetworkTreePanel } from './components/NetworkTreePanel.js';
 import { MenuButton } from './components/MenuButton.js';
 import { quantityTablesToXlsx } from './quantitiesExport.js';
-import { buildBuildingScopeTables, readSummaries, scopeFileName, statSheets, withWarningsSheet, type ExportScope } from './quantitiesScope.js';
+import {
+  buildBuildingScopeTables,
+  needsSaveBeforeExport,
+  readSummaries,
+  scopeBuildingChoices,
+  scopeFileName,
+  statSheets,
+  withWarningsSheet,
+  type ExportScope,
+} from './quantitiesScope.js';
 import { QuantitiesScopeDialog } from './components/QuantitiesScopeDialog.js';
+import { SaveBeforeExportDialog } from './components/SaveBeforeExportDialog.js';
 import { roomTableToXlsx } from './roomExport.js';
 import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { RoomToolBar } from './components/RoomToolBar.js';
@@ -437,6 +447,7 @@ export function MepSketchApp({
   const [labelVisibility, setLabelVisibility] = useState<StampLabelVisibility>(loadLabelVisibility);
   const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
   const [quantitiesScopeDialog, setQuantitiesScopeDialog] = useState<{ building?: BuildingFile } | null>(null);
+  const [exportSaveAsk, setExportSaveAsk] = useState<{ scope: ExportScope; building: BuildingFile | undefined; needsSaveAs: boolean } | null>(null);
   /** Element Editor dialog target — 'create' for a brand-new custom element, the definitionId being re-authored via a placed instance's "Edit ports…" (see PropertiesPanel), or 'duplicate' for a library stamp opened for editing via its Stamps tab tile (see handleDuplicateStampDefinition — `seed` keeps the library entry's own id, so the save is an override that every stamp placed from it follows, and carries a self-contained iconRef). */
   const [elementEditorTarget, setElementEditorTarget] = useState<
     { mode: 'create' } | { mode: 'edit'; definitionId: string } | { mode: 'duplicate'; seed: StampDefinition } | { mode: 'edit-user'; definition: StampDefinition } | null
@@ -1119,6 +1130,7 @@ export function MepSketchApp({
   const handleExportQuantities = useCallback(async () => {
     const scene = sceneRef.current;
     if (!scene) return;
+    buildingHook.dismissMessage();
     let building: BuildingFile | undefined;
     if (buildingStore) {
       try {
@@ -1129,7 +1141,7 @@ export function MepSketchApp({
       }
     }
     setQuantitiesScopeDialog({ building });
-  }, [buildingStore, sceneRef]);
+  }, [buildingHook.dismissMessage, buildingStore, sceneRef]);
 
   const runExportQuantities = useCallback(
     async (scope: ExportScope, building?: BuildingFile) => {
@@ -1891,7 +1903,7 @@ export function MepSketchApp({
         {sheetLabel && <span className="mep-header-sheet" data-testid="current-sheet-header" title={sheetLabel}>{sheetLabel}</span>}
         <RoomToolBar tool={tool} sceneRef={sceneRef} />
         <div className="mep-fill" />
-        {status && <span className="mep-header-status">{status}</span>}
+        {status && <span className="mep-header-status" role="status" title={status} tabIndex={0}>{status}</span>}
       </div>
 
       {reconciliation && (
@@ -2214,13 +2226,19 @@ export function MepSketchApp({
 
       {quantitiesScopeDialog && (
         <QuantitiesScopeDialog
-          building={scopeBuilding && { name: scopeBuilding.name, levels: scopeBuilding.levels.map((level) => ({ id: level.id, name: level.name })) }}
-          recent={buildingHook.recent.map(({ id, name }) => ({ id, name }))}
+          building={scopeBuilding && { id: scopeBuilding.id, name: scopeBuilding.name, levels: scopeBuilding.levels.map((level) => ({ id: level.id, name: level.name })) }}
+          buildings={scopeBuildingChoices(
+            buildingHook.building ? { id: buildingHook.building.file.id, name: buildingHook.building.file.name } : null,
+            buildingHook.recent.map(({ id, name }) => ({ id, name })),
+          )}
           busy={buildingHook.busy}
           message={buildingHook.message}
-          onOpenRecent={(id) => {
+          onSelectBuilding={(id) => {
+            if (id === buildingHook.building?.file.id) return;
             const entry = buildingHook.recent.find((r) => r.id === id);
-            if (entry) void buildingHook.openRecent(entry);
+            if (!entry) return;
+            setQuantitiesScopeDialog({});
+            void buildingHook.openRecent(entry);
           }}
           onOpenFile={() => void buildingHook.open()}
           onManage={() => {
@@ -2230,7 +2248,32 @@ export function MepSketchApp({
           onCancel={() => setQuantitiesScopeDialog(null)}
           onExport={(scope) => {
             setQuantitiesScopeDialog(null);
+            const doc = sceneRef.current?.getDocuments().find((d) => d.id === activeDocumentId);
+            if (needsSaveBeforeExport(scope, doc)) {
+              setExportSaveAsk({
+                scope,
+                building: scopeBuilding,
+                needsSaveAs: activeDocumentId === null || !fileTargetsRef.current.has(activeDocumentId),
+              });
+              return;
+            }
             void runExportQuantities(scope, scopeBuilding);
+          }}
+        />
+      )}
+
+      {exportSaveAsk && (
+        <SaveBeforeExportDialog
+          needsSaveAs={exportSaveAsk.needsSaveAs}
+          onCancel={() => setExportSaveAsk(null)}
+          onSave={() => {
+            const ask = exportSaveAsk;
+            setExportSaveAsk(null);
+            void (async () => {
+              await handleSave();
+              const saved = sceneRef.current?.getDocuments().find((d) => d.id === sceneRef.current?.getActiveDocumentId())?.projectUuidInFile === true;
+              if (saved) await runExportQuantities(ask.scope, ask.building);
+            })();
           }}
         />
       )}

@@ -2,17 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 
 export interface BuildingMenuProps {
   busy: boolean;
-  hasBuilding: boolean;
   /** Text of the import item, e.g. "Import 2 old buildings". Null hides the item. */
   importLabel: string | null;
   onNew: () => void;
   onOpen: () => void;
-  onClose: () => void;
   onImport: () => void;
 }
 
 /** The "Building" menu of the Manage Buildings header. Reuses the classes of the app menu. */
-export function BuildingMenu({ busy, hasBuilding, importLabel, onNew, onOpen, onClose, onImport }: BuildingMenuProps) {
+export function BuildingMenu({ busy, importLabel, onNew, onOpen, onImport }: BuildingMenuProps) {
   const [shown, setShown] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -69,9 +67,6 @@ export function BuildingMenu({ busy, hasBuilding, importLabel, onNew, onOpen, on
           </button>
           <button type="button" role="menuitem" className="mep-menu-item" disabled={busy} onClick={() => pick(onOpen)}>
             Open building…
-          </button>
-          <button type="button" role="menuitem" className="mep-menu-item" disabled={!hasBuilding} onClick={() => pick(onClose)}>
-            Close building
           </button>
           {importLabel !== null && (
             <>

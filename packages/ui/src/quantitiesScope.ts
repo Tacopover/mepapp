@@ -37,6 +37,21 @@ export function scopeFileName(args: { documentName: string | undefined; scope: E
   return safeFilePart(`${(documentName ?? 'quantities').replace(/\.pdf$/i, '')}-quantities.xlsx`);
 }
 
+/** The open building first (when there is one), then the recent buildings without the open id. Each id once. */
+export function scopeBuildingChoices(open: { id: string; name: string } | null, recent: readonly { id: string; name: string }[]): { id: string; name: string }[] {
+  const choices = open ? [open] : [];
+  for (const entry of recent) {
+    if (choices.some((choice) => choice.id === entry.id)) continue;
+    choices.push(entry);
+  }
+  return choices;
+}
+
+/** True only for a Level or Building scope of a drawing that is not saved yet (projectUuidInFile is false). No document (undefined) gives false. */
+export function needsSaveBeforeExport(scope: ExportScope, doc: { projectUuidInFile: boolean } | undefined): boolean {
+  return (scope.kind === 'level' || scope.kind === 'building') && doc !== undefined && !doc.projectUuidInFile;
+}
+
 export function withWarningsSheet(tables: QuantityTable[], warnings: string[]): QuantityTable[] {
   return warnings.length > 0 ? [...tables, { name: 'Warnings', headers: ['Warning'], rows: warnings.map((w) => [w]) }] : tables;
 }

@@ -110,7 +110,7 @@ export async function exportScope(t, scope, levelName) {
   const count = await page.evaluate(() => (window.__suggested ?? []).length);
   await openScopeDialog(t);
   await dialog(t).locator('input[type=radio]').nth(RADIO[scope]).check();
-  if (scope === 'level' && levelName) await dialog(t).locator('select').selectOption({ label: levelName });
+  if (scope === 'level' && levelName) await dialog(t).locator('select[aria-label="Level"]').selectOption({ label: levelName });
   await idle(200);
   await dialog(t).locator('button', { hasText: /^Export$/ }).click();
   await until(async () => (await page.evaluate(() => (window.__suggested ?? []).length)) > count, `export ${scope}`, 60000);
