@@ -1,0 +1,6 @@
+import { execFileSync } from 'node:child_process';
+
+const add = (e) => console.log(execFileSync('node', ['.claude/roadmap/ledger.mjs', '--stream', 'buildings', 'add', JSON.stringify(e)], { cwd: '/root/MepApp/.claude/worktrees/buildings-model' }).toString().trim().slice(0, 70));
+
+add({ type: 'task', id: 'B3-T12d', part: 'B3', state: 'done', commit: '08069d4', summary: 'Layout of the Building dialog panes: section cards with title bars, Name and Elevation first, fixed-column sheet rows (name with ellipsis and tooltip, status, Open, Relink, Move to, Remove aligned right), summaries row with the button on the right, small Add files strip at the bottom. b3-t12d-check 54/54 by bounding box at 1600x900, 1100x700, 760x640; UI tests 675; pnpm build --force 9/9. Not verified: old checks after this change, dark theme, NotPlaced pane in the browser, 2 open PDFs in the strip, Windows. Open: building rename does not exist (no core function); Summaries count (12 without summary) differs from the sheet footer (0 of 30 have a summary) because Missing sheets are skipped.' });
+add({ type: 'now', id: 'now', role: '', task: 'B3-T12e', note: 'Windows feedback round: T12a-d done, T12e (old checks, test script) running.' });
