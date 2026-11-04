@@ -22,6 +22,16 @@ Read this file first. It applies to the director and to each role in `protocol.m
 - A commit message ends with the `Co-Authored-By` line from the system reminder of the session.
 - Browser checks: only one Chromium page with a PDF open at a time (the container has 3.9 GB). So only one tester or UI reviewer uses the browser at a time.
 
+## 1a. Rules for checks of a screen
+
+- A check that the implementer wrote confirms the design of the implementer. It finds no missing feature, no bad flow and no bad text. Do not call it a review.
+- For a screen task, the journey checks come from the UX spec goals. A second agent (the `journey-tester`, not the task lead that wrote the briefs) writes at least the journey check.
+- A fix for a user report needs a check that fails before the fix. A check that passes both before and after proves nothing.
+- A finding of a reviewer ends as `fixed`, `accepted` with a reason, or `open`. A finding must not vanish.
+- A check script exits with a non-zero code when a check fails (`lib.mjs` `finish()` does it). To run many checks, use `node .claude/roadmap/browser/run-checks.mjs <list.json>`. It exits with 1 when any check fails. Run only the checks that a task changes. Run the full list once for each part.
+- A platform test script (Windows) is written from the journeys. Each step must be possible on one PC.
+- UX work reads `.claude/roadmap/ux-lessons.md`, `ui-guide.md` and `ux-checklists.md` first.
+
 ## 2. Rules of the repository
 
 - Only `@mepapp/pdf-engine-mupdf` imports `mupdf`. Everything else uses the `pdf-engine` interface.
