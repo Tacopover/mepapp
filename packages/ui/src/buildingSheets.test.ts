@@ -11,6 +11,7 @@ import {
   pdfTotals,
   placeEntriesOnLevel,
   relinkWouldDuplicate,
+  resolveEntryIds,
   sheetDisplayName,
   sheetGroupsOfLevel,
   sheetPdfKey,
@@ -355,6 +356,65 @@ describe('placeEntriesOnLevel', () => {
     expect(result.placed).toBe(3);
     expect(result.already).toBe(0);
     expect(result.file.sheets.map((sheet) => sheet.levelId)).toEqual(['L1', 'L1', 'L1']);
+  });
+
+  it('mints one id for all pages of a PDF without an id and flags the new sheets', () => {
+    const result = placeEntriesOnLevel(twoLevels([]), [pendingOf({ fileName: 'n.pdf', path: 'C:/n.pdf', pageCount: 3 })], 'L1', () => 'mint-1');
+    expect(result.placed).toBe(3);
+    expect(result.file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['mint-1', 'mint-1', 'mint-1']);
+    expect(result.file.sheets.every((sheet) => sheet.idMinted === true)).toBe(true);
+  });
+
+  it('a second add of the same PDF reuses the minted id and counts its pages as already on the level', () => {
+    const first = placeEntriesOnLevel(twoLevels([]), [pendingOf({ fileName: 'n.pdf', path: 'C:/n.pdf', pageCount: 3 })], 'L1', () => 'mint-1');
+    const second = placeEntriesOnLevel(first.file, [pendingOf({ fileName: 'n.pdf', path: 'C:/n.pdf', pageCount: 3 })], 'L1', () => 'mint-2');
+    expect(second.placed).toBe(0);
+    expect(second.sameLevel).toBe(3);
+    expect(second.file.sheets).toHaveLength(3);
+    expect(second.file.sheets.every((sheet) => sheet.projectUuid === 'mint-1')).toBe(true);
+  });
+
+  it('gives two different PDFs two different minted ids', () => {
+    const ids = ['mint-a', 'mint-b'];
+    const result = placeEntriesOnLevel(
+      twoLevels([]),
+      [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 1 }), pendingOf({ fileName: 'b.pdf', path: 'C:/b.pdf', pageCount: 1 })],
+      'L1',
+      () => ids.shift()!,
+    );
+    expect(result.file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['mint-a', 'mint-b']);
+  });
+
+  it('does not give an id to an old sheet with no id, and keeps the entry unlinked', () => {
+    let calls = 0;
+    const file = buildingOf([sheetOf('s1', 0, 'old.pdf', { path: 'C:/old.pdf' })]);
+    const resolved = resolveEntryIds(file, [pendingOf({ fileName: 'old.pdf', path: 'C:/old.pdf', pageCount: 1 })], () => {
+      calls += 1;
+      return 'mint-x';
+    });
+    expect(calls).toBe(0);
+    expect(resolved.entries[0]!.projectUuid).toBeNull();
+    expect(resolved.entries[0]).not.toHaveProperty('idMinted');
+  });
+
+  it('the id in the PDF replaces a minted id of the same document', () => {
+    const minted = { ...sheetOf('s1', 0, 'e.pdf', { projectUuid: 'mint-1', path: 'C:/e.pdf' }), idMinted: true as const };
+    const resolved = resolveEntryIds(buildingOf([minted]), [pendingOf({ fileName: 'e.pdf', path: 'C:/e.pdf', pageCount: 1, projectUuid: 'real-1' })], () => 'unused');
+    expect(resolved.file.sheets[0]!.projectUuid).toBe('real-1');
+    expect(resolved.file.sheets[0]).not.toHaveProperty('idMinted');
+    expect(resolved.entries[0]!.projectUuid).toBe('real-1');
+  });
+
+  it('a PDF with an id in the file is unchanged and gets no flag', () => {
+    let calls = 0;
+    const entry = pendingOf({ fileName: 'f.pdf', path: 'C:/f.pdf', pageCount: 1, projectUuid: 'real-2' });
+    const resolved = resolveEntryIds(buildingOf([]), [entry], () => {
+      calls += 1;
+      return 'mint-y';
+    });
+    expect(calls).toBe(0);
+    expect(resolved.entries).toEqual([entry]);
+    expect(resolved.entries[0]).not.toHaveProperty('idMinted');
   });
 
   it('counts the pages that are already sheets on another level and leaves them where they are', () => {

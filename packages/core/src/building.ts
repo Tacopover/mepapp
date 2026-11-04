@@ -26,6 +26,8 @@ export interface BuildingSheet {
   levelId: string;
   /** null until the document has been saved by MepApp with an id. */
   projectUuid: string | null;
+  /** true: the app made projectUuid and the PDF does not hold it yet. Absent once a save wrote the id into the PDF. */
+  idMinted?: true;
   pageIndex: number;
   displayName: string;
   location: SheetLocation;

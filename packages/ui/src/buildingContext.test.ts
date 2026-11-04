@@ -181,6 +181,21 @@ describe('summaryAfterSave', () => {
     const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
     expect(file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['uuid-a', 'uuid-b']);
   });
+
+  it('a save clears the minted flag of the matched sheet and counts it as patched', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1', idMinted: true })]) });
+    expect(await summaryAfterSave(args(store))).toEqual({ state: 'written', projectUuid: 'proj-1', patchedSheets: 1 });
+    const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
+    expect(file.sheets[0]).not.toHaveProperty('idMinted');
+    expect(file.sheets[0]?.projectUuid).toBe('proj-1');
+  });
+
+  it('with idInFile false a save keeps the minted flag', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1', idMinted: true })]) });
+    expect(await summaryAfterSave(args(store, undefined, { idInFile: false }))).toEqual({ state: 'written', projectUuid: 'proj-1', patchedSheets: 0 });
+    const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
+    expect(file.sheets[0]?.idMinted).toBe(true);
+  });
 });
 
 const summaryOf = (project: ProjectDocument): string =>

@@ -116,7 +116,7 @@ export function LevelSheetsPane({
     <BuildingSection title="Sheets" testId="level-sheets" aside={countLabel(shown.length, 'sheet')}>
       {shown.length === 0 && (
         <p className="mep-hint">
-          {levelId === null ? 'No sheets in this building yet.' : 'No sheets on this level. Add PDFs below and pick this level for their pages.'}
+          {levelId === null ? 'No sheets in this building yet.' : 'No sheets on this level. Use Add PDFs… below.'}
         </p>
       )}
       <div ref={rowsRef} className="mep-srows" data-fix={needsFix ? 'true' : 'false'}>
@@ -252,7 +252,7 @@ export function LevelSheetsPane({
                       Remove
                     </button>
                   </span>
-                  {status === 'not-stamped' && (
+                  {(status === 'not-stamped' || status === 'not-opened') && (
                     <p className="mep-hint mep-sheet-hint" data-testid="sheet-hint">
                       {statusHint(status)}
                     </p>

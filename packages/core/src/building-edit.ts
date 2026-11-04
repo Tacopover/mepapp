@@ -4,6 +4,7 @@ export type BuildingEditError = 'unknown-level' | 'level-has-sheets' | 'duplicat
 
 export interface NewSheetPage {
   projectUuid: string | null;
+  idMinted?: true;
   pageIndex: number;
   displayName: string;
   location: SheetLocation;
@@ -81,6 +82,7 @@ export function addSheets(
       id: crypto.randomUUID(),
       levelId,
       projectUuid: page.projectUuid,
+      ...(page.idMinted === true && page.projectUuid !== null ? { idMinted: true as const } : {}),
       pageIndex: page.pageIndex,
       displayName: page.displayName,
       location: structuredClone(page.location),
@@ -127,6 +129,38 @@ export function relinkSheet(
           : sheet,
       ),
     },
+  };
+}
+
+/** The file with idMinted removed from every sheet that has projectUuid. The same file when no sheet has the flag with that id. */
+export function withIdInFile(file: BuildingFile, projectUuid: string): BuildingFile {
+  if (!file.sheets.some((sheet) => sheet.projectUuid === projectUuid && sheet.idMinted === true)) return file;
+  return {
+    ...file,
+    sheets: file.sheets.map((sheet) => {
+      if (sheet.projectUuid !== projectUuid || sheet.idMinted !== true) return sheet;
+      const next: BuildingSheet = { ...sheet };
+      delete next.idMinted;
+      return next;
+    }),
+  };
+}
+
+/** The file with projectUuid set to toUuid on the sheets that have fromUuid and idMinted, and idMinted removed from them. The same file when no sheet has both, when fromUuid equals toUuid, or when a sheet outside those sheets already has toUuid on a pageIndex they use. */
+export function replaceMintedId(file: BuildingFile, fromUuid: string, toUuid: string): BuildingFile {
+  if (fromUuid === toUuid) return file;
+  const renamed = new Set(file.sheets.filter((sheet) => sheet.projectUuid === fromUuid && sheet.idMinted === true));
+  if (renamed.size === 0) return file;
+  const pages = new Set([...renamed].map((sheet) => sheet.pageIndex));
+  if (file.sheets.some((sheet) => sheet.projectUuid === toUuid && pages.has(sheet.pageIndex))) return file;
+  return {
+    ...file,
+    sheets: file.sheets.map((sheet) => {
+      if (!renamed.has(sheet)) return sheet;
+      const next: BuildingSheet = { ...sheet, projectUuid: toUuid };
+      delete next.idMinted;
+      return next;
+    }),
   };
 }
 

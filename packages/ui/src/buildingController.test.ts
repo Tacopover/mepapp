@@ -542,4 +542,18 @@ describe('BuildingController refreshSheetStatus', () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(controller.getState().building?.sheetStatus).toEqual({ 's-new': 'not-stamped' });
   });
+
+  it('refreshes the sheet status on reload when the revision did not change', async () => {
+    const store = new MemoryBuildingStore({ json: serializeBuildingFile(buildingWith([sheetAt('s-1', '/plans/a.pdf', 'p-1')])) });
+    const controller = controllerWith({ statPath: async () => ({ state: 'ok' as const }) });
+    await controller.adopt(store);
+    await controller.refreshSheetStatus();
+    expect(controller.getState().building?.sheetStatus).toEqual({ 's-1': 'no-summary' });
+    const revision = controller.getState().building?.revision;
+    await store.writeSummary('p-1', summaryJson('p-1', 500));
+    await controller.reload();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(controller.getState().building?.revision).toBe(revision);
+    expect(controller.getState().building?.sheetStatus).toEqual({ 's-1': 'ok' });
+  });
 });

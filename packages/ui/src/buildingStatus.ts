@@ -11,7 +11,7 @@ export function currentSheetLabel(building: BuildingFile | null, projectUuid: st
   return `${building.name} / ${level.name} / ${sheet.displayName}`;
 }
 
-export type SheetStatus = 'ok' | 'pdf-missing' | 'no-access' | 'not-stamped' | 'no-summary' | 'old-summary' | 'copy-suspected';
+export type SheetStatus = 'ok' | 'pdf-missing' | 'no-access' | 'not-stamped' | 'no-summary' | 'not-opened' | 'old-summary' | 'copy-suspected';
 
 /** state 'unknown' = the platform cannot probe the file (no path, or no statPath). */
 export interface SheetProbe {
@@ -19,7 +19,7 @@ export interface SheetProbe {
   sizeBytes?: number;
 }
 
-/** missing -> 'pdf-missing'; no-access -> 'no-access'; else projectUuid null -> 'not-stamped'; no summary -> 'no-summary'; probe.sizeBytes known and different from summary.sourceSizeBytes -> 'old-summary'; else 'ok'. 'copy-suspected' is never returned here (reserved). */
+/** missing -> 'pdf-missing'; no-access -> 'no-access'; else projectUuid null -> 'not-stamped'; no summary -> 'not-opened' when the sheet has idMinted, else 'no-summary'; probe.sizeBytes known and different from summary.sourceSizeBytes -> 'old-summary'; else 'ok'. 'copy-suspected' is never returned here (reserved). */
 export function sheetStatusOf(
   sheet: BuildingSheet,
   probe: SheetProbe,
@@ -28,7 +28,7 @@ export function sheetStatusOf(
   if (probe.state === 'missing') return 'pdf-missing';
   if (probe.state === 'no-access') return 'no-access';
   if (sheet.projectUuid === null) return 'not-stamped';
-  if (summary === undefined) return 'no-summary';
+  if (summary === undefined) return sheet.idMinted === true ? 'not-opened' : 'no-summary';
   if (probe.sizeBytes !== undefined && probe.sizeBytes !== summary.sourceSizeBytes) return 'old-summary';
   return 'ok';
 }
@@ -45,6 +45,8 @@ export function statusLabel(status: SheetStatus): string {
       return 'Not saved yet';
     case 'no-summary':
       return 'No summary';
+    case 'not-opened':
+      return 'Not opened yet';
     case 'old-summary':
       return 'Out of date';
     case 'copy-suspected':
@@ -65,6 +67,8 @@ export function statusHint(status: SheetStatus): string {
       return 'Not saved yet. Save it in MepApp to link it.';
     case 'no-summary':
       return 'MepApp has not saved a summary for this sheet yet.';
+    case 'not-opened':
+      return 'Open this PDF in MepApp to read its summary.';
     case 'old-summary':
       return 'The PDF changed after the summary was saved.';
     case 'copy-suspected':
@@ -81,6 +85,7 @@ export function statusTone(status: SheetStatus): 'ok' | 'warn' | 'bad' {
       return 'bad';
     case 'not-stamped':
     case 'no-summary':
+    case 'not-opened':
     case 'old-summary':
     case 'copy-suspected':
       return 'warn';
@@ -120,9 +125,16 @@ export function summaryCountText(sheets: readonly BuildingSheet[], summaries: Re
   return total === 1 ? `${withSummary} of 1 sheet has a summary` : `${withSummary} of ${total} sheets have a summary`;
 }
 
-/** The sheets that have a probed status and no summary. A missing or no-access PDF is not counted: a read cannot fix it. A sheet with no status yet is not counted (the probe has not run). */
+/** The sheets that have a probed status and no summary. A missing, no-access or not-opened PDF is not counted: a read cannot fix it. A sheet with no status yet is not counted (the probe has not run). */
 export function sheetsWithoutSummary(sheets: readonly BuildingSheet[], status: Record<string, SheetStatus>, summaries: Record<string, unknown>): BuildingSheet[] {
-  return sheets.filter((sheet) => status[sheet.id] !== undefined && status[sheet.id] !== 'pdf-missing' && status[sheet.id] !== 'no-access' && !Object.prototype.hasOwnProperty.call(summaries, sheet.id));
+  return sheets.filter(
+    (sheet) =>
+      status[sheet.id] !== undefined &&
+      status[sheet.id] !== 'pdf-missing' &&
+      status[sheet.id] !== 'no-access' &&
+      status[sheet.id] !== 'not-opened' &&
+      !Object.prototype.hasOwnProperty.call(summaries, sheet.id),
+  );
 }
 
 /** "1 sheet has no summary" or "N sheets have no summary". */
@@ -138,8 +150,8 @@ export function readableNoSummaryText(count: number): string {
 /** The sheets without a summary that cannot be read now. Empty string for 0. */
 export function otherNoSummaryText(count: number): string {
   if (count === 0) return '';
-  if (count === 1) return '1 more sheet has no summary and cannot be read now: its PDF is missing, has no access, or is not checked yet.';
-  return `${count} more sheets have no summary and cannot be read now: their PDFs are missing, have no access, or are not checked yet.`;
+  if (count === 1) return '1 more sheet has no summary and cannot be read now: its PDF is missing, has no access, is not opened yet, or is not checked yet.';
+  return `${count} more sheets have no summary and cannot be read now: their PDFs are missing, have no access, are not opened yet, or are not checked yet.`;
 }
 
 /** The text of the in-dialog question when an action drops the pages that wait for a level. */

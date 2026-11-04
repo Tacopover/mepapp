@@ -27,6 +27,7 @@ import {
   type QuantityResult,
   type RoomDetectionClient,
   type ReconciliationReport,
+  replaceMintedId,
   type SchematicSymbol,
   type SchematicTemplate,
   type SheetLocation,
@@ -96,6 +97,7 @@ import { currentSheetLevelId } from './buildingTree.js';
 import { displayedPageInfos, readBuildingForExport, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { openDocumentRows } from './openDocumentsView.js';
 import { shouldWriteSummaryOnOpen } from './summaryOnOpen.js';
+import { matchingMintedIds, mintedAdoptions } from './adoptSheetId.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
 import { loadCustomTemplates, saveCustomTemplates } from './schematicTemplateStorage.js';
 import { loadRoomNeeds, saveRoomNeeds } from './roomNeedStorage.js';
@@ -483,6 +485,7 @@ export function MepSketchApp({
     file: File;
     target: FileTarget | undefined;
     projectUuidInFile: boolean;
+    idInFile: boolean;
     loadMismatch: boolean;
   } | null>(null);
   const [onboardingSeen, setOnboardingSeen] = useState(() => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1');
@@ -689,7 +692,7 @@ export function MepSketchApp({
 
   // Writes the sheet summary of a document that was just opened. Only writes when the stored summary is stale. Never throws.
   const writeSummaryOnOpen = useCallback(
-    async (snapshot: DocumentSnapshot, file: File, target: FileTarget | undefined) => {
+    async (snapshot: DocumentSnapshot, file: File, target: FileTarget | undefined, idInFile: boolean) => {
       if (!buildingStore) return;
       try {
         const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
@@ -700,6 +703,7 @@ export function MepSketchApp({
           pageInfos: snapshot.pageInfos,
           ...stampNameLookups(definitions),
           onlyIfStale: true,
+          idInFile,
         });
         if (result.state === 'written' || (result.state === 'fresh' && result.patchedSheets > 0)) await buildingHook.reload();
       } catch (err) {
@@ -779,13 +783,29 @@ export function MepSketchApp({
   documentOpenedRef.current = async ({ documentId, file, target, loadMismatch }) => {
     const building = buildingRef.current;
     if (building === null || sceneRef.current?.getActiveDocumentId() !== documentId) return;
+    const projectUuidInFile = sceneRef.current.getDocuments().find((d) => d.id === documentId)?.projectUuidInFile ?? false;
+    const docIdentity = { path: pathOfTarget(target), fileName: file.name, sizeBytes: file.size };
+    let adopted = false;
+    if (!projectUuidInFile) {
+      const minted = matchingMintedIds(building.file, docIdentity)[0];
+      if (minted !== undefined) {
+        sceneRef.current.commitProjectUuid(documentId, minted, { inFile: false });
+        adopted = true;
+      }
+    } else {
+      const ownId = sceneRef.current.getProjectUuid();
+      if (ownId !== null) {
+        for (const id of matchingMintedIds(building.file, docIdentity)) {
+          if (id !== ownId) await updateRef.current((f) => replaceMintedId(f, id, ownId));
+        }
+      }
+    }
     let snapshot: DocumentSnapshot | null;
     try {
       snapshot = snapshotDocument(documentId);
     } catch {
       snapshot = null;
     }
-    const projectUuidInFile = sceneRef.current.getDocuments().find((d) => d.id === documentId)?.projectUuidInFile ?? false;
     const projectUuid = sceneRef.current.getProjectUuid();
     const outcome = await checkOpenedDocument({
       building: building.file,
@@ -811,13 +831,26 @@ export function MepSketchApp({
         snapshot,
         file,
         target,
-        projectUuidInFile,
+        projectUuidInFile: projectUuidInFile || adopted,
+        idInFile: projectUuidInFile,
         loadMismatch,
       });
       return;
     }
-    if (snapshot && shouldWriteSummaryOnOpen({ projectUuidInFile, loadMismatch, outcome })) await writeSummaryOnOpen(snapshot, file, target);
+    if (snapshot && shouldWriteSummaryOnOpen({ projectUuidInFile: projectUuidInFile || adopted, loadMismatch, outcome })) {
+      await writeSummaryOnOpen(snapshot, file, target, projectUuidInFile);
+    }
   };
+
+  // A document that was open when its sheet got a minted id takes that id, the same as on open.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const file = buildingHook.building?.file;
+    if (!scene || !file) return;
+    for (const { documentId, projectUuid } of mintedAdoptions(file, documents, fileTargetsRef.current)) {
+      scene.commitProjectUuid(documentId, projectUuid, { inFile: false });
+    }
+  }, [buildingHook.building?.file, documents]);
 
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
   const openSheet = useCallback(
@@ -2214,10 +2247,10 @@ export function MepSketchApp({
             if (buildingRef.current !== null) setStatus(`Updated the location of ${duplicatePrompt.storedName} in ${buildingRef.current.file.name}.`);
             setDuplicatePrompt(null);
             void moved.then(async () => {
-              const { snapshot, documentId, file, target, projectUuidInFile, loadMismatch } = duplicatePrompt;
+              const { snapshot, documentId, file, target, projectUuidInFile, idInFile, loadMismatch } = duplicatePrompt;
               if (!snapshot || sceneRef.current?.getActiveDocumentId() !== documentId) return;
               if (!shouldWriteSummaryOnOpen({ projectUuidInFile, loadMismatch, outcome: { kind: 'none' }, afterSameFile: true })) return;
-              await writeSummaryOnOpen(snapshot, file, target);
+              await writeSummaryOnOpen(snapshot, file, target, idInFile);
             });
           }}
           onCancel={() => setDuplicatePrompt(null)}

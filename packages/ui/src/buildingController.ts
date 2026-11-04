@@ -267,7 +267,11 @@ export class BuildingController {
     try {
       const stored = await building.store.read();
       if (this.generation !== generation) return;
-      if (stored === undefined || stored.revision === building.revision) return;
+      if (stored === undefined) return;
+      if (stored.revision === building.revision) {
+        void this.refreshSheetStatus();
+        return;
+      }
       const file = sortLevelsByElevation(parseBuildingFile(JSON.parse(stored.json)));
       this.lastJson = serializeBuildingFile(file);
       this.setBuilding({ file, revision: stored.revision });

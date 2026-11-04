@@ -9,8 +9,10 @@ import {
   renameBuilding,
   removeSheet,
   renameLevel,
+  replaceMintedId,
   setLevelElevation,
   sortLevelsByElevation,
+  withIdInFile,
   type BuildingEditError,
   type NewSheetPage,
 } from './building-edit.js';
@@ -345,5 +347,92 @@ describe('building edit', () => {
     file = unwrap(relinkSheet(file, 's0', { fileName: 'plan.pdf', path: '/c/plan.pdf' }));
     expect(() => parseBuildingFile(JSON.parse(serializeBuildingFile(file)))).not.toThrow();
     expect(parseBuildingFile(JSON.parse(serializeBuildingFile(file)))).toEqual(file);
+  });
+
+  it('keeps the minted flag on an added sheet that has an id', () => {
+    const minted: NewSheetPage = { ...page(0, 'u-7'), idMinted: true };
+    const result = addSheets(sample(), 'l1', [minted]);
+    if (!result.ok) throw new Error('add failed');
+    expect(result.file.sheets[2]!.idMinted).toBe(true);
+    expect(result.file.sheets[2]!.projectUuid).toBe('u-7');
+  });
+
+  it('does not keep the minted flag on an added sheet without an id', () => {
+    const minted: NewSheetPage = { ...page(0, null), idMinted: true };
+    const result = addSheets(sample(), 'l1', [minted]);
+    if (!result.ok) throw new Error('add failed');
+    expect(result.file.sheets[2]!).not.toHaveProperty('idMinted');
+  });
+
+  it('does not add the minted flag to a sheet when the page has no flag', () => {
+    const result = addSheets(sample(), 'l1', [page(0, 'u-7')]);
+    if (!result.ok) throw new Error('add failed');
+    expect(result.file.sheets[2]!).not.toHaveProperty('idMinted');
+  });
+
+  it('removes the minted flag from the sheets with that id', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [
+        { ...sample().sheets[0]!, projectUuid: 'u-m', idMinted: true },
+        { ...sample().sheets[1]!, projectUuid: 'u-m', idMinted: true, pageIndex: 1 },
+        { ...sample().sheets[0]!, id: 's9', projectUuid: 'u-o', idMinted: true, pageIndex: 3 },
+      ],
+    };
+    const result = withIdInFile(file, 'u-m');
+    expect(result.sheets.map((sheet) => sheet.idMinted)).toEqual([undefined, undefined, true]);
+    expect(result.sheets[0]!).not.toHaveProperty('idMinted');
+    expect(result.sheets[0]!.projectUuid).toBe('u-m');
+  });
+
+  it('returns the same file from withIdInFile when no sheet has the flag with that id', () => {
+    const file = sample();
+    expect(withIdInFile(file, 'u-1')).toBe(file);
+    expect(withIdInFile(file, 'u-none')).toBe(file);
+  });
+
+  it('renames the minted sheets of one id to the embedded id', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [
+        { ...sample().sheets[0]!, projectUuid: 'u-m', idMinted: true },
+        { ...sample().sheets[1]!, projectUuid: 'u-m', idMinted: true, pageIndex: 1 },
+      ],
+    };
+    const result = replaceMintedId(file, 'u-m', 'u-real');
+    expect(result.sheets.map((sheet) => sheet.projectUuid)).toEqual(['u-real', 'u-real']);
+    expect(result.sheets.some((sheet) => 'idMinted' in sheet)).toBe(false);
+  });
+
+  it('returns the same file from replaceMintedId when no sheet has the minted id', () => {
+    const file = sample();
+    expect(replaceMintedId(file, 'u-1', 'u-real')).toBe(file);
+  });
+
+  it('returns the same file from replaceMintedId when the ids are equal', () => {
+    const file: BuildingFile = { ...sample(), sheets: [{ ...sample().sheets[0]!, projectUuid: 'u-m', idMinted: true }] };
+    expect(replaceMintedId(file, 'u-m', 'u-m')).toBe(file);
+  });
+
+  it('returns the same file from replaceMintedId when a sheet outside the set already has the new id on a used page', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [
+        { ...sample().sheets[0]!, projectUuid: 'u-m', idMinted: true, pageIndex: 0 },
+        { ...sample().sheets[1]!, id: 's5', projectUuid: 'u-real', pageIndex: 0 },
+      ],
+    };
+    expect(replaceMintedId(file, 'u-m', 'u-real')).toBe(file);
+  });
+
+  it('renames the minted sheets when the other sheet with the new id uses another page', () => {
+    const file: BuildingFile = {
+      ...sample(),
+      sheets: [
+        { ...sample().sheets[0]!, projectUuid: 'u-m', idMinted: true, pageIndex: 0 },
+        { ...sample().sheets[1]!, id: 's5', projectUuid: 'u-real', pageIndex: 4 },
+      ],
+    };
+    expect(replaceMintedId(file, 'u-m', 'u-real').sheets[0]!.projectUuid).toBe('u-real');
   });
 });

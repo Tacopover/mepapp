@@ -129,6 +129,22 @@ describe('sheetStatusOf', () => {
     expect(sheetStatusOf(sheet({ projectUuid: null }), { state: 'no-access' }, undefined)).toBe('no-access');
   });
 
+  it('gives not-opened for a sheet with a minted id and no summary', () => {
+    expect(sheetStatusOf(sheet({ idMinted: true }), { state: 'ok', sizeBytes: 500 }, undefined)).toBe('not-opened');
+  });
+
+  it('gives no-summary for a sheet without a minted id and no summary', () => {
+    expect(sheetStatusOf(sheet({ idMinted: undefined }), { state: 'ok', sizeBytes: 500 }, undefined)).toBe('no-summary');
+  });
+
+  it('gives ok for a sheet with a minted id and a summary', () => {
+    expect(sheetStatusOf(sheet({ idMinted: true }), { state: 'ok', sizeBytes: 500 }, summary)).toBe('ok');
+  });
+
+  it('gives pdf-missing before not-opened for a sheet with a minted id', () => {
+    expect(sheetStatusOf(sheet({ idMinted: true }), { state: 'missing' }, undefined)).toBe('pdf-missing');
+  });
+
   it('never gives copy-suspected', () => {
     const statuses = [
       sheetStatusOf(sheet(), { state: 'ok', sizeBytes: 1 }, summary),
@@ -146,6 +162,7 @@ describe('statusLabel', () => {
       'no-access': 'No access',
       'not-stamped': 'Not saved yet',
       'no-summary': 'No summary',
+      'not-opened': 'Not opened yet',
       'old-summary': 'Out of date',
       'copy-suspected': 'May be a copy',
     };
@@ -163,6 +180,7 @@ describe('statusHint', () => {
       'no-access': 'MepApp has no access to the folder of this PDF.',
       'not-stamped': 'Not saved yet. Save it in MepApp to link it.',
       'no-summary': 'MepApp has not saved a summary for this sheet yet.',
+      'not-opened': 'Open this PDF in MepApp to read its summary.',
       'old-summary': 'The PDF changed after the summary was saved.',
       'copy-suspected': 'This PDF may be a copy of another file.',
     };
@@ -201,6 +219,7 @@ describe('statusTone', () => {
   it('gives the tone of every status', () => {
     expect(statusTone('ok')).toBe('ok');
     expect(statusTone('no-summary')).toBe('warn');
+    expect(statusTone('not-opened')).toBe('warn');
     expect(statusTone('not-stamped')).toBe('warn');
     expect(statusTone('old-summary')).toBe('warn');
     expect(statusTone('copy-suspected')).toBe('warn');
@@ -261,6 +280,12 @@ describe('summary repair helpers', () => {
     expect(found.map((item) => item.id)).toEqual(['a']);
   });
 
+  it('does not count a not-opened sheet as readable', () => {
+    const sheets = [sheet({ id: 'a' }), sheet({ id: 'b' })];
+    const status: Record<string, SheetStatus> = { a: 'not-opened', b: 'no-summary' };
+    expect(sheetsWithoutSummary(sheets, status, {}).map((item) => item.id)).toEqual(['b']);
+  });
+
   it('writes the count with the right verb', () => {
     expect(noSummaryText(1)).toBe('1 sheet has no summary');
     expect(noSummaryText(2)).toBe('2 sheets have no summary');
@@ -274,10 +299,10 @@ describe('summary repair helpers', () => {
   it('says which sheets cannot be read now', () => {
     expect(otherNoSummaryText(0)).toBe('');
     expect(otherNoSummaryText(1)).toBe(
-      '1 more sheet has no summary and cannot be read now: its PDF is missing, has no access, or is not checked yet.',
+      '1 more sheet has no summary and cannot be read now: its PDF is missing, has no access, is not opened yet, or is not checked yet.',
     );
     expect(otherNoSummaryText(3)).toBe(
-      '3 more sheets have no summary and cannot be read now: their PDFs are missing, have no access, or are not checked yet.',
+      '3 more sheets have no summary and cannot be read now: their PDFs are missing, have no access, are not opened yet, or are not checked yet.',
     );
   });
 

@@ -1,4 +1,12 @@
-import { addSheets, type BuildingFile, type BuildingSheet, type NewSheetPage, type SheetLocation } from '@mepapp/core';
+import {
+  addSheets,
+  findSheets,
+  replaceMintedId,
+  type BuildingFile,
+  type BuildingSheet,
+  type NewSheetPage,
+  type SheetLocation,
+} from '@mepapp/core';
 import { countLabel } from './buildingLevels.js';
 
 export const COLLAPSE_AFTER_PAGES = 20;
@@ -9,6 +17,7 @@ export interface PendingPdf {
   sizeBytes: number;
   pageCount: number;
   projectUuid: string | null;
+  idMinted?: true;
 }
 
 export interface PageRow {
@@ -21,6 +30,7 @@ export interface PdfGroup {
   fileName: string;
   path?: string;
   projectUuid: string | null;
+  idMinted?: true;
   sizeBytes?: number;
   /** Pages in the PDF when known (a pending PDF); for a PDF known only from sheets: highest assigned pageIndex + 1. */
   pageCount: number;
@@ -50,6 +60,7 @@ export function groupPdfs(file: BuildingFile, pending: readonly PendingPdf[]): P
       fileName: pdf.fileName,
       path: pdf.path,
       projectUuid: pdf.projectUuid,
+      ...(pdf.idMinted === true ? { idMinted: true as const } : {}),
       sizeBytes: pdf.sizeBytes,
       pageCount: pdf.pageCount,
       rows,
@@ -99,6 +110,7 @@ export function newSheetPage(group: PdfGroup, pageIndex: number): NewSheetPage {
   if (group.sizeBytes !== undefined) location.sizeBytes = group.sizeBytes;
   return {
     projectUuid: group.projectUuid,
+    ...(group.idMinted === true && group.projectUuid !== null ? { idMinted: true as const } : {}),
     pageIndex,
     displayName: sheetDisplayName(group.fileName, pageIndex, group.pageCount),
     location,
@@ -155,16 +167,59 @@ export function waitingGroups(file: BuildingFile, pending: readonly PendingPdf[]
     .filter((group) => group.rows.length > 0);
 }
 
-/** Puts the pages of the entries that are not yet sheets on the level. A page that is already a sheet stays where it is: `sameLevel` counts those on the level, `elsewhere` those on other levels, grouped by level in order of first appearance. An unknown level changes nothing. */
+/** The sheets of the file that can be the document of one pending entry (projectUuid null in the match). A weak match (file name and size only) does not count when the entry and the sheet both have a path. */
+function entrySheetMatches(file: BuildingFile, entry: PendingPdf): BuildingSheet[] {
+  return findSheets(file, {
+    projectUuid: null,
+    ...(entry.path === undefined ? {} : { path: entry.path }),
+    fileName: entry.fileName,
+    sizeBytes: entry.sizeBytes,
+  })
+    .filter((match) => !(match.strength === 'weak' && entry.path !== undefined && match.sheet.location.path !== undefined))
+    .map((match) => match.sheet);
+}
+
+/** Gives each pending entry its document id before the entries are placed. An entry with an id makes the minted ids of the matching sheets take its id (the id in the PDF wins). An entry without an id takes the id of a matching sheet, or gets a new id from makeId() with idMinted when no sheet matches. Entries are handled in order. */
+export function resolveEntryIds(
+  file: BuildingFile,
+  entries: readonly PendingPdf[],
+  makeId: () => string,
+): { file: BuildingFile; entries: PendingPdf[] } {
+  let next = file;
+  const resolved = entries.map((entry): PendingPdf => {
+    const matches = entrySheetMatches(next, entry);
+    if (entry.projectUuid !== null) {
+      const embeddedId = entry.projectUuid;
+      for (const sheet of matches) {
+        if (sheet.idMinted === true && sheet.projectUuid !== null && sheet.projectUuid !== embeddedId) {
+          next = replaceMintedId(next, sheet.projectUuid, embeddedId);
+        }
+      }
+      return entry;
+    }
+    if (matches.length === 0) return { ...entry, projectUuid: makeId(), idMinted: true };
+    const linked = matches.find((sheet) => sheet.projectUuid !== null);
+    if (linked === undefined) return entry;
+    const adopted: PendingPdf = { ...entry, projectUuid: linked.projectUuid };
+    delete adopted.idMinted;
+    if (linked.idMinted === true) adopted.idMinted = true;
+    return adopted;
+  });
+  return { file: next, entries: resolved };
+}
+
+/** Puts the pages of the entries that are not yet sheets on the level. A page that is already a sheet stays where it is: `sameLevel` counts those on the level, `elsewhere` those on other levels, grouped by level in order of first appearance. An unknown level changes nothing. Before the pages are placed, resolveEntryIds gives each entry its document id (makeId mints a new one). */
 export function placeEntriesOnLevel(
   file: BuildingFile,
   entries: readonly PendingPdf[],
   levelId: string,
+  makeId: () => string = () => crypto.randomUUID(),
 ): { file: BuildingFile; placed: number; already: number; sameLevel: number; elsewhere: { levelName: string; count: number }[] } {
+  const resolved = resolveEntryIds(file, entries, makeId);
   const pages: NewSheetPage[] = [];
   let sameLevel = 0;
   const elsewhereByLevel = new Map<string, number>();
-  for (const group of groupPdfs(file, entries).filter((item) => item.pending)) {
+  for (const group of groupPdfs(resolved.file, resolved.entries).filter((item) => item.pending)) {
     for (const row of group.rows) {
       if (row.sheet === null) {
         pages.push(newSheetPage(group, row.pageIndex));
@@ -175,7 +230,7 @@ export function placeEntriesOnLevel(
       }
     }
   }
-  const result = addSheets(file, levelId, pages);
+  const result = addSheets(resolved.file, levelId, pages);
   if (!result.ok) return { file, placed: 0, already: 0, sameLevel: 0, elsewhere: [] };
   const elsewhere = [...elsewhereByLevel].map(([id, count]) => ({
     levelName: file.levels.find((level) => level.id === id)?.name ?? 'another level',
