@@ -20,14 +20,14 @@ export interface OpenDocumentRow {
   sheetProjectUuid: string | null;
 }
 
-/** One row per open document, in the order of docs. A page takes the strongest sheet match for its page index. A name-and-size match counts only when the document has no path. An id counts only when the file holds it (projectUuidInFile); a minted id never matches a sheet, and needsSave is true until a Save writes it. */
+/** One row per open document that holds a PDF, in the order of docs. A page takes the strongest sheet match for its page index. A name-and-size match counts only when the document has no path. An id counts only when the file holds it (projectUuidInFile); a minted id never matches a sheet, and needsSave is true until a Save writes it. */
 export function openDocumentRows(
   docs: readonly DocumentSummary[],
   targets: ReadonlyMap<string, FileTarget>,
   file: BuildingFile | null,
   active: { documentId: string | null; pageIndex: number | null } = { documentId: null, pageIndex: null },
 ): OpenDocumentRow[] {
-  return docs.map((doc) => {
+  return docs.filter((doc) => doc.hasPdf && doc.pageCount > 0).map((doc) => {
     const path = targets.get(doc.id)?.path;
     const isActive = doc.id === active.documentId;
     const sheetProjectUuid = doc.projectUuidInFile ? doc.projectUuid : null;

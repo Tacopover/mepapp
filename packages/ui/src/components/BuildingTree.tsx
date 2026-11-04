@@ -84,7 +84,7 @@ export function BuildingTree({
           aria-selected={node.key === selectedKey}
           aria-expanded={node.expandable ? node.expanded : undefined}
           tabIndex={node.key === focusKey ? 0 : -1}
-          className={`mep-tree-item mep-tree-item--${node.kind === 'add-level' ? 'add' : node.kind}${node.key === selectedKey ? ' mep-tree-item--selected' : ''}`}
+          className={`mep-tree-item mep-tree-item--${node.kind === 'add-level' ? 'add' : node.kind}${node.isOpen ? ' mep-tree-item--open' : ''}${node.key === selectedKey ? ' mep-tree-item--selected' : ''}`}
           onFocus={(event) => {
             if (event.target === event.currentTarget) onFocusKey(node.key);
           }}
@@ -92,26 +92,35 @@ export function BuildingTree({
           onKeyDown={(event) => handleKeyDown(event, node)}
         >
           {node.expandable ? (
-            <span
+            <button
+              type="button"
               className="mep-tree-arrow"
+              tabIndex={-1}
               aria-hidden="true"
+              title={node.expanded ? 'Collapse' : 'Expand'}
               onClick={(event) => {
                 event.stopPropagation();
+                const item = event.currentTarget.closest('[role="treeitem"]') as HTMLElement | null;
                 onToggle(node.key, !node.expanded);
+                item?.focus();
               }}
             >
               {node.expanded ? '▾' : '▸'}
-            </span>
+            </button>
           ) : (
             <span className="mep-tree-arrow" aria-hidden="true" />
           )}
           <span className="mep-tree-text">
-            <span className="mep-tree-label">{node.label}</span>
+            <span className="mep-tree-label" title={node.label}>
+              {node.label}
+            </span>
             {node.kind === 'building' && node.detail !== null && <span className="mep-tree-detail">{node.detail}</span>}
           </span>
-          {node.kind === 'building' && node.isOpen && <span className="mep-tree-badge">Open</span>}
           {node.kind === 'level' && node.warning && (
             <span className="mep-tree-dot" role="img" aria-label="A sheet of this level has a missing PDF or no access" title="A sheet of this level has a missing PDF or no access" />
+          )}
+          {node.kind === 'sheet' && node.warning && (
+            <span className="mep-tree-dot" role="img" aria-label="This sheet has a missing PDF or no access" title="This sheet has a missing PDF or no access" />
           )}
           {node.kind !== 'building' && node.detail !== null && <span className="mep-tree-count">{node.detail}</span>}
           {node.kind === 'building' && !node.isOpen && (

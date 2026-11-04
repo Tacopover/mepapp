@@ -116,7 +116,7 @@ await n0.press('Enter');
 await idle(400);
 check((await items('level').count()) === 2, 'tree: two level items under Tower', String(await items('level').count()));
 check(/Ground floor/.test((await items('level').nth(0).textContent()) ?? '') && /0 sheets/.test((await items('level').nth(0).textContent()) ?? ''), 'tree: the level shows its name and 0 sheets (the rename shows at once)');
-check((await items('building').count()) === 1 && /Open/.test((await items('building').first().textContent()) ?? ''), 'tree: Tower has the Open marker');
+check((await items('building').count()) === 1 && (await items('building').first().getAttribute('class'))?.includes('mep-tree-item--open') === true, 'tree: Tower is the open building (no Open badge)');
 check((await items('building').first().getAttribute('aria-expanded')) === 'true', 'tree: the open building is expanded');
 check(/2 levels, 0 sheets/.test((await dlg.locator('.mep-buildings-header').textContent()) ?? ''), 'header shows the counts');
 await shot('B3-T11c-wide-tower');
@@ -171,7 +171,7 @@ await idle(400);
 const annexJson = await readStore();
 check((await items('building').count()) === 2, 'tree: two buildings in the list', String(await items('building').count()));
 check((await items('level').count()) === 1, 'tree: only the open building (Annex) shows levels', String(await items('level').count()));
-check(/Open/.test((await items('building').filter({ hasText: 'Annex' }).textContent()) ?? '') && !/Open\b/.test((await items('building').filter({ hasText: 'Tower' }).textContent()) ?? '').valueOf(), 'tree: only Annex has the Open marker');
+check(((await items('building').filter({ hasText: 'Annex' }).getAttribute('class')) ?? '').includes('mep-tree-item--open') && !((await items('building').filter({ hasText: 'Tower' }).getAttribute('class')) ?? '').includes('mep-tree-item--open'), 'tree: only Annex is the open building');
 await shot('B3-T11c-wide-two-buildings');
 
 // Step 6: switch with one click each. The store gets the file of the target first (dev stand-in).

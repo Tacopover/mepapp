@@ -1,5 +1,6 @@
 import { levelWarnings, type BuildingFile } from '@mepapp/core';
 import { countLabel, sheetCount } from './buildingLevels.js';
+import { sheetGroupsOfLevel, sheetsOfSamePdf } from './buildingSheets.js';
 import { statusTone, type SheetStatus } from './buildingStatus.js';
 import type { RecentBuilding } from './recentBuildings.js';
 
@@ -9,26 +10,28 @@ export const NOT_PLACED_KEY = 'p:not-placed';
 /** The key of the "+ Add level" node of the open building. The dialog never selects it. */
 export const ADD_LEVEL_KEY = 'a:add-level';
 
-export type TreeNodeKind = 'building' | 'level' | 'add-level' | 'not-placed';
+export type TreeNodeKind = 'building' | 'level' | 'sheet' | 'add-level' | 'not-placed';
 
 export interface TreeNode {
   key: string;
   kind: TreeNodeKind;
-  /** 1 for a building, 2 for its children. */
-  depth: 1 | 2;
+  /** 1 for a building, 2 for its children, 3 for a sheet of a level. */
+  depth: 1 | 2 | 3;
   parentKey: string | null;
   label: string;
-  /** Second line of a building (its location) or the sheet count text of a level. Null when there is nothing to show. */
+  /** Second line of a building (its location), the sheet count text of a level or the page of a sheet. Null when there is nothing to show. */
   detail: string | null;
   /** Building node: this is the open building. */
   isOpen: boolean;
-  /** Building node: the node has children (only the open building has). */
+  /** Building or level node: the node has children (an open building, a level with sheets). */
   expandable: boolean;
   expanded: boolean;
-  /** Level node: a sheet of the level has a missing PDF or no access to it. */
+  /** Level node: a sheet of the level has a missing PDF or no access to it. Sheet node: this sheet has one. */
   warning: boolean;
   /** Building node: the recent entry (the controller opens it). Null for the other kinds. */
   entry: RecentBuilding | null;
+  /** Sheet node: the id of the sheet. Null for the other kinds. */
+  sheetId: string | null;
 }
 
 export interface TreeInput {
@@ -40,10 +43,13 @@ export interface TreeInput {
   notPlacedCount: number;
   /** Keys ("b:<id>") of open buildings that the user collapsed. */
   collapsed: ReadonlySet<string>;
+  /** Keys ("l:<id>") of levels that the user expanded. A level is collapsed by default. */
+  expandedLevels: ReadonlySet<string>;
 }
 
 export const buildingKey = (id: string): string => `b:${id}`;
 export const levelKey = (id: string): string => `l:${id}`;
+export const sheetKey = (id: string): string => `s:${id}`;
 
 /** True when a sheet of the level has a missing PDF or no access (tone "bad"). */
 export function levelHasWarning(file: BuildingFile, levelId: string, sheetStatus: Record<string, SheetStatus>): boolean {
@@ -56,7 +62,7 @@ export function levelHasWarning(file: BuildingFile, levelId: string, sheetStatus
 
 /** The visible nodes in display order: every building, and under the open building its levels, the add-level node and the Not placed node. */
 export function buildTreeNodes(input: TreeInput): TreeNode[] {
-  const { recent, open, sheetStatus, notPlacedCount, collapsed } = input;
+  const { recent, open, sheetStatus, notPlacedCount, collapsed, expandedLevels } = input;
   const listed =
     open !== null && !recent.some((entry) => entry.id === open.file.id)
       ? [{ id: open.file.id, name: open.file.name, location: open.location }, ...recent]
@@ -80,22 +86,45 @@ export function buildTreeNodes(input: TreeInput): TreeNode[] {
       expanded,
       warning: false,
       entry,
+      sheetId: null,
     });
     if (!isOpen || !expanded) continue;
     for (const level of open.file.levels) {
+      const sheets = sheetGroupsOfLevel(open.file, level.id).flatMap((group) => group.sheets);
+      const levelNodeKey = levelKey(level.id);
+      const levelExpanded = sheets.length > 0 && expandedLevels.has(levelNodeKey);
       nodes.push({
-        key: levelKey(level.id),
+        key: levelNodeKey,
         kind: 'level',
         depth: 2,
         parentKey: key,
         label: level.name,
         detail: countLabel(sheetCount(open.file, level.id), 'sheet'),
         isOpen: false,
-        expandable: false,
-        expanded: false,
+        expandable: sheets.length > 0,
+        expanded: levelExpanded,
         warning: levelHasWarning(open.file, level.id, sheetStatus),
         entry: null,
+        sheetId: null,
       });
+      if (!levelExpanded) continue;
+      for (const sheet of sheets) {
+        const status = sheetStatus[sheet.id];
+        nodes.push({
+          key: sheetKey(sheet.id),
+          kind: 'sheet',
+          depth: 3,
+          parentKey: levelNodeKey,
+          label: sheet.location.fileName,
+          detail: sheetsOfSamePdf(open.file, sheet).length > 1 || sheet.pageIndex > 0 ? `p. ${sheet.pageIndex + 1}` : null,
+          isOpen: false,
+          expandable: false,
+          expanded: false,
+          warning: status !== undefined && statusTone(status) === 'bad',
+          entry: null,
+          sheetId: sheet.id,
+        });
+      }
     }
     nodes.push({
       key: ADD_LEVEL_KEY,
@@ -109,6 +138,7 @@ export function buildTreeNodes(input: TreeInput): TreeNode[] {
       expanded: false,
       warning: false,
       entry: null,
+      sheetId: null,
     });
     if (notPlacedCount > 0) {
       nodes.push({
@@ -123,6 +153,7 @@ export function buildTreeNodes(input: TreeInput): TreeNode[] {
         expanded: false,
         warning: false,
         entry: null,
+        sheetId: null,
       });
     }
   }
@@ -175,10 +206,17 @@ export function warningLines(warnings: BuildingWarnings): string[] {
   return lines;
 }
 
+/** The warning for a name that another recent building has (trimmed, case-insensitive). Null when the name is unique. Pure. */
+export function duplicateBuildingNameWarning(recent: readonly RecentBuilding[], file: BuildingFile): string | null {
+  const name = file.name.trim().toLowerCase();
+  const clash = recent.some((entry) => entry.id !== file.id && entry.name.trim().toLowerCase() === name);
+  return clash ? 'Another building has this name.' : null;
+}
+
 export interface FocusMove {
   /** The key to focus (and to scroll to). */
   focusKey: string;
-  /** Set when the key expands or collapses a building. */
+  /** Set when the key expands or collapses a building or a level. */
   toggle: { key: string; expand: boolean } | null;
 }
 

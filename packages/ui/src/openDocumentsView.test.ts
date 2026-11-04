@@ -154,11 +154,25 @@ describe('openDocumentRows', () => {
     expect(rows.map((row) => row.doc.id)).toEqual(['d2', 'd1']);
   });
 
-  it('gives an empty page list and not-placed for a document with no PDF', () => {
+  it('skips a document with no PDF', () => {
     const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' })]);
-    const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', hasPdf: false, pageCount: 0 })], new Map(), file, NO_ACTIVE);
-    expect(row!.pages).toEqual([]);
-    expect(row!.state).toBe('not-placed');
+    const rows = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', hasPdf: false, pageCount: 0 })], new Map(), file, NO_ACTIVE);
+    expect(rows).toEqual([]);
+  });
+
+  it('skips a document with zero pages', () => {
+    const rows = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', hasPdf: true, pageCount: 0 })], new Map(), null, NO_ACTIVE);
+    expect(rows).toEqual([]);
+  });
+
+  it('keeps the documents with a PDF in order when a document with no PDF sits between them', () => {
+    const rows = openDocumentRows(
+      [docOf({ id: 'd2', fileName: 'b.pdf' }), docOf({ id: 'd3', fileName: 'c.pdf', hasPdf: false, pageCount: 0 }), docOf({ id: 'd1', fileName: 'a.pdf' })],
+      new Map(),
+      null,
+      NO_ACTIVE,
+    );
+    expect(rows.map((row) => row.doc.id)).toEqual(['d2', 'd1']);
   });
 
   it('does not match a minted id to a sheet of the same id when the path is unset', () => {

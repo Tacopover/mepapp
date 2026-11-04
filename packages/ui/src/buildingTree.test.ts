@@ -1,4 +1,4 @@
-import { addLevel, emptyBuilding, type BuildingFile } from '@mepapp/core';
+import { addLevel, emptyBuilding, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
 import {
   ADD_LEVEL_KEY,
@@ -6,6 +6,7 @@ import {
   buildingWarnings,
   buildTreeNodes,
   currentSheetLevelId,
+  duplicateBuildingNameWarning,
   initialSelection,
   levelKey,
   moveFocus,
@@ -38,7 +39,7 @@ const recent = [
 ];
 
 function input(overrides: Partial<TreeInput> = {}): TreeInput {
-  return { recent, open: null, sheetStatus: {}, notPlacedCount: 0, collapsed: new Set(), ...overrides };
+  return { recent, open: null, sheetStatus: {}, notPlacedCount: 0, collapsed: new Set(), expandedLevels: new Set(), ...overrides };
 }
 
 describe('buildTreeNodes', () => {
@@ -154,6 +155,73 @@ describe('buildTreeNodes', () => {
   });
 });
 
+describe('buildTreeNodes sheets', () => {
+  it('keeps the levels collapsed by default and lists no sheet', () => {
+    const file = withSheets(withLevels([0, 3000]), ['level-0', 'level-1']);
+    const nodes = buildTreeNodes(input({ open: { file, location: 'x' } }));
+    expect(nodes.some((n) => n.kind === 'sheet')).toBe(false);
+    expect(nodes.find((n) => n.key === 'l:level-0')).toMatchObject({ expandable: true, expanded: false });
+    const bare = buildTreeNodes(input({ open: { file: withLevels([0]), location: 'x' }, expandedLevels: new Set(['l:level-0']) }));
+    expect(bare.find((n) => n.key === 'l:level-0')).toMatchObject({ expandable: false, expanded: false });
+  });
+
+  it('lists the sheets of an expanded level under it, in sheet group order, and keeps the other levels collapsed', () => {
+    const file = withSheets(withLevels([0, 3000]), ['level-0', 'level-1', 'level-0']);
+    const nodes = buildTreeNodes(input({ open: { file, location: 'x' }, expandedLevels: new Set(['l:level-0']) }));
+    expect(nodes.map((n) => n.key)).toEqual(['b:b1', 'l:level-0', 's:sheet-0', 's:sheet-2', 'l:level-1', ADD_LEVEL_KEY, 'b:b2']);
+    expect(nodes[1]).toMatchObject({ expandable: true, expanded: true });
+    expect(nodes[2]).toMatchObject({ kind: 'sheet', depth: 3, parentKey: 'l:level-0', sheetId: 'sheet-0', expandable: false, expanded: false, isOpen: false, entry: null });
+    expect(nodes[2]!.label).toBe('plan0.pdf');
+    expect(nodes[4]).toMatchObject({ key: 'l:level-1', expanded: false });
+  });
+
+  it('shows the page of a sheet only when its PDF has more than one sheet or the page is not the first', () => {
+    const sheets: BuildingSheet[] = [
+      { id: 's-a', levelId: 'level-0', projectUuid: 'u-a', pageIndex: 0, displayName: 'A', location: { fileName: 'a.pdf' } },
+      { id: 's-b1', levelId: 'level-0', projectUuid: 'u-b', pageIndex: 0, displayName: 'B1', location: { fileName: 'b.pdf' } },
+      { id: 's-b2', levelId: 'level-0', projectUuid: 'u-b', pageIndex: 1, displayName: 'B2', location: { fileName: 'b.pdf' } },
+      { id: 's-c', levelId: 'level-0', projectUuid: 'u-c', pageIndex: 2, displayName: 'C', location: { fileName: 'c.pdf' } },
+    ];
+    const file = { ...withLevels([0]), sheets };
+    const nodes = buildTreeNodes(input({ open: { file, location: 'x' }, expandedLevels: new Set(['l:level-0']) }));
+    expect(nodes.filter((n) => n.kind === 'sheet').map((n) => n.detail)).toEqual([null, 'p. 1', 'p. 2', 'p. 3']);
+  });
+
+  it('sets a warning only on a sheet with a missing PDF or no access', () => {
+    const file = withSheets(withLevels([0]), ['level-0', 'level-0', 'level-0']);
+    const nodes = buildTreeNodes(
+      input({
+        open: { file, location: 'x' },
+        expandedLevels: new Set(['l:level-0']),
+        sheetStatus: { 'sheet-0': 'pdf-missing', 'sheet-1': 'no-access', 'sheet-2': 'no-summary' },
+      }),
+    );
+    expect(nodes.filter((n) => n.kind === 'sheet').map((n) => n.warning)).toEqual([true, true, false]);
+    expect(nodes.find((n) => n.key === 'l:level-0')).toMatchObject({ warning: true });
+  });
+});
+
+describe('moveFocus with sheets', () => {
+  const file = withSheets(withLevels([0, 3000]), ['level-0', 'level-0', 'level-1']);
+  const nodes = buildTreeNodes(input({ open: { file, location: 'x' }, expandedLevels: new Set(['l:level-0']) }));
+  // keys: b:b1, l:level-0, s:sheet-0, s:sheet-1, l:level-1, a:add-level, b:b2
+
+  it('expands a collapsed level with Right and goes to its first sheet when expanded', () => {
+    expect(moveFocus(nodes, 'l:level-1', 'ArrowRight')).toEqual({ focusKey: 'l:level-1', toggle: { key: 'l:level-1', expand: true } });
+    expect(moveFocus(nodes, 'l:level-0', 'ArrowRight')).toEqual({ focusKey: 's:sheet-0', toggle: null });
+  });
+
+  it('collapses an expanded level with Left and goes from a sheet to its level', () => {
+    expect(moveFocus(nodes, 'l:level-0', 'ArrowLeft')).toEqual({ focusKey: 'l:level-0', toggle: { key: 'l:level-0', expand: false } });
+    expect(moveFocus(nodes, 's:sheet-1', 'ArrowLeft')).toEqual({ focusKey: 'l:level-0', toggle: null });
+  });
+
+  it('walks down from a level into its first sheet and from the last sheet to the next level', () => {
+    expect(moveFocus(nodes, 'l:level-0', 'ArrowDown')).toEqual({ focusKey: 's:sheet-0', toggle: null });
+    expect(moveFocus(nodes, 's:sheet-1', 'ArrowDown')).toEqual({ focusKey: 'l:level-1', toggle: null });
+  });
+});
+
 describe('initialSelection', () => {
   const file = withLevels([0, 3000]);
   it('selects the level of the active sheet', () => {
@@ -193,6 +261,21 @@ describe('buildingWarnings', () => {
     const warnings = buildingWarnings(withLevels([0, 3000]), {});
     expect(warnings.total).toBe(0);
     expect(warningLines(warnings)).toEqual([]);
+  });
+});
+
+describe('duplicateBuildingNameWarning', () => {
+  it('warns when another recent building has the same name', () => {
+    expect(duplicateBuildingNameWarning(recent, withLevels([0], 'b3', 'Tower'))).toBe('Another building has this name.');
+  });
+  it('ignores the building itself', () => {
+    expect(duplicateBuildingNameWarning(recent, withLevels([0], 'b1', 'Tower'))).toBeNull();
+  });
+  it('compares names without case and outer spaces', () => {
+    expect(duplicateBuildingNameWarning(recent, withLevels([0], 'b3', ' tower '))).toBe('Another building has this name.');
+  });
+  it('returns null when no other building has the name', () => {
+    expect(duplicateBuildingNameWarning(recent, withLevels([0], 'b3', 'Annex'))).toBeNull();
   });
 });
 

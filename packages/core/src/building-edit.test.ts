@@ -6,6 +6,7 @@ import {
   deleteLevel,
   moveSheet,
   relinkSheet,
+  renameBuilding,
   removeSheet,
   renameLevel,
   setLevelElevation,
@@ -38,6 +39,29 @@ function page(pageIndex: number, projectUuid: string | null = 'u-2'): NewSheetPa
 }
 
 describe('building edit', () => {
+  it('renames a building and trims the name', () => {
+    expect(renameBuilding(sample(), '  Annex ').name).toBe('Annex');
+  });
+
+  it('returns the same file for a blank name and for the same name', () => {
+    const file = sample();
+    expect(renameBuilding(file, '   ')).toBe(file);
+    expect(renameBuilding(file, 'Tower')).toBe(file);
+  });
+
+  it('keeps the id and the other fields of a renamed building', () => {
+    const file = sample();
+    expect(renameBuilding(file, 'Annex')).toEqual({ ...file, name: 'Annex' });
+    expect(renameBuilding(file, 'Annex').id).toBe('b-1');
+  });
+
+  it('does not change the levels or the sheets of a renamed building', () => {
+    const file = sample();
+    const renamed = renameBuilding(file, 'Annex');
+    expect(renamed.levels).toBe(file.levels);
+    expect(renamed.sheets).toBe(file.sheets);
+  });
+
   it('adds a level at the end with a default name and zero elevation', () => {
     const file = sample();
     const result = addLevel(file, '   ', undefined, 'l2');

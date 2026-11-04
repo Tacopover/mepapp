@@ -129,7 +129,7 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, child
       </div>
       {expanded && (
         <div id="mep-open-docs-list" className="mep-open-docs-list">
-          {rows.length === 0 && <p className="mep-hint">No documents are open in the viewer.</p>}
+          {rows.length === 0 && <p className="mep-hint">No PDF is open in the viewer.</p>}
           {rows.map((row) => {
             const multi = row.doc.pageCount > 1;
             const unplaced = row.pages.filter((page) => page.sheet === null).length;

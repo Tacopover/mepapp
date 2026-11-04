@@ -2,6 +2,7 @@ import {
   addLevel,
   emptyBuilding,
   parseBuildingFile,
+  renameBuilding,
   serializeBuildingFile,
   setLevelElevation,
   type BuildingFile,
@@ -286,6 +287,16 @@ describe('BuildingController update', () => {
     const { controller } = setup();
     await expect(controller.update((file) => ({ ...file, name: 'x' }))).resolves.toBeUndefined();
     expect(controller.getState().building).toBeNull();
+  });
+
+  it('renames the building in the recent list and in the ref, and stores the list', async () => {
+    const { controller, storage } = setup({ saveFileAs: savedAs('Tower.building.json') });
+    await controller.create('Tower');
+    await controller.update((file) => renameBuilding(file, 'New name'));
+    const entry = { id: 'b-1', name: 'New name', location: 'Tower.building.json' };
+    expect(controller.getState().recent).toEqual([entry]);
+    expect(controller.getState().building?.ref.name).toBe('New name');
+    expect(JSON.parse(storage.data.get(RECENT_BUILDINGS_KEY) ?? '[]')).toEqual([entry]);
   });
 });
 

@@ -238,7 +238,13 @@ export class BuildingController {
     if (current === null) return;
     const next = sortLevelsByElevation(change(current.file));
     if (next === current.file) return;
-    this.setBuilding({ file: next, dirty: true });
+    const renamed = next.name !== current.file.name;
+    this.setBuilding(renamed ? { file: next, dirty: true, ref: { ...current.ref, name: next.name } } : { file: next, dirty: true });
+    if (renamed && this.state.recent.some((entry) => entry.id === current.ref.id)) {
+      const list = this.state.recent.map((entry) => (entry.id === current.ref.id ? { ...entry, name: next.name } : entry));
+      saveRecentBuildings(list, this.storage);
+      this.setState({ recent: list });
+    }
     this.pendingWrites += 1;
     const generation = this.generation;
     const write = this.writeChain.then(() => this.writeLatest(generation));

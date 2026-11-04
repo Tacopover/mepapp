@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { moveSheet, removeSheet, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { FileAccess } from '@mepapp/platform';
 import { countLabel } from '../buildingLevels.js';
@@ -30,6 +30,8 @@ export interface LevelSheetsPaneProps {
   onRefreshStatus: () => void;
   onNotice: (text: string, error: boolean) => void;
   relinker: SheetRelink;
+  /** The sheet that the user picked in the tree. The row of that sheet is marked and scrolled to. */
+  highlight?: { sheetId: string; seq: number } | null;
 }
 
 /** One block of rows. A level block (building node) has a header row with the level name. */
@@ -72,10 +74,17 @@ export function LevelSheetsPane({
   onRefreshStatus,
   onNotice,
   relinker,
+  highlight = null,
 }: LevelSheetsPaneProps) {
   const groups = rowGroups(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
   const needsFix = shown.some((sheet) => sheetStatus[sheet.id] === 'pdf-missing' || sheetStatus[sheet.id] === 'no-access');
+  const rowsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const row = rowsRef.current?.querySelector<HTMLElement>('[data-highlight="true"]');
+    if (row && typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'nearest' });
+  }, [highlight?.seq]);
 
   async function grantAccess() {
     try {
@@ -105,7 +114,7 @@ export function LevelSheetsPane({
           {levelId === null ? 'No sheets in this building yet.' : 'No sheets on this level. Add PDFs below and pick this level for their pages.'}
         </p>
       )}
-      <div className="mep-srows" data-fix={needsFix ? 'true' : 'false'}>
+      <div ref={rowsRef} className="mep-srows" data-fix={needsFix ? 'true' : 'false'}>
       {groups.map((group) => (
         <div key={group.key} className="mep-sgroup" data-testid={group.testId}>
           {group.header !== null && (
@@ -122,10 +131,12 @@ export function LevelSheetsPane({
             const pageText = `Page ${sheet.pageIndex + 1}`;
             const summary = hasSummary ? summaryText(sheetSummary[sheet.id]) : '';
             const tone = status !== undefined ? statusTone(status) : 'ok';
+            const picked = highlight?.sheetId === sheet.id;
             return (
               <Fragment key={sheet.id}>
                 <div
-                  className={tone === 'ok' ? 'mep-srow' : `mep-srow mep-srow--${tone}`}
+                  className={`${tone === 'ok' ? 'mep-srow' : `mep-srow mep-srow--${tone}`}${picked ? ' mep-srow--pick' : ''}`}
+                  data-highlight={picked ? 'true' : undefined}
                   data-testid="page-row"
                   title={`${sheet.location.fileName} - ${pageText}${summary !== '' ? ` - ${summary}` : ''}`}
                 >

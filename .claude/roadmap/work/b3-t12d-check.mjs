@@ -198,7 +198,7 @@ check(addSec.height < sheetsFull.height / 2, 'the Add files strip is less than h
 const addTitle = await dlg.locator('[data-testid="open-documents"] h4').textContent();
 check(addTitle === 'Add files', 'the strip title is Add files', addTitle);
 check((await dlg.locator('[data-testid="open-documents"] [data-testid="add-actions"] button', { hasText: /^Add PDFs…$/ }).count()) === 1, 'Add PDFs… is in the strip');
-check((await dlg.locator('[data-testid="open-docs-toggle"]').getAttribute('aria-expanded')) === 'true' && (await dlg.locator('[data-testid="open-doc-row"]').count()) === 1, 'the open documents list is open with the one open document');
+check((await dlg.locator('[data-testid="open-docs-toggle"]').count()) === 1 && (await dlg.locator('[data-testid="open-doc-row"]').count()) === 0, 'the open documents strip lists no Untitled document (no PDF is open)');
 const quietSize = await dlg.locator('[data-testid="open-documents"] [data-testid="add-actions"] button').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
 const mainSize = await dlg.locator('[data-testid="level-sheets"] .mep-srow button').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
 check(quietSize <= mainSize, 'the strip buttons are not larger than the main buttons', `${quietSize} vs ${mainSize}`);

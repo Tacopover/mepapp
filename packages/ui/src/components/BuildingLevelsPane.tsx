@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { deleteLevel, levelWarnings, renameLevel, setLevelElevation, type BuildingFile, type BuildingLevel } from '@mepapp/core';
+import {
+  deleteLevel,
+  levelWarnings,
+  renameBuilding,
+  renameLevel,
+  setLevelElevation,
+  type BuildingFile,
+  type BuildingLevel,
+} from '@mepapp/core';
 import { countLabel, deleteBlockedText, restoreLevel, sheetCount } from '../buildingLevels.js';
 import { buildingKey, levelKey } from '../buildingTree.js';
+import { BuildingNameEditor } from './BuildingNameEditor.js';
 import { BuildingSection } from './BuildingSection.js';
 
 /** How long the Undo line stays after a level is deleted, in ms. */
@@ -92,6 +101,14 @@ export function BuildingLevelsPane({
         title={file.name}
         aside={`${countLabel(file.levels.length, 'level')}, ${countLabel(file.sheets.length, 'sheet')}`}
       >
+        <div className="mep-level-field">
+          <span>Name</span>
+          <BuildingNameEditor
+            testId="building-name-pane"
+            name={file.name}
+            onRename={(name) => void update((f) => renameBuilding(f, name))}
+          />
+        </div>
         {file.levels.length === 0 && <p className="mep-hint">No levels yet. Use + Add level.</p>}
         {buildingWarningLines.length > 0 ? (
           buildingWarningLines.map((line) => (

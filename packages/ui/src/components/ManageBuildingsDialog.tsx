@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { addLevel, type BuildingFile, type BuildingSheet } from '@mepapp/core';
+import { addLevel, renameBuilding, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
@@ -12,6 +12,7 @@ import {
   buildingKey,
   buildTreeNodes,
   buildingWarnings,
+  duplicateBuildingNameWarning,
   initialSelection,
   levelKey,
   NOT_PLACED_KEY,
@@ -20,6 +21,7 @@ import {
 } from '../buildingTree.js';
 import { BuildingLevelsPane } from './BuildingLevelsPane.js';
 import { BuildingMenu } from './BuildingMenu.js';
+import { BuildingNameEditor } from './BuildingNameEditor.js';
 import { BuildingSheetsPane, usePendingPdfs } from './BuildingSheetsPane.js';
 import { BuildingSummariesPane, type BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 import { BuildingTree } from './BuildingTree.js';
@@ -127,6 +129,8 @@ export function ManageBuildingsDialog({
   const openedIdRef = useRef<string | null>(openedFileId);
   const initialKey = building.building ? initialSelection(building.building.file, activeSheetLevelId ?? null) : '';
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [expandedLevels, setExpandedLevels] = useState<Set<string>>(() => new Set());
+  const [highlight, setHighlight] = useState<{ sheetId: string; seq: number } | null>(null);
   const [selectedKey, setSelectedKey] = useState(initialKey);
   const [focusKey, setFocusKey] = useState(initialKey);
   const [focusNameLevelId, setFocusNameLevelId] = useState<string | null>(null);
@@ -142,6 +146,8 @@ export function ManageBuildingsDialog({
     setSelectedKey(key);
     setFocusKey(key);
     setCollapsed(new Set());
+    setExpandedLevels(new Set());
+    setHighlight(null);
     setNotice(null);
     setAsk(null);
     setCreating(false);
@@ -238,6 +244,7 @@ export function ManageBuildingsDialog({
     sheetStatus: openBuilding?.sheetStatus ?? {},
     notPlacedCount: notPlaced,
     collapsed,
+    expandedLevels,
   });
   const selected = resolveSelectedKey(selectedKey, openBuilding?.file ?? null, notPlaced);
   const focus = resolveFocusKey(focusKey, selected, nodes);
@@ -252,6 +259,13 @@ export function ManageBuildingsDialog({
 
   function onActivate(node: TreeNode) {
     if (building.busy) return;
+    if (node.kind === 'sheet') {
+      setSelectedKey(node.parentKey!);
+      setFocusKey(node.key);
+      setHighlight((current) => ({ sheetId: node.sheetId!, seq: (current?.seq ?? 0) + 1 }));
+      return;
+    }
+    setHighlight(null);
     if (node.kind === 'building' && !node.isOpen) {
       guard('switch', () => {
         void building.openRecent(node.entry!);
@@ -275,10 +289,20 @@ export function ManageBuildingsDialog({
   function onSelectKey(key: string) {
     setSelectedKey(key);
     setFocusKey(key);
+    setHighlight(null);
     focusNav();
   }
 
   function onToggle(key: string, expand: boolean) {
+    if (key.startsWith('l:')) {
+      setExpandedLevels((set) => {
+        const next = new Set(set);
+        if (expand) next.add(key);
+        else next.delete(key);
+        return next;
+      });
+      return;
+    }
     setCollapsed((set) => {
       const next = new Set(set);
       if (expand) next.delete(key);
@@ -306,7 +330,14 @@ export function ManageBuildingsDialog({
       </div>
       {openBuilding && (
         <div className="mep-buildings-header-info">
-          <p className="mep-buildings-open-name">{openBuilding.file.name}</p>
+          <div className="mep-buildings-open-name">
+            <BuildingNameEditor
+              testId="building-name-header"
+              name={openBuilding.file.name}
+              onRename={(name) => void building.update((f) => renameBuilding(f, name))}
+              warning={duplicateBuildingNameWarning(building.recent, openBuilding.file)}
+            />
+          </div>
           <p className="mep-hint mep-buildings-location" title={openBuilding.ref.location}>
             {openBuilding.ref.location}
           </p>
@@ -382,7 +413,7 @@ export function ManageBuildingsDialog({
                   Choose a building or level
                 </option>
               )}
-              {nodes.map((node) => (
+              {nodes.filter((node) => node.kind !== 'sheet').map((node) => (
                 <option key={node.key} value={node.key}>
                   {(node.depth === 2 ? '   ' : '') +
                     node.label +
@@ -529,6 +560,7 @@ export function ManageBuildingsDialog({
                   levelId={selectedLevel?.id ?? null}
                   onOpenSheet={openSheetKeepOpen}
                   relinker={relinker}
+                  highlight={highlight}
                   sheetStatus={openBuilding.sheetStatus}
                   sheetSummary={openBuilding.sheetSummary}
                   onRefreshStatus={building.refreshSheetStatus}
@@ -566,6 +598,7 @@ export function ManageBuildingsDialog({
                     onAdded={() => {
                       setSelectedKey(NOT_PLACED_KEY);
                       setFocusKey(NOT_PLACED_KEY);
+                      setHighlight(null);
                     }}
                     onNotice={onNotice}
                   />

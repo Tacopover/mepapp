@@ -14,6 +14,13 @@ function sheetKey(projectUuid: string | null, path: string | undefined, pageInde
   return owner === null ? null : `${owner}#${String(pageIndex)}`;
 }
 
+/** A blank (after trim) name returns the file unchanged. The id stays. */
+export function renameBuilding(file: BuildingFile, name: string): BuildingFile {
+  const trimmed = name.trim();
+  if (trimmed === '' || trimmed === file.name) return file;
+  return { ...file, name: trimmed };
+}
+
 /** New level at the end. name is trimmed; a blank name becomes 'Level N' where N = levels.length + 1. elevationMm defaults to 0; a value that is not finite becomes 0. id defaults to crypto.randomUUID() (the optional last argument exists for tests). */
 export function addLevel(file: BuildingFile, name: string, elevationMm?: number, id?: string): BuildingFile {
   const trimmed = name.trim();
