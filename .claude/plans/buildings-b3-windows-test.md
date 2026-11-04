@@ -82,6 +82,6 @@ Report each step as pass or fail. For a fail, write the text on the screen.
 - Export Building (the select in the Export dialog) has no question for pages that are not placed.
 - The dialog has no focus trap.
 - The active PDF cannot pick the building it belongs to.
-- A PDF that was open before you added it to a level gets the id of its sheet at once. Its summary is written at the next Save.
+- A PDF that was open before you added it to a level gets the id of its sheet at once. Its summary is written when that PDF is the active tab. A PDF that already holds its id in the file and is added later gets its summary at the next Open or Save.
 - Read summaries still tries a sheet that says Not opened yet and fails it with "not saved yet". Open the PDF instead.
 - An old sheet with no id (made before run 3) still says "Not saved yet". Save the PDF once in MepApp to link it.
