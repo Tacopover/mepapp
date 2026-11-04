@@ -143,14 +143,16 @@ await levelItem('Level 1').click();
 await idle(300);
 await removeFile('temp.pdf');
 await dlg.locator('[data-testid="refresh-status"]').click();
-await idle(800);
+await until(async () => (await chip('temp.pdf').getAttribute('data-status')) === 'pdf-missing', 'temp.pdf shows pdf-missing', 15000);
 check((await chip('temp.pdf').getAttribute('data-status')) === 'pdf-missing', 'the deleted temp.pdf shows Missing', (await chip('temp.pdf').getAttribute('data-status')) ?? '');
 check((await rowOf('temp.pdf').locator('[data-testid="open-sheet"]').isDisabled()), 'Open is disabled while the PDF is missing');
 await shot('B3-T11e-missing');
 await putFile('temp2.pdf', '01_arch_first_floor.pdf');
+await rowOf('temp.pdf').locator('[data-testid="relink-pdf"]').waitFor({ state: 'visible', timeout: 8000 });
 await rowOf('temp.pdf').locator('[data-testid="relink-pdf"]').click();
 await idle(1200);
 check((await stored()).sheets.find((s) => s.id === 's5').location.fileName === 'temp2.pdf', 'Relink stored the new file name');
+await until(async () => (await rowOf('temp2.pdf').count()) === 1 && (await rowOf('temp2.pdf').locator('[data-testid="relink-pdf"]').count()) === 0, 'the temp2.pdf row has no Relink', 15000);
 check((await rowOf('temp2.pdf').count()) === 1 && (await rowOf('temp2.pdf').locator('[data-testid="relink-pdf"]').count()) === 0, 'the row shows temp2.pdf with no Relink');
 check(/Relinked temp2\.pdf/.test((await dlg.locator('[data-testid="sheets-notice"]').textContent()) ?? ''), 'a notice says Relinked');
 await shot('B3-T11e-relinked');
@@ -168,17 +170,20 @@ await idle(300);
 check((await rows().count()) === 4, 'building node: all four sheets', String(await rows().count()));
 check((await dlg.locator('[data-testid="level-sheets"] [data-testid="level-group"]').filter({ hasText: 'orig.pdf' }).locator('.mep-sgroup-head b').textContent())?.trim() === 'Ground floor', 'building node: the orig.pdf row sits under its level header Ground floor');
 
-// Add pane: a pending PDF with 1 page, assign it to Level 1; it appears in the level list.
+// Add: the building node offers no add; a level does. Add PDFs places the page on the selected level at once.
+check((await dlg.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 0, 'building node: no Add PDFs button');
+check(((await dlg.locator('[data-testid="add-hint"]').textContent().catch(() => '')) ?? '').trim() === 'Select a level to add PDFs.', 'building node: the hint says to select a level');
 await putFile('first.pdf', '01_arch_first_floor.pdf');
-await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
-await idle(1500);
-check((await dlg.locator('[data-testid="sheets-pane"] [data-testid="pdf-group"]').count()) === 1, 'add pane: one waiting PDF');
-await dlg.locator('select[aria-label="Level for first.pdf page 1"]').selectOption({ label: 'Level 1' });
-await idle(600);
-check((await dlg.locator('[data-testid="sheets-pane"] [data-testid="pdf-group"]').count()) === 0, 'add pane: the assigned page leaves the waiting list');
 await levelItem('Level 1').click();
 await idle(300);
-check(JSON.stringify(await rowNames()) === JSON.stringify(['first.pdf']), 'the assigned page shows on Level 1', JSON.stringify(await rowNames()));
+await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
+await until(async () => (await stored()).sheets.some((x) => x.location.fileName === 'first.pdf' && x.levelId === 'l1'), 'first.pdf placed on Level 1', 20000);
+await idle(500);
+const added = (await stored()).sheets.find((x) => x.location.fileName === 'first.pdf');
+check(added?.idMinted === true && typeof added?.projectUuid === 'string', 'first.pdf sheet has a minted id', JSON.stringify(added));
+check(/^Added 1 page to Level 1\./.test((await dlg.locator('[data-testid="add-result"]').textContent().catch(() => '')) ?? ''), 'the add result says Added 1 page to Level 1.');
+check(JSON.stringify(await rowNames()) === JSON.stringify(['first.pdf']), 'the added page shows on Level 1', JSON.stringify(await rowNames()));
+check((await chip('first.pdf').getAttribute('data-status')) === 'not-opened' && /Not opened yet/.test((await chip('first.pdf').textContent()) ?? ''), 'first.pdf chip says Not opened yet', (await chip('first.pdf').getAttribute('data-status')) ?? '');
 await shot('B3-T11e-assigned');
 
 // The create input goes away after a building is created through the Building menu.

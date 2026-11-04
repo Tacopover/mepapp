@@ -19,8 +19,8 @@ Source: the user ran `buildings-b3-windows-test.md` (run 2, installer `desktop-v
 
 - **T13a** D-B-41, D-B-42, D-B-46, D-B-47 (rename, no Untitled entry, no Open badge, PDF names in the tree). DONE f36c290.
 - **T13b** D-B-43, D-B-44, D-B-45, D-B-48, D-B-50 (delete text, PDFs on levels only, Opened state, already-assigned alert, multi-file picker). DONE (commit on branch worktree-buildings-model, see the ledger). Check: `b3-t13b-check.mjs` 27 passed, 0 failed. Old checks `b3-t11e` (from line 173), `b3-t04`, `b3-check`, `b3-t11c`, `b3-t11g*`, `b3-t11h`, `b3-t12b` (Step 5) still expect the Not placed flow and need an update in T13c. The real Windows picker is not tested.
-- **T13c** D-B-49 (link at add) and the update of `buildings-b3-windows-test.md` and of all browser checks.
+- **T13c** D-B-49 (link at add: minted sheet id with the flag idMinted, adopted when the PDF opens; status "Not opened yet") and the update of `buildings-b3-windows-test.md` (run 3) and of all old browser checks. DONE baa9dcf (code) and the commit after it (checks and plans). Check: `b3-t13c-check.mjs` 20 passed, 0 failed. Known open items: the path match runs only when a PDF opens; Export Building has no not-placed ask; the dialog has no focus trap (focus falls to body when Open turns into Opened); the active PDF cannot pick its building; a PDF open before it is added gets the sheet id at once but its summary waits for the next Save; Read summaries still tries a not-opened sheet and fails it with "not saved yet"; old sheets with no id still say "Not saved yet"; the web run cannot prove the path match or that the PDF file on disk stays unchanged.
 
 ## Status
 
-T13a and T13b done. T13c not started.
+T13a, T13b and T13c done.

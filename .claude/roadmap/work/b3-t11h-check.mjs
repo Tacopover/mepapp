@@ -1,4 +1,4 @@
-// B3-T11h: repair action (Read summaries now), asks before dropping waiting pages, 760x640 layout, create row, stale read. Real clicks.
+// B3-T11h: repair action (Read summaries now), Add on a level leaves nothing waiting, 760x640 layout, create row, stale read. Real clicks.
 import { readFileSync } from 'node:fs';
 import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
 
@@ -12,7 +12,6 @@ const uuid = () => page.evaluate(() => window.__mepSketchScene.getProjectUuid())
 const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBuilding.read()).json));
 const rebuild = () => dlg.locator('[data-testid="rebuild-summaries"]');
 const ask = () => dlg.locator('[data-testid="close-ask"]');
-const askText = async () => ((await ask().textContent().catch(() => '')) ?? '').trim();
 async function reloadPage() {
   await page.reload();
   await page.locator('button.mep-onboarding-start').click({ timeout: 30000 }).catch(() => {});
@@ -126,32 +125,34 @@ await page.evaluate(() => window.dispatchEvent(new Event('focus')));
 await until(async () => (await plainStatus()) === 'pdf-missing', 'focus refresh marks plain.pdf missing', 8000);
 check(before !== 'pdf-missing' && (await plainStatus()) === 'pdf-missing', 'a window focus checks the files again', `${before} -> ${await plainStatus()}`);
 
-// 3. Asks. Add a PDF that waits.
+// 3. Add on a level: the pages land at once, nothing waits.
 await nextFile('multi.pdf');
-await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
-await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
-await idle(1200);
-check((await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).count()) === 1, 'a page waits (Not placed node)');
-await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+await dlg.locator('[role="treeitem"][data-kind="level"]').first().click();
 await idle(300);
-check(/pages? (is|are) not placed\. Close anyway\?/.test(await askText()), 'the Close button asks about the waiting pages', await askText());
-await shot('B3-T11h-ask-close-building');
-await dlg.locator('[data-testid="keep-working"]').click();
-await idle(200);
-check((await ask().count()) === 0 && (await dlg.locator('.mep-buildings-open-name').count()) === 1, 'Keep working keeps the building');
-// Open a sheet asks nothing: the dialog stays open.
+await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
+await dlg.locator('[data-testid="add-result"]').waitFor({ timeout: 15000 });
+await idle(300);
+const addText = ((await dlg.locator('[data-testid="add-result"]').textContent()) ?? '').trim();
+check((await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).count()) === 0, 'Add PDFs on a level leaves no Not placed node');
+check(/^(Added|Nothing added)/.test(addText), 'the add result says what happened', addText);
+await shot('B3-T11h-add-on-level');
+// Open a sheet asks nothing: the dialog stays open. The ground.pdf document of the save above is still open, so close it first.
+await page.evaluate(() => {
+  const scene = window.__mepSketchScene;
+  const doc = scene.getDocuments().find((d) => d.fileName === 'ground.pdf');
+  if (doc) scene.closeDocument(doc.id);
+});
+await idle(300);
 await dlg.locator('[role="treeitem"][data-kind="level"]').first().click();
 await idle(300);
 await dlg.locator('[data-testid="page-row"]', { hasText: 'ground.pdf' }).locator('[data-testid="open-sheet"]').click();
 await idle(300);
 check((await ask().count()) === 0, 'opening a sheet asks nothing');
 check((await dlg.count()) === 1, 'the dialog stays open behind the ask');
-// Close building, answer yes.
+// Close with no waiting page: no ask, the dialog closes.
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
-await idle(300);
-await dlg.locator('[data-testid="close-anyway"]').click();
 await idle(600);
-check((await dlg.count()) === 0, 'Close anyway closes the dialog');
+check((await ask().count()) === 0 && (await dlg.count()) === 0, 'Close closes the dialog with no ask');
 await reloadPage();
 await openDialog();
 check(/No building is open/.test((await dlg.textContent()) ?? ''), 'a reload leaves no building open');
@@ -187,14 +188,20 @@ await page.evaluate(() => {
   const orig = window.showOpenFilePicker;
   window.showOpenFilePicker = async (...a) => { await new Promise((r) => setTimeout(r, 3000)); return orig(...a); };
 });
-await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
+await dlg.locator('[data-testid="tree-add-level"]').click();
+await idle(400);
+await page.keyboard.type('Level 1');
+await page.keyboard.press('Enter');
+await idle(400);
+await dlg.locator('[role="treeitem"][data-kind="level"]', { hasText: 'Level 1' }).click();
+await idle(300);
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await buildingMenu('New building…');
 await nameIn().fill('Fresh');
 await nameIn().press('Enter');
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Fresh' }).waitFor({ timeout: 8000 });
 await idle(5000);
-check((await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).count()) === 0, 'the late read did not add a waiting page to the new building');
+check((await stored()).sheets.length === 0, 'the late read did not add a page to the new building', JSON.stringify((await stored()).sheets.length));
 await closeDialog();
 
 // 6. 760x640: the right pane is high enough and shows a scroll cue.

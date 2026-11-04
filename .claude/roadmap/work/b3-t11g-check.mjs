@@ -1,4 +1,4 @@
-// B3-T11g: add from disk and not-placed pages. Real clicks and real selects. Picker stub (OPFS), one file at a time.
+// B3-T11g: add PDFs on a level. The pages go on the level at once. Real clicks and real selects. Picker stub (OPFS), one file at a time.
 import { readFileSync } from 'node:fs';
 import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
 
@@ -9,9 +9,10 @@ await t.start();
 
 const dlg = page.locator('.mep-modal');
 const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBuilding.read()).json));
-const pane = () => dlg.locator('[data-testid="sheets-pane"]');
-const groups = () => pane().locator('[data-testid="pdf-group"]');
+const sheetsBlock = () => dlg.locator('[data-testid="level-sheets"]');
+const groups = () => sheetsBlock().locator('[data-testid="pdf-group"]');
 const notPlacedNode = () => dlg.locator('[role="treeitem"]', { hasText: 'Not placed' });
+const addResult = async () => ((await dlg.locator('[data-testid="add-result"]').textContent().catch(() => '')) ?? '');
 const b64 = (file) => readFileSync(FIX + file).toString('base64');
 
 async function addPdf(name, file) {
@@ -59,94 +60,74 @@ await idle(300);
 await items('building').first().click();
 await idle(300);
 
-// The action row sits in the open documents section.
+// The building node offers no add. The add-hint says to select a level.
+check((await dlg.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 0, 'building selected: no Add PDFs… button');
+check(/Select a level to add PDFs\./.test((await dlg.locator('[data-testid="add-hint"]').textContent().catch(() => '')) ?? ''), 'building selected: the add-hint says to select a level');
+
+// Level 1 selected: Add PDFs… is in the open documents section.
+await items('level').nth(1).click();
+await idle(300);
 const section = dlg.locator('[data-testid="open-documents"]');
-check((await section.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 1, 'Add PDFs… is in the open documents section');
+check((await section.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 1, 'level selected: Add PDFs… is in the open documents section');
 check((await dlg.locator('[data-testid="level-sheets"] button', { hasText: /^Add PDFs…$/ }).count()) === 0, 'no Add PDFs… in the sheets block');
 check((await notPlacedNode().count()) === 0, 'no Not placed node before an add');
-check((await pane().count()) === 0, 'no Not placed pane before an add');
+check((await dlg.locator('[data-testid="sheets-pane"]').count()) === 0, 'no Not placed pane before an add');
 
-// Add two files.
+// Add two files. Each page is on Level 1 at once.
 await addPdf('ground.pdf', '00_arch_ground_floor.pdf');
+check((await notPlacedNode().count()) === 0, 'no Not placed node after an add: the page is on the level');
+check(/^Added 1 page to Level 1\./.test(await addResult()), 'add result: Added 1 page to Level 1.', await addResult());
+check((await stored()).sheets.length === 1, 'the sheet is stored at once', String((await stored()).sheets.length));
 await addPdf('multi.pdf', 'Sample Project_multi_page.pdf');
-check((await notPlacedNode().count()) === 1, 'Not placed node exists');
-const badge = ((await notPlacedNode().textContent()) ?? '').replace(/\s+/g, ' ');
-check(/4/.test(badge), 'the node shows 4 pages', badge);
-check((await notPlacedNode().getAttribute('aria-selected')) === 'true', 'the Not placed node is selected after an add');
-check(/These pages are not saved in the building\. Place them or they go when you close this dialog\./.test((await pane().textContent()) ?? ''), 'the pane shows the warning line');
-check((await groups().count()) === 2, 'two waiting PDFs', String(await groups().count()));
-check(/Added multi\.pdf/.test((await dlg.locator('[data-testid="sheets-notice"]').textContent()) ?? ''), 'status line says Added multi.pdf');
-check((await dlg.locator('[data-testid="sheets-notice"] button').count()) === 0, 'no Dismiss button in the status line');
-check((await stored()).sheets.length === 0, 'nothing is stored yet');
-await shot('B3-T11g-not-placed');
+check(/^Added 3 pages to Level 1\./.test(await addResult()), 'add result: Added 3 pages to Level 1.', await addResult());
+check((await groups().count()) === 2, 'Level 1 lists two PDFs', String(await groups().count()));
+check((await stored()).sheets.length === 4, 'four sheets are stored', String((await stored()).sheets.length));
+await shot('B3-T11g-added');
 
-// The status line fades: the text goes away after some seconds.
-await t.until(async () => (await dlg.locator('[data-testid="sheets-notice"]').count()) === 0, 'status line fades', 10000).catch(() => {});
-check((await dlg.locator('[data-testid="sheets-notice"]').count()) === 0, 'the status line is gone after a few seconds');
+// The result stays until Dismiss.
+await idle(7000);
+check(/^Added 3 pages to Level 1\./.test(await addResult()), 'the add result stays after a few seconds');
+await dlg.locator('[data-testid="add-result-dismiss"]').click();
+await idle(300);
+check((await dlg.locator('[data-testid="add-result"]').count()) === 0, 'Dismiss removes the add result');
 
-// Assign all pages of the 3-page PDF with one action.
+// The 3-page PDF is on Level 1 from one add: 3 sheets, page indexes 0, 1, 2.
 const multi = groups().filter({ hasText: 'multi.pdf' });
 check((await multi.locator('[data-testid="page-row"]').count()) === 3, 'multi.pdf shows 3 page rows');
-await multi.locator('select[data-testid="assign-all"]').selectOption({ label: 'Level 1' });
-await idle(700);
 let s = await stored();
 const lvl = (id) => s.levels.find((l) => l.id === id)?.name;
 const multiSheets = s.sheets.filter((x) => x.location.fileName === 'multi.pdf').sort((a, b) => a.pageIndex - b.pageIndex);
-check(multiSheets.length === 3 && multiSheets.every((x) => lvl(x.levelId) === 'Level 1'), 'three sheets on Level 1 from one action', JSON.stringify(multiSheets.map((x) => [x.pageIndex, lvl(x.levelId)])));
+check(multiSheets.length === 3 && multiSheets.every((x) => lvl(x.levelId) === 'Level 1'), 'three sheets on Level 1 from one add', JSON.stringify(multiSheets.map((x) => [x.pageIndex, lvl(x.levelId)])));
 check(multiSheets.map((x) => x.pageIndex).join() === '0,1,2', 'page indexes 0,1,2');
-check((await groups().count()) === 1, 'one waiting PDF is left', String(await groups().count()));
-check(/1/.test(((await notPlacedNode().textContent()) ?? '')), 'the badge shows 1 page');
 
-// Close asks. Keep working keeps the dialog.
+// Close needs no ask: every page is on a level.
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
-await idle(300);
-check((await dlg.locator('[data-testid="close-ask"]').count()) === 1, 'Close with a page waiting shows the ask');
-check(/1 page is not placed\. Close anyway\?/.test((await dlg.locator('[data-testid="close-ask"]').textContent()) ?? ''), 'the ask text names the count', (await dlg.locator('[data-testid="close-ask"]').textContent()) ?? '');
-await shot('B3-T11g-close-ask');
-await dlg.locator('[data-testid="keep-working"]').click();
-await idle(300);
-check((await dlg.count()) === 1 && (await dlg.locator('[data-testid="close-ask"]').count()) === 0, 'Keep working keeps the dialog and hides the ask');
-check((await groups().count()) === 1, 'the waiting PDF is still there');
-
-// Escape asks too.
-await page.keyboard.press('Escape');
-await idle(300);
-check((await dlg.count()) === 1 && (await dlg.locator('[data-testid="close-ask"]').count()) === 1, 'Escape shows the ask and keeps the dialog');
-// Close anyway closes.
-await dlg.locator('[data-testid="close-anyway"]').click();
 await idle(500);
-check((await page.locator('.mep-modal').count()) === 0, 'Close anyway closes the dialog');
+check((await page.locator('.mep-modal').count()) === 0, 'Close closes the dialog at once, no ask');
 
-// After a reopen the waiting page is gone and Close needs no ask.
+// After a reopen the sheets stay and no Not placed node shows.
 await menu('Manage Buildings…');
 await dlg.waitFor({ state: 'visible', timeout: 8000 });
 await idle(500);
 check((await notPlacedNode().count()) === 0, 'after a reopen no Not placed node');
 s = await stored();
-check(s.sheets.length === 3, 'three sheets stay stored', String(s.sheets.length));
+check(s.sheets.length === 4, 'four sheets stay stored', String(s.sheets.length));
 
-// Wording: placed pages say Move to..., a level select of an unplaced open document says Add to another level...
-await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
-await idle(400);
-check((await page.locator('.mep-modal').count()) === 0, 'Close with nothing waiting closes at once');
-
-// Backdrop is not a close gesture (unchanged), but 760x640 view of the pane and the ask.
-await menu('Manage Buildings…');
-await dlg.waitFor({ state: 'visible', timeout: 8000 });
-await idle(400);
-await items('building').first().click();
+// Narrow view: the add result fits inside the dialog at 760x640.
+await items('level').filter({ hasText: 'Level 1' }).click();
 await idle(300);
 await addPdf('first.pdf', '01_arch_first_floor.pdf');
 await page.setViewportSize({ width: 760, height: 640 });
 await idle(500);
+await dlg.locator('[data-testid="add-result"]').scrollIntoViewIfNeeded();
+await idle(300);
 await shot('B3-T11g-narrow');
-await page.keyboard.press('Escape');
-await idle(400);
-await shot('B3-T11g-narrow-ask');
-const askBox = await dlg.locator('[data-testid="close-ask"]').boundingBox();
+const resultBox = await dlg.locator('[data-testid="add-result"]').boundingBox();
 const dlgBox = await dlg.boundingBox();
-check(askBox !== null && dlgBox !== null && askBox.y + askBox.height <= dlgBox.y + dlgBox.height + 1 && askBox.x + askBox.width <= dlgBox.x + dlgBox.width + 1, 'the ask fits inside the dialog at 760x640', JSON.stringify({ askBox, dlgBox }));
-await dlg.locator('[data-testid="keep-working"]').click();
+check(resultBox !== null && dlgBox !== null && resultBox.y >= dlgBox.y - 1 && resultBox.y + resultBox.height <= dlgBox.y + dlgBox.height + 1 && resultBox.x >= dlgBox.x - 1 && resultBox.x + resultBox.width <= dlgBox.x + dlgBox.width + 1, 'the add result fits inside the dialog at 760x640', JSON.stringify({ resultBox, dlgBox }));
+await shot('B3-T11g-narrow-result');
+await dlg.locator('[data-testid="add-result-dismiss"]').click();
+await idle(300);
 await page.setViewportSize({ width: 1600, height: 1000 });
 await idle(400);
 await shot('B3-T11g-wide');

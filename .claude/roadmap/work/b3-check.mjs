@@ -31,10 +31,10 @@ async function putFile(name, b64text) {
     [b64text, name],
   );
 }
-async function addPdf(name, file) {
+async function addPdf(name, file, level) {
   if (file === null) await page.evaluate((n) => { window.__nextFile = n; }, name);
   else await putFile(name, b64(file));
-await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
+  await dlg.locator('[role="treeitem"][data-kind="level"]', { hasText: level }).click();
   await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
   await idle(900);
 }
@@ -104,24 +104,18 @@ check(s.levels.length === 2 && s.levels[0].name === 'Ground floor' && s.levels[1
 check(s.levels[0].elevationMm === 0 && s.levels[1].elevationMm === 3000, 'step 2: elevations 0 and 3000', JSON.stringify(s.levels.map((l) => l.elevationMm)));
 await shot('B3-T10-2-levels');
 
-// Step 3: add the PDFs and assign pages (the multi-page file proves the select of each page).
-await addPdf('ground.pdf', null);
-await addPdf('first.pdf', null);
-await addPdf('multi.pdf', 'Sample Project_multi_page.pdf');
-check((await groups().count()) === 3, 'step 3: three PDFs listed', String(await groups().count()));
+// Step 3: add the PDFs to their levels, then move page 2 of multi.pdf to Level 1 (the multi-page file proves the select of each page).
+await addPdf('ground.pdf', null, 'Ground floor');
+await addPdf('first.pdf', null, 'Level 1');
+await addPdf('multi.pdf', 'Sample Project_multi_page.pdf', 'Ground floor');
 check((await groupOf('multi.pdf').locator('[data-testid="page-row"]').count()) === 3, 'step 3: multi.pdf has 3 page rows');
-await dlg.locator('select[aria-label="Level for ground.pdf page 1"]').selectOption({ label: 'Ground floor' });
-await idle(300);
-await dlg.locator('select[aria-label="Level for first.pdf page 1"]').selectOption({ label: 'Level 1' });
-await idle(300);
-await dlg.locator('select[aria-label="Level for multi.pdf page 1"]').selectOption({ label: 'Ground floor' });
-await idle(300);
-await dlg.locator('select[aria-label="Level for multi.pdf page 2"]').selectOption({ label: 'Level 1' });
+await groupOf('multi.pdf').locator('select[aria-label="Move multi.pdf page 2 to level"]').selectOption({ label: 'Level 1' });
 await idle(500);
 s = await stored();
-check(s.sheets.length === 4, 'step 3: four sheets stored', String(s.sheets.length));
+check(s.sheets.length === 5, 'step 3: five sheets stored', String(s.sheets.length));
 const fileId = (n) => s.sheets.find((x) => x.location.fileName === n)?.projectUuid;
-check(!!fileId('ground.pdf') && !!fileId('first.pdf') && fileId('multi.pdf') === null, 'step 3: stamped files are linked to their ids, multi.pdf is not stamped');
+const multiSheet = s.sheets.find((x) => x.location.fileName === 'multi.pdf');
+check(!!fileId('ground.pdf') && !!fileId('first.pdf') && typeof fileId('multi.pdf') === 'string' && multiSheet?.idMinted === true, 'step 3: stamped files keep their ids, multi.pdf gets a minted id');
 await shot('B3-T10-3-sheets');
 
 // Dev stand-in for desktop paths: the file name is the path in OPFS.
@@ -144,15 +138,20 @@ check(okGround === 'ok' && okFirst === 'ok', 'step 4: both stamped files are ok'
 check(/Summary saved \d{4}-\d{2}-\d{2}/.test(await sheetGroupOf('first.pdf').textContent()), 'step 4: the row shows the summary date');
 await shot('B3-T10-4-rebuilt');
 
-// Step 5: open a sheet.
+// Step 5: open a sheet. Step 0 left first.pdf open in the viewer, so its row shows "Opened": close that document first.
+await page.evaluate(() => {
+  const scene = window.__mepSketchScene;
+  const doc = scene.getDocuments().find((d) => d.fileName === 'first.pdf');
+  if (doc) scene.closeDocument(doc.id);
+});
+await idle(500);
 await showLevel('Level 1');
+check((await sheetGroupOf('first.pdf').locator('[data-testid="open-sheet"]').isEnabled()) === true, 'step 5: the first.pdf row offers Open once its document is closed');
 await sheetGroupOf('first.pdf').locator('[data-testid="open-sheet"]').click();
 await idle(300);
-if ((await dlg.locator('[data-testid="close-ask"]').count()) === 1) await dlg.locator('[data-testid="close-anyway"]').click();
 await t.until(async () => ((await page.locator('[data-testid="current-sheet-header"]').textContent().catch(() => '')) ?? '') === 'Office block / Level 1 / first.pdf', 'header shows the opened sheet', 60000);
 check((await dlg.count()) === 1, 'the dialog stays open after Open');
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
-if ((await dlg.locator('[data-testid="close-anyway"]').count()) > 0) await dlg.locator('[data-testid="close-anyway"]').click();
 await dlg.waitFor({ state: 'hidden', timeout: 5000 });
 await idle(1500);
 const headerLabel = await page.locator('[data-testid="current-sheet-header"]').textContent().catch(() => '');
@@ -193,7 +192,7 @@ await dlg.locator('[role=treeitem][data-kind=building]', { hasText: 'Office bloc
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Office block' }).waitFor({ timeout: 8000 });
 await idle(600);
 s = await stored();
-check(/2 levels, 4 sheets/.test(await dlg.textContent()), 'step 7: reopened from the recent list with 2 levels and 4 sheets', (await dlg.textContent()).slice(0, 200));
+check(/2 levels, 5 sheets/.test(await dlg.textContent()), 'step 7: reopened from the recent list with 2 levels and 5 sheets', (await dlg.textContent()).slice(0, 200));
 await items('level').nth(1).click();
 await idle(300);
 check((await row.locator('input[aria-label="Elevation (mm)"]').inputValue()) === '3000', 'step 7: elevation 3000 survived');

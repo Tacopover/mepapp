@@ -121,7 +121,7 @@ check((await items('building').first().getAttribute('aria-expanded')) === 'true'
 check(/2 levels, 0 sheets/.test((await dlg.locator('.mep-buildings-header').textContent()) ?? ''), 'header shows the counts');
 await shot('B3-T11c-wide-tower');
 
-// Step 3: a PDF that waits shows the Not placed node. Assign its page: the node goes away.
+// Step 3: PDFs go on a level only. Select Level 2 and add a PDF: its page is on Level 2 at once.
 const addPdf = async (name, file) => {
   await page.evaluate(async ([b, n]) => {
     if (b !== null) {
@@ -131,19 +131,15 @@ const addPdf = async (name, file) => {
     }
     window.__nextFile = n;
   }, [file === null ? null : b64(file), name]);
-  await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
+  await items('level').nth(1).click();
+  await idle(300);
   await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
   await idle(900);
 };
 await addPdf('ground.pdf', null);
-check((await items('not-placed').count()) === 1 && /^Not placed1$/.test((await items('not-placed').textContent()) ?? ''), 'tree: Not placed node shows with 1 page');
-await items('not-placed').click();
-await idle(300);
-check((await items('not-placed').getAttribute('aria-selected')) === 'true', 'Not placed node can be selected');
-check((await dlg.locator('[data-testid="pdf-group"]').count()) === 1, 'the sheets pane (pending list) is still there after selecting Not placed');
-await dlg.locator('select[aria-label="Level for ground.pdf page 1"]').selectOption({ label: 'Level 2' });
-await idle(600);
-check((await items('not-placed').count()) === 0, 'tree: Not placed node is gone after the page got a level');
+check((await items('not-placed').count()) === 0, 'tree: no Not placed node, the page is on Level 2 at once');
+check(/^Added 1 page to Level 2\./.test((await dlg.locator('[data-testid="add-result"]').textContent()) ?? ''), 'add result: Added 1 page to Level 2.', (await dlg.locator('[data-testid="add-result"]').textContent()) ?? '');
+check((await dlg.locator('[data-testid="pdf-group"]').count()) === 1, 'Level 2 lists the PDF of the page');
 check(/Level 2/.test((await items('level').nth(1).textContent()) ?? '') && /1 sheet\b/.test((await items('level').nth(1).textContent()) ?? ''), 'tree: Level 2 shows 1 sheet');
 const towerJson = await readStore();
 

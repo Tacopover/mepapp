@@ -1,4 +1,4 @@
-// B3-T11g UI review: is the right pane scrollable at 760x640, and does the not-placed list reach its end?
+// B3-T11g UI review: is the right pane scrollable at 760x640, and does the sheets list of a level reach its end?
 import { readFileSync } from 'node:fs';
 import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
 
@@ -34,6 +34,8 @@ await nameInput.press('Enter');
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Tower' }).waitFor({ timeout: 8000 });
 await dlg.locator('[data-testid="tree-add-level"]').click();
 await idle(300);
+await items('level').first().click();
+await idle(300);
 await page.setViewportSize({ width: 760, height: 640 });
 await idle(500);
 console.log('NARROW-TREE-SELECT', JSON.stringify(await dlg.locator('select').evaluateAll((els) => els.map((e) => Array.from(e.options).map((o) => o.text)))));
@@ -41,11 +43,7 @@ console.log('NARROW-ADD-LEVEL-VISIBLE', await dlg.locator('[data-testid="tree-ad
 
 await addPdf('ground.pdf', '00_arch_ground_floor.pdf');
 await addPdf('multi.pdf', 'Sample Project_multi_page.pdf');
-const pane = dlg.locator('[data-testid="sheets-pane"]');
-if ((await pane.count()) === 0) {
-  await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).click();
-  await idle(300);
-}
+const pane = dlg.locator('[data-testid="level-sheets"]');
 
 // Walk the ancestors of the pane and report the ones that scroll or clip.
 const info = await pane.evaluate((el) => {
@@ -61,7 +59,7 @@ const info = await pane.evaluate((el) => {
   return out;
 });
 console.log('CLIP-ANCESTORS', JSON.stringify(info));
-const lastBox = await pane.locator('button', { hasText: /^Remove from list$/ }).last().boundingBox();
+const lastBox = await pane.locator('button', { hasText: /^Remove$/ }).last().boundingBox();
 const paneBox = await pane.boundingBox();
 console.log('LAST-REMOVE-BTN', JSON.stringify(lastBox), 'PANE', JSON.stringify(paneBox));
 await shot('B3-T11g-review-narrow-scroll-bottom');
@@ -72,7 +70,7 @@ await pane.evaluate((el) => {
 });
 await idle(300);
 await shot('B3-T11g-review-narrow-scrolled');
-const lastAfter = await pane.locator('button', { hasText: /^Remove from list$/ }).last().boundingBox();
+const lastAfter = await pane.locator('button', { hasText: /^Remove$/ }).last().boundingBox();
 console.log('LAST-REMOVE-BTN-AFTER-SCROLL', JSON.stringify(lastAfter));
 
 await t.finish();

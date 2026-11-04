@@ -1,4 +1,4 @@
-// B3-T04: Sheets pane. Add PDFs through the real "Add PDFs…" button (OPFS stub picker), assign pages with real selects.
+// B3-T04: Sheets on levels. Add PDFs to a level through the real "Add PDFs…" button (OPFS stub picker), move a page with the real select.
 import { readFileSync } from 'node:fs';
 import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
 
@@ -9,7 +9,7 @@ await t.start();
 
 const dlg = page.locator('.mep-modal');
 const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBuilding.read()).json));
-const groups = () => dlg.locator('[data-testid="pdf-group"]');
+const groups = () => dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]');
 const sheetGroups = () => dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]');
 const showLevel = async (name) => { await dlg.locator('[role="treeitem"][data-kind="level"]', { hasText: name }).click(); await idle(300); };
 
@@ -25,9 +25,9 @@ async function putFile(name, bytesB64) {
   );
 }
 const b64 = (file) => readFileSync(FIX + file).toString('base64');
-async function addPdf(name, file) {
+async function addPdf(name, file, level) {
   await putFile(name, b64(file));
-  await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
+  await dlg.locator('[role="treeitem"][data-kind="level"]', { hasText: level }).click();
   await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
   await idle(900);
 }
@@ -40,7 +40,8 @@ await nameInput.fill('Tower');
 await nameInput.press('Enter');
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Tower' }).waitFor({ timeout: 8000 });
 
-check((await dlg.locator('[data-testid="add-actions"]').count()) === 1, 'add action row is shown');
+check((await dlg.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 0, 'building node: no Add PDFs button');
+check((((await dlg.locator('[data-testid="open-documents"]').textContent()) ?? '').includes('Add a level first.')), 'no level: the strip says Add a level first.');
 check((await dlg.locator('[data-testid="sheets-pane"]').count()) === 0, 'no Not placed pane before an add');
 
 // Two levels by typing.
@@ -64,27 +65,21 @@ await n1.fill('Level 1');
 await n1.press('Tab');
 await idle(300);
 
-// Add the two one-page fixtures.
-await addPdf('ground.pdf', '00_arch_ground_floor.pdf');
-check((await groups().count()) === 1, 'one PDF group after the first add', String(await groups().count()));
+// Add one one-page fixture to each level: the page appears on its level at once.
+await addPdf('ground.pdf', '00_arch_ground_floor.pdf', 'Ground floor');
+check((await groups().count()) === 1, 'one PDF group on Ground floor after the add', String(await groups().count()));
 check(/ground\.pdf/.test(await groups().first().textContent()), 'group shows the file name');
 check((await groups().first().locator('[data-testid="page-row"]').count()) === 1, 'one page row for a 1-page PDF');
-await addPdf('first.pdf', '01_arch_first_floor.pdf');
-check((await groups().count()) === 2, 'two PDF groups', String(await groups().count()));
-check(/2 PDFs, 2 pages, 0 assigned/.test(await dlg.locator('[data-testid="sheets-totals"]').textContent()), 'totals line before assigning', await dlg.locator('[data-testid="sheets-totals"]').textContent());
+check(/^Added 1 page to Ground floor\./.test((await dlg.locator('[data-testid="add-result"]').textContent()) ?? ''), 'add result says Added 1 page to Ground floor.');
+await addPdf('first.pdf', '01_arch_first_floor.pdf', 'Level 1');
+check((await groups().count()) === 1 && /first\.pdf/.test(await groups().first().textContent()), 'Level 1 shows first.pdf at once', String(await groups().count()));
+check(/^Added 1 page to Level 1\./.test((await dlg.locator('[data-testid="add-result"]').textContent()) ?? ''), 'add result says Added 1 page to Level 1.');
 
-// Adding the same PDF again is refused with a notice.
-await addPdf('ground.pdf', '00_arch_ground_floor.pdf');
-await dlg.locator('[role="treeitem"][data-kind="not-placed"]').click();
-await idle(300);
-check((await groups().count()) === 2, 'same PDF twice: still two groups');
-check(/already in the list/.test((await dlg.locator('[data-testid="sheets-notice"]').textContent()) ?? ''), 'notice for the duplicate');
+// Adding the same PDF to the same level again adds nothing.
+await addPdf('ground.pdf', '00_arch_ground_floor.pdf', 'Ground floor');
+check((await groups().count()) === 1, 'same PDF again: still one group on Ground floor');
+check(/^Nothing added\. 1 page is already on this level\./.test((await dlg.locator('[data-testid="add-result"]').textContent()) ?? ''), 'notice for the page already on this level', (await dlg.locator('[data-testid="add-result"]').textContent()) ?? '');
 
-// Assign page of ground.pdf to Ground floor and first.pdf to Level 1 with the real selects.
-await dlg.locator('select[aria-label="Level for ground.pdf page 1"]').selectOption({ label: 'Ground floor' });
-await idle(300);
-await dlg.locator('select[aria-label="Level for first.pdf page 1"]').selectOption({ label: 'Level 1' });
-await idle(300);
 let s = await stored();
 check(s.sheets.length === 2, 'two sheets stored', String(s.sheets.length));
 const byName = (n) => s.sheets.find((x) => x.location.fileName === n);
@@ -93,7 +88,6 @@ check(lvl(byName('ground.pdf')?.levelId) === 'Ground floor', 'ground.pdf sheet i
 check(lvl(byName('first.pdf')?.levelId) === 'Level 1', 'first.pdf sheet is on Level 1');
 check(byName('ground.pdf')?.pageIndex === 0 && byName('ground.pdf')?.displayName === 'ground.pdf', 'sheet page index 0 and display name', JSON.stringify(byName('ground.pdf')));
 check(/2 sheets/.test(await dlg.textContent()), 'dialog says 2 sheets');
-check((await dlg.locator('[data-testid="sheets-totals"]').count()) === 0, 'no totals line once every waiting PDF is assigned');
 await shot('B3-T04-assign');
 
 // The level with a sheet cannot be deleted any more.
@@ -101,37 +95,30 @@ await items('level').nth(0).click();
 await idle(300);
 check(await row.locator('button', { hasText: /^Delete$/ }).isDisabled(), 'level with a sheet: Delete disabled');
 
-// Multi-page PDF: three page rows; assign p1 and p2, leave p3.
-await addPdf('multi.pdf', 'Sample Project_multi_page.pdf');
+// Multi-page PDF on Ground floor: three page rows, all placed at once; move page 2 to Level 1.
+await addPdf('multi.pdf', 'Sample Project_multi_page.pdf', 'Ground floor');
 const multi = groups().filter({ hasText: 'multi.pdf' });
 check((await multi.locator('[data-testid="page-row"]').count()) === 3, 'multi-page PDF shows 3 page rows', String(await multi.locator('[data-testid="page-row"]').count()));
-await multi.locator('select[aria-label="Level for multi.pdf page 1"]').selectOption({ label: 'Ground floor' });
-await idle(300);
-await multi.locator('select[aria-label="Level for multi.pdf page 2"]').selectOption({ label: 'Level 1' });
-await idle(300);
+check(/^Added 3 pages to Ground floor\./.test((await dlg.locator('[data-testid="add-result"]').textContent()) ?? ''), 'add result says Added 3 pages to Ground floor.');
 s = await stored();
 const multiSheets = s.sheets.filter((x) => x.location.fileName === 'multi.pdf').sort((a, b) => a.pageIndex - b.pageIndex);
-check(multiSheets.length === 2 && multiSheets[0].pageIndex === 0 && multiSheets[1].pageIndex === 1, 'two multi-page sheets, page indexes 0 and 1', JSON.stringify(multiSheets.map((x) => x.pageIndex)));
+check(multiSheets.length === 3 && multiSheets.map((x) => x.pageIndex).join() === '0,1,2', 'three multi-page sheets, page indexes 0, 1 and 2', JSON.stringify(multiSheets.map((x) => x.pageIndex)));
 check(multiSheets[1].displayName === 'multi.pdf p2', 'display name has the page', multiSheets[1].displayName);
-check(/2 assigned/.test(await dlg.locator('[data-testid="sheets-totals"]').textContent()), 'totals count', await dlg.locator('[data-testid="sheets-totals"]').textContent());
 
-// Move page 2 to Ground floor (moveSheet keeps the sheet id).
+// Move page 2 to Level 1 (moveSheet keeps the sheet id).
 const id2 = multiSheets[1].id;
-await showLevel('Level 1');
-await sheetGroups().filter({ hasText: 'multi.pdf' }).locator('select[aria-label="Move multi.pdf page 2 to level"]').selectOption({ label: 'Ground floor' });
+await multi.locator('select[aria-label="Move multi.pdf page 2 to level"]').selectOption({ label: 'Level 1' });
 await idle(300);
 s = await stored();
 const moved = s.sheets.find((x) => x.id === id2);
-check(moved && lvl(moved.levelId) === 'Ground floor', 'page 2 moved to Ground floor with the same sheet id');
-// Remove removes the sheet; its page waits in the add pane again.
-await showLevel('Ground floor');
+check(moved && lvl(moved.levelId) === 'Level 1', 'page 2 moved to Level 1 with the same sheet id');
+// Remove on Level 1 removes that sheet only.
+await showLevel('Level 1');
 await sheetGroups().filter({ hasText: 'multi.pdf' }).locator('button[aria-label="Remove multi.pdf page 2"]').click();
-await idle(300);
-await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).click();
 await idle(300);
 s = await stored();
 check(!s.sheets.some((x) => x.id === id2), 'Remove removes the sheet');
-check((await multi.locator('select[aria-label="Level for multi.pdf page 2"]').count()) === 1, 'removed page 2 waits in the add pane');
+check((await sheetGroups().filter({ hasText: 'multi.pdf' }).count()) === 0, 'Level 1 shows no multi.pdf page after the removal');
 await shot('B3-T04-multi');
 
 // A file that is not a PDF: error notice, no group added.
@@ -140,15 +127,14 @@ await putFile('notes.pdf', Buffer.from('this is not a pdf').toString('base64'));
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await idle(900);
 check((await groups().count()) === before, 'a non-PDF adds no group');
-check(/Could not read notes\.pdf/.test((await dlg.locator('[data-testid="sheets-notice"]').textContent()) ?? ''), 'error notice for the non-PDF', (await dlg.locator('[data-testid="sheets-notice"]').textContent()) ?? '');
+check(/Nothing added\. Could not read notes\.pdf\./.test((await dlg.locator('[data-testid="add-result"]').textContent()) ?? ''), 'error notice for the non-PDF', (await dlg.locator('[data-testid="add-result"]').textContent()) ?? '');
 
 t.errors.length = 0; // the MuPDF messages of the deliberate non-PDF step are expected
 
-// Close and reopen: pending pages are gone, assigned sheets stay as groups.
+// Close and reopen: the sheets stay on their levels. Close closes at once, no ask.
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
-await idle(300);
-await dlg.locator('[data-testid="close-anyway"]').click();
-await idle(300);
+await idle(500);
+check((await page.locator('.mep-modal').count()) === 0 && (await dlg.locator('[data-testid="close-ask"]').count()) === 0, 'Close closes the dialog at once, no ask');
 await menu('Manage Buildings…');
 await dlg.waitFor({ state: 'visible', timeout: 8000 });
 await idle(300);
@@ -156,9 +142,9 @@ await items('building').first().click();
 await idle(300);
 const reopened = await dlg.locator('[data-testid="level-sheets"] [data-testid="level-group"]').count();
 const reopenedRows = await dlg.locator('[data-testid="level-sheets"] [data-testid="page-row"]').count();
-check(reopened === 2 && reopenedRows === 3, 'after reopening: 2 level groups with the 3 stored sheets', `${reopened} groups, ${reopenedRows} rows`);
-check((await dlg.locator('select[aria-label="Move multi.pdf page 1 to level"]').count()) === 1, 'multi.pdf page 1 is still assigned');
-check((await dlg.locator('select[aria-label="Level for multi.pdf page 3"]').count()) === 0, 'unassigned page 3 is not listed after reopening');
+check(reopened === 2 && reopenedRows === 4, 'after reopening: 2 level groups with the 4 stored sheets', `${reopened} groups, ${reopenedRows} rows`);
+check((await dlg.locator('select[aria-label="Move multi.pdf page 1 to level"]').count()) === 1, 'multi.pdf page 1 is still on its level');
+check((await dlg.locator('select[aria-label="Move multi.pdf page 3 to level"]').count()) === 1, 'multi.pdf page 3 is listed after reopening');
 await shot('B3-T04-reopened');
 
 // Remove: one button for each sheet row. Clears every sheet of one PDF.

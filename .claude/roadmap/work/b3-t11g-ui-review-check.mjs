@@ -1,4 +1,4 @@
-// B3-T11g UI review: action row placement, text sizes, status line fade, not-placed pane, 760x640 layout. Real clicks.
+// B3-T11g UI review: action row placement, text sizes, add result stays until Dismiss, level sheets pane, 760x640 layout. Real clicks.
 import { readFileSync } from 'node:fs';
 import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
 
@@ -10,8 +10,8 @@ await t.start();
 const dlg = page.locator('.mep-modal');
 const b64 = (file) => readFileSync(FIX + file).toString('base64');
 const items = (kind) => dlg.locator(`[role="treeitem"][data-kind="${kind}"]`);
-const notice = dlg.locator('[data-testid="sheets-notice"]');
-const op = async () => ((await notice.count()) ? notice.evaluate((el) => getComputedStyle(el).opacity) : 'absent');
+const result = dlg.locator('[data-testid="add-result"]');
+const op = async () => ((await result.count()) ? result.evaluate((el) => getComputedStyle(el).opacity) : 'absent');
 
 async function addPdf(name, file) {
   await page.evaluate(
@@ -43,33 +43,31 @@ await nameInput.press('Enter');
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Tower' }).waitFor({ timeout: 8000 });
 await dlg.locator('[data-testid="tree-add-level"]').click();
 await idle(300);
-await items('building').first().click();
+await items('level').first().click();
 await idle(300);
 
 await addPdf('ground.pdf', '00_arch_ground_floor.pdf');
 await addPdf('multi.pdf', 'Sample Project_multi_page.pdf');
-const pane = dlg.locator('[data-testid="sheets-pane"]');
-console.log('PANE-COUNT', await pane.count(), 'NOTICE', ((await notice.textContent().catch(() => '')) ?? ''));
-if ((await pane.count()) === 0) {
-  await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).click();
-  await idle(300);
-}
-console.log('WARN-STYLE', JSON.stringify(await probe(pane.getByText(/These pages are not saved/))));
-console.log('COUNT-LINE-STYLE', JSON.stringify(await probe(pane.getByText(/assigned$/))));
+const pane = dlg.locator('[data-testid="level-sheets"]');
+console.log('PANE-COUNT', await pane.count(), 'RESULT', ((await result.textContent().catch(() => '')) ?? ''));
+check((await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).count()) === 0, 'no Not placed node after the adds');
+
+console.log('RESULT-STYLE', JSON.stringify(await probe(result)));
+console.log('COUNT-LINE-STYLE', JSON.stringify(await probe(dlg.locator('[data-testid="summary-count"]'))));
 console.log('FILE-HEADING-STYLE', JSON.stringify(await probe(pane.getByText('ground.pdf', { exact: true }))));
 console.log('PAGE-LABEL-STYLE', JSON.stringify(await probe(pane.getByText(/^Page 1$/))));
-console.log('REMOVE-BTN-STYLE', JSON.stringify(await probe(pane.locator('button', { hasText: /^Remove from list$/ }))));
-console.log('NOTICE-OPACITY-0S', await op(), ((await notice.textContent().catch(() => '')) ?? ''));
-await shot('B3-T11g-review-notice-fresh');
+console.log('REMOVE-BTN-STYLE', JSON.stringify(await probe(pane.locator('button', { hasText: /^Remove$/ }))));
+console.log('RESULT-OPACITY-0S', await op());
+await shot('B3-T11g-review-result-fresh');
 await idle(1000);
-console.log('NOTICE-OPACITY-1S', await op());
+console.log('RESULT-OPACITY-1S', await op());
 await idle(7000);
-console.log('NOTICE-OPACITY-8S', await op());
-await shot('B3-T11g-review-notice-faded');
+console.log('RESULT-OPACITY-8S', await op());
+await shot('B3-T11g-review-result-stays');
 
 await page.setViewportSize({ width: 760, height: 640 });
 await idle(500);
-await shot('B3-T11g-review-narrow-notplaced');
+await shot('B3-T11g-review-narrow-level');
 console.log('PANE-NARROW', JSON.stringify(await pane.boundingBox()), 'DLG', JSON.stringify(await dlg.boundingBox()));
 
 await t.finish();
