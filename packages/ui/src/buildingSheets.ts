@@ -1,4 +1,5 @@
 import { addSheets, type BuildingFile, type BuildingSheet, type NewSheetPage, type SheetLocation } from '@mepapp/core';
+import { countLabel } from './buildingLevels.js';
 
 export const COLLAPSE_AFTER_PAGES = 20;
 
@@ -154,19 +155,75 @@ export function waitingGroups(file: BuildingFile, pending: readonly PendingPdf[]
     .filter((group) => group.rows.length > 0);
 }
 
-/** Puts the pages of the entries that are not yet sheets on the level. A page that is already a sheet stays where it is and is counted in `already`. An unknown level changes nothing. */
-export function placeEntriesOnLevel(file: BuildingFile, entries: readonly PendingPdf[], levelId: string): { file: BuildingFile; placed: number; already: number } {
+/** Puts the pages of the entries that are not yet sheets on the level. A page that is already a sheet stays where it is: `sameLevel` counts those on the level, `elsewhere` those on other levels, grouped by level in order of first appearance. An unknown level changes nothing. */
+export function placeEntriesOnLevel(
+  file: BuildingFile,
+  entries: readonly PendingPdf[],
+  levelId: string,
+): { file: BuildingFile; placed: number; already: number; sameLevel: number; elsewhere: { levelName: string; count: number }[] } {
   const pages: NewSheetPage[] = [];
-  let already = 0;
+  let sameLevel = 0;
+  const elsewhereByLevel = new Map<string, number>();
   for (const group of groupPdfs(file, entries).filter((item) => item.pending)) {
     for (const row of group.rows) {
-      if (row.sheet === null) pages.push(newSheetPage(group, row.pageIndex));
-      else already += 1;
+      if (row.sheet === null) {
+        pages.push(newSheetPage(group, row.pageIndex));
+      } else if (row.sheet.levelId === levelId) {
+        sameLevel += 1;
+      } else {
+        elsewhereByLevel.set(row.sheet.levelId, (elsewhereByLevel.get(row.sheet.levelId) ?? 0) + 1);
+      }
     }
   }
   const result = addSheets(file, levelId, pages);
-  if (!result.ok) return { file, placed: 0, already: 0 };
-  return { file: result.file, placed: pages.length - result.skipped.length, already };
+  if (!result.ok) return { file, placed: 0, already: 0, sameLevel: 0, elsewhere: [] };
+  const elsewhere = [...elsewhereByLevel].map(([id, count]) => ({
+    levelName: file.levels.find((level) => level.id === id)?.name ?? 'another level',
+    count,
+  }));
+  const already = sameLevel + elsewhere.reduce((sum, item) => sum + item.count, 0);
+  return { file: result.file, placed: pages.length - result.skipped.length, already, sameLevel, elsewhere };
+}
+
+/** '' when nothing was already assigned. Else one sentence per level, the other levels first, joined by a space. */
+export function alreadyAssignedText(sameLevel: number, elsewhere: readonly { levelName: string; count: number }[]): string {
+  const sentences = elsewhere.map(
+    ({ levelName, count }) =>
+      `${countLabel(count, 'page')} ${count === 1 ? 'is' : 'are'} already on ${levelName} and ${count === 1 ? 'was' : 'were'} not moved.`,
+  );
+  if (sameLevel > 0) sentences.push(`${countLabel(sameLevel, 'page')} ${sameLevel === 1 ? 'is' : 'are'} already on this level.`);
+  return sentences.join(' ');
+}
+
+/** The status line text after an add: what was added to the level, what was already there, and what was skipped or failed. */
+export function addResultText(input: {
+  levelName: string;
+  placed: number;
+  pdfCount: number;
+  sameLevel: number;
+  elsewhere: readonly { levelName: string; count: number }[];
+  skippedDuplicates?: number;
+  failed?: readonly string[];
+  source?: string;
+}): string {
+  const parts: string[] = [];
+  const assigned = input.sameLevel + input.elsewhere.reduce((sum, item) => sum + item.count, 0);
+  const pdfNote = assigned === 0 ? ` (${countLabel(input.pdfCount, 'PDF')})` : '';
+  if (input.placed === 0) {
+    parts.push('Nothing added.');
+  } else if (input.source !== undefined) {
+    parts.push(`Added ${countLabel(input.placed, 'page')} from ${input.source}${pdfNote} to ${input.levelName}.`);
+  } else if (input.pdfCount > 1) {
+    parts.push(`Added ${countLabel(input.placed, 'page')}${pdfNote} to ${input.levelName}.`);
+  } else {
+    parts.push(`Added ${countLabel(input.placed, 'page')} to ${input.levelName}.`);
+  }
+  const already = alreadyAssignedText(input.sameLevel, input.elsewhere);
+  if (already !== '') parts.push(already);
+  const skipped = input.skippedDuplicates ?? 0;
+  if (skipped > 0) parts.push(`${countLabel(skipped, 'PDF')} ${skipped === 1 ? 'was' : 'were'} picked twice and skipped.`);
+  if (input.failed !== undefined && input.failed.length > 0) parts.push(`Could not read ${input.failed.join(', ')}.`);
+  return parts.join(' ');
 }
 
 /** True when two pending entries name the same PDF (same pdfGroupKey). */

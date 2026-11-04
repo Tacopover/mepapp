@@ -107,12 +107,12 @@ describe('deleteBlockedText', () => {
 
   it('names one sheet in the singular', () => {
     const file = withSheets(withLevels([0]), ['level-0']);
-    expect(deleteBlockedText(file, 'level-0')).toBe('Remove its 1 sheet first');
+    expect(deleteBlockedText(file, 'level-0')).toBe('This level has 1 sheet. Move or remove it to delete the level.');
   });
 
   it('names several sheets in the plural', () => {
     const file = withSheets(withLevels([0]), ['level-0', 'level-0']);
-    expect(deleteBlockedText(file, 'level-0')).toBe('Remove its 2 sheets first');
+    expect(deleteBlockedText(file, 'level-0')).toBe('This level has 2 sheets. Move or remove them to delete the level.');
   });
 });
 

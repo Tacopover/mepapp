@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { emptyBuilding, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import {
+  addResultText,
+  alreadyAssignedText,
   COLLAPSE_AFTER_PAGES,
   groupPdfs,
   isSamePdf,
@@ -355,19 +357,46 @@ describe('placeEntriesOnLevel', () => {
     expect(result.file.sheets.map((sheet) => sheet.levelId)).toEqual(['L1', 'L1', 'L1']);
   });
 
-  it('counts the pages that are already sheets and leaves them where they are', () => {
+  it('counts the pages that are already sheets on another level and leaves them where they are', () => {
     const old = { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L2' };
     const file = twoLevels([old]);
     const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 3 })], 'L1');
     expect(result.placed).toBe(2);
     expect(result.already).toBe(1);
+    expect(result.sameLevel).toBe(0);
+    expect(result.elsewhere).toEqual([{ levelName: 'First', count: 1 }]);
     expect(result.file.sheets.find((sheet) => sheet.id === 's1')).toEqual(old);
+  });
+
+  it('counts the pages that are already sheets on the target level as same level', () => {
+    const old = { ...sheetOf('s1', 1, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L1' };
+    const file = twoLevels([old]);
+    const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 3 })], 'L1');
+    expect(result.placed).toBe(2);
+    expect(result.already).toBe(1);
+    expect(result.sameLevel).toBe(1);
+    expect(result.elsewhere).toEqual([]);
+  });
+
+  it('groups the elsewhere pages by level in order of first appearance and names an unknown level', () => {
+    const file = twoLevels([
+      { ...sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L2' },
+      { ...sheetOf('s2', 1, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L9' },
+      { ...sheetOf('s3', 2, 'a.pdf', { path: 'C:/a.pdf' }), levelId: 'L2' },
+    ]);
+    const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 4 })], 'L1');
+    expect(result.placed).toBe(1);
+    expect(result.already).toBe(3);
+    expect(result.elsewhere).toEqual([
+      { levelName: 'First', count: 2 },
+      { levelName: 'another level', count: 1 },
+    ]);
   });
 
   it('changes nothing for an unknown level', () => {
     const file = twoLevels([]);
     const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'c.pdf', path: 'C:/c.pdf', pageCount: 2 })], 'missing');
-    expect(result).toEqual({ file, placed: 0, already: 0 });
+    expect(result).toEqual({ file, placed: 0, already: 0, sameLevel: 0, elsewhere: [] });
   });
 
   it('names the new sheets from the PDF', () => {
@@ -375,5 +404,91 @@ describe('placeEntriesOnLevel', () => {
     const result = placeEntriesOnLevel(file, [pendingOf({ fileName: 'c.pdf', path: 'C:/c.pdf', pageCount: 2 })], 'L1');
     expect(result.file.sheets[1]?.displayName).toBe('c.pdf p2');
     expect(result.file.sheets[1]?.location.fileName).toBe('c.pdf');
+  });
+});
+
+describe('alreadyAssignedText', () => {
+  it('gives an empty text when nothing was already assigned', () => {
+    expect(alreadyAssignedText(0, [])).toBe('');
+  });
+
+  it('names the other level in the plural and the singular', () => {
+    expect(alreadyAssignedText(0, [{ levelName: 'Level 1', count: 2 }])).toBe('2 pages are already on Level 1 and were not moved.');
+    expect(alreadyAssignedText(0, [{ levelName: 'Level 1', count: 1 }])).toBe('1 page is already on Level 1 and was not moved.');
+  });
+
+  it('names the same level in the plural and the singular', () => {
+    expect(alreadyAssignedText(3, [])).toBe('3 pages are already on this level.');
+    expect(alreadyAssignedText(1, [])).toBe('1 page is already on this level.');
+  });
+
+  it('puts the other levels first, one sentence each', () => {
+    expect(
+      alreadyAssignedText(1, [
+        { levelName: 'Level 1', count: 2 },
+        { levelName: 'Roof', count: 1 },
+      ]),
+    ).toBe('2 pages are already on Level 1 and were not moved. 1 page is already on Roof and was not moved. 1 page is already on this level.');
+  });
+});
+
+describe('addResultText', () => {
+  const none = { sameLevel: 0, elsewhere: [] };
+
+  it('names the count of added pages and the level', () => {
+    expect(addResultText({ levelName: 'Ground floor', placed: 3, pdfCount: 1, ...none })).toBe('Added 3 pages to Ground floor.');
+  });
+
+  it('adds the already-assigned sentence after a placed count', () => {
+    expect(addResultText({ levelName: 'Ground floor', placed: 1, pdfCount: 1, sameLevel: 0, elsewhere: [{ levelName: 'Level 1', count: 2 }] })).toBe(
+      'Added 1 page to Ground floor. 2 pages are already on Level 1 and were not moved.',
+    );
+  });
+
+  it('says nothing was added when no page was placed', () => {
+    expect(addResultText({ levelName: 'Ground floor', placed: 0, pdfCount: 1, sameLevel: 0, elsewhere: [{ levelName: 'Level 1', count: 2 }] })).toBe(
+      'Nothing added. 2 pages are already on Level 1 and were not moved.',
+    );
+  });
+
+  it('names the folder and the PDF count when a source is given', () => {
+    expect(addResultText({ levelName: 'Ground floor', placed: 5, pdfCount: 2, source: 'Plans', ...none })).toBe(
+      'Added 5 pages from Plans (2 PDFs) to Ground floor.',
+    );
+  });
+
+  it('names the PDF count when several PDFs were picked without a source', () => {
+    expect(addResultText({ levelName: 'Ground floor', placed: 5, pdfCount: 2, ...none })).toBe('Added 5 pages (2 PDFs) to Ground floor.');
+  });
+
+  it('leaves out the PDF count when some pages were already assigned, with a source', () => {
+    expect(
+      addResultText({ levelName: 'Level 1', placed: 1, pdfCount: 1, source: 'Plans', sameLevel: 0, elsewhere: [{ levelName: 'First', count: 1 }] }),
+    ).toBe('Added 1 page from Plans to Level 1. 1 page is already on First and was not moved.');
+  });
+
+  it('leaves out the PDF count when some pages were already assigned, without a source', () => {
+    expect(addResultText({ levelName: 'Level 1', placed: 5, pdfCount: 2, sameLevel: 1, elsewhere: [] })).toBe(
+      'Added 5 pages to Level 1. 1 page is already on this level.',
+    );
+  });
+
+  it('keeps the PDF count when the picked pages were all new', () => {
+    expect(addResultText({ levelName: 'Level 1', placed: 1, pdfCount: 1, source: 'Plans', ...none })).toBe('Added 1 page from Plans (1 PDF) to Level 1.');
+  });
+
+  it('counts the duplicates that were skipped in the singular and the plural', () => {
+    expect(addResultText({ levelName: 'Ground floor', placed: 1, pdfCount: 1, skippedDuplicates: 1, ...none })).toBe(
+      'Added 1 page to Ground floor. 1 PDF was picked twice and skipped.',
+    );
+    expect(addResultText({ levelName: 'Ground floor', placed: 1, pdfCount: 1, skippedDuplicates: 2, ...none })).toBe(
+      'Added 1 page to Ground floor. 2 PDFs were picked twice and skipped.',
+    );
+  });
+
+  it('names the files that could not be read', () => {
+    expect(addResultText({ levelName: 'Ground floor', placed: 1, pdfCount: 1, failed: ['x.pdf'], ...none })).toBe(
+      'Added 1 page to Ground floor. Could not read x.pdf.',
+    );
   });
 });

@@ -134,7 +134,7 @@ await idle(400);
 await pick(0);
 const delA = row().locator('button', { hasText: /^Delete$/ });
 check(await delA.isDisabled(), 'level with a sheet: Delete disabled');
-check(/Remove its 1 sheet first/.test((await dlg.locator('[data-testid="delete-reason"]').textContent()) ?? ''), 'disabled Delete explains why', String(await dlg.locator('[data-testid="delete-reason"]').textContent()));
+check(/This level has 1 sheet\. Move or remove it to delete the level\./.test((await dlg.locator('[data-testid="delete-reason"]').textContent()) ?? ''), 'disabled Delete explains why', String(await dlg.locator('[data-testid="delete-reason"]').textContent()));
 await pick(1);
 check(await row().locator('button', { hasText: /^Delete$/ }).isEnabled(), 'empty level: Delete enabled');
 check(/1 level\b|2 levels/.test(await dlg.textContent()) && /1 sheet\b/.test(await dlg.textContent()), 'singular sheet label');

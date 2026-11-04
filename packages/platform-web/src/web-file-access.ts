@@ -34,19 +34,20 @@ function downloadBlob(blob: Blob, fileName: string): void {
 // The fallback path for browsers without the File System Access API: a
 // classic <input type="file">, added for the one pick. click() runs before
 // any await, so it still counts as the user's click.
-function pickWithFileInput(types: FileTypeFilter[]): Promise<File | undefined> {
+function pickWithFileInput(types: FileTypeFilter[], multiple: boolean): Promise<File[]> {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = types.flatMap((t) => t.extensions.map((ext) => `.${ext}`)).join(',');
+  input.multiple = multiple;
   input.style.display = 'none';
   document.body.appendChild(input);
   return new Promise((resolve) => {
-    const finish = (file: File | undefined) => {
+    const finish = (files: File[]) => {
       input.remove();
-      resolve(file);
+      resolve(files);
     };
-    input.addEventListener('change', () => finish(input.files?.[0]), { once: true });
-    input.addEventListener('cancel', () => finish(undefined), { once: true });
+    input.addEventListener('change', () => finish(Array.from(input.files ?? [])), { once: true });
+    input.addEventListener('cancel', () => finish([]), { once: true });
     input.click();
   });
 }
@@ -78,7 +79,7 @@ export class WebFileAccess implements FileAccess {
 
   async openFile(types: FileTypeFilter[]): Promise<OpenedFile | undefined> {
     if (!supportsFileSystemAccess()) {
-      const file = await pickWithFileInput(types);
+      const [file] = await pickWithFileInput(types, false);
       return file ? { file } : undefined;
     }
     try {
@@ -86,6 +87,19 @@ export class WebFileAccess implements FileAccess {
       return { file: await fileHandle.getFile(), target: fileHandle };
     } catch (err) {
       if (isAbortError(err)) return undefined;
+      throw err;
+    }
+  }
+
+  async openFiles(types: FileTypeFilter[]): Promise<OpenedFile[]> {
+    if (!supportsFileSystemAccess()) {
+      return (await pickWithFileInput(types, true)).map((file) => ({ file }));
+    }
+    try {
+      const fileHandles = await window.showOpenFilePicker!({ types: pickerTypes(types), multiple: true });
+      return Promise.all(fileHandles.map(async (fileHandle) => ({ file: await fileHandle.getFile(), target: fileHandle })));
+    } catch (err) {
+      if (isAbortError(err)) return [];
       throw err;
     }
   }

@@ -9,7 +9,7 @@ export interface OpenDocumentsPaneProps {
   file: BuildingFile;
   update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
   rows: readonly OpenDocumentRow[];
-  /** The selected level. null (building node): the first level is the target. */
+  /** The selected level. null (building node): the rows only show their state. */
   levelId: string | null;
   onNotice: (text: string, error: boolean) => void;
   /** The action row to add PDFs from disk. */
@@ -32,12 +32,12 @@ function sheetsText(count: number): string {
 /**
  * The quiet "Add files" strip at the bottom of the right pane: Add PDFs and Add folder (children), and a block with the documents
  * that are open in the viewer. One click adds the pages of a document to the selected level.
- * The block is collapsed when no document is open. The row state is read again inside the building update, so a second click adds nothing twice.
+ * Without a selected level the rows are read-only. The block is collapsed when no document is open. The row state is read again inside the building update, so a second click adds nothing twice.
  */
 export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, children }: OpenDocumentsPaneProps) {
   const lastAddAt = useRef(0);
   const [expanded, setExpanded] = useState(() => rows.length > 0);
-  const target = file.levels.find((level) => level.id === levelId) ?? file.levels[0] ?? null;
+  const target = file.levels.find((level) => level.id === levelId) ?? null;
 
   async function put(row: OpenDocumentRow, toLevelId: string, pageIndexes: readonly number[], move: boolean) {
     if (Date.now() - lastAddAt.current < CLICK_GUARD_MS) return;
@@ -79,7 +79,7 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, child
     return row.pages.map((page) => page.pageIndex);
   }
 
-  if (target === null) {
+  if (file.levels.length === 0) {
     return (
       <BuildingSection quiet title="Add files" testId="open-documents">
         {children}
@@ -115,7 +115,7 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, child
         >
           <span aria-hidden="true">{expanded ? '▾' : '▸'}</span> Open in the viewer ({rows.length})
         </button>
-        {expanded && rows.length > 1 && (
+        {expanded && target !== null && rows.length > 1 && (
           <button
             type="button"
             data-testid="open-doc-add-all-docs"
@@ -133,23 +133,25 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, child
           {rows.map((row) => {
             const multi = row.doc.pageCount > 1;
             const unplaced = row.pages.filter((page) => page.sheet === null).length;
-            const elsewhere = row.pages.filter((page) => page.sheet !== null && page.sheet.levelId !== target.id).length;
-            const otherLevels = file.levels.filter((level) => level.id !== target.id);
             const single = row.pages[0];
-            let primary: string;
+            const otherLevels = target === null ? [] : file.levels.filter((level) => level.id !== target.id);
+            let primary = '';
             let primaryDisabled = false;
-            if (multi) {
-              if (unplaced > 0) primary = 'Add all pages';
-              else if (elsewhere > 0) primary = `Move all pages to ${target.name}`;
+            if (target !== null) {
+              const elsewhere = row.pages.filter((page) => page.sheet !== null && page.sheet.levelId !== target.id).length;
+              if (multi) {
+                if (unplaced > 0) primary = 'Add all pages';
+                else if (elsewhere > 0) primary = `Move all pages to ${target.name}`;
+                else {
+                  primary = 'All pages added';
+                  primaryDisabled = true;
+                }
+              } else if (single?.sheet === null) primary = `Add to ${target.name}`;
+              else if (single !== undefined && single.sheet.levelId !== target.id) primary = `Move to ${target.name}`;
               else {
-                primary = 'All pages added';
+                primary = 'Added';
                 primaryDisabled = true;
               }
-            } else if (single?.sheet === null) primary = `Add to ${target.name}`;
-            else if (single !== undefined && single.sheet.levelId !== target.id) primary = `Move to ${target.name}`;
-            else {
-              primary = `Added`;
-              primaryDisabled = true;
             }
             return (
               <div key={row.doc.id} className="mep-open-doc" data-testid="open-doc-row" data-state={row.state}>
@@ -162,17 +164,19 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, child
                   )}
                   {!multi && <span className="mep-hint">1 page</span>}
                   <span data-testid="open-doc-placed">{placedText(row)}</span>
-                  <button
-                    type="button"
-                    className="mep-open-doc-primary"
-                    data-testid="open-doc-add"
-                    disabled={primaryDisabled}
-                    aria-label={`${primary} - ${row.displayName}`}
-                    onClick={() => void put(row, target.id, allPages(row), !multi || unplaced === 0)}
-                  >
-                    {primary}
-                  </button>
-                  {otherLevels.length > 0 && (
+                  {target !== null && (
+                    <button
+                      type="button"
+                      className="mep-open-doc-primary"
+                      data-testid="open-doc-add"
+                      disabled={primaryDisabled}
+                      aria-label={`${primary} - ${row.displayName}`}
+                      onClick={() => void put(row, target.id, allPages(row), !multi || unplaced === 0)}
+                    >
+                      {primary}
+                    </button>
+                  )}
+                  {target !== null && otherLevels.length > 0 && (
                     <select
                       data-testid="open-doc-level"
                       aria-label={`${unplaced === 0 ? 'Move' : 'Add'} ${row.displayName} to another level`}
@@ -191,7 +195,7 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, child
                     </select>
                   )}
                 </div>
-                {multi && (
+                {multi && target !== null && (
                   <div className="mep-open-doc-pages" data-testid="open-doc-pages">
                     <span className="mep-hint">Pages:</span>
                     {row.pages.map((page) => {

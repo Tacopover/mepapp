@@ -28,7 +28,7 @@ import { BuildingTree } from './BuildingTree.js';
 import { LevelSheetsPane } from './LevelSheetsPane.js';
 import { NotPlacedPane } from './NotPlacedPane.js';
 import { OpenDocumentsPane } from './OpenDocumentsPane.js';
-import type { OpenDocumentRow } from '../openDocumentsView.js';
+import { openedSheetIds, type OpenDocumentRow } from '../openDocumentsView.js';
 
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
@@ -565,6 +565,7 @@ export function ManageBuildingsDialog({
                   sheetSummary={openBuilding.sheetSummary}
                   onRefreshStatus={building.refreshSheetStatus}
                   onNotice={onNotice}
+                  openedSheetIds={openedSheetIds(openDocuments)}
                 />
                 <BuildingSummariesPane
                   key={`${openBuilding.file.id}-summaries`}
@@ -590,16 +591,10 @@ export function ManageBuildingsDialog({
                     key={openBuilding.file.id}
                     fileAccess={fileAccess}
                     engine={pdfEngine}
-                    pendingPdfs={pendingPdfs}
                     file={openBuilding.file}
                     update={building.update}
                     levelId={selectedLevel?.id ?? null}
                     onRefreshStatus={building.refreshSheetStatus}
-                    onAdded={() => {
-                      setSelectedKey(NOT_PLACED_KEY);
-                      setFocusKey(NOT_PLACED_KEY);
-                      setHighlight(null);
-                    }}
                     onNotice={onNotice}
                   />
                 </OpenDocumentsPane>

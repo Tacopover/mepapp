@@ -54,6 +54,18 @@ export class TauriFileAccess implements FileAccess {
     return { file: await readAsFile(path, mimeTypeFor(path, types)), target };
   }
 
+  async openFiles(types: FileTypeFilter[]): Promise<OpenedFile[]> {
+    const paths = await open({ multiple: true, directory: false, filters: dialogFilters(types) });
+    if (paths === null || paths.length === 0) return [];
+    this.lastDirectory = await dirname(paths[0]);
+    const files: OpenedFile[] = [];
+    for (const path of paths) {
+      const target: PathTarget = { name: baseName(path), path };
+      files.push({ file: await readAsFile(path, mimeTypeFor(path, types)), target });
+    }
+    return files;
+  }
+
   async writeFile(target: FileTarget, data: Blob): Promise<void> {
     await writeFile((target as PathTarget).path, new Uint8Array(await data.arrayBuffer()));
   }

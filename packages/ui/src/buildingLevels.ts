@@ -22,11 +22,13 @@ export function defaultLevelName(file: BuildingFile): string {
   return `Level ${file.levels.length + 1}`;
 }
 
-/** null when the level can be deleted; else "Remove its 2 sheets first" / "Remove its 1 sheet first". */
+/** null when the level can be deleted; else "This level has 1 sheet. Move or remove it to delete the level." / "... has N sheets. Move or remove them ...". */
 export function deleteBlockedText(file: BuildingFile, levelId: string): string | null {
   const count = sheetCount(file, levelId);
   if (count === 0) return null;
-  return `Remove its ${countLabel(count, 'sheet')} first`;
+  return count === 1
+    ? 'This level has 1 sheet. Move or remove it to delete the level.'
+    : `This level has ${count} sheets. Move or remove them to delete the level.`;
 }
 
 /** Puts a deleted level back at index (clamped). Returns the file unchanged when a level with that id exists. */

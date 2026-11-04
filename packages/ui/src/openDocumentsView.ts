@@ -20,6 +20,17 @@ export interface OpenDocumentRow {
   sheetProjectUuid: string | null;
 }
 
+/** Ids of the sheets whose PDF is open in the viewer (any page of an open document that is matched to a sheet). */
+export function openedSheetIds(rows: readonly OpenDocumentRow[]): Set<string> {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    for (const page of row.pages) {
+      if (page.sheet !== null) ids.add(page.sheet.id);
+    }
+  }
+  return ids;
+}
+
 /** One row per open document that holds a PDF, in the order of docs. A page takes the strongest sheet match for its page index. A name-and-size match counts only when the document has no path. An id counts only when the file holds it (projectUuidInFile); a minted id never matches a sheet, and needsSave is true until a Save writes it. */
 export function openDocumentRows(
   docs: readonly DocumentSummary[],

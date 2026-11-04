@@ -83,7 +83,7 @@ check((await chip('nopath.pdf').textContent())?.trim() === 'Not saved yet', 'nop
 check(/Save it in MepApp to link it/.test((await dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]').filter({ hasText: 'nopath.pdf' }).textContent()) ?? ''), 'nopath.pdf group explains the next step');
 check(!/stamped/i.test((await dlg.textContent()) ?? ''), 'the word "stamped" is gone from the dialog');
 check((await rowOf('nopath.pdf').locator('[data-testid="open-sheet"]').textContent())?.trim() === 'Choose file…', 'a sheet with no path has "Choose file…"');
-check((await rowOf('orig.pdf').locator('[data-testid="open-sheet"]').textContent())?.trim() === 'Open', 'a sheet with a path has "Open"');
+check(['Open', 'Opened'].includes((await rowOf('orig.pdf').locator('[data-testid="open-sheet"]').textContent())?.trim() ?? ''), 'a sheet with a path has "Open" or "Opened"');
 check((await rowOf('gone.pdf').locator('[data-testid="relink-pdf"]').count()) === 1, 'the missing sheet has Relink… on its row');
 check((await rowOf('orig.pdf').locator('[data-testid="relink-pdf"]').count()) === 0, 'an OK sheet has no Relink');
 check(/1 of 3 sheets have a summary/.test((await dlg.locator('[data-testid="summary-count"]').textContent()) ?? ''), 'footer: 1 of 3 sheets have a summary', (await dlg.locator('[data-testid="summary-count"]').textContent()) ?? '');

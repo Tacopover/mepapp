@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { emptyBuilding, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { DocumentSummary } from '@mepapp/render';
 import type { FileTarget } from '@mepapp/platform';
-import { openDocumentRows } from './openDocumentsView.js';
+import { openDocumentRows, openedSheetIds } from './openDocumentsView.js';
 
 const sheetOf = (id: string, pageIndex: number, fileName: string, options: { projectUuid?: string | null; path?: string; sizeBytes?: number; levelId?: string } = {}): BuildingSheet => ({
   id,
@@ -203,5 +203,35 @@ describe('openDocumentRows', () => {
     const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { sizeBytes: 1000 }), sheetOf('s2', 0, 'a.pdf', { projectUuid: 'u1' })]);
     const [row] = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: true, sizeBytes: 1000 })], new Map(), file, NO_ACTIVE);
     expect(row!.pages[0]!.sheet?.id).toBe('s2');
+  });
+});
+
+describe('openedSheetIds', () => {
+  it('gives no ids when no document is open', () => {
+    expect(openedSheetIds([])).toEqual(new Set());
+  });
+
+  it('gives the ids of the sheets matched on every page of every open document', () => {
+    const file = buildingOf([
+      sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' }),
+      sheetOf('s2', 2, 'a.pdf', { projectUuid: 'u1' }),
+      sheetOf('s3', 0, 'b.pdf', { projectUuid: 'u2' }),
+    ]);
+    const rows = openDocumentRows(
+      [
+        docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: true, pageCount: 3 }),
+        docOf({ id: 'd2', fileName: 'b.pdf', projectUuid: 'u2', projectUuidInFile: true, pageCount: 1 }),
+        docOf({ id: 'd3', fileName: 'c.pdf', pageCount: 1 }),
+      ],
+      new Map(),
+      file,
+      NO_ACTIVE,
+    );
+    expect(openedSheetIds(rows)).toEqual(new Set(['s1', 's2', 's3']));
+  });
+
+  it('gives nothing for an open document that has no sheet', () => {
+    const rows = openDocumentRows([docOf({ id: 'd1', fileName: 'a.pdf' })], new Map(), buildingOf([]), NO_ACTIVE);
+    expect(openedSheetIds(rows).size).toBe(0);
   });
 });

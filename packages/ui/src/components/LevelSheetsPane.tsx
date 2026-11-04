@@ -32,7 +32,11 @@ export interface LevelSheetsPaneProps {
   relinker: SheetRelink;
   /** The sheet that the user picked in the tree. The row of that sheet is marked and scrolled to. */
   highlight?: { sheetId: string; seq: number } | null;
+  /** The sheets whose PDF is open in the viewer. Their Open button shows "Opened" and is disabled. */
+  openedSheetIds?: ReadonlySet<string>;
 }
+
+const NO_OPENED_SHEETS: ReadonlySet<string> = new Set();
 
 /** One block of rows. A level block (building node) has a header row with the level name. */
 interface RowGroup {
@@ -75,6 +79,7 @@ export function LevelSheetsPane({
   onNotice,
   relinker,
   highlight = null,
+  openedSheetIds = NO_OPENED_SHEETS,
 }: LevelSheetsPaneProps) {
   const groups = rowGroups(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
@@ -162,7 +167,18 @@ export function LevelSheetsPane({
                     )}
                   </span>
                   <span className="mep-srow-cell mep-srow-cell--open">
-                    {sheet.location.path !== undefined && fileAccess.readPath !== undefined ? (
+                    {openedSheetIds.has(sheet.id) ? (
+                      <button
+                        type="button"
+                        data-testid="open-sheet"
+                        disabled
+                        data-opened="true"
+                        aria-label={`Opened: ${sheet.location.fileName}`}
+                        title="This PDF is open in the viewer."
+                      >
+                        Opened
+                      </button>
+                    ) : sheet.location.path !== undefined && fileAccess.readPath !== undefined ? (
                       <button
                         type="button"
                         data-testid="open-sheet"

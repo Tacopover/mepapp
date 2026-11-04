@@ -173,7 +173,7 @@ await idle(500);
 await treeLevels().nth(0).click();
 await idle(300);
 check((await delBtn().getAttribute('aria-disabled')) === 'true' && (await delBtn().isDisabled()), 'level with 1 sheet: Delete is aria-disabled');
-check(/Remove its 1 sheet first/.test((await dlg.locator('[data-testid="delete-reason"]').textContent()) ?? ''), 'reason text: Remove its 1 sheet first');
+check(/This level has 1 sheet\. Move or remove it to delete the level\./.test((await dlg.locator('[data-testid="delete-reason"]').textContent()) ?? ''), 'reason text: This level has 1 sheet. Move or remove it to delete the level.');
 await detail().locator('input[aria-label="Elevation (mm)"]').focus();
 await page.keyboard.press('Tab');
 a = await active();
@@ -184,7 +184,7 @@ check((await treeLevels().count()) === 3 && (await dlg.locator('[data-testid="le
 await shot('B3-T11d-blocked-delete');
 await treeLevels().nth(2).click();
 await idle(300);
-check(/Remove its 2 sheets first/.test((await dlg.locator('[data-testid="delete-reason"]').textContent()) ?? ''), 'reason text: Remove its 2 sheets first');
+check(/This level has 2 sheets\. Move or remove them to delete the level\./.test((await dlg.locator('[data-testid="delete-reason"]').textContent()) ?? ''), 'reason text: This level has 2 sheets. Move or remove them to delete the level.');
 await treeLevels().nth(1).click();
 await idle(300);
 check((await delBtn().getAttribute('aria-disabled')) !== 'true', 'empty level: Delete is enabled');

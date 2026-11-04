@@ -5911,6 +5911,25 @@ button.mep-tree-arrow {
 .mep-sheets-count {
   margin: 8px 0 0;
 }
+.mep-add-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  overflow-wrap: anywhere;
+}
+.mep-add-result > span {
+  flex: 1;
+  min-width: 0;
+}
+.mep-add-result--error {
+  border-left-color: var(--bad);
+}
 
 /* Summaries section: text left, button right, quiet result under it. */
 .mep-summaries-head {
@@ -6134,6 +6153,11 @@ button.mep-tree-arrow {
 }
 .mep-modal--buildings .mep-srow .mep-sheets-remove {
   color: var(--bad);
+}
+.mep-srow-cell--open button:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+  cursor: default;
 }
 .mep-buildings-status-line:empty {
   border-top: none;

@@ -41,6 +41,8 @@ export interface FileAccess {
   readonly capabilities: FileAccessCapabilities;
   /** Resolves undefined when the user cancels. */
   openFile(types: FileTypeFilter[]): Promise<OpenedFile | undefined>;
+  /** Like openFile, but the user can pick several files. Resolves to an empty array when the user cancels. */
+  openFiles(types: FileTypeFilter[]): Promise<OpenedFile[]>;
   writeFile(target: FileTarget, data: Blob): Promise<void>;
   /** Asks for a location and writes the data there. Resolves undefined when the user cancels; a failed write throws. */
   saveFileAs(suggestedName: string, types: FileTypeFilter[], data: Blob): Promise<SavedFile | undefined>;
