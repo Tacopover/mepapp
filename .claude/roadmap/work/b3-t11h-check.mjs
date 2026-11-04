@@ -13,6 +13,11 @@ const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBui
 const rebuild = () => dlg.locator('[data-testid="rebuild-summaries"]');
 const ask = () => dlg.locator('[data-testid="close-ask"]');
 const askText = async () => ((await ask().textContent().catch(() => '')) ?? '').trim();
+async function reloadPage() {
+  await page.reload();
+  await page.locator('button.mep-onboarding-start').click({ timeout: 30000 }).catch(() => {});
+  await page.waitForFunction(() => window.__mepSketchScene !== undefined);
+}
 async function buildingMenu(item) {
   await dlg.locator('button.mep-menu-btn').click();
   await dlg.locator('[role="menuitem"]', { hasText: item }).click();
@@ -70,7 +75,7 @@ check((await rebuild().count()) === 1, 'N=2: the Read summaries now button shows
 check(/^Read summaries now$/.test(((await rebuild().textContent()) ?? '').trim()), 'the button text is "Read summaries now"');
 check(/2 sheets have no summary/.test((await dlg.locator('[data-testid="summaries-missing"]').textContent()) ?? ''), 'the line says "2 sheets have no summary"');
 check(/Reads each PDF of this building from disk and saves its summary\. MepApp does this when you open or save a PDF\./.test((await dlg.locator('[data-testid="summaries-pane"]').textContent()) ?? ''), 'the explain text shows');
-check((await dlg.locator('h4', { hasText: /^Summaries$/ }).count()) === 0, 'no Summaries section title');
+check((await dlg.locator('h4', { hasText: /^Summaries$/ }).count()) === 1, 'the Summaries section title shows');
 check((await dlg.locator('[data-testid="refresh-status"]').count()) === 1 && /Refresh/.test((await dlg.locator('[data-testid="refresh-status"]').getAttribute('aria-label')) ?? ''), 'a small Refresh icon button stays');
 await shot('B3-T11h-n2');
 await rebuild().click();
@@ -127,8 +132,9 @@ await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await idle(1200);
 check((await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).count()) === 1, 'a page waits (Not placed node)');
-await buildingMenu('Close building');
-check(/pages? (is|are) not placed\. Close the building anyway\?/.test(await askText()), 'Close building asks', await askText());
+await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+await idle(300);
+check(/pages? (is|are) not placed\. Close anyway\?/.test(await askText()), 'the Close button asks about the waiting pages', await askText());
 await shot('B3-T11h-ask-close-building');
 await dlg.locator('[data-testid="keep-working"]').click();
 await idle(200);
@@ -141,10 +147,14 @@ await idle(300);
 check((await ask().count()) === 0, 'opening a sheet asks nothing');
 check((await dlg.count()) === 1, 'the dialog stays open behind the ask');
 // Close building, answer yes.
-await buildingMenu('Close building');
+await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+await idle(300);
 await dlg.locator('[data-testid="close-anyway"]').click();
 await idle(600);
-check(/No building is open/.test((await dlg.textContent()) ?? ''), 'Close building after the answer closes the building');
+check((await dlg.count()) === 0, 'Close anyway closes the dialog');
+await reloadPage();
+await openDialog();
+check(/No building is open/.test((await dlg.textContent()) ?? ''), 'a reload leaves no building open');
 
 // 4. Create row: closes after create, after Cancel; never with a building open unless chosen.
 const nameIn = () => dlg.locator('input[aria-label="Building name"]');
@@ -179,8 +189,7 @@ await page.evaluate(() => {
 });
 await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
-await buildingMenu('Close building');
-await dlg.locator('button', { hasText: /^New building$/ }).click();
+await buildingMenu('New building…');
 await nameIn().fill('Fresh');
 await nameIn().press('Enter');
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Fresh' }).waitFor({ timeout: 8000 });

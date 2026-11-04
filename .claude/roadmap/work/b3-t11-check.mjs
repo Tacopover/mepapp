@@ -42,6 +42,11 @@ async function openDialog() {
   await dlg.waitFor({ state: 'visible', timeout: 8000 });
   await idle(700);
 }
+async function reloadPage() {
+  await page.reload();
+  await page.locator('button.mep-onboarding-start').click({ timeout: 30000 }).catch(() => {});
+  await page.waitForFunction(() => window.__mepSketchScene !== undefined);
+}
 async function buildingMenu(item) {
   await dlg.locator('button.mep-menu-btn').click();
   await dlg.locator('[role="menuitem"]', { hasText: item }).click();
@@ -221,11 +226,14 @@ check(/^Tower-.*quantities\.xlsx$/.test(bld.name), 'Building export file name', 
 const segB = bld.xlsx.sheets.Segments ?? [];
 check(segB.length >= 3, 'Building export has the segments of both levels', JSON.stringify(segB));
 
-// Step 9: close the building and reopen it from the tree.
+// Step 9: a reload closes the building, then reopen it from the tree.
 await openDialog();
-await buildingMenu('Close building');
-check(/No building is open/.test((await dlg.textContent()) ?? ''), 'Close building closes it');
+const towerAtClose = await readStore();
+await reloadPage();
+await openDialog();
+check(/No building is open/.test((await dlg.textContent()) ?? ''), 'a reload closes the building');
 await shot('B3-T11j-15-closed');
+await loadStore(towerAtClose);
 await items('building').filter({ hasText: 'Tower' }).click();
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Tower' }).waitFor({ timeout: 8000 });
 await idle(500);
@@ -237,7 +245,9 @@ await putFile('temp.pdf', '01_arch_first_floor.pdf');
 const cur = await stored();
 cur.sheets.push({ id: 'sx-temp', levelId: cur.levels[1].id, projectUuid: null, pageIndex: 0, displayName: 'temp.pdf', location: { fileName: 'temp.pdf', path: 'temp.pdf' } });
 await loadStore(JSON.stringify(cur));
-await buildingMenu('Close building');
+await reloadPage();
+await openDialog();
+await loadStore(JSON.stringify(cur));
 await items('building').filter({ hasText: 'Tower' }).click();
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Tower' }).waitFor({ timeout: 8000 });
 await idle(600);
@@ -303,7 +313,8 @@ await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await idle(1500);
 a = await active();
 check(a.tag !== 'BODY', 'focus is not on body after Add PDFs…', JSON.stringify(a));
-await buildingMenu('Close building');
+await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+await idle(300);
 a = await active();
 check(await dlg.locator('[data-testid="keep-working"]').count() === 1 && a.test === 'keep-working', 'the ask puts the focus on Keep working', JSON.stringify(a));
 await shot('B3-T11j-18-ask');
@@ -311,19 +322,20 @@ await page.keyboard.press('Enter');
 await idle(300);
 a = await active();
 check(a.inDialog && a.tag !== 'BODY', 'after Keep working (Enter) the focus stays in the dialog', JSON.stringify(a));
-await buildingMenu('Close building');
+await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+await idle(300);
 await dlg.locator('[data-testid="close-anyway"]').click();
 await idle(500);
-a = await active();
-check(a.inDialog && a.tag !== 'BODY', 'after Close anyway the focus stays in the dialog', JSON.stringify(a));
-// Escape twice: closes the dialog.
+check((await dlg.count()) === 0, 'Close anyway closes the dialog');
+// Escape: the dialog stays closed.
 await page.keyboard.press('Escape');
 await idle(300);
-check((await dlg.count()) === 0, 'Escape closes the dialog (no building)');
+check((await dlg.count()) === 0, 'Escape keeps the closed dialog closed');
 a = await active();
 console.log('INFO focus after the dialog closes: ' + JSON.stringify(a));
 
 // Step 11: reopen the building, then the 760x640 run.
+await t.openPdf(FIX + '00_arch_ground_floor.pdf', 'ground.pdf');
 await openDialog();
 await loadStore(towerJson0);
 await items('building').filter({ hasText: 'Tower' }).click();

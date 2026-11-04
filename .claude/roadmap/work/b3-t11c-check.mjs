@@ -27,6 +27,11 @@ async function openDialog() {
   await dlg.waitFor({ state: 'visible', timeout: 8000 });
   await idle(500);
 }
+async function reloadPage() {
+  await page.reload();
+  await page.locator('button.mep-onboarding-start').click({ timeout: 30000 }).catch(() => {});
+  await page.waitForFunction(() => window.__mepSketchScene !== undefined);
+}
 async function closeByEscape() {
   await page.keyboard.press('Escape');
   await idle(300);
@@ -79,8 +84,8 @@ check(a.tag === 'BUTTON' && a.text === 'New building', 'no building, no recent: 
 let r0 = await rect();
 check(r0.w === 1100 && r0.h === 760, 'fixed size 1100x760 at 1600x1000', JSON.stringify(r0));
 await dlg.locator('button.mep-menu-btn').click();
-check((await dlg.locator('[role="menuitem"]', { hasText: /^Close building$/ }).isDisabled()), 'menu: Close building is disabled with no building');
-check((await dlg.locator('[role="menuitem"]').count()) === 3, 'menu: three items with no old buildings', String(await dlg.locator('[role="menuitem"]').count()));
+check((await dlg.locator('[role="menuitem"]', { hasText: /^Close building$/ }).count()) === 0, 'menu: no Close building item');
+check((await dlg.locator('[role="menuitem"]').count()) === 2, 'menu: two items with no old buildings', String(await dlg.locator('[role="menuitem"]').count()));
 await shot('B3-T11c-nobuilding-menu');
 await page.keyboard.press('Escape');
 await idle(300);
@@ -246,10 +251,10 @@ const ring2 = await page.evaluate(() => {
 });
 check(ring2.style !== 'none' && ring2.width >= 2, 'a focused control has a visible focus ring', JSON.stringify(ring2));
 
-// Step 8: the Building menu: Close building, then the tree still lists the buildings.
-await buildingMenu('Close building');
-await idle(400);
-check(/No building is open/.test((await dlg.textContent()) ?? ''), 'menu: Close building closes the building');
+// Step 8: a reload closes the building, then the tree still lists the buildings.
+await reloadPage();
+await openDialog();
+check(/No building is open/.test((await dlg.textContent()) ?? ''), 'reload: no building is open');
 check((await items('building').count()) === 2 && (await items('level').count()) === 0, 'tree: both buildings are listed, no levels, none open');
 check((await dlg.locator('.mep-tree-badge').count()) === 0, 'tree: no Open marker with no building open');
 await shot('B3-T11c-nobuilding-tree');

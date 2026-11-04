@@ -43,6 +43,11 @@ async function openDialog() {
   await dlg.waitFor({ state: 'visible', timeout: 8000 });
   await idle(500);
 }
+async function reloadPage() {
+  await page.reload();
+  await page.locator('button.mep-onboarding-start').click({ timeout: 30000 }).catch(() => {});
+  await page.waitForFunction(() => window.__mepSketchScene !== undefined);
+}
 async function saveActive(label) {
   await menu('Save');
   await until(async () => /Saved |Failed/.test(await statusText()), `save ${label}`);
@@ -178,11 +183,12 @@ await until(async () => (await statusOf('Level 1', 'first2.pdf')) !== 'pdf-missi
 check((await sheetGroupOf('first2.pdf').locator('[data-testid="relink-pdf"]').count()) === 0, 'step 6: no Relink button after the relink');
 await shot('B3-T10-6-relinked');
 
-// Step 7: close the building, open it again from the recent list.
-await dlg.locator('button.mep-menu-btn').click();
-await dlg.locator('[role=menuitem]', { hasText: 'Close building' }).click();
-await idle(400);
-check(/No building is open/.test(await dlg.textContent()), 'step 7: building closed');
+// Step 7: a reload closes the building, open it again from the recent list.
+const savedJson = await page.evaluate(async () => (await window.__mepBuilding.read()).json);
+await reloadPage();
+await openDialog();
+check(/No building is open/.test(await dlg.textContent()), 'step 7: building closed by a reload');
+await page.evaluate((j) => window.__mepBuilding.store.load(j), savedJson);
 await dlg.locator('[role=treeitem][data-kind=building]', { hasText: 'Office block' }).click();
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Office block' }).waitFor({ timeout: 8000 });
 await idle(600);

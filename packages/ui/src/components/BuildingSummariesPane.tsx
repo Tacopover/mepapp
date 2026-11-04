@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BuildingSheet } from '@mepapp/core';
 import type { FileAccess } from '@mepapp/platform';
-import { noSummaryText, type SheetStatus } from '../buildingStatus.js';
+import { otherNoSummaryText, readableNoSummaryText, type SheetStatus } from '../buildingStatus.js';
 import type { RebuildResult } from '../rebuildSummaries.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
 import { BuildingSection } from './BuildingSection.js';
@@ -12,6 +12,8 @@ export const REPAIR_ORIGIN = 'repair';
 export interface BuildingSummariesPaneProps {
   /** How many sheets have a probed status and no summary. The button shows only when this is above 0. */
   missing: number;
+  /** How many sheets have no summary and cannot be read now (file missing, no access, or not checked yet). */
+  other: number;
   /** Undefined when the app has no PDF engine: the button is disabled with a reason. */
   onRebuild: ((run: { signal: AbortSignal; onProgress: (done: number, total: number, name: string) => void }) => Promise<RebuildResult | undefined>) | undefined;
   /** Called when a run ends (any result) so the sheet rows read the summaries again. */
@@ -32,8 +34,10 @@ interface Progress {
 /**
  * The repair action for sheets with no summary: a line with a count and the button "Read summaries now" (only when the count is above 0),
  * a progress line with Cancel, and the result of the last run. Each failed sheet has the actions that can fix it.
+ * The line of the count names the sheets that can be read now. A second line names the sheets that cannot be read now.
+ * The pane shows when either count is above 0, a run is going, or a last result is shown. The count line and the button need missing above 0. The second line needs other above 0.
  */
-export function BuildingSummariesPane({ missing, onRebuild, onDone, fileAccess, relinker, sheetStatus, onOpenSheet, onNotice }: BuildingSummariesPaneProps) {
+export function BuildingSummariesPane({ missing, other, onRebuild, onDone, fileAccess, relinker, sheetStatus, onOpenSheet, onNotice }: BuildingSummariesPaneProps) {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<Progress>({ done: 0, total: 0, name: '' });
   const [last, setLast] = useState<{ result: RebuildResult | undefined; error?: string } | null>(null);
@@ -73,13 +77,13 @@ export function BuildingSummariesPane({ missing, onRebuild, onDone, fileAccess, 
     }
   }
 
-  if (missing === 0 && !running && last === null) return null;
+  if (missing === 0 && other === 0 && !running && last === null) return null;
 
   return (
     <BuildingSection title="Summaries" testId="summaries-pane">
       {(missing > 0 || running) && (
         <div className="mep-summaries-head">
-          <span data-testid="summaries-missing">{noSummaryText(missing)}</span>
+          <span data-testid="summaries-missing">{readableNoSummaryText(missing)}</span>
           <span className="mep-summaries-actions">
             {missing > 0 && (
               <button
@@ -103,6 +107,11 @@ export function BuildingSummariesPane({ missing, onRebuild, onDone, fileAccess, 
       {missing > 0 && !running && (
         <p className="mep-hint">
           Reads each PDF of this building from disk and saves its summary. MepApp does this when you open or save a PDF.
+        </p>
+      )}
+      {other > 0 && !running && (
+        <p className="mep-hint" data-testid="summaries-other">
+          {otherNoSummaryText(other)}
         </p>
       )}
       {running && (

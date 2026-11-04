@@ -154,8 +154,9 @@ await dlg.waitFor({ state: 'visible', timeout: 8000 });
 await idle(300);
 await items('building').first().click();
 await idle(300);
-const reopened = await sheetGroups().count();
-check(reopened === 3, 'after reopening: 3 groups from the stored sheets', String(reopened));
+const reopened = await dlg.locator('[data-testid="level-sheets"] [data-testid="level-group"]').count();
+const reopenedRows = await dlg.locator('[data-testid="level-sheets"] [data-testid="page-row"]').count();
+check(reopened === 2 && reopenedRows === 3, 'after reopening: 2 level groups with the 3 stored sheets', `${reopened} groups, ${reopenedRows} rows`);
 check((await dlg.locator('select[aria-label="Move multi.pdf page 1 to level"]').count()) === 1, 'multi.pdf page 1 is still assigned');
 check((await dlg.locator('select[aria-label="Level for multi.pdf page 3"]').count()) === 0, 'unassigned page 3 is not listed after reopening');
 await shot('B3-T04-reopened');
@@ -169,6 +170,6 @@ for (let i = 0; i < multiRows; i += 1) {
   await idle(400);
 }
 check((await stored()).sheets.length === countBefore - multiRows && !(await stored()).sheets.some((x) => x.location.fileName === 'multi.pdf'), 'Remove on each row clears the PDF');
-check((await sheetGroups().filter({ hasText: 'multi.pdf' }).count()) === 0, 'no multi.pdf group left after the removal');
+check((await dlg.locator('[data-testid="level-sheets"] [data-testid="level-group"]').filter({ hasText: 'multi.pdf' }).count()) === 0, 'no multi.pdf group left after the removal');
 
 await t.finish();

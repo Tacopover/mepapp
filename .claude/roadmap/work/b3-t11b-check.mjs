@@ -106,6 +106,9 @@ const sheets = await page.evaluate(async () => JSON.parse((await window.__mepBui
 check(sheets[2] === null, 'a PDF with no id links no sheet', JSON.stringify(sheets));
 
 // Level export works without Rebuild.
+await menu('Save');
+await until(async () => /Saved |Failed/.test(await statusText()), 'save plain');
+await idle(800);
 const level0 = await exportScope(t, 'level', 'Level 0');
 const seg = level0.xlsx.sheets.Segments ?? [];
 check(seg.length === 2, 'Level 0 export has one segment row', JSON.stringify(seg));

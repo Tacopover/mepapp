@@ -166,7 +166,7 @@ check((await rows().count()) === 0 && /No sheets on this level/.test((await dlg.
 await dlg.locator('[role="treeitem"][data-kind="building"]').click();
 await idle(300);
 check((await rows().count()) === 4, 'building node: all four sheets', String(await rows().count()));
-check(/Ground floor/.test((await rowOf('orig.pdf').textContent()) ?? ''), 'building node: a row shows its level name');
+check((await dlg.locator('[data-testid="level-sheets"] [data-testid="level-group"]').filter({ hasText: 'orig.pdf' }).locator('.mep-sgroup-head b').textContent())?.trim() === 'Ground floor', 'building node: the orig.pdf row sits under its level header Ground floor');
 
 // Add pane: a pending PDF with 1 page, assign it to Level 1; it appears in the level list.
 await putFile('first.pdf', '01_arch_first_floor.pdf');

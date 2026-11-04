@@ -6,6 +6,7 @@ import {
   parseBuildingFile,
   parseSheetSummary,
   serializeBuildingFile,
+  sortLevelsByElevation,
   withProjectUuid,
   type BuildingFile,
   type ProjectDocument,
@@ -96,6 +97,12 @@ async function linkSheets(store: BuildingStore, file: BuildingFile, revision: st
   if (patched === 0) return 0;
   await store.write(serializeBuildingFile(next), revision);
   return patched;
+}
+
+/** Reads the building file from the store for an export. Levels come back sorted by elevation. Undefined when the store holds no building. */
+export async function readBuildingForExport(store: BuildingStore): Promise<BuildingFile | undefined> {
+  const stored = await store.read();
+  return stored === undefined ? undefined : sortLevelsByElevation(parseBuildingFile(JSON.parse(stored.json)));
 }
 
 /** The two name lookups of the quantity tables, from a list of stamp definitions. Same rules as handleExportQuantities. */

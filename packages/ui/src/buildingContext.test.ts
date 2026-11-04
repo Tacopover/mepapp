@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildSheetSummary, emptyBuilding, parseBuildingFile, parseSheetSummary, serializeBuildingFile, type BuildingSheet, type ProjectDocument, type StampDefinition } from '@mepapp/core';
 import { MemoryBuildingStore, StoreConflictError, type BuildingStore } from '@mepapp/platform';
-import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
+import { displayedPageInfos, readBuildingForExport, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 
 const PATH = 'C:/work/plan.pdf';
 
@@ -248,5 +248,33 @@ describe('displayedPageInfos', () => {
       { widthPt: 200, heightPt: 300, rotationDegrees: 270 },
       { widthPt: 595, heightPt: 842, rotationDegrees: 0 },
     ]);
+  });
+});
+
+describe('readBuildingForExport', () => {
+  it('returns undefined when the store holds no building file', async () => {
+    expect(await readBuildingForExport(new MemoryBuildingStore())).toBeUndefined();
+  });
+
+  it('reads the sheet link that summaryAfterSave wrote after an earlier read', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf()]) });
+    const before = await readBuildingForExport(store);
+    await summaryAfterSave(args(store));
+    const after = await readBuildingForExport(store);
+    expect(before?.sheets[0]?.projectUuid).toBeNull();
+    expect(after?.sheets[0]?.projectUuid).toBe('proj-1');
+  });
+
+  it('returns the levels sorted by elevation', async () => {
+    const json = serializeBuildingFile({
+      ...emptyBuilding('b1', 'Block'),
+      levels: [
+        { id: 'L2', name: 'First', elevationMm: 3000 },
+        { id: 'L1', name: 'Ground', elevationMm: 0 },
+      ],
+      sheets: [],
+    });
+    const file = await readBuildingForExport(new MemoryBuildingStore({ json }));
+    expect(file?.levels.map((level) => level.elevationMm)).toEqual([0, 3000]);
   });
 });

@@ -130,6 +130,18 @@ export function noSummaryText(count: number): string {
   return count === 1 ? '1 sheet has no summary' : `${count} sheets have no summary`;
 }
 
+/** "1 sheet has no summary and can be read now." or "N sheets have no summary and can be read now.". */
+export function readableNoSummaryText(count: number): string {
+  return `${noSummaryText(count)} and can be read now.`;
+}
+
+/** The sheets without a summary that cannot be read now. Empty string for 0. */
+export function otherNoSummaryText(count: number): string {
+  if (count === 0) return '';
+  if (count === 1) return '1 more sheet has no summary and cannot be read now: its PDF is missing, has no access, or is not checked yet.';
+  return `${count} more sheets have no summary and cannot be read now: their PDFs are missing, have no access, or are not checked yet.`;
+}
+
 /** The text of the in-dialog question when an action drops the pages that wait for a level. */
 export function notPlacedAskText(action: 'close' | 'switch', pages: number): string {
   const lead = `${pages} ${pages === 1 ? 'page is' : 'pages are'} not placed.`;

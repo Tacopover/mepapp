@@ -4,6 +4,8 @@ import {
   currentSheetLabel,
   noSummaryText,
   notPlacedAskText,
+  otherNoSummaryText,
+  readableNoSummaryText,
   sheetsWithoutSummary,
   shortText,
   sheetStatusOf,
@@ -262,6 +264,21 @@ describe('summary repair helpers', () => {
   it('writes the count with the right verb', () => {
     expect(noSummaryText(1)).toBe('1 sheet has no summary');
     expect(noSummaryText(2)).toBe('2 sheets have no summary');
+  });
+
+  it('says which sheets can be read now', () => {
+    expect(readableNoSummaryText(1)).toBe('1 sheet has no summary and can be read now.');
+    expect(readableNoSummaryText(2)).toBe('2 sheets have no summary and can be read now.');
+  });
+
+  it('says which sheets cannot be read now', () => {
+    expect(otherNoSummaryText(0)).toBe('');
+    expect(otherNoSummaryText(1)).toBe(
+      '1 more sheet has no summary and cannot be read now: its PDF is missing, has no access, or is not checked yet.',
+    );
+    expect(otherNoSummaryText(3)).toBe(
+      '3 more sheets have no summary and cannot be read now: their PDFs are missing, have no access, or are not checked yet.',
+    );
   });
 
   it('adapts the question to the action', () => {

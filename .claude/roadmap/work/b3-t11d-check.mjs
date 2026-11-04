@@ -73,10 +73,10 @@ await page.keyboard.press('Tab');
 await idle(400);
 check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@0', 'First floor@3500']), 'elevation typed and saved by Tab', JSON.stringify(await names()));
 a = await active();
-check(a.label === 'Move level up', 'Tab order after elevation: Move level up', JSON.stringify(a));
+check(a.tag === 'BUTTON' && a.text === 'Delete', 'Tab order after elevation: Delete', JSON.stringify(a));
 await page.keyboard.press('Tab');
 a = await active();
-check(a.label === 'Move level down', 'Tab order: Move level down stays in the Tab order (aria-disabled on the last level)', JSON.stringify(a));
+check(a.tag !== 'BODY', 'Tab from Delete does not drop to body', JSON.stringify(a));
 check((await elevBox().inputValue()) === '3500', 'elevation field shows the value');
 
 // Escape in the name field keeps the dialog.
@@ -86,43 +86,37 @@ await idle(300);
 check((await dlg.count()) === 1, 'Escape in the name field keeps the dialog open');
 check((await nameBox().inputValue()) === 'First floor', 'Escape drops the draft');
 
-// Move up by button: order in the tree and in the file; the level stays selected.
-check(await detail().locator('button[aria-label="Move level down"]').isDisabled(), 'last level: down disabled');
-await detail().locator('button[aria-label="Move level up"]').click();
+// The tree follows the elevation: a lower elevation moves the level up in the tree.
+await elevBox().fill('-1000');
+await elevBox().press('Enter');
 await idle(400);
-check(JSON.stringify(await treeNames()) === JSON.stringify(['First floor', 'Ground floor']), 'tree shows the order of the file after Move up', JSON.stringify(await treeNames()));
-check((await treeLevels().first().getAttribute('aria-selected')) === 'true', 'moved level stays selected');
-// Alt+ArrowDown in the tree moves the level down again.
-await treeLevels().first().focus();
-await page.keyboard.press('Alt+ArrowDown');
+check(JSON.stringify(await treeNames()) === JSON.stringify(['First floor', 'Ground floor']), 'tree shows the levels by elevation after a change', JSON.stringify(await treeNames()));
+check((await treeLevels().first().getAttribute('aria-selected')) === 'true', 'the changed level stays selected');
+check(JSON.stringify(await names()) === JSON.stringify(['First floor@-1000', 'Ground floor@0']), 'the file holds the elevation order', JSON.stringify(await names()));
+await elevBox().fill('3500');
+await elevBox().press('Enter');
 await idle(400);
-check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@0', 'First floor@3500']), 'Alt+ArrowDown in the tree moves the level down', JSON.stringify(await names()));
-await idle(200);
+check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@0', 'First floor@3500']), 'raising the elevation moves the level down again', JSON.stringify(await names()));
 a = await active();
-check(a.tag === 'DIV' && /First floor/.test(a.text), 'focus stays on the moved level in the tree', JSON.stringify(a));
+check(a.label === 'Elevation (mm)', 'focus stays in the elevation field after Enter', JSON.stringify(a));
 
-// Sort: disabled with a reason when sorted; enabled when not.
-check((await sortBtn().getAttribute('aria-disabled')) === 'true', 'sort: aria-disabled when the order is by elevation');
-check(/Levels are already in order of elevation\./.test((await dlg.locator('[data-testid="sort-reason"]').textContent()) ?? ''), 'sort: reason text visible');
-await sortBtn().click({ force: true });
-await idle(300);
-check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@0', 'First floor@3500']), 'click on disabled sort changes nothing');
-await detail().locator('button[aria-label="Move level up"]').click();
-await idle(300);
-await treeLevels().nth(1).click();
-await idle(300);
-await detail().locator('button[aria-label="Move level up"]').click();
-await idle(400);
-check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@0', 'First floor@3500']), 'moves back to the elevation order', JSON.stringify(await names()));
+// No sort button and no reason text: the order follows the elevation at once.
+check((await sortBtn().count()) === 0, 'no Sort by elevation button');
+check((await dlg.locator('[data-testid="sort-reason"]').count()) === 0, 'no sort reason text');
 await treeLevels().nth(0).click();
 await idle(300);
-await detail().locator('button[aria-label="Move level down"]').click();
+await elevBox().fill('5000');
+await elevBox().press('Enter');
 await idle(400);
-check((await sortBtn().getAttribute('aria-disabled')) !== 'true', 'sort: enabled when the order is not by elevation');
-check((await dlg.locator('[data-testid="sort-reason"]').count()) === 0, 'sort: no reason text when enabled');
-await sortBtn().click();
+check(JSON.stringify(await names()) === JSON.stringify(['First floor@3500', 'Ground floor@5000']), 'a higher elevation moves Ground floor down', JSON.stringify(await names()));
+check(JSON.stringify(await treeNames()) === JSON.stringify(['First floor', 'Ground floor']), 'the tree follows the new order', JSON.stringify(await treeNames()));
+check((await elevBox().inputValue()) === '5000', 'the elevation field shows 5000');
+check((await treeLevels().nth(1).getAttribute('aria-selected')) === 'true', 'Ground floor stays selected after its move');
+await elevBox().fill('0');
+await elevBox().press('Enter');
 await idle(400);
-check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@0', 'First floor@3500']), 'sort by elevation works', JSON.stringify(await names()));
+check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@0', 'First floor@3500']), 'the elevation order is restored', JSON.stringify(await names()));
+check((await nameBox().inputValue()) === 'Ground floor', 'the name field shows Ground floor');
 
 // Delete an empty level: no confirm, Undo line, next level selected; Undo restores at the same place.
 await addItem().click();
@@ -180,7 +174,7 @@ await treeLevels().nth(0).click();
 await idle(300);
 check((await delBtn().getAttribute('aria-disabled')) === 'true' && (await delBtn().isDisabled()), 'level with 1 sheet: Delete is aria-disabled');
 check(/Remove its 1 sheet first/.test((await dlg.locator('[data-testid="delete-reason"]').textContent()) ?? ''), 'reason text: Remove its 1 sheet first');
-await detail().locator('button[aria-label="Move level down"]').focus();
+await detail().locator('input[aria-label="Elevation (mm)"]').focus();
 await page.keyboard.press('Tab');
 a = await active();
 check(a.text === 'Delete', 'blocked Delete stays in the Tab order', JSON.stringify(a));

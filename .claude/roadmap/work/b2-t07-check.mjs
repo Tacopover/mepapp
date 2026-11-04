@@ -35,7 +35,7 @@ await openScopeDialog(t);
 check(await radios.nth(2).isEnabled() && await radios.nth(3).isEnabled(), 'Level and Building are enabled with a building');
 check(!/Open a building first/i.test(await dialog(t).innerText()), 'no hint with a building');
 await radios.nth(2).check();
-const options = await dialog(t).locator('select option').allInnerTexts();
+const options = await dialog(t).locator('select[aria-label="Level"] option').allInnerTexts();
 check(JSON.stringify(options.map((s) => s.trim())) === JSON.stringify(['Level 0', 'Level 1']), 'level select lists the levels', JSON.stringify(options));
 await shot('B2-T07-dialog');
 await dialog(t).locator('button', { hasText: /^Cancel$/ }).click();

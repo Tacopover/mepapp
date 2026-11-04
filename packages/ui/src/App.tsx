@@ -9,7 +9,6 @@ import {
   isLibraryStampId,
   makeProjectUuid,
   parseBuildingFile,
-  sortLevelsByElevation,
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
   DEFAULT_CEILING_HEIGHT_MM,
@@ -94,7 +93,7 @@ import { pathOfTarget } from './buildingPdfInfo.js';
 import { findOpenDocumentByPath } from './openDocumentMatch.js';
 import { currentSheetLabel } from './buildingStatus.js';
 import { currentSheetLevelId } from './buildingTree.js';
-import { displayedPageInfos, stampNameLookups, summaryAfterSave } from './buildingContext.js';
+import { displayedPageInfos, readBuildingForExport, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { openDocumentRows } from './openDocumentsView.js';
 import { shouldWriteSummaryOnOpen } from './summaryOnOpen.js';
 import { rebuildSummaries, type RebuildResult } from './rebuildSummaries.js';
@@ -1056,10 +1055,10 @@ export function MepSketchApp({
   // The unsaved-changes marker is cleared only after the bytes reach the
   // file, so a cancelled picker or a failed write keeps the close warning.
   const saveDocument = useCallback(
-    async (asNewFile: boolean) => {
+    async (asNewFile: boolean): Promise<boolean> => {
       if (fileTaskRef.current) {
         setStatus(FILE_TASK_BUSY_STATUS);
-        return;
+        return false;
       }
       fileTaskRef.current = { documentId: activeDocumentId };
       setStatus('Saving...');
@@ -1068,7 +1067,7 @@ export function MepSketchApp({
         const result = await syncAndGetPdfBytes({ newProjectUuid });
         if (!result) {
           setStatus('');
-          return;
+          return false;
         }
         const documentId = result.receipt.documentId;
         // Never saved to a real file yet (opened via the legacy file-picker
@@ -1095,8 +1094,10 @@ export function MepSketchApp({
             }
           }
         }
+        return saved;
       } catch (err) {
         setStatus(`Failed to save: ${(err as Error).message}`);
+        return false;
       } finally {
         fileTaskRef.current = null;
       }
@@ -1134,8 +1135,7 @@ export function MepSketchApp({
     let building: BuildingFile | undefined;
     if (buildingStore) {
       try {
-        const stored = await buildingStore.read();
-        building = stored === undefined ? undefined : sortLevelsByElevation(parseBuildingFile(JSON.parse(stored.json)));
+        building = await readBuildingForExport(buildingStore);
       } catch (err) {
         setStatus(`Failed to read the building: ${(err as Error).message}`);
       }
@@ -2270,9 +2270,19 @@ export function MepSketchApp({
             const ask = exportSaveAsk;
             setExportSaveAsk(null);
             void (async () => {
-              await handleSave();
-              const saved = sceneRef.current?.getDocuments().find((d) => d.id === sceneRef.current?.getActiveDocumentId())?.projectUuidInFile === true;
-              if (saved) await runExportQuantities(ask.scope, ask.building);
+              const saved = await handleSave();
+              if (!saved) return;
+              const inFile = sceneRef.current?.getDocuments().find((d) => d.id === sceneRef.current?.getActiveDocumentId())?.projectUuidInFile === true;
+              if (!inFile) {
+                setStatus('Saved, but the document has no id in the file yet, so the export did not run. Try Save again, then export.');
+                return;
+              }
+              try {
+                const fresh = buildingStore ? await readBuildingForExport(buildingStore) : undefined;
+                await runExportQuantities(ask.scope, fresh ?? ask.building);
+              } catch (err) {
+                setStatus(`Failed to read the building: ${(err as Error).message}`);
+              }
             })();
           }}
         />

@@ -11,6 +11,7 @@ const row = () => dlg.locator('[data-testid="level-row"]');
 const pick = async (i) => { await items('level').nth(i).click(); await idle(300); };
 const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBuilding.read()).json));
 const names = async () => (await stored()).levels.map((l) => `${l.name}@${l.elevationMm}`);
+const treeNames = () => items('level').locator('.mep-tree-label').allInnerTexts();
 
 async function openDialog() {
   await menu('Manage Buildings…');
@@ -90,21 +91,21 @@ await elev2.press('Tab');
 await idle(300);
 check(!/same elevation/i.test(await dlg.textContent()), 'warning gone');
 
-// Move: second level up; the first row's up button and the last row's down button are disabled.
-await pick(0);
-check(await row().locator('button[aria-label="Move level up"]').isDisabled(), 'first row: up disabled');
+// Order: the levels follow their elevation. The third level moves to the top and back.
 await pick(2);
-check(await row().locator('button[aria-label="Move level down"]').isDisabled(), 'last row: down disabled');
-await pick(1);
-await row().locator('button[aria-label="Move level up"]').click();
+const elevTop = row().locator('input[aria-label="Elevation (mm)"]');
+await elevTop.fill('-6000');
+await elevTop.press('Enter');
 await idle(300);
-check(JSON.stringify(await names()) === JSON.stringify(['First floor@3000', 'Ground floor@-3000', 'Level 3@6000']), 'move up changes the order', JSON.stringify(await names()));
-const sortBtn = dlg.locator('button', { hasText: /^Sort by elevation$/ });
-check(await sortBtn.isEnabled(), 'sort enabled when the order is not ascending');
-await sortBtn.click();
+check(JSON.stringify(await names()) === JSON.stringify(['Level 3@-6000', 'Ground floor@-3000', 'First floor@3000']), 'a lower elevation moves the level up in the file', JSON.stringify(await names()));
+check(JSON.stringify(await treeNames()) === JSON.stringify(['Level 3', 'Ground floor', 'First floor']), 'the tree follows the elevation order', JSON.stringify(await treeNames()));
+check((await row().locator('button[aria-label^="Move level"]').count()) === 0, 'no Move level buttons');
+check((await dlg.locator('button', { hasText: /^Sort by elevation$/ }).count()) === 0, 'no Sort by elevation button');
+await elevTop.fill('6000');
+await elevTop.press('Enter');
 await idle(300);
-check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@-3000', 'First floor@3000', 'Level 3@6000']), 'sort by elevation', JSON.stringify(await names()));
-check(await sortBtn.isDisabled(), 'sort disabled when already ascending');
+check(JSON.stringify(await names()) === JSON.stringify(['Ground floor@-3000', 'First floor@3000', 'Level 3@6000']), 'a higher elevation moves the level down again', JSON.stringify(await names()));
+check((await elevTop.inputValue()) === '6000', 'the elevation field shows 6000');
 
 // Delete the third level.
 await pick(2);

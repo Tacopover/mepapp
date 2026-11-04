@@ -245,6 +245,10 @@ export function ManageBuildingsDialog({
   const selectedLevel = openBuilding?.file.levels.find((level) => levelKey(level.id) === selected) ?? null;
   const warnings = openBuilding ? buildingWarnings(openBuilding.file, openBuilding.sheetStatus) : null;
   const warningText = warnings !== null ? warningLines(warnings) : [];
+  const readableNoSummary = openBuilding ? sheetsWithoutSummary(openBuilding.file.sheets, openBuilding.sheetStatus, openBuilding.sheetSummary) : [];
+  const noSummary = openBuilding
+    ? openBuilding.file.sheets.filter((sheet) => !Object.prototype.hasOwnProperty.call(openBuilding.sheetSummary, sheet.id))
+    : [];
 
   function onActivate(node: TreeNode) {
     if (building.busy) return;
@@ -532,7 +536,8 @@ export function ManageBuildingsDialog({
                 />
                 <BuildingSummariesPane
                   key={`${openBuilding.file.id}-summaries`}
-                  missing={sheetsWithoutSummary(openBuilding.file.sheets, openBuilding.sheetStatus, openBuilding.sheetSummary).length}
+                  missing={readableNoSummary.length}
+                  other={noSummary.length - readableNoSummary.length}
                   onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
                   onDone={() => void building.refreshSheetStatus()}
                   fileAccess={fileAccess}

@@ -14,11 +14,11 @@ Source: the user ran `.claude/plans/buildings-b3-windows-test.md` on Windows (in
 
 ## Tasks
 
-- **T12a** Order by elevation, remove the move and sort buttons, fixed alphabetical order of buildings (D-B-34, D-B-37). User items: general comment, step 11.
-- **T12b** Add to the selected level at once, "Not placed" only for edge cases, "Open" keeps the dialog open (D-B-35, D-B-36). User items: steps 3, 5, 7. Check again whether Open after Save opens a duplicate tab.
-- **T12c** Remove "Close building" from the dialog and the Building menu. Export dialog: Building select that updates the Level select. Export of an unsaved PDF asks to save (D-B-38, D-B-39). Tooltip with the full text on the alert at the top right. User items: steps 14, 15.
-- **T12d** Layout of the Level pane, the Building sheets pane and the summaries row (D-B-40). User items: step 13 and the layout comments.
-- **T12e** Update `buildings-b3-windows-test.md` for the new behaviour and run all browser checks.
+- **T12a** Order by elevation, remove the move and sort buttons, fixed alphabetical order of buildings (D-B-34, D-B-37). User items: general comment, step 11. **DONE 66a436c.**
+- **T12b** Add to the selected level at once, "Not placed" only for edge cases, "Open" keeps the dialog open (D-B-35, D-B-36). User items: steps 3, 5, 7. Check again whether Open after Save opens a duplicate tab. **DONE 85382da.**
+- **T12c** Remove "Close building" from the dialog and the Building menu. Export dialog: Building select that updates the Level select. Export of an unsaved PDF asks to save (D-B-38, D-B-39). Tooltip with the full text on the alert at the top right. User items: steps 14, 15. **DONE cc2a8fb.**
+- **T12d** Layout of the Level pane, the Building sheets pane and the summaries row (D-B-40). User items: step 13 and the layout comments. **DONE 08069d4.**
+- **T12e** Update `buildings-b3-windows-test.md` for the new behaviour and run all browser checks. **DONE (the commit that holds this line).**
 
 ## Step 9 (no second computer)
 
@@ -26,4 +26,14 @@ The "No access" state comes from the Tauri file scope (the list of paths the app
 
 ## Status
 
-Not started.
+T12a to T12e are done (commits above). The browser checks run green with `run-all-b3-checks.mjs`. The user tests run 2 with `buildings-b3-windows-test.md`.
+
+Also fixed in T12e: the Level export after the Save question reads the building again after the save, so a sheet that the save linked no longer warns "no id yet". A save that works but leaves the file with no id shows a status message. The Summaries section now says how many sheets can be read and how many cannot.
+
+Known open items:
+- The path match applies to every open: a tab for a changed file can stay stale, and the match ignores upper and lower case on all platforms.
+- The Export Building select has no "not placed" question.
+- There is no building rename.
+- The shared Dialog has no focus trap.
+- The active PDF cannot pick the building: that needs a read of every building file.
+- Step 9 (No access) stays open until a second PC is available.

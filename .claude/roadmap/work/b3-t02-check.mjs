@@ -11,10 +11,6 @@ async function openDialog() {
   await dlg.waitFor({ state: 'visible', timeout: 8000 });
   await idle(300);
 }
-async function buildingMenu(item) {
-  await dlg.locator('button.mep-menu-btn').click();
-  await dlg.locator('[role=menuitem]', { hasText: item }).click();
-}
 
 await openDialog();
 check(/Manage Buildings/.test(await dlg.textContent()), 'dialog opens');
@@ -73,9 +69,11 @@ await dlg.locator('button', { hasText: /^Open building…$/ }).click();
 await dlg.locator('.mep-buildings-open-name', { hasText: 'Office block' }).waitFor({ timeout: 8000 }).catch(() => {});
 check(/0 levels, 0 sheets/.test(await dlg.textContent()), 'Open building loads the file');
 
-// Remove from recent: the Remove button shows only for a building that is not open, so close it first.
-await buildingMenu('Close building');
-await idle(300);
+// Remove from recent: the Remove button shows only for a building that is not open. A reload closes it.
+await page.reload();
+await page.locator('button.mep-onboarding-start').click({ timeout: 30000 }).catch(() => {});
+await page.waitForFunction(() => window.__mepSketchScene !== undefined);
+await openDialog();
 await dlg.locator('button[aria-label="Remove Office block from the list"]').click();
 await idle(300);
 check((await dlg.locator('[role=treeitem][data-kind=building]').count()) === 0, 'Remove empties the building tree');
