@@ -86,7 +86,7 @@ Per item (the role that should have caught it, the step of the loop, the cause):
 | Director prompt and skill: start order, wireframe on the dashboard, part check with journey tester | `.claude/roadmap/director-prompt.md`, `.claude/skills/roadmap-director/SKILL.md` | cause 4 |
 
 Not done on purpose:
-- `permissions.md` and `.claude/settings.local.json` are unchanged (the user rule). The new agents use the same Bash commands as the existing ones, so the allow rules cover them. The new `run-checks.mjs` and `mirror-batch.mjs` commands need an allow rule if the user wants an unattended run: `node .claude/roadmap/browser/run-checks.mjs *` and `node .claude/roadmap/tools/mirror-batch.mjs *`.
+- The new agents use the same Bash commands as the existing ones, so the allow rules cover them. The two new commands got allow rules after the user agreed (2026-11-04): `node .claude/roadmap/browser/run-checks.mjs:*` and `node .claude/roadmap/tools/mirror-batch.mjs:*`, in `.claude/settings.local.json` and in `permissions.md`.
 - The ledger and the dashboard work as before. Only the mirror step is easier.
 - The `code-reviewer` is unchanged.
 
@@ -101,7 +101,7 @@ Not done on purpose:
 | 5 | Check runner with exit code and `--only` | medium | low | done |
 | 6 | Mirror tool, no hand-back while a worker runs | medium | low | done |
 | 7 | Platform table and platform test script from journeys | medium | low | done |
-| 8 | Allow rules for the two new tools | low | needs the user | open |
+| 8 | Allow rules for the two new tools | low | needs the user | done (user agreed 2026-11-04; `settings.local.json` and `permissions.md`) |
 | 9 | Mine the T11 review findings that had no outcome (R-7, R-9) for a "finding must get an outcome" check in the ledger tool | medium | medium: a ledger change | not done (the prompt says keep the ledger as is) |
 
 ## 5. Replay test

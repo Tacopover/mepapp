@@ -10,7 +10,9 @@ An unattended run stops at each permission prompt. This file lists the calls of 
 | `git worktree add`, `git fetch` | director | A new branch for each part. |
 | `pnpm install`, `pnpm build`, `pnpm test`, `pnpm typecheck` | tester, director | Tests and builds. |
 | `node .claude/roadmap/ledger.mjs …` | director | Ledger events. |
-| `node .claude/roadmap/browser/with-server.mjs …` | tester, ui-reviewer | Browser checks. |
+| `node .claude/roadmap/browser/with-server.mjs …` | tester, ui-reviewer, journey-tester | Browser checks. |
+| `node .claude/roadmap/browser/run-checks.mjs …` | tester, director | Runs a list of browser checks. Exits with 1 on a fail. |
+| `node .claude/roadmap/tools/mirror-batch.mjs …` | director | Writes the pending ledger events to a batch file for the dashboard. |
 | `cp`, `cmp` to the hub folder | director | Plan and protocol copies. |
 | `Write`, `Edit` in the worktree | all roles that write | Plans, briefs, checks, product code. |
 | `ArtifactData` (batch, list, update) on the dashboard | director | Events, answers, notes. |
@@ -43,6 +45,8 @@ Put this in `permissions.allow` of `.claude/settings.local.json`:
   "Bash(pnpm --filter:*)",
   "Bash(node .claude/roadmap/ledger.mjs:*)",
   "Bash(node .claude/roadmap/browser/with-server.mjs:*)",
+  "Bash(node .claude/roadmap/browser/run-checks.mjs:*)",
+  "Bash(node .claude/roadmap/tools/mirror-batch.mjs:*)",
   "Bash(node --check:*)",
   "Bash(cmp:*)",
   "Bash(cp .claude/roadmap/protocol.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/agent-framework.md\")",
