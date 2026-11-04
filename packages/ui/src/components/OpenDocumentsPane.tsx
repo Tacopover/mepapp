@@ -1,8 +1,9 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { addLevel, type BuildingFile } from '@mepapp/core';
 import { defaultLevelName, nextLevelElevation } from '../buildingLevels.js';
 import { addOpenDocumentPages } from '../openDocumentAdd.js';
 import type { OpenDocumentRow } from '../openDocumentsView.js';
+import { BuildingSection } from './BuildingSection.js';
 
 export interface OpenDocumentsPaneProps {
   file: BuildingFile;
@@ -29,11 +30,13 @@ function sheetsText(count: number): string {
 }
 
 /**
- * Lists the documents that are open in the viewer. One click adds the pages of a document to the selected level.
- * The row state is read again inside the building update, so a second click adds nothing twice.
+ * The quiet "Add files" strip at the bottom of the right pane: Add PDFs and Add folder (children), and a block with the documents
+ * that are open in the viewer. One click adds the pages of a document to the selected level.
+ * The block is collapsed when no document is open. The row state is read again inside the building update, so a second click adds nothing twice.
  */
 export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, children }: OpenDocumentsPaneProps) {
   const lastAddAt = useRef(0);
+  const [expanded, setExpanded] = useState(() => rows.length > 0);
   const target = file.levels.find((level) => level.id === levelId) ?? file.levels[0] ?? null;
 
   async function put(row: OpenDocumentRow, toLevelId: string, pageIndexes: readonly number[], move: boolean) {
@@ -78,36 +81,41 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, child
 
   if (target === null) {
     return (
-      <div className="mep-section" data-testid="open-documents">
-        <h4>Open in the viewer</h4>
+      <BuildingSection quiet title="Add files" testId="open-documents">
         {children}
-        {(
-          <div className="mep-buildings-actions">
-            <p className="mep-hint" data-testid="open-doc-no-level">
-              Add a level first. Then you can add the open documents to it.
-            </p>
-            <button
-              type="button"
-              data-testid="open-doc-add-level"
-              onClick={() => void update((f) => addLevel(f, defaultLevelName(f), nextLevelElevation(f)))}
-            >
-              Add level
-            </button>
-          </div>
-        )}
-      </div>
+        <div className="mep-buildings-actions">
+          <p className="mep-hint" data-testid="open-doc-no-level">
+            Add a level first. Then you can add the open documents to it.
+          </p>
+          <button
+            type="button"
+            data-testid="open-doc-add-level"
+            onClick={() => void update((f) => addLevel(f, defaultLevelName(f), nextLevelElevation(f)))}
+          >
+            Add level
+          </button>
+        </div>
+      </BuildingSection>
     );
   }
 
   const unplacedTotal = rows.reduce((sum, row) => sum + row.pages.filter((page) => page.sheet === null).length, 0);
 
   return (
-    <div className="mep-section" data-testid="open-documents">
-      <h4>Open in the viewer</h4>
+    <BuildingSection quiet title="Add files" testId="open-documents">
       {children}
-      {rows.length === 0 && <p className="mep-hint">No documents are open in the viewer.</p>}
-      {rows.length > 1 && (
-        <div className="mep-buildings-actions">
+      <div className="mep-open-docs-bar">
+        <button
+          type="button"
+          className="mep-open-docs-toggle"
+          data-testid="open-docs-toggle"
+          aria-expanded={expanded}
+          aria-controls={expanded ? 'mep-open-docs-list' : undefined}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <span aria-hidden="true">{expanded ? '▾' : '▸'}</span> Open in the viewer ({rows.length})
+        </button>
+        {expanded && rows.length > 1 && (
           <button
             type="button"
             data-testid="open-doc-add-all-docs"
@@ -117,107 +125,112 @@ export function OpenDocumentsPane({ file, update, rows, levelId, onNotice, child
           >
             Add all open documents to {target.name}
           </button>
+        )}
+      </div>
+      {expanded && (
+        <div id="mep-open-docs-list" className="mep-open-docs-list">
+          {rows.length === 0 && <p className="mep-hint">No documents are open in the viewer.</p>}
+          {rows.map((row) => {
+            const multi = row.doc.pageCount > 1;
+            const unplaced = row.pages.filter((page) => page.sheet === null).length;
+            const elsewhere = row.pages.filter((page) => page.sheet !== null && page.sheet.levelId !== target.id).length;
+            const otherLevels = file.levels.filter((level) => level.id !== target.id);
+            const single = row.pages[0];
+            let primary: string;
+            let primaryDisabled = false;
+            if (multi) {
+              if (unplaced > 0) primary = 'Add all pages';
+              else if (elsewhere > 0) primary = `Move all pages to ${target.name}`;
+              else {
+                primary = 'All pages added';
+                primaryDisabled = true;
+              }
+            } else if (single?.sheet === null) primary = `Add to ${target.name}`;
+            else if (single !== undefined && single.sheet.levelId !== target.id) primary = `Move to ${target.name}`;
+            else {
+              primary = `Added`;
+              primaryDisabled = true;
+            }
+            return (
+              <div key={row.doc.id} className="mep-open-doc" data-testid="open-doc-row" data-state={row.state}>
+                <div className="mep-open-doc-head">
+                  <b title={row.displayName}>{row.displayName}</b>
+                  {row.doc.active && (
+                    <span className="mep-open-doc-active" data-testid="open-doc-active" title="This document is on screen now.">
+                      Active
+                    </span>
+                  )}
+                  {!multi && <span className="mep-hint">1 page</span>}
+                  <span data-testid="open-doc-placed">{placedText(row)}</span>
+                  <button
+                    type="button"
+                    className="mep-open-doc-primary"
+                    data-testid="open-doc-add"
+                    disabled={primaryDisabled}
+                    aria-label={`${primary} - ${row.displayName}`}
+                    onClick={() => void put(row, target.id, allPages(row), !multi || unplaced === 0)}
+                  >
+                    {primary}
+                  </button>
+                  {otherLevels.length > 0 && (
+                    <select
+                      data-testid="open-doc-level"
+                      aria-label={`${unplaced === 0 ? 'Move' : 'Add'} ${row.displayName} to another level`}
+                      value=""
+                      onChange={(event) => {
+                        const id = event.target.value;
+                        if (id !== '') void put(row, id, allPages(row), !multi || unplaced === 0);
+                      }}
+                    >
+                      <option value="">{unplaced === 0 ? 'Move to…' : 'Add to another level…'}</option>
+                      {otherLevels.map((level) => (
+                        <option key={level.id} value={level.id}>
+                          {level.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {multi && (
+                  <div className="mep-open-doc-pages" data-testid="open-doc-pages">
+                    <span className="mep-hint">Pages:</span>
+                    {row.pages.map((page) => {
+                      const onTarget = page.sheet !== null && page.sheet.levelId === target.id;
+                      const label = page.sheet === null ? `p${page.pageIndex + 1}` : `p${page.pageIndex + 1}: ${page.levelName ?? 'Placed'}`;
+                      const action = page.sheet === null ? `Add page ${page.pageIndex + 1} to ${target.name}` : onTarget ? `Page ${page.pageIndex + 1} is on ${target.name}` : `Move page ${page.pageIndex + 1} to ${target.name}`;
+                      return (
+                        <button
+                          key={page.pageIndex}
+                          type="button"
+                          className={onTarget ? 'mep-open-doc-chip on' : 'mep-open-doc-chip'}
+                          data-testid="open-doc-page-chip"
+                          data-placed={page.sheet !== null ? 'true' : 'false'}
+                          disabled={onTarget}
+                          title={action}
+                          aria-label={`${action} - ${row.displayName}`}
+                          onClick={() => void put(row, target.id, [page.pageIndex], true)}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {row.needsSave && (
+                  <p className="mep-hint mep-open-doc-note" data-testid="open-doc-note">
+                    Save it to link it.{row.path === undefined ? ' It has no file path yet, so the sheet cannot open the file later.' : ''}
+                  </p>
+                )}
+                {row.doc.isDirty && (
+                  <p className="mep-hint mep-open-doc-note" data-testid="open-doc-dirty">
+                    Unsaved changes. The summary updates when you save.
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
-      {rows.map((row) => {
-        const multi = row.doc.pageCount > 1;
-        const unplaced = row.pages.filter((page) => page.sheet === null).length;
-        const elsewhere = row.pages.filter((page) => page.sheet !== null && page.sheet.levelId !== target.id).length;
-        const otherLevels = file.levels.filter((level) => level.id !== target.id);
-        const single = row.pages[0];
-        let primary: string;
-        let primaryDisabled = false;
-        if (multi) {
-          if (unplaced > 0) primary = 'Add all pages';
-          else if (elsewhere > 0) primary = `Move all pages to ${target.name}`;
-          else {
-            primary = 'All pages added';
-            primaryDisabled = true;
-          }
-        } else if (single?.sheet === null) primary = `Add to ${target.name}`;
-        else if (single !== undefined && single.sheet.levelId !== target.id) primary = `Move to ${target.name}`;
-        else {
-          primary = `Added`;
-          primaryDisabled = true;
-        }
-        return (
-          <div key={row.doc.id} className="mep-open-doc" data-testid="open-doc-row" data-state={row.state}>
-            <div className="mep-open-doc-head">
-              <b>{row.displayName}</b>
-              {row.doc.active && (
-                <span className="mep-open-doc-active" data-testid="open-doc-active" title="This document is on screen now.">
-                  Active
-                </span>
-              )}
-              {!multi && <span className="mep-hint">1 page</span>}
-              <span data-testid="open-doc-placed">{placedText(row)}</span>
-              <button
-                type="button"
-                className="mep-open-doc-primary"
-                data-testid="open-doc-add"
-                disabled={primaryDisabled}
-                aria-label={`${primary} - ${row.displayName}`}
-                onClick={() => void put(row, target.id, allPages(row), !multi || unplaced === 0)}
-              >
-                {primary}
-              </button>
-              {otherLevels.length > 0 && (
-                <select
-                  data-testid="open-doc-level"
-                  aria-label={`${unplaced === 0 ? 'Move' : 'Add'} ${row.displayName} to another level`}
-                  value=""
-                  onChange={(event) => {
-                    const id = event.target.value;
-                    if (id !== '') void put(row, id, allPages(row), !multi || unplaced === 0);
-                  }}
-                >
-                  <option value="">{unplaced === 0 ? 'Move to…' : 'Add to another level…'}</option>
-                  {otherLevels.map((level) => (
-                    <option key={level.id} value={level.id}>
-                      {level.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            {multi && (
-              <div className="mep-open-doc-pages" data-testid="open-doc-pages">
-                <span className="mep-hint">Pages:</span>
-                {row.pages.map((page) => {
-                  const onTarget = page.sheet !== null && page.sheet.levelId === target.id;
-                  const label = page.sheet === null ? `p${page.pageIndex + 1}` : `p${page.pageIndex + 1}: ${page.levelName ?? 'Placed'}`;
-                  const action = page.sheet === null ? `Add page ${page.pageIndex + 1} to ${target.name}` : onTarget ? `Page ${page.pageIndex + 1} is on ${target.name}` : `Move page ${page.pageIndex + 1} to ${target.name}`;
-                  return (
-                    <button
-                      key={page.pageIndex}
-                      type="button"
-                      className={onTarget ? 'mep-open-doc-chip on' : 'mep-open-doc-chip'}
-                      data-testid="open-doc-page-chip"
-                      data-placed={page.sheet !== null ? 'true' : 'false'}
-                      disabled={onTarget}
-                      title={action}
-                      aria-label={`${action} - ${row.displayName}`}
-                      onClick={() => void put(row, target.id, [page.pageIndex], true)}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {row.needsSave && (
-              <p className="mep-hint mep-open-doc-note" data-testid="open-doc-note">
-                Save it to link it.{row.path === undefined ? ' It has no file path yet, so the sheet cannot open the file later.' : ''}
-              </p>
-            )}
-            {row.doc.isDirty && (
-              <p className="mep-hint mep-open-doc-note" data-testid="open-doc-dirty">
-                Unsaved changes. The summary updates when you save.
-              </p>
-            )}
-          </div>
-        );
-      })}
-    </div>
+    </BuildingSection>
   );
 }

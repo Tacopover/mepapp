@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { deleteLevel, levelWarnings, renameLevel, setLevelElevation, type BuildingFile, type BuildingLevel } from '@mepapp/core';
-import { deleteBlockedText, restoreLevel } from '../buildingLevels.js';
+import { countLabel, deleteBlockedText, restoreLevel, sheetCount } from '../buildingLevels.js';
 import { buildingKey, levelKey } from '../buildingTree.js';
+import { BuildingSection } from './BuildingSection.js';
 
 /** How long the Undo line stays after a level is deleted, in ms. */
 const UNDO_MS = 8000;
@@ -15,10 +16,15 @@ export interface BuildingLevelsPaneProps {
   onNameFocused: () => void;
   /** Ask the dialog to select a node (key from levelKey/buildingKey) and move DOM focus to the tree. */
   onSelectKey: (key: string) => void;
+  /** The warning lines of the building (shown when no level is selected). */
+  buildingWarningLines: readonly string[];
+  /** True when a sheet of the selected level has a missing PDF or no access. */
+  levelHasWarning: boolean;
 }
 
 /**
- * Edits the selected level of the open building. Every change goes through update, which writes the building file.
+ * The first section of the right pane. A selected level shows Name and Elevation (the basic information of a level).
+ * Without a selected level it shows the building. Every change goes through update, which writes the building file.
  */
 export function BuildingLevelsPane({
   file,
@@ -27,6 +33,8 @@ export function BuildingLevelsPane({
   focusNameLevelId,
   onNameFocused,
   onSelectKey,
+  buildingWarningLines,
+  levelHasWarning,
 }: BuildingLevelsPaneProps) {
   const [undo, setUndo] = useState<{ level: BuildingLevel; index: number } | null>(null);
   const selectedIndex = file.levels.findIndex((level) => level.id === selectedLevelId);
@@ -58,49 +66,8 @@ export function BuildingLevelsPane({
     onSelectKey(levelKey(level.id));
   }
 
-  return (
-    <div className="mep-section">
-      <h4>Level settings</h4>
-      {file.levels.length === 0 && <p className="mep-hint">No levels yet. Use + Add level.</p>}
-      {selectedLevel !== null && (
-        <div key={selectedLevel.id} className="mep-level-detail" data-testid="level-row">
-          <div className="mep-level-row">
-            <span>Name</span>
-            <LevelNameInput
-              name={selectedLevel.name}
-              onRename={(name) => void update((f) => renameLevel(f, selectedLevel.id, name))}
-              focusRequested={focusNameLevelId === selectedLevel.id}
-              onFocused={onNameFocused}
-            />
-            <span>Elevation</span>
-            <span className="mep-level-elevation">
-              <LevelElevationInput
-                value={selectedLevel.elevationMm}
-                onCommit={(value) => void update((f) => setLevelElevation(f, selectedLevel.id, value))}
-              />
-              <span>mm</span>
-            </span>
-          </div>
-          <div className="mep-level-row">
-            <div className="mep-level-delete">
-              <button
-                type="button"
-                aria-disabled={deleteBlocked !== null}
-                aria-describedby={deleteBlocked !== null ? 'mep-level-delete-reason' : undefined}
-                title={deleteBlocked ?? 'Delete level'}
-                onClick={() => deleteAt(selectedLevel, selectedIndex)}
-              >
-                Delete
-              </button>
-              {deleteBlocked !== null && (
-                <p id="mep-level-delete-reason" className="mep-hint" data-testid="delete-reason">
-                  {deleteBlocked}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+  const extras = (
+    <>
       {undo !== null && (
         <p role="status" data-testid="level-undo" className="mep-hint mep-level-undo">
           {`Deleted level "${undo.level.name}". `}
@@ -114,7 +81,81 @@ export function BuildingLevelsPane({
           {warning}
         </p>
       ))}
-    </div>
+    </>
+  );
+
+  if (selectedLevel === null) {
+    return (
+      <BuildingSection
+        testId="selection-summary"
+        kind="Building"
+        title={file.name}
+        aside={`${countLabel(file.levels.length, 'level')}, ${countLabel(file.sheets.length, 'sheet')}`}
+      >
+        {file.levels.length === 0 && <p className="mep-hint">No levels yet. Use + Add level.</p>}
+        {buildingWarningLines.length > 0 ? (
+          buildingWarningLines.map((line) => (
+            <p key={line} className="mep-hint mep-buildings-message">
+              {line}
+            </p>
+          ))
+        ) : (
+          <p className="mep-hint">No warnings.</p>
+        )}
+        {extras}
+      </BuildingSection>
+    );
+  }
+
+  return (
+    <BuildingSection
+      testId="selection-summary"
+      kind="Level"
+      title={selectedLevel.name}
+      aside={countLabel(sheetCount(file, selectedLevel.id), 'sheet')}
+    >
+      <div key={selectedLevel.id} className="mep-level-detail" data-testid="level-row">
+        <div className="mep-level-fields">
+          <label className="mep-level-field mep-level-field--name">
+            <span>Name</span>
+            <LevelNameInput
+              name={selectedLevel.name}
+              onRename={(name) => void update((f) => renameLevel(f, selectedLevel.id, name))}
+              focusRequested={focusNameLevelId === selectedLevel.id}
+              onFocused={onNameFocused}
+            />
+          </label>
+          <label className="mep-level-field mep-level-field--elevation">
+            <span>Elevation</span>
+            <span className="mep-level-elevation">
+              <LevelElevationInput
+                value={selectedLevel.elevationMm}
+                onCommit={(value) => void update((f) => setLevelElevation(f, selectedLevel.id, value))}
+              />
+              <span>mm</span>
+            </span>
+          </label>
+          <div className="mep-level-delete">
+            <button
+              type="button"
+              aria-disabled={deleteBlocked !== null}
+              aria-describedby={deleteBlocked !== null ? 'mep-level-delete-reason' : undefined}
+              title={deleteBlocked ?? 'Delete level'}
+              onClick={() => deleteAt(selectedLevel, selectedIndex)}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+        {deleteBlocked !== null && (
+          <p id="mep-level-delete-reason" className="mep-hint" data-testid="delete-reason">
+            {deleteBlocked}
+          </p>
+        )}
+      </div>
+      {levelHasWarning && <p className="mep-hint mep-buildings-message">A sheet of this level has a missing PDF or no access.</p>}
+      {extras}
+    </BuildingSection>
   );
 }
 

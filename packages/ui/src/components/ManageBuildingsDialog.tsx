@@ -4,7 +4,7 @@ import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import type { UseBuilding } from '../useBuilding.js';
-import { countLabel, defaultLevelName, nextLevelElevation, sheetCount } from '../buildingLevels.js';
+import { countLabel, defaultLevelName, nextLevelElevation } from '../buildingLevels.js';
 import { notPlacedAskText, sheetsWithoutSummary } from '../buildingStatus.js';
 import { useSheetRelink } from '../useSheetRelink.js';
 import { loadBuildings, loadImportedOldIds, pendingOldBuildings } from '../buildings.js';
@@ -478,17 +478,6 @@ export function ManageBuildingsDialog({
 
           {openBuilding && (
             <>
-              <BuildingSummariesPane
-                key={`${openBuilding.file.id}-summaries`}
-                missing={sheetsWithoutSummary(openBuilding.file.sheets, openBuilding.sheetStatus, openBuilding.sheetSummary).length}
-                onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
-                onDone={() => void building.refreshSheetStatus()}
-                fileAccess={fileAccess}
-                relinker={relinker}
-                sheetStatus={openBuilding.sheetStatus}
-                onOpenSheet={openSheetKeepOpen}
-                onNotice={onNotice}
-              />
               {/* B4 adds a Risers tab here */}
               <div role="tablist" className="mep-buildings-tabs">
                 <button
@@ -517,30 +506,17 @@ export function ManageBuildingsDialog({
                     onRemove={pendingPdfs.remove}
                   />
                 )}
-                <div className="mep-section" data-testid="selection-summary">
-                  {selectedLevel !== null ? (
-                    <>
-                      <h4>{selectedLevel.name}</h4>
-                      <p>{countLabel(sheetCount(openBuilding.file, selectedLevel.id), 'sheet')}.</p>
-                      {selectedNode?.warning && (
-                        <p className="mep-hint mep-buildings-message">A sheet of this level has a missing PDF or no access.</p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <h4>Building summary</h4>
-                      {warningText.length > 0 ? (
-                        warningText.map((line) => (
-                          <p key={line} className="mep-hint mep-buildings-message">
-                            {line}
-                          </p>
-                        ))
-                      ) : (
-                        <p className="mep-hint">No warnings.</p>
-                      )}
-                    </>
-                  )}
-                </div>
+                <BuildingLevelsPane
+                  key={`${openBuilding.file.id}-levels`}
+                  file={openBuilding.file}
+                  update={building.update}
+                  selectedLevelId={selectedLevel?.id ?? null}
+                  focusNameLevelId={focusNameLevelId}
+                  onNameFocused={() => setFocusNameLevelId(null)}
+                  onSelectKey={onSelectKey}
+                  buildingWarningLines={warningText}
+                  levelHasWarning={Boolean(selectedNode?.warning)}
+                />
                 <LevelSheetsPane
                   key={`${openBuilding.file.id}-level-sheets-${selectedLevel?.id ?? 'all'}`}
                   file={openBuilding.file}
@@ -554,7 +530,19 @@ export function ManageBuildingsDialog({
                   onRefreshStatus={building.refreshSheetStatus}
                   onNotice={onNotice}
                 />
+                <BuildingSummariesPane
+                  key={`${openBuilding.file.id}-summaries`}
+                  missing={sheetsWithoutSummary(openBuilding.file.sheets, openBuilding.sheetStatus, openBuilding.sheetSummary).length}
+                  onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
+                  onDone={() => void building.refreshSheetStatus()}
+                  fileAccess={fileAccess}
+                  relinker={relinker}
+                  sheetStatus={openBuilding.sheetStatus}
+                  onOpenSheet={openSheetKeepOpen}
+                  onNotice={onNotice}
+                />
                 <OpenDocumentsPane
+                  key={openBuilding.file.id}
                   file={openBuilding.file}
                   update={building.update}
                   rows={openDocuments}
@@ -577,15 +565,6 @@ export function ManageBuildingsDialog({
                     onNotice={onNotice}
                   />
                 </OpenDocumentsPane>
-                <BuildingLevelsPane
-                  key={`${openBuilding.file.id}-levels`}
-                  file={openBuilding.file}
-                  update={building.update}
-                  selectedLevelId={selectedLevel?.id ?? null}
-                  focusNameLevelId={focusNameLevelId}
-                  onNameFocused={() => setFocusNameLevelId(null)}
-                  onSelectKey={onSelectKey}
-                />
               </div>
               <div className="mep-buildings-status-line">
                 {notice !== null && (

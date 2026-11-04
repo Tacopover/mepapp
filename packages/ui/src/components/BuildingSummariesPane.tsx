@@ -4,6 +4,7 @@ import type { FileAccess } from '@mepapp/platform';
 import { noSummaryText, type SheetStatus } from '../buildingStatus.js';
 import type { RebuildResult } from '../rebuildSummaries.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
+import { BuildingSection } from './BuildingSection.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
 
 export const REPAIR_ORIGIN = 'repair';
@@ -75,26 +76,28 @@ export function BuildingSummariesPane({ missing, onRebuild, onDone, fileAccess, 
   if (missing === 0 && !running && last === null) return null;
 
   return (
-    <div className="mep-section mep-summaries" data-testid="summaries-pane">
+    <BuildingSection title="Summaries" testId="summaries-pane">
       {(missing > 0 || running) && (
         <div className="mep-summaries-head">
           <span data-testid="summaries-missing">{noSummaryText(missing)}</span>
-          {missing > 0 && (
-            <button
-              type="button"
-              data-testid="rebuild-summaries"
-              disabled={running || onRebuild === undefined}
-              title={onRebuild === undefined ? 'PDF reading is not available in this version of the app.' : undefined}
-              onClick={() => void run()}
-            >
-              Read summaries now
-            </button>
-          )}
-          {running && (
-            <button type="button" data-testid="rebuild-cancel" onClick={() => controllerRef.current?.abort()}>
-              Cancel
-            </button>
-          )}
+          <span className="mep-summaries-actions">
+            {missing > 0 && (
+              <button
+                type="button"
+                data-testid="rebuild-summaries"
+                disabled={running || onRebuild === undefined}
+                title={onRebuild === undefined ? 'PDF reading is not available in this version of the app.' : undefined}
+                onClick={() => void run()}
+              >
+                Read summaries now
+              </button>
+            )}
+            {running && (
+              <button type="button" data-testid="rebuild-cancel" onClick={() => controllerRef.current?.abort()}>
+                Cancel
+              </button>
+            )}
+          </span>
         </div>
       )}
       {missing > 0 && !running && (
@@ -163,6 +166,6 @@ export function BuildingSummariesPane({ missing, onRebuild, onDone, fileAccess, 
           )}
         </div>
       )}
-    </div>
+    </BuildingSection>
   );
 }

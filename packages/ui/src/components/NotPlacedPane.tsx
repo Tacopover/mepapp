@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { addSheets, type BuildingFile } from '@mepapp/core';
 import { countLabel } from '../buildingLevels.js';
 import { newSheetPage, type PdfGroup } from '../buildingSheets.js';
+import { BuildingSection } from './BuildingSection.js';
 
 export interface NotPlacedPaneProps {
   file: BuildingFile;
@@ -30,8 +31,11 @@ export function NotPlacedPane({ file, update, waiting, totals, onRemove }: NotPl
   }
 
   return (
-    <div className="mep-section" data-testid="sheets-pane">
-      <h4>Not placed</h4>
+    <BuildingSection
+      title="Not placed"
+      testId="sheets-pane"
+      aside={waiting.length > 0 ? `${countLabel(totals.pages - totals.assigned, 'page')} waiting` : undefined}
+    >
       <p data-testid="not-placed-line">These pages are not saved in the building. Place them or they go when you close this dialog.</p>
       {waiting.length > 0 && (
         <p className="mep-hint" data-testid="sheets-totals">
@@ -42,8 +46,8 @@ export function NotPlacedPane({ file, update, waiting, totals, onRemove }: NotPl
       {waiting.map((group) => {
         const showPages = !group.collapsedByDefault || expanded[group.key] === true;
         return (
-          <div key={group.key} className="mep-sheets-group" data-testid="pdf-group">
-            <div className="mep-buildings-actions">
+          <div key={group.key} className="mep-sgroup" data-testid="pdf-group">
+            <div className="mep-notplaced-head">
               <b>{group.fileName}</b>
               {group.path !== undefined && <span className="mep-hint">{group.path}</span>}
               <span className="mep-hint">{countLabel(group.rows.length, 'page')} not placed</span>
@@ -86,7 +90,7 @@ export function NotPlacedPane({ file, update, waiting, totals, onRemove }: NotPl
             </div>
             {showPages &&
               group.rows.map((row) => (
-                <div key={`page-${row.pageIndex}`} className="mep-elem-row mep-sheet-page-row" data-testid="page-row">
+                <div key={`page-${row.pageIndex}`} className="mep-prow" data-testid="page-row">
                   <span>Page {row.pageIndex + 1}</span>
                   <select
                     aria-label={`Level for ${group.fileName} page ${row.pageIndex + 1}`}
@@ -106,6 +110,6 @@ export function NotPlacedPane({ file, update, waiting, totals, onRemove }: NotPl
           </div>
         );
       })}
-    </div>
+    </BuildingSection>
   );
 }

@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { moveSheet, removeSheet, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { FileAccess } from '@mepapp/platform';
+import { countLabel } from '../buildingLevels.js';
 import { sheetGroupsOfLevel } from '../buildingSheets.js';
 import {
   statusHint,
@@ -12,6 +13,7 @@ import {
   type SheetSummaryInfo,
 } from '../buildingStatus.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
+import { BuildingSection } from './BuildingSection.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
 
 export const SHEETS_ORIGIN = 'sheets';
@@ -20,7 +22,7 @@ export interface LevelSheetsPaneProps {
   file: BuildingFile;
   update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
   fileAccess: FileAccess;
-  /** null = building node: all sheets, each row also shows its level name. */
+  /** null = building node: all sheets, grouped by level with a header row for each level. */
   levelId: string | null;
   onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
   sheetStatus: Record<string, SheetStatus>;
@@ -30,8 +32,33 @@ export interface LevelSheetsPaneProps {
   relinker: SheetRelink;
 }
 
+/** One block of rows. A level block (building node) has a header row with the level name. */
+interface RowGroup {
+  key: string;
+  testId: 'pdf-group' | 'level-group';
+  header: string | null;
+  sheets: BuildingSheet[];
+}
+
+function rowGroups(file: BuildingFile, levelId: string | null): RowGroup[] {
+  if (levelId !== null) {
+    return sheetGroupsOfLevel(file, levelId).map((group) => ({ key: group.key, testId: 'pdf-group', header: null, sheets: group.sheets }));
+  }
+  const known = new Set(file.levels.map((level) => level.id));
+  const groups: RowGroup[] = file.levels.map((level) => ({
+    key: level.id,
+    testId: 'level-group',
+    header: level.name,
+    sheets: sheetGroupsOfLevel(file, level.id).flatMap((group) => group.sheets),
+  }));
+  const orphans = file.sheets.filter((sheet) => !known.has(sheet.levelId));
+  if (orphans.length > 0) groups.push({ key: 'no-level', testId: 'level-group', header: 'No level', sheets: orphans });
+  return groups.filter((group) => group.sheets.length > 0);
+}
+
 /**
- * Lists the sheets of the selected level, one row per sheet, and moves, removes, opens and relinks them.
+ * Lists the sheets of the selected level, one grid row per sheet, and moves, removes, opens and relinks them.
+ * The columns are the same in every row: name and page, status, then the actions Open, Relink, Move to, Remove.
  * A relink changes every sheet of the same PDF, also the sheets on other levels.
  */
 export function LevelSheetsPane({
@@ -46,8 +73,9 @@ export function LevelSheetsPane({
   onNotice,
   relinker,
 }: LevelSheetsPaneProps) {
-  const groups = sheetGroupsOfLevel(file, levelId);
+  const groups = rowGroups(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
+  const needsFix = shown.some((sheet) => sheetStatus[sheet.id] === 'pdf-missing' || sheetStatus[sheet.id] === 'no-access');
 
   async function grantAccess() {
     try {
@@ -71,125 +99,150 @@ export function LevelSheetsPane({
   }
 
   return (
-    <div className="mep-section" data-testid="level-sheets">
-      <h4>Sheets</h4>
+    <BuildingSection title="Sheets" testId="level-sheets" aside={countLabel(shown.length, 'sheet')}>
       {shown.length === 0 && (
         <p className="mep-hint">
           {levelId === null ? 'No sheets in this building yet.' : 'No sheets on this level. Add PDFs below and pick this level for their pages.'}
         </p>
       )}
+      <div className="mep-srows" data-fix={needsFix ? 'true' : 'false'}>
       {groups.map((group) => (
-        <div key={group.key} className="mep-sheets-group" data-testid="pdf-group">
+        <div key={group.key} className="mep-sgroup" data-testid={group.testId}>
+          {group.header !== null && (
+            <div className="mep-sgroup-head">
+              <b title={group.header}>{group.header}</b>
+              <span>{countLabel(group.sheets.length, 'sheet')}</span>
+            </div>
+          )}
           {group.sheets.map((sheet) => {
             const status = sheetStatus[sheet.id];
             const ask = relinker.askFor(sheet.id, SHEETS_ORIGIN);
-            const levelName = file.levels.find((level) => level.id === sheet.levelId)?.name;
             const otherLevels = file.levels.filter((level) => level.id !== sheet.levelId);
+            const hasSummary = status === 'ok' || status === 'old-summary';
+            const pageText = `Page ${sheet.pageIndex + 1}`;
+            const summary = hasSummary ? summaryText(sheetSummary[sheet.id]) : '';
+            const tone = status !== undefined ? statusTone(status) : 'ok';
             return (
               <Fragment key={sheet.id}>
-                <div className="mep-elem-row mep-sheet-page-row" data-testid="page-row">
-                  <b>{sheet.location.fileName}</b>
-                  <span>Page {sheet.pageIndex + 1}</span>
-                  {levelId === null && levelName !== undefined && <span className="mep-hint">{levelName}</span>}
-                  {status !== undefined && (
-                    <span
-                      className={`mep-sheet-status mep-sheet-status--${statusTone(status)}`}
-                      data-testid="sheet-status"
-                      data-status={status}
-                      title={statusHint(status) || undefined}
-                    >
-                      {statusLabel(status)}
+                <div
+                  className={tone === 'ok' ? 'mep-srow' : `mep-srow mep-srow--${tone}`}
+                  data-testid="page-row"
+                  title={`${sheet.location.fileName} - ${pageText}${summary !== '' ? ` - ${summary}` : ''}`}
+                >
+                  <div className="mep-srow-name">
+                    <b className="mep-srow-file">{sheet.location.fileName}</b>
+                    <span className="mep-srow-meta">
+                      <span>{pageText}</span>
+                      {hasSummary && (
+                        <span data-testid="sheet-summary">{summary}</span>
+                      )}
                     </span>
-                  )}
-                  {(status === 'ok' || status === 'old-summary') && (
-                    <span className="mep-hint" data-testid="sheet-summary">
-                      {summaryText(sheetSummary[sheet.id])}
-                    </span>
-                  )}
-                  {sheet.location.path !== undefined && fileAccess.readPath !== undefined ? (
+                  </div>
+                  <span className="mep-srow-status">
+                    {status !== undefined && (
+                      <span
+                        className={`mep-sheet-status mep-sheet-status--${statusTone(status)}`}
+                        data-testid="sheet-status"
+                        data-status={status}
+                        title={statusHint(status) || undefined}
+                      >
+                        {statusLabel(status)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mep-srow-cell mep-srow-cell--open">
+                    {sheet.location.path !== undefined && fileAccess.readPath !== undefined ? (
+                      <button
+                        type="button"
+                        data-testid="open-sheet"
+                        disabled={status === 'pdf-missing'}
+                        aria-label={`Open ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
+                        title={status === 'pdf-missing' ? 'The PDF is missing. Relink it first.' : 'Open this sheet'}
+                        onClick={() => void openRow(sheet, 'path')}
+                      >
+                        Open
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        data-testid="open-sheet"
+                        aria-label={`Choose file for ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
+                        title="Choose the PDF file to open this sheet"
+                        onClick={() => void openRow(sheet, 'pick')}
+                      >
+                        Choose file…
+                      </button>
+                    )}
+                  </span>
+                  <span className="mep-srow-cell mep-srow-cell--fix">
+                    {status === 'pdf-missing' && (
+                      <button
+                        type="button"
+                        data-testid="relink-pdf"
+                        aria-label={`Relink ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
+                        onClick={() => void relinker.relink(sheet, SHEETS_ORIGIN)}
+                      >
+                        Relink…
+                      </button>
+                    )}
+                    {status === 'no-access' && (
+                      <button
+                        type="button"
+                        data-testid="grant-access"
+                        aria-label={`Grant access for ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
+                        onClick={() => void grantAccess()}
+                      >
+                        Grant access…
+                      </button>
+                    )}
+                  </span>
+                  <span className="mep-srow-cell mep-srow-cell--move">
+                    <select
+                      aria-label={`Move ${sheet.location.fileName} page ${sheet.pageIndex + 1} to level`}
+                      value=""
+                      disabled={otherLevels.length === 0}
+                      onChange={(event) => {
+                        const target = event.target.value;
+                        if (target !== '') void update((f) => moveSheet(f, sheet.id, target));
+                      }}
+                    >
+                      <option value="">Move to…</option>
+                      {otherLevels.map((level) => (
+                        <option key={level.id} value={level.id}>
+                          {level.name}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                  <span className="mep-srow-cell mep-srow-cell--remove">
                     <button
                       type="button"
-                      data-testid="open-sheet"
-                      disabled={status === 'pdf-missing'}
-                      aria-label={`Open ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                      title={status === 'pdf-missing' ? 'The PDF is missing. Relink it first.' : 'Open this sheet'}
-                      onClick={() => void openRow(sheet, 'path')}
+                      className="mep-sheets-remove"
+                      aria-label={`Remove ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
+                      title="Remove this sheet from the building. The PDF file stays on disk."
+                      onClick={() => void update((f) => removeSheet(f, sheet.id))}
                     >
-                      Open
+                      Remove
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      data-testid="open-sheet"
-                      aria-label={`Choose file for ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                      title="Choose the PDF file to open this sheet"
-                      onClick={() => void openRow(sheet, 'pick')}
-                    >
-                      Choose file…
-                    </button>
+                  </span>
+                  {status === 'not-stamped' && (
+                    <p className="mep-hint mep-sheet-hint" data-testid="sheet-hint">
+                      {statusHint(status)}
+                    </p>
                   )}
-                  {status === 'pdf-missing' && (
-                    <button
-                      type="button"
-                      data-testid="relink-pdf"
-                      aria-label={`Relink ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                      onClick={() => void relinker.relink(sheet, SHEETS_ORIGIN)}
-                    >
-                      Relink…
-                    </button>
-                  )}
-                  {status === 'no-access' && (
-                    <button
-                      type="button"
-                      data-testid="grant-access"
-                      aria-label={`Grant access for ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                      onClick={() => void grantAccess()}
-                    >
-                      Grant access…
-                    </button>
-                  )}
-                  <select
-                    aria-label={`Move ${sheet.location.fileName} page ${sheet.pageIndex + 1} to level`}
-                    value=""
-                    disabled={otherLevels.length === 0}
-                    onChange={(event) => {
-                      const target = event.target.value;
-                      if (target !== '') void update((f) => moveSheet(f, sheet.id, target));
-                    }}
-                  >
-                    <option value="">Move to…</option>
-                    {otherLevels.map((level) => (
-                      <option key={level.id} value={level.id}>
-                        {level.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="mep-sheets-remove"
-                    aria-label={`Remove ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                    title="Remove this sheet from the building. The PDF file stays on disk."
-                    onClick={() => void update((f) => removeSheet(f, sheet.id))}
-                  >
-                    Remove
-                  </button>
                 </div>
-                {status === 'not-stamped' && (
-                  <p className="mep-hint mep-sheet-hint" data-testid="sheet-hint">
-                    {statusHint(status)}
-                  </p>
-                )}
                 {ask !== null && <RelinkConfirm relinker={relinker} sheet={sheet} askedName={ask.pickedName} />}
               </Fragment>
             );
           })}
         </div>
       ))}
+      </div>
       {shown.length > 0 && (
-        <p className="mep-hint" data-testid="summary-count">
+        <p className="mep-hint mep-sheets-count" data-testid="summary-count">
           {summaryCountText(shown, sheetSummary)}
         </p>
       )}
-    </div>
+    </BuildingSection>
   );
 }
