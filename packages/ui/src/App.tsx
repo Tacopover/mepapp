@@ -713,7 +713,35 @@ export function MepSketchApp({
     [buildingHook.reload, buildingStore, customStampDefinitions, userStampLibrary.definitions],
   );
 
-  const documentOpenedRef = useRef<((args: { documentId: string; file: File; target: FileTarget | undefined; loadMismatch: boolean }) => Promise<void>) | null>(null);
+  // Writes the sheet summary of an open document whose sheet got its minted id while the document was open. Never throws.
+  const writeSummaryForOpenDocument = useCallback(
+    async (documentId: string, fileName: string, sizeBytes: number) => {
+      try {
+        const snapshot = snapshotDocument(documentId);
+        if (!buildingStore || !snapshot) return;
+        const path = fileTargetsRef.current.get(documentId)?.path;
+        let modifiedMs = Date.now();
+        if (path !== undefined && fileAccess.statPath) modifiedMs = (await fileAccess.statPath(path)).modifiedMs ?? Date.now();
+        const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
+        const result = await summaryAfterSave({
+          store: buildingStore,
+          project: snapshot.project,
+          document: { fileName, path, sizeBytes, modifiedMs },
+          pageInfos: snapshot.pageInfos,
+          ...stampNameLookups(definitions),
+          onlyIfStale: true,
+          idInFile: false,
+        });
+        if (result.state === 'written') await buildingHook.reload();
+      } catch (err) {
+        setStatus(`Could not write the building summary of ${fileName}: ${(err as Error).message}`);
+      }
+    },
+    [buildingHook.reload, buildingStore, customStampDefinitions, fileAccess, snapshotDocument, userStampLibrary.definitions],
+  );
+  const summaryKeysRef = useRef(new Set<string>());
+
+  const documentOpenedRef =useRef<((args: { documentId: string; file: File; target: FileTarget | undefined; loadMismatch: boolean }) => Promise<void>) | null>(null);
 
   const openPdfFile = useCallback(
     async (file: File, fileTarget: FileTarget | undefined): Promise<string | null> => {
@@ -851,6 +879,19 @@ export function MepSketchApp({
       scene.commitProjectUuid(documentId, projectUuid, { inFile: false });
     }
   }, [buildingHook.building?.file, documents]);
+
+  // The active document took a minted id from its sheet, so its summary is written at once. Otherwise the sheet stays "Not opened yet" until a Save.
+  useEffect(() => {
+    const file = buildingHook.building?.file;
+    const doc = documents.find((d) => d.id === activeDocumentId);
+    if (!file || !doc || !doc.hasPdf || doc.projectUuidInFile || doc.projectUuid === null || doc.sizeBytes === null) return;
+    const projectUuid = doc.projectUuid;
+    if (!file.sheets.some((sheet) => sheet.idMinted === true && sheet.projectUuid === projectUuid)) return;
+    const key = `${doc.id}:${projectUuid}:${doc.sizeBytes}`;
+    if (summaryKeysRef.current.has(key)) return;
+    summaryKeysRef.current.add(key);
+    void writeSummaryForOpenDocument(doc.id, doc.fileName, doc.sizeBytes);
+  }, [buildingHook.building?.file, documents, activeDocumentId, writeSummaryForOpenDocument]);
 
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
   const openSheet = useCallback(

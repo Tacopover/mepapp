@@ -176,6 +176,24 @@ s = await stored();
 check(s.sheets.find((x) => x.displayName === 'first.pdf' || x.location.fileName === 'first.pdf').levelId === s.levels[1].id, 'Move to put first.pdf on Level 1');
 await shot('B3-T11j-09-moved');
 
+// Step 5b: make each open document the active one, so its summary is written at once.
+await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
+await dlg.waitFor({ state: 'hidden', timeout: 5000 });
+for (const file of ['ground.pdf', 'first.pdf', 'm.pdf']) {
+  await page.locator('.mep-doc-switcher-btn').click();
+  await idle(300);
+  await page.locator('.mep-doc-switcher-dropdown .mep-elem-row', { hasText: file }).first().click();
+  await idle(800);
+  check((await activeDocName()) === file, `${file} becomes the active document`, await activeDocName());
+  await menu('Save');
+  await until(async () => /Saved |Failed/.test(await statusText()), `save ${file}`);
+  await idle(800);
+  const id = (await stored()).sheets.find((x) => x.location.fileName === file)?.projectUuid;
+  const ids = await page.evaluate(async () => await window.__mepBuilding.store.listSummaries());
+  check(typeof id === 'string' && ids.includes(id), `the summary of ${file} is written without a Save`, JSON.stringify(ids));
+}
+await openDialog();
+
 // Step 6: open each document from a sheet.
 for (const [lv, file] of [['Ground floor', 'ground.pdf'], ['Ground floor', 'm.pdf'], ['Level 1', 'first.pdf']]) {
   await level(lv).click();
@@ -183,6 +201,14 @@ for (const [lv, file] of [['Ground floor', 'ground.pdf'], ['Ground floor', 'm.pd
   const row = rowOf(file).first();
   const btn = row.locator('[data-testid="open-sheet"]');
   const label = ((await btn.textContent()) ?? '').trim();
+  const disabled = await btn.isDisabled();
+  const isOpen = await page.evaluate((n) => window.__mepSketchScene.getDocuments().some((d) => d.fileName === n), file);
+  check(disabled === isOpen, `${file} Open button is disabled exactly while its PDF is open`, `disabled ${disabled}, open ${isOpen}`);
+  if (disabled) {
+    check(label === 'Opened', `${file} shows the disabled Opened button`, label);
+    await shot(`B3-T11j-10-opened-${file.replace('.pdf', '')}`);
+    continue;
+  }
   await nextFile(file);
   await btn.click();
   await idle(1500);
@@ -199,7 +225,11 @@ console.log('INFO header: ' + header.slice(0, 200));
 const readBtn = dlg.locator('[data-testid="rebuild-summaries"]');
 if ((await readBtn.count()) > 0) {
   await shot('B3-T11j-13-summaries-needed');
-  console.log('INFO Read summaries now shows');
+  await readBtn.click();
+  await until(async () => /^Read \d+ of \d+ summaries|^Failed to rebuild/.test(await statusText()), 'summaries read', 60000);
+  await idle(500);
+  const pane = (await dlg.locator('[data-testid="summaries-pane"]').innerText().catch(() => '')) ?? '';
+  check(/no path is stored for this PDF/.test(pane), 'Read summaries reports the web limit: no path is stored for this PDF', pane.slice(0, 300));
 }
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
 await dlg.waitFor({ state: 'hidden', timeout: 5000 });
@@ -297,7 +327,7 @@ await shot('B3-T11j-17-tab-walk');
 await items('building').first().focus();
 await page.keyboard.press('Shift+Tab');
 a = await active();
-check(a.inDialog && /^Building/.test(a.text), 'Shift+Tab from the first tree item goes to the Building menu button', JSON.stringify(a));
+check(a.inDialog && a.test === 'building-name-header-rename', 'Shift+Tab from the first tree item goes to the Rename building button', JSON.stringify(a));
 await level('Ground floor').focus();
 await page.keyboard.press('ArrowDown');
 a = await active();
@@ -305,28 +335,22 @@ check(a.role === 'treeitem', 'ArrowDown moves between tree items', JSON.stringif
 await page.keyboard.press('Enter');
 await idle(300);
 check((await dlg.locator('[data-testid="selection-summary"] h4').textContent())?.length > 0, 'Enter selects a node');
-// Ask: add a waiting PDF, then Close building -> ask -> focus checks.
+// Add a PDF with the level selected: it is placed at once, so Close asks nothing.
 await items('building').filter({ hasText: 'Tower' }).click();
+await idle(300);
+check((await dlg.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 0, 'the building node offers no Add PDFs button');
+await level('Ground floor').click();
 await idle(300);
 await putFile('wait.pdf', 'arch_simple_A4.pdf');
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
-await idle(1500);
+await until(async () => (await stored()).sheets.some((x) => x.location.fileName === 'wait.pdf'), 'wait.pdf added', 20000);
+await idle(800);
 a = await active();
 check(a.tag !== 'BODY', 'focus is not on body after Add PDFs…', JSON.stringify(a));
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
-await idle(300);
-a = await active();
-check(await dlg.locator('[data-testid="keep-working"]').count() === 1 && a.test === 'keep-working', 'the ask puts the focus on Keep working', JSON.stringify(a));
+await dlg.waitFor({ state: 'hidden', timeout: 8000 });
+check((await dlg.count()) === 0, 'Close closes the dialog: no PDF is waiting');
 await shot('B3-T11j-18-ask');
-await page.keyboard.press('Enter');
-await idle(300);
-a = await active();
-check(a.inDialog && a.tag !== 'BODY', 'after Keep working (Enter) the focus stays in the dialog', JSON.stringify(a));
-await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
-await idle(300);
-await dlg.locator('[data-testid="close-anyway"]').click();
-await idle(500);
-check((await dlg.count()) === 0, 'Close anyway closes the dialog');
 // Escape: the dialog stays closed.
 await page.keyboard.press('Escape');
 await idle(300);

@@ -118,6 +118,9 @@ await idle(1500);
 const a3id = (await stored()).sheets.find((x) => x.location.fileName === 'a3.pdf')?.projectUuid;
 await until(async () => (await docs()).find((d) => d.name === 'a3.pdf')?.uuid === a3id, 'a3 document adopts the id', 15000);
 check((await docs()).find((d) => d.name === 'a3.pdf')?.uuid === a3id, 'an already open document adopts the id of the new sheet');
+await until(async () => (await chipStatus('a3.pdf')) === 'ok', 'a3 chip OK without a Save', 20000);
+check((await chipStatus('a3.pdf')) === 'ok', 'an open PDF added to a level shows OK without a Save', await chipStatus('a3.pdf'));
+check((await summaryIds()).includes(a3id), 'the summary file has the a3 id without a Save', JSON.stringify(await summaryIds()));
 
 // 5. Export a Level: the rows of the opened PDFs, no "no id yet" warning.
 await closeDialog();
