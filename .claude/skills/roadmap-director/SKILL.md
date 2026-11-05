@@ -27,7 +27,7 @@ Arguments: `$ARGUMENTS`
 4. Run `node .claude/roadmap/ledger.mjs show`. This is your state.
 5. Get the dashboard link from `.claude/roadmap/dashboard/URL.txt`.
 6. Check `.claude/roadmap/permissions.md`. If the allow rules are not in `.claude/settings.local.json` and the user did not agree to run without them, tell the user and stop.
-7. Check that `.claude/agents/` has the role files (list below).
+7. Check that `.claude/agents/` has the role files (list below). UX work also uses `.claude/roadmap/ux-lessons.md`, `ui-guide.md` and `ux-checklists.md`.
 
 ## The director loop
 
@@ -44,6 +44,8 @@ Each cycle does one step. Then it ends. The full cycle text is in `.claude/roadm
 
 - Work in a worktree. Never push to master. Never merge a part branch into master. Push the branch only. The user tests on Windows and merges.
 - Write prose for the user in STE (ASD-STE100: short sentences, active voice, one word for one meaning). The UI text of the product is English only.
+- For a task that changes a screen, the task lead starts the `ux-designer` first. For a new dialog or a big change of a screen, show the wireframe, the journeys and the texts to the user on the dashboard (event `decision`, kind `ux`) before the implementation starts (protocol section 4a).
+- Mirror the ledger at once after each task and each decision: `node .claude/roadmap/tools/mirror-batch.mjs <out.json> [stream]`, then `ArtifactData` batch, then `ledger.mjs mirrored <lastSeq>`. Read `answers` and `notes` at the start of each cycle.
 - Upload the screenshots of each task to the dashboard right after the task. Add a `shot` event for each.
 - Put each question for the user on the dashboard (event `decision`, status `open`). Send `PushNotification` only to ask the user for something: the batch, a stop, the end.
 - Browser checks: one Chromium page at a time. Use `node .claude/roadmap/browser/with-server.mjs <check.mjs>`. Never use `pkill -f vite`.
@@ -67,7 +69,9 @@ Each role has a file in `.claude/agents/`. The brief format is in protocol secti
 | Implementer | `.claude/agents/implementer.md` | Implements one seven-part brief. |
 | Tester | `.claude/agents/tester.md` | Runs tests, builds, browser checks and screenshots. |
 | Code reviewer | `.claude/agents/code-reviewer.md` | Reviews the diff of a task. Read only. |
-| UI reviewer | `.claude/agents/ui-reviewer.md` | Uses the page and reads the screenshots. |
+| UX designer | `.claude/agents/ux-designer.md` | Before a screen task: writes the UX spec (journeys, tables, texts, wireframe). The task lead starts it. |
+| Journey tester | `.claude/agents/journey-tester.md` | Plays a first-time user with goals, writes a friction log. The task lead starts it. |
+| UI reviewer | `.claude/agents/ui-reviewer.md` | Uses the page, measures the layout, runs the audits, reads every screenshot. |
 
 How to run a role: first try the `Agent` tool with `subagent_type` set to the role name. Named agents may not load in a session. If the name is not listed, start a `general-purpose` agent. In its prompt, tell it to read `.claude/agents/<role>.md` and `.claude/roadmap/rules.md` first, and then give it the brief. Give each role the paths, the goal, the report shape, the worktree path and the branch. Give a task lead also a work folder in your scratchpad.
 
@@ -88,7 +92,8 @@ Use this for work that is not the routing road map.
 - Rules (run, repository, domain, browser facts): `.claude/roadmap/rules.md`
 - Allow rules and deny rules: `.claude/roadmap/permissions.md`
 - Cycle text of the director: `.claude/roadmap/director-prompt.md`
-- Browser checks and helper: `.claude/roadmap/browser/` (`lib.mjs`, `with-server.mjs`, examples `p3-check.mjs`, `p6-check.mjs`)
+- Browser checks and helper: `.claude/roadmap/browser/` (`lib.mjs`, `with-server.mjs`, `run-checks.mjs`, `layout-measure.mjs`, examples `p3-check.mjs`, `p6-check.mjs`)
+- UX: `.claude/roadmap/ux-lessons.md`, `ui-guide.md`, `ux-checklists.md`
 - Ledger helper: `node .claude/roadmap/ledger.mjs` (commands: add, show, pending, batch, mirrored)
 - Dashboard source and link: `.claude/roadmap/dashboard/index.html`, `.claude/roadmap/dashboard/URL.txt`
 - Plans: `.claude/plans/`

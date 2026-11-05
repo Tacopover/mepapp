@@ -19,11 +19,13 @@ Every agent reads `.claude/roadmap/rules.md` first.
 | Implementer | `implementer` | haiku | read, edit, write, bash | Implements one brief. |
 | Tester | `tester` | haiku | bash, read | Runs tests and builds. Runs browser checks. Takes screenshots. |
 | Code reviewer | `code-reviewer` | haiku | read, bash (read-only) | Reviews the diff of a task against its brief, the plan and the rules. |
-| UI reviewer | `ui-reviewer` | haiku | read, bash | Uses the page and reads the screenshots. Checks usability and completeness. |
+| UX designer | `ux-designer` | sonnet | read, bash, write | Before the implementation of a task that changes a screen: writes the UX spec (journeys, entity by action table, state table, texts, wireframe, platform table). |
+| Journey tester | `journey-tester` | sonnet | read, bash, write | Plays a first-time user with goals, at 3 widths, from an empty and a full state. Writes a friction log and counts steps. |
+| UI reviewer | `ui-reviewer` | sonnet | read, bash, write | Uses the page, measures the layout, runs the audits and reads every screenshot. Checks usability and completeness against the UX spec. |
 
-Sonnet judges and Haiku works (decision of the user, 2026-10-16: "Let's use sonnet where you adviced opus instead").
+Sonnet judges and Haiku works (the UI reviewer moved from Haiku to Sonnet on 2026-11-04: it judges) (decision of the user, 2026-10-16: "Let's use sonnet where you adviced opus instead").
 
-Nesting: the director starts a task lead. The task lead starts Haiku workers. That is 2 layers below the main session. Claude Code allows 3 by default (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`). Only the director and the task lead have the `Agent` tool. The workers do not.
+Nesting: the director starts a task lead. The task lead starts Haiku workers. That is 2 layers below the main session. Claude Code allows 3 by default (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`). Only the director and the task lead have the `Agent` tool. The task lead also starts the `ux-designer` and the `journey-tester`. The workers do not.
 
 ## 2. The flow
 
@@ -53,13 +55,23 @@ States of the **run**: `idle`, `running`, `waiting` (for the user), `stopped`, `
 
 The task lead gets: the task text from the part plan, the files to read, the branch, the work folder, and the ledger id. The task lead does not edit product code itself.
 
+0. **UX spec.** If the task changes what the user sees: start the `ux-designer` first (section 4a). The spec is input for the briefs and for the checks.
 1. **Brief.** Write one brief for each implementer job in the format of section 5. Put the briefs in `<work>/briefs/`. One brief = one seam, at most about 150 changed lines. Jobs on the same file run one after another. Jobs on separate files can run in parallel.
 2. **Implement.** Start an `implementer` for each brief. Read the diff of each result, even for DONE.
 3. **Test.** Start the `tester` with the exact commands (core tests, UI tests, `pnpm build`, the browser check, the screenshots). A fail goes back to step 2 as a finding.
 4. **Code review.** Start the `code-reviewer` on the diff. The task lead also reads the diff. Findings go back to step 2.
-5. **UI review.** If the task changes what the user sees: start the `ui-reviewer` with the screenshots and the browser check. Findings go back to step 2.
+5. **UI review.** If the task changes what the user sees: start the `journey-tester` (goals from the UX spec) and the `ui-reviewer` (screenshots, UX spec, measurement, audits). Findings go back to step 2. Each finding gets an outcome: `fixed`, `accepted` with a reason, or `open`.
 6. **Fix.** A finding gets at most **2 fix rounds**. Then the task is `blocked` and the task lead reports to the director. Two failed fixes on the same symptom: stop, find the cause again (rule of the user).
 7. **Finish.** The task lead commits the work (one commit for each task, message in STE, `Co-Authored-By` line) and pushes the branch. Then the task lead returns the summary of section 6.
+
+## 4a. The UX spec and the wireframe approval
+
+A task that changes what the user sees starts with the UX spec (`.claude/roadmap/ux-checklists.md` section A). The `ux-designer` writes it. The reason: in the Building dialog stream, the plan phase reviewed behavior and data, not the screen. The user saw the screen first at the end, and found 30+ problems in 3 rounds (`ux-lessons.md`).
+
+- **Small change** (a control, a text, a layout detail in an existing screen): the spec is short. The task lead takes the open questions as provisional decisions (section 3).
+- **New dialog, new screen, or a big change of a screen:** the director puts the wireframe, the journeys with step counts and the texts on the dashboard before the implementation starts. The user answers on the dashboard (event `decision`, kind `ux`). The director continues with another task while it waits, or sets the run to `waiting`.
+- A spec question about the data model or the file format stops the task (section 3).
+- The platform table of the spec feeds the platform test script. The `journey-tester` writes that script from the journeys and checks that one PC can do each step.
 
 ## 5. The brief format (seven parts)
 
@@ -129,6 +141,7 @@ The dashboard is an artifact page. It is built from `.claude/roadmap/dashboard/i
 - **Screenshots.** The tester saves them in `<work>/shots/`. The director uploads each file with `Artifact` (`action: publish`, `url`, `asset: true`, `file_path` or `file_paths`). The result gives the `url` and `id` of each asset. The director adds a `shot` event for each.
 - **Fallback.** If the account has no `db` or no `assets`: publish the folded state as `state.json` and the screenshots as files of the artifact, and publish again after each task. The page then reads `state.json` with `fetch`.
 - **Language.** Prose on the page is in STE. The page works at phone width.
+- **Mirror tool.** `node .claude/roadmap/tools/mirror-batch.mjs <out.json> [stream]` writes the pending events (at most 50) to a JSON file with `writes` and `lastSeq`. Pass `writes` to `ArtifactData` (batch), then run `ledger.mjs mirrored <lastSeq>`. The director mirrors at the end of every task and every decision, not later.
 
 ## 9. Branch policy
 

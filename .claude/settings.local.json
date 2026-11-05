@@ -19,6 +19,8 @@
       "Bash(pnpm --filter:*)",
       "Bash(node .claude/roadmap/ledger.mjs:*)",
       "Bash(node .claude/roadmap/browser/with-server.mjs:*)",
+      "Bash(node .claude/roadmap/browser/run-checks.mjs:*)",
+      "Bash(node .claude/roadmap/tools/mirror-batch.mjs:*)",
       "Bash(node --check:*)",
       "Bash(cmp:*)",
       "Bash(cp .claude/roadmap/protocol.md \"/taco/notes/Obsidian Vault/Project Docs/MepApp/Specs/agent-framework.md\")",

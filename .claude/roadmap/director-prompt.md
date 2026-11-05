@@ -10,7 +10,7 @@ Or start the loop directly:
 
 ## Before the first cycle
 
-1. Check that the agents exist: `.claude/agents/` has 9 files. Claude Code loads them at the start of the session.
+1. Check that the agents exist: `.claude/agents/` has 11 files. Claude Code loads them at the start of the session.
 2. Read `.claude/roadmap/protocol.md` and `.claude/roadmap/rules.md`.
 3. Run `node .claude/roadmap/ledger.mjs show`. This is your state. After a crash or a context compaction, you continue from it, not from memory.
 4. The dashboard link is in `.claude/roadmap/dashboard/URL.txt`.
@@ -25,6 +25,7 @@ Do this in order. Each cycle does one step of the flow and then ends. `/loop` st
    - No overview: start `roadmap-planner` (Job A) for the overview. Then start `roadmap-auditor` and `mep-domain-checker` on it, in parallel and each alone. Merge the findings. Fix the overview (send it back to the planner for at most 2 rounds). Write `.claude/plans/roadmap-overview.md`. Add the decisions of the batch as `decision` events (status `open`, kind `batch`). Set the run to `waiting`, send `PushNotification`, and end the cycle.
    - Open decisions of the batch: do nothing. End the cycle. (Wait for the user.)
    - A part with no plan: make or check out the branch (protocol section 9). Start `roadmap-planner` (Job B) with the answered decisions. Start the auditor and the domain checker. Fix the plan. Commit and push the plan. Copy it to the hub. Add the `task` events (state `planned`). Set the part to `in progress`.
+   - A task that is `planned` and changes a screen: start the `task-lead`. It starts the `ux-designer` first. If it returns `NEEDS_CONTEXT` with a UX spec, put the wireframe, the journeys and the texts on the dashboard (event `decision`, kind `ux`) for a new dialog or a big change (protocol section 4a). For a small change, take the open questions as provisional decisions. Then start the task lead again with the answers.
    - A task that is `planned`: start one `task-lead` with the task text. Set `now`. When the lead returns, add the events (task state, commit, findings, screenshots). Upload the screenshots to the dashboard. Commit the ledger.
    - A task that is `blocked`: decide. Change the brief or the plan, or split the task, and start a new task lead. Two blocks on the same task: stop the run.
    - All tasks of a part are `done`: run the part check (below). Then mark the part done in its plan, copy the plan to the hub (`cmp`), set the part to `done`, and make the branch for the next part.
@@ -46,7 +47,7 @@ Do this in order. Each cycle does one step of the flow and then ends. `/loop` st
 
 ## Part check (after the last task of a part)
 
-Run these yourself or through the `tester`: `pnpm test`, `pnpm typecheck`, `pnpm build`, and the browser checks of the part. Read the screenshots of the part. If a check fails, add a task. Do not mark the part done on a fail.
+Run these yourself or through the `tester`: `pnpm test`, `pnpm typecheck`, `pnpm build`, and the full list of browser checks of the part (`node .claude/roadmap/browser/run-checks.mjs <list.json>`; it exits with 1 when a check fails). For a part with screens, start the `journey-tester` once over the whole part, from an empty state, and add its platform steps to the platform test script. A finding with no outcome (`fixed`, `accepted`, `open`) blocks the part. Read the screenshots of the part. If a check fails, add a task. Do not mark the part done on a fail.
 
 ## Marking a part done
 
