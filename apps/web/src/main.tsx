@@ -72,6 +72,16 @@ async function createPlatform(): Promise<{
       buildingStorage: 'file',
     };
   }
+  // Dev browser checks keep the in-memory dev store unless they ask for the real web store (mepapp.webLike=1).
+  if (devBuildingStore && localStorage.getItem('mepapp.webLike') !== '1') {
+    return {
+      fileAccess: new WebFileAccess(),
+      closeGuard: new WebCloseGuard(),
+      dialogs: new WebAppDialogs(),
+      makeBuildingStore: () => devBuildingStore,
+      buildingStorage: 'file',
+    };
+  }
   const webStores = createWebBuildingStores();
   return {
     fileAccess: new WebFileAccess(),
