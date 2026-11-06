@@ -8,15 +8,6 @@ export function sheetCount(file: BuildingFile, levelId: string): number {
   return file.sheets.filter((sheet) => sheet.levelId === levelId).length;
 }
 
-/** null when the level can be deleted; otherwise the reason for the tooltip. */
-export function deleteBlockedReason(file: BuildingFile, levelId: string): string | null {
-  const count = sheetCount(file, levelId);
-  if (count === 0) return null;
-  return count === 1
-    ? 'This level has 1 sheet. Move or remove the sheet first.'
-    : `This level has ${count} sheets. Move or remove the sheets first.`;
-}
-
 /** Name for a new level: "Level N", N = levels.length + 1 (same as addLevel with a blank name). */
 export function defaultLevelName(file: BuildingFile): string {
   return `Level ${file.levels.length + 1}`;

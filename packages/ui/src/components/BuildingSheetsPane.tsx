@@ -23,7 +23,6 @@ export interface PendingPdfsState {
   waitingPages: number;
   /** PDFs, pages and assigned pages over all added PDFs, also the pages that already have a level. */
   totals: { pdfs: number; pages: number; assigned: number };
-  add: (entries: PendingPdf[]) => void;
   remove: (key: string) => void;
 }
 
@@ -57,7 +56,6 @@ export function usePendingPdfs(file: BuildingFile | null): PendingPdfsState {
     waiting,
     waitingPages,
     totals: pdfTotals(groups.filter((group) => group.pending)),
-    add: (entries) => setPending((list) => [...list, ...entries.filter((entry) => !list.some((other) => isSamePdf(other, entry)))]),
     remove: (key) => setPending((list) => list.filter((pdf) => pdfGroupKey(pdf.projectUuid, pdf.path, pdf.fileName) !== key)),
   };
 }

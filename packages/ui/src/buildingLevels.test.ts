@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   countLabel,
   defaultLevelName,
-  deleteBlockedReason,
   deleteBlockedText,
   nextLevelElevation,
   restoreLevel,
@@ -34,26 +33,6 @@ describe('sheetCount', () => {
     expect(sheetCount(file, 'level-0')).toBe(2);
     expect(sheetCount(file, 'level-1')).toBe(1);
     expect(sheetCount(file, 'unknown')).toBe(0);
-  });
-});
-
-describe('deleteBlockedReason', () => {
-  it('returns null for a level with no sheet', () => {
-    expect(deleteBlockedReason(withLevels([0]), 'level-0')).toBeNull();
-  });
-
-  it('returns null for an unknown level id', () => {
-    expect(deleteBlockedReason(withLevels([0]), 'unknown')).toBeNull();
-  });
-
-  it('names one sheet in the singular', () => {
-    const file = withSheets(withLevels([0]), ['level-0']);
-    expect(deleteBlockedReason(file, 'level-0')).toBe('This level has 1 sheet. Move or remove the sheet first.');
-  });
-
-  it('names several sheets in the plural', () => {
-    const file = withSheets(withLevels([0]), ['level-0', 'level-0', 'level-0']);
-    expect(deleteBlockedReason(file, 'level-0')).toBe('This level has 3 sheets. Move or remove the sheets first.');
   });
 });
 
