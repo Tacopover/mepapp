@@ -286,3 +286,7 @@
 {"seq":286,"at":"2026-11-04T14:31:54.032Z","type":"shot","id":"S-B3-T13b-3","part":"B3","task":"B3-T13b","caption":"Result text: pages already on another level","assetId":"878990eaba6cc5b2d07ee056ff3b0868","url":"/_blob/878990eaba6cc5b2d07ee056ff3b0868"}
 {"seq":287,"at":"2026-11-04T14:31:54.074Z","type":"shot","id":"S-B3-T13c-1","part":"B3","task":"B3-T13c","caption":"Added PDF: Not opened yet","assetId":"706feb43846eca9b3bc6190ebb53fa53","url":"/_blob/706feb43846eca9b3bc6190ebb53fa53"}
 {"seq":288,"at":"2026-11-04T14:31:54.115Z","type":"shot","id":"S-B3-T13c-2","part":"B3","task":"B3-T13c","caption":"After Open: sheet linked, summary made","assetId":"a2d10b8e05eb3fb209ce5c96ba81bc07","url":"/_blob/a2d10b8e05eb3fb209ce5c96ba81bc07"}
+{"seq":289,"at":"2026-11-06T08:54:49.338Z","type":"decision","id":"D-B-51","status":"answered","answer":"B","by":"user","reason":"T19: summaries in IndexedDB, no folder pick."}
+{"seq":290,"at":"2026-11-06T08:54:50.246Z","type":"decision","id":"D-B-52","status":"answered","answer":"hidden browser storage with alert","by":"user","reason":"T19: Firefox/Safari keep the building in hidden browser storage; alert says to use Chrome or Edge to see or move the file."}
+{"seq":291,"at":"2026-11-06T08:54:50.880Z","type":"decision","id":"D-B-53","status":"answered","answer":"A","by":"user","reason":"T19: no PDF handles; the user picks a sheet PDF again."}
+{"seq":292,"at":"2026-11-06T08:54:54.913Z","type":"task","id":"B1-T19","part":"B1","state":"in_progress"}
