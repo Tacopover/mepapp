@@ -157,7 +157,15 @@ export function BuildingSummariesPane({ missing, other, onRebuild, onDone, fileA
                               type="button"
                               data-testid="repair-open"
                               disabled={sheetStatus[sheet.id] === 'pdf-missing'}
-                              title={sheetStatus[sheet.id] === 'pdf-missing' ? 'The PDF is missing. Relink it first.' : undefined}
+                              title={
+                                sheetStatus[sheet.id] === 'pdf-missing'
+                                  ? 'The PDF is missing. Relink it first.'
+                                  : canOpenPath
+                                    ? undefined
+                                    : fileAccess.readPath === undefined
+                                      ? 'This browser cannot open the PDF by itself. Choose the file again.'
+                                      : undefined
+                              }
                               aria-label={`${canOpenPath ? 'Open' : 'Choose file for'} ${sheet.location.fileName}`}
                               onClick={() => void openRow(sheet, canOpenPath ? 'path' : 'pick')}
                             >

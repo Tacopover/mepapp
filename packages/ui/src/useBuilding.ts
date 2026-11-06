@@ -1,18 +1,25 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import type { BuildingRef, BuildingStore, FileAccess } from '@mepapp/platform';
+import type { BuildingRef, BuildingStorageKind, BuildingStore, FileAccess } from '@mepapp/platform';
 import { BuildingController, type BuildingState } from './buildingController.js';
 
 export type UseBuilding = BuildingState &
-  Pick<BuildingController, 'create' | 'open' | 'openRecent' | 'importOldBuildings' | 'forgetRecent' | 'adopt' | 'update' | 'reload' | 'refreshSheetStatus' | 'dismissMessage'>;
+  Pick<
+    BuildingController,
+    'create' | 'open' | 'openRecent' | 'importOldBuildings' | 'forgetRecent' | 'adopt' | 'update' | 'reload' | 'refreshSheetStatus' | 'dismissMessage' | 'allowAccess' | 'saveCopy'
+  >;
 
 const unavailableStore = (): BuildingStore => {
   throw new Error('Buildings are not available in this build.');
 };
 
-export function useBuilding(args: { fileAccess: FileAccess; makeStore?: (ref: BuildingRef) => BuildingStore }): UseBuilding & { available: boolean } {
-  const { fileAccess, makeStore } = args;
+export function useBuilding(args: {
+  fileAccess: FileAccess;
+  makeStore?: (ref: BuildingRef, target?: unknown) => BuildingStore;
+  buildingStorage?: BuildingStorageKind;
+}): UseBuilding & { available: boolean } {
+  const { fileAccess, makeStore, buildingStorage } = args;
   const api = useMemo(() => {
-    const controller = new BuildingController({ fileAccess, makeStore: makeStore ?? unavailableStore });
+    const controller = new BuildingController({ fileAccess, makeStore: makeStore ?? unavailableStore, buildingStorage });
     return {
       subscribe: controller.subscribe.bind(controller),
       getState: controller.getState.bind(controller),
@@ -26,8 +33,10 @@ export function useBuilding(args: { fileAccess: FileAccess; makeStore?: (ref: Bu
       reload: controller.reload.bind(controller),
       refreshSheetStatus: controller.refreshSheetStatus.bind(controller),
       dismissMessage: controller.dismissMessage.bind(controller),
+      allowAccess: controller.allowAccess.bind(controller),
+      saveCopy: controller.saveCopy.bind(controller),
     };
-  }, [fileAccess, makeStore]);
+  }, [fileAccess, makeStore, buildingStorage]);
   const state = useSyncExternalStore(api.subscribe, api.getState);
   return {
     ...state,
@@ -41,6 +50,8 @@ export function useBuilding(args: { fileAccess: FileAccess; makeStore?: (ref: Bu
     reload: api.reload,
     refreshSheetStatus: api.refreshSheetStatus,
     dismissMessage: api.dismissMessage,
+    allowAccess: api.allowAccess,
+    saveCopy: api.saveCopy,
     available: makeStore !== undefined,
   };
 }

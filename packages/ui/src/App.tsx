@@ -129,7 +129,7 @@ import {
 import { useShowBuiltInStamps } from './builtInStampsSetting.js';
 import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
 import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
-import { libraryFolderOf, type AppDialogs, type BuildingRef, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore, type OpenedFile } from '@mepapp/platform';
+import { libraryFolderOf, type AppDialogs, type BuildingRef, type BuildingStorageKind, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore, type OpenedFile } from '@mepapp/platform';
 import './theme.css';
 
 // The project and the displayed page sizes of one document, read together.
@@ -169,7 +169,9 @@ export interface MepSketchAppProps {
   /** Yes/no questions: window.confirm on the web, a native dialog on desktop. */
   dialogs: AppDialogs;
   /** Creates the store of a building file from its ref. Without it the building features are unavailable. */
-  makeBuildingStore?: (ref: BuildingRef) => BuildingStore;
+  makeBuildingStore?: (ref: BuildingRef, target?: unknown) => BuildingStore;
+  /** Where a building lives: a picked file, inside the browser, or nowhere. Default 'file'. */
+  buildingStorage?: BuildingStorageKind;
   /** Gives the app shell the adopt action (null on unmount). The dev hook of the web app loads a building through it. */
   onBuildingReady?: (api: { adopt: (store: BuildingStore) => Promise<void> } | null) => void;
   /** Reads the PDFs of a building. Needed for Read summaries now. */
@@ -277,6 +279,7 @@ export function MepSketchApp({
   closeGuard,
   dialogs,
   makeBuildingStore,
+  buildingStorage,
   onBuildingReady,
   pdfEngine,
   onRebuildReady,
@@ -464,7 +467,7 @@ export function MepSketchApp({
   useEffect(() => saveCustomTemplates(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicTemplates), [customSchematicTemplates]);
   const [customSchematicSymbols, setCustomSchematicSymbols] = useState<SchematicSymbol[]>(() => loadCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicSymbols), [customSchematicSymbols]);
-  const buildingHook = useBuilding({ fileAccess, makeStore: makeBuildingStore });
+  const buildingHook = useBuilding({ fileAccess, makeStore: makeBuildingStore, buildingStorage });
   const buildingStore = buildingHook.building?.store;
   useEffect(() => {
     onBuildingReady?.({ adopt: buildingHook.adopt });
@@ -1087,6 +1090,7 @@ export function MepSketchApp({
           return (await fileAccess.readPath(path))?.file;
         });
         const whyUnreadable = async (sheet: BuildingSheet): Promise<string> => {
+          if (!fileAccess.readPath) return 'this browser cannot read a PDF without your help. Open the PDF in the viewer first, then try again';
           const path = sheet.location.path;
           if (path === undefined) return 'no path is stored for this PDF';
           if (!fileAccess.statPath) return 'this platform cannot read a PDF by path';

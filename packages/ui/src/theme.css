@@ -1743,6 +1743,32 @@
 .mep-buildings-message button {
   margin-left: 8px;
 }
+.mep-buildings-alert {
+  flex: none;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border: 1px solid #9a5b00;
+  border-radius: 4px;
+  color: var(--ink);
+}
+.mep-buildings-access {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
+  gap: 8px;
+  width: 100%;
+  max-width: 520px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.mep-buildings-access h4,
+.mep-buildings-access p {
+  margin: 0;
+}
 .mep-buildings-open-name {
   font-size: 15px;
   font-weight: 700;
@@ -2008,6 +2034,12 @@ button.mep-tree-arrow {
   outline-offset: 2px;
 }
 @media (max-width: 899px) {
+  .mep-buildings-access {
+    max-width: none;
+  }
+  .mep-buildings-access button {
+    width: 100%;
+  }
   .mep-buildings-layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
@@ -5828,7 +5860,7 @@ button.mep-tree-arrow {
 }
 .mep-srow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px 84px 92px 104px 64px;
+  grid-template-columns: minmax(0, 1fr) 96px 104px 92px 104px 64px;
   column-gap: 8px;
   align-items: center;
   box-sizing: border-box;
@@ -6109,7 +6141,7 @@ button.mep-tree-arrow {
     grid-column: 1 / -1;
   }
   .mep-srow {
-    grid-template-columns: minmax(0, 1fr) 84px 92px 104px 64px;
+    grid-template-columns: minmax(0, 1fr) 104px 92px 104px 64px;
     row-gap: 4px;
   }
   .mep-srow-name {
@@ -6146,7 +6178,7 @@ button.mep-tree-arrow {
   row-gap: 2px;
 }
 .mep-srows[data-fix='false'] .mep-srow {
-  grid-template-columns: minmax(0, 1fr) 96px 84px 104px 64px;
+  grid-template-columns: minmax(0, 1fr) 96px 104px 104px 64px;
 }
 .mep-srows[data-fix='false'] .mep-srow-cell--fix {
   display: none;
@@ -6164,7 +6196,7 @@ button.mep-tree-arrow {
 }
 @media (max-width: 899px) {
   .mep-srows[data-fix='false'] .mep-srow {
-    grid-template-columns: minmax(0, 1fr) 84px 104px 64px;
+    grid-template-columns: minmax(0, 1fr) 104px 104px 64px;
   }
   .mep-srows[data-fix='false'] .mep-srow-cell--move {
     grid-column: 3;

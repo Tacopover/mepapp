@@ -9,6 +9,16 @@ import { notPlacedAskText, sheetsWithoutSummary } from '../buildingStatus.js';
 import { useSheetRelink } from '../useSheetRelink.js';
 import { loadBuildings, loadImportedOldIds, pendingOldBuildings } from '../buildings.js';
 import {
+  accessCardText,
+  allowAccessLabel,
+  BLOCKED_STORAGE,
+  BROWSER_STORAGE_ALERT,
+  createButtonLabel,
+  importHint,
+  NEEDS_ACCESS_HINT,
+  openHint,
+} from '../buildingStorageText.js';
+import {
   buildingKey,
   buildTreeNodes,
   buildingWarnings,
@@ -221,6 +231,12 @@ export function ManageBuildingsDialog({
     });
   }
 
+  async function handleSaveCopy() {
+    if (building.busy) return;
+    const name = await building.saveCopy();
+    if (name) onNotice(`Saved a copy as ${name}.`, false);
+  }
+
   async function handleImportOld() {
     if (building.busy) return;
     const total = oldPending.length;
@@ -232,12 +248,13 @@ export function ManageBuildingsDialog({
   if (!building.available) {
     return (
       <Dialog title="Manage Buildings" onClose={onClose} closeOnBackdropClick={false} actions={<button onClick={onClose}>Close</button>}>
-        <p>Building files are not available in this version of the app. Use the desktop app.</p>
+        <p>{building.storage === 'blocked' ? BLOCKED_STORAGE : 'Building files are not available in this version of the app. Use the desktop app.'}</p>
       </Dialog>
     );
   }
 
   const openBuilding = building.building;
+  const needsAccess = building.needsAccess;
   const nodes = buildTreeNodes({
     recent: building.recent,
     open: openBuilding ? { file: openBuilding.file, location: openBuilding.ref.location } : null,
@@ -245,7 +262,35 @@ export function ManageBuildingsDialog({
     notPlacedCount: notPlaced,
     collapsed,
     expandedLevels,
-  });
+  }).map((node) =>
+    node.kind === 'building' && node.entry !== null && needsAccess !== null && node.entry.id === needsAccess.entry.id
+      ? { ...node, detail: NEEDS_ACCESS_HINT }
+      : node,
+  );
+  const hint = openHint(building.storage);
+  const card = needsAccess === null ? null : accessCardText(needsAccess.denied);
+  const accessCard =
+    needsAccess === null || card === null ? null : (
+      <div className="mep-buildings-access" data-testid="access-card">
+        <h4>{needsAccess.entry.name}</h4>
+        {card.denied !== null && (
+          <p role="alert" data-testid="access-denied">
+            {card.denied}
+          </p>
+        )}
+        <p>{card.line}</p>
+        <button
+          type="button"
+          className="primary"
+          data-testid="allow-access"
+          autoFocus
+          disabled={building.busy}
+          onClick={() => void building.allowAccess()}
+        >
+          {allowAccessLabel(building.busy)}
+        </button>
+      </div>
+    );
   const selected = resolveSelectedKey(selectedKey, openBuilding?.file ?? null, notPlaced);
   const focus = resolveFocusKey(focusKey, selected, nodes);
   const selectedNode = nodes.find((node) => node.key === selected) ?? null;
@@ -326,6 +371,8 @@ export function ManageBuildingsDialog({
           onNew={() => setCreating(true)}
           onOpen={() => guard('switch', () => void building.open())}
           onImport={() => void handleImportOld()}
+          onSaveCopy={openBuilding !== null && building.storage === 'browser' ? () => void handleSaveCopy() : undefined}
+          saveCopyDisabled={openBuilding === null}
         />
       </div>
       {openBuilding && (
@@ -430,27 +477,30 @@ export function ManageBuildingsDialog({
               onFocusKey={setFocusKey}
               onActivate={onActivate}
               onToggle={onToggle}
-              onForget={onForget}
+              onForget={building.storage === 'browser' ? undefined : onForget}
               autoFocus={nodes.length > 0}
             />
           )}
         </nav>
 
         <section className="mep-buildings-detail">
+          {building.storage === 'browser' && (
+            <p className="mep-hint mep-buildings-alert" role="status" data-testid="browser-storage-alert">
+              {BROWSER_STORAGE_ALERT}
+            </p>
+          )}
+
           {building.message && (
             <p className="mep-hint mep-buildings-message" role="alert">
               {building.message} <button type="button" onClick={() => building.dismissMessage()}>Dismiss</button>
             </p>
           )}
 
+          {openBuilding && accessCard}
+
           {(oldPending.length > 0 || importResult !== null) && (
             <div className="mep-buildings-strip" data-testid="import-old">
-              {oldPending.length > 0 && (
-                <p className="mep-hint">
-                  {countLabel(oldPending.length, 'old building')} can be imported. Open the Building menu and choose Import. MepApp asks
-                  where to save each building file. The old list stays unchanged.
-                </p>
-              )}
+              {oldPending.length > 0 && <p className="mep-hint">{importHint(oldPending.length, building.storage)}</p>}
               {importResult !== null && (
                 <p className="mep-hint" data-testid="import-old-result">
                   {importResult}
@@ -475,7 +525,7 @@ export function ManageBuildingsDialog({
                 }}
               />
               <button type="button" disabled={building.busy} onClick={handleCreate}>
-                Create…
+                {createButtonLabel(building.storage)}
               </button>
               <button
                 type="button"
@@ -490,9 +540,12 @@ export function ManageBuildingsDialog({
             </div>
           )}
 
+          {!openBuilding && accessCard}
+
           {!openBuilding && (
             <div className="mep-buildings-empty">
-              <p className="mep-hint">No building is open. Create a building or open a building file.</p>
+              {accessCard === null && <p className="mep-hint">No building is open. Create a building or open a building file.</p>}
+              {accessCard === null && hint !== null && <p className="mep-hint">{hint}</p>}
               <div className="mep-buildings-actions">
                 {!creating && (
                   <button

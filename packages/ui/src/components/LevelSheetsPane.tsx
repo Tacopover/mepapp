@@ -194,7 +194,7 @@ export function LevelSheetsPane({
                         type="button"
                         data-testid="open-sheet"
                         aria-label={`Choose file for ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                        title="Choose the PDF file to open this sheet"
+                        title={fileAccess.readPath === undefined ? 'This browser cannot open the PDF by itself. Choose the file again.' : 'Choose the PDF file to open this sheet'}
                         onClick={() => void openRow(sheet, 'pick')}
                       >
                         Choose file…

@@ -12,8 +12,8 @@ export interface BuildingTreeProps {
   onActivate: (node: TreeNode) => void;
   /** Left and Right on a building, or a click on its arrow. */
   onToggle: (key: string, expand: boolean) => void;
-  /** Delete on a building that is not open, or a click on its remove button. */
-  onForget: (node: TreeNode) => void;
+  /** Delete on a building that is not open, or a click on its remove button. Absent: no remove button and no Delete removal. */
+  onForget?: (node: TreeNode) => void;
   /** Focus the tree when it mounts. */
   autoFocus: boolean;
 }
@@ -44,6 +44,7 @@ export function BuildingTree({
   }
 
   function forget(node: TreeNode) {
+    if (onForget === undefined) return;
     const index = nodes.findIndex((item) => item.key === node.key);
     const nextKey = nodes[index + 1]?.key ?? nodes[index - 1]?.key ?? null;
     onForget(node);
@@ -57,7 +58,7 @@ export function BuildingTree({
       onActivate(node);
       return;
     }
-    if (event.key === 'Delete' && node.kind === 'building' && !node.isOpen) {
+    if (event.key === 'Delete' && onForget !== undefined && node.kind === 'building' && !node.isOpen) {
       event.preventDefault();
       forget(node);
       return;
@@ -123,7 +124,7 @@ export function BuildingTree({
             <span className="mep-tree-dot" role="img" aria-label="This sheet has a missing PDF or no access" title="This sheet has a missing PDF or no access" />
           )}
           {node.kind !== 'building' && node.detail !== null && <span className="mep-tree-count">{node.detail}</span>}
-          {node.kind === 'building' && !node.isOpen && (
+          {node.kind === 'building' && !node.isOpen && onForget !== undefined && (
             <button
               type="button"
               className="mep-tree-forget"

@@ -6,6 +6,9 @@ export interface BuildingRef {
   location: string;
 }
 
+/** 'file': the building is a file the user picked (Chrome, Edge, desktop). 'browser': kept inside the browser (no File System Access API). 'blocked': neither works. */
+export type BuildingStorageKind = 'file' | 'browser' | 'blocked';
+
 export interface BuildingStore extends BaseStore {
   /** The building file as an opaque JSON string with its revision, or undefined when absent. */
   read(): Promise<{ json: string; revision: string } | undefined>;

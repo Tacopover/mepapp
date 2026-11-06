@@ -7,10 +7,14 @@ export interface BuildingMenuProps {
   onNew: () => void;
   onOpen: () => void;
   onImport: () => void;
+  /** Shows the item "Save a copy…". Null or missing hides it. */
+  onSaveCopy?: () => void;
+  /** Disables "Save a copy…", e.g. when no building is open. */
+  saveCopyDisabled?: boolean;
 }
 
 /** The "Building" menu of the Manage Buildings header. Reuses the classes of the app menu. */
-export function BuildingMenu({ busy, importLabel, onNew, onOpen, onImport }: BuildingMenuProps) {
+export function BuildingMenu({ busy, importLabel, onNew, onOpen, onImport, onSaveCopy, saveCopyDisabled = false }: BuildingMenuProps) {
   const [shown, setShown] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -68,6 +72,18 @@ export function BuildingMenu({ busy, importLabel, onNew, onOpen, onImport }: Bui
           <button type="button" role="menuitem" className="mep-menu-item" disabled={busy} onClick={() => pick(onOpen)}>
             Open building…
           </button>
+          {onSaveCopy !== undefined && (
+            <button
+              type="button"
+              role="menuitem"
+              className="mep-menu-item"
+              data-testid="save-copy-button"
+              disabled={busy || saveCopyDisabled}
+              onClick={() => pick(onSaveCopy)}
+            >
+              Save a copy…
+            </button>
+          )}
           {importLabel !== null && (
             <>
               <div className="mep-menu-divider" />

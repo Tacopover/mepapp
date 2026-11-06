@@ -10,6 +10,7 @@ import {
 import {
   StoreConflictError,
   type BuildingRef,
+  type BuildingStorageKind,
   type BuildingStore,
   type FileAccess,
   type FileTarget,
@@ -43,6 +44,13 @@ export interface OpenBuilding {
   sheetSummary: Record<string, SheetSummaryInfo>;
 }
 
+/** A recent building whose file needs the user's permission before it can open. */
+export interface NeedsAccess {
+  entry: RecentBuilding;
+  /** True when the user refused the permission request. */
+  denied: boolean;
+}
+
 export interface BuildingState {
   building: OpenBuilding | null;
   recent: RecentBuilding[];
@@ -50,11 +58,17 @@ export interface BuildingState {
   message: string | null;
   /** True while create/open/openRecent runs. */
   busy: boolean;
+  /** The recent building that waits for the user's permission, or null. */
+  needsAccess: NeedsAccess | null;
+  /** Where the buildings live in this build. Set by the args; default 'file'. */
+  storage: BuildingStorageKind;
 }
 
 export interface BuildingControllerArgs {
   fileAccess: FileAccess;
-  makeStore: (ref: BuildingRef) => BuildingStore;
+  makeStore: (ref: BuildingRef, target?: unknown) => BuildingStore;
+  /** Where the buildings live: a picked file, inside the browser, or nowhere. Default 'file'. */
+  buildingStorage?: BuildingStorageKind;
   /** Storage for the recent list; defaults to localStorage (see recentBuildings.ts). */
   storage?: Pick<Storage, 'getItem' | 'setItem'>;
   /** Defaults to crypto.randomUUID. */
@@ -64,6 +78,8 @@ export interface BuildingControllerArgs {
 export const BUILDING_FILE_TYPES: FileTypeFilter[] = [
   { description: 'Building file', mimeType: 'application/json', extensions: ['json'] },
 ];
+
+export const BROWSER_LOCATION = 'Kept inside this browser';
 
 const CONFLICT_MESSAGE = 'The building file changed on disk. Your last change was not saved.';
 
@@ -93,7 +109,7 @@ export class BuildingController {
   private state: BuildingState;
   private readonly listeners = new Set<() => void>();
   private readonly fileAccess: FileAccess;
-  private readonly makeStore: (ref: BuildingRef) => BuildingStore;
+  private readonly makeStore: (ref: BuildingRef, target?: unknown) => BuildingStore;
   private readonly storage: Pick<Storage, 'getItem' | 'setItem'> | undefined;
   private readonly newId: () => string;
   /** Advances when the open building changes or a conflict drops the queued writes. */
@@ -102,13 +118,22 @@ export class BuildingController {
   private writeChain: Promise<void> = Promise.resolve();
   /** The JSON that the store holds, or that the open building was loaded from. */
   private lastJson = '';
+  /** The store of the building that waits for permission (see needsAccess). */
+  private accessStore: BuildingStore | undefined;
 
   constructor(args: BuildingControllerArgs) {
     this.fileAccess = args.fileAccess;
     this.makeStore = args.makeStore;
     this.storage = args.storage;
     this.newId = args.newId ?? (() => crypto.randomUUID());
-    this.state = { building: null, recent: loadRecentBuildings(args.storage), message: null, busy: false };
+    this.state = {
+      building: null,
+      recent: loadRecentBuildings(args.storage),
+      message: null,
+      busy: false,
+      needsAccess: null,
+      storage: args.buildingStorage ?? 'file',
+    };
   }
 
   getState(): BuildingState {
@@ -128,6 +153,11 @@ export class BuildingController {
     const json = serializeBuildingFile(file);
     const suggested = `${title.replace(/[\\/:*?"<>|]/g, '-')}.building.json`;
     try {
+      if (this.state.storage === 'browser') {
+        const ref: BuildingRef = { id: file.id, name: title, location: BROWSER_LOCATION };
+        await this.busy(() => this.loadInto(this.makeStore(ref), ref, json));
+        return;
+      }
       const saved: SavedFile | undefined = await this.fileAccess.saveFileAs(
         suggested,
         BUILDING_FILE_TYPES,
@@ -135,7 +165,7 @@ export class BuildingController {
       );
       if (saved === undefined) return;
       const ref: BuildingRef = { id: file.id, name: title, location: locationOf(saved.target, saved.name) };
-      await this.busy(() => this.loadInto(this.makeStore(ref), ref, json));
+      await this.busy(() => this.loadInto(this.makeStore(ref, saved.target), ref, json));
     } catch (error) {
       this.setState({ message: `Could not create the building: ${messageOf(error)}` });
     }
@@ -148,8 +178,16 @@ export class BuildingController {
       await this.busy(async () => {
         const text = await opened.file.text();
         const parsed = parseBuildingFile(JSON.parse(text));
+        if (this.state.storage === 'browser') {
+          const ref: BuildingRef = { id: parsed.id, name: parsed.name, location: BROWSER_LOCATION };
+          const store = this.makeStore(ref);
+          await this.writeChain;
+          await store.write(text);
+          await this.loadInto(store, ref, text);
+          return;
+        }
         const ref: BuildingRef = { id: parsed.id, name: parsed.name, location: locationOf(opened.target, opened.file.name) };
-        await this.loadInto(this.makeStore(ref), ref, text);
+        await this.loadInto(this.makeStore(ref, opened.target), ref, text);
       });
     } catch (error) {
       const prefix = isInvalidFile(error) ? 'This is not a valid building file' : 'Could not open the building';
@@ -165,6 +203,14 @@ export class BuildingController {
         try {
           const file = importOldRegistry([building])[0];
           const json = serializeBuildingFile(file);
+          if (this.state.storage === 'browser') {
+            const entry: RecentBuilding = { id: file.id, name: file.name, location: BROWSER_LOCATION };
+            await this.makeStore(entry).write(json);
+            this.setState({ recent: this.remember(entry) });
+            markOldImported([building.id], this.storage);
+            result.saved += 1;
+            continue;
+          }
           const suggested = `${building.name.replace(/[\\/:*?"<>|]/g, '-')}.building.json`;
           const saved: SavedFile | undefined = await this.fileAccess.saveFileAs(
             suggested,
@@ -176,6 +222,7 @@ export class BuildingController {
             continue;
           }
           const entry: RecentBuilding = { id: file.id, name: file.name, location: locationOf(saved.target, saved.name) };
+          this.makeStore(entry, saved.target);
           this.setState({ recent: this.remember(entry) });
           markOldImported([building.id], this.storage);
           result.saved += 1;
@@ -188,25 +235,80 @@ export class BuildingController {
   }
 
   async openRecent(entry: RecentBuilding): Promise<void> {
+    this.setState({ needsAccess: null });
     try {
       await this.busy(async () => {
         const store = this.makeStore(entry);
-        const stored = await store.read();
-        if (stored === undefined || (JSON.parse(stored.json) as { id?: unknown }).id !== entry.id) {
+        const status = await store.status();
+        if (status === 'unavailable') {
           this.setState({ message: `The building file "${entry.name}" was not found. Use Open building… to find it.` });
           return;
         }
-        await this.loadInto(store, entry, stored.json);
+        if (status === 'needs-permission') {
+          this.accessStore = store;
+          this.setState({ needsAccess: { entry, denied: false } });
+          return;
+        }
+        await this.openWithStore(store, entry);
       });
     } catch (error) {
       this.setState({ message: `Could not open the building: ${messageOf(error)}` });
     }
   }
 
+  /** Asks for the permission of the recent building that waits for it. The request runs inside the click, so the first await is the request. */
+  async allowAccess(): Promise<void> {
+    const pending = this.state.needsAccess;
+    if (pending === null) return;
+    const { entry } = pending;
+    const store = this.accessStore ?? this.makeStore(entry);
+    try {
+      await this.busy(async () => {
+        const status = await store.requestAccess();
+        if (status === 'unavailable') {
+          this.setState({
+            needsAccess: null,
+            message: `The building file "${entry.name}" was not found. Use Open building… to find it.`,
+          });
+          return;
+        }
+        if (status !== 'ready') {
+          this.setState({ needsAccess: { entry, denied: true } });
+          return;
+        }
+        this.setState({ needsAccess: null });
+        await this.openWithStore(store, entry);
+      });
+    } catch (error) {
+      this.setState({ message: `Could not open the building: ${messageOf(error)}` });
+    }
+  }
+
+  /** Saves a copy of the open building through saveFileAs. Returns the saved file name, or undefined when the user cancels or no building is open. */
+  async saveCopy(): Promise<string | undefined> {
+    await this.writeChain;
+    const building = this.state.building;
+    if (building === null) return undefined;
+    const json = serializeBuildingFile(building.file);
+    const suggested = `${building.file.name.replace(/[\\/:*?"<>|]/g, '-')}.building.json`;
+    try {
+      const saved: SavedFile | undefined = await this.fileAccess.saveFileAs(
+        suggested,
+        BUILDING_FILE_TYPES,
+        new Blob([json], { type: 'application/json' }),
+      );
+      return saved?.name;
+    } catch (error) {
+      this.setState({ message: `Could not save a copy: ${messageOf(error)}` });
+      return undefined;
+    }
+  }
+
   forgetRecent(id: string): void {
     const list = removeRecentBuilding(this.state.recent, id);
     saveRecentBuildings(list, this.storage);
-    this.setState({ recent: list });
+    const needsAccess = this.state.needsAccess?.entry.id === id ? null : this.state.needsAccess;
+    this.setState({ recent: list, needsAccess });
   }
 
   async adopt(store: BuildingStore, location = 'dev'): Promise<void> {
@@ -255,7 +357,7 @@ export class BuildingController {
   async close(): Promise<void> {
     await this.writeChain;
     this.generation += 1;
-    this.setState({ building: null, message: null });
+    this.setState({ building: null, message: null, needsAccess: null });
   }
 
   async reload(): Promise<void> {
@@ -338,7 +440,7 @@ export class BuildingController {
     const shown = { ...building, file: sortLevelsByElevation(building.file) };
     this.generation += 1;
     this.lastJson = serializeBuildingFile(shown.file);
-    this.setState({ building: shown, message: null, recent: recent ?? this.state.recent });
+    this.setState({ building: shown, message: null, recent: recent ?? this.state.recent, needsAccess: null });
   }
 
   private async busy(task: () => Promise<void>): Promise<void> {
@@ -350,8 +452,31 @@ export class BuildingController {
     }
   }
 
+  private async openWithStore(store: BuildingStore, entry: RecentBuilding): Promise<void> {
+    const stored = await store.read();
+    if (stored === undefined || (JSON.parse(stored.json) as { id?: unknown }).id !== entry.id) {
+      this.setState({ message: `The building file "${entry.name}" was not found. Use Open building… to find it.` });
+      return;
+    }
+    await this.loadInto(store, entry, stored.json);
+  }
+
+  /** True when the store can read and write. Otherwise sets needsAccess (and returns false) or throws. */
+  private async ensureAccess(store: BuildingStore, ref: BuildingRef): Promise<boolean> {
+    let status = await store.status();
+    if (status === 'needs-permission') status = await store.requestAccess();
+    if (status === 'ready') return true;
+    if (status === 'needs-permission') {
+      this.accessStore = store;
+      this.setState({ needsAccess: { entry: { id: ref.id, name: ref.name, location: ref.location }, denied: false } });
+      return false;
+    }
+    throw new Error('The building file is not available.');
+  }
+
   private async loadInto(store: BuildingStore, ref: BuildingRef, json: string): Promise<void> {
     await this.writeChain;
+    if (!(await this.ensureAccess(store, ref))) return;
     if (!store.capabilities.persistent) await store.write(json);
     let stored = await store.read();
     if (stored === undefined) {

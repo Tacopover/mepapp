@@ -3,9 +3,10 @@ import { MepSketchApp, type PdfPageLoadResult } from '@mepapp/ui';
 import { displayDimensions } from '@mepapp/core';
 import { MupdfEngine } from '@mepapp/pdf-engine-mupdf';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
-import type { AppDialogs, BuildingRef, BuildingStore, CloseGuard, FileAccess } from '@mepapp/platform';
+import type { AppDialogs, BuildingRef, BuildingStorageKind, BuildingStore, CloseGuard, FileAccess } from '@mepapp/platform';
 import {
   createDevBuildingStore,
+  createWebBuildingStores,
   IndexedDbLibraryStore,
   WebAppDialogs,
   WebCloseGuard,
@@ -55,7 +56,8 @@ async function createPlatform(): Promise<{
   fileAccess: FileAccess;
   closeGuard: CloseGuard;
   dialogs: AppDialogs;
-  makeBuildingStore?: (ref: BuildingRef) => BuildingStore;
+  makeBuildingStore?: (ref: BuildingRef, target?: unknown) => BuildingStore;
+  buildingStorage?: BuildingStorageKind;
 }> {
   if (isTauri) {
     const { TauriAppDialogs, TauriCloseGuard, TauriFileAccess, createTauriBuildingStore } = await import('@mepapp/platform-tauri');
@@ -67,13 +69,16 @@ async function createPlatform(): Promise<{
         const i = Math.max(ref.location.lastIndexOf('/'), ref.location.lastIndexOf('\\'));
         return createTauriBuildingStore(ref.location.slice(0, i), ref.location.slice(i + 1));
       },
+      buildingStorage: 'file',
     };
   }
+  const webStores = createWebBuildingStores();
   return {
     fileAccess: new WebFileAccess(),
     closeGuard: new WebCloseGuard(),
     dialogs: new WebAppDialogs(),
-    makeBuildingStore: devBuildingStore ? () => devBuildingStore : undefined,
+    makeBuildingStore: webStores.storage === 'blocked' ? undefined : webStores.make,
+    buildingStorage: webStores.storage,
   };
 }
 
@@ -102,9 +107,9 @@ async function devReadPath(path: string): ReturnType<NonNullable<FileAccess['rea
 
 const container = document.getElementById('root');
 if (container) {
-  void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs, makeBuildingStore }) => {
+  void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs, makeBuildingStore, buildingStorage }) => {
     const fileAccess: FileAccess =
-      import.meta.env.DEV && platformFileAccess.statPath === undefined
+      import.meta.env.DEV && localStorage.getItem('mepapp.webLike') !== '1' && platformFileAccess.statPath === undefined
         ? Object.assign(Object.create(platformFileAccess), { statPath: devStatPath, readPath: devReadPath })
         : platformFileAccess;
     createRoot(container).render(
@@ -119,6 +124,7 @@ if (container) {
         closeGuard={closeGuard}
         dialogs={dialogs}
         makeBuildingStore={makeBuildingStore}
+        buildingStorage={buildingStorage}
         onBuildingReady={
           import.meta.env.DEV
             ? (api) => {

@@ -8,10 +8,10 @@ import {
   type BuildingFile,
   type BuildingSheet,
 } from '@mepapp/core';
-import { MemoryBuildingStore, type BuildingRef, type BuildingStore, type FileAccess } from '@mepapp/platform';
+import { MemoryBuildingStore, type BuildingRef, type BuildingStorageKind, type BuildingStore, type FileAccess } from '@mepapp/platform';
 import { describe, expect, it, vi } from 'vitest';
 import { IMPORTED_OLD_BUILDINGS_KEY, type Building } from './buildings.js';
-import { BuildingController } from './buildingController.js';
+import { BROWSER_LOCATION, BuildingController } from './buildingController.js';
 import { RECENT_BUILDINGS_KEY } from './recentBuildings.js';
 
 const CONFLICT = 'The building file changed on disk. Your last change was not saved.';
@@ -27,7 +27,7 @@ function fakeStorage() {
   };
 }
 
-function setup(options: { saveFileAs?: () => Promise<unknown>; openFile?: () => Promise<unknown> } = {}) {
+function setup(options: { saveFileAs?: () => Promise<unknown>; openFile?: () => Promise<unknown>; buildingStorage?: BuildingStorageKind } = {}) {
   const storage = fakeStorage();
   const stores = new Map<string, MemoryBuildingStore>();
   let counter = 0;
@@ -46,6 +46,7 @@ function setup(options: { saveFileAs?: () => Promise<unknown>; openFile?: () => 
   const controller = new BuildingController({
     fileAccess,
     makeStore,
+    buildingStorage: options.buildingStorage,
     storage,
     newId: () => `b-${++counter}`,
   });
@@ -555,5 +556,222 @@ describe('BuildingController refreshSheetStatus', () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(controller.getState().building?.revision).toBe(revision);
     expect(controller.getState().building?.sheetStatus).toEqual({ 's-1': 'ok' });
+  });
+});
+
+function gatedStore(json: string, initial: StoreAccess, granted: StoreAccess, calls: string[]): BuildingStore {
+  const store = new MemoryBuildingStore({ json });
+  let access = initial;
+  const read = store.read.bind(store);
+  store.status = async () => access;
+  store.requestAccess = async () => {
+    calls.push('requestAccess');
+    access = granted;
+    return access;
+  };
+  store.read = async () => {
+    calls.push('read');
+    return read();
+  };
+  return store;
+}
+
+type StoreAccess = 'ready' | 'needs-permission' | 'unavailable';
+
+describe('BuildingController recent building with access', () => {
+  const towerJson = serializeBuildingFile(emptyBuilding('b-1', 'Tower'));
+  const entry = { id: 'b-1', name: 'Tower', location: 'Tower.building.json' };
+  const controllerFor = (store: BuildingStore) =>
+    new BuildingController({ fileAccess: {} as FileAccess, makeStore: () => store, storage: fakeStorage(), newId: () => 'b-1' });
+
+  it('keeps a recent building that needs permission out of the view and reads nothing', async () => {
+    const calls: string[] = [];
+    const controller = controllerFor(gatedStore(towerJson, 'needs-permission', 'ready', calls));
+    await controller.openRecent(entry);
+    expect(controller.getState().needsAccess).toEqual({ entry, denied: false });
+    expect(controller.getState().building).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it('opens the building and clears needsAccess when the user allows the access', async () => {
+    const calls: string[] = [];
+    const controller = controllerFor(gatedStore(towerJson, 'needs-permission', 'ready', calls));
+    await controller.openRecent(entry);
+    await controller.allowAccess();
+    expect(controller.getState().building?.file.name).toBe('Tower');
+    expect(controller.getState().needsAccess).toBeNull();
+    expect(calls[0]).toBe('requestAccess');
+    expect(calls).toContain('read');
+  });
+
+  it('marks needsAccess as denied and loads nothing when the user refuses the access', async () => {
+    const calls: string[] = [];
+    const controller = controllerFor(gatedStore(towerJson, 'needs-permission', 'needs-permission', calls));
+    await controller.openRecent(entry);
+    await controller.allowAccess();
+    expect(controller.getState().needsAccess).toEqual({ entry, denied: true });
+    expect(controller.getState().building).toBeNull();
+    expect(calls).toEqual(['requestAccess']);
+  });
+
+  it('gives the not-found message when the recent file is unavailable', async () => {
+    const controller = controllerFor(gatedStore(towerJson, 'unavailable', 'ready', []));
+    await controller.openRecent(entry);
+    expect(controller.getState().building).toBeNull();
+    expect(controller.getState().message).toBe('The building file "Tower" was not found. Use Open building… to find it.');
+  });
+
+  it('gives the not-found message and no denial when the file is unavailable after the access request', async () => {
+    const controller = controllerFor(gatedStore(towerJson, 'needs-permission', 'unavailable', []));
+    await controller.openRecent(entry);
+    await controller.allowAccess();
+    expect(controller.getState().needsAccess).toBeNull();
+    expect(controller.getState().building).toBeNull();
+    expect(controller.getState().message).toBe('The building file "Tower" was not found. Use Open building… to find it.');
+  });
+
+  it('passes the saved file handle to makeStore on create', async () => {
+    const target = { handle: 'h-1' };
+    const makeStore = vi.fn((_ref: BuildingRef, _target?: unknown) => new MemoryBuildingStore());
+    const fileAccess = { saveFileAs: vi.fn(async () => ({ name: 'Tower.building.json', target })) } as unknown as FileAccess;
+    const controller = new BuildingController({ fileAccess, makeStore, storage: fakeStorage(), newId: () => 'b-1' });
+    await controller.create('Tower');
+    expect(makeStore).toHaveBeenCalledWith(expect.objectContaining({ id: 'b-1' }), target);
+  });
+
+  it('passes the opened file handle to makeStore on open', async () => {
+    const target = { handle: 'h-2' };
+    const json = serializeBuildingFile(emptyBuilding('b-2', 'Tower'));
+    const makeStore = vi.fn((_ref: BuildingRef, _target?: unknown) => new MemoryBuildingStore());
+    const fileAccess = {
+      openFile: vi.fn(async () => ({ file: new File([json], 'Tower.building.json'), target })),
+    } as unknown as FileAccess;
+    const controller = new BuildingController({ fileAccess, makeStore, storage: fakeStorage(), newId: () => 'b-1' });
+    await controller.open();
+    expect(makeStore).toHaveBeenCalledWith(expect.objectContaining({ id: 'b-2' }), target);
+  });
+
+  it('passes the saved file handle to makeStore on import', async () => {
+    const target = { handle: 'h-3' };
+    const annex: Building = { id: 'old-2', name: 'Annex', levels: [] };
+    const makeStore = vi.fn((_ref: BuildingRef, _target?: unknown) => new MemoryBuildingStore());
+    const fileAccess = { saveFileAs: vi.fn(async () => ({ name: 'Annex.building.json', target })) } as unknown as FileAccess;
+    const controller = new BuildingController({ fileAccess, makeStore, storage: fakeStorage() });
+    await controller.importOldBuildings([annex]);
+    expect(makeStore).toHaveBeenCalledWith(expect.objectContaining({ id: 'old-2' }), target);
+  });
+});
+
+describe('BuildingController browser storage', () => {
+  it('create keeps the building inside the browser and never asks for a file', async () => {
+    const { controller, fileAccess, stores } = setup({ buildingStorage: 'browser' });
+    await controller.create('Tower');
+    expect(fileAccess.saveFileAs).not.toHaveBeenCalled();
+    expect(controller.getState().storage).toBe('browser');
+    expect(controller.getState().building?.ref.location).toBe(BROWSER_LOCATION);
+    expect(controller.getState().building?.file.name).toBe('Tower');
+    const stored = JSON.parse((await stores.get('b-1')!.read())!.json) as { name: string };
+    expect(stored.name).toBe('Tower');
+  });
+
+  it('waits for a queued write of the open building before the chosen file overwrites it', async () => {
+    const json = serializeBuildingFile(emptyBuilding('b-1', 'Replaced'));
+    const { controller, stores } = setup({
+      buildingStorage: 'browser',
+      openFile: async () => ({ file: new File([json], 'Replaced.building.json') }),
+    });
+    await controller.create('Tower');
+    const store = stores.get('b-1')!;
+    const write = store.write.bind(store);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const completed: string[] = [];
+    let gated = false;
+    store.write = async (text: string, expectedRevision?: string) => {
+      if (!gated) {
+        gated = true;
+        await gate;
+      }
+      const result = await write(text, expectedRevision);
+      completed.push(text);
+      return result;
+    };
+    const pending = controller.update((file) => addLevel(file, 'Ground', 0, 'L1'));
+    const opening = controller.open();
+    for (let tick = 0; tick < 20; tick += 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+    release();
+    await Promise.all([pending, opening]);
+    expect(controller.getState().message).toBeNull();
+    expect(controller.getState().building?.file.name).toBe('Replaced');
+    expect(completed[0]).toContain('"Ground"');
+    expect(completed[1]).toBe(json);
+  });
+
+  it('open writes the chosen file into the browser store over an older copy, then loads it', async () => {
+    const json = serializeBuildingFile(addLevel(emptyBuilding('b-2', 'Tower'), 'Ground', 0, 'L1'));
+    const { controller, stores } = setup({
+      buildingStorage: 'browser',
+      openFile: async () => ({ file: new File([json], 'Tower.building.json') }),
+    });
+    stores.set('b-2', new MemoryBuildingStore({ json: serializeBuildingFile(emptyBuilding('b-2', 'Old copy')) }));
+    await controller.open();
+    expect(controller.getState().building?.file.name).toBe('Tower');
+    expect(controller.getState().building?.file.levels).toHaveLength(1);
+    expect(controller.getState().building?.ref.location).toBe(BROWSER_LOCATION);
+    const stored = JSON.parse((await stores.get('b-2')!.read())!.json) as { name: string };
+    expect(stored.name).toBe('Tower');
+  });
+
+  it('import saves every building in the browser store and never asks for a file', async () => {
+    const { controller, fileAccess, stores, storage } = setup({ buildingStorage: 'browser' });
+    const buildings: Building[] = [
+      { id: 'old-1', name: 'Tower', levels: [] },
+      { id: 'old-2', name: 'Annex', levels: [] },
+    ];
+    const result = await controller.importOldBuildings(buildings);
+    expect(result).toEqual({ saved: 2, cancelled: 0, failed: [] });
+    expect(fileAccess.saveFileAs).not.toHaveBeenCalled();
+    expect(stores.has('old-1')).toBe(true);
+    expect(stores.has('old-2')).toBe(true);
+    expect(controller.getState().recent.map((entry) => entry.location)).toEqual([BROWSER_LOCATION, BROWSER_LOCATION]);
+    expect(JSON.parse(storage.data.get(IMPORTED_OLD_BUILDINGS_KEY) ?? '[]').sort()).toEqual(['old-1', 'old-2']);
+  });
+});
+
+describe('BuildingController saveCopy', () => {
+  it('saves the building JSON through saveFileAs and returns the saved name', async () => {
+    const { controller, fileAccess } = setup({
+      saveFileAs: vi
+        .fn()
+        .mockResolvedValueOnce({ name: 'Tower.building.json', target: undefined })
+        .mockResolvedValueOnce({ name: 'Copy.building.json', target: undefined }),
+    });
+    await controller.create('Tower');
+    await expect(controller.saveCopy()).resolves.toBe('Copy.building.json');
+    const [suggested, , blob] = fileAccess.saveFileAs.mock.calls[1] as [string, unknown, Blob];
+    expect(suggested).toBe('Tower.building.json');
+    expect(await blob.text()).toBe(serializeBuildingFile(controller.getState().building!.file));
+  });
+
+  it('returns undefined when the user cancels', async () => {
+    const { controller } = setup({
+      saveFileAs: vi
+        .fn()
+        .mockResolvedValueOnce({ name: 'Tower.building.json', target: undefined })
+        .mockResolvedValueOnce(undefined),
+    });
+    await controller.create('Tower');
+    await expect(controller.saveCopy()).resolves.toBeUndefined();
+    expect(controller.getState().message).toBeNull();
+  });
+
+  it('returns undefined when no building is open', async () => {
+    const { controller, fileAccess } = setup();
+    await expect(controller.saveCopy()).resolves.toBeUndefined();
+    expect(fileAccess.saveFileAs).not.toHaveBeenCalled();
   });
 });
