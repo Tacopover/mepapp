@@ -34,6 +34,8 @@ export interface LevelSheetsPaneProps {
   highlight?: { sheetId: string; seq: number } | null;
   /** The sheets whose PDF is open in the viewer. Their Open button shows "Opened" and is disabled. */
   openedSheetIds?: ReadonlySet<string>;
+  /** True when the PDF of the sheet was given to the app in this tab. Its row then opens without a picker. */
+  canOpenCached?: (sheet: BuildingSheet) => boolean;
 }
 
 const NO_OPENED_SHEETS: ReadonlySet<string> = new Set();
@@ -80,6 +82,7 @@ export function LevelSheetsPane({
   relinker,
   highlight = null,
   openedSheetIds = NO_OPENED_SHEETS,
+  canOpenCached,
 }: LevelSheetsPaneProps) {
   const groups = rowGroups(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
@@ -186,6 +189,16 @@ export function LevelSheetsPane({
                         aria-label={`Open ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
                         title={status === 'pdf-missing' ? 'The PDF is missing. Relink it first.' : 'Open this sheet'}
                         onClick={() => void openRow(sheet, 'path')}
+                      >
+                        Open
+                      </button>
+                    ) : canOpenCached?.(sheet) === true ? (
+                      <button
+                        type="button"
+                        data-testid="open-sheet"
+                        aria-label={`Open ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
+                        title="Open this sheet"
+                        onClick={() => void openRow(sheet, 'pick')}
                       >
                         Open
                       </button>

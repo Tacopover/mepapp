@@ -1,6 +1,6 @@
 # Test script B1-T19: buildings in the browser
 
-For one PC. Use Chrome (steps 1 to 12) and Firefox (steps 13 to 17). Use the test build of the branch `worktree-buildings-t19`. Fake pickers cannot prove these steps.
+For one PC. Use Chrome (steps 1 to 12) and Firefox (steps 13 to 17). Use the test build of the branch `worktree-buildings-t19`. Fake pickers cannot prove these steps. Check: the button of each sheet says "Open". Click "Open" on one sheet. Check: the PDF opens in the viewer and no file window opens. The app keeps the picked file in memory for this tab only. A real picker proves that the kept file handle still reads the file.
 
 ## Chrome
 

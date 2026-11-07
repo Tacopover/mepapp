@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BuildingFile } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
-import type { FileAccess } from '@mepapp/platform';
+import type { FileAccess, OpenedFile } from '@mepapp/platform';
 import { BUILDING_PDF_TYPES, joinFolderPath, pathOfTarget, readPdfInfo } from '../buildingPdfInfo.js';
 import {
   addResultText,
@@ -69,13 +69,14 @@ export interface BuildingSheetsPaneProps {
   levelId: string | null;
   onRefreshStatus: () => void;
   onNotice: (text: string, error: boolean) => void;
+  onFilesRead?: (opened: OpenedFile[]) => void;
 }
 
 /**
  * The action row that adds PDFs from disk to the selected level: "Add PDFs…" (one or more files) and "Add folder…" (desktop only).
  * The pages go to that level at once. The result text stays below the row until the next add, a dismiss or a level change.
  */
-export function BuildingSheetsPane({ fileAccess, engine, file, update, levelId, onRefreshStatus, onNotice }: BuildingSheetsPaneProps) {
+export function BuildingSheetsPane({ fileAccess, engine, file, update, levelId, onRefreshStatus, onNotice, onFilesRead }: BuildingSheetsPaneProps) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ text: string; error: boolean; levelId: string | null } | null>(null);
   const levelSelected = file.levels.some((item) => item.id === levelId);
@@ -120,7 +121,9 @@ export function BuildingSheetsPane({ fileAccess, engine, file, update, levelId, 
       notify(`Could not open the file picker: ${(err as Error).message}`);
       return null;
     });
-    if (opened === null || opened.length === 0 || engine === undefined || level === undefined) return;
+    if (opened === null || opened.length === 0) return;
+    onFilesRead?.(opened);
+    if (engine === undefined || level === undefined) return;
     restoreRef.current = 'add';
     setBusy(true);
     try {
@@ -182,6 +185,7 @@ export function BuildingSheetsPane({ fileAccess, engine, file, update, levelId, 
         notify(`No PDF files in ${picked.name}.`);
         return;
       }
+      onFilesRead?.(files.map((file) => ({ file })));
       const added: PendingPdf[] = [];
       const failed: string[] = [];
       let skippedDuplicates = 0;

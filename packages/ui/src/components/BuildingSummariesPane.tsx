@@ -23,6 +23,8 @@ export interface BuildingSummariesPaneProps {
   sheetStatus: Record<string, SheetStatus>;
   onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
   onNotice: (text: string, error: boolean) => void;
+  /** True when the PDF of the sheet was given to the app in this tab. Its row then opens without a picker. */
+  canOpenCached?: (sheet: BuildingSheet) => boolean;
 }
 
 interface Progress {
@@ -37,7 +39,7 @@ interface Progress {
  * The line of the count names the sheets that can be read now. A second line names the sheets that cannot be read now.
  * The pane shows when either count is above 0, a run is going, or a last result is shown. The count line and the button need missing above 0. The second line needs other above 0.
  */
-export function BuildingSummariesPane({ missing, other, onRebuild, onDone, fileAccess, relinker, sheetStatus, onOpenSheet, onNotice }: BuildingSummariesPaneProps) {
+export function BuildingSummariesPane({ missing, other, onRebuild, onDone, fileAccess, relinker, sheetStatus, onOpenSheet, onNotice, canOpenCached }: BuildingSummariesPaneProps) {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<Progress>({ done: 0, total: 0, name: '' });
   const [last, setLast] = useState<{ result: RebuildResult | undefined; error?: string } | null>(null);
@@ -140,7 +142,8 @@ export function BuildingSummariesPane({ missing, other, onRebuild, onDone, fileA
                     {last.result.failed.map((failure) => {
                       const sheet = failure.sheet;
                       const ask = relinker.askFor(sheet.id, REPAIR_ORIGIN);
-                      const canOpenPath = sheet.location.path !== undefined && fileAccess.readPath !== undefined;
+                      const canOpenByPath = sheet.location.path !== undefined && fileAccess.readPath !== undefined;
+                      const canOpenPath = canOpenByPath || canOpenCached?.(sheet) === true;
                       return (
                         <li key={sheet.id}>
                           <b>{sheet.location.fileName}</b>: {failure.reason}
@@ -167,7 +170,7 @@ export function BuildingSummariesPane({ missing, other, onRebuild, onDone, fileA
                                       : undefined
                               }
                               aria-label={`${canOpenPath ? 'Open' : 'Choose file for'} ${sheet.location.fileName}`}
-                              onClick={() => void openRow(sheet, canOpenPath ? 'path' : 'pick')}
+                              onClick={() => void openRow(sheet, canOpenByPath ? 'path' : 'pick')}
                             >
                               {canOpenPath ? 'Open' : 'Choose file…'}
                             </button>

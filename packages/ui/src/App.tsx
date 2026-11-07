@@ -81,6 +81,7 @@ import { CalibrationDialog } from './components/CalibrationDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRenames } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog, type SheetOpenResult } from './components/ManageBuildingsDialog.js';
+import { SheetFileCache } from './sheetFileCache.js';
 import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
 import { StampLabelsDialog } from './components/StampLabelsDialog.js';
@@ -660,6 +661,32 @@ export function MepSketchApp({
   // IconBitmapResolver layering). A plain ref, not state: it's write-target
   // bookkeeping, never rendered.
   const fileTargetsRef = useRef(new Map<string, FileTarget>());
+  // PDFs given to the app in this tab, so a sheet row can open its PDF without a second pick. Memory only.
+  const sheetFilesRef = useRef(new SheetFileCache());
+  const [sheetFilesVersion, setSheetFilesVersion] = useState(0);
+  const sheetFilesBuildingIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = sheetFilesBuildingIdRef.current;
+    const current = buildingHook.building?.file.id ?? null;
+    sheetFilesBuildingIdRef.current = current;
+    if (previous !== null && previous !== current) {
+      sheetFilesRef.current.clear();
+      setSheetFilesVersion((n) => n + 1);
+    }
+  }, [buildingHook.building?.file.id]);
+  // The sheet rows read the cache through this object. A new object after each change makes them render again.
+  // On the desktop the cache stays empty: a sheet opens by its path there.
+  const sheetFiles = useMemo(
+    () => ({
+      remember: (list: OpenedFile[]) => {
+        if (fileAccess.readPath !== undefined) return;
+        list.forEach((item) => sheetFilesRef.current.remember(item));
+        setSheetFilesVersion((n) => n + 1);
+      },
+      has: (sheet: BuildingSheet) => sheetFilesRef.current.has(sheet),
+    }),
+    [fileAccess, sheetFilesVersion],
+  );
   // The open/save running right now, if any. Only one runs at a time: two
   // overlapping saves of one PDF both write the same new annotations, and
   // closing a document mid-task destroys what the task still reads.
@@ -748,6 +775,7 @@ export function MepSketchApp({
 
   const openPdfFile = useCallback(
     async (file: File, fileTarget: FileTarget | undefined): Promise<string | null> => {
+      if (fileAccess.readPath === undefined) sheetFilesRef.current.remember({ file, target: fileTarget });
       // Reopening a file already open elsewhere in the document list just
       // switches to its tab — no re-parse, no duplicate — see decisions log
       // 2026-09-07's multi-document plan, D3.
@@ -808,7 +836,7 @@ export function MepSketchApp({
         fileTaskRef.current = null;
       }
     },
-    [onLoadPdfPage, resolveStampIconBitmap, sceneRef],
+    [fileAccess, onLoadPdfPage, resolveStampIconBitmap, sceneRef],
   );
 
   documentOpenedRef.current = async ({ documentId, file, target, loadMismatch }) => {
@@ -919,7 +947,8 @@ export function MepSketchApp({
             return { ok: false, message };
           }
         } else {
-          opened = await fileAccess.openFile(PDF_FILE_TYPES);
+          const cached = await sheetFilesRef.current.take(sheet);
+          opened = cached ?? (await fileAccess.openFile(PDF_FILE_TYPES));
           if (opened === undefined) return { ok: false, message: null };
         }
       } catch (err) {
@@ -2278,6 +2307,7 @@ export function MepSketchApp({
           onRebuildSummaries={(run) => handleRebuildSummaries(undefined, run)}
           activeSheetLevelId={currentSheetLevelId(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex)}
           openDocuments={openDocumentRows(documents, fileTargetsRef.current, buildingHook.building?.file ?? null, { documentId: activeDocumentId, pageIndex })}
+          sheetFiles={sheetFiles}
         />
       )}
 

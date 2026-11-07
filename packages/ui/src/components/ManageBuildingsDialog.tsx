@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { addLevel, renameBuilding, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
-import type { FileAccess } from '@mepapp/platform';
+import type { FileAccess, OpenedFile } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import type { UseBuilding } from '../useBuilding.js';
 import { countLabel, defaultLevelName, nextLevelElevation } from '../buildingLevels.js';
@@ -112,6 +112,7 @@ export interface ManageBuildingsDialogProps {
   activeSheetLevelId?: string | null;
   /** The documents open in the viewer, one row each (openDocumentRows). */
   openDocuments?: readonly OpenDocumentRow[];
+  sheetFiles?: { remember: (opened: OpenedFile[]) => void; has: (sheet: BuildingSheet) => boolean };
 }
 
 /**
@@ -127,6 +128,7 @@ export function ManageBuildingsDialog({
   onRebuildSummaries,
   activeSheetLevelId,
   openDocuments = [],
+  sheetFiles,
 }: ManageBuildingsDialogProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -619,6 +621,7 @@ export function ManageBuildingsDialog({
                   onRefreshStatus={building.refreshSheetStatus}
                   onNotice={onNotice}
                   openedSheetIds={openedSheetIds(openDocuments)}
+                  canOpenCached={sheetFiles?.has}
                 />
                 <BuildingSummariesPane
                   key={`${openBuilding.file.id}-summaries`}
@@ -631,6 +634,7 @@ export function ManageBuildingsDialog({
                   sheetStatus={openBuilding.sheetStatus}
                   onOpenSheet={openSheetKeepOpen}
                   onNotice={onNotice}
+                  canOpenCached={sheetFiles?.has}
                 />
                 <OpenDocumentsPane
                   key={openBuilding.file.id}
@@ -649,6 +653,7 @@ export function ManageBuildingsDialog({
                     levelId={selectedLevel?.id ?? null}
                     onRefreshStatus={building.refreshSheetStatus}
                     onNotice={onNotice}
+                    onFilesRead={sheetFiles?.remember}
                   />
                 </OpenDocumentsPane>
               </div>
