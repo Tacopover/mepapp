@@ -93,7 +93,7 @@ await docRow('f.pdf').locator('[data-testid="open-doc-add"]').dblclick();
 await idle(700);
 let s = await stored();
 check(s.sheets.length === 1, 'double click on f.pdf adds one sheet only', String(s.sheets.length));
-check(s.sheets[0].projectUuid === null && s.sheets[0].location.path === undefined && s.sheets[0].location.fileName === 'f.pdf', 'f.pdf sheet: no id, no path, file name f.pdf', JSON.stringify(s.sheets[0]));
+check(typeof s.sheets[0].projectUuid === 'string' && s.sheets[0].idMinted === true && s.sheets[0].location.path === undefined && s.sheets[0].location.fileName === 'f.pdf', 'f.pdf sheet: runtime id minted, no path, file name f.pdf', JSON.stringify(s.sheets[0]));
 check(s.sheets[0].levelId === L1.id, 'f.pdf sheet is on the selected level');
 check((await docRow('f.pdf').locator('[data-testid="open-doc-placed"]').textContent())?.trim() === `Placed on ${L1.name}`, 'f.pdf now shows "Placed on <level>"');
 check(await docRow('f.pdf').locator('[data-testid="open-doc-add"]').isDisabled(), 'f.pdf primary button is disabled when it is on the level');

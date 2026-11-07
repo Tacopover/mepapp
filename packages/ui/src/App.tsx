@@ -883,18 +883,22 @@ export function MepSketchApp({
     }
   }, [buildingHook.building?.file, documents]);
 
-  // The active document took a minted id from its sheet, so its summary is written at once. Otherwise the sheet stays "Not opened yet" until a Save.
+  // An open document took a minted id from its sheet, so its summary is written at once. Only the active document can be snapshotted, so a background document waits until it becomes active (activeDocumentId is a dependency). Otherwise the sheet stays "Not opened yet" until a Save.
   useEffect(() => {
     const file = buildingHook.building?.file;
-    const doc = documents.find((d) => d.id === activeDocumentId);
-    if (!file || !doc || !doc.hasPdf || doc.projectUuidInFile || doc.projectUuid === null || doc.sizeBytes === null) return;
-    const projectUuid = doc.projectUuid;
-    if (!file.sheets.some((sheet) => sheet.idMinted === true && sheet.projectUuid === projectUuid)) return;
-    const key = `${doc.id}:${projectUuid}:${doc.sizeBytes}`;
-    if (summaryKeysRef.current.has(key)) return;
-    summaryKeysRef.current.add(key);
-    void writeSummaryForOpenDocument(doc.id, doc.fileName, doc.sizeBytes);
-  }, [buildingHook.building?.file, documents, activeDocumentId, writeSummaryForOpenDocument]);
+    // The controller writes the store after it changes the file. summaryAfterSave needs the sheet in the store, and a concurrent write would conflict.
+    if (!file || buildingHook.building?.dirty) return;
+    for (const doc of documents) {
+      const projectUuid = doc.projectUuid;
+      if (!doc.hasPdf || doc.projectUuidInFile || projectUuid === null || doc.sizeBytes === null) continue;
+      if (!file.sheets.some((sheet) => sheet.idMinted === true && sheet.projectUuid === projectUuid)) continue;
+      const key = `${doc.id}:${projectUuid}:${doc.sizeBytes}`;
+      if (summaryKeysRef.current.has(key)) continue;
+      if (snapshotDocument(doc.id) === null) continue;
+      summaryKeysRef.current.add(key);
+      void writeSummaryForOpenDocument(doc.id, doc.fileName, doc.sizeBytes);
+    }
+  }, [buildingHook.building?.file, buildingHook.building?.dirty, documents, activeDocumentId, snapshotDocument, writeSummaryForOpenDocument]);
 
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
   const openSheet = useCallback(

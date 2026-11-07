@@ -89,13 +89,26 @@ describe('addOpenDocumentPages', () => {
     expect(moved.added).toBe(0);
   });
 
-  it('adds a sheet with projectUuid null and a path when the document has no id', () => {
+  it('adds a sheet with the runtime id as minted and a path when the document has no id', () => {
     const file = buildingOf([]);
     const doc = docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'minted', projectUuidInFile: false, pageCount: 1 });
     const result = addOpenDocumentPages(file, rowOf(file, doc, targetsFor('d1')), 'L1', [0], false);
     expect(result.file.sheets).toHaveLength(1);
-    expect(result.file.sheets[0]!.projectUuid).toBeNull();
+    expect(result.file.sheets[0]!.projectUuid).toBe('minted');
+    expect(result.file.sheets[0]!.idMinted).toBe(true);
     expect(result.file.sheets[0]!.location.path).toBe('/x/a.pdf');
+  });
+
+  it('adds the sheets of all pages with the runtime id as minted, and adds nothing on a second call', () => {
+    const file = buildingOf([]);
+    const doc = docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'minted', projectUuidInFile: false, pageCount: 3 });
+    const first = addOpenDocumentPages(file, rowOf(file, doc, targetsFor('d1')), 'L1', [0, 1, 2], false);
+    expect(first.added).toBe(3);
+    expect(first.file.sheets).toHaveLength(3);
+    expect(first.file.sheets.every((sheet) => sheet.projectUuid === 'minted' && sheet.idMinted === true)).toBe(true);
+    const second = addOpenDocumentPages(first.file, rowOf(first.file, doc, targetsFor('d1')), 'L1', [0, 1, 2], false);
+    expect(second.added).toBe(0);
+    expect(second.file).toEqual(first.file);
   });
 
   it('adds a sheet with no path key and adds nothing on a second call when the document has no id and no path', () => {
@@ -104,7 +117,7 @@ describe('addOpenDocumentPages', () => {
     const originalRow = rowOf(file, doc, new Map());
     const first = addOpenDocumentPages(file, originalRow, 'L1', [0], false);
     expect(first.file.sheets).toHaveLength(1);
-    expect(first.file.sheets[0]!.projectUuid).toBeNull();
+    expect(first.file.sheets[0]!.projectUuid).toBe('minted');
     expect('path' in first.file.sheets[0]!.location).toBe(false);
     const second = addOpenDocumentPages(first.file, originalRow, 'L1', [0], false);
     expect(second.added).toBe(0);
@@ -162,5 +175,29 @@ describe('openDocumentNewPage', () => {
     const page = openDocumentNewPage(rowOf(file, doc, new Map()), 0);
     expect('sizeBytes' in page.location).toBe(false);
     expect(page.location.fileName).toBe('a.pdf');
+  });
+
+  it('gives the runtime id with idMinted when the file holds no id', () => {
+    const file = buildingOf([]);
+    const doc = docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'minted', projectUuidInFile: false });
+    const page = openDocumentNewPage(rowOf(file, doc, new Map()), 0);
+    expect(page.projectUuid).toBe('minted');
+    expect(page.idMinted).toBe(true);
+  });
+
+  it('gives the id of the file without idMinted when the file holds the id', () => {
+    const file = buildingOf([]);
+    const doc = docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: 'u1', projectUuidInFile: true });
+    const page = openDocumentNewPage(rowOf(file, doc, new Map()), 0);
+    expect(page.projectUuid).toBe('u1');
+    expect('idMinted' in page).toBe(false);
+  });
+
+  it('gives projectUuid null without idMinted when the document has no runtime id', () => {
+    const file = buildingOf([]);
+    const doc = docOf({ id: 'd1', fileName: 'a.pdf', projectUuid: null, projectUuidInFile: false });
+    const page = openDocumentNewPage(rowOf(file, doc, new Map()), 0);
+    expect(page.projectUuid).toBeNull();
+    expect('idMinted' in page).toBe(false);
   });
 });

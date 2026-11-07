@@ -7,13 +7,18 @@ export interface OpenDocumentAddResult {
   moved: number;
 }
 
-/** The NewSheetPage of one page of an open document. projectUuid is the row field sheetProjectUuid (null for a PDF that does not hold its id). */
+/**
+ * The NewSheetPage of one page of an open document. projectUuid is the row field sheetProjectUuid when the PDF holds its id.
+ * A PDF without an id in the file takes the runtime id of the document with idMinted, the same as "Add PDFs…". A document with no runtime id gets projectUuid null.
+ */
 export function openDocumentNewPage(row: OpenDocumentRow, pageIndex: number): NewSheetPage {
   const location: SheetLocation = { fileName: row.doc.fileName };
   if (row.path !== undefined) location.path = row.path;
   if (row.doc.sizeBytes !== null) location.sizeBytes = row.doc.sizeBytes;
+  const minted = row.sheetProjectUuid === null && row.doc.projectUuid !== null;
   return {
-    projectUuid: row.sheetProjectUuid,
+    projectUuid: row.sheetProjectUuid ?? row.doc.projectUuid,
+    ...(minted ? { idMinted: true as const } : {}),
     pageIndex,
     displayName: row.pages[pageIndex]?.displayName ?? row.doc.fileName,
     location,
