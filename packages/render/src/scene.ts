@@ -159,7 +159,7 @@ import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroup
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
-import { moveFittingInState, riserConflictsIn, type RiserConflict, type RiserMark } from './riserMarks.js';
+import { moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserConflict, type RiserMark } from './riserMarks.js';
 import {
   addPanelAccessoryCommand,
   addTerminalToCircuitCommand,
@@ -586,6 +586,10 @@ interface SketchSceneEvents {
   riserFittingMoved: [info: { fittingId: string; from: Vec2; to: Vec2 }];
   /** Undo or redo changed a marked fitting (position changed, or the fitting is gone: then `to` is null). The UI decides whether to sync (D-B-56 A) or to show the conflict state. */
   riserFittingChanged: [info: { fittingId: string; from: Vec2 | null; to: Vec2 | null; cause: 'undo' | 'redo' }];
+  /** A network type change touched a marked fitting's riser. Emitted after the change is committed. The UI shows which risers the change reaches. */
+  riserTypeChangeRequested: [info: { riserIds: string[]; networkTypeId: string }];
+  /** removeFitting or deleteSelection refused a marked fitting. Nothing changed. The UI tells the user why. */
+  fittingRemovalRefused: [info: { fittingId: string; reason: 'riser' }];
   /** The active document's customStampDefinitions list changed (a new one authored, or an existing one edited) — the Stamps tab's cue to re-render its palette. */
   customStampDefinitionsChanged: [StampDefinition[]];
   /** The active document's label layouts changed (label-feature.md §6.2) — the status bar's label filter lists the definitions that have one. */
@@ -696,6 +700,7 @@ export class SketchScene {
   private routeMarkers: RouteMarker[] = [];
   /** Scene-level: the riser marks of the active document, keyed by fitting id. Not part of the document, never saved. */
   private riserMarks: Map<string, RiserMark> = new Map();
+  private riserTypeGuard: ((riserIds: string[], networkTypeId: string) => boolean) | null = null;
   /** Scene-level: the planned route shown on the overlay. Not part of the document, never saved. */
   private routePreview: RoutePreviewView | null = null;
   private autoPlaceUnitNotes: { reason: AutoPlaceUnitNoteReason; count: number }[] = [];
@@ -1481,6 +1486,7 @@ export class SketchScene {
 
   /** Whether removeFitting would merge this fitting's two segments — false for a fitting with any other segment count, or one whose merge would loop back on itself. */
   canRemoveFitting(fittingId: string): boolean {
+    if (this.fittingRemovalBlockReason(fittingId) !== null) return false;
     const state = this.doc.drawingHistory.getState();
     return !!state.fittings[fittingId] && mergeSegmentsAtFitting(fittingId, Object.values(state.segments), '') !== null;
   }
@@ -1510,6 +1516,10 @@ export class SketchScene {
   removeFitting(fittingId: string): void {
     const state = this.doc.drawingHistory.getState();
     if (!state.fittings[fittingId]) return;
+    if (this.fittingRemovalBlockReason(fittingId) === 'riser') {
+      this.emitter.emit('fittingRemovalRefused', { fittingId, reason: 'riser' });
+      return;
+    }
     const merge = mergeSegmentsAtFitting(fittingId, Object.values(state.segments), `segment-${this.doc.nextSegmentSeq}`);
     if (!merge) return;
     this.doc.nextSegmentSeq++;
@@ -1567,6 +1577,8 @@ export class SketchScene {
     // DEFAULT_NETWORK_TYPE (see resolveNetworkTypeVisuals).
     this.adoptNetworkTypes([networkTypeId]);
     const targetIds = segmentIdsOfNetworks({ segments: Object.values(state.segments), fittings: Object.values(state.fittings), portGroups: this.doc.portGroups }, validIds);
+    const riserIds = riserIdsTouchedBySegments([...targetIds].map((id) => state.segments[id]).filter(Boolean), this.riserMarks);
+    if (riserIds.length > 0 && this.riserTypeGuard && !this.riserTypeGuard(riserIds, networkTypeId)) return;
     const tx = new Transaction(this.doc.drawingHistory, 'Change network type');
     tx.update((s) => {
       const segments = { ...s.segments };
@@ -1579,6 +1591,7 @@ export class SketchScene {
     this.syncDrawingLayer();
     this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
+    if (riserIds.length > 0) this.emitter.emit('riserTypeChangeRequested', { riserIds, networkTypeId });
   }
 
   /** Programmatically selects one placed stamp by id and syncs the canvas highlight — the Networks tree's click-to-select-on-canvas action (every other selection path so far originated from a canvas hit-test). No-op if `id` isn't a placed stamp on the shown page. */
@@ -2987,6 +3000,16 @@ export class SketchScene {
 
   getRiserMarks(): ReadonlyMap<string, RiserMark> {
     return this.riserMarks;
+  }
+
+  /** Sets the guard that a network type change asks when it touches a riser. Return false to refuse the change. Null removes the guard. */
+  setRiserTypeGuard(guard: ((riserIds: string[], networkTypeId: string) => boolean) | null): void {
+    this.riserTypeGuard = guard;
+  }
+
+  /** Why a fitting cannot be removed: 'riser' for a marked fitting, null otherwise. */
+  fittingRemovalBlockReason(fittingId: string): 'riser' | null {
+    return this.riserMarks.has(fittingId) ? 'riser' : null;
   }
 
   /** Moves a fitting of the active document to `to` as one undo step ('Move riser fitting'). Its attached segments follow (moveFittingInState). False when the fitting is not found. Emits 'riserFittingMoved' for a marked fitting unless opts.source is 'riser-sync'. */
@@ -5435,6 +5458,10 @@ export class SketchScene {
   deleteSelection(): void {
     const ids = [...this.doc.selectedIds];
     if (ids.length === 0) return;
+    if (ids.length === 1 && this.riserMarks.has(ids[0])) {
+      this.emitter.emit('fittingRemovalRefused', { fittingId: ids[0], reason: 'riser' });
+      return;
+    }
     if (ids.length === 1 && this.canRemoveFitting(ids[0])) {
       this.removeFitting(ids[0]);
       return;

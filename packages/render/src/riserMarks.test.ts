@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CommandManager, Transaction, type Fitting, type Segment, type Vec2 } from '@mepapp/core';
+import { CommandManager, Transaction, splitSegmentAtFitting, type Fitting, type Segment, type Vec2 } from '@mepapp/core';
 import type { DrawingState } from './document.js';
-import { moveFittingInState, riserConflictsIn, type RiserMark } from './riserMarks.js';
+import { moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserMark } from './riserMarks.js';
 
 function fitting(id: string, position: Vec2, pageIndex = 0, routedBy?: 'route'): Fitting {
   return { id, pageIndex, position, kind: 'junction', ...(routedBy ? { routedBy } : {}) };
@@ -86,6 +86,43 @@ describe('moveFittingInState', () => {
     fresh.setLiveState(moveFittingInState(initial, 'f1', { x: 100, y: 150 }, [])!);
     expect(fresh.canUndo).toBe(false);
     expect(fresh.getState().fittings.f1.position).toEqual({ x: 100, y: 150 });
+  });
+});
+
+describe('riserIdsTouchedBySegments', () => {
+  const marks = new Map<string, RiserMark>([
+    ['f1', { riserId: 'R1', name: 'R1', networkTypeId: 'supply-air', anchorPt: { x: 100, y: 100 } }],
+    ['f2', { riserId: 'R2', name: 'R2', networkTypeId: 'supply-air', anchorPt: { x: 300, y: 100 } }],
+  ]);
+  const s1 = makeState().segments.s1;
+  const portEnd: Segment = {
+    ...s1,
+    id: 's2',
+    endpointA: { kind: 'port', elementId: 'stamp-1', portId: 'p1' },
+    endpointB: { kind: 'port', elementId: 'stamp-2', portId: 'p2' },
+  };
+
+  it('returns no riser ids when no fitting is marked', () => {
+    expect(riserIdsTouchedBySegments([s1], new Map())).toEqual([]);
+  });
+
+  it('returns the riser of one marked end', () => {
+    expect(riserIdsTouchedBySegments([s1], new Map([['f1', marks.get('f1')!]]))).toEqual(['R1']);
+  });
+
+  it('dedupes riser ids over two segments on one riser', () => {
+    const s2: Segment = { ...s1, id: 's2', endpointA: { kind: 'fitting', fittingId: 'f1' }, endpointB: { kind: 'fitting', fittingId: 'f3' } };
+    expect(riserIdsTouchedBySegments([s1, s2], new Map([['f1', marks.get('f1')!]]))).toEqual(['R1']);
+  });
+
+  it('ignores a port endpoint', () => {
+    expect(riserIdsTouchedBySegments([portEnd], marks)).toEqual([]);
+  });
+
+  it('keeps the riser of a marked fitting after splitSegmentAtFitting inserts a new fitting', () => {
+    const f3: Fitting = { id: 'f3', pageIndex: 0, position: { x: 200, y: 100 }, kind: 'junction' };
+    const { segmentA, segmentB } = splitSegmentAtFitting(s1, f3, { x: 200, y: 100 }, { segmentA: 'sa', segmentB: 'sb' });
+    expect(riserIdsTouchedBySegments([segmentA, segmentB], new Map([['f2', marks.get('f2')!]]))).toEqual(['R2']);
   });
 });
 

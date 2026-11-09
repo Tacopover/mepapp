@@ -1,10 +1,23 @@
-import { clearRoutedMarks, recomputeAttachedSegments, type PortGroup, type Vec2 } from '@mepapp/core';
+import { clearRoutedMarks, recomputeAttachedSegments, type PortGroup, type Segment, type Vec2 } from '@mepapp/core';
 import type { DrawingState } from './document.js';
 
 /** One marked fitting. The UI builds it from the building file; anchorPt is the riser anchor in pt on the shown page. */
 export interface RiserMark { riserId: string; name: string; networkTypeId: string; anchorPt: Vec2 }
 
 export interface RiserConflict { fittingId: string; fittingPt: Vec2; anchorPt: Vec2 }
+
+/** Riser ids (deduped, first-seen order) of the marked fittings that the given segments end at. */
+export function riserIdsTouchedBySegments(segments: readonly Segment[], marks: ReadonlyMap<string, RiserMark>): string[] {
+  const riserIds: string[] = [];
+  for (const segment of segments) {
+    for (const end of [segment.endpointA, segment.endpointB]) {
+      if (end.kind !== 'fitting') continue;
+      const mark = marks.get(end.fittingId);
+      if (mark && !riserIds.includes(mark.riserId)) riserIds.push(mark.riserId);
+    }
+  }
+  return riserIds;
+}
 
 /** Moves one fitting to `to` and re-seats the attached segments (recomputeAttachedSegments with the given portGroups). Clears the route mark (routedBy) of the moved fitting and of the segments that end at it, like a hand drag does. Returns the new state, or null when the fitting does not exist. Returns the same state object when the position is already equal. */
 export function moveFittingInState(state: DrawingState, fittingId: string, to: Vec2, portGroups: readonly PortGroup[]): DrawingState | null {
