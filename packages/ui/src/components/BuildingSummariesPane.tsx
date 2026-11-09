@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BuildingSheet } from '@mepapp/core';
 import type { FileAccess } from '@mepapp/platform';
-import { otherNoSummaryText, readableNoSummaryText, type SheetStatus } from '../buildingStatus.js';
+import { otherNoSummaryText, readableNoSummaryText, rebuildResultText, type SheetStatus } from '../buildingStatus.js';
 import type { RebuildResult } from '../rebuildSummaries.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
 import { BuildingSection } from './BuildingSection.js';
@@ -132,7 +132,7 @@ export function BuildingSummariesPane({ missing, other, onRebuild, onDone, fileA
             <p>The rebuild did not run. See the message in the header.</p>
           ) : (
             <>
-              <p>{`Read ${last.result.ok} of ${last.result.total} summaries.${last.result.linked > 0 ? ` ${last.result.linked} ${last.result.linked === 1 ? 'sheet' : 'sheets'} linked.` : ''}${last.result.cancelled ? ' Cancelled before the end.' : ''}`}</p>
+              <p>{`${rebuildResultText(last.result)}${last.result.linked > 0 ? ` ${last.result.linked} ${last.result.linked === 1 ? 'sheet' : 'sheets'} linked.` : ''}`}</p>
               {last.result.failed.length > 0 && (
                 <>
                   <p className="mep-hint">

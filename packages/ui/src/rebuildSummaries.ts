@@ -15,7 +15,8 @@ export interface RebuildResult {
   failed: RebuildFailure[];
   /** Sheets that were unlinked and are now linked to the id of their document. */
   linked: number;
-  total: number;       // number of documents
+  total: number;       // number of documents that run
+  skipped: number;     // number of documents that skip() left out
   cancelled: boolean;  // the signal aborted before all documents ran
 }
 
@@ -89,14 +90,17 @@ export async function rebuildSummaries(args: {
   /** Name lookups for one project (its own custom stamps plus the library). */
   stampNames: (project: ProjectDocument) => { stampTypeName: (id: string) => string | null; stampImageName: (id: string) => string | null };
   store: BuildingStore;
+  /** True for a document that is not read. The test uses its first sheet. Default: every document is read. */
+  skip?: (sheet: BuildingSheet) => boolean;
   onProgress: (done: number, total: number, name: string) => void;
   signal: AbortSignal;
   now?: () => Date;
 }): Promise<RebuildResult> {
-  const documents = firstSheetPerDocument(args.building.sheets);
+  const allDocuments = firstSheetPerDocument(args.building.sheets);
+  const documents = allDocuments.filter((first) => args.skip?.(first) !== true);
   const total = documents.length;
   const now = args.now ?? (() => new Date());
-  const result: RebuildResult = { ok: 0, failed: [], linked: 0, total, cancelled: false };
+  const result: RebuildResult = { ok: 0, failed: [], linked: 0, total, skipped: allDocuments.length - total, cancelled: false };
   let done = 0;
   for (const first of documents) {
     if (args.signal.aborted) {

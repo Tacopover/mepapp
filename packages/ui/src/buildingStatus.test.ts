@@ -6,6 +6,7 @@ import {
   notPlacedAskText,
   otherNoSummaryText,
   readableNoSummaryText,
+  rebuildResultText,
   sheetsWithoutSummary,
   shortText,
   sheetStatusOf,
@@ -294,6 +295,15 @@ describe('summary repair helpers', () => {
   it('says which sheets can be read now', () => {
     expect(readableNoSummaryText(1)).toBe('1 sheet has no summary and can be read now.');
     expect(readableNoSummaryText(2)).toBe('2 sheets have no summary and can be read now.');
+  });
+
+  it('says how many PDFs need to be opened first after a rebuild', () => {
+    expect(rebuildResultText({ ok: 2, failed: [], skipped: 0, cancelled: false })).toBe('Read 2 of 2 summaries.');
+    expect(rebuildResultText({ ok: 2, failed: [{ sheet: sheet(), reason: 'PDF missing' }], skipped: 1, cancelled: false })).toBe(
+      'Read 2 of 3 summaries. 1 PDF needs to be opened first.',
+    );
+    expect(rebuildResultText({ ok: 0, failed: [], skipped: 2, cancelled: false })).toBe('Read 0 of 0 summaries. 2 PDFs need to be opened first.');
+    expect(rebuildResultText({ ok: 1, failed: [], skipped: 0, cancelled: true })).toBe('Read 1 of 1 summaries. Cancelled before the end.');
   });
 
   it('says which sheets cannot be read now', () => {

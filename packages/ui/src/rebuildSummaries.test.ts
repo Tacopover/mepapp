@@ -110,7 +110,7 @@ describe('rebuildSummaries', () => {
       signal: new AbortController().signal,
       now: () => new Date('2026-11-01T10:00:00.000Z'),
     });
-    expect(result).toEqual({ ok: 2, failed: [], linked: 2, total: 2, cancelled: false });
+    expect(result).toEqual({ ok: 2, failed: [], linked: 2, total: 2, skipped: 0, cancelled: false });
     expect(await store.listSummaries()).toEqual(['uuid-a', 'uuid-b']);
     expect(progress.calls[0]).toEqual([0, 2, 'a.pdf']);
     expect(progress.calls[progress.calls.length - 1]).toEqual([2, 2, '']);
@@ -245,7 +245,7 @@ describe('rebuildSummaries', () => {
       onProgress: () => undefined,
       signal: new AbortController().signal,
     });
-    expect(result).toEqual({ ok: 2, failed: [], linked: 1, total: 2, cancelled: false });
+    expect(result).toEqual({ ok: 2, failed: [], linked: 1, total: 2, skipped: 0, cancelled: false });
     expect(await store.listSummaries()).toEqual(['uuid-a', 'uuid-b']);
     const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
     expect(file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['uuid-a', 'uuid-b']);
@@ -265,7 +265,7 @@ describe('rebuildSummaries', () => {
       onProgress: () => undefined,
       signal: new AbortController().signal,
     });
-    expect(result).toEqual({ ok: 1, failed: [], linked: 2, total: 1, cancelled: false });
+    expect(result).toEqual({ ok: 1, failed: [], linked: 2, total: 1, skipped: 0, cancelled: false });
     const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
     expect(file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['uuid-a', 'uuid-a']);
   });
@@ -292,8 +292,46 @@ describe('rebuildSummaries', () => {
       onProgress: () => undefined,
       signal: new AbortController().signal,
     });
-    expect(result).toEqual({ ok: 1, failed: [], linked: 1, total: 1, cancelled: false });
+    expect(result).toEqual({ ok: 1, failed: [], linked: 1, total: 1, skipped: 0, cancelled: false });
     const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
     expect(file.sheets.map((sheet) => sheet.projectUuid)).toEqual(['uuid-a', null]);
+  });
+
+  it('does not read a document whose first sheet is skipped, and counts it as skipped', async () => {
+    const { engine, state } = stubEngine();
+    const reads: string[] = [];
+    const progress = progressCalls();
+    const result = await rebuildSummaries({
+      building: buildingOf([sheetOf('s1', 'C:/a.pdf', 0), sheetOf('s2', 'C:/b.pdf', 0)]),
+      engine,
+      read: readerOf({ 'C:/a.pdf': 'A', 'C:/b.pdf': 'B' }, reads),
+      stampNames,
+      store: new MemoryBuildingStore(),
+      skip: (sheet) => sheet.id === 's1',
+      onProgress: progress.onProgress,
+      signal: new AbortController().signal,
+    });
+    expect(result).toEqual({ ok: 1, failed: [], linked: 0, total: 1, skipped: 1, cancelled: false });
+    expect(reads).toEqual(['s2']);
+    expect(state.opened).toBe(1);
+    expect(progress.calls[0]).toEqual([0, 1, 'b.pdf']);
+    expect(progress.calls[progress.calls.length - 1]).toEqual([1, 1, '']);
+  });
+
+  it('reads a document whose first sheet is not skipped, even when a later sheet is', async () => {
+    const { engine } = stubEngine();
+    const reads: string[] = [];
+    const result = await rebuildSummaries({
+      building: buildingOf([sheetOf('s1', 'C:/a.pdf', 0), sheetOf('s2', 'C:/a.pdf', 1)]),
+      engine,
+      read: readerOf({ 'C:/a.pdf': 'A' }, reads),
+      stampNames,
+      store: new MemoryBuildingStore(),
+      skip: (sheet) => sheet.id === 's2',
+      onProgress: () => undefined,
+      signal: new AbortController().signal,
+    });
+    expect(result).toEqual({ ok: 1, failed: [], linked: 0, total: 1, skipped: 0, cancelled: false });
+    expect(reads).toEqual(['s1']);
   });
 });

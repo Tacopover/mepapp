@@ -93,7 +93,7 @@ import { useBuilding } from './useBuilding.js';
 import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
 import { findOpenDocumentByPath } from './openDocumentMatch.js';
-import { currentSheetLabel } from './buildingStatus.js';
+import { currentSheetLabel, rebuildResultText } from './buildingStatus.js';
 import { currentSheetLevelId } from './buildingTree.js';
 import { displayedPageInfos, readBuildingForExport, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 import { openDocumentRows } from './openDocumentsView.js';
@@ -1139,6 +1139,7 @@ export function MepSketchApp({
           whyUnreadable,
           stampNames: (project) => stampNameLookups([...project.customStampDefinitions, ...userStampLibrary.definitions]),
           store: buildingStore,
+          skip: (sheet) => buildingRef.current?.sheetStatus[sheet.id] === 'not-opened',
           onProgress: (done, total, name) => {
             setStatus(`Reading summaries: ${done} of ${total}${name ? ` (${name})` : ''}`);
             run?.onProgress?.(done, total, name);
@@ -1147,7 +1148,7 @@ export function MepSketchApp({
         });
         await buildingHook.reload();
         setStatus(
-          `Read ${result.ok} of ${result.total} summaries.${result.cancelled ? ' Cancelled before the end.' : ''}${result.failed.length > 0 ? ` ${result.failed.length} failed. See Manage Buildings.` : ''}`,
+          `${rebuildResultText(result)}${result.failed.length > 0 ? ` ${result.failed.length} failed. See Manage Buildings.` : ''}`,
         );
         return result;
       } catch (err) {

@@ -1,5 +1,6 @@
 import { scaleDenominatorFromCalibration, type BuildingFile, type BuildingSheet, type SheetSummary } from '@mepapp/core';
 import type { PathState } from '@mepapp/platform';
+import type { RebuildResult } from './rebuildSummaries.js';
 
 /** "<Building> / <Level> / <display name>" for the sheet with this projectUuid and pageIndex. Null when building is null, projectUuid is null, no sheet matches, or the level is missing. */
 export function currentSheetLabel(building: BuildingFile | null, projectUuid: string | null, pageIndex: number): string | null {
@@ -145,6 +146,13 @@ export function noSummaryText(count: number): string {
 /** "1 sheet has no summary and can be read now." or "N sheets have no summary and can be read now.". */
 export function readableNoSummaryText(count: number): string {
   return `${noSummaryText(count)} and can be read now.`;
+}
+
+/** "Read 2 of 3 summaries." The "of" count is the documents read and failed. Adds "1 PDF needs to be opened first." (or "N PDFs need ...") when skipped is above 0, and " Cancelled before the end." when cancelled. */
+export function rebuildResultText(result: Pick<RebuildResult, 'ok' | 'failed' | 'skipped' | 'cancelled'>): string {
+  const skippedText = result.skipped > 0 ? ` ${result.skipped} ${result.skipped === 1 ? 'PDF needs' : 'PDFs need'} to be opened first.` : '';
+  const cancelledText = result.cancelled ? ' Cancelled before the end.' : '';
+  return `Read ${result.ok} of ${result.ok + result.failed.length} summaries.${skippedText}${cancelledText}`;
 }
 
 /** The sheets without a summary that cannot be read now. Empty string for 0. */
