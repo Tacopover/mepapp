@@ -12,7 +12,7 @@ For one PC. Use Chrome (steps 1 to 12) and Firefox (steps 13 to 17). Use the tes
 6. Click "Office 12". Check: a card shows with the button "Allow access" and the text about Allow on every visit.
 7. Click "Allow access". Check: the Chrome prompt shows. Choose "Don't allow". Check: the card stays and says "Access was not given."
 8. Click "Allow access" again. Choose "Allow on every visit". Check: the building opens with the level and the two sheets.
-9. Check the sheets: the chip never says "Missing" or "No access". The row button says "Choose file…". Click it and pick the PDF. Check: the PDF opens in the viewer.
+9. Check the sheets: the chip never says "Missing" or "No access". The row button says "Choose file…". Click it and pick the PDF. Check: the PDF opens in the viewer. This is expected after a restart: the browser gives no stored access to a PDF, so each PDF needs one "Choose file…" per session. The permission click in steps 6 to 8 is also a browser rule. Users who want fewer clicks use the desktop app.
 10. Close all Chrome windows. Open the app. Click "Office 12". Check: no prompt (Allow on every visit) and the building opens at once.
 11. Close the dialog. In Windows Explorer, rename `Office 12.building.json` to `Office 13.building.json`. In the app click "Office 12" in the list. Check: the red message "The building file "Office 12" was not found. Use Open building… to find it." Click Open building… and choose the renamed file. Check: the building opens.
 12. Open a Chrome Incognito window. Open the app and create a building. Check: it works. Close the window. Check nothing else changes in the normal window.
