@@ -43,13 +43,16 @@ export function setLevelElevation(file: BuildingFile, levelId: string, elevation
   return { ...file, levels: file.levels.map((level) => (level.id === levelId ? { ...level, elevationMm } : level)) };
 }
 
-/** Refuses when a sheet uses the level. */
+/** Refuses when a sheet or a riser member uses the level. */
 export function deleteLevel(
   file: BuildingFile,
   levelId: string,
 ): { ok: true; file: BuildingFile } | { ok: false; error: BuildingEditError } {
   if (!file.levels.some((level) => level.id === levelId)) return { ok: false, error: 'unknown-level' };
   if (file.sheets.some((sheet) => sheet.levelId === levelId)) return { ok: false, error: 'level-has-sheets' };
+  if (file.risers.some((riser) => riser.members.some((member) => member.levelId === levelId))) {
+    return { ok: false, error: 'level-has-sheets' };
+  }
   return { ok: true, file: { ...file, levels: file.levels.filter((level) => level.id !== levelId) } };
 }
 
@@ -91,16 +94,43 @@ export function addSheets(
   return { ok: true, file: { ...file, sheets: [...file.sheets, ...added] }, skipped };
 }
 
-/** Unknown ids: unchanged. */
+/** 'Detach the riser first.' text, or null when the sheet is not a riser member. */
+export function sheetRemovalBlock(file: BuildingFile, sheetId: string): string | null {
+  const isMember = file.risers.some((riser) => riser.members.some((member) => member.sheetId === sheetId));
+  return isMember ? 'Detach the riser first.' : null;
+}
+
+/** Text when moveSheet would be refused because of a riser, else null. */
+export function sheetMoveBlock(file: BuildingFile, sheetId: string, levelId: string): string | null {
+  for (const riser of file.risers) {
+    const own = riser.members.find((member) => member.sheetId === sheetId);
+    if (own === undefined) continue;
+    if (riser.members.some((member) => member !== own && member.levelId === levelId)) {
+      return `Riser ${riser.name} already has a member on that level.`;
+    }
+  }
+  return null;
+}
+
+/** Unknown ids: unchanged. A riser refusal (see sheetMoveBlock): unchanged. A riser member moves with its sheet. */
 export function moveSheet(file: BuildingFile, sheetId: string, levelId: string): BuildingFile {
   if (!file.sheets.some((sheet) => sheet.id === sheetId) || !file.levels.some((level) => level.id === levelId)) {
     return file;
   }
-  return { ...file, sheets: file.sheets.map((sheet) => (sheet.id === sheetId ? { ...sheet, levelId } : sheet)) };
+  if (sheetMoveBlock(file, sheetId, levelId) !== null) return file;
+  return {
+    ...file,
+    sheets: file.sheets.map((sheet) => (sheet.id === sheetId ? { ...sheet, levelId } : sheet)),
+    risers: file.risers.map((riser) =>
+      riser.members.some((member) => member.sheetId === sheetId)
+        ? { ...riser, members: riser.members.map((member) => (member.sheetId === sheetId ? { ...member, levelId } : member)) }
+        : riser,
+    ),
+  };
 }
 
 export function removeSheet(file: BuildingFile, sheetId: string): BuildingFile {
-  if (!file.sheets.some((sheet) => sheet.id === sheetId)) return file;
+  if (!file.sheets.some((sheet) => sheet.id === sheetId) || sheetRemovalBlock(file, sheetId) !== null) return file;
   return { ...file, sheets: file.sheets.filter((sheet) => sheet.id !== sheetId) };
 }
 

@@ -163,7 +163,148 @@ const validateSheets: Validator = (data) => {
   return issues;
 };
 
-const buildingValidators: Validator[] = [validateTopLevel, validateLevels, validateSheets];
+const RISER_FLOWS: readonly unknown[] = ['up', 'down', 'both', 'unknown'];
+const RISER_END_KINDS: readonly unknown[] = ['member', 'open', 'capped'];
+
+const validateRisers: Validator = (data) => {
+  const issues: ValidationIssue[] = [];
+  if (!Array.isArray(data.risers)) return issues;
+  const levelIds = new Set<string>();
+  if (Array.isArray(data.levels)) {
+    for (const level of data.levels) if (isRecord(level) && typeof level.id === 'string') levelIds.add(level.id);
+  }
+  const sheetsById = new Map<string, JsonRecord>();
+  if (Array.isArray(data.sheets)) {
+    for (const sheet of data.sheets) {
+      if (isRecord(sheet) && typeof sheet.id === 'string' && !sheetsById.has(sheet.id)) sheetsById.set(sheet.id, sheet);
+    }
+  }
+  const riserIds = new Set<string>();
+  data.risers.forEach((riser: unknown, index) => {
+    const path = `risers[${index}]`;
+    if (!isRecord(riser)) {
+      issues.push({ path, message: 'riser must be an object' });
+      return;
+    }
+    if (!isNonEmptyString(riser.id)) {
+      issues.push({ path: `${path}.id`, message: 'riser id must be a non-empty string' });
+    } else if (riserIds.has(riser.id)) {
+      issues.push({ path: `${path}.id`, message: `duplicate riser id ${riser.id}` });
+    } else {
+      riserIds.add(riser.id);
+    }
+    if (typeof riser.name !== 'string') issues.push({ path: `${path}.name`, message: 'riser name must be a string' });
+    if (riser.shaftName !== undefined && typeof riser.shaftName !== 'string') {
+      issues.push({ path: `${path}.shaftName`, message: 'shaftName must be a string' });
+    }
+    if (!isNonEmptyString(riser.networkTypeId)) {
+      issues.push({ path: `${path}.networkTypeId`, message: 'networkTypeId must be a non-empty string' });
+    }
+    const networkType = riser.networkType;
+    if (!isRecord(networkType) || !isNonEmptyString(networkType.id) || networkType.id !== riser.networkTypeId) {
+      issues.push({ path: `${path}.networkType`, message: 'networkType must be an object whose id equals networkTypeId' });
+    }
+    const anchor: JsonRecord = isRecord(riser.anchorMm) ? riser.anchorMm : {};
+    if (typeof anchor.xMm !== 'number' || !Number.isFinite(anchor.xMm)) {
+      issues.push({ path: `${path}.anchorMm.xMm`, message: 'anchorMm.xMm must be a finite number' });
+    }
+    if (typeof anchor.yMm !== 'number' || !Number.isFinite(anchor.yMm)) {
+      issues.push({ path: `${path}.anchorMm.yMm`, message: 'anchorMm.yMm must be a finite number' });
+    }
+    if (!RISER_FLOWS.includes(riser.flow)) issues.push({ path: `${path}.flow`, message: 'flow must be up, down, both or unknown' });
+    if (!RISER_END_KINDS.includes(riser.topEnd)) {
+      issues.push({ path: `${path}.topEnd`, message: 'topEnd must be member, open or capped' });
+    }
+    if (!RISER_END_KINDS.includes(riser.bottomEnd)) {
+      issues.push({ path: `${path}.bottomEnd`, message: 'bottomEnd must be member, open or capped' });
+    }
+    if (typeof riser.endAllowanceMm !== 'number' || !Number.isFinite(riser.endAllowanceMm) || riser.endAllowanceMm < 0) {
+      issues.push({ path: `${path}.endAllowanceMm`, message: 'endAllowanceMm must be a finite number from 0' });
+    }
+    const memberLevelIds = new Set<string>();
+    const memberSheetIds = new Set<string>();
+    if (!Array.isArray(riser.members)) {
+      issues.push({ path: `${path}.members`, message: 'members must be an array' });
+    } else {
+      riser.members.forEach((member: unknown, memberIndex) => {
+        const memberPath = `${path}.members[${memberIndex}]`;
+        if (!isRecord(member)) {
+          issues.push({ path: memberPath, message: 'member must be an object' });
+          return;
+        }
+        if (typeof member.levelId !== 'string' || !levelIds.has(member.levelId)) {
+          issues.push({ path: `${memberPath}.levelId`, message: `levelId ${String(member.levelId)} does not name a level` });
+        } else if (memberLevelIds.has(member.levelId)) {
+          issues.push({ path: `${memberPath}.levelId`, message: `riser has two members on level ${member.levelId}` });
+        } else {
+          memberLevelIds.add(member.levelId);
+        }
+        const sheet = typeof member.sheetId === 'string' ? sheetsById.get(member.sheetId) : undefined;
+        if (sheet === undefined) {
+          issues.push({ path: `${memberPath}.sheetId`, message: `sheetId ${String(member.sheetId)} does not name a sheet` });
+        } else {
+          if (sheet.levelId !== member.levelId) {
+            issues.push({ path: `${memberPath}.levelId`, message: 'member levelId must equal the levelId of its sheet' });
+          }
+          if (member.pageIndex !== sheet.pageIndex) {
+            issues.push({ path: `${memberPath}.pageIndex`, message: 'member pageIndex must equal the pageIndex of its sheet' });
+          }
+          if (typeof member.sheetId === 'string') memberSheetIds.add(member.sheetId);
+        }
+        if (!isNonEmptyString(member.fittingId)) {
+          issues.push({ path: `${memberPath}.fittingId`, message: 'fittingId must be a non-empty string' });
+        }
+        if (
+          member.connectionHeightMm !== undefined &&
+          (typeof member.connectionHeightMm !== 'number' || !Number.isFinite(member.connectionHeightMm) || member.connectionHeightMm < 0)
+        ) {
+          issues.push({ path: `${memberPath}.connectionHeightMm`, message: 'connectionHeightMm must be a finite number from 0' });
+        }
+      });
+    }
+    if (riser.sourceLevelId !== undefined && (typeof riser.sourceLevelId !== 'string' || !memberLevelIds.has(riser.sourceLevelId))) {
+      issues.push({ path: `${path}.sourceLevelId`, message: 'sourceLevelId must name a level of a member of this riser' });
+    }
+    if (!Array.isArray(riser.pending)) {
+      issues.push({ path: `${path}.pending`, message: 'pending must be an array' });
+    } else {
+      let previousSeq: number | undefined;
+      riser.pending.forEach((op: unknown, opIndex) => {
+        const opPath = `${path}.pending[${opIndex}]`;
+        if (!isRecord(op)) {
+          issues.push({ path: opPath, message: 'pending operation must be an object' });
+          return;
+        }
+        if (typeof op.seq !== 'number' || !Number.isInteger(op.seq)) {
+          issues.push({ path: `${opPath}.seq`, message: 'seq must be a whole number' });
+        } else {
+          if (previousSeq !== undefined && op.seq <= previousSeq) {
+            issues.push({ path: `${opPath}.seq`, message: 'seq must grow along the pending list' });
+          }
+          previousSeq = op.seq;
+        }
+        if (typeof op.sheetId !== 'string' || !memberSheetIds.has(op.sheetId)) {
+          issues.push({ path: `${opPath}.sheetId`, message: 'sheetId must name a member sheet of this riser' });
+        }
+        if (op.kind === 'move') {
+          const to: JsonRecord = isRecord(op.toMm) ? op.toMm : {};
+          if (typeof to.xMm !== 'number' || !Number.isFinite(to.xMm) || typeof to.yMm !== 'number' || !Number.isFinite(to.yMm)) {
+            issues.push({ path: `${opPath}.toMm`, message: 'a move needs a finite toMm.xMm and toMm.yMm' });
+          }
+        } else if (op.kind === 'retag') {
+          if (!isNonEmptyString(op.networkTypeId)) {
+            issues.push({ path: `${opPath}.networkTypeId`, message: 'a retag needs a non-empty networkTypeId' });
+          }
+        } else {
+          issues.push({ path: `${opPath}.kind`, message: 'kind must be move or retag' });
+        }
+      });
+    }
+  });
+  return issues;
+};
+
+const buildingValidators: Validator[] = [validateTopLevel, validateLevels, validateSheets, validateRisers];
 
 /** Migrates raw JSON (any prior schema version) to the current shape and validates it. Throws BuildingFileError if the file is malformed or newer than this app. Fields that this app does not know stay in the result. */
 export function parseBuildingFile(raw: unknown): BuildingFile {
@@ -194,6 +335,47 @@ export function levelWarnings(file: BuildingFile): string[] {
   for (const [elevationMm, group] of byElevation) {
     if (group.length > 1) {
       warnings.push(`Levels ${group.map((level) => level.name).join(', ')} have the same elevation (${elevationMm} mm).`);
+    }
+  }
+  return warnings;
+}
+
+export const RISER_MIN_ANCHOR_SPACING_MM = 150;
+
+/** Warnings for the risers of a valid building file (not errors). */
+export function riserWarnings(file: BuildingFile): string[] {
+  const warnings: string[] = [];
+  const risersByLevel = new Map<string, Riser[]>();
+  for (const riser of file.risers) {
+    if (riser.members.length === 1) warnings.push(`Riser ${riser.name} has one member.`);
+    const hasFreeEnd = riser.topEnd !== 'member' || riser.bottomEnd !== 'member';
+    if (hasFreeEnd && riser.endAllowanceMm === 0) {
+      warnings.push(`Riser ${riser.name} has an open or capped end and no end allowance.`);
+    }
+    if (riser.endAllowanceMm > 0 && riser.topEnd === 'member' && riser.bottomEnd === 'member') {
+      warnings.push(`Riser ${riser.name} has an end allowance but both ends are members.`);
+    }
+    for (const member of riser.members) {
+      const group = risersByLevel.get(member.levelId);
+      if (group) {
+        if (!group.includes(riser)) group.push(riser);
+      } else {
+        risersByLevel.set(member.levelId, [riser]);
+      }
+    }
+  }
+  const levelNames = new Map(file.levels.map((level) => [level.id, level.name]));
+  for (const [levelId, group] of risersByLevel) {
+    const levelName = levelNames.get(levelId) ?? levelId;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const a = group[i]!;
+        const b = group[j]!;
+        const distance = Math.hypot(a.anchorMm.xMm - b.anchorMm.xMm, a.anchorMm.yMm - b.anchorMm.yMm);
+        if (distance < RISER_MIN_ANCHOR_SPACING_MM) {
+          warnings.push(`Risers ${a.name} and ${b.name} are closer than ${RISER_MIN_ANCHOR_SPACING_MM} mm on level ${levelName}.`);
+        }
+      }
     }
   }
   return warnings;

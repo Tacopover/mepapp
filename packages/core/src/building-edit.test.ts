@@ -11,11 +11,14 @@ import {
   renameLevel,
   replaceMintedId,
   setLevelElevation,
+  sheetMoveBlock,
+  sheetRemovalBlock,
   sortLevelsByElevation,
   withIdInFile,
   type BuildingEditError,
   type NewSheetPage,
 } from './building-edit.js';
+import type { Riser } from './riser.js';
 
 function unwrap(result: { ok: true; file: BuildingFile } | { ok: false; error: BuildingEditError }): BuildingFile {
   if (!result.ok) throw new Error(`relink failed: ${result.error}`);
@@ -349,6 +352,53 @@ describe('building edit', () => {
     expect(parseBuildingFile(JSON.parse(serializeBuildingFile(file)))).toEqual(file);
   });
 
+  it('refuses to remove a sheet that a riser member uses and returns the same file', () => {
+    const file = withRiser(sample(), [member('l0', 's0', 0)]);
+    expect(removeSheet(file, 's0')).toBe(file);
+  });
+
+  it('removes a sheet that no riser member uses', () => {
+    const file = withRiser(sample(), [member('l0', 's0', 0)]);
+    expect(removeSheet(file, 's1').sheets.map((sheet) => sheet.id)).toEqual(['s0']);
+  });
+
+  it('moves a riser member with its sheet', () => {
+    const file = withRiser({ ...sample(), levels: [...sample().levels, { id: 'l2', name: 'Roof', elevationMm: 9000 }] }, [member('l0', 's0', 0)]);
+    const moved = moveSheet(file, 's0', 'l2');
+    expect(moved.sheets[0]!.levelId).toBe('l2');
+    expect(moved.risers[0]!.members[0]!.levelId).toBe('l2');
+  });
+
+  it('refuses to move a riser member to a level where the riser has another member and returns the same file', () => {
+    const file = withRiser(sample(), [member('l0', 's0', 0), member('l1', 's1', 1)]);
+    expect(moveSheet(file, 's0', 'l1')).toBe(file);
+  });
+
+  it('moves a sheet that no riser member uses as before', () => {
+    const file = withRiser(sample(), [member('l0', 's0', 0)]);
+    const moved = moveSheet(file, 's1', 'l0');
+    expect(moved.sheets[1]!.levelId).toBe('l0');
+    expect(moved.risers).toEqual(file.risers);
+  });
+
+  it('refuses to delete a level that a riser member uses', () => {
+    const file = withRiser({ ...sample(), levels: [...sample().levels, { id: 'l2', name: 'Roof', elevationMm: 9000 }] }, [member('l2', 's0', 0)]);
+    expect(deleteLevel(file, 'l2')).toEqual({ ok: false, error: 'level-has-sheets' });
+  });
+
+  it('gives the text for a blocked removal only for a riser member', () => {
+    const file = withRiser(sample(), [member('l0', 's0', 0)]);
+    expect(sheetRemovalBlock(file, 's0')).toBe('Detach the riser first.');
+    expect(sheetRemovalBlock(file, 's1')).toBeNull();
+  });
+
+  it('gives the text for a blocked move only when another member of the riser uses the target level', () => {
+    const file = withRiser(sample(), [member('l0', 's0', 0), member('l1', 's1', 1)]);
+    expect(sheetMoveBlock(file, 's0', 'l1')).toBe('Riser R1 already has a member on that level.');
+    expect(sheetMoveBlock(file, 's0', 'l0')).toBeNull();
+    expect(sheetMoveBlock(withRiser(sample(), [member('l0', 's0', 0)]), 's1', 'l0')).toBeNull();
+  });
+
   it('keeps the minted flag on an added sheet that has an id', () => {
     const minted: NewSheetPage = { ...page(0, 'u-7'), idMinted: true };
     const result = addSheets(sample(), 'l1', [minted]);
@@ -436,3 +486,24 @@ describe('building edit', () => {
     expect(replaceMintedId(file, 'u-m', 'u-real').sheets[0]!.projectUuid).toBe('u-real');
   });
 });
+
+function member(levelId: string, sheetId: string, pageIndex: number): Riser['members'][number] {
+  return { levelId, sheetId, pageIndex, fittingId: `f-${sheetId}` };
+}
+
+function withRiser(file: BuildingFile, members: Riser['members']): BuildingFile {
+  const riser: Riser = {
+    id: 'r1',
+    name: 'R1',
+    networkTypeId: 'vent',
+    networkType: { id: 'vent', name: 'Supply', discipline: 'ventilation', units: 'CFM', defaultCapacity: 100, color: '#2196f3', lineWidthPt: 1, linePattern: 'solid' },
+    anchorMm: { xMm: 0, yMm: 0 },
+    flow: 'down',
+    topEnd: 'member',
+    bottomEnd: 'member',
+    endAllowanceMm: 0,
+    members,
+    pending: [],
+  };
+  return { ...file, risers: [riser] };
+}
