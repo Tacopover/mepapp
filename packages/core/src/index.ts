@@ -79,3 +79,4 @@ export * from './building-identity.js';
 export * from './riser.js';
 export * from './riser-coords.js';
 export * from './riser-edit.js';
+export * from './riser-quantities.js';
