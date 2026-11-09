@@ -1,6 +1,6 @@
 // B3-T11b: summary on open. Two saved PDFs, a building with NO summaries, each PDF opened through Menu > Open.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { makeTwoDocuments, buildingOf, recordSuggestedNames, exportScope } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/work/b2-lib.mjs';
 
 const t = await open();

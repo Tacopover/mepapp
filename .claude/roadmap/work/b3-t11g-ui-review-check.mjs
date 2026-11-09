@@ -1,6 +1,6 @@
 // B3-T11g UI review: action row placement, text sizes, add result stays until Dismiss, level sheets pane, 760x640 layout. Real clicks.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();

@@ -1,5 +1,5 @@
 // B3-T11f: open documents list and one-step Add to level. Real clicks and real selects. 3 documents (one multi-page, one unsaved), no file picker call.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();

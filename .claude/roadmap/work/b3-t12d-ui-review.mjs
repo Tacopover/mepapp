@@ -1,6 +1,6 @@
 // B3-T12d UI review: bounding boxes of the row cells, vertical centres, fonts, stray empty blocks, Summaries shot.
 // Setup copied from b3-t12d-check.mjs. Observation only.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { readFileSync } from 'node:fs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';

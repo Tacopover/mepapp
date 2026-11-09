@@ -72,8 +72,8 @@ async function createPlatform(): Promise<{
       buildingStorage: 'file',
     };
   }
-  // Dev browser checks keep the in-memory dev store unless they ask for the real web store (mepapp.webLike=1).
-  if (devBuildingStore && localStorage.getItem('mepapp.webLike') !== '1') {
+  // Only dev browser checks use the in-memory dev store and the OPFS path helpers (mepapp.devPlatform=1). A plain dev build uses the real web store.
+  if (devBuildingStore && localStorage.getItem('mepapp.devPlatform') === '1') {
     return {
       fileAccess: new WebFileAccess(),
       closeGuard: new WebCloseGuard(),
@@ -119,7 +119,7 @@ const container = document.getElementById('root');
 if (container) {
   void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs, makeBuildingStore, buildingStorage }) => {
     const fileAccess: FileAccess =
-      import.meta.env.DEV && localStorage.getItem('mepapp.webLike') !== '1' && platformFileAccess.statPath === undefined
+      import.meta.env.DEV && localStorage.getItem('mepapp.devPlatform') === '1' && platformFileAccess.statPath === undefined
         ? Object.assign(Object.create(platformFileAccess), { statPath: devStatPath, readPath: devReadPath })
         : platformFileAccess;
     createRoot(container).render(

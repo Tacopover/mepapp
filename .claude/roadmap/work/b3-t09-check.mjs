@@ -1,5 +1,5 @@
 // B3-T09: the old registry import line. Real clicks. The save picker is a stub that writes imp-<n>.json in OPFS.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const old = [
   { id: 'old-1', name: 'Old tower', levels: [{ id: 'ol-1', name: 'Ground', documentFileName: 'ground.pdf' }, { id: 'ol-2', name: 'Level 1', documentFileName: null }] },

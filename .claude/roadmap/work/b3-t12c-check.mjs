@@ -1,6 +1,6 @@
 // B3-T12c: no Close building; Export dialog Building select; Save question for an unsaved drawing; status tooltip. Real clicks and typing.
 // Web stand-in: the dev store holds ONE building file. Before a switch of building the target JSON goes into the store (store.load).
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { GROUND, drawSegmentWithTool, recordSuggestedNames, openScopeDialog } from './b2-lib.mjs';
 import { readXlsx } from './xlsx-read.mjs';
 

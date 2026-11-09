@@ -1,6 +1,6 @@
 // B3-T13c: a PDF that MepApp never saved is added to a level, then opened. The sheet is linked and the summary is written without a Save.
 // Web stand-in: files come from OPFS (no file paths), so the match is by file name and size. The path match of the desktop is not proven here.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { readFileSync } from 'node:fs';
 import { readXlsx } from './xlsx-read.mjs';
 

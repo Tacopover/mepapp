@@ -1,6 +1,6 @@
 // B3-T05: go to sheet. Real clicks on the Open buttons of the Sheets pane.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();

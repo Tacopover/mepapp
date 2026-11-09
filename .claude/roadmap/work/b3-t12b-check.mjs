@@ -1,6 +1,6 @@
 // B3-T12b: Add PDFs / Add folder go to the selected level at once; the building node offers no add; Open keeps the dialog open.
 // Empty profile, real clicks and typing. The web stand-in feeds files through OPFS (window.__nextFile) and a fake directory picker.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { readFileSync } from 'node:fs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';

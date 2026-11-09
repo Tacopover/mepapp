@@ -1,7 +1,7 @@
 // B3-T10: the part check. One run from an empty profile with real clicks and typing.
 // Web dev stand-ins (the native Tauri parts cannot run here): the OPFS picker stubs give files by name; a web file has no path, so the check adds `location.path` (= the file name, read by the dev statPath/readPath) to the stored building through the dev hook, the way the desktop gives real paths.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();

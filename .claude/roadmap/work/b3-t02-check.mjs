@@ -1,5 +1,5 @@
 // B3-T02: Manage Buildings dialog: new building, recent list after reload, open from the dev hook. Real clicks and typing.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const t = await open();
 const { page, check, shot, idle, menu } = t;

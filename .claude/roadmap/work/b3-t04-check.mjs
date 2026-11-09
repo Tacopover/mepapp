@@ -1,6 +1,6 @@
 // B3-T04: Sheets on levels. Add PDFs to a level through the real "Add PDFs…" button (OPFS stub picker), move a page with the real select.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();

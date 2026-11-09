@@ -1,5 +1,5 @@
 // B2-T07: the scope dialog of Export quantities. Real clicks on the radio buttons and Export; the xlsx is read from OPFS.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { makeTwoDocuments, buildingOf, loadBuildingWithSummaries, recordSuggestedNames, openScopeDialog, exportScope, dialog } from './b2-lib.mjs';
 
 const t = await open();

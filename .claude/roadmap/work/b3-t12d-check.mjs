@@ -1,6 +1,6 @@
 // B3-T12d: layout of the right pane of the Building dialog. Bounding boxes, real DOM.
 // Web stand-in: the dev store holds ONE building file. The test building is made in the UI, then edited as JSON and put back with store.load.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { readFileSync } from 'node:fs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';

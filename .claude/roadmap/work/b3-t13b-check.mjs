@@ -1,6 +1,6 @@
 // B3-T13b: delete text, PDFs on levels only, Opened state, already-assigned text, two-file pick. Real DOM clicks and typing.
 // Web stand-in: files come from OPFS; window.showOpenFilePicker is replaced to honour { multiple: true }. The real Windows picker is not tested.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { readFileSync } from 'node:fs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';

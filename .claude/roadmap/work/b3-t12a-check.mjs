@@ -1,6 +1,6 @@
 // B3-T12a: levels sit in order of elevation, buildings sit in alphabetical order, no Move or Sort buttons. Empty profile, real clicks and typing.
 // Web stand-in: the dev store holds ONE building file. A switch between buildings first puts the target's JSON into the store (store.load), then clicks the tree item once.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const t = await open();
 const { page, check, shot, idle, menu } = t;

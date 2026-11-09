@@ -1,5 +1,5 @@
 // B2-T05: Save writes the sheet summary into the open building store (real Menu > Save).
-import { open, PDF } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open, PDF } from '../browser/lib.mjs';
 
 const GROUND = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/00_arch_ground_floor.pdf';
 const t = await open();

@@ -1,6 +1,6 @@
 // B3-T11j: part check of the Building dialog. Empty profile, real clicks and typing.
 // Web stand-in: the dev store holds ONE building file. A switch between buildings first puts the target's JSON into the store (store.load), then clicks the tree item once.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { makeTwoDocuments, recordSuggestedNames, openScopeDialog, dialog } from './b2-lib.mjs';
 import { readXlsx } from './xlsx-read.mjs';
 import { readFileSync } from 'node:fs';

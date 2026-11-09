@@ -1,5 +1,5 @@
 // B3-T12c UI review 2: Building select read back from the real select (keyboard), with the web stand-in store holding the other building.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { GROUND, drawSegmentWithTool, openScopeDialog } from './b2-lib.mjs';
 
 const t = await open();

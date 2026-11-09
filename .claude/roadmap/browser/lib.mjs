@@ -21,6 +21,8 @@ const { chromium } = await import(`${REPO}/node_modules/playwright/index.mjs`);
 export async function open({ width = 1600, height = 1000, seed = {}, dark = false } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width, height }, colorScheme: dark ? 'dark' : 'light' });
+  // Old checks run on the in-memory dev building store; a check that sets mepapp.webLike or mepapp.realStore runs on the real web store.
+  if (seed['mepapp.webLike'] === undefined && seed['mepapp.realStore'] === undefined) seed = { 'mepapp.devPlatform': '1', ...seed };
   await context.addInitScript((s) => {
     window.showOpenFilePicker = async () => [await (await navigator.storage.getDirectory()).getFileHandle(window.__nextFile ?? 'drawing.pdf')];
     window.showSaveFilePicker = async () => await (await navigator.storage.getDirectory()).getFileHandle('export.json', { create: true });

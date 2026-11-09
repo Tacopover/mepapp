@@ -2,7 +2,7 @@
 // Usage: node .claude/roadmap/browser/with-server.mjs .claude/roadmap/work/b3-t11-review.mjs
 // The scenario name is read from the file MEPAPP_SCENARIO_FILE-less convention: edit SCENARIO below.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const SCENARIO = readFileSync('/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/work/b3-t11-scenario.txt', 'utf8').trim();
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';

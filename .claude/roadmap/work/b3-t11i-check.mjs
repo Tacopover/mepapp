@@ -1,5 +1,5 @@
 // B3-T11i: Export scope with no building open, header sheet label (button, ellipsis, title), "Saved" text clears on a tab change. Real clicks.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { makeTwoDocuments, buildingOf, loadBuildingWithSummaries, recordSuggestedNames, dialog, openScopeDialog } from './b2-lib.mjs';
 import { readXlsx } from './xlsx-read.mjs';
 

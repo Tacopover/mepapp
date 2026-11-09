@@ -1,6 +1,6 @@
 // B3-T06: sheet status, relink, and the copy/move dialog. Real clicks. Native Tauri paths (moved verdict, grant access) cannot run here.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();

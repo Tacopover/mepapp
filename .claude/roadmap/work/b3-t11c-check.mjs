@@ -1,7 +1,7 @@
 // B3-T11c: new Manage Buildings shell: tree, building switcher, Building menu, keyboard, fixed size, narrow select. Real clicks and typing.
 // Web dev stand-in: the dev building store holds ONE building file. To switch to a building through the tree, the check first puts that building's JSON into the store (store.load) and then clicks the tree item once.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();

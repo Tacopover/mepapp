@@ -1,5 +1,5 @@
 // B3-T12c UI review: narrow window (800 px), keyboard only for the Building select, Save question, focus on the status text.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { GROUND, drawSegmentWithTool, recordSuggestedNames, openScopeDialog } from './b2-lib.mjs';
 
 const t = await open();

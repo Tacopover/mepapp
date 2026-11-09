@@ -1,5 +1,5 @@
 // B3-T11d: levels in the tree. Real clicks, typing, Enter, Tab, keyboard. Add level in the tree, level detail, delete with Undo, blocked delete reason, sort reason.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const t = await open();
 const { page, check, shot, idle, menu } = t;

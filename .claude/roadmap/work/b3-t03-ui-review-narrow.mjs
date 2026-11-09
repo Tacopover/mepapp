@@ -1,5 +1,5 @@
 // B3-T03 UI review: levels pane at a narrow window (800 px) and in the dark theme. Reads layout only.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const t = await open({ width: 800, height: 900 });
 const { page, check, shot, idle, menu, finish } = t;

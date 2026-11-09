@@ -1,6 +1,6 @@
 // B3-T13a: rename a building, no Untitled entry, no Open badge, sheets under the levels in the tree. Real DOM clicks and typing.
 // Web stand-in: the dev store holds ONE building file. The test building is made in the UI, then edited as JSON and put back with store.load.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const t = await open();
 const { page, check, shot, idle, menu } = t;

@@ -1,5 +1,5 @@
 // B2-T06: Rebuild summaries over the two tracked fixtures. Real Open and Save through the menu; the rebuild starts through the dev hook (no button before B3-T08).
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const GROUND = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/00_arch_ground_floor.pdf';
 const FIRST = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/01_arch_first_floor.pdf';

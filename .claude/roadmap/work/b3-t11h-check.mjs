@@ -1,6 +1,6 @@
 // B3-T11h: repair action (Read summaries now), Add on a level leaves nothing waiting, 760x640 layout, create row, stale read. Real clicks.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();

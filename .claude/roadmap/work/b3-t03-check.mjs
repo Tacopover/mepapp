@@ -1,5 +1,5 @@
 // B3-T03: levels pane. Real typing into the name and elevation inputs, Enter and Tab, move buttons, delete, reopen the dialog.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const t = await open();
 const { page, check, shot, idle, menu } = t;

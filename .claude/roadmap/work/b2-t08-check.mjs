@@ -1,5 +1,5 @@
 // B2-T08: part check on the two tracked fixtures. Export Level 0 and Building, then remove one PDF from OPFS and export again.
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 import { makeTwoDocuments, buildingOf, loadBuildingWithSummaries, recordSuggestedNames, exportScope } from './b2-lib.mjs';
 
 const t = await open();

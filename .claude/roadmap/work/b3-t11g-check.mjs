@@ -1,6 +1,6 @@
 // B3-T11g: add PDFs on a level. The pages go on the level at once. Real clicks and real selects. Picker stub (OPFS), one file at a time.
 import { readFileSync } from 'node:fs';
-import { open } from '/root/MepApp/.claude/worktrees/buildings-model/.claude/roadmap/browser/lib.mjs';
+import { open } from '../browser/lib.mjs';
 
 const FIX = '/root/MepApp/.claude/worktrees/buildings-model/fixtures/pdfs/';
 const t = await open();
