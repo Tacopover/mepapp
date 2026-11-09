@@ -1,6 +1,6 @@
 # B4 plan: risers between levels
 
-Status: planned 2026-10-31 by the road map planner. Not started. Not audited. The user decided D-B-13 A, D-B-18 A and D-B-20 A, and D-B-14 as a custom answer: the anchor is in real-world mm (2026-10-31). No decision of the user is open.
+Status: planned 2026-10-31 by the road map planner. Audited 2026-11-09 (auditor + domain checker, findings in section 9; section 9 overrides sections 2 to 5 where they differ). Not started. The user decided D-B-13 A, D-B-18 A and D-B-20 A, and D-B-14 as a custom answer: the anchor is in real-world mm (2026-10-31). No decision of the user is open.
 Origin: `buildings-levels-sheets-spec.md` (sections 3.4, 3.6, 6), `buildings-b1.md` to `buildings-b3.md`. Final decisions: D-B-04 (a riser has the same x and y on every level; a move on one level syncs to the others), D-B-07 A (a riser is an entity in the building file with one anchor and the list of segments on each level).
 Read `.claude/roadmap/rules.md` first. Paths start at the repository root. Line numbers can move.
 Terms: as in the spec, section 0. **Member**: the part of a riser on one level: a fitting at the anchor and the segments that end there. **Pending op**: a change (a move or a type change) that a closed document has not applied yet.
@@ -198,3 +198,53 @@ T01, T02, T03 in core in order. T03 does not wait for the scene. T04 after T02. 
 ## 8. Where B4 stops
 
 B4 ends with risers in the file, in the scene, in the dialog and in the takeoff. The anchor is in mm from the bottom-left of each displayed page, y up. A shared coordinate system between sheets is **B5 (later)**: goal, reason and open questions are in the spec, section 5.5. Not in B4: flow or sizing across levels, auto-routing of risers (R6 still refuses multi-page documents), risers that change x and y on one level (D-B-04 forbids), a 3D view, and shared "typical floor" sheets (D-B-02 forbids).
+
+## 9. Audit amendments (2026-11-09)
+
+Sources: the auditor (code) and the domain checker. These rules override the text above.
+
+### 9.1 Corrected API table (the line numbers in section 2 and 5 are old)
+
+| Plan says | Real now |
+|---|---|
+| `applyConnectivityCascade` `scene.ts:4883` | private, `scene.ts:4972`, passed to tools at `:903`, reads `this.doc` (active document) |
+| `setNetworkTypeForSegmentsNetworks` `:1531` | `:1544`, active document only |
+| `adoptNetworkTypes` `:2529` | `:2553`, `(ids, copies = [])`, returns ids not found |
+| `removeFitting` / `canRemoveFitting` `:1453` | `:1494` / `:1467`; `insertFittingOnSegment` `:1473` |
+| context menu `:542-544`, `:989` | type `CanvasContextMenuTarget` `:544`, event `:632`, emitted `:997` and `:1003`; it has only `insertFitting`, `drawFrom`, `removeFittingId`: B4-T06 adds target fields |
+| `applyRemoteFittingMove` | does NOT exist. New, per document (see 9.2) |
+| `handleActivateDocument` `App.tsx:664`, `openPdfFile` `:623` | `:993`, `:776`; `openSheet` `:932` (modes `path`, `pick`) |
+| backdrop size `:1100-1110`, marker radius `:358` | `:1108-1119`, `:363` |
+| `getCalibration` `:2389`, `getProjectUuid` `:4245` | true, but active document only. For all open documents use `getDocuments()` `:1195` (`DocumentSummary`: `projectUuid`, `projectUuidInFile`, `pageCount`) |
+| `useBuilding.update` | true: `update(change: (file) => file): Promise<void>`, serialized, no-op on the same object, re-sorts levels |
+
+Model facts: `BUILDING_SCHEMA_VERSION = 1`, `risers: Riser[]` exists (`building.ts:44`), `riser.ts` is a types-only stub, `validateTopLevel` only checks that `risers` is an array. B4 needs no file migration unless a new required riser field is added later. The tab strip in `ManageBuildingsDialog.tsx:494-506` has one tab and a comment "B4 adds a Risers tab here".
+
+### 9.2 Must-fix rules
+
+1. **Non-active documents (T04, T07).** `SketchScene` works on the active document only (`this.doc`). B4 adds a per-document path: `applyRemoteFittingMoveIn(docId, fittingId, to)` edits that document's `drawingHistory`, uses that document's `portGroups`, sets that document's dirty flag, makes no undo entry. The retag of an open non-active member uses the same kind of path. If the first spike shows that this is unsafe, the fallback is: store the op and apply it on the next activation (same code as a pending op). T04 starts with a spike and a note in the ledger.
+2. **Reconcile instead of only events (T04/T07).** `riserFittingMoved` fires only for the select-tool drag. Undo, redo, route (R6), rotate, scale, paste and undo of Attach also change a marked fitting. The scene does not sync these. A check compares each marked fitting with `anchorMm` (the 0.5 mm rule) on document activation and after each commit. A difference shows the conflict state ("Move the riser here" or "Snap back"). Whether undo of a synced move should sync is a user decision (D-B-56).
+3. **Sheet link (T07).** `openSheetIds` and `takePendingOps(sheetId)` get the sheet id from `findSheets` (`core/src/building-identity.ts:34-49`: id, then path, then name+size). Apply an op only on an **id match**. A weak match (name+size, `projectUuid: null`, `idMinted`) keeps the op pending and shows a warning. One document has many pages: a member names `sheetId` and `pageIndex`. Validate `Fitting.pageIndex === sheet.pageIndex` (T01).
+4. **Calibration and height source order (T07).** Live scene (active page) first, then the sheet summary (`pages[].heightPt`, `pageUnitsPerRealUnit`), else the op stays pending with a status line. The summary is written at Save and when a background document becomes active (`App.tsx:917-920`), so it can be stale: show "scale from saved summary" in the status line. `frames.first` can be null when a sheet has no summary (`building-takeoff.ts:73-78`): `attachMember` returns `scale-unknown`.
+5. **Type cascade over the building graph (T03, T05, T07), domain rule 2.** A type change retags the connected run, every riser that run touches, every member run of those risers, and so on until no new run or riser is reached (union-find from T03). The event carries the list of risers: `riserTypeChangeRequested({ riserIds, networkTypeId })`. All reached risers get the new `networkTypeId` and `networkType` copy. Open members: retag now. Closed members: pending `retag` ops.
+6. **Fitting identity.** Fitting ids restart per document (`nextFittingSeq`). The key is `(sheetId, fittingId)`. `RiserMark` is cleared and set again on `documentActivated` and `setBackdropPage`.
+7. **Sheet edits (T01).** `removeSheet` (`building-edit.ts:102`) and `moveSheet` (`:95`) ignore risers. `removeSheet` of a sheet that is a member is refused ("Detach the riser first"). `moveSheet` updates `member.levelId` (and refuses when the target level already has a member of that riser). `riserWarnings` and the validator catch a dangling member.
+8. **`endAllowanceMm` meaning (T01/T03).** It is the extra pipe length at ONE end, counted once per open or closed end of the riser, added to the span row of that end. The fittings table counts fittings, the Risers table counts length: the two never add up to a double count. Defined in the data model (see D-B-55).
+9. **Takeoff columns (T08).** The Segments table has no endpoint fitting ids (`quantities.ts:117-118`). `Size` and the `Riser` column need them. Add endpoint fitting id columns and bump `SHEET_SUMMARY_VERSION` (now 1) with a reader for 1. Format change: needs D-B-57. Without it, `Size` is dropped and the `Riser` column is filled from the building file only.
+10. **Split T07** into T07a (live sync of open documents, reconcile, conflict dialog) and T07b (pending ops on open, status lines, calibration source order).
+11. **T09 and T10** run `.claude/roadmap/work/run-all-b3-checks.mjs` (result `checks with problems: 0`) and add one check with no flags (web mode, restart closes all documents, so pending ops are the main case).
+12. **UX.** T06 (Make riser dialog, Attach, menu) and T09 (Risers tab) are screen tasks. The `ux-designer` runs first. The wireframe, journeys and texts go to the dashboard (decision, kind `ux`) before the implementation. The `journey-tester` runs before the task is done.
+
+### 9.3 Domain additions
+
+- **Flow vs type.** A drainage riser flows down only. For exhaust and return, `sourceLevelId` is the fan level (the sink). The Risers tab shows a warning when the stored flow direction does not fit the network type (a table of type to allowed directions; the type kind comes from the network type). No default is written (D-B-18 A: `unknown`).
+- **Flow and size per span.** B4 does not size or sum flow across levels. The Building takeoff states "Flow is not summed across levels." A later part owns the downstream sums. The local flow solve treats a riser fitting with no source in its own document as a boundary: check `flow.ts` in T04 and write the result in the ledger.
+- **End kinds.** Add `capped` beside `member` and `open` (a dead end of a water or wet sprinkler riser is not open to the roof). D-B-55.
+- **Fire and smoke.** The Risers table shows "Floor crossings" (T03). It also gets a column `Fire crossings to check` equal to the crossings, with a note that each floor crossing of a duct needs a fire damper or a fire-stopped penetration (standard clauses not verified). D-B-58 decides whether a "fire-rated shaft" flag exists.
+- **Electrical.** Cable length excludes vertical runs (the note goes on the circuit row, T08). Electrical rising mains cannot be modelled in B4 (a riser needs a network type).
+- **Transfer floors.** D-B-04 forces equal x and y. The Make riser dialog help says: "For an offset, use two risers and a horizontal run."
+- **Warnings.** The 150 mm anchor spacing is point to point; when segment sizes are known it uses half-widths. The page-size warning shows the difference in mm. The conflict dialog says that a new calibration of a page moves every anchor of that page into conflict. The size cell shows both sizes when the ends differ ("200 / 160"), not "mixed".
+
+### 9.4 Decisions for the user (on the dashboard)
+
+D-B-55 (data model: end kinds and `endAllowanceMm`), D-B-56 (undo of a synced move), D-B-57 (summary format v2 for endpoint fitting ids), D-B-58 (fire-rated shaft flag). Phase 1 T01 waits for D-B-55. Everything else in T02 (coordinates) does not depend on them.
