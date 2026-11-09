@@ -8,7 +8,6 @@ import {
   isSamePdf,
   newSheetPage,
   pdfGroupKey,
-  pdfTotals,
   placeEntriesOnLevel,
   relinkWouldDuplicate,
   resolveEntryIds,
@@ -16,7 +15,6 @@ import {
   sheetGroupsOfLevel,
   sheetPdfKey,
   sheetsOfSamePdf,
-  waitingGroups,
   type PendingPdf,
 } from './buildingSheets.js';
 
@@ -176,20 +174,6 @@ describe('sheetDisplayName', () => {
   });
 });
 
-describe('pdfTotals', () => {
-  it('counts the pending pages and the assigned pages, and the pages of a sheets-only PDF as assigned', () => {
-    const groups = groupPdfs(
-      buildingOf([sheetOf('s1', 1, 'a.pdf', { path: 'C:/a.pdf' }), sheetOf('s2', 0, 'b.pdf', { path: 'C:/b.pdf' }), sheetOf('s3', 1, 'b.pdf', { path: 'C:/b.pdf' })]),
-      [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 3 })],
-    );
-    expect(pdfTotals(groups)).toEqual({ pdfs: 2, pages: 5, assigned: 3 });
-  });
-
-  it('returns zeros for no groups', () => {
-    expect(pdfTotals([])).toEqual({ pdfs: 0, pages: 0, assigned: 0 });
-  });
-});
-
 describe('relinkWouldDuplicate', () => {
   it('returns false when the document id is undefined or null', () => {
     const file = buildingOf([sheetOf('s1', 0, 'a.pdf', { projectUuid: 'u1' }), sheetOf('s2', 0, 'b.pdf')]);
@@ -314,38 +298,6 @@ describe('sheetsOfSamePdf', () => {
   it('gives only the sheet itself when no other sheet shares its PDF', () => {
     const only = sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' });
     expect(sheetsOfSamePdf(twoLevels([only]), only).map((sheet) => sheet.id)).toEqual(['s1']);
-  });
-});
-
-describe('waitingGroups', () => {
-  it('gives no groups when there is no pending PDF', () => {
-    expect(waitingGroups(twoLevels([sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' })]), [])).toEqual([]);
-  });
-
-  it('drops a pending PDF whose pages all have sheets', () => {
-    const file = twoLevels([
-      sheetOf('s1', 0, 'a.pdf', { path: 'C:/a.pdf' }),
-      sheetOf('s2', 1, 'a.pdf', { path: 'C:/a.pdf' }),
-    ]);
-    expect(waitingGroups(file, [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 2 })])).toEqual([]);
-  });
-
-  it('keeps only the open pages of a partly assigned PDF and keeps the full pageCount', () => {
-    const file = twoLevels([sheetOf('s1', 1, 'a.pdf', { path: 'C:/a.pdf' })]);
-    const groups = waitingGroups(file, [pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 3 })]);
-    expect(groups).toHaveLength(1);
-    expect(groups[0]!.pageCount).toBe(3);
-    expect(groups[0]!.rows.map((row) => row.pageIndex)).toEqual([0, 2]);
-    expect(groups[0]!.rows.every((row) => row.sheet === null)).toBe(true);
-  });
-
-  it('gives the pending PDFs that have open pages, in the order given', () => {
-    const groups = waitingGroups(twoLevels([]), [
-      pendingOf({ fileName: 'a.pdf', path: 'C:/a.pdf', pageCount: 1 }),
-      pendingOf({ fileName: 'b.pdf', path: 'C:/b.pdf', pageCount: 2 }),
-    ]);
-    expect(groups.map((group) => group.fileName)).toEqual(['a.pdf', 'b.pdf']);
-    expect(groups.every((group) => group.pending)).toBe(true);
   });
 });
 

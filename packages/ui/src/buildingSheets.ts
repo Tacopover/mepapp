@@ -159,14 +159,6 @@ export function sheetsOfSamePdf(file: BuildingFile, sheet: BuildingSheet): Build
   return file.sheets.filter((other) => sheetPdfKey(other) === key);
 }
 
-/** Pending PDFs for the add pane: groupPdfs(file, pending) filtered to pending groups, rows filtered to rows with sheet === null (unassigned pages), groups with no such rows dropped. Other fields unchanged (pageCount stays the full count). */
-export function waitingGroups(file: BuildingFile, pending: readonly PendingPdf[]): PdfGroup[] {
-  return groupPdfs(file, pending)
-    .filter((group) => group.pending)
-    .map((group) => ({ ...group, rows: group.rows.filter((row) => row.sheet === null) }))
-    .filter((group) => group.rows.length > 0);
-}
-
 /** The sheets of the file that can be the document of one pending entry (projectUuid null in the match). A weak match (file name and size only) does not count when the entry and the sheet both have a path. */
 function entrySheetMatches(file: BuildingFile, entry: PendingPdf): BuildingSheet[] {
   return findSheets(file, {
@@ -284,17 +276,6 @@ export function addResultText(input: {
 /** True when two pending entries name the same PDF (same pdfGroupKey). */
 export function isSamePdf(a: PendingPdf, b: PendingPdf): boolean {
   return pdfGroupKey(a.projectUuid, a.path, a.fileName) === pdfGroupKey(b.projectUuid, b.path, b.fileName);
-}
-
-/** How many pages in total and how many assigned over the groups, for a hint line: { pdfs, pages, assigned }. Pages of a sheets-only group count as assigned pages. */
-export function pdfTotals(groups: readonly PdfGroup[]): { pdfs: number; pages: number; assigned: number } {
-  let pages = 0;
-  let assigned = 0;
-  for (const group of groups) {
-    pages += group.pending ? group.pageCount : group.rows.length;
-    assigned += group.rows.filter((row) => row.sheet !== null).length;
-  }
-  return { pdfs: groups.length, pages, assigned };
 }
 
 /** True when giving the sheets `sheetIds` the document id `projectUuid` would leave two sheets with the same non-null id and page index. projectUuid undefined or null -> false. Sheets outside sheetIds keep their id. */

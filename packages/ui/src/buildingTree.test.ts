@@ -10,7 +10,6 @@ import {
   initialSelection,
   levelKey,
   moveFocus,
-  NOT_PLACED_KEY,
   warningLines,
   type TreeInput,
 } from './buildingTree.js';
@@ -39,7 +38,7 @@ const recent = [
 ];
 
 function input(overrides: Partial<TreeInput> = {}): TreeInput {
-  return { recent, open: null, sheetStatus: {}, notPlacedCount: 0, collapsed: new Set(), expandedLevels: new Set(), ...overrides };
+  return { recent, open: null, sheetStatus: {}, collapsed: new Set(), expandedLevels: new Set(), ...overrides };
 }
 
 describe('buildTreeNodes', () => {
@@ -78,12 +77,6 @@ describe('buildTreeNodes', () => {
     expect(nodes.indexOf(add!)).toBe(3);
   });
 
-  it('places the add-level node before the Not placed node', () => {
-    const file = withLevels([0]);
-    const nodes = buildTreeNodes(input({ open: { file, location: 'x' }, notPlacedCount: 2 }));
-    expect(nodes.map((n) => n.key)).toEqual(['b:b1', 'l:level-0', ADD_LEVEL_KEY, 'p:not-placed', 'b:b2']);
-  });
-
   it('omits the add-level node when the building is collapsed or not open', () => {
     const file = withLevels([0]);
     const collapsed = buildTreeNodes(input({ open: { file, location: 'x' }, collapsed: new Set(['b:b1']) }));
@@ -119,16 +112,6 @@ describe('buildTreeNodes', () => {
     );
     const dots = nodes.filter((n) => n.kind === 'level').map((n) => n.warning);
     expect(dots).toEqual([true, true, false]);
-  });
-
-  it('shows the Not placed node only when pages wait', () => {
-    const file = withLevels([0]);
-    const none = buildTreeNodes(input({ open: { file, location: 'x' } }));
-    expect(none.some((n) => n.key === NOT_PLACED_KEY)).toBe(false);
-    const some = buildTreeNodes(input({ open: { file, location: 'x' }, notPlacedCount: 3 }));
-    const node = some.find((n) => n.key === NOT_PLACED_KEY);
-    expect(node).toMatchObject({ kind: 'not-placed', parentKey: 'b:b1', detail: '3' });
-    expect(some.indexOf(node!)).toBe(3);
   });
 
   it('orders the buildings alphabetically, ignoring case, and does not change the recent list', () => {

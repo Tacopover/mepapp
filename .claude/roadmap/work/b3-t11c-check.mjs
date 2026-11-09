@@ -137,7 +137,6 @@ const addPdf = async (name, file) => {
   await idle(900);
 };
 await addPdf('ground.pdf', null);
-check((await items('not-placed').count()) === 0, 'tree: no Not placed node, the page is on Level 2 at once');
 check(/^Added 1 page to Level 2\./.test((await dlg.locator('[data-testid="add-result"]').textContent()) ?? ''), 'add result: Added 1 page to Level 2.', (await dlg.locator('[data-testid="add-result"]').textContent()) ?? '');
 check((await dlg.locator('[data-testid="pdf-group"]').count()) === 1, 'Level 2 lists the PDF of the page');
 check(/Level 2/.test((await items('level').nth(1).textContent()) ?? '') && /1 sheet\b/.test((await items('level').nth(1).textContent()) ?? ''), 'tree: Level 2 shows 1 sheet');

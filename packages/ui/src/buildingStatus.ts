@@ -162,17 +162,6 @@ export function otherNoSummaryText(count: number): string {
   return `${count} more sheets have no summary and cannot be read now: their PDFs are missing, have no access, are not opened yet, or are not checked yet.`;
 }
 
-/** The text of the in-dialog question when an action drops the pages that wait for a level. */
-export function notPlacedAskText(action: 'close' | 'switch', pages: number): string {
-  const lead = `${pages} ${pages === 1 ? 'page is' : 'pages are'} not placed.`;
-  switch (action) {
-    case 'close':
-      return `${lead} Close anyway?`;
-    case 'switch':
-      return `${lead} Switch building anyway?`;
-  }
-}
-
 /** A short form of a long text for the status bar: the first `max` characters, then an ellipsis. */
 export function shortText(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`;

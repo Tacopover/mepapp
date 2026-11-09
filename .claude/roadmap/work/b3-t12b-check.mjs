@@ -54,8 +54,6 @@ await until(async () => (await stored()).sheets.length >= 1, 'a1 placed', 15000)
 await idle(600);
 s = await stored();
 check(s.sheets.length === 1 && s.sheets[0].levelId === s.levels[0].id, 'Add PDFs put the page on the selected level', JSON.stringify(s.sheets.map((x) => x.displayName)));
-check((await items('not-placed').count()) === 0, 'no Not placed node in the tree');
-check((await dlg.locator('[data-testid="sheets-pane"]').count()) === 0, 'no Not placed pane');
 const n1 = await notice();
 check(/Added 1 page to Ground floor/.test(n1), 'the notice says where the page went', n1);
 await shot('b3-t12b-1');
@@ -63,7 +61,6 @@ const sameBefore = (await stored()).sheets.length;
 await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await idle(1500);
 check((await stored()).sheets.length === sameBefore, 'the same PDF again adds no second sheet');
-check(!(await items('not-placed').count()), 'the same PDF again leaves no Not placed node');
 const n1b = await notice();
 check(/Nothing added\. 1 page is already on this level\./.test(n1b), 'the same PDF again says the page is already on the level', n1b);
 
@@ -81,7 +78,6 @@ if ((await folderBtn.count()) > 0) {
   s = await stored();
   const onL1 = s.sheets.filter((x) => x.levelId === s.levels[1].id);
   check(onL1.length === 2, 'Add folder put both PDFs on Level 1', JSON.stringify(s.sheets.map((x) => [x.displayName, x.levelId === s.levels[1].id])));
-  check((await items('not-placed').count()) === 0 && (await dlg.locator('[data-testid="sheets-pane"]').count()) === 0, 'no Not placed after Add folder');
   const n2 = (await dlg.locator('[data-testid="add-result"] span').textContent().catch(() => '')) ?? '';
   check(/^Added 2 pages from \S+ \(2 PDFs\) to Level 1\.$/.test(n2.trim()), 'the folder result names the level', n2);
   await shot('b3-t12b-2');
@@ -112,7 +108,6 @@ if ((await folderBtn.count()) > 0) {
   const names = await docNames();
   check(names.includes('a1.pdf') && names.includes('f1.pdf'), 'both documents are open', JSON.stringify(names));
 }
-check(!(await dlg.locator('[data-testid="close-anyway"]').count()), 'no ask appeared on Open');
 await shot('b3-t12b-3');
 
 // Step 5: the building node offers no add. Only a level takes PDFs.
@@ -122,10 +117,9 @@ check((await dlg.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 0,
 check((await dlg.locator('button', { hasText: /^Add folder…$/ }).count()) === 0, 'no Add folder button with the building selected');
 const hint = (await dlg.locator('[data-testid="add-hint"]').textContent().catch(() => '')) ?? '';
 check(/Select a level to add PDFs\./.test(hint), 'the hint asks for a level', hint);
-check((await items('not-placed').count()) === 0, 'no Not placed node after the adds');
 await shot('b3-t12b-4');
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
 await idle(600);
-check((await dlg.locator('[data-testid="close-anyway"]').count()) === 0 && (await dlg.count()) === 0, 'Close does not ask when no page waits');
+check((await dlg.count()) === 0, 'Close closes the dialog');
 
 await t.finish();

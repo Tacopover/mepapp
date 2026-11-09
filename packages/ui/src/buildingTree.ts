@@ -4,13 +4,10 @@ import { sheetGroupsOfLevel, sheetsOfSamePdf } from './buildingSheets.js';
 import { statusTone, type SheetStatus } from './buildingStatus.js';
 import type { RecentBuilding } from './recentBuildings.js';
 
-/** The key of the "Not placed" node. Keys of the other nodes: "b:<building id>" and "l:<level id>". */
-export const NOT_PLACED_KEY = 'p:not-placed';
-
 /** The key of the "+ Add level" node of the open building. The dialog never selects it. */
 export const ADD_LEVEL_KEY = 'a:add-level';
 
-export type TreeNodeKind = 'building' | 'level' | 'sheet' | 'add-level' | 'not-placed';
+export type TreeNodeKind = 'building' | 'level' | 'sheet' | 'add-level';
 
 export interface TreeNode {
   key: string;
@@ -39,8 +36,6 @@ export interface TreeInput {
   /** The open building, or null. Its entry is added to the list when the recent list does not hold it. */
   open: { file: BuildingFile; location: string } | null;
   sheetStatus: Record<string, SheetStatus>;
-  /** Pages that wait for a level (dialog state). The node shows only when above 0. */
-  notPlacedCount: number;
   /** Keys ("b:<id>") of open buildings that the user collapsed. */
   collapsed: ReadonlySet<string>;
   /** Keys ("l:<id>") of levels that the user expanded. A level is collapsed by default. */
@@ -60,9 +55,9 @@ export function levelHasWarning(file: BuildingFile, levelId: string, sheetStatus
   });
 }
 
-/** The visible nodes in display order: every building, and under the open building its levels, the add-level node and the Not placed node. */
+/** The visible nodes in display order: every building, and under the open building its levels and the add-level node. */
 export function buildTreeNodes(input: TreeInput): TreeNode[] {
-  const { recent, open, sheetStatus, notPlacedCount, collapsed, expandedLevels } = input;
+  const { recent, open, sheetStatus, collapsed, expandedLevels } = input;
   const listed =
     open !== null && !recent.some((entry) => entry.id === open.file.id)
       ? [{ id: open.file.id, name: open.file.name, location: open.location }, ...recent]
@@ -140,22 +135,6 @@ export function buildTreeNodes(input: TreeInput): TreeNode[] {
       entry: null,
       sheetId: null,
     });
-    if (notPlacedCount > 0) {
-      nodes.push({
-        key: NOT_PLACED_KEY,
-        kind: 'not-placed',
-        depth: 2,
-        parentKey: key,
-        label: 'Not placed',
-        detail: String(notPlacedCount),
-        isOpen: false,
-        expandable: false,
-        expanded: false,
-        warning: false,
-        entry: null,
-        sheetId: null,
-      });
-    }
   }
   return nodes;
 }

@@ -1737,12 +1737,6 @@
     opacity: 0;
   }
 }
-.mep-buildings-close-ask {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 .mep-buildings-message button {
   margin-left: 8px;
 }
@@ -6099,41 +6093,6 @@ button.mep-tree-arrow {
 }
 .mep-open-doc-note {
   margin: 4px 0 0;
-}
-
-/* Not placed section. */
-.mep-notplaced-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  margin-bottom: 4px;
-}
-.mep-notplaced-head b {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.mep-notplaced-head .mep-hint {
-  margin: 0;
-}
-.mep-notplaced-head select {
-  width: auto;
-  max-width: 14em;
-  margin-bottom: 0;
-}
-.mep-prow {
-  display: grid;
-  grid-template-columns: 80px minmax(0, 220px);
-  gap: 8px;
-  align-items: center;
-  padding: 4px 0;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-}
-.mep-modal--buildings .mep-prow select {
-  margin-bottom: 0;
-  font-size: 12px;
-  padding: 3px 6px;
 }
 
 @media (max-width: 899px) {

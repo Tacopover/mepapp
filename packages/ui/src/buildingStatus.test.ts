@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   currentSheetLabel,
   noSummaryText,
-  notPlacedAskText,
   otherNoSummaryText,
   readableNoSummaryText,
   rebuildResultText,
@@ -314,11 +313,6 @@ describe('summary repair helpers', () => {
     expect(otherNoSummaryText(3)).toBe(
       '3 more sheets have no summary and cannot be read now: their PDFs are missing, have no access, are not opened yet, or are not checked yet.',
     );
-  });
-
-  it('adapts the question to the action', () => {
-    expect(notPlacedAskText('close', 1)).toBe('1 page is not placed. Close anyway?');
-    expect(notPlacedAskText('switch', 2)).toBe('2 pages are not placed. Switch building anyway?');
   });
 
   it('shortens a long text', () => {

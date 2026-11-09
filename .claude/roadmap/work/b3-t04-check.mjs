@@ -42,7 +42,6 @@ await dlg.locator('.mep-buildings-open-name', { hasText: 'Tower' }).waitFor({ ti
 
 check((await dlg.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 0, 'building node: no Add PDFs button');
 check((((await dlg.locator('[data-testid="open-documents"]').textContent()) ?? '').includes('Add a level first.')), 'no level: the strip says Add a level first.');
-check((await dlg.locator('[data-testid="sheets-pane"]').count()) === 0, 'no Not placed pane before an add');
 
 // Two levels by typing.
 const items = (kind) => dlg.locator(`[role="treeitem"][data-kind="${kind}"]`);
@@ -131,10 +130,10 @@ check(/Nothing added\. Could not read notes\.pdf\./.test((await dlg.locator('[da
 
 t.errors.length = 0; // the MuPDF messages of the deliberate non-PDF step are expected
 
-// Close and reopen: the sheets stay on their levels. Close closes at once, no ask.
+// Close and reopen: the sheets stay on their levels. Close closes at once.
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
 await idle(500);
-check((await page.locator('.mep-modal').count()) === 0 && (await dlg.locator('[data-testid="close-ask"]').count()) === 0, 'Close closes the dialog at once, no ask');
+check((await page.locator('.mep-modal').count()) === 0, 'Close closes the dialog at once');
 await menu('Manage Buildings…');
 await dlg.waitFor({ state: 'visible', timeout: 8000 });
 await idle(300);

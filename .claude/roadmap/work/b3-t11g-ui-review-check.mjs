@@ -50,7 +50,6 @@ await addPdf('ground.pdf', '00_arch_ground_floor.pdf');
 await addPdf('multi.pdf', 'Sample Project_multi_page.pdf');
 const pane = dlg.locator('[data-testid="level-sheets"]');
 console.log('PANE-COUNT', await pane.count(), 'RESULT', ((await result.textContent().catch(() => '')) ?? ''));
-check((await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).count()) === 0, 'no Not placed node after the adds');
 
 console.log('RESULT-STYLE', JSON.stringify(await probe(result)));
 console.log('COUNT-LINE-STYLE', JSON.stringify(await probe(dlg.locator('[data-testid="summary-count"]'))));

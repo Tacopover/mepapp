@@ -3,62 +3,7 @@ import type { BuildingFile } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess, OpenedFile } from '@mepapp/platform';
 import { BUILDING_PDF_TYPES, joinFolderPath, pathOfTarget, readPdfInfo } from '../buildingPdfInfo.js';
-import {
-  addResultText,
-  groupPdfs,
-  isSamePdf,
-  pdfGroupKey,
-  pdfTotals,
-  placeEntriesOnLevel,
-  waitingGroups,
-  type PdfGroup,
-  type PendingPdf,
-} from '../buildingSheets.js';
-
-export interface PendingPdfsState {
-  pending: PendingPdf[];
-  /** The pending PDFs that still have pages with no level, rows filtered to those pages. */
-  waiting: PdfGroup[];
-  /** The pages with no level over all waiting PDFs. */
-  waitingPages: number;
-  /** PDFs, pages and assigned pages over all added PDFs, also the pages that already have a level. */
-  totals: { pdfs: number; pages: number; assigned: number };
-  remove: (key: string) => void;
-}
-
-/**
- * The PDFs that the user added from disk and that wait for a level. They live in this dialog only, not in the building file.
- * A PDF leaves the list when every page of it is a sheet. The list is empty again when another building file opens.
- */
-export function usePendingPdfs(file: BuildingFile | null): PendingPdfsState {
-  const [pending, setPending] = useState<PendingPdf[]>([]);
-  const fileId = file?.id ?? null;
-
-  useEffect(() => {
-    setPending([]);
-  }, [fileId]);
-
-  const groups = file === null ? [] : groupPdfs(file, pending);
-  const waiting = file === null ? [] : waitingGroups(file, pending);
-  const waitingPages = waiting.reduce((n, group) => n + group.rows.length, 0);
-
-  useEffect(() => {
-    const full = new Set(groups.filter((group) => group.pending && !group.rows.some((row) => row.sheet === null)).map((group) => group.key));
-    if (full.size === 0) return;
-    setPending((list) => {
-      const next = list.filter((pdf) => !full.has(pdfGroupKey(pdf.projectUuid, pdf.path, pdf.fileName)));
-      return next.length === list.length ? list : next;
-    });
-  }, [file, pending]);
-
-  return {
-    pending,
-    waiting,
-    waitingPages,
-    totals: pdfTotals(groups.filter((group) => group.pending)),
-    remove: (key) => setPending((list) => list.filter((pdf) => pdfGroupKey(pdf.projectUuid, pdf.path, pdf.fileName) !== key)),
-  };
-}
+import { addResultText, isSamePdf, placeEntriesOnLevel, type PendingPdf } from '../buildingSheets.js';
 
 export interface BuildingSheetsPaneProps {
   fileAccess: FileAccess;

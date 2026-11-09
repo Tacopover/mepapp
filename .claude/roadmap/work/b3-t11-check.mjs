@@ -212,7 +212,6 @@ for (const [lv, file] of [['Ground floor', 'ground.pdf'], ['Ground floor', 'm.pd
   await nextFile(file);
   await btn.click();
   await idle(1500);
-  if ((await dlg.count()) > 0 && (await dlg.locator('[data-testid="close-anyway"]').count()) > 0) await dlg.locator('[data-testid="keep-working"]').click();
   const name = await activeDocName();
   check(name === file, `Open (${label}) on ${file} activates it`, `active: ${name}`);
   await shot(`B3-T11j-10-open-${file.replace('.pdf', '')}`);

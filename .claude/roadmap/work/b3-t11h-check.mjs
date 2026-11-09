@@ -11,7 +11,6 @@ const dlg = page.locator('.mep-modal');
 const uuid = () => page.evaluate(() => window.__mepSketchScene.getProjectUuid());
 const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBuilding.read()).json));
 const rebuild = () => dlg.locator('[data-testid="rebuild-summaries"]');
-const ask = () => dlg.locator('[data-testid="close-ask"]');
 async function reloadPage() {
   await page.reload();
   await page.locator('button.mep-onboarding-start').click({ timeout: 30000 }).catch(() => {});
@@ -133,10 +132,9 @@ await dlg.locator('button', { hasText: /^Add PDFs…$/ }).click();
 await dlg.locator('[data-testid="add-result"]').waitFor({ timeout: 15000 });
 await idle(300);
 const addText = ((await dlg.locator('[data-testid="add-result"]').textContent()) ?? '').trim();
-check((await dlg.locator('[role="treeitem"]', { hasText: 'Not placed' }).count()) === 0, 'Add PDFs on a level leaves no Not placed node');
 check(/^(Added|Nothing added)/.test(addText), 'the add result says what happened', addText);
 await shot('B3-T11h-add-on-level');
-// Open a sheet asks nothing: the dialog stays open. The ground.pdf document of the save above is still open, so close it first.
+// Open a sheet keeps the dialog open. The ground.pdf document of the save above is still open, so close it first.
 await page.evaluate(() => {
   const scene = window.__mepSketchScene;
   const doc = scene.getDocuments().find((d) => d.fileName === 'ground.pdf');
@@ -147,12 +145,10 @@ await dlg.locator('[role="treeitem"][data-kind="level"]').first().click();
 await idle(300);
 await dlg.locator('[data-testid="page-row"]', { hasText: 'ground.pdf' }).locator('[data-testid="open-sheet"]').click();
 await idle(300);
-check((await ask().count()) === 0, 'opening a sheet asks nothing');
-check((await dlg.count()) === 1, 'the dialog stays open behind the ask');
-// Close with no waiting page: no ask, the dialog closes.
+check((await dlg.count()) === 1, 'the dialog stays open after a sheet opens');
 await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
 await idle(600);
-check((await ask().count()) === 0 && (await dlg.count()) === 0, 'Close closes the dialog with no ask');
+check((await dlg.count()) === 0, 'Close closes the dialog');
 await reloadPage();
 await openDialog();
 check(/No building is open/.test((await dlg.textContent()) ?? ''), 'a reload leaves no building open');

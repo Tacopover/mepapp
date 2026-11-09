@@ -5,7 +5,7 @@ import type { FileAccess, OpenedFile } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
 import type { UseBuilding } from '../useBuilding.js';
 import { countLabel, defaultLevelName, nextLevelElevation } from '../buildingLevels.js';
-import { notPlacedAskText, sheetsWithoutSummary } from '../buildingStatus.js';
+import { sheetsWithoutSummary } from '../buildingStatus.js';
 import { useSheetRelink } from '../useSheetRelink.js';
 import { loadBuildings, loadImportedOldIds, pendingOldBuildings } from '../buildings.js';
 import {
@@ -25,36 +25,21 @@ import {
   duplicateBuildingNameWarning,
   initialSelection,
   levelKey,
-  NOT_PLACED_KEY,
   warningLines,
   type TreeNode,
 } from '../buildingTree.js';
 import { BuildingLevelsPane } from './BuildingLevelsPane.js';
 import { BuildingMenu } from './BuildingMenu.js';
 import { BuildingNameEditor } from './BuildingNameEditor.js';
-import { BuildingSheetsPane, usePendingPdfs } from './BuildingSheetsPane.js';
+import { BuildingSheetsPane } from './BuildingSheetsPane.js';
 import { BuildingSummariesPane, type BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 import { BuildingTree } from './BuildingTree.js';
 import { LevelSheetsPane } from './LevelSheetsPane.js';
-import { NotPlacedPane } from './NotPlacedPane.js';
 import { OpenDocumentsPane } from './OpenDocumentsPane.js';
 import { openedSheetIds, type OpenDocumentRow } from '../openDocumentsView.js';
 
 /** The result of opening a sheet. A null message means the user cancelled the file picker. */
 export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
-
-type AskKind = 'close' | 'switch';
-
-/** An action that waits for the answer to the question about the pages that are not placed. */
-interface PendingAsk {
-  kind: AskKind;
-  run: () => void;
-}
-
-const ASK_BUTTON: Record<AskKind, string> = {
-  close: 'Close anyway',
-  switch: 'Switch building',
-};
 
 const NARROW_QUERY = '(max-width: 899px)';
 
@@ -86,11 +71,10 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-/** The selected key. Falls back to the building key when the selected level or the Not placed node no longer exists. */
-function resolveSelectedKey(key: string, file: BuildingFile | null, notPlaced: number): string {
+/** The selected key. Falls back to the building key when the selected level no longer exists. */
+function resolveSelectedKey(key: string, file: BuildingFile | null): string {
   if (file === null) return '';
   if (key === buildingKey(file.id)) return key;
-  if (key === NOT_PLACED_KEY) return notPlaced > 0 ? key : buildingKey(file.id);
   if (file.levels.some((level) => levelKey(level.id) === key)) return key;
   return buildingKey(file.id);
 }
@@ -136,7 +120,6 @@ export function ManageBuildingsDialog({
   const [importResult, setImportResult] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; error: boolean; id: number } | null>(null);
   const noticeCount = useRef(0);
-  const [ask, setAsk] = useState<PendingAsk | null>(null);
   const openedFileId = building.building?.file.id ?? null;
   const openedIdRef = useRef<string | null>(openedFileId);
   const initialKey = building.building ? initialSelection(building.building.file, activeSheetLevelId ?? null) : '';
@@ -148,8 +131,6 @@ export function ManageBuildingsDialog({
   const [focusNameLevelId, setFocusNameLevelId] = useState<string | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
   const narrow = useNarrow();
-  const pendingPdfs = usePendingPdfs(building.building?.file ?? null);
-  const notPlaced = pendingPdfs.waitingPages;
 
   useEffect(() => {
     if (openedFileId === openedIdRef.current) return;
@@ -161,7 +142,6 @@ export function ManageBuildingsDialog({
     setExpandedLevels(new Set());
     setHighlight(null);
     setNotice(null);
-    setAsk(null);
     setCreating(false);
     setName('');
   }, [openedFileId]);
@@ -171,10 +151,6 @@ export function ManageBuildingsDialog({
     const timer = window.setTimeout(() => setNotice(null), notice.error ? NOTICE_ERROR_MS : NOTICE_MS);
     return () => window.clearTimeout(timer);
   }, [notice?.id]);
-
-  useEffect(() => {
-    if (notPlaced === 0) setAsk(null);
-  }, [notPlaced]);
 
   const refreshRef = useRef(building.refreshSheetStatus);
   refreshRef.current = building.refreshSheetStatus;
@@ -193,28 +169,9 @@ export function ManageBuildingsDialog({
     setNotice({ text, error, id: noticeCount.current });
   }
 
-  /** Runs the action. With pages that have no level the dialog asks first, because the action drops them. */
-  function guard(kind: AskKind, run: () => void) {
-    if (notPlaced === 0) {
-      run();
-      return;
-    }
-    setAsk({ kind, run });
-  }
-
-  /** Moves the focus into the navigation after the question closes, so the focus does not fall to the body. */
+  /** Moves the focus into the navigation after a selection, so the focus does not fall to the body. */
   function focusNav() {
     requestAnimationFrame(() => navRef.current?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"], select')?.focus());
-  }
-
-  /** Close button, Escape. A second Escape answers "Keep working". */
-  function requestClose() {
-    if (ask !== null) {
-      setAsk(null);
-      focusNav();
-      return;
-    }
-    guard('close', onClose);
   }
 
   /** The open action of the sheet rows. The dialog stays open, so the user can open more sheets. */
@@ -226,11 +183,9 @@ export function ManageBuildingsDialog({
 
   function handleCreate() {
     if (building.busy) return;
-    guard('switch', () => {
-      void building.create(name);
-      setCreating(false);
-      setName('');
-    });
+    void building.create(name);
+    setCreating(false);
+    setName('');
   }
 
   async function handleSaveCopy() {
@@ -261,7 +216,6 @@ export function ManageBuildingsDialog({
     recent: building.recent,
     open: openBuilding ? { file: openBuilding.file, location: openBuilding.ref.location } : null,
     sheetStatus: openBuilding?.sheetStatus ?? {},
-    notPlacedCount: notPlaced,
     collapsed,
     expandedLevels,
   }).map((node) =>
@@ -293,7 +247,7 @@ export function ManageBuildingsDialog({
         </button>
       </div>
     );
-  const selected = resolveSelectedKey(selectedKey, openBuilding?.file ?? null, notPlaced);
+  const selected = resolveSelectedKey(selectedKey, openBuilding?.file ?? null);
   const focus = resolveFocusKey(focusKey, selected, nodes);
   const selectedNode = nodes.find((node) => node.key === selected) ?? null;
   const selectedLevel = openBuilding?.file.levels.find((level) => levelKey(level.id) === selected) ?? null;
@@ -314,10 +268,8 @@ export function ManageBuildingsDialog({
     }
     setHighlight(null);
     if (node.kind === 'building' && !node.isOpen) {
-      guard('switch', () => {
-        void building.openRecent(node.entry!);
-        setFocusKey(node.key);
-      });
+      void building.openRecent(node.entry!);
+      setFocusKey(node.key);
       return;
     }
     if (node.kind === 'add-level') {
@@ -371,7 +323,7 @@ export function ManageBuildingsDialog({
           busy={building.busy}
           importLabel={oldPending.length > 0 ? `Import ${countLabel(oldPending.length, 'old building')}` : null}
           onNew={() => setCreating(true)}
-          onOpen={() => guard('switch', () => void building.open())}
+          onOpen={() => void building.open()}
           onImport={() => void handleImportOld()}
           onSaveCopy={openBuilding !== null && building.storage === 'browser' ? () => void handleSaveCopy() : undefined}
           saveCopyDisabled={openBuilding === null}
@@ -406,42 +358,14 @@ export function ManageBuildingsDialog({
   return (
     <Dialog
       title="Manage Buildings"
-      onClose={requestClose}
+      onClose={onClose}
       closeOnBackdropClick={false}
       className="mep-modal--buildings"
       header={header}
       actions={
-        ask !== null && notPlaced > 0 ? (
-          <div className="mep-buildings-close-ask" role="alert" data-testid="close-ask">
-            <span>{notPlacedAskText(ask.kind, notPlaced)}</span>
-            <button
-              type="button"
-              data-testid="close-anyway"
-              onClick={() => {
-                setAsk(null);
-                focusNav();
-                ask.run();
-              }}
-            >
-              {ASK_BUTTON[ask.kind]}
-            </button>
-            <button
-              type="button"
-              data-testid="keep-working"
-              autoFocus
-              onClick={() => {
-                setAsk(null);
-                focusNav();
-              }}
-            >
-              Keep working
-            </button>
-          </div>
-        ) : (
-          <button type="button" onClick={requestClose}>
-            Close
-          </button>
-        )
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
       }
     >
       <div className="mep-buildings-layout">
@@ -534,7 +458,6 @@ export function ManageBuildingsDialog({
                 onClick={() => {
                   setCreating(false);
                   setName('');
-                  setAsk((current) => (current?.kind === 'switch' ? null : current));
                 }}
               >
                 Cancel
@@ -587,15 +510,6 @@ export function ManageBuildingsDialog({
                 aria-labelledby="mep-buildings-tab-levels"
                 className="mep-buildings-panel"
               >
-                {selected === NOT_PLACED_KEY && (
-                  <NotPlacedPane
-                    file={openBuilding.file}
-                    update={building.update}
-                    waiting={pendingPdfs.waiting}
-                    totals={pendingPdfs.totals}
-                    onRemove={pendingPdfs.remove}
-                  />
-                )}
                 <BuildingLevelsPane
                   key={`${openBuilding.file.id}-levels`}
                   file={openBuilding.file}

@@ -11,7 +11,6 @@ const dlg = page.locator('.mep-modal');
 const stored = () => page.evaluate(async () => JSON.parse((await window.__mepBuilding.read()).json));
 const sheetsBlock = () => dlg.locator('[data-testid="level-sheets"]');
 const groups = () => sheetsBlock().locator('[data-testid="pdf-group"]');
-const notPlacedNode = () => dlg.locator('[role="treeitem"]', { hasText: 'Not placed' });
 const addResult = async () => ((await dlg.locator('[data-testid="add-result"]').textContent().catch(() => '')) ?? '');
 const b64 = (file) => readFileSync(FIX + file).toString('base64');
 
@@ -70,12 +69,9 @@ await idle(300);
 const section = dlg.locator('[data-testid="open-documents"]');
 check((await section.locator('button', { hasText: /^Add PDFs…$/ }).count()) === 1, 'level selected: Add PDFs… is in the open documents section');
 check((await dlg.locator('[data-testid="level-sheets"] button', { hasText: /^Add PDFs…$/ }).count()) === 0, 'no Add PDFs… in the sheets block');
-check((await notPlacedNode().count()) === 0, 'no Not placed node before an add');
-check((await dlg.locator('[data-testid="sheets-pane"]').count()) === 0, 'no Not placed pane before an add');
 
 // Add two files. Each page is on Level 1 at once.
 await addPdf('ground.pdf', '00_arch_ground_floor.pdf');
-check((await notPlacedNode().count()) === 0, 'no Not placed node after an add: the page is on the level');
 check(/^Added 1 page to Level 1\./.test(await addResult()), 'add result: Added 1 page to Level 1.', await addResult());
 check((await stored()).sheets.length === 1, 'the sheet is stored at once', String((await stored()).sheets.length));
 await addPdf('multi.pdf', 'Sample Project_multi_page.pdf');
@@ -105,11 +101,10 @@ await dlg.locator('.mep-modal-actions button', { hasText: /^Close$/ }).click();
 await idle(500);
 check((await page.locator('.mep-modal').count()) === 0, 'Close closes the dialog at once, no ask');
 
-// After a reopen the sheets stay and no Not placed node shows.
+// After a reopen the sheets stay.
 await menu('Manage Buildings…');
 await dlg.waitFor({ state: 'visible', timeout: 8000 });
 await idle(500);
-check((await notPlacedNode().count()) === 0, 'after a reopen no Not placed node');
 s = await stored();
 check(s.sheets.length === 4, 'four sheets stay stored', String(s.sheets.length));
 
