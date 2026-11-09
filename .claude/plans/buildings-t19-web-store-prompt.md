@@ -48,7 +48,7 @@ After B3-T13 these may be dead: `pendingPdfs`, `deleteBlockedReason`, `usePendin
 
 ### Also (small, ask first)
 
-These gaps are open. Do them only if the user agrees, in a separate task: path match runs on every open; no focus trap in `Dialog`; "Export Building" has no question about pages that are not on a level; "Read summaries now" tries a sheet that shows "Not opened yet"; old sheets with no id say "Not saved yet". Do not start B4 (risers).
+These gaps are open. Do them only if the user agrees, in a separate task: path match runs on every open; no focus trap in `Dialog`; "Export Building" has no question about pages that are not on a level; "Read summaries now" tries a sheet that shows "Not opened yet"; old sheets with no id say "Not linked yet". Do not start B4 (risers).
 
 ### Finish
 

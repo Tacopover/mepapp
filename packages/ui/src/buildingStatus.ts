@@ -42,7 +42,7 @@ export function statusLabel(status: SheetStatus): string {
     case 'no-access':
       return 'No access';
     case 'not-stamped':
-      return 'Not saved yet';
+      return 'Not linked yet';
     case 'no-summary':
       return 'No summary';
     case 'not-opened':
@@ -64,7 +64,7 @@ export function statusHint(status: SheetStatus): string {
     case 'no-access':
       return 'MepApp has no access to the folder of this PDF.';
     case 'not-stamped':
-      return 'Not saved yet. Save it in MepApp to link it.';
+      return 'MepApp cannot link this PDF to the sheet yet. Open the PDF in MepApp and save it once.';
     case 'no-summary':
       return 'MepApp has not saved a summary for this sheet yet.';
     case 'not-opened':

@@ -40,7 +40,7 @@ The browser check ran on the web build with a fake file picker. It did not run t
 9. Tree (new in run 3). Look at the tree with the levels closed. Click the arrow of Ground floor.
    Expected: the level opens and shows the PDF names. Click a PDF name: its level is selected and its sheet is marked. No "Open" badge shows next to a building.
 10. Add a PDF, then Open it (new in run 3). Add a PDF that MepApp never saved to Level 1. Look at its status. Click Open on its row.
-    Expected: before Open the status says "Not opened yet" (not "Not saved yet"). The PDF opens in the viewer. In a few seconds the status turns "OK" and the row shows "Summary saved …". The row never says "Save it in MepApp to link it". The Open button now says "Opened" and is off.
+    Expected: before Open the status says "Not opened yet" (not "Not saved yet"). The PDF opens in the viewer. In a few seconds the status turns "OK" and the row shows "Summary saved …". The row never says "MepApp cannot link this PDF to the sheet yet. Open the PDF in MepApp and save it once.". The Open button now says "Opened" and is off.
 11. Opened button (new in run 3). With the PDF of step 10 open, look at its row. Close its tab in the viewer.
     Expected: the button says "Opened" while the PDF is open. After the tab closes, the button says "Open" again.
 12. Open keeps the dialog open. On Level 1, click Open on a sheet. Then click Open on a sheet of Ground floor. Then click Open on a third sheet.
@@ -84,4 +84,4 @@ Report each step as pass or fail. For a fail, write the text on the screen.
 - The active PDF cannot pick the building it belongs to.
 - A PDF that was open before you added it to a level gets the id of its sheet at once. Its summary is written when that PDF is the active tab. A PDF that already holds its id in the file and is added later gets its summary at the next Open or Save.
 - Read summaries still tries a sheet that says Not opened yet and fails it with "not saved yet". Open the PDF instead.
-- An old sheet with no id (made before run 3) still says "Not saved yet". Save the PDF once in MepApp to link it.
+- An old sheet with no id (made before run 3) shows the chip "Not linked yet" with the hint "MepApp cannot link this PDF to the sheet yet. Open the PDF in MepApp and save it once."

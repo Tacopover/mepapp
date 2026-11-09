@@ -70,7 +70,7 @@ check(typeof sa?.projectUuid === 'string' && sa.idMinted === true, 'the added sh
 await until(async () => (await chipStatus('a1.pdf')) !== '', 'a1 chip', 10000);
 check((await chipStatus('a1.pdf')) === 'not-opened', 'before Open the chip says not-opened', await chipStatus('a1.pdf'));
 check((((await chip('a1.pdf').textContent()) ?? '').trim()) === 'Not opened yet', 'the chip text is "Not opened yet"');
-check(!/Save it in MepApp to link it/.test((await row('a1.pdf').textContent()) ?? '') && !/Not saved yet/.test((await dlg.textContent()) ?? ''), 'no "Not saved yet" text before Open');
+check(!/Open the PDF in MepApp and save it once/.test((await row('a1.pdf').textContent()) ?? '') && !/Not linked yet/.test((await dlg.textContent()) ?? ''), 'no "Not linked yet" text before Open');
 check((await summaryIds()).length === 0, 'no summary before Open');
 await shot('b3-t13c-1');
 
@@ -79,7 +79,7 @@ await row('a1.pdf').locator('[data-testid="open-sheet"]').click();
 await until(async () => (await docs()).some((d) => d.name === 'a1.pdf'), 'a1 opened', 30000);
 await until(async () => (await chipStatus('a1.pdf')) === 'ok', 'a1 chip OK after Open', 30000);
 check((((await chip('a1.pdf').textContent()) ?? '').trim()) === 'OK', 'after Open the chip says OK');
-check(!/Not saved yet|Save it in MepApp/.test((await dlg.textContent()) ?? ''), 'no "Save it to link it" text after Open');
+check(!/Not linked yet|Open the PDF in MepApp and save it once/.test((await dlg.textContent()) ?? ''), 'no "Open the PDF in MepApp and save it once" text after Open');
 const d1 = (await docs()).find((d) => d.name === 'a1.pdf');
 s = await stored();
 const sa2 = s.sheets.find((x) => x.location.fileName === 'a1.pdf');
