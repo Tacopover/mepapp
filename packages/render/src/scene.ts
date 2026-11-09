@@ -159,6 +159,7 @@ import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroup
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
+import { moveFittingInState, riserConflictsIn, type RiserConflict, type RiserMark } from './riserMarks.js';
 import {
   addPanelAccessoryCommand,
   addTerminalToCircuitCommand,
@@ -497,6 +498,8 @@ export interface OpenPortCount {
 const OPEN_PORT_RADIUS_SCREEN_PX = 4.5;
 
 const ROUTE_MARKER_COLOR = 0xe6007e;
+/** Purple ring on a riser-marked fitting. Cyan 0x00e5ff is the selection, magenta is the route marker, green 0x00c853 is a wall debug group. */
+const RISER_MARK_COLOR = 0x7c4dff;
 
 /** A route marker on the overlay: the start port (square) or a target port (ring). */
 export interface RouteMarker { world: Vec2; kind: 'start' | 'target' }
@@ -579,6 +582,10 @@ interface SketchSceneEvents {
   documentActivated: [];
   /** The open-document list, a document's name, or its dirty flag changed — the Drawings tab's cue to re-render. */
   documentsChanged: [DocumentSummary[]];
+  /** A marked fitting was dropped by the select-tool drag (once, on mouse up) or moved by moveFittingTo without source 'riser-sync'. Points are pt of the shown page. */
+  riserFittingMoved: [info: { fittingId: string; from: Vec2; to: Vec2 }];
+  /** Undo or redo changed a marked fitting (position changed, or the fitting is gone: then `to` is null). The UI decides whether to sync (D-B-56 A) or to show the conflict state. */
+  riserFittingChanged: [info: { fittingId: string; from: Vec2 | null; to: Vec2 | null; cause: 'undo' | 'redo' }];
   /** The active document's customStampDefinitions list changed (a new one authored, or an existing one edited) — the Stamps tab's cue to re-render its palette. */
   customStampDefinitionsChanged: [StampDefinition[]];
   /** The active document's label layouts changed (label-feature.md §6.2) — the status bar's label filter lists the definitions that have one. */
@@ -687,6 +694,8 @@ export class SketchScene {
   private autoPlacePreviewHidden: Sprite[] = [];
   /** Scene-level: the route markers of the route dialog (route-ports). Not part of the document, never saved. */
   private routeMarkers: RouteMarker[] = [];
+  /** Scene-level: the riser marks of the active document, keyed by fitting id. Not part of the document, never saved. */
+  private riserMarks: Map<string, RiserMark> = new Map();
   /** Scene-level: the planned route shown on the overlay. Not part of the document, never saved. */
   private routePreview: RoutePreviewView | null = null;
   private autoPlaceUnitNotes: { reason: AutoPlaceUnitNoteReason; count: number }[] = [];
@@ -894,6 +903,7 @@ export class SketchScene {
       emit: (event, ...args) => (self.emitter.emit as (event: string, ...args: unknown[]) => void)(event, ...args),
       openTextEditor: (id) => self.openTextEditor(id),
       getZoomScale: () => self.world.scale.x,
+      getRiserMarks: () => self.getRiserMarks(),
       hitTest: (worldPoint) => self.hitTest(worldPoint),
       selectableRefForId: (id, state) => self.selectableRefForId(id, state),
       resolveSelectableBoundsWorld: (ref, state) => self.resolveSelectableBoundsWorld(ref, state),
@@ -1124,6 +1134,7 @@ export class SketchScene {
     this.selectedRoomVertices = [];
     this.roomPreview = null;
     this.circuitToolHover = null;
+    this.riserMarks = new Map();
     if (this.tool === 'calibrate' || this.tool === 'measure') void this.loadSnapLines();
     this.syncDrawingLayer();
     this.redrawOverlay();
@@ -1246,6 +1257,7 @@ export class SketchScene {
     this.pendingPoints = [];
     for (const tool of this.toolMap.values()) tool.onDeactivate?.(this.ctx); // a pending polyline or measurement belongs to the outgoing document
     this.drag = { kind: 'none' };
+    this.riserMarks = new Map();
 
     this.syncDrawingLayer(); // a project may have loaded, or the label context changed, while this document was inactive
     this.redrawOverlay();
@@ -1256,9 +1268,13 @@ export class SketchScene {
   }
 
   private markDirty(): void {
-    this.doc.editSeq++;
-    if (this.doc.isDirty) return;
-    this.doc.isDirty = true;
+    this.markDocumentDirty(this.doc);
+  }
+
+  private markDocumentDirty(doc: SketchDocument): void {
+    doc.editSeq++;
+    if (doc.isDirty) return;
+    doc.isDirty = true;
     this.emitter.emit('documentsChanged', this.getDocuments());
   }
 
@@ -2472,6 +2488,7 @@ export class SketchScene {
   }
 
   undoDrawing(): void {
+    const riserBefore = this.riserFittingPositions();
     this.doc.drawingHistory.undo();
     this.drawSegmentTool.onDeactivate(); // a pending chain may start from a fitting or segment the undo just removed
     this.selectedRoomVertices = [];
@@ -2485,9 +2502,11 @@ export class SketchScene {
     // whether it did — always notify rather than trying to detect it, same
     // as syncDrawingLayer() always running above regardless of what changed.
     this.notifyCircuitsChanged();
+    this.emitRiserFittingChanges(riserBefore, 'undo');
   }
 
   redoDrawing(): void {
+    const riserBefore = this.riserFittingPositions();
     this.doc.drawingHistory.redo();
     this.drawSegmentTool.onDeactivate();
     this.selectedRoomVertices = [];
@@ -2497,6 +2516,7 @@ export class SketchScene {
     this.emitter.emit('selectionChanged', this.getSelection());
     this.emitter.emit('roomsChanged');
     this.notifyCircuitsChanged();
+    this.emitRiserFittingChanges(riserBefore, 'redo');
   }
 
   /** Every network type known to the active document — the effective library the Stamps tab's Network Types section renders (falls back to the static NETWORK_TYPE_LIBRARY entry for any type never yet picked). */
@@ -2957,6 +2977,87 @@ export class SketchScene {
     if (this.routeMarkers.length === 0) return;
     this.routeMarkers = [];
     this.redrawOverlay();
+  }
+
+  /** Replaces the riser marks of the active document. A mark is not an edit, so this never marks the document dirty. */
+  setRiserMarks(marks: ReadonlyMap<string, RiserMark>): void {
+    this.riserMarks = new Map(marks);
+    this.redrawOverlay();
+  }
+
+  getRiserMarks(): ReadonlyMap<string, RiserMark> {
+    return this.riserMarks;
+  }
+
+  /** Moves a fitting of the active document to `to` as one undo step ('Move riser fitting'). Its attached segments follow (moveFittingInState). False when the fitting is not found. Emits 'riserFittingMoved' for a marked fitting unless opts.source is 'riser-sync'. */
+  moveFittingTo(fittingId: string, to: Vec2, opts?: { source: 'riser-sync' }): boolean {
+    const state = this.doc.drawingHistory.getState();
+    const from = state.fittings[fittingId]?.position;
+    const moved = from ? moveFittingInState(state, fittingId, to, this.doc.portGroups) : null;
+    if (!from || !moved) return false;
+    if (moved === state) return true;
+    const tx = new Transaction(this.doc.drawingHistory, 'Move riser fitting');
+    tx.update(() => moved);
+    tx.commit();
+    this.syncDrawingLayer();
+    this.redrawOverlay();
+    this.markDirty();
+    this.emitter.emit('selectionChanged', this.getSelection());
+    if (this.riserMarks.has(fittingId) && opts?.source !== 'riser-sync') {
+      this.emitter.emit('riserFittingMoved', { fittingId, from, to: { x: to.x, y: to.y } });
+    }
+    return true;
+  }
+
+  /** Moves a fitting of the active document as a remote edit: no undo entry, no event. Marks the document dirty (D-B-21 A). False when the fitting is not found. */
+  applyRemoteFittingMove(fittingId: string, to: Vec2): boolean {
+    return this.applyRemoteFittingMoveIn(this.activeId, fittingId, to);
+  }
+
+  /** The remote edit of applyRemoteFittingMove for any open document, by runtime id (SketchDocument.id). Uses that document's own portGroups. For a non-active document no sync and no redraw run. */
+  applyRemoteFittingMoveIn(docId: string, fittingId: string, to: Vec2): boolean {
+    const target = this.documents.find((d) => d.id === docId);
+    if (!target) return false;
+    const state = target.drawingHistory.getState();
+    const moved = moveFittingInState(state, fittingId, to, target.portGroups);
+    if (!moved) return false;
+    if (moved === state) return true;
+    target.drawingHistory.setLiveState(moved);
+    this.markDocumentDirty(target);
+    if (target !== this.doc) return true;
+    this.syncDrawingLayer();
+    this.redrawOverlay();
+    this.emitter.emit('selectionChanged', this.getSelection());
+    return true;
+  }
+
+  /** The marked fittings of the active document on the shown page that are more than `tolerancePt` away from their mark anchor. */
+  riserConflicts(tolerancePt: number): RiserConflict[] {
+    return riserConflictsIn(this.doc.drawingHistory.getState(), this.riserMarks, this.doc.pageIndex, tolerancePt);
+  }
+
+  /** The size of the shown page in pt, as displayed (the backdrop sprite). Null without a backdrop. */
+  getDisplayedPageSize(): { widthPt: number; heightPt: number } | null {
+    const sprite = this.doc.backdropSprite;
+    if (!sprite) return null;
+    return { widthPt: sprite.width, heightPt: sprite.height };
+  }
+
+  /** The position of each marked fitting on the active document. A fitting that does not exist maps to null. */
+  private riserFittingPositions(): Map<string, Vec2 | null> {
+    const state = this.doc.drawingHistory.getState();
+    const positions = new Map<string, Vec2 | null>();
+    for (const fittingId of this.riserMarks.keys()) positions.set(fittingId, state.fittings[fittingId]?.position ?? null);
+    return positions;
+  }
+
+  private emitRiserFittingChanges(before: Map<string, Vec2 | null>, cause: 'undo' | 'redo'): void {
+    const after = this.riserFittingPositions();
+    for (const [fittingId, from] of before) {
+      const to = after.get(fittingId) ?? null;
+      if (from?.x === to?.x && from?.y === to?.y) continue;
+      this.emitter.emit('riserFittingChanged', { fittingId, from, to, cause });
+    }
   }
 
   /** Plans a route from a start port. Read-only: the drawing, the history and the document counters stay unchanged. The target ports are found without the old routed run, so a re-run keeps its targets. */
@@ -5851,6 +5952,13 @@ export class SketchScene {
       } else {
         this.overlay.circle(marker.world.x, marker.world.y, markerRadius).stroke({ width: 2 / this.world.scale.x, color: ROUTE_MARKER_COLOR });
       }
+    }
+    for (const fittingId of this.riserMarks.keys()) {
+      const fitting = state.fittings[fittingId];
+      if (!fitting || (fitting.pageIndex ?? 0) !== this.doc.pageIndex) continue;
+      this.overlay
+        .circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD + 3 / this.world.scale.x)
+        .stroke({ width: 2.5 / this.world.scale.x, color: RISER_MARK_COLOR });
     }
     if (this.routePreview) drawRoutePreview(this.overlay, this.routePreview, 1 / this.world.scale.x);
     for (const id of this.doc.selectedIds) {

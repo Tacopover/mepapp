@@ -1,6 +1,7 @@
 import type { FederatedPointerEvent, Sprite, Texture } from 'pixi.js';
 import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, RoomPolygon, SnapLines, StampDefinition, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
 import type { AlignmentGuide } from './alignmentGuides.js';
+import type { RiserMark } from '../riserMarks.js';
 import type { DrawingState, SketchDocument } from '../document.js';
 import type { StampInfo, TerminalAssignmentResult } from '../scene.js';
 
@@ -153,6 +154,9 @@ export interface ToolContext {
 
   /** Current world scale (1 = 100%) — for converting screen-px thresholds (handle hit radius, min-drag distance) to world units. */
   getZoomScale(): number;
+
+  /** The riser marks of the active document — see SketchScene.getRiserMarks. */
+  getRiserMarks(): ReadonlyMap<string, RiserMark>;
 
   hitTest(worldPoint: Vec2): SelectableRef | null;
   selectableRefForId(id: string, state: DrawingState): SelectableRef;

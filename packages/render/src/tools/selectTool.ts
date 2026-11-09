@@ -225,6 +225,12 @@ export class SelectTool implements Tool {
         if (drag.moved) {
           drag.drawingTx?.commit();
           ctx.syncDrawingLayer();
+          const riserMarks = ctx.getRiserMarks();
+          const committed = ctx.doc.drawingHistory.getState();
+          for (const [fittingId, from] of Object.entries(drag.fittingSnapshot)) {
+            const to = committed.fittings[fittingId]?.position;
+            if (riserMarks.has(fittingId) && to) ctx.emit('riserFittingMoved', { fittingId, from, to: { x: to.x, y: to.y } });
+          }
         } else if (drag.reopenTextEditId) {
           ctx.openTextEditor(drag.reopenTextEditId);
         }
