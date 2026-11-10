@@ -78,6 +78,7 @@ import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { RoomToolBar } from './components/RoomToolBar.js';
 import { Dialog } from './components/Dialog.js';
 import { CalibrationDialog } from './components/CalibrationDialog.js';
+import { RiserConflictDialog } from './components/RiserConflictDialog.js';
 import { RiserDeleteDialog } from './components/RiserDeleteDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRenames } from './components/GlobalPropertiesDialog.js';
@@ -2163,6 +2164,9 @@ export function MepSketchApp({
       )}
       {risers.pendingDelete && (
         <RiserDeleteDialog label={risers.pendingDelete.label} onConfirm={risers.confirmDelete} onCancel={risers.cancelDelete} />
+      )}
+      {risers.conflict && (
+        <RiserConflictDialog info={risers.conflict} onMoveHere={risers.resolveConflictMoveHere} onSnapBack={risers.resolveConflictSnapBack} onLater={risers.decideConflictLater} />
       )}
 
       {settingsOpen && (

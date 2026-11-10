@@ -2,7 +2,14 @@ import { clearRoutedMarks, recomputeAttachedSegments, type PortGroup, type Segme
 import type { DrawingState } from './document.js';
 
 /** One marked fitting. The UI builds it from the building file; anchorPt is the riser anchor in pt on the shown page. */
-export interface RiserMark { riserId: string; name: string; networkTypeId: string; anchorPt: Vec2 }
+export interface RiserMark {
+  riserId: string;
+  name: string;
+  networkTypeId: string;
+  anchorPt: Vec2;
+  /** true: the user chose "Decide later" for a conflict of this fitting. The ring is drawn amber. */
+  undecided?: boolean;
+}
 
 export interface RiserConflict { fittingId: string; fittingPt: Vec2; anchorPt: Vec2 }
 

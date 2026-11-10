@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import type { BuildingFile, BuildingSheet, Calibration } from '@mepapp/core';
-import type { CanvasContextMenuTarget, DocumentSummary, SceneNotice, SketchScene } from '@mepapp/render';
+import type { BuildingFile, BuildingSheet, Calibration, Vec2 } from '@mepapp/core';
+import type { CanvasContextMenuTarget, DocumentSummary, RiserMark, SceneNotice, SketchScene } from '@mepapp/render';
 import type { OpenBuilding } from './buildingController.js';
 import { readSummaries } from './quantitiesScope.js';
 import {
@@ -9,15 +9,22 @@ import {
   attachAction,
   buildRiserAnchors,
   buildRiserMarks,
+  conflictLaterText,
+  conflictTolerancePt,
   deleteRiserAction,
   detachAction,
   firstMemberFrame,
   HINT_NOT_IN_BUILDING,
   HINT_NO_SCALE,
   makeRiserAction,
+  planRiserMove,
   removalRefusedText,
+  riserConflictInfo,
   riserMenuModel,
+  riserOfFitting,
+  type LiveTarget,
   type RiserActionResult,
+  type RiserConflictInfo,
   type RiserMenuModel,
   type ShownPage,
 } from './riserActions.js';
@@ -31,6 +38,7 @@ export interface RiserMenuState {
 interface Outcome {
   file: BuildingFile;
   notice: SceneNotice | null;
+  after?: () => void;
 }
 
 interface LiveValues {
@@ -59,6 +67,19 @@ function hasScaleOf(page: ShownPage | null): boolean {
   return page !== null && page.pageUnitsPerRealUnit !== null && page.pageUnitsPerRealUnit > 0;
 }
 
+function sameConflict(a: RiserConflictInfo | null, b: RiserConflictInfo | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.riserId === b.riserId &&
+    a.fittingId === b.fittingId &&
+    a.distanceMm === b.distanceMm &&
+    a.fittingPt.x === b.fittingPt.x &&
+    a.fittingPt.y === b.fittingPt.y &&
+    a.anchorPt.x === b.anchorPt.x &&
+    a.anchorPt.y === b.anchorPt.y
+  );
+}
+
 function sheetOnShownPage(file: BuildingFile | null, documents: DocumentSummary[], activeDocumentId: string | null, pageIndex: number): BuildingSheet | null {
   const projectUuid = documents.find((doc) => doc.id === activeDocumentId)?.projectUuid ?? null;
   return activeSheetOf(file, projectUuid, pageIndex);
@@ -80,6 +101,9 @@ export function useBuildingRisers(args: {
   const sheet = sheetOnShownPage(file, documents, activeDocumentId, pageIndex);
   const [pendingDelete, setPendingDelete] = useState<{ riserId: string; label: string } | null>(null);
   const [sceneTick, setSceneTick] = useState(0);
+  const [conflict, setConflict] = useState<RiserConflictInfo | null>(null);
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const syncing = useRef(0);
   const live = useRef<LiveValues>({ building, sheet, update, pushToast });
   live.current = { building, sheet, update, pushToast };
 
@@ -91,6 +115,7 @@ export function useBuildingRisers(args: {
       return next.file;
     });
     if (outcome !== null && outcome.notice !== null) live.current.pushToast(outcome.notice);
+    if (outcome !== null && outcome.after) outcome.after();
   };
 
   const guard = (task: () => Promise<void>): void => {
@@ -155,10 +180,75 @@ export function useBuildingRisers(args: {
 
   const cancelDelete = (): void => setPendingDelete(null);
 
+  const syncMove = (fittingId: string, toPt: Vec2): void => {
+    const scene = sceneRef.current;
+    const open = live.current.building;
+    const onSheet = live.current.sheet;
+    if (!scene || open === null || onSheet === null) return;
+    const riser = riserOfFitting(open.file, onSheet.id, fittingId);
+    if (riser === null) return;
+    const fromPage = shownPageOf(scene);
+    if (fromPage === null) {
+      live.current.pushToast({ kind: 'warning', message: HINT_NO_SCALE });
+      return;
+    }
+    const liveTargetOf = (target: BuildingSheet): LiveTarget | null => {
+      const doc = target.projectUuid === null ? undefined : scene.getDocuments().find((candidate) => candidate.projectUuid === target.projectUuid);
+      if (doc === undefined) return null;
+      const frame = scene.getDocumentPageFrame(doc.id, target.pageIndex);
+      if (frame === null) return null;
+      return { docId: doc.id, heightPt: frame.heightPt, pageUnitsPerRealUnit: frame.pageUnitsPerRealUnit };
+    };
+    syncing.current += 1;
+    guard(async () => {
+      try {
+        await commit((current): Outcome => {
+          const result = planRiserMove(current, { riserId: riser.id, fromSheet: onSheet, toPt, fromPage, liveTargetOf });
+          if (!result.ok) return { file: current, notice: { kind: 'warning', message: result.text } };
+          return {
+            file: result.file,
+            notice: result.message === null ? null : { kind: 'info', message: result.message },
+            after: () => {
+              for (const move of result.live) scene.applyRemoteFittingMoveIn(move.docId, move.fittingId, move.toPt);
+            },
+          };
+        });
+      } finally {
+        syncing.current -= 1;
+        if (syncing.current === 0) setSceneTick((tick) => tick + 1);
+      }
+    });
+  };
+
+  const resolveConflictMoveHere = (): void => {
+    const pending = conflict;
+    setConflict(null);
+    if (pending !== null) syncMove(pending.fittingId, pending.fittingPt);
+  };
+
+  const resolveConflictSnapBack = (): void => {
+    const pending = conflict;
+    setConflict(null);
+    if (pending === null) return;
+    sceneRef.current?.moveFittingTo(pending.fittingId, pending.anchorPt, { source: 'riser-sync' });
+    setSceneTick((tick) => tick + 1);
+  };
+
+  const decideConflictLater = (): void => {
+    const pending = conflict;
+    setConflict(null);
+    if (pending === null) return;
+    setDismissed((set) => new Set(set).add(pending.fittingId));
+    live.current.pushToast({ kind: 'warning', message: conflictLaterText(pending.label) });
+  };
+
   useEffect(() => {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
-    const bump = () => setSceneTick((tick) => tick + 1);
+    const bump = () => {
+      setDismissed((set) => (set.size === 0 ? set : new Set<string>()));
+      setSceneTick((tick) => tick + 1);
+    };
     scene.on('documentActivated', bump);
     scene.on('pageChanged', bump);
     scene.on('calibrationSet', bump);
@@ -173,11 +263,43 @@ export function useBuildingRisers(args: {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
     const shown = shownPageOf(scene);
-    scene.setRiserMarks(
-      file && sheet ? buildRiserMarks(file, sheet, shown, (fittingId) => scene.getFittingContext(fittingId)?.position ?? null) : new Map(),
-    );
+    const marks = file && sheet ? buildRiserMarks(file, sheet, shown, (fittingId) => scene.getFittingContext(fittingId)?.position ?? null) : new Map<string, RiserMark>();
+    scene.setRiserMarks(marks);
     scene.setRiserAnchors(file && sheet ? buildRiserAnchors(file, sheet, shown) : []);
-  }, [ready, sceneRef, file, sheet, calibration, sceneTick]);
+    if (syncing.current > 0) return;
+    if (!file || !sheet) {
+      setConflict(null);
+      return;
+    }
+    const tolerance = conflictTolerancePt(shown);
+    const found = tolerance === null ? [] : scene.riserConflicts(tolerance);
+    let changed = false;
+    for (const candidate of found) {
+      const mark = marks.get(candidate.fittingId);
+      if (!dismissed.has(candidate.fittingId) || mark === undefined) continue;
+      marks.set(candidate.fittingId, { ...mark, undecided: true });
+      changed = true;
+    }
+    if (changed) scene.setRiserMarks(marks);
+    const first = found.find((candidate) => !dismissed.has(candidate.fittingId)) ?? null;
+    const next = first === null ? null : riserConflictInfo(file, sheet, first, shown);
+    setConflict((previous) => (sameConflict(previous, next) ? previous : next));
+  }, [ready, sceneRef, file, sheet, calibration, sceneTick, dismissed]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    const onMoved = (info: { fittingId: string; to: Vec2 }) => syncMove(info.fittingId, info.to);
+    const onChanged = (info: { fittingId: string; to: Vec2 | null }) => {
+      if (info.to !== null) syncMove(info.fittingId, info.to);
+    };
+    scene.on('riserFittingMoved', onMoved);
+    scene.on('riserFittingChanged', onChanged);
+    return () => {
+      scene.off('riserFittingMoved', onMoved);
+      scene.off('riserFittingChanged', onChanged);
+    };
+  }, [ready, sceneRef]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -244,5 +366,17 @@ export function useBuildingRisers(args: {
     };
   }, [ready, sceneRef]);
 
-  return { menuStateFor, makeRiser, detach, askDelete, pendingDelete, confirmDelete, cancelDelete };
+  return {
+    menuStateFor,
+    makeRiser,
+    detach,
+    askDelete,
+    pendingDelete,
+    confirmDelete,
+    cancelDelete,
+    conflict,
+    resolveConflictMoveHere,
+    resolveConflictSnapBack,
+    decideConflictLater,
+  };
 }

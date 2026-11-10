@@ -501,6 +501,7 @@ const OPEN_PORT_RADIUS_SCREEN_PX = 4.5;
 const ROUTE_MARKER_COLOR = 0xe6007e;
 /** Purple ring on a riser-marked fitting. Cyan 0x00e5ff is the selection, magenta is the route marker, green 0x00c853 is a wall debug group. */
 const RISER_MARK_COLOR = 0x7c4dff;
+const RISER_UNDECIDED_COLOR = 0xe69500;
 /** Red ring on a riser anchor that refused a segment end. */
 const RISER_ANCHOR_REFUSED_COLOR = 0xe53935;
 
@@ -3110,6 +3111,17 @@ export class SketchScene {
     const sprite = this.doc.backdropSprite;
     if (!sprite) return null;
     return { widthPt: sprite.width, heightPt: sprite.height };
+  }
+
+  /** The size in pt and the scale of page `pageIndex` of the open document `docId`, as displayed. Null when the document is not open, when it shows another page (only the shown page has a backdrop), when it has no backdrop, or when that page has no calibration with pageUnitsPerRealUnit > 0. */
+  getDocumentPageFrame(docId: string, pageIndex: number): { widthPt: number; heightPt: number; pageUnitsPerRealUnit: number } | null {
+    const target = this.documents.find((d) => d.id === docId);
+    if (!target || target.pageIndex !== pageIndex) return null;
+    const sprite = target.backdropSprite;
+    if (!sprite) return null;
+    const pageUnitsPerRealUnit = target.calibrations.get(pageIndex)?.pageUnitsPerRealUnit ?? 0;
+    if (!(pageUnitsPerRealUnit > 0)) return null;
+    return { widthPt: sprite.width, heightPt: sprite.height, pageUnitsPerRealUnit };
   }
 
   /** The position of each marked fitting on the active document. A fitting that does not exist maps to null. */
@@ -6031,7 +6043,7 @@ export class SketchScene {
       if (!fitting || (fitting.pageIndex ?? 0) !== this.doc.pageIndex) continue;
       this.overlay
         .circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD + 3 / this.world.scale.x)
-        .stroke({ width: 2.5 / this.world.scale.x, color: RISER_MARK_COLOR });
+        .stroke({ width: 2.5 / this.world.scale.x, color: this.riserMarks.get(fittingId)?.undecided ? RISER_UNDECIDED_COLOR : RISER_MARK_COLOR });
     }
     const visibleAnchors = this.getVisibleRiserAnchors();
     for (const anchor of visibleAnchors) {

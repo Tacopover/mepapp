@@ -2166,6 +2166,48 @@ button.mep-tree-arrow {
   display: flex;
   min-height: 0;
 }
+.mep-modal--riser-conflict {
+  width: min(760px, calc(100vw - 32px));
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+.mep-modal--riser-conflict .mep-modal-actions {
+  flex-wrap: wrap;
+}
+.mep-modal--riser-conflict .mep-conflict-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+}
+.mep-modal--riser-conflict .mep-conflict-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.mep-modal--riser-conflict .mep-conflict-buttons button {
+  white-space: nowrap;
+}
+.mep-modal--riser-conflict .mep-conflict-buttons button.primary {
+  background: #0b4f8a;
+  color: #fff;
+  border-color: #0b4f8a;
+}
+.mep-modal--riser-conflict .mep-conflict-buttons button.primary:hover {
+  background: #093f6f;
+  border-color: #093f6f;
+}
+.mep-modal--riser-conflict button:focus-visible {
+  outline: 2px solid #0b4f8a;
+  outline-offset: 2px;
+}
+.mep-modal--riser-conflict .mep-conflict-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
 .mep-modal--full {
   width: min(1400px, 97vw);
   max-width: min(1400px, 97vw);

@@ -2,6 +2,8 @@ import {
   attachMember,
   calibrationFromScale,
   makeRiser,
+  mmToPt,
+  ptToMm,
   type BuildingFile,
   type BuildingSheet,
   type NetworkType,
@@ -19,6 +21,13 @@ import {
   attachAction,
   buildRiserAnchors,
   buildRiserMarks,
+  CONFLICT_MOVE_HELP,
+  CONFLICT_SCALE_NOTE,
+  CONFLICT_SNAP_HELP,
+  conflictBody,
+  conflictLaterText,
+  conflictTitle,
+  conflictTolerancePt,
   deleteRiserAction,
   detachAction,
   firstMemberFrame,
@@ -26,9 +35,12 @@ import {
   HINT_NOT_IN_BUILDING,
   HINT_TWO_TYPES,
   LINE_UP_NOTE,
+  type LiveTarget,
   makeRiserAction,
   NO_RISER_MENU,
+  planRiserMove,
   removalRefusedText,
+  riserConflictInfo,
   riserMenuModel,
   riserOfFitting,
   type ShownPage,
@@ -562,5 +574,136 @@ describe('applyRiserTypeChange', () => {
     const result = applyRiserTypeChange(file, { eventRiserIds: ['r1'], networkType: sameName, activeSheetId: 's0', summaries: new Map() });
     expect(riserById(result.file, 'r1').name).toBe('Supply riser 1');
     expect(riserById(result.file, 'r1').networkTypeId).toBe('vent-2');
+  });
+});
+
+const ppmm50 = calibrationFromScale(50).pageUnitsPerRealUnit;
+const frame50: PageFrame = { widthPt: 595, heightPt: 842, pageUnitsPerRealUnit: ppmm50 };
+
+function fourLevelFile(): BuildingFile {
+  const file = baseFile();
+  return {
+    ...file,
+    levels: [...file.levels, { id: 'l3', name: 'Roof', elevationMm: 9000 }],
+    sheets: [...file.sheets, { id: 's3', levelId: 'l3', projectUuid: 'u3', pageIndex: 0, displayName: 'Sheet 3', location: { fileName: 'plan.pdf' } }],
+  };
+}
+
+/** Riser r1 with a member on each of four levels. s1 is the 1:100 sheet, s0 is a 1:50 sheet. */
+function fourLevelRiser(): BuildingFile {
+  const first = addRiser(fourLevelFile(), 'r1', 'Supply riser 1', 's1', 'f1');
+  const second = ok(attachMember(first, 'r1', { levelId: 'l0', sheetId: 's0', pageIndex: 0, fittingId: 'f0' }, { first: frame, this: frame50 })).file;
+  const third = ok(attachMember(second, 'r1', { levelId: 'l2', sheetId: 's2', pageIndex: 0, fittingId: 'f2' }, { first: frame, this: frame })).file;
+  return ok(attachMember(third, 'r1', { levelId: 'l3', sheetId: 's3', pageIndex: 0, fittingId: 'f3' }, { first: frame, this: frame })).file;
+}
+
+const openOnlyS0 = (sheet: BuildingSheet): LiveTarget | null =>
+  sheet.id === 's0' ? { docId: 'd0', heightPt: 842, pageUnitsPerRealUnit: ppmm50 } : null;
+
+describe('planRiserMove', () => {
+  it('moves the open calibrated member live and sends the others as pending ops', () => {
+    const file = fourLevelRiser();
+    const plan = planRiserMove(file, { riserId: 'r1', fromSheet: sheetOf(file, 's1'), toPt: { x: 150, y: 180 }, fromPage: page, liveTargetOf: openOnlyS0 });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const anchor = ptToMm({ x: 150, y: 180 }, { heightPt: 842, ppmm });
+    expect(riserById(plan.file, 'r1').anchorMm).toEqual(anchor);
+    const livePt = mmToPt(anchor, { heightPt: 842, ppmm: ppmm50 });
+    expect(livePt).not.toEqual(mmToPt(anchor, { heightPt: 842, ppmm }));
+    expect(plan.live).toEqual([{ sheetId: 's0', sheetName: 'Sheet 0', docId: 'd0', fittingId: 'f0', toPt: livePt }]);
+    expect(plan.pendingCount).toBe(2);
+    expect(riserById(plan.file, 'r1').pending).toEqual([
+      { seq: 1, sheetId: 's2', kind: 'move', toMm: anchor },
+      { seq: 2, sheetId: 's3', kind: 'move', toMm: anchor },
+    ]);
+    expect(plan.message).toBe('Supply riser 1 moved to match the building.');
+  });
+
+  it('raises the anchor mm value when the drag goes up on the screen', () => {
+    const file = fourLevelRiser();
+    const before = riserById(file, 'r1').anchorMm.yMm;
+    const plan = planRiserMove(file, { riserId: 'r1', fromSheet: sheetOf(file, 's1'), toPt: { x: 100, y: 100 }, fromPage: page, liveTargetOf: openOnlyS0 });
+    expect(plan.ok && riserById(plan.file, 'r1').anchorMm.yMm).toBeGreaterThan(before);
+  });
+
+  it('gives no live move and a null message when no other sheet is open', () => {
+    const file = fourLevelRiser();
+    const plan = planRiserMove(file, { riserId: 'r1', fromSheet: sheetOf(file, 's1'), toPt: { x: 150, y: 180 }, fromPage: page, liveTargetOf: () => null });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.live).toEqual([]);
+    expect(plan.pendingCount).toBe(3);
+    expect(plan.message).toBeNull();
+  });
+
+  it('refuses for an unknown riser', () => {
+    const file = fourLevelRiser();
+    expect(planRiserMove(file, { riserId: 'nope', fromSheet: sheetOf(file, 's1'), toPt: { x: 1, y: 1 }, fromPage: page, liveTargetOf: openOnlyS0 })).toEqual({
+      ok: false,
+      text: 'This riser does not exist any more.',
+    });
+  });
+
+  it('refuses for a sheet that is not a member', () => {
+    const file = addRiser(baseFile(), 'r1', 'Supply riser 1', 's1', 'f1');
+    expect(planRiserMove(file, { riserId: 'r1', fromSheet: sheetOf(file, 's0'), toPt: { x: 1, y: 1 }, fromPage: page, liveTargetOf: openOnlyS0 })).toEqual({
+      ok: false,
+      text: 'This fitting is not part of a riser.',
+    });
+  });
+
+  it('refuses with the scale text when the shown page has no scale', () => {
+    const file = fourLevelRiser();
+    expect(planRiserMove(file, { riserId: 'r1', fromSheet: sheetOf(file, 's1'), toPt: { x: 1, y: 1 }, fromPage: noScalePage, liveTargetOf: openOnlyS0 })).toEqual({
+      ok: false,
+      text: 'Set the scale of Sheet 1 to move Supply riser 1.',
+    });
+  });
+});
+
+describe('conflict helpers', () => {
+  const conflictAt = (dx: number, sheetFitting = 'f1') => ({ fittingId: sheetFitting, fittingPt: { x: 100 + dx, y: 200 }, anchorPt: { x: 100, y: 200 } });
+
+  it('gives the whole-mm distance, rounded, and at least 1 mm', () => {
+    const file = addRiser(baseFile(), 'r1', 'Supply riser 1', 's1', 'f1');
+    const sheet = sheetOf(file, 's1');
+    expect(riserConflictInfo(file, sheet, conflictAt(3 * ppmm), page)).toEqual({
+      riserId: 'r1',
+      fittingId: 'f1',
+      label: 'Supply riser 1',
+      levelName: 'Ground',
+      distanceMm: 3,
+      fittingPt: { x: 100 + 3 * ppmm, y: 200 },
+      anchorPt: { x: 100, y: 200 },
+    });
+    expect(riserConflictInfo(file, sheet, conflictAt(2.6 * ppmm), page)?.distanceMm).toBe(3);
+    expect(riserConflictInfo(file, sheet, conflictAt(2.4 * ppmm), page)?.distanceMm).toBe(2);
+    expect(riserConflictInfo(file, sheet, conflictAt(0.1 * ppmm), page)?.distanceMm).toBe(1);
+    expect(riserConflictInfo(file, sheet, conflictAt(0), page)?.distanceMm).toBe(1);
+  });
+
+  it('gives null for an unknown fitting, a sheet without the riser or a page without scale', () => {
+    const file = addRiser(baseFile(), 'r1', 'Supply riser 1', 's1', 'f1');
+    expect(riserConflictInfo(file, sheetOf(file, 's1'), conflictAt(3 * ppmm, 'other'), page)).toBeNull();
+    expect(riserConflictInfo(file, sheetOf(file, 's0'), conflictAt(3 * ppmm), page)).toBeNull();
+    expect(riserConflictInfo(file, sheetOf(file, 's1'), conflictAt(3 * ppmm), noScalePage)).toBeNull();
+    expect(riserConflictInfo(file, sheetOf(file, 's1'), conflictAt(3 * ppmm), null)).toBeNull();
+  });
+
+  it('gives the tolerance of half a mm in pt, or null without scale', () => {
+    expect(conflictTolerancePt(page)).toBe(0.5 * ppmm);
+    expect(conflictTolerancePt(noScalePage)).toBeNull();
+    expect(conflictTolerancePt(null)).toBeNull();
+  });
+
+  it('has the exact texts', () => {
+    expect(CONFLICT_SCALE_NOTE).toBe('A new scale on a page moves every riser on that page into this state.');
+    expect(CONFLICT_MOVE_HELP).toBe('Move the riser here: the riser and all other levels follow this fitting.');
+    expect(CONFLICT_SNAP_HELP).toBe('Snap back: this fitting returns to the building position.');
+    expect(conflictTitle('Supply riser 1')).toBe('Supply riser 1 is not at the building position');
+    expect(conflictLaterText('Supply riser 1')).toBe('Supply riser 1 is not at the building position.');
+    const file = addRiser(baseFile(), 'r1', 'Supply riser 1', 's1', 'f1');
+    const info = riserConflictInfo(file, sheetOf(file, 's1'), conflictAt(3 * ppmm), page);
+    expect(info && conflictBody(info)).toBe('On Ground, the fitting is 3 mm from where the building file puts Supply riser 1.');
   });
 });

@@ -4,7 +4,9 @@ import {
   detachMember,
   makeRiser,
   mmToPt,
+  moveRiser,
   nextRiserLabel,
+  ptToMm,
   riserGraphReach,
   type BuildingFile,
   type BuildingSheet,
@@ -288,4 +290,101 @@ export function applyRiserTypeChange(
     file: next,
     message: `Type changed on ${levelCount} ${levelCount === 1 ? 'level' : 'levels'} for ${eventRiser.name}.`,
   };
+}
+
+export interface LiveTarget { docId: string; heightPt: number; pageUnitsPerRealUnit: number }
+export interface LiveMove { sheetId: string; sheetName: string; docId: string; fittingId: string; toPt: Vec2 }
+
+/** Plan a move of the riser to toPt (pt of fromPage, the shown page of fromSheet). Order: riser unknown -> { ok:false, text: TEXT_RISER_GONE }; fromSheet not a member -> { ok:false, text: TEXT_NOT_IN_RISER }; ppmmOf(fromPage) null -> { ok:false, text: `Set the scale of ${fromSheet.displayName} to move ${riser.name}.` }. Else toMm = ptToMm(toPt, {heightPt: fromPage.heightPt, ppmm}). openSheetIds = ids of the OTHER members' sheets (look the sheet up in file.sheets by member.sheetId) for which liveTargetOf(sheet) is not null. r = moveRiser(file, riserId, toMm, fromSheet.id, openSheetIds). live = one LiveMove per r.applyNow entry: toPt = mmToPt(entry.toMm, {heightPt: target.heightPt, ppmm: target.pageUnitsPerRealUnit}), fittingId = the member's fittingId, docId from the target, sheetName = sheet.displayName. pendingCount = number of other members that are not live. message = live.length > 0 ? `${riser.name} moved to match the building.` : null. */
+export function planRiserMove(
+  file: BuildingFile,
+  args: { riserId: string; fromSheet: BuildingSheet; toPt: Vec2; fromPage: ShownPage; liveTargetOf: (sheet: BuildingSheet) => LiveTarget | null },
+): { ok: true; file: BuildingFile; live: LiveMove[]; pendingCount: number; message: string | null } | { ok: false; text: string } {
+  const riser = file.risers.find((candidate) => candidate.id === args.riserId);
+  if (riser === undefined) return { ok: false, text: TEXT_RISER_GONE };
+  if (!riser.members.some((member) => member.sheetId === args.fromSheet.id)) return { ok: false, text: TEXT_NOT_IN_RISER };
+  const ppmm = ppmmOf(args.fromPage);
+  if (ppmm === null) return { ok: false, text: `Set the scale of ${args.fromSheet.displayName} to move ${riser.name}.` };
+  const toMm = ptToMm(args.toPt, { heightPt: args.fromPage.heightPt, ppmm });
+  const targets = new Map<string, { sheet: BuildingSheet; target: LiveTarget }>();
+  for (const member of riser.members) {
+    if (member.sheetId === args.fromSheet.id) continue;
+    const sheet = file.sheets.find((candidate) => candidate.id === member.sheetId);
+    if (sheet === undefined) continue;
+    const target = args.liveTargetOf(sheet);
+    if (target !== null) targets.set(sheet.id, { sheet, target });
+  }
+  const result = moveRiser(file, args.riserId, toMm, args.fromSheet.id, new Set(targets.keys()));
+  const live: LiveMove[] = [];
+  for (const entry of result.applyNow) {
+    const found = targets.get(entry.sheetId);
+    const member = riser.members.find((candidate) => candidate.sheetId === entry.sheetId);
+    if (found === undefined || member === undefined) continue;
+    live.push({
+      sheetId: entry.sheetId,
+      sheetName: found.sheet.displayName,
+      docId: found.target.docId,
+      fittingId: member.fittingId,
+      toPt: mmToPt(entry.toMm, { heightPt: found.target.heightPt, ppmm: found.target.pageUnitsPerRealUnit }),
+    });
+  }
+  const pendingCount = riser.members.filter(
+    (member) => member.sheetId !== args.fromSheet.id && !live.some((move) => move.sheetId === member.sheetId),
+  ).length;
+  return {
+    ok: true,
+    file: result.file,
+    live,
+    pendingCount,
+    message: live.length > 0 ? `${riser.name} moved to match the building.` : null,
+  };
+}
+
+export interface RiserConflictInfo {
+  riserId: string; fittingId: string; label: string; levelName: string;
+  distanceMm: number; fittingPt: Vec2; anchorPt: Vec2;
+}
+export const CONFLICT_SCALE_NOTE = 'A new scale on a page moves every riser on that page into this state.';
+export const CONFLICT_MOVE_HELP = 'Move the riser here: the riser and all other levels follow this fitting.';
+export const CONFLICT_SNAP_HELP = 'Snap back: this fitting returns to the building position.';
+
+/** Tolerance in pt for scene.riserConflicts: 0.5 * ppmm (the 0.5 mm rule of inConflict). Null when the page has no scale. */
+export function conflictTolerancePt(page: ShownPage | null): number | null {
+  const ppmm = ppmmOf(page);
+  return ppmm === null ? null : 0.5 * ppmm;
+}
+
+/** null when the riser of the fitting is unknown (riserOfFitting on sheet.id) or the page has no scale. distanceMm = Math.max(1, Math.round(hypot(dx,dy) / ppmm)) (whole mm). levelName = levelNameOf(file, sheet). label = riser.name. */
+export function riserConflictInfo(
+  file: BuildingFile,
+  sheet: BuildingSheet,
+  conflict: { fittingId: string; fittingPt: Vec2; anchorPt: Vec2 },
+  page: ShownPage | null,
+): RiserConflictInfo | null {
+  const riser = riserOfFitting(file, sheet.id, conflict.fittingId);
+  const ppmm = ppmmOf(page);
+  if (riser === null || ppmm === null) return null;
+  const dx = conflict.fittingPt.x - conflict.anchorPt.x;
+  const dy = conflict.fittingPt.y - conflict.anchorPt.y;
+  return {
+    riserId: riser.id,
+    fittingId: conflict.fittingId,
+    label: riser.name,
+    levelName: levelNameOf(file, sheet),
+    distanceMm: Math.max(1, Math.round(Math.hypot(dx, dy) / ppmm)),
+    fittingPt: conflict.fittingPt,
+    anchorPt: conflict.anchorPt,
+  };
+}
+
+export function conflictTitle(label: string): string {
+  return `${label} is not at the building position`;
+}
+
+export function conflictBody(info: RiserConflictInfo): string {
+  return `On ${info.levelName}, the fitting is ${info.distanceMm} mm from where the building file puts ${info.label}.`;
+}
+
+export function conflictLaterText(label: string): string {
+  return `${label} is not at the building position.`;
 }
