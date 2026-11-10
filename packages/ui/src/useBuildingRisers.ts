@@ -1,8 +1,19 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import type { BuildingFile, BuildingSheet, Calibration, Vec2 } from '@mepapp/core';
+import type { BuildingFile, BuildingSheet, Calibration, SheetSummary, Vec2 } from '@mepapp/core';
 import type { CanvasContextMenuTarget, DocumentSummary, RiserMark, SceneNotice, SketchScene } from '@mepapp/render';
 import type { OpenBuilding } from './buildingController.js';
 import { readSummaries } from './quantitiesScope.js';
+import {
+  dropPendingOps,
+  hasPendingMove,
+  hasPendingOps,
+  pendingLinkOf,
+  pendingNotices,
+  planPendingOps,
+  summaryFrameOf,
+  type PendingEdit,
+  type PendingFrame,
+} from './riserPending.js';
 import {
   activeSheetOf,
   applyRiserTypeChange,
@@ -46,6 +57,8 @@ interface LiveValues {
   sheet: BuildingSheet | null;
   update: (change: (file: BuildingFile) => BuildingFile) => Promise<void>;
   pushToast: (notice: SceneNotice) => void;
+  pathOfDocument: (documentId: string) => string | undefined;
+  isLoading: () => boolean;
 }
 
 function messageOf(error: unknown): string {
@@ -95,8 +108,10 @@ export function useBuildingRisers(args: {
   pageIndex: number;
   calibration: Calibration | null;
   pushToast: (notice: SceneNotice) => void;
+  pathOfDocument: (documentId: string) => string | undefined;
+  isLoading: () => boolean;
 }) {
-  const { sceneRef, ready, building, update, documents, activeDocumentId, pageIndex, calibration, pushToast } = args;
+  const { sceneRef, ready, building, update, documents, activeDocumentId, pageIndex, calibration, pushToast, pathOfDocument, isLoading } = args;
   const file = building?.file ?? null;
   const sheet = sheetOnShownPage(file, documents, activeDocumentId, pageIndex);
   const [pendingDelete, setPendingDelete] = useState<{ riserId: string; label: string } | null>(null);
@@ -104,22 +119,114 @@ export function useBuildingRisers(args: {
   const [conflict, setConflict] = useState<RiserConflictInfo | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set<string>());
   const syncing = useRef(0);
-  const live = useRef<LiveValues>({ building, sheet, update, pushToast });
-  live.current = { building, sheet, update, pushToast };
+  const pendingQueue = useRef<Promise<void>>(Promise.resolve());
+  const notified = useRef(new Set<string>());
+  const live = useRef<LiveValues>({ building, sheet, update, pushToast, pathOfDocument, isLoading });
+  live.current = { building, sheet, update, pushToast, pathOfDocument, isLoading };
 
   const commit = async (build: (current: BuildingFile) => Outcome): Promise<void> => {
     let outcome = null as Outcome | null;
-    await live.current.update((current) => {
-      const next = build(current);
-      outcome = next;
-      return next.file;
-    });
+    let failure: unknown = null;
+    try {
+      await live.current.update((current) => {
+        const next = build(current);
+        outcome = next;
+        return next.file;
+      });
+    } catch (error: unknown) {
+      failure = error;
+    }
     if (outcome !== null && outcome.notice !== null) live.current.pushToast(outcome.notice);
     if (outcome !== null && outcome.after) outcome.after();
+    if (failure !== null && outcome === null) throw failure;
+    if (failure !== null && outcome !== null) live.current.pushToast({ kind: 'warning', message: `The building file was not saved: ${messageOf(failure)}` });
   };
 
   const guard = (task: () => Promise<void>): void => {
     task().catch((error: unknown) => live.current.pushToast({ kind: 'warning', message: `Could not update the riser: ${messageOf(error)}` }));
+  };
+
+  const runPending = async (only: string | null): Promise<void> => {
+    const scene = sceneRef.current;
+    const start = live.current.building;
+    if (!scene || start === null) return;
+    let summaries: ReadonlyMap<string, SheetSummary> | null = null;
+    for (const doc of scene.getDocuments()) {
+      if (only !== null && doc.id !== only) continue;
+      if (doc.projectUuid === null) continue;
+      for (const sheet of start.file.sheets) {
+        if (sheet.projectUuid !== doc.projectUuid) continue;
+        const open = live.current.building;
+        if (open === null || open.file.id !== start.file.id) return;
+        let file = open.file;
+        if (!hasPendingOps(file, sheet.id)) {
+          for (const token of notified.current) {
+            if (token.startsWith(`${sheet.id}|`)) notified.current.delete(token);
+          }
+          continue;
+        }
+        const path = live.current.pathOfDocument(doc.id);
+        const link = pendingLinkOf(
+          file,
+          { projectUuid: doc.projectUuid, projectUuidInFile: doc.projectUuidInFile, ...(path === undefined ? {} : { path }), fileName: doc.fileName, sizeBytes: doc.sizeBytes },
+          sheet,
+        );
+        const sceneFrame = scene.getDocumentPageFrame(doc.id, sheet.pageIndex);
+        let frame: PendingFrame | null =
+          sceneFrame === null ? null : { heightPt: sceneFrame.heightPt, pageUnitsPerRealUnit: sceneFrame.pageUnitsPerRealUnit, source: 'scene' };
+        if (frame === null && link !== 'ambiguous' && hasPendingMove(file, sheet.id)) {
+          if (summaries === null) {
+            try {
+              summaries = (await readSummaries(start.store)).summaries;
+            } catch {
+              summaries = new Map<string, SheetSummary>();
+            }
+          }
+          frame = summaryFrameOf(summaries, sheet);
+          const after = live.current.building;
+          if (after === null || after.file.id !== start.file.id) return;
+          file = after.file;
+        }
+        const plan = planPendingOps(file, { sheet, link, frame });
+        const applied: PendingEdit[] = [];
+        for (const edit of plan.edits) {
+          if (edit.kind === 'move') {
+            if (edit.toPt !== undefined && scene.applyRemoteFittingMoveIn(doc.id, edit.fittingId, edit.toPt)) applied.push(edit);
+          } else if (edit.networkType !== undefined && scene.applyRemoteRetagIn(doc.id, edit.fittingId, edit.networkType)) {
+            applied.push(edit);
+          }
+        }
+        const keys = [...plan.obsolete, ...applied.map((edit) => edit.key)];
+        if (keys.length > 0) await commit((current) => ({ file: dropPendingOps(current, keys), notice: null }));
+        for (const notice of pendingNotices({ file, sheet, link, plan, applied })) {
+          if (notice.kind === 'info') {
+            live.current.pushToast(notice);
+            continue;
+          }
+          const token = `${sheet.id}|${notice.message}`;
+          if (notified.current.has(token)) continue;
+          notified.current.add(token);
+          live.current.pushToast(notice);
+        }
+        if (plan.waiting === null) {
+          for (const token of notified.current) {
+            if (token.startsWith(`${sheet.id}|`)) notified.current.delete(token);
+          }
+        }
+        if (applied.length > 0) setSceneTick((tick) => tick + 1);
+      }
+    }
+  };
+
+  const enqueuePending = (only: string | null): void => {
+    pendingQueue.current = pendingQueue.current
+      .then(() => runPending(only))
+      .catch((error: unknown) => live.current.pushToast({ kind: 'warning', message: `Could not apply the riser changes: ${messageOf(error)}` }));
+  };
+
+  const applyPendingForDocument = (documentId: string): void => {
+    notified.current.clear();
+    enqueuePending(documentId);
   };
 
   const menuStateFor = (target: CanvasContextMenuTarget): RiserMenuState => {
@@ -267,6 +374,10 @@ export function useBuildingRisers(args: {
     scene.setRiserMarks(marks);
     scene.setRiserAnchors(file && sheet ? buildRiserAnchors(file, sheet, shown) : []);
     if (syncing.current > 0) return;
+    if (file && sheet && hasPendingMove(file, sheet.id)) {
+      setConflict(null);
+      return;
+    }
     if (!file || !sheet) {
       setConflict(null);
       return;
@@ -285,6 +396,11 @@ export function useBuildingRisers(args: {
     const next = first === null ? null : riserConflictInfo(file, sheet, first, shown);
     setConflict((previous) => (sameConflict(previous, next) ? previous : next));
   }, [ready, sceneRef, file, sheet, calibration, sceneTick, dismissed]);
+
+  useEffect(() => {
+    if (!ready || live.current.isLoading()) return;
+    enqueuePending(null);
+  }, [ready, file, documents, activeDocumentId, pageIndex, calibration, sceneTick]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -378,5 +494,6 @@ export function useBuildingRisers(args: {
     resolveConflictMoveHere,
     resolveConflictSnapBack,
     decideConflictLater,
+    applyPendingForDocument,
   };
 }

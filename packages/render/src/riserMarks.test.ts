@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CommandManager, Transaction, splitSegmentAtFitting, type Fitting, type Segment, type Vec2 } from '@mepapp/core';
 import type { DrawingState } from './document.js';
-import { fittingContextIn, moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserMark } from './riserMarks.js';
+import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserMark } from './riserMarks.js';
 
 function fitting(id: string, position: Vec2, pageIndex = 0, routedBy?: 'route'): Fitting {
   return { id, pageIndex, position, kind: 'junction', ...(routedBy ? { routedBy } : {}) };
@@ -123,6 +123,60 @@ describe('riserIdsTouchedBySegments', () => {
     const f3: Fitting = { id: 'f3', pageIndex: 0, position: { x: 200, y: 100 }, kind: 'junction' };
     const { segmentA, segmentB } = splitSegmentAtFitting(s1, f3, { x: 200, y: 100 }, { segmentA: 'sa', segmentB: 'sb' });
     expect(riserIdsTouchedBySegments([segmentA, segmentB], new Map([['f2', marks.get('f2')!]]))).toEqual(['R2']);
+  });
+});
+
+describe('retagRunInState', () => {
+  function segmentAt(id: string, networkTypeId: string, endpointA: Segment['endpointA'], endpointB: Segment['endpointB']): Segment {
+    return { ...makeState().segments.s1, id, networkTypeId, endpointA, endpointB };
+  }
+  const at = (fittingId: string) => ({ kind: 'fitting' as const, fittingId });
+  const fourFittings = {
+    f1: fitting('f1', { x: 100, y: 100 }),
+    f2: fitting('f2', { x: 300, y: 100 }),
+    f3: fitting('f3', { x: 500, y: 100 }),
+    f4: fitting('f4', { x: 700, y: 100 }),
+  };
+
+  it('retags both segments of a run joined at the fitting', () => {
+    const state = makeState({
+      fittings: fourFittings,
+      segments: {
+        s1: segmentAt('s1', 'supply-air', at('f1'), at('f2')),
+        s2: segmentAt('s2', 'supply-air', at('f2'), at('f3')),
+      },
+    });
+    const after = retagRunInState(state, 'f2', 'return-air', [])!;
+    expect(after.segments.s1.networkTypeId).toBe('return-air');
+    expect(after.segments.s2.networkTypeId).toBe('return-air');
+    expect(state.segments.s1.networkTypeId).toBe('supply-air');
+  });
+
+  it('keeps the type of a segment of another run with no shared fitting', () => {
+    const state = makeState({
+      fittings: fourFittings,
+      segments: {
+        s1: segmentAt('s1', 'supply-air', at('f1'), at('f2')),
+        s3: segmentAt('s3', 'supply-air', at('f3'), at('f4')),
+      },
+    });
+    const after = retagRunInState(state, 'f2', 'return-air', [])!;
+    expect(after.segments.s1.networkTypeId).toBe('return-air');
+    expect(after.segments.s3.networkTypeId).toBe('supply-air');
+  });
+
+  it('returns null for an unknown fitting id', () => {
+    expect(retagRunInState(makeState(), 'missing', 'return-air', [])).toBeNull();
+  });
+
+  it('returns the same state object when the fitting has no segment', () => {
+    const before = makeState({ fittings: { ...fourFittings } });
+    expect(retagRunInState(before, 'f4', 'return-air', [])).toBe(before);
+  });
+
+  it('returns the same state object when every segment of the run has the type already', () => {
+    const before = makeState();
+    expect(retagRunInState(before, 'f1', 'supply-air', [])).toBe(before);
   });
 });
 

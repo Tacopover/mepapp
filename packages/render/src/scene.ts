@@ -159,7 +159,7 @@ import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroup
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
-import { fittingContextIn, moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
+import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
 import { visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
 import {
   addPanelAccessoryCommand,
@@ -2608,17 +2608,17 @@ export class SketchScene {
   }
 
   /** adoptNetworkTypes without the event, for a caller that emits it itself. */
-  private adoptTypes(ids: Iterable<string>, copies: readonly NetworkType[]): { adopted: boolean; missing: string[] } {
+  private adoptTypes(ids: Iterable<string>, copies: readonly NetworkType[], target: SketchDocument = this.doc): { adopted: boolean; missing: string[] } {
     let adopted = false;
     const missing: string[] = [];
     for (const id of new Set(ids)) {
-      if (this.doc.networkTypes.some((t) => t.id === id)) continue;
+      if (target.networkTypes.some((t) => t.id === id)) continue;
       const type = copies.find((t) => t.id === id) ?? getNetworkTypeFromLibrary(id);
       if (!type) {
         missing.push(id);
         continue;
       }
-      this.doc.networkTypes.push({ ...type });
+      target.networkTypes.push({ ...type });
       adopted = true;
     }
     return { adopted, missing };
@@ -3088,6 +3088,32 @@ export class SketchScene {
     if (!moved) return false;
     if (moved === state) return true;
     target.drawingHistory.setLiveState(moved);
+    this.markDocumentDirty(target);
+    if (target !== this.doc) return true;
+    this.syncDrawingLayer();
+    this.redrawOverlay();
+    this.emitter.emit('selectionChanged', this.getSelection());
+    return true;
+  }
+
+  /** Remote retag of the run at a fitting of any open document, by runtime id (SketchDocument.id). Adopts `networkType` into that document first (the document keeps its own copy if it has the id). No undo entry, no 'riserTypeChangeRequested'. Marks the document dirty. For a non-active document no sync and no redraw run. False when the document or the fitting is not found. */
+  applyRemoteRetagIn(docId: string, fittingId: string, networkType: NetworkType): boolean {
+    const target = this.documents.find((d) => d.id === docId);
+    if (!target) return false;
+    const state = target.drawingHistory.getState();
+    const next = retagRunInState(state, fittingId, networkType.id, target.portGroups);
+    if (!next) return false;
+    const { adopted } = this.adoptTypes([networkType.id], [networkType], target);
+    if (adopted && target === this.doc) this.emitter.emit('networkTypesChanged', target.networkTypes);
+    if (next === state) {
+      if (adopted) this.markDocumentDirty(target);
+      if (adopted && target === this.doc) {
+        this.syncDrawingLayer();
+        this.redrawOverlay();
+      }
+      return true;
+    }
+    target.drawingHistory.setLiveState(next);
     this.markDocumentDirty(target);
     if (target !== this.doc) return true;
     this.syncDrawingLayer();

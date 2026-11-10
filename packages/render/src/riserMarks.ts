@@ -1,4 +1,4 @@
-import { clearRoutedMarks, recomputeAttachedSegments, type PortGroup, type Segment, type Vec2 } from '@mepapp/core';
+import { clearRoutedMarks, recomputeAttachedSegments, segmentIdsOfNetworks, type PortGroup, type Segment, type Vec2 } from '@mepapp/core';
 import type { DrawingState } from './document.js';
 
 /** One marked fitting. The UI builds it from the building file; anchorPt is the riser anchor in pt on the shown page. */
@@ -59,6 +59,26 @@ export function moveFittingInState(state: DrawingState, fittingId: string, to: V
     fittings: Object.fromEntries(clearRoutedMarks(Object.values(next.fittings), fittingIds).map((f) => [f.id, f])),
     segments: Object.fromEntries(clearRoutedMarks(Object.values(next.segments), segmentIds).map((s) => [s.id, s])),
   };
+}
+
+/** Sets networkTypeId on every segment of the connected run(s) that end at `fittingId` (segmentIdsOfNetworks with the given portGroups, seeds = the segments with endpointA or endpointB { kind:'fitting', fittingId }). Null when the fitting does not exist. The same state object when the fitting has no segment, or when every segment of the run has the type already. */
+export function retagRunInState(state: DrawingState, fittingId: string, networkTypeId: string, portGroups: readonly PortGroup[]): DrawingState | null {
+  if (!state.fittings[fittingId]) return null;
+  const seedIds = Object.values(state.segments)
+    .filter((s) => [s.endpointA, s.endpointB].some((e) => e.kind === 'fitting' && e.fittingId === fittingId))
+    .map((s) => s.id);
+  if (seedIds.length === 0) return state;
+  const runIds = segmentIdsOfNetworks({ segments: Object.values(state.segments), fittings: Object.values(state.fittings), portGroups: [...portGroups] }, seedIds);
+
+  const segments = { ...state.segments };
+  let changed = false;
+  for (const id of runIds) {
+    const segment = state.segments[id];
+    if (!segment || segment.networkTypeId === networkTypeId) continue;
+    segments[id] = { ...segment, networkTypeId };
+    changed = true;
+  }
+  return changed ? { ...state, segments } : state;
 }
 
 /** The marked fittings on `pageIndex` whose distance to the anchor of their mark is greater than `tolerancePt`. A mark whose fitting is missing or on another page is skipped. */

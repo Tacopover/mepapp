@@ -482,6 +482,8 @@ export function MepSketchApp({
     pageIndex,
     calibration,
     pushToast,
+    pathOfDocument: (documentId) => pathOfTarget(fileTargetsRef.current.get(documentId)),
+    isLoading: () => fileTaskRef.current !== null,
   });
   const riserMenuState = canvasContextMenuRequest ? risers.menuStateFor(canvasContextMenuRequest.target) : null;
   const buildingStore = buildingHook.building?.store;
@@ -911,6 +913,7 @@ export function MepSketchApp({
       });
       return;
     }
+    risers.applyPendingForDocument(documentId);
     if (snapshot && shouldWriteSummaryOnOpen({ projectUuidInFile: projectUuidInFile || adopted, loadMismatch, outcome })) {
       await writeSummaryOnOpen(snapshot, file, target, projectUuidInFile);
     }
