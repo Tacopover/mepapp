@@ -151,7 +151,7 @@ a = await active();
 check(a.role === 'treeitem' && a.key.startsWith('l:'), 'reopen: the focus is in the tree', JSON.stringify(a));
 check((await dlg.locator('[data-testid="selection-summary"] h4').textContent()) === 'Level 2', 'right pane: the summary is the one of Level 2');
 check((await dlg.locator('[role="tree"] [role="treeitem"][tabindex="0"]').count()) === 1, 'roving tabindex: one tab stop in the tree');
-check((await dlg.locator('[role="tab"]').count()) === 1 && /Levels and sheets/.test((await dlg.locator('[role="tab"]').textContent()) ?? ''), 'one tab: Levels and sheets');
+check((await dlg.locator('[role="tab"]').count()) === 2 && /Levels and sheets/.test((await dlg.locator('[role="tab"]').first().textContent()) ?? '') && /^Risers \(\d+\)$/.test(((await dlg.locator('[role="tab"]').nth(1).textContent()) ?? '').trim()), 'two tabs: Levels and sheets, Risers (n) (B4-T09 adds the second)');
 await shot('B3-T11c-wide-active-level');
 
 // Step 5: a second building "Annex" through the Building menu.

@@ -117,6 +117,8 @@ export function useBuildingRisers(args: {
   const [pendingDelete, setPendingDelete] = useState<{ riserId: string; label: string } | null>(null);
   const [sceneTick, setSceneTick] = useState(0);
   const [conflict, setConflict] = useState<RiserConflictInfo | null>(null);
+  const [conflictKeys, setConflictKeys] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const conflictKeysJoined = useRef('');
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set<string>());
   const syncing = useRef(0);
   const pendingQueue = useRef<Promise<void>>(Promise.resolve());
@@ -341,6 +343,14 @@ export function useBuildingRisers(args: {
     setSceneTick((tick) => tick + 1);
   };
 
+  const applyConflictKeys = (keys: string[]): void => {
+    const unique = [...new Set(keys)].sort();
+    const joined = unique.join('\n');
+    if (joined === conflictKeysJoined.current) return;
+    conflictKeysJoined.current = joined;
+    setConflictKeys(new Set(unique));
+  };
+
   const decideConflictLater = (): void => {
     const pending = conflict;
     setConflict(null);
@@ -376,10 +386,12 @@ export function useBuildingRisers(args: {
     if (syncing.current > 0) return;
     if (file && sheet && hasPendingMove(file, sheet.id)) {
       setConflict(null);
+      applyConflictKeys([]);
       return;
     }
     if (!file || !sheet) {
       setConflict(null);
+      applyConflictKeys([]);
       return;
     }
     const tolerance = conflictTolerancePt(shown);
@@ -392,6 +404,12 @@ export function useBuildingRisers(args: {
       changed = true;
     }
     if (changed) scene.setRiserMarks(marks);
+    const keys: string[] = [];
+    for (const candidate of found) {
+      const riser = riserOfFitting(file, sheet.id, candidate.fittingId);
+      if (riser !== null) keys.push(`${riser.id}|${sheet.id}`);
+    }
+    applyConflictKeys(keys);
     const first = found.find((candidate) => !dismissed.has(candidate.fittingId)) ?? null;
     const next = first === null ? null : riserConflictInfo(file, sheet, first, shown);
     setConflict((previous) => (sameConflict(previous, next) ? previous : next));
@@ -491,6 +509,7 @@ export function useBuildingRisers(args: {
     confirmDelete,
     cancelDelete,
     conflict,
+    conflictKeys,
     resolveConflictMoveHere,
     resolveConflictSnapBack,
     decideConflictLater,

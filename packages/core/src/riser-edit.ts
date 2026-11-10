@@ -125,6 +125,39 @@ export function detachMember(file: BuildingFile, riserId: string, sheetId: strin
   return { ...file, risers: file.risers.map((candidate) => (candidate.id === riserId ? next : candidate)) };
 }
 
+/** Removes the hand-set flow: flow becomes 'unknown' and sourceLevelId is deleted. Unknown riser, or a riser that has no override (flow 'unknown' and no sourceLevelId): file unchanged (same object). */
+export function clearRiserFlowOverride(file: BuildingFile, riserId: string): BuildingFile {
+  const riser = file.risers.find((candidate) => candidate.id === riserId);
+  if (riser === undefined) return file;
+  if (riser.flow === 'unknown' && riser.sourceLevelId === undefined) return file;
+  const next: Riser = { ...riser, flow: 'unknown' };
+  delete next.sourceLevelId;
+  return { ...file, risers: file.risers.map((candidate) => (candidate.id === riserId ? next : candidate)) };
+}
+
+/** Sets connectionHeightMm of the member with that sheetId. mm undefined removes the field. mm that is not finite or is negative: file unchanged. Unknown riser or sheet, or the value is already equal: file unchanged (same object). */
+export function setMemberConnectionHeight(file: BuildingFile, riserId: string, sheetId: string, mm: number | undefined): BuildingFile {
+  const riser = file.risers.find((candidate) => candidate.id === riserId);
+  if (riser === undefined) return file;
+  if (mm !== undefined && (!Number.isFinite(mm) || mm < 0)) return file;
+  const member = riser.members.find((candidate) => candidate.sheetId === sheetId);
+  if (member === undefined) return file;
+  if (mm === undefined) {
+    if (!('connectionHeightMm' in member)) return file;
+  } else if (member.connectionHeightMm === mm) {
+    return file;
+  }
+  const members = riser.members.map((candidate) => {
+    if (candidate.sheetId !== sheetId) return candidate;
+    const updated: RiserMember = { ...candidate };
+    if (mm === undefined) delete updated.connectionHeightMm;
+    else updated.connectionHeightMm = mm;
+    return updated;
+  });
+  const next: Riser = { ...riser, members };
+  return { ...file, risers: file.risers.map((candidate) => (candidate.id === riserId ? next : candidate)) };
+}
+
 /** Removes the riser. Unknown id: file unchanged. */
 export function deleteRiser(file: BuildingFile, riserId: string): BuildingFile {
   if (!file.risers.some((riser) => riser.id === riserId)) return file;

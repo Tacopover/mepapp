@@ -5,11 +5,13 @@ import type { NetworkType } from './network.js';
 import type { Riser, RiserMember } from './riser.js';
 import {
   attachMember,
+  clearRiserFlowOverride,
   deleteRiser,
   detachMember,
   makeRiser,
   moveRiser,
   nextRiserLabel,
+  setMemberConnectionHeight,
   setRiserProps,
   takePendingOps,
   type PageFrame,
@@ -299,6 +301,90 @@ describe('detachMember', () => {
   it('returns the same file for a sheet that is not a member', () => {
     const file = fileWithRiser();
     expect(detachMember(file, 'r1', 's2')).toBe(file);
+  });
+});
+
+describe('clearRiserFlowOverride', () => {
+  it('removes the flow and the source level and keeps the other risers', () => {
+    const withOverride = setRiserProps(fileWithRiser(), 'r1', { flow: 'up', sourceLevelId: 'l1' });
+    const other = ok(
+      makeRiser(withOverride, {
+        id: 'r2',
+        name: 'R2',
+        networkType: water,
+        sheetId: 's2',
+        fittingId: 'f2',
+        fittingPt: { x: 0, y: 0 },
+        frame,
+      }),
+    );
+    const file = clearRiserFlowOverride(other, 'r1');
+    expect(riserOf(file, 'r1')).toMatchObject({ flow: 'unknown' });
+    expect(riserOf(file, 'r1')).not.toHaveProperty('sourceLevelId');
+    expect(file.risers[1]).toBe(other.risers[1]);
+  });
+
+  it('returns the same file for a riser without an override', () => {
+    const file = fileWithRiser();
+    expect(clearRiserFlowOverride(file, 'r1')).toBe(file);
+  });
+
+  it('returns the same file for an unknown riser', () => {
+    const file = setRiserProps(fileWithRiser(), 'r1', { flow: 'up' });
+    expect(clearRiserFlowOverride(file, 'nope')).toBe(file);
+  });
+
+  it('clears a source level when the flow is unknown', () => {
+    const withSource = setRiserProps(fileWithRiser(), 'r1', { sourceLevelId: 'l1' });
+    expect(riserOf(clearRiserFlowOverride(withSource, 'r1'), 'r1')).not.toHaveProperty('sourceLevelId');
+  });
+});
+
+describe('setMemberConnectionHeight', () => {
+  function withMembers(): BuildingFile {
+    return ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+  }
+
+  it('sets the connection height of the member', () => {
+    const file = setMemberConnectionHeight(withMembers(), 'r1', 's1', 250);
+    expect(riserOf(file, 'r1').members.find((item) => item.sheetId === 's1')?.connectionHeightMm).toBe(250);
+  });
+
+  it('accepts zero', () => {
+    const file = setMemberConnectionHeight(withMembers(), 'r1', 's1', 0);
+    expect(riserOf(file, 'r1').members.find((item) => item.sheetId === 's1')?.connectionHeightMm).toBe(0);
+  });
+
+  it('removes the field for undefined', () => {
+    const withHeight = setMemberConnectionHeight(withMembers(), 'r1', 's1', 250);
+    const file = setMemberConnectionHeight(withHeight, 'r1', 's1', undefined);
+    const removed = riserOf(file, 'r1').members.find((item) => item.sheetId === 's1');
+    expect(removed !== undefined && 'connectionHeightMm' in removed).toBe(false);
+  });
+
+  it('returns the same file for a value that is negative, NaN or infinite', () => {
+    const file = withMembers();
+    expect(setMemberConnectionHeight(file, 'r1', 's1', -1)).toBe(file);
+    expect(setMemberConnectionHeight(file, 'r1', 's1', Number.NaN)).toBe(file);
+    expect(setMemberConnectionHeight(file, 'r1', 's1', Number.POSITIVE_INFINITY)).toBe(file);
+  });
+
+  it('returns the same file for an unknown riser or sheet', () => {
+    const file = withMembers();
+    expect(setMemberConnectionHeight(file, 'nope', 's1', 250)).toBe(file);
+    expect(setMemberConnectionHeight(file, 'r1', 's2', 250)).toBe(file);
+  });
+
+  it('returns the same file when the value is already equal', () => {
+    const withHeight = setMemberConnectionHeight(withMembers(), 'r1', 's1', 250);
+    expect(setMemberConnectionHeight(withHeight, 'r1', 's1', 250)).toBe(withHeight);
+  });
+
+  it('leaves the other members unchanged', () => {
+    const file = ok(attachMember(withMembers(), 'r1', member(2), { first: frame, this: frame })).file;
+    const next = setMemberConnectionHeight(file, 'r1', 's1', 250);
+    expect(riserOf(next, 'r1').members[0]).toBe(riserOf(file, 'r1').members[0]);
+    expect(riserOf(next, 'r1').members[2]).toBe(riserOf(file, 'r1').members[2]);
   });
 });
 

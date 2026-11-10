@@ -347,13 +347,13 @@ export function riserWarnings(file: BuildingFile): string[] {
   const warnings: string[] = [];
   const risersByLevel = new Map<string, Riser[]>();
   for (const riser of file.risers) {
-    if (riser.members.length === 1) warnings.push(`Riser ${riser.name} has one member.`);
+    if (riser.members.length === 1) warnings.push(`${riser.name} has one level.`);
     const hasFreeEnd = riser.topEnd !== 'member' || riser.bottomEnd !== 'member';
     if (hasFreeEnd && riser.endAllowanceMm === 0) {
-      warnings.push(`Riser ${riser.name} has an open or capped end and no end allowance.`);
+      warnings.push(`${riser.name} has an open or capped end and no end allowance.`);
     }
     if (riser.endAllowanceMm > 0 && riser.topEnd === 'member' && riser.bottomEnd === 'member') {
-      warnings.push(`Riser ${riser.name} has an end allowance but both ends are members.`);
+      warnings.push(`${riser.name} has an end allowance but both ends continue on a level.`);
     }
     for (const member of riser.members) {
       const group = risersByLevel.get(member.levelId);
@@ -373,7 +373,7 @@ export function riserWarnings(file: BuildingFile): string[] {
         const b = group[j]!;
         const distance = Math.hypot(a.anchorMm.xMm - b.anchorMm.xMm, a.anchorMm.yMm - b.anchorMm.yMm);
         if (distance < RISER_MIN_ANCHOR_SPACING_MM) {
-          warnings.push(`Risers ${a.name} and ${b.name} are closer than ${RISER_MIN_ANCHOR_SPACING_MM} mm on level ${levelName}.`);
+          warnings.push(`${a.name} and ${b.name} are closer than ${RISER_MIN_ANCHOR_SPACING_MM} mm on level ${levelName}.`);
         }
       }
     }

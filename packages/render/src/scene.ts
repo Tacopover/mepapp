@@ -505,6 +505,23 @@ const RISER_UNDECIDED_COLOR = 0xe69500;
 /** Red ring on a riser anchor that refused a segment end. */
 const RISER_ANCHOR_REFUSED_COLOR = 0xe53935;
 
+/** A text on a white box, drawn on the overlay. The text origin is at (0, 0) of the container. */
+interface RiserBadge { container: Container; background: Graphics; text: Text }
+
+function createRiserBadge(fontSize: number, fill: number, anchorX: number, anchorY: number): RiserBadge {
+  const container = new Container();
+  container.eventMode = 'none';
+  const background = new Graphics();
+  const text = new Text({ text: '', style: { fontSize, fill, fontWeight: 'bold' } });
+  text.anchor.set(anchorX, anchorY);
+  container.addChild(background, text);
+  return { container, background, text };
+}
+
+function drawRiserBadgeBox(background: Graphics, x: number, y: number, width: number, height: number, alpha: number, borderColor: number): void {
+  background.clear().roundRect(x, y, width, height, 3).fill({ color: 0xffffff, alpha }).stroke({ width: 1, color: borderColor });
+}
+
 /** A route marker on the overlay: the start port (square) or a target port (ring). */
 export interface RouteMarker { world: Vec2; kind: 'start' | 'target' }
 
@@ -710,7 +727,9 @@ export class SketchScene {
   private riserAnchors: RiserAnchor[] = [];
   /** Scene-level: the anchor that refused a segment end, with the tip text. Not part of the document, never saved. */
   private riserAnchorRefusal: { riserId: string; text: string } | null = null;
-  private riserAnchorTip: Text | null = null;
+  private riserAnchorTip: RiserBadge | null = null;
+  /** Scene-level: the ring labels of the shown riser anchors, pooled and reused by redrawOverlay. Not part of the document, never saved. */
+  private riserAnchorLabels: RiserBadge[] = [];
   private riserTypeGuard: ((riserIds: string[], networkTypeId: string) => boolean) | null = null;
   /** Scene-level: the planned route shown on the overlay. Not part of the document, never saved. */
   private routePreview: RoutePreviewView | null = null;
@@ -1256,7 +1275,8 @@ export class SketchScene {
     this.world.addChild(this.autoPlacePreviewLayer);
     this.world.addChild(this.overlay);
     if (this.measureLabel) this.world.addChild(this.measureLabel); // created lazily on the first measurement, so not in the list above
-    if (this.riserAnchorTip) this.world.addChild(this.riserAnchorTip);
+    if (this.riserAnchorTip) this.world.addChild(this.riserAnchorTip.container);
+    for (const label of this.riserAnchorLabels) this.world.addChild(label.container);
     this.world.x = target.viewport.x;
     this.world.y = target.viewport.y;
     this.world.scale.set(target.viewport.scale);
@@ -6088,17 +6108,38 @@ export class SketchScene {
     const refusedAnchor = refusal ? visibleAnchors.find((anchor) => anchor.riserId === refusal.riserId) : undefined;
     if (refusal && refusedAnchor && this.tool === 'draw-segment') {
       if (!this.riserAnchorTip) {
-        this.riserAnchorTip = new Text({ text: '', style: { fontSize: 12, fill: RISER_ANCHOR_REFUSED_COLOR, fontWeight: 'bold' } });
-        this.riserAnchorTip.anchor.set(0.5, 1);
-        this.world.addChild(this.riserAnchorTip);
+        this.riserAnchorTip = createRiserBadge(12, RISER_ANCHOR_REFUSED_COLOR, 0.5, 1);
+        this.world.addChild(this.riserAnchorTip.container);
       }
-      this.riserAnchorTip.text = refusal.text;
-      this.riserAnchorTip.position.set(refusedAnchor.anchorPt.x, refusedAnchor.anchorPt.y - (FITTING_MARKER_RADIUS_WORLD + 12 / this.world.scale.x));
-      this.riserAnchorTip.scale.set(1 / this.world.scale.x);
-      this.riserAnchorTip.visible = true;
+      const tip = this.riserAnchorTip;
+      tip.text.text = refusal.text;
+      const tipPadding = 4;
+      drawRiserBadgeBox(tip.background, -tip.text.width / 2 - tipPadding, -tip.text.height - tipPadding, tip.text.width + 2 * tipPadding, tip.text.height + 2 * tipPadding, 0.92, RISER_ANCHOR_REFUSED_COLOR);
+      tip.container.position.set(refusedAnchor.anchorPt.x, refusedAnchor.anchorPt.y - (FITTING_MARKER_RADIUS_WORLD + 12 / this.world.scale.x));
+      tip.container.scale.set(1 / this.world.scale.x);
+      tip.container.visible = true;
     } else if (this.riserAnchorTip) {
-      this.riserAnchorTip.visible = false;
+      this.riserAnchorTip.container.visible = false;
     }
+    let labelCount = 0;
+    for (const anchor of visibleAnchors) {
+      if (anchor === refusedAnchor && this.tool === 'draw-segment') continue;
+      const color = this.riserAnchorRefusal?.riserId === anchor.riserId ? RISER_ANCHOR_REFUSED_COLOR : RISER_MARK_COLOR;
+      if (labelCount === this.riserAnchorLabels.length) {
+        const label = createRiserBadge(11, 0x1a1a1a, 0, 0.5);
+        this.riserAnchorLabels.push(label);
+        this.world.addChild(label.container);
+      }
+      const label = this.riserAnchorLabels[labelCount++];
+      const padding = 3;
+      const ringRadius = FITTING_MARKER_RADIUS_WORLD + 8 / this.world.scale.x;
+      label.text.text = anchor.label;
+      drawRiserBadgeBox(label.background, -padding, -label.text.height / 2 - padding, label.text.width + 2 * padding, label.text.height + 2 * padding, 0.9, color);
+      label.container.position.set(anchor.anchorPt.x + ringRadius + (4 + padding) / this.world.scale.x, anchor.anchorPt.y);
+      label.container.scale.set(1 / this.world.scale.x);
+      label.container.visible = true;
+    }
+    for (let i = labelCount; i < this.riserAnchorLabels.length; i++) this.riserAnchorLabels[i].container.visible = false;
     if (this.routePreview) drawRoutePreview(this.overlay, this.routePreview, 1 / this.world.scale.x);
     for (const id of this.doc.selectedIds) {
       const element = state.stamps[id] ?? state.segments[id] ?? state.fittings[id] ?? state.annotations[id];

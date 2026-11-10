@@ -257,19 +257,19 @@ describe('building file', () => {
   });
 
   it('warns about a riser with one member', () => {
-    expect(riserWarnings(riserFile(riserRecord({ members: [member('l0', 's0', 0)] })))).toEqual(['Riser R1 has one member.']);
+    expect(riserWarnings(riserFile(riserRecord({ members: [member('l0', 's0', 0)] })))).toEqual(['R1 has one level.']);
   });
 
   it('warns about an open or capped end with no end allowance', () => {
     const open = riserWarnings(riserFile(riserRecord({ topEnd: 'open', bottomEnd: 'member' })));
-    expect(open).toEqual(['Riser R1 has an open or capped end and no end allowance.']);
+    expect(open).toEqual(['R1 has an open or capped end and no end allowance.']);
     const capped = riserWarnings(riserFile(riserRecord({ topEnd: 'member', bottomEnd: 'capped' })));
-    expect(capped).toEqual(['Riser R1 has an open or capped end and no end allowance.']);
+    expect(capped).toEqual(['R1 has an open or capped end and no end allowance.']);
   });
 
   it('warns about an end allowance when both ends are members', () => {
     expect(riserWarnings(riserFile(riserRecord({ endAllowanceMm: 300 })))).toEqual([
-      'Riser R1 has an end allowance but both ends are members.',
+      'R1 has an end allowance but both ends continue on a level.',
     ]);
   });
 
@@ -283,8 +283,8 @@ describe('building file', () => {
       riserFile(riserRecord({ members }), riserRecord({ id: 'r2', name: 'R2', anchorMm: { xMm: 100, yMm: 0 }, members })),
     );
     expect(warnings).toEqual([
-      'Risers R1 and R2 are closer than 150 mm on level Basement.',
-      'Risers R1 and R2 are closer than 150 mm on level Ground.',
+      'R1 and R2 are closer than 150 mm on level Basement.',
+      'R1 and R2 are closer than 150 mm on level Ground.',
     ]);
   });
 

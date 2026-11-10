@@ -31,6 +31,7 @@ import {
 import { BuildingLevelsPane } from './BuildingLevelsPane.js';
 import { BuildingMenu } from './BuildingMenu.js';
 import { BuildingNameEditor } from './BuildingNameEditor.js';
+import { BuildingRisersPane } from './BuildingRisersPane.js';
 import { BuildingSheetsPane } from './BuildingSheetsPane.js';
 import { BuildingSummariesPane, type BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 import { BuildingTree } from './BuildingTree.js';
@@ -46,6 +47,10 @@ const NARROW_QUERY = '(max-width: 899px)';
 /** The time a notice stays in the status line. An error stays longer. */
 const NOTICE_MS = 6000;
 const NOTICE_ERROR_MS = 12000;
+
+type BuildingTab = 'levels' | 'risers';
+const BUILDING_TABS: readonly BuildingTab[] = ['levels', 'risers'];
+const NO_RISER_CONFLICTS: ReadonlySet<string> = new Set<string>();
 
 function importResultText(total: number, result: { saved: number; cancelled: number; failed: string[] }): string {
   return (
@@ -97,6 +102,7 @@ export interface ManageBuildingsDialogProps {
   /** The documents open in the viewer, one row each (openDocumentRows). */
   openDocuments?: readonly OpenDocumentRow[];
   sheetFiles?: { remember: (opened: OpenedFile[]) => void; has: (sheet: BuildingSheet) => boolean };
+  riserConflictKeys?: ReadonlySet<string>;
 }
 
 /**
@@ -113,6 +119,7 @@ export function ManageBuildingsDialog({
   activeSheetLevelId,
   openDocuments = [],
   sheetFiles,
+  riserConflictKeys = NO_RISER_CONFLICTS,
 }: ManageBuildingsDialogProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -129,6 +136,7 @@ export function ManageBuildingsDialog({
   const [selectedKey, setSelectedKey] = useState(initialKey);
   const [focusKey, setFocusKey] = useState(initialKey);
   const [focusNameLevelId, setFocusNameLevelId] = useState<string | null>(null);
+  const [tab, setTab] = useState<BuildingTab>('levels');
   const navRef = useRef<HTMLElement | null>(null);
   const narrow = useNarrow();
 
@@ -144,6 +152,7 @@ export function ManageBuildingsDialog({
     setNotice(null);
     setCreating(false);
     setName('');
+    setTab('levels');
   }, [openedFileId]);
 
   useEffect(() => {
@@ -172,6 +181,12 @@ export function ManageBuildingsDialog({
   /** Moves the focus into the navigation after a selection, so the focus does not fall to the body. */
   function focusNav() {
     requestAnimationFrame(() => navRef.current?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"], select')?.focus());
+  }
+
+  /** Shows a tab and moves the focus to its button, so the keyboard focus follows the selection. */
+  function selectTab(next: BuildingTab) {
+    setTab(next);
+    requestAnimationFrame(() => document.getElementById(`mep-buildings-tab-${next}`)?.focus());
   }
 
   /** The open action of the sheet rows. The dialog stays open, so the user can open more sheets. */
@@ -491,17 +506,45 @@ export function ManageBuildingsDialog({
 
           {openBuilding && (
             <>
-              {/* B4 adds a Risers tab here */}
-              <div role="tablist" className="mep-buildings-tabs">
+              <div
+                role="tablist"
+                aria-label="Building sections"
+                className="mep-buildings-tabs"
+                onKeyDown={(event) => {
+                  const index = BUILDING_TABS.indexOf(tab);
+                  let next: BuildingTab | null = null;
+                  if (event.key === 'ArrowRight') next = BUILDING_TABS[(index + 1) % BUILDING_TABS.length];
+                  else if (event.key === 'ArrowLeft') next = BUILDING_TABS[(index - 1 + BUILDING_TABS.length) % BUILDING_TABS.length];
+                  else if (event.key === 'Home') next = BUILDING_TABS[0];
+                  else if (event.key === 'End') next = BUILDING_TABS[BUILDING_TABS.length - 1];
+                  if (next === null) return;
+                  event.preventDefault();
+                  selectTab(next);
+                }}
+              >
                 <button
                   type="button"
                   role="tab"
                   id="mep-buildings-tab-levels"
-                  aria-selected="true"
+                  aria-selected={tab === 'levels'}
                   aria-controls="mep-buildings-panel-levels"
-                  className="mep-buildings-tab on"
+                  tabIndex={tab === 'levels' ? 0 : -1}
+                  className={tab === 'levels' ? 'mep-buildings-tab on' : 'mep-buildings-tab'}
+                  onClick={() => setTab('levels')}
                 >
                   Levels and sheets
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  id="mep-buildings-tab-risers"
+                  aria-selected={tab === 'risers'}
+                  aria-controls={tab === 'risers' ? 'mep-buildings-panel-risers' : undefined}
+                  tabIndex={tab === 'risers' ? 0 : -1}
+                  className={tab === 'risers' ? 'mep-buildings-tab on' : 'mep-buildings-tab'}
+                  onClick={() => setTab('risers')}
+                >
+                  {`Risers (${openBuilding.file.risers.length})`}
                 </button>
               </div>
               <div
@@ -509,6 +552,7 @@ export function ManageBuildingsDialog({
                 id="mep-buildings-panel-levels"
                 aria-labelledby="mep-buildings-tab-levels"
                 className="mep-buildings-panel"
+                hidden={tab !== 'levels'}
               >
                 <BuildingLevelsPane
                   key={`${openBuilding.file.id}-levels`}
@@ -571,6 +615,29 @@ export function ManageBuildingsDialog({
                   />
                 </OpenDocumentsPane>
               </div>
+              {tab === 'risers' && (
+                <div
+                  role="tabpanel"
+                  id="mep-buildings-panel-risers"
+                  aria-labelledby="mep-buildings-tab-risers"
+                  className="mep-buildings-panel"
+                  data-testid="risers-panel"
+                >
+                  <BuildingRisersPane
+                    key={`${openBuilding.file.id}-risers`}
+                    file={openBuilding.file}
+                    update={building.update}
+                    store={openBuilding.store}
+                    conflictKeys={riserConflictKeys}
+                    fileAccess={fileAccess}
+                    onOpenSheet={openSheetKeepOpen}
+                    openedSheetIds={openedSheetIds(openDocuments)}
+                    canOpenCached={sheetFiles?.has}
+                    onNotice={onNotice}
+                    busy={building.busy}
+                  />
+                </div>
+              )}
               <div className="mep-buildings-status-line">
                 {notice !== null && (
                   <p

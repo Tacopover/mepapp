@@ -76,6 +76,7 @@ export function Dialog({ title, onClose, children, actions, className, closeOnBa
         return;
       }
       if (event.key !== 'Escape') return;
+      if (!isTopDialog(id)) return;
       // The scene listens on window; without this the same Escape would also act on the canvas (e.g. leave Circuits mode).
       event.stopPropagation();
       onClose();

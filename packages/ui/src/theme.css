@@ -1923,6 +1923,9 @@
     linear-gradient(rgba(0, 0, 0, 0.22), transparent) top / 100% 8px no-repeat scroll,
     linear-gradient(transparent, rgba(0, 0, 0, 0.22)) bottom / 100% 8px no-repeat scroll;
 }
+.mep-buildings-panel[hidden] {
+  display: none;
+}
 .mep-tree {
   display: flex;
   flex-direction: column;
@@ -6240,5 +6243,351 @@ button.mep-tree-arrow {
   }
   .mep-srow > .mep-sheet-hint {
     grid-row: 3;
+  }
+}
+
+/* Risers tab diagram (B4-T09) */
+.mep-rd {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.mep-rd-levels {
+  position: relative;
+  width: 130px;
+  flex: none;
+}
+.mep-rd-level {
+  position: absolute;
+  left: 0;
+  right: 12px;
+  transform: translateY(-50%);
+  text-align: right;
+}
+.mep-rd-level-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 126px;
+}
+.mep-rd-level-elev {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 126px;
+}
+.mep-rd-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.mep-rd-main > .mep-rd-scroll {
+  flex: 1;
+  min-width: 0;
+}
+.mep-rd-scroll {
+  overflow-x: auto;
+}
+.mep-rd-frame {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2px;
+}
+.mep-rd-level-line {
+  stroke: var(--line);
+  stroke-width: 2px;
+}
+.mep-rd-halo {
+  fill: var(--accent-soft);
+}
+.mep-rd-lane {
+  outline: none;
+}
+.mep-rd-hit {
+  fill: transparent;
+  stroke: none;
+}
+.mep-rd-focus {
+  display: none;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  rx: 6;
+}
+.mep-rd-lane:focus-visible .mep-rd-focus {
+  display: block;
+}
+.mep-rd-lane-label {
+  fill: var(--ink);
+}
+.mep-rd-dot-ring {
+  fill: var(--surface);
+  stroke: var(--ink);
+}
+.mep-rd-dot-ring--waiting {
+  stroke: var(--warn);
+}
+.mep-rd-dot-ring--off {
+  stroke: var(--bad);
+}
+.mep-rd-dot-mark--waiting {
+  fill: var(--warn);
+}
+.mep-rd-dot-mark--off line {
+  stroke: var(--bad);
+  stroke-width: 1.5px;
+}
+.mep-rd-legend {
+  position: static;
+  flex: none;
+  width: 112px;
+  background: var(--surface);
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--muted);
+}
+.mep-rd-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mep-rd-legend-dot {
+  flex: none;
+}
+@media (max-width: 1199px) {
+  .mep-rd-main {
+    flex-wrap: wrap;
+  }
+  .mep-rd-legend {
+    width: 100%;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+}
+
+/* Risers pane (B4-T09) */
+.mep-rp {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--ink);
+  font-size: 12px;
+}
+.mep-rp-show {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.mep-rp-show-label {
+  color: var(--muted);
+}
+.mep-rp-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mep-rp-swatch {
+  display: inline-block;
+  flex: none;
+  width: 28px;
+  height: 0;
+  border-top-width: 4px;
+  border-top-style: solid;
+}
+.mep-rp-warnings {
+  background: #fbeed6;
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+.mep-rp-warnings summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.mep-rp-warnings ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.mep-rp-info {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 12px;
+}
+.mep-rp-info--stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+.mep-rp-info-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.mep-rp-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mep-rp-title h4 {
+  margin: 0;
+  font-size: 14px;
+}
+.mep-rp-line {
+  margin: 0;
+  color: var(--muted);
+}
+.mep-rp-subhead {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.mep-rp-flowbox {
+  border: 1.5px dashed var(--accent);
+  border-radius: 4px;
+  background: var(--accent-soft);
+  padding: 8px 10px;
+}
+.mep-rp-fields {
+  display: grid;
+  gap: 8px;
+}
+.mep-rp-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.mep-rp-details input,
+.mep-rp-details select,
+.mep-rp-fields input,
+.mep-rp-fields select {
+  box-sizing: border-box;
+  max-width: 100%;
+  width: 100%;
+}
+.mep-rp-field input[aria-invalid='true'] {
+  border-color: var(--bad);
+}
+.mep-rp-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.mep-rp-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.mep-rp-link:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.mep-rp-details {
+  display: grid;
+  gap: 8px;
+}
+.mep-rp-delete {
+  justify-self: start;
+  margin-top: 4px;
+}
+.mep-rp-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-x: auto;
+}
+.mep-rp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 170px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+.mep-rp-row--details {
+  grid-template-columns: minmax(0, 1fr) 110px 120px 170px;
+}
+.mep-rp-row--head {
+  border-bottom: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.mep-rp-level {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-rp-status {
+  white-space: nowrap;
+}
+.mep-rp-status--ok {
+  color: var(--ok);
+}
+.mep-rp-status--waiting {
+  color: var(--warn);
+}
+.mep-rp-status--bad {
+  color: var(--bad);
+}
+.mep-rp-status--muted {
+  color: var(--muted);
+}
+.mep-rp-height input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.mep-rp-height input[aria-invalid='true'] {
+  border-color: var(--bad);
+}
+.mep-rp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.mep-rp-actions button {
+  white-space: nowrap;
+}
+.mep-rp-side > .mep-hint {
+  margin: 8px 0 0;
+}
+@media (max-width: 899px) {
+  .mep-rp-info {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mep-rp-row,
+  .mep-rp-row--details {
+    grid-template-columns: minmax(0, 1fr) 96px 168px;
+  }
+  .mep-rp-row--head {
+    display: none;
+  }
+  .mep-rp-row--details .mep-rp-actions {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .mep-rp-row--details .mep-rp-height {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 }

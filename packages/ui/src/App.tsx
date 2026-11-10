@@ -950,6 +950,12 @@ export function MepSketchApp({
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
   const openSheet = useCallback(
     async (sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> => {
+      const openDoc = sheet.projectUuid === null ? undefined : sceneRef.current?.getDocuments().find((doc) => doc.projectUuid === sheet.projectUuid);
+      if (openDoc !== undefined && sceneRef.current) {
+        if (sceneRef.current.getActiveDocumentId() !== openDoc.id) sceneRef.current.activateDocument(openDoc.id);
+        await showPage(sheet.pageIndex);
+        return { ok: true };
+      }
       let opened: OpenedFile | undefined;
       try {
         if (mode === 'path') {
@@ -2340,6 +2346,7 @@ export function MepSketchApp({
           activeSheetLevelId={currentSheetLevelId(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex)}
           openDocuments={openDocumentRows(documents, fileTargetsRef.current, buildingHook.building?.file ?? null, { documentId: activeDocumentId, pageIndex })}
           sheetFiles={sheetFiles}
+          riserConflictKeys={risers.conflictKeys}
         />
       )}
 
