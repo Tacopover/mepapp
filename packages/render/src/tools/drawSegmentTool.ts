@@ -17,6 +17,7 @@ import type { DrawingState } from '../document.js';
 import { createFittingCommand, createSegmentCommand, deleteSegmentCommand } from '../drawingCommands.js';
 import type { AlignmentGuide } from './alignmentGuides.js';
 import { resolveSnappedPoint } from './dragSnap.js';
+import { anchorAtPoint, decideAnchorEnd, type RiserAnchor } from '../riserAnchors.js';
 import type { Tool, ToolContext } from './types.js';
 
 export interface DrawEndpointResolution {
@@ -72,6 +73,9 @@ export class DrawSegmentTool implements Tool {
     const { point, guides } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart?.worldPosition, shiftKey: event.shiftKey });
     if (this.pendingStart) this.pendingCursor = point;
     this.guides = guides;
+    const ring = this.pendingStart ? this.ringAt(ctx, point) : null;
+    const decision = ring ? decideAnchorEnd(ring, ctx.getActiveNetworkTypeId(), ctx.doc.networkTypes.find((t) => t.id === ctx.getActiveNetworkTypeId())?.name ?? ctx.getActiveNetworkTypeId()) : null;
+    ctx.setRiserAnchorRefusal(decision?.kind === 'blocked' ? { riserId: decision.anchor.riserId, text: decision.text } : null);
     ctx.redrawOverlay();
   }
 
@@ -82,6 +86,7 @@ export class DrawSegmentTool implements Tool {
       this.pendingCursor = null;
       this.guides = [];
       this.activeChainAnchorId = null;
+      ctx.setRiserAnchorRefusal(null);
       ctx.syncDrawingLayer();
       ctx.redrawOverlay();
       return true;
@@ -90,11 +95,12 @@ export class DrawSegmentTool implements Tool {
     return true;
   }
 
-  onDeactivate(): void {
+  onDeactivate(ctx?: ToolContext): void {
     this.pendingStart = null;
     this.pendingCursor = null;
     this.guides = [];
     this.activeChainAnchorId = null;
+    ctx?.setRiserAnchorRefusal(null);
   }
 
   private onDrawSegmentClick(ctx: ToolContext, world: Vec2, shiftKey: boolean): void {
@@ -106,7 +112,17 @@ export class DrawSegmentTool implements Tool {
 
     const { point: snappedWorld } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart?.worldPosition, shiftKey });
     this.guides = [];
-    const target = resolveSegmentEndpoint(snappedWorld, stamps, fittings, segments, { radius: snapRadius });
+    const ring = this.pendingStart ? this.ringAt(ctx, snappedWorld) : null;
+    const decision = ring ? decideAnchorEnd(ring, ctx.getActiveNetworkTypeId(), ctx.doc.networkTypes.find((t) => t.id === ctx.getActiveNetworkTypeId())?.name ?? ctx.getActiveNetworkTypeId()) : null;
+    if (decision?.kind === 'blocked') {
+      ctx.setRiserAnchorRefusal({ riserId: decision.anchor.riserId, text: decision.text });
+      ctx.redrawOverlay();
+      return;
+    }
+    const joinAnchor = decision?.kind === 'join' && !fittings.some((f) => Math.hypot(f.position.x - decision.anchor.anchorPt.x, f.position.y - decision.anchor.anchorPt.y) <= 0.5) ? decision.anchor : null;
+    const target = joinAnchor
+      ? { kind: 'new-fitting' as const, worldPosition: { x: joinAnchor.anchorPt.x, y: joinAnchor.anchorPt.y } }
+      : resolveSegmentEndpoint(snappedWorld, stamps, fittings, segments, { radius: snapRadius });
     const resolved = this.resolveDrawTarget(ctx, target);
 
     if (!this.pendingStart) {
@@ -136,12 +152,20 @@ export class DrawSegmentTool implements Tool {
     subCommands.push(createSegmentCommand(newSegment));
 
     ctx.doc.drawingHistory.execute(new CompositeCommand('Draw segment', subCommands));
+    if (joinAnchor && resolved.point.kind === 'fitting') {
+      ctx.setRiserAnchorRefusal(null);
+      ctx.emit('riserAttachRequested', { riserId: joinAnchor.riserId, fittingId: resolved.point.fittingId, segmentId: newSegment.id, anchorPt: { x: joinAnchor.anchorPt.x, y: joinAnchor.anchorPt.y } });
+    }
     this.pendingStart = this.chainContinuationFrom(resolved, state.stamps);
     this.pendingCursor = null;
     this.activeChainAnchorId = this.pendingStart ? newSegment.id : null;
     ctx.syncDrawingLayer();
     ctx.markDirty();
     ctx.redrawOverlay();
+  }
+
+  private ringAt(ctx: ToolContext, point: Vec2): RiserAnchor | null {
+    return anchorAtPoint(point, ctx.getVisibleRiserAnchors(), 0.5);
   }
 
   /** Whether a just-placed segment endpoint continues the chain: a bare fitting always continues; a stamp's port continues only for Equipment (a pass-through node), not Terminal (an end-use device that should end the run). The continuation never carries the endpoint's setupCommand — that already ran in the segment just committed, and running it again in the next segment's undo step would let that undo delete the shared fitting. */

@@ -2,6 +2,7 @@ import type { FederatedPointerEvent, Sprite, Texture } from 'pixi.js';
 import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, RoomPolygon, SnapLines, StampDefinition, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
 import type { AlignmentGuide } from './alignmentGuides.js';
 import type { RiserMark } from '../riserMarks.js';
+import type { RiserAnchor } from '../riserAnchors.js';
 import type { DrawingState, SketchDocument } from '../document.js';
 import type { StampInfo, TerminalAssignmentResult } from '../scene.js';
 
@@ -157,6 +158,10 @@ export interface ToolContext {
 
   /** The riser marks of the active document — see SketchScene.getRiserMarks. */
   getRiserMarks(): ReadonlyMap<string, RiserMark>;
+  /** The riser anchors that are visible now: their network type has a segment on the shown page. */
+  getVisibleRiserAnchors(): RiserAnchor[];
+  /** Marks one anchor refused (its ring turns red and a tip shows `text`), or null to clear. */
+  setRiserAnchorRefusal(refusal: { riserId: string; text: string } | null): void;
 
   hitTest(worldPoint: Vec2): SelectableRef | null;
   selectableRefForId(id: string, state: DrawingState): SelectableRef;

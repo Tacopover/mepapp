@@ -5,3 +5,4 @@ export { WALL_DEBUG_GROUPS, type WallDebugGroup, type WallLineInfo } from './wal
 export { drawRouteArea, type RouteAreaView } from './routeAreaLayer.js';
 export { drawRoutePreview, type RoutePreviewView } from './routePreviewLayer.js';
 export { type RiserMark, type RiserConflict } from './riserMarks.js';
+export { type RiserAnchor } from './riserAnchors.js';

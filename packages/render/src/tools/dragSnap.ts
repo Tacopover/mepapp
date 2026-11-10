@@ -1,5 +1,6 @@
 import type { Vec2 } from '@mepapp/core';
 import { computeStampBoundsWorld, resolveAlignmentSnap, resolveRayAlignmentSnap, type AlignmentGuide } from './alignmentGuides.js';
+import { anchorAtPoint } from '../riserAnchors.js';
 import type { ToolContext } from './types.js';
 
 export interface DragSnapContext {
@@ -21,11 +22,17 @@ export interface SnappedPoint {
 /**
  * Adjusts a raw world-space point derived from the pointer, before a tool applies it to
  * geometry — the shared seam for snap-to-object alignment guides (move-selection,
- * place-stamp, draw-segment) and angle-snap-while-drawing-segments (draw-segment). Every
- * other call site gets back the point unchanged and an empty guides list.
+ * place-stamp, draw-segment), angle-snap-while-drawing-segments (draw-segment) and the
+ * riser ring a pending segment end snaps to first (draw-segment). Every other call site
+ * gets back the point unchanged and an empty guides list.
  */
 export function resolveSnappedPoint(rawWorldPoint: Vec2, context: DragSnapContext): SnappedPoint {
   if (context.kind === 'draw-segment') {
+    if (context.anchor) {
+      const radius = context.ctx.getSnapRadiusScreenPx() / context.ctx.getZoomScale();
+      const ring = anchorAtPoint(rawWorldPoint, context.ctx.getVisibleRiserAnchors(), radius);
+      if (ring) return { point: { x: ring.anchorPt.x, y: ring.anchorPt.y }, guides: [] };
+    }
     const state = context.ctx.doc.drawingHistory.getState();
     const angleSnapDegrees = context.ctx.getAngleSnapDegrees();
     if (context.anchor && !context.shiftKey && angleSnapDegrees > 0) {

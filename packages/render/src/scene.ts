@@ -160,6 +160,7 @@ import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomC
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import { moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserConflict, type RiserMark } from './riserMarks.js';
+import { visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
 import {
   addPanelAccessoryCommand,
   addTerminalToCircuitCommand,
@@ -500,6 +501,8 @@ const OPEN_PORT_RADIUS_SCREEN_PX = 4.5;
 const ROUTE_MARKER_COLOR = 0xe6007e;
 /** Purple ring on a riser-marked fitting. Cyan 0x00e5ff is the selection, magenta is the route marker, green 0x00c853 is a wall debug group. */
 const RISER_MARK_COLOR = 0x7c4dff;
+/** Red ring on a riser anchor that refused a segment end. */
+const RISER_ANCHOR_REFUSED_COLOR = 0xe53935;
 
 /** A route marker on the overlay: the start port (square) or a target port (ring). */
 export interface RouteMarker { world: Vec2; kind: 'start' | 'target' }
@@ -584,6 +587,8 @@ interface SketchSceneEvents {
   documentsChanged: [DocumentSummary[]];
   /** A marked fitting was dropped by the select-tool drag (once, on mouse up) or moved by moveFittingTo without source 'riser-sync'. Points are pt of the shown page. */
   riserFittingMoved: [info: { fittingId: string; from: Vec2; to: Vec2 }];
+  /** A segment of the anchor's network type ended in the ring; a new fitting sits at anchorPt. */
+  riserAttachRequested: [info: { riserId: string; fittingId: string; segmentId: string; anchorPt: Vec2 }];
   /** Undo or redo changed a marked fitting (position changed, or the fitting is gone: then `to` is null). The UI decides whether to sync (D-B-56 A) or to show the conflict state. */
   riserFittingChanged: [info: { fittingId: string; from: Vec2 | null; to: Vec2 | null; cause: 'undo' | 'redo' }];
   /** A network type change touched a marked fitting's riser. Emitted after the change is committed. The UI shows which risers the change reaches. */
@@ -700,6 +705,11 @@ export class SketchScene {
   private routeMarkers: RouteMarker[] = [];
   /** Scene-level: the riser marks of the active document, keyed by fitting id. Not part of the document, never saved. */
   private riserMarks: Map<string, RiserMark> = new Map();
+  /** Scene-level: the free riser anchors of the shown page. Not part of the document, never saved. */
+  private riserAnchors: RiserAnchor[] = [];
+  /** Scene-level: the anchor that refused a segment end, with the tip text. Not part of the document, never saved. */
+  private riserAnchorRefusal: { riserId: string; text: string } | null = null;
+  private riserAnchorTip: Text | null = null;
   private riserTypeGuard: ((riserIds: string[], networkTypeId: string) => boolean) | null = null;
   /** Scene-level: the planned route shown on the overlay. Not part of the document, never saved. */
   private routePreview: RoutePreviewView | null = null;
@@ -909,6 +919,8 @@ export class SketchScene {
       openTextEditor: (id) => self.openTextEditor(id),
       getZoomScale: () => self.world.scale.x,
       getRiserMarks: () => self.getRiserMarks(),
+      getVisibleRiserAnchors: () => self.getVisibleRiserAnchors(),
+      setRiserAnchorRefusal: (refusal) => self.setRiserAnchorRefusal(refusal),
       hitTest: (worldPoint) => self.hitTest(worldPoint),
       selectableRefForId: (id, state) => self.selectableRefForId(id, state),
       resolveSelectableBoundsWorld: (ref, state) => self.resolveSelectableBoundsWorld(ref, state),
@@ -1140,6 +1152,8 @@ export class SketchScene {
     this.roomPreview = null;
     this.circuitToolHover = null;
     this.riserMarks = new Map();
+    this.riserAnchors = [];
+    this.riserAnchorRefusal = null;
     if (this.tool === 'calibrate' || this.tool === 'measure') void this.loadSnapLines();
     this.syncDrawingLayer();
     this.redrawOverlay();
@@ -1241,6 +1255,7 @@ export class SketchScene {
     this.world.addChild(this.autoPlacePreviewLayer);
     this.world.addChild(this.overlay);
     if (this.measureLabel) this.world.addChild(this.measureLabel); // created lazily on the first measurement, so not in the list above
+    if (this.riserAnchorTip) this.world.addChild(this.riserAnchorTip);
     this.world.x = target.viewport.x;
     this.world.y = target.viewport.y;
     this.world.scale.set(target.viewport.scale);
@@ -1263,6 +1278,8 @@ export class SketchScene {
     for (const tool of this.toolMap.values()) tool.onDeactivate?.(this.ctx); // a pending polyline or measurement belongs to the outgoing document
     this.drag = { kind: 'none' };
     this.riserMarks = new Map();
+    this.riserAnchors = [];
+    this.riserAnchorRefusal = null;
 
     this.syncDrawingLayer(); // a project may have loaded, or the label context changed, while this document was inactive
     this.redrawOverlay();
@@ -3000,6 +3017,30 @@ export class SketchScene {
 
   getRiserMarks(): ReadonlyMap<string, RiserMark> {
     return this.riserMarks;
+  }
+
+  /** Replaces the free riser anchors of the shown page. A ring is not an edit, so this never marks the document dirty. */
+  setRiserAnchors(anchors: ReadonlyArray<RiserAnchor>): void {
+    this.riserAnchors = [...anchors];
+    this.riserAnchorRefusal = null;
+    this.redrawOverlay();
+  }
+
+  getRiserAnchors(): readonly RiserAnchor[] {
+    return this.riserAnchors;
+  }
+
+  /** The riser anchors whose network type has a segment on the shown page. */
+  getVisibleRiserAnchors(): RiserAnchor[] {
+    if (this.riserAnchors.length === 0) return [];
+    const state = this.doc.drawingHistory.getState();
+    return visibleRiserAnchors(this.riserAnchors, onPage(Object.values(state.segments), this.doc.pageIndex));
+  }
+
+  private setRiserAnchorRefusal(refusal: { riserId: string; text: string } | null): void {
+    if (refusal?.riserId === this.riserAnchorRefusal?.riserId && refusal?.text === this.riserAnchorRefusal?.text) return;
+    this.riserAnchorRefusal = refusal;
+    this.redrawOverlay();
   }
 
   /** Sets the guard that a network type change asks when it touches a riser. Return false to refuse the change. Null removes the guard. */
@@ -5986,6 +6027,34 @@ export class SketchScene {
       this.overlay
         .circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD + 3 / this.world.scale.x)
         .stroke({ width: 2.5 / this.world.scale.x, color: RISER_MARK_COLOR });
+    }
+    const visibleAnchors = this.getVisibleRiserAnchors();
+    for (const anchor of visibleAnchors) {
+      const color = this.riserAnchorRefusal?.riserId === anchor.riserId ? RISER_ANCHOR_REFUSED_COLOR : RISER_MARK_COLOR;
+      const radius = FITTING_MARKER_RADIUS_WORLD + 8 / this.world.scale.x;
+      for (let dash = 0; dash < 12; dash++) {
+        const start = (dash * 30 * Math.PI) / 180;
+        const end = start + (15 * Math.PI) / 180;
+        this.overlay
+          .moveTo(anchor.anchorPt.x + radius * Math.cos(start), anchor.anchorPt.y + radius * Math.sin(start))
+          .arc(anchor.anchorPt.x, anchor.anchorPt.y, radius, start, end);
+      }
+      this.overlay.stroke({ width: 2.5 / this.world.scale.x, color });
+    }
+    const refusal = this.riserAnchorRefusal;
+    const refusedAnchor = refusal ? visibleAnchors.find((anchor) => anchor.riserId === refusal.riserId) : undefined;
+    if (refusal && refusedAnchor && this.tool === 'draw-segment') {
+      if (!this.riserAnchorTip) {
+        this.riserAnchorTip = new Text({ text: '', style: { fontSize: 12, fill: RISER_ANCHOR_REFUSED_COLOR, fontWeight: 'bold' } });
+        this.riserAnchorTip.anchor.set(0.5, 1);
+        this.world.addChild(this.riserAnchorTip);
+      }
+      this.riserAnchorTip.text = refusal.text;
+      this.riserAnchorTip.position.set(refusedAnchor.anchorPt.x, refusedAnchor.anchorPt.y - (FITTING_MARKER_RADIUS_WORLD + 12 / this.world.scale.x));
+      this.riserAnchorTip.scale.set(1 / this.world.scale.x);
+      this.riserAnchorTip.visible = true;
+    } else if (this.riserAnchorTip) {
+      this.riserAnchorTip.visible = false;
     }
     if (this.routePreview) drawRoutePreview(this.overlay, this.routePreview, 1 / this.world.scale.x);
     for (const id of this.doc.selectedIds) {
