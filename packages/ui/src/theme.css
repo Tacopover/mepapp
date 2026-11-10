@@ -2582,6 +2582,36 @@ button.mep-tree-arrow {
 .mep-draw-from-menu-btn:hover {
   background: var(--surface-2);
 }
+.mep-draw-from-menu-sep {
+  height: 0;
+  border-top: 2px solid var(--line);
+  margin: 4px 0;
+}
+.mep-draw-from-menu-btn--dim {
+  color: var(--muted);
+  cursor: default;
+  white-space: normal;
+}
+.mep-draw-from-menu-btn--dim:hover {
+  background: none;
+}
+.mep-draw-from-menu-hint {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: normal;
+  max-width: 240px;
+}
+.mep-draw-from-menu-hint-inline {
+  font-weight: 400;
+  color: var(--muted);
+}
+.mep-btn-danger {
+  border-color: var(--danger, #c0392b);
+  color: var(--danger, #c0392b);
+}
 
 /* ---------- Floating textbox-annotation input ---------- */
 

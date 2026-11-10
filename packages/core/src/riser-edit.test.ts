@@ -9,6 +9,7 @@ import {
   detachMember,
   makeRiser,
   moveRiser,
+  nextRiserLabel,
   setRiserProps,
   takePendingOps,
   type PageFrame,
@@ -190,6 +191,55 @@ describe('attachMember', () => {
     const this50: PageFrame = { widthPt: 1190, heightPt: 1684, pageUnitsPerRealUnit: calibrationFromScale(50).pageUnitsPerRealUnit };
     const result = ok(attachMember(fileWithRiser(), 'r1', second, { first, this: this50 }));
     expect(result.warnings).toEqual([]);
+  });
+});
+
+describe('nextRiserLabel', () => {
+  function withRiserNames(names: string[]): BuildingFile {
+    let file = baseFile();
+    names.forEach((name, index) => {
+      file = ok(
+        makeRiser(file, {
+          id: `r${index}`,
+          name,
+          networkType: vent,
+          sheetId: 's0',
+          fittingId: 'f0',
+          fittingPt: { x: 0, y: 0 },
+          frame,
+        }),
+      );
+    });
+    return file;
+  }
+
+  it('gives number 1 for an empty file', () => {
+    expect(nextRiserLabel(baseFile(), 'Supply air')).toBe('Supply air riser 1');
+  });
+
+  it('gives the number after the highest used number', () => {
+    expect(nextRiserLabel(withRiserNames(['Supply air riser 1', 'Supply air riser 2']), 'Supply air')).toBe('Supply air riser 3');
+  });
+
+  it('gives the smallest unused number', () => {
+    expect(nextRiserLabel(withRiserNames(['Supply air riser 2']), 'Supply air')).toBe('Supply air riser 1');
+  });
+
+  it('ignores a riser of another type', () => {
+    expect(nextRiserLabel(withRiserNames(['Extract air riser 1']), 'Supply air')).toBe('Supply air riser 1');
+  });
+
+  it('works with a type name that holds regex characters', () => {
+    expect(nextRiserLabel(withRiserNames(['Pipe (cold) [A+] riser 1']), 'Pipe (cold) [A+]')).toBe('Pipe (cold) [A+] riser 2');
+  });
+
+  it('ignores names that do not match the pattern', () => {
+    const file = withRiserNames(['Supply air riser 1b', 'Supply air riser 01', 'Supply air riser', 'Supply air riser 0']);
+    expect(nextRiserLabel(file, 'Supply air')).toBe('Supply air riser 1');
+  });
+
+  it('trims the spaces of the type name', () => {
+    expect(nextRiserLabel(withRiserNames(['Supply air riser 1']), '  Supply air ')).toBe('Supply air riser 2');
   });
 });
 

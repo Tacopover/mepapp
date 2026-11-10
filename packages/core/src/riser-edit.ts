@@ -185,3 +185,17 @@ export function takePendingOps(file: BuildingFile, sheetId: string): { file: Bui
     ops,
   };
 }
+
+/** `${networkTypeName} riser ${n}`. n = the smallest whole number >= 1 that no riser in file.risers uses as the suffix of a name that is exactly `${networkTypeName} riser <digits>`. The type name is compared as it is (case sensitive, no trimming of the existing names; trim networkTypeName once). Names that do not match the pattern are ignored. Deleting a riser frees its number again. */
+export function nextRiserLabel(file: BuildingFile, networkTypeName: string): string {
+  const prefix = `${networkTypeName.trim()} riser `;
+  const used = new Set<number>();
+  for (const riser of file.risers) {
+    if (!riser.name.startsWith(prefix)) continue;
+    const digits = riser.name.slice(prefix.length);
+    if (/^[1-9][0-9]*$/.test(digits)) used.add(Number(digits));
+  }
+  let n = 1;
+  while (used.has(n)) n += 1;
+  return `${prefix}${n}`;
+}

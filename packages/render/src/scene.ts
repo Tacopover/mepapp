@@ -159,7 +159,7 @@ import { WallDebugData, drawWallDebug, drawWallDebugHighlight, setWallDebugGroup
 import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomCommand } from './roomCommands.js';
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
-import { moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserConflict, type RiserMark } from './riserMarks.js';
+import { fittingContextIn, moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
 import { visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
 import {
   addPanelAccessoryCommand,
@@ -3098,6 +3098,11 @@ export class SketchScene {
   /** The marked fittings of the active document on the shown page that are more than `tolerancePt` away from their mark anchor. */
   riserConflicts(tolerancePt: number): RiserConflict[] {
     return riserConflictsIn(this.doc.drawingHistory.getState(), this.riserMarks, this.doc.pageIndex, tolerancePt);
+  }
+
+  /** Position, segment count and segment network types of one fitting of the active document. Null when the fitting does not exist. */
+  getFittingContext(fittingId: string): FittingContext | null {
+    return fittingContextIn(this.doc.drawingHistory.getState(), fittingId);
   }
 
   /** The size of the shown page in pt, as displayed (the backdrop sprite). Null without a backdrop. */

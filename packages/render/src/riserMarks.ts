@@ -6,6 +6,14 @@ export interface RiserMark { riserId: string; name: string; networkTypeId: strin
 
 export interface RiserConflict { fittingId: string; fittingPt: Vec2; anchorPt: Vec2 }
 
+export interface FittingContext {
+  position: Vec2;
+  /** Number of segments with an endpoint at the fitting. */
+  segmentCount: number;
+  /** Distinct networkTypeId of those segments, in first-seen order of Object.values(state.segments). */
+  networkTypeIds: string[];
+}
+
 /** Riser ids (deduped, first-seen order) of the marked fittings that the given segments end at. */
 export function riserIdsTouchedBySegments(segments: readonly Segment[], marks: ReadonlyMap<string, RiserMark>): string[] {
   const riserIds: string[] = [];
@@ -56,4 +64,19 @@ export function riserConflictsIn(state: DrawingState, marks: ReadonlyMap<string,
     conflicts.push({ fittingId, fittingPt: fitting.position, anchorPt: mark.anchorPt });
   }
   return conflicts;
+}
+
+/** Null when the fitting does not exist. Counts every segment of the state that has endpointA or endpointB `{ kind: 'fitting', fittingId }` (a segment with both ends at the fitting counts once). */
+export function fittingContextIn(state: DrawingState, fittingId: string): FittingContext | null {
+  const fitting = state.fittings[fittingId];
+  if (!fitting) return null;
+  let segmentCount = 0;
+  const networkTypeIds: string[] = [];
+  for (const segment of Object.values(state.segments)) {
+    const atFitting = [segment.endpointA, segment.endpointB].some((e) => e.kind === 'fitting' && e.fittingId === fittingId);
+    if (!atFitting) continue;
+    segmentCount += 1;
+    if (!networkTypeIds.includes(segment.networkTypeId)) networkTypeIds.push(segment.networkTypeId);
+  }
+  return { position: fitting.position, segmentCount, networkTypeIds };
 }

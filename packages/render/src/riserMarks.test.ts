@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CommandManager, Transaction, splitSegmentAtFitting, type Fitting, type Segment, type Vec2 } from '@mepapp/core';
 import type { DrawingState } from './document.js';
-import { moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserMark } from './riserMarks.js';
+import { fittingContextIn, moveFittingInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserMark } from './riserMarks.js';
 
 function fitting(id: string, position: Vec2, pageIndex = 0, routedBy?: 'route'): Fitting {
   return { id, pageIndex, position, kind: 'junction', ...(routedBy ? { routedBy } : {}) };
@@ -147,5 +147,52 @@ describe('riserConflictsIn', () => {
   it('skips a mark whose fitting is missing', () => {
     const state = makeState({ fittings: { f2: fitting('f2', { x: 300, y: 100 }) } });
     expect(riserConflictsIn(state, marks, 0, 0.5)).toEqual([]);
+  });
+});
+
+describe('fittingContextIn', () => {
+  function segmentAt(id: string, networkTypeId: string, endpointA: Segment['endpointA'], endpointB: Segment['endpointB']): Segment {
+    return { ...makeState().segments.s1, id, networkTypeId, endpointA, endpointB };
+  }
+  const at = (fittingId: string) => ({ kind: 'fitting' as const, fittingId });
+
+  it('returns null for a missing fitting', () => {
+    expect(fittingContextIn(makeState(), 'missing')).toBeNull();
+  });
+
+  it('gives zero segments and no types for a fitting without segments', () => {
+    const state = makeState({ fittings: { f1: fitting('f1', { x: 100, y: 100 }), f2: fitting('f2', { x: 300, y: 100 }), f3: fitting('f3', { x: 50, y: 50 }) } });
+    expect(fittingContextIn(state, 'f3')).toEqual({ position: { x: 50, y: 50 }, segmentCount: 0, networkTypeIds: [] });
+  });
+
+  it('counts two segments of one type once in the type list', () => {
+    const state = makeState({
+      segments: {
+        s1: segmentAt('s1', 'supply-air', at('f1'), at('f2')),
+        s2: segmentAt('s2', 'supply-air', at('f1'), at('f3')),
+      },
+    });
+    expect(fittingContextIn(state, 'f1')).toEqual({ position: { x: 100, y: 100 }, segmentCount: 2, networkTypeIds: ['supply-air'] });
+  });
+
+  it('lists two types in first-seen order of the segments', () => {
+    const state = makeState({
+      segments: {
+        s1: segmentAt('s1', 'return-air', at('f1'), at('f2')),
+        s2: segmentAt('s2', 'supply-air', at('f1'), at('f3')),
+        s3: segmentAt('s3', 'return-air', at('f1'), at('f3')),
+      },
+    });
+    expect(fittingContextIn(state, 'f1')).toEqual({ position: { x: 100, y: 100 }, segmentCount: 3, networkTypeIds: ['return-air', 'supply-air'] });
+  });
+
+  it('counts a segment with both ends at the fitting once', () => {
+    const state = makeState({ segments: { s1: segmentAt('s1', 'supply-air', at('f1'), at('f1')) } });
+    expect(fittingContextIn(state, 'f1')).toEqual({ position: { x: 100, y: 100 }, segmentCount: 1, networkTypeIds: ['supply-air'] });
+  });
+
+  it('does not count a segment that ends at another fitting', () => {
+    const state = makeState({ segments: { s1: segmentAt('s1', 'supply-air', at('f2'), at('f3')) } });
+    expect(fittingContextIn(state, 'f1')).toEqual({ position: { x: 100, y: 100 }, segmentCount: 0, networkTypeIds: [] });
   });
 });

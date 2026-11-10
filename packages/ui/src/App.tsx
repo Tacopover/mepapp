@@ -78,6 +78,7 @@ import { DocumentSwitcher } from './components/DocumentSwitcher.js';
 import { RoomToolBar } from './components/RoomToolBar.js';
 import { Dialog } from './components/Dialog.js';
 import { CalibrationDialog } from './components/CalibrationDialog.js';
+import { RiserDeleteDialog } from './components/RiserDeleteDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRenames } from './components/GlobalPropertiesDialog.js';
 import { ManageBuildingsDialog, type SheetOpenResult } from './components/ManageBuildingsDialog.js';
@@ -90,6 +91,7 @@ import { CircuitTypesDialog } from './components/CircuitTypesDialog.js';
 import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { useBuilding } from './useBuilding.js';
+import { useBuildingRisers } from './useBuildingRisers.js';
 import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
 import { findOpenDocumentByPath } from './openDocumentMatch.js';
@@ -469,6 +471,18 @@ export function MepSketchApp({
   const [customSchematicSymbols, setCustomSchematicSymbols] = useState<SchematicSymbol[]>(() => loadCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicSymbols), [customSchematicSymbols]);
   const buildingHook = useBuilding({ fileAccess, makeStore: makeBuildingStore, buildingStorage });
+  const risers = useBuildingRisers({
+    sceneRef,
+    ready,
+    building: buildingHook.building,
+    update: buildingHook.update,
+    documents,
+    activeDocumentId,
+    pageIndex,
+    calibration,
+    pushToast,
+  });
+  const riserMenuState = canvasContextMenuRequest ? risers.menuStateFor(canvasContextMenuRequest.target) : null;
   const buildingStore = buildingHook.building?.store;
   useEffect(() => {
     onBuildingReady?.({ adopt: buildingHook.adopt });
@@ -2097,7 +2111,12 @@ export function MepSketchApp({
               )}
               <ToastStack toasts={toasts} onDismiss={dismissToast} />
               {canvasContextMenuRequest && (
-                <CanvasContextMenu request={canvasContextMenuRequest} sceneRef={sceneRef} onDismiss={() => setCanvasContextMenuRequest(null)} />
+                <CanvasContextMenu
+                  request={canvasContextMenuRequest}
+                  sceneRef={sceneRef}
+                  onDismiss={() => setCanvasContextMenuRequest(null)}
+                  riser={riserMenuState ? { state: riserMenuState, onMake: risers.makeRiser, onDetach: risers.detach, onDelete: risers.askDelete } : undefined}
+                />
               )}
             </>
           )}
@@ -2141,6 +2160,9 @@ export function MepSketchApp({
             setCalibrationPrompt(null);
           }}
         />
+      )}
+      {risers.pendingDelete && (
+        <RiserDeleteDialog label={risers.pendingDelete.label} onConfirm={risers.confirmDelete} onCancel={risers.cancelDelete} />
       )}
 
       {settingsOpen && (
