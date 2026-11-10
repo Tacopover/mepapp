@@ -349,3 +349,4 @@
 {"seq":349,"at":"2026-11-10T15:56:50.347Z","type":"task","id":"B4-T07b","part":"B4","state":"done","commit":"8017148"}
 {"seq":350,"at":"2026-11-10T15:57:08.225Z","type":"shot","id":"S-B4-T07b-moved","part":"B4","task":"B4-T07b","caption":"Level opened later: pending move applied, unsaved dot","assetId":"efb066d8afa0fc6bfbdc4226c44e0582","url":"/_blob/efb066d8afa0fc6bfbdc4226c44e0582"}
 {"seq":351,"at":"2026-11-10T15:57:08.261Z","type":"shot","id":"S-B4-T07b-retag","part":"B4","task":"B4-T07b","caption":"Level opened later: pending type change applied","assetId":"926ca710033d10a702f293c69ca7429d","url":"/_blob/926ca710033d10a702f293c69ca7429d"}
+{"seq":352,"at":"2026-11-10T16:24:21.842Z","type":"task","id":"B4-T08","part":"B4","state":"done","commit":"d533d9d"}
