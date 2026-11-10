@@ -248,3 +248,33 @@ Model facts: `BUILDING_SCHEMA_VERSION = 1`, `risers: Riser[]` exists (`building.
 ### 9.4 Decisions for the user (on the dashboard)
 
 D-B-55 (data model: end kinds and `endAllowanceMm`), D-B-56 (undo of a synced move), D-B-57 (summary format v2 for endpoint fitting ids), D-B-58 (fire-rated shaft flag). Phase 1 T01 waits for D-B-55. Everything else in T02 (coordinates) does not depend on them.
+
+## 10. Design agreed with the user on 2026-11-10 (overrides sections 5 and 9 where they differ)
+
+The user reviewed a mockup (https://claude.ai/artifact/VSDkgTHMaqGk2jYqHZdYzo, version 3) and agreed. T01 to T05 are done and stay as built. The UX spec `buildings-b4-ux-spec.md` is superseded by this section and the mockup.
+
+### 10.1 Decisions
+
+- **D-B-61 No riser name.** The user does not type a name. The app makes the label `<network type name> riser <n>` ("Supply air riser 1"). `n` is the highest number in use for that type plus one. `Riser.name` stays in the file and holds this label (no data model change). Core gets `nextRiserLabel(file, networkTypeName)`. The label never changes when another riser is deleted. Rename is not offered.
+- **D-B-62 The Risers tab is a building diagram.** Levels on the left (name and floor height), a frame with level lines on the right, spaced by elevation. Checkboxes above it, one per network type that has a riser, with the colour and line pattern of the type (`NetworkType.color`, `linePattern`); a type that is off hides its risers. Each riser is a vertical line in the colour and pattern of its type. Risers of one type sit next to each other, one line each, ordered by type then number. A line starts and stops **inside the band of its first and last level**, not on a level line (the user: a line that stops on the level line is unclear). A dot in each band where the riser has a part shows its status (at position, waiting, not at position). A click selects a riser. The info panel below shows: label and swatch, levels and total length, flow direction and source level (derived, see D-B-59), a status row per level with Go to and Detach, Delete riser, and a "More details" fold with the ends (member, open, capped), the end allowance, the connection height per level and the offset help line "For an offset, use two risers and a horizontal run.". Spec of the old tab (sections 8.1 to 8.6 of the UX spec) is void.
+- **D-B-63 Make riser has no dialog; a riser is joined by drawing into it.** Right-click a fitting, "Make riser": the riser is made at once with the network type of the fitting. A message names the riser and says "Sheets line up only if the PDFs share the same origin and orientation." There is no "Attach to riser" menu entry and no Attach dialog. On another level a riser shows as a **dashed ring at its position** when that drawing has at least one segment of the riser's network type. A segment of that type that the user draws into the ring snaps to the position and joins the riser. A segment of another type is blocked, the ring turns red and a text says why ("Supply air riser 1 takes only Supply air. This segment is Extract air."). There is no way to attach an existing fitting or an earlier-drawn segment in B4 (open question, left out).
+- **D-B-59 (answered through the mockup): the flow direction and the source level of a riser come from the flow solve of each level.** They are read only and marked "from the flow solve". "Set by hand" overrides them, "Use the flow solve" removes the override. The stored `flow` and `sourceLevelId` fields are the override; `unknown` means "use the solve" (D-B-18 A default). The type-name word match is dropped. A riser with no level that has a source shows "Not known yet".
+- Kept as before: D-B-55 to D-B-58, D-B-60 (menu order: riser entries at the end), conflict dialog, delete confirmation in the app with Undo, the messages (names replaced by the label).
+
+### 10.2 Tasks after the change
+
+| Task | Content | Package |
+|---|---|---|
+| B4-T05b (new) | Scene: free riser anchors. A scene API `setRiserAnchors` (list of `{ riserId, label, networkTypeId, anchorPt }` for the active page). The scene draws a dashed ring for an anchor only when the drawing has a segment of that network type. The segment tool snaps to a ring, on a type match it emits `riserAttachRequested({ riserId, point, segmentId })`, on a mismatch it blocks the end and shows the refusal. Render tests and a browser check with real mouse moves. | render |
+| B4-T05c (new) | Flow: `flow.ts` treats a fitting with a riser mark as a boundary and never as the root; a new pure function reports, for each marked fitting, whether flow arrives there (`out`, the level feeds the riser) or leaves there (`in`, the riser feeds the level) or neither. Core adds `deriveRiserFlow(file, perLevelFlow)` giving direction (`up`, `down`, `both`, `unknown`) and source level by elevation. Tests. | core |
+| B4-T05d (new) | Sheet summary v2 (D-B-57): endpoint fitting ids on segments, and the flow in or out at each riser fitting (from T05c). A reader for v1 stays. Tests. | core |
+| B4-T06 (changed) | UI: right-click menu entries "Make riser", "Detach from riser", "Delete riser" (greyed with the hint when the page has no scale or the fitting has two types), the message after Make riser, wire `riserAttachRequested` to `attachMember`, wire the guard events of T05, show the refusals. `nextRiserLabel` in core is part of this task. No dialogs. | ui, core |
+| B4-T07a, T07b, T08 | As in section 9 (sync, pending moves, takeoff). Labels replace names. T08 also writes the derived flow direction in the Risers table. | ui, core |
+| B4-T09 (changed) | The Risers tab as in D-B-62. | ui |
+| B4-T10 | Part check. | all |
+
+T06 and T09 are screen tasks: the `ux-designer` spec is the mockup plus the sections above; the `journey-tester` runs before each is done. T06, T09 and T10 run the 29-check runner (they touch the building dialog flow). T05b to T05d do not (the user said it is only needed for tasks that edit the Building dialog or building controller).
+
+### 10.3 Order
+
+T05b, T05c, T05d, T06, T07a, T07b, T08, T09, T10. T05c and T05d can follow T05b in one sitting (render first, then core).

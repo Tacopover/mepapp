@@ -1,5 +1,7 @@
 # UX spec: B4-T06 (Make riser, Attach, Detach, sync) and B4-T09 (Risers tab)
 
+SUPERSEDED 2026-11-10 by `buildings-b4.md` section 10 and the mockup https://claude.ai/artifact/VSDkgTHMaqGk2jYqHZdYzo. Void: Make riser dialog, Attach dialog, "Attach to riser..." menu entry, riser names, the old Risers tab (sections 8.1 to 8.6), the type-name flow rule (Q1). Still valid: conflict dialog (6.5), delete confirmation, messages (6.3, 6.4) with the riser label instead of the name, the platform table (section 9).
+
 Status: draft for the user. Decisions kept: D-B-04, D-B-13 A, D-B-14 (mm), D-B-18 A, D-B-55 A, D-B-56 A, D-B-58 A. No product code changed.
 Reuse: `CanvasContextMenu.tsx` (button list), `Dialog.tsx`, `BuildingSection` (`quiet`), the status-line `notice` of `ManageBuildingsDialog`, the tab strip at `ManageBuildingsDialog.tsx:494-506`, the Levels pane row style, in-app confirm (no `window.confirm`).
 
