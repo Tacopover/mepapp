@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeNetworks, type Fitting, type Segment } from './network.js';
-import { solveFlow } from './flow.js';
+import { riserFittingFlow, solveFlow, type FlowSolveInput } from './flow.js';
 
 function segment(id: string, endpointA: Segment['endpointA'], endpointB: Segment['endpointB']): Segment {
   return {
@@ -391,5 +391,156 @@ describe('solveFlow — exact root element, root port and the fallback', () => {
     const withGhost = solveFlow({ network, segments, fittings: [], portGroups: [], terminalCapacities, rootElementId: 'ghost' });
     const withoutRoot = solveFlow({ network, segments, fittings: [], portGroups: [], terminalCapacities });
     expect(withGhost).toEqual(withoutRoot);
+  });
+});
+
+function inputOf(
+  segments: Segment[],
+  fittings: Fitting[],
+  terminalCapacities: Record<string, number>,
+  extra: Partial<FlowSolveInput> = {},
+): FlowSolveInput {
+  const [network] = computeNetworks({ segments, fittings, portGroups: [] });
+  return { network, segments, fittings, portGroups: [], terminalCapacities, ...extra };
+}
+
+describe('solveFlow — riser fittings as boundaries', () => {
+  it('gives the same result with no marks, an empty set, or an unused id', () => {
+    const teeSegments = [
+      segment('branchA', { kind: 'port', elementId: 'diffuserA', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('branchB', { kind: 'port', elementId: 'diffuserB', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('trunk', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+    ];
+    const cases: Array<[Segment[], Fitting[], Record<string, number>]> = [
+      [[segment('trunk', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'port', elementId: 'ahu', portId: 'p1' })], [], { diffuser: 150 }],
+      [teeSegments, [fitting('tee')], { diffuserA: 100, diffuserB: 75 }],
+      [[segment('s', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'fitting', fittingId: 'end' })], [fitting('end')], { diffuser: 50 }],
+    ];
+    for (const [segments, fittings, terminalCapacities] of cases) {
+      const base = inputOf(segments, fittings, terminalCapacities);
+      const plain = JSON.stringify(solveFlow(base));
+      expect(JSON.stringify(solveFlow({ ...base, riserFittingIds: new Set() }))).toBe(plain);
+      expect(JSON.stringify(solveFlow({ ...base, riserFittingIds: new Set(['unused']) }))).toBe(plain);
+    }
+  });
+
+  it('never roots at a marked fitting, even when it is the first open end in sort order', () => {
+    const segments = [
+      segment('s1', { kind: 'fitting', fittingId: 'r' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }),
+    ];
+    const fittings = [fitting('r'), fitting('tee')];
+    const terminalCapacities = { diffuser: 100 };
+
+    const unmarked = solveFlow(inputOf(segments, fittings, terminalCapacities));
+    expect(unmarked.fittingCapacity.r).toBe(unmarked.totalCapacity);
+
+    const marked = solveFlow(inputOf(segments, fittings, terminalCapacities, { riserFittingIds: new Set(['r']) }));
+    expect(marked.resolved).toBe(true);
+    expect(marked.totalCapacity).toBe(100);
+    expect(marked.fittingCapacity.r).toBe(0);
+  });
+
+  it('does not continue past a marked fitting', () => {
+    const segments = [
+      segment('a', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'm' }),
+      segment('b', { kind: 'fitting', fittingId: 'm' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }),
+    ];
+    const fittings = [fitting('m')];
+    const terminalCapacities = { diffuser: 100 };
+
+    const unmarked = solveFlow(inputOf(segments, fittings, terminalCapacities));
+    expect(unmarked.segmentCapacity.b).toBe(100);
+
+    const marked = solveFlow(inputOf(segments, fittings, terminalCapacities, { riserFittingIds: new Set(['m']) }));
+    expect(marked.resolved).toBe(true);
+    expect(marked.segmentCapacity.a).toBe(0);
+    expect(marked.segmentCapacity.b).toBeNull();
+  });
+
+  it('ignores an explicit root that is a marked fitting', () => {
+    const segments = [
+      segment('s1', { kind: 'fitting', fittingId: 'r' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }),
+    ];
+    const fittings = [fitting('r'), fitting('tee')];
+    const terminalCapacities = { diffuser: 100 };
+
+    const unmarked = solveFlow(inputOf(segments, fittings, terminalCapacities, { rootElementId: 'r' }));
+    expect(unmarked.fittingCapacity.r).toBe(100);
+
+    const marked = solveFlow(
+      inputOf(segments, fittings, terminalCapacities, { rootElementId: 'r', riserFittingIds: new Set(['r']) }),
+    );
+    expect(marked.resolved).toBe(true);
+    expect(marked.fittingCapacity.r).toBe(0);
+  });
+
+  it('is unresolved when every node is a marked fitting', () => {
+    const segments = [segment('s', { kind: 'fitting', fittingId: 'a' }, { kind: 'fitting', fittingId: 'b' })];
+    const fittings = [fitting('a'), fitting('b')];
+
+    const result = solveFlow(inputOf(segments, fittings, {}, { riserFittingIds: new Set(['a', 'b']) }));
+    expect(result.resolved).toBe(false);
+    expect(result.totalCapacity).toBeNull();
+  });
+});
+
+describe('riserFittingFlow', () => {
+  const trunkSegments = [
+    segment('trunk', { kind: 'fitting', fittingId: 'm' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+    segment('branch', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'fitting', fittingId: 'm' }),
+  ];
+
+  it('gives out when the level has an equipment and the solve reaches the marked fitting', () => {
+    const input = inputOf([...trunkSegments], [fitting('m')], { diffuser: 100 }, {
+      elementCategories: { ahu: 'equipment', diffuser: 'terminal' },
+      riserFittingIds: new Set(['m']),
+    });
+    expect(riserFittingFlow(input)).toEqual({ m: 'out' });
+  });
+
+  it('gives in when there is no source and the reached fitting has a demand above 0', () => {
+    const segments = [segment('a', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'fitting', fittingId: 'm' })];
+    const input = inputOf(segments, [fitting('m')], { diffuser: 100 }, { riserFittingIds: new Set(['m']) });
+    expect(riserFittingFlow(input)).toEqual({ m: 'in' });
+  });
+
+  it('gives none when there is no source and no demand', () => {
+    const segments = [segment('a', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'fitting', fittingId: 'm' })];
+    const input = inputOf(segments, [fitting('m')], {}, { riserFittingIds: new Set(['m']) });
+    expect(riserFittingFlow(input)).toEqual({ m: 'none' });
+  });
+
+  it('gives none for a marked fitting that the solve does not reach', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'm1' }),
+      segment('s2', { kind: 'fitting', fittingId: 'm1' }, { kind: 'fitting', fittingId: 'm2' }),
+      segment('s3', { kind: 'fitting', fittingId: 'm2' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }),
+    ];
+    const input = inputOf(segments, [fitting('m1'), fitting('m2')], { diffuser: 100 }, {
+      elementCategories: { ahu: 'equipment', diffuser: 'terminal' },
+      riserFittingIds: new Set(['m1', 'm2']),
+    });
+    expect(riserFittingFlow(input)).toEqual({ m1: 'out', m2: 'none' });
+  });
+
+  it('gives out for an explicit root that is in the network, without elementCategories', () => {
+    const input = inputOf([...trunkSegments], [fitting('m')], { diffuser: 100 }, {
+      rootElementId: 'ahu',
+      riserFittingIds: new Set(['m']),
+    });
+    expect(riserFittingFlow(input)).toEqual({ m: 'out' });
+  });
+
+  it('gives in for a stale explicit root that is not in the network', () => {
+    const segments = [segment('a', { kind: 'port', elementId: 'diffuser', portId: 'p1' }, { kind: 'fitting', fittingId: 'm' })];
+    const input = inputOf(segments, [fitting('m')], { diffuser: 100 }, {
+      rootElementId: 'ghost',
+      riserFittingIds: new Set(['m']),
+    });
+    expect(riserFittingFlow(input)).toEqual({ m: 'in' });
   });
 });

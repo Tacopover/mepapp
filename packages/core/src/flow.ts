@@ -25,7 +25,12 @@ export interface FlowSolveInput {
   rootPortId?: string;
   /** The stamp category of each element whose ports are in the network — what tells an equipment (the source) apart from a terminal and a loose duct end. An element missing here counts as a terminal only when it has a capacity. */
   elementCategories?: Record<string, StampCategory>;
+  /** Ids of the fittings that carry a riser mark. Such a fitting is a boundary: it is never the root (an explicit root that is marked is ignored), and the solve does not continue past it. When omitted, nothing changes. */
+  riserFittingIds?: ReadonlySet<string>;
 }
+
+/** `out`: flow arrives at the riser fitting (this level feeds the riser). `in`: flow leaves it (the riser feeds this level). `none`: neither. */
+export type RiserFittingFlow = 'out' | 'in' | 'none';
 
 export interface FlowResult {
   /** null means unresolved — either no root could be determined, or the segment closes a loop (loops are out of scope, matching the old app: NetworkFlowProcessor.cs:319-324). */
@@ -82,6 +87,14 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     return { segmentCapacity, fittingCapacity, resolved: false, totalCapacity: null, segmentDirection };
   }
 
+  const riserFittingIds = input.riserFittingIds;
+  const isBoundary = (k: string): boolean =>
+    riserFittingIds !== undefined && k.startsWith('fitting:') && riserFittingIds.has(k.slice('fitting:'.length));
+  const rootCandidates = riserFittingIds ? nodeKeys.filter((k) => !isBoundary(k)) : nodeKeys;
+  if (rootCandidates.length === 0) {
+    return { segmentCapacity, fittingCapacity, resolved: false, totalCapacity: null, segmentDirection };
+  }
+
   // Root order, as the old app's FindRoot: an equipment with one connection
   // (a single-trunk AHU), then an open end that is not a terminal (a loose
   // duct end, or a collector's discharge), then any equipment. Without the
@@ -102,15 +115,16 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
       const portKey = nodeKeyOf({ kind: 'port', elementId: input.rootElementId, portId: input.rootPortId }, input.portGroups);
       if (adjacency.has(portKey)) explicitRootKey = portKey;
     }
-    explicitRootKey ??= nodeKeys.find(isRootNode);
+    explicitRootKey ??= rootCandidates.find(isRootNode);
+    if (explicitRootKey !== undefined && isBoundary(explicitRootKey)) explicitRootKey = undefined;
   }
   const rootKey =
     explicitRootKey ||
-    nodeKeys.find((k) => degreeOf(k) === 1 && categoryOf(k) === 'equipment') ||
-    nodeKeys.find((k) => degreeOf(k) === 1 && !isTerminal(k)) ||
-    nodeKeys.find((k) => categoryOf(k) === 'equipment') ||
-    nodeKeys.find((k) => degreeOf(k) === 1) ||
-    nodeKeys[0];
+    rootCandidates.find((k) => degreeOf(k) === 1 && categoryOf(k) === 'equipment') ||
+    rootCandidates.find((k) => degreeOf(k) === 1 && !isTerminal(k)) ||
+    rootCandidates.find((k) => categoryOf(k) === 'equipment') ||
+    rootCandidates.find((k) => degreeOf(k) === 1) ||
+    rootCandidates[0];
 
   // Post-order DFS: each node's demand = its own capacity + the sum of its children's subtree demand.
   const visited = new Set<string>();
@@ -121,7 +135,8 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
       if (visited.has(edge.neighborKey)) {
         continue; // already visited: either the parent, or a cycle-closing edge — left unresolved either way
       }
-      const childDemand = demandOf(edge.neighborKey);
+      if (isBoundary(edge.neighborKey)) visited.add(edge.neighborKey); // a riser fitting ends the walk: nothing beyond it is followed
+      const childDemand = isBoundary(edge.neighborKey) ? 0 : demandOf(edge.neighborKey);
       segmentCapacity[edge.segmentId] = childDemand;
       const segment = segmentById.get(edge.segmentId);
       if (segment) {
@@ -150,4 +165,31 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
   }
 
   return { segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection };
+}
+
+/** For each marked fitting of the network: `out` when the level has a source and the solve reaches the fitting; `in` when there is no source and the solve reaches the fitting with a total demand above 0; else `none`. A source is an element of category 'equipment' in `elementCategories`, or the explicit `rootElementId` when it is not a marked fitting and one of its ports or fittings ends a segment of the network. A stale root id gives no source. Needs `input.riserFittingIds`. */
+export function riserFittingFlow(input: FlowSolveInput): Record<string, RiserFittingFlow> {
+  const marks = input.riserFittingIds ?? new Set<string>();
+  const markedIds = input.network.fittingIds.filter((id) => marks.has(id));
+  const flow: Record<string, RiserFittingFlow> = Object.fromEntries(markedIds.map((id) => [id, 'none' as const]));
+  const result = solveFlow(input);
+  if (!result.resolved) return flow;
+  const root = input.rootElementId;
+  const rootInNetwork =
+    root !== undefined &&
+    root !== '' &&
+    !marks.has(root) &&
+    input.segments.some(
+      (segment) =>
+        input.network.segmentIds.includes(segment.id) &&
+        [segment.endpointA, segment.endpointB].some((endpoint) =>
+          endpoint.kind === 'port' ? endpoint.elementId === root : endpoint.fittingId === root,
+        ),
+    );
+  const hasSource = rootInNetwork || Object.values(input.elementCategories ?? {}).includes('equipment');
+  for (const id of markedIds) {
+    if (result.fittingCapacity[id] == null) continue;
+    flow[id] = hasSource ? 'out' : (result.totalCapacity ?? 0) > 0 ? 'in' : 'none';
+  }
+  return flow;
 }
