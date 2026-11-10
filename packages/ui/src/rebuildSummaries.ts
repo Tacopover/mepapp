@@ -1,4 +1,4 @@
-import { buildSheetSummary, loadProject, parseBuildingFile, type BuildingFile, type BuildingSheet, type ProjectDocument } from '@mepapp/core';
+import { buildSheetSummary, loadProject, parseBuildingFile, riserFittingIdsForSheets, type BuildingFile, type BuildingSheet, type ProjectDocument } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { BuildingStore } from '@mepapp/platform';
 import { displayedPageInfos, linkSheetsWithRetry } from './buildingContext.js';
@@ -35,14 +35,17 @@ function firstSheetPerDocument(sheets: readonly BuildingSheet[]): BuildingSheet[
   return [...firsts.values()];
 }
 
+/** True when sheet is the same file as first. A file without a path is matched by its size too. */
+function isSameFile(first: BuildingSheet, sheet: BuildingSheet): boolean {
+  return fileKey(sheet) === fileKey(first) && (first.location.path !== undefined || sheet.location.sizeBytes === first.location.sizeBytes);
+}
+
 /** Links the unlinked sheets of the file of first to projectUuid. Reads the building file fresh from the store. Returns the number linked. */
 async function linkDocumentSheets(store: BuildingStore, first: BuildingSheet, projectUuid: string): Promise<number> {
   const stored = await store.read();
   if (stored === undefined) return 0;
   const file: BuildingFile = parseBuildingFile(JSON.parse(stored.json));
-  const sameFile = (sheet: BuildingSheet): boolean =>
-    fileKey(sheet) === fileKey(first) && (first.location.path !== undefined || sheet.location.sizeBytes === first.location.sizeBytes);
-  const sheetIds = file.sheets.filter((sheet) => sheet.projectUuid === null && sameFile(sheet)).map((sheet) => sheet.id);
+  const sheetIds = file.sheets.filter((sheet) => sheet.projectUuid === null && isSameFile(first, sheet)).map((sheet) => sheet.id);
   if (sheetIds.length === 0) return 0;
   return linkSheetsWithRetry(store, file, stored.revision, projectUuid, sheetIds);
 }
@@ -50,7 +53,7 @@ async function linkDocumentSheets(store: BuildingStore, first: BuildingSheet, pr
 /** Returns the reason the document failed. When the summary was written, linked counts the sheets linked to it. */
 async function rebuildDocument(
   first: BuildingSheet,
-  args: Pick<Parameters<typeof rebuildSummaries>[0], 'engine' | 'read' | 'whyUnreadable' | 'stampNames' | 'store'>,
+  args: Pick<Parameters<typeof rebuildSummaries>[0], 'building' | 'engine' | 'read' | 'whyUnreadable' | 'stampNames' | 'store'>,
   now: () => Date,
 ): Promise<{ reason?: string; linked?: number }> {
   const file = await args.read(first);
@@ -64,12 +67,16 @@ async function rebuildDocument(
     if (project.projectUuid === undefined) return { reason: 'the document has no id yet. Save it again in MepApp' };
     if (first.projectUuid !== null && first.projectUuid !== project.projectUuid) return { reason: 'the file holds another document id' };
     const pageInfos = displayedPageInfos(handle);
+    const documentSheetIds = args.building.sheets
+      .filter((sheet) => sheet.projectUuid === project.projectUuid || (first.projectUuid === null && sheet.projectUuid === null && isSameFile(first, sheet)))
+      .map((sheet) => sheet.id);
     const summary = buildSheetSummary({
       project,
       savedAt: now().toISOString(),
       sourceSizeBytes: file.size,
       sourceModifiedMs: file.lastModified,
       pageInfos,
+      riserFittingIds: riserFittingIdsForSheets(args.building, documentSheetIds),
       ...args.stampNames(project),
     });
     await args.store.writeSummary(project.projectUuid, JSON.stringify(summary));

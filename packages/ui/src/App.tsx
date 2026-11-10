@@ -13,6 +13,7 @@ import {
   calibrationFromScale,
   DEFAULT_CEILING_HEIGHT_MM,
   getNetworkTypeFromLibrary,
+  riserFittingIdsForSheets,
   STAMP_LIBRARY,
   SAVED_STAMPS_SOURCE_ID,
   type BuildingFile,
@@ -1297,6 +1298,7 @@ export function MepSketchApp({
                   sourceSizeBytes: 0,
                   sourceModifiedMs: 0,
                   pageInfos: displayedPageInfos(pdfHandle),
+                  riserFittingIds: riserFittingIdsForSheets(building, building.sheets.filter((sheet) => sheet.projectUuid === scene.getProjectUuid()).map((sheet) => sheet.id)),
                   ...stampNameLookups(definitions),
                 })
               : undefined;

@@ -6,6 +6,7 @@ import type { Riser, RiserMember } from './riser.js';
 import {
   buildingNetworkLabels,
   buildingNetworkRollup,
+  riserFittingIdsForSheets,
   riserGraphReach,
   riserSpans,
   riserTable,
@@ -106,6 +107,7 @@ describe('riserSpans and riserTable', () => {
       'Size',
       'Flow direction',
       'Source level',
+      'Flow set by',
     ]);
     expect(table.rows).toHaveLength(1);
     expect(cellOf(table, 0, 'Floor-to-floor length (m)')).toBe(6);
@@ -193,6 +195,27 @@ describe('riserSpans and riserTable', () => {
     expect(warnings).toEqual(['Levels Basement, Ground have the same elevation (0 mm). Riser R1 has a span of length 0.']);
   });
 
+  it('gives the connection-height length and a warning for two levels of equal elevation', () => {
+    const equal: BuildingLevel[] = [
+      { id: 'l0', name: 'Basement', elevationMm: 0 },
+      { id: 'l1', name: 'Ground', elevationMm: 0 },
+    ];
+    const riser = makeRiser('R1', [member(0), member(1, { connectionHeightMm: 400 })]);
+    const { spans, warnings } = riserSpans(fileWith([riser], equal), riser);
+    expect(spans[0]!.lengthMm).toBe(400);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('from the connection heights only');
+    expect(warnings[0]).not.toContain('length 0');
+    expect(cellOf(riserTable(fileWith([riser], equal), () => null), 0, 'Floor-to-floor length (m)')).toBe(0.4);
+  });
+
+  it('gives all rows and Not known yet for a riser table without options', () => {
+    const riser = makeRiser('R1', [member(0), member(2)]);
+    const table = riserTable(fileWith([riser]), () => null);
+    expect(table.rows).toHaveLength(1);
+    expect(cellOf(table, 0, 'Flow set by')).toBe('Not known yet');
+  });
+
   it('joins two different sizes with a slash', () => {
     const file = fileWith([makeRiser('R1', [member(0), member(2)])]);
     const table = riserTable(file, (m) => (m.levelId === 'l0' ? '200' : '160'));
@@ -221,6 +244,73 @@ describe('riserTakeoffWarnings', () => {
       'Flow is not summed across levels.',
       'Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.',
     ]);
+  });
+});
+
+describe('riserTable options', () => {
+  it('keeps only the spans that touch the level', () => {
+    const file = fileWith([makeRiser('R1', [member(0), member(1), member(2)])]);
+    expect(riserTable(file, () => null, { levelId: 'l0' }).rows).toHaveLength(1);
+    expect(cellOf(riserTable(file, () => null, { levelId: 'l0' }), 0, 'To level')).toBe('Ground');
+    expect(riserTable(file, () => null, { levelId: 'l1' }).rows).toHaveLength(2);
+    expect(riserTable(file, () => null, { levelId: 'l3' }).rows).toHaveLength(0);
+  });
+
+  it('keeps a one-member riser only for its own level', () => {
+    const file = fileWith([makeRiser('R1', [member(0)])]);
+    expect(riserTable(file, () => null, { levelId: 'l0' }).rows).toHaveLength(1);
+    expect(riserTable(file, () => null, { levelId: 'l1' }).rows).toHaveLength(0);
+  });
+
+  it('takes the flow and the source level from the derived flow', () => {
+    const riser = makeRiser('R1', [member(0), member(2)]);
+    const table = riserTable(fileWith([riser]), () => null, {
+      derived: { R1: { flow: 'up', sourceLevelId: 'l0', fromSolve: true } },
+    });
+    expect(cellOf(table, 0, 'Flow direction')).toBe('up');
+    expect(cellOf(table, 0, 'Source level')).toBe('Basement');
+    expect(cellOf(table, 0, 'Flow set by')).toBe('From the flow solve');
+  });
+
+  it('gives Set by hand for a riser with a hand-set flow', () => {
+    const riser = makeRiser('R1', [member(0), member(2)], {}, vent);
+    const table = riserTable(fileWith([{ ...riser, flow: 'down' }]), () => null, {
+      derived: { R1: { flow: 'down', fromSolve: false } },
+    });
+    expect(cellOf(table, 0, 'Flow set by')).toBe('Set by hand');
+  });
+
+  it('gives unknown, an empty source and Not known yet when nothing is set', () => {
+    const table = riserTable(fileWith([makeRiser('R1', [member(0), member(2)])]), () => null, { derived: {} });
+    expect(cellOf(table, 0, 'Flow direction')).toBe('unknown');
+    expect(cellOf(table, 0, 'Source level')).toBe('');
+    expect(cellOf(table, 0, 'Flow set by')).toBe('Not known yet');
+  });
+
+  it('gives the last cell for the one-member row', () => {
+    const table = riserTable(fileWith([makeRiser('R1', [member(0)])]), () => null, { derived: {} });
+    expect(table.rows[0]).toHaveLength(table.headers.length);
+    expect(cellOf(table, 0, 'Flow set by')).toBe('Not known yet');
+  });
+
+});
+
+describe('riserFittingIdsForSheets', () => {
+  const file = fileWith([
+    makeRiser('R1', [member(0, { fittingId: 'f1' }), member(2, { fittingId: 'f9' })]),
+    makeRiser('R2', [member(0, { fittingId: 'f1' })]),
+  ]);
+
+  it('gives the fitting ids of one sheet', () => {
+    expect(riserFittingIdsForSheets(file, ['s0'])).toEqual(['f1']);
+  });
+
+  it('gives the fitting ids of two sheets, each id once', () => {
+    expect(riserFittingIdsForSheets(file, ['s0', 's2'])).toEqual(['f1', 'f9']);
+  });
+
+  it('gives no ids for no sheets', () => {
+    expect(riserFittingIdsForSheets(file, [])).toEqual([]);
   });
 });
 

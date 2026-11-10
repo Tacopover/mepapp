@@ -5,6 +5,7 @@ import {
   getStampDefinition,
   parseBuildingFile,
   parseSheetSummary,
+  riserFittingIdsForSheets,
   serializeBuildingFile,
   sortLevelsByElevation,
   withIdInFile,
@@ -55,6 +56,7 @@ export async function summaryAfterSave(args: {
       pageInfos: args.pageInfos,
       stampTypeName: args.stampTypeName,
       stampImageName: args.stampImageName,
+      riserFittingIds: riserFittingIdsForSheets(file, matches.map((match) => match.sheet.id)),
     });
     await store.writeSummary(projectUuid, JSON.stringify(summary));
   }

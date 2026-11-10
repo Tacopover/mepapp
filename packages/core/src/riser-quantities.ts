@@ -4,6 +4,7 @@
 import type { BuildingFile, BuildingLevel } from './building.js';
 import type { QuantityCell, QuantityTable } from './quantities.js';
 import type { Riser, RiserEndKind, RiserMember } from './riser.js';
+import type { DerivedRiserFlow } from './riser-flow.js';
 
 export interface RiserSpan {
   riser: Riser;
@@ -68,18 +69,21 @@ export function riserSpans(file: BuildingFile, riser: Riser): { spans: RiserSpan
     const lowerMm = lower.level.elevationMm;
     const upperMm = upper.level.elevationMm;
     const between = file.levels.filter((level) => level.elevationMm > lowerMm && level.elevationMm < upperMm).length;
+    const lengthMm = upperMm - lowerMm + (upper.member.connectionHeightMm ?? 0) - (lower.member.connectionHeightMm ?? 0);
     spans.push({
       riser,
       fromLevelId: lower.member.levelId,
       toLevelId: upper.member.levelId,
-      lengthMm: upperMm - lowerMm + (upper.member.connectionHeightMm ?? 0) - (lower.member.connectionHeightMm ?? 0),
+      lengthMm,
       crossings: between + 1,
       fromMember: lower.member,
       toMember: upper.member,
     });
     if (lowerMm === upperMm) {
       warnings.push(
-        `Levels ${lower.level.name}, ${upper.level.name} have the same elevation (${lowerMm} mm). Riser ${riser.name} has a span of length 0.`,
+        lengthMm === 0
+          ? `Levels ${lower.level.name}, ${upper.level.name} have the same elevation (${lowerMm} mm). Riser ${riser.name} has a span of length 0.`
+          : `Levels ${lower.level.name}, ${upper.level.name} have the same elevation (${lowerMm} mm). The span of riser ${riser.name} between them is ${Math.round(lengthMm) / 1000} m long, from the connection heights only.`,
       );
     }
   }
@@ -95,20 +99,42 @@ function sizeCell(a: string | null, b: string | null): string | null {
   return `${a} / ${b}`;
 }
 
-export function riserTable(file: BuildingFile, sizeOf: (member: RiserMember) => string | null): QuantityTable {
+export interface RiserTableOptions {
+  /** Keep only the spans that touch this level (fromLevelId or toLevelId equals it; an end row counts by its fromLevelId; a one-member riser counts when its member is on this level). A riser with no row left gives no row. */
+  levelId?: string;
+  /** Result of deriveRiserFlow(file, perLevelFlow), keyed by riser id. Used for the columns "Flow direction" and "Source level". */
+  derived?: Record<string, DerivedRiserFlow>;
+}
+
+export function riserTable(
+  file: BuildingFile,
+  sizeOf: (member: RiserMember) => string | null,
+  options: RiserTableOptions = {},
+): QuantityTable {
   const levelName = new Map(file.levels.map((level) => [level.id, level.name]));
   const rows: QuantityCell[][] = [];
   for (const riser of file.risers) {
     const common: QuantityCell[] = [file.name, riser.name, riser.shaftName ?? '', riser.networkType.name];
-    const source = riser.sourceLevelId === undefined ? '' : (levelName.get(riser.sourceLevelId) ?? '');
-    const tail: QuantityCell[] = [riser.flow, source];
+    const derivedFlow = options.derived?.[riser.id];
+    const sourceId = derivedFlow?.sourceLevelId ?? riser.sourceLevelId;
+    const source = sourceId === undefined ? '' : (levelName.get(sourceId) ?? '');
+    const setByHand = riser.flow !== 'unknown' || riser.sourceLevelId !== undefined;
+    const flowSetBy = setByHand
+      ? 'Set by hand'
+      : derivedFlow && (derivedFlow.fromSolve || derivedFlow.sourceLevelId !== undefined)
+        ? 'From the flow solve'
+        : 'Not known yet';
+    const tail: QuantityCell[] = [derivedFlow?.flow ?? riser.flow, source, flowSetBy];
     const members = sortedMembers(file, riser);
     if (members.length === 1) {
       const member = members[0]!.member;
-      rows.push([...common, levelName.get(member.levelId) ?? '', '', null, null, null, sizeOf(member), ...tail]);
+      if (options.levelId === undefined || member.levelId === options.levelId) {
+        rows.push([...common, levelName.get(member.levelId) ?? '', '', null, null, null, sizeOf(member), ...tail]);
+      }
       continue;
     }
     for (const span of riserSpans(file, riser).spans) {
+      if (options.levelId !== undefined && span.fromLevelId !== options.levelId && span.toLevelId !== options.levelId) continue;
       rows.push([
         ...common,
         levelName.get(span.fromLevelId) ?? '',
@@ -136,6 +162,7 @@ export function riserTable(file: BuildingFile, sizeOf: (member: RiserMember) => 
       'Size',
       'Flow direction',
       'Source level',
+      'Flow set by',
     ],
     rows,
   };
@@ -147,6 +174,18 @@ export function riserTakeoffWarnings(file: BuildingFile): string[] {
   warnings.push('Flow is not summed across levels.');
   warnings.push('Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.');
   return warnings;
+}
+
+/** Fitting ids of the members of all risers whose sheetId is in sheetIds. Each id once, in order of first use. */
+export function riserFittingIdsForSheets(file: BuildingFile, sheetIds: readonly string[]): string[] {
+  const wanted = new Set(sheetIds);
+  const fittingIds = new Set<string>();
+  for (const riser of file.risers) {
+    for (const member of riser.members) {
+      if (wanted.has(member.sheetId)) fittingIds.add(member.fittingId);
+    }
+  }
+  return [...fittingIds];
 }
 
 class UnionFind {

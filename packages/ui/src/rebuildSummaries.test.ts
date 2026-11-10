@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { emptyBuilding, parseBuildingFile, serializeBuildingFile, serializeProject, type BuildingFile, type BuildingSheet, type ProjectDocument } from '@mepapp/core';
+import { buildSheetSummary, emptyBuilding, loadProject, parseBuildingFile, serializeBuildingFile, serializeProject, type BuildingFile, type BuildingSheet, type ProjectDocument, type Riser } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import { MemoryBuildingStore } from '@mepapp/platform';
 import { rebuildSummaries } from './rebuildSummaries.js';
 
-const projectJson = (projectUuid: string): string =>
+const projectJson = (projectUuid: string, fittings: unknown[] = []): string =>
   JSON.stringify(
     serializeProject({
       projectUuid,
       networkTypes: [],
       segments: [],
-      fittings: [],
+      fittings,
       stamps: [],
       portGroups: [],
       annotations: [],
@@ -51,6 +51,7 @@ const documents: Record<string, { pages: number; embedded: string | null }> = {
   C: { pages: 1, embedded: null },
   D: { pages: 1, embedded: '{not json' },
   E: { pages: 1, embedded: projectJson('uuid-e') },
+  F: { pages: 1, embedded: projectJson('uuid-f', [{ id: 'f1', pageIndex: 0, position: { x: 0, y: 0 }, kind: 'tee' }]) },
 };
 
 function stubEngine() {
@@ -79,6 +80,20 @@ function stubEngine() {
 }
 
 const stampNames = () => ({ stampTypeName: () => null, stampImageName: () => null });
+
+const riserOf = (sheetId: string, fittingId: string): Riser => ({
+  id: 'R1',
+  name: 'R1',
+  networkTypeId: 'vent',
+  networkType: { id: 'vent', name: 'Supply', discipline: 'ventilation', units: 'CFM', defaultCapacity: 100, color: '#2196f3', lineWidthPt: 1, linePattern: 'solid' },
+  anchorMm: { xMm: 0, yMm: 0 },
+  flow: 'unknown',
+  topEnd: 'member',
+  bottomEnd: 'member',
+  endAllowanceMm: 0,
+  members: [{ levelId: 'L1', sheetId, pageIndex: 0, fittingId }],
+  pending: [],
+});
 
 const progressCalls = (): { calls: [number, number, string][]; onProgress: (done: number, total: number, name: string) => void } => {
   const calls: [number, number, string][] = [];
@@ -333,5 +348,49 @@ describe('rebuildSummaries', () => {
     });
     expect(result).toEqual({ ok: 1, failed: [], linked: 0, total: 1, skipped: 0, cancelled: false });
     expect(reads).toEqual(['s1']);
+  });
+
+  it('writes the riser flow of the fittings of a riser on a sheet of the document', async () => {
+    const { engine } = stubEngine();
+    const store = new MemoryBuildingStore();
+    await rebuildSummaries({
+      building: { ...buildingOf([sheetOf('s1', 'C:/f.pdf', 0)]), risers: [riserOf('s1', 'f1')] },
+      engine,
+      read: readerOf({ 'C:/f.pdf': 'F' }),
+      stampNames,
+      store,
+      onProgress: () => undefined,
+      signal: new AbortController().signal,
+    });
+    const summary = JSON.parse((await store.readSummary('uuid-f')) ?? 'null');
+    expect(summary.riserFittingFlow).toEqual({ f1: 'none' });
+  });
+
+  it('writes no riser flow for a building without risers, the same as a summary without riser ids', async () => {
+    const { engine } = stubEngine();
+    const store = new MemoryBuildingStore();
+    const now = new Date('2026-11-01T10:00:00.000Z');
+    await rebuildSummaries({
+      building: buildingOf([sheetOf('s1', 'C:/f.pdf', 0)]),
+      engine,
+      read: readerOf({ 'C:/f.pdf': 'F' }),
+      stampNames,
+      store,
+      onProgress: () => undefined,
+      signal: new AbortController().signal,
+      now: () => now,
+    });
+    const stored = JSON.parse((await store.readSummary('uuid-f')) ?? 'null');
+    const expected = buildSheetSummary({
+      project: loadProject(JSON.parse(documents.F!.embedded!)),
+      savedAt: now.toISOString(),
+      sourceSizeBytes: 1,
+      sourceModifiedMs: 5000,
+      pageInfos: [{ widthPt: 595, heightPt: 842, rotationDegrees: 0 }],
+      stampTypeName: () => null,
+      stampImageName: () => null,
+    });
+    expect(stored).not.toHaveProperty('riserFittingFlow');
+    expect(stored).toEqual(JSON.parse(JSON.stringify(expected)));
   });
 });

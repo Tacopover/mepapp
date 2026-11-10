@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSheetSummary, emptyBuilding, parseBuildingFile, parseSheetSummary, serializeBuildingFile, type BuildingSheet, type ProjectDocument, type StampDefinition } from '@mepapp/core';
+import { buildSheetSummary, emptyBuilding, parseBuildingFile, parseSheetSummary, serializeBuildingFile, type BuildingSheet, type ProjectDocument, type Riser, type StampDefinition } from '@mepapp/core';
 import { MemoryBuildingStore, StoreConflictError, type BuildingStore } from '@mepapp/platform';
 import { displayedPageInfos, readBuildingForExport, stampNameLookups, summaryAfterSave } from './buildingContext.js';
 
@@ -15,18 +15,32 @@ const sheetOf = (overrides: Partial<BuildingSheet> = {}): BuildingSheet => ({
   ...overrides,
 });
 
-const buildingJson = (sheets: BuildingSheet[]): string => {
+const buildingJson = (sheets: BuildingSheet[], risers: Riser[] = []): string => {
   const file = emptyBuilding('b1', 'Block');
-  return serializeBuildingFile({ ...file, levels: [{ id: 'L1', name: 'Ground', elevationMm: 0 }], sheets });
+  return serializeBuildingFile({ ...file, levels: [{ id: 'L1', name: 'Ground', elevationMm: 0 }], sheets, risers });
 };
 
-const projectOf = (projectUuid: string | undefined) =>
+const riserOf = (sheetId: string, fittingId: string): Riser => ({
+  id: 'R1',
+  name: 'R1',
+  networkTypeId: 'vent',
+  networkType: { id: 'vent', name: 'Supply', discipline: 'ventilation', units: 'CFM', defaultCapacity: 100, color: '#2196f3', lineWidthPt: 1, linePattern: 'solid' },
+  anchorMm: { xMm: 0, yMm: 0 },
+  flow: 'unknown',
+  topEnd: 'member',
+  bottomEnd: 'member',
+  endAllowanceMm: 0,
+  members: [{ levelId: 'L1', sheetId, pageIndex: 0, fittingId }],
+  pending: [],
+});
+
+const projectOf = (projectUuid: string | undefined, fittings: unknown[] = []) =>
   ({
     schemaVersion: 22,
     projectUuid,
     networkTypes: [],
     segments: [],
-    fittings: [],
+    fittings,
     stamps: [],
     portGroups: [],
     terminalCapacities: {},
@@ -195,6 +209,21 @@ describe('summaryAfterSave', () => {
     expect(await summaryAfterSave(args(store, undefined, { idInFile: false }))).toEqual({ state: 'written', projectUuid: 'proj-1', patchedSheets: 0 });
     const file = parseBuildingFile(JSON.parse((await store.read())?.json ?? 'null'));
     expect(file.sheets[0]?.idMinted).toBe(true);
+  });
+
+  it('writes the riser flow of the fittings of a riser on the matched sheet', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1' })], [riserOf('s1', 'f1')]) });
+    await summaryAfterSave(args(store, projectOf('proj-1', [{ id: 'f1', pageIndex: 0, position: { x: 0, y: 0 }, kind: 'tee' }])));
+    const summary = JSON.parse((await store.readSummary('proj-1')) ?? 'null');
+    expect(summary.riserFittingFlow).toEqual({ f1: 'none' });
+  });
+
+  it('writes the same summary as without riser ids when the building has no risers', async () => {
+    const store = new MemoryBuildingStore({ json: buildingJson([sheetOf({ projectUuid: 'proj-1' })]) });
+    await summaryAfterSave(args(store));
+    const stored = JSON.parse((await store.readSummary('proj-1')) ?? 'null');
+    expect(stored).not.toHaveProperty('riserFittingFlow');
+    expect(stored).toEqual(JSON.parse(summaryOf(projectOf('proj-1'))));
   });
 });
 
