@@ -21,13 +21,13 @@ Words in this script: "level 0" is the lower level, "level 1" is the upper level
 8. Click the fitting and press Delete. Check: the fitting stays. A toast says "This fitting belongs to Supply Air riser 1. Detach the riser first, or use Delete riser."
 9. Go to level 1. Check: a dashed ring shows on the sheet, with the label "Supply Air riser 1". The ring is at the real position of the riser, not on a segment.
 10. Pick the network type Extract Air. Choose the Segment tool. Click in free space, then move the mouse onto the ring. Check: a red tip shows: "Supply Air riser 1 takes only Supply Air. This segment is Extract air." Click on the ring. Check: the riser does not get a part on level 1. Press Escape.
-11. Pick the network type Supply Air again. Draw a new segment: click in free space, then click on the ring. Check: a toast says "Supply Air riser 1 attached on Level 1." The ring becomes a solid mark. If the two PDFs have a different page size, the toast can add "Page sizes differ ...: the sheets may not line up". This is expected for two different PDFs.
+11. Pick the network type Supply Air again. Draw a new segment: click in free space, then click on the ring. Check: a toast says "Supply Air riser 1 attached on Level 1." The ring becomes a solid mark (not proven in a browser check: tell us what you see). If the two PDFs have a different page size, the toast can add "Page sizes differ ...: the sheets may not line up". This is expected for two different PDFs.
 12. In the menu choose Save on level 1. Go to level 0 and Save there.
 
 ### Move, undo and conflict
 
 13. On level 0, click the riser fitting and drag it 2 to 3 cm up and to the right. Release. Check: a toast says "Supply Air riser 1 moved to match the building." No dialog opens.
-14. Go to level 1. Check: the riser fitting is at the matching real position (the other scale is taken into account). The tab of level 1 shows that it has unsaved changes.
+14. Go to level 1. Check: the riser fitting is at the matching real position (the other scale is taken into account). The tab of level 1 shows that it has unsaved changes (not proven in a browser check).
 15. Go to level 0. Click the Undo button in the left rail (no keyboard shortcut). Check: the fitting goes back. Go to level 1. Check: the fitting of level 1 also went back.
 16. On level 1, change the scale in the status bar (for example to 1:120). Check: a dialog opens with the title "Supply Air riser 1 is not at the building position" and three buttons in this order: "Decide later", "Snap back", "Move the riser here". Check: a click on the dark background does not close it. Press Escape. Check: the dialog closes, a toast says the riser is not at the building position, and the ring mark is amber.
 17. Go to level 0 and back to level 1. Check: the dialog opens again. Click "Snap back". Check: the fitting goes back to the building position and the dialog closes.
@@ -52,7 +52,7 @@ Words in this script: "level 0" is the lower level, "level 1" is the upper level
 24. Click the tab "Risers (1)". Check: a diagram shows two level lines (Level 1 above Level 0) with one riser line between them. A legend explains the three ring states (at position, waiting, not at position). The Supply Air filter checkbox is on.
 25. Clear the Supply Air checkbox. Check: the riser line disappears. Set it again. Check: the line comes back.
 26. Click the riser line. Check: the info box shows "Supply Air riser 1", "Level 0 to Level 1", "2 levels", "3.00 m", the flow direction "Not known yet", and one row for each level with the status "OK".
-27. Press the Right Arrow key. Check: the selection moves to the next riser (with one riser it stays). Press Enter. Check: the focus moves to the title of the info box.
+27. Press the Right Arrow key. Check: the selection moves to the next riser (with one riser it stays; not proven in a browser check). Press Enter. Check: the focus moves to the title of the info box.
 28. Click "Go to" on the row of Level 1. Check: the viewer shows level 1 and the dialog stays open. Click "Set by hand", choose "Down" in the list, and then click "Use the flow solve". Check: the direction goes back to "Not known yet".
 
 ### Export
