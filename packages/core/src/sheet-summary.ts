@@ -1,9 +1,12 @@
+import { riserFittingFlow, type RiserFittingFlow } from './flow.js';
+import { computeNetworks } from './network.js';
 import { buildQuantityTables, type QuantityTable } from './quantities.js';
 import type { ProjectDocument } from './project.js';
 import { migrateToLatest, SchemaMigrationError, validateDocument } from './schema.js';
 import type { JsonRecord, MigrationStep, ValidationIssue, Validator } from './schema.js';
+import type { StampCategory } from './stamp-library.js';
 
-export const SHEET_SUMMARY_VERSION = 1;
+export const SHEET_SUMMARY_VERSION = 2;
 
 export interface SheetSummaryPage {
   calibrated: boolean;
@@ -24,6 +27,8 @@ export interface SheetSummary {
   pages: Record<string, SheetSummaryPage>;
   tables: QuantityTable[];
   warnings: string[];
+  /** Flow at each riser fitting of this sheet that exists in the project, merged over all networks: fitting id -> 'out' | 'in' | 'none'. Absent when no riser fitting ids were given, and in a v1 summary (unknown). */
+  riserFittingFlow?: Record<string, RiserFittingFlow>;
 }
 
 export class SheetSummaryError extends Error {
@@ -35,6 +40,41 @@ export class SheetSummaryError extends Error {
   }
 }
 
+function riserFittingFlowOf(project: ProjectDocument, riserIds: ReadonlySet<string>): Record<string, RiserFittingFlow> {
+  const segmentById = new Map(project.segments.map((segment) => [segment.id, segment]));
+  const flow = new Map<string, RiserFittingFlow>(
+    project.fittings.filter((fitting) => riserIds.has(fitting.id)).map((fitting): [string, RiserFittingFlow] => [fitting.id, 'none']),
+  );
+  const networks = computeNetworks({ segments: project.segments, fittings: project.fittings, portGroups: project.portGroups });
+  for (const network of networks) {
+    if (!network.fittingIds.some((id) => riserIds.has(id))) continue;
+    const elementIds = new Set<string>();
+    for (const segmentId of network.segmentIds) {
+      const segment = segmentById.get(segmentId);
+      for (const endpoint of [segment?.endpointA, segment?.endpointB]) {
+        if (endpoint?.kind === 'port') elementIds.add(endpoint.elementId);
+      }
+    }
+    const elementCategories: Record<string, StampCategory> = {};
+    for (const stamp of project.stamps) {
+      if (elementIds.has(stamp.id)) elementCategories[stamp.id] = stamp.category;
+    }
+    const result = riserFittingFlow({
+      network,
+      segments: project.segments,
+      fittings: project.fittings,
+      portGroups: project.portGroups,
+      terminalCapacities: project.terminalCapacities,
+      elementCategories,
+      riserFittingIds: riserIds,
+    });
+    for (const [id, value] of Object.entries(result)) {
+      if (value !== 'none') flow.set(id, value);
+    }
+  }
+  return Object.fromEntries([...flow.keys()].sort().map((id) => [id, flow.get(id)!]));
+}
+
 export function buildSheetSummary(args: {
   project: ProjectDocument;
   savedAt: string;
@@ -44,12 +84,15 @@ export function buildSheetSummary(args: {
   pageInfos: readonly { widthPt: number; heightPt: number; rotationDegrees: number }[];
   stampTypeName: (id: string) => string | null;
   stampImageName: (id: string) => string | null;
+  /** Ids of the riser fittings on this sheet. */
+  riserFittingIds?: readonly string[];
 }): SheetSummary {
   const { project } = args;
   const projectUuid = project.projectUuid;
   if (projectUuid === undefined) {
     throw new SheetSummaryError('project has no projectUuid', [{ path: 'projectUuid', message: 'the project needs a projectUuid for a sheet summary' }]);
   }
+  const riserIds = new Set(args.riserFittingIds ?? []);
 
   const calibrationOf = (pageIndex: number) => project.calibrations[String(pageIndex)] ?? null;
   const quantities = buildQuantityTables({
@@ -91,6 +134,7 @@ export function buildSheetSummary(args: {
     pages,
     tables: quantities.tables,
     warnings: quantities.warnings,
+    ...(riserIds.size > 0 ? { riserFittingFlow: riserFittingFlowOf(project, riserIds) } : {}),
   };
 }
 
@@ -100,6 +144,13 @@ const sheetSummaryMigrationSteps: MigrationStep[] = [
     toVersion: 1,
     migrate(data) {
       return { ...data, version: 1 };
+    },
+  },
+  {
+    fromVersion: 1,
+    toVersion: 2,
+    migrate(data) {
+      return { ...data, version: 2 };
     },
   },
 ];
@@ -168,7 +219,19 @@ const validateTables: Validator = (data) => {
   return issues;
 };
 
-const sheetSummaryValidators: Validator[] = [validateTopLevel, validatePages, validateTables];
+const validateRiserFlow: Validator = (data) => {
+  if (data.riserFittingFlow === undefined) return [];
+  if (!isRecord(data.riserFittingFlow)) return [{ path: 'riserFittingFlow', message: 'riserFittingFlow must be an object' }];
+  const issues: ValidationIssue[] = [];
+  for (const [id, flow] of Object.entries(data.riserFittingFlow)) {
+    if (flow !== 'out' && flow !== 'in' && flow !== 'none') {
+      issues.push({ path: `riserFittingFlow.${id}`, message: "riserFittingFlow values must be 'out', 'in' or 'none'" });
+    }
+  }
+  return issues;
+};
+
+const sheetSummaryValidators: Validator[] = [validateTopLevel, validatePages, validateTables, validateRiserFlow];
 
 /** Migrates raw JSON (any prior summary version) to the current shape and validates it. Throws SheetSummaryError if the summary is malformed or newer than this app. */
 export function parseSheetSummary(raw: unknown): SheetSummary {

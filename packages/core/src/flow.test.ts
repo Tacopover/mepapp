@@ -543,4 +543,17 @@ describe('riserFittingFlow', () => {
     });
     expect(riserFittingFlow(input)).toEqual({ m: 'in' });
   });
+
+  it('gives in for a riser between a zero-capacity and a capacity terminal, whichever id sorts first', () => {
+    const forward = [
+      segment('a', { kind: 'port', elementId: 'T1', portId: 'p1' }, { kind: 'fitting', fittingId: 'm' }),
+      segment('b', { kind: 'fitting', fittingId: 'm' }, { kind: 'port', elementId: 'T2', portId: 'p1' }),
+    ];
+    const swapped = [
+      segment('a', { kind: 'port', elementId: 'T2', portId: 'p1' }, { kind: 'fitting', fittingId: 'm' }),
+      segment('b', { kind: 'fitting', fittingId: 'm' }, { kind: 'port', elementId: 'T1', portId: 'p1' }),
+    ];
+    expect(riserFittingFlow(inputOf(forward, [fitting('m')], { T1: 0, T2: 50 }, { riserFittingIds: new Set(['m']) }))).toEqual({ m: 'in' });
+    expect(riserFittingFlow(inputOf(swapped, [fitting('m')], { T1: 50, T2: 0 }, { riserFittingIds: new Set(['m']) }))).toEqual({ m: 'in' });
+  });
 });

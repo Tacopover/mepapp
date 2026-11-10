@@ -115,7 +115,7 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
   const segments = [...allSegments].sort((a, b) => a.pageIndex - b.pageIndex || collator.compare(a.id, b.id));
   const segmentTable: QuantityTable = {
     name: 'Segments',
-    headers: ['Page', 'Id', 'Network', 'Network type', 'Shape', 'Diameter (mm)', 'Width (mm)', 'Height (mm)', 'Material', 'Length (m)', 'Routed', 'Start X (pt)', 'Start Y (pt)', 'End X (pt)', 'End Y (pt)'],
+    headers: ['Page', 'Id', 'Network', 'Network type', 'Shape', 'Diameter (mm)', 'Width (mm)', 'Height (mm)', 'Material', 'Length (m)', 'Routed', 'Start X (pt)', 'Start Y (pt)', 'End X (pt)', 'End Y (pt)', 'Start fitting', 'End fitting'],
     rows: segments.map((segment) => {
       const calibration = input.calibrationOf(segment.pageIndex);
       // Blank, never 0 or raw page units: both read as real numbers in Excel and corrupt a takeoff.
@@ -135,6 +135,8 @@ export function buildQuantityTables(input: QuantityInput): QuantityResult {
         !!segment.routedBy,
         ...pointCells(segment.geometry[0]),
         ...pointCells(segment.geometry[segment.geometry.length - 1]),
+        segment.endpointA.kind === 'fitting' ? segment.endpointA.fittingId : null,
+        segment.endpointB.kind === 'fitting' ? segment.endpointB.fittingId : null,
       ];
     }),
   };

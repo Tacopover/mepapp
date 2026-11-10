@@ -122,6 +122,24 @@ describe('buildQuantityTables', () => {
     expect(equipment.rows[0]![0]).toBe(2);
   });
 
+  it('lists the start fitting and the end fitting of a segment, null for a port end', () => {
+    const fitting = { id: 'f1', pageIndex: 0, position: { x: 1000, y: 0 }, kind: 'junction' } as never;
+    const connected: Segment = {
+      id: 's1',
+      pageIndex: 0,
+      networkTypeId: 't',
+      shape: 'round',
+      diameter: 200,
+      endpointA: { kind: 'fitting', fittingId: 'f1' },
+      endpointB: { kind: 'port', elementId: 'diffuser', portId: 'p' },
+      geometry: [{ x: 1000, y: 0 }, { x: 0, y: 0 }],
+    };
+    const result = buildQuantityTables({ ...base, segments: [connected], fittings: [fitting], calibrationOf: () => null });
+    const table = result.tables.find((t) => t.name === 'Segments')!;
+    expect(table.headers.slice(-2)).toEqual(['Start fitting', 'End fitting']);
+    expect(table.rows[0]!.slice(-2)).toEqual(['f1', null]);
+  });
+
   describe('page filter', () => {
     const fitting = (id: string, pageIndex: number) => ({ id, pageIndex, position: { x: 1000, y: 0 }, kind: 'junction' }) as never;
     const pagedSegment = (id: string, pageIndex: number, fittingId: string): Segment => ({

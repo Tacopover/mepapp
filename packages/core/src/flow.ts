@@ -167,7 +167,7 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
   return { segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection };
 }
 
-/** For each marked fitting of the network: `out` when the level has a source and the solve reaches the fitting; `in` when there is no source and the solve reaches the fitting with a total demand above 0; else `none`. A source is an element of category 'equipment' in `elementCategories`, or the explicit `rootElementId` when it is not a marked fitting and one of its ports or fittings ends a segment of the network. A stale root id gives no source. Needs `input.riserFittingIds`. */
+/** For each marked fitting of the network: `out` when the level has a source and the solve reaches the fitting; `in` when there is no source and the solve reaches the fitting and the network has a total terminal capacity above 0; else `none`. A source is an element of category 'equipment' in `elementCategories`, or the explicit `rootElementId` when it is not a marked fitting and one of its ports or fittings ends a segment of the network. A stale root id gives no source. Needs `input.riserFittingIds`. */
 export function riserFittingFlow(input: FlowSolveInput): Record<string, RiserFittingFlow> {
   const marks = input.riserFittingIds ?? new Set<string>();
   const markedIds = input.network.fittingIds.filter((id) => marks.has(id));
@@ -187,9 +187,18 @@ export function riserFittingFlow(input: FlowSolveInput): Record<string, RiserFit
         ),
     );
   const hasSource = rootInNetwork || Object.values(input.elementCategories ?? {}).includes('equipment');
+  const networkElementIds = Array.from(
+    new Set(
+      input.segments
+        .filter((segment) => input.network.segmentIds.includes(segment.id))
+        .flatMap((segment) => [segment.endpointA, segment.endpointB])
+        .flatMap((endpoint) => (endpoint.kind === 'port' ? [endpoint.elementId] : [])),
+    ),
+  );
+  const networkCapacity = networkElementIds.reduce((sum, id) => sum + (input.terminalCapacities[id] ?? 0), 0);
   for (const id of markedIds) {
     if (result.fittingCapacity[id] == null) continue;
-    flow[id] = hasSource ? 'out' : (result.totalCapacity ?? 0) > 0 ? 'in' : 'none';
+    flow[id] = hasSource ? 'out' : networkCapacity > 0 ? 'in' : 'none';
   }
   return flow;
 }
