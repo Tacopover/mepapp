@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyBuilding, type BuildingFile, type BuildingSheet } from '@mepapp/core';
+import { emptyBuilding, removeSheet, type BuildingFile, type BuildingSheet, type Riser } from '@mepapp/core';
 import {
   addResultText,
   alreadyAssignedText,
@@ -14,6 +14,7 @@ import {
   sheetDisplayName,
   sheetGroupsOfLevel,
   sheetPdfKey,
+  sheetRemoveRefusal,
   sheetsOfSamePdf,
   type PendingPdf,
 } from './buildingSheets.js';
@@ -502,5 +503,48 @@ describe('addResultText', () => {
     expect(addResultText({ levelName: 'Ground floor', placed: 1, pdfCount: 1, failed: ['x.pdf'], ...none })).toBe(
       'Added 1 page to Ground floor. Could not read x.pdf.',
     );
+  });
+});
+
+const riserWith = (name: string, sheetId: string): Riser => ({
+  id: `r-${name}`,
+  name,
+  networkTypeId: 'vent',
+  networkType: { id: 'vent', name: 'Supply', discipline: 'ventilation', units: 'CFM', defaultCapacity: 100, color: '#2196f3', lineWidthPt: 1, linePattern: 'solid' },
+  anchorMm: { xMm: 0, yMm: 0 },
+  flow: 'down',
+  topEnd: 'member',
+  bottomEnd: 'member',
+  endAllowanceMm: 0,
+  members: [{ levelId: 'L1', sheetId, pageIndex: 0, fittingId: `f-${sheetId}` }],
+  pending: [],
+});
+
+describe('sheetRemoveRefusal', () => {
+  const oneLevel = (sheets: BuildingSheet[], risers: Riser[]): BuildingFile => ({
+    ...buildingOf(sheets),
+    levels: [{ id: 'L1', name: 'Ground', elevationMm: 0 }],
+    risers,
+  });
+  const sheetA = sheetOf('A', 0, 'a.pdf', { projectUuid: 'u-a' });
+  const sheetB = sheetOf('B', 0, 'b.pdf', { projectUuid: 'u-b' });
+
+  it('names the riser that uses the sheet and lets the other sheet go', () => {
+    const file = oneLevel([sheetA, sheetB], [riserWith('R1', 'A')]);
+    expect(sheetRemoveRefusal(file, 'A')).toBe('Detach R1 first.');
+    expect(sheetRemoveRefusal(file, 'B')).toBeNull();
+    expect(removeSheet(file, 'B').sheets.map((sheet) => sheet.id)).toEqual(['A']);
+    expect(removeSheet(file, 'A')).toBe(file);
+  });
+
+  it('allows the removal once the riser has no member', () => {
+    const file = oneLevel([sheetA, sheetB], []);
+    expect(sheetRemoveRefusal(file, 'A')).toBeNull();
+    expect(removeSheet(file, 'A').sheets.map((sheet) => sheet.id)).toEqual(['B']);
+  });
+
+  it('names both risers joined by and when two risers use the sheet', () => {
+    const file = oneLevel([sheetA, sheetB], [riserWith('R1', 'A'), riserWith('R2', 'A')]);
+    expect(sheetRemoveRefusal(file, 'A')).toBe('Detach R1 and R2 first.');
   });
 });

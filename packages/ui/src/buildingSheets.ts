@@ -2,6 +2,7 @@ import {
   addSheets,
   findSheets,
   replaceMintedId,
+  sheetRemovalBlock,
   type BuildingFile,
   type BuildingSheet,
   type NewSheetPage,
@@ -157,6 +158,19 @@ export function sheetGroupsOfLevel(file: BuildingFile, levelId: string | null): 
 export function sheetsOfSamePdf(file: BuildingFile, sheet: BuildingSheet): BuildingSheet[] {
   const key = sheetPdfKey(sheet);
   return file.sheets.filter((other) => sheetPdfKey(other) === key);
+}
+
+/** Text that says why removeSheet refuses the sheet, or null when it does not refuse. Names the risers that use the sheet. */
+export function sheetRemoveRefusal(file: BuildingFile, sheetId: string): string | null {
+  const block = sheetRemovalBlock(file, sheetId);
+  if (block === null) return null;
+  const names = file.risers
+    .filter((riser) => riser.members.some((member) => member.sheetId === sheetId))
+    .map((riser) => riser.name);
+  if (names.length === 0) return block;
+  const last = names[names.length - 1]!;
+  if (names.length === 1) return `Detach ${last} first.`;
+  return `Detach ${names.slice(0, -1).join(', ')} and ${last} first.`;
 }
 
 /** The sheets of the file that can be the document of one pending entry (projectUuid null in the match). A weak match (file name and size only) does not count when the entry and the sheet both have a path. */

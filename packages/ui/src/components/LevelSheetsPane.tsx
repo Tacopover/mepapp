@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useRef } from 'react';
-import { moveSheet, removeSheet, type BuildingFile, type BuildingSheet } from '@mepapp/core';
+import { moveSheet, removeSheet, sheetMoveBlock, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { FileAccess } from '@mepapp/platform';
 import { countLabel } from '../buildingLevels.js';
-import { sheetGroupsOfLevel } from '../buildingSheets.js';
+import { sheetGroupsOfLevel, sheetRemoveRefusal } from '../buildingSheets.js';
 import {
   statusHint,
   statusLabel,
@@ -243,7 +243,13 @@ export function LevelSheetsPane({
                       disabled={otherLevels.length === 0}
                       onChange={(event) => {
                         const target = event.target.value;
-                        if (target !== '') void update((f) => moveSheet(f, sheet.id, target));
+                        if (target === '') return;
+                        const block = sheetMoveBlock(file, sheet.id, target);
+                        if (block !== null) {
+                          onNotice(`Could not move ${sheet.location.fileName} page ${sheet.pageIndex + 1}. ${block}`, true);
+                          return;
+                        }
+                        void update((f) => moveSheet(f, sheet.id, target));
                       }}
                     >
                       <option value="">Move to…</option>
@@ -260,7 +266,14 @@ export function LevelSheetsPane({
                       className="mep-sheets-remove"
                       aria-label={`Remove ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
                       title="Remove this sheet from the building. The PDF file stays on disk."
-                      onClick={() => void update((f) => removeSheet(f, sheet.id))}
+                      onClick={() => {
+                        const refusal = sheetRemoveRefusal(file, sheet.id);
+                        if (refusal !== null) {
+                          onNotice(`Could not remove ${sheet.location.fileName} page ${sheet.pageIndex + 1}. ${refusal}`, true);
+                          return;
+                        }
+                        void update((f) => removeSheet(f, sheet.id));
+                      }}
                     >
                       Remove
                     </button>
