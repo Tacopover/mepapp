@@ -7,7 +7,7 @@ export interface CanvasContextMenuProps {
   request: CanvasContextMenuRequest;
   sceneRef: RefObject<SketchScene | null>;
   onDismiss: () => void;
-  riser?: { state: RiserMenuState; onMake(fittingId: string): void; onDetach(riserId: string): void; onDelete(riserId: string): void };
+  riser?: { state: RiserMenuState; onMake(fittingId: string): void; onDrawFromRing(riserId: string): void; onDetach(riserId: string): void; onDelete(riserId: string): void };
 }
 
 /**
@@ -20,9 +20,9 @@ export interface CanvasContextMenuProps {
  */
 export function CanvasContextMenu({ request, sceneRef, onDismiss, riser }: CanvasContextMenuProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const { drawFrom, insertFitting, removeFittingId } = request.target;
+  const { drawFrom, insertFitting, removeFittingId, riserAnchor } = request.target;
   const riserModel = riser?.state.model ?? null;
-  const hasEntryAbove = Boolean(drawFrom || insertFitting || removeFittingId);
+  const hasEntryAbove = Boolean(drawFrom || insertFitting || removeFittingId || riserAnchor);
   const [offset, setOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const { x: posX, y: posY } = request.screenPosition;
 
@@ -65,6 +65,18 @@ export function CanvasContextMenu({ request, sceneRef, onDismiss, riser }: Canva
 
   return (
     <div ref={rootRef} className="mep-draw-from-menu" style={{ left: request.screenPosition.x + offset.dx, top: request.screenPosition.y + offset.dy }}>
+      {riserAnchor && riser && (
+        <button
+          type="button"
+          className="mep-draw-from-menu-btn"
+          onClick={() => {
+            riser.onDrawFromRing(riserAnchor.riserId);
+            onDismiss();
+          }}
+        >
+          Draw from
+        </button>
+      )}
       {drawFrom && (
         <button
           type="button"

@@ -90,6 +90,18 @@ export class SelectTool implements Tool {
     }
 
     const hit = ctx.hitTest(world);
+    const ring = hit === null && !event.shiftKey ? ctx.hitRiserAnchor(world) : null;
+    if (ring) {
+      if (ctx.doc.selectedIds.size > 0) {
+        ctx.doc.selectedIds.clear();
+        ctx.emit('selectionChanged', ctx.getSelection());
+        ctx.syncDrawingLayer();
+      }
+      ctx.selectRiserAnchor(ring.riserId);
+      ctx.redrawOverlay();
+      return;
+    }
+    ctx.selectRiserAnchor(null);
     if (hit) {
       // A click (not drag) on an already-sole-selected textbox/stickyNote reopens its text editor — checked before selectedIds is mutated below, see onPointerUp's move-selection case.
       const alreadySoleSelected = ctx.doc.selectedIds.size === 1 && ctx.doc.selectedIds.has(hit.id);

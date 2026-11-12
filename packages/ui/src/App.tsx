@@ -2127,7 +2127,7 @@ export function MepSketchApp({
                   request={canvasContextMenuRequest}
                   sceneRef={sceneRef}
                   onDismiss={() => setCanvasContextMenuRequest(null)}
-                  riser={riserMenuState ? { state: riserMenuState, onMake: risers.makeRiser, onDetach: risers.detach, onDelete: risers.askDelete } : undefined}
+                  riser={riserMenuState ? { state: riserMenuState, onMake: risers.makeRiser, onDrawFromRing: risers.drawFromRing, onDetach: risers.detach, onDelete: risers.askDelete } : undefined}
                 />
               )}
             </>

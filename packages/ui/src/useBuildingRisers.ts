@@ -27,6 +27,7 @@ import {
   firstMemberFrame,
   HINT_NOT_IN_BUILDING,
   HINT_NO_SCALE,
+  HINT_TWO_TYPES,
   makeRiserAction,
   planRiserMove,
   removalRefusedText,
@@ -266,6 +267,57 @@ export function useBuildingRisers(args: {
     );
   };
 
+  const drawFromRing = (riserId: string): void => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const anchor = scene.getRiserAnchors().find((candidate) => candidate.riserId === riserId);
+    if (anchor === undefined) {
+      pushToast({ kind: 'warning', message: 'This riser does not exist any more.' });
+      return;
+    }
+    if (building === null || sheet === null) {
+      pushToast({ kind: 'warning', message: HINT_NOT_IN_BUILDING });
+      return;
+    }
+    const page = shownPageOf(scene);
+    if (page === null) {
+      pushToast({ kind: 'warning', message: HINT_NO_SCALE });
+      return;
+    }
+    guard(async () => {
+      const open = live.current.building;
+      const onSheet = live.current.sheet;
+      if (open === null || onSheet === null) {
+        live.current.pushToast({ kind: 'warning', message: HINT_NOT_IN_BUILDING });
+        return;
+      }
+      const { summaries } = await readSummaries(open.store);
+      const after = live.current;
+      if (after.building?.file.id !== open.file.id || after.sheet === null || after.sheet.id !== onSheet.id) return;
+      const riser = open.file.risers.find((candidate) => candidate.id === riserId);
+      const firstFrame = riser === undefined ? null : firstMemberFrame(open.file, riser, summaries);
+      const fittingId = scene.riserAnchorFittingId(anchor);
+      const context = scene.getFittingContext(fittingId);
+      if (context !== null && context.networkTypeIds.length > 1) {
+        live.current.pushToast({ kind: 'warning', message: HINT_TWO_TYPES });
+        return;
+      }
+      const segmentNetworkTypeId = context?.networkTypeIds[0] ?? anchor.networkTypeId;
+      await commit((current): Outcome => {
+        const result = attachAction(current, { riserId, sheet: onSheet, fittingId, segmentNetworkTypeId, page, firstFrame });
+        const outcome = fromResult(current, result);
+        if (!result.ok) return outcome;
+        return {
+          ...outcome,
+          after: () => {
+            if (live.current.sheet?.id === onSheet.id) scene.drawFromRiserAnchor(anchor, fittingId);
+            setSceneTick((tick) => tick + 1);
+          },
+        };
+      });
+    });
+  };
+
   const detach = (riserId: string): void => {
     if (building === null || sheet === null) {
       pushToast({ kind: 'warning', message: HINT_NOT_IN_BUILDING });
@@ -503,6 +555,7 @@ export function useBuildingRisers(args: {
   return {
     menuStateFor,
     makeRiser,
+    drawFromRing,
     detach,
     askDelete,
     pendingDelete,

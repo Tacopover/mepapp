@@ -160,6 +160,10 @@ export interface ToolContext {
   getRiserMarks(): ReadonlyMap<string, RiserMark>;
   /** The riser anchors that are visible now: their network type has a segment on the shown page. */
   getVisibleRiserAnchors(): RiserAnchor[];
+  /** The visible riser ring under the point (inside the ring disk plus 4 screen px), or null. */
+  hitRiserAnchor(worldPoint: Vec2): RiserAnchor | null;
+  /** Selects one visible ring (riserId) or clears the ring selection (null). Idempotent; redraws the overlay only on change. */
+  selectRiserAnchor(riserId: string | null): void;
   /** Marks one anchor refused (its ring turns red and a tip shows `text`), or null to clear. */
   setRiserAnchorRefusal(refusal: { riserId: string; text: string } | null): void;
 

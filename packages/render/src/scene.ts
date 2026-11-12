@@ -160,7 +160,8 @@ import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomC
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
-import { visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
+import { anchorAtPoint, visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
+import { createFittingCommand } from './drawingCommands.js';
 import {
   addPanelAccessoryCommand,
   addTerminalToCircuitCommand,
@@ -573,6 +574,8 @@ export interface CanvasContextMenuTarget {
   insertFitting?: { segmentId: string; breakPoint: Vec2 };
   /** A fitting with exactly two segments, which removeFitting can merge into one. */
   removeFittingId?: string;
+  /** A visible riser ring was right-clicked: the menu offers "Draw from" on it. */
+  riserAnchor?: { riserId: string; label: string; anchorPt: Vec2 };
 }
 
 interface SketchSceneEvents {
@@ -727,6 +730,7 @@ export class SketchScene {
   private riserAnchors: RiserAnchor[] = [];
   /** Scene-level: the anchor that refused a segment end, with the tip text. Not part of the document, never saved. */
   private riserAnchorRefusal: { riserId: string; text: string } | null = null;
+  private selectedRiserAnchorId: string | null = null;
   private riserAnchorTip: RiserBadge | null = null;
   /** Scene-level: the ring labels of the shown riser anchors, pooled and reused by redrawOverlay. Not part of the document, never saved. */
   private riserAnchorLabels: RiserBadge[] = [];
@@ -940,6 +944,8 @@ export class SketchScene {
       getZoomScale: () => self.world.scale.x,
       getRiserMarks: () => self.getRiserMarks(),
       getVisibleRiserAnchors: () => self.getVisibleRiserAnchors(),
+      hitRiserAnchor: (worldPoint) => self.hitRiserAnchor(worldPoint),
+      selectRiserAnchor: (riserId) => self.selectRiserAnchor(riserId),
       setRiserAnchorRefusal: (refusal) => self.setRiserAnchorRefusal(refusal),
       hitTest: (worldPoint) => self.hitTest(worldPoint),
       selectableRefForId: (id, state) => self.selectableRefForId(id, state),
@@ -1049,6 +1055,17 @@ export class SketchScene {
         };
         if (target.point.kind === 'fitting' && this.canRemoveFitting(target.point.fittingId)) menu.removeFittingId = target.point.fittingId;
         this.emitter.emit('canvasContextMenuRequested', screen, menu);
+      } else if (target.kind === 'new-fitting') {
+        const ring = this.hitRiserAnchor(world);
+        if (ring) {
+          if (this.doc.selectedIds.size > 0) {
+            this.doc.selectedIds.clear();
+            this.emitter.emit('selectionChanged', this.getSelection());
+            this.syncDrawingLayer();
+          }
+          this.selectRiserAnchor(ring.riserId);
+          this.emitter.emit('canvasContextMenuRequested', screen, { riserAnchor: { riserId: ring.riserId, label: ring.label, anchorPt: { x: ring.anchorPt.x, y: ring.anchorPt.y } } });
+        }
       }
     });
     window.addEventListener('keydown', this.onKeyDown);
@@ -1087,6 +1104,7 @@ export class SketchScene {
       this.circuitToolReturn = 'select';
     }
     this.tool = tool;
+    this.selectedRiserAnchorId = null;
     this.selectedRoomVertices = [];
     // The room selection (shown in the Properties panel) lives while the user stays with the room tools.
     if (!ROOM_TOOLS.has(tool)) this.clearRoomSelection();
@@ -1175,6 +1193,7 @@ export class SketchScene {
     this.riserMarks = new Map();
     this.riserAnchors = [];
     this.riserAnchorRefusal = null;
+    this.selectedRiserAnchorId = null;
     if (this.tool === 'calibrate' || this.tool === 'measure') void this.loadSnapLines();
     this.syncDrawingLayer();
     this.redrawOverlay();
@@ -1302,6 +1321,7 @@ export class SketchScene {
     this.riserMarks = new Map();
     this.riserAnchors = [];
     this.riserAnchorRefusal = null;
+    this.selectedRiserAnchorId = null;
 
     this.syncDrawingLayer(); // a project may have loaded, or the label context changed, while this document was inactive
     this.redrawOverlay();
@@ -3044,6 +3064,7 @@ export class SketchScene {
   /** Replaces the free riser anchors of the shown page. A ring is not an edit, so this never marks the document dirty. */
   setRiserAnchors(anchors: ReadonlyArray<RiserAnchor>): void {
     this.riserAnchors = [...anchors];
+    if (this.selectedRiserAnchorId !== null && !this.riserAnchors.some((anchor) => anchor.riserId === this.selectedRiserAnchorId)) this.selectedRiserAnchorId = null;
     this.riserAnchorRefusal = null;
     this.redrawOverlay();
   }
@@ -3057,6 +3078,56 @@ export class SketchScene {
     if (this.riserAnchors.length === 0) return [];
     const state = this.doc.drawingHistory.getState();
     return visibleRiserAnchors(this.riserAnchors, onPage(Object.values(state.segments), this.doc.pageIndex));
+  }
+
+  /** The visible riser ring under the point (inside the ring disk plus 4 screen px), or null. */
+  hitRiserAnchor(world: Vec2): RiserAnchor | null {
+    const hitRadius = FITTING_MARKER_RADIUS_WORLD + 8 / this.world.scale.x + 4 / this.world.scale.x;
+    return anchorAtPoint(world, this.getVisibleRiserAnchors(), hitRadius);
+  }
+
+  /** Selects one visible ring (riserId) or clears the ring selection (null). Idempotent; redraws the overlay only on change. */
+  selectRiserAnchor(riserId: string | null): void {
+    if (this.selectedRiserAnchorId === riserId) return;
+    this.selectedRiserAnchorId = riserId;
+    this.redrawOverlay();
+  }
+
+  getSelectedRiserAnchorId(): string | null {
+    return this.selectedRiserAnchorId;
+  }
+
+  /** The id of the fitting at the ring when one exists on the shown page, else the id the next new fitting gets. */
+  riserAnchorFittingId(anchor: RiserAnchor): string {
+    const state = this.doc.drawingHistory.getState();
+    const existing = onPage(Object.values(state.fittings), this.doc.pageIndex).find((fitting) => Math.hypot(fitting.position.x - anchor.anchorPt.x, fitting.position.y - anchor.anchorPt.y) <= 0.5);
+    return existing ? existing.id : `fitting-${this.doc.nextFittingSeq}`;
+  }
+
+  /** Turns the ring into a riser fitting (created when none exists there) and arms draw-segment from it. Returns the fitting id. */
+  drawFromRiserAnchor(anchor: RiserAnchor, fittingId?: string): string {
+    const id = fittingId ?? this.riserAnchorFittingId(anchor);
+    if (!this.doc.drawingHistory.getState().fittings[id]) {
+      if (fittingId === undefined) {
+        this.doc.nextFittingSeq++;
+      } else {
+        const seq = /^fitting-(\d+)$/.exec(fittingId);
+        if (seq) this.doc.nextFittingSeq = Math.max(this.doc.nextFittingSeq, Number(seq[1]) + 1);
+      }
+      const fitting: Fitting = { id, pageIndex: this.doc.pageIndex, position: { x: anchor.anchorPt.x, y: anchor.anchorPt.y }, kind: 'junction' };
+      this.doc.drawingHistory.execute(createFittingCommand(fitting));
+    }
+    this.riserMarks = new Map(this.riserMarks).set(id, {
+      riserId: anchor.riserId,
+      name: anchor.label,
+      networkTypeId: anchor.networkTypeId,
+      anchorPt: { x: anchor.anchorPt.x, y: anchor.anchorPt.y },
+    });
+    this.selectedRiserAnchorId = null;
+    this.syncDrawingLayer();
+    this.markDirty();
+    this.armSegmentStartFromTarget({ kind: 'fitting', fittingId: id }, { x: anchor.anchorPt.x, y: anchor.anchorPt.y });
+    return id;
   }
 
   private setRiserAnchorRefusal(refusal: { riserId: string; text: string } | null): void {
@@ -5527,6 +5598,10 @@ export class SketchScene {
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
 
+    if (event.key === 'Escape' && this.tool === 'select' && this.selectedRiserAnchorId !== null) {
+      this.selectRiserAnchor(null);
+      return;
+    }
     if (event.key === 'Escape') {
       this.toolMap.get(this.tool)?.onKeyDown?.(this.ctx, event);
       return;
@@ -6096,6 +6171,8 @@ export class SketchScene {
     for (const anchor of visibleAnchors) {
       const color = this.riserAnchorRefusal?.riserId === anchor.riserId ? RISER_ANCHOR_REFUSED_COLOR : RISER_MARK_COLOR;
       const radius = FITTING_MARKER_RADIUS_WORLD + 8 / this.world.scale.x;
+      const selected = this.selectedRiserAnchorId === anchor.riserId;
+      if (selected) this.overlay.circle(anchor.anchorPt.x, anchor.anchorPt.y, radius).fill({ color, alpha: 0.15 });
       for (let dash = 0; dash < 12; dash++) {
         const start = (dash * 30 * Math.PI) / 180;
         const end = start + (15 * Math.PI) / 180;
@@ -6103,7 +6180,7 @@ export class SketchScene {
           .moveTo(anchor.anchorPt.x + radius * Math.cos(start), anchor.anchorPt.y + radius * Math.sin(start))
           .arc(anchor.anchorPt.x, anchor.anchorPt.y, radius, start, end);
       }
-      this.overlay.stroke({ width: 2.5 / this.world.scale.x, color });
+      this.overlay.stroke({ width: (selected ? 4.5 : 2.5) / this.world.scale.x, color });
     }
     const refusal = this.riserAnchorRefusal;
     const refusedAnchor = refusal ? visibleAnchors.find((anchor) => anchor.riserId === refusal.riserId) : undefined;
