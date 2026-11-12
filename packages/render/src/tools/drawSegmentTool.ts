@@ -18,6 +18,7 @@ import { createFittingCommand, createSegmentCommand, deleteSegmentCommand } from
 import type { AlignmentGuide } from './alignmentGuides.js';
 import { resolveSnappedPoint } from './dragSnap.js';
 import { anchorAtPoint, decideAnchorEnd, type RiserAnchor } from '../riserAnchors.js';
+import { networkTypeForSegmentFromFitting } from '../riserMarks.js';
 import type { Tool, ToolContext } from './types.js';
 
 export interface DrawEndpointResolution {
@@ -48,6 +49,8 @@ export class DrawSegmentTool implements Tool {
   private guides: AlignmentGuide[] = [];
   /** Id of the most recently committed segment in the chain currently being drawn — governs fitting visibility alongside the current selection. Cleared whenever the chain stops being "in progress": natural end, Escape-finish, or switching tools. */
   private activeChainAnchorId: string | null = null;
+  /** Network type of the chain being drawn when its start is an existing fitting (see inheritFrom). The whole chain keeps it. Null when the start is free-space drawing: the active type applies. */
+  private startNetworkTypeId: string | null = null;
 
   getPendingStart(): DrawEndpointResolution | null {
     return this.pendingStart;
@@ -74,7 +77,7 @@ export class DrawSegmentTool implements Tool {
     if (this.pendingStart) this.pendingCursor = point;
     this.guides = guides;
     const ring = this.pendingStart ? this.ringAt(ctx, point) : null;
-    const decision = ring ? decideAnchorEnd(ring, ctx.getActiveNetworkTypeId(), ctx.doc.networkTypes.find((t) => t.id === ctx.getActiveNetworkTypeId())?.name ?? ctx.getActiveNetworkTypeId()) : null;
+    const decision = ring ? decideAnchorEnd(ring, this.drawingNetworkTypeId(ctx), ctx.doc.networkTypes.find((t) => t.id === this.drawingNetworkTypeId(ctx))?.name ?? this.drawingNetworkTypeId(ctx)) : null;
     ctx.setRiserAnchorRefusal(decision?.kind === 'blocked' ? { riserId: decision.anchor.riserId, text: decision.text } : null);
     ctx.redrawOverlay();
   }
@@ -86,6 +89,7 @@ export class DrawSegmentTool implements Tool {
       this.pendingCursor = null;
       this.guides = [];
       this.activeChainAnchorId = null;
+      this.startNetworkTypeId = null;
       ctx.setRiserAnchorRefusal(null);
       ctx.syncDrawingLayer();
       ctx.redrawOverlay();
@@ -100,6 +104,7 @@ export class DrawSegmentTool implements Tool {
     this.pendingCursor = null;
     this.guides = [];
     this.activeChainAnchorId = null;
+    this.startNetworkTypeId = null;
     ctx?.setRiserAnchorRefusal(null);
   }
 
@@ -113,7 +118,7 @@ export class DrawSegmentTool implements Tool {
     const { point: snappedWorld } = resolveSnappedPoint(world, { ctx, kind: 'draw-segment', anchor: this.pendingStart?.worldPosition, shiftKey });
     this.guides = [];
     const ring = this.pendingStart ? this.ringAt(ctx, snappedWorld) : null;
-    const decision = ring ? decideAnchorEnd(ring, ctx.getActiveNetworkTypeId(), ctx.doc.networkTypes.find((t) => t.id === ctx.getActiveNetworkTypeId())?.name ?? ctx.getActiveNetworkTypeId()) : null;
+    const decision = ring ? decideAnchorEnd(ring, this.drawingNetworkTypeId(ctx), ctx.doc.networkTypes.find((t) => t.id === this.drawingNetworkTypeId(ctx))?.name ?? this.drawingNetworkTypeId(ctx)) : null;
     if (decision?.kind === 'blocked') {
       ctx.setRiserAnchorRefusal({ riserId: decision.anchor.riserId, text: decision.text });
       ctx.redrawOverlay();
@@ -127,6 +132,11 @@ export class DrawSegmentTool implements Tool {
 
     if (!this.pendingStart) {
       this.pendingStart = resolved;
+      if (target.kind === 'existing') {
+        this.inheritFrom(ctx, resolved.point);
+      } else {
+        this.startNetworkTypeId = null;
+      }
       ctx.activateRoutingTargetOf(resolved.point);
       ctx.redrawOverlay();
       return;
@@ -134,11 +144,13 @@ export class DrawSegmentTool implements Tool {
 
     const start = this.pendingStart;
     this.pendingStart = null;
+    const networkTypeId = this.drawingNetworkTypeId(ctx);
+    ctx.adoptNetworkTypes([networkTypeId]);
 
     const newSegment: Segment = {
       id: `segment-${ctx.doc.nextSegmentSeq++}`,
       pageIndex: ctx.activePage(),
-      networkTypeId: ctx.getActiveNetworkTypeId(),
+      networkTypeId,
       shape: 'round',
       diameter: 200,
       endpointA: start.point,
@@ -157,11 +169,25 @@ export class DrawSegmentTool implements Tool {
       ctx.emit('riserAttachRequested', { riserId: joinAnchor.riserId, fittingId: resolved.point.fittingId, segmentId: newSegment.id, anchorPt: { x: joinAnchor.anchorPt.x, y: joinAnchor.anchorPt.y } });
     }
     this.pendingStart = this.chainContinuationFrom(resolved, state.stamps);
+    if (!this.pendingStart) this.startNetworkTypeId = null;
     this.pendingCursor = null;
     this.activeChainAnchorId = this.pendingStart ? newSegment.id : null;
     ctx.syncDrawingLayer();
     ctx.markDirty();
     ctx.redrawOverlay();
+  }
+
+  private drawingNetworkTypeId(ctx: ToolContext): string {
+    return this.startNetworkTypeId ?? ctx.getActiveNetworkTypeId();
+  }
+
+  /** Sets startNetworkTypeId from a start point: an existing fitting gives its network type (see networkTypeForSegmentFromFitting); any other point clears it. */
+  private inheritFrom(ctx: ToolContext, point: ConnectionPoint): void {
+    if (point.kind !== 'fitting') {
+      this.startNetworkTypeId = null;
+      return;
+    }
+    this.startNetworkTypeId = networkTypeForSegmentFromFitting(ctx.doc.drawingHistory.getState(), point.fittingId, ctx.getRiserMarks(), ctx.getActiveNetworkTypeId());
   }
 
   private ringAt(ctx: ToolContext, point: Vec2): RiserAnchor | null {
@@ -229,6 +255,7 @@ export class DrawSegmentTool implements Tool {
   armStartFromTarget(ctx: ToolContext, point: ConnectionPoint, worldPosition: Vec2): void {
     this.activeChainAnchorId = null;
     this.pendingStart = { point, worldPosition };
+    this.inheritFrom(ctx, point);
     this.pendingCursor = null;
     this.guides = [];
     ctx.activateRoutingTargetOf(point);

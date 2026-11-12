@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CommandManager, Transaction, splitSegmentAtFitting, type Fitting, type Segment, type Vec2 } from '@mepapp/core';
 import type { DrawingState } from './document.js';
-import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserMark } from './riserMarks.js';
+import { fittingContextIn, moveFittingInState, networkTypeForSegmentFromFitting, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type RiserMark } from './riserMarks.js';
 
 function fitting(id: string, position: Vec2, pageIndex = 0, routedBy?: 'route'): Fitting {
   return { id, pageIndex, position, kind: 'junction', ...(routedBy ? { routedBy } : {}) };
@@ -248,5 +248,51 @@ describe('fittingContextIn', () => {
   it('does not count a segment that ends at another fitting', () => {
     const state = makeState({ segments: { s1: segmentAt('s1', 'supply-air', at('f2'), at('f3')) } });
     expect(fittingContextIn(state, 'f1')).toEqual({ position: { x: 100, y: 100 }, segmentCount: 0, networkTypeIds: [] });
+  });
+});
+
+describe('networkTypeForSegmentFromFitting', () => {
+  function segmentAt(id: string, networkTypeId: string, endpointA: Segment['endpointA'], endpointB: Segment['endpointB']): Segment {
+    return { ...makeState().segments.s1, id, networkTypeId, endpointA, endpointB };
+  }
+  const at = (fittingId: string) => ({ kind: 'fitting' as const, fittingId });
+  const noMarks = new Map<string, RiserMark>();
+  const withF3 = (): DrawingState['fittings'] => ({ f1: fitting('f1', { x: 100, y: 100 }), f2: fitting('f2', { x: 300, y: 100 }), f3: fitting('f3', { x: 50, y: 50 }) });
+
+  it('takes the type of the segment at the fitting over the active type', () => {
+    const state = makeState({ segments: { s1: segmentAt('s1', 'supply-air', at('f1'), at('f2')) } });
+    expect(networkTypeForSegmentFromFitting(state, 'f1', noMarks, 'return-air')).toBe('supply-air');
+  });
+
+  it('takes the first-seen type when the fitting has segments of two types', () => {
+    const state = makeState({
+      fittings: withF3(),
+      segments: {
+        s1: segmentAt('s1', 'supply-air', at('f1'), at('f2')),
+        s2: segmentAt('s2', 'return-air', at('f1'), at('f3')),
+      },
+    });
+    expect(networkTypeForSegmentFromFitting(state, 'f1', noMarks, 'return-air')).toBe('supply-air');
+  });
+
+  it('takes the active type for a fitting with no segment and no mark', () => {
+    const state = makeState({ fittings: withF3() });
+    expect(networkTypeForSegmentFromFitting(state, 'f3', noMarks, 'supply-air')).toBe('supply-air');
+  });
+
+  it('takes the riser mark type for a fitting with no segment', () => {
+    const state = makeState({ fittings: withF3() });
+    const marks = new Map<string, RiserMark>([['f3', { riserId: 'R3', name: 'R3', networkTypeId: 'return-air', anchorPt: { x: 50, y: 50 } }]]);
+    expect(networkTypeForSegmentFromFitting(state, 'f3', marks, 'supply-air')).toBe('return-air');
+  });
+
+  it('takes the segment type over the riser mark type', () => {
+    const state = makeState({ segments: { s1: segmentAt('s1', 'supply-air', at('f1'), at('f2')) } });
+    const marks = new Map<string, RiserMark>([['f1', { riserId: 'R1', name: 'R1', networkTypeId: 'return-air', anchorPt: { x: 100, y: 100 } }]]);
+    expect(networkTypeForSegmentFromFitting(state, 'f1', marks, 'return-air')).toBe('supply-air');
+  });
+
+  it('takes the active type for a missing fitting', () => {
+    expect(networkTypeForSegmentFromFitting(makeState(), 'missing', noMarks, 'return-air')).toBe('return-air');
   });
 });

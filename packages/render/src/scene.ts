@@ -956,6 +956,7 @@ export class SketchScene {
       getSnapLines: () => self.currentSnapLines(),
       getActiveNetworkTypeId: () => self.activeNetworkTypeId,
       activateRoutingTargetOf: (point) => self.activateRoutingTargetOf(point),
+      adoptNetworkTypes: (ids) => self.adoptNetworkTypes(ids),
       getSnapRadiusScreenPx: () => self.snapRadiusScreenPx,
       getAngleSnapDegrees: () => self.angleSnapDegrees,
       activePage: () => self.doc.pageIndex,

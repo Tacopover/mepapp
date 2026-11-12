@@ -107,3 +107,11 @@ export function fittingContextIn(state: DrawingState, fittingId: string): Fittin
   }
   return { position: fitting.position, segmentCount, networkTypeIds };
 }
+
+/** The network type of a segment that starts at a fitting: the first-seen type of the segments at the fitting, else the type of its riser mark, else the active type. A missing fitting gives the active type. */
+export function networkTypeForSegmentFromFitting(state: DrawingState, fittingId: string, marks: ReadonlyMap<string, RiserMark>, activeNetworkTypeId: string): string {
+  const context = fittingContextIn(state, fittingId);
+  if (!context) return activeNetworkTypeId;
+  if (context.segmentCount > 0) return context.networkTypeIds[0];
+  return marks.get(fittingId)?.networkTypeId ?? activeNetworkTypeId;
+}
