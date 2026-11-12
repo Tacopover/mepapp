@@ -117,6 +117,12 @@ export function detachAction(file: BuildingFile, riserId: string, sheet: Buildin
   return { ok: true, file: detachMember(file, riserId, sheet.id), message: `${riser.name} detached from ${levelNameOf(file, sheet)}.` };
 }
 
+/** Undo removed the fitting of a riser member: detach that member like detachAction (last member deletes the riser). Null when the fitting is no member on the sheet. */
+export function undoAttachAction(file: BuildingFile, sheet: BuildingSheet, fittingId: string): RiserActionResult | null {
+  const riser = riserOfFitting(file, sheet.id, fittingId);
+  return riser === null ? null : detachAction(file, riser.id, sheet);
+}
+
 /** Delete the riser. message = `${label} deleted. Its fittings stay on the sheets.` Unknown riser -> ok:false text 'This riser does not exist any more.' */
 export function deleteRiserAction(file: BuildingFile, riserId: string): RiserActionResult {
   const riser = file.risers.find((candidate) => candidate.id === riserId);

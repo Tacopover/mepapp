@@ -39,6 +39,7 @@ import {
   type RiserConflictInfo,
   type RiserMenuModel,
   type ShownPage,
+  undoAttachAction,
 } from './riserActions.js';
 
 export interface RiserMenuState {
@@ -476,8 +477,19 @@ export function useBuildingRisers(args: {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
     const onMoved = (info: { fittingId: string; to: Vec2 }) => syncMove(info.fittingId, info.to);
-    const onChanged = (info: { fittingId: string; to: Vec2 | null }) => {
-      if (info.to !== null) syncMove(info.fittingId, info.to);
+    const onChanged = (info: { fittingId: string; to: Vec2 | null; cause: 'undo' | 'redo' }) => {
+      if (info.to !== null) {
+        syncMove(info.fittingId, info.to);
+        return;
+      }
+      if (info.cause !== 'undo') return;
+      guard(() =>
+        commit((current) => {
+          const onSheet = live.current.sheet;
+          const result = onSheet === null ? null : undoAttachAction(current, onSheet, info.fittingId);
+          return result === null ? { file: current, notice: null } : fromResult(current, result);
+        }),
+      );
     };
     scene.on('riserFittingMoved', onMoved);
     scene.on('riserFittingChanged', onChanged);

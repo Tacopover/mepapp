@@ -44,6 +44,7 @@ import {
   riserMenuModel,
   riserOfFitting,
   type ShownPage,
+  undoAttachAction,
 } from './riserActions.js';
 
 const ppmm = calibrationFromScale(100).pageUnitsPerRealUnit;
@@ -302,6 +303,35 @@ describe('detachAction', () => {
     const file = addRiser(baseFile(), 'r1', 'Supply riser 1', 's0', 'f0');
     expect(detachAction(file, 'nope', sheetOf(file, 's0'))).toEqual({ ok: false, text: 'This fitting is not part of a riser.' });
     expect(detachAction(file, 'r1', sheetOf(file, 's2'))).toEqual({ ok: false, text: 'This fitting is not part of a riser.' });
+  });
+});
+
+describe('undoAttachAction', () => {
+  it('detaches the member of the sheet and keeps the riser when other members stay', () => {
+    const first = addRiser(baseFile(), 'r1', 'Supply riser 1', 's0', 'f0');
+    const file = ok(attachMember(first, 'r1', { levelId: 'l1', sheetId: 's1', pageIndex: 0, fittingId: 'f1' }, { first: frame, this: frame })).file;
+    const result = undoAttachAction(file, sheetOf(file, 's1'), 'f1');
+    expect(result?.ok).toBe(true);
+    if (result === null || !result.ok) return;
+    expect(riserById(result.file, 'r1').members.map((member) => member.sheetId)).toEqual(['s0']);
+    expect(result.message).toBe('Supply riser 1 detached from Ground.');
+  });
+
+  it('deletes the riser when the fitting is the sole member', () => {
+    const file = addRiser(baseFile(), 'r1', 'Supply riser 1', 's1', 'f1');
+    const result = undoAttachAction(file, sheetOf(file, 's1'), 'f1');
+    expect(result?.ok && result.file.risers).toEqual([]);
+    expect(result?.ok && result.message).toBe('Supply riser 1 deleted. Its fittings stay on the sheets.');
+  });
+
+  it('returns null for a fitting that is no member', () => {
+    const file = addRiser(baseFile(), 'r1', 'Supply riser 1', 's1', 'f1');
+    expect(undoAttachAction(file, sheetOf(file, 's1'), 'other')).toBeNull();
+  });
+
+  it('returns null for a fitting id that is a member on another sheet', () => {
+    const file = addRiser(baseFile(), 'r1', 'Supply riser 1', 's1', 'f1');
+    expect(undoAttachAction(file, sheetOf(file, 's0'), 'f1')).toBeNull();
   });
 });
 
