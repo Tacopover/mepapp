@@ -2211,6 +2211,80 @@ button.mep-tree-arrow {
   font-size: 12px;
   color: var(--muted);
 }
+.mep-modal--scale-change {
+  box-sizing: border-box;
+  width: min(600px, calc(100vw - 32px));
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+.mep-modal--scale-change .mep-modal-actions {
+  flex-wrap: wrap;
+}
+.mep-modal--scale-change .mep-scale-rows {
+  display: flex;
+  flex-direction: column;
+  max-height: 40vh;
+  overflow: auto;
+  margin: 8px 0;
+}
+.mep-modal--scale-change .mep-scale-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px 64px;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line, #d8dee2);
+}
+.mep-modal--scale-change .mep-scale-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mep-modal--scale-change .mep-scale-open {
+  text-align: right;
+  white-space: nowrap;
+}
+.mep-modal--scale-change .mep-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mep-modal--scale-change .mep-modal-actions button {
+  white-space: nowrap;
+}
+.mep-modal--scale-change .mep-modal-actions button.primary {
+  background: #0b4f8a;
+  color: #fff;
+  border-color: #0b4f8a;
+}
+.mep-modal--scale-change .mep-modal-actions button.primary:hover {
+  background: #093f6f;
+  border-color: #093f6f;
+}
+.mep-modal--scale-change button:focus-visible {
+  outline: 2px solid #0b4f8a;
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .mep-modal--scale-change .mep-scale-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .mep-scale-name {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .mep-scale-open {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .mep-scale-change {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .mep-modal--scale-change .mep-scale-change {
+    grid-column: 1 / -1;
+  }
+}
 .mep-modal--full {
   width: min(1400px, 97vw);
   max-width: min(1400px, 97vw);

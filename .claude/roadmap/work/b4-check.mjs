@@ -116,7 +116,7 @@ const decideLater = async () => {
 
 // --- setup: the two fixtures, different scales ---
 const uuid = {};
-for (const [key, file, name, y, scale] of [['ground', '00_arch_ground_floor.pdf', 'ground.pdf', 400, 0.01], ['first', '01_arch_first_floor.pdf', 'first.pdf', 600, 0.011]]) {
+for (const [key, file, name, y, scale] of [['ground', '00_arch_ground_floor.pdf', 'ground.pdf', 400, 0.01], ['first', '01_arch_first_floor.pdf', 'first.pdf', 600, 0.01]]) {
   await t.openPdf(W + file, name);
   await setType('Supply air', 'supply-air', '#1f77b4');
   await drawSeg({ x: 300, y }, { x: 500, y });
@@ -241,7 +241,7 @@ await switchTo('ground.pdf');
 
 // --- 5. Conflict dialog: a new scale on level 1 ---
 {
-  await page.evaluate(() => window.__mepSketchScene.setCalibration({ pageUnitsPerRealUnit: 0.012 }));
+  await page.evaluate(() => window.__mepSketchScene.applyCalibration({ pageUnitsPerRealUnit: 0.012 }));
   let seen = false;
   try { await dlg.waitFor({ state: 'visible', timeout: 5000 }); seen = true; } catch {}
   check(seen, 'conflict dialog opens after a new scale');

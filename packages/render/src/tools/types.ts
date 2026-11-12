@@ -1,5 +1,5 @@
 import type { FederatedPointerEvent, Sprite, Texture } from 'pixi.js';
-import type { AnnotationGeometry, ConnectionPoint, PlacedStamp, RoomPolygon, SnapLines, StampDefinition, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
+import type { AnnotationGeometry, Calibration, ConnectionPoint, PlacedStamp, RoomPolygon, SnapLines, StampDefinition, Transaction, Transform2D, Vec2, VertexRef } from '@mepapp/core';
 import type { AlignmentGuide } from './alignmentGuides.js';
 import type { RiserMark } from '../riserMarks.js';
 import type { RiserAnchor } from '../riserAnchors.js';
@@ -123,6 +123,8 @@ export interface ToolContext {
 
   setTool(tool: SketchTool): void;
   markDirty(): void;
+  /** Sets the calibration of the shown page through the scene's guard. False when the guard held it. */
+  requestCalibration(calibration: Calibration): boolean;
   /** `live`: a drag step — see SketchScene.syncDrawingLayer. The drag's onEnd must then run a full sync. */
   syncDrawingLayer(live?: boolean): void;
   redrawOverlay(): void;
@@ -166,6 +168,8 @@ export interface ToolContext {
   selectRiserAnchor(riserId: string | null): void;
   /** Marks one anchor refused (its ring turns red and a tip shows `text`), or null to clear. */
   setRiserAnchorRefusal(refusal: { riserId: string; text: string } | null): void;
+  /** The refusal text when a segment may not be drawn into this riser ring (for example a scale mismatch), or null to allow. */
+  riserAttachRefusal(riserId: string): string | null;
 
   hitTest(worldPoint: Vec2): SelectableRef | null;
   selectableRefForId(id: string, state: DrawingState): SelectableRef;

@@ -46,21 +46,23 @@ export interface RiserMenuModel {
 
 export const NO_RISER_MENU: RiserMenuModel = { makeRiser: null, detach: false, deleteRiser: false };
 
-/** fittingContext null = the target is not a fitting. markedRiserId = the riser mark of that fitting on the shown page, or null. Rules, in order: file null or fittingContext null -> NO_RISER_MENU. markedRiserId set -> { makeRiser: null, detach: true, deleteRiser: true }. segmentCount 0 -> NO_RISER_MENU. Else makeRiser is shown, with disabledHint: sheet null -> HINT_NOT_IN_BUILDING; else hasScale false -> HINT_NO_SCALE; else networkTypeIds.length > 1 -> HINT_TWO_TYPES; else null. detach and deleteRiser false. */
+/** fittingContext null = the target is not a fitting. markedRiserId = the riser mark of that fitting on the shown page, or null. scaleHint = a refusal text from makeRiserScaleHint, or null. Rules, in order: file null or fittingContext null -> NO_RISER_MENU. markedRiserId set -> { makeRiser: null, detach: true, deleteRiser: true }. segmentCount 0 -> NO_RISER_MENU. Else makeRiser is shown, with disabledHint: sheet null -> HINT_NOT_IN_BUILDING; else hasScale false -> HINT_NO_SCALE; else a non-empty scaleHint -> scaleHint; else networkTypeIds.length > 1 -> HINT_TWO_TYPES; else null. detach and deleteRiser false. */
 export function riserMenuModel(args: {
   file: BuildingFile | null;
   sheet: BuildingSheet | null;
   hasScale: boolean;
   fittingContext: { segmentCount: number; networkTypeIds: string[] } | null;
   markedRiserId: string | null;
+  scaleHint?: string | null;
 }): RiserMenuModel {
-  const { file, sheet, hasScale, fittingContext, markedRiserId } = args;
+  const { file, sheet, hasScale, fittingContext, markedRiserId, scaleHint } = args;
   if (file === null || fittingContext === null) return NO_RISER_MENU;
   if (markedRiserId !== null) return { makeRiser: null, detach: true, deleteRiser: true };
   if (fittingContext.segmentCount === 0) return NO_RISER_MENU;
   let disabledHint: string | null = null;
   if (sheet === null) disabledHint = HINT_NOT_IN_BUILDING;
   else if (!hasScale) disabledHint = HINT_NO_SCALE;
+  else if (scaleHint) disabledHint = scaleHint;
   else if (fittingContext.networkTypeIds.length > 1) disabledHint = HINT_TWO_TYPES;
   return { makeRiser: { disabledHint }, detach: false, deleteRiser: false };
 }
@@ -350,7 +352,6 @@ export interface RiserConflictInfo {
   riserId: string; fittingId: string; label: string; levelName: string;
   distanceMm: number; fittingPt: Vec2; anchorPt: Vec2;
 }
-export const CONFLICT_SCALE_NOTE = 'A new scale on a page moves every riser on that page into this state.';
 export const CONFLICT_MOVE_HELP = 'Move the riser here: the riser and all other levels follow this fitting.';
 export const CONFLICT_SNAP_HELP = 'Snap back: this fitting returns to the building position.';
 

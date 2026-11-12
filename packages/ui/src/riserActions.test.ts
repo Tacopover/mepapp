@@ -22,7 +22,6 @@ import {
   buildRiserAnchors,
   buildRiserMarks,
   CONFLICT_MOVE_HELP,
-  CONFLICT_SCALE_NOTE,
   CONFLICT_SNAP_HELP,
   conflictBody,
   conflictLaterText,
@@ -190,6 +189,21 @@ describe('riserMenuModel', () => {
       markedRiserId: null,
     });
     expect(model).toEqual({ makeRiser: { disabledHint: HINT_TWO_TYPES }, detach: false, deleteRiser: false });
+  });
+
+  it('greys make riser with the scale hint before the two-types hint', () => {
+    const scaleHint = 'Make riser is not possible here: the scale of Basement differs from Ground.';
+    const model = riserMenuModel({ file: baseFile(), sheet, hasScale: true, fittingContext: segmentRun, markedRiserId: null, scaleHint });
+    expect(model).toEqual({ makeRiser: { disabledHint: scaleHint }, detach: false, deleteRiser: false });
+    const twoTypes = riserMenuModel({
+      file: baseFile(),
+      sheet,
+      hasScale: true,
+      fittingContext: { segmentCount: 2, networkTypeIds: ['vent', 'water'] },
+      markedRiserId: null,
+      scaleHint,
+    });
+    expect(twoTypes).toEqual({ makeRiser: { disabledHint: scaleHint }, detach: false, deleteRiser: false });
   });
 
   it('enables make riser when every check passes', () => {
@@ -727,7 +741,6 @@ describe('conflict helpers', () => {
   });
 
   it('has the exact texts', () => {
-    expect(CONFLICT_SCALE_NOTE).toBe('A new scale on a page moves every riser on that page into this state.');
     expect(CONFLICT_MOVE_HELP).toBe('Move the riser here: the riser and all other levels follow this fitting.');
     expect(CONFLICT_SNAP_HELP).toBe('Snap back: this fitting returns to the building position.');
     expect(conflictTitle('Supply riser 1')).toBe('Supply riser 1 is not at the building position');

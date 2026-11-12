@@ -937,6 +937,7 @@ export class SketchScene {
       pushRoomVerticesOut: (id, polygon, refs) => self.pushRoomVerticesOut(id, polygon, refs),
       splitRoomByLine: (a, b) => self.splitRoomByLine(a, b),
       markDirty: () => self.markDirty(),
+      requestCalibration: (calibration) => self.setCalibration(calibration),
       syncDrawingLayer: (live) => self.syncDrawingLayer(live),
       redrawOverlay: () => self.redrawOverlay(),
       emit: (event, ...args) => (self.emitter.emit as (event: string, ...args: unknown[]) => void)(event, ...args),
@@ -947,6 +948,7 @@ export class SketchScene {
       hitRiserAnchor: (worldPoint) => self.hitRiserAnchor(worldPoint),
       selectRiserAnchor: (riserId) => self.selectRiserAnchor(riserId),
       setRiserAnchorRefusal: (refusal) => self.setRiserAnchorRefusal(refusal),
+      riserAttachRefusal: (riserId) => self.riserAttachGuard?.(riserId) ?? null,
       hitTest: (worldPoint) => self.hitTest(worldPoint),
       selectableRefForId: (id, state) => self.selectableRefForId(id, state),
       resolveSelectableBoundsWorld: (ref, state) => self.resolveSelectableBoundsWorld(ref, state),
@@ -1086,6 +1088,11 @@ export class SketchScene {
 
   off<K extends keyof SketchSceneEvents>(event: K, listener: Listener<SketchSceneEvents[K]>): void {
     this.emitter.off(event, listener);
+  }
+
+  /** The tool that receives pointer and key input now. */
+  getTool(): SketchTool {
+    return this.tool;
   }
 
   setTool(tool: SketchTool): void {
@@ -2478,11 +2485,58 @@ export class SketchScene {
     return this.doc.calibrations.get(pageIndex) ?? null;
   }
 
-  /** Sets the calibration of the shown page directly (e.g. from a chosen drawing scale), without the two-click calibrate tool. */
-  setCalibration(calibration: Calibration): void {
+  private calibrationGuard: ((next: Calibration, previous: Calibration | null) => boolean) | null = null;
+
+  /** The guard runs before every scale change of the shown page (picker, calibrate tool). It returns false to hold the change; the caller then applies it later with applyCalibration. */
+  setCalibrationGuard(guard: ((next: Calibration, previous: Calibration | null) => boolean) | null): void {
+    this.calibrationGuard = guard;
+  }
+
+  private riserAttachGuard: ((riserId: string) => string | null) | null = null;
+
+  /** The guard runs before a segment is drawn into a riser ring. It returns a refusal text (the segment is not drawn), or null to allow. */
+  setRiserAttachGuard(guard: ((riserId: string) => string | null) | null): void {
+    this.riserAttachGuard = guard;
+  }
+
+  /** Sets the calibration of the shown page directly (e.g. from a chosen drawing scale), without the two-click calibrate tool. Runs the guard first. Returns false when the guard held the change (nothing changed), true when it was applied. */
+  setCalibration(calibration: Calibration): boolean {
+    if (this.calibrationGuard && !this.calibrationGuard(calibration, this.getCalibration())) return false;
+    this.applyCalibration(calibration);
+    return true;
+  }
+
+  /** Applies the calibration of the shown page with no guard. */
+  applyCalibration(calibration: Calibration): void {
     this.doc.calibration = calibration;
     this.markDirty();
     this.emitter.emit('calibrationSet', calibration);
+  }
+
+  /** The calibration of page `pageIndex` of the open document `docId` (any page, shown or not). Null when the document is not open or the page has none. */
+  getDocumentCalibration(docId: string, pageIndex: number): Calibration | null {
+    const target = this.documents.find((d) => d.id === docId);
+    if (!target) return null;
+    return target.calibrations.get(pageIndex) ?? null;
+  }
+
+  /** The size in pt of page `pageIndex` of the open document `docId`, as displayed. Null when the document is not open, shows another page, or has no backdrop. Does not need a calibration. */
+  getDocumentPageSize(docId: string, pageIndex: number): { widthPt: number; heightPt: number } | null {
+    const target = this.documents.find((d) => d.id === docId);
+    if (!target || target.pageIndex !== pageIndex) return null;
+    const sprite = target.backdropSprite;
+    if (!sprite) return null;
+    return { widthPt: sprite.width, heightPt: sprite.height };
+  }
+
+  /** Sets the calibration of page `pageIndex` of the open document `docId` with no guard. Marks that document dirty. When it is the active document and the shown page, also emits 'calibrationSet'. False when the document is not open. */
+  setCalibrationIn(docId: string, pageIndex: number, calibration: Calibration): boolean {
+    const target = this.documents.find((d) => d.id === docId);
+    if (!target) return false;
+    target.calibrations.set(pageIndex, calibration);
+    this.markDocumentDirty(target);
+    if (target === this.doc && pageIndex === this.doc.pageIndex) this.emitter.emit('calibrationSet', calibration);
+    return true;
   }
 
   private snapLinesKey(): string {

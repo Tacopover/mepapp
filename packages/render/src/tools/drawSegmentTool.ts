@@ -124,6 +124,14 @@ export class DrawSegmentTool implements Tool {
       ctx.redrawOverlay();
       return;
     }
+    if (decision?.kind === 'join') {
+      const refusal = ctx.riserAttachRefusal(decision.anchor.riserId);
+      if (refusal !== null) {
+        ctx.setRiserAnchorRefusal({ riserId: decision.anchor.riserId, text: refusal });
+        ctx.redrawOverlay();
+        return;
+      }
+    }
     const joinAnchor = decision?.kind === 'join' && !fittings.some((f) => Math.hypot(f.position.x - decision.anchor.anchorPt.x, f.position.y - decision.anchor.anchorPt.y) <= 0.5) ? decision.anchor : null;
     const target = joinAnchor
       ? { kind: 'new-fitting' as const, worldPosition: { x: joinAnchor.anchorPt.x, y: joinAnchor.anchorPt.y } }

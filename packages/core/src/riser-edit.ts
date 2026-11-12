@@ -164,6 +164,13 @@ export function deleteRiser(file: BuildingFile, riserId: string): BuildingFile {
   return { ...file, risers: file.risers.filter((riser) => riser.id !== riserId) };
 }
 
+/** Removes the risers with those ids. Unknown ids are ignored. No riser removed: file is the same object. */
+export function deleteRisers(file: BuildingFile, riserIds: readonly string[]): BuildingFile {
+  const ids = new Set(riserIds);
+  if (!file.risers.some((riser) => ids.has(riser.id))) return file;
+  return { ...file, risers: file.risers.filter((riser) => !ids.has(riser.id)) };
+}
+
 /** toMm rounded to 0.01 mm (Math.round(v*100)/100, no -0). Sets riser.anchorMm to the rounded value. applyNow: one entry for each member that is in openSheetIds and is not fromSheetId (member order). Each member NOT in openSheetIds and not fromSheetId gets a pending op { seq, sheetId, kind: 'move', toMm: rounded } appended to riser.pending; seq = (largest seq in riser.pending, or 0) + 1, growing by 1 for each op. Unknown riser: file unchanged, applyNow []. */
 export function moveRiser(
   file: BuildingFile,
@@ -231,4 +238,65 @@ export function nextRiserLabel(file: BuildingFile, networkTypeName: string): str
   let n = 1;
   while (used.has(n)) n += 1;
   return `${prefix}${n}`;
+}
+
+/** The risers that have a member with that sheetId, in file order. */
+export function risersOnSheet(file: BuildingFile, sheetId: string): Riser[] {
+  return file.risers.filter((riser) => riser.members.some((member) => member.sheetId === sheetId));
+}
+
+/** The sheet ids that join sheetId through risers (a riser joins all its member sheets, chains are followed). sheetId is first, the others follow in file.sheets order. No riser: [sheetId]. */
+export function riserSheetGroup(file: BuildingFile, sheetId: string): string[] {
+  const joined = new Set<string>([sheetId]);
+  let grown = true;
+  while (grown) {
+    grown = false;
+    for (const riser of file.risers) {
+      const sheetIds = riser.members.map((member) => member.sheetId);
+      if (!sheetIds.some((id) => joined.has(id))) continue;
+      for (const id of sheetIds) {
+        if (!joined.has(id)) {
+          joined.add(id);
+          grown = true;
+        }
+      }
+    }
+  }
+  return [sheetId, ...file.sheets.map((sheet) => sheet.id).filter((id) => id !== sheetId && joined.has(id))];
+}
+
+/** pageUnitsPerRealUnit of the 'setScale' op of that sheet with the largest seq over all risers. No such op: null. */
+export function pendingScaleOf(file: BuildingFile, sheetId: string): number | null {
+  let latest: RiserPendingOp | undefined;
+  for (const riser of file.risers) {
+    for (const op of riser.pending) {
+      if (op.kind !== 'setScale' || op.sheetId !== sheetId) continue;
+      if (latest === undefined || op.seq > latest.seq) latest = op;
+    }
+  }
+  return latest?.pageUnitsPerRealUnit ?? null;
+}
+
+/** Stores a 'setScale' op for each sheet of sheetIds. First every 'setScale' op of that sheet is removed from every riser. Then each riser with a member on that sheet gets { seq, sheetId, kind: 'setScale', pageUnitsPerRealUnit } appended; seq = (largest seq in riser.pending, or 0) + 1, growing by 1 per op. A value that is not finite or not > 0: file unchanged. Nothing changed: file is the same object. */
+export function setPendingScale(file: BuildingFile, sheetIds: readonly string[], pageUnitsPerRealUnit: number): BuildingFile {
+  if (!Number.isFinite(pageUnitsPerRealUnit) || pageUnitsPerRealUnit <= 0) return file;
+  let risers = file.risers;
+  let changed = false;
+  for (const sheetId of sheetIds) {
+    risers = risers.map((riser) => {
+      const pending = riser.pending.filter((op) => op.kind !== 'setScale' || op.sheetId !== sheetId);
+      if (pending.length === riser.pending.length) return riser;
+      changed = true;
+      return { ...riser, pending };
+    });
+    risers = risers.map((riser) => {
+      if (!riser.members.some((member) => member.sheetId === sheetId)) return riser;
+      changed = true;
+      const seq = riser.pending.reduce((largest, op) => Math.max(largest, op.seq), 0) + 1;
+      const op: RiserPendingOp = { seq, sheetId, kind: 'setScale', pageUnitsPerRealUnit };
+      return { ...riser, pending: [...riser.pending, op] };
+    });
+  }
+  if (!changed) return file;
+  return { ...file, risers };
 }

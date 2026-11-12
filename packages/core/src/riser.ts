@@ -43,7 +43,9 @@ export interface RiserPendingOp {
   /** Unique in the riser, grows in array order. */
   seq: number;
   sheetId: string;
-  kind: 'move' | 'retag';
+  kind: 'move' | 'retag' | 'setScale';
   toMm?: { xMm: number; yMm: number };
   networkTypeId?: string;
+  /** setScale: pt per real mm, the same unit as Calibration.pageUnitsPerRealUnit. */
+  pageUnitsPerRealUnit?: number;
 }

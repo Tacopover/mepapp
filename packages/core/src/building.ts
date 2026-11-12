@@ -295,8 +295,13 @@ const validateRisers: Validator = (data) => {
           if (!isNonEmptyString(op.networkTypeId)) {
             issues.push({ path: `${opPath}.networkTypeId`, message: 'a retag needs a non-empty networkTypeId' });
           }
+        } else if (op.kind === 'setScale') {
+          const scale = op.pageUnitsPerRealUnit;
+          if (typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0) {
+            issues.push({ path: `${opPath}.pageUnitsPerRealUnit`, message: 'a setScale needs a positive pageUnitsPerRealUnit' });
+          }
         } else {
-          issues.push({ path: `${opPath}.kind`, message: 'kind must be move or retag' });
+          issues.push({ path: `${opPath}.kind`, message: 'kind must be move, retag or setScale' });
         }
       });
     }

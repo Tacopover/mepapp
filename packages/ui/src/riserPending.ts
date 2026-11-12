@@ -1,4 +1,4 @@
-import { findSheets, mmToPt, takePendingOps, type BuildingFile, type BuildingSheet, type NetworkType, type SheetSummary, type Vec2 } from '@mepapp/core';
+import { findSheets, mmToPt, pendingScaleOf, takePendingOps, type BuildingFile, type BuildingSheet, type NetworkType, type SheetSummary, type Vec2 } from '@mepapp/core';
 import { matchingMintedIds } from './adoptSheetId.js';
 
 export type PendingLink = 'id' | 'weak' | 'ambiguous';
@@ -10,6 +10,7 @@ export interface PendingPlan {
   edits: PendingEdit[];
   obsolete: PendingKey[];
   waiting: { reason: 'no-scale' | 'ambiguous'; labels: string[] } | null;
+  scale: { pageUnitsPerRealUnit: number; keys: PendingKey[] } | null;
   frameSource: 'scene' | 'summary' | null;
 }
 export interface PendingNotice { kind: 'info' | 'warning'; message: string }
@@ -19,9 +20,14 @@ export function hasPendingOps(file: BuildingFile, sheetId: string): boolean {
   return file.risers.some((riser) => riser.pending.some((op) => op.sheetId === sheetId));
 }
 
-/** True when a riser has a pending move on the sheet. */
+/** True when a riser has a pending move or a pending scale on the sheet. */
 export function hasPendingMove(file: BuildingFile, sheetId: string): boolean {
-  return file.risers.some((riser) => riser.pending.some((op) => op.sheetId === sheetId && op.kind === 'move'));
+  return file.risers.some((riser) => riser.pending.some((op) => op.sheetId === sheetId && (op.kind === 'move' || op.kind === 'setScale')));
+}
+
+/** True when a riser has a pending scale on the sheet. */
+export function hasPendingScale(file: BuildingFile, sheetId: string): boolean {
+  return file.risers.some((riser) => riser.pending.some((op) => op.sheetId === sheetId && op.kind === 'setScale'));
 }
 
 /** How the open document links to the sheet: 'id' (the id is known), 'weak' (file name and size only) or 'ambiguous' (two minted sheets could match). */
@@ -51,11 +57,23 @@ export function planPendingOps(file: BuildingFile, args: { sheet: BuildingSheet;
   const { sheet, link, frame } = args;
   const frameSource = frame?.source ?? null;
   const { ops } = takePendingOps(file, sheet.id);
-  if (ops.length === 0) return { edits: [], obsolete: [], waiting: null, frameSource };
+  if (ops.length === 0) return { edits: [], obsolete: [], waiting: null, scale: null, frameSource };
   if (link === 'ambiguous') {
     const labels = file.risers.filter((riser) => riser.pending.some((op) => op.sheetId === sheet.id)).map((riser) => riser.name);
-    return { edits: [], obsolete: [], waiting: { reason: 'ambiguous', labels: uniqueOf(labels) }, frameSource };
+    return { edits: [], obsolete: [], waiting: { reason: 'ambiguous', labels: uniqueOf(labels) }, scale: null, frameSource };
   }
+  const hasScale = hasPendingScale(file, sheet.id);
+  if (hasScale && frame === null) return { edits: [], obsolete: [], waiting: null, scale: null, frameSource };
+  const scaleValue = pendingScaleOf(file, sheet.id);
+  const scaleKeys: PendingKey[] = [];
+  for (const riser of file.risers) {
+    for (const op of riser.pending) {
+      if (op.sheetId === sheet.id && op.kind === 'setScale') scaleKeys.push({ riserId: riser.id, seq: op.seq });
+    }
+  }
+  const scale =
+    hasScale && scaleValue !== null && Number.isFinite(scaleValue) && scaleValue > 0 ? { pageUnitsPerRealUnit: scaleValue, keys: scaleKeys } : null;
+  const effective: PendingFrame | null = frame !== null && scale !== null ? { ...frame, pageUnitsPerRealUnit: scale.pageUnitsPerRealUnit } : frame;
   const edits: PendingEdit[] = [];
   const obsolete: PendingKey[] = [];
   const waitingLabels: string[] = [];
@@ -68,6 +86,9 @@ export function planPendingOps(file: BuildingFile, args: { sheet: BuildingSheet;
       for (const op of riserOps) obsolete.push(keyOf(op.seq));
       continue;
     }
+    for (const op of riserOps) {
+      if (op.kind === 'setScale' && (scale === null || !isPositiveScale(op.pageUnitsPerRealUnit))) obsolete.push(keyOf(op.seq));
+    }
     const moves = riserOps.filter((op) => op.kind === 'move');
     const moveTargets = moves.filter((op) => op.toMm !== undefined);
     for (const op of moves) {
@@ -75,7 +96,7 @@ export function planPendingOps(file: BuildingFile, args: { sheet: BuildingSheet;
     }
     const lastMove = moveTargets[moveTargets.length - 1];
     if (lastMove !== undefined) {
-      if (frame === null) {
+      if (effective === null) {
         waitingLabels.push(riser.name);
       } else {
         for (const op of moveTargets.slice(0, -1)) obsolete.push(keyOf(op.seq));
@@ -86,7 +107,7 @@ export function planPendingOps(file: BuildingFile, args: { sheet: BuildingSheet;
             label: riser.name,
             kind: 'move',
             fittingId: member.fittingId,
-            toPt: mmToPt(lastMove.toMm, { heightPt: frame.heightPt, ppmm: frame.pageUnitsPerRealUnit }),
+            toPt: mmToPt(lastMove.toMm, { heightPt: effective.heightPt, ppmm: effective.pageUnitsPerRealUnit }),
           });
         }
       }
@@ -113,11 +134,28 @@ export function planPendingOps(file: BuildingFile, args: { sheet: BuildingSheet;
       }
     }
   }
+  if (scale !== null && effective !== null) {
+    for (const riser of file.risers) {
+      const member = riser.members.find((candidate) => candidate.sheetId === sheet.id);
+      if (member === undefined) continue;
+      if (edits.some((edit) => edit.riserId === riser.id && edit.kind === 'move')) continue;
+      const lastScale = riser.pending.filter((op) => op.sheetId === sheet.id && op.kind === 'setScale').sort((a, b) => a.seq - b.seq).pop();
+      edits.push({
+        key: { riserId: riser.id, seq: lastScale?.seq ?? -1 },
+        riserId: riser.id,
+        label: riser.name,
+        kind: 'move',
+        fittingId: member.fittingId,
+        toPt: mmToPt(riser.anchorMm, { heightPt: effective.heightPt, ppmm: effective.pageUnitsPerRealUnit }),
+      });
+    }
+  }
   const waitingUnique = uniqueOf(waitingLabels);
   return {
     edits: edits.sort((a, b) => a.key.seq - b.key.seq),
     obsolete,
     waiting: waitingUnique.length > 0 ? { reason: 'no-scale', labels: waitingUnique } : null,
+    scale,
     frameSource,
   };
 }
@@ -142,12 +180,15 @@ export function pendingNotices(args: {
   link: PendingLink;
   plan: PendingPlan;
   applied: readonly PendingEdit[];
+  scaleApplied?: number | null;
 }): PendingNotice[] {
-  const { file, sheet, link, plan, applied } = args;
+  const { file, sheet, link, plan, applied, scaleApplied } = args;
   const levelName = file.levels.find((level) => level.id === sheet.levelId)?.name ?? 'this level';
   const parts: string[] = [];
   const moved = applied.filter((edit) => edit.kind === 'move');
-  if (moved.length > 0) {
+  if (typeof scaleApplied === 'number') {
+    parts.push(`The scale of ${levelName} is 1:${scaleApplied} now, to match the building. The risers stay at the same real-world positions.`);
+  } else if (moved.length > 0) {
     const summaryNote = plan.frameSource === 'summary' ? ' (scale from the saved sheet)' : '';
     parts.push(`${who(moved.map((edit) => edit.label))} moved on ${levelName} to match the building${summaryNote}.`);
   }
@@ -177,6 +218,10 @@ export function pendingNotices(args: {
     }
   }
   return notices;
+}
+
+function isPositiveScale(value: number | undefined): boolean {
+  return value !== undefined && Number.isFinite(value) && value > 0;
 }
 
 function uniqueOf(values: readonly string[]): string[] {

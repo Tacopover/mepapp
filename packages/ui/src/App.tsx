@@ -80,6 +80,7 @@ import { RoomToolBar } from './components/RoomToolBar.js';
 import { Dialog } from './components/Dialog.js';
 import { CalibrationDialog } from './components/CalibrationDialog.js';
 import { RiserConflictDialog } from './components/RiserConflictDialog.js';
+import { RiserScaleDialog } from './components/RiserScaleDialog.js';
 import { RiserDeleteDialog } from './components/RiserDeleteDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRenames } from './components/GlobalPropertiesDialog.js';
@@ -2243,6 +2244,16 @@ export function MepSketchApp({
           onPlaced={showPlacedStatus}
           onRemoved={(count) => setStatus(`Removed ${count} auto-placed stamp${count === 1 ? '' : 's'}. Undo gives them back.`)}
           onClose={ruleStampPick ? () => {} : () => setAutoPlaceOpen(false)}
+        />
+      )}
+
+      {risers.scaleChange && (
+        <RiserScaleDialog
+          plan={risers.scaleChange.plan}
+          busy={risers.scaleChange.busy}
+          onCancel={risers.cancelScaleChange}
+          onSetAll={risers.setScaleOnAll}
+          onDisconnect={risers.disconnectForScale}
         />
       )}
 

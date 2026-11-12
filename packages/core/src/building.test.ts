@@ -152,6 +152,21 @@ describe('building file', () => {
     expect(() => parseBuildingFile({ ...sample(), schemaVersion: 1, risers: [] })).not.toThrow();
   });
 
+  it('round-trips a riser with a setScale operation', () => {
+    const file = riserFile(riserRecord({ members: [member('l0', 's0', 0)], pending: [setScale(1, 's0', 2.5)] }));
+    expect(parseBuildingFile(JSON.parse(serializeBuildingFile(file)))).toEqual(file);
+  });
+
+  it('loads a version 1 file with only move and retag operations', () => {
+    const pending = [{ seq: 1, sheetId: 's0', kind: 'move', toMm: { xMm: 1, yMm: 2 } }, retag(2, 's0')];
+    expect(() => parseBuildingFile(riserFile(riserRecord({ members: [member('l0', 's0', 0)], pending })))).not.toThrow();
+  });
+
+  it('loads a version 0 file with no pending operations', () => {
+    const parsed = parseBuildingFile({ ...sample(), schemaVersion: 0, risers: [riserRecord({ members: [member('l0', 's0', 0)] })] });
+    expect(parsed.schemaVersion).toBe(1);
+  });
+
   it('refuses a riser with an empty id, and a duplicate id', () => {
     expect(riserIssues({ id: '' })).toContain('risers[0].id');
     expect(issuesOf(riserFile(riserRecord(), riserRecord()))).toEqual(['risers[1].id']);
@@ -250,10 +265,21 @@ describe('building file', () => {
     );
   });
 
-  it('refuses an operation kind other than move or retag', () => {
+  it('refuses an operation kind other than move, retag or setScale', () => {
     expect(riserIssues({ members: [member('l0', 's0', 0)], pending: [{ seq: 1, sheetId: 's0', kind: 'spin' }] })).toContain(
       'risers[0].pending[0].kind',
     );
+  });
+
+  it('accepts a setScale operation with a positive value', () => {
+    expect(() => parseBuildingFile(riserFile(riserRecord({ members: [member('l0', 's0', 0)], pending: [setScale(1, 's0', 2.5)] })))).not.toThrow();
+  });
+
+  it('refuses a setScale operation with no value, zero or NaN', () => {
+    const pending = (value: unknown) => [{ seq: 1, sheetId: 's0', kind: 'setScale', pageUnitsPerRealUnit: value }];
+    for (const value of [undefined, 0, Number.NaN]) {
+      expect(riserIssues({ members: [member('l0', 's0', 0)], pending: pending(value) })).toEqual(['risers[0].pending[0].pageUnitsPerRealUnit']);
+    }
   });
 
   it('warns about a riser with one member', () => {
@@ -332,4 +358,8 @@ function member(levelId: string, sheetId: string, pageIndex: number): Record<str
 
 function retag(seq: number, sheetId: string): Record<string, unknown> {
   return { seq, sheetId, kind: 'retag', networkTypeId: 'vent' };
+}
+
+function setScale(seq: number, sheetId: string, pageUnitsPerRealUnit: number): Record<string, unknown> {
+  return { seq, sheetId, kind: 'setScale', pageUnitsPerRealUnit };
 }

@@ -1,4 +1,4 @@
-import { CONFLICT_MOVE_HELP, CONFLICT_SCALE_NOTE, CONFLICT_SNAP_HELP, conflictBody, conflictTitle, type RiserConflictInfo } from '../riserActions.js';
+import { CONFLICT_MOVE_HELP, CONFLICT_SNAP_HELP, conflictBody, conflictTitle, type RiserConflictInfo } from '../riserActions.js';
 import { Dialog } from './Dialog.js';
 
 export interface RiserConflictDialogProps {
@@ -34,7 +34,6 @@ export function RiserConflictDialog({ info, onMoveHere, onSnapBack, onLater }: R
       }
     >
       <p>{conflictBody(info)}</p>
-      <p className="mep-hint">{CONFLICT_SCALE_NOTE}</p>
     </Dialog>
   );
 }

@@ -1,5 +1,17 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import type { BuildingFile, BuildingSheet, Calibration, SheetSummary, Vec2 } from '@mepapp/core';
+import {
+  deleteRisers,
+  mmToPt,
+  pendingScaleOf,
+  risersOnSheet,
+  scaleDenominatorFromCalibration,
+  setPendingScale,
+  type BuildingFile,
+  type BuildingSheet,
+  type Calibration,
+  type SheetSummary,
+  type Vec2,
+} from '@mepapp/core';
 import type { CanvasContextMenuTarget, DocumentSummary, RiserMark, SceneNotice, SketchScene } from '@mepapp/render';
 import type { OpenBuilding } from './buildingController.js';
 import { readSummaries } from './quantitiesScope.js';
@@ -7,6 +19,7 @@ import {
   dropPendingOps,
   hasPendingMove,
   hasPendingOps,
+  hasPendingScale,
   pendingLinkOf,
   pendingNotices,
   planPendingOps,
@@ -14,6 +27,16 @@ import {
   type PendingEdit,
   type PendingFrame,
 } from './riserPending.js';
+import {
+  makeRiserScaleHint,
+  planScaleChange,
+  scaleDisconnectMessage,
+  scaleCancelMessage,
+  scaleMismatchText,
+  scaleSetAllMessage,
+  scaleSetFailedText,
+  type ScaleChangePlan,
+} from './riserScale.js';
 import {
   activeSheetOf,
   applyRiserTypeChange,
@@ -100,6 +123,25 @@ function sheetOnShownPage(file: BuildingFile | null, documents: DocumentSummary[
   return activeSheetOf(file, projectUuid, pageIndex);
 }
 
+function sameScale(a: number, b: number): boolean {
+  return Math.abs(a - b) <= 1e-6 * Math.max(a, b);
+}
+
+function docOfSheet(scene: SketchScene, sheet: BuildingSheet): DocumentSummary | undefined {
+  if (sheet.projectUuid === null) return undefined;
+  return scene.getDocuments().find((doc) => doc.projectUuid === sheet.projectUuid);
+}
+
+function isOpenSheet(scene: SketchScene, sheet: BuildingSheet): boolean {
+  const doc = docOfSheet(scene, sheet);
+  return doc !== undefined && scene.getDocumentPageSize(doc.id, sheet.pageIndex) !== null;
+}
+
+function focusElement(selector: string): void {
+  const element = document.querySelector(selector);
+  if (element instanceof HTMLElement) element.focus();
+}
+
 export function useBuildingRisers(args: {
   sceneRef: RefObject<SketchScene | null>;
   ready: boolean;
@@ -122,6 +164,10 @@ export function useBuildingRisers(args: {
   const [conflictKeys, setConflictKeys] = useState<ReadonlySet<string>>(() => new Set<string>());
   const conflictKeysJoined = useRef('');
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const [scaleChange, setScaleChange] = useState<{ plan: ScaleChangePlan; next: Calibration; busy: boolean } | null>(null);
+  const scaleOpen = useRef(false);
+  const scaleRequest = useRef(0);
+  const summariesCache = useRef<ReadonlyMap<string, SheetSummary>>(new Map<string, SheetSummary>());
   const syncing = useRef(0);
   const pendingQueue = useRef<Promise<void>>(Promise.resolve());
   const notified = useRef(new Set<string>());
@@ -148,6 +194,177 @@ export function useBuildingRisers(args: {
 
   const guard = (task: () => Promise<void>): void => {
     task().catch((error: unknown) => live.current.pushToast({ kind: 'warning', message: `Could not update the riser: ${messageOf(error)}` }));
+  };
+
+  const scaleOfWith = (file: BuildingFile, summaries: ReadonlyMap<string, SheetSummary>) => {
+    return (sheet: BuildingSheet): number | null => {
+      const pending = pendingScaleOf(file, sheet.id);
+      if (pending !== null) return pending;
+      const scene = sceneRef.current;
+      if (scene === null) return null;
+      const doc = docOfSheet(scene, sheet);
+      if (doc !== undefined) return scene.getDocumentCalibration(doc.id, sheet.pageIndex)?.pageUnitsPerRealUnit ?? null;
+      return summaryFrameOf(summaries, sheet)?.pageUnitsPerRealUnit ?? null;
+    };
+  };
+
+  const finishScaleChange = (): void => {
+    const scene = sceneRef.current;
+    if (scene === null) return;
+    if (scene.getTool() === 'calibrate') {
+      scene.setTool('select');
+      focusElement('canvas');
+      return;
+    }
+    focusElement('.mep-scale-select');
+  };
+
+  const cancelScaleChange = (): void => {
+    const pending = scaleChange;
+    if (pending === null || pending.busy) return;
+    scaleOpen.current = false;
+    setScaleChange(null);
+    live.current.pushToast({ kind: 'info', message: scaleCancelMessage(pending.plan.levelName, pending.plan.previousDenominator) });
+    if (sceneRef.current?.getTool() !== 'calibrate') focusElement('.mep-scale-select');
+  };
+
+  const failScaleChange = (text: string): void => {
+    scaleOpen.current = false;
+    setScaleChange(null);
+    live.current.pushToast({ kind: 'warning', message: text });
+  };
+
+  const openScaleChange = async (next: Calibration, shownSheetId: string, request: number): Promise<void> => {
+    const scene = sceneRef.current;
+    const open = live.current.building;
+    if (scene === null || open === null) return;
+    let summaries: ReadonlyMap<string, SheetSummary>;
+    try {
+      summaries = (await readSummaries(open.store)).summaries;
+    } catch {
+      summaries = new Map<string, SheetSummary>();
+    }
+    if (request !== scaleRequest.current) return;
+    const after = live.current;
+    const onSheet = after.sheet;
+    if (after.building?.file.id !== open.file.id || onSheet === null || onSheet.id !== shownSheetId) {
+      live.current.pushToast({ kind: 'info', message: 'The scale change was dropped because you switched sheets.' });
+      return;
+    }
+    const plan = planScaleChange(open.file, {
+      sheet: onSheet,
+      nextPageUnitsPerRealUnit: next.pageUnitsPerRealUnit,
+      scaleOf: scaleOfWith(open.file, summaries),
+      isOpen: (candidate) => isOpenSheet(scene, candidate),
+    });
+    if (plan === null) {
+      scene.applyCalibration(next);
+      finishScaleChange();
+      return;
+    }
+    scaleOpen.current = true;
+    setScaleChange({ plan, next, busy: false });
+  };
+
+  const setScaleOnAll = (): void => {
+    const pending = scaleChange;
+    if (pending === null || pending.busy) return;
+    setScaleChange({ ...pending, busy: true });
+    guard(async () => {
+      const scene = sceneRef.current;
+      const { plan, next } = pending;
+      if (live.current.building === null || live.current.sheet?.id !== plan.currentSheetId) {
+        failScaleChange(scaleSetFailedText(plan.levelName));
+        return;
+      }
+      if (scene === null) {
+        scaleOpen.current = false;
+        setScaleChange(null);
+        return;
+      }
+      try {
+        let file: BuildingFile | null = live.current.building?.file ?? null;
+        if (plan.setSheetIds.length > 0) {
+          try {
+            await live.current.update((current) => {
+              file = setPendingScale(current, plan.setSheetIds, next.pageUnitsPerRealUnit);
+              return file;
+            });
+          } catch {
+            const firstId = plan.setSheetIds[0];
+            failScaleChange(scaleSetFailedText(plan.rows.find((row) => row.sheetId === firstId)?.levelName ?? plan.levelName));
+            return;
+          }
+        }
+        if (file === null) {
+          failScaleChange(scaleSetFailedText(plan.levelName));
+          return;
+        }
+        for (const sheetId of [...plan.liveSheetIds, plan.currentSheetId]) {
+          const target = file.sheets.find((candidate) => candidate.id === sheetId);
+          if (target === undefined) continue;
+          const isShown = sheetId === plan.currentSheetId;
+          const docId = isShown ? activeDocumentId : (docOfSheet(scene, target)?.id ?? null);
+          if (docId === null) continue;
+          const size = isShown ? scene.getDisplayedPageSize() : scene.getDocumentPageSize(docId, target.pageIndex);
+          if (size !== null) {
+            for (const riser of risersOnSheet(file, target.id)) {
+              const member = riser.members.find((candidate) => candidate.sheetId === target.id);
+              if (member === undefined) continue;
+              scene.applyRemoteFittingMoveIn(docId, member.fittingId, mmToPt(riser.anchorMm, { heightPt: size.heightPt, ppmm: next.pageUnitsPerRealUnit }));
+            }
+          }
+          if (isShown) scene.applyCalibration(next);
+          else scene.setCalibrationIn(docId, target.pageIndex, next);
+        }
+        scaleOpen.current = false;
+        setScaleChange(null);
+        live.current.pushToast({ kind: 'info', message: scaleSetAllMessage(plan.newDenominator, plan.rows.length) });
+        finishScaleChange();
+        setSceneTick((tick) => tick + 1);
+      } catch (error: unknown) {
+        scaleOpen.current = false;
+        setScaleChange(null);
+        throw error;
+      }
+    });
+  };
+
+  const disconnectForScale = (): void => {
+    const pending = scaleChange;
+    if (pending === null || pending.busy) return;
+    setScaleChange({ ...pending, busy: true });
+    guard(async () => {
+      const scene = sceneRef.current;
+      const { plan, next } = pending;
+      if (live.current.building === null || live.current.sheet?.id !== plan.currentSheetId) {
+        failScaleChange(scaleSetFailedText(plan.levelName));
+        return;
+      }
+      if (scene === null) {
+        scaleOpen.current = false;
+        setScaleChange(null);
+        return;
+      }
+      try {
+        try {
+          await live.current.update((current) => deleteRisers(current, plan.riserIds));
+        } catch {
+          failScaleChange(scaleSetFailedText(plan.levelName));
+          return;
+        }
+        scene.applyCalibration(next);
+        scaleOpen.current = false;
+        setScaleChange(null);
+        live.current.pushToast({ kind: 'info', message: scaleDisconnectMessage(plan.riserIds.length) });
+        finishScaleChange();
+        setSceneTick((tick) => tick + 1);
+      } catch (error: unknown) {
+        scaleOpen.current = false;
+        setScaleChange(null);
+        throw error;
+      }
+    });
   };
 
   const runPending = async (only: string | null): Promise<void> => {
@@ -178,6 +395,10 @@ export function useBuildingRisers(args: {
         const sceneFrame = scene.getDocumentPageFrame(doc.id, sheet.pageIndex);
         let frame: PendingFrame | null =
           sceneFrame === null ? null : { heightPt: sceneFrame.heightPt, pageUnitsPerRealUnit: sceneFrame.pageUnitsPerRealUnit, source: 'scene' };
+        if (frame === null && hasPendingScale(file, sheet.id)) {
+          const size = scene.getDocumentPageSize(doc.id, sheet.pageIndex);
+          if (size !== null) frame = { heightPt: size.heightPt, pageUnitsPerRealUnit: pendingScaleOf(file, sheet.id) ?? 1, source: 'scene' };
+        }
         if (frame === null && link !== 'ambiguous' && hasPendingMove(file, sheet.id)) {
           if (summaries === null) {
             try {
@@ -192,6 +413,10 @@ export function useBuildingRisers(args: {
           file = after.file;
         }
         const plan = planPendingOps(file, { sheet, link, frame });
+        let scaleApplied: number | null = null;
+        if (plan.scale !== null && scene.setCalibrationIn(doc.id, sheet.pageIndex, { pageUnitsPerRealUnit: plan.scale.pageUnitsPerRealUnit })) {
+          scaleApplied = Math.round(scaleDenominatorFromCalibration({ pageUnitsPerRealUnit: plan.scale.pageUnitsPerRealUnit }));
+        }
         const applied: PendingEdit[] = [];
         for (const edit of plan.edits) {
           if (edit.kind === 'move') {
@@ -200,9 +425,10 @@ export function useBuildingRisers(args: {
             applied.push(edit);
           }
         }
-        const keys = [...plan.obsolete, ...applied.map((edit) => edit.key)];
+        const scaleKeys = scaleApplied !== null && plan.scale !== null ? plan.scale.keys : [];
+        const keys = [...plan.obsolete, ...applied.map((edit) => edit.key), ...scaleKeys];
         if (keys.length > 0) await commit((current) => ({ file: dropPendingOps(current, keys), notice: null }));
-        for (const notice of pendingNotices({ file, sheet, link, plan, applied })) {
+        for (const notice of pendingNotices({ file, sheet, link, plan, applied, scaleApplied })) {
           if (notice.kind === 'info') {
             live.current.pushToast(notice);
             continue;
@@ -217,7 +443,7 @@ export function useBuildingRisers(args: {
             if (token.startsWith(`${sheet.id}|`)) notified.current.delete(token);
           }
         }
-        if (applied.length > 0) setSceneTick((tick) => tick + 1);
+        if (applied.length > 0 || scaleApplied !== null) setSceneTick((tick) => tick + 1);
       }
     }
   };
@@ -239,7 +465,12 @@ export function useBuildingRisers(args: {
     const fittingContext = scene && fittingId !== null ? scene.getFittingContext(fittingId) : null;
     const riserId = scene && fittingId !== null ? (scene.getRiserMarks().get(fittingId)?.riserId ?? null) : null;
     const page = scene ? shownPageOf(scene) : null;
-    const model = riserMenuModel({ file, sheet, hasScale: hasScaleOf(page), fittingContext, markedRiserId: riserId });
+    const thisScale = page !== null && hasScaleOf(page) ? page.pageUnitsPerRealUnit : null;
+    const scaleHint =
+      file && sheet && fittingContext && thisScale !== null
+        ? makeRiserScaleHint(file, { sheet, thisPageUnitsPerRealUnit: thisScale, networkTypeIds: fittingContext.networkTypeIds, scaleOf: scaleOfWith(file, summariesCache.current) })
+        : null;
+    const model = riserMenuModel({ file, sheet, hasScale: hasScaleOf(page), fittingContext, markedRiserId: riserId, scaleHint });
     return { model, fittingId, riserId };
   };
 
@@ -259,6 +490,15 @@ export function useBuildingRisers(args: {
     const page = shownPageOf(scene);
     if (page === null) {
       pushToast({ kind: 'warning', message: HINT_NO_SCALE });
+      return;
+    }
+    const thisScale = page.pageUnitsPerRealUnit;
+    const scaleHint =
+      thisScale === null
+        ? null
+        : makeRiserScaleHint(building.file, { sheet, thisPageUnitsPerRealUnit: thisScale, networkTypeIds: context.networkTypeIds, scaleOf: scaleOfWith(building.file, summariesCache.current) });
+    if (scaleHint !== null) {
+      pushToast({ kind: 'warning', message: scaleHint });
       return;
     }
     guard(() =>
@@ -297,6 +537,14 @@ export function useBuildingRisers(args: {
       if (after.building?.file.id !== open.file.id || after.sheet === null || after.sheet.id !== onSheet.id) return;
       const riser = open.file.risers.find((candidate) => candidate.id === riserId);
       const firstFrame = riser === undefined ? null : firstMemberFrame(open.file, riser, summaries);
+      const refused =
+        riser === undefined || page.pageUnitsPerRealUnit === null
+          ? null
+          : scaleMismatchText(open.file, { sheet: onSheet, riser, thisPageUnitsPerRealUnit: page.pageUnitsPerRealUnit, scaleOf: scaleOfWith(open.file, summaries) });
+      if (refused !== null) {
+        live.current.pushToast({ kind: 'warning', message: refused });
+        return;
+      }
       const fittingId = scene.riserAnchorFittingId(anchor);
       const context = scene.getFittingContext(fittingId);
       if (context !== null && context.networkTypeIds.length > 1) {
@@ -523,6 +771,14 @@ export function useBuildingRisers(args: {
         const riser = open.file.risers.find((candidate) => candidate.id === info.riserId);
         const firstFrame = riser === undefined ? null : firstMemberFrame(open.file, riser, summaries);
         const segmentNetworkTypeId = active.getFittingContext(info.fittingId)?.networkTypeIds[0] ?? null;
+        const refused =
+          riser === undefined || page.pageUnitsPerRealUnit === null
+            ? null
+            : scaleMismatchText(open.file, { sheet: onSheet, riser, thisPageUnitsPerRealUnit: page.pageUnitsPerRealUnit, scaleOf: scaleOfWith(open.file, summaries) });
+        if (refused !== null) {
+          live.current.pushToast({ kind: 'warning', message: refused });
+          return;
+        }
         await commit((current) =>
           fromResult(current, attachAction(current, { riserId: info.riserId, sheet: onSheet, fittingId: info.fittingId, segmentNetworkTypeId, page, firstFrame })),
         );
@@ -564,6 +820,54 @@ export function useBuildingRisers(args: {
     };
   }, [ready, sceneRef]);
 
+  useEffect(() => {
+    if (!ready || building === null) return;
+    readSummaries(building.store)
+      .then(({ summaries }) => {
+        summariesCache.current = summaries;
+      })
+      .catch(() => undefined);
+  }, [ready, building?.file.id, sceneTick]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    scene.setCalibrationGuard((next, previous) => {
+      const open = live.current.building;
+      const onSheet = live.current.sheet;
+      if (open === null || onSheet === null) return true;
+      if (risersOnSheet(open.file, onSheet.id).length === 0) return true;
+      if (previous !== null && sameScale(previous.pageUnitsPerRealUnit, next.pageUnitsPerRealUnit)) return true;
+      if (scaleOpen.current) return false;
+      scaleRequest.current += 1;
+      const request = scaleRequest.current;
+      guard(() => openScaleChange(next, onSheet.id, request));
+      return false;
+    });
+    scene.setRiserAttachGuard((riserId) => {
+      const building = live.current.building;
+      const sheet = live.current.sheet;
+      if (building === null || sheet === null) return null;
+      const page = shownPageOf(scene);
+      const scale = page?.pageUnitsPerRealUnit ?? null;
+      if (scale === null || !(scale > 0)) return null;
+      const riser = building.file.risers.find((candidate) => candidate.id === riserId);
+      if (riser === undefined) return null;
+      const text = scaleMismatchText(building.file, {
+        sheet,
+        riser,
+        thisPageUnitsPerRealUnit: scale,
+        scaleOf: scaleOfWith(building.file, summariesCache.current),
+      });
+      if (text !== null) live.current.pushToast({ kind: 'warning', message: text });
+      return text;
+    });
+    return () => {
+      scene.setCalibrationGuard(null);
+      scene.setRiserAttachGuard(null);
+    };
+  }, [ready, sceneRef]);
+
   return {
     menuStateFor,
     makeRiser,
@@ -579,5 +883,9 @@ export function useBuildingRisers(args: {
     resolveConflictSnapBack,
     decideConflictLater,
     applyPendingForDocument,
+    scaleChange,
+    cancelScaleChange,
+    setScaleOnAll,
+    disconnectForScale,
   };
 }

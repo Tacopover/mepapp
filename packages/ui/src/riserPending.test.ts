@@ -4,6 +4,7 @@ import {
   dropPendingOps,
   hasPendingMove,
   hasPendingOps,
+  hasPendingScale,
   pendingLinkOf,
   pendingNotices,
   type PendingFrame,
@@ -240,7 +241,7 @@ describe('planPendingOps', () => {
       riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], [{ seq: 1, sheetId: 's1', kind: 'move', toMm: moveTo }]),
     ]);
     const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'ambiguous', frame: scene });
-    expect(plan).toEqual({ edits: [], obsolete: [], waiting: { reason: 'ambiguous', labels: ['Supply air riser 1'] }, frameSource: 'scene' });
+    expect(plan).toEqual({ edits: [], obsolete: [], waiting: { reason: 'ambiguous', labels: ['Supply air riser 1'] }, scale: null, frameSource: 'scene' });
   });
 
   it('applies a retag without a frame', () => {
@@ -275,7 +276,96 @@ describe('planPendingOps', () => {
   it('returns an empty plan when the sheet has no ops', () => {
     const file = baseFile();
     const plan = planPendingOps(file, { sheet: sheetOf(file, 's2'), link: 'id', frame: scene });
-    expect(plan).toEqual({ edits: [], obsolete: [], waiting: null, frameSource: 'scene' });
+    expect(plan).toEqual({ edits: [], obsolete: [], waiting: null, scale: null, frameSource: 'scene' });
+  });
+});
+
+describe('planPendingOps with a scale', () => {
+  const moveTo = { xMm: 1000, yMm: 2000 };
+  const ppmm50 = calibrationFromScale(50).pageUnitsPerRealUnit;
+  const scaleOp = (seq: number, sheetId: string, value: number) => ({ seq, sheetId, kind: 'setScale' as const, pageUnitsPerRealUnit: value });
+
+  it('converts a move with the scale of a setScale op on the same sheet', () => {
+    const file = fileWith([
+      riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], [
+        { seq: 1, sheetId: 's1', kind: 'move', toMm: moveTo },
+        scaleOp(2, 's1', ppmm50),
+      ]),
+    ]);
+    const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'id', frame: scene });
+    expect(plan.edits).toEqual([
+      {
+        key: { riserId: 'r1', seq: 1 },
+        riserId: 'r1',
+        label: 'Supply air riser 1',
+        kind: 'move',
+        fittingId: 'f1',
+        toPt: mmToPt(moveTo, { heightPt: 842, ppmm: ppmm50 }),
+      },
+    ]);
+    expect(plan.scale).toEqual({ pageUnitsPerRealUnit: ppmm50, keys: [{ riserId: 'r1', seq: 2 }] });
+    expect(plan.obsolete).toEqual([]);
+  });
+
+  it('reseats a riser that has only a setScale op at its building position, keyed by that op', () => {
+    const file = fileWith([riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], [scaleOp(3, 's1', ppmm50)])]);
+    const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'id', frame: scene });
+    expect(plan.edits).toEqual([
+      {
+        key: { riserId: 'r1', seq: 3 },
+        riserId: 'r1',
+        label: 'Supply air riser 1',
+        kind: 'move',
+        fittingId: 'f1',
+        toPt: mmToPt({ xMm: 1000, yMm: 2000 }, { heightPt: 842, ppmm: ppmm50 }),
+      },
+    ]);
+    expect(plan.scale).toEqual({ pageUnitsPerRealUnit: ppmm50, keys: [{ riserId: 'r1', seq: 3 }] });
+  });
+
+  it('keys the reseat of a riser without a setScale op at seq -1 and sorts it first', () => {
+    const file = fileWith([
+      riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], []),
+      riserOf('r2', 'Supply air riser 2', vent, [riserMember('s1', 'l1', 'f2')], [scaleOp(3, 's1', ppmm50)]),
+    ]);
+    const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'id', frame: scene });
+    expect(plan.edits.map((edit) => edit.key)).toEqual([
+      { riserId: 'r1', seq: -1 },
+      { riserId: 'r2', seq: 3 },
+    ]);
+  });
+
+  it('changes nothing and waits quietly without a frame', () => {
+    const file = fileWith([
+      riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], [
+        { seq: 1, sheetId: 's1', kind: 'move', toMm: moveTo },
+        scaleOp(2, 's1', ppmm50),
+      ]),
+    ]);
+    const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'id', frame: null });
+    expect(plan).toEqual({ edits: [], obsolete: [], waiting: null, scale: null, frameSource: null });
+  });
+
+  it('makes a setScale op with an invalid value obsolete and gives no scale', () => {
+    const file = fileWith([riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], [scaleOp(1, 's1', 0)])]);
+    const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'id', frame: scene });
+    expect(plan.obsolete).toEqual([{ riserId: 'r1', seq: 1 }]);
+    expect(plan.edits).toEqual([]);
+    expect(plan.scale).toBeNull();
+  });
+});
+
+describe('hasPendingScale', () => {
+  it('is true for a setScale op on the sheet and counts it as a pending move', () => {
+    const ppmm50 = calibrationFromScale(50).pageUnitsPerRealUnit;
+    const file = fileWith([
+      riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], [
+        { seq: 1, sheetId: 's1', kind: 'setScale', pageUnitsPerRealUnit: ppmm50 },
+      ]),
+    ]);
+    expect(hasPendingScale(file, 's1')).toBe(true);
+    expect(hasPendingScale(file, 's2')).toBe(false);
+    expect(hasPendingMove(file, 's1')).toBe(true);
   });
 });
 
@@ -331,7 +421,14 @@ describe('pendingNotices', () => {
     fittingId: 'f1',
     networkType: type,
   });
-  const idPlan: PendingPlan = { edits: [], obsolete: [], waiting: null, frameSource: 'scene' };
+  const idPlan: PendingPlan = { edits: [], obsolete: [], waiting: null, scale: null, frameSource: 'scene' };
+
+  it('reports the applied scale and leaves out the moved part', () => {
+    const notices = pendingNotices({ file, sheet, link: 'id', plan: idPlan, applied: [moveEdit('Supply air riser 1')], scaleApplied: 50 });
+    expect(notices).toEqual([
+      { kind: 'info', message: 'The scale of Ground is 1:50 now, to match the building. The risers stay at the same real-world positions.' },
+    ]);
+  });
 
   it('reports a move applied from the scene scale', () => {
     const notices = pendingNotices({ file, sheet, link: 'id', plan: idPlan, applied: [moveEdit('Supply air riser 1')] });
@@ -413,13 +510,13 @@ describe('pendingNotices', () => {
   });
 
   it('warns that the scale is missing', () => {
-    const plan: PendingPlan = { edits: [], obsolete: [], waiting: { reason: 'no-scale', labels: ['Supply air riser 1'] }, frameSource: null };
+    const plan: PendingPlan = { edits: [], obsolete: [], waiting: { reason: 'no-scale', labels: ['Supply air riser 1'] }, scale: null, frameSource: null };
     const notices = pendingNotices({ file, sheet, link: 'id', plan, applied: [] });
     expect(notices).toEqual([{ kind: 'warning', message: 'Set the scale of Sheet 1 to move Supply air riser 1.' }]);
   });
 
   it('warns that one riser waits for the link', () => {
-    const plan: PendingPlan = { edits: [], obsolete: [], waiting: { reason: 'ambiguous', labels: ['Supply air riser 1'] }, frameSource: null };
+    const plan: PendingPlan = { edits: [], obsolete: [], waiting: { reason: 'ambiguous', labels: ['Supply air riser 1'] }, scale: null, frameSource: null };
     const notices = pendingNotices({ file, sheet, link: 'ambiguous', plan, applied: [] });
     expect(notices).toEqual([
       { kind: 'warning', message: 'Sheet 1: Supply air riser 1 waits. Open this sheet from the building to apply it.' },
@@ -431,6 +528,7 @@ describe('pendingNotices', () => {
       edits: [],
       obsolete: [],
       waiting: { reason: 'ambiguous', labels: ['Supply air riser 1', 'Supply air riser 2'] },
+      scale: null,
       frameSource: null,
     };
     const notices = pendingNotices({ file, sheet, link: 'ambiguous', plan, applied: [] });
@@ -440,7 +538,7 @@ describe('pendingNotices', () => {
   });
 
   it('puts the info notice before the warning', () => {
-    const plan: PendingPlan = { edits: [], obsolete: [], waiting: { reason: 'no-scale', labels: ['Supply air riser 2'] }, frameSource: 'scene' };
+    const plan: PendingPlan = { edits: [], obsolete: [], waiting: { reason: 'no-scale', labels: ['Supply air riser 2'] }, scale: null, frameSource: 'scene' };
     const notices = pendingNotices({ file, sheet, link: 'id', plan, applied: [moveEdit('Supply air riser 1')] });
     expect(notices).toEqual([
       { kind: 'info', message: 'Supply air riser 1 moved on Ground to match the building.' },

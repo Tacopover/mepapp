@@ -7,11 +7,15 @@ import {
   attachMember,
   clearRiserFlowOverride,
   deleteRiser,
+  deleteRisers,
   detachMember,
   makeRiser,
   moveRiser,
   nextRiserLabel,
+  pendingScaleOf,
+  riserSheetGroup,
   setMemberConnectionHeight,
+  setPendingScale,
   setRiserProps,
   takePendingOps,
   type PageFrame,
@@ -454,5 +458,115 @@ describe('takePendingOps', () => {
     const again = takePendingOps(taken.file, 's1');
     expect(again.ops).toEqual([]);
     expect(again.file).toBe(taken.file);
+  });
+});
+
+describe('riserSheetGroup', () => {
+  it('follows a chain of risers', () => {
+    let file = fileWithRiser();
+    file = ok(attachMember(file, 'r1', member(1), { first: frame, this: frame })).file;
+    file = ok(makeRiser(file, { id: 'r2', name: 'R2', networkType: water, sheetId: 's1', fittingId: 'f1', fittingPt: { x: 0, y: 0 }, frame }));
+    file = ok(attachMember(file, 'r2', member(2), { first: frame, this: frame })).file;
+    expect(riserSheetGroup(file, 's0')).toEqual(['s0', 's1', 's2']);
+    expect(riserSheetGroup(file, 's2')).toEqual(['s2', 's0', 's1']);
+  });
+
+  it('returns only the sheet when no riser has it', () => {
+    expect(riserSheetGroup(fileWithRiser(), 's2')).toEqual(['s2']);
+  });
+});
+
+describe('setPendingScale', () => {
+  function withMoveOp(): BuildingFile {
+    const attached = ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+    return moveRiser(attached, 'r1', { xMm: 1, yMm: 2 }, 's0', new Set()).file;
+  }
+
+  it('appends one setScale op for each sheet after the existing ops', () => {
+    const file = setPendingScale(withMoveOp(), ['s0', 's1'], 2.5);
+    expect(riserOf(file, 'r1').pending).toEqual([
+      { seq: 1, sheetId: 's1', kind: 'move', toMm: { xMm: 1, yMm: 2 } },
+      { seq: 2, sheetId: 's0', kind: 'setScale', pageUnitsPerRealUnit: 2.5 },
+      { seq: 3, sheetId: 's1', kind: 'setScale', pageUnitsPerRealUnit: 2.5 },
+    ]);
+  });
+
+  it('replaces the value of a sheet and keeps one setScale op for it', () => {
+    const first = setPendingScale(withMoveOp(), ['s0', 's1'], 2.5);
+    const second = setPendingScale(first, ['s0', 's1'], 3);
+    const scaleOps = riserOf(second, 'r1').pending.filter((op) => op.kind === 'setScale');
+    expect(scaleOps).toHaveLength(2);
+    expect(pendingScaleOf(second, 's0')).toBe(3);
+    expect(pendingScaleOf(second, 's1')).toBe(3);
+    expect(riserOf(second, 'r1').pending.some((op) => op.kind === 'move')).toBe(true);
+  });
+
+  it('returns the same file for a value that is zero, negative, NaN or infinite', () => {
+    const file = withMoveOp();
+    expect(setPendingScale(file, ['s0'], 0)).toBe(file);
+    expect(setPendingScale(file, ['s0'], -1)).toBe(file);
+    expect(setPendingScale(file, ['s0'], Number.NaN)).toBe(file);
+    expect(setPendingScale(file, ['s0'], Number.POSITIVE_INFINITY)).toBe(file);
+  });
+
+  it('returns the same file for a sheet that no riser has', () => {
+    const file = withMoveOp();
+    expect(setPendingScale(file, ['s2'], 2.5)).toBe(file);
+  });
+});
+
+describe('pendingScaleOf', () => {
+  it('returns null when the sheet has no setScale op', () => {
+    expect(pendingScaleOf(fileWithRiser(), 's0')).toBeNull();
+  });
+
+  it('returns the value of the setScale op with the largest seq over all risers', () => {
+    const scaled = setPendingScale(fileWithRiser(), ['s0'], 2.5);
+    const second = ok(
+      makeRiser(scaled, { id: 'r2', name: 'R2', networkType: water, sheetId: 's0', fittingId: 'f0', fittingPt: { x: 0, y: 0 }, frame }),
+    );
+    const withLater: BuildingFile = {
+      ...second,
+      risers: second.risers.map((riser) =>
+        riser.id === 'r2' ? { ...riser, pending: [{ seq: 5, sheetId: 's0', kind: 'setScale', pageUnitsPerRealUnit: 4 }] } : riser,
+      ),
+    };
+    expect(pendingScaleOf(withLater, 's0')).toBe(4);
+    expect(pendingScaleOf(withLater, 's1')).toBeNull();
+  });
+});
+
+describe('setScale ops with other ops', () => {
+  it('takePendingOps returns a setScale op with the move ops of its sheet in seq order', () => {
+    let file = ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+    file = moveRiser(file, 'r1', { xMm: 1, yMm: 2 }, 's0', new Set()).file;
+    file = setPendingScale(file, ['s1'], 2.5);
+    const taken = takePendingOps(file, 's1');
+    expect(taken.ops.map((op) => op.kind)).toEqual(['move', 'setScale']);
+    expect(taken.ops.map((op) => op.seq)).toEqual([1, 2]);
+  });
+
+  it('detachMember drops the setScale op of the detached sheet only', () => {
+    const attached = ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+    const scaled = setPendingScale(attached, ['s0', 's1'], 2.5);
+    const file = detachMember(scaled, 'r1', 's1');
+    expect(pendingScaleOf(file, 's1')).toBeNull();
+    expect(pendingScaleOf(file, 's0')).toBe(2.5);
+  });
+});
+
+describe('deleteRisers', () => {
+  it('removes the listed risers and ignores unknown ids', () => {
+    const second = ok(
+      makeRiser(fileWithRiser(), { id: 'r2', name: 'R2', networkType: water, sheetId: 's2', fittingId: 'f2', fittingPt: { x: 0, y: 0 }, frame }),
+    );
+    const file = deleteRisers(second, ['r1', 'nope']);
+    expect(file.risers.map((riser) => riser.id)).toEqual(['r2']);
+  });
+
+  it('returns the same file when no listed riser exists', () => {
+    const file = fileWithRiser();
+    expect(deleteRisers(file, ['nope'])).toBe(file);
+    expect(deleteRisers(file, [])).toBe(file);
   });
 });
