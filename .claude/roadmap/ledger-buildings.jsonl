@@ -376,3 +376,5 @@
 {"seq":376,"at":"2026-11-12T10:37:30.262Z","type":"decision","id":"D-B-65","part":"B4","kind":"ux","status":"answered","answer":"A","by":"user","reason":"Draw into a ring or Make riser on a PDF with another scale: the tool refuses with a message to set the same scale first."}
 {"seq":377,"at":"2026-11-12T11:49:09.323Z","type":"task","id":"B4-F1","part":"B4","state":"done","commit":"a064131"}
 {"seq":378,"at":"2026-11-12T11:49:12.676Z","type":"shot","id":"S-B4-F1-refused","part":"B4","task":"B4-F1","caption":"Remove refused with the reason","assetId":"5c17d9dd1b697d1f1ce7c0840437e924","url":"/_blob/5c17d9dd1b697d1f1ce7c0840437e924"}
+{"seq":379,"at":"2026-11-12T12:27:27.665Z","type":"task","id":"B4-F3","part":"B4","state":"done","commit":"6b0db21"}
+{"seq":380,"at":"2026-11-12T12:27:36.820Z","type":"shot","id":"S-B4-F3-draw-from","part":"B4","task":"B4-F3","caption":"Draw from a fitting: the new segment keeps the type of the fitting","assetId":"9b06d99b566ace2872cf601d152a6d63","url":"/_blob/9b06d99b566ace2872cf601d152a6d63"}
