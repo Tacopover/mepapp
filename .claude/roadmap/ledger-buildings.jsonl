@@ -381,3 +381,8 @@
 {"seq":381,"at":"2026-11-12T13:44:49.274Z","type":"task","id":"B4-F2","part":"B4","state":"done","commit":"d0a6910"}
 {"seq":382,"at":"2026-11-12T13:44:49.485Z","type":"task","id":"B4-F5","part":"B4","state":"planned"}
 {"seq":383,"at":"2026-11-12T15:35:38.735Z","type":"task","id":"B4-F5","part":"B4","state":"done","commit":"acdd928"}
+{"seq":384,"at":"2026-11-12T19:47:16.700Z","type":"task","id":"B4-F4","part":"B4","state":"done","commit":"8dfabd7"}
+{"seq":385,"at":"2026-11-12T19:47:16.741Z","type":"shot","id":"S-B4-F2-ring-menu","part":"B4","task":"B4-F2","caption":"Right-click on a riser ring: Draw from","assetId":"68b3551d30c607bbbf177e15b0a1995b","url":"/_blob/68b3551d30c607bbbf177e15b0a1995b"}
+{"seq":386,"at":"2026-11-12T19:47:16.784Z","type":"shot","id":"S-B4-F4-dialog","part":"B4","task":"B4-F4","caption":"Scale change dialog: Cancel, Set on all, Disconnect","assetId":"ce0b04d642c0d3cc7b7f8285811a4a3c","url":"/_blob/ce0b04d642c0d3cc7b7f8285811a4a3c"}
+{"seq":387,"at":"2026-11-12T19:47:16.824Z","type":"shot","id":"S-B4-F4-closed-pdf","part":"B4","task":"B4-F4","caption":"Scale change dialog with a closed PDF","assetId":"56c27128a0ed795d983508be60c8754f","url":"/_blob/56c27128a0ed795d983508be60c8754f"}
+{"seq":388,"at":"2026-11-12T19:47:16.867Z","type":"shot","id":"S-B4-F4-ring-refusal","part":"B4","task":"B4-F4","caption":"Draw into a ring on a PDF with another scale is refused","assetId":"fbfdcc55ba0de73454cb75384c45dc1f","url":"/_blob/fbfdcc55ba0de73454cb75384c45dc1f"}

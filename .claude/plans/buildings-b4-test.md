@@ -29,9 +29,9 @@ Words in this script: "level 0" is the lower level, "level 1" is the upper level
 13. On level 0, click the riser fitting and drag it 2 to 3 cm up and to the right. Release. Check: a toast says "Supply Air riser 1 moved to match the building." No dialog opens.
 14. Go to level 1. Check: the riser fitting is at the matching real position (the other scale is taken into account). The tab of level 1 shows that it has unsaved changes (not proven in a browser check).
 15. Go to level 0. Click the Undo button in the left rail (no keyboard shortcut). Check: the fitting goes back. Go to level 1. Check: the fitting of level 1 also went back.
-16. On level 1, change the scale in the status bar (for example to 1:120). Check: a dialog opens with the title "Supply Air riser 1 is not at the building position" and three buttons in this order: "Decide later", "Snap back", "Move the riser here". Check: a click on the dark background does not close it. Press Escape. Check: the dialog closes, a toast says the riser is not at the building position, and the ring mark is amber.
-17. Go to level 0 and back to level 1. Check: the dialog opens again. Click "Snap back". Check: the fitting goes back to the building position and the dialog closes.
-18. Change the scale of level 1 again (for example to 1:115). When the dialog opens, click "Move the riser here". Check: the dialog closes. Go to level 0. Check: the riser fitting of level 0 is at the new position.
+16. On level 1, change the scale in the status bar (for example to 1:120). Check: a dialog opens with the title "Change the scale of Level 1 to 1:120?" and the text "PDFs that share a riser must have the same scale." It has three buttons in this order: "Cancel", "Set 1:120 on all 2 PDFs", "Disconnect the risers". The focus is on "Cancel". Check: a click on the dark background does not close it. Press Escape. Check: the dialog closes, a message says "The scale of Level 1 stays 1:100." (or the scale you had), and nothing moved.
+17. Change the scale of level 1 again to 1:120 and click "Disconnect the risers". Check: a message says "1 riser disconnected. Its fittings are normal fittings now." The ring marks are gone and the riser is gone from the Risers tab. The fittings and segments stay. The Undo button does not bring the riser back (known). Make the riser again (steps 6 to 11) and go on.
+18. Change the scale of level 1 again to 1:120 and click "Set 1:120 on all 2 PDFs". Check: a message says "The scale is 1:120 on 2 PDFs. The risers stay at the same real-world positions." Go to level 0. Check: the status bar says 1:120 there too, and the riser fitting did not move on the real-world position. Both PDFs now have one scale. A scale of 1:110 or 1:100 can only be set again through the same dialog.
 
 ### Pending move on a closed level
 
@@ -70,6 +70,18 @@ Words in this script: "level 0" is the lower level, "level 1" is the upper level
 33. Make a riser again (steps 6 to 11). Close ALL Chrome windows. Open the app again. Open Manage Buildings and click "Tower". If the card "Allow access" shows, allow it. Check: the building opens and the tab "Risers (1)" lists the riser.
 34. Check the sheets: the row button says "Choose file…". This is expected after a restart (D-B-53): the browser keeps no access to a PDF, so each PDF needs one "Choose file…". Click it for both sheets. Check: both PDFs open, the rings and the riser marks show, and no conflict dialog opens.
 
+### Feedback round 1 (steps F1 to F9)
+
+F1. Add one PDF to a level. Use "Save As" to make a copy of the PDF and add the copy to the same level. Make a riser on the first PDF (steps 6 and 7). Click "Remove" on the first PDF. Check: nothing is removed, and a message says "Could not remove <file> page 1. Detach <riser> first." Detach the riser. Click "Remove" again. Check: the PDF goes. Try the "Move to" list on a PDF that holds a riser part. Check: the same kind of message shows.
+F2. Draw a segment with network type Supply Air on level 0 and make a riser (steps 6 and 7). Go to level 1. Choose the Select tool. Click the dashed ring. Check: the ring gets thicker with a faint fill. Click on empty canvas. Check: the ring is normal again.
+F3. Right-click the ring. Check: a menu shows with one entry "Draw from". Click it. Check: a toast says "Supply Air riser 1 attached on Level 1." and a riser mark shows on a fitting at the ring. Move the mouse and click to draw a segment. Check: the segment has the network type Supply Air, also when another type is picked in the toolbar. Press Escape.
+F4. Click the Undo button after "Draw from". Check: the fitting goes, a toast says "Supply Air riser 1 detached from Level 1.", and the ring shows again. Right-click the ring and choose "Draw from" again. Check: it works.
+F5. On any level, draw a segment with network type Extract Air. Pick the network type Supply Air in the toolbar. Right-click the end fitting of the segment and choose "Draw from". Draw a segment. Check: the new segment is Extract Air, the type of the fitting, and not Supply Air.
+F6. Start with a building that has no riser and two levels at different scales (steps 1 to 5). Make a riser on level 0 (it has one PDF, so this works). Go to level 1. Right-click a fitting that has the same network type. Check: "Make riser" is greyed and the hint says "Make riser is not possible here: the scale of Level 1 differs from Level 0." Draw a segment into the ring of the riser. Check: the ring turns red, nothing is drawn, and a message says to set the same scale first.
+F7. Close level 1 with a riser that joins level 0 and level 1. On level 0 change the scale and choose "Set <scale> on all 2 PDFs". Check: a note in the dialog says that Level 1 is closed and gets the scale when it opens. Open level 1 from Manage Buildings. Check: the status bar shows the new scale and the riser fitting is at the real-world position.
+F8. Use "Calibrate" in the left rail on a page that shares a riser, and set a new distance. Check: the same three-button dialog opens before the scale changes. Press Escape. Check: the scale did not change.
+F9. Open a plain app with no building. Change the scale in the status bar. Check: no dialog opens and the scale changes at once.
+
 ## Part B: desktop app (only if the Tauri build is installed)
 
 35. Open the desktop app. Repeat steps 1 to 5 and 6 to 11. Check: the same texts show. The sheets open with "Open" and no "Choose file…" is needed.
@@ -83,6 +95,8 @@ Words in this script: "level 0" is the lower level, "level 1" is the upper level
 - The agent did not run the desktop app (Tauri). Steps 35 to 38 are untested.
 - The agent used no real browser profile. The agent did not test Allow on every visit, a restart, Edge, Firefox or Incognito for risers.
 - The agent set the scale of a page through the scene API in the browser check, not through the status bar control. Steps 4, 5, 16 and 18 test the real control.
+- Feedback round 1 (F1 to F9): the agent ran these in Chromium on Linux only. A building file with a "set scale" pending change is refused by a B4 build from before this change (it names the kind as unknown). The file version stays 1.
+- Known gaps in round 1: Undo on page 1 can remove a riser fitting of page 0 without a detach. The right-click menu can open behind the right dock when the ring is near it. A scale change has no undo. A PDF with no scale is ignored by the "same scale" rule.
 - The agent did not test with a large building (more than 10 levels or more than 5 risers) or with a PDF that has a rotated page.
 - The agent did not test a shared coordinate system for the sheets. This is part B5: sheets line up only if the PDFs share one origin.
 - The check on "Page sizes differ" uses two different real plans. A building with equal page sizes does not show that text.
