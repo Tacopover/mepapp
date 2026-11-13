@@ -9,6 +9,7 @@ export * from './file-access.js';
 export * from './project-store.js';
 export * from './building-store.js';
 export * from './folder-building-store.js';
+export * from './pdf-handle-store.js';
 export * from './settings-store.js';
 export * from './memory/memory-library-store.js';
 export * from './memory/memory-building-store.js';

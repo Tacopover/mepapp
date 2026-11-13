@@ -3,10 +3,11 @@ import { MepSketchApp, type PdfPageLoadResult } from '@mepapp/ui';
 import { displayDimensions } from '@mepapp/core';
 import { MupdfEngine } from '@mepapp/pdf-engine-mupdf';
 import type { PdfDocumentHandle } from '@mepapp/pdf-engine';
-import type { AppDialogs, BuildingRef, BuildingStorageKind, BuildingStore, CloseGuard, FileAccess } from '@mepapp/platform';
+import type { AppDialogs, BuildingRef, BuildingStorageKind, BuildingStore, CloseGuard, FileAccess, PdfHandleStore } from '@mepapp/platform';
 import {
   createDevBuildingStore,
   createWebBuildingStores,
+  createWebPdfHandleStore,
   IndexedDbLibraryStore,
   WebAppDialogs,
   WebCloseGuard,
@@ -58,6 +59,7 @@ async function createPlatform(): Promise<{
   dialogs: AppDialogs;
   makeBuildingStore?: (ref: BuildingRef, target?: unknown) => BuildingStore;
   buildingStorage?: BuildingStorageKind;
+  pdfHandleStore?: PdfHandleStore;
 }> {
   if (isTauri) {
     const { TauriAppDialogs, TauriCloseGuard, TauriFileAccess, createTauriBuildingStore } = await import('@mepapp/platform-tauri');
@@ -89,6 +91,7 @@ async function createPlatform(): Promise<{
     dialogs: new WebAppDialogs(),
     makeBuildingStore: webStores.storage === 'blocked' ? undefined : webStores.make,
     buildingStorage: webStores.storage,
+    pdfHandleStore: createWebPdfHandleStore(),
   };
 }
 

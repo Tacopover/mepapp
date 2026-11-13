@@ -27,8 +27,8 @@ interface StoredFile {
   counter: number;
 }
 
-const DEFAULT_DB_NAME = 'mepapp-buildings';
-const DB_VERSION = 1;
+export const DEFAULT_DB_NAME = 'mepapp-buildings';
+const DB_VERSION = 2;
 const BLOCKED_MESSAGE = 'This browser does not let MepApp keep a building.';
 const UNAVAILABLE_MESSAGE = 'IndexedDB is not available';
 
@@ -58,9 +58,9 @@ function openDatabase(factory: IDBFactory, dbName: string): Promise<IDBDatabase>
     const req = factory.open(dbName, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      db.createObjectStore('handles');
-      db.createObjectStore('files');
-      db.createObjectStore('summaries');
+      for (const name of ['handles', 'files', 'summaries', 'pdfHandles', 'pdfFolders']) {
+        if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -73,7 +73,7 @@ function summaryKey(buildingId: string, projectUuid: string): string {
   return `${buildingId}:${projectUuid}`;
 }
 
-class BuildingDatabase {
+export class BuildingDatabase {
   private readonly factory: IDBFactory | undefined;
   private readonly dbName: string;
   private readonly unavailableMessage: string;
@@ -105,7 +105,7 @@ class BuildingDatabase {
     return this.dbPromise;
   }
 
-  private async run<T>(
+  async run<T>(
     storeName: string,
     mode: IDBTransactionMode,
     action: (store: IDBObjectStore) => IDBRequest<T>,
