@@ -120,7 +120,7 @@ async function devReadPath(path: string): ReturnType<NonNullable<FileAccess['rea
 
 const container = document.getElementById('root');
 if (container) {
-  void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs, makeBuildingStore, buildingStorage }) => {
+  void createPlatform().then(({ fileAccess: platformFileAccess, closeGuard, dialogs, makeBuildingStore, buildingStorage, pdfHandleStore }) => {
     const fileAccess: FileAccess =
       import.meta.env.DEV && localStorage.getItem('mepapp.devPlatform') === '1' && platformFileAccess.statPath === undefined
         ? Object.assign(Object.create(platformFileAccess), { statPath: devStatPath, readPath: devReadPath })
@@ -137,6 +137,7 @@ if (container) {
         closeGuard={closeGuard}
         dialogs={dialogs}
         makeBuildingStore={makeBuildingStore}
+        pdfHandleStore={pdfHandleStore}
         buildingStorage={buildingStorage}
         onBuildingReady={
           import.meta.env.DEV

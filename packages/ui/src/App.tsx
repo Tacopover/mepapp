@@ -84,7 +84,7 @@ import { RiserScaleDialog } from './components/RiserScaleDialog.js';
 import { RiserDeleteDialog } from './components/RiserDeleteDialog.js';
 import { SettingsDialog, MIN_SNAP_RADIUS_PX, MAX_SNAP_RADIUS_PX, MIN_ANGLE_SNAP_DEGREES, MAX_ANGLE_SNAP_DEGREES } from './components/SettingsDialog.js';
 import { GlobalPropertiesDialog, type GlobalPropertyDefs, type GlobalPropertyRenames } from './components/GlobalPropertiesDialog.js';
-import { ManageBuildingsDialog, type SheetOpenResult } from './components/ManageBuildingsDialog.js';
+import { ManageBuildingsDialog, type SheetNotice, type SheetOpenResult } from './components/ManageBuildingsDialog.js';
 import { SheetFileCache } from './sheetFileCache.js';
 import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog.js';
 import { ElementEditorDialog } from './components/ElementEditorDialog.js';
@@ -135,7 +135,19 @@ import {
 import { useShowBuiltInStamps } from './builtInStampsSetting.js';
 import { LibrarySourceDialog } from './components/LibrarySourceDialog.js';
 import { LibraryFoldersDialog } from './components/LibraryFoldersDialog.js';
-import { libraryFolderOf, type AppDialogs, type BuildingRef, type BuildingStorageKind, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore, type OpenedFile } from '@mepapp/platform';
+import { libraryFolderOf, type AppDialogs, type BuildingRef, type BuildingStorageKind, type BuildingStore, type CloseGuard, type FileAccess, type FileTarget, type FileTypeFilter, type LibraryFolderRef, type LibrarySourceRecord, type LibraryStore, type OpenedFile, type PdfHandleStore, pdfHandleFileKey } from '@mepapp/platform';
+import {
+  openStoredHandle,
+  pickerBlockedNotice,
+  removedKeys,
+  sheetFileKey,
+  sheetHasFile,
+  sheetKeySet,
+  shouldDeleteHandle,
+  storableHandle,
+  storedOpenNotice,
+  type StoredOpenOutcome,
+} from './pdfHandles.js';
 import './theme.css';
 
 // The project and the displayed page sizes of one document, read together.
@@ -184,6 +196,8 @@ export interface MepSketchAppProps {
   pdfEngine?: PdfEngine;
   /** Gives the app shell the rebuild action (null on unmount). A browser check starts it from the dev console. */
   onRebuildReady?: (run: ((read?: (sheet: BuildingSheet) => Promise<File | undefined>) => Promise<RebuildResult | undefined>) | null) => void;
+  /** Keeps the file handles of the PDFs of a building (Chrome and Edge). Without it a sheet needs the file picker after each restart. */
+  pdfHandleStore?: PdfHandleStore;
 }
 
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
@@ -289,6 +303,7 @@ export function MepSketchApp({
   onBuildingReady,
   pdfEngine,
   onRebuildReady,
+  pdfHandleStore,
 }: MepSketchAppProps) {
   useEffect(() => setAppDialogs(dialogs), [dialogs]);
   const userStampLibrary = useUserStampLibrary(libraryStore, fileAccess.capabilities.folders);
@@ -693,6 +708,53 @@ export function MepSketchApp({
       setSheetFilesVersion((n) => n + 1);
     }
   }, [buildingHook.building?.file.id]);
+  // The keys of the PDF handles stored for the open building. Read with sheetFilesRef.
+  const storedKeysRef = useRef(new Set<string>());
+  const openBuildingId = buildingHook.building?.file.id ?? null;
+  const openBuildingIdRef = useRef<string | null>(openBuildingId);
+  openBuildingIdRef.current = openBuildingId;
+  const canStoreHandles = pdfHandleStore?.available === true && fileAccess.readPath === undefined;
+  useEffect(() => {
+    storedKeysRef.current = new Set();
+    setSheetFilesVersion((n) => n + 1);
+    if (!canStoreHandles || openBuildingId === null || pdfHandleStore === undefined) return;
+    let cancelled = false;
+    void pdfHandleStore.listFiles(openBuildingId).then((keys) => {
+      if (cancelled || openBuildingIdRef.current !== openBuildingId) return;
+      keys.forEach((key) => storedKeysRef.current.add(key));
+      setSheetFilesVersion((n) => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [openBuildingId, pdfHandleStore, fileAccess]);
+  const rememberHandle = useCallback(
+    (fileName: string, sizeBytes: number, target: FileTarget | undefined) => {
+      const id = openBuildingIdRef.current;
+      const handle = storableHandle(target);
+      if (!canStoreHandles || pdfHandleStore === undefined || id === null || handle === undefined) return;
+      const key = pdfHandleFileKey(fileName, sizeBytes);
+      storedKeysRef.current.add(key);
+      void pdfHandleStore.putFile(id, key, handle);
+      setSheetFilesVersion((n) => n + 1);
+    },
+    [pdfHandleStore, canStoreHandles],
+  );
+  const sheetKeysRef = useRef<{ id: string | null; keys: Set<string> }>({ id: null, keys: new Set() });
+  useEffect(() => {
+    const file = buildingHook.building?.file ?? null;
+    const next = file === null ? new Set<string>() : sheetKeySet(file.sheets);
+    const previous = sheetKeysRef.current;
+    sheetKeysRef.current = { id: file?.id ?? null, keys: next };
+    if (file === null || previous.id !== file.id || !canStoreHandles || pdfHandleStore === undefined) return;
+    let removed = false;
+    for (const key of removedKeys(previous.keys, next)) {
+      storedKeysRef.current.delete(key);
+      void pdfHandleStore.deleteFile(file.id, key);
+      removed = true;
+    }
+    if (removed) setSheetFilesVersion((n) => n + 1);
+  }, [buildingHook.building?.file, pdfHandleStore]);
   // The sheet rows read the cache through this object. A new object after each change makes them render again.
   // On the desktop the cache stays empty: a sheet opens by its path there.
   const sheetFiles = useMemo(
@@ -700,12 +762,13 @@ export function MepSketchApp({
       remember: (list: OpenedFile[]) => {
         if (fileAccess.readPath !== undefined) return;
         list.forEach((item) => sheetFilesRef.current.remember(item));
+        list.forEach((item) => rememberHandle(item.file.name, item.file.size, item.target));
         setSheetFilesVersion((n) => n + 1);
       },
-      has: (sheet: BuildingSheet) => sheetFilesRef.current.has(sheet),
+      has: (sheet: BuildingSheet) => sheetHasFile(sheetFilesRef.current, storedKeysRef.current, sheet),
       isAmbiguous: (sheet: BuildingSheet) => sheetFilesRef.current.isAmbiguous(sheet),
     }),
-    [fileAccess, sheetFilesVersion],
+    [fileAccess, sheetFilesVersion, rememberHandle],
   );
   // The open/save running right now, if any. Only one runs at a time: two
   // overlapping saves of one PDF both write the same new annotations, and
@@ -796,6 +859,7 @@ export function MepSketchApp({
   const openPdfFile = useCallback(
     async (file: File, fileTarget: FileTarget | undefined): Promise<string | null> => {
       if (fileAccess.readPath === undefined) sheetFilesRef.current.remember({ file, target: fileTarget });
+      rememberHandle(file.name, file.size, fileTarget);
       // Reopening a file already open elsewhere in the document list just
       // switches to its tab — no re-parse, no duplicate — see decisions log
       // 2026-09-07's multi-document plan, D3.
@@ -856,7 +920,7 @@ export function MepSketchApp({
         fileTaskRef.current = null;
       }
     },
-    [fileAccess, onLoadPdfPage, resolveStampIconBitmap, sceneRef],
+    [fileAccess, onLoadPdfPage, rememberHandle, resolveStampIconBitmap, sceneRef],
   );
 
   documentOpenedRef.current = async ({ documentId, file, target, loadMismatch }) => {
@@ -949,6 +1013,24 @@ export function MepSketchApp({
     }
   }, [buildingHook.building?.file, buildingHook.building?.dirty, documents, activeDocumentId, snapshotDocument, writeSummaryForOpenDocument]);
 
+  const openStoredSheet = useCallback(
+    async (sheet: BuildingSheet): Promise<StoredOpenOutcome | undefined> => {
+      const id = openBuildingIdRef.current;
+      const key = sheetFileKey(sheet);
+      const size = sheet.location.sizeBytes;
+      if (!canStoreHandles || pdfHandleStore === undefined || id === null || key === undefined || size === undefined) return undefined;
+      if (!storedKeysRef.current.has(key) || sheetFilesRef.current.isAmbiguous(sheet)) return undefined;
+      const outcome = await openStoredHandle(await pdfHandleStore.getFile(id, key), size);
+      if (shouldDeleteHandle(outcome)) {
+        storedKeysRef.current.delete(key);
+        void pdfHandleStore.deleteFile(id, key); // not awaited: the click must still count as the gesture for the file picker
+        setSheetFilesVersion((n) => n + 1);
+      }
+      return outcome;
+    },
+    [canStoreHandles, pdfHandleStore],
+  );
+
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
   const openSheet = useCallback(
     async (sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> => {
@@ -959,6 +1041,7 @@ export function MepSketchApp({
         return { ok: true };
       }
       let opened: OpenedFile | undefined;
+      let pendingNotice: SheetNotice | undefined;
       try {
         if (mode === 'path') {
           const path = sheet.location.path;
@@ -975,8 +1058,19 @@ export function MepSketchApp({
           }
         } else {
           const cached = await sheetFilesRef.current.take(sheet);
-          opened = cached ?? (await fileAccess.openFile(PDF_FILE_TYPES));
-          if (opened === undefined) return { ok: false, message: null };
+          const stored = cached === undefined ? await openStoredSheet(sheet) : undefined;
+          opened = cached ?? (stored?.kind === 'opened' ? stored.opened : undefined);
+          if (opened === undefined) {
+            const failedNotice = stored === undefined ? null : storedOpenNotice(stored, sheet.location.fileName);
+            try {
+              opened = await fileAccess.openFile(PDF_FILE_TYPES);
+            } catch (err) {
+              if (stored === undefined) throw err;
+              return { ok: false, message: null, notice: pickerBlockedNotice(stored, sheet.location.fileName) };
+            }
+            if (opened === undefined) return failedNotice === null ? { ok: false, message: null } : { ok: false, message: null, notice: failedNotice };
+            pendingNotice = failedNotice ?? undefined;
+          }
         }
       } catch (err) {
         const message = `Could not open ${sheet.location.fileName}: ${(err as Error).message}`;
@@ -988,9 +1082,9 @@ export function MepSketchApp({
       if (!scene || !documentId) return { ok: false, message: 'The file could not be opened. See the header for details.' };
       if (scene.getActiveDocumentId() !== documentId) scene.activateDocument(documentId);
       await showPage(sheet.pageIndex);
-      return { ok: true };
+      return pendingNotice === undefined ? { ok: true } : { ok: true, notice: pendingNotice };
     },
-    [fileAccess, openPdfFile, sceneRef, showPage],
+    [fileAccess, openPdfFile, openStoredSheet, sceneRef, showPage],
   );
 
   const handleOpenPdf = useCallback(async () => {
@@ -1113,6 +1207,7 @@ export function MepSketchApp({
         modifiedMs = stat.modifiedMs ?? Date.now();
         documentSize = stat.sizeBytes ?? documentSize;
       }
+      rememberHandle(target.name, documentSize, target);
       const definitions = [...customStampDefinitions, ...userStampLibrary.definitions];
       await summaryAfterSave({
         store: buildingStore,
@@ -1123,7 +1218,7 @@ export function MepSketchApp({
       });
       await buildingHook.reload();
     },
-    [buildingHook.reload, buildingStore, customStampDefinitions, fileAccess, snapshotDocument, userStampLibrary.definitions],
+    [buildingHook.reload, buildingStore, customStampDefinitions, fileAccess, rememberHandle, snapshotDocument, userStampLibrary.definitions],
   );
 
   // Rebuilds the sheet summary of every document of the open building. The PDFs are read by
@@ -2349,7 +2444,17 @@ export function MepSketchApp({
 
       {manageBuildingsOpen && (
         <ManageBuildingsDialog
-          building={buildingHook}
+          building={{
+            ...buildingHook,
+            forgetRecent: (id: string) => {
+              buildingHook.forgetRecent(id);
+              if (canStoreHandles) void pdfHandleStore?.deleteBuilding(id);
+              if (id === openBuildingIdRef.current) {
+                storedKeysRef.current = new Set();
+                setSheetFilesVersion((n) => n + 1);
+              }
+            },
+          }}
           onClose={() => setManageBuildingsOpen(false)}
           fileAccess={fileAccess}
           pdfEngine={pdfEngine}

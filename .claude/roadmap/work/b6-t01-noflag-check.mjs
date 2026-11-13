@@ -44,6 +44,7 @@ await t.context.addInitScript(() => {
   };
   const origPut = IDBObjectStore.prototype.put;
   IDBObjectStore.prototype.put = function (value, key) {
+    if (this.name === 'pdfHandles') throw new DOMException('no handle store (T01 simulates Firefox)', 'DataError');
     if (this.name === 'handles' && value && typeof value.getFile === 'function') return origPut.call(this, { __fakeHandle: value.name }, key);
     return origPut.call(this, value, key);
   };

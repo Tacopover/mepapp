@@ -39,8 +39,10 @@ import { LevelSheetsPane } from './LevelSheetsPane.js';
 import { OpenDocumentsPane } from './OpenDocumentsPane.js';
 import { openedSheetIds, type OpenDocumentRow } from '../openDocumentsView.js';
 
-/** The result of opening a sheet. A null message means the user cancelled the file picker. */
-export type SheetOpenResult = { ok: true } | { ok: false; message: string | null };
+export interface SheetNotice { text: string; error: boolean }
+
+/** The result of opening a sheet. A null message means the user cancelled the file picker, and the three panes stay silent. The notice, when set, is shown by the dialog. */
+export type SheetOpenResult = { ok: true; notice?: SheetNotice } | { ok: false; message: string | null; notice?: SheetNotice };
 
 const NARROW_QUERY = '(max-width: 899px)';
 
@@ -196,7 +198,8 @@ export function ManageBuildingsDialog({
   /** The open action of the sheet rows. The dialog stays open, so the user can open more sheets. */
   async function openSheetKeepOpen(sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> {
     const result = await onOpenSheet(sheet, mode);
-    if (result.ok) onNotice(`Opened ${sheet.displayName} in the viewer.`, false);
+    if (result.ok) onNotice(`${result.notice !== undefined ? `${result.notice.text} ` : ''}Opened ${sheet.displayName} in the viewer.`, result.notice?.error === true);
+    else if (result.notice !== undefined) onNotice(result.notice.text, result.notice.error);
     return result;
   }
 
