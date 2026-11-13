@@ -7,13 +7,17 @@ export interface PdfNeed {
   sheet: BuildingSheet;
 }
 
-/** Distinct fileName+size among `sheets` that have a size and for which canOpen(sheet) is false. Order of first appearance. */
-export function pdfsNeedingFile(sheets: BuildingSheet[], canOpen: (sheet: BuildingSheet) => boolean): PdfNeed[] {
+/** Distinct fileName+size among `sheets` that have a size, are not opened in the viewer and for which canOpen(sheet) is false. Order of first appearance. */
+export function pdfsNeedingFile(
+  sheets: BuildingSheet[],
+  canOpen: (sheet: BuildingSheet) => boolean,
+  openedSheetIds: ReadonlySet<string> = new Set(),
+): PdfNeed[] {
   const seen = new Set<string>();
   const needed: PdfNeed[] = [];
   for (const sheet of sheets) {
     const size = sheet.location.sizeBytes;
-    if (size === undefined || canOpen(sheet)) continue;
+    if (size === undefined || openedSheetIds.has(sheet.id) || canOpen(sheet)) continue;
     const key = SheetFileCache.key(sheet.location.fileName, size);
     if (seen.has(key)) continue;
     seen.add(key);

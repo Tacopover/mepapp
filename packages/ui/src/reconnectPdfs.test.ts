@@ -52,6 +52,21 @@ describe('pdfsNeedingFile', () => {
   });
 });
 
+describe('pdfsNeedingFile with opened sheets', () => {
+  it('skips sheets that are opened in the viewer', () => {
+    const sheets = [sheetOf('a.pdf', 3), sheetOf('b.pdf', 4)];
+    const needed = pdfsNeedingFile(sheets, never, new Set([sheets[0]!.id]));
+    expect(needed.map((need) => need.fileName)).toEqual(['b.pdf']);
+  });
+
+  it('keeps a PDF that another, not opened sheet still needs', () => {
+    const sheets = [sheetOf('a.pdf', 3, 0), sheetOf('a.pdf', 3, 1)];
+    const needed = pdfsNeedingFile(sheets, never, new Set([sheets[0]!.id]));
+    expect(needed).toHaveLength(1);
+    expect(needed[0]?.sheet).toBe(sheets[1]);
+  });
+});
+
 describe('reconnectHint and reconnectTooltip', () => {
   it('has the singular hint for one PDF', () => {
     expect(reconnectHint(1)).toBe('1 PDF needs a file before it opens. Choose it again.');

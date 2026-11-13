@@ -2063,6 +2063,12 @@ button.mep-tree-arrow {
   .mep-buildings-detail {
     display: block;
   }
+  .mep-buildings-status-line {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: var(--surface);
+  }
   .mep-buildings-panel {
     overflow: visible;
     background: none;

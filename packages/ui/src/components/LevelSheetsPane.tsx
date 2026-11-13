@@ -105,7 +105,7 @@ export function LevelSheetsPane({
   const groups = rowGroups(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
   const needsFix = shown.some((sheet) => sheetStatus[sheet.id] === 'pdf-missing' || sheetStatus[sheet.id] === 'no-access');
-  const needed = pdfsNeedingFile(shown, canOpenCached ?? (() => false));
+  const needed = pdfsNeedingFile(shown, canOpenCached ?? (() => false), openedSheetIds);
   const rowsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
