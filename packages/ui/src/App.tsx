@@ -703,6 +703,7 @@ export function MepSketchApp({
         setSheetFilesVersion((n) => n + 1);
       },
       has: (sheet: BuildingSheet) => sheetFilesRef.current.has(sheet),
+      isAmbiguous: (sheet: BuildingSheet) => sheetFilesRef.current.isAmbiguous(sheet),
     }),
     [fileAccess, sheetFilesVersion],
   );

@@ -27,6 +27,13 @@ export class SheetFileCache {
     return this.entries.has(key) && !this.ambiguous.has(key);
   }
 
+  /** True when the key of the sheet has two different files. False for a sheet with no size and for an unknown file. */
+  isAmbiguous(sheet: BuildingSheet): boolean {
+    const size = sheet.location.sizeBytes;
+    if (size === undefined) return false;
+    return this.ambiguous.has(SheetFileCache.key(sheet.location.fileName, size));
+  }
+
   /** The file of the sheet, or undefined. With a target that has getFile(): calls it again; if it throws or the size differs from sheet.location.sizeBytes, drops the entry and returns undefined. Without such a target: returns the stored file when its size equals sheet.location.sizeBytes. An ambiguous key returns undefined. */
   async take(sheet: BuildingSheet): Promise<OpenedFile | undefined> {
     const size = sheet.location.sizeBytes;

@@ -85,6 +85,33 @@ describe('SheetFileCache', () => {
     expect(await cache.take(sheetOf('a.pdf', 3))).toBeUndefined();
   });
 
+  it('reports an ambiguous key for two different files with the same name and size', () => {
+    const cache = new SheetFileCache();
+    cache.remember({ file: new File(['abc'], 'a.pdf', { lastModified: 1 }) });
+    cache.remember({ file: new File(['xyz'], 'a.pdf', { lastModified: 2 }) });
+    expect(cache.isAmbiguous(sheetOf('a.pdf', 3))).toBe(true);
+  });
+
+  it('reports no ambiguous key for a normal file', () => {
+    const cache = new SheetFileCache();
+    cache.remember({ file: new File(['abc'], 'a.pdf') });
+    expect(cache.isAmbiguous(sheetOf('a.pdf', 3))).toBe(false);
+  });
+
+  it('reports no ambiguous key for a sheet without a size', () => {
+    const cache = new SheetFileCache();
+    cache.remember({ file: new File(['abc'], 'a.pdf', { lastModified: 1 }) });
+    cache.remember({ file: new File(['xyz'], 'a.pdf', { lastModified: 2 }) });
+    expect(cache.isAmbiguous(sheetOf('a.pdf'))).toBe(false);
+  });
+
+  it('reports no ambiguous key for an unknown file', () => {
+    const cache = new SheetFileCache();
+    cache.remember({ file: new File(['abc'], 'a.pdf', { lastModified: 1 }) });
+    cache.remember({ file: new File(['xyz'], 'a.pdf', { lastModified: 2 }) });
+    expect(cache.isAmbiguous(sheetOf('b.pdf', 3))).toBe(false);
+  });
+
   it('does not mark the same file remembered twice as ambiguous', () => {
     const cache = new SheetFileCache();
     const file = new File(['abc'], 'a.pdf', { lastModified: 1 });

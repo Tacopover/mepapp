@@ -101,7 +101,11 @@ export interface ManageBuildingsDialogProps {
   activeSheetLevelId?: string | null;
   /** The documents open in the viewer, one row each (openDocumentRows). */
   openDocuments?: readonly OpenDocumentRow[];
-  sheetFiles?: { remember: (opened: OpenedFile[]) => void; has: (sheet: BuildingSheet) => boolean };
+  sheetFiles?: {
+    remember: (opened: OpenedFile[]) => void;
+    has: (sheet: BuildingSheet) => boolean;
+    isAmbiguous: (sheet: BuildingSheet) => boolean;
+  };
   riserConflictKeys?: ReadonlySet<string>;
 }
 
@@ -580,6 +584,8 @@ export function ManageBuildingsDialog({
                   onNotice={onNotice}
                   openedSheetIds={openedSheetIds(openDocuments)}
                   canOpenCached={sheetFiles?.has}
+                  rememberFiles={sheetFiles?.remember}
+                  isAmbiguous={sheetFiles?.isAmbiguous}
                 />
                 <BuildingSummariesPane
                   key={`${openBuilding.file.id}-summaries`}

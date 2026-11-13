@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef } from 'react';
 import { moveSheet, removeSheet, sheetMoveBlock, type BuildingFile, type BuildingSheet } from '@mepapp/core';
-import type { FileAccess } from '@mepapp/platform';
+import type { FileAccess, OpenedFile } from '@mepapp/platform';
 import { countLabel } from '../buildingLevels.js';
+import { BUILDING_PDF_TYPES } from '../buildingPdfInfo.js';
 import { sheetGroupsOfLevel, sheetRemoveRefusal } from '../buildingSheets.js';
 import {
   statusHint,
@@ -12,6 +13,8 @@ import {
   type SheetStatus,
   type SheetSummaryInfo,
 } from '../buildingStatus.js';
+import { pdfsNeedingFile, reconnectHint, reconnectResult, reconnectTooltip } from '../reconnectPdfs.js';
+import { SheetFileCache } from '../sheetFileCache.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
 import { BuildingSection } from './BuildingSection.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
@@ -36,9 +39,22 @@ export interface LevelSheetsPaneProps {
   openedSheetIds?: ReadonlySet<string>;
   /** True when the PDF of the sheet was given to the app in this tab. Its row then opens without a picker. */
   canOpenCached?: (sheet: BuildingSheet) => boolean;
+  /** Keeps the PDF files that the user picked in this tab, so their sheets open without a second pick. */
+  rememberFiles?: (opened: OpenedFile[]) => void;
+  /** True when two different files have the name and size of the sheet. The app then uses neither. */
+  isAmbiguous?: (sheet: BuildingSheet) => boolean;
 }
 
 const NO_OPENED_SHEETS: ReadonlySet<string> = new Set();
+
+function sheetKeys(sheets: BuildingSheet[]): Set<string> {
+  const keys = new Set<string>();
+  for (const sheet of sheets) {
+    const size = sheet.location.sizeBytes;
+    if (size !== undefined) keys.add(SheetFileCache.key(sheet.location.fileName, size));
+  }
+  return keys;
+}
 
 /** One block of rows. A level block (building node) has a header row with the level name. */
 interface RowGroup {
@@ -83,10 +99,13 @@ export function LevelSheetsPane({
   highlight = null,
   openedSheetIds = NO_OPENED_SHEETS,
   canOpenCached,
+  rememberFiles,
+  isAmbiguous,
 }: LevelSheetsPaneProps) {
   const groups = rowGroups(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
   const needsFix = shown.some((sheet) => sheetStatus[sheet.id] === 'pdf-missing' || sheetStatus[sheet.id] === 'no-access');
+  const needed = pdfsNeedingFile(shown, canOpenCached ?? (() => false));
   const rowsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -105,6 +124,29 @@ export function LevelSheetsPane({
     }
   }
 
+  async function reconnect() {
+    const needed0 = needed;
+    let opened: OpenedFile[];
+    try {
+      opened = await fileAccess.openFiles(BUILDING_PDF_TYPES);
+    } catch (err) {
+      onNotice(`Could not open the file picker: ${(err as Error).message}`, true);
+      return;
+    }
+    if (opened.length === 0) return;
+    rememberFiles?.(opened);
+    const result = reconnectResult({
+      needed: needed0,
+      picked: opened.map((item) => ({ name: item.file.name, size: item.file.size })),
+      scopeKeys: sheetKeys(shown),
+      buildingKeys: sheetKeys(file.sheets),
+      isFound: (need) => canOpenCached?.(need.sheet) === true,
+      isAmbiguous: (need) => isAmbiguous?.(need.sheet) === true,
+      levelScope: levelId !== null,
+    });
+    onNotice(result.text, result.error);
+  }
+
   async function openRow(sheet: BuildingSheet, mode: 'path' | 'pick') {
     const result = await onOpenSheet(sheet, mode);
     if (!result.ok && result.message !== null) {
@@ -117,6 +159,12 @@ export function LevelSheetsPane({
 
   return (
     <BuildingSection title="Sheets" testId="level-sheets" aside={countLabel(shown.length, 'sheet')}>
+      {fileAccess.readPath === undefined && rememberFiles !== undefined && needed.length >= 1 && (
+        <div className="mep-reconnect" data-testid="reconnect-band">
+          <p className="mep-hint" data-testid="reconnect-hint">{reconnectHint(needed.length)}</p>
+          <button type="button" data-testid="reconnect-pdfs" aria-label="Reconnect PDFs" title={reconnectTooltip(levelId !== null)} onClick={() => void reconnect()}>Reconnect PDFs…</button>
+        </div>
+      )}
       {shown.length === 0 && (
         <p className="mep-hint">
           {levelId === null ? 'No sheets in this building yet.' : 'No sheets on this level. Use Add PDFs… below.'}

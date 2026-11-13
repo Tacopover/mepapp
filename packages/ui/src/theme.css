@@ -6089,6 +6089,29 @@ button.mep-tree-arrow {
 .mep-sheets-count {
   margin: 8px 0 0;
 }
+.mep-reconnect {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.mep-reconnect .mep-hint {
+  margin: 0;
+}
+.mep-reconnect button {
+  font-size: 12px;
+}
+@media (max-width: 899px) {
+  .mep-reconnect {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mep-reconnect button {
+    justify-self: start;
+  }
+}
 .mep-add-result {
   display: flex;
   align-items: flex-start;
