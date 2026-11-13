@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   deleteRisers,
-  mmToPt,
   pendingScaleOf,
+  rescaleRisers,
   risersOnSheet,
   scaleDenominatorFromCalibration,
   setPendingScale,
@@ -282,19 +282,35 @@ export function useBuildingRisers(args: {
         setScaleChange(null);
         return;
       }
+      syncing.current += 1;
       try {
         let file: BuildingFile | null = live.current.building?.file ?? null;
-        if (plan.setSheetIds.length > 0) {
-          try {
-            await live.current.update((current) => {
-              file = setPendingScale(current, plan.setSheetIds, next.pageUnitsPerRealUnit);
-              return file;
-            });
-          } catch {
-            const firstId = plan.setSheetIds[0];
-            failScaleChange(scaleSetFailedText(plan.rows.find((row) => row.sheetId === firstId)?.levelName ?? plan.levelName));
-            return;
-          }
+        try {
+          await live.current.update((current) => {
+            const ratios = new Map<string, number>();
+            const groupIds = new Set(plan.rows.map((row) => row.sheetId));
+            const scaleOf = scaleOfWith(current, summariesCache.current);
+            for (const riser of current.risers) {
+              const members = riser.members.filter((member) => groupIds.has(member.sheetId));
+              const ordered = [...members.filter((member) => member.sheetId === plan.currentSheetId), ...members.filter((member) => member.sheetId !== plan.currentSheetId)];
+              for (const member of ordered) {
+                const sheet = current.sheets.find((candidate) => candidate.id === member.sheetId);
+                if (sheet === undefined) continue;
+                const old = scaleOf(sheet);
+                if (old !== null && old > 0) {
+                  ratios.set(riser.id, old / next.pageUnitsPerRealUnit);
+                  break;
+                }
+              }
+            }
+            const scaled = plan.setSheetIds.length > 0 ? setPendingScale(current, plan.setSheetIds, next.pageUnitsPerRealUnit) : current;
+            file = rescaleRisers(scaled, ratios);
+            return file;
+          });
+        } catch {
+          const firstId = plan.setSheetIds[0];
+          failScaleChange(scaleSetFailedText(plan.rows.find((row) => row.sheetId === firstId)?.levelName ?? plan.levelName));
+          return;
         }
         if (file === null) {
           failScaleChange(scaleSetFailedText(plan.levelName));
@@ -306,14 +322,6 @@ export function useBuildingRisers(args: {
           const isShown = sheetId === plan.currentSheetId;
           const docId = isShown ? activeDocumentId : (docOfSheet(scene, target)?.id ?? null);
           if (docId === null) continue;
-          const size = isShown ? scene.getDisplayedPageSize() : scene.getDocumentPageSize(docId, target.pageIndex);
-          if (size !== null) {
-            for (const riser of risersOnSheet(file, target.id)) {
-              const member = riser.members.find((candidate) => candidate.sheetId === target.id);
-              if (member === undefined) continue;
-              scene.applyRemoteFittingMoveIn(docId, member.fittingId, mmToPt(riser.anchorMm, { heightPt: size.heightPt, ppmm: next.pageUnitsPerRealUnit }));
-            }
-          }
           if (isShown) scene.applyCalibration(next);
           else scene.setCalibrationIn(docId, target.pageIndex, next);
         }
@@ -326,6 +334,9 @@ export function useBuildingRisers(args: {
         scaleOpen.current = false;
         setScaleChange(null);
         throw error;
+      } finally {
+        syncing.current -= 1;
+        setSceneTick((tick) => tick + 1);
       }
     });
   };

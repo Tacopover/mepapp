@@ -187,10 +187,10 @@ describe('scale dialog texts', () => {
     const file = baseFile([riserOn('r1', 'R1', ['s0', 's1'])]);
     const allOpen = planFor(file, 's0', allAt50);
     expect(scaleSetAllLabel(allOpen)).toBe('Set 1:100 on all 2 PDFs');
-    expect(scaleSetAllHint(allOpen)).toBe('Set 1:100 on all 2 PDFs: the risers keep their positions in real-world units.');
+    expect(scaleSetAllHint(allOpen)).toBe('Set 1:100 on all 2 PDFs: nothing moves on the pages. The risers stay on their fittings.');
     const oneClosed = planFor(file, 's0', allAt50, () => false);
     expect(scaleSetAllHint(oneClosed)).toBe(
-      'Set 1:100 on all 2 PDFs: the risers keep their positions in real-world units. A PDF that is not open gets the new scale when you open it.',
+      'Set 1:100 on all 2 PDFs: nothing moves on the pages. The risers stay on their fittings. A PDF that is not open gets the new scale when you open it.',
     );
   });
 
@@ -208,7 +208,7 @@ describe('scale dialog texts', () => {
   });
 
   it('builds the set-all and disconnect messages', () => {
-    expect(scaleSetAllMessage(100, 2)).toBe('The scale is 1:100 on 2 PDFs. The risers stay at the same real-world positions.');
+    expect(scaleSetAllMessage(100, 2)).toBe('The scale is 1:100 on 2 PDFs. Nothing moved on the pages.');
     expect(scaleDisconnectMessage(1)).toBe('1 riser disconnected. Its fittings are normal fittings now.');
     expect(scaleDisconnectMessage(2)).toBe('2 risers disconnected. Their fittings are normal fittings now.');
   });

@@ -300,3 +300,26 @@ export function setPendingScale(file: BuildingFile, sheetIds: readonly string[],
   if (!changed) return file;
   return { ...file, risers };
 }
+
+/** For each riser id in `ratios` (value = oldPageUnitsPerRealUnit / newPageUnitsPerRealUnit), multiplies riser.anchorMm (xMm and yMm) by the ratio and rounds to 0.01 mm with roundMm. Does the same for toMm of every pending op of kind 'move' of that riser (those values are in the old real-world frame). 'setScale' and 'retag' ops and every other field stay as they are. A ratio that is not finite, not > 0, or exactly 1 is ignored; a riser id that does not exist is ignored. Nothing changed: the same file object. A riser with no change keeps its object. */
+export function rescaleRisers(file: BuildingFile, ratios: ReadonlyMap<string, number>): BuildingFile {
+  let changed = false;
+  const risers = file.risers.map((riser) => {
+    const ratio = ratios.get(riser.id);
+    if (ratio === undefined || !Number.isFinite(ratio) || ratio <= 0 || ratio === 1) return riser;
+    const anchorMm = { xMm: roundMm(riser.anchorMm.xMm * ratio), yMm: roundMm(riser.anchorMm.yMm * ratio) };
+    const pending = riser.pending.map((op) => {
+      if (op.kind !== 'move' || op.toMm === undefined) return op;
+      const toMm = { xMm: roundMm(op.toMm.xMm * ratio), yMm: roundMm(op.toMm.yMm * ratio) };
+      if (toMm.xMm === op.toMm.xMm && toMm.yMm === op.toMm.yMm) return op;
+      return { ...op, toMm };
+    });
+    const anchorUnchanged = anchorMm.xMm === riser.anchorMm.xMm && anchorMm.yMm === riser.anchorMm.yMm;
+    const pendingUnchanged = pending.every((op, index) => op === riser.pending[index]);
+    if (anchorUnchanged && pendingUnchanged) return riser;
+    changed = true;
+    return { ...riser, anchorMm, pending };
+  });
+  if (!changed) return file;
+  return { ...file, risers };
+}

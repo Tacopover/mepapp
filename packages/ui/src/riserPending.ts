@@ -134,22 +134,6 @@ export function planPendingOps(file: BuildingFile, args: { sheet: BuildingSheet;
       }
     }
   }
-  if (scale !== null && effective !== null) {
-    for (const riser of file.risers) {
-      const member = riser.members.find((candidate) => candidate.sheetId === sheet.id);
-      if (member === undefined) continue;
-      if (edits.some((edit) => edit.riserId === riser.id && edit.kind === 'move')) continue;
-      const lastScale = riser.pending.filter((op) => op.sheetId === sheet.id && op.kind === 'setScale').sort((a, b) => a.seq - b.seq).pop();
-      edits.push({
-        key: { riserId: riser.id, seq: lastScale?.seq ?? -1 },
-        riserId: riser.id,
-        label: riser.name,
-        kind: 'move',
-        fittingId: member.fittingId,
-        toPt: mmToPt(riser.anchorMm, { heightPt: effective.heightPt, ppmm: effective.pageUnitsPerRealUnit }),
-      });
-    }
-  }
   const waitingUnique = uniqueOf(waitingLabels);
   return {
     edits: edits.sort((a, b) => a.key.seq - b.key.seq),
@@ -187,7 +171,7 @@ export function pendingNotices(args: {
   const parts: string[] = [];
   const moved = applied.filter((edit) => edit.kind === 'move');
   if (typeof scaleApplied === 'number') {
-    parts.push(`The scale of ${levelName} is 1:${scaleApplied} now, to match the building. The risers stay at the same real-world positions.`);
+    parts.push(`The scale of ${levelName} is 1:${scaleApplied} now, to match the building. Nothing moved on the page.`);
   } else if (moved.length > 0) {
     const summaryNote = plan.frameSource === 'summary' ? ' (scale from the saved sheet)' : '';
     parts.push(`${who(moved.map((edit) => edit.label))} moved on ${levelName} to match the building${summaryNote}.`);

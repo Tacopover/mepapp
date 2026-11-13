@@ -85,7 +85,7 @@ export function scaleSetAllLabel(plan: ScaleChangePlan): string {
 
 /** The hint under the set-all button. It names the open-later rule when a PDF is not open. */
 export function scaleSetAllHint(plan: ScaleChangePlan): string {
-  const base = `Set 1:${plan.newDenominator} on all ${plan.rows.length} PDFs: the risers keep their positions in real-world units.`;
+  const base = `Set 1:${plan.newDenominator} on all ${plan.rows.length} PDFs: nothing moves on the pages. The risers stay on their fittings.`;
   if (plan.rows.some((row) => !row.open)) return `${base} A PDF that is not open gets the new scale when you open it.`;
   return base;
 }
@@ -106,7 +106,7 @@ export function scaleDisconnectHint(plan: ScaleChangePlan): string {
 
 /** The message after the set-all action. */
 export function scaleSetAllMessage(n: number, count: number): string {
-  return `The scale is 1:${n} on ${count} PDFs. The risers stay at the same real-world positions.`;
+  return `The scale is 1:${n} on ${count} PDFs. Nothing moved on the pages.`;
 }
 
 /** The message after the disconnect action. */

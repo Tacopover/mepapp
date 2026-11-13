@@ -13,6 +13,7 @@ import {
   moveRiser,
   nextRiserLabel,
   pendingScaleOf,
+  rescaleRisers,
   riserSheetGroup,
   setMemberConnectionHeight,
   setPendingScale,
@@ -568,5 +569,54 @@ describe('deleteRisers', () => {
     const file = fileWithRiser();
     expect(deleteRisers(file, ['nope'])).toBe(file);
     expect(deleteRisers(file, [])).toBe(file);
+  });
+});
+
+describe('rescaleRisers', () => {
+  function anchored(xMm: number, yMm: number): BuildingFile {
+    return moveRiser(fileWithRiser(), 'r1', { xMm, yMm }, 's0', new Set()).file;
+  }
+
+  it('multiplies the anchor by the ratio and rounds to 0.01 mm', () => {
+    expect(riserOf(rescaleRisers(anchored(1000, 2000), new Map([['r1', 2]])), 'r1').anchorMm).toEqual({ xMm: 2000, yMm: 4000 });
+    expect(riserOf(rescaleRisers(anchored(1000, 3), new Map([['r1', 0.5]])), 'r1').anchorMm).toEqual({ xMm: 500, yMm: 1.5 });
+    expect(riserOf(rescaleRisers(anchored(10, 10), new Map([['r1', 1 / 3]])), 'r1').anchorMm).toEqual({ xMm: 3.33, yMm: 3.33 });
+  });
+
+  it('scales the toMm of pending move ops and keeps their other fields', () => {
+    const attached = ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+    const moved = moveRiser(attached, 'r1', { xMm: 100, yMm: 200 }, 's0', new Set()).file;
+    const file = rescaleRisers(moved, new Map([['r1', 2]]));
+    expect(riserOf(file, 'r1').pending).toEqual([{ seq: 1, sheetId: 's1', kind: 'move', toMm: { xMm: 200, yMm: 400 } }]);
+    expect(riserOf(file, 'r1').anchorMm).toEqual({ xMm: 200, yMm: 400 });
+  });
+
+  it('leaves the setScale ops unchanged', () => {
+    const attached = ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+    const scaled = setPendingScale(attached, ['s0', 's1'], 2.5);
+    const before = riserOf(scaled, 'r1').pending.filter((op) => op.kind === 'setScale');
+    const file = rescaleRisers(scaled, new Map([['r1', 2]]));
+    expect(riserOf(file, 'r1').pending.filter((op) => op.kind === 'setScale')).toEqual(before);
+  });
+
+  it('returns the same file when nothing changes', () => {
+    const file = anchored(1000, 2000);
+    expect(rescaleRisers(file, new Map())).toBe(file);
+    expect(rescaleRisers(file, new Map([['r1', 1]]))).toBe(file);
+    expect(rescaleRisers(file, new Map([['r1', 0]]))).toBe(file);
+    expect(rescaleRisers(file, new Map([['r1', -1]]))).toBe(file);
+    expect(rescaleRisers(file, new Map([['r1', Number.NaN]]))).toBe(file);
+    expect(rescaleRisers(file, new Map([['r1', Number.POSITIVE_INFINITY]]))).toBe(file);
+    expect(rescaleRisers(file, new Map([['nope', 2]]))).toBe(file);
+  });
+
+  it('changes only the listed risers', () => {
+    const file = ok(
+      makeRiser(anchored(1000, 2000), { id: 'r2', name: 'R2', networkType: water, sheetId: 's2', fittingId: 'f2', fittingPt: { x: 0, y: 0 }, frame }),
+    );
+    const next = rescaleRisers(file, new Map([['r1', 2]]));
+    expect(riserOf(next, 'r1').anchorMm).toEqual({ xMm: 2000, yMm: 4000 });
+    expect(riserOf(next, 'r2')).toEqual(riserOf(file, 'r2'));
+    expect(riserOf(next, 'r2')).toBe(riserOf(file, 'r2'));
   });
 });

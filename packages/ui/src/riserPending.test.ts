@@ -307,31 +307,41 @@ describe('planPendingOps with a scale', () => {
     expect(plan.obsolete).toEqual([]);
   });
 
-  it('reseats a riser that has only a setScale op at its building position, keyed by that op', () => {
+  it('does not move a riser that has only a setScale op', () => {
     const file = fileWith([riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], [scaleOp(3, 's1', ppmm50)])]);
     const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'id', frame: scene });
-    expect(plan.edits).toEqual([
-      {
-        key: { riserId: 'r1', seq: 3 },
-        riserId: 'r1',
-        label: 'Supply air riser 1',
-        kind: 'move',
-        fittingId: 'f1',
-        toPt: mmToPt({ xMm: 1000, yMm: 2000 }, { heightPt: 842, ppmm: ppmm50 }),
-      },
-    ]);
+    expect(plan.edits).toEqual([]);
     expect(plan.scale).toEqual({ pageUnitsPerRealUnit: ppmm50, keys: [{ riserId: 'r1', seq: 3 }] });
+    expect(plan.obsolete).toEqual([]);
   });
 
-  it('keys the reseat of a riser without a setScale op at seq -1 and sorts it first', () => {
+  it('keeps two risers in place when the sheet has a setScale op', () => {
     const file = fileWith([
       riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], []),
       riserOf('r2', 'Supply air riser 2', vent, [riserMember('s1', 'l1', 'f2')], [scaleOp(3, 's1', ppmm50)]),
     ]);
     const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'id', frame: scene });
-    expect(plan.edits.map((edit) => edit.key)).toEqual([
-      { riserId: 'r1', seq: -1 },
-      { riserId: 'r2', seq: 3 },
+    expect(plan.edits).toEqual([]);
+    expect(plan.scale).toEqual({ pageUnitsPerRealUnit: ppmm50, keys: [{ riserId: 'r2', seq: 3 }] });
+  });
+
+  it('gives one edit for a riser with a move and a setScale op on the same sheet', () => {
+    const file = fileWith([
+      riserOf('r1', 'Supply air riser 1', vent, [riserMember('s1', 'l1', 'f1')], [
+        { seq: 1, sheetId: 's1', kind: 'move', toMm: moveTo },
+        scaleOp(2, 's1', ppmm50),
+      ]),
+    ]);
+    const plan = planPendingOps(file, { sheet: sheetOf(file, 's1'), link: 'id', frame: scene });
+    expect(plan.edits).toEqual([
+      {
+        key: { riserId: 'r1', seq: 1 },
+        riserId: 'r1',
+        label: 'Supply air riser 1',
+        kind: 'move',
+        fittingId: 'f1',
+        toPt: mmToPt(moveTo, { heightPt: 842, ppmm: ppmm50 }),
+      },
     ]);
   });
 
@@ -426,7 +436,7 @@ describe('pendingNotices', () => {
   it('reports the applied scale and leaves out the moved part', () => {
     const notices = pendingNotices({ file, sheet, link: 'id', plan: idPlan, applied: [moveEdit('Supply air riser 1')], scaleApplied: 50 });
     expect(notices).toEqual([
-      { kind: 'info', message: 'The scale of Ground is 1:50 now, to match the building. The risers stay at the same real-world positions.' },
+      { kind: 'info', message: 'The scale of Ground is 1:50 now, to match the building. Nothing moved on the page.' },
     ]);
   });
 
