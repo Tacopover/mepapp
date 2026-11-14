@@ -149,7 +149,11 @@ import {
   pickedOtherFileNotice,
   type StoredOpenOutcome,
 } from './pdfHandles.js';
+import type { FolderMatch } from './pdfFolder.js';
+import { usePdfFolder } from './usePdfFolder.js';
 import './theme.css';
+
+const NO_SHEETS: BuildingSheet[] = [];
 
 // The project and the displayed page sizes of one document, read together.
 type DocumentSnapshot = { project: ProjectDocument; pageInfos: ReturnType<typeof displayedPageInfos> };
@@ -756,6 +760,25 @@ export function MepSketchApp({
     }
     if (removed) setSheetFilesVersion((n) => n + 1);
   }, [buildingHook.building?.file, pdfHandleStore]);
+  const rememberFolderMatch = useCallback(
+    (match: FolderMatch, ambiguous: boolean) => {
+      const target = match.handle as unknown as FileTarget;
+      sheetFilesRef.current.remember({ file: match.file, target });
+      if (!ambiguous) rememberHandle(match.file.name, match.file.size, target);
+    },
+    [rememberHandle],
+  );
+  const pdfFolder = usePdfFolder({
+    store: pdfHandleStore,
+    enabled: canStoreHandles,
+    buildingId: openBuildingId,
+    sheets: buildingHook.building?.file.sheets ?? NO_SHEETS,
+    fileAccess,
+    cache: sheetFilesRef.current,
+    hasStoredKey: (key) => storedKeysRef.current.has(key),
+    rememberMatch: rememberFolderMatch,
+    version: sheetFilesVersion,
+  });
   // The sheet rows read the cache through this object. A new object after each change makes them render again.
   // On the desktop the cache stays empty: a sheet opens by its path there.
   const sheetFiles = useMemo(
@@ -768,8 +791,9 @@ export function MepSketchApp({
       },
       has: (sheet: BuildingSheet) => sheetHasFile(sheetFilesRef.current, storedKeysRef.current, sheet),
       isAmbiguous: (sheet: BuildingSheet) => sheetFilesRef.current.isAmbiguous(sheet),
+      folder: pdfFolder.control,
     }),
-    [fileAccess, sheetFilesVersion, rememberHandle],
+    [fileAccess, sheetFilesVersion, rememberHandle, pdfFolder.control],
   );
   // The open/save running right now, if any. Only one runs at a time: two
   // overlapping saves of one PDF both write the same new annotations, and
@@ -1059,10 +1083,13 @@ export function MepSketchApp({
           }
         } else {
           const cached = await sheetFilesRef.current.take(sheet);
-          const stored = cached === undefined ? await openStoredSheet(sheet) : undefined;
-          opened = cached ?? (stored?.kind === 'opened' ? stored.opened : undefined);
+          const viaFolder = cached === undefined ? await pdfFolder.openViaFolder(sheet) : undefined;
+          if (viaFolder?.stale === true) return { ok: false, message: null };
+          const folderNotice: SheetNotice | undefined = viaFolder?.notice;
+          const stored = cached === undefined && viaFolder?.opened === undefined && viaFolder?.denied !== true ? await openStoredSheet(sheet) : undefined;
+          opened = cached ?? viaFolder?.opened ?? (stored?.kind === 'opened' ? stored.opened : undefined);
           if (opened === undefined) {
-            const failedNotice = stored === undefined ? null : storedOpenNotice(stored, sheet.location.fileName);
+            const failedNotice = (stored === undefined ? null : storedOpenNotice(stored, sheet.location.fileName)) ?? folderNotice ?? null;
             try {
               opened = await fileAccess.openFile(PDF_FILE_TYPES);
             } catch (err) {
@@ -1073,6 +1100,7 @@ export function MepSketchApp({
             const knownSize = sheet.location.sizeBytes;
             if (knownSize !== undefined && opened.file.size !== knownSize) pendingNotice = pickedOtherFileNotice();
           }
+          if (pendingNotice === undefined && folderNotice !== undefined) pendingNotice = folderNotice;
         }
       } catch (err) {
         const message = `Could not open ${sheet.location.fileName}: ${(err as Error).message}`;
@@ -1086,7 +1114,7 @@ export function MepSketchApp({
       await showPage(sheet.pageIndex);
       return pendingNotice === undefined ? { ok: true } : { ok: true, notice: pendingNotice };
     },
-    [fileAccess, openPdfFile, openStoredSheet, sceneRef, showPage],
+    [fileAccess, openPdfFile, openStoredSheet, pdfFolder.openViaFolder, sceneRef, showPage],
   );
 
   const handleOpenPdf = useCallback(async () => {

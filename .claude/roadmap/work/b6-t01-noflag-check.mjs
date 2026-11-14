@@ -111,7 +111,7 @@ await dlg.locator('[role="treeitem"][data-kind="building"]').first().click();
 await idle(600);
 const hint = dlg.locator('[data-testid="reconnect-hint"]');
 const hintText = (await hint.count()) === 1 ? (await hint.innerText()).trim() : 'no band';
-check(hintText === '3 PDFs need a file before they open. Choose them all in one step.', 'after restart: the band counts 3 PDFs', hintText);
+check(hintText === '3 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.', 'after restart: the band counts 3 PDFs', hintText);
 await shot('b6-t01-noflag-02-after-restart');
 await page.evaluate(() => { window.__pickCancel = true; });
 await dlg.locator('[data-testid="reconnect-pdfs"]').click();

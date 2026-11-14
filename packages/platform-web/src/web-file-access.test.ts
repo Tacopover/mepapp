@@ -58,3 +58,34 @@ describe('scanDirectoryHandle', () => {
     expect(files.map((f) => f.name)).toEqual(['a.svg', 'b.PNG']);
   });
 });
+
+describe('WebFileAccess.pickFolder', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the stamp library picker id when no id is given', async () => {
+    const picker = vi.fn(async () => ({ name: 'Stamps' }));
+    vi.stubGlobal('window', { showDirectoryPicker: picker });
+    await new WebFileAccess().pickFolder();
+    expect(picker).toHaveBeenCalledWith({ id: 'mepapp-stamp-library', mode: 'read' });
+  });
+
+  it('passes the id of the caller and returns the folder handle', async () => {
+    const handle = { name: 'Plans' };
+    const picker = vi.fn(async () => handle);
+    vi.stubGlobal('window', { showDirectoryPicker: picker });
+    const picked = await new WebFileAccess().pickFolder({ id: 'mepapp-building-pdfs' });
+    expect(picker).toHaveBeenCalledWith({ id: 'mepapp-building-pdfs', mode: 'read' });
+    expect(picked).toEqual({ name: 'Plans', folder: { dirHandle: handle } });
+  });
+
+  it('resolves undefined when the user cancels', async () => {
+    vi.stubGlobal('window', {
+      showDirectoryPicker: async () => {
+        throw new DOMException('x', 'AbortError');
+      },
+    });
+    expect(await new WebFileAccess().pickFolder({ id: 'x' })).toBeUndefined();
+  });
+});

@@ -46,7 +46,7 @@ await dlg.getByRole('treeitem').first().click();
 await idle(600);
 const choose = await chooseCount();
 const h = await hint();
-const want = choose === 0 ? null : choose === 1 ? '1 PDF needs a file before it opens. Choose it again.' : `${choose} PDFs need a file before they open. Choose them all in one step.`;
+const want = choose === 0 ? null : choose === 1 ? '1 PDF needs a file before it opens. Choose the file, or allow access to the PDF folder once.' : `${choose} PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.`;
 check(choose === 3 && h === want, 'F1: band count equals the rows that say Choose file… (opened sheet excluded)', `choose=${choose} hint=${h}`);
 await close();
 

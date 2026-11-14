@@ -144,7 +144,7 @@ await closeDialog();
 await restart('prompt', 'granted');
 await openBuilding(b1());
 check((await dlg.locator('[data-testid="open-sheet"]', { hasText: /^Open$/ }).count()) === 3, 'S1 restart: the three rows say Open at once', String(await dlg.locator('[data-testid="open-sheet"]').allInnerTexts()));
-check((await band().count()) === 0, 'S1 restart: no band (nothing to reconnect)');
+check((await hint()) === '3 PDFs are saved in this browser. Allow access to their folder once to open them all.', 'S1 restart: the band offers the folder (T04 text T-B)', String(await hint()));
 check((await reqCalls()) === 0, 'S1 restart: no permission question before a click');
 await shot('b6-t03-01-after-restart');
 await openBtn(A).first().click();
@@ -154,6 +154,7 @@ check((await reqCalls()) === 1, 'S1 click Open: one permission question (the cli
 check(((await notice()) ?? '').startsWith('Opened '), 'S1 granted: the sheet opens', String(await notice()));
 check((await pickCalls()) === 0, 'S1 granted: the file picker did not open', String(await pickCalls()));
 check((await dlg.count()) === 1, 'S1 the dialog stays open');
+await idle(2500);
 await openBtn(B).first().click();
 let nb = null;
 for (let i = 0; i < 30 && !(nb ?? '').includes(B); i++) { nb = await notice(); await page.waitForTimeout(300); }
@@ -189,7 +190,7 @@ check(!(await noticeIsError()), 'S3 moved notice is not an error');
 check((await pickCalls()) === 1, 'S3 the picker opened at once', String(await pickCalls()));
 check(!(await storedKeys()).includes(K('b1', C)) && (await storedKeys()).length === 2, 'S3 the stale handle is deleted', (await storedKeys()).join(','));
 check((await chooseBtn(C).count()) === 1, 'S3 the row falls back to Choose file…');
-check((await hint()) === '1 PDF needs a file before it opens. Choose it again.', 'S3 the band shows 1 PDF', String(await hint()));
+check((await hint()) === '1 PDF needs a file before it opens. Choose the file, or allow access to the PDF folder once.', 'S3 the band shows 1 PDF', String(await hint()));
 await shot('b6-t03-03-moved');
 // the user picks the file again: a new handle replaces the old one
 await putPdf(C);

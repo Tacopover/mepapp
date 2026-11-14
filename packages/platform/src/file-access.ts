@@ -46,8 +46,8 @@ export interface FileAccess {
   writeFile(target: FileTarget, data: Blob): Promise<void>;
   /** Asks for a location and writes the data there. Resolves undefined when the user cancels; a failed write throws. */
   saveFileAs(suggestedName: string, types: FileTypeFilter[], data: Blob): Promise<SavedFile | undefined>;
-  /** Resolves undefined when the user cancels. Throws when the platform refuses the folder. */
-  pickFolder(): Promise<{ name: string; folder: LibraryFolderRef } | undefined>;
+  /** Resolves undefined when the user cancels. Throws when the platform refuses the folder. `id` (web only) lets the browser remember the last folder for each use. */
+  pickFolder(options?: { id?: string }): Promise<{ name: string; folder: LibraryFolderRef } | undefined>;
   /** Must run inside a click handler. True when the folder can be read now. */
   requestFolderAccess(folder: LibraryFolderRef): Promise<boolean>;
   /** Top level of the folder only: files with one of the extensions (no dot, any case), sorted by name. Subfolders are skipped. */

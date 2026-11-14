@@ -126,9 +126,9 @@ export class WebFileAccess implements FileAccess {
     return { name: fileHandle.name, target: fileHandle };
   }
 
-  async pickFolder(): Promise<{ name: string; folder: LibraryFolderRef } | undefined> {
+  async pickFolder(options?: { id?: string }): Promise<{ name: string; folder: LibraryFolderRef } | undefined> {
     try {
-      const dirHandle = await window.showDirectoryPicker!({ id: 'mepapp-stamp-library', mode: 'read' });
+      const dirHandle = await window.showDirectoryPicker!({ id: options?.id ?? 'mepapp-stamp-library', mode: 'read' });
       return { name: dirHandle.name, folder: { dirHandle } };
     } catch (err) {
       if (isAbortError(err)) return undefined;

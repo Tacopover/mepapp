@@ -7,6 +7,7 @@ import type { UseBuilding } from '../useBuilding.js';
 import { countLabel, defaultLevelName, nextLevelElevation } from '../buildingLevels.js';
 import { sheetsWithoutSummary } from '../buildingStatus.js';
 import { useSheetRelink } from '../useSheetRelink.js';
+import type { PdfFolderControl } from '../usePdfFolder.js';
 import { loadBuildings, loadImportedOldIds, pendingOldBuildings } from '../buildings.js';
 import {
   accessCardText,
@@ -107,6 +108,7 @@ export interface ManageBuildingsDialogProps {
     remember: (opened: OpenedFile[]) => void;
     has: (sheet: BuildingSheet) => boolean;
     isAmbiguous: (sheet: BuildingSheet) => boolean;
+    folder?: PdfFolderControl;
   };
   riserConflictKeys?: ReadonlySet<string>;
 }
@@ -589,6 +591,7 @@ export function ManageBuildingsDialog({
                   canOpenCached={sheetFiles?.has}
                   rememberFiles={sheetFiles?.remember}
                   isAmbiguous={sheetFiles?.isAmbiguous}
+                  folder={sheetFiles?.folder}
                 />
                 <BuildingSummariesPane
                   key={`${openBuilding.file.id}-summaries`}

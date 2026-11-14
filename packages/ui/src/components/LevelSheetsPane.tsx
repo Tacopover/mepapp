@@ -13,9 +13,11 @@ import {
   type SheetStatus,
   type SheetSummaryInfo,
 } from '../buildingStatus.js';
-import { pdfsNeedingFile, reconnectHint, reconnectResult, reconnectTooltip } from '../reconnectPdfs.js';
+import { bandView } from '../pdfFolder.js';
+import { pdfsNeedingFile, reconnectResult, reconnectTooltip } from '../reconnectPdfs.js';
 import { SheetFileCache } from '../sheetFileCache.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
+import type { PdfFolderControl } from '../usePdfFolder.js';
 import { BuildingSection } from './BuildingSection.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
 
@@ -43,6 +45,8 @@ export interface LevelSheetsPaneProps {
   rememberFiles?: (opened: OpenedFile[]) => void;
   /** True when two different files have the name and size of the sheet. The app then uses neither. */
   isAmbiguous?: (sheet: BuildingSheet) => boolean;
+  /** The PDF folder of the building (Chrome and Edge only). Undefined when the browser cannot keep PDF handles. */
+  folder?: PdfFolderControl;
 }
 
 const NO_OPENED_SHEETS: ReadonlySet<string> = new Set();
@@ -101,11 +105,25 @@ export function LevelSheetsPane({
   canOpenCached,
   rememberFiles,
   isAmbiguous,
+  folder,
 }: LevelSheetsPaneProps) {
   const groups = rowGroups(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
   const needsFix = shown.some((sheet) => sheetStatus[sheet.id] === 'pdf-missing' || sheetStatus[sheet.id] === 'no-access');
   const needed = pdfsNeedingFile(shown, canOpenCached ?? (() => false), openedSheetIds);
+  const folderState = folder?.state;
+  const band =
+    fileAccess.readPath === undefined && rememberFiles !== undefined
+      ? bandView({
+          canStore: folder !== undefined,
+          checked: folderState?.checked ?? true,
+          busy: folderState?.busy ?? false,
+          folderName: folderState?.folderName ?? null,
+          folderAccess: folderState?.folderAccess ?? 'prompt',
+          savedNeedAllow: folderState?.savedNeedAllow ?? 0,
+          needFile: needed.length,
+        })
+      : null;
   const rowsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -122,6 +140,12 @@ export function LevelSheetsPane({
     } catch (err) {
       onNotice(`Could not open the file picker: ${(err as Error).message}`, true);
     }
+  }
+
+  async function allowFolder(pick: boolean) {
+    const scope = shown.filter((sheet) => !openedSheetIds.has(sheet.id));
+    const notice = await folder?.allow({ pick, scope });
+    if (notice !== null && notice !== undefined) onNotice(notice.text, notice.error);
   }
 
   async function reconnect() {
@@ -159,10 +183,24 @@ export function LevelSheetsPane({
 
   return (
     <BuildingSection title="Sheets" testId="level-sheets" aside={countLabel(shown.length, 'sheet')}>
-      {fileAccess.readPath === undefined && rememberFiles !== undefined && needed.length >= 1 && (
+      {band !== null && (
         <div className="mep-reconnect" data-testid="reconnect-band">
-          <p className="mep-hint" data-testid="reconnect-hint">{reconnectHint(needed.length)}</p>
-          <button type="button" data-testid="reconnect-pdfs" aria-label="Reconnect PDFs" title={reconnectTooltip(levelId !== null)} onClick={() => void reconnect()}>Reconnect PDFs…</button>
+          <p className="mep-hint" data-testid="reconnect-hint">{band.hint}</p>
+          <div className="mep-reconnect-buttons">
+            {band.allow !== null && (
+              <button
+                type="button"
+                data-testid="allow-pdf-folder"
+                aria-label={band.allow.ariaLabel}
+                title={band.allow.tooltip}
+                disabled={band.allow.disabled}
+                onClick={() => void allowFolder(band.allow?.picks === true)}
+              >
+                {band.allow.label}
+              </button>
+            )}
+            <button type="button" data-testid="reconnect-pdfs" aria-label="Reconnect PDFs" title={reconnectTooltip(levelId !== null)} disabled={band.reconnectDisabled} onClick={() => void reconnect()}>Reconnect PDFs…</button>
+          </div>
         </div>
       )}
       {shown.length === 0 && (

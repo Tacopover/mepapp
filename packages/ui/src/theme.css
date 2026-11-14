@@ -6110,12 +6110,19 @@ button.mep-tree-arrow {
 .mep-reconnect button {
   font-size: 12px;
 }
+.mep-reconnect-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 @media (max-width: 899px) {
   .mep-reconnect {
     grid-template-columns: minmax(0, 1fr);
   }
-  .mep-reconnect button {
+  .mep-reconnect-buttons {
     justify-self: start;
+    justify-content: flex-start;
   }
 }
 .mep-add-result {

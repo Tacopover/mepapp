@@ -68,7 +68,7 @@ const reconnect = async (list) => {
 await openBuilding(buildingJson('b1', fullSheets()));
 await node('building').click();
 await idle(500);
-check((await hint()) === '5 PDFs need a file before they open. Choose them all in one step.', 'building node: band hint counts 5 PDFs', String(await hint()));
+check((await hint()) === '5 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.', 'building node: band hint counts 5 PDFs', String(await hint()));
 check((await chooseCount()) === 6, 'six rows say Choose file…', String(await chooseCount()));
 check((await btn().innerText()).trim() === 'Reconnect PDFs…', 'button label');
 check((await btn().getAttribute('aria-label')) === 'Reconnect PDFs', 'button aria-label');
@@ -90,13 +90,13 @@ await pick('cancel');
 await btn().click();
 await idle(700);
 check((await notice()) === null, 'cancel: no message', String(await notice()));
-check((await hint()) === '5 PDFs need a file before they open. Choose them all in one step.', 'cancel: band unchanged');
+check((await hint()) === '5 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.', 'cancel: band unchanged');
 check(!(await btn().isDisabled()), 'cancel: button is not disabled');
 
 // level scope: Level 2 has C, D, E
 await node('level', 'Level 2').click();
 await idle(500);
-check((await hint()) === '3 PDFs need a file before they open. Choose them all in one step.', 'level node: band counts only the PDFs of the level', String(await hint()));
+check((await hint()) === '3 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.', 'level node: band counts only the PDFs of the level', String(await hint()));
 check((await btn().getAttribute('title')) === 'Choose the PDF files of this level. The app finds the sheets by file name and size. No sheet is added or changed.', 'tooltip names the level');
 await reconnect([{ f: C }, { f: X1 }, { f: A }]);
 {
@@ -104,7 +104,7 @@ await reconnect([{ f: C }, { f: X1 }, { f: A }]);
   const want = `Found 1 of 3 PDFs. Missing: ${D}, ${E}. 1 file is for another level. 1 file was not used.`;
   check(text === want, 'level partial notice (found, missing, other level, not used)', `${text} | want ${want}`);
   check(!(await noticeIsError()), 'partial notice is not an error');
-  check((await hint()) === '2 PDFs need a file before they open. Choose them all in one step.', 'band shows the new count', String(await hint()));
+  check((await hint()) === '2 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.', 'band shows the new count', String(await hint()));
   check((await openCount()) === 1 && (await chooseCount()) === 2, 'level rows: 1 Open, 2 Choose file…', `${await openCount()} / ${await chooseCount()}`);
 }
 await shot('b6-t01-03-level-partial');
@@ -116,14 +116,14 @@ await reconnect([{ f: X2 }]);
   const want = `Found 0 of 2 PDFs. The file you chose does not have the same name and size as a PDF of the sheets here. Missing: ${D}, ${E}. 1 file was not used.`;
   check(text === want, 'zero found notice', `${text} | want ${want}`);
   check(await noticeIsError(), 'zero found notice has the error style');
-  check((await hint()) === '2 PDFs need a file before they open. Choose them all in one step.', 'zero found: band unchanged');
+  check((await hint()) === '2 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.', 'zero found: band unchanged');
 }
 await shot('b6-t01-04-zero-found');
 
 // building node: the pick of the level is shared. A (picked before, level 1) already counts as found.
 await node('building').click();
 await idle(500);
-check((await hint()) === '3 PDFs need a file before they open. Choose them all in one step.', 'building node after the level pick: 3 PDFs left (A and C found)', String(await hint()));
+check((await hint()) === '3 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.', 'building node after the level pick: 3 PDFs left (A and C found)', String(await hint()));
 await reconnect([{ f: B }, { f: D }, { f: E }, { f: X1 }, { f: X2 }]);
 {
   const text = await notice();
@@ -153,7 +153,7 @@ await reconnect([{ f: B, m: 1 }, { f: B, m: 2 }]);
   const want = `Found 0 of 5 PDFs. Missing: ${A}, ${B}, ${C} and 2 more. For ${B} you chose two different files with the same name and size. The app cannot tell which one to use. Use Choose file… on its row.`;
   check(text === want, 'ambiguous notice', `${text} | want ${want}`);
   check(await noticeIsError(), 'ambiguous with zero found has the error style');
-  check((await hint()) === '5 PDFs need a file before they open. Choose them all in one step.', 'ambiguous: band unchanged');
+  check((await hint()) === '5 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.', 'ambiguous: band unchanged');
   check((await dlg.locator('[data-testid="open-sheet"][aria-label^="Choose file for 01_arch_first_floor"]').count()) === 1, 'ambiguous: the row of the PDF still says Choose file…');
 }
 await shot('b6-t01-06-ambiguous');
@@ -163,7 +163,7 @@ await closeDialog();
 await openBuilding(buildingJson('b3', [sheet('s1', 'l1', A, 0), sheet('s2', 'l1', A, 1)]));
 await node('building').click();
 await idle(500);
-check((await hint()) === '1 PDF needs a file before it opens. Choose it again.', 'one PDF: singular hint', String(await hint()));
+check((await hint()) === '1 PDF needs a file before it opens. Choose the file, or allow access to the PDF folder once.', 'one PDF: singular hint', String(await hint()));
 await reconnect([{ f: A }]);
 check((await notice()) === 'Found the PDF.', 'one PDF: found text', String(await notice()));
 check((await band().count()) === 0 && (await chooseCount()) === 0, 'one PDF: band gone, no row says Choose file…');
