@@ -198,7 +198,7 @@ export function ManageBuildingsDialog({
   /** The open action of the sheet rows. The dialog stays open, so the user can open more sheets. */
   async function openSheetKeepOpen(sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> {
     const result = await onOpenSheet(sheet, mode);
-    if (result.ok) onNotice(`${result.notice !== undefined ? `${result.notice.text} ` : ''}Opened ${sheet.displayName} in the viewer.`, result.notice?.error === true);
+    if (result.ok) onNotice(`Opened ${sheet.displayName} in the viewer.${result.notice !== undefined ? ` ${result.notice.text}` : ''}`, result.notice?.error === true);
     else if (result.notice !== undefined) onNotice(result.notice.text, result.notice.error);
     return result;
   }

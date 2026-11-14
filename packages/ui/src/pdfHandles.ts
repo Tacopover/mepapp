@@ -90,6 +90,11 @@ export function storedOpenNotice(outcome: StoredOpenOutcome, fileName: string): 
   }
 }
 
+/** The notice when the user picks a file whose size is not the size the sheet knows. The PDF opens, but the sheet keeps its old size until a relink. Not an error. */
+export function pickedOtherFileNotice(): { text: string; error: false } {
+  return { text: 'This file is not the one the sheet knows (the size is different). Use Relink on the sheet to update it.', error: false };
+}
+
 /** The notice when the picker fails after a stored handle failed (the browser refused the picker). Always error.
  *  denied -> same text as storedOpenNotice denied. Every other failed outcome -> `Could not open ${fileName}. Choose the file again.` with error: true. */
 export function pickerBlockedNotice(outcome: StoredOpenOutcome, fileName: string): { text: string; error: true } {

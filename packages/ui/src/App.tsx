@@ -146,6 +146,7 @@ import {
   shouldDeleteHandle,
   storableHandle,
   storedOpenNotice,
+  pickedOtherFileNotice,
   type StoredOpenOutcome,
 } from './pdfHandles.js';
 import './theme.css';
@@ -1069,7 +1070,8 @@ export function MepSketchApp({
               return { ok: false, message: null, notice: pickerBlockedNotice(stored, sheet.location.fileName) };
             }
             if (opened === undefined) return failedNotice === null ? { ok: false, message: null } : { ok: false, message: null, notice: failedNotice };
-            pendingNotice = failedNotice ?? undefined;
+            const knownSize = sheet.location.sizeBytes;
+            if (knownSize !== undefined && opened.file.size !== knownSize) pendingNotice = pickedOtherFileNotice();
           }
         }
       } catch (err) {

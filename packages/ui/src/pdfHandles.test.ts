@@ -11,6 +11,7 @@ import {
   sheetKeySet,
   storableHandle,
   storedOpenNotice,
+  pickedOtherFileNotice,
   type StoredOpenOutcome,
 } from './pdfHandles.js';
 import { SheetFileCache } from './sheetFileCache.js';
@@ -174,6 +175,13 @@ describe('handle helpers', () => {
 });
 
 describe('notices', () => {
+  it('gives the notice for a picked file of another size', () => {
+    expect(pickedOtherFileNotice()).toEqual({
+      text: 'This file is not the one the sheet knows (the size is different). Use Relink on the sheet to update it.',
+      error: false,
+    });
+  });
+
   it('gives the exact text of each failed outcome', () => {
     const opened: StoredOpenOutcome = { kind: 'opened', opened: { file: fileOf(3) } };
     expect(storedOpenNotice(opened, 'a.pdf')).toBeNull();
