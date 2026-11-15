@@ -68,7 +68,7 @@ Words in this script: "level 0" is the lower level, "level 1" is the upper level
 ### Restart of the web store
 
 33. Make a riser again (steps 6 to 11). Close ALL Chrome windows. Open the app again. Open Manage Buildings and click "Tower". If the card "Allow access" shows, allow it. Check: the building opens and the tab "Risers (1)" lists the riser.
-34. Check the sheets: the row button says "Choose file…". This is expected after a restart (D-B-53): the browser keeps no access to a PDF, so each PDF needs one "Choose file…". Click it for both sheets. Check: both PDFs open, the rings and the riser marks show, and no conflict dialog opens.
+34. Check the sheets. In Chrome and Edge the row button says "Open" (B6 stores the PDF handles, D-B-66). The browser can ask once for permission: allow it. In Firefox and Safari the row button says "Choose file…" (the browser keeps no access to a PDF). Click "Reconnect PDFs…" or "Choose file…" for both sheets. Check: both PDFs open, the rings and the riser marks show, and no conflict dialog opens.
 
 ### Feedback round 1 (steps F1 to F9)
 
