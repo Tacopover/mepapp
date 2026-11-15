@@ -129,7 +129,8 @@ export function usePdfFolder(input: UsePdfFolderInput): { control: PdfFolderCont
     async (id: string, dir: FolderEntry, scope: readonly BuildingSheet[] | null): Promise<ScanOutcome> => {
       const name = folderRef.current.name ?? dir.name;
       const all = sheetsRef.current;
-      const needed = pdfsNeedingFile([...(scope ?? all)], (sheet) => cache.has(sheet));
+      // The notice counts every PDF of the scope. A PDF that this tab holds already counts as found.
+      const needed = pdfsNeedingFile([...(scope ?? all)], () => false);
       busyRef.current = true;
       refresh();
       try {
@@ -153,9 +154,12 @@ export function usePdfFolder(input: UsePdfFolderInput): { control: PdfFolderCont
         if (idRef.current !== id) return { kind: 'stale' };
         const ambiguous = new Set(result.ambiguousKeys);
         const foundKeys = new Set<string>();
+        const noticeKeys = new Set<string>();
+        for (const need of needed) if (cache.has(need.sheet)) noticeKeys.add(pdfHandleFileKey(need.fileName, need.sizeBytes));
         for (const match of result.matches) {
           rememberRef.current(match, ambiguous.has(match.key));
           foundKeys.add(match.key);
+          noticeKeys.add(match.key);
         }
         for (const pdf of wantedPdfs(all)) {
           const key = pdfHandleFileKey(pdf.fileName, pdf.sizeBytes);
@@ -163,7 +167,7 @@ export function usePdfFolder(input: UsePdfFolderInput): { control: PdfFolderCont
           else missesRef.current.add(key);
         }
         folderRef.current = { ...folderRef.current, access: 'granted' };
-        return { kind: 'done', notice: folderResultNotice({ folderName: name, needed, foundKeys, ambiguousKeys: ambiguous, capped: result.capped }) };
+        return { kind: 'done', notice: folderResultNotice({ folderName: name, needed, foundKeys: noticeKeys, ambiguousKeys: ambiguous, capped: result.capped }) };
       } finally {
         if (idRef.current === id) busyRef.current = false;
         refresh();

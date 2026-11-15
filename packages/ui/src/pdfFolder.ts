@@ -271,7 +271,7 @@ export function folderResultNotice(input: FolderResultInput): FolderNotice | nul
 }
 
 export function folderDeniedNotice(): FolderNotice {
-  return { text: 'Access was not allowed. Click Allow access to try again, or choose the files.', error: true };
+  return { text: 'Access was not allowed. Choose the files with Reconnect PDFs…, or change the site setting in the browser.', error: true };
 }
 
 export function folderGoneNotice(folderName: string): FolderNotice {

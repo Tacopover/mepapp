@@ -327,7 +327,7 @@ describe('folderResultNotice', () => {
 
 describe('fixed notices', () => {
   it('has the texts of the spec', () => {
-    expect(folderDeniedNotice()).toEqual({ text: 'Access was not allowed. Click Allow access to try again, or choose the files.', error: true });
+    expect(folderDeniedNotice()).toEqual({ text: 'Access was not allowed. Choose the files with Reconnect PDFs…, or change the site setting in the browser.', error: true });
     expect(folderGoneNotice('Plans')).toEqual({ text: 'The folder Plans is not there any more. Allow access to the PDF folder again.', error: true });
   });
 });

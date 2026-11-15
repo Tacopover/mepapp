@@ -41,6 +41,8 @@ export interface LevelSheetsPaneProps {
   openedSheetIds?: ReadonlySet<string>;
   /** True when the PDF of the sheet was given to the app in this tab. Its row then opens without a picker. */
   canOpenCached?: (sheet: BuildingSheet) => boolean;
+  /** True when the PDF of the sheet is in the memory of this tab. A saved file that the browser has not allowed yet is not. */
+  inTab?: (sheet: BuildingSheet) => boolean;
   /** Keeps the PDF files that the user picked in this tab, so their sheets open without a second pick. */
   rememberFiles?: (opened: OpenedFile[]) => void;
   /** True when two different files have the name and size of the sheet. The app then uses neither. */
@@ -103,6 +105,7 @@ export function LevelSheetsPane({
   highlight = null,
   openedSheetIds = NO_OPENED_SHEETS,
   canOpenCached,
+  inTab,
   rememberFiles,
   isAmbiguous,
   folder,
@@ -143,13 +146,16 @@ export function LevelSheetsPane({
   }
 
   async function allowFolder(pick: boolean) {
-    const scope = shown.filter((sheet) => !openedSheetIds.has(sheet.id));
+    const scope = shown;
     const notice = await folder?.allow({ pick, scope });
     if (notice !== null && notice !== undefined) onNotice(notice.text, notice.error);
   }
 
   async function reconnect() {
-    const needed0 = needed;
+    // Nothing lacks a file, but saved PDFs wait for the browser to allow them: the pick gives the files now, so the result counts those PDFs.
+    const looksForSaved = needed.length === 0 && inTab !== undefined;
+    const needed0 = looksForSaved ? pdfsNeedingFile(shown, inTab, openedSheetIds) : needed;
+    const hasFile = looksForSaved ? inTab : canOpenCached;
     let opened: OpenedFile[];
     try {
       opened = await fileAccess.openFiles(BUILDING_PDF_TYPES);
@@ -164,7 +170,7 @@ export function LevelSheetsPane({
       picked: opened.map((item) => ({ name: item.file.name, size: item.file.size })),
       scopeKeys: sheetKeys(shown),
       buildingKeys: sheetKeys(file.sheets),
-      isFound: (need) => canOpenCached?.(need.sheet) === true,
+      isFound: (need) => hasFile?.(need.sheet) === true,
       isAmbiguous: (need) => isAmbiguous?.(need.sheet) === true,
       levelScope: levelId !== null,
     });

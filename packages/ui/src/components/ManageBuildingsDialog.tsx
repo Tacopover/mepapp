@@ -107,6 +107,8 @@ export interface ManageBuildingsDialogProps {
   sheetFiles?: {
     remember: (opened: OpenedFile[]) => void;
     has: (sheet: BuildingSheet) => boolean;
+    /** True only when the file is in the memory of this tab (not only saved in the browser). */
+    inTab?: (sheet: BuildingSheet) => boolean;
     isAmbiguous: (sheet: BuildingSheet) => boolean;
     folder?: PdfFolderControl;
   };
@@ -589,6 +591,7 @@ export function ManageBuildingsDialog({
                   onNotice={onNotice}
                   openedSheetIds={openedSheetIds(openDocuments)}
                   canOpenCached={sheetFiles?.has}
+                  inTab={sheetFiles?.inTab}
                   rememberFiles={sheetFiles?.remember}
                   isAmbiguous={sheetFiles?.isAmbiguous}
                   folder={sheetFiles?.folder}

@@ -790,6 +790,7 @@ export function MepSketchApp({
         setSheetFilesVersion((n) => n + 1);
       },
       has: (sheet: BuildingSheet) => sheetHasFile(sheetFilesRef.current, storedKeysRef.current, sheet),
+      inTab: (sheet: BuildingSheet) => sheetFilesRef.current.has(sheet),
       isAmbiguous: (sheet: BuildingSheet) => sheetFilesRef.current.isAmbiguous(sheet),
       folder: pdfFolder.control,
     }),
@@ -1057,7 +1058,7 @@ export function MepSketchApp({
   );
 
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
-  const openSheet = useCallback(
+  const openSheetNow = useCallback(
     async (sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> => {
       const openDoc = sheet.projectUuid === null ? undefined : sceneRef.current?.getDocuments().find((doc) => doc.projectUuid === sheet.projectUuid);
       if (openDoc !== undefined && sceneRef.current) {
@@ -1109,12 +1110,23 @@ export function MepSketchApp({
       }
       const documentId = await openPdfFile(opened.file, opened.target);
       const scene = sceneRef.current;
-      if (!scene || !documentId) return { ok: false, message: 'The file could not be opened. See the header for details.' };
+      if (!scene || !documentId) return { ok: false, message: `Could not open ${sheet.location.fileName}. The viewer did not load the file.` };
       if (scene.getActiveDocumentId() !== documentId) scene.activateDocument(documentId);
       await showPage(sheet.pageIndex);
       return pendingNotice === undefined ? { ok: true } : { ok: true, notice: pendingNotice };
     },
     [fileAccess, openPdfFile, openStoredSheet, pdfFolder.openViaFolder, sceneRef, showPage],
+  );
+
+  // One sheet opens at a time: a second Open click waits for the load of the first, as openPdfFile refuses a second load at once.
+  const sheetOpenQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const openSheet = useCallback(
+    (sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> => {
+      const run = sheetOpenQueueRef.current.then(() => openSheetNow(sheet, mode));
+      sheetOpenQueueRef.current = run.catch(() => undefined);
+      return run;
+    },
+    [openSheetNow],
   );
 
   const handleOpenPdf = useCallback(async () => {
