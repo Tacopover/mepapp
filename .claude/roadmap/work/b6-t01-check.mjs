@@ -144,7 +144,7 @@ for (let i = 0; i < 3; i++) {
   await idle(1500);
   check((await dlg.count()) === 1 && (await band().count()) === 0, `open ${i + 1}: dialog open, no band`);
 }
-check(((await notice()) ?? '').startsWith('Opened '), 'the notice after Open says Opened', String(await notice()));
+check(/^(Opened |Could not open .* page \d+\. The file has \d+ pages?\.)/.test((await notice()) ?? ''), 'the notice after Open says Opened (or, for a page that the PDF does not have, the page notice of T08)', String(await notice()));
 await closeDialog();
 
 // ---------- S2: ambiguous (two files, one name and size, different time stamps) ----------

@@ -267,7 +267,7 @@ await scenario('S3', async () => {
   await putPdf(C);
   await openBuilding(threeJson('b3'));
   await nextFiles([A, B, C]);
-  await reconnectBtn().click({ timeout: 5000 });
+  await reconnectBtn().click({ timeout: 5000 }); await dlg.locator('[data-testid="pdf-files-pick"]').click({ timeout: 5000 });
   const p = await promptText();
   check(/^2 PDFs changed: .*Use the new files for 2 sheets\?$/s.test(p ?? ''), 'S3 prompt text', String(p));
   check((p ?? '').includes(A) && (p ?? '').includes(B), 'S3 the prompt names the 2 changed PDFs', String(p));
@@ -282,7 +282,7 @@ await scenario('S3', async () => {
   await restart();
   await openBuilding(threeJson('b3'));
   await nextFiles([A, B, C]);
-  await reconnectBtn().click({ timeout: 5000 });
+  await reconnectBtn().click({ timeout: 5000 }); await dlg.locator('[data-testid="pdf-files-pick"]').click({ timeout: 5000 });
   const p2 = await promptText();
   check((p2 ?? '').startsWith('2 PDFs changed: '), 'S3 run 2: the prompt shows', String(p2));
   await cancelBtn().click({ timeout: 3000 });
@@ -301,7 +301,7 @@ await scenario('S4', async () => {
   await setTrees({ Plans: { files: [...files(A, B, C), { name: 'copy_of_a.pdf', src: 'orig_a.pdf' }], dirs: {} } });
   await openBuilding(threeJson('b4'));
   await nextFolder('Plans');
-  await allowBtn().click({ timeout: 5000 });
+  await reconnectBtn().click({ timeout: 5000 }); await dlg.locator('[data-testid="pdf-folder-pick"]').click({ timeout: 5000 });
   const p = await promptText();
   check((p ?? '').startsWith('2 PDFs changed: ') && (p ?? '').includes(A) && (p ?? '').includes(B), 'S4 the prompt names the changed PDFs', String(p));
   check(!(p ?? '').includes(C) && !(p ?? '').includes('copy_of_a.pdf'), 'S4 the prompt does not name the unchanged PDF or the old copy', String(p));
@@ -320,7 +320,7 @@ await scenario('S5', async () => {
   await setTrees({ Plans: { files: [], dirs: { d1: { files: [{ name: A, src: 'a_v1.pdf' }] }, d2: { files: [{ name: A, src: 'a_v2.pdf' }] } } } });
   await openBuilding(buildingJson('b5', [sheet('s1', 'l1', A)]));
   await nextFolder('Plans');
-  await allowBtn().click({ timeout: 5000 });
+  await reconnectBtn().click({ timeout: 5000 }); await dlg.locator('[data-testid="pdf-folder-pick"]').click({ timeout: 5000 });
   const n = await waitNotice((x) => x.includes('two different files') || x.startsWith('Found') || x.startsWith('No '), 15000);
   check((n ?? '').includes('has two different files with another size'), 'S5 notice for two changed candidates', String(n));
   check((await promptEl().count()) === 0, 'S5 no prompt');
