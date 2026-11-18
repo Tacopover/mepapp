@@ -154,20 +154,23 @@ export async function ensureFolderAccess(folder: FolderEntry): Promise<'granted'
   }
 }
 
-export interface AllowButtonView {
+export type ReconnectMenuAction = 'pick' | 'use' | 'files';
+
+export interface ReconnectMenuItem {
+  /** 'pick' opens the folder picker, 'use' asks the permission for the stored folder, 'files' opens the file picker. */
+  action: ReconnectMenuAction;
   label: string;
-  ariaLabel: string;
-  tooltip: string | undefined;
-  /** True when the click opens the folder picker. False when it asks the permission for the stored folder. */
-  picks: boolean;
-  disabled: boolean;
+  help: string;
+  testId: 'pdf-folder-pick' | 'pdf-folder-use' | 'pdf-files-pick';
 }
 
 export interface BandView {
   hint: string;
-  /** Null in a browser that cannot save PDFs: the band is the T01 band then. */
-  allow: AllowButtonView | null;
+  /** Null: the button opens the file picker at once (Firefox, Safari) or is off (busy). */
+  menu: ReconnectMenuItem[] | null;
   reconnectDisabled: boolean;
+  /** True when the button has a menu (Chrome and Edge, not busy). */
+  hasMenu: boolean;
 }
 
 export interface BandInput {
@@ -183,63 +186,101 @@ export interface BandInput {
   savedNeedAllow: number;
   /** N: PDFs of the shown scope that have no file and no saved file. */
   needFile: number;
+  /** K: PDFs known as changed in this tab (T06). */
+  changedPdfs: number;
 }
-
-const ALLOW_ARIA = 'Allow access to the PDF folder';
-const PICK_TOOLTIP =
-  'Choose the folder with the PDFs of this building. The app finds the sheets in it by file name and size. The app only reads the files.';
 
 function needSentence(count: number): string {
   return count === 1 ? '1 PDF needs a file before it opens.' : `${count} PDFs need a file before they open.`;
 }
 
-function allowView(picks: boolean, tooltip: string): AllowButtonView {
-  return { label: picks ? `${ALLOW_ARIA}…` : ALLOW_ARIA, ariaLabel: ALLOW_ARIA, tooltip, picks, disabled: false };
+function changedHint(count: number): string | null {
+  return count >= 2 ? `${count} PDFs changed after they were added. Click Reconnect PDFs… and choose the new files.` : null;
 }
 
-/** The band of the Sheets section: the hint and the buttons of the state (UX spec B6-T03/T04 section 5 and 7). Null when the band is hidden. */
+const FILES_ITEM: ReconnectMenuItem = {
+  action: 'files',
+  label: 'Choose files…',
+  help: 'Pick the PDF files yourself. Press Ctrl+A in the picker to pick all.',
+  testId: 'pdf-files-pick',
+};
+
+function menuOf(folderName: string | null, folderAccess: FolderAccess): ReconnectMenuItem[] {
+  if (folderName === null) {
+    return [
+      {
+        action: 'pick',
+        label: 'Choose a folder…',
+        help: 'The app finds the PDFs of this building in the folder and the folders inside it.',
+        testId: 'pdf-folder-pick',
+      },
+      FILES_ITEM,
+    ];
+  }
+  const use: ReconnectMenuItem =
+    folderAccess === 'prompt'
+      ? { action: 'use', label: `Use the folder ${folderName}`, help: 'The browser asks you once to allow access.', testId: 'pdf-folder-use' }
+      : {
+          action: 'use',
+          label: `Look in ${folderName} again`,
+          help: 'The app searches the folder and the folders inside it again.',
+          testId: 'pdf-folder-use',
+        };
+  const pick: ReconnectMenuItem = {
+    action: 'pick',
+    label: 'Choose another folder…',
+    help: `The app uses it instead of ${folderName}.`,
+    testId: 'pdf-folder-pick',
+  };
+  return [use, pick, FILES_ITEM];
+}
+
+/** The band of the Sheets section: the hint and the button of the state (UX spec B6-T06/T08 section 6.2). Null when the band is hidden. */
 export function bandView(input: BandInput): BandView | null {
-  const { canStore, checked, busy, folderName, folderAccess, savedNeedAllow: saved, needFile: need } = input;
+  const { canStore, checked, busy, folderName, folderAccess, savedNeedAllow: saved, needFile: need, changedPdfs } = input;
   if (!canStore) {
-    return need >= 1 ? { hint: reconnectHint(need), allow: null, reconnectDisabled: false } : null;
+    const hint = need >= 1 ? reconnectHint(need) : changedHint(changedPdfs);
+    return hint === null ? null : { hint, menu: null, reconnectDisabled: false, hasMenu: false };
   }
   if (!checked) return null;
   if (busy) {
-    return {
-      hint: `Looking for PDFs in ${folderName ?? 'the folder'}…`,
-      allow: { label: 'Looking for PDFs…', ariaLabel: ALLOW_ARIA, tooltip: undefined, picks: false, disabled: true },
-      reconnectDisabled: true,
-    };
+    return { hint: `Looking for PDFs in ${folderName ?? 'the folder'}…`, menu: null, reconnectDisabled: true, hasMenu: false };
   }
-  if (saved === 0 && need === 0) return null;
+  const menu = menuOf(folderName, folderAccess);
+  const view = (hint: string | null): BandView | null => (hint === null ? null : { hint, menu, reconnectDisabled: false, hasMenu: true });
+  const withNeed = (first: string): string => (need >= 1 ? `${first} ${needSentence(need)}` : first);
+  if (saved === 0 && need === 0) return view(changedHint(changedPdfs));
   if (folderName === null) {
     if (saved >= 1) {
-      const first =
-        saved === 1
-          ? '1 PDF is saved in this browser. Allow access to its folder once to open it.'
-          : `${saved} PDFs are saved in this browser. Allow access to their folder once to open them all.`;
-      return { hint: need >= 1 ? `${first} ${needSentence(need)}` : first, allow: allowView(true, PICK_TOOLTIP), reconnectDisabled: false };
+      return view(
+        withNeed(
+          saved === 1
+            ? '1 PDF is saved in this browser. Click Reconnect PDFs… to open it.'
+            : `${saved} PDFs are saved in this browser. Click Reconnect PDFs… to open them all.`,
+        ),
+      );
     }
-    const hint =
+    return view(
       need === 1
-        ? '1 PDF needs a file before it opens. Choose the file, or allow access to the PDF folder once.'
-        : `${need} PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.`;
-    return { hint, allow: allowView(true, PICK_TOOLTIP), reconnectDisabled: false };
+        ? '1 PDF needs a file before it opens. Click Reconnect PDFs… to choose the folder or the file.'
+        : `${need} PDFs need a file before they open. Click Reconnect PDFs… to choose the folder or the files.`,
+    );
   }
   if (folderAccess === 'prompt' && saved >= 1) {
-    const first =
-      saved === 1
-        ? `1 PDF is saved in this browser. Allow access to the folder ${folderName} once to open it.`
-        : `${saved} PDFs are saved in this browser. Allow access to the folder ${folderName} once to open them.`;
-    const tooltip = `The app opens the PDFs of this building from the folder ${folderName}. The browser asks you once. The app only reads the files.`;
-    return { hint: need >= 1 ? `${first} ${needSentence(need)}` : first, allow: allowView(false, tooltip), reconnectDisabled: false };
+    return view(
+      withNeed(
+        saved === 1
+          ? `1 PDF is saved in this browser. Click Reconnect PDFs… and use the folder ${folderName} to open it.`
+          : `${saved} PDFs are saved in this browser. Click Reconnect PDFs… and use the folder ${folderName} to open them.`,
+      ),
+    );
   }
-  if (need === 0) return null;
-  const hint =
+  if (need === 0) return view(changedHint(changedPdfs));
+  return view(
     need === 1
-      ? `1 PDF is not in the folder ${folderName}. Choose the file, or allow access to another folder.`
-      : `${need} PDFs are not in the folder ${folderName}. Choose the files, or allow access to another folder.`;
-  return { hint, allow: allowView(true, `Choose another folder. The app uses it instead of ${folderName}.`), reconnectDisabled: false };
+      ? `1 PDF is not in the folder ${folderName}. Click Reconnect PDFs… to choose the file or another folder.`
+      : `${need} PDFs are not in the folder ${folderName}. Click Reconnect PDFs… to choose the files or another folder.`,
+  );
 }
 
 function namesList(names: string[]): string {
@@ -308,11 +349,14 @@ export function folderResultNotice(input: FolderResultInput): FolderNotice | nul
 }
 
 export function folderDeniedNotice(): FolderNotice {
-  return { text: 'Access was not allowed. Choose the files with Reconnect PDFs…, or change the site setting in the browser.', error: true };
+  return {
+    text: 'Access was not allowed. Click Reconnect PDFs… and choose the files, or change the site setting in the browser.',
+    error: true,
+  };
 }
 
 export function folderGoneNotice(folderName: string): FolderNotice {
-  return { text: `The folder ${folderName} is not there any more. Allow access to the PDF folder again.`, error: true };
+  return { text: `The folder ${folderName} is not there any more. Click Reconnect PDFs… and choose the folder again.`, error: true };
 }
 
 export function folderReadFailedNotice(folderName: string, message: string): FolderNotice {

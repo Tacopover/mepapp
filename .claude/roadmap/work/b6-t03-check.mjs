@@ -133,6 +133,7 @@ check((await dlg.locator('[data-testid="open-sheet"]', { hasText: /^Choose file�
 check((await storedKeys()).length === 0, 'S1 nothing is stored before a file is given');
 await next([A, B, C]);
 await dlg.locator('[data-testid="reconnect-pdfs"]').click();
+await dlg.locator('[data-testid="pdf-files-pick"]').click();
 await idle(900);
 check((await notice()) === 'Found all 3 PDFs.', 'S1 reconnect notice', String(await notice()));
 {
@@ -144,7 +145,7 @@ await closeDialog();
 await restart('prompt', 'granted');
 await openBuilding(b1());
 check((await dlg.locator('[data-testid="open-sheet"]', { hasText: /^Open$/ }).count()) === 3, 'S1 restart: the three rows say Open at once', String(await dlg.locator('[data-testid="open-sheet"]').allInnerTexts()));
-check((await hint()) === '3 PDFs are saved in this browser. Allow access to their folder once to open them all.', 'S1 restart: the band offers the folder (T04 text T-B)', String(await hint()));
+check((await hint()) === '3 PDFs are saved in this browser. Click Reconnect PDFs… to open them all.', 'S1 restart: the band offers the folder (T04 text T-B)', String(await hint()));
 check((await reqCalls()) === 0, 'S1 restart: no permission question before a click');
 await shot('b6-t03-01-after-restart');
 await openBtn(A).first().click();
@@ -190,7 +191,7 @@ check(!(await noticeIsError()), 'S3 moved notice is not an error');
 check((await pickCalls()) === 1, 'S3 the picker opened at once', String(await pickCalls()));
 check(!(await storedKeys()).includes(K('b1', C)) && (await storedKeys()).length === 2, 'S3 the stale handle is deleted', (await storedKeys()).join(','));
 check((await chooseBtn(C).count()) === 1, 'S3 the row falls back to Choose file…');
-check((await hint()) === '1 PDF needs a file before it opens. Choose the file, or allow access to the PDF folder once.', 'S3 the band shows 1 PDF', String(await hint()));
+check((await hint()) === '1 PDF needs a file before it opens. Click Reconnect PDFs… to choose the folder or the file.', 'S3 the band shows 1 PDF', String(await hint()));
 await shot('b6-t03-03-moved');
 // the user picks the file again: a new handle replaces the old one
 await putPdf(C);
@@ -225,7 +226,10 @@ await putPdf(A);
 await cancelPick(false);
 await openBuilding(b1());
 await next([A, B, C]);
-if ((await band().count()) === 1) await dlg.locator('[data-testid="reconnect-pdfs"]').click();
+if ((await band().count()) === 1) {
+  await dlg.locator('[data-testid="reconnect-pdfs"]').click();
+  await dlg.locator('[data-testid="pdf-files-pick"]').click();
+}
 await idle(900);
 check((await storedKeys()).length === 3, 'S5 three handles before the removal', (await storedKeys()).join(','));
 await dlg.locator(`button[aria-label^="Remove ${B} page 1"]`).click();
@@ -244,6 +248,7 @@ const b2 = () => buildingJson('b2', [sheet('s1', 'l1', A), sheet('s2', 'l2', B)]
 await openBuilding(b2());
 await next([A, B]);
 await dlg.locator('[data-testid="reconnect-pdfs"]').click();
+await dlg.locator('[data-testid="pdf-files-pick"]').click();
 await idle(900);
 check((await storedKeys()).includes(K('b2', A)) && (await storedKeys()).includes(K('b2', B)), 'S6 handles of building b2 are stored', (await storedKeys()).join(','));
 await closeDialog();

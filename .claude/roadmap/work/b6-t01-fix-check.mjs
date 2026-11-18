@@ -28,7 +28,7 @@ const close = async () => { await dlg.getByRole('button', { name: 'Close', exact
 const hint = async () => ((await dlg.locator('[data-testid="reconnect-hint"]').count()) === 0 ? null : (await dlg.locator('[data-testid="reconnect-hint"]').innerText()).trim());
 const chooseCount = () => dlg.locator('[data-testid="open-sheet"]', { hasText: /^Choose file…$/ }).count();
 const all = real.map((f) => ({ src: f, name: f }));
-const recon = async () => { await page.evaluate((x) => { window.__pick = x; }, all); await dlg.getByRole('button', { name: 'Reconnect PDFs' }).click(); await idle(800); };
+const recon = async () => { await page.evaluate((x) => { window.__pick = x; }, all); await dlg.getByRole('button', { name: 'Reconnect PDFs' }).click(); await dlg.locator('[data-testid="pdf-files-pick"]').click(); await idle(800); };
 
 // F1
 await load('e1');
@@ -46,7 +46,7 @@ await dlg.getByRole('treeitem').first().click();
 await idle(600);
 const choose = await chooseCount();
 const h = await hint();
-const want = choose === 0 ? null : choose === 1 ? '1 PDF needs a file before it opens. Choose the file, or allow access to the PDF folder once.' : `${choose} PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.`;
+const want = choose === 0 ? null : choose === 1 ? '1 PDF needs a file before it opens. Click Reconnect PDFs… to choose the folder or the file.' : `${choose} PDFs need a file before they open. Click Reconnect PDFs… to choose the folder or the files.`;
 check(choose === 3 && h === want, 'F1: band count equals the rows that say Choose file… (opened sheet excluded)', `choose=${choose} hint=${h}`);
 await close();
 

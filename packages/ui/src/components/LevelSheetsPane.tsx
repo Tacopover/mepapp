@@ -15,12 +15,13 @@ import {
 } from '../buildingStatus.js';
 import { changedCancelText, changedManyUseText, splitChangedPicks } from '../changedFile.js';
 import { bandView } from '../pdfFolder.js';
-import { pdfsNeedingFile, reconnectResult, reconnectTooltip, type PdfNeed } from '../reconnectPdfs.js';
+import { pdfsNeedingFile, reconnectMenuTooltip, reconnectResult, reconnectTooltip, type PdfNeed } from '../reconnectPdfs.js';
 import { SheetFileCache } from '../sheetFileCache.js';
 import { ChangedFileConfirm, type ChangedFiles } from '../useChangedFile.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
 import type { PdfFolderControl } from '../usePdfFolder.js';
 import { BuildingSection } from './BuildingSection.js';
+import { ReconnectButton } from './ReconnectButton.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
 
 export const SHEETS_ORIGIN = 'sheets';
@@ -135,6 +136,7 @@ export function LevelSheetsPane({
           folderAccess: folderState?.folderAccess ?? 'prompt',
           savedNeedAllow: folderState?.savedNeedAllow ?? 0,
           needFile: needed.length,
+          changedPdfs: changed?.changedPdfCount ?? 0,
         })
       : null;
   const rowsRef = useRef<HTMLDivElement | null>(null);
@@ -246,19 +248,13 @@ export function LevelSheetsPane({
         <div className="mep-reconnect" data-testid="reconnect-band">
           <p className="mep-hint" data-testid="reconnect-hint">{band.hint}</p>
           <div className="mep-reconnect-buttons">
-            {band.allow !== null && (
-              <button
-                type="button"
-                data-testid="allow-pdf-folder"
-                aria-label={band.allow.ariaLabel}
-                title={band.allow.tooltip}
-                disabled={band.allow.disabled}
-                onClick={() => void allowFolder(band.allow?.picks === true)}
-              >
-                {band.allow.label}
-              </button>
-            )}
-            <button type="button" data-testid="reconnect-pdfs" aria-label="Reconnect PDFs" title={reconnectTooltip(levelId !== null)} disabled={band.reconnectDisabled} onClick={() => void reconnect()}>Reconnect PDFs…</button>
+            <ReconnectButton
+              tooltip={folder !== undefined ? reconnectMenuTooltip(levelId !== null) : reconnectTooltip(levelId !== null)}
+              disabled={band.reconnectDisabled}
+              menu={band.menu}
+              onChoose={(action) => (action === 'files' ? void reconnect() : void allowFolder(action === 'pick'))}
+              onDirect={() => void reconnect()}
+            />
           </div>
         </div>
       )}

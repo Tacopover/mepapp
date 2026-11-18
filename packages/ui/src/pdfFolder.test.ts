@@ -220,14 +220,53 @@ describe('ensureFolderAccess', () => {
   });
 });
 
-const base: BandInput = { canStore: true, checked: true, busy: false, folderName: null, folderAccess: 'prompt', savedNeedAllow: 0, needFile: 0 };
+const base: BandInput = {
+  canStore: true,
+  checked: true,
+  busy: false,
+  folderName: null,
+  folderAccess: 'prompt',
+  savedNeedAllow: 0,
+  needFile: 0,
+  changedPdfs: 0,
+};
+const CHANGED_2 = '2 PDFs changed after they were added. Click Reconnect PDFs… and choose the new files.';
+const FILES_MENU = { action: 'files', label: 'Choose files…', help: 'Pick the PDF files yourself. Press Ctrl+A in the picker to pick all.', testId: 'pdf-files-pick' };
+const NO_FOLDER_MENU = [
+  {
+    action: 'pick',
+    label: 'Choose a folder…',
+    help: 'The app finds the PDFs of this building in the folder and the folders inside it.',
+    testId: 'pdf-folder-pick',
+  },
+  FILES_MENU,
+];
+const PICK_ANOTHER = { action: 'pick', label: 'Choose another folder…', help: 'The app uses it instead of Plans.', testId: 'pdf-folder-pick' };
 
 describe('bandView', () => {
-  it('is the T01 band without a folder button when the browser cannot save', () => {
+  it('Firefox and Safari: the T01 hint, no menu', () => {
     expect(bandView({ ...base, canStore: false, needFile: 0 })).toBeNull();
     const view = bandView({ ...base, canStore: false, needFile: 2 });
-    expect(view?.allow).toBeNull();
-    expect(view?.hint).toBe('2 PDFs need a file before they open. Choose them all in one step.');
+    expect(view).toEqual({
+      hint: '2 PDFs need a file before they open. Choose them all in one step.',
+      menu: null,
+      reconnectDisabled: false,
+      hasMenu: false,
+    });
+    expect(bandView({ ...base, canStore: false, needFile: 1 })?.hint).toBe('1 PDF needs a file before it opens. Choose it again.');
+  });
+
+  it('Firefox and Safari: the changed hint when no PDF needs a file', () => {
+    expect(bandView({ ...base, canStore: false, changedPdfs: 1 })).toBeNull();
+    expect(bandView({ ...base, canStore: false, changedPdfs: 2 })).toEqual({
+      hint: CHANGED_2,
+      menu: null,
+      reconnectDisabled: false,
+      hasMenu: false,
+    });
+    expect(bandView({ ...base, canStore: false, changedPdfs: 2, needFile: 1 })?.hint).toBe(
+      '1 PDF needs a file before it opens. Choose it again.',
+    );
   });
 
   it('shows nothing until the access check ends', () => {
@@ -237,72 +276,86 @@ describe('bandView', () => {
   it('shows nothing when nothing is to do', () => {
     expect(bandView(base)).toBeNull();
     expect(bandView({ ...base, folderName: 'Plans', folderAccess: 'granted' })).toBeNull();
+    expect(bandView({ ...base, changedPdfs: 1 })).toBeNull();
   });
 
-  it('T-A: nothing saved, no folder', () => {
+  it('no folder, nothing saved: choose the folder or the files', () => {
     const one = bandView({ ...base, needFile: 1 });
-    expect(one?.hint).toBe('1 PDF needs a file before it opens. Choose the file, or allow access to the PDF folder once.');
-    expect(one?.allow?.label).toBe('Allow access to the PDF folder…');
-    expect(one?.allow?.picks).toBe(true);
-    const many = bandView({ ...base, needFile: 4 });
-    expect(many?.hint).toBe('4 PDFs need a file before they open. Choose the files, or allow access to the PDF folder once.');
-    expect(many?.allow?.tooltip).toBe(
-      'Choose the folder with the PDFs of this building. The app finds the sheets in it by file name and size. The app only reads the files.',
+    expect(one?.hint).toBe('1 PDF needs a file before it opens. Click Reconnect PDFs… to choose the folder or the file.');
+    expect(one?.menu).toEqual(NO_FOLDER_MENU);
+    expect(one?.hasMenu).toBe(true);
+    expect(one?.reconnectDisabled).toBe(false);
+    expect(bandView({ ...base, needFile: 4 })?.hint).toBe(
+      '4 PDFs need a file before they open. Click Reconnect PDFs… to choose the folder or the files.',
     );
-    expect(many?.allow?.ariaLabel).toBe('Allow access to the PDF folder');
   });
 
-  it('T-B: saved PDFs, no folder', () => {
-    expect(bandView({ ...base, savedNeedAllow: 1 })?.hint).toBe('1 PDF is saved in this browser. Allow access to its folder once to open it.');
-    expect(bandView({ ...base, savedNeedAllow: 9 })?.hint).toBe(
-      '9 PDFs are saved in this browser. Allow access to their folder once to open them all.',
-    );
+  it('no folder, saved PDFs', () => {
+    expect(bandView({ ...base, savedNeedAllow: 1 })?.hint).toBe('1 PDF is saved in this browser. Click Reconnect PDFs… to open it.');
+    expect(bandView({ ...base, savedNeedAllow: 9 })?.hint).toBe('9 PDFs are saved in this browser. Click Reconnect PDFs… to open them all.');
     expect(bandView({ ...base, savedNeedAllow: 9, needFile: 1 })?.hint).toBe(
-      '9 PDFs are saved in this browser. Allow access to their folder once to open them all. 1 PDF needs a file before it opens.',
+      '9 PDFs are saved in this browser. Click Reconnect PDFs… to open them all. 1 PDF needs a file before it opens.',
     );
     expect(bandView({ ...base, savedNeedAllow: 2, needFile: 3 })?.hint).toBe(
-      '2 PDFs are saved in this browser. Allow access to their folder once to open them all. 3 PDFs need a file before they open.',
+      '2 PDFs are saved in this browser. Click Reconnect PDFs… to open them all. 3 PDFs need a file before they open.',
     );
+    expect(bandView({ ...base, savedNeedAllow: 1 })?.menu).toEqual(NO_FOLDER_MENU);
   });
 
-  it('T-C: folder stored, permission needed, no ellipsis because no picker opens', () => {
+  it('folder stored, access prompt, saved PDFs: menu starts with Use the folder', () => {
     const view = bandView({ ...base, folderName: 'Plans', savedNeedAllow: 9 });
-    expect(view?.hint).toBe('9 PDFs are saved in this browser. Allow access to the folder Plans once to open them.');
-    expect(view?.allow?.label).toBe('Allow access to the PDF folder');
-    expect(view?.allow?.picks).toBe(false);
-    expect(view?.allow?.tooltip).toBe(
-      'The app opens the PDFs of this building from the folder Plans. The browser asks you once. The app only reads the files.',
-    );
+    expect(view?.hint).toBe('9 PDFs are saved in this browser. Click Reconnect PDFs… and use the folder Plans to open them.');
+    expect(view?.menu).toEqual([
+      { action: 'use', label: 'Use the folder Plans', help: 'The browser asks you once to allow access.', testId: 'pdf-folder-use' },
+      PICK_ANOTHER,
+      FILES_MENU,
+    ]);
     expect(bandView({ ...base, folderName: 'Plans', savedNeedAllow: 1 })?.hint).toBe(
-      '1 PDF is saved in this browser. Allow access to the folder Plans once to open it.',
+      '1 PDF is saved in this browser. Click Reconnect PDFs… and use the folder Plans to open it.',
     );
     expect(bandView({ ...base, folderName: 'Plans', savedNeedAllow: 1, needFile: 2 })?.hint).toBe(
-      '1 PDF is saved in this browser. Allow access to the folder Plans once to open it. 2 PDFs need a file before they open.',
+      '1 PDF is saved in this browser. Click Reconnect PDFs… and use the folder Plans to open it. 2 PDFs need a file before they open.',
     );
   });
 
-  it('T-D: busy, both buttons off', () => {
-    const view = bandView({ ...base, busy: true, folderName: 'Plans', savedNeedAllow: 9 });
-    expect(view?.hint).toBe('Looking for PDFs in Plans…');
-    expect(view?.allow?.label).toBe('Looking for PDFs…');
-    expect(view?.allow?.disabled).toBe(true);
-    expect(view?.allow?.tooltip).toBeUndefined();
-    expect(view?.reconnectDisabled).toBe(true);
+  it('folder stored, access prompt, nothing saved: Use the folder, hint of the missing PDFs', () => {
+    const view = bandView({ ...base, folderName: 'Plans', needFile: 1 });
+    expect(view?.hint).toBe('1 PDF is not in the folder Plans. Click Reconnect PDFs… to choose the file or another folder.');
+    expect(view?.menu?.[0]?.label).toBe('Use the folder Plans');
   });
 
-  it('T-E: folder granted, some PDFs not in it', () => {
+  it('folder granted, some PDFs not in it: menu starts with Look in again', () => {
     const one = bandView({ ...base, folderName: 'Plans', folderAccess: 'granted', needFile: 1 });
-    expect(one?.hint).toBe('1 PDF is not in the folder Plans. Choose the file, or allow access to another folder.');
-    expect(one?.allow?.label).toBe('Allow access to the PDF folder…');
-    expect(one?.allow?.picks).toBe(true);
-    expect(one?.allow?.tooltip).toBe('Choose another folder. The app uses it instead of Plans.');
+    expect(one?.hint).toBe('1 PDF is not in the folder Plans. Click Reconnect PDFs… to choose the file or another folder.');
+    expect(one?.menu).toEqual([
+      { action: 'use', label: 'Look in Plans again', help: 'The app searches the folder and the folders inside it again.', testId: 'pdf-folder-use' },
+      PICK_ANOTHER,
+      FILES_MENU,
+    ]);
     expect(bandView({ ...base, folderName: 'Plans', folderAccess: 'granted', needFile: 2 })?.hint).toBe(
-      '2 PDFs are not in the folder Plans. Choose the files, or allow access to another folder.',
+      '2 PDFs are not in the folder Plans. Click Reconnect PDFs… to choose the files or another folder.',
     );
   });
 
-  it('keeps the Reconnect button on in the states that are not busy', () => {
-    expect(bandView({ ...base, needFile: 1 })?.reconnectDisabled).toBe(false);
+  it('busy: no menu, the button is off', () => {
+    const view = bandView({ ...base, busy: true, folderName: 'Plans', savedNeedAllow: 9 });
+    expect(view).toEqual({ hint: 'Looking for PDFs in Plans…', menu: null, reconnectDisabled: true, hasMenu: false });
+    expect(bandView({ ...base, busy: true, needFile: 1 })?.hint).toBe('Looking for PDFs in the folder…');
+  });
+
+  it('the changed hint shows with the menu of the folder state when nothing else is to do', () => {
+    const none = bandView({ ...base, changedPdfs: 2 });
+    expect(none?.hint).toBe(CHANGED_2);
+    expect(none?.menu).toEqual(NO_FOLDER_MENU);
+    const granted = bandView({ ...base, folderName: 'Plans', folderAccess: 'granted', changedPdfs: 5 });
+    expect(granted?.hint).toBe('5 PDFs changed after they were added. Click Reconnect PDFs… and choose the new files.');
+    expect(granted?.menu?.[0]?.label).toBe('Look in Plans again');
+  });
+
+  it('a need hint wins over the changed hint', () => {
+    expect(bandView({ ...base, needFile: 1, changedPdfs: 3 })?.hint).toBe(
+      '1 PDF needs a file before it opens. Click Reconnect PDFs… to choose the folder or the file.',
+    );
   });
 });
 
@@ -413,7 +466,13 @@ describe('folderResultNotice', () => {
 
 describe('fixed notices', () => {
   it('has the texts of the spec', () => {
-    expect(folderDeniedNotice()).toEqual({ text: 'Access was not allowed. Choose the files with Reconnect PDFs…, or change the site setting in the browser.', error: true });
-    expect(folderGoneNotice('Plans')).toEqual({ text: 'The folder Plans is not there any more. Allow access to the PDF folder again.', error: true });
+    expect(folderDeniedNotice()).toEqual({
+      text: 'Access was not allowed. Click Reconnect PDFs… and choose the files, or change the site setting in the browser.',
+      error: true,
+    });
+    expect(folderGoneNotice('Plans')).toEqual({
+      text: 'The folder Plans is not there any more. Click Reconnect PDFs… and choose the folder again.',
+      error: true,
+    });
   });
 });

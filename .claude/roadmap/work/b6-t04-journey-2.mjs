@@ -32,14 +32,14 @@ for (const w of widths) {
   await h.openBuilding(g3);
   await h.nextFolder('Plans');
   let clicks = 1; // Allow button
-  await h.allowBtn().click();
+  await h.allowClick();
   const n3 = await h.waitNotice((x) => x.startsWith('Found'));
   log('G3 notice:', JSON.stringify(n3), '| vis', await h.noticeVis(), '| error?', await h.noticeIsError());
   await h.dumpBand('G3 after pick');
   await shot(`${tag}-g3-partial`);
   // fix: the user clicks Reconnect PDFs… and picks the 2 files
   await h.next([P(7), P(8)]);
-  await h.reconnectBtn().click(); clicks++;
+  await h.filesClick(); clicks++;
   await idle(1200);
   log('G3 after Reconnect (2 files):', JSON.stringify(await h.notice()), '| vis', await h.noticeVis());
   await h.dumpBand('G3 after reconnect');
@@ -51,7 +51,7 @@ for (const w of widths) {
   await h.openBuilding(g3);
   await h.dumpBand('G3 restart');
   await shot(`${tag}-g3-restart`);
-  await h.allowBtn().click();
+  await h.allowClick();
   log('G3 restart band click notice:', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found'))), '| band', await h.hint(), '| rows', JSON.stringify(await h.counts()));
   await h.closeDialog();
 
@@ -60,7 +60,7 @@ for (const w of widths) {
   await h.restart();
   await h.openBuilding(g3b);
   await h.nextFolder('Plans');
-  await h.allowBtn().click();
+  await h.allowClick();
   await h.waitNotice((x) => x.startsWith('Found'));
   await h.next([P(7)]);
   await h.bySheetBtn(P(7)).click();
@@ -74,14 +74,14 @@ for (const w of widths) {
   await h.restart();
   await h.openBuilding(g4);
   await h.nextFolder('Plans');
-  await h.allowBtn().click();
+  await h.allowClick();
   await h.waitNotice((x) => x.startsWith('Found'));
   await h.closeDialog();
   await h.restart({ fans: 'denied' });
   await h.openBuilding(g4);
   await h.dumpBand('G4a start (T-C)');
   for (let i = 0; i < 3; i++) {
-    await h.allowBtn().click();
+    await h.allowClick();
     await idle(900);
     log(`G4a denied click #${i + 1}:`, JSON.stringify(await h.notice()), '| vis', await h.noticeVis(), '| err', await h.noticeIsError(), '| folder q', await h.freqCalls(), '| band', await h.hint());
     if (i === 0) await shot(`${tag}-g4a-denied`);
@@ -94,14 +94,14 @@ for (const w of widths) {
   await h.cancelPick(false);
   // recover 1: the user allows now (the site setting changed): click the band button again
   await h.setPerm({ __fans: 'granted' });
-  await h.allowBtn().click();
+  await h.allowClick();
   log('G4a recover after allow:', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found'))), '| band', await h.hint());
   await h.closeDialog();
   // recover 2: denied for good, the user chooses the files with Reconnect
   await h.restart({ fans: 'denied' });
   await h.openBuilding(g4);
   await h.next(h.nine.map((x) => x.name));
-  await h.reconnectBtn().click();
+  await h.filesClick();
   await idle(1500);
   log('G4a recover via Reconnect:', JSON.stringify(await h.notice()), '| band', await h.hint(), '| rows', JSON.stringify(await h.counts()));
   await h.closeDialog();
@@ -112,14 +112,14 @@ for (const w of widths) {
   await h.restart();
   await h.openBuilding(g4b);
   await h.nextFolder('Plans');
-  await h.allowBtn().click();
+  await h.allowClick();
   await h.waitNotice((x) => x.startsWith('Found'));
   await h.closeDialog();
   await h.setTrees({ PlansMoved: { files: f(0, 1, 2, 3, 4, 5, 6, 7, 8), dirs: {} } }); // the folder moved: old path is gone
   await h.restart();
   await h.openBuilding(g4b);
   await h.dumpBand('G4b restart, folder moved');
-  await h.allowBtn().click();
+  await h.allowClick();
   log('G4b band click:', JSON.stringify(await h.waitNotice((x) => x.startsWith('The folder'))), '| vis', await h.noticeVis(), '| err', await h.noticeIsError());
   await h.dumpBand('G4b after');
   await shot(`${tag}-g4b-gone`);
@@ -130,7 +130,7 @@ for (const w of widths) {
   log('G4b row Open after folder gone (picker cancelled):', JSON.stringify(await h.notice()), '| picks', await h.pickCalls());
   await h.cancelPick(false);
   await h.nextFolder('PlansMoved');
-  await h.allowBtn().click();
+  await h.allowClick();
   log('G4b pick the moved folder:', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found'))), '| band', await h.hint());
   await h.closeDialog();
 
@@ -145,7 +145,7 @@ for (const w of widths) {
   await h.restart();
   await h.openBuilding(g5);
   await h.nextFolder('Plans');
-  await h.allowBtn().click();
+  await h.allowClick();
   log('G5 notice:', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found') || x.startsWith('For '))), '| vis', await h.noticeVis(), '| err', await h.noticeIsError());
   await h.dumpBand('G5 after');
   await shot(`${tag}-g5-ambiguous`);
@@ -162,7 +162,7 @@ for (const w of widths) {
   await h.restart();
   await h.openBuilding(gb);
   await h.nextFolder('Plans');
-  await h.allowBtn().click();
+  await h.allowClick();
   await page.waitForTimeout(900);
   await h.dumpBand('BUSY');
   log('BUSY buttons disabled:', JSON.stringify(await dlg.locator('[data-testid="reconnect-band"] button').evaluateAll((els) => els.map((e) => e.disabled))), '| allow aria-busy', await h.allowBtn().getAttribute('aria-busy').catch(() => 'n/a'));
@@ -184,7 +184,7 @@ const rj = h.bjson('race', h.nineSheets());
 await h.restart();
 await h.openBuilding(rj);
 await h.nextFolder('Plans');
-await h.allowBtn().click();
+await h.allowClick();
 await h.waitNotice((x) => x.startsWith('Found'));
 await h.closeDialog();
 async function trace(label, ms) {

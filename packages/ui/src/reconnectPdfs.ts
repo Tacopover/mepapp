@@ -36,6 +36,10 @@ export function reconnectTooltip(levelScope: boolean): string {
   return `Choose the PDF files of this ${levelScope ? 'level' : 'building'}. The app finds the sheets by file name and size. No sheet is added or changed.`;
 }
 
+export function reconnectMenuTooltip(levelScope: boolean): string {
+  return `Choose the folder or the PDF files of this ${levelScope ? 'level' : 'building'}. The app finds the sheets by file name. No sheet is added or changed.`;
+}
+
 export interface ReconnectInput {
   needed: PdfNeed[];
   picked: { name: string; size: number }[];

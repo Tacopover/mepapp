@@ -111,7 +111,9 @@ const storeCount = (name) =>
     name,
   );
 const band = () => dlg.locator('[data-testid="reconnect-band"]');
-const allowBtn = () => dlg.locator('[data-testid="allow-pdf-folder"]');
+const allowBtn = () => dlg.locator('[data-testid="reconnect-pdfs"]');
+const menuItem = (id) => dlg.locator(`[data-testid="${id}"]`);
+const itemLabel = async (id) => (await menuItem(id).locator('strong').innerText()).trim();
 const hint = async () => ((await band().count()) === 0 ? null : (await dlg.locator('[data-testid="reconnect-hint"]').innerText()).trim());
 const notice = async () => ((await dlg.locator('[data-testid="sheets-notice"]').first().innerText({ timeout: 2000 }).catch(() => null)) ?? null)?.trim() ?? null;
 async function waitNotice(test, ms = 20000) {
@@ -173,12 +175,13 @@ await closeDialog();
 // restart 1: saved PDFs, no folder: the band offers the folder
 await restart();
 await idle(3000);
-check((await hint()) === '3 PDFs are saved in this browser. Allow access to their folder once to open them all.', 'restart 1: band hint (T-B)', String(await hint()));
-check((await dlg.locator('[data-testid="reconnect-band"] button').allInnerTexts()).join('|') === 'Allow access to the PDF folder…|Reconnect PDFs…', 'restart 1: two buttons');
+check((await hint()) === '3 PDFs are saved in this browser. Click Reconnect PDFs… to open them all.', 'restart 1: band hint (T-B)', String(await hint()));
+check((await dlg.locator('[data-testid="reconnect-band"] button').allInnerTexts()).join('|') === 'Reconnect PDFs…', 'restart 1: one button');
 check((await dlg.locator('[data-testid="open-sheet"]', { hasText: /^Open$/ }).count()) >= 3, 'restart 1: the rows say Open');
 await shot('b6-t04-noflag-01-saved-no-folder');
 await page.evaluate(() => { window.__nextFolder = 'Plans'; });
 await allowBtn().click();
+await menuItem('pdf-folder-pick').click();
 check((await waitNotice((x) => x.startsWith('Found'))) === 'Found all 3 PDFs in Plans.', 'pick: notice', String(await notice()));
 check((await storeCount('pdfFolders')) === 1, 'pick: the folder handle is stored in IndexedDB', String(await storeCount('pdfFolders')));
 check((await page.evaluate(() => window.__dirPicks.length)) === 1 && (await page.evaluate(() => window.__dirPicks[0].id)) === 'mepapp-building-pdfs', 'pick: picker id is mepapp-building-pdfs');
@@ -188,10 +191,11 @@ await closeDialog();
 
 // restart 2: one click on the band asks the folder once; then a sheet opens with no picker
 await restart();
-check((await hint()) === '3 PDFs are saved in this browser. Allow access to the folder Plans once to open them.', 'restart 2: band hint (T-C)', String(await hint()));
-check((await allowBtn().innerText()).trim() === 'Allow access to the PDF folder', 'restart 2: no ellipsis');
-await shot('b6-t04-noflag-02-folder-saved');
+check((await hint()) === '3 PDFs are saved in this browser. Click Reconnect PDFs… and use the folder Plans to open them.', 'restart 2: band hint (T-C)', String(await hint()));
 await allowBtn().click();
+check((await itemLabel('pdf-folder-use')) === 'Use the folder Plans', 'restart 2: the first menu item names the folder', await itemLabel('pdf-folder-use'));
+await shot('b6-t04-noflag-02-folder-saved');
+await menuItem('pdf-folder-use').click();
 check((await waitNotice((x) => x.startsWith('Found'))) === 'Found all 3 PDFs in Plans.', 'restart 2: notice', String(await notice()));
 check((await num('__freqCalls')) === 1, 'restart 2: the folder was asked once', String(await num('__freqCalls')));
 check((await num('__reqCalls')) === 0, 'restart 2: no single file was asked');
@@ -205,9 +209,12 @@ await closeDialog();
 await page.evaluate(() => navigator.storage.getDirectory().then((d) => d.removeEntry('Plans', { recursive: true })));
 await restart();
 await allowBtn().click();
-check((await waitNotice((x) => x.startsWith('The folder'))) === 'The folder Plans is not there any more. Allow access to the PDF folder again.', 'restart 3: folder gone notice', String(await notice()));
+await menuItem('pdf-folder-use').click();
+check((await waitNotice((x) => x.startsWith('The folder'))) === 'The folder Plans is not there any more. Click Reconnect PDFs… and choose the folder again.', 'restart 3: folder gone notice', String(await notice()));
 check((await storeCount('pdfFolders')) === 0, 'restart 3: the folder handle is deleted');
-check((await allowBtn().innerText()).trim() === 'Allow access to the PDF folder…', 'restart 3: the label has the ellipsis again');
+await allowBtn().click();
+check((await itemLabel('pdf-folder-pick')) === 'Choose a folder…', 'restart 3: the menu offers the folder picker again', await itemLabel('pdf-folder-pick'));
+await allowBtn().click();
 await shot('b6-t04-noflag-03-folder-gone');
 await closeDialog();
 check(errors.length === 0, 'no page errors', errors.join(' | '));

@@ -5,6 +5,7 @@ import {
   pdfsNeedingFile,
   reconnectHint,
   reconnectResult,
+  reconnectMenuTooltip,
   reconnectTooltip,
   type PdfNeed,
   type ReconnectInput,
@@ -85,6 +86,15 @@ describe('reconnectHint and reconnectTooltip', () => {
   it('names the building in the tooltip for the building node', () => {
     expect(reconnectTooltip(false)).toBe(
       'Choose the PDF files of this building. The app finds the sheets by file name and size. No sheet is added or changed.',
+    );
+  });
+
+  it('has the menu tooltip for a level and for the building', () => {
+    expect(reconnectMenuTooltip(true)).toBe(
+      'Choose the folder or the PDF files of this level. The app finds the sheets by file name. No sheet is added or changed.',
+    );
+    expect(reconnectMenuTooltip(false)).toBe(
+      'Choose the folder or the PDF files of this building. The app finds the sheets by file name. No sheet is added or changed.',
     );
   });
 });

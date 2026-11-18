@@ -25,7 +25,7 @@ for (const w of widths) {
   log('G1a notice vis', await h.noticeVis(), 'allow tooltip:', await h.allowBtn().getAttribute('title'));
   await shot(`${tag}-g1a-first-start`);
   await h.next(h.nine.map((f) => f.name));
-  await h.reconnectBtn().click();
+  await h.filesClick();
   await idle(1200);
   log('G1a after Reconnect: notice', JSON.stringify(await h.notice()), 'vis', await h.noticeVis());
   await h.dumpBand('G1a after reconnect');
@@ -46,7 +46,7 @@ for (const w of widths) {
   await h.dumpBand('G1a after 3 single opens');
   // now the folder button (picker) as the band says
   await h.nextFolder('Plans');
-  await h.allowBtn().click();
+  await h.allowClick();
   log('G1a after folder pick: notice', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found'))), 'vis', await h.noticeVis(), 'folderPicks', await h.dirPicks());
   await h.dumpBand('G1a after folder pick');
   await shot(`${tag}-g1a-after-folder`);
@@ -57,7 +57,7 @@ for (const w of widths) {
   await h.restart();
   await h.openBuilding(bJson);
   await h.nextFolder('Plans');
-  await h.allowBtn().click();
+  await h.allowClick();
   log('G1b folder pick: notice', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found'))), '| band', await h.hint(), '| rows', JSON.stringify(await h.counts()));
   await h.closeDialog();
   await h.restart();
@@ -65,7 +65,7 @@ for (const w of widths) {
   await h.dumpBand('G2 restart (T-C)');
   log('G2 allow tooltip:', await h.allowBtn().getAttribute('title'), '| reconnect tooltip:', await h.reconnectBtn().getAttribute('title'));
   await shot(`${tag}-g2-restart-tc`);
-  await h.allowBtn().click();
+  await h.allowClick();
   log('G2 after band click: notice', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found'))), 'vis', await h.noticeVis(), '| folder q', await h.freqCalls());
   await h.dumpBand('G2 after band click');
   await shot(`${tag}-g2-after-allow`);
@@ -94,7 +94,7 @@ for (const w of widths) {
   await h.dumpBand('FULL first start');
   await shot(`${tag}-full-first-start`);
   await h.nextFolder('Big');
-  await h.allowBtn().click();
+  await h.allowClick();
   log('FULL folder pick: notice', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found'))), 'vis', await h.noticeVis());
   await shot(`${tag}-full-after-pick`);
   await h.closeDialog();
@@ -102,7 +102,7 @@ for (const w of widths) {
   await h.openBuilding(fJson);
   await h.dumpBand('FULL restart');
   await shot(`${tag}-full-restart`);
-  await h.allowBtn().click();
+  await h.allowClick();
   log('FULL band click: notice', JSON.stringify(await h.waitNotice((x) => x.startsWith('Found'))), 'vis', await h.noticeVis());
   for (const f of h.tenFiles.slice(0, 3)) {
     await h.bySheetBtn(f.name).click();

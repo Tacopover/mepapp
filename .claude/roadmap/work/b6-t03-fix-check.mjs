@@ -150,7 +150,7 @@ const clickRow = (name, kind) => (kind === undefined ? dlg.locator(`[data-testid
 async function reconnectAll(files) {
   await next(files);
   const b = dlg.getByRole("button", { name: "Reconnect PDFs" });
-  if ((await b.count()) === 1) { await b.click(); await idle(1200); }
+  if ((await b.count()) === 1) { await b.click(); await dlg.locator('[data-testid="pdf-files-pick"]').click(); await idle(1200); }
 }
 
 // ---------- B6-T03 journey fixes: F1 notice after a successful pick, F2 a changed file picked ----------

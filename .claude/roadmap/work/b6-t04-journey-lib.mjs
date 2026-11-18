@@ -150,8 +150,19 @@ export async function setup() {
   const closeDialog = async () => { await dlg.getByRole('button', { name: 'Close', exact: true }).click(); await idle(400); };
   const bySheetBtn = (name) => dlg.locator(`[data-testid="open-sheet"][aria-label^="Open ${name}"], [data-testid="open-sheet"][aria-label^="Choose file for ${name}"]`).first();
   const band = () => dlg.locator('[data-testid="reconnect-band"]');
-  const allowBtn = () => dlg.locator('[data-testid="allow-pdf-folder"]');
+  const allowBtn = () => dlg.locator('[data-testid="reconnect-pdfs"]');
   const reconnectBtn = () => dlg.locator('[data-testid="reconnect-pdfs"]');
+  // The old Allow button: "Use the folder X" when the stored folder needs the permission, else "Choose a folder…" / "Choose another folder…".
+  const allowClick = async () => {
+    await allowBtn().click();
+    const use = dlg.locator('[data-testid="pdf-folder-use"]');
+    if ((await use.count()) === 1 && /^Use the folder /.test((await use.locator('strong').innerText()).trim())) await use.click();
+    else await dlg.locator('[data-testid="pdf-folder-pick"]').click();
+  };
+  const filesClick = async () => {
+    await reconnectBtn().click();
+    await dlg.locator('[data-testid="pdf-files-pick"]').click();
+  };
   const hint = async () => ((await band().count()) === 0 ? null : (await dlg.locator('[data-testid="reconnect-hint"]').innerText()).trim());
   const bandButtons = async () => ((await band().count()) === 0 ? [] : (await dlg.locator('[data-testid="reconnect-band"] button').allInnerTexts()).map((x) => x.trim()));
   const notice = async () => ((await dlg.locator('[data-testid="sheets-notice"]').first().innerText({ timeout: 1500 }).catch(() => null)) ?? null)?.trim() ?? null;
@@ -197,5 +208,5 @@ export async function setup() {
     );
   const log = (...a) => console.log('LOG', ...a);
   const dumpBand = async (label) => log(label, '| band:', JSON.stringify(await hint()), '| buttons:', JSON.stringify(await bandButtons()), '| rows:', JSON.stringify(await counts()), '| bandVis', await bandVis());
-  return { ...t, dlg, putPdf, setTrees, nextFolder, dirCancel, cancelPick, next, pickCalls, dirPicks, reqCalls, freqCalls, setPerm, restart, levels, sheet, riser, bjson, nine, nineSheets, tenFiles, fullSheets, openBuilding, closeDialog, bySheetBtn, band, allowBtn, reconnectBtn, hint, bandButtons, notice, noticeIsError, counts, waitNotice, noticeVis, bandVis, idbKeys, log, dumpBand, sizeOf };
+  return { ...t, dlg, putPdf, setTrees, nextFolder, dirCancel, cancelPick, next, pickCalls, dirPicks, reqCalls, freqCalls, setPerm, restart, levels, sheet, riser, bjson, nine, nineSheets, tenFiles, fullSheets, openBuilding, closeDialog, bySheetBtn, band, allowBtn, reconnectBtn, allowClick, filesClick, hint, bandButtons, notice, noticeIsError, counts, waitNotice, noticeVis, bandVis, idbKeys, log, dumpBand, sizeOf };
 }

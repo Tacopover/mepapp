@@ -6116,13 +6116,39 @@ button.mep-tree-arrow {
   justify-content: flex-end;
   gap: 8px;
 }
+.mep-reconnect-dropdown {
+  left: auto;
+  right: 0;
+  width: 320px;
+  max-width: calc(100vw - 48px);
+}
+.mep-reconnect-item {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: normal;
+}
+.mep-reconnect-item .mep-hint {
+  margin: 0;
+  font-weight: 400;
+}
 @media (max-width: 899px) {
   .mep-reconnect {
     grid-template-columns: minmax(0, 1fr);
+    position: relative;
   }
   .mep-reconnect-buttons {
     justify-self: start;
     justify-content: flex-start;
+  }
+  .mep-reconnect-menu {
+    position: static;
+  }
+  .mep-reconnect-dropdown {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
   }
 }
 .mep-add-result {
