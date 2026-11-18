@@ -1,0 +1,10 @@
+import { setup, EDIT, sizeOf } from './b6-t06-journey-lib.mjs';
+const h = await setup();
+const { page, dlg } = h;
+await h.restart();
+await h.putPdf('plan.pdf', EDIT);
+await h.openBuilding(h.buildingJson('e1', [h.sheet('s1', 'l1', 'plan.pdf', 0, 'plan L1'), h.sheet('s2', 'l2', 'plan.pdf', 0, 'plan L2')]));
+await h.shot('b6-t06-j-explore-open');
+console.log('BUTTONS', JSON.stringify(await dlg.locator('button').allInnerTexts()));
+console.log('TEXT', JSON.stringify(await dlg.innerText()));
+await h.t.finish();

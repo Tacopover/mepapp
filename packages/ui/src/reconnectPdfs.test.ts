@@ -320,8 +320,27 @@ describe('reconnectResult', () => {
       expect(reconnectResult({ ...changedInput(), changedMode: 'found' })).toEqual({ text: 'Found all 2 PDFs.', error: false });
     });
 
-    it('leaves the changed PDF out of the counts in mode excluded', () => {
-      expect(reconnectResult({ ...changedInput(), changedMode: 'excluded' })).toEqual({ text: 'Found the PDF.', error: false });
+    it('keeps the changed PDF in the total and does not count it as found in mode excluded', () => {
+      expect(reconnectResult({ ...changedInput(), changedMode: 'excluded' })).toEqual({ text: 'Found 1 of 2 PDFs.', error: false });
+    });
+
+    it('uses the form Found X of N when 3 of 9 PDFs are changed', () => {
+      const names = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((letter) => `${letter}.pdf`);
+      const result = reconnectResult({
+        ...changedInput(),
+        needed: names.map((name) => needOf(name, 1)),
+        picked: names.map((name) => ({ name, size: names.slice(6).includes(name) ? 9 : 1 })),
+        buildingKeys: keysOf(...names.map((name) => ({ name, size: 1 }))),
+        isFound: onlyNamed(names.slice(0, 6)),
+        changedNames: new Set(names.slice(6)),
+        changedMode: 'excluded',
+      });
+      expect(result.text).toBe('Found 6 of 9 PDFs.');
+    });
+
+    it('is not an error when only changed PDFs remain', () => {
+      const result = reconnectResult({ ...changedInput(), needed: [needOf('b.pdf', 4)], changedMode: 'excluded' });
+      expect(result).toEqual({ text: '', error: false });
     });
 
     it('gives no change without a mode, and never counts the changed file as not used', () => {
@@ -330,7 +349,7 @@ describe('reconnectResult', () => {
 
     it('adds the text of two changed files', () => {
       expect(reconnectResult({ ...changedInput(), changedMode: 'excluded', changedAmbiguousNames: ['b.pdf'] }).text).toBe(
-        'Found the PDF. For b.pdf you chose two different files with another size. The app cannot tell which one to use. Use Choose file… on its row.',
+        'Found 1 of 2 PDFs. For b.pdf you chose two different files with another size. The app cannot tell which one to use. Use Choose file… on its row.',
       );
     });
   });

@@ -70,31 +70,34 @@ function foundText(found: number, total: number): string {
 export function reconnectResult(input: ReconnectInput): { text: string; error: boolean } {
   const { picked, scopeKeys, buildingKeys, isAmbiguous, levelScope, changedNames, changedMode, changedAmbiguousNames } = input;
   const isChanged = (need: PdfNeed) => changedNames?.has(need.fileName) === true;
-  const needed = changedMode === 'excluded' ? input.needed.filter((need) => !isChanged(need)) : input.needed;
-  const isFound = (need: PdfNeed) => (changedMode === 'found' && isChanged(need)) || input.isFound(need);
+  const needed = input.needed;
+  const held = (need: PdfNeed) => changedMode === 'excluded' && isChanged(need);
+  const isFound = (need: PdfNeed) => (changedMode === 'found' && isChanged(need)) || (!held(need) && input.isFound(need));
   const total = needed.length;
+  const others = needed.filter((need) => !held(need)).length;
   const found = needed.filter(isFound).length;
+  const lacking = others - found;
   const neededKeys = new Set(needed.map((need) => SheetFileCache.key(need.fileName, need.sizeBytes)));
   const pickedKeys = picked.map((file) => SheetFileCache.key(file.name, file.size));
   const pickedKeySet = new Set(pickedKeys);
   const parts: string[] = [];
 
-  if (total > 0) parts.push(foundText(found, total));
-  if (total > 0 && found === 0 && !pickedKeys.some((key) => neededKeys.has(key))) {
+  if (others > 0) parts.push(foundText(found, total));
+  if (others > 0 && found === 0 && !pickedKeys.some((key) => neededKeys.has(key))) {
     parts.push(
       picked.length === 1
         ? 'The file you chose does not have the same name and size as a PDF of the sheets here.'
         : `None of the ${picked.length} files you chose has the same name and size as a PDF of the sheets here.`,
     );
   }
-  if (found < total) {
-    const missing = uniqueNames(needed.filter((need) => !isFound(need)).map((need) => need.fileName));
+  if (lacking > 0) {
+    const missing = uniqueNames(needed.filter((need) => !isFound(need) && !held(need)).map((need) => need.fileName));
     parts.push(`Missing: ${namesList(missing)}.`);
   }
 
   const twoFiles = uniqueNames(
     needed
-      .filter((need) => !isFound(need) && isAmbiguous(need) && pickedKeySet.has(SheetFileCache.key(need.fileName, need.sizeBytes)))
+      .filter((need) => !isFound(need) && !held(need) && isAmbiguous(need) && pickedKeySet.has(SheetFileCache.key(need.fileName, need.sizeBytes)))
       .map((need) => need.fileName),
   );
   if (twoFiles.length > 0) {
@@ -120,5 +123,5 @@ export function reconnectResult(input: ReconnectInput): { text: string; error: b
   ).length;
   if (unused > 0) parts.push(unused === 1 ? '1 file was not used.' : `${unused} files were not used.`);
 
-  return { text: parts.join(' '), error: found === 0 && total >= 1 };
+  return { text: parts.join(' '), error: found === 0 && others >= 1 };
 }

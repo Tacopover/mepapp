@@ -1,0 +1,14 @@
+import { setup, EDIT } from './b6-t06-journey-lib.mjs';
+const h = await setup();
+const { page, dlg } = h;
+await page.setViewportSize({ width: 760, height: 1000 });
+await h.restart();
+await h.putPdf('plan.pdf', EDIT);
+await page.evaluate((j) => window.__mepBuilding.load(j), h.buildingJson('n1', [h.sheet('s1', 'l1', 'plan.pdf', 0, 'plan L1'), h.sheet('s2', 'l2', 'plan.pdf', 0, 'plan L2')]));
+await h.idle(600);
+await h.menu('Manage Buildings…');
+await dlg.waitFor({ state: 'visible', timeout: 8000 });
+await h.idle(900);
+await h.shot('b6-t06-j-760-dialog');
+console.log('TREEITEMS', await dlg.locator('[role="treeitem"]').count(), JSON.stringify(await dlg.locator('button').allInnerTexts()));
+await h.t.finish();

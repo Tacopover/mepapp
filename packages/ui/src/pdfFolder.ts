@@ -272,24 +272,27 @@ export interface FolderResultInput {
 export function folderResultNotice(input: FolderResultInput): FolderNotice | null {
   const { folderName, foundKeys, ambiguousKeys, capped, changedNames, changedMode, changedAmbiguousNames } = input;
   const isChanged = (need: PdfNeed) => changedNames?.has(need.fileName) === true;
-  const needed = changedMode === 'excluded' ? input.needed.filter((need) => !isChanged(need)) : input.needed;
+  const needed = input.needed;
   const total = needed.length;
-  if (total === 0) return null;
+  const held = (need: PdfNeed) => changedMode === 'excluded' && isChanged(need);
+  const others = needed.filter((need) => !held(need)).length;
+  if (others === 0) return null;
   const keyOf = (need: PdfNeed) => pdfHandleFileKey(need.fileName, need.sizeBytes);
   const isFound = (need: PdfNeed) =>
-    (changedMode === 'found' && isChanged(need)) || (foundKeys.has(keyOf(need)) && !ambiguousKeys.has(keyOf(need)));
+    (changedMode === 'found' && isChanged(need)) || (!held(need) && foundKeys.has(keyOf(need)) && !ambiguousKeys.has(keyOf(need)));
   const found = needed.filter(isFound).length;
+  const lacking = others - found;
   const parts: string[] = [];
   if (found === total) parts.push(total === 1 ? `Found the PDF in ${folderName}.` : `Found all ${total} PDFs in ${folderName}.`);
   else parts.push(`Found ${found} of ${total} PDF${total === 1 ? '' : 's'} in ${folderName}.`);
   if (found === 0) {
     parts.push('The app looked in the folder and in the folders inside it, 3 levels deep.');
   }
-  if (found < total) {
-    const missing = [...new Set(needed.filter((need) => !isFound(need)).map((need) => need.fileName))];
+  if (lacking > 0) {
+    const missing = [...new Set(needed.filter((need) => !isFound(need) && !held(need)).map((need) => need.fileName))];
     parts.push(`Missing: ${namesList(missing)}.`);
   }
-  const twoFiles = [...new Set(needed.filter((need) => ambiguousKeys.has(keyOf(need))).map((need) => need.fileName))];
+  const twoFiles = [...new Set(needed.filter((need) => !held(need) && ambiguousKeys.has(keyOf(need))).map((need) => need.fileName))];
   if (twoFiles.length > 0) {
     parts.push(
       `For ${twoFiles.join(', ')} the folder has two different files with the same name and size. The app cannot tell which one to use. Use Choose file… on its row.`,
@@ -298,10 +301,10 @@ export function folderResultNotice(input: FolderResultInput): FolderNotice | nul
   if (changedAmbiguousNames !== undefined && changedAmbiguousNames.length > 0) {
     parts.push(twoChangedText(changedAmbiguousNames, 'folder'));
   }
-  if (capped && found < total) {
+  if (capped && lacking > 0) {
     parts.push(`The app stopped looking after ${FOLDER_MAX_ITEMS} items in ${folderName}. Choose a folder that holds fewer files.`);
   }
-  return { text: parts.join(' '), error: found === 0 || (capped && found < total) };
+  return { text: parts.join(' '), error: found === 0 || (capped && lacking > 0) };
 }
 
 export function folderDeniedNotice(): FolderNotice {

@@ -378,8 +378,22 @@ describe('folderResultNotice', () => {
 
   it('leaves a changed PDF out of the counts in mode excluded', () => {
     const base = { folderName: 'Plans', foundKeys: keys('a.pdf:1'), ambiguousKeys: keys(), capped: false, changedNames: new Set(['b.pdf']), changedMode: 'excluded' as const };
-    expect(folderResultNotice({ ...base, needed: [needOf('a.pdf', 1), needOf('b.pdf', 2)] })?.text).toBe('Found the PDF in Plans.');
+    expect(folderResultNotice({ ...base, needed: [needOf('a.pdf', 1), needOf('b.pdf', 2)] })?.text).toBe('Found 1 of 2 PDFs in Plans.');
     expect(folderResultNotice({ ...base, needed: [needOf('b.pdf', 2)] })).toBeNull();
+  });
+
+  it('uses the form Found X of N and no Missing list for changed PDFs when 3 of 9 are changed', () => {
+    const names = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((letter) => `${letter}.pdf`);
+    const result = folderResultNotice({
+      folderName: 'Plans',
+      needed: names.map((name) => needOf(name, 1)),
+      foundKeys: keys(...names.slice(0, 6).map((name) => `${name}:1`)),
+      ambiguousKeys: keys(),
+      capped: false,
+      changedNames: new Set(names.slice(6)),
+      changedMode: 'excluded',
+    });
+    expect(result?.text).toBe('Found 6 of 9 PDFs in Plans.');
   });
 
   it('adds the text of two changed files after the two-files part', () => {
