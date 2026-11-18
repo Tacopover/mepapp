@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BuildingSheet } from '@mepapp/core';
-import type { FileAccess, OpenedFile, PdfHandleStore } from '@mepapp/platform';
+import type { FileAccess, FileTarget, OpenedFile, PdfHandleStore } from '@mepapp/platform';
 import { pdfHandleFileKey } from '@mepapp/platform';
 import { asFileHandle, sheetFileKey } from './pdfHandles.js';
 import {
@@ -41,12 +41,31 @@ export interface PdfFolderControl {
    * pick = false asks the permission for the stored folder. Then the folder is searched.
    * `scope` lists the sheets that the notice counts. Resolves with the notice, or null when the user cancelled.
    */
-  allow(options: { pick: boolean; scope: readonly BuildingSheet[] }): Promise<FolderNotice | null>;
+  allow(options: { pick: boolean; scope: readonly BuildingSheet[] }): Promise<AllowOutcome>;
+}
+
+/** The changed files that a folder search found (same name as a sheet, another size). The files are not remembered. */
+export interface ChangedScan {
+  files: OpenedFile[];
+  /** File names with two different changed files. The app uses neither. */
+  ambiguousNames: string[];
+  /** The notice of the search with the changed PDFs counted as found, or left out. */
+  /** `names`: the changed file names that the mode applies to. Default: every changed file of the search. */
+  noticeFor: (mode: 'found' | 'excluded', names?: ReadonlySet<string>) => FolderNotice | null;
+}
+
+export interface AllowOutcome {
+  /** The notice of the search with no change for changed files. Null when the user cancelled or nothing was looked for. */
+  notice: FolderNotice | null;
+  /** Null when the search found no changed file. */
+  changed: ChangedScan | null;
 }
 
 export interface FolderOpenResult {
   /** The file of the sheet, when the folder had it. */
   opened?: OpenedFile;
+  /** A changed file of the sheet (same name, another size), when the folder had no exact file. */
+  changed?: OpenedFile;
   /** The result of the search, or the reason that the folder could not be used. */
   notice?: FolderNotice;
   /** True when the user did not allow access to the folder. */
@@ -71,7 +90,7 @@ export interface UsePdfFolderInput {
   version: number;
 }
 
-type ScanOutcome = { kind: 'done' | 'gone' | 'denied' | 'failed'; notice: FolderNotice | null } | { kind: 'stale' };
+type ScanOutcome = { kind: 'done' | 'gone' | 'denied' | 'failed'; notice: FolderNotice | null; changed: ChangedScan | null } | { kind: 'stale' };
 
 interface FolderMemory {
   handle: FolderEntry | null;
@@ -143,13 +162,13 @@ export function usePdfFolder(input: UsePdfFolderInput): { control: PdfFolderCont
           if (kind === 'gone') {
             folderRef.current = EMPTY_FOLDER;
             void store?.deleteFolder(id);
-            return { kind, notice: folderGoneNotice(name) };
+            return { kind, notice: folderGoneNotice(name), changed: null };
           }
           if (kind === 'denied') {
             folderRef.current = { ...folderRef.current, access: 'prompt' };
-            return { kind, notice: folderDeniedNotice() };
+            return { kind, notice: folderDeniedNotice(), changed: null };
           }
-          return { kind, notice: folderReadFailedNotice(name, (error as Error | null)?.message ?? 'unknown error') };
+          return { kind, notice: folderReadFailedNotice(name, (error as Error | null)?.message ?? 'unknown error'), changed: null };
         }
         if (idRef.current !== id) return { kind: 'stale' };
         const ambiguous = new Set(result.ambiguousKeys);
@@ -167,7 +186,28 @@ export function usePdfFolder(input: UsePdfFolderInput): { control: PdfFolderCont
           else missesRef.current.add(key);
         }
         folderRef.current = { ...folderRef.current, access: 'granted' };
-        return { kind: 'done', notice: folderResultNotice({ folderName: name, needed, foundKeys: noticeKeys, ambiguousKeys: ambiguous, capped: result.capped }) };
+        const notice = folderResultNotice({ folderName: name, needed, foundKeys: noticeKeys, ambiguousKeys: ambiguous, capped: result.capped });
+        let changed: ChangedScan | null = null;
+        if (result.changed.length > 0 || result.changedAmbiguousNames.length > 0) {
+          const changedNames = new Set(result.changed.map((match) => match.file.name));
+          const changedAmbiguousNames = result.changedAmbiguousNames;
+          changed = {
+            files: result.changed.map((match) => ({ file: match.file, target: match.handle as unknown as FileTarget })),
+            ambiguousNames: changedAmbiguousNames,
+            noticeFor: (mode, names) =>
+              folderResultNotice({
+                folderName: name,
+                needed,
+                foundKeys: noticeKeys,
+                ambiguousKeys: ambiguous,
+                capped: result.capped,
+                changedNames: names ?? changedNames,
+                changedMode: mode,
+                changedAmbiguousNames,
+              }),
+          };
+        }
+        return { kind: 'done', notice, changed };
       } finally {
         if (idRef.current === id) busyRef.current = false;
         refresh();
@@ -210,9 +250,10 @@ export function usePdfFolder(input: UsePdfFolderInput): { control: PdfFolderCont
   }, [enabled, store, buildingId, refresh, runScan]);
 
   const allow = useCallback(
-    async ({ pick, scope }: { pick: boolean; scope: readonly BuildingSheet[] }): Promise<FolderNotice | null> => {
+    async ({ pick, scope }: { pick: boolean; scope: readonly BuildingSheet[] }): Promise<AllowOutcome> => {
+      const none: AllowOutcome = { notice: null, changed: null };
       const id = idRef.current;
-      if (id === null || store === undefined) return null;
+      if (id === null || store === undefined) return none;
       deniedRef.current = false;
       let handle: FolderEntry;
       if (pick) {
@@ -220,31 +261,31 @@ export function usePdfFolder(input: UsePdfFolderInput): { control: PdfFolderCont
         try {
           picked = await fileAccess.pickFolder({ id: FOLDER_PICKER_ID });
         } catch (error) {
-          return { text: `Could not open the file picker: ${(error as Error).message}`, error: true };
+          return { notice: { text: `Could not open the file picker: ${(error as Error).message}`, error: true }, changed: null };
         }
-        if (picked === undefined || idRef.current !== id) return null;
+        if (picked === undefined || idRef.current !== id) return none;
         const chosen = 'dirHandle' in picked.folder ? asFolderHandle(picked.folder.dirHandle) : undefined;
-        if (chosen === undefined) return { text: 'Could not open the file picker: the browser gave no folder.', error: true };
+        if (chosen === undefined) return { notice: { text: 'Could not open the file picker: the browser gave no folder.', error: true }, changed: null };
         await store.putFolder(id, chosen);
-        if (idRef.current !== id) return null;
+        if (idRef.current !== id) return none;
         folderRef.current = { handle: chosen, name: chosen.name, access: 'granted' };
         missesRef.current = new Set();
         handle = chosen;
       } else {
         const stored = folderRef.current.handle;
-        if (stored === null) return null;
+        if (stored === null) return none;
         const verdict = await ensureFolderAccess(stored);
-        if (idRef.current !== id) return null;
+        if (idRef.current !== id) return none;
         if (verdict === 'denied') {
           folderRef.current = { ...folderRef.current, access: 'prompt' };
           refresh();
-          return folderDeniedNotice();
+          return { notice: folderDeniedNotice(), changed: null };
         }
         folderRef.current = { ...folderRef.current, access: 'granted' };
         handle = stored;
       }
       const outcome = await runScan(id, handle, scope);
-      return outcome.kind === 'stale' ? null : outcome.notice;
+      return outcome.kind === 'stale' ? none : { notice: outcome.notice, changed: outcome.changed };
     },
     [fileAccess, refresh, runScan, store],
   );
@@ -269,7 +310,11 @@ export function usePdfFolder(input: UsePdfFolderInput): { control: PdfFolderCont
       const outcome = await runScan(id, handle, null);
       if (outcome.kind === 'stale') return { stale: true };
       const opened = await cache.take(sheet);
-      return { opened, notice: outcome.notice ?? undefined, denied: outcome.kind === 'denied' };
+      let changed: OpenedFile | undefined;
+      if (opened === undefined && outcome.changed !== null && !outcome.changed.ambiguousNames.includes(sheet.location.fileName)) {
+        changed = outcome.changed.files.find((candidate) => candidate.file.name === sheet.location.fileName);
+      }
+      return { opened, changed, notice: outcome.notice ?? undefined, denied: outcome.kind === 'denied' };
     },
     [cache, enabled, refresh, runScan, store],
   );

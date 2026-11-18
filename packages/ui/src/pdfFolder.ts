@@ -1,4 +1,5 @@
 import { pdfHandleFileKey } from '@mepapp/platform';
+import { twoChangedText } from './changedFile.js';
 import { reconnectHint, type PdfNeed } from './reconnectPdfs.js';
 
 /** The id of the folder picker. Chrome remembers the last folder for each id. Not the id of the stamp library. */
@@ -34,6 +35,10 @@ export interface FolderScanResult {
   matches: FolderMatch[];
   /** Keys with two different files (different time stamps) under one name and size. */
   ambiguousKeys: string[];
+  /** One candidate for each file name with a changed file (same name, another size than every sheet). Never a name that has an exact match. */
+  changed: FolderMatch[];
+  /** File names with two different changed files (different size or time stamp). Not in `changed`. */
+  changedAmbiguousNames: string[];
   /** True when the search stopped at the item limit. */
   capped: boolean;
   scanned: number;
@@ -65,6 +70,8 @@ export async function scanPdfFolder(
     sizesByName.set(pdf.fileName, sizes);
   }
   const found = new Map<string, FolderMatch[]>();
+  const candidates = new Map<string, FolderMatch[]>();
+  const exactNames = new Set<string>();
   let scanned = 0;
   let capped = false;
   const queue: { dir: FolderEntry; depth: number }[] = [{ dir: root, depth: 0 }];
@@ -89,7 +96,15 @@ export async function scanPdfFolder(
         } catch {
           continue;
         }
-        if (!sizes.has(file.size)) continue;
+        if (!sizes.has(file.size)) {
+          const list = candidates.get(entry.name) ?? [];
+          if (!list.some((match) => match.file.size === file.size && match.file.lastModified === file.lastModified)) {
+            list.push({ key: pdfHandleFileKey(entry.name, file.size), file, handle: entry });
+          }
+          candidates.set(entry.name, list);
+          continue;
+        }
+        exactNames.add(entry.name);
         const key = pdfHandleFileKey(entry.name, file.size);
         const list = found.get(key) ?? [];
         if (!list.some((match) => match.file.lastModified === file.lastModified)) list.push({ key, file, handle: entry });
@@ -105,7 +120,14 @@ export async function scanPdfFolder(
     matches.push(...list);
     if (list.length > 1) ambiguousKeys.push(key);
   }
-  return { matches, ambiguousKeys, capped, scanned: Math.min(scanned, maxItems) };
+  const changed: FolderMatch[] = [];
+  const changedAmbiguousNames: string[] = [];
+  for (const [name, list] of candidates) {
+    if (exactNames.has(name)) continue;
+    if (list.length === 1) changed.push(list[0]!);
+    else if (list.length > 1) changedAmbiguousNames.push(name);
+  }
+  return { matches, ambiguousKeys, changed, changedAmbiguousNames, capped, scanned: Math.min(scanned, maxItems) };
 }
 
 /** How a failed read of the folder is told: the user did not allow, the folder is not there, or another error. */
@@ -238,15 +260,24 @@ export interface FolderResultInput {
   foundKeys: ReadonlySet<string>;
   ambiguousKeys: ReadonlySet<string>;
   capped: boolean;
+  /** File names with a changed file in the folder. */
+  changedNames?: ReadonlySet<string>;
+  /** 'found': a needed PDF with a name in changedNames counts as found. 'excluded': it is left out of the counts. */
+  changedMode?: 'found' | 'excluded';
+  /** File names with two different changed files. */
+  changedAmbiguousNames?: string[];
 }
 
-/** The notice after a folder search. Parts join with one space: found, missing, two files, too many items. Null when nothing was looked for. */
+/** The notice after a folder search. Parts join with one space: found, missing, two files, two changed files, too many items. Null when nothing was looked for. */
 export function folderResultNotice(input: FolderResultInput): FolderNotice | null {
-  const { folderName, needed, foundKeys, ambiguousKeys, capped } = input;
+  const { folderName, foundKeys, ambiguousKeys, capped, changedNames, changedMode, changedAmbiguousNames } = input;
+  const isChanged = (need: PdfNeed) => changedNames?.has(need.fileName) === true;
+  const needed = changedMode === 'excluded' ? input.needed.filter((need) => !isChanged(need)) : input.needed;
   const total = needed.length;
   if (total === 0) return null;
   const keyOf = (need: PdfNeed) => pdfHandleFileKey(need.fileName, need.sizeBytes);
-  const isFound = (need: PdfNeed) => foundKeys.has(keyOf(need)) && !ambiguousKeys.has(keyOf(need));
+  const isFound = (need: PdfNeed) =>
+    (changedMode === 'found' && isChanged(need)) || (foundKeys.has(keyOf(need)) && !ambiguousKeys.has(keyOf(need)));
   const found = needed.filter(isFound).length;
   const parts: string[] = [];
   if (found === total) parts.push(total === 1 ? `Found the PDF in ${folderName}.` : `Found all ${total} PDFs in ${folderName}.`);
@@ -263,6 +294,9 @@ export function folderResultNotice(input: FolderResultInput): FolderNotice | nul
     parts.push(
       `For ${twoFiles.join(', ')} the folder has two different files with the same name and size. The app cannot tell which one to use. Use Choose file… on its row.`,
     );
+  }
+  if (changedAmbiguousNames !== undefined && changedAmbiguousNames.length > 0) {
+    parts.push(twoChangedText(changedAmbiguousNames, 'folder'));
   }
   if (capped && found < total) {
     parts.push(`The app stopped looking after ${FOLDER_MAX_ITEMS} items in ${folderName}. Choose a folder that holds fewer files.`);

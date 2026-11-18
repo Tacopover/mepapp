@@ -303,4 +303,35 @@ describe('reconnectResult', () => {
     };
     expect(reconnectResult(input)).toEqual({ text: 'Found the PDF.', error: false });
   });
+
+  describe('with a changed file', () => {
+    const changedInput = (): ReconnectInput => ({
+      needed: [needOf('a.pdf', 3), needOf('b.pdf', 4)],
+      picked: [{ name: 'a.pdf', size: 3 }, { name: 'b.pdf', size: 9 }],
+      scopeKeys: keysOf({ name: 'a.pdf', size: 3 }, { name: 'b.pdf', size: 4 }),
+      buildingKeys: keysOf({ name: 'a.pdf', size: 3 }, { name: 'b.pdf', size: 4 }),
+      isFound: onlyNamed(['a.pdf']),
+      isAmbiguous: never,
+      levelScope: false,
+      changedNames: new Set(['b.pdf']),
+    });
+
+    it('counts the changed PDF as found in mode found', () => {
+      expect(reconnectResult({ ...changedInput(), changedMode: 'found' })).toEqual({ text: 'Found all 2 PDFs.', error: false });
+    });
+
+    it('leaves the changed PDF out of the counts in mode excluded', () => {
+      expect(reconnectResult({ ...changedInput(), changedMode: 'excluded' })).toEqual({ text: 'Found the PDF.', error: false });
+    });
+
+    it('gives no change without a mode, and never counts the changed file as not used', () => {
+      expect(reconnectResult(changedInput())).toEqual({ text: 'Found 1 of 2 PDFs. Missing: b.pdf.', error: false });
+    });
+
+    it('adds the text of two changed files', () => {
+      expect(reconnectResult({ ...changedInput(), changedMode: 'excluded', changedAmbiguousNames: ['b.pdf'] }).text).toBe(
+        'Found the PDF. For b.pdf you chose two different files with another size. The app cannot tell which one to use. Use Choose file… on its row.',
+      );
+    });
+  });
 });

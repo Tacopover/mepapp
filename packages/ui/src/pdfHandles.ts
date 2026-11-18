@@ -13,7 +13,7 @@ export type StoredOpenOutcome =
   | { kind: 'opened'; opened: OpenedFile }
   | { kind: 'denied' } // the user did not allow access. The handle stays.
   | { kind: 'gone' } // the file is moved, renamed or deleted, or the stored value is not a file handle. Delete the handle.
-  | { kind: 'changed' } // the file has another size than the sheet. Delete the handle.
+  | { kind: 'changed'; opened: OpenedFile } // the file has another size than the sheet. The handle stays until the user uses the new file.
   | { kind: 'failed' }; // another read error. The handle stays.
 
 /** The stored value, or undefined when the value is not a file handle (no getFile function). */
@@ -40,7 +40,7 @@ export function sheetFileKey(sheet: BuildingSheet): string | undefined {
  * (it needs the click as the gesture, so nothing else is awaited in between). A thrown error or an answer other than 'granted' gives 'denied'.
  * A handle without queryPermission counts as granted. Then getFile():
  * NotAllowedError or SecurityError -> 'denied'; NotFoundError -> 'gone'; any other error -> 'failed'.
- * file.size !== sizeBytes -> 'changed'. Else 'opened' with { file, target: handle }.
+ * file.size !== sizeBytes -> 'changed' with { file, target: handle }. Else 'opened' with { file, target: handle }.
  * A value that asFileHandle rejects -> 'gone'.
  */
 export async function openStoredHandle(value: unknown, sizeBytes: number): Promise<StoredOpenOutcome> {
@@ -66,33 +66,32 @@ export async function openStoredHandle(value: unknown, sizeBytes: number): Promi
     if (name === 'NotFoundError') return { kind: 'gone' };
     return { kind: 'failed' };
   }
-  if (file.size !== sizeBytes) return { kind: 'changed' };
+  if (file.size !== sizeBytes) return { kind: 'changed', opened: { file, target: handle } };
   return { kind: 'opened', opened: { file, target: handle } };
 }
 
-/** True for 'gone' and 'changed'. */
+/** True for 'gone'. */
 export function shouldDeleteHandle(outcome: StoredOpenOutcome): boolean {
-  return outcome.kind === 'gone' || outcome.kind === 'changed';
+  return outcome.kind === 'gone';
 }
 
-/** null for 'opened'. The notice of a failed outcome. */
+/** null for 'opened' and 'changed' (the prompt of the changed file replaces the notice). The notice of a failed outcome. */
 export function storedOpenNotice(outcome: StoredOpenOutcome, fileName: string): { text: string; error: boolean } | null {
   switch (outcome.kind) {
     case 'opened':
+    case 'changed':
       return null;
     case 'denied':
       return { text: `Could not open ${fileName}. Access was not allowed. Choose the file again.`, error: true };
-    case 'changed':
-      return { text: `${fileName} is not the same file any more. Choose the file again.`, error: false };
     case 'gone':
     case 'failed':
       return { text: `Could not open ${fileName}. Choose the file again.`, error: false };
   }
 }
 
-/** The notice when the user picks a file whose size is not the size the sheet knows. The PDF opens, but the sheet keeps its old size until a relink. Not an error. */
+/** The notice when the user picks a file with another name and another size than the sheet. The PDF opens, and the sheet keeps its saved file name. Not an error. */
 export function pickedOtherFileNotice(): { text: string; error: false } {
-  return { text: 'This file is not the one the sheet knows (the size is different). Use Relink on the sheet to update it.', error: false };
+  return { text: 'This file has another name than the sheet. The sheet keeps its saved file name.', error: false };
 }
 
 /** The notice when the picker fails after a stored handle failed (the browser refused the picker). Always error.

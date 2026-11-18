@@ -13,9 +13,11 @@ import {
   type SheetStatus,
   type SheetSummaryInfo,
 } from '../buildingStatus.js';
+import { changedCancelText, changedManyUseText, splitChangedPicks } from '../changedFile.js';
 import { bandView } from '../pdfFolder.js';
-import { pdfsNeedingFile, reconnectResult, reconnectTooltip } from '../reconnectPdfs.js';
+import { pdfsNeedingFile, reconnectResult, reconnectTooltip, type PdfNeed } from '../reconnectPdfs.js';
 import { SheetFileCache } from '../sheetFileCache.js';
+import { ChangedFileConfirm, type ChangedFiles } from '../useChangedFile.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
 import type { PdfFolderControl } from '../usePdfFolder.js';
 import { BuildingSection } from './BuildingSection.js';
@@ -29,7 +31,7 @@ export interface LevelSheetsPaneProps {
   fileAccess: FileAccess;
   /** null = building node: all sheets, grouped by level with a header row for each level. */
   levelId: string | null;
-  onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
+  onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick', options?: { picker?: boolean }) => Promise<SheetOpenResult>;
   sheetStatus: Record<string, SheetStatus>;
   sheetSummary: Record<string, SheetSummaryInfo>;
   onRefreshStatus: () => void;
@@ -49,9 +51,16 @@ export interface LevelSheetsPaneProps {
   isAmbiguous?: (sheet: BuildingSheet) => boolean;
   /** The PDF folder of the building (Chrome and Edge only). Undefined when the browser cannot keep PDF handles. */
   folder?: PdfFolderControl;
+  /** The prompt for a PDF that changed after it was added, and the rows that wait for a new file. */
+  changed?: ChangedFiles;
 }
 
 const NO_OPENED_SHEETS: ReadonlySet<string> = new Set();
+
+function joinText(...parts: (string | undefined)[]): string {
+  return parts.filter((part): part is string => part !== undefined && part !== '').join(' ');
+}
+
 
 function sheetKeys(sheets: BuildingSheet[]): Set<string> {
   const keys = new Set<string>();
@@ -109,6 +118,7 @@ export function LevelSheetsPane({
   rememberFiles,
   isAmbiguous,
   folder,
+  changed,
 }: LevelSheetsPaneProps) {
   const groups = rowGroups(file, levelId);
   const shown = groups.flatMap((group) => group.sheets);
@@ -147,8 +157,31 @@ export function LevelSheetsPane({
 
   async function allowFolder(pick: boolean) {
     const scope = shown;
-    const notice = await folder?.allow({ pick, scope });
-    if (notice !== null && notice !== undefined) onNotice(notice.text, notice.error);
+    const outcome = await folder?.allow({ pick, scope });
+    if (outcome === undefined) return;
+    const scan = outcome.changed;
+    if (scan !== null && changed !== undefined && scan.files.length > 0) {
+      const offered = await changed.offerFiles(scan.files, (answer) => {
+        const names = new Set(answer.items.map((item) => item.fileName));
+        if (answer.used) return { text: joinText(scan.noticeFor('found', names)?.text, changedManyUseText(answer.items)), error: false };
+        return { text: joinText(scan.noticeFor('excluded', names)?.text, changedCancelText(answer.items)), error: false };
+      });
+      if (offered.prompted) return;
+      const base = scan.noticeFor('excluded');
+      const text = joinText(base?.text, offered.extraText);
+      if (text !== '') {
+        onNotice(text, base?.error === true);
+        return;
+      }
+    }
+    if (scan !== null && scan.files.length === 0) {
+      const only = scan.noticeFor('excluded');
+      if (only !== null) {
+        onNotice(only.text, only.error);
+        return;
+      }
+    }
+    if (outcome.notice !== null) onNotice(outcome.notice.text, outcome.notice.error);
   }
 
   async function reconnect() {
@@ -164,21 +197,41 @@ export function LevelSheetsPane({
       return;
     }
     if (opened.length === 0) return;
-    rememberFiles?.(opened);
-    const result = reconnectResult({
+    const split = splitChangedPicks(file, opened);
+    const changedFiles = split.changed;
+    rememberFiles?.(opened.filter((item) => !changedFiles.includes(item) && !split.dropped.includes(item)));
+    const input = {
       needed: needed0,
       picked: opened.map((item) => ({ name: item.file.name, size: item.file.size })),
       scopeKeys: sheetKeys(shown),
       buildingKeys: sheetKeys(file.sheets),
-      isFound: (need) => hasFile?.(need.sheet) === true,
-      isAmbiguous: (need) => isAmbiguous?.(need.sheet) === true,
+      isFound: (need: PdfNeed) => hasFile?.(need.sheet) === true,
+      isAmbiguous: (need: PdfNeed) => isAmbiguous?.(need.sheet) === true,
       levelScope: levelId !== null,
-    });
-    onNotice(result.text, result.error);
+    };
+    if (changedFiles.length === 0) {
+      const base = reconnectResult(input);
+      onNotice(base.text, base.error);
+      return;
+    }
+    const resultFor = (names: ReadonlySet<string>, mode: 'found' | 'excluded') =>
+      reconnectResult({ ...input, changedNames: names, changedMode: mode });
+    const offered =
+      changed === undefined
+        ? { prompted: false, extraText: '' }
+        : await changed.offerFiles(changedFiles, (answer) => {
+            const names = new Set(answer.items.map((item) => item.fileName));
+            if (answer.used) return { text: joinText(resultFor(names, 'found').text, changedManyUseText(answer.items)), error: false };
+            return { text: joinText(resultFor(names, 'excluded').text, changedCancelText(answer.items)), error: false };
+          });
+    if (offered.prompted) return;
+    const base = resultFor(new Set(changedFiles.map((item) => item.file.name)), 'excluded');
+    const text = joinText(base.text, offered.extraText);
+    if (text !== '') onNotice(text, base.error);
   }
 
-  async function openRow(sheet: BuildingSheet, mode: 'path' | 'pick') {
-    const result = await onOpenSheet(sheet, mode);
+  async function openRow(sheet: BuildingSheet, mode: 'path' | 'pick', options?: { picker?: boolean }) {
+    const result = await onOpenSheet(sheet, mode, options);
     if (!result.ok && result.message !== null) {
       const text = result.message.startsWith('Could not')
         ? result.message
@@ -208,6 +261,9 @@ export function LevelSheetsPane({
             <button type="button" data-testid="reconnect-pdfs" aria-label="Reconnect PDFs" title={reconnectTooltip(levelId !== null)} disabled={band.reconnectDisabled} onClick={() => void reconnect()}>Reconnect PDFs…</button>
           </div>
         </div>
+      )}
+      {changed?.offer?.scope === 'band' && (
+        <ChangedFileConfirm offer={changed.offer} onYes={() => void changed.confirm()} onNo={changed.cancel} />
       )}
       {shown.length === 0 && (
         <p className="mep-hint">
@@ -283,6 +339,16 @@ export function LevelSheetsPane({
                         onClick={() => void openRow(sheet, 'path')}
                       >
                         Open
+                      </button>
+                    ) : changed?.changedSheetIds.has(sheet.id) === true ? (
+                      <button
+                        type="button"
+                        data-testid="open-sheet"
+                        aria-label={`Choose file for ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
+                        title="The PDF changed. Choose the new file to use it."
+                        onClick={() => void openRow(sheet, 'pick', { picker: true })}
+                      >
+                        Choose file…
                       </button>
                     ) : canOpenCached?.(sheet) === true ? (
                       <button
@@ -377,6 +443,9 @@ export function LevelSheetsPane({
                   )}
                 </div>
                 {ask !== null && <RelinkConfirm relinker={relinker} sheet={sheet} askedName={ask.pickedName} />}
+                {changed?.offer?.scope === 'row' && changed.offer.sheetId === sheet.id && (
+                  <ChangedFileConfirm offer={changed.offer} onYes={() => void changed.confirm()} onNo={changed.cancel} />
+                )}
               </Fragment>
             );
           })}

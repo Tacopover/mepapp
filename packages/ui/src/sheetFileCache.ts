@@ -8,6 +8,8 @@ export class SheetFileCache {
   private readonly entries = new Map<string, OpenedFile>();
   /** Keys with two different files (different lastModified) under one name and size. Such a key is never used. */
   private readonly ambiguous = new Set<string>();
+  /** The file that getFile gave with another size, by the key of the sheet. Read once by takeChanged. */
+  private readonly changed = new Map<string, OpenedFile>();
 
   static key(fileName: string, sizeBytes: number): string {
     return `${fileName}:${sizeBytes}`;
@@ -47,13 +49,25 @@ export class SheetFileCache {
       const file = await target.getFile().catch(() => undefined);
       if (file?.size === size) return { file, target: entry.target };
       if (this.entries.get(key) === entry) this.entries.delete(key);
+      if (file !== undefined) this.changed.set(key, { file, target: entry.target });
       return undefined;
     }
     return entry.file.size === size ? entry : undefined;
   }
 
+  /** The new file that the last take(sheet) found with another size. Returned once, then removed. Undefined when take found none. */
+  async takeChanged(sheet: BuildingSheet): Promise<OpenedFile | undefined> {
+    const size = sheet.location.sizeBytes;
+    if (size === undefined) return undefined;
+    const key = SheetFileCache.key(sheet.location.fileName, size);
+    const opened = this.changed.get(key);
+    this.changed.delete(key);
+    return opened;
+  }
+
   clear(): void {
     this.entries.clear();
     this.ambiguous.clear();
+    this.changed.clear();
   }
 }

@@ -135,6 +135,45 @@ describe('scanPdfFolder', () => {
   });
 });
 
+describe('scanPdfFolder changed files', () => {
+  it('collects a file with the name of a wanted PDF and another size', async () => {
+    const root = dirOf('Plans', [{ file: 'a.pdf', size: 5 }, { file: 'b.pdf', size: 4 }]);
+    const result = await scanPdfFolder(root, wanted(['a.pdf', 3], ['b.pdf', 4]));
+    expect(result.changed.map((m) => m.key)).toEqual(['a.pdf:5']);
+    expect(result.changed[0]?.handle.name).toBe('a.pdf');
+    expect(result.changedAmbiguousNames).toEqual([]);
+    expect(result.matches.map((m) => m.key)).toEqual(['b.pdf:4']);
+  });
+
+  it('lets an exact match win over a changed file of the same name', async () => {
+    const root = dirOf('Plans', [{ file: 'a.pdf', size: 5 }, { dir: 'old', items: [{ file: 'a.pdf', size: 3 }] }]);
+    const result = await scanPdfFolder(root, wanted(['a.pdf', 3]));
+    expect(result.changed).toEqual([]);
+    expect(result.changedAmbiguousNames).toEqual([]);
+    expect(result.matches.map((m) => m.key)).toEqual(['a.pdf:3']);
+  });
+
+  it('names a PDF with two different changed files and does not list it', async () => {
+    const root = dirOf('Plans', [{ file: 'a.pdf', size: 5 }, { file: 'a.pdf', size: 6 }, { file: 'b.pdf', size: 7, time: 1 }, { file: 'b.pdf', size: 7, time: 2 }]);
+    const result = await scanPdfFolder(root, wanted(['a.pdf', 3], ['b.pdf', 4]));
+    expect(result.changed).toEqual([]);
+    expect(result.changedAmbiguousNames.sort()).toEqual(['a.pdf', 'b.pdf']);
+  });
+
+  it('counts two copies of a changed file with the same size and time stamp once', async () => {
+    const root = dirOf('Plans', [{ file: 'a.pdf', size: 5, time: 4 }, { dir: 'copy', items: [{ file: 'a.pdf', size: 5, time: 4 }] }]);
+    const result = await scanPdfFolder(root, wanted(['a.pdf', 3]));
+    expect(result.changed).toHaveLength(1);
+    expect(result.changedAmbiguousNames).toEqual([]);
+  });
+
+  it('finds a changed file in a subfolder', async () => {
+    const root = dirOf('Plans', [{ dir: 'sub', items: [{ file: 'a.pdf', size: 5 }] }]);
+    const result = await scanPdfFolder(root, wanted(['a.pdf', 3]));
+    expect(result.changed.map((m) => m.key)).toEqual(['a.pdf:5']);
+  });
+});
+
 describe('asFolderHandle and folderErrorKind', () => {
   it('accepts a value with values() only', () => {
     expect(asFolderHandle({ values: () => [] })).toBeDefined();
@@ -322,6 +361,39 @@ describe('folderResultNotice', () => {
 
   it('is null when nothing was looked for', () => {
     expect(folderResultNotice({ folderName: 'Plans', needed: [], foundKeys: keys(), ambiguousKeys: keys(), capped: false })).toBeNull();
+  });
+
+  it('counts a changed PDF as found in mode found', () => {
+    const result = folderResultNotice({
+      folderName: 'Plans',
+      needed: [needOf('a.pdf', 1), needOf('b.pdf', 2)],
+      foundKeys: keys('a.pdf:1'),
+      ambiguousKeys: keys(),
+      capped: false,
+      changedNames: new Set(['b.pdf']),
+      changedMode: 'found',
+    });
+    expect(result).toEqual({ text: 'Found all 2 PDFs in Plans.', error: false });
+  });
+
+  it('leaves a changed PDF out of the counts in mode excluded', () => {
+    const base = { folderName: 'Plans', foundKeys: keys('a.pdf:1'), ambiguousKeys: keys(), capped: false, changedNames: new Set(['b.pdf']), changedMode: 'excluded' as const };
+    expect(folderResultNotice({ ...base, needed: [needOf('a.pdf', 1), needOf('b.pdf', 2)] })?.text).toBe('Found the PDF in Plans.');
+    expect(folderResultNotice({ ...base, needed: [needOf('b.pdf', 2)] })).toBeNull();
+  });
+
+  it('adds the text of two changed files after the two-files part', () => {
+    const result = folderResultNotice({
+      folderName: 'Plans',
+      needed: [needOf('a.pdf', 1), needOf('c.pdf', 3)],
+      foundKeys: keys('a.pdf:1', 'c.pdf:3'),
+      ambiguousKeys: keys('c.pdf:3'),
+      capped: false,
+      changedAmbiguousNames: ['b.pdf'],
+    });
+    expect(result?.text).toBe(
+      'Found 1 of 2 PDFs in Plans. Missing: c.pdf. For c.pdf the folder has two different files with the same name and size. The app cannot tell which one to use. Use Choose file… on its row. For b.pdf the folder has two different files with another size. The app cannot tell which one to use. Use Choose file… on its row.',
+    );
   });
 });
 

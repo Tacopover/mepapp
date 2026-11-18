@@ -149,6 +149,7 @@ import {
   pickedOtherFileNotice,
   type StoredOpenOutcome,
 } from './pdfHandles.js';
+import { isChangedFile } from './changedFile.js';
 import type { FolderMatch } from './pdfFolder.js';
 import { usePdfFolder } from './usePdfFolder.js';
 import './theme.css';
@@ -1059,7 +1060,7 @@ export function MepSketchApp({
 
   // Opens the PDF of a building sheet, then shows its page. 'path' reads the file by its saved path; 'pick' asks the user for the file.
   const openSheetNow = useCallback(
-    async (sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> => {
+    async (sheet: BuildingSheet, mode: 'path' | 'pick', options?: { picker?: boolean }): Promise<SheetOpenResult> => {
       const openDoc = sheet.projectUuid === null ? undefined : sceneRef.current?.getDocuments().find((doc) => doc.projectUuid === sheet.projectUuid);
       if (openDoc !== undefined && sceneRef.current) {
         if (sceneRef.current.getActiveDocumentId() !== openDoc.id) sceneRef.current.activateDocument(openDoc.id);
@@ -1083,11 +1084,18 @@ export function MepSketchApp({
             return { ok: false, message };
           }
         } else {
-          const cached = await sheetFilesRef.current.take(sheet);
-          const viaFolder = cached === undefined ? await pdfFolder.openViaFolder(sheet) : undefined;
+          const toPicker = options?.picker === true;
+          const cached = toPicker ? undefined : await sheetFilesRef.current.take(sheet);
+          if (!toPicker && cached === undefined) {
+            const changedCached = await sheetFilesRef.current.takeChanged(sheet);
+            if (changedCached !== undefined) return { ok: false, message: null, changed: changedCached };
+          }
+          const viaFolder = !toPicker && cached === undefined ? await pdfFolder.openViaFolder(sheet) : undefined;
           if (viaFolder?.stale === true) return { ok: false, message: null };
+          if (viaFolder?.changed !== undefined) return { ok: false, message: null, changed: viaFolder.changed };
           const folderNotice: SheetNotice | undefined = viaFolder?.notice;
-          const stored = cached === undefined && viaFolder?.opened === undefined && viaFolder?.denied !== true ? await openStoredSheet(sheet) : undefined;
+          const stored = !toPicker && cached === undefined && viaFolder?.opened === undefined && viaFolder?.denied !== true ? await openStoredSheet(sheet) : undefined;
+          if (stored?.kind === 'changed') return { ok: false, message: null, changed: stored.opened };
           opened = cached ?? viaFolder?.opened ?? (stored?.kind === 'opened' ? stored.opened : undefined);
           if (opened === undefined) {
             const failedNotice = (stored === undefined ? null : storedOpenNotice(stored, sheet.location.fileName)) ?? folderNotice ?? null;
@@ -1099,7 +1107,17 @@ export function MepSketchApp({
             }
             if (opened === undefined) return failedNotice === null ? { ok: false, message: null } : { ok: false, message: null, notice: failedNotice };
             const knownSize = sheet.location.sizeBytes;
-            if (knownSize !== undefined && opened.file.size !== knownSize) pendingNotice = pickedOtherFileNotice();
+            const buildingFile = buildingRef.current?.file;
+            if (
+              opened.file.name === sheet.location.fileName &&
+              knownSize !== undefined &&
+              opened.file.size !== knownSize &&
+              buildingFile !== undefined &&
+              isChangedFile(buildingFile, opened.file.name, opened.file.size)
+            ) {
+              return { ok: false, message: null, changed: opened };
+            }
+            if (knownSize !== undefined && opened.file.size !== knownSize && opened.file.name !== sheet.location.fileName) pendingNotice = pickedOtherFileNotice();
           }
           if (pendingNotice === undefined && folderNotice !== undefined) pendingNotice = folderNotice;
         }
@@ -1121,8 +1139,8 @@ export function MepSketchApp({
   // One sheet opens at a time: a second Open click waits for the load of the first, as openPdfFile refuses a second load at once.
   const sheetOpenQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const openSheet = useCallback(
-    (sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> => {
-      const run = sheetOpenQueueRef.current.then(() => openSheetNow(sheet, mode));
+    (sheet: BuildingSheet, mode: 'path' | 'pick', options?: { picker?: boolean }): Promise<SheetOpenResult> => {
+      const run = sheetOpenQueueRef.current.then(() => openSheetNow(sheet, mode, options));
       sheetOpenQueueRef.current = run.catch(() => undefined);
       return run;
     },

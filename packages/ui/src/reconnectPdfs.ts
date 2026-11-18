@@ -1,4 +1,5 @@
 import type { BuildingSheet } from '@mepapp/core';
+import { twoChangedText } from './changedFile.js';
 import { SheetFileCache } from './sheetFileCache.js';
 
 export interface PdfNeed {
@@ -43,6 +44,12 @@ export interface ReconnectInput {
   isFound: (need: PdfNeed) => boolean;
   isAmbiguous: (need: PdfNeed) => boolean;
   levelScope: boolean;
+  /** File names of picked files that are changed files of the building. */
+  changedNames?: ReadonlySet<string>;
+  /** 'found': a needed PDF with a name in changedNames counts as found. 'excluded': it is left out of the counts. */
+  changedMode?: 'found' | 'excluded';
+  /** File names with two different picked files of another size. */
+  changedAmbiguousNames?: string[];
 }
 
 function uniqueNames(names: string[]): string[] {
@@ -61,7 +68,10 @@ function foundText(found: number, total: number): string {
 
 /** The notice after a pick of files. Parts join with one space, in this order: found, missing, two files, other levels, not used. */
 export function reconnectResult(input: ReconnectInput): { text: string; error: boolean } {
-  const { needed, picked, scopeKeys, buildingKeys, isFound, isAmbiguous, levelScope } = input;
+  const { picked, scopeKeys, buildingKeys, isAmbiguous, levelScope, changedNames, changedMode, changedAmbiguousNames } = input;
+  const isChanged = (need: PdfNeed) => changedNames?.has(need.fileName) === true;
+  const needed = changedMode === 'excluded' ? input.needed.filter((need) => !isChanged(need)) : input.needed;
+  const isFound = (need: PdfNeed) => (changedMode === 'found' && isChanged(need)) || input.isFound(need);
   const total = needed.length;
   const found = needed.filter(isFound).length;
   const neededKeys = new Set(needed.map((need) => SheetFileCache.key(need.fileName, need.sizeBytes)));
@@ -93,6 +103,10 @@ export function reconnectResult(input: ReconnectInput): { text: string; error: b
     );
   }
 
+  if (changedAmbiguousNames !== undefined && changedAmbiguousNames.length > 0) {
+    parts.push(twoChangedText(changedAmbiguousNames, 'picked'));
+  }
+
   if (levelScope) {
     const other = picked.filter((file) => {
       const key = SheetFileCache.key(file.name, file.size);
@@ -101,7 +115,9 @@ export function reconnectResult(input: ReconnectInput): { text: string; error: b
     if (other > 0) parts.push(other === 1 ? '1 file is for another level.' : `${other} files are for other levels.`);
   }
 
-  const unused = picked.filter((file) => !buildingKeys.has(SheetFileCache.key(file.name, file.size))).length;
+  const unused = picked.filter(
+    (file) => !buildingKeys.has(SheetFileCache.key(file.name, file.size)) && changedNames?.has(file.name) !== true,
+  ).length;
   if (unused > 0) parts.push(unused === 1 ? '1 file was not used.' : `${unused} files were not used.`);
 
   return { text: parts.join(' '), error: found === 0 && total >= 1 };

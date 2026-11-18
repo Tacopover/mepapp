@@ -7,6 +7,7 @@ import type { UseBuilding } from '../useBuilding.js';
 import { countLabel, defaultLevelName, nextLevelElevation } from '../buildingLevels.js';
 import { sheetsWithoutSummary } from '../buildingStatus.js';
 import { useSheetRelink } from '../useSheetRelink.js';
+import { ChangedFileConfirm, offerShownInSheetsPane, useChangedFile } from '../useChangedFile.js';
 import type { PdfFolderControl } from '../usePdfFolder.js';
 import { loadBuildings, loadImportedOldIds, pendingOldBuildings } from '../buildings.js';
 import {
@@ -43,7 +44,10 @@ import { openedSheetIds, type OpenDocumentRow } from '../openDocumentsView.js';
 export interface SheetNotice { text: string; error: boolean }
 
 /** The result of opening a sheet. A null message means the user cancelled the file picker, and the three panes stay silent. The notice, when set, is shown by the dialog. */
-export type SheetOpenResult = { ok: true; notice?: SheetNotice } | { ok: false; message: string | null; notice?: SheetNotice };
+export type SheetOpenResult =
+  | { ok: true; notice?: SheetNotice }
+  | { ok: false; message: string | null; notice?: SheetNotice }
+  | { ok: false; message: null; changed: OpenedFile };
 
 const NARROW_QUERY = '(max-width: 899px)';
 
@@ -99,7 +103,7 @@ export interface ManageBuildingsDialogProps {
   onClose: () => void;
   fileAccess: FileAccess;
   pdfEngine?: PdfEngine;
-  onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick') => Promise<SheetOpenResult>;
+  onOpenSheet: (sheet: BuildingSheet, mode: 'path' | 'pick', options?: { picker?: boolean }) => Promise<SheetOpenResult>;
   onRebuildSummaries?: BuildingSummariesPaneProps['onRebuild'];
   activeSheetLevelId?: string | null;
   /** The documents open in the viewer, one row each (openDocumentRows). */
@@ -182,6 +186,7 @@ export function ManageBuildingsDialog({
   }, [hasBuilding]);
 
   const relinker = useSheetRelink({ file: building.building?.file ?? null, update: building.update, fileAccess, engine: pdfEngine, onNotice });
+  const changed = useChangedFile({ file: building.building?.file ?? null, engine: pdfEngine, relinker, remember: sheetFiles?.remember, onNotice });
 
   function onNotice(text: string, error: boolean) {
     noticeCount.current += 1;
@@ -200,8 +205,25 @@ export function ManageBuildingsDialog({
   }
 
   /** The open action of the sheet rows. The dialog stays open, so the user can open more sheets. */
-  async function openSheetKeepOpen(sheet: BuildingSheet, mode: 'path' | 'pick'): Promise<SheetOpenResult> {
-    const result = await onOpenSheet(sheet, mode);
+  async function openSheetKeepOpen(sheet: BuildingSheet, mode: 'path' | 'pick', options?: { picker?: boolean }): Promise<SheetOpenResult> {
+    const result = await onOpenSheet(sheet, mode, options);
+    if ('changed' in result) {
+      await changed.offerRow(sheet, result.changed, async (newSheet, useText) => {
+        const again = await onOpenSheet(newSheet, 'pick');
+        if (again.ok) {
+          onNotice(`Opened ${newSheet.displayName} in the viewer. ${useText}`, false);
+        } else if ('changed' in again) {
+          onNotice(useText, false);
+        } else if (again.notice !== undefined) {
+          onNotice(`${again.notice.text} ${useText}`, again.notice.error);
+        } else if (again.message !== null) {
+          onNotice(`${again.message} ${useText}`, true);
+        } else {
+          onNotice(useText, false);
+        }
+      });
+      return result;
+    }
     if (result.ok) onNotice(`Opened ${sheet.displayName} in the viewer.${result.notice !== undefined ? ` ${result.notice.text}` : ''}`, result.notice?.error === true);
     else if (result.notice !== undefined) onNotice(result.notice.text, result.notice.error);
     return result;
@@ -595,6 +617,7 @@ export function ManageBuildingsDialog({
                   rememberFiles={sheetFiles?.remember}
                   isAmbiguous={sheetFiles?.isAmbiguous}
                   folder={sheetFiles?.folder}
+                  changed={changed}
                 />
                 <BuildingSummariesPane
                   key={`${openBuilding.file.id}-summaries`}
@@ -652,6 +675,9 @@ export function ManageBuildingsDialog({
                     busy={building.busy}
                   />
                 </div>
+              )}
+              {changed.offer !== null && !offerShownInSheetsPane(changed.offer, openBuilding.file, selectedLevel?.id ?? null, tab) && (
+                <ChangedFileConfirm offer={changed.offer} onYes={() => void changed.confirm()} onNo={changed.cancel} />
               )}
               <div className="mep-buildings-status-line">
                 {notice !== null && (

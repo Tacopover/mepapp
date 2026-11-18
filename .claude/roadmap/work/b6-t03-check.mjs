@@ -204,15 +204,20 @@ check(((await notice()) ?? '').startsWith('Opened '), 'S3 the picked file opens'
 await idle(3000);
 await closeDialog();
 
-// ---------- S4: changed size deletes the handle (same session as S3: A was not opened in this tab) ----------
+// ---------- S4: changed size shows the changed-file prompt, the handle stays until yes (same session as S3: A was not opened in this tab) ----------
 await growPdf(A);
 await openBuilding(b1());
 await cancelPick(true);
 await openBtn(A).first().click();
 await idle(1200);
-check((await notice()) === `${A} is not the same file any more. Choose the file again.`, 'S4 changed notice', String(await notice()));
-check(!(await storedKeys()).includes(K('b1', A)), 'S4 the stale handle is deleted', (await storedKeys()).join(','));
-check((await chooseBtn(A).count()) === 1, 'S4 the row falls back to Choose file…');
+const s4Count = JSON.parse(b1()).sheets.filter((s) => s.location.fileName === A).length;
+const s4Text = `${A} changed. Use the new file for ${s4Count === 1 ? 'this sheet' : `${s4Count} sheets`}?`;
+check((await dlg.locator('[data-testid="changed-confirm"]').count()) === 1, 'S4 changed file shows the prompt');
+check(((await dlg.locator('[data-testid="changed-confirm"]').innerText().catch(() => '')) ?? '').trim() === s4Text, 'S4 changed prompt text', String(await dlg.locator('[data-testid="changed-confirm"]').innerText().catch(() => null)));
+check((await storedKeys()).includes(K('b1', A)), 'S4 the stored handle is still stored (replaced only after yes)', (await storedKeys()).join(','));
+await dlg.locator('[data-testid="changed-confirm-cancel"]').click();
+await idle(600);
+check((await chooseBtn(A).count()) === 1, 'S4 after Cancel the row says Choose file…');
 await closeDialog();
 await putPdf(A);
 

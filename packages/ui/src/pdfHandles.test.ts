@@ -138,11 +138,15 @@ describe('openStoredHandle', () => {
     expect(shouldDeleteHandle(outcome)).toBe(false);
   });
 
-  it('gives changed and deletes the handle when the size differs', async () => {
-    const handle = { name: 'a.pdf', getFile: vi.fn(async () => fileOf(6)) };
+  it('gives changed with the new file and keeps the handle when the size differs', async () => {
+    const file = fileOf(6);
+    const handle = { name: 'a.pdf', getFile: vi.fn(async () => file) };
     const outcome = await openStoredHandle(handle, 3);
     expect(outcome.kind).toBe('changed');
-    expect(shouldDeleteHandle(outcome)).toBe(true);
+    if (outcome.kind !== 'changed') return;
+    expect(outcome.opened.file).toBe(file);
+    expect(outcome.opened.target).toBe(handle);
+    expect(shouldDeleteHandle(outcome)).toBe(false);
   });
 
   it('opens when the size is equal', async () => {
@@ -177,7 +181,7 @@ describe('handle helpers', () => {
 describe('notices', () => {
   it('gives the notice for a picked file of another size', () => {
     expect(pickedOtherFileNotice()).toEqual({
-      text: 'This file is not the one the sheet knows (the size is different). Use Relink on the sheet to update it.',
+      text: 'This file has another name than the sheet. The sheet keeps its saved file name.',
       error: false,
     });
   });
@@ -197,10 +201,7 @@ describe('notices', () => {
       text: 'Could not open a.pdf. Choose the file again.',
       error: false,
     });
-    expect(storedOpenNotice({ kind: 'changed' }, 'a.pdf')).toEqual({
-      text: 'a.pdf is not the same file any more. Choose the file again.',
-      error: false,
-    });
+    expect(storedOpenNotice({ kind: 'changed', opened: { file: fileOf(6) } }, 'a.pdf')).toBeNull();
   });
 
   it('gives the denied text for the picker notice after a denied outcome', () => {
@@ -211,7 +212,7 @@ describe('notices', () => {
       text: 'Could not open a.pdf. Choose the file again.',
       error: true,
     });
-    expect(pickerBlockedNotice({ kind: 'changed' }, 'a.pdf')).toEqual({
+    expect(pickerBlockedNotice({ kind: 'changed', opened: { file: fileOf(6) } }, 'a.pdf')).toEqual({
       text: 'Could not open a.pdf. Choose the file again.',
       error: true,
     });

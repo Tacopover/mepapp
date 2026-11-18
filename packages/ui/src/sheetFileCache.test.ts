@@ -58,6 +58,29 @@ describe('SheetFileCache', () => {
     expect(cache.has(sheetOf('a.pdf', 3))).toBe(false);
   });
 
+  it('keeps the bigger file of the target for takeChanged, once', async () => {
+    const cache = new SheetFileCache();
+    const bigger = new File(['abcdef'], 'a.pdf');
+    const target = { name: 'a.pdf', getFile: async () => bigger };
+    cache.remember({ file: new File(['abc'], 'a.pdf'), target: target as FileTarget });
+    expect(await cache.take(sheetOf('a.pdf', 3))).toBeUndefined();
+    const changed = await cache.takeChanged(sheetOf('a.pdf', 3));
+    expect(changed?.file).toBe(bigger);
+    expect(changed?.target).toBe(target);
+    expect(await cache.takeChanged(sheetOf('a.pdf', 3))).toBeUndefined();
+  });
+
+  it('gives no changed file when nothing changed, and clear drops it', async () => {
+    const cache = new SheetFileCache();
+    expect(await cache.takeChanged(sheetOf('a.pdf', 3))).toBeUndefined();
+    expect(await cache.takeChanged(sheetOf('a.pdf'))).toBeUndefined();
+    const target = { name: 'a.pdf', getFile: async () => new File(['abcdef'], 'a.pdf') };
+    cache.remember({ file: new File(['abc'], 'a.pdf'), target: target as FileTarget });
+    await cache.take(sheetOf('a.pdf', 3));
+    cache.clear();
+    expect(await cache.takeChanged(sheetOf('a.pdf', 3))).toBeUndefined();
+  });
+
   it('clears all entries', () => {
     const cache = new SheetFileCache();
     cache.remember({ file: new File(['abc'], 'a.pdf') });

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { relinkSheet, type BuildingFile, type BuildingSheet, type SheetLocation } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
-import type { FileAccess } from '@mepapp/platform';
+import type { FileAccess, OpenedFile } from '@mepapp/platform';
 import { BUILDING_PDF_TYPES, pathOfTarget, readPdfInfo } from './buildingPdfInfo.js';
 import { relinkWouldDuplicate, sheetsOfSamePdf } from './buildingSheets.js';
 
@@ -14,11 +14,17 @@ interface RelinkAsk {
   pickedName: string;
 }
 
-const RELINK_REFUSED = 'Could not relink: another sheet already uses this document and page.';
+export const RELINK_REFUSED = 'Could not relink: another sheet already uses this document and page.';
 
 export interface SheetRelink {
   /** Picks a new file for the sheet. A relink changes every sheet of the same PDF, also the sheets on other levels. */
   relink: (sheet: BuildingSheet, origin: string) => Promise<void>;
+  /** The part of relink after the pick. Reads the file, asks RelinkConfirm for a different document, else applies. */
+  relinkWith: (sheet: BuildingSheet, origin: string, picked: OpenedFile) => Promise<void>;
+  /** Updates fileName, sizeBytes (and projectUuid when given) of every sheet of the same PDF. Returns true when done. No notice on success; the refused notice shows as before. */
+  applyNewFile: (sheet: BuildingSheet, location: SheetLocation, projectUuid: string | undefined) => Promise<boolean>;
+  /** True when the new file belongs to a different document than the sheets of the PDF (same test as relink). */
+  isOtherDocument: (sheet: BuildingSheet, projectUuid: string | null) => boolean;
   /** The open question (a different document was picked) for this origin and sheet, else null. */
   askFor: (sheetId: string, origin: string) => { pickedName: string } | null;
   confirm: () => Promise<void>;
@@ -35,6 +41,8 @@ export function useSheetRelink(args: {
 }): SheetRelink {
   const { file, update, fileAccess, engine, onNotice } = args;
   const [ask, setAsk] = useState<RelinkAsk | null>(null);
+  const fileRef = useRef(file);
+  fileRef.current = file;
 
   async function relink(sheet: BuildingSheet, origin: string) {
     if (file === null) return;
@@ -43,6 +51,11 @@ export function useSheetRelink(args: {
       return undefined;
     });
     if (picked === undefined) return;
+    await relinkWith(sheet, origin, picked);
+  }
+
+  async function relinkWith(sheet: BuildingSheet, origin: string, picked: OpenedFile) {
+    if (file === null) return;
     const path = pathOfTarget(picked.target);
     const location: SheetLocation = {
       fileName: picked.file.name,
@@ -58,23 +71,30 @@ export function useSheetRelink(args: {
         return;
       }
     }
-    if (
-      projectUuid !== null &&
-      sheetsOfSamePdf(file, sheet).some((other) => other.projectUuid !== null && other.projectUuid !== projectUuid)
-    ) {
+    if (projectUuid !== null && isOtherDocument(sheet, projectUuid)) {
       setAsk({ sheetId: sheet.id, origin, location, projectUuid, pickedName: picked.file.name });
       return;
     }
     await applyRelink(sheet, location, projectUuid ?? undefined);
   }
 
+  function isOtherDocument(sheet: BuildingSheet, projectUuid: string | null): boolean {
+    if (file === null || projectUuid === null) return false;
+    return sheetsOfSamePdf(file, sheet).some((other) => other.projectUuid !== null && other.projectUuid !== projectUuid);
+  }
+
   async function applyRelink(sheet: BuildingSheet, location: SheetLocation, projectUuid: string | undefined) {
-    if (file === null) return;
-    const ids = sheetsOfSamePdf(file, sheet).map((item) => item.id);
-    if (relinkWouldDuplicate(file, ids, projectUuid)) {
+    if (await applyNewFile(sheet, location, projectUuid)) onNotice(`Relinked ${location.fileName}.`, false);
+  }
+
+  async function applyNewFile(sheet: BuildingSheet, location: SheetLocation, projectUuid: string | undefined): Promise<boolean> {
+    const latest = fileRef.current;
+    if (latest === null) return false;
+    const ids = sheetsOfSamePdf(latest, sheet).map((item) => item.id);
+    if (relinkWouldDuplicate(latest, ids, projectUuid)) {
       setAsk(null);
       onNotice(RELINK_REFUSED, true);
-      return;
+      return false;
     }
     let refused = false;
     await update((f) =>
@@ -89,9 +109,9 @@ export function useSheetRelink(args: {
     );
     if (refused) {
       onNotice(RELINK_REFUSED, true);
-      return;
+      return false;
     }
-    onNotice(`Relinked ${location.fileName}.`, false);
+    return true;
   }
 
   async function confirm() {
@@ -105,6 +125,9 @@ export function useSheetRelink(args: {
 
   return {
     relink,
+    relinkWith,
+    applyNewFile,
+    isOtherDocument,
     askFor: (sheetId, origin) => (ask !== null && ask.sheetId === sheetId && ask.origin === origin ? { pickedName: ask.pickedName } : null),
     confirm,
     cancel: () => setAsk(null),
