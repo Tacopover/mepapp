@@ -46,7 +46,7 @@ export interface SheetNotice { text: string; error: boolean }
 /** The result of opening a sheet. A null message means the user cancelled the file picker, and the three panes stay silent. The notice, when set, is shown by the dialog. */
 export type SheetOpenResult =
   | { ok: true; notice?: SheetNotice }
-  | { ok: false; message: string | null; notice?: SheetNotice }
+  | { ok: false; message: string | null; notice?: SheetNotice; pageMissing?: true }
   | { ok: false; message: null; changed: OpenedFile };
 
 const NARROW_QUERY = '(max-width: 899px)';

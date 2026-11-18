@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { moveSheet, removeSheet, sheetMoveBlock, type BuildingFile, type BuildingSheet } from '@mepapp/core';
 import type { FileAccess, OpenedFile } from '@mepapp/platform';
 import { countLabel } from '../buildingLevels.js';
@@ -17,6 +17,7 @@ import { changedCancelText, changedManyUseText, splitChangedPicks } from '../cha
 import { bandView } from '../pdfFolder.js';
 import { pdfsNeedingFile, reconnectMenuTooltip, reconnectResult, reconnectTooltip, type PdfNeed } from '../reconnectPdfs.js';
 import { SheetFileCache } from '../sheetFileCache.js';
+import { chooseFileTitle, sheetRowLine } from '../sheetRowLine.js';
 import { ChangedFileConfirm, type ChangedFiles } from '../useChangedFile.js';
 import { RelinkConfirm, type SheetRelink } from '../useSheetRelink.js';
 import type { PdfFolderControl } from '../usePdfFolder.js';
@@ -140,6 +141,7 @@ export function LevelSheetsPane({
         })
       : null;
   const rowsRef = useRef<HTMLDivElement | null>(null);
+  const [missingPages, setMissingPages] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     const row = rowsRef.current?.querySelector<HTMLElement>('[data-highlight="true"]');
@@ -234,6 +236,14 @@ export function LevelSheetsPane({
 
   async function openRow(sheet: BuildingSheet, mode: 'path' | 'pick', options?: { picker?: boolean }) {
     const result = await onOpenSheet(sheet, mode, options);
+    const pageMissing = !result.ok && 'pageMissing' in result && result.pageMissing === true;
+    setMissingPages((current) => {
+      if (!pageMissing && !current.has(sheet.id)) return current;
+      const next = new Map(current);
+      if (pageMissing) next.set(sheet.id, sheet.pageIndex + 1);
+      else next.delete(sheet.id);
+      return next;
+    });
     if (!result.ok && result.message !== null) {
       const text = result.message.startsWith('Could not')
         ? result.message
@@ -284,6 +294,14 @@ export function LevelSheetsPane({
             const summary = hasSummary ? summaryText(sheetSummary[sheet.id]) : '';
             const tone = status !== undefined ? statusTone(status) : 'ok';
             const picked = highlight?.sheetId === sheet.id;
+            const line = sheetRowLine({
+              web: fileAccess.readPath === undefined,
+              status,
+              opened: openedSheetIds.has(sheet.id),
+              missingPage: openedSheetIds.has(sheet.id) ? null : (missingPages.get(sheet.id) ?? null),
+              changed: changed?.changedSheetIds.has(sheet.id) === true,
+              canOpen: canOpenCached?.(sheet) === true,
+            });
             return (
               <Fragment key={sheet.id}>
                 <div
@@ -341,7 +359,7 @@ export function LevelSheetsPane({
                         type="button"
                         data-testid="open-sheet"
                         aria-label={`Choose file for ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                        title="The PDF changed. Choose the new file to use it."
+                        title={chooseFileTitle(true, fileAccess.readPath === undefined)}
                         onClick={() => void openRow(sheet, 'pick', { picker: true })}
                       >
                         Choose file…
@@ -361,7 +379,7 @@ export function LevelSheetsPane({
                         type="button"
                         data-testid="open-sheet"
                         aria-label={`Choose file for ${sheet.location.fileName} page ${sheet.pageIndex + 1}`}
-                        title={fileAccess.readPath === undefined ? 'This browser cannot open the PDF by itself. Choose the file again.' : 'Choose the PDF file to open this sheet'}
+                        title={chooseFileTitle(false, fileAccess.readPath === undefined)}
                         onClick={() => void openRow(sheet, 'pick')}
                       >
                         Choose file…
@@ -426,15 +444,21 @@ export function LevelSheetsPane({
                           onNotice(`Could not remove ${sheet.location.fileName} page ${sheet.pageIndex + 1}. ${refusal}`, true);
                           return;
                         }
+                        setMissingPages((current) => {
+                          if (!current.has(sheet.id)) return current;
+                          const next = new Map(current);
+                          next.delete(sheet.id);
+                          return next;
+                        });
                         void update((f) => removeSheet(f, sheet.id));
                       }}
                     >
                       Remove
                     </button>
                   </span>
-                  {(status === 'not-stamped' || status === 'not-opened') && (
+                  {line !== null && (
                     <p className="mep-hint mep-sheet-hint" data-testid="sheet-hint">
-                      {statusHint(status)}
+                      {line}
                     </p>
                   )}
                 </div>

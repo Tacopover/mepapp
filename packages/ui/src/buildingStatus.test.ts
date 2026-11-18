@@ -178,7 +178,7 @@ describe('statusHint', () => {
       ok: '',
       'pdf-missing': 'The PDF is not at its saved place. Use Relink.',
       'no-access': 'MepApp has no access to the folder of this PDF.',
-      'not-stamped': 'MepApp cannot link this PDF to the sheet yet. Open the PDF in MepApp and save it once.',
+      'not-stamped': 'This sheet finds its PDF by file name and size. Save the PDF once in MepApp to link it for good.',
       'no-summary': 'MepApp has not saved a summary for this sheet yet.',
       'not-opened': 'Open this PDF in MepApp to read its summary.',
       'old-summary': 'The PDF changed after the summary was saved.',

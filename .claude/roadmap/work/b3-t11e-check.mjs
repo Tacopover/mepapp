@@ -80,7 +80,7 @@ check(JSON.stringify(names) === JSON.stringify(['gone.pdf', 'nopath.pdf', 'orig.
 check((await chip('orig.pdf').textContent())?.trim() === 'OK', 'orig.pdf chip says OK', (await chip('orig.pdf').textContent()) ?? '');
 check((await chip('gone.pdf').textContent())?.trim() === 'Missing', 'gone.pdf chip says Missing', (await chip('gone.pdf').textContent()) ?? '');
 check((await chip('nopath.pdf').textContent())?.trim() === 'Not linked yet', 'nopath.pdf chip says Not linked yet', (await chip('nopath.pdf').textContent()) ?? '');
-check(/Open the PDF in MepApp and save it once/.test((await dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]').filter({ hasText: 'nopath.pdf' }).textContent()) ?? ''), 'nopath.pdf group explains the next step');
+check(/Save the PDF once in MepApp to link it for good/.test((await dlg.locator('[data-testid="level-sheets"] [data-testid="pdf-group"]').filter({ hasText: 'nopath.pdf' }).textContent()) ?? ''), 'nopath.pdf group explains the next step');
 check(!/stamped/i.test((await dlg.textContent()) ?? ''), 'the word "stamped" is gone from the dialog');
 check((await rowOf('nopath.pdf').locator('[data-testid="open-sheet"]').textContent())?.trim() === 'Choose file…', 'a sheet with no path has "Choose file…"');
 check(['Open', 'Opened'].includes((await rowOf('orig.pdf').locator('[data-testid="open-sheet"]').textContent())?.trim() ?? ''), 'a sheet with a path has "Open" or "Opened"');

@@ -277,6 +277,14 @@ function pdfBlob(bytes: Uint8Array<ArrayBuffer>): Blob {
   return new Blob([bytes], { type: 'application/pdf' });
 }
 
+function pageMissingResult(sheet: BuildingSheet, pageCount: number): SheetOpenResult {
+  return {
+    ok: false,
+    message: `Could not open ${sheet.location.fileName} page ${sheet.pageIndex + 1}. The file has ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`,
+    pageMissing: true,
+  };
+}
+
 /** The first discipline of a Stamps-panel discipline group — the default for a newly added stamp folder. */
 function defaultDisciplineFor(group: DisciplineGroup | null): Discipline {
   switch (group) {
@@ -638,28 +646,29 @@ export function MepSketchApp({
   const pageRequestRef = useRef(0);
   // Shows one page of the active PDF. It reads the scene's own handle, so it works right after an open.
   const showPage = useCallback(
-    async (pageIndex: number) => {
+    async (pageIndex: number): Promise<{ pageCount: number } | null> => {
       const scene = sceneRef.current;
       const handle = scene?.getActivePdfHandle();
-      if (!scene || !handle) return;
+      if (!scene || !handle) return null;
       const documentId = scene.getActiveDocumentId();
       if (pageIndex >= handle.getPageCount()) {
         setStatus(`Page ${pageIndex + 1} is not in this PDF (${handle.getPageCount()} pages).`);
-        return;
+        return { pageCount: handle.getPageCount() };
       }
       const request = ++pageRequestRef.current;
-      if (pageIndex === scene.getPageIndex()) return;
+      if (pageIndex === scene.getPageIndex()) return null;
       try {
         const { bitmap, pageWidthPt, pageHeightPt } = await onLoadPdfPageAt(handle, pageIndex);
         // setBackdropPage acts on the active document, so a result that a later page click or a document switch overtook is dropped.
         if (request !== pageRequestRef.current || scene.getActiveDocumentId() !== documentId) {
           bitmap.close();
-          return;
+          return null;
         }
         scene.setBackdropPage(bitmap, pageWidthPt, pageHeightPt, pageIndex);
       } catch (err) {
         setStatus(`Could not show page ${pageIndex + 1}: ${(err as Error).message}`);
       }
+      return null;
     },
     [onLoadPdfPageAt, sceneRef],
   );
@@ -1064,7 +1073,8 @@ export function MepSketchApp({
       const openDoc = sheet.projectUuid === null ? undefined : sceneRef.current?.getDocuments().find((doc) => doc.projectUuid === sheet.projectUuid);
       if (openDoc !== undefined && sceneRef.current) {
         if (sceneRef.current.getActiveDocumentId() !== openDoc.id) sceneRef.current.activateDocument(openDoc.id);
-        await showPage(sheet.pageIndex);
+        const missing = await showPage(sheet.pageIndex);
+        if (missing !== null) return pageMissingResult(sheet, missing.pageCount);
         return { ok: true };
       }
       let opened: OpenedFile | undefined;
@@ -1130,7 +1140,8 @@ export function MepSketchApp({
       const scene = sceneRef.current;
       if (!scene || !documentId) return { ok: false, message: `Could not open ${sheet.location.fileName}. The viewer did not load the file.` };
       if (scene.getActiveDocumentId() !== documentId) scene.activateDocument(documentId);
-      await showPage(sheet.pageIndex);
+      const missing = await showPage(sheet.pageIndex);
+      if (missing !== null) return pageMissingResult(sheet, missing.pageCount);
       return pendingNotice === undefined ? { ok: true } : { ok: true, notice: pendingNotice };
     },
     [fileAccess, openPdfFile, openStoredSheet, pdfFolder.openViaFolder, sceneRef, showPage],
