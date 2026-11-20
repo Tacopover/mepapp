@@ -1549,6 +1549,9 @@
 .mep-toast-warning {
   border-left-color: var(--elec);
 }
+.mep-toast-error {
+  border-left-color: var(--bad);
+}
 
 .mep-link-btn {
   padding: 0;

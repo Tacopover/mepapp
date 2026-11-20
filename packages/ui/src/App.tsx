@@ -56,6 +56,7 @@ import { useRoomSelection } from './useRoomSelection.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ToastStack, useToasts } from './components/Toasts.js';
+import { isSaveCancelled, saveFailureText, summaryFailureText } from './saveFailure.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
 import { useNetworkTreeState } from './useNetworkTreeState.js';
 import { CircuitsToolbar } from './components/CircuitsToolbar.js';
@@ -209,6 +210,7 @@ export interface MepSketchAppProps {
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
 
 const PDF_FILE_TYPES: FileTypeFilter[] = [{ description: 'PDF', mimeType: 'application/pdf', extensions: ['pdf'] }];
+const SAVE_FAILURE_TOAST_KEY = 'save-failure';
 const FILE_TASK_BUSY_STATUS = 'Wait until the current open or save has finished.';
 const JSON_FILE_TYPES: FileTypeFilter[] = [{ description: 'JSON', mimeType: 'application/json', extensions: ['json'] }];
 const XLSX_FILE_TYPES: FileTypeFilter[] = [{ description: 'Excel workbook', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', extensions: ['xlsx'] }];
@@ -373,7 +375,7 @@ export function MepSketchApp({
     activePdfHandle,
   } = useSketchScene();
 
-  const { toasts, pushToast, dismissToast } = useToasts();
+  const { toasts, pushToast, dismissToast, dismissToastKey } = useToasts();
   const [status, setStatus] = useState('');
   useEffect(() => {
     setStatus((s) => (/^Saved [^,]*\.$/.test(s) ? '' : s));
@@ -1387,6 +1389,7 @@ export function MepSketchApp({
           saved = await saveAsNewFile(result.bytes, documentId);
           if (!saved) setStatus('Save cancelled.');
         }
+        if (saved) dismissToastKey(SAVE_FAILURE_TOAST_KEY);
         if (saved) sceneRef.current?.commitProjectUuid(documentId, result.newProjectUuid ?? undefined);
         if (saved) sceneRef.current?.markSaved(result.receipt);
         if (saved) {
@@ -1396,18 +1399,25 @@ export function MepSketchApp({
               await writeBuildingSummary(documentId, target, result.bytes.length);
             } catch (err) {
               setStatus(`Saved ${target.name}, but the building summary was not written: ${(err as Error).message}`);
+              pushToast({ kind: 'error', persistent: true, key: SAVE_FAILURE_TOAST_KEY, message: summaryFailureText(err, target.name) });
             }
           }
         }
         return saved;
       } catch (err) {
-        setStatus(`Failed to save: ${(err as Error).message}`);
+        if (isSaveCancelled(err)) {
+          setStatus('Save cancelled.');
+          return false;
+        }
+        const fileName = documents.find((d) => d.id === activeDocumentId)?.fileName ?? 'the PDF';
+        pushToast({ kind: 'error', persistent: true, key: SAVE_FAILURE_TOAST_KEY, message: saveFailureText(err, fileName) });
+        setStatus('Failed to save.');
         return false;
       } finally {
         fileTaskRef.current = null;
       }
     },
-    [activeDocumentId, fileAccess, saveAsNewFile, sceneRef, syncAndGetPdfBytes, writeBuildingSummary],
+    [activeDocumentId, documents, dismissToastKey, fileAccess, pushToast, saveAsNewFile, sceneRef, syncAndGetPdfBytes, writeBuildingSummary],
   );
 
   const handleExportRooms = useCallback(async () => {

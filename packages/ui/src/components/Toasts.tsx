@@ -5,7 +5,15 @@ import type { SceneNotice } from '@mepapp/render';
 const TOAST_LIFETIME_MS = 4500;
 const MAX_VISIBLE_TOASTS = 4;
 
-export interface Toast extends SceneNotice {
+/** A message for the toast stack. A persistent toast stays until the user closes it; a new persistent toast with the same key replaces the old one. */
+export interface ToastInput {
+  message: string;
+  kind: SceneNotice['kind'] | 'error';
+  persistent?: boolean;
+  key?: string;
+}
+
+export interface Toast extends ToastInput {
   id: number;
 }
 
@@ -23,10 +31,13 @@ export function useToasts() {
   }, []);
 
   const pushToast = useCallback(
-    (notice: SceneNotice) => {
+    (notice: ToastInput) => {
       const id = nextId.current++;
-      setToasts((current) => [...current, { ...notice, id }].slice(-MAX_VISIBLE_TOASTS));
-      timers.current.set(id, window.setTimeout(() => dismissToast(id), TOAST_LIFETIME_MS));
+      setToasts((current) => {
+        const kept = notice.key === undefined ? current : current.filter((t) => t.key !== notice.key);
+        return [...kept, { ...notice, id }].slice(-MAX_VISIBLE_TOASTS);
+      });
+      if (!notice.persistent) timers.current.set(id, window.setTimeout(() => dismissToast(id), TOAST_LIFETIME_MS));
     },
     [dismissToast],
   );
@@ -36,7 +47,11 @@ export function useToasts() {
     return () => pending.forEach((timer) => window.clearTimeout(timer));
   }, []);
 
-  return { toasts, pushToast, dismissToast };
+  const dismissToastKey = useCallback((key: string) => {
+    setToasts((current) => current.filter((t) => t.key !== key));
+  }, []);
+
+  return { toasts, pushToast, dismissToast, dismissToastKey };
 }
 
 export interface ToastStackProps {
@@ -49,7 +64,7 @@ export function ToastStack({ toasts, onDismiss }: ToastStackProps) {
   return (
     <div className="mep-toasts" role="status" aria-live="polite">
       {toasts.map((toast) => (
-        <div key={toast.id} className={`mep-toast mep-toast-${toast.kind}`} onClick={() => onDismiss(toast.id)}>
+        <div key={toast.id} className={`mep-toast mep-toast-${toast.kind}`} data-persistent={toast.persistent ? 'true' : undefined} onClick={() => onDismiss(toast.id)}>
           {toast.message}
         </div>
       ))}
