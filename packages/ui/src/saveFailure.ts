@@ -1,5 +1,8 @@
 const LOCK_ERROR_NAMES = new Set(['NoModificationAllowedError', 'InvalidStateError', 'NotAllowedError']);
-const LOCK_MESSAGE = /lock|being used|sharing violation|could not be read|permission|access/i;
+const LOCK_MESSAGE = /\block(ed)?\b|being used|sharing violation|could not be read|permission|\baccess\b|os error (16|32|33)|resource busy/i;
+
+/** The key of the failure toast of one document. */
+export const saveFailureKey = (documentId: string | null): string => `save-failure:${documentId ?? ''}`;
 
 const errorName = (err: unknown): string => (typeof err === 'object' && err !== null && 'name' in err ? String((err as { name: unknown }).name) : '');
 
@@ -32,5 +35,5 @@ export function saveFailureText(err: unknown, fileName: string): string {
 /** The text of the persistent toast when the PDF was saved but the building summary write failed. */
 export function summaryFailureText(err: unknown, fileName: string): string {
   const detail = errorMessage(err).trim();
-  return `Saved ${fileName}, but the building summary was not written.${detail === '' ? '' : ` ${detail}`}`;
+  return `Saved ${fileName}, but the building summary was not written.${detail === '' ? '' : ` ${detail.replace(/\.+$/, '')}.`}`;
 }

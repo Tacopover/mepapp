@@ -18,6 +18,10 @@ describe('saveFailureText', () => {
     expect(saveFailureText(new Error(message), 'plan.pdf')).toBe(LOCKED);
   });
 
+  it('does not treat "blocked" as a lock', () => {
+    expect(saveFailureText(new Error('Write blocked by a security tool'), 'plan.pdf')).toBe('Could not save plan.pdf. Write blocked by a security tool. Your changes are still in MepApp.');
+  });
+
   it('shows the browser message for another error, with one full stop', () => {
     expect(saveFailureText(new Error('Disk is full'), 'plan.pdf')).toBe('Could not save plan.pdf. Disk is full. Your changes are still in MepApp.');
   });
@@ -46,6 +50,6 @@ describe('isSaveCancelled', () => {
 
 describe('summaryFailureText', () => {
   it('names the saved file and adds the message', () => {
-    expect(summaryFailureText(new Error('Store is full'), 'plan.pdf')).toBe('Saved plan.pdf, but the building summary was not written. Store is full');
+    expect(summaryFailureText(new Error('Store is full'), 'plan.pdf')).toBe('Saved plan.pdf, but the building summary was not written. Store is full.');
   });
 });

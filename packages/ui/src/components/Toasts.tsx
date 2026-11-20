@@ -17,6 +17,14 @@ export interface Toast extends ToastInput {
   id: number;
 }
 
+/** Adds a toast. A toast with the same key is replaced. Only transient toasts count against the limit: a persistent toast is never dropped. */
+export function addToast(current: Toast[], notice: ToastInput, id: number): Toast[] {
+  const kept = notice.key === undefined ? current : current.filter((t) => t.key !== notice.key);
+  const all = [...kept, { ...notice, id }];
+  let excess = all.filter((t) => !t.persistent).length - MAX_VISIBLE_TOASTS;
+  return all.filter((t) => t.persistent || excess-- <= 0);
+}
+
 /** Transient, self-dismissing messages — fed by SketchScene's 'notice' event (see App.tsx). Newest last; the oldest drops off when more than MAX_VISIBLE_TOASTS are showing. */
 export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -33,10 +41,7 @@ export function useToasts() {
   const pushToast = useCallback(
     (notice: ToastInput) => {
       const id = nextId.current++;
-      setToasts((current) => {
-        const kept = notice.key === undefined ? current : current.filter((t) => t.key !== notice.key);
-        return [...kept, { ...notice, id }].slice(-MAX_VISIBLE_TOASTS);
-      });
+      setToasts((current) => addToast(current, notice, id));
       if (!notice.persistent) timers.current.set(id, window.setTimeout(() => dismissToast(id), TOAST_LIFETIME_MS));
     },
     [dismissToast],

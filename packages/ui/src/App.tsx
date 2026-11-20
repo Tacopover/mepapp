@@ -56,7 +56,7 @@ import { useRoomSelection } from './useRoomSelection.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ToastStack, useToasts } from './components/Toasts.js';
-import { isSaveCancelled, saveFailureText, summaryFailureText } from './saveFailure.js';
+import { isSaveCancelled, saveFailureKey, saveFailureText, summaryFailureText } from './saveFailure.js';
 import { DrawingsPanel } from './components/DrawingsPanel.js';
 import { useNetworkTreeState } from './useNetworkTreeState.js';
 import { CircuitsToolbar } from './components/CircuitsToolbar.js';
@@ -210,7 +210,6 @@ export interface MepSketchAppProps {
 const DEFAULT_RESOLVE_ICON_URL = (iconRef: string) => `/stamps/${iconRef}`;
 
 const PDF_FILE_TYPES: FileTypeFilter[] = [{ description: 'PDF', mimeType: 'application/pdf', extensions: ['pdf'] }];
-const SAVE_FAILURE_TOAST_KEY = 'save-failure';
 const FILE_TASK_BUSY_STATUS = 'Wait until the current open or save has finished.';
 const JSON_FILE_TYPES: FileTypeFilter[] = [{ description: 'JSON', mimeType: 'application/json', extensions: ['json'] }];
 const XLSX_FILE_TYPES: FileTypeFilter[] = [{ description: 'Excel workbook', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', extensions: ['xlsx'] }];
@@ -1201,8 +1200,9 @@ export function MepSketchApp({
       const target = documents.find((d) => d.id === id);
       if (target?.isDirty && !(await confirmDialog(`"${target.fileName}" has unsaved changes. Close anyway?`))) return;
       sceneRef.current?.closeDocument(id);
+      dismissToastKey(saveFailureKey(id));
     },
-    [documents, sceneRef],
+    [dismissToastKey, documents, sceneRef],
   );
 
   // The only guard when the tab or window itself is closed with unsaved drawings open.
@@ -1389,7 +1389,7 @@ export function MepSketchApp({
           saved = await saveAsNewFile(result.bytes, documentId);
           if (!saved) setStatus('Save cancelled.');
         }
-        if (saved) dismissToastKey(SAVE_FAILURE_TOAST_KEY);
+        if (saved) dismissToastKey(saveFailureKey(documentId));
         if (saved) sceneRef.current?.commitProjectUuid(documentId, result.newProjectUuid ?? undefined);
         if (saved) sceneRef.current?.markSaved(result.receipt);
         if (saved) {
@@ -1399,7 +1399,7 @@ export function MepSketchApp({
               await writeBuildingSummary(documentId, target, result.bytes.length);
             } catch (err) {
               setStatus(`Saved ${target.name}, but the building summary was not written: ${(err as Error).message}`);
-              pushToast({ kind: 'error', persistent: true, key: SAVE_FAILURE_TOAST_KEY, message: summaryFailureText(err, target.name) });
+              pushToast({ kind: 'error', persistent: true, key: saveFailureKey(documentId), message: summaryFailureText(err, target.name) });
             }
           }
         }
@@ -1410,7 +1410,7 @@ export function MepSketchApp({
           return false;
         }
         const fileName = documents.find((d) => d.id === activeDocumentId)?.fileName ?? 'the PDF';
-        pushToast({ kind: 'error', persistent: true, key: SAVE_FAILURE_TOAST_KEY, message: saveFailureText(err, fileName) });
+        pushToast({ kind: 'error', persistent: true, key: saveFailureKey(activeDocumentId), message: saveFailureText(err, fileName) });
         setStatus('Failed to save.');
         return false;
       } finally {
