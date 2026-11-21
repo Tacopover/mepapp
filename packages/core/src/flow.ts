@@ -25,8 +25,12 @@ export interface FlowSolveInput {
   rootPortId?: string;
   /** The stamp category of each element whose ports are in the network — what tells an equipment (the source) apart from a terminal and a loose duct end. An element missing here counts as a terminal only when it has a capacity. */
   elementCategories?: Record<string, StampCategory>;
-  /** Ids of the fittings that carry a riser mark. Such a fitting is a boundary: it is never the root (an explicit root that is marked is ignored), and the solve does not continue past it. When omitted, nothing changes. */
+  /** Ids of the fittings that carry a riser mark. Such a fitting is a boundary: it is never the root unless it is `entryFittingId`, an explicit root that is marked is ignored unless it is the entry, and the solve does not continue past it. When omitted, nothing changes. */
   riserFittingIds?: ReadonlySet<string>;
+  /** A marked riser fitting that feeds this network. It is the root right after an explicit root and before the old root order; every other marked fitting stays a boundary. Ignored when it is not in `riserFittingIds` or not in the network. */
+  entryFittingId?: string;
+  /** Capacity beyond each marked fitting (fitting id to number). A boundary fitting counts it as child demand; the entry, as the root, adds it to its total. A key for an unmarked fitting or a fitting outside the network is ignored. When omitted, nothing changes. */
+  riserDemand?: Record<string, number>;
 }
 
 /** `out`: flow arrives at the riser fitting (this level feeds the riser). `in`: flow leaves it (the riser feeds this level). `none`: neither. */
@@ -41,6 +45,8 @@ export interface FlowResult {
   totalCapacity: number | null;
   /** Which physical endpoint is upstream (toward the resolved root): 'AtoB' means flow travels from endpointA to endpointB. A purely structural direction (leaf-to-root), not a supply/return distinction — this layer has no such concept. Null wherever segmentCapacity is null. */
   segmentDirection: Record<string, 'AtoB' | 'BtoA' | null>;
+  /** The sum of the `riserDemand` values this solve used (the exits it reached, plus the entry when it is the root). Set only when `riserDemand` is given. */
+  riserCapacity?: number;
 }
 
 interface Edge {
@@ -83,16 +89,26 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     input.network.fittingIds.map((id) => [id, null]),
   );
 
+  const riserDemand = input.riserDemand;
+  const withRiserCapacity = (result: FlowResult, riserCapacity: number): FlowResult =>
+    riserDemand ? { ...result, riserCapacity } : result;
+
   if (nodeKeys.length === 0) {
-    return { segmentCapacity, fittingCapacity, resolved: false, totalCapacity: null, segmentDirection };
+    return withRiserCapacity({ segmentCapacity, fittingCapacity, resolved: false, totalCapacity: null, segmentDirection }, 0);
   }
 
   const riserFittingIds = input.riserFittingIds;
-  const isBoundary = (k: string): boolean =>
+  const isMarked = (k: string): boolean =>
     riserFittingIds !== undefined && k.startsWith('fitting:') && riserFittingIds.has(k.slice('fitting:'.length));
-  const rootCandidates = riserFittingIds ? nodeKeys.filter((k) => !isBoundary(k)) : nodeKeys;
+  const entryKey =
+    input.entryFittingId !== undefined &&
+    adjacency.has(`fitting:${input.entryFittingId}`) &&
+    isMarked(`fitting:${input.entryFittingId}`)
+      ? `fitting:${input.entryFittingId}`
+      : undefined;
+  const rootCandidates = riserFittingIds ? nodeKeys.filter((k) => !isMarked(k) || k === entryKey) : nodeKeys;
   if (rootCandidates.length === 0) {
-    return { segmentCapacity, fittingCapacity, resolved: false, totalCapacity: null, segmentDirection };
+    return withRiserCapacity({ segmentCapacity, fittingCapacity, resolved: false, totalCapacity: null, segmentDirection }, 0);
   }
 
   // Root order, as the old app's FindRoot: an equipment with one connection
@@ -116,18 +132,27 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
       if (adjacency.has(portKey)) explicitRootKey = portKey;
     }
     explicitRootKey ??= rootCandidates.find(isRootNode);
-    if (explicitRootKey !== undefined && isBoundary(explicitRootKey)) explicitRootKey = undefined;
+    if (explicitRootKey !== undefined && isMarked(explicitRootKey) && explicitRootKey !== entryKey) explicitRootKey = undefined;
   }
   const rootKey =
     explicitRootKey ||
+    entryKey ||
     rootCandidates.find((k) => degreeOf(k) === 1 && categoryOf(k) === 'equipment') ||
     rootCandidates.find((k) => degreeOf(k) === 1 && !isTerminal(k)) ||
     rootCandidates.find((k) => categoryOf(k) === 'equipment') ||
     rootCandidates.find((k) => degreeOf(k) === 1) ||
     rootCandidates[0];
+  const isBoundary = (k: string): boolean => isMarked(k) && k !== rootKey;
 
   // Post-order DFS: each node's demand = its own capacity + the sum of its children's subtree demand.
   const visited = new Set<string>();
+  let usedRiserDemand = 0;
+  const takeRiserDemand = (nodeKey: string): number => {
+    const id = nodeKey.slice('fitting:'.length);
+    const beyond = riserDemand && Object.hasOwn(riserDemand, id) ? riserDemand[id] : 0;
+    usedRiserDemand += beyond;
+    return beyond;
+  };
   const demandOf = (nodeKey: string): number => {
     visited.add(nodeKey);
     let demand = ownCapacityOf(nodeKey, input.terminalCapacities);
@@ -136,7 +161,7 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
         continue; // already visited: either the parent, or a cycle-closing edge — left unresolved either way
       }
       if (isBoundary(edge.neighborKey)) visited.add(edge.neighborKey); // a riser fitting ends the walk: nothing beyond it is followed
-      const childDemand = isBoundary(edge.neighborKey) ? 0 : demandOf(edge.neighborKey);
+      const childDemand = isBoundary(edge.neighborKey) ? takeRiserDemand(edge.neighborKey) : demandOf(edge.neighborKey);
       segmentCapacity[edge.segmentId] = childDemand;
       const segment = segmentById.get(edge.segmentId);
       if (segment) {
@@ -153,7 +178,7 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     return demand;
   };
 
-  const totalCapacity = demandOf(rootKey);
+  const totalCapacity = demandOf(rootKey) + (rootKey === entryKey ? takeRiserDemand(rootKey) : 0);
 
   // The loop above only records a fitting's capacity when it's visited as someone else's
   // child edge — the root itself is never anyone's child, so a fitting that happens to BE
@@ -164,7 +189,7 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     fittingCapacity[rootFittingMatch[1]] = totalCapacity;
   }
 
-  return { segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection };
+  return withRiserCapacity({ segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection }, usedRiserDemand);
 }
 
 /** For each marked fitting of the network: `out` when the level has a source and the solve reaches the fitting; `in` when there is no source and the solve reaches the fitting and the network has a total terminal capacity above 0; else `none`. A source is an element of category 'equipment' in `elementCategories`, or the explicit `rootElementId` when it is not a marked fitting and one of its ports or fittings ends a segment of the network. A stale root id gives no source. Needs `input.riserFittingIds`. */

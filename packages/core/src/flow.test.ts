@@ -557,3 +557,381 @@ describe('riserFittingFlow', () => {
     expect(riserFittingFlow(inputOf(swapped, [fitting('m')], { T1: 50, T2: 0 }, { riserFittingIds: new Set(['m']) }))).toEqual({ m: 'in' });
   });
 });
+
+describe('solveFlow — riser fittings as entry and with demand beyond', () => {
+  const networkA = [
+    segment('s1', { kind: 'fitting', fittingId: 'e' }, { kind: 'fitting', fittingId: 'tee' }),
+    segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'd1', portId: 'p1' }),
+    segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'x' }),
+  ];
+  const fittingsA = [fitting('e'), fitting('tee'), fitting('x')];
+
+  it('roots at the entry, and a drain behind another marked fitting is a boundary', () => {
+    const result = solveFlow(inputOf(networkA, fittingsA, { d1: 40 }, {
+      riserFittingIds: new Set(['e', 'x']),
+      entryFittingId: 'e',
+      riserDemand: { x: 25 },
+    }));
+    expect(result.resolved).toBe(true);
+    expect(result.totalCapacity).toBe(65);
+    expect(result.segmentCapacity.s1).toBe(65);
+    expect(result.segmentCapacity.s2).toBe(40);
+    expect(result.segmentCapacity.s3).toBe(25);
+    expect(result.fittingCapacity.e).toBe(65);
+    expect(result.fittingCapacity.tee).toBe(65);
+    expect(result.fittingCapacity.x).toBe(25);
+    expect(result.riserCapacity).toBe(25);
+  });
+
+  it('counts 0 beyond a marked fitting that has no key, and sets no riserCapacity when riserDemand is absent', () => {
+    const result = solveFlow(inputOf(networkA, fittingsA, { d1: 40 }, {
+      riserFittingIds: new Set(['e', 'x']),
+      entryFittingId: 'e',
+    }));
+    expect(result.totalCapacity).toBe(40);
+    expect(result.segmentCapacity.s3).toBe(0);
+    expect(result.fittingCapacity.x).toBe(0);
+    expect('riserCapacity' in result).toBe(false);
+  });
+
+  it('prefers the entry over the old chain (a loose duct end)', () => {
+    const segments = [
+      segment('s1', { kind: 'fitting', fittingId: 'e' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'd1', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'open' }),
+    ];
+    const fittings = [fitting('e'), fitting('tee'), fitting('open')];
+    const terminalCapacities = { d1: 40 };
+
+    const withEntry = solveFlow(inputOf(segments, fittings, terminalCapacities, {
+      riserFittingIds: new Set(['e']),
+      entryFittingId: 'e',
+    }));
+    expect(withEntry.fittingCapacity.e).toBe(40);
+    expect(withEntry.fittingCapacity.open).toBe(0);
+    expect(withEntry.totalCapacity).toBe(40);
+
+    const withoutEntry = solveFlow(inputOf(segments, fittings, terminalCapacities, {
+      riserFittingIds: new Set(['e']),
+    }));
+    expect(withoutEntry.fittingCapacity.open).toBe(40);
+    expect(withoutEntry.fittingCapacity.e).toBe(0);
+    expect(withoutEntry.totalCapacity).toBe(40);
+  });
+
+  it('lets an explicit root win over the entry; the entry then acts as a boundary with its demand', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'd1', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'e' }),
+    ];
+    const fittings = [fitting('tee'), fitting('e')];
+    const terminalCapacities = { d1: 40 };
+    const elementCategories = { ahu: 'equipment' as const };
+
+    const ahuRoot = solveFlow(inputOf(segments, fittings, terminalCapacities, {
+      elementCategories,
+      riserFittingIds: new Set(['e']),
+      entryFittingId: 'e',
+      rootElementId: 'ahu',
+      riserDemand: { e: 7 },
+    }));
+    expect(ahuRoot.totalCapacity).toBe(47);
+    expect(ahuRoot.segmentCapacity.s3).toBe(7);
+    expect(ahuRoot.fittingCapacity.e).toBe(7);
+    expect(ahuRoot.segmentCapacity.s1).toBe(47);
+    expect(ahuRoot.riserCapacity).toBe(7);
+
+    const entryRoot = solveFlow(inputOf(segments, fittings, terminalCapacities, {
+      elementCategories,
+      riserFittingIds: new Set(['e']),
+      entryFittingId: 'e',
+      rootElementId: 'e',
+      riserDemand: { e: 7 },
+    }));
+    expect(entryRoot.segmentCapacity.s3).toBe(40);
+    expect(entryRoot.fittingCapacity.e).toBe(47);
+    expect(entryRoot.totalCapacity).toBe(47);
+    expect(entryRoot.riserCapacity).toBe(7);
+  });
+
+  it('ignores an explicit root that is a marked fitting other than the entry, and roots at the entry', () => {
+    const result = solveFlow(inputOf(networkA, fittingsA, { d1: 40 }, {
+      riserFittingIds: new Set(['e', 'x']),
+      entryFittingId: 'e',
+      rootElementId: 'x',
+    }));
+    expect(result.fittingCapacity.e).toBe(40);
+    expect(result.totalCapacity).toBe(40);
+  });
+
+  it('roots at an equipment with exits that carry riserDemand', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'd1', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'x1' }),
+      segment('s4', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'x2' }),
+    ];
+    const fittings = [fitting('tee'), fitting('x1'), fitting('x2')];
+
+    const result = solveFlow(inputOf(segments, fittings, { d1: 100 }, {
+      elementCategories: { ahu: 'equipment', d1: 'terminal' },
+      riserFittingIds: new Set(['x1', 'x2']),
+      riserDemand: { x1: 650, x2: 50 },
+    }));
+    expect(result.totalCapacity).toBe(800);
+    expect(result.segmentCapacity.s1).toBe(800);
+    expect(result.segmentCapacity.s2).toBe(100);
+    expect(result.segmentCapacity.s3).toBe(650);
+    expect(result.segmentCapacity.s4).toBe(50);
+    expect(result.fittingCapacity.tee).toBe(800);
+    expect(result.fittingCapacity.x1).toBe(650);
+    expect(result.fittingCapacity.x2).toBe(50);
+    expect(result.riserCapacity).toBe(700);
+  });
+
+  it('gives the entry its own terminals plus the demand beyond, and the segments only the terminals behind them', () => {
+    const segments = [
+      segment('s1', { kind: 'fitting', fittingId: 'e' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 't300', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 't200', portId: 'p1' }),
+    ];
+    const fittings = [fitting('e'), fitting('tee')];
+
+    const result = solveFlow(inputOf(segments, fittings, { t300: 300, t200: 200 }, {
+      riserFittingIds: new Set(['e']),
+      entryFittingId: 'e',
+      riserDemand: { e: 150 },
+    }));
+    expect(result.fittingCapacity.e).toBe(650);
+    expect(result.totalCapacity).toBe(650);
+    expect(result.segmentCapacity.s2).toBe(300);
+    expect(result.segmentCapacity.s3).toBe(200);
+    expect(result.segmentCapacity.s1).toBe(500);
+    expect(result.riserCapacity).toBe(150);
+  });
+
+  it('worked example, source level (row 1, level 0)', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'd1', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'x' }),
+    ];
+    const fittings = [fitting('tee'), fitting('x')];
+
+    const result = solveFlow(inputOf(segments, fittings, { d1: 100 }, {
+      elementCategories: { ahu: 'equipment' },
+      riserFittingIds: new Set(['x']),
+      riserDemand: { x: 650 },
+    }));
+    expect(result.totalCapacity).toBe(750);
+    expect(result.segmentCapacity.s3).toBe(650);
+    expect(result.fittingCapacity.x).toBe(650);
+    expect(result.riserCapacity).toBe(650);
+  });
+
+  it('lets the entry win over an equipment on the same network', () => {
+    const segments = [
+      segment('s1', { kind: 'fitting', fittingId: 'e' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'd1', portId: 'p1' }),
+    ];
+    const fittings = [fitting('e'), fitting('tee')];
+    const terminalCapacities = { d1: 50 };
+    const elementCategories = { ahu: 'equipment' as const };
+
+    const withEntry = solveFlow(inputOf(segments, fittings, terminalCapacities, {
+      elementCategories,
+      riserFittingIds: new Set(['e']),
+      entryFittingId: 'e',
+      riserDemand: { e: 20 },
+    }));
+    expect(withEntry.totalCapacity).toBe(70);
+    expect(withEntry.fittingCapacity.e).toBe(70);
+    expect(withEntry.segmentCapacity.s1).toBe(50);
+    expect(withEntry.segmentCapacity.s2).toBe(0);
+    expect(withEntry.segmentCapacity.s3).toBe(50);
+
+    const withoutEntry = solveFlow(inputOf(segments, fittings, terminalCapacities, {
+      elementCategories,
+      riserFittingIds: new Set(['e']),
+      riserDemand: { e: 20 },
+    }));
+    expect(withoutEntry.totalCapacity).toBe(70);
+    expect(withoutEntry.segmentCapacity.s1).toBe(20);
+    expect(withoutEntry.segmentCapacity.s2).toBe(70);
+    expect(withoutEntry.fittingCapacity.e).toBe(20);
+  });
+
+  it('ignores an entry that is not in the network or not marked', () => {
+    const base = solveFlow(inputOf(networkA, fittingsA, { d1: 40 }, {
+      riserFittingIds: new Set(['e', 'x']),
+      riserDemand: { x: 25 },
+    }));
+
+    const ghostEntry = solveFlow(inputOf(networkA, fittingsA, { d1: 40 }, {
+      riserFittingIds: new Set(['e', 'x', 'ghost']),
+      entryFittingId: 'ghost',
+      riserDemand: { x: 25 },
+    }));
+    expect(ghostEntry).toEqual(base);
+
+    const networkWithAhu = [
+      ...networkA,
+      segment('s4', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+    ];
+    const elementCategories = { ahu: 'equipment' as const };
+    const unmarkedEntry = solveFlow(inputOf(networkWithAhu, fittingsA, { d1: 40 }, {
+      elementCategories,
+      riserFittingIds: new Set(['x']),
+      entryFittingId: 'e',
+      riserDemand: { x: 25 },
+    }));
+    const unmarkedNoEntry = solveFlow(inputOf(networkWithAhu, fittingsA, { d1: 40 }, {
+      elementCategories,
+      riserFittingIds: new Set(['x']),
+      riserDemand: { x: 25 },
+    }));
+    expect(unmarkedEntry).toEqual(unmarkedNoEntry);
+    expect(unmarkedEntry.segmentCapacity.s4).toBe(65);
+  });
+
+  it('ignores a riserDemand key of a fitting that is not marked or not in the network', () => {
+    const result = solveFlow(inputOf(networkA, fittingsA, { d1: 40 }, {
+      riserFittingIds: new Set(['x']),
+      riserDemand: { x: 25, tee: 99, ghost: 5 },
+    }));
+    expect(result.segmentCapacity.s3).toBe(25);
+    expect(result.riserCapacity).toBe(25);
+    expect(result.totalCapacity).toBe(65);
+  });
+
+  it('counts a boundary that sits in the middle of a run, and not the terminal behind it', () => {
+    const segments = [
+      segment('a', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'm' }),
+      segment('b', { kind: 'fitting', fittingId: 'm' }, { kind: 'port', elementId: 'diffuser', portId: 'p1' }),
+    ];
+    const fittings = [fitting('m')];
+    const terminalCapacities = { diffuser: 100 };
+
+    const withDemand = solveFlow(inputOf(segments, fittings, terminalCapacities, {
+      riserFittingIds: new Set(['m']),
+      riserDemand: { m: 30 },
+    }));
+    expect(withDemand.segmentCapacity.a).toBe(30);
+    expect(withDemand.segmentCapacity.b).toBeNull();
+    expect(withDemand.totalCapacity).toBe(30);
+    expect(withDemand.riserCapacity).toBe(30);
+
+    const withoutDemand = solveFlow(inputOf(segments, fittings, terminalCapacities, {
+      riserFittingIds: new Set(['m']),
+    }));
+    expect(withoutDemand.segmentCapacity.a).toBe(0);
+    expect(withoutDemand.segmentCapacity.b).toBeNull();
+  });
+
+  it('follows a loop closing edge as unresolved and counts the entry demand once', () => {
+    const segments = [
+      segment('s1', { kind: 'fitting', fittingId: 'e' }, { kind: 'fitting', fittingId: 'a' }),
+      segment('s2', { kind: 'fitting', fittingId: 'a' }, { kind: 'fitting', fittingId: 'b' }),
+      segment('s3', { kind: 'fitting', fittingId: 'a' }, { kind: 'fitting', fittingId: 'b' }),
+      segment('s4', { kind: 'fitting', fittingId: 'a' }, { kind: 'port', elementId: 'd1', portId: 'p1' }),
+    ];
+    const fittings = [fitting('e'), fitting('a'), fitting('b')];
+
+    const result = solveFlow(inputOf(segments, fittings, { d1: 40 }, {
+      riserFittingIds: new Set(['e']),
+      entryFittingId: 'e',
+      riserDemand: { e: 10 },
+    }));
+    expect(result.segmentCapacity.s1).toBe(40);
+    expect(result.segmentCapacity.s2).toBe(0);
+    expect(result.segmentCapacity.s3).toBeNull();
+    expect(result.segmentCapacity.s4).toBe(40);
+    expect(result.totalCapacity).toBe(50);
+    expect(result.fittingCapacity.e).toBe(50);
+    expect(result.riserCapacity).toBe(10);
+  });
+
+  it('sums only the riserDemand that the walk reached', () => {
+    const segments = [
+      segment('a', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'm1' }),
+      segment('b', { kind: 'fitting', fittingId: 'm1' }, { kind: 'fitting', fittingId: 'm2' }),
+    ];
+    const fittings = [fitting('m1'), fitting('m2')];
+
+    const result = solveFlow(inputOf(segments, fittings, {}, {
+      elementCategories: { ahu: 'equipment' },
+      riserFittingIds: new Set(['m1', 'm2']),
+      riserDemand: { m1: 30, m2: 40 },
+    }));
+    expect(result.segmentCapacity.a).toBe(30);
+    expect(result.riserCapacity).toBe(30);
+    expect(result.totalCapacity).toBe(30);
+  });
+
+  it('gives riserCapacity 0 for an empty riserDemand and for an unresolved network', () => {
+    const empty = solveFlow(inputOf(networkA, fittingsA, { d1: 40 }, {
+      riserFittingIds: new Set(['e', 'x']),
+      entryFittingId: 'e',
+      riserDemand: {},
+    }));
+    expect('riserCapacity' in empty).toBe(true);
+    expect(empty.riserCapacity).toBe(0);
+
+    const segments = [segment('s', { kind: 'fitting', fittingId: 'a' }, { kind: 'fitting', fittingId: 'b' })];
+    const fittings = [fitting('a'), fitting('b')];
+    const unresolved = solveFlow(inputOf(segments, fittings, {}, {
+      riserFittingIds: new Set(['a', 'b']),
+      riserDemand: {},
+    }));
+    expect(unresolved.resolved).toBe(false);
+    expect(unresolved.riserCapacity).toBe(0);
+  });
+
+  it('gives the same result as before when neither input is given', () => {
+    const base = inputOf(networkA, fittingsA, { d1: 40 }, {
+      riserFittingIds: new Set(['e', 'x']),
+    });
+    const explicitUndefined = solveFlow({ ...base, entryFittingId: undefined, riserDemand: undefined });
+    expect(JSON.stringify(solveFlow(base))).toBe(JSON.stringify(explicitUndefined));
+  });
+
+  it('counts the demand of a boundary once when two segments reach it', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'e' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'e' }),
+    ];
+    const fittings = [fitting('tee'), fitting('e')];
+
+    const result = solveFlow(inputOf(segments, fittings, {}, {
+      elementCategories: { ahu: 'equipment' as const },
+      riserFittingIds: new Set(['e']),
+      entryFittingId: 'e',
+      rootElementId: 'ahu',
+      riserDemand: { e: 7 },
+    }));
+    expect(result.riserCapacity).toBe(7);
+    expect(result.totalCapacity).toBe(7);
+    expect(result.segmentCapacity.s1).toBe(7);
+    expect(result.segmentCapacity.s2).toBe(7);
+    expect(result.segmentCapacity.s3).toBeNull();
+  });
+
+  it('ignores inherited keys of riserDemand', () => {
+    const segments = [
+      segment('a', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'constructor' }),
+    ];
+    const fittings = [fitting('constructor')];
+
+    const result = solveFlow(inputOf(segments, fittings, {}, {
+      elementCategories: { ahu: 'equipment' as const },
+      riserFittingIds: new Set(['constructor']),
+      riserDemand: {},
+    }));
+    expect(result.segmentCapacity.a).toBe(0);
+    expect(result.totalCapacity).toBe(0);
+    expect(result.riserCapacity).toBe(0);
+  });
+});
