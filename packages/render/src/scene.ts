@@ -71,6 +71,7 @@ import {
   resolveCircuitLineTargets,
   remapRoutingTargets,
   resolveSegmentEndpoint,
+  type RiserFlowInput,
   routingTargetOf,
   withRoutingTarget,
   rotateAnnotationGeometry,
@@ -160,6 +161,7 @@ import { createRoomCommand, deleteRoomsCommand, replaceRoomsCommand, updateRoomC
 import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type DrawingState } from './document.js';
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
+import { riserSolveOptionsFor } from './riserFlowInputs.js';
 import { anchorAtPoint, visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
 import { createFittingCommand } from './drawingCommands.js';
 import {
@@ -726,6 +728,8 @@ export class SketchScene {
   private routeMarkers: RouteMarker[] = [];
   /** Scene-level: the riser marks of the active document, keyed by fitting id. Not part of the document, never saved. */
   private riserMarks: Map<string, RiserMark> = new Map();
+  /** Scene-level: the riser flow numbers of the active document, keyed by fitting id. Not part of the document, never saved. */
+  private riserFlowInputs: Map<string, RiserFlowInput> = new Map();
   /** Scene-level: the free riser anchors of the shown page. Not part of the document, never saved. */
   private riserAnchors: RiserAnchor[] = [];
   /** Scene-level: the anchor that refused a segment end, with the tip text. Not part of the document, never saved. */
@@ -1198,6 +1202,7 @@ export class SketchScene {
     this.roomPreview = null;
     this.circuitToolHover = null;
     this.riserMarks = new Map();
+    this.riserFlowInputs = new Map();
     this.riserAnchors = [];
     this.riserAnchorRefusal = null;
     this.selectedRiserAnchorId = null;
@@ -1326,6 +1331,7 @@ export class SketchScene {
     for (const tool of this.toolMap.values()) tool.onDeactivate?.(this.ctx); // a pending polyline or measurement belongs to the outgoing document
     this.drag = { kind: 'none' };
     this.riserMarks = new Map();
+    this.riserFlowInputs = new Map();
     this.riserAnchors = [];
     this.riserAnchorRefusal = null;
     this.selectedRiserAnchorId = null;
@@ -3109,10 +3115,17 @@ export class SketchScene {
   setRiserMarks(marks: ReadonlyMap<string, RiserMark>): void {
     this.riserMarks = new Map(marks);
     this.redrawOverlay();
+    if (this.riserFlowInputs.size > 0) this.recomputeFlow();
   }
 
   getRiserMarks(): ReadonlyMap<string, RiserMark> {
     return this.riserMarks;
+  }
+
+  /** Replaces the riser flow numbers of the active document (fitting id to role and demand beyond). The numbers are not an edit, so this never marks the document dirty. A riser fitting is a flow boundary only when it has an entry here. */
+  setRiserFlowInputs(inputs: Readonly<Record<string, RiserFlowInput>>): void {
+    this.riserFlowInputs = new Map(Object.entries(inputs));
+    this.recomputeFlow();
   }
 
   /** Replaces the free riser anchors of the shown page. A ring is not an edit, so this never marks the document dirty. */
@@ -3764,7 +3777,7 @@ export class SketchScene {
     const capacities = Object.fromEntries(this.doc.terminalCapacities);
     const elementCategories = Object.fromEntries(Object.values(state.stamps).map((stamp) => [stamp.id, stamp.category]));
     this.doc.lastFlowResult = networks.map((network: Network) =>
-      solveFlow({ network, segments, fittings, portGroups: this.doc.portGroups, terminalCapacities: capacities, elementCategories }),
+      solveFlow({ network, segments, fittings, portGroups: this.doc.portGroups, terminalCapacities: capacities, elementCategories, ...riserSolveOptionsFor(network, this.riserFlowInputs) }),
     );
     this.syncFlowLabels();
     this.emitter.emit('flowSolved', this.doc.lastFlowResult);
