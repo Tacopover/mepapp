@@ -192,7 +192,7 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
   return withRiserCapacity({ segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection }, usedRiserDemand);
 }
 
-/** For each marked fitting of the network: `out` when the level has a source and the solve reaches the fitting; `in` when there is no source and the solve reaches the fitting and the network has a total terminal capacity above 0; else `none`. A source is an element of category 'equipment' in `elementCategories`, or the explicit `rootElementId` when it is not a marked fitting and one of its ports or fittings ends a segment of the network. A stale root id gives no source. Needs `input.riserFittingIds`. */
+/** For each marked fitting of the network: `out` when the level has a source and the solve reaches the fitting; `in` when there is no source and the solve reaches the fitting and the network has a total terminal capacity above 0; else `none`. A source is an element of category 'equipment' whose own capacity in `terminalCapacities` is 0 or absent, or the explicit `rootElementId` when it is not a marked fitting and one of its ports or fittings ends a segment of the network. A stale root id gives no source. Needs `input.riserFittingIds`. */
 export function riserFittingFlow(input: FlowSolveInput): Record<string, RiserFittingFlow> {
   const marks = input.riserFittingIds ?? new Set<string>();
   const markedIds = input.network.fittingIds.filter((id) => marks.has(id));
@@ -211,7 +211,9 @@ export function riserFittingFlow(input: FlowSolveInput): Record<string, RiserFit
           endpoint.kind === 'port' ? endpoint.elementId === root : endpoint.fittingId === root,
         ),
     );
-  const hasSource = rootInNetwork || Object.values(input.elementCategories ?? {}).includes('equipment');
+  const hasSource =
+    rootInNetwork ||
+    Object.entries(input.elementCategories ?? {}).some(([id, category]) => category === 'equipment' && !((input.terminalCapacities[id] ?? 0) > 0));
   const networkElementIds = Array.from(
     new Set(
       input.segments

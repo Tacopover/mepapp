@@ -1,5 +1,5 @@
-import { riserFittingFlow, type RiserFittingFlow } from './flow.js';
-import { computeNetworks } from './network.js';
+import { riserFittingFlow, solveFlow, type RiserFittingFlow } from './flow.js';
+import { computeNetworks, type Segment } from './network.js';
 import { buildQuantityTables, type QuantityTable } from './quantities.js';
 import type { ProjectDocument } from './project.js';
 import { migrateToLatest, SchemaMigrationError, validateDocument } from './schema.js';
@@ -16,6 +16,18 @@ export interface SheetSummaryPage {
   rotationDegrees: number;
 }
 
+export interface RiserNetworkSummary {
+  networkTypeId: string;
+  /** The riser fittings of this network, sorted. */
+  fittingIds: string[];
+  /** Total capacity behind the first riser fitting (the entry), with every riser fitting a boundary. 0 when the solve does not resolve. */
+  terminalCapacity: number;
+  /** True when the network has an equipment (stamp category 'equipment') whose own capacity is 0 or absent. An equipment with a capacity above 0 is a demand, not a source. */
+  hasSource: boolean;
+  /** Absent when empty. */
+  warnings?: string[];
+}
+
 export interface SheetSummary {
   version: number;
   projectUuid: string;
@@ -29,6 +41,8 @@ export interface SheetSummary {
   warnings: string[];
   /** Flow at each riser fitting of this sheet that exists in the project, merged over all networks: fitting id -> 'out' | 'in' | 'none'. Absent when no riser fitting ids were given, and in a v1 summary (unknown). */
   riserFittingFlow?: Record<string, RiserFittingFlow>;
+  /** One entry for each network of this sheet that holds a riser fitting. Absent when no riser fitting ids were given, and in a summary written before this field existed (unknown). */
+  riserNetworks?: RiserNetworkSummary[];
 }
 
 export class SheetSummaryError extends Error {
@@ -40,6 +54,21 @@ export class SheetSummaryError extends Error {
   }
 }
 
+function elementCategoriesOf(project: ProjectDocument, segmentById: Map<string, Segment>, segmentIds: string[]): Record<string, StampCategory> {
+  const elementIds = new Set<string>();
+  for (const segmentId of segmentIds) {
+    const segment = segmentById.get(segmentId);
+    for (const endpoint of [segment?.endpointA, segment?.endpointB]) {
+      if (endpoint?.kind === 'port') elementIds.add(endpoint.elementId);
+    }
+  }
+  const elementCategories: Record<string, StampCategory> = {};
+  for (const stamp of project.stamps) {
+    if (elementIds.has(stamp.id)) elementCategories[stamp.id] = stamp.category;
+  }
+  return elementCategories;
+}
+
 function riserFittingFlowOf(project: ProjectDocument, riserIds: ReadonlySet<string>): Record<string, RiserFittingFlow> {
   const segmentById = new Map(project.segments.map((segment) => [segment.id, segment]));
   const flow = new Map<string, RiserFittingFlow>(
@@ -48,17 +77,7 @@ function riserFittingFlowOf(project: ProjectDocument, riserIds: ReadonlySet<stri
   const networks = computeNetworks({ segments: project.segments, fittings: project.fittings, portGroups: project.portGroups });
   for (const network of networks) {
     if (!network.fittingIds.some((id) => riserIds.has(id))) continue;
-    const elementIds = new Set<string>();
-    for (const segmentId of network.segmentIds) {
-      const segment = segmentById.get(segmentId);
-      for (const endpoint of [segment?.endpointA, segment?.endpointB]) {
-        if (endpoint?.kind === 'port') elementIds.add(endpoint.elementId);
-      }
-    }
-    const elementCategories: Record<string, StampCategory> = {};
-    for (const stamp of project.stamps) {
-      if (elementIds.has(stamp.id)) elementCategories[stamp.id] = stamp.category;
-    }
+    const elementCategories = elementCategoriesOf(project, segmentById, network.segmentIds);
     const result = riserFittingFlow({
       network,
       segments: project.segments,
@@ -73,6 +92,50 @@ function riserFittingFlowOf(project: ProjectDocument, riserIds: ReadonlySet<stri
     }
   }
   return Object.fromEntries([...flow.keys()].sort().map((id) => [id, flow.get(id)!]));
+}
+
+const RISER_WARNING = 'Riser fitting is not an open end. The terminals behind it are not counted.';
+
+/** The networks of the whole project that hold a riser fitting. A network is not limited to one sheet, so the same network can appear in the summary of each sheet that shares the project. The entry is the first sorted riser fitting. Needs no stamp names, so it is light. */
+export function buildRiserNetworks(project: ProjectDocument, riserFittingIds: ReadonlySet<string> | readonly string[]): RiserNetworkSummary[] {
+  const riserIds = new Set<string>(riserFittingIds);
+  const segmentById = new Map(project.segments.map((segment) => [segment.id, segment]));
+  const networks = computeNetworks({ segments: project.segments, fittings: project.fittings, portGroups: project.portGroups });
+  const entries: RiserNetworkSummary[] = [];
+  for (const network of networks) {
+    const fittingIds = network.fittingIds.filter((id) => riserIds.has(id)).sort();
+    if (fittingIds.length === 0) continue;
+    const elementCategories = elementCategoriesOf(project, segmentById, network.segmentIds);
+    const result = solveFlow({
+      network,
+      segments: project.segments,
+      fittings: project.fittings,
+      portGroups: project.portGroups,
+      terminalCapacities: project.terminalCapacities,
+      elementCategories,
+      riserFittingIds: riserIds,
+      entryFittingId: fittingIds[0],
+    });
+    const hasSource = Object.entries(elementCategories).some(
+      ([id, category]) => category === 'equipment' && !((project.terminalCapacities[id] ?? 0) > 0),
+    );
+    const fittingEndCounts = new Map<string, number>();
+    for (const segmentId of network.segmentIds) {
+      const segment = segmentById.get(segmentId);
+      for (const endpoint of [segment?.endpointA, segment?.endpointB]) {
+        if (endpoint?.kind === 'fitting') fittingEndCounts.set(endpoint.fittingId, (fittingEndCounts.get(endpoint.fittingId) ?? 0) + 1);
+      }
+    }
+    const midRun = fittingIds.some((id) => (fittingEndCounts.get(id) ?? 0) > 1);
+    entries.push({
+      networkTypeId: network.networkTypeId,
+      fittingIds,
+      terminalCapacity: result.resolved ? (result.totalCapacity ?? 0) : 0,
+      hasSource,
+      ...(midRun ? { warnings: [RISER_WARNING] } : {}),
+    });
+  }
+  return entries.sort((a, b) => (a.fittingIds[0]! < b.fittingIds[0]! ? -1 : a.fittingIds[0]! > b.fittingIds[0]! ? 1 : 0));
 }
 
 export function buildSheetSummary(args: {
@@ -135,6 +198,7 @@ export function buildSheetSummary(args: {
     tables: quantities.tables,
     warnings: quantities.warnings,
     ...(riserIds.size > 0 ? { riserFittingFlow: riserFittingFlowOf(project, riserIds) } : {}),
+    ...(riserIds.size > 0 ? { riserNetworks: buildRiserNetworks(project, riserIds) } : {}),
   };
 }
 
@@ -231,7 +295,30 @@ const validateRiserFlow: Validator = (data) => {
   return issues;
 };
 
-const sheetSummaryValidators: Validator[] = [validateTopLevel, validatePages, validateTables, validateRiserFlow];
+const validateRiserNetworks: Validator = (data) => {
+  if (data.riserNetworks === undefined) return [];
+  if (!Array.isArray(data.riserNetworks)) return [{ path: 'riserNetworks', message: 'riserNetworks must be an array' }];
+  const issues: ValidationIssue[] = [];
+  data.riserNetworks.forEach((entry: unknown, index) => {
+    const path = `riserNetworks[${index}]`;
+    if (!isRecord(entry)) {
+      issues.push({ path, message: 'riser network must be an object' });
+      return;
+    }
+    if (typeof entry.networkTypeId !== 'string') issues.push({ path: `${path}.networkTypeId`, message: 'networkTypeId must be a string' });
+    if (!Array.isArray(entry.fittingIds) || !entry.fittingIds.every((id) => typeof id === 'string')) {
+      issues.push({ path: `${path}.fittingIds`, message: 'fittingIds must be an array of strings' });
+    }
+    if (!isFiniteNumber(entry.terminalCapacity)) issues.push({ path: `${path}.terminalCapacity`, message: 'terminalCapacity must be a finite number' });
+    if (typeof entry.hasSource !== 'boolean') issues.push({ path: `${path}.hasSource`, message: 'hasSource must be a boolean' });
+    if (entry.warnings !== undefined && (!Array.isArray(entry.warnings) || !entry.warnings.every((w) => typeof w === 'string'))) {
+      issues.push({ path: `${path}.warnings`, message: 'warnings must be an array of strings' });
+    }
+  });
+  return issues;
+};
+
+const sheetSummaryValidators: Validator[] = [validateTopLevel, validatePages, validateTables, validateRiserFlow, validateRiserNetworks];
 
 /** Migrates raw JSON (any prior summary version) to the current shape and validates it. Throws SheetSummaryError if the summary is malformed or newer than this app. */
 export function parseSheetSummary(raw: unknown): SheetSummary {

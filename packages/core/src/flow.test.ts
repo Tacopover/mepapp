@@ -556,6 +556,47 @@ describe('riserFittingFlow', () => {
     expect(riserFittingFlow(inputOf(forward, [fitting('m')], { T1: 0, T2: 50 }, { riserFittingIds: new Set(['m']) }))).toEqual({ m: 'in' });
     expect(riserFittingFlow(inputOf(swapped, [fitting('m')], { T1: 50, T2: 0 }, { riserFittingIds: new Set(['m']) }))).toEqual({ m: 'in' });
   });
+
+  it('gives in, not out, when the only equipment has a capacity above 0 (a fan coil unit)', () => {
+    const segments = [segment('a', { kind: 'fitting', fittingId: 'm' }, { kind: 'port', elementId: 'fcu', portId: 'p1' })];
+    const input = inputOf(segments, [fitting('m')], { fcu: 150 }, {
+      elementCategories: { fcu: 'equipment' },
+      riserFittingIds: new Set(['m']),
+    });
+    expect(riserFittingFlow(input)).toEqual({ m: 'in' });
+  });
+
+  it('gives out when the equipment has capacity 0', () => {
+    const segments = [segment('a', { kind: 'fitting', fittingId: 'm' }, { kind: 'port', elementId: 'fcu', portId: 'p1' })];
+    const input = inputOf(segments, [fitting('m')], { fcu: 0 }, {
+      elementCategories: { fcu: 'equipment' },
+      riserFittingIds: new Set(['m']),
+    });
+    expect(riserFittingFlow(input)).toEqual({ m: 'out' });
+  });
+
+  it('gives out when an equipment with no capacity and an equipment with a capacity are in the network', () => {
+    const segments = [
+      segment('s1', { kind: 'fitting', fittingId: 'm' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'ahu', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'fcu', portId: 'p1' }),
+    ];
+    const input = inputOf(segments, [fitting('m'), fitting('tee')], { fcu: 150 }, {
+      elementCategories: { ahu: 'equipment', fcu: 'equipment' },
+      riserFittingIds: new Set(['m']),
+    });
+    expect(riserFittingFlow(input)).toEqual({ m: 'out' });
+  });
+
+  it('an explicit root still gives out when the equipment has a capacity', () => {
+    const segments = [segment('a', { kind: 'fitting', fittingId: 'm' }, { kind: 'port', elementId: 'fcu', portId: 'p1' })];
+    const input = inputOf(segments, [fitting('m')], { fcu: 150 }, {
+      elementCategories: { fcu: 'equipment' },
+      rootElementId: 'fcu',
+      riserFittingIds: new Set(['m']),
+    });
+    expect(riserFittingFlow(input)).toEqual({ m: 'out' });
+  });
 });
 
 describe('solveFlow — riser fittings as entry and with demand beyond', () => {
