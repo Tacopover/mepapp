@@ -1,6 +1,6 @@
 # B7: flow through risers
 
-Status: **planned 2026-11-21, revised the same day after the audit and the domain check. Not started.** Stream `buildings`, part id `B7`. B5 (shared coordinate system) stays deferred. A later part (B8, riser arrows) needs B7 first. Branch for the work: `worktree-buildings-b7`, made from `origin/worktree-buildings-b4` (master `1b7b4fd` plus this plan).
+Status: **planned 2026-11-21, revised the same day after the audit and the domain check. T01 to T06 done on the branch (2026-11-21); waiting for the Windows test (`buildings-b7-test.md`) and the merge by the user.** Stream `buildings`, part id `B7`. B5 (shared coordinate system) stays deferred. A later part (B8, riser arrows) needs B7 first. Branch for the work: `worktree-buildings-b7`, made from `origin/worktree-buildings-b4` (master `1b7b4fd` plus this plan).
 
 ## 1. Why
 
@@ -64,6 +64,8 @@ Order matters. T01 to T03 are core only (pure functions with unit tests first). 
 
 ### B7-T01: solver inputs for risers (core)
 
+Done: `c7d500b`. 18 flow tests.
+
 - `FlowSolveInput` gets two optional fields:
   - `entryFittingId?: string`: a marked riser fitting that feeds this network. It is a root candidate. It is the root right after an explicit root, and before every step of the old root chain. The old chain never picks it before the entry. A marked fitting that is not the entry stays a boundary. An entry id that is not in the network is ignored.
   - `riserDemand?: Record<string, number>`: the capacity beyond a marked fitting (fitting id to number). For a boundary fitting it is added to the child demand: `segmentCapacity`, `fittingCapacity` and `totalCapacity` count it. For the entry (the root) it is added to the total of the root and to `fittingCapacity` of the entry. The segments of the network keep only the terminals behind them. A key for a fitting that is not marked or not in the network is ignored. A marked fitting with no key counts 0.
@@ -72,6 +74,8 @@ Order matters. T01 to T03 are core only (pure functions with unit tests first). 
 - Tests: entry as root with a drain behind another fitting; the old chain with a loose duct end (the entry wins); entry plus an explicit root (the explicit root wins); equipment root with exits that have `riserDemand`; entry and equipment on one network (the entry wins; the building solve decides the roles); an entry id that is not in the network; a key for an unmarked fitting; a marked fitting with no key; a marked fitting in the middle of a run (the terminal behind it is not counted: this documents `flow.test.ts:446-458`); a loop; `riserCapacity`.
 
 ### B7-T02: the summary lists the riser networks (core)
+
+Done: `01aa16e`, `ba7f025`. 51 sheet-summary tests.
 
 - After the answer to D-B-73 (option A: no version change).
 - New optional field of `SheetSummary`: `riserNetworks?: Array<{ networkTypeId: string; fittingIds: string[]; terminalCapacity: number; hasSource: boolean; warnings?: string[] }>`. One entry for each network that holds at least one riser fitting. `fittingIds` are the riser fittings of the network (sorted).
@@ -84,6 +88,8 @@ Order matters. T01 to T03 are core only (pure functions with unit tests first). 
 - `rebuildSummaries` and `buildingContext` already call `buildSheetSummary` with `riserFittingIds`, so they build the field with no extra change. Check this with a test.
 
 ### B7-T03: the building solve (core)
+
+Done: `588090b`, `691b53c`. 43 building-flow tests.
 
 - New file `packages/core/src/building-flow.ts`: `solveBuildingFlow(file, summariesByProject, live?)`. `summariesByProject` maps `projectUuid` to `SheetSummary`. `live` is the optional live `riserNetworks` of the open sheet, with its `projectUuid`. The function replaces the stored summary of that `projectUuid` with the live data, once (the same rule as `quantitiesScope.ts:108`). Pure. No I/O.
 - First read `riserGraph` and `buildingNetworkLabels` in `riser-quantities.ts`. Reuse their identity if it fits. If it does not fit, say why in the report and say how the two agree.
@@ -99,6 +105,8 @@ Order matters. T01 to T03 are core only (pure functions with unit tests first). 
 
 ### B7-T04a: the scene takes the numbers (render, no new screen)
 
+Done: `23e2b26`. 8 render tests. No test builds a real scene; T04b proved it in a browser.
+
 - `SketchScene` gets `setRiserFlowInputs(inputs)` with the shape of `riserFlowInputsOf`. `recomputeFlow` uses a fitting as a boundary only when `setRiserFlowInputs` has an entry for it. For a network it passes `riserFittingIds` (the keys), `entryFittingId` and `riserDemand`. A network with no key is solved as today. Without inputs the scene behaves as today.
 - `setRiserFlowInputs` calls `recomputeFlow`. So do `setRiserMarks` and a page change. The inputs reset when a document is activated (`scene.ts:1200`, `:1328`).
 - `App.tsx:2015-2020` (header total) subtracts `riserCapacity`, so the header total stays level-only (D-B-78).
@@ -106,16 +114,22 @@ Order matters. T01 to T03 are core only (pure functions with unit tests first). 
 
 ### B7-T04b: the open level shows the numbers (ui, screen task)
 
+Done: `d5411de`. Browser checks b7-t04b 48, nobuilding 22, pages 13, noflag 7. Beyond the plan: a hint on a segment that points to the riser fitting.
+
 - The ui computes the inputs from the building and the summaries, and from the live data of the open sheet (`buildRiserNetworks`). It runs again after a capacity edit, a save, a change of the riser list or a rebuild of summaries. Trigger on `drawingChanged`, not on `flowSolved` (`recomputeFlow` emits `flowSolved`, which would loop). After a save, refresh the other open documents.
 - Visible result: the capacity of every segment and fitting of the open level counts the other levels where the solve gives a number. The Properties panel of a riser fitting says which level is the main level and the total, with the unit (`NetworkType.flowUnit` of the type of the riser, never of the open level). Draft texts: `Connected total 650 m³/h (no diversity)`, `Main level: Level 0`. The `ux-designer` writes the final texts and follows D-B-74.
 - Check in a real browser (one Chromium page): a 3-level fixture (real PDFs from `fixtures/pdfs/`), the numbers of the worked example, a capacity edit that changes the numbers on the open level, and a no-building run where nothing changes. Plus a vitest for the input mapping (already in T03).
 
 ### B7-T05: the Building dialog and the takeoff (ui, screen task)
 
+Done: `1afbc8b`, `234dd53`. Browser check b7-t05 45, noflag 5, 29-check runner 0 problems.
+
 - The riser detail in the Building dialog shows the capacity of each span, "Connected total (no diversity)" and the unit. The Risers table of the takeoff gets a column (the headers of `riserTable` change, `riser-quantities.ts:152-166`, and their tests). The line `Flow is not summed across levels.` (`riser-quantities.ts:174`) becomes false: remove it or change it, and change the two tests (`riser-quantities.test.ts:244`, `building-takeoff.test.ts:314`). `BuildingRisersPane` gets the live summary of the open sheet (the same function as T03). A span with `complete` false reads "at least N". Warnings of the solve show in the dialog and in the takeoff warnings. For a drain, sprinkler or electrical type the dialog adds "Not a design flow". The `ux-designer` writes the texts.
 - `journey-tester`: a user with 3 levels and one riser opens the Building dialog and understands the numbers without help.
 
 ### B7-T06: Windows test script and records
+
+Done: the script `.claude/plans/buildings-b7-test.md` is written (35 steps, Parts A to I). The run on Windows is open.
 
 - `.claude/plans/buildings-b7-test.md`: step by step, with the numbers of the worked example, a change of one terminal capacity, a level that is not saved, a riser with two sources, a hand-set source level, a fan coil unit level, and a drain network (the word "Main level" is the outlet, no direction word).
 - Ledger events, dashboard screenshots, push the branch only.
