@@ -1,0 +1,668 @@
+import { describe, expect, it } from 'vitest';
+import type { BuildingFile, BuildingLevel } from './building.js';
+import { riserFlowInputsOf, solveBuildingFlow, type RiserNetworksLive } from './building-flow.js';
+import type { BuildingFlowResult } from './building-flow.js';
+import type { RiserFittingFlow } from './flow.js';
+import type { NetworkType } from './network.js';
+import type { Riser, RiserMember } from './riser.js';
+import { deriveRiserFlow, type PerSheetRiserFittingFlow } from './riser-flow.js';
+import type { RiserNetworkSummary, SheetSummary } from './sheet-summary.js';
+
+const vent: NetworkType = {
+  id: 'vent',
+  name: 'Supply',
+  discipline: 'ventilation',
+  units: 'CFM',
+  defaultCapacity: 100,
+  color: '#2196f3',
+  lineWidthPt: 1,
+  linePattern: 'solid',
+};
+
+const LEVELS: BuildingLevel[] = [
+  { id: 'l0', name: 'L0', elevationMm: 0 },
+  { id: 'l1', name: 'L1', elevationMm: 3000 },
+  { id: 'l2', name: 'L2', elevationMm: 6000 },
+  { id: 'l3', name: 'L3', elevationMm: 9000 },
+];
+
+function fileWith(risers: Riser[], opts: { projectUuids?: (string | null)[]; levelCount?: number } = {}): BuildingFile {
+  const levelList = LEVELS.slice(0, opts.levelCount ?? 3);
+  return {
+    schemaVersion: 1,
+    id: 'b1',
+    name: 'Building',
+    levels: levelList,
+    sheets: levelList.map((level, index) => ({
+      id: `s${index}`,
+      levelId: level.id,
+      projectUuid: opts.projectUuids === undefined ? `p${index}` : (opts.projectUuids[index] ?? null),
+      pageIndex: 0,
+      displayName: `Sheet ${index}`,
+      location: { fileName: 'plan.pdf' },
+    })),
+    risers,
+  };
+}
+
+function member(index: number, fittingId = 'f', extra: Partial<RiserMember> = {}): RiserMember {
+  return { levelId: `l${index}`, sheetId: `s${index}`, pageIndex: 0, fittingId, ...extra };
+}
+
+function makeRiser(id: string, members: RiserMember[], extra: Partial<Riser> = {}): Riser {
+  return {
+    id,
+    name: id,
+    networkTypeId: vent.id,
+    networkType: vent,
+    anchorMm: { xMm: 0, yMm: 0 },
+    flow: 'unknown',
+    topEnd: 'member',
+    bottomEnd: 'member',
+    endAllowanceMm: 0,
+    members,
+    pending: [],
+    ...extra,
+  };
+}
+
+function entry(
+  fittingIds: string[],
+  terminalCapacity: number,
+  hasSource = false,
+  extra: Partial<RiserNetworkSummary> = {},
+): RiserNetworkSummary {
+  return { networkTypeId: vent.id, fittingIds, terminalCapacity, hasSource, ...extra };
+}
+
+function summary(projectUuid: string, entries?: RiserNetworkSummary[]): SheetSummary {
+  const base: SheetSummary = {
+    version: 2,
+    projectUuid,
+    savedAt: '2026-01-01T00:00:00Z',
+    sourceSizeBytes: 0,
+    sourceModifiedMs: 0,
+    pages: {},
+    tables: [],
+    warnings: [],
+  };
+  if (entries === undefined) return base;
+  const riserFittingFlow: Record<string, RiserFittingFlow> = {};
+  for (const item of entries) {
+    for (const fittingId of item.fittingIds) riserFittingFlow[fittingId] = item.hasSource ? 'out' : 'in';
+  }
+  return { ...base, riserNetworks: entries, riserFittingFlow };
+}
+
+function summariesOf(...list: SheetSummary[]): Map<string, SheetSummary> {
+  return new Map(list.map((item) => [item.projectUuid, item] as const));
+}
+
+function threeLevels(terminals: [number, number, number], sources: [boolean, boolean, boolean]) {
+  const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+  const summaries = summariesOf(
+    summary('p0', [entry(['f'], terminals[0], sources[0])]),
+    summary('p1', [entry(['f'], terminals[1], sources[1])]),
+    summary('p2', [entry(['f'], terminals[2], sources[2])]),
+  );
+  return { file, summaries };
+}
+
+function hasWarning(warnings: string[], pattern: RegExp, ...mentions: string[]): boolean {
+  return warnings.some((warning) => pattern.test(warning) && mentions.every((mention) => warning.includes(mention)));
+}
+
+function warningsMatching(warnings: string[], pattern: RegExp): string[] {
+  return warnings.filter((warning) => pattern.test(warning));
+}
+
+function perLevelFlowOf(summaries: ReadonlyMap<string, SheetSummary>): PerSheetRiserFittingFlow {
+  const flow: PerSheetRiserFittingFlow = {};
+  for (let index = 0; index < 3; index++) {
+    flow[`s${index}`] = summaries.get(`p${index}`)?.riserFittingFlow ?? {};
+  }
+  return flow;
+}
+
+function expectDerivedSourceAgrees(sources: [boolean, boolean, boolean], levelId: string): void {
+  const { file, summaries } = threeLevels([100, 500, 150], sources);
+  const result = solveBuildingFlow(file, summaries);
+  const derived = deriveRiserFlow(file, perLevelFlowOf(summaries));
+  expect(result.groups[0]!.sourceLevelId).toBe(levelId);
+  expect(derived.R!.sourceLevelId).toBe(levelId);
+}
+
+describe('solveBuildingFlow', () => {
+  it('solves the worked example with the source on level 0', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const result = solveBuildingFlow(file, summaries);
+    const riser = result.risers.R!;
+    expect(riser.spans).toHaveLength(2);
+    expect(riser.spans[0]).toMatchObject({ fromLevelId: 'l0', toLevelId: 'l1', capacity: 650, state: 'ok', complete: true });
+    expect(riser.spans[1]).toMatchObject({ fromLevelId: 'l1', toLevelId: 'l2', capacity: 150, state: 'ok', complete: true });
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]).toMatchObject({ riserIds: ['R'], total: 750, complete: true, state: 'ok', sourceLevelId: 'l0' });
+    expect(riser.members[0]).toMatchObject({ levelId: 'l0', role: 'source', capacityIn: 0, demandBeyond: 650 });
+    expect(riser.members[1]).toMatchObject({ levelId: 'l1', role: 'entry', capacityIn: 650, demandBeyond: 150 });
+    expect(riser.members[2]).toMatchObject({ levelId: 'l2', role: 'entry', capacityIn: 150, demandBeyond: 0 });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('solves the worked example with the source on level 2', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [false, false, true]);
+    const result = solveBuildingFlow(file, summaries);
+    const riser = result.risers.R!;
+    expect(riser.spans[0]).toMatchObject({ fromLevelId: 'l0', toLevelId: 'l1', capacity: 100, state: 'ok', complete: true });
+    expect(riser.spans[1]).toMatchObject({ fromLevelId: 'l1', toLevelId: 'l2', capacity: 600, state: 'ok', complete: true });
+    expect(result.groups[0]).toMatchObject({ riserIds: ['R'], total: 750, complete: true, state: 'ok', sourceLevelId: 'l2' });
+    expect(riser.members[2]).toMatchObject({ levelId: 'l2', role: 'source', demandBeyond: 600 });
+    expect(riser.members[1]).toMatchObject({ levelId: 'l1', role: 'entry', capacityIn: 600, demandBeyond: 100 });
+    expect(riser.members[0]).toMatchObject({ levelId: 'l0', role: 'entry', capacityIn: 100, demandBeyond: 0 });
+  });
+
+  it('solves the worked example with the source on level 1', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [false, true, false]);
+    const result = solveBuildingFlow(file, summaries);
+    const riser = result.risers.R!;
+    expect(riser.spans[0]).toMatchObject({ capacity: 100, state: 'ok', complete: true });
+    expect(riser.spans[1]).toMatchObject({ capacity: 150, state: 'ok', complete: true });
+    expect(result.groups[0]).toMatchObject({ riserIds: ['R'], total: 750, complete: true, state: 'ok', sourceLevelId: 'l1' });
+    expect(riser.members[1]).toMatchObject({ levelId: 'l1', role: 'source', capacityIn: 0, demandBeyond: 250 });
+    expect(riser.members[0]).toMatchObject({ levelId: 'l0', role: 'entry', capacityIn: 100, demandBeyond: 0 });
+    expect(riser.members[2]).toMatchObject({ levelId: 'l2', role: 'entry', capacityIn: 150, demandBeyond: 0 });
+  });
+
+  it('skips a level with no member and joins the spans across the gap', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(3)])], { levelCount: 4 });
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true)]),
+      summary('p1', [entry(['f'], 200)]),
+      summary('p3', [entry(['f'], 300)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    const spans = result.risers.R!.spans;
+    expect(spans).toHaveLength(2);
+    expect(spans[0]).toMatchObject({ fromLevelId: 'l0', toLevelId: 'l1', capacity: 500 });
+    expect(spans[1]).toMatchObject({ fromLevelId: 'l1', toLevelId: 'l3', capacity: 300 });
+  });
+
+  it('joins two risers that share one network on a level', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(1, 'b'), member(2, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a'], 100, true)]),
+      summary('p1', [entry(['a', 'b'], 500)]),
+      summary('p2', [entry(['b'], 150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]).toMatchObject({ riserIds: ['A', 'B'], total: 750 });
+    expect(result.risers.A!.spans[0]).toMatchObject({ capacity: 650 });
+    expect(result.risers.B!.spans[0]).toMatchObject({ capacity: 150 });
+    expect(result.risers.A!.members[1]).toMatchObject({ levelId: 'l1', role: 'entry', capacityIn: 650, demandBeyond: 0 });
+    expect(result.risers.B!.members[0]).toMatchObject({ levelId: 'l1', role: 'exit', capacityIn: 0, demandBeyond: 150 });
+    expect(result.risers.B!.members[1]).toMatchObject({ levelId: 'l2', role: 'entry', capacityIn: 150 });
+  });
+
+  it('marks a loop of two risers as unknown and warns about the loop', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(0, 'b'), member(1, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a', 'b'], 100, true)]),
+      summary('p1', [entry(['a', 'b'], 500)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 600 });
+    for (const riserId of ['A', 'B']) {
+      const spans = result.risers[riserId]!.spans;
+      expect(spans).toHaveLength(1);
+      expect(spans[0]).toMatchObject({ capacity: null, state: 'unknown' });
+    }
+    expect(hasWarning(result.warnings, /loop/i)).toBe(true);
+  });
+
+  it('reports two sources as unknown and names both levels', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, true]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toHaveLength(1);
+    const group = result.groups[0]!;
+    expect(group).toMatchObject({ state: 'unknown', total: 750 });
+    expect(group.sourceLevelId).toBeUndefined();
+    const spans = result.risers.R!.spans;
+    expect(spans).toHaveLength(2);
+    for (const span of spans) expect(span).toMatchObject({ capacity: null, state: 'unknown' });
+    for (const item of result.risers.R!.members) {
+      expect(item).toMatchObject({ role: 'none', capacityIn: null, demandBeyond: null });
+    }
+    expect(hasWarning(result.warnings, /source/i, 'L0', 'L2')).toBe(true);
+    expect(new Set(result.warnings).size).toBe(result.warnings.length);
+  });
+
+  it('reports no source as unknown and warns that there is no source', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [false, false, false]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 750 });
+    expect(result.groups[0]!.sourceLevelId).toBeUndefined();
+    const spans = result.risers.R!.spans;
+    expect(spans).toHaveLength(2);
+    for (const span of spans) expect(span).toMatchObject({ capacity: null, state: 'unknown' });
+    for (const item of result.risers.R!.members) {
+      expect(item).toMatchObject({ role: 'none', capacityIn: null, demandBeyond: null });
+    }
+    expect(hasWarning(result.warnings, /no source/i)).toBe(true);
+  });
+
+  it('uses a hand-set source level and notes the equipment levels it overrides', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)], { sourceLevelId: 'l1' })]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true)]),
+      summary('p1', [entry(['f'], 500)]),
+      summary('p2', [entry(['f'], 150, true)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    const riser = result.risers.R!;
+    expect(result.groups[0]).toMatchObject({ state: 'ok', sourceLevelId: 'l1' });
+    expect(riser.spans[0]).toMatchObject({ capacity: 100, state: 'ok' });
+    expect(riser.spans[1]).toMatchObject({ capacity: 150, state: 'ok' });
+    expect(riser.members[1]).toMatchObject({ levelId: 'l1', role: 'source' });
+    expect(warningsMatching(result.warnings, /set by hand/i)).toHaveLength(2);
+    expect(hasWarning(result.warnings, /set by hand/i, 'L0')).toBe(true);
+    expect(hasWarning(result.warnings, /set by hand/i, 'L2')).toBe(true);
+  });
+
+  it('solves a hand-set source level above the equipment', () => {
+    const { summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)], { sourceLevelId: 'l2' })]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.risers.R!.spans[0]).toMatchObject({ capacity: 100 });
+    expect(result.risers.R!.spans[1]).toMatchObject({ capacity: 600 });
+    expect(result.groups[0]).toMatchObject({ sourceLevelId: 'l2' });
+  });
+
+  it('ignores a hand-set source level that has no member and uses the equipment', () => {
+    const { summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)], { sourceLevelId: 'l9' })]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'ok', sourceLevelId: 'l0' });
+    expect(result.risers.R!.spans[0]).toMatchObject({ capacity: 650, state: 'ok' });
+    expect(result.risers.R!.spans[1]).toMatchObject({ capacity: 150, state: 'ok' });
+    expect(hasWarning(result.warnings, /main level|hand/i)).toBe(true);
+  });
+
+  it('treats a level with equipment and hasSource false as a demand', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'ok', sourceLevelId: 'l0', total: 750 });
+    expect(result.risers.R!.members[2]).toMatchObject({ levelId: 'l2', role: 'entry', capacityIn: 150, demandBeyond: 0 });
+  });
+
+  it('counts a missing summary as zero capacity and marks the spans incomplete', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    summaries.delete('p2');
+    const result = solveBuildingFlow(file, summaries);
+    const riser = result.risers.R!;
+    expect(riser.spans[0]).toMatchObject({ capacity: 500, complete: false });
+    expect(riser.spans[1]).toMatchObject({ capacity: 0, complete: false });
+    expect(result.groups[0]).toMatchObject({ complete: false, total: 600 });
+    expect(hasWarning(result.warnings, /summar/i, 'L2')).toBe(true);
+    expect(riser.members[2]).toMatchObject({ levelId: 'l2', role: 'none', capacityIn: null });
+  });
+
+  it('treats a summary without riser data as a node with zero capacity', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    summaries.set('p1', summary('p1'));
+    const result = solveBuildingFlow(file, summaries);
+    const riser = result.risers.R!;
+    expect(hasWarning(result.warnings, /no riser data/i, 'L1')).toBe(true);
+    expect(riser.spans[0]).toMatchObject({ capacity: 150, complete: false });
+    expect(riser.spans[1]).toMatchObject({ capacity: 150, complete: true });
+  });
+
+  it('warns that a member sheet is not linked to a project', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])], { projectUuids: ['p0', null, 'p2'] });
+    const summaries = summariesOf(summary('p0', [entry(['f'], 100, true)]), summary('p2', [entry(['f'], 150)]));
+    const result = solveBuildingFlow(file, summaries);
+    expect(hasWarning(result.warnings, /not linked/i, 'L1')).toBe(true);
+  });
+
+  it('warns that a riser fitting is in no segment network and counts that level as zero', () => {
+    const { file } = threeLevels([100, 500, 150], [true, false, false]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true)]),
+      summary('p1', [entry(['other'], 500)]),
+      summary('p2', [entry(['f'], 150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(hasWarning(result.warnings, /no segment/i, 'L1')).toBe(true);
+    expect(result.risers.R!.spans[0]).toMatchObject({ capacity: 150 });
+    expect(result.risers.R!.spans[1]).toMatchObject({ capacity: 150 });
+  });
+
+  it('ignores the end rows and solves the same numbers', () => {
+    const { summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const file = fileWith([
+      makeRiser('R', [member(0), member(1), member(2)], { topEnd: 'open', bottomEnd: 'capped', endAllowanceMm: 500 }),
+    ]);
+    const result = solveBuildingFlow(file, summaries);
+    const spans = result.risers.R!.spans;
+    expect(spans.map((span) => span.toLevelId)).toEqual(['l1', 'l2']);
+    expect(spans[0]).toMatchObject({ capacity: 650 });
+    expect(spans[1]).toMatchObject({ capacity: 150 });
+    expect(result.groups[0]).toMatchObject({ total: 750, state: 'ok', sourceLevelId: 'l0' });
+  });
+
+  it('solves without any riser data and warns once for each level', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const summaries = summariesOf(summary('p0'), summary('p1'), summary('p2'));
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 0, complete: false });
+    for (const span of result.risers.R!.spans) expect(span).toMatchObject({ capacity: null, state: 'unknown' });
+    expect(warningsMatching(result.warnings, /no riser data/i)).toHaveLength(3);
+    expect(new Set(result.warnings).size).toBe(result.warnings.length);
+  });
+
+  it('counts a project once when two of its sheets share one entry', () => {
+    const file = fileWith(
+      [makeRiser('A', [member(0, 'a'), member(1, 'f')]), makeRiser('B', [member(2, 'b'), member(3, 'c')])],
+      { levelCount: 4, projectUuids: ['p0', 'p1', 'p0', 'p3'] },
+    );
+    const summaries = summariesOf(
+      summary('p0', [entry(['a', 'b'], 100)]),
+      summary('p1', [entry(['f'], 500, true)]),
+      summary('p3', [entry(['c'], 150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]).toMatchObject({ riserIds: ['A', 'B'], total: 750, state: 'ok', sourceLevelId: 'l1' });
+    expect(result.risers.A!.spans[0]).toMatchObject({ capacity: 250, state: 'ok' });
+    expect(result.risers.B!.spans[0]).toMatchObject({ capacity: 150, state: 'ok' });
+    expect(result.risers.A!.members[0]).toMatchObject({ levelId: 'l0', role: 'entry', capacityIn: 250, demandBeyond: 0 });
+    expect(result.risers.B!.members[0]).toMatchObject({ levelId: 'l2', role: 'exit', capacityIn: 0, demandBeyond: 150 });
+    expect(result.risers.A!.members[1]).toMatchObject({ levelId: 'l1', role: 'source', demandBeyond: 250 });
+  });
+
+  it('replaces the stored summary of the live project and counts it once', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const live: RiserNetworksLive = { projectUuid: 'p1', riserNetworks: [entry(['f'], 800)] };
+    const result = solveBuildingFlow(file, summaries, live);
+    const spans = result.risers.R!.spans;
+    expect(spans[0]).toMatchObject({ capacity: 950 });
+    expect(spans[1]).toMatchObject({ capacity: 150 });
+    expect(result.groups[0]).toMatchObject({ total: 1050 });
+  });
+
+  it('uses the live data when the stored summary of its project is missing', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    summaries.delete('p1');
+    const live: RiserNetworksLive = { projectUuid: 'p1', riserNetworks: [entry(['f'], 800)] };
+    const result = solveBuildingFlow(file, summaries, live);
+    const spans = result.risers.R!.spans;
+    expect(spans[0]).toMatchObject({ capacity: 950 });
+    expect(spans[1]).toMatchObject({ capacity: 150 });
+    expect(result.groups[0]).toMatchObject({ total: 1050 });
+    expect(result.warnings.some((warning) => warning.includes('L1'))).toBe(false);
+  });
+
+  it('keeps the numbers when the live data belongs to a project that no member uses', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const live: RiserNetworksLive = { projectUuid: 'p9', riserNetworks: [entry(['f'], 999)] };
+    const result = solveBuildingFlow(file, summaries, live);
+    expect(result.risers.R!.spans[0]).toMatchObject({ capacity: 650 });
+    expect(result.risers.R!.spans[1]).toMatchObject({ capacity: 150 });
+    expect(result.groups[0]).toMatchObject({ total: 750 });
+  });
+
+  it('warns when a linked entry has another network type', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true)]),
+      summary('p1', [{ ...entry(['f'], 500), networkTypeId: 'other' }]),
+      summary('p2', [entry(['f'], 150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(hasWarning(result.warnings, /another network type/i, 'L1', 'R')).toBe(true);
+  });
+
+  it('copies the warnings of a linked entry and names the level', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true)]),
+      summary('p1', [{ ...entry(['f'], 500), warnings: ['Riser fitting is not an open end.'] }]),
+      summary('p2', [entry(['f'], 150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(hasWarning(result.warnings, /not an open end/i, 'L1')).toBe(true);
+  });
+
+  it('solves a riser with one member without spans and without a group', () => {
+    const file = fileWith([makeRiser('R', [member(0)])]);
+    const summaries = summariesOf(summary('p0', [entry(['f'], 100, true)]));
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.risers.R!.spans).toEqual([]);
+    expect(result.risers.R!.members).toHaveLength(1);
+    expect(result.risers.R!.members[0]).toMatchObject({ role: 'none', capacityIn: null });
+    expect(result.groups).toEqual([]);
+  });
+
+  it('solves a riser with no members to empty lists', () => {
+    const file = fileWith([makeRiser('R', [])]);
+    const result = solveBuildingFlow(file, summariesOf());
+    expect(result.risers.R).toEqual({ spans: [], members: [] });
+  });
+
+  it('ignores a member on a level that the file does not have', () => {
+    const { summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const file = fileWith([
+      makeRiser('R', [member(0), member(1), { levelId: 'zz', sheetId: 's0', pageIndex: 0, fittingId: 'f' }, member(2)]),
+    ]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.risers.R!.spans).toHaveLength(2);
+    expect(result.risers.R!.members).toHaveLength(3);
+  });
+
+  it('agrees with deriveRiserFlow on the source level for the source on level 0', () => {
+    expectDerivedSourceAgrees([true, false, false], 'l0');
+  });
+
+  it('agrees with deriveRiserFlow on the source level for the source on level 2', () => {
+    expectDerivedSourceAgrees([false, false, true], 'l2');
+  });
+
+  it('agrees with deriveRiserFlow on the source level for the source on level 1', () => {
+    expectDerivedSourceAgrees([false, true, false], 'l1');
+  });
+
+  it('agrees with deriveRiserFlow on a hand-set source level', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)], { sourceLevelId: 'l1' })]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true)]),
+      summary('p1', [entry(['f'], 500)]),
+      summary('p2', [entry(['f'], 150, true)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    const derived = deriveRiserFlow(file, perLevelFlowOf(summaries));
+    expect(result.groups[0]!.sourceLevelId).toBe('l1');
+    expect(derived.R!.sourceLevelId).toBe('l1');
+  });
+
+  it('documents the intended disagreement: two sources', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, true]);
+    const result = solveBuildingFlow(file, summaries);
+    const derived = deriveRiserFlow(file, perLevelFlowOf(summaries));
+    expect(derived.R!.sourceLevelId).toBe('l0');
+    expect(derived.R!.flow).toBe('both');
+    expect(result.groups[0]!.state).toBe('unknown');
+    expect(result.groups[0]!.sourceLevelId).toBeUndefined();
+  });
+
+  it('two levels with no data and the same fitting id make no loop', () => {
+    const { file } = threeLevels([100, 500, 150], [true, false, false]);
+    const result = solveBuildingFlow(file, new Map());
+    expect(warningsMatching(result.warnings, /loop/i)).toEqual([]);
+    for (const span of result.risers.R!.spans) expect(span).toMatchObject({ state: 'unknown' });
+    expect(hasWarning(result.warnings, /no source/i)).toBe(true);
+  });
+
+  it('risers that meet on a level with no data stay in one group', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(1, 'b'), member(2, 'b')]),
+    ]);
+    const summaries = summariesOf(summary('p0', [entry(['a'], 100, true)]), summary('p2', [entry(['b'], 150)]));
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]).toMatchObject({
+      riserIds: ['A', 'B'],
+      state: 'ok',
+      total: 250,
+      complete: false,
+      sourceLevelId: 'l0',
+    });
+    expect(result.risers.A!.spans[0]).toMatchObject({ capacity: 150, complete: false });
+    expect(result.risers.B!.spans[0]).toMatchObject({ capacity: 150, complete: true });
+    expect(hasWarning(result.warnings, /no saved summary/i, 'L1')).toBe(true);
+  });
+
+  it('two networks of one level that use two different risers', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(1, 'b'), member(2, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a'], 100, true)]),
+      summary('p1', [entry(['a'], 200), entry(['b'], 300)]),
+      summary('p2', [entry(['b'], 150, true)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toHaveLength(2);
+    expect(result.groups[0]).toMatchObject({ riserIds: ['A'], total: 300, state: 'ok', sourceLevelId: 'l0' });
+    expect(result.groups[1]).toMatchObject({ riserIds: ['B'], total: 450, state: 'ok', sourceLevelId: 'l2' });
+    expect(result.risers.A!.spans[0]).toMatchObject({ capacity: 200 });
+    expect(result.risers.B!.spans[0]).toMatchObject({ capacity: 300 });
+    expect(result.risers.B!.members[0]).toMatchObject({ levelId: 'l1', role: 'entry', capacityIn: 300, demandBeyond: 0 });
+  });
+
+  it('a span with both ends in one network is a loop', () => {
+    const file = fileWith([makeRiser('R', [member(0, 'a'), member(1, 'b')])], {
+      levelCount: 2,
+      projectUuids: ['p0', 'p0'],
+    });
+    const summaries = summariesOf(summary('p0', [entry(['a', 'b'], 100, true)]));
+    expect(() => solveBuildingFlow(file, summaries)).not.toThrow();
+    const result = solveBuildingFlow(file, summaries);
+    expect(hasWarning(result.warnings, /loop/i)).toBe(true);
+    expect(result.risers.R!.spans[0]).toMatchObject({ capacity: null, state: 'unknown' });
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 100 });
+  });
+});
+
+describe('riserFlowInputsOf', () => {
+  it('maps the source sheet to an exit with the demand beyond it', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's0')).toEqual({ f: { role: 'exit', demandBeyond: 650 } });
+    expect(riserFlowInputsOf(result, 's1')).toEqual({ f: { role: 'entry', demandBeyond: 150 } });
+    expect(riserFlowInputsOf(result, 's2')).toEqual({ f: { role: 'entry', demandBeyond: 0 } });
+  });
+
+  it('maps the source on level 1 to an exit with its demand beyond', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [false, true, false]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's1')).toEqual({ f: { role: 'exit', demandBeyond: 250 } });
+  });
+
+  it('keys the entries by fitting id when two risers share a level', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(1, 'b'), member(2, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a'], 100, true)]),
+      summary('p1', [entry(['a', 'b'], 500)]),
+      summary('p2', [entry(['b'], 150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's1')).toEqual({
+      a: { role: 'entry', demandBeyond: 0 },
+      b: { role: 'exit', demandBeyond: 150 },
+    });
+  });
+
+  it('returns no entries when the solve is unknown', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, true]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's0')).toEqual({});
+  });
+
+  it('returns no entries for a sheet with no member', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(3)])], { levelCount: 4 });
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true)]),
+      summary('p1', [entry(['f'], 200)]),
+      summary('p3', [entry(['f'], 300)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's2')).toEqual({});
+  });
+
+  it('returns an exit for the second sheet of one project', () => {
+    const file = fileWith(
+      [makeRiser('A', [member(0, 'a'), member(1, 'f')]), makeRiser('B', [member(2, 'b'), member(3, 'c')])],
+      { levelCount: 4, projectUuids: ['p0', 'p1', 'p0', 'p3'] },
+    );
+    const summaries = summariesOf(
+      summary('p0', [entry(['a', 'b'], 100)]),
+      summary('p1', [entry(['f'], 500, true)]),
+      summary('p3', [entry(['c'], 150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's2')).toEqual({ b: { role: 'exit', demandBeyond: 150 } });
+  });
+
+  it('adds the demand of two members that share one fitting id', () => {
+    const exitAndEntry: BuildingFlowResult = {
+      risers: {
+        A: {
+          spans: [],
+          members: [
+            { riserId: 'A', levelId: 'l0', sheetId: 's0', fittingId: 'f', role: 'exit', capacityIn: 0, demandBeyond: 100 },
+          ],
+        },
+        B: {
+          spans: [],
+          members: [
+            { riserId: 'B', levelId: 'l0', sheetId: 's0', fittingId: 'f', role: 'entry', capacityIn: 50, demandBeyond: 20 },
+          ],
+        },
+      },
+      groups: [],
+      warnings: [],
+    };
+    expect(riserFlowInputsOf(exitAndEntry, 's0')).toEqual({ f: { role: 'entry', demandBeyond: 120 } });
+    const twoExits: BuildingFlowResult = {
+      risers: {
+        A: {
+          spans: [],
+          members: [
+            { riserId: 'A', levelId: 'l0', sheetId: 's0', fittingId: 'f', role: 'exit', capacityIn: 0, demandBeyond: 100 },
+          ],
+        },
+        B: {
+          spans: [],
+          members: [
+            { riserId: 'B', levelId: 'l0', sheetId: 's0', fittingId: 'f', role: 'exit', capacityIn: 0, demandBeyond: 30 },
+          ],
+        },
+      },
+      groups: [],
+      warnings: [],
+    };
+    expect(riserFlowInputsOf(twoExits, 's0')).toEqual({ f: { role: 'exit', demandBeyond: 130 } });
+  });
+});

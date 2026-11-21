@@ -23,13 +23,13 @@ export interface RiserSpan {
   endLabel?: 'to roof/ground' | 'to cap';
 }
 
-interface SortedMember {
+export interface SortedMember {
   member: RiserMember;
   level: BuildingLevel;
 }
 
 /** The members of a riser on known levels, lowest level first. Equal elevations keep the member order. */
-function sortedMembers(file: BuildingFile, riser: Riser): SortedMember[] {
+export function sortedMembers(file: BuildingFile, riser: Riser): SortedMember[] {
   const levels = new Map(file.levels.map((level) => [level.id, level]));
   return riser.members
     .map((member) => ({ member, level: levels.get(member.levelId) }))
