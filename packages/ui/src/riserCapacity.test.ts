@@ -1,6 +1,6 @@
 import { solveBuildingFlow, type BuildingFile, type BuildingLevel, type BuildingSheet, type NetworkType, type Riser, type RiserMember, type RiserNetworksLive, type RiserNetworkSummary, type SheetSummary } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
-import { capacityNumberText, capacityViewOf, isNotDesignFlow, needsSummaryRead, rebuildNoticeText, riserFlowUnit, unknownReasonOf } from './riserCapacity.js';
+import { capacityNumberText, capacityViewOf, fittingRiserLinesOf, isNotDesignFlow, needsSummaryRead, rebuildNoticeText, riserFlowUnit, unknownReasonOf, type CapacityView } from './riserCapacity.js';
 import type { RebuildResult } from './rebuildSummaries.js';
 
 const DESIGN_FLOW_TEXT = 'These numbers are a plain sum of connected capacities, with no diversity factor. They are not a design flow for this network type.';
@@ -8,6 +8,10 @@ const INCOMPLETE_TEXT = 'Some levels have no data, so some numbers read "at leas
 const UNKNOWN_TEXT = 'Click Set by hand and choose a source level.';
 const NO_UNIT_TEXT = 'This network type has no flow unit, so the numbers have no unit.';
 const ONE_MEMBER_TEXT = 'This riser has one level. A capacity needs two levels.';
+const RISER_INCOMPLETE_TEXT = 'Some levels have no data, so a number reads "at least". Solved capacity counts only the levels that have data. Open Manage Buildings, tab Risers, to see which levels.';
+const RISER_UNKNOWN_TEXT = 'Solved capacity counts this level only until the main level is known. Open Manage Buildings, tab Risers, to set it.';
+const RISER_LOOP_TEXT = 'Solved capacity counts this level only. The risers make a loop. Open Manage Buildings, tab Risers, for details.';
+const SHARED_R2_TEXT = 'The total also covers R2. It shares a network with this riser.';
 
 const vent: NetworkType = {
   id: 'vent',
@@ -386,6 +390,225 @@ describe('capacityViewOf', () => {
       'not known yet (more than one source level)',
       'not known yet (more than one source level)',
     ]);
+  });
+});
+
+describe('CapacityView parts', () => {
+  it('gives the value parts of the known state, and the two lines are built from them', () => {
+    const { file, riser, summaries } = worked([true, false, false]);
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    expect(view).toMatchObject({
+      mainValue: 'Level 0',
+      totalValue: '750 m³/h (no diversity)',
+      unknownReasonText: null,
+      complete: true,
+      unknown: false,
+      loop: false,
+      noUnit: false,
+    });
+    expect(view.mainLine).toBe('Main level: Level 0');
+    expect(view.totalLine).toBe('Connected total: 750 m³/h (no diversity)');
+  });
+
+  it('gives empty value parts and false flags for a one-member riser', () => {
+    const riser = riserOf('R1', [memberOf(0)]);
+    const file = fileWith([riser]);
+    const flow = solveBuildingFlow(file, summariesOf(summaryOf('p0', [entryOf(['f'], 100, true)])));
+    expect(capacityViewOf(file, riser, flow)).toMatchObject({
+      mainValue: '',
+      totalValue: null,
+      unknownReasonText: null,
+      complete: false,
+      unknown: false,
+      loop: false,
+      noUnit: false,
+    });
+  });
+});
+
+describe('fittingRiserLinesOf', () => {
+  it('gives the heading, the two rows and no hint for the known state', () => {
+    const { file, riser, summaries } = worked([true, false, false]);
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    expect(fittingRiserLinesOf(view, 'R1')).toEqual({
+      heading: 'Riser R1',
+      tag: null,
+      rows: [
+        { label: 'Main level', value: 'Level 0', title: 'Main level: Level 0' },
+        { label: 'Connected total', value: '750 m³/h (no diversity)', title: 'Connected total: 750 m³/h (no diversity)' },
+      ],
+      hints: [],
+    });
+  });
+
+  it('gives "at least" for the total when a level has no summary, and the hint E only', () => {
+    const riser = riserOf('R1', [memberOf(0), memberOf(1), memberOf(2)]);
+    const file = fileWith([riser]);
+    const summaries = summariesOf(summaryOf('p0', [entryOf(['f'], 100, true)]), summaryOf('p2', [entryOf(['f'], 150)]));
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    expect(fittingRiserLinesOf(view, 'R1')).toEqual({
+      heading: 'Riser R1',
+      tag: null,
+      rows: [
+        { label: 'Main level', value: 'Level 0', title: 'Main level: Level 0' },
+        { label: 'Connected total', value: 'at least 250 m³/h (no diversity)', title: 'Connected total: at least 250 m³/h (no diversity)' },
+      ],
+      hints: [RISER_INCOMPLETE_TEXT],
+    });
+  });
+
+  it('gives the reason in the main level row and keeps the total when no level is the source', () => {
+    const { file, riser, summaries } = worked([false, false, false]);
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    expect(fittingRiserLinesOf(view, 'R1')).toEqual({
+      heading: 'Riser R1',
+      tag: null,
+      rows: [
+        { label: 'Main level', value: 'not known yet (no source level)', title: 'Main level: not known yet (no source level)' },
+        { label: 'Connected total', value: '750 m³/h (no diversity)', title: 'Connected total: 750 m³/h (no diversity)' },
+      ],
+      hints: [RISER_UNKNOWN_TEXT],
+    });
+  });
+
+  it('gives the loop text for the hint when the risers make a loop', () => {
+    const r1 = riserOf('R1', [memberOf(0, 'a'), memberOf(1, 'a')]);
+    const r2 = riserOf('R2', [memberOf(0, 'b'), memberOf(1, 'b')]);
+    const file = fileWith([r1, r2]);
+    const summaries = summariesOf(summaryOf('p0', [entryOf(['a', 'b'], 100, true)]), summaryOf('p1', [entryOf(['a', 'b'], 500)]));
+    const view = capacityViewOf(file, r1, solveBuildingFlow(file, summaries));
+    const lines = fittingRiserLinesOf(view, 'R1');
+    expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (the risers make a loop)', title: 'Main level: not known yet (the risers make a loop)' });
+    expect(lines?.rows[1]?.value).toBe('600 m³/h (no diversity)');
+    expect(lines?.hints).toEqual([SHARED_R2_TEXT, RISER_LOOP_TEXT]);
+  });
+
+  it('gives the total without a unit and the hint G when the network type has no flow unit', () => {
+    const bare = networkTypeOf();
+    delete bare.flowUnit;
+    const { file, riser, summaries } = worked([true, false, false], [100, 500, 150], bare);
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    expect(fittingRiserLinesOf(view, 'R1')?.rows[1]).toEqual({ label: 'Connected total', value: '750 (no diversity)', title: 'Connected total: 750 (no diversity)' });
+    expect(fittingRiserLinesOf(view, 'R1')?.hints).toEqual([NO_UNIT_TEXT]);
+  });
+
+  it('gives the tag and the hint H after the other hints for a drain', () => {
+    const drain = networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' });
+    const { file, riser, summaries } = worked([false, false, false], [100, 500, 150], drain);
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    const lines = fittingRiserLinesOf(view, 'R1');
+    expect(lines?.tag).toBe('Not a design flow');
+    expect(lines?.hints).toEqual([RISER_UNKNOWN_TEXT, DESIGN_FLOW_TEXT]);
+  });
+
+  it('gives the shared line as the first hint for a riser in a shared network', () => {
+    const r1 = riserOf('R1', [memberOf(0, 'a'), memberOf(1, 'a')]);
+    const r2 = riserOf('R2', [memberOf(1, 'b'), memberOf(2, 'b')]);
+    const file = fileWith([r1, r2]);
+    const summaries = summariesOf(summaryOf('p0', [entryOf(['a'], 100, true)]), summaryOf('p1', [entryOf(['a', 'b'], 500)]), summaryOf('p2', [entryOf(['b'], 150)]));
+    const view = capacityViewOf(file, r1, solveBuildingFlow(file, summaries));
+    expect(fittingRiserLinesOf(view, 'R1')?.hints).toEqual([SHARED_R2_TEXT]);
+  });
+
+  it('returns null for a one-member riser', () => {
+    const riser = riserOf('R1', [memberOf(0)]);
+    const file = fileWith([riser]);
+    const flow = solveBuildingFlow(file, summariesOf(summaryOf('p0', [entryOf(['f'], 100, true)])));
+    expect(fittingRiserLinesOf(capacityViewOf(file, riser, flow), 'R1')).toBeNull();
+  });
+
+  it('gives the hints in the order D, E, F, G, H when all apply', () => {
+    const view: CapacityView = {
+      kind: 'solved',
+      notDesignFlow: true,
+      mainLine: 'Main level: not known yet',
+      totalLine: 'Connected total: at least 750 m³/h (no diversity)',
+      rows: [],
+      sharedLine: SHARED_R2_TEXT,
+      hints: [],
+      designFlowHint: DESIGN_FLOW_TEXT,
+      mainValue: 'not known yet',
+      totalValue: 'at least 750 m³/h (no diversity)',
+      unknownReasonText: 'more than one source level',
+      complete: false,
+      unknown: true,
+      loop: false,
+      noUnit: true,
+    };
+    const lines = fittingRiserLinesOf(view, 'R1');
+    expect(lines?.tag).toBe('Not a design flow');
+    expect(lines?.rows[0]?.value).toBe('not known yet (more than one source level)');
+    expect(lines?.hints).toEqual([SHARED_R2_TEXT, RISER_INCOMPLETE_TEXT, RISER_UNKNOWN_TEXT, NO_UNIT_TEXT, DESIGN_FLOW_TEXT]);
+  });
+
+  it('gives "a level has no data" for the main level and no hint F when a level has no data and no source is known', () => {
+    const view: CapacityView = {
+      kind: 'solved',
+      notDesignFlow: false,
+      mainLine: 'Main level: not known yet',
+      totalLine: 'Connected total: at least 250 m³/h (no diversity)',
+      rows: [],
+      sharedLine: null,
+      hints: [],
+      designFlowHint: null,
+      mainValue: 'not known yet',
+      totalValue: 'at least 250 m³/h (no diversity)',
+      unknownReasonText: 'no source level',
+      complete: false,
+      unknown: true,
+      loop: false,
+      noUnit: false,
+    };
+    const lines = fittingRiserLinesOf(view, 'R1');
+    expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (a level has no data)', title: 'Main level: not known yet (a level has no data)' });
+    expect(lines?.hints).toContain(RISER_INCOMPLETE_TEXT);
+    expect(lines?.hints).not.toContain(RISER_UNKNOWN_TEXT);
+  });
+
+  it('keeps "no source level" and hint F when every level has data', () => {
+    const view: CapacityView = {
+      kind: 'solved',
+      notDesignFlow: false,
+      mainLine: 'Main level: not known yet',
+      totalLine: 'Connected total: 750 m³/h (no diversity)',
+      rows: [],
+      sharedLine: null,
+      hints: [],
+      designFlowHint: null,
+      mainValue: 'not known yet',
+      totalValue: '750 m³/h (no diversity)',
+      unknownReasonText: 'no source level',
+      complete: true,
+      unknown: true,
+      loop: false,
+      noUnit: false,
+    };
+    const lines = fittingRiserLinesOf(view, 'R1');
+    expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (no source level)', title: 'Main level: not known yet (no source level)' });
+    expect(lines?.hints).toEqual([RISER_UNKNOWN_TEXT]);
+  });
+
+  it('keeps the reason of more than one source level and both hints E and F when a level has no data', () => {
+    const view: CapacityView = {
+      kind: 'solved',
+      notDesignFlow: false,
+      mainLine: 'Main level: not known yet',
+      totalLine: 'Connected total: at least 250 m³/h (no diversity)',
+      rows: [],
+      sharedLine: null,
+      hints: [],
+      designFlowHint: null,
+      mainValue: 'not known yet',
+      totalValue: 'at least 250 m³/h (no diversity)',
+      unknownReasonText: 'more than one source level',
+      complete: false,
+      unknown: true,
+      loop: false,
+      noUnit: false,
+    };
+    const lines = fittingRiserLinesOf(view, 'R1');
+    expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (more than one source level)', title: 'Main level: not known yet (more than one source level)' });
+    expect(lines?.hints).toEqual([RISER_INCOMPLETE_TEXT, RISER_UNKNOWN_TEXT]);
   });
 });
 

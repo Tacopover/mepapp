@@ -12,6 +12,7 @@ import {
   parseBuildingFile,
   SCHEMATIC_TEMPLATE_LIBRARY,
   calibrationFromScale,
+  computeNetworks,
   DEFAULT_CEILING_HEIGHT_MM,
   getNetworkTypeFromLibrary,
   riserFittingIdsForSheets,
@@ -98,6 +99,10 @@ import { SchematicDialog } from './components/SchematicDialog.js';
 import { NetworkTypeEditorDialog, type NetworkTypeEditPatch } from './components/NetworkTypeEditorDialog.js';
 import { useBuilding } from './useBuilding.js';
 import { useBuildingRisers } from './useBuildingRisers.js';
+import { useRiserFlowInputs } from './useRiserFlowInputs.js';
+import { riserOfFitting } from './riserActions.js';
+import { risersOfNetwork, segmentRiserHint } from './riserSegmentHint.js';
+import { capacityViewOf, fittingRiserLinesOf } from './riserCapacity.js';
 import { checkOpenedDocument } from './documentIdentity.js';
 import { pathOfTarget } from './buildingPdfInfo.js';
 import { findOpenDocumentByPath } from './openDocumentMatch.js';
@@ -519,6 +524,7 @@ export function MepSketchApp({
     pathOfDocument: (documentId) => pathOfTarget(fileTargetsRef.current.get(documentId)),
     isLoading: () => fileTaskRef.current !== null,
   });
+  const riserFlow = useRiserFlowInputs({ sceneRef, ready, building: buildingHook.building });
   const riserMenuState = canvasContextMenuRequest ? risers.menuStateFor(canvasContextMenuRequest.target) : null;
   const buildingStore = buildingHook.building?.store;
   useEffect(() => {
@@ -2022,6 +2028,27 @@ export function MepSketchApp({
     ? flowResult.reduce((sum, r) => sum + (r.totalCapacity ?? 0) - (r.riserCapacity ?? 0), 0)
     : null;
 
+  const riserLines = useMemo(() => {
+    const file = buildingHook.building?.file;
+    if (!file || !riserFlow || !selectedFitting) return null;
+    const riser = riserOfFitting(file, riserFlow.sheetId, selectedFitting.id);
+    if (!riser) return null;
+    return fittingRiserLinesOf(capacityViewOf(file, riser, riserFlow.flow), riser.name);
+  }, [buildingHook.building?.file, riserFlow, selectedFitting]);
+
+  const segmentRiserHintLine = useMemo(() => {
+    const file = buildingHook.building?.file;
+    const scene = sceneRef.current;
+    if (!file || !riserFlow || !scene || !selectedSegment) return null;
+    const { segments, fittings, portGroups } = scene.getConnectivity();
+    const network = computeNetworks({ segments, fittings, portGroups }).find((item) => item.segmentIds.includes(selectedSegment.id));
+    if (!network) return null;
+    const names = risersOfNetwork(file, riserFlow.sheetId, network.fittingIds)
+      .filter((riser) => (riserFlow.flow.risers[riser.id]?.spans.length ?? 0) > 0)
+      .map((riser) => riser.name);
+    return segmentRiserHint(names);
+  }, [buildingHook.building?.file, riserFlow, selectedSegment]);
+
   const dockTabDefs: DockTabDef[] = [
     { id: 'stamps', label: 'MEP' },
     { id: 'drawings', label: 'Drawings' },
@@ -2115,6 +2142,8 @@ export function MepSketchApp({
         selectedSegment={selectedSegment}
         selectedSegments={selectedSegments}
         selectedFitting={selectedFitting}
+        riserLines={riserLines}
+        segmentRiserHint={segmentRiserHintLine}
         networkTypes={networkTypes}
         customPropertyDefs={customPropertyDefs}
         customStampDefinitions={customStampDefinitions}

@@ -20,6 +20,7 @@ import {
 } from '@mepapp/core';
 import { IconRotate } from '../icons.js';
 import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
+import type { FittingRiserLines } from '../riserCapacity.js';
 import { RoomProperties } from './RoomProperties.js';
 import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
 import { capacityLabel } from './capacityLabel.js';
@@ -74,6 +75,10 @@ export interface PropertiesPanelProps {
   selectedSegments: SegmentInfo[];
   /** The lone selected fitting's read model — see SketchScene.getSelectedFittingInfo. Only non-null when exactly one fitting (and nothing else) is selected. */
   selectedFitting: FittingInfo | null;
+  /** The riser block of the lone selected fitting (riserCapacity.ts fittingRiserLinesOf). null or absent: no block. */
+  riserLines?: FittingRiserLines | null;
+  /** One hint line for the lone selected segment whose network holds a riser fitting (riserSegmentHint.ts). null or absent: no line. */
+  segmentRiserHint?: string | null;
   /** The active document's adopted network types — the selected segment's "Network Type" dropdown. */
   networkTypes: NetworkType[];
   /** Global Properties definitions (Terminal, Equipment and Circuit) — see GlobalPropertiesDialog. */
@@ -115,6 +120,8 @@ export function PropertiesPanel({
   selectedSegment,
   selectedSegments,
   selectedFitting,
+  riserLines = null,
+  segmentRiserHint = null,
   networkTypes,
   customPropertyDefs,
   customStampDefinitions,
@@ -210,6 +217,7 @@ export function PropertiesPanel({
             <label>Solved capacity</label>
             <input type="text" value={formatSolvedCapacity(selectedSegment.solvedCapacity)} disabled />
           </div>
+          {segmentRiserHint && <p className="mep-hint" data-testid="props-segment-riser-hint">{segmentRiserHint}</p>}
           <div className="mep-field-row">
             <label>Network Type</label>
             <select
@@ -321,6 +329,19 @@ export function PropertiesPanel({
             <input type="text" value={formatSolvedCapacity(selectedFitting.solvedCapacity)} disabled />
           </div>
         </div>
+        {riserLines && (
+          <div className="mep-section" data-testid="props-riser-section">
+            <h4 title={riserLines.heading}>{riserLines.heading}</h4>
+            {riserLines.tag && <div className="mep-rp-tag" data-testid="props-riser-tag">{riserLines.tag}</div>}
+            {riserLines.rows.map((row, index) => (
+              <div className="mep-field-row mep-field-row--text" key={row.label}>
+                <label>{row.label}</label>
+                <span className="mep-field-text" title={row.title} data-testid={index === 0 ? 'props-riser-main' : 'props-riser-total'}>{row.value}</span>
+              </div>
+            ))}
+            {riserLines.hints.map((hint) => (<p className="mep-hint" data-testid="props-riser-hint" key={hint}>{hint}</p>))}
+          </div>
+        )}
       </div>
     );
   }
