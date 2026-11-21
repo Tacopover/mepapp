@@ -94,7 +94,7 @@ function riserFittingFlowOf(project: ProjectDocument, riserIds: ReadonlySet<stri
   return Object.fromEntries([...flow.keys()].sort().map((id) => [id, flow.get(id)!]));
 }
 
-const RISER_WARNING = 'Riser fitting is not an open end. The terminals behind it are not counted.';
+const RISER_WARNING = 'Riser fitting is not an open end. The terminals behind it may not be counted.';
 
 /** The networks of the whole project that hold a riser fitting. A network is not limited to one sheet, so the same network can appear in the summary of each sheet that shares the project. The entry is the first sorted riser fitting. Needs no stamp names, so it is light. */
 export function buildRiserNetworks(project: ProjectDocument, riserFittingIds: ReadonlySet<string> | readonly string[]): RiserNetworkSummary[] {

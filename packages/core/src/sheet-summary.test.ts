@@ -232,7 +232,7 @@ describe('sheet summary version 2', () => {
 });
 
 describe('riser networks of the sheet summary', () => {
-  const RISER_WARNING = 'Riser fitting is not an open end. The terminals behind it are not counted.';
+  const RISER_WARNING = 'Riser fitting is not an open end. The terminals behind it may not be counted.';
   type RawChange = (raw: Record<string, unknown>) => Record<string, unknown>;
 
   const networkProject = (overrides: Partial<Record<string, unknown>> = {}) => projectOf({ ...overrides });
