@@ -250,7 +250,7 @@ await closeDialog();
   await idle(600);
   await showRisers();
   const w = await warningsText();
-  check(/The summary of level Level 1 has no riser data\. Read the summaries\./.test(w), 'the old-summary warning is visible in the pane', w);
+  check(/The summary of Level 1 has no riser data\. Read the summaries\./.test(w), 'the old-summary warning is visible in the pane', w);
   check((await page.locator('[data-testid="riser-read-summaries"]').count()) === 1, 'the link shows for a summary with no riser data');
   await snap('b7-t05-2b-old-summary');
   await closeDialog();

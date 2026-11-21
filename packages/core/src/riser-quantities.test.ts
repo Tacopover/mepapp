@@ -377,10 +377,10 @@ describe('riser capacity', () => {
 
   it('puts the solve warnings after the span warnings and before the capacity line', () => {
     const riser = makeRiser('R1', [member(0), member(2)], { topEnd: 'open', endAllowanceMm: 0 });
-    const flow = flowOf({ R1: [flowSpan('R1', 'l0', 'l2')] }, ['Level First has no saved summary. Read the summaries.']);
+    const flow = flowOf({ R1: [flowSpan('R1', 'l0', 'l2')] }, ['First has no saved summary. Read the summaries.']);
     expect(riserTakeoffWarnings(fileWith([riser]), flow)).toEqual([
       'Riser R1 has an open end with no end allowance.',
-      'Level First has no saved summary. Read the summaries.',
+      'First has no saved summary. Read the summaries.',
       'Network type Supply has no flow unit. Its capacity numbers have no unit.',
       'Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.',
       'Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.',

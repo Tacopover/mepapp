@@ -444,7 +444,7 @@ describe('buildBuildingTakeoff with risers', () => {
         [150, 'm³/h', 'No'],
         [150, 'm³/h', 'Yes'],
       ]);
-      expect(result.warnings).toContain('Level First has no saved summary. Read the summaries.');
+      expect(result.warnings).toContain('First has no saved summary. Read the summaries.');
     });
 
     it('gives no capacity when no level is a source', () => {

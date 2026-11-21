@@ -119,25 +119,25 @@ export function solveBuildingFlow(
       return key;
     };
     const sheet = file.sheets.find((item) => item.id === member.sheetId);
-    if (sheet === undefined || sheet.projectUuid === null) return missing(`Level ${level} is not linked to a PDF yet.`);
+    if (sheet === undefined || sheet.projectUuid === null) return missing(`${level} is not linked to a PDF yet.`);
     const uuid = sheet.projectUuid;
     let data: RiserNetworkSummary[];
     if (live && live.projectUuid === uuid) {
       data = live.riserNetworks;
     } else {
       const summary = summaries.get(uuid);
-      if (summary === undefined) return missing(`Level ${level} has no saved summary. Read the summaries.`);
+      if (summary === undefined) return missing(`${level} has no saved summary. Read the summaries.`);
       if (summary.riserNetworks === undefined) {
-        return missing(`The summary of level ${level} has no riser data. Read the summaries.`);
+        return missing(`The summary of ${level} has no riser data. Read the summaries.`);
       }
       data = summary.riserNetworks;
     }
     const entry = data.find((item) => item.fittingIds.includes(member.fittingId));
-    if (entry === undefined) return missing(`Level ${level} has no segment at the riser fitting.`);
+    if (entry === undefined) return missing(`${level} has no segment at the riser fitting.`);
     if (entry.networkTypeId !== riser.networkTypeId) {
-      warn(`Level ${level} has another network type than riser ${riser.name}.`);
+      warn(`${level} has another network type than riser ${riser.name}.`);
     }
-    for (const text of entry.warnings ?? []) warn(`Level ${level}: ${text}`);
+    for (const text of entry.warnings ?? []) warn(`${level}: ${text}`);
     const key = `${uuid}|${entry.fittingIds[0]!}`;
     let node = nodeByKey.get(key);
     if (node === undefined) {
@@ -256,7 +256,7 @@ export function solveBuildingFlow(
       for (const node of component.nodes) {
         if (node.key === sourceKey || node.missing || !node.hasSource) continue;
         const levelList = node.levels.map((level) => level.name).join(', ');
-        warn(`Level ${levelList} has an equipment, but the main level is set by hand to ${levelName(handLevelId)}.`);
+        warn(`${levelList} has an equipment, but the main level is set by hand to ${levelName(handLevelId)}.`);
       }
       continue;
     }

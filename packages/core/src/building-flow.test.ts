@@ -324,6 +324,15 @@ describe('solveBuildingFlow', () => {
     expect(riser.spans[1]).toMatchObject({ capacity: 150, complete: true });
   });
 
+  it('names the level once in the warnings of a missing summary', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    summaries.delete('p2');
+    summaries.set('p1', summary('p1'));
+    const { warnings } = solveBuildingFlow(file, summaries);
+    expect(warnings).toContain('L2 has no saved summary. Read the summaries.');
+    expect(warnings).toContain('The summary of L1 has no riser data. Read the summaries.');
+  });
+
   it('warns that a member sheet is not linked to a project', () => {
     const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])], { projectUuids: ['p0', null, 'p2'] });
     const summaries = summariesOf(summary('p0', [entry(['f'], 100, true)]), summary('p2', [entry(['f'], 150)]));
