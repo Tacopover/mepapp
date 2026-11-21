@@ -1,6 +1,7 @@
 // Takeoff of a building: the saved sheet summaries of the sheets in one scope, merged into one set of tables.
 // Pure data, no I/O: the caller reads the summaries and the status of each PDF.
 
+import { solveBuildingFlow } from './building-flow.js';
 import type { BuildingFile, BuildingSheet } from './building.js';
 import { mergeQuantityTables } from './quantities-merge.js';
 import type { QuantityCell, QuantityProvenance, QuantityTable } from './quantities.js';
@@ -213,11 +214,18 @@ export function buildBuildingTakeoff(args: {
   }
 
   if (hasRisers) {
+    const summariesByProject = new Map<string, SheetSummary>();
+    for (const sheet of building.sheets) {
+      if (sheet.projectUuid === null) continue;
+      const summary = summaryOf(sheet.projectUuid);
+      if (summary) summariesByProject.set(sheet.projectUuid, summary);
+    }
+    const flow = solveBuildingFlow(building, summariesByProject);
     const scopedLevelId = scope.kind === 'level' ? scope.levelId : undefined;
     const scopedRisers = building.risers.filter(
       (riser) => scopedLevelId === undefined || riser.members.some((member) => member.levelId === scopedLevelId),
     );
-    const riserRows = riserTable(building, sizeOf, { derived, ...(scope.kind === 'level' ? { levelId: scope.levelId } : {}) });
+    const riserRows = riserTable(building, sizeOf, { derived, flow, ...(scope.kind === 'level' ? { levelId: scope.levelId } : {}) });
     if (riserRows.rows.length > 0) tables.push(riserRows);
     const spans = building.risers
       .flatMap((riser) => riserSpans(building, riser).spans)
@@ -236,7 +244,7 @@ export function buildBuildingTakeoff(args: {
         }
       }
     }
-    warnings.push(...riserTakeoffWarnings({ ...building, risers: scopedRisers }));
+    warnings.push(...riserTakeoffWarnings({ ...building, risers: scopedRisers }, flow));
   }
 
   return { tables, warnings, sheets: statuses };

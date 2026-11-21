@@ -5,12 +5,14 @@ import {
   riserWarnings,
   setMemberConnectionHeight,
   setRiserProps,
+  solveBuildingFlow,
   type BuildingFile,
   type BuildingSheet,
   type LinePattern,
   type Riser,
   type RiserEndKind,
   type RiserFlow,
+  type RiserNetworksLive,
   type SheetSummary,
 } from '@mepapp/core';
 import type { FileAccess } from '@mepapp/platform';
@@ -27,7 +29,9 @@ import {
   type RiserLevelRow,
   type RowStatus,
 } from '../riserInfo.js';
+import { capacityViewOf, needsSummaryRead, rebuildNoticeText } from '../riserCapacity.js';
 import { BuildingRisersDiagram } from './BuildingRisersDiagram.js';
+import type { BuildingSummariesPaneProps } from './BuildingSummariesPane.js';
 import { RiserDeleteDialog } from './RiserDeleteDialog.js';
 import type { SheetOpenResult } from './ManageBuildingsDialog.js';
 
@@ -44,6 +48,12 @@ export interface BuildingRisersPaneProps {
   canOpenCached?: (sheet: BuildingSheet) => boolean;
   onNotice: (text: string, error: boolean) => void;
   busy: boolean;
+  /** The live riserNetworks of the open sheet (replaces the saved summary of the same projectUuid in the solve). Undefined when no saved document of this building is open. */
+  live?: RiserNetworksLive;
+  /** Reads the PDFs again and saves the summaries. Same function as the Levels tab. Undefined: the link "Read summaries now" is hidden. */
+  onRebuild?: BuildingSummariesPaneProps['onRebuild'];
+  /** Called when a run of onRebuild ends (any result). */
+  onRebuildDone?: () => void;
 }
 
 /** Pure, exported for tests. `file.risers` in the order shown: same order as layoutRisers (type, then number). */
@@ -178,7 +188,7 @@ function MmField({ id, label, hideLabel = false, placeholder, testId, value, dis
 
 /** The Risers tab of Manage Buildings: the type filters, the diagram, the warnings and the info panel of the selected riser. */
 export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element {
-  const { file, update, store, conflictKeys, fileAccess, onOpenSheet, openedSheetIds, canOpenCached, onNotice, busy } = props;
+  const { file, update, store, conflictKeys, fileAccess, onOpenSheet, openedSheetIds, canOpenCached, onNotice, busy, live, onRebuild, onRebuildDone } = props;
   const baseId = useId();
   const paneRef = useRef<HTMLDivElement>(null);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
@@ -190,6 +200,14 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [reading, setReading] = useState(false);
+  const rebuildRef = useRef<AbortController | null>(null);
+  const capacityRef = useRef<HTMLDivElement>(null);
+  const capacityHeadRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => () => rebuildRef.current?.abort(), []);
 
   useEffect(() => {
     const previous = previousIdsRef.current;
@@ -205,16 +223,20 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
     let active = true;
     readSummaries(store).then(
       (loaded) => {
-        if (active) setSummaries(loaded.summaries);
+        if (!active) return;
+        setSummaries(loaded.summaries);
+        setLoaded(true);
       },
       () => {
-        if (active) setSummaries(new Map());
+        if (!active) return;
+        setSummaries(new Map());
+        setLoaded(true);
       },
     );
     return () => {
       active = false;
     };
-  }, [file, store]);
+  }, [file, store, reloadTick]);
 
   useEffect(() => {
     const pane = paneRef.current;
@@ -235,6 +257,7 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
   const lanes = useMemo(() => layoutRisers(file, levelLayout, hidden, conflictKeys), [file, levelLayout, hidden, conflictKeys]);
   const filters = useMemo(() => typeFilters(file.risers, hidden), [file.risers, hidden]);
   const derived = useMemo(() => derivedFlowOf(file, summaries), [file, summaries]);
+  const buildingFlow = useMemo(() => (loaded ? solveBuildingFlow(file, summaries, live) : null), [loaded, file, summaries, live]);
   const laneAria = useMemo(
     () =>
       new Map(
@@ -242,8 +265,17 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
       ),
     [file],
   );
-  const warnings = riserWarnings(file);
+  const warnings = [...riserWarnings(file), ...(buildingFlow?.warnings ?? [])];
   const selected = file.risers.find((riser) => riser.id === selectedId) ?? null;
+  const needsAttention = useMemo(() => {
+    if (buildingFlow === null || selected === null) return false;
+    const view = capacityViewOf(file, selected, buildingFlow);
+    return view.kind === 'solved' && (view.rows.some((row) => !row.known) || needsSummaryRead(file, selected, buildingFlow, summaries, live));
+  }, [file, selected, buildingFlow, summaries, live]);
+
+  useEffect(() => {
+    if (needsAttention) capacityRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [needsAttention, selectedId]);
 
   function idsOf(next: BuildingFile): string[] {
     return orderedRisers(next, hidden).map((riser) => riser.id);
@@ -361,6 +393,26 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
     setFocusRequest(nextId === null ? { kind: 'checkbox' } : { kind: 'lane', riserId: nextId });
   }
 
+  async function readSummariesNow() {
+    if (onRebuild === undefined) return;
+    const controller = new AbortController();
+    rebuildRef.current = controller;
+    setReading(true);
+    try {
+      const result = await onRebuild({ signal: controller.signal, onProgress: () => {} });
+      const notice = rebuildNoticeText(result);
+      onNotice(notice.text, notice.error);
+    } catch (error) {
+      onNotice(`The rebuild failed: ${(error as Error).message}`, true);
+    } finally {
+      rebuildRef.current = null;
+      setReading(false);
+      capacityHeadRef.current?.focus();
+      setReloadTick((n) => n + 1);
+      onRebuildDone?.();
+    }
+  }
+
   if (file.risers.length === 0) {
     return (
       <div ref={paneRef} className="mep-rp" data-testid="risers-pane">
@@ -389,6 +441,7 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
           .filter((level) => riser.members.some((member) => member.levelId === level.id))
           .sort((a, b) => b.elevationMm - a.elevationMm);
   const rows = riser === null ? [] : riserRows(file, riser, conflictKeys);
+  const capacity = riser === null || buildingFlow === null ? null : capacityViewOf(file, riser, buildingFlow, { selectsShown: showSelects });
 
   return (
     <div ref={paneRef} className="mep-rp" data-testid="risers-pane">
@@ -459,6 +512,80 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
               <h4 id={`${baseId}-title`} tabIndex={-1}>{riser.name}</h4>
             </div>
             <p className="mep-rp-line">{riserLineText(file, riser)}</p>
+
+            <div ref={capacityRef} className="mep-rp-capacity" data-testid="riser-capacity">
+              <div className="mep-rp-capacity-head">
+                <h5 ref={capacityHeadRef} tabIndex={-1} className="mep-rp-subhead">Capacity</h5>
+                {capacity?.notDesignFlow && (
+                  <span
+                    className="mep-rp-tag"
+                    title={capacity.designFlowHint ?? undefined}
+                    data-testid="riser-not-design-flow"
+                  >
+                    Not a design flow
+                  </span>
+                )}
+              </div>
+              {capacity === null ? (
+                <p className="mep-hint">Reading the saved summaries…</p>
+              ) : (
+                <>
+                  {capacity.kind === 'solved' && (
+                    <>
+                      <div className="mep-rp-flowbox mep-rp-capbox">
+                        <div data-testid="riser-capacity-main">{capacity.mainLine}</div>
+                        <div data-testid="riser-capacity-total">{capacity.totalLine}</div>
+                      </div>
+                      <div className="mep-rp-cap-list" data-testid="riser-capacity-list" role="list" tabIndex={0} aria-label="Capacity of each span">
+                        {capacity.rows.map((row) => (
+                          <div
+                            key={row.key}
+                            className="mep-rp-cap-row"
+                            role="listitem"
+                            aria-label={row.ariaLabel}
+                            data-testid="riser-capacity-row"
+                          >
+                            <span className="mep-rp-cap-levels">{row.levelsText}</span>
+                            <span className={row.known ? 'mep-rp-cap-value' : 'mep-rp-cap-value mep-rp-cap-value--unknown'}>
+                              {row.valueText}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {capacity.sharedLine !== null && (
+                        <p className="mep-hint" data-testid="riser-capacity-hint">
+                          {capacity.sharedLine}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {capacity.hints.map((text) => (
+                    <p key={text} className="mep-hint" data-testid="riser-capacity-hint">
+                      {text}
+                    </p>
+                  ))}
+                  {capacity.designFlowHint !== null && (
+                    <p className="mep-hint" data-testid="riser-design-flow-hint">
+                      {capacity.designFlowHint}
+                    </p>
+                  )}
+                  {buildingFlow !== null && onRebuild !== undefined && needsSummaryRead(file, riser, buildingFlow, summaries, live) && (
+                    <div className="mep-rp-links">
+                      <button
+                        type="button"
+                        className="mep-rp-link"
+                        data-testid="riser-read-summaries"
+                        disabled={busy || reading}
+                        onClick={() => void readSummariesNow()}
+                      >
+                        {reading ? 'Reading…' : 'Read summaries now'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
             <h5 className="mep-rp-subhead">Flow direction</h5>
             <div className="mep-rp-flowbox" data-testid="riser-flow-box">
               {flow.text}

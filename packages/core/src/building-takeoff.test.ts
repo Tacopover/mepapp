@@ -311,7 +311,8 @@ describe('buildBuildingTakeoff with risers', () => {
     const label = cellById(segments, 'seg0', 'Building network');
     expect(label).toBe('Building network Supply 1');
     expect(cellById(segments, 'seg1', 'Building network')).toBe(label);
-    expect(result.warnings).toContain('Flow is not summed across levels.');
+    expect(result.warnings).not.toContain('Flow is not summed across levels.');
+    expect(result.warnings).toContain('Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.');
   });
 
   it('lists the riser span only on the levels it touches in Level scope', () => {
@@ -403,5 +404,65 @@ describe('buildBuildingTakeoff with risers', () => {
   it('gives no conflict warning for a fitting at the riser anchor', () => {
     const result = takeoff(twoLevelFile, twoLevelSummaries());
     expect(result.warnings.filter((warning) => warning.includes('pending change'))).toEqual([]);
+  });
+
+  describe('capacity of a riser from the flow solve', () => {
+    const capacityRiser = towerRiser('r1', 'Supply air riser 1', [member(0, 'f0'), member(1, 'f1'), member(2, 'f2')], {
+      networkType: { ...supply, flowUnit: 'm³/h' },
+    });
+    const capacityFile = tower([towerSheets[0]!, towerSheets[1]!, towerSheets[2]!], [capacityRiser]);
+    const capacitySummary = (level: number, terminalCapacity: number, hasSource: boolean): SheetSummary =>
+      towerSummary(`u${level}`, [], {
+        riserNetworks: [{ networkTypeId: supply.id, fittingIds: [`f${level}`], terminalCapacity, hasSource }],
+      });
+    const capacityRows = (tables: QuantityTable[]): unknown[][] => {
+      const risers = tableNamed(tables, 'Risers')!;
+      return risers.rows.map((row) => ['Capacity', 'Capacity unit', 'Capacity complete'].map((header) => row[columnOf(risers, header)]));
+    };
+
+    it('gives the capacity of each span from the source level below it', () => {
+      const result = takeoff(capacityFile, [capacitySummary(0, 100, true), capacitySummary(1, 500, false), capacitySummary(2, 150, false)]);
+      expect(capacityRows(result.tables)).toEqual([
+        [650, 'm³/h', 'Yes'],
+        [150, 'm³/h', 'Yes'],
+      ]);
+      expect(result.warnings).not.toContain('Flow is not summed across levels.');
+      expect(result.warnings).toContain('Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.');
+    });
+
+    it('gives the capacity of each span from the source level above it', () => {
+      const result = takeoff(capacityFile, [capacitySummary(0, 100, false), capacitySummary(1, 500, false), capacitySummary(2, 150, true)]);
+      expect(capacityRows(result.tables)).toEqual([
+        [100, 'm³/h', 'Yes'],
+        [600, 'm³/h', 'Yes'],
+      ]);
+    });
+
+    it('gives numbers that read at least when the summary of a level is missing', () => {
+      const result = takeoff(capacityFile, [capacitySummary(0, 100, true), capacitySummary(2, 150, false)]);
+      expect(capacityRows(result.tables)).toEqual([
+        [150, 'm³/h', 'No'],
+        [150, 'm³/h', 'Yes'],
+      ]);
+      expect(result.warnings).toContain('Level First has no saved summary. Read the summaries.');
+    });
+
+    it('gives no capacity when no level is a source', () => {
+      const result = takeoff(capacityFile, [capacitySummary(0, 100, false), capacitySummary(1, 500, false), capacitySummary(2, 150, false)]);
+      expect(capacityRows(result.tables)).toEqual([
+        [null, null, null],
+        [null, null, null],
+      ]);
+      expect(result.warnings).toContain('Riser Supply air riser 1 has no source level. Set one by hand.');
+    });
+
+    it('gives the numbers of the two spans that touch the level in Level scope', () => {
+      const summaries = [capacitySummary(0, 100, true), capacitySummary(1, 500, false), capacitySummary(2, 150, false)];
+      const result = takeoff(capacityFile, summaries, { kind: 'level', levelId: 'l1' });
+      expect(capacityRows(result.tables)).toEqual([
+        [650, 'm³/h', 'Yes'],
+        [150, 'm³/h', 'Yes'],
+      ]);
+    });
   });
 });

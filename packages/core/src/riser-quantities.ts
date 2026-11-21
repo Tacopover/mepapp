@@ -1,6 +1,7 @@
 // Riser takeoff: the spans between the member levels of each riser, the Risers table, the building network
 // labels, the graph reach of a seed and the Building networks roll-up. Pure data, no I/O. Types are in riser.ts.
 
+import type { BuildingFlowResult } from './building-flow.js';
 import type { BuildingFile, BuildingLevel } from './building.js';
 import type { QuantityCell, QuantityTable } from './quantities.js';
 import type { Riser, RiserEndKind, RiserMember } from './riser.js';
@@ -104,6 +105,8 @@ export interface RiserTableOptions {
   levelId?: string;
   /** Result of deriveRiserFlow(file, perLevelFlow), keyed by riser id. Used for the columns "Flow direction" and "Source level". */
   derived?: Record<string, DerivedRiserFlow>;
+  /** Result of solveBuildingFlow; gives the three capacity columns. */
+  flow?: BuildingFlowResult;
 }
 
 export function riserTable(
@@ -125,11 +128,17 @@ export function riserTable(
         ? 'From the flow solve'
         : 'Not known yet';
     const tail: QuantityCell[] = [derivedFlow?.flow ?? riser.flow, source, flowSetBy];
+    const capacityOf = (span: RiserSpan): QuantityCell[] => {
+      if (span.endLabel !== undefined) return [null, null, null];
+      const flowSpan = options.flow?.risers[riser.id]?.spans.find((s) => s.fromLevelId === span.fromLevelId && s.toLevelId === span.toLevelId);
+      if (flowSpan === undefined || flowSpan.state !== 'ok' || flowSpan.capacity === null) return [null, null, null];
+      return [Math.round(flowSpan.capacity * 100) / 100, riser.networkType.flowUnit ?? null, flowSpan.complete ? 'Yes' : 'No'];
+    };
     const members = sortedMembers(file, riser);
     if (members.length === 1) {
       const member = members[0]!.member;
       if (options.levelId === undefined || member.levelId === options.levelId) {
-        rows.push([...common, levelName.get(member.levelId) ?? '', '', null, null, null, sizeOf(member), ...tail]);
+        rows.push([...common, levelName.get(member.levelId) ?? '', '', null, null, null, sizeOf(member), ...tail, null, null, null]);
       }
       continue;
     }
@@ -144,6 +153,7 @@ export function riserTable(
         span.crossings,
         sizeCell(span.fromMember ? sizeOf(span.fromMember) : null, span.toMember ? sizeOf(span.toMember) : null),
         ...tail,
+        ...capacityOf(span),
       ]);
     }
   }
@@ -163,15 +173,25 @@ export function riserTable(
       'Flow direction',
       'Source level',
       'Flow set by',
+      'Capacity',
+      'Capacity unit',
+      'Capacity complete',
     ],
     rows,
   };
 }
 
-export function riserTakeoffWarnings(file: BuildingFile): string[] {
+export function riserTakeoffWarnings(file: BuildingFile, flow?: BuildingFlowResult): string[] {
   if (file.risers.length === 0) return [];
   const warnings = file.risers.flatMap((riser) => riserSpans(file, riser).warnings);
-  warnings.push('Flow is not summed across levels.');
+  warnings.push(...(flow?.warnings ?? []));
+  const unitless = new Set<string>();
+  for (const riser of file.risers) {
+    if (riser.networkType.flowUnit !== undefined) continue;
+    if (flow?.risers[riser.id]?.spans.some((span) => span.state === 'ok' && span.capacity !== null)) unitless.add(riser.networkType.name);
+  }
+  for (const name of unitless) warnings.push(`Network type ${name} has no flow unit. Its capacity numbers have no unit.`);
+  warnings.push('Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.');
   warnings.push('Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.');
   return warnings;
 }

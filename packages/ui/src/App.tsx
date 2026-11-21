@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   buildQuantityTables,
+  buildRiserNetworks,
   buildRoomExportTable,
   buildSheetSummary,
   buildStampPropertyContext,
@@ -19,6 +20,7 @@ import {
   type BuildingFile,
   type BuildingSheet,
   type Discipline,
+  type RiserNetworksLive,
   type RoomNeed,
   type RoomType,
   type PlacementRule,
@@ -2191,6 +2193,17 @@ export function MepSketchApp({
     }
   }, [inCircuitsFamily, tool, setShowCircuitLines]);
 
+  const liveProjectUuid = manageBuildingsOpen ? (sceneRef.current?.getProjectUuid() ?? null) : null;
+  const liveRiserNetworks = useMemo<RiserNetworksLive | undefined>(() => {
+    if (!manageBuildingsOpen) return undefined;
+    const scene = sceneRef.current;
+    const file = buildingHook.building?.file;
+    if (!scene || !file || liveProjectUuid === null) return undefined;
+    const sheetIds = file.sheets.filter((sheet) => sheet.projectUuid === liveProjectUuid).map((sheet) => sheet.id);
+    if (sheetIds.length === 0) return undefined;
+    return { projectUuid: liveProjectUuid, riserNetworks: buildRiserNetworks(scene.exportProject(), riserFittingIdsForSheets(file, sheetIds)) };
+  }, [manageBuildingsOpen, activeDocumentId, liveProjectUuid, buildingHook.building?.file]);
+
   const sheetLabel = currentSheetLabel(buildingHook.building?.file ?? null, sceneRef.current?.getProjectUuid() ?? null, pageIndex);
   const scopeBuilding = quantitiesScopeDialog?.building ?? buildingHook.building?.file;
 
@@ -2546,6 +2559,7 @@ export function MepSketchApp({
           openDocuments={openDocumentRows(documents, fileTargetsRef.current, buildingHook.building?.file ?? null, { documentId: activeDocumentId, pageIndex })}
           sheetFiles={sheetFiles}
           riserConflictKeys={risers.conflictKeys}
+          liveRiserNetworks={liveRiserNetworks}
         />
       )}
 

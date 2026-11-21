@@ -1,0 +1,20 @@
+import { open } from '/root/MepApp/.claude/worktrees/buildings-b7/.claude/roadmap/browser/lib.mjs';
+import { setup, SHOTS } from '/root/MepApp/.claude/worktrees/buildings-b7/.claude/roadmap/work/b7-t05-journey-setup.mjs';
+
+const t = await open();
+const { page, check, idle, menu } = t;
+await t.start();
+const { uuids, summaries, building } = await setup(t);
+const dlg = page.locator('.mep-modal');
+await menu('Manage Buildings…');
+await dlg.waitFor({ state: 'visible' });
+await idle(600);
+await page.screenshot({ path: `${SHOTS}journey-explore-open.png` });
+console.log('TABS', JSON.stringify(await dlg.getByRole('tab').allInnerTexts()));
+await dlg.getByRole('tab', { name: /^Risers/ }).click();
+await idle(1000);
+await page.screenshot({ path: `${SHOTS}journey-explore-risers.png` });
+console.log('TEXT', await dlg.innerText());
+console.log('BOX', JSON.stringify(await dlg.boundingBox()));
+console.log('HTML', (await dlg.innerHTML()).length);
+await t.finish();

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { BuildingFlowResult, BuildingFlowSpan } from './building-flow.js';
 import type { BuildingFile, BuildingLevel } from './building.js';
 import type { NetworkType } from './network.js';
 import type { QuantityTable } from './quantities.js';
@@ -108,6 +109,9 @@ describe('riserSpans and riserTable', () => {
       'Flow direction',
       'Source level',
       'Flow set by',
+      'Capacity',
+      'Capacity unit',
+      'Capacity complete',
     ]);
     expect(table.rows).toHaveLength(1);
     expect(cellOf(table, 0, 'Floor-to-floor length (m)')).toBe(6);
@@ -238,12 +242,13 @@ describe('riserTakeoffWarnings', () => {
     expect(riserTakeoffWarnings(fileWith([]))).toEqual([]);
   });
 
-  it('gives the flow and fire warnings after the riser warnings', () => {
+  it('gives the capacity and fire warnings after the riser warnings', () => {
     const warnings = riserTakeoffWarnings(fileWith([makeRiser('R1', [member(0), member(2)])]));
     expect(warnings.slice(-2)).toEqual([
-      'Flow is not summed across levels.',
+      'Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.',
       'Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.',
     ]);
+    expect(warnings).not.toContain('Flow is not summed across levels.');
   });
 });
 
@@ -293,6 +298,119 @@ describe('riserTable options', () => {
     expect(cellOf(table, 0, 'Flow set by')).toBe('Not known yet');
   });
 
+});
+
+describe('riser capacity', () => {
+  const withUnit: NetworkType = { ...vent, flowUnit: 'm³/h' };
+
+  const flowSpan = (riserId: string, fromLevelId: string, toLevelId: string, extra: Partial<BuildingFlowSpan> = {}): BuildingFlowSpan => ({
+    riserId,
+    fromLevelId,
+    toLevelId,
+    fromFittingId: 'f',
+    toFittingId: 'f',
+    capacity: 650,
+    state: 'ok',
+    complete: true,
+    ...extra,
+  });
+
+  const flowOf = (spans: Record<string, BuildingFlowSpan[]>, warnings: string[] = []): BuildingFlowResult => {
+    const risers: BuildingFlowResult['risers'] = {};
+    for (const [riserId, list] of Object.entries(spans)) risers[riserId] = { spans: list, members: [] };
+    return { risers, groups: [], warnings };
+  };
+
+  it('gives the capacity, the unit and complete for each joined span', () => {
+    const riser = makeRiser('R1', [member(0), member(1), member(2)], {}, withUnit);
+    const flow = flowOf({
+      R1: [flowSpan('R1', 'l0', 'l1', { capacity: 650, complete: true }), flowSpan('R1', 'l1', 'l2', { capacity: 150, complete: false })],
+    });
+    const table = riserTable(fileWith([riser]), () => null, { flow });
+    expect(cellOf(table, 0, 'Capacity')).toBe(650);
+    expect(cellOf(table, 0, 'Capacity unit')).toBe('m³/h');
+    expect(cellOf(table, 0, 'Capacity complete')).toBe('Yes');
+    expect(cellOf(table, 1, 'Capacity')).toBe(150);
+    expect(cellOf(table, 1, 'Capacity unit')).toBe('m³/h');
+    expect(cellOf(table, 1, 'Capacity complete')).toBe('No');
+  });
+
+  it('gives three empty cells for a span with no number', () => {
+    const riser = makeRiser('R1', [member(0), member(2)], {}, withUnit);
+    const flow = flowOf({ R1: [flowSpan('R1', 'l0', 'l2', { state: 'unknown', capacity: null, complete: false })] });
+    const table = riserTable(fileWith([riser]), () => null, { flow });
+    expect(cellOf(table, 0, 'Capacity')).toBeNull();
+    expect(cellOf(table, 0, 'Capacity unit')).toBeNull();
+    expect(cellOf(table, 0, 'Capacity complete')).toBeNull();
+  });
+
+  it('gives an empty unit cell when the network type has no flow unit', () => {
+    const riser = makeRiser('R1', [member(0), member(2)]);
+    const table = riserTable(fileWith([riser]), () => null, { flow: flowOf({ R1: [flowSpan('R1', 'l0', 'l2')] }) });
+    expect(cellOf(table, 0, 'Capacity')).toBe(650);
+    expect(cellOf(table, 0, 'Capacity unit')).toBeNull();
+    expect(cellOf(table, 0, 'Capacity complete')).toBe('Yes');
+  });
+
+  it('gives three empty cells for an end row and for a one-member row', () => {
+    const open = makeRiser('R1', [member(0), member(2)], { topEnd: 'open', endAllowanceMm: 500 }, withUnit);
+    const flow = flowOf({ R1: [flowSpan('R1', 'l0', 'l2'), flowSpan('R1', 'l2', '', { capacity: 500 })] });
+    const table = riserTable(fileWith([open]), () => null, { flow });
+    expect(cellOf(table, 1, 'To level')).toBe('to roof/ground');
+    expect(cellOf(table, 1, 'Capacity')).toBeNull();
+    expect(cellOf(table, 1, 'Capacity unit')).toBeNull();
+    expect(cellOf(table, 1, 'Capacity complete')).toBeNull();
+    const lone = makeRiser('R2', [member(0)], {}, withUnit);
+    const loneTable = riserTable(fileWith([lone]), () => null, { flow: flowOf({ R2: [flowSpan('R2', 'l0', 'l2')] }) });
+    expect(cellOf(loneTable, 0, 'Capacity')).toBeNull();
+    expect(cellOf(loneTable, 0, 'Capacity unit')).toBeNull();
+    expect(cellOf(loneTable, 0, 'Capacity complete')).toBeNull();
+  });
+
+  it('gives every row as many cells as there are headers', () => {
+    const open = makeRiser('R1', [member(0), member(2)], { topEnd: 'open', endAllowanceMm: 500 }, withUnit);
+    const lone = makeRiser('R2', [member(0)]);
+    const table = riserTable(fileWith([open, lone]), () => null, { flow: flowOf({ R1: [flowSpan('R1', 'l0', 'l2')] }) });
+    expect(table.rows).toHaveLength(3);
+    for (const row of table.rows) expect(row).toHaveLength(table.headers.length);
+  });
+
+  it('puts the solve warnings after the span warnings and before the capacity line', () => {
+    const riser = makeRiser('R1', [member(0), member(2)], { topEnd: 'open', endAllowanceMm: 0 });
+    const flow = flowOf({ R1: [flowSpan('R1', 'l0', 'l2')] }, ['Level First has no saved summary. Read the summaries.']);
+    expect(riserTakeoffWarnings(fileWith([riser]), flow)).toEqual([
+      'Riser R1 has an open end with no end allowance.',
+      'Level First has no saved summary. Read the summaries.',
+      'Network type Supply has no flow unit. Its capacity numbers have no unit.',
+      'Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.',
+      'Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.',
+    ]);
+  });
+
+  it('gives one flow unit line for each network type name with numbers and no unit', () => {
+    const file = fileWith([
+      makeRiser('R1', [member(0), member(2)]),
+      makeRiser('R2', [member(0), member(2)]),
+      makeRiser('R3', [member(0), member(2)], {}, water),
+    ]);
+    const flow = flowOf({
+      R1: [flowSpan('R1', 'l0', 'l2')],
+      R2: [flowSpan('R2', 'l0', 'l2', { capacity: 100 })],
+      R3: [flowSpan('R3', 'l0', 'l2')],
+    });
+    expect(riserTakeoffWarnings(file, flow).filter((warning) => warning.includes('has no flow unit'))).toEqual([
+      'Network type Supply has no flow unit. Its capacity numbers have no unit.',
+      'Network type Return has no flow unit. Its capacity numbers have no unit.',
+    ]);
+  });
+
+  it('gives no flow unit line when the unit is set or no span has a number', () => {
+    const withUnitFile = fileWith([makeRiser('R1', [member(0), member(2)], {}, withUnit)]);
+    expect(riserTakeoffWarnings(withUnitFile, flowOf({ R1: [flowSpan('R1', 'l0', 'l2')] })).filter((warning) => warning.includes('has no flow unit'))).toEqual([]);
+    const noNumberFile = fileWith([makeRiser('R1', [member(0), member(2)])]);
+    const noNumber = flowOf({ R1: [flowSpan('R1', 'l0', 'l2', { state: 'unknown', capacity: null, complete: false })] });
+    expect(riserTakeoffWarnings(noNumberFile, noNumber).filter((warning) => warning.includes('has no flow unit'))).toEqual([]);
+  });
 });
 
 describe('riserFittingIdsForSheets', () => {

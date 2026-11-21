@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { addLevel, renameBuilding, type BuildingFile, type BuildingSheet } from '@mepapp/core';
+import { addLevel, renameBuilding, type BuildingFile, type BuildingSheet, type RiserNetworksLive } from '@mepapp/core';
 import type { PdfEngine } from '@mepapp/pdf-engine';
 import type { FileAccess, OpenedFile } from '@mepapp/platform';
 import { Dialog } from './Dialog.js';
@@ -117,6 +117,8 @@ export interface ManageBuildingsDialogProps {
     folder?: PdfFolderControl;
   };
   riserConflictKeys?: ReadonlySet<string>;
+  /** The live riser networks of the open document. Passed to the Risers tab. */
+  liveRiserNetworks?: RiserNetworksLive;
 }
 
 /**
@@ -134,6 +136,7 @@ export function ManageBuildingsDialog({
   openDocuments = [],
   sheetFiles,
   riserConflictKeys = NO_RISER_CONFLICTS,
+  liveRiserNetworks,
 }: ManageBuildingsDialogProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -673,6 +676,9 @@ export function ManageBuildingsDialog({
                     canOpenCached={sheetFiles?.has}
                     onNotice={onNotice}
                     busy={building.busy}
+                    live={liveRiserNetworks}
+                    onRebuild={pdfEngine === undefined ? undefined : onRebuildSummaries}
+                    onRebuildDone={() => void building.refreshSheetStatus()}
                   />
                 </div>
               )}
