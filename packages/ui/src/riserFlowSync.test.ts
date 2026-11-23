@@ -1,6 +1,6 @@
-import type { BuildingFile, BuildingLevel, NetworkType, Riser, RiserMember, RiserNetworkSummary, SheetSummary } from '@mepapp/core';
+import type { BuildingFile, BuildingLevel, NetworkType, Riser, RiserMember, RiserNetworkSummary, RiserNetworksLive, SheetSummary } from '@mepapp/core';
 import { describe, expect, it, vi } from 'vitest';
-import { computeRiserFlow, RiserFlowSender, sameRiserFlowInputs, type RiserFlowInputs } from './riserFlowSync.js';
+import { computeRiserFlow, LiveRiserOverlay, RiserFlowSender, sameRiserFlowInputs, type RiserFlowInputs } from './riserFlowSync.js';
 
 const vent: NetworkType = {
   id: 'vent',
@@ -128,6 +128,90 @@ describe('computeRiserFlow', () => {
       expect(computeRiserFlow({ ...item, summaries, liveNetworksOf })).toBeNull();
       expect(liveNetworksOf).not.toHaveBeenCalled();
     }
+  });
+
+  it('counts the live networks of the other open documents', () => {
+    const { file, summaries } = threeLevelsSetup();
+    const others: RiserNetworksLive[] = [{ projectUuid: 'p2', riserNetworks: [entryOf(['f'], 250)] }];
+    const result = computeRiserFlow({ file, projectUuid: 'p1', pageIndex: 0, summaries, liveNetworksOf: () => [entryOf(['f'], 500)], others });
+    expect(result?.inputs).toEqual({ f: { role: 'entry', demandBeyond: 250 } });
+    expect(result?.flow.groups[0]?.total).toBe(100 + 500 + 250);
+  });
+
+  it('counts the other documents of the building on the source level', () => {
+    const { file, summaries } = threeLevelsSetup();
+    const others: RiserNetworksLive[] = [
+      { projectUuid: 'p1', riserNetworks: [entryOf(['f'], 600)] },
+      { projectUuid: 'p2', riserNetworks: [entryOf(['f'], 250)] },
+    ];
+    const result = computeRiserFlow({ file, projectUuid: 'p0', pageIndex: 0, summaries, liveNetworksOf: () => [entryOf(['f'], 100, true)], others });
+    expect(result?.inputs).toEqual({ f: { role: 'exit', demandBeyond: 850 } });
+    expect(result?.flow.groups[0]?.total).toBe(100 + 600 + 250);
+  });
+
+  it('ignores the other entry of the open project', () => {
+    const { file, summaries } = threeLevelsSetup();
+    const others: RiserNetworksLive[] = [
+      { projectUuid: 'p1', riserNetworks: [entryOf(['f'], 9999)] },
+      { projectUuid: 'p2', riserNetworks: [entryOf(['f'], 250)] },
+    ];
+    const result = computeRiserFlow({ file, projectUuid: 'p1', pageIndex: 0, summaries, liveNetworksOf: () => [entryOf(['f'], 500)], others });
+    expect(result?.inputs).toEqual({ f: { role: 'entry', demandBeyond: 250 } });
+    expect(result?.flow.groups[0]?.total).toBe(100 + 500 + 250);
+  });
+
+  it('counts a live document that has no stored summary, with no warning about a saved summary', () => {
+    const { file } = threeLevelsSetup();
+    const summaries = summariesOf(summaryOf('p0', [entryOf(['f'], 100, true)]), summaryOf('p1', [entryOf(['f'], 500)]));
+    const others: RiserNetworksLive[] = [{ projectUuid: 'p2', riserNetworks: [entryOf(['f'], 150)] }];
+    const result = computeRiserFlow({ file, projectUuid: 'p1', pageIndex: 0, summaries, liveNetworksOf: () => [entryOf(['f'], 500)], others });
+    expect(result?.inputs).toEqual({ f: { role: 'entry', demandBeyond: 150 } });
+    expect(result?.flow.groups[0]?.total).toBe(100 + 500 + 150);
+    expect(result?.flow.warnings.some((text) => text.includes('no saved summary'))).toBe(false);
+  });
+});
+
+describe('LiveRiserOverlay', () => {
+  it('reports a change only when the networks differ from the stored value', () => {
+    const overlay = new LiveRiserOverlay();
+    expect(overlay.set('p1', [entryOf(['f'], 500)])).toBe(true);
+    expect(overlay.set('p1', [entryOf(['f'], 500)])).toBe(false);
+    expect(overlay.set('p1', [entryOf(['f'], 700)])).toBe(true);
+  });
+
+  it('bumps the version only on a change', () => {
+    const overlay = new LiveRiserOverlay();
+    overlay.set('p1', [entryOf(['f'], 500)]);
+    const first = overlay.version;
+    overlay.set('p1', [entryOf(['f'], 500)]);
+    expect(overlay.version).toBe(first);
+    overlay.set('p1', [entryOf(['f'], 700)]);
+    expect(overlay.version).toBe(first + 1);
+  });
+
+  it('returns whether delete, retain and clear removed an entry', () => {
+    const overlay = new LiveRiserOverlay();
+    overlay.set('p0', [entryOf(['f'], 100, true)]);
+    overlay.set('p1', [entryOf(['f'], 500)]);
+    overlay.set('p2', [entryOf(['f'], 150)]);
+    expect(overlay.delete('p9')).toBe(false);
+    expect(overlay.delete('p2')).toBe(true);
+    expect(overlay.retain(new Set(['p0', 'p1']))).toBe(false);
+    expect(overlay.retain(new Set(['p0']))).toBe(true);
+    expect(overlay.clear()).toBe(true);
+    expect(overlay.clear()).toBe(false);
+  });
+
+  it('lists the entries sorted by projectUuid', () => {
+    const overlay = new LiveRiserOverlay();
+    overlay.set('p2', [entryOf(['f'], 150)]);
+    overlay.set('p0', [entryOf(['f'], 100, true)]);
+    overlay.set('p1', [entryOf(['f'], 500)]);
+    expect(overlay.list()).toEqual([
+      { projectUuid: 'p0', riserNetworks: [entryOf(['f'], 100, true)] },
+      { projectUuid: 'p1', riserNetworks: [entryOf(['f'], 500)] },
+      { projectUuid: 'p2', riserNetworks: [entryOf(['f'], 150)] },
+    ]);
   });
 });
 

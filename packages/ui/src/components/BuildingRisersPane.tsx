@@ -48,8 +48,8 @@ export interface BuildingRisersPaneProps {
   canOpenCached?: (sheet: BuildingSheet) => boolean;
   onNotice: (text: string, error: boolean) => void;
   busy: boolean;
-  /** The live riserNetworks of the open sheet (replaces the saved summary of the same projectUuid in the solve). Undefined when no saved document of this building is open. */
-  live?: RiserNetworksLive;
+  /** The live riser networks of all open documents of this building. They replace the saved summary of the same projectUuid. */
+  live?: readonly RiserNetworksLive[];
   /** Reads the PDFs again and saves the summaries. Same function as the Levels tab. Undefined: the link "Read summaries now" is hidden. */
   onRebuild?: BuildingSummariesPaneProps['onRebuild'];
   /** Called when a run of onRebuild ends (any result). */

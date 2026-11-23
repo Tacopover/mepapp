@@ -117,8 +117,8 @@ export interface ManageBuildingsDialogProps {
     folder?: PdfFolderControl;
   };
   riserConflictKeys?: ReadonlySet<string>;
-  /** The live riser networks of the open document. Passed to the Risers tab. */
-  liveRiserNetworks?: RiserNetworksLive;
+  /** The live riser networks of all open documents of this building. Passed to the Risers tab. */
+  liveRiserNetworks?: readonly RiserNetworksLive[];
 }
 
 /**

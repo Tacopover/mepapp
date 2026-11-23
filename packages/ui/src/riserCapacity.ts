@@ -233,13 +233,13 @@ export function fittingRiserLinesOf(view: CapacityView, riserName: string): Fitt
   };
 }
 
-/** True when a member sheet of any riser of the group of `riser` has a projectUuid, is not the sheet of `live`, and has no stored summary or a stored summary with no `riserNetworks`. False for one-member and when there is no group. The pane then shows the link "Read summaries now". */
+/** True when a member sheet of any riser of the group of `riser` has a projectUuid that is not in `live`, and has no stored summary or a stored summary with no `riserNetworks`. False for one-member and when there is no group. The pane then shows the link "Read summaries now". */
 export function needsSummaryRead(
   file: BuildingFile,
   riser: Riser,
   flow: BuildingFlowResult,
   summaries: ReadonlyMap<string, SheetSummary>,
-  live?: RiserNetworksLive,
+  live?: readonly RiserNetworksLive[],
 ): boolean {
   const spans = flow.risers[riser.id]?.spans ?? [];
   const group = flow.groups.find((item) => item.riserIds.includes(riser.id));
@@ -247,7 +247,7 @@ export function needsSummaryRead(
   const members = file.risers.filter((item) => group.riserIds.includes(item.id)).flatMap((item) => item.members);
   return members.some((member) => {
     const projectUuid = file.sheets.find((sheet) => sheet.id === member.sheetId)?.projectUuid ?? null;
-    if (projectUuid === null || projectUuid === live?.projectUuid) return false;
+    if (projectUuid === null || live?.some((item) => item.projectUuid === projectUuid)) return false;
     const stored = summaries.get(projectUuid);
     return stored === undefined || stored.riserNetworks === undefined;
   });

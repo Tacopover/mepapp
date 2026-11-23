@@ -159,11 +159,11 @@ await selectTool();
 {
   const c = await calls();
   console.log('CALLS after switch to level 0', JSON.stringify(c.slice(-2)));
-  check(sameJson(await lastCall(), { rf: { role: 'exit', demandBeyond: 650 } }), 'level 0 open: the scene got { rf: exit, 650 } (level 1 is not saved: its stored summary counts)', JSON.stringify(await lastCall()));
+  check(sameJson(await lastCall(), { rf: { role: 'exit', demandBeyond: 750 } }), 'level 0 open: the scene got { rf: exit, 750 } (level 1 is open and not saved: its live numbers count, B7-T07)', JSON.stringify(await lastCall()));
   await clickFitting();
   check((await byId('props-riser-main')) === 'Level 0', 'level 0: Main level is Level 0', String(await byId('props-riser-main')));
-  check((await solved()) === '650', 'level 0: the exit fitting carries what goes up: 650 (unsaved edit of level 1 not counted, D-B-75)', String(await solved()));
-  check((await byId('props-riser-total')) === '750 m³/h (no concurrency factor)', 'level 0: total 750 (stored summary of level 1)', String(await byId('props-riser-total')));
+  check((await solved()) === '750', 'level 0: the exit fitting carries what goes up: 750 (600 + 150; the unsaved edit of the open level 1 counts, B7-T07)', String(await solved()));
+  check((await byId('props-riser-total')) === '850 m³/h (no concurrency factor)', 'level 0: total 850 (live level 1)', String(await byId('props-riser-total')));
 }
 await activate('l1.pdf');
 await selectTool();
@@ -184,6 +184,12 @@ await activate('l1.pdf');
 await selectTool();
 
 // --- 4. a level with no summary: "at least" ---
+// B7-T07: an open level counts live, so the summary of an open level is never read. Close level 0 and level 2 (scene API, setup only; the close by a real click is proven in b7-t07-check). Level 1 stays open and live.
+await page.evaluate(() => {
+  const s = window.__mepSketchScene;
+  for (const d of s.getDocuments()) if (d.fileName !== 'l1.pdf') s.closeDocument(d.id);
+});
+await idle(800);
 await loadBuilding(building, { [uuids[0]]: summaries[0], [uuids[1]]: summaries[1] });
 await clickFitting();
 console.log('AT LEAST', await byId('props-riser-main'), '|', await byId('props-riser-total'), '|', JSON.stringify(await hints()), '| solved', await solved());

@@ -4609,6 +4609,12 @@ export class SketchScene {
     return this.serializeDocument(this.doc);
   }
 
+  /** Like exportProject for any open document, active or not. null when no open document has this id. */
+  exportProjectOf(documentId: string): ProjectDocument | null {
+    const target = this.documents.find((d) => d.id === documentId);
+    return target ? this.serializeDocument(target) : null;
+  }
+
   getProjectUuid(): string | null {
     return this.doc.projectUuid;
   }

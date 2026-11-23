@@ -91,12 +91,13 @@ function isJoined(span: RiserSpan): span is JoinedSpan {
 export function solveBuildingFlow(
   file: BuildingFile,
   summaries: ReadonlyMap<string, SheetSummary>,
-  live?: RiserNetworksLive,
+  live?: RiserNetworksLive | readonly RiserNetworksLive[],
 ): BuildingFlowResult {
   const warnings: string[] = [];
   const warn = (text: string): void => {
     if (!warnings.includes(text)) warnings.push(text);
   };
+  const lives: readonly RiserNetworksLive[] = live === undefined ? [] : 'projectUuid' in live ? [live] : live;
   const levelNames = new Map(file.levels.map((level) => [level.id, level.name]));
   const levelName = (levelId: string): string => levelNames.get(levelId) ?? levelId;
   const who = (names: string[]): string => (names.length === 1 ? `Riser ${names[0]}` : `Risers ${names.join(', ')}`);
@@ -122,8 +123,9 @@ export function solveBuildingFlow(
     if (sheet === undefined || sheet.projectUuid === null) return missing(`${level} is not linked to a PDF yet.`);
     const uuid = sheet.projectUuid;
     let data: RiserNetworkSummary[];
-    if (live && live.projectUuid === uuid) {
-      data = live.riserNetworks;
+    const liveHit = lives.find((item) => item.projectUuid === uuid);
+    if (liveHit) {
+      data = liveHit.riserNetworks;
     } else {
       const summary = summaries.get(uuid);
       if (summary === undefined) return missing(`${level} has no saved summary. Read the summaries.`);

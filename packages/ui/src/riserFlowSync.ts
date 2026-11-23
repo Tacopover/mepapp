@@ -1,4 +1,4 @@
-import { riserFittingIdsForSheets, riserFlowInputsOf, solveBuildingFlow, type BuildingFile, type BuildingFlowResult, type RiserFlowInput, type RiserNetworkSummary, type SheetSummary } from '@mepapp/core';
+import { riserFittingIdsForSheets, riserFlowInputsOf, solveBuildingFlow, type BuildingFile, type BuildingFlowResult, type RiserFlowInput, type RiserNetworkSummary, type RiserNetworksLive, type SheetSummary } from '@mepapp/core';
 import { activeSheetOf } from './riserActions.js';
 
 export type RiserFlowInputs = Record<string, RiserFlowInput>;
@@ -14,8 +14,8 @@ export interface RiserFlowComputation {
  * The solve of the whole building and the scene inputs for the shown page.
  * Returns null (and never calls liveNetworksOf) when: file is null, file.risers is empty, no sheet of file has projectUuid and pageIndex
  * (use activeSheetOf), or no riser member sits on a sheet of that projectUuid (riserFittingIdsForSheets over ALL sheets with that projectUuid is empty).
- * Else: sheetIds = ids of all sheets with that projectUuid; live = { projectUuid, riserNetworks: liveNetworksOf(riserFittingIdsForSheets(file, sheetIds)) } (called exactly once);
- * flow = solveBuildingFlow(file, summaries, live); inputs = riserFlowInputsOf(flow, sheet.id).
+ * Else: sheetIds = ids of all sheets with that projectUuid; lives = [{ projectUuid, riserNetworks: liveNetworksOf(riserFittingIdsForSheets(file, sheetIds)) }, ...others of other projectUuids] (liveNetworksOf called exactly once);
+ * flow = solveBuildingFlow(file, summaries, lives); inputs = riserFlowInputsOf(flow, sheet.id).
  */
 export function computeRiserFlow(args: {
   file: BuildingFile | null;
@@ -23,16 +23,64 @@ export function computeRiserFlow(args: {
   pageIndex: number;
   summaries: ReadonlyMap<string, SheetSummary>;
   liveNetworksOf: (riserFittingIds: string[]) => RiserNetworkSummary[];
+  others?: readonly RiserNetworksLive[];
 }): RiserFlowComputation | null {
-  const { file, projectUuid, pageIndex, summaries, liveNetworksOf } = args;
+  const { file, projectUuid, pageIndex, summaries, liveNetworksOf, others } = args;
   const sheet = activeSheetOf(file, projectUuid, pageIndex);
   if (file === null || projectUuid === null || sheet === null || file.risers.length === 0) return null;
   const sheetIds = file.sheets.filter((item) => item.projectUuid === projectUuid).map((item) => item.id);
   const fittingIds = riserFittingIdsForSheets(file, sheetIds);
   if (fittingIds.length === 0) return null;
-  const live = { projectUuid, riserNetworks: liveNetworksOf(fittingIds) };
-  const flow = solveBuildingFlow(file, summaries, live);
+  const lives = [{ projectUuid, riserNetworks: liveNetworksOf(fittingIds) }, ...(others ?? []).filter((item) => item.projectUuid !== projectUuid)];
+  const flow = solveBuildingFlow(file, summaries, lives);
   return { sheetId: sheet.id, flow, inputs: riserFlowInputsOf(flow, sheet.id) };
+}
+
+/** The live riser networks of the open documents. Session only: never stored. Key: projectUuid. */
+export class LiveRiserOverlay {
+  /** Counts each change. */
+  version = 0;
+  private readonly entries = new Map<string, RiserNetworkSummary[]>();
+
+  /** True when the networks differ from the stored value of projectUuid. */
+  set(projectUuid: string, networks: RiserNetworkSummary[]): boolean {
+    if (JSON.stringify(this.entries.get(projectUuid)) === JSON.stringify(networks)) return false;
+    this.entries.set(projectUuid, networks);
+    this.version += 1;
+    return true;
+  }
+
+  /** True when an entry was removed. */
+  delete(projectUuid: string): boolean {
+    const removed = this.entries.delete(projectUuid);
+    if (removed) this.version += 1;
+    return removed;
+  }
+
+  /** Removes the entries whose projectUuid is not in keep. True when any entry was removed. */
+  retain(keep: ReadonlySet<string>): boolean {
+    let removed = false;
+    for (const projectUuid of this.entries.keys()) {
+      if (keep.has(projectUuid)) continue;
+      this.entries.delete(projectUuid);
+      removed = true;
+    }
+    if (removed) this.version += 1;
+    return removed;
+  }
+
+  /** True when an entry was removed. */
+  clear(): boolean {
+    if (this.entries.size === 0) return false;
+    this.entries.clear();
+    this.version += 1;
+    return true;
+  }
+
+  /** The entries sorted by projectUuid. */
+  list(): RiserNetworksLive[] {
+    return [...this.entries.keys()].sort().map((projectUuid) => ({ projectUuid, riserNetworks: this.entries.get(projectUuid) ?? [] }));
+  }
 }
 
 /** True when both have the same keys and the same role and demandBeyond for each key (key order does not matter). */

@@ -8,7 +8,8 @@ Words in this script:
 - The "main level" is the level where the flow starts (the level that has the source, for example an air handling unit).
 - The "capacity" of a span is the sum of the capacities of all terminals that sit behind that span, seen from the main level.
 - The "connected total" is the sum of all terminals of all levels of the riser. The app does not apply a concurrency factor (a factor that lowers the sum because not all terminals run at the same time). So the number is not a design flow.
-- A "summary" is a small file that the app saves next to each PDF when you save. It holds the capacity numbers of that level. The other levels read it.
+- A "summary" is a small file that the app saves next to each PDF when you save. It holds the capacity numbers of that level.
+- The rule for the other levels: a level that is open in the app counts with its live numbers, saved or not. A level that is not open counts with its saved summary. When you close a level, the app uses its saved summary again.
 - "at least" is the text that the app puts before a number when a level has no summary. The app counts that level as 0.
 
 Use 3 real plan PDFs of one building, one for each level. Use the building "Tower" with "Level 0", "Level 1" and "Level 2" from the B4 script (steps 1 to 12 of `buildings-b4-test.md`, Part A), and make one Supply Air riser through the three levels. The terminals and the source of this script:
@@ -34,10 +35,10 @@ The numbers below hold for these terminals. The total is always 750.
 
 ## Part B: change a capacity, and a level that is not saved
 
-7. Open Level 2. Change the terminal from 150 to 250. Do not save. Open the Risers tab. Check: the rows say 750 for "Level 0 to Level 1" and 250 for "Level 1 to Level 2". The connected total is 850 m³/h (the open level counts its live numbers).
-8. Close the dialog. Switch to Level 1 (the document switcher in the header). Click the riser fitting. Check: it still says the old numbers (650, and 750 m³/h for the total), because Level 2 is not saved. This is the rule of the app: the other levels count the saved summary. Write down if this surprises you.
-9. Switch to Level 2. Save. Switch to Level 1. Click the riser fitting. Check: "Solved capacity" says 750 and "Connected total" says 850 m³/h (no concurrency factor). You did not reopen anything.
-10. On Level 1 change the terminal 300 to 400. Do not save. Check at once, with no click on another place: the duct shows 600 and the riser fitting shows 850. The header says 600. Press Save. Open the Risers tab. Check: the rows say 850 and 250. The total says 950 m³/h.
+7. Open Level 2. Change the terminal from 150 to 250 (type the number and press Enter). Do not save. Switch to Level 1 (the document switcher in the header). Click the riser fitting. Check: "Solved capacity" says 750 and "Connected total" says 850 m³/h (no concurrency factor). You did not save and you did not click "Read summaries now". The numbers of Level 2 reached Level 1 with the switch.
+8. On Level 1 change the terminal 300 to 400. Do not save. Check at once, with no click on another place: the duct shows 600 and the riser fitting shows 850. The header says 600. Switch to Level 0. Click the exit fitting of the riser. Check: "Solved capacity" says 850 (600 of Level 1 and 250 of Level 2) and "Connected total" says 950 m³/h. Level 1 and Level 2 are both not saved. Write down if the numbers show later than the switch.
+9. Switch to Level 1. Open Manage Buildings and the tab "Risers". Check: the rows say 850 for "Level 0 to Level 1" and 250 for "Level 1 to Level 2". The connected total is 950 m³/h. These are the live numbers of all open levels. Close the dialog. Close Level 2 with the close button in the document switcher and answer "Close anyway" (Level 2 is not saved). Open the tab "Risers" again. Check: the rows say 750 and 150, and the total says 850 m³/h. Level 2 is not open now, so it counts its saved summary (150). Level 1 is still open and counts its live 600.
+10. On Level 1 change the terminal 400 to 450. Switch to Level 0 as fast as you can, with no wait. Click the exit fitting. Check: "Solved capacity" says 800 (650 of Level 1 and 150 of the saved Level 2). The last edit is not lost. Open Level 2 again (Menu, Open) before you go on.
 
 ## Part C: the main level by hand
 
@@ -79,7 +80,7 @@ The numbers below hold for these terminals. The total is always 750.
 
 ## Part I: Windows only (the desktop app, the real screen)
 
-31. In the desktop app with PDFs on disk, repeat steps 1 to 3 and step 9. Check: the same numbers. The real save writes a PDF. The other level must read the new summary at once.
+31. In the desktop app with PDFs on disk, repeat steps 1 to 3 and steps 7 and 8. Check: the same numbers, with no save. Then save Level 2 and switch to Level 1. Check: the numbers do not change. The real save writes a PDF and a summary that holds the same numbers as the live data.
 32. In the desktop app click "Read summaries now" with one level not saved. Check: no picker opens, the numbers lose "at least", and the notice says "Read N of N summaries."
 33. Open the Risers tab in a window of 1366 x 768. Check: the block "Capacity" is visible without scrolling the dialog, or the hint is visible. The scrollbar of Windows does not hide a text.
 34. Set the display scaling of Windows to 125 % and then to 150 %. Open the Risers tab and the Properties panel of a riser fitting at the smallest dock width. Check: texts wrap. Nothing is cut. The tab name "Properties" can be cut at the right edge at the smallest dock width (known, from B4).
@@ -87,4 +88,4 @@ The numbers below hold for these terminals. The total is always 750.
 
 ## What to write down
 
-For every step where the result is not as written, write the step number, what you saw, and a screenshot. These items are open questions, so write down your opinion for them: step 4 (header 500 and fitting 650), step 8 (the saved summary counts), step 25 (Excel cells), and the word "Main level" (steps 1, 3, 21). The old box "Flow direction" can say "Up · source: Level 0" while the block "Capacity" says "Main level: not known yet". This is known. B8 solves it.
+For every step where the result is not as written, write the step number, what you saw, and a screenshot. These items are open questions, so write down your opinion for them: step 4 (header 500 and fitting 650), step 9 (a closed level that is not saved counts its saved summary), step 25 (Excel cells), and the word "Main level" (steps 1, 3, 21). The old box "Flow direction" can say "Up · source: Level 0" while the block "Capacity" says "Main level: not known yet". This is known. B8 solves it.

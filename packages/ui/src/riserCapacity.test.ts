@@ -182,7 +182,20 @@ describe('capacityViewOf', () => {
     expect(view.rows.map((row) => row.valueText)).toEqual(['650 m³/h', '150 m³/h']);
     expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
     expect(view.hints).toEqual([]);
+    expect(needsSummaryRead(file, riser, flow, summaries, [live])).toBe(false);
+  });
+
+  it('does not ask for a summary when the live data covers every sheet without one', () => {
+    const riser = riserOf('R1', [memberOf(0), memberOf(1), memberOf(2)]);
+    const file = fileWith([riser]);
+    const summaries = summariesOf(summaryOf('p0', [entryOf(['f'], 100, true)]));
+    const live: RiserNetworksLive[] = [
+      { projectUuid: 'p1', riserNetworks: [entryOf(['f'], 500)] },
+      { projectUuid: 'p2', riserNetworks: [entryOf(['f'], 150)] },
+    ];
+    const flow = solveBuildingFlow(file, summaries, live);
     expect(needsSummaryRead(file, riser, flow, summaries, live)).toBe(false);
+    expect(needsSummaryRead(file, riser, flow, summaries, live.slice(0, 1))).toBe(true);
   });
 
   it('asks for the summary when the stored summary has no riser data', () => {

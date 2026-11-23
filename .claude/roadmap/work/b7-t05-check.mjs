@@ -214,6 +214,12 @@ await closeDialog();
 }
 
 // --- state 2: "at least" (level 1 has no saved summary) ---
+// B7-T07: an open level counts live, so a missing summary of an open level is never read. Close level 0 and level 1 (scene API, setup only; the close by a real click is proven in b7-t07-check). Level 2 stays open and live.
+await page.evaluate(() => {
+  const s = window.__mepSketchScene;
+  for (const d of s.getDocuments()) if (d.fileName !== 'l2.pdf') s.closeDocument(d.id);
+});
+await idle(800);
 await page.evaluate(([j, s]) => window.__mepBuilding.load(j, s), [JSON.stringify(building), { [uuids[0]]: summaries[0], [uuids[2]]: summaries[2] }]);
 await idle(600);
 await showRisers();

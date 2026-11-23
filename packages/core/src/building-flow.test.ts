@@ -569,6 +569,54 @@ describe('solveBuildingFlow', () => {
     expect(result.risers.R!.spans[0]).toMatchObject({ capacity: null, state: 'unknown' });
     expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 100 });
   });
+
+  it('takes the live data of several projects from a list', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const lives: RiserNetworksLive[] = [
+      { projectUuid: 'p1', riserNetworks: [entry(['f'], 400)] },
+      { projectUuid: 'p2', riserNetworks: [entry(['f'], 250)] },
+    ];
+    const result = solveBuildingFlow(file, summaries, lives);
+    const spans = result.risers.R!.spans;
+    expect(spans[0]).toMatchObject({ capacity: 650, state: 'ok', complete: true });
+    expect(spans[1]).toMatchObject({ capacity: 250, state: 'ok', complete: true });
+    expect(result.groups[0]).toMatchObject({ total: 750, state: 'ok', sourceLevelId: 'l0' });
+  });
+
+  it('uses the live data of a list when the stored summary of its project is missing', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    summaries.delete('p2');
+    const lives: RiserNetworksLive[] = [{ projectUuid: 'p2', riserNetworks: [entry(['f'], 250)] }];
+    const result = solveBuildingFlow(file, summaries, lives);
+    const spans = result.risers.R!.spans;
+    expect(spans[0]).toMatchObject({ capacity: 750, state: 'ok', complete: true });
+    expect(spans[1]).toMatchObject({ capacity: 250, state: 'ok', complete: true });
+    expect(result.groups[0]).toMatchObject({ total: 850, state: 'ok', sourceLevelId: 'l0' });
+    expect(result.warnings.some((warning) => warning.includes('L2'))).toBe(false);
+  });
+
+  it('lets the first of two live entries with the same project id win', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const lives: RiserNetworksLive[] = [
+      { projectUuid: 'p1', riserNetworks: [entry(['f'], 800)] },
+      { projectUuid: 'p1', riserNetworks: [entry(['f'], 300)] },
+    ];
+    const result = solveBuildingFlow(file, summaries, lives);
+    expect(result.risers.R!.spans[0]).toMatchObject({ capacity: 950 });
+    expect(result.groups[0]).toMatchObject({ total: 1050 });
+    expect(result).toEqual(solveBuildingFlow(file, summaries, [lives[0]!]));
+  });
+
+  it('solves an empty list the same as no live data', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    expect(solveBuildingFlow(file, summaries, [])).toEqual(solveBuildingFlow(file, summaries));
+  });
+
+  it('solves a single live object the same as a list with that object', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const live: RiserNetworksLive = { projectUuid: 'p1', riserNetworks: [entry(['f'], 800)] };
+    expect(solveBuildingFlow(file, summaries, [live])).toEqual(solveBuildingFlow(file, summaries, live));
+  });
 });
 
 describe('riserFlowInputsOf', () => {
