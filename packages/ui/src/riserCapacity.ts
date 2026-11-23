@@ -38,7 +38,7 @@ const REASON_TEXT: Record<UnknownReason, string> = {
 export const MAIN_LEVEL_LABEL = 'Main level';
 export const CONNECTED_TOTAL_LABEL = 'Connected total';
 
-const DESIGN_FLOW_HINT = 'These numbers are a plain sum of connected capacities, with no diversity factor. They are not a design flow for this network type.';
+const DESIGN_FLOW_HINT = 'These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type.';
 const INCOMPLETE_HINT = 'Some levels have no data, so some numbers read "at least". The warnings above name each level.';
 const LOOP_HINT = 'See the warnings above.';
 const UNKNOWN_HINT = 'Click Set by hand and choose a source level.';
@@ -84,14 +84,14 @@ export interface CapacityView {
   notDesignFlow: boolean;
   /** `Main level: Level 0` or `Main level: not known yet` (group.sourceLevelId is undefined or the level is unknown). '' for one-member. */
   mainLine: string;
-  /** `Connected total: 750 m³/h (no diversity)`, `Connected total: at least 750 m³/h (no diversity)`, `Connected total: 750 (no diversity)` (no unit). null for one-member. */
+  /** `Connected total: 750 m³/h (no concurrency factor)`, `Connected total: at least 750 m³/h (no concurrency factor)`, `Connected total: 750 (no concurrency factor)` (no unit). null for one-member. */
   totalLine: string | null;
   rows: CapacityRow[];
   /** One other riser in the group: `The total also covers R2. It shares a network with this riser.` Several: `The total also covers R2, R3. They share a network with this riser.` null when the group has only this riser. */
   sharedLine: string | null;
   /** The hint paragraphs in this order, each only when it applies: (1) not complete (group.complete false): `Some levels have no data, so some numbers read "at least". The warnings above name each level.`; (2) group state unknown: reason 'loop' -> `See the warnings above.`; any other reason, and no reason -> `Choose a level in the list "Source level".` when options.selectsShown is true, else `Click Set by hand and choose a source level.`; (3) unit not set: `This network type has no flow unit, so the numbers have no unit.`; (4) one-member: `This riser has one level. A capacity needs two levels.` (only hint of a one-member view). */
   hints: string[];
-  /** Only for notDesignFlow: `These numbers are a plain sum of connected capacities, with no diversity factor. They are not a design flow for this network type.` else null. */
+  /** Only for notDesignFlow: `These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type.` else null. */
   designFlowHint: string | null;
   /** The text after `Main level: ` in mainLine: `Level 0` or `not known yet`. '' for one-member. */
   mainValue: string;
@@ -153,7 +153,7 @@ export function capacityViewOf(file: BuildingFile, riser: Riser, flow: BuildingF
   const sourceLevel = group.sourceLevelId === undefined ? undefined : file.levels.find((level) => level.id === group.sourceLevelId);
   const mainValue = sourceLevel === undefined ? 'not known yet' : sourceLevel.name;
   const mainLine = `${MAIN_LEVEL_LABEL}: ${mainValue}`;
-  const totalValue = `${capacityNumberText(group.total, unit, !group.complete)} (no diversity)`;
+  const totalValue = `${capacityNumberText(group.total, unit, !group.complete)} (no concurrency factor)`;
   const totalLine = `${CONNECTED_TOTAL_LABEL}: ${totalValue}`;
   const unknownReasonText = reason === undefined ? null : REASON_TEXT[reason];
   const rows = spans.map((span, index): CapacityRow => {

@@ -220,7 +220,7 @@ async function measureState(tag) {
     const vis = await blockVisibility();
     const box = await rootBox(page);
     const clipped = await findClipped(page, '.mep-modal');
-    const capClipped = clipped.filter((c) => /Capacity|Level|at least|not known|Connected|Main|Read|Reading|Some levels|diversity/.test(c));
+    const capClipped = clipped.filter((c) => /Capacity|Level|at least|not known|Connected|Main|Read|Reading|Some levels|concurrency/.test(c));
     const rowsM = await measureRows(page, '.mep-rp-cap-row', ':scope > *');
     const rowTexts = await page.locator('.mep-rp-cap-row').evaluateAll((els) => els.map((e) => ({ h: Math.round(e.getBoundingClientRect().height), v: e.querySelector('.mep-rp-cap-value')?.getBoundingClientRect().height | 0 })));
     const entry = { tag, w, h, box, vis, capClipped, allClipped: clipped.length, rowProblems: rowsM.problems, rowHeights: rowTexts.map((r) => r.h) };

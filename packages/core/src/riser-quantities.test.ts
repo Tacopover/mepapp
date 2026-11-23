@@ -245,7 +245,7 @@ describe('riserTakeoffWarnings', () => {
   it('gives the capacity and fire warnings after the riser warnings', () => {
     const warnings = riserTakeoffWarnings(fileWith([makeRiser('R1', [member(0), member(2)])]));
     expect(warnings.slice(-2)).toEqual([
-      'Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.',
+      'Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.',
       'Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.',
     ]);
     expect(warnings).not.toContain('Flow is not summed across levels.');
@@ -382,7 +382,7 @@ describe('riser capacity', () => {
       'Riser R1 has an open end with no end allowance.',
       'First has no saved summary. Read the summaries.',
       'Network type Supply has no flow unit. Its capacity numbers have no unit.',
-      'Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.',
+      'Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.',
       'Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.',
     ]);
   });

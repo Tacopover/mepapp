@@ -17,7 +17,7 @@ Source files read: `building-flow.ts`, `BuildingRisersPane.tsx`, `riserInfo.ts`,
 |---|---|---|
 | Capacity (of a span) | yes: capacity of equipment and segments in Properties | |
 | Main level | yes, domain word chosen by the checker | replaces "source" in new text |
-| Connected total (no diversity) | yes (engineer word: no diversity factor) | |
+| Connected total (no concurrency factor) | yes (engineer word: no concurrency factor) | |
 | at least | yes, plain word | |
 | Read summaries now | yes, exists on the Levels tab | |
 | Not a design flow | yes (engineer word) | |
@@ -27,15 +27,15 @@ Source files read: `building-flow.ts`, `BuildingRisersPane.tsx`, `riserInfo.ts`,
 
 **J1: all numbers known. Goal: read the capacity of each span. Start: building with Level 0, 1, 2, one riser R1, an equipment on Level 0, all summaries saved, unit m³/h. 2 steps.**
 1. Open the Building dialog. (The Risers tab is not the first tab.)
-2. Click the tab "Risers". R1 is selected by itself (first riser). The user sees under "Capacity": "Main level: Level 0", "Connected total: 750 m³/h (no diversity)", rows "Level 0 to Level 1" 650 m³/h and "Level 1 to Level 2" 150 m³/h. No hint line.
+2. Click the tab "Risers". R1 is selected by itself (first riser). The user sees under "Capacity": "Main level: Level 0", "Connected total: 750 m³/h (no concurrency factor)", rows "Level 0 to Level 1" 650 m³/h and "Level 1 to Level 2" 150 m³/h. No hint line.
 Repeat check (L3): click 3 risers one after another in the diagram. 1 step each; each shows its own numbers; the list order does not move.
 
 **J2: one level has no summary. Goal: understand why a number reads "at least" and fix it. Start: as J1, Level 1 has no saved summary. 3 steps.**
-1. Open the Building dialog. 2. Click "Risers". The user sees "Connected total: at least 750 m³/h (no diversity)" and the span rows "Level 0 to Level 1: at least 650 m³/h", "Level 1 to Level 2: at least 150 m³/h" (the number of a row is "at least" when a level behind it has no data). Under the rows: the hint and the button "Read summaries now". The "Warnings (1)" line at the top of the tab names Level 1.
+1. Open the Building dialog. 2. Click "Risers". The user sees "Connected total: at least 750 m³/h (no concurrency factor)" and the span rows "Level 0 to Level 1: at least 650 m³/h", "Level 1 to Level 2: at least 150 m³/h" (the number of a row is "at least" when a level behind it has no data). Under the rows: the hint and the button "Read summaries now". The "Warnings (1)" line at the top of the tab names Level 1.
 3. Click "Read summaries now". The button shows "Reading…" and is off. When it ends, a notice shows "Read 3 of 3 summaries." The "at least" words, the hint and the button go. (If a PDF cannot be read, the notice says "1 PDF needs to be opened first." and the hint stays.)
 
 **J3: no source level. Goal: set the main level. Start: 3 levels, no equipment on any level. 4 steps.**
-1. Open the Building dialog. 2. Click "Risers". The user sees "Main level: not known yet", "Connected total: 750 m³/h (no diversity)", the rows "Level 0 to Level 1: not known yet (no source level)" and the hint "Click Set by hand and choose a source level."
+1. Open the Building dialog. 2. Click "Risers". The user sees "Main level: not known yet", "Connected total: 750 m³/h (no concurrency factor)", the rows "Level 0 to Level 1: not known yet (no source level)" and the hint "Click Set by hand and choose a source level."
 3. Click "Set by hand" (existing link). Two selects show.
 4. In the select "Source level", choose "Level 0". The rows now show 650 and 150. "Main level: Level 0".
 
@@ -86,7 +86,7 @@ Wide (1600 px, dialog about 1100 px of content):
 | | [ Up . source: Level 0 ..   ] |                                |
 | | Capacity        [Not a design flow]                              |
 | | [ Main level: Level 0         ]                                |
-| | [ Connected total: at least 750 m3/h (no diversity) ]          |
+| | [ Connected total: at least 750 m3/h (no concurrency factor) ]          |
 | |  Level 0 to Level 1  at least 650 m3/h |                       |
 | |  Level 1 to Level 2  at least 150 m3/h |  (list scrolls > 8 rows)|
 | | Some levels have no data, so some numbers read "at least".     |
@@ -120,9 +120,9 @@ Major or minor: the block is a sub-block of the info panel, not a section card. 
 **Texts**
 
 - Subhead: `Capacity`
-- Tag (drain `sanitary-waste` (`ROUTE_GRAVITY_TYPE_IDS`), discipline `fireProtection`, discipline `electrical`): `Not a design flow`. Its `title` and a visible hint below the rows: `These numbers are a plain sum of connected capacities, with no diversity factor. They are not a design flow for this network type.`
+- Tag (drain `sanitary-waste` (`ROUTE_GRAVITY_TYPE_IDS`), discipline `fireProtection`, discipline `electrical`): `Not a design flow`. Its `title` and a visible hint below the rows: `These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type.`
 - Line 1: `Main level: Level 0`; unknown: `Main level: not known yet`.
-- Line 2: `Connected total: 750 m³/h (no diversity)`; not complete: `Connected total: at least 750 m³/h (no diversity)`; no unit: `Connected total: 750 (no diversity)`. Note: the draft had no colon after "Connected total"; I added one so both lines match.
+- Line 2: `Connected total: 750 m³/h (no concurrency factor)`; not complete: `Connected total: at least 750 m³/h (no concurrency factor)`; no unit: `Connected total: 750 (no concurrency factor)`. Note: the draft had no colon after "Connected total"; I added one so both lines match.
 - Row (one per span, lowest level first): `Level 0 to Level 1` + value `650 m³/h`; not complete: `at least 150 m³/h`; unknown: `not known yet (no source level)`, `not known yet (more than one source level)`, `not known yet (the risers make a loop)`, `not known yet (two main levels set by hand)`. Without unit: `650`, `at least 150`.
 - Shared network (group has more than one riser): `The total also covers Riser 2, Riser 3. They share a network with this riser.` (one riser: `The total also covers Riser 2. It shares a network with this riser.`)
 - Not complete: `Some levels have no data, so some numbers read "at least". The warnings above name each level.` and the link button `Read summaries now` (shown only when a member sheet has a PDF link but no summary or no riser data; hidden when the app cannot read PDFs, `onRebuildSummaries` absent). While it runs: `Reading…`. Result: the notice of the dialog with `rebuildResultText` ("Read 3 of 3 summaries.").
@@ -137,7 +137,7 @@ Major or minor: the block is a sub-block of the info panel, not a section card. 
 - `Capacity`: a number (2 decimals at most) or empty. Empty for an end row, a one-member riser and a span with state unknown.
 - `Capacity unit`: `riser.networkType.flowUnit` (for example `m³/h`), empty when the unit is not set or the capacity is empty.
 - `Capacity complete`: `Yes` or `No` (`No` means "at least"). Empty when the capacity is empty.
-- Takeoff warnings, in this order: the existing span warnings; the solve warnings as the core builds them (they name the level; no prefix); one line per network type that has numbers but no unit: `Network type <name> has no flow unit. Its capacity numbers have no unit.`; the line that replaces `Flow is not summed across levels.`: `Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.`; the existing fire damper line.
+- Takeoff warnings, in this order: the existing span warnings; the solve warnings as the core builds them (they name the level; no prefix); one line per network type that has numbers but no unit: `Network type <name> has no flow unit. Its capacity numbers have no unit.`; the line that replaces `Flow is not summed across levels.`: `Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.`; the existing fire damper line.
 
 ## 7. Platform table
 
@@ -160,4 +160,4 @@ No new platform API. The new link "Read summaries now" reuses the existing rebui
 
 ## Not in this task
 
-Arrows or "Up/Down" in the new text (B8). A capacity per level row. Diversity factors. Sizing from the capacity. A filter of warnings by riser.
+Arrows or "Up/Down" in the new text (B8). A capacity per level row. Concurrency factors. Sizing from the capacity. A filter of warnings by riser.

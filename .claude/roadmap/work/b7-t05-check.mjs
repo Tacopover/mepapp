@@ -176,7 +176,7 @@ const warningsText = async () => ((await page.locator('[data-testid="riser-warni
 await showRisers();
 await snap('b7-t05-1-known-1600');
 check((await textOf('riser-capacity-main')) === 'Main level: Level 0', 'main level line', String(await textOf('riser-capacity-main')));
-check((await textOf('riser-capacity-total')) === 'Connected total: 750 m³/h (no diversity)', 'connected total line', String(await textOf('riser-capacity-total')));
+check((await textOf('riser-capacity-total')) === 'Connected total: 750 m³/h (no concurrency factor)', 'connected total line', String(await textOf('riser-capacity-total')));
 {
   const rows = await rowsText();
   check(JSON.stringify(rows) === JSON.stringify(['Level 0 to Level 1: 650 m³/h', 'Level 1 to Level 2: 150 m³/h']), 'rows 650 and 150 (worked example, source on level 0)', JSON.stringify(rows));
@@ -206,7 +206,7 @@ await closeDialog();
   await showRisers();
   const rows = await rowsText();
   check(JSON.stringify(rows) === JSON.stringify(['Level 0 to Level 1: 750 m³/h', 'Level 1 to Level 2: 250 m³/h']), 'a capacity edit on the open level changes the rows (live data, counted once)', JSON.stringify(rows));
-  check((await textOf('riser-capacity-total')) === 'Connected total: 850 m³/h (no diversity)', 'total after the edit is 850 (not 1000)', String(await textOf('riser-capacity-total')));
+  check((await textOf('riser-capacity-total')) === 'Connected total: 850 m³/h (no concurrency factor)', 'total after the edit is 850 (not 1000)', String(await textOf('riser-capacity-total')));
   await snap('b7-t05-1b-live-edit');
   await closeDialog();
   await page.evaluate(() => window.__mepSketchScene.setTerminalCapacity('t0', 150));
@@ -221,7 +221,7 @@ await snap('b7-t05-2-atleast-1600');
 {
   const rows = await rowsText();
   check(JSON.stringify(rows) === JSON.stringify(['Level 0 to Level 1: at least 150 m³/h', 'Level 1 to Level 2: 150 m³/h']), 'span behind the missing level reads "at least"; the leaf span is exact', JSON.stringify(rows));
-  check((await textOf('riser-capacity-total')) === 'Connected total: at least 250 m³/h (no diversity)', 'total reads "at least"', String(await textOf('riser-capacity-total')));
+  check((await textOf('riser-capacity-total')) === 'Connected total: at least 250 m³/h (no concurrency factor)', 'total reads "at least"', String(await textOf('riser-capacity-total')));
   const h = await hints();
   check(h.some((x) => /Some levels have no data/.test(x)), 'the incomplete hint shows', JSON.stringify(h));
   const w = await warningsText();
@@ -267,7 +267,7 @@ await closeDialog();
   const rows = await rowsText();
   check(rows.length === 2 && rows.every((r) => /not known yet \(no source level\)$/.test(r)), 'rows read "not known yet (no source level)"', JSON.stringify(rows));
   check((await textOf('riser-capacity-main')) === 'Main level: not known yet', 'main level not known', String(await textOf('riser-capacity-main')));
-  check((await textOf('riser-capacity-total')) === 'Connected total: 750 m³/h (no diversity)', 'total still shows', String(await textOf('riser-capacity-total')));
+  check((await textOf('riser-capacity-total')) === 'Connected total: 750 m³/h (no concurrency factor)', 'total still shows', String(await textOf('riser-capacity-total')));
   const h = await hints();
   check(h.some((x) => /Click Set by hand and choose a source level\./.test(x)), 'the hint points to Set by hand', JSON.stringify(h));
   check(/no source level/.test(await warningsText()), 'the warning list has the no-source warning', await warningsText());

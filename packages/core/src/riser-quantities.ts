@@ -191,7 +191,7 @@ export function riserTakeoffWarnings(file: BuildingFile, flow?: BuildingFlowResu
     if (flow?.risers[riser.id]?.spans.some((span) => span.state === 'ok' && span.capacity !== null)) unitless.add(riser.networkType.name);
   }
   for (const name of unitless) warnings.push(`Network type ${name} has no flow unit. Its capacity numbers have no unit.`);
-  warnings.push('Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.');
+  warnings.push('Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.');
   warnings.push('Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.');
   return warnings;
 }

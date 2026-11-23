@@ -18,7 +18,7 @@ Source files read: `riserCapacity.ts`, `PropertiesPanel.tsx` (segment branch lin
 | Solved capacity | yes, exists in Properties | the number now counts other levels where the solve has a number |
 | Riser (R1) | yes, exists in the Risers tab | |
 | Main level | yes (T05) | the level of the source; neutral word (D-B-74 A) |
-| Connected total (no diversity) | yes (T05) | |
+| Connected total (no concurrency factor) | yes (T05) | |
 | at least | yes (T05) | |
 | not known yet | yes (T05) | |
 | Not a design flow | yes (T05) | |
@@ -29,11 +29,11 @@ Source files read: `riserCapacity.ts`, `PropertiesPanel.tsx` (segment branch lin
 
 **J1 (main): read the duct and find the rest of the building. 2 steps.** Start: 3 levels, one riser R1, equipment on Level 0, terminals 100 / 300 + 200 / 150, Level 1 is open, nothing selected.
 1. Click the duct that ends at the riser. Properties shows "Segment", "Solved capacity 500". No new row (the duct carries only the terminals behind it: 500 is right for the duct).
-2. Click the riser fitting at the end of the duct. Properties shows "Fitting" with "Solved capacity 650", and a new section "Riser R1": "Main level  Level 0", "Connected total  750 m³/h (no diversity)". The user now knows: the fitting carries 650, the whole building 750, the source is Level 0.
+2. Click the riser fitting at the end of the duct. Properties shows "Fitting" with "Solved capacity 650", and a new section "Riser R1": "Main level  Level 0", "Connected total  750 m³/h (no concurrency factor)". The user now knows: the fitting carries 650, the whole building 750, the source is Level 0.
 Friction check: the user does not need the Building dialog for this answer. The hint text names the dialog only for the detail per level.
 
 **J2: change a terminal capacity on the open level. 4 steps.** Start: as J1, the riser fitting is selected and shows 650 and 750.
-1. Click the terminal that has 300. 2. In Properties type 400 in its capacity field and press Enter. The numbers change by themselves after about 0.2 s. No reopen. 3. Click the riser fitting again. It shows "Solved capacity 750", "Connected total 850 m³/h (no diversity)". The header total shows 600 (level only: unchanged rule D-B-78).
+1. Click the terminal that has 300. 2. In Properties type 400 in its capacity field and press Enter. The numbers change by themselves after about 0.2 s. No reopen. 3. Click the riser fitting again. It shows "Solved capacity 750", "Connected total 850 m³/h (no concurrency factor)". The header total shows 600 (level only: unchanged rule D-B-78).
 Rule: while the fitting stays selected during an edit (for example after an Undo click), the two rows keep the last numbers until the new numbers arrive. They never go empty and never flicker.
 
 **J3: switch to another document and back. 3 steps.** Start: as J1, Level 1 and Level 0 are open as two document tabs.
@@ -60,11 +60,11 @@ Read-out only. No entity, no control, no setting.
 | Stamp, segment (one), several segments selected | as today. No new section. A segment shows only its own capacity (see note) | none new |
 | Loading (summaries not read yet, or the scene has no numbers for this document yet) | no section. "Solved capacity" shows the level-only number | none new |
 | Riser with one member | no section (no other level, nothing to add) | none new |
-| Known | section "Riser R1": Main level `Level 0`, Connected total `750 m³/h (no diversity)` | none |
-| At least (a level has no data) | Connected total `at least 750 m³/h (no diversity)`, hint (E) | none |
+| Known | section "Riser R1": Main level `Level 0`, Connected total `750 m³/h (no concurrency factor)` | none |
+| At least (a level has no data) | Connected total `at least 750 m³/h (no concurrency factor)`, hint (E) | none |
 | Not known yet | Main level `not known yet (<reason>)` with one of the four reasons, Connected total still shows (D-B-76), hint (F). "Solved capacity" is level-only | none |
 | Hand-set main level | Main level `Level 0` (the level that the user set). No extra word | none |
-| No unit | `750 (no diversity)`, hint (G) | none |
+| No unit | `750 (no concurrency factor)`, hint (G) | none |
 | Not a design flow (drain, fire protection, electrical) | tag `Not a design flow` under the heading, hint (H) after the rows | none |
 | Shared network (group has more than one riser) | hint (D) | none |
 | Error: summaries cannot be read | same as "at least" | none |
@@ -83,21 +83,21 @@ Labels show in the existing style of `.mep-field-row label` (small, upper case b
 
 - Section heading (`h4`, as in `CircuitPanelProperties`): `Riser R1` (the name of the riser).
 - Row 1 label: `Main level`. Value: `Level 0` | `not known yet` | `not known yet (no source level)` | `not known yet (more than one source level)` | `not known yet (the risers make a loop)` | `not known yet (two main levels set by hand)`. (`not known yet` alone only when no reason can be found.)
-- Row 2 label: `Connected total`. Value: `750 m³/h (no diversity)` | `at least 750 m³/h (no diversity)` | no unit: `750 (no diversity)` and `at least 750 (no diversity)`.
+- Row 2 label: `Connected total`. Value: `750 m³/h (no concurrency factor)` | `at least 750 m³/h (no concurrency factor)` | no unit: `750 (no concurrency factor)` and `at least 750 (no concurrency factor)`.
 - Tag (only for Not a design flow): `Not a design flow`
 - Hints, in this order, each only when it applies. Style: `.mep-hint`.
   - (D) shared network, reused word for word from `sharedLine`: `The total also covers R2. It shares a network with this riser.` Several: `The total also covers R2, R3. They share a network with this riser.`
   - (E) not complete: `Some levels have no data, so a number reads "at least". Solved capacity counts only the levels that have data. Open Manage Buildings, tab Risers, to see which levels.`
   - (F) not known yet, reason is not a loop: `Solved capacity counts this level only until the main level is known. Open Manage Buildings, tab Risers, to set it.` Reason loop: `Solved capacity counts this level only. The risers make a loop. Open Manage Buildings, tab Risers, for details.`
   - (G) no unit, reused word for word: `This network type has no flow unit, so the numbers have no unit.`
-  - (H) not a design flow, reused word for word: `These numbers are a plain sum of connected capacities, with no diversity factor. They are not a design flow for this network type.`
-- `title` of each value: the full sentence `Main level: Level 0` and `Connected total: 750 m³/h (no diversity)` (the same text that the Risers tab shows).
+  - (H) not a design flow, reused word for word: `These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type.`
+- `title` of each value: the full sentence `Main level: Level 0` and `Connected total: 750 m³/h (no concurrency factor)` (the same text that the Risers tab shows).
 
 Why (E) and (F) are not the T05 hints word for word: the T05 hints point to "the warnings above", to the link "Set by hand" and to the list "Source level". None of these exist in Properties. A hint that names a control that is not on the screen is a defect (L12, L14). All the other texts are reused word for word.
 
 String source (so the words cannot drift): `riserCapacity.ts` is the only source.
 - Add the exports `MAIN_LEVEL_LABEL = 'Main level'` and `CONNECTED_TOTAL_LABEL = 'Connected total'`.
-- `CapacityView` gets `mainValue` (`Level 0` or `not known yet`), `totalValue` (`750 m³/h (no diversity)`), `unknownReasonText` (the reason text or null), and the flags `complete`, `unknown`, `loop`, `noUnit`.
+- `CapacityView` gets `mainValue` (`Level 0` or `not known yet`), `totalValue` (`750 m³/h (no concurrency factor)`), `unknownReasonText` (the reason text or null), and the flags `complete`, `unknown`, `loop`, `noUnit`.
 - `mainLine` and `totalLine` are built as `${LABEL}: ${value}`. Their text does not change, so the T05 tests stay green. A new unit test checks this.
 - A new function `fittingRiserLinesOf(view)` returns the heading tag, the two rows (label, value, title) and the hints (D to H). `PropertiesPanel` only draws what it returns. A test on `riserCapacity.ts` checks every state of the table in 4.
 - `PropertiesPanel` gets one new optional prop with this result (null = no section). `App.tsx` finds the riser of the selected fitting through `scene.getRiserMarks()` and calls `capacityViewOf` with the same building solve that feeds the scene.
@@ -122,7 +122,7 @@ Dock at the default width 420 px (content about 372 px). Known state:
 | RISER R1                                   |
 |--------------------------------------------|
 | MAIN LEVEL                         Level 0 |
-| CONNECTED TOTAL    750 m³/h (no diversity) |
+| CONNECTED TOTAL    750 m³/h (no concurrency factor) |
 +--------------------------------------------+
 ```
 
@@ -144,7 +144,7 @@ Narrowest dock, 280 px (content about 232 px). A long value wraps, nothing is cu
 |                  source level)   |
 | CONNECTED TOTAL  at least 12345.6|
 |                  7 m³/h (no      |
-|                  diversity)      |
+|                  concurrency)      |
 | Solved capacity counts this      |
 | level only until the main level  |
 | is known. Open Manage Buildings, |
@@ -159,7 +159,7 @@ Not a design flow (drain): the tag line `Not a design flow` (class `mep-rp-tag`)
 ## 8. Platform table
 
 No new platform API. The numbers of other levels come from the stored summaries that B6 and T05 already read (`readPath`, `statPath`, stored handles). What the web fake hides, as steps for the platform test script B7-T06:
-1. Windows desktop app, 3-level building with real PDFs on disk. Open Level 1, click the duct, then the riser fitting. Expect 500, then 650, "Main level  Level 0", "Connected total  750 m³/h (no diversity)". (The web check uses OPFS files, not real disk files.)
+1. Windows desktop app, 3-level building with real PDFs on disk. Open Level 1, click the duct, then the riser fitting. Expect 500, then 650, "Main level  Level 0", "Connected total  750 m³/h (no concurrency factor)". (The web check uses OPFS files, not real disk files.)
 2. Edit a terminal capacity on Level 0 and save the PDF in the desktop app. Switch to the tab of Level 1 and click the riser fitting. Expect the new numbers with no reopen. (The fake save writes to OPFS. The real save writes a PDF, and the other tab must read the new summary.)
 3. In Chrome or Edge (no stored handle for Level 2): click the riser fitting of Level 1. Expect `at least` and hint (E). The web fake can open every PDF, so it hides this.
 4. Drag the dock to its minimum width (280 px) on a screen with 125 % or 150 % scaling. Read the two rows in the "not known yet" state. Expect a wrapped text, nothing cut. (The headless browser has 100 % scaling.)
@@ -175,7 +175,7 @@ No new platform API. The numbers of other levels come from the stored summaries 
 
 ## Not in this task
 
-Arrows or direction words (B8). A capacity line on the segment panel. A change of the header total. A jump from Properties to the Risers tab. "at least" on the Solved capacity row. Diversity factors. Sizing from the capacity.
+Arrows or direction words (B8). A capacity line on the segment panel. A change of the header total. A jump from Properties to the Risers tab. "at least" on the Solved capacity row. Concurrency factors. Sizing from the capacity.
 
 ## Addendum after the journey test (task lead, provisional)
 

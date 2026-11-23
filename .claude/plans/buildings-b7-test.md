@@ -7,7 +7,7 @@ Words in this script:
 - A "span" is the part of a riser between two levels next to each other.
 - The "main level" is the level where the flow starts (the level that has the source, for example an air handling unit).
 - The "capacity" of a span is the sum of the capacities of all terminals that sit behind that span, seen from the main level.
-- The "connected total" is the sum of all terminals of all levels of the riser. The app does not apply a diversity factor (a factor that lowers the sum because not all terminals run at the same time). So the number is not a design flow.
+- The "connected total" is the sum of all terminals of all levels of the riser. The app does not apply a concurrency factor (a factor that lowers the sum because not all terminals run at the same time). So the number is not a design flow.
 - A "summary" is a small file that the app saves next to each PDF when you save. It holds the capacity numbers of that level. The other levels read it.
 - "at least" is the text that the app puts before a number when a level has no summary. The app counts that level as 0.
 
@@ -25,9 +25,9 @@ The numbers below hold for these terminals. The total is always 750.
 
 ## Part A: the worked example
 
-1. Open Manage Buildings and the tab "Risers". Select the riser. Check: the block "Capacity" shows "Main level" with "Level 0" and "Connected total" with "750 m³/h (no diversity)". The rows say "Level 0 to Level 1" with "650 m³/h" and "Level 1 to Level 2" with "150 m³/h". No hint shows. The old box "Flow direction" is still there and says "Up · source: Level 0".
+1. Open Manage Buildings and the tab "Risers". Select the riser. Check: the block "Capacity" shows "Main level" with "Level 0" and "Connected total" with "750 m³/h (no concurrency factor)". The rows say "Level 0 to Level 1" with "650 m³/h" and "Level 1 to Level 2" with "150 m³/h". No hint shows. The old box "Flow direction" is still there and says "Up · source: Level 0".
 2. Close the dialog. Open Level 1. Click the duct that ends at the riser fitting. Check: the Properties panel says "Solved capacity" 500. A line says "This segment is on the network of riser R1. Select the riser fitting to see the connected total." (the riser can have another name).
-3. Click the riser fitting of Level 1. Check: "Solved capacity" says 650. A section shows "Main level" with "Level 0" and "Connected total" with "750 m³/h (no diversity)". Write down if you find any word with a direction ("up", "down") in this section. There must be none.
+3. Click the riser fitting of Level 1. Check: "Solved capacity" says 650. A section shows "Main level" with "Level 0" and "Connected total" with "750 m³/h (no concurrency factor)". Write down if you find any word with a direction ("up", "down") in this section. There must be none.
 4. Look at the header. Check: it says 500 for the capacity of this level (it counts this level only). Write down if this difference (500 in the header, 650 at the fitting) is confusing. This is an open question for the next round.
 5. Open Level 0. Click the exit fitting of the riser. Check: "Solved capacity" says 650 (the flow that goes to the other levels). Click the terminal. Check: "Capacity" says 100.
 6. Open Level 2. Click the riser fitting. Check: "Solved capacity" says 150. The section says "Main level" "Level 0".
@@ -36,7 +36,7 @@ The numbers below hold for these terminals. The total is always 750.
 
 7. Open Level 2. Change the terminal from 150 to 250. Do not save. Open the Risers tab. Check: the rows say 750 for "Level 0 to Level 1" and 250 for "Level 1 to Level 2". The connected total is 850 m³/h (the open level counts its live numbers).
 8. Close the dialog. Switch to Level 1 (the document switcher in the header). Click the riser fitting. Check: it still says the old numbers (650, and 750 m³/h for the total), because Level 2 is not saved. This is the rule of the app: the other levels count the saved summary. Write down if this surprises you.
-9. Switch to Level 2. Save. Switch to Level 1. Click the riser fitting. Check: "Solved capacity" says 750 and "Connected total" says 850 m³/h (no diversity). You did not reopen anything.
+9. Switch to Level 2. Save. Switch to Level 1. Click the riser fitting. Check: "Solved capacity" says 750 and "Connected total" says 850 m³/h (no concurrency factor). You did not reopen anything.
 10. On Level 1 change the terminal 300 to 400. Do not save. Check at once, with no click on another place: the duct shows 600 and the riser fitting shows 850. The header says 600. Press Save. Open the Risers tab. Check: the rows say 850 and 250. The total says 950 m³/h.
 
 ## Part C: the main level by hand
@@ -60,13 +60,13 @@ The numbers below hold for these terminals. The total is always 750.
 
 ## Part F: other network types
 
-21. Make a second riser of the type Sanitary Waste (a drain) through two levels, or change the network type of a test riser. Open the Risers tab. Check: the Capacity block shows a tag "Not a design flow" and the hint "These numbers are a plain sum of connected capacities, with no diversity factor. They are not a design flow for this network type." The word "Main level" is used. No word "up" or "down" shows in the new text.
+21. Make a second riser of the type Sanitary Waste (a drain) through two levels, or change the network type of a test riser. Open the Risers tab. Check: the Capacity block shows a tag "Not a design flow" and the hint "These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type." The word "Main level" is used. No word "up" or "down" shows in the new text.
 22. Repeat the check with a fire protection (sprinkler) network type and with an electrical network type, if the app has a riser for them. Write down what you see.
 23. Make a network type that has no flow unit (open Networks and clear the unit). Check: the numbers show with no unit and a hint says: `This network type has no flow unit, so the numbers have no unit.`
 
 ## Part G: the takeoff and Excel
 
-24. Open the takeoff (Quantities) for the scope "Building". Open the table "Risers". Check: the last three columns are "Capacity", "Capacity unit" and "Capacity complete". The rows show 650 and 150, the unit m³/h and "Yes". The warnings do not contain "Flow is not summed across levels." One warning says: `Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.`
+24. Open the takeoff (Quantities) for the scope "Building". Open the table "Risers". Check: the last three columns are "Capacity", "Capacity unit" and "Capacity complete". The rows show 650 and 150, the unit m³/h and "Yes". The warnings do not contain "Flow is not summed across levels." One warning says: `Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.`
 25. Export the takeoff to Excel and open the file. Check: the table "Risers" has the same columns. Sum the column "Capacity" and filter on the column "Capacity unit". Write down if the numbers in the column "Capacity" are numbers (right aligned, they sum) or text.
 26. Choose the scope "Level" (Level 1). Check: the Risers table shows the spans that touch Level 1. The warning list can name warnings of other levels. This is accepted.
 

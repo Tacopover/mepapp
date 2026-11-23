@@ -312,7 +312,7 @@ describe('buildBuildingTakeoff with risers', () => {
     expect(label).toBe('Building network Supply 1');
     expect(cellById(segments, 'seg1', 'Building network')).toBe(label);
     expect(result.warnings).not.toContain('Flow is not summed across levels.');
-    expect(result.warnings).toContain('Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.');
+    expect(result.warnings).toContain('Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.');
   });
 
   it('lists the riser span only on the levels it touches in Level scope', () => {
@@ -427,7 +427,7 @@ describe('buildBuildingTakeoff with risers', () => {
         [150, 'm³/h', 'Yes'],
       ]);
       expect(result.warnings).not.toContain('Flow is not summed across levels.');
-      expect(result.warnings).toContain('Capacity is a plain sum of connected capacities, with no diversity factor. It is not a design flow.');
+      expect(result.warnings).toContain('Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.');
     });
 
     it('gives the capacity of each span from the source level above it', () => {

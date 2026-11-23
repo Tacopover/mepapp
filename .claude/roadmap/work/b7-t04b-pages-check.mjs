@@ -137,7 +137,7 @@ await clickFittingAt('rf');
 console.log('PAGE 0', await solved(), await byId('props-riser-main'), await byId('props-riser-total'), JSON.stringify(await lastCall()));
 check((await solved()) === '250', 'page 0 (source): the exit fitting rf carries the 250 that go to page 1', String(await solved()));
 check((await byId('props-riser-main')) === 'Level 0', 'page 0: Main level is Level 0', String(await byId('props-riser-main')));
-check((await byId('props-riser-total')) === '400 m³/h (no diversity)', 'page 0: total 400', String(await byId('props-riser-total')));
+check((await byId('props-riser-total')) === '400 m³/h (no concurrency factor)', 'page 0: total 400', String(await byId('props-riser-total')));
 const callsBefore = (await page.evaluate(() => window.__calls)).length;
 await page.locator('button[title="Next page"]').click();
 await idle(1500);
@@ -146,7 +146,7 @@ check(JSON.stringify(await lastCall()) === JSON.stringify({ rf2: { role: 'entry'
 await clickFittingAt('rf2');
 check((await solved()) === '250', 'page 1: rf2 shows 250 (terminals of the page only)', String(await solved()));
 check((await byId('props-riser-main')) === 'Level 0', 'page 1: Main level Level 0', String(await byId('props-riser-main')));
-check((await byId('props-riser-total')) === '400 m³/h (no diversity)', 'page 1: total 400', String(await byId('props-riser-total')));
+check((await byId('props-riser-total')) === '400 m³/h (no concurrency factor)', 'page 1: total 400', String(await byId('props-riser-total')));
 await page.locator('button[title="Previous page"]').click();
 await idle(1500);
 check(JSON.stringify(await lastCall()) === JSON.stringify({ rf: { role: 'exit', demandBeyond: 250 } }), 'back on page 0: the scene got { rf: exit, 250 } again', JSON.stringify(await lastCall()));

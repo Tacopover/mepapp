@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { capacityNumberText, capacityViewOf, fittingRiserLinesOf, isNotDesignFlow, needsSummaryRead, rebuildNoticeText, riserFlowUnit, unknownReasonOf, type CapacityView } from './riserCapacity.js';
 import type { RebuildResult } from './rebuildSummaries.js';
 
-const DESIGN_FLOW_TEXT = 'These numbers are a plain sum of connected capacities, with no diversity factor. They are not a design flow for this network type.';
+const DESIGN_FLOW_TEXT = 'These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type.';
 const INCOMPLETE_TEXT = 'Some levels have no data, so some numbers read "at least". The warnings above name each level.';
 const UNKNOWN_TEXT = 'Click Set by hand and choose a source level.';
 const NO_UNIT_TEXT = 'This network type has no flow unit, so the numbers have no unit.';
@@ -143,7 +143,7 @@ describe('capacityViewOf', () => {
     ]);
     expect(view.rows[0]).toMatchObject({ known: true, ariaLabel: 'Level 0 to Level 1: 650 m³/h' });
     expect(view.mainLine).toBe('Main level: Level 0');
-    expect(view.totalLine).toBe('Connected total: 750 m³/h (no diversity)');
+    expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
     expect(view.hints).toEqual([]);
     expect(view.sharedLine).toBeNull();
     expect(view.notDesignFlow).toBe(false);
@@ -156,7 +156,7 @@ describe('capacityViewOf', () => {
     const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
     expect(view.rows.map((row) => row.valueText)).toEqual(['100 m³/h', '600 m³/h']);
     expect(view.mainLine).toBe('Main level: Level 2');
-    expect(view.totalLine).toBe('Connected total: 750 m³/h (no diversity)');
+    expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
   });
 
   it('reads "at least" for a span behind a level with no summary, and asks for the summary', () => {
@@ -167,7 +167,7 @@ describe('capacityViewOf', () => {
     const view = capacityViewOf(file, riser, flow);
     expect(view.rows.map((row) => row.valueText)).toEqual(['at least 150 m³/h', '150 m³/h']);
     expect(view.rows[0]).toMatchObject({ known: true });
-    expect(view.totalLine).toBe('Connected total: at least 250 m³/h (no diversity)');
+    expect(view.totalLine).toBe('Connected total: at least 250 m³/h (no concurrency factor)');
     expect(view.hints[0]).toBe(INCOMPLETE_TEXT);
     expect(needsSummaryRead(file, riser, flow, summaries)).toBe(true);
   });
@@ -180,7 +180,7 @@ describe('capacityViewOf', () => {
     const flow = solveBuildingFlow(file, summaries, live);
     const view = capacityViewOf(file, riser, flow);
     expect(view.rows.map((row) => row.valueText)).toEqual(['650 m³/h', '150 m³/h']);
-    expect(view.totalLine).toBe('Connected total: 750 m³/h (no diversity)');
+    expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
     expect(view.hints).toEqual([]);
     expect(needsSummaryRead(file, riser, flow, summaries, live)).toBe(false);
   });
@@ -212,7 +212,7 @@ describe('capacityViewOf', () => {
     ]);
     expect(view.rows[0]!.ariaLabel).toBe('Level 0 to Level 1: not known yet (no source level)');
     expect(view.mainLine).toBe('Main level: not known yet');
-    expect(view.totalLine).toBe('Connected total: 750 m³/h (no diversity)');
+    expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
     expect(view.hints).toEqual([UNKNOWN_TEXT]);
     expect(unknownReasonOf(file, flow.groups[0]!, flow.warnings)).toBe('no-source');
   });
@@ -250,7 +250,7 @@ describe('capacityViewOf', () => {
     const flow = solveBuildingFlow(file, summaries);
     const view = capacityViewOf(file, r1, flow);
     expect(view.rows.map((row) => row.valueText)).toEqual(['not known yet (the risers make a loop)']);
-    expect(view.totalLine).toBe('Connected total: 600 m³/h (no diversity)');
+    expect(view.totalLine).toBe('Connected total: 600 m³/h (no concurrency factor)');
     expect(view.hints).toEqual(['See the warnings above.']);
     expect(view.sharedLine).toBe('The total also covers R2. It shares a network with this riser.');
     expect(unknownReasonOf(file, flow.groups[0]!, flow.warnings)).toBe('loop');
@@ -287,7 +287,7 @@ describe('capacityViewOf', () => {
     delete bare.flowUnit;
     const { file, riser, summaries } = worked([true, false, false], [100, 500, 150], bare);
     const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
-    expect(view.totalLine).toBe('Connected total: 750 (no diversity)');
+    expect(view.totalLine).toBe('Connected total: 750 (no concurrency factor)');
     expect(view.rows.map((row) => row.valueText)).toEqual(['650', '150']);
     expect(view.hints).toEqual([NO_UNIT_TEXT]);
   });
@@ -399,7 +399,7 @@ describe('CapacityView parts', () => {
     const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
     expect(view).toMatchObject({
       mainValue: 'Level 0',
-      totalValue: '750 m³/h (no diversity)',
+      totalValue: '750 m³/h (no concurrency factor)',
       unknownReasonText: null,
       complete: true,
       unknown: false,
@@ -407,7 +407,7 @@ describe('CapacityView parts', () => {
       noUnit: false,
     });
     expect(view.mainLine).toBe('Main level: Level 0');
-    expect(view.totalLine).toBe('Connected total: 750 m³/h (no diversity)');
+    expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
   });
 
   it('gives empty value parts and false flags for a one-member riser', () => {
@@ -435,7 +435,7 @@ describe('fittingRiserLinesOf', () => {
       tag: null,
       rows: [
         { label: 'Main level', value: 'Level 0', title: 'Main level: Level 0' },
-        { label: 'Connected total', value: '750 m³/h (no diversity)', title: 'Connected total: 750 m³/h (no diversity)' },
+        { label: 'Connected total', value: '750 m³/h (no concurrency factor)', title: 'Connected total: 750 m³/h (no concurrency factor)' },
       ],
       hints: [],
     });
@@ -451,7 +451,7 @@ describe('fittingRiserLinesOf', () => {
       tag: null,
       rows: [
         { label: 'Main level', value: 'Level 0', title: 'Main level: Level 0' },
-        { label: 'Connected total', value: 'at least 250 m³/h (no diversity)', title: 'Connected total: at least 250 m³/h (no diversity)' },
+        { label: 'Connected total', value: 'at least 250 m³/h (no concurrency factor)', title: 'Connected total: at least 250 m³/h (no concurrency factor)' },
       ],
       hints: [RISER_INCOMPLETE_TEXT],
     });
@@ -465,7 +465,7 @@ describe('fittingRiserLinesOf', () => {
       tag: null,
       rows: [
         { label: 'Main level', value: 'not known yet (no source level)', title: 'Main level: not known yet (no source level)' },
-        { label: 'Connected total', value: '750 m³/h (no diversity)', title: 'Connected total: 750 m³/h (no diversity)' },
+        { label: 'Connected total', value: '750 m³/h (no concurrency factor)', title: 'Connected total: 750 m³/h (no concurrency factor)' },
       ],
       hints: [RISER_UNKNOWN_TEXT],
     });
@@ -479,7 +479,7 @@ describe('fittingRiserLinesOf', () => {
     const view = capacityViewOf(file, r1, solveBuildingFlow(file, summaries));
     const lines = fittingRiserLinesOf(view, 'R1');
     expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (the risers make a loop)', title: 'Main level: not known yet (the risers make a loop)' });
-    expect(lines?.rows[1]?.value).toBe('600 m³/h (no diversity)');
+    expect(lines?.rows[1]?.value).toBe('600 m³/h (no concurrency factor)');
     expect(lines?.hints).toEqual([SHARED_R2_TEXT, RISER_LOOP_TEXT]);
   });
 
@@ -488,7 +488,7 @@ describe('fittingRiserLinesOf', () => {
     delete bare.flowUnit;
     const { file, riser, summaries } = worked([true, false, false], [100, 500, 150], bare);
     const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
-    expect(fittingRiserLinesOf(view, 'R1')?.rows[1]).toEqual({ label: 'Connected total', value: '750 (no diversity)', title: 'Connected total: 750 (no diversity)' });
+    expect(fittingRiserLinesOf(view, 'R1')?.rows[1]).toEqual({ label: 'Connected total', value: '750 (no concurrency factor)', title: 'Connected total: 750 (no concurrency factor)' });
     expect(fittingRiserLinesOf(view, 'R1')?.hints).toEqual([NO_UNIT_TEXT]);
   });
 
@@ -522,13 +522,13 @@ describe('fittingRiserLinesOf', () => {
       kind: 'solved',
       notDesignFlow: true,
       mainLine: 'Main level: not known yet',
-      totalLine: 'Connected total: at least 750 m³/h (no diversity)',
+      totalLine: 'Connected total: at least 750 m³/h (no concurrency factor)',
       rows: [],
       sharedLine: SHARED_R2_TEXT,
       hints: [],
       designFlowHint: DESIGN_FLOW_TEXT,
       mainValue: 'not known yet',
-      totalValue: 'at least 750 m³/h (no diversity)',
+      totalValue: 'at least 750 m³/h (no concurrency factor)',
       unknownReasonText: 'more than one source level',
       complete: false,
       unknown: true,
@@ -546,13 +546,13 @@ describe('fittingRiserLinesOf', () => {
       kind: 'solved',
       notDesignFlow: false,
       mainLine: 'Main level: not known yet',
-      totalLine: 'Connected total: at least 250 m³/h (no diversity)',
+      totalLine: 'Connected total: at least 250 m³/h (no concurrency factor)',
       rows: [],
       sharedLine: null,
       hints: [],
       designFlowHint: null,
       mainValue: 'not known yet',
-      totalValue: 'at least 250 m³/h (no diversity)',
+      totalValue: 'at least 250 m³/h (no concurrency factor)',
       unknownReasonText: 'no source level',
       complete: false,
       unknown: true,
@@ -570,13 +570,13 @@ describe('fittingRiserLinesOf', () => {
       kind: 'solved',
       notDesignFlow: false,
       mainLine: 'Main level: not known yet',
-      totalLine: 'Connected total: 750 m³/h (no diversity)',
+      totalLine: 'Connected total: 750 m³/h (no concurrency factor)',
       rows: [],
       sharedLine: null,
       hints: [],
       designFlowHint: null,
       mainValue: 'not known yet',
-      totalValue: '750 m³/h (no diversity)',
+      totalValue: '750 m³/h (no concurrency factor)',
       unknownReasonText: 'no source level',
       complete: true,
       unknown: true,
@@ -593,13 +593,13 @@ describe('fittingRiserLinesOf', () => {
       kind: 'solved',
       notDesignFlow: false,
       mainLine: 'Main level: not known yet',
-      totalLine: 'Connected total: at least 250 m³/h (no diversity)',
+      totalLine: 'Connected total: at least 250 m³/h (no concurrency factor)',
       rows: [],
       sharedLine: null,
       hints: [],
       designFlowHint: null,
       mainValue: 'not known yet',
-      totalValue: 'at least 250 m³/h (no diversity)',
+      totalValue: 'at least 250 m³/h (no concurrency factor)',
       unknownReasonText: 'more than one source level',
       complete: false,
       unknown: true,
