@@ -147,7 +147,7 @@ export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSecti
           onChange={(v) => sceneRef.current?.setCircuitPhase(circuit.id, v as Circuit['phase'])}
         />
         <InheritableNumberField
-          label="Diversity %"
+          label="Concurrency %"
           value={circuit.diversityPercent}
           defaultValue={getEffectiveDiversityPercent(circuit, panel)}
           onChange={(v) => sceneRef.current?.setCircuitDiversity(circuit.id, v)}
@@ -417,7 +417,7 @@ export function PanelProperties({ sceneRef, panel, circuits, panelSections, circ
           </select>
         </div>
         <div className="mep-field-row">
-          <label>Diversity %</label>
+          <label>Concurrency %</label>
           <input
             type="number"
             value={defaults.diversityPercent ?? ''}

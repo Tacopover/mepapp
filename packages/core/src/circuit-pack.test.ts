@@ -43,7 +43,7 @@ describe('packRooms', () => {
     ]);
   });
 
-  it('applies the diversity factor to the load limit and closes the last piece of a split room', () => {
+  it('applies the concurrency factor to the load limit and closes the last piece of a split room', () => {
     const loads = Array.from({ length: 8 }, () => 300);
     const limits: PackLimits = { maxTerminals: null, maxLoad: 1000, diversityPercent: 50 };
     const terminalIds = loads.map((_, i) => `t${i + 1}`);

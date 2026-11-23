@@ -40,7 +40,7 @@ export const RESERVED_CIRCUIT_PROPERTY_NAMES = [
   'prefix',
   'circuit type',
   'phase',
-  'diversity %',
+  'concurrency %',
   'kind',
   'curve',
   'rating (a)',

@@ -206,7 +206,7 @@ describe('generateSchematic bindings', () => {
     expect(text('c2', 'cable')).toBe('B2CA 3G2,5 mm²  l=12 m');
   });
 
-  it('sums terminal capacity, and applies the diversity factor', () => {
+  it('sums terminal capacity, and applies the concurrency factor', () => {
     expect(text('c1', 'count')).toBe('2 (160VA)');
     expect(text('c1', 'div')).toBe('160 · 100%');
     expect(text('c2', 'div')).toBe('150 · 50%');
