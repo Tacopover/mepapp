@@ -38,6 +38,7 @@ export * from './network.js';
 export * from './connectivity.js';
 export * from './network-type-library.js';
 export * from './flow.js';
+export * from './flow-highest.js';
 export * from './circuit.js';
 export * from './circuit-type-library.js';
 export * from './circuit-pack.js';
