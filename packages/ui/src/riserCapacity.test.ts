@@ -547,6 +547,7 @@ describe('fittingRiserLinesOf', () => {
       unknown: true,
       loop: false,
       noUnit: true,
+      atMost: false,
     };
     const lines = fittingRiserLinesOf(view, 'R1');
     expect(lines?.tag).toBe('Not a design flow');
@@ -571,6 +572,7 @@ describe('fittingRiserLinesOf', () => {
       unknown: true,
       loop: false,
       noUnit: false,
+      atMost: false,
     };
     const lines = fittingRiserLinesOf(view, 'R1');
     expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (a level has no data)', title: 'Main level: not known yet (a level has no data)' });
@@ -595,6 +597,7 @@ describe('fittingRiserLinesOf', () => {
       unknown: true,
       loop: false,
       noUnit: false,
+      atMost: false,
     };
     const lines = fittingRiserLinesOf(view, 'R1');
     expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (no source level)', title: 'Main level: not known yet (no source level)' });
@@ -618,6 +621,7 @@ describe('fittingRiserLinesOf', () => {
       unknown: true,
       loop: false,
       noUnit: false,
+      atMost: false,
     };
     const lines = fittingRiserLinesOf(view, 'R1');
     expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (more than one source level)', title: 'Main level: not known yet (more than one source level)' });
@@ -666,5 +670,188 @@ describe('rebuildNoticeText', () => {
       text: 'Read 0 of 4 summaries. Failed: a.pdf: the PDF could not be read; b.pdf: the PDF could not be read; c.pdf: the PDF could not be read and 1 more.',
       error: true,
     });
+  });
+});
+
+describe('capacityNumberText with atMost', () => {
+  it('writes "at most" and keeps "at least" first', () => {
+    expect(capacityNumberText(650, 'm³/h', false, true)).toBe('at most 650 m³/h');
+    expect(capacityNumberText(650, undefined, false, true)).toBe('at most 650');
+    expect(capacityNumberText(12.345, 'l/s', false, true)).toBe('at most 12.35 l/s');
+    expect(capacityNumberText(150, 'm³/h', true, true)).toBe('at least 150 m³/h');
+    expect(capacityNumberText(650, 'm³/h', false, false)).toBe('650 m³/h');
+  });
+});
+
+describe('riser views with no source level', () => {
+  const AT_MOST_HINT_1_TEXT = 'No source level yet. Each span shows the largest flow for any source position.';
+  const AT_MOST_HINT_2_TEXT = 'Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0.';
+  const AT_MOST_HINT_3_TEXT = 'Place an air handling unit or a fan on a level, or click Set by hand and choose a main level.';
+  const AT_MOST_SELECT_TEXT = 'Place an air handling unit or a fan on a level, or choose a main level in the list "Source level".';
+  const RISER_AT_MOST_TEXT = 'No source level yet. Solved capacity shows the largest flow for any source position. Open Manage Buildings, tab Risers, to set the main level.';
+
+  function entryWith(fittingIds: string[], terminalCapacity: number, openEnds: number, hasSource = false): RiserNetworkSummary {
+    return { networkTypeId: vent.id, fittingIds, terminalCapacity, hasSource, openEnds };
+  }
+
+  /** Riser R1 on l0, l1 and l2 at fitting f. Terminals 100, 500, 150; one open end on each level; no source. */
+  function exampleFiveOf(type: NetworkType = vent) {
+    const riser = riserOf('R1', [memberOf(0), memberOf(1), memberOf(2)], type);
+    const file = fileWith([riser]);
+    const summaries = summariesOf(
+      summaryOf('p0', [{ ...entryWith(['f'], 100, 1), networkTypeId: type.id }]),
+      summaryOf('p1', [{ ...entryWith(['f'], 500, 1), networkTypeId: type.id }]),
+      summaryOf('p2', [{ ...entryWith(['f'], 150, 1), networkTypeId: type.id }]),
+    );
+    return { file, riser, summaries, flow: solveBuildingFlow(file, summaries) };
+  }
+
+  it('gives the at-most rows, the main level and the hints when no level is the source', () => {
+    const { file, riser, flow } = exampleFiveOf();
+    const view = capacityViewOf(file, riser, flow);
+    expect(view.atMost).toBe(true);
+    expect(view.rows.map((row) => row.valueText)).toEqual(['at most 650 m³/h', 'at most 600 m³/h']);
+    expect(view.rows[0]).toMatchObject({ known: true, ariaLabel: 'Level 0 to Level 1: at most 650 m³/h' });
+    expect(view.mainLine).toBe('Main level: not known yet (no source level)');
+    expect(view.mainValue).toBe('not known yet');
+    expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
+    expect(view.unknown).toBe(false);
+    expect(view.hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, AT_MOST_HINT_3_TEXT]);
+    expect(view.hints).not.toContain(UNKNOWN_TEXT);
+  });
+
+  it('names the list "Source level" in the third hint when the selects are shown', () => {
+    const { file, riser, flow } = exampleFiveOf();
+    expect(capacityViewOf(file, riser, flow, { selectsShown: true }).hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, AT_MOST_SELECT_TEXT]);
+    expect(capacityViewOf(file, riser, flow, { selectsShown: false }).hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, AT_MOST_HINT_3_TEXT]);
+  });
+
+  it('takes the source word of the network type in the third hint', () => {
+    const cases: [NetworkType, string][] = [
+      [networkTypeOf({ id: 'water', name: 'Water', discipline: 'heatingAndCooling' }), 'a pump or a boiler'],
+      [networkTypeOf({ id: 'water', name: 'Water', discipline: 'plumbing' }), 'a pump or a boiler'],
+      [networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' }), 'a panel'],
+      [networkTypeOf({ id: 'sprinkler', name: 'Sprinkler', discipline: 'fireProtection', flowUnit: 'l/s' }), 'a pump'],
+      [networkTypeOf({ id: 'other', name: 'Other', discipline: 'other' }), 'a source equipment'],
+      [networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' }), 'an outlet or a pump'],
+    ];
+    for (const [type, word] of cases) {
+      const { file, riser, flow } = exampleFiveOf(type);
+      const view = capacityViewOf(file, riser, flow);
+      expect(view.atMost).toBe(true);
+      expect(view.rows[0]!.valueText.startsWith('at most ')).toBe(true);
+      expect(view.hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, `Place ${word} on a level, or click Set by hand and choose a main level.`]);
+    }
+  });
+
+  it('writes the at-most numbers without a unit and ends the hints with the no-unit text', () => {
+    const bare = networkTypeOf();
+    delete bare.flowUnit;
+    const { file, riser, flow } = exampleFiveOf(bare);
+    const view = capacityViewOf(file, riser, flow);
+    expect(view.rows.map((row) => row.valueText)).toEqual(['at most 650', 'at most 600']);
+    expect(view.totalLine).toBe('Connected total: 750 (no concurrency factor)');
+    expect(view.hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, AT_MOST_HINT_3_TEXT, NO_UNIT_TEXT]);
+  });
+
+  it('gives a plain main line and no hint for a group with one possible source', () => {
+    const riser = riserOf('R1', [memberOf(0), memberOf(1), memberOf(2)]);
+    const file = fileWith([riser]);
+    const summaries = summariesOf(
+      summaryOf('p0', [entryWith(['f'], 100, 1)]),
+      summaryOf('p1', [entryWith(['f'], 500, 0)]),
+      summaryOf('p2', [entryWith(['f'], 150, 0)]),
+    );
+    const flow = solveBuildingFlow(file, summaries);
+    expect(flow.groups[0]).toMatchObject({ state: 'ok' });
+    expect(flow.groups[0]!.sourceLevelId).toBeUndefined();
+    expect(flow.groups[0]!.atMost).toBeUndefined();
+    const view = capacityViewOf(file, riser, flow);
+    expect(view.atMost).toBe(false);
+    expect(view.mainValue).toBe('none yet (no source level)');
+    expect(view.mainLine).toBe('Main level: none yet (no source level)');
+    expect(view.rows.map((row) => row.valueText)).toEqual(['650 m³/h', '150 m³/h']);
+    expect(view.rows.some((row) => row.valueText.includes('at most') || row.valueText.includes('at least'))).toBe(false);
+    expect(view.hints).toEqual([]);
+    const lines = fittingRiserLinesOf(view, 'R1');
+    expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'none yet (no source level)', title: 'Main level: none yet (no source level)' });
+    expect(lines?.hints).toEqual([]);
+  });
+
+  it('gives the at-most main level row and the at-most hint in the riser block', () => {
+    const { file, riser, flow } = exampleFiveOf();
+    const lines = fittingRiserLinesOf(capacityViewOf(file, riser, flow), 'R1');
+    expect(lines?.rows[0]).toEqual({ label: 'Main level', value: 'not known yet (no source level)', title: 'Main level: not known yet (no source level)' });
+    expect(lines?.rows[1]?.value).toBe('750 m³/h (no concurrency factor)');
+    expect(lines?.hints).toEqual([RISER_AT_MOST_TEXT]);
+  });
+
+  it('gives the shared line before the at-most hint when another riser shares the network', () => {
+    const r1 = riserOf('R1', [memberOf(0, 'a'), memberOf(1, 'a')]);
+    const r2 = riserOf('R2', [memberOf(1, 'b'), memberOf(2, 'b')]);
+    const file = fileWith([r1, r2]);
+    const summaries = summariesOf(summaryOf('p0', [entryWith(['a'], 100, 1)]), summaryOf('p1', [entryWith(['a', 'b'], 500, 1)]), summaryOf('p2', [entryWith(['b'], 150, 1)]));
+    const flow = solveBuildingFlow(file, summaries);
+    expect(flow.groups[0]!.riserIds).toEqual(['R1', 'R2']);
+    const view = capacityViewOf(file, r1, flow);
+    expect(view.atMost).toBe(true);
+    expect(fittingRiserLinesOf(view, 'R1')?.hints).toEqual([SHARED_R2_TEXT, RISER_AT_MOST_TEXT]);
+  });
+
+  it('keeps the design flow hint after the at-most hint for an electrical riser', () => {
+    const power = networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' });
+    const { file, riser, flow } = exampleFiveOf(power);
+    const view = capacityViewOf(file, riser, flow);
+    expect(view.notDesignFlow).toBe(true);
+    expect(view.designFlowHint).toBe(DESIGN_FLOW_TEXT);
+    expect(view.hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, 'Place a panel on a level, or click Set by hand and choose a main level.']);
+    const lines = fittingRiserLinesOf(view, 'R1');
+    expect(lines?.tag).toBe('Not a design flow');
+    expect(lines?.hints).toEqual([RISER_AT_MOST_TEXT, DESIGN_FLOW_TEXT]);
+  });
+
+  it('gives atMost false and the full view for a group with a source level', () => {
+    const { file, riser, summaries } = worked([true, false, false]);
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    const expected: CapacityView = {
+      kind: 'solved',
+      notDesignFlow: false,
+      mainLine: 'Main level: Level 0',
+      totalLine: 'Connected total: 750 m³/h (no concurrency factor)',
+      rows: [
+        { key: 'l0|l1|0', levelsText: 'Level 0 to Level 1', valueText: '650 m³/h', known: true, ariaLabel: 'Level 0 to Level 1: 650 m³/h' },
+        { key: 'l1|l2|1', levelsText: 'Level 1 to Level 2', valueText: '150 m³/h', known: true, ariaLabel: 'Level 1 to Level 2: 150 m³/h' },
+      ],
+      sharedLine: null,
+      hints: [],
+      designFlowHint: null,
+      mainValue: 'Level 0',
+      totalValue: '750 m³/h (no concurrency factor)',
+      unknownReasonText: null,
+      complete: true,
+      unknown: false,
+      loop: false,
+      noUnit: false,
+      atMost: false,
+    };
+    expect(view).toEqual(expected);
+  });
+
+  it('keeps atMost false for a group with no source and no open-end data', () => {
+    const { file, riser, summaries } = worked([false, false, false]);
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    expect(view.atMost).toBe(false);
+    expect(view.unknown).toBe(true);
+    expect(view.hints).toEqual([UNKNOWN_TEXT]);
+  });
+
+  it('gives the members of a riser with no source the open role, and the view still shows the at-most rows and the total', () => {
+    const { file, riser, flow } = exampleFiveOf();
+    const members = flow.risers['R1']!.members;
+    expect(members.map((member) => member.role)).toEqual(['open', 'open', 'open']);
+    expect(members.every((member) => member.sides !== undefined)).toBe(true);
+    const view = capacityViewOf(file, riser, flow);
+    expect(view.rows.map((row) => row.valueText)).toEqual(['at most 650 m³/h', 'at most 600 m³/h']);
+    expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
   });
 });

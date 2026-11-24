@@ -1,0 +1,10 @@
+import { begin } from '/root/MepApp/.claude/worktrees/buildings-b7/.claude/roadmap/work/b7-t09c2b-journey-lib.mjs';
+const j = await begin();
+const { page, dlg, snap, openRisersTab, dlgLines, idle } = j;
+await openRisersTab();
+console.log('LINES', JSON.stringify(await dlgLines(), null, 1));
+await snap('x-risers-opened');
+const html = await dlg.evaluate((e) => e.innerHTML.length);
+console.log('HTMLLEN', html);
+console.log('BUTTONS', JSON.stringify(await dlg.getByRole('button').allInnerTexts()));
+await j.t.finish();

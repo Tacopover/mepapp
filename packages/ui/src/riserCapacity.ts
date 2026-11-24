@@ -1,6 +1,7 @@
 import { ROUTE_GRAVITY_TYPE_IDS, type BuildingFile, type BuildingFlowGroup, type BuildingFlowResult, type FlowUnitId, type NetworkType, type Riser, type RiserNetworksLive, type SheetSummary } from '@mepapp/core';
 import { rebuildResultText } from './buildingStatus.js';
 import type { RebuildResult } from './rebuildSummaries.js';
+import { sourceWordOf } from './sourceWord.js';
 
 /** The unit of the capacity numbers of the riser: riser.networkType.flowUnit. Never the unit of an open level. */
 export function riserFlowUnit(riser: Pick<Riser, 'networkType'>): FlowUnitId | undefined {
@@ -12,11 +13,12 @@ export function isNotDesignFlow(type: Pick<NetworkType, 'id' | 'discipline'>): b
   return ROUTE_GRAVITY_TYPE_IDS.includes(type.id) || type.discipline === 'fireProtection' || type.discipline === 'electrical';
 }
 
-/** Round to 2 decimals; text `[at least ]<n>[ <unit>]`. Example: capacityNumberText(650, 'm³/h', false) = '650 m³/h'; (150, 'm³/h', true) = 'at least 150 m³/h'; (650, undefined, false) = '650'; (12.345, 'l/s', false) = '12.35 l/s' (Math.round(v * 100) / 100 then String). */
-export function capacityNumberText(value: number, unit: FlowUnitId | undefined, atLeast: boolean): string {
+/** Round to 2 decimals; text `[at least |at most ]<n>[ <unit>]`; atLeast wins over atMost. Example: capacityNumberText(650, 'm³/h', false) = '650 m³/h'; (150, 'm³/h', true) = 'at least 150 m³/h'; (650, undefined, false, true) = 'at most 650'; (12.345, 'l/s', false) = '12.35 l/s' (Math.round(v * 100) / 100 then String). */
+export function capacityNumberText(value: number, unit: FlowUnitId | undefined, atLeast: boolean, atMost = false): string {
   const number = String(Math.round(value * 100) / 100);
   const text = unit === undefined ? number : `${number} ${unit}`;
-  return atLeast ? `at least ${text}` : text;
+  if (atLeast) return `at least ${text}`;
+  return atMost ? `at most ${text}` : text;
 }
 
 export type UnknownReason = 'no-source' | 'many-sources' | 'loop' | 'hand-conflict';
@@ -37,6 +39,13 @@ const REASON_TEXT: Record<UnknownReason, string> = {
 
 export const MAIN_LEVEL_LABEL = 'Main level';
 export const CONNECTED_TOTAL_LABEL = 'Connected total';
+export const AT_MOST_MAIN_VALUE = 'not known yet';
+const AT_MOST_MAIN_VALUE_FULL = 'not known yet (no source level)';
+const AT_MOST_MAIN_LINE = `${MAIN_LEVEL_LABEL}: ${AT_MOST_MAIN_VALUE_FULL}`;
+const NONE_YET_MAIN_VALUE = 'none yet (no source level)';
+const AT_MOST_HINT_1 = 'No source level yet. Each span shows the largest flow for any source position.';
+const AT_MOST_HINT_2 = 'Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0.';
+const RISER_AT_MOST_HINT = 'No source level yet. Solved capacity shows the largest flow for any source position. Open Manage Buildings, tab Risers, to set the main level.';
 
 const DESIGN_FLOW_HINT = 'These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type.';
 const INCOMPLETE_HINT = 'Some levels have no data, so some numbers read "at least". The warnings above name each level.';
@@ -49,6 +58,12 @@ const RISER_INCOMPLETE_HINT = 'Some levels have no data, so a number reads "at l
 const RISER_UNKNOWN_HINT = 'Solved capacity counts this level only until the main level is known. Open Manage Buildings, tab Risers, to set it.';
 const RISER_LOOP_HINT = 'Solved capacity counts this level only. The risers make a loop. Open Manage Buildings, tab Risers, for details.';
 const NOT_DESIGN_FLOW_TAG = 'Not a design flow';
+
+function atMostHint3(word: string, selectsShown: boolean): string {
+  return selectsShown
+    ? `Place ${word} on a level, or choose a main level in the list "Source level".`
+    : `Place ${word} on a level, or click Set by hand and choose a main level.`;
+}
 
 /** The reason that a group has state 'unknown'. Looks in `warnings` for a warning that starts with the same subject as the solve builds: `Riser <name>` for one riser, `Risers <name>, <name>` for several (names of group.riserIds in the order of group.riserIds, found in file.risers; unknown id skipped), followed by a space, and then contains: 'no source level' -> 'no-source'; 'more than one source level' -> 'many-sources'; 'a loop' -> 'loop'; 'different main levels set by hand' -> 'hand-conflict'. Undefined when the group is not 'unknown' or no warning matches. */
 export function unknownReasonOf(file: BuildingFile, group: BuildingFlowGroup, warnings: readonly string[]): UnknownReason | undefined {
@@ -71,7 +86,7 @@ export interface CapacityRow {
   key: string;
   /** `Level 0 to Level 1` (names of the levels; the id when the level is not in file.levels) */
   levelsText: string;
-  /** `650 m³/h`, `at least 150 m³/h`, `not known yet (no source level)`, `not known yet` */
+  /** `650 m³/h`, `at least 150 m³/h`, `at most 650 m³/h`, `not known yet (no source level)`, `not known yet` */
   valueText: string;
   known: boolean;
   /** `${levelsText}: ${valueText}` */
@@ -82,18 +97,18 @@ export interface CapacityView {
   /** 'one-member': the riser has no span (it has no group in the result). */
   kind: 'one-member' | 'solved';
   notDesignFlow: boolean;
-  /** `Main level: Level 0` or `Main level: not known yet` (group.sourceLevelId is undefined or the level is unknown). '' for one-member. */
+  /** `Main level: Level 0` or `Main level: not known yet` (group.sourceLevelId is undefined or the level is unknown). `Main level: not known yet (no source level)` for a group with atMost. `Main level: none yet (no source level)` for a group with state ok, no source level, no atMost. '' for one-member. */
   mainLine: string;
   /** `Connected total: 750 m³/h (no concurrency factor)`, `Connected total: at least 750 m³/h (no concurrency factor)`, `Connected total: 750 (no concurrency factor)` (no unit). null for one-member. */
   totalLine: string | null;
   rows: CapacityRow[];
   /** One other riser in the group: `The total also covers R2. It shares a network with this riser.` Several: `The total also covers R2, R3. They share a network with this riser.` null when the group has only this riser. */
   sharedLine: string | null;
-  /** The hint paragraphs in this order, each only when it applies: (1) not complete (group.complete false): `Some levels have no data, so some numbers read "at least". The warnings above name each level.`; (2) group state unknown: reason 'loop' -> `See the warnings above.`; any other reason, and no reason -> `Choose a level in the list "Source level".` when options.selectsShown is true, else `Click Set by hand and choose a source level.`; (3) unit not set: `This network type has no flow unit, so the numbers have no unit.`; (4) one-member: `This riser has one level. A capacity needs two levels.` (only hint of a one-member view). */
+  /** The hint paragraphs in this order, each only when it applies: (1) not complete (group.complete false): `Some levels have no data, so some numbers read "at least". The warnings above name each level.`; (2b) atMost, before (2): the three paragraphs `No source level yet...`, `Numbers show different source positions...`, `Place <source word> on a level, ...` in place of the unknown hint; (2) group state unknown: reason 'loop' -> `See the warnings above.`; any other reason, and no reason -> `Choose a level in the list "Source level".` when options.selectsShown is true, else `Click Set by hand and choose a source level.`; (3) unit not set: `This network type has no flow unit, so the numbers have no unit.`; (4) one-member: `This riser has one level. A capacity needs two levels.` (only hint of a one-member view). */
   hints: string[];
   /** Only for notDesignFlow: `These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type.` else null. */
   designFlowHint: string | null;
-  /** The text after `Main level: ` in mainLine: `Level 0` or `not known yet`. '' for one-member. */
+  /** The text after `Main level: ` in mainLine: `Level 0` or `not known yet`. For atMost, mainLine adds ` (no source level)` and mainValue is `not known yet`. `none yet (no source level)` for a group with one possible source. '' for one-member. */
   mainValue: string;
   /** The text after `Connected total: ` in totalLine. null for one-member. */
   totalValue: string | null;
@@ -107,6 +122,8 @@ export interface CapacityView {
   loop: boolean;
   /** The riser network type has no flow unit. false for one-member. */
   noUnit: boolean;
+  /** group.atMost === true. false for one-member. */
+  atMost: boolean;
 }
 
 export interface FittingRiserLines {
@@ -146,13 +163,18 @@ export function capacityViewOf(file: BuildingFile, riser: Riser, flow: BuildingF
       unknown: false,
       loop: false,
       noUnit: false,
+      atMost: false,
     };
   }
   const unit = riserFlowUnit(riser);
   const reason = unknownReasonOf(file, group, flow.warnings);
   const sourceLevel = group.sourceLevelId === undefined ? undefined : file.levels.find((level) => level.id === group.sourceLevelId);
-  const mainValue = sourceLevel === undefined ? 'not known yet' : sourceLevel.name;
-  const mainLine = `${MAIN_LEVEL_LABEL}: ${mainValue}`;
+  const atMost = group.atMost === true;
+  let mainValue = 'not known yet';
+  if (sourceLevel !== undefined) mainValue = sourceLevel.name;
+  else if (atMost) mainValue = AT_MOST_MAIN_VALUE;
+  else if (group.state === 'ok' && group.sourceLevelId === undefined) mainValue = NONE_YET_MAIN_VALUE;
+  const mainLine = atMost ? AT_MOST_MAIN_LINE : `${MAIN_LEVEL_LABEL}: ${mainValue}`;
   const totalValue = `${capacityNumberText(group.total, unit, !group.complete)} (no concurrency factor)`;
   const totalLine = `${CONNECTED_TOTAL_LABEL}: ${totalValue}`;
   const unknownReasonText = reason === undefined ? null : REASON_TEXT[reason];
@@ -161,7 +183,7 @@ export function capacityViewOf(file: BuildingFile, riser: Riser, flow: BuildingF
     let valueText: string;
     let known = false;
     if (span.state === 'ok' && span.capacity !== null) {
-      valueText = capacityNumberText(span.capacity, unit, !span.complete);
+      valueText = capacityNumberText(span.capacity, unit, !span.complete, atMost || span.atMost === true);
       known = true;
     } else {
       valueText = reason === undefined ? 'not known yet' : `not known yet (${REASON_TEXT[reason]})`;
@@ -185,6 +207,7 @@ export function capacityViewOf(file: BuildingFile, riser: Riser, flow: BuildingF
   }
   const hints: string[] = [];
   if (!group.complete) hints.push(INCOMPLETE_HINT);
+  if (atMost) hints.push(AT_MOST_HINT_1, AT_MOST_HINT_2, atMostHint3(sourceWordOf(riser.networkType), options.selectsShown === true));
   if (group.state === 'unknown') {
     if (reason === 'loop') hints.push(LOOP_HINT);
     else hints.push(options.selectsShown ? UNKNOWN_SELECT_HINT : UNKNOWN_HINT);
@@ -206,20 +229,23 @@ export function capacityViewOf(file: BuildingFile, riser: Riser, flow: BuildingF
     unknown: group.state === 'unknown',
     loop: reason === 'loop',
     noUnit: unit === undefined,
+    atMost,
   };
 }
 
-/** null for a view of kind 'one-member'. Rows: label MAIN_LEVEL_LABEL, value `Level 0` or `not known yet` or `not known yet (<unknownReasonText>)` (when the reason is known); label CONNECTED_TOTAL_LABEL, value = view.totalValue. */
+/** null for a view of kind 'one-member'. Rows: label MAIN_LEVEL_LABEL, value `Level 0` or `not known yet` or `not known yet (<unknownReasonText>)` (when the reason is known), or `not known yet (no source level)` when view.atMost; label CONNECTED_TOTAL_LABEL, value = view.totalValue. */
 export function fittingRiserLinesOf(view: CapacityView, riserName: string): FittingRiserLines | null {
   if (view.kind === 'one-member') return null;
   const noData = view.unknown && !view.complete && view.unknownReasonText === REASON_TEXT['no-source'];
   let mainValue = view.mainValue === 'not known yet' && view.unknownReasonText !== null ? `not known yet (${view.unknownReasonText})` : view.mainValue;
   if (noData) mainValue = 'not known yet (a level has no data)';
+  if (view.atMost) mainValue = AT_MOST_MAIN_VALUE_FULL;
   const totalValue = view.totalValue ?? '';
   const hints: string[] = [];
   if (view.sharedLine !== null) hints.push(view.sharedLine);
   if (!view.complete) hints.push(RISER_INCOMPLETE_HINT);
   if (view.unknown && !noData) hints.push(view.loop ? RISER_LOOP_HINT : RISER_UNKNOWN_HINT);
+  if (view.atMost) hints.push(RISER_AT_MOST_HINT);
   if (view.noUnit) hints.push(NO_UNIT_HINT);
   if (view.designFlowHint !== null) hints.push(view.designFlowHint);
   return {
