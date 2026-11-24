@@ -1,6 +1,6 @@
 # B7: flow through risers
 
-Status: **planned 2026-11-21, revised the same day after the audit and the domain check. T01 to T06 done on the branch (2026-11-21), T07 done (2026-11-23); waiting for the Windows test (`buildings-b7-test.md`) and the merge by the user.** Stream `buildings`, part id `B7`. B5 (shared coordinate system) stays deferred. A later part (B8, riser arrows) needs B7 first. Branch for the work: `worktree-buildings-b7`, made from `origin/worktree-buildings-b4` (master `1b7b4fd` plus this plan).
+Status: **planned 2026-11-21, revised the same day after the audit and the domain check. T01 to T06 done on the branch (2026-11-21), T07 done (2026-11-23), T08 (the word "concurrency") and T09 with T10 (open ends with no source, "at most"; plan `buildings-b7-t09-open-ends.md`) done (2026-11-24); waiting for the Windows test (`buildings-b7-test.md`) and the merge by the user.** Stream `buildings`, part id `B7`. B5 (shared coordinate system) stays deferred. A later part (B8, riser arrows) needs B7 first. Branch for the work: `worktree-buildings-b7`, made from `origin/worktree-buildings-b4` (master `1b7b4fd` plus this plan).
 
 ## 1. Why
 
