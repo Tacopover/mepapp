@@ -10,6 +10,7 @@
 
 import type { Fitting, Network, PortGroup, Segment } from './network.js';
 import { nodeKeyOf } from './network.js';
+import { highestFlow } from './flow-highest.js';
 import type { StampCategory } from './stamp-library.js';
 
 export interface FlowSolveInput {
@@ -31,6 +32,10 @@ export interface FlowSolveInput {
   entryFittingId?: string;
   /** Capacity beyond each marked fitting (fitting id to number). A boundary fitting counts it as child demand; the entry, as the root, adds it to its total. A key for an unmarked fitting or a fitting outside the network is ignored. When omitted, nothing changes. */
   riserDemand?: Record<string, number>;
+  /** With no source and no valid entry or explicit root, treat every open end as a possible source and give each segment and fitting the highest value over all choices. Opt in; sizing and routing do not set it. */
+  highestWhenNoSource?: boolean;
+  /** Fittings that are never a root and never an open end in the highest rule: riser fittings that have no input. Ignored by the old rule. */
+  notOpenEndIds?: ReadonlySet<string>;
 }
 
 /** `out`: flow arrives at the riser fitting (this level feeds the riser). `in`: flow leaves it (the riser feeds this level). `none`: neither. */
@@ -47,6 +52,8 @@ export interface FlowResult {
   segmentDirection: Record<string, 'AtoB' | 'BtoA' | null>;
   /** The sum of the `riserDemand` values this solve used (the exits it reached, plus the entry when it is the root). Set only when `riserDemand` is given. */
   riserCapacity?: number;
+  /** The network has no source. 'highest': the highest rule gave the numbers (K is 2 or more). 'loop': a loop kept the old rule. Absent otherwise. */
+  noSource?: 'highest' | 'loop';
 }
 
 interface Edge {
@@ -64,6 +71,33 @@ function ownCapacityOf(nodeKey: string, terminalCapacities: Record<string, numbe
     return 0; // fitting nodes contribute nothing of their own
   }
   return terminalCapacities[elementId] ?? 0;
+}
+
+function networkSegmentsOf(input: FlowSolveInput): Segment[] {
+  const segmentById = new Map(input.segments.map((s) => [s.id, s]));
+  return input.network.segmentIds.map((id) => segmentById.get(id)).filter((s): s is Segment => s != null);
+}
+
+function isOpenEndKey(nodeKey: string, degree: number, input: FlowSolveInput): boolean {
+  if (degree !== 1 || !nodeKey.startsWith('fitting:')) return false;
+  const fittingId = nodeKey.slice('fitting:'.length);
+  return !input.riserFittingIds?.has(fittingId) && !input.notOpenEndIds?.has(fittingId);
+}
+
+function hasLoop(segments: Segment[], portGroups: PortGroup[]): boolean {
+  const parent = new Map<string, string>();
+  const rootOf = (key: string): string => {
+    let root = key;
+    while (parent.has(root)) root = parent.get(root)!;
+    return root;
+  };
+  for (const segment of segments) {
+    const a = rootOf(nodeKeyOf(segment.endpointA, portGroups));
+    const b = rootOf(nodeKeyOf(segment.endpointB, portGroups));
+    if (a === b) return true;
+    parent.set(a, b);
+  }
+  return false;
 }
 
 export function solveFlow(input: FlowSolveInput): FlowResult {
@@ -134,6 +168,29 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     explicitRootKey ??= rootCandidates.find(isRootNode);
     if (explicitRootKey !== undefined && isMarked(explicitRootKey) && explicitRootKey !== entryKey) explicitRootKey = undefined;
   }
+
+  let noSource: FlowResult['noSource'];
+  if (input.highestWhenNoSource && explicitRootKey === undefined && entryKey === undefined && !networkHasSource(input)) {
+    if (hasLoop(segments, input.portGroups)) {
+      noSource = 'loop';
+    } else {
+      const rootsOf = (k: string): number => (isOpenEndKey(k, degreeOf(k), input) ? 1 : 0);
+      const openEnds = nodeKeys.reduce((sum, k) => sum + rootsOf(k), 0);
+      if (openEnds >= 1 && nodeKeys.every((k) => !isMarked(k) || degreeOf(k) === 1)) {
+        const highest = highestFlow(
+          nodeKeys.map((k) => ({ id: k, own: ownCapacityOf(k, input.terminalCapacities), roots: rootsOf(k) })),
+          segments.map((s) => ({ id: s.id, a: nodeKeyOf(s.endpointA, input.portGroups), b: nodeKeyOf(s.endpointB, input.portGroups) })),
+        );
+        if (highest) {
+          for (const segment of segments) segmentCapacity[segment.id] = highest.edge[segment.id] ?? null;
+          for (const id of input.network.fittingIds) fittingCapacity[id] = highest.node[`fitting:${id}`] ?? null;
+          const result: FlowResult = { segmentCapacity, fittingCapacity, resolved: true, totalCapacity: highest.total, segmentDirection };
+          return withRiserCapacity(highest.roots >= 2 ? { ...result, noSource: 'highest' } : result, 0);
+        }
+      }
+    }
+  }
+
   const rootKey =
     explicitRootKey ||
     entryKey ||
@@ -189,7 +246,34 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     fittingCapacity[rootFittingMatch[1]] = totalCapacity;
   }
 
-  return withRiserCapacity({ segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection }, usedRiserDemand);
+  return withRiserCapacity(
+    { segmentCapacity, fittingCapacity, resolved: true, totalCapacity, segmentDirection, ...(noSource ? { noSource } : {}) },
+    usedRiserDemand,
+  );
+}
+
+/** The number of open ends of the network: bare fitting nodes with one segment that are not in `input.riserFittingIds` or `input.notOpenEndIds`. */
+export function countOpenEnds(input: FlowSolveInput): number {
+  const degrees = new Map<string, number>();
+  for (const segment of networkSegmentsOf(input)) {
+    for (const endpoint of [segment.endpointA, segment.endpointB]) {
+      const key = nodeKeyOf(endpoint, input.portGroups);
+      degrees.set(key, (degrees.get(key) ?? 0) + 1);
+    }
+  }
+  return Array.from(degrees).filter(([key, degree]) => isOpenEndKey(key, degree, input)).length;
+}
+
+/** True when an element of category 'equipment' with own capacity not above 0 has a port in this network (only this network's elements count). */
+export function networkHasSource(input: FlowSolveInput): boolean {
+  return networkSegmentsOf(input).some((segment) =>
+    [segment.endpointA, segment.endpointB].some(
+      (endpoint) =>
+        endpoint.kind === 'port' &&
+        input.elementCategories?.[endpoint.elementId] === 'equipment' &&
+        !((input.terminalCapacities[endpoint.elementId] ?? 0) > 0),
+    ),
+  );
 }
 
 /** For each marked fitting of the network: `out` when the level has a source and the solve reaches the fitting; `in` when there is no source and the solve reaches the fitting and the network has a total terminal capacity above 0; else `none`. A source is an element of category 'equipment' whose own capacity in `terminalCapacities` is 0 or absent, or the explicit `rootElementId` when it is not a marked fitting and one of its ports or fittings ends a segment of the network. A stale root id gives no source. Needs `input.riserFittingIds`. */
