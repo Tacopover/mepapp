@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { calibrationFromScale, scaleDenominatorFromCalibration } from './calibration.js';
-import { solveFlow } from './flow.js';
+import { countOpenEnds, solveFlow } from './flow.js';
 import { computeNetworks } from './network.js';
 import type { ProjectDocument } from './project.js';
-import { buildRiserNetworks, buildSheetSummary, parseSheetSummary, SheetSummaryError, type RiserNetworkSummary } from './sheet-summary.js';
+import { buildRiserNetworks, buildSheetSummary, parseSheetSummary, RISER_WARNING as EXPORTED_RISER_WARNING, SHEET_SUMMARY_VERSION, SheetSummaryError, type RiserNetworkSummary } from './sheet-summary.js';
 
 const type = { id: 't', name: 'Supply air', discipline: 'hvac', units: 'l/s', defaultCapacity: 0, color: '#000', lineWidthPt: 1, linePattern: 'solid' } as never;
 
@@ -253,7 +253,7 @@ describe('riser networks of the sheet summary', () => {
   const entryOf = (raw: Record<string, unknown>) => (raw.riserNetworks as Record<string, unknown>[])[0]!;
 
   it('sums the terminals of a riser network into its terminal capacity', () => {
-    const expected: RiserNetworkSummary[] = [{ networkTypeId: 't', fittingIds: ['m'], terminalCapacity: 500, hasSource: false }];
+    const expected: RiserNetworkSummary[] = [{ networkTypeId: 't', fittingIds: ['m'], terminalCapacity: 500, hasSource: false, openEnds: 0 }];
     const result = buildRiserNetworks(planProject(), ['m']);
     expect(result).toEqual(expected);
     expect('warnings' in result[0]!).toBe(false);
@@ -274,8 +274,8 @@ describe('riser networks of the sheet summary', () => {
       terminalCapacities: { d1: 10, d2: 20 },
     });
     expect(buildRiserNetworks(project, ['z', 'a'])).toEqual([
-      { networkTypeId: 't', fittingIds: ['a'], terminalCapacity: 20, hasSource: false },
-      { networkTypeId: 't', fittingIds: ['z'], terminalCapacity: 10, hasSource: false },
+      { networkTypeId: 't', fittingIds: ['a'], terminalCapacity: 20, hasSource: false, openEnds: 0 },
+      { networkTypeId: 't', fittingIds: ['z'], terminalCapacity: 10, hasSource: false, openEnds: 0 },
     ]);
   });
 
@@ -291,7 +291,7 @@ describe('riser networks of the sheet summary', () => {
       terminalCapacities: { d1: 300 },
     });
     const result = buildRiserNetworks(project, ['m2', 'm1']);
-    expect(result).toEqual([{ networkTypeId: 't', fittingIds: ['m1', 'm2'], terminalCapacity: 300, hasSource: false }]);
+    expect(result).toEqual([{ networkTypeId: 't', fittingIds: ['m1', 'm2'], terminalCapacity: 300, hasSource: false, openEnds: 0 }]);
     expect('warnings' in result[0]!).toBe(false);
   });
 
@@ -303,8 +303,8 @@ describe('riser networks of the sheet summary', () => {
       terminalCapacities: { d1: 10, d2: 20 },
     });
     expect(buildRiserNetworks(project, ['a', 'b'])).toEqual([
-      { networkTypeId: 't', fittingIds: ['a'], terminalCapacity: 10, hasSource: false },
-      { networkTypeId: 'u', fittingIds: ['b'], terminalCapacity: 20, hasSource: false },
+      { networkTypeId: 't', fittingIds: ['a'], terminalCapacity: 10, hasSource: false, openEnds: 0 },
+      { networkTypeId: 'u', fittingIds: ['b'], terminalCapacity: 20, hasSource: false, openEnds: 0 },
     ]);
   });
 
@@ -356,7 +356,7 @@ describe('riser networks of the sheet summary', () => {
       segments: [linked('branch', fittingEnd('m'), port('fcu'))],
       terminalCapacities: { fcu: 150 },
     });
-    expect(buildRiserNetworks(project, ['m'])).toEqual([{ networkTypeId: 't', fittingIds: ['m'], terminalCapacity: 150, hasSource: false }]);
+    expect(buildRiserNetworks(project, ['m'])).toEqual([{ networkTypeId: 't', fittingIds: ['m'], terminalCapacity: 150, hasSource: false, openEnds: 0 }]);
   });
 
   it('takes the source of a network with an equipment without capacity and a fan coil unit', () => {
@@ -401,7 +401,7 @@ describe('riser networks of the sheet summary', () => {
       terminalCapacities: { d1: 300, d2: 200 },
     });
     expect(buildRiserNetworks(project, ['m'])).toEqual([
-      { networkTypeId: 't', fittingIds: ['m'], terminalCapacity: 500, hasSource: false, warnings: [RISER_WARNING] },
+      { networkTypeId: 't', fittingIds: ['m'], terminalCapacity: 500, hasSource: false, openEnds: 0, warnings: [RISER_WARNING] },
     ]);
   });
 
@@ -418,7 +418,7 @@ describe('riser networks of the sheet summary', () => {
       terminalCapacities: { d1: 300, d2: 200 },
     });
     expect(buildRiserNetworks(project, ['m1', 'm2'])).toEqual([
-      { networkTypeId: 't', fittingIds: ['m1', 'm2'], terminalCapacity: 300, hasSource: false, warnings: [RISER_WARNING] },
+      { networkTypeId: 't', fittingIds: ['m1', 'm2'], terminalCapacity: 300, hasSource: false, openEnds: 0, warnings: [RISER_WARNING] },
     ]);
   });
 
@@ -437,7 +437,7 @@ describe('riser networks of the sheet summary', () => {
       terminalCapacities: { d1: 300, d2: 200, d3: 100 },
     });
     const result = buildRiserNetworks(project, ['m1', 'm2', 'm3']);
-    expect(result).toEqual([{ networkTypeId: 't', fittingIds: ['m1', 'm2', 'm3'], terminalCapacity: 300, hasSource: false, warnings: [RISER_WARNING] }]);
+    expect(result).toEqual([{ networkTypeId: 't', fittingIds: ['m1', 'm2', 'm3'], terminalCapacity: 300, hasSource: false, openEnds: 0, warnings: [RISER_WARNING] }]);
     expect(result[0]!.warnings).toHaveLength(1);
   });
 
@@ -457,6 +457,83 @@ describe('riser networks of the sheet summary', () => {
     });
     expect(solved.totalCapacity).toBe(500);
     expect(buildRiserNetworks(project, ['m'])[0]?.terminalCapacity).toBe(solved.totalCapacity);
+  });
+
+  const openEndProject = () =>
+    networkProject({
+      fittings: [fitting('m'), fitting('tee'), fitting('o')],
+      stamps: [stamp('d1', 'terminal')],
+      segments: [
+        linked('a', fittingEnd('m'), fittingEnd('tee')),
+        linked('b', fittingEnd('tee'), port('d1')),
+        linked('c', fittingEnd('tee'), fittingEnd('o')),
+      ],
+      terminalCapacities: { d1: 300 },
+    });
+
+  it('counts the open end of a level that has one and gives 0 for a level that has none', () => {
+    expect(buildRiserNetworks(openEndProject(), ['m'])[0]?.openEnds).toBe(1);
+    expect(buildRiserNetworks(planProject(), ['m'])[0]?.openEnds).toBe(0);
+    expect('openEnds' in buildRiserNetworks(planProject(), ['m'])[0]!).toBe(true);
+  });
+
+  it('counts two open ends and does not count a riser fitting', () => {
+    const project = networkProject({
+      fittings: [fitting('m'), fitting('tee'), fitting('o1'), fitting('o2')],
+      segments: [
+        linked('a', fittingEnd('m'), fittingEnd('tee')),
+        linked('b', fittingEnd('tee'), fittingEnd('o1')),
+        linked('c', fittingEnd('tee'), fittingEnd('o2')),
+      ],
+    });
+    expect(buildRiserNetworks(project, ['m'])[0]?.openEnds).toBe(2);
+    expect(buildRiserNetworks(project, ['m', 'o2'])[0]?.openEnds).toBe(1);
+  });
+
+  it('gives the same number as countOpenEnds with the same input', () => {
+    const project = openEndProject();
+    const network = computeNetworks({ segments: project.segments, fittings: project.fittings, portGroups: project.portGroups }).find((n) =>
+      n.fittingIds.includes('m'),
+    );
+    const count = countOpenEnds({
+      network: network!,
+      segments: project.segments,
+      fittings: project.fittings,
+      portGroups: project.portGroups,
+      terminalCapacities: project.terminalCapacities,
+      riserFittingIds: new Set(['m']),
+      entryFittingId: 'm',
+    });
+    expect(count).toBe(buildRiserNetworks(project, ['m'])[0]?.openEnds);
+  });
+
+  it('writes openEnds in the sheet summary and keeps it after a JSON round trip', () => {
+    const summary = buildSheetSummary({ ...summaryArgs(openEndProject(), [portrait]), riserFittingIds: ['m'] });
+    expect(summary.riserNetworks?.[0]?.openEnds).toBe(1);
+    expect(summary.version).toBe(SHEET_SUMMARY_VERSION);
+    expect(SHEET_SUMMARY_VERSION).toBe(2);
+    expect(parseSheetSummary(JSON.parse(JSON.stringify(summary))).riserNetworks?.[0]?.openEnds).toBe(1);
+  });
+
+  it('parses a v2 summary whose entry has no openEnds (no data)', () => {
+    const raw = rawWithRiser();
+    delete entryOf(raw).openEnds;
+    const parsed = parseSheetSummary(raw);
+    expect(parsed.version).toBe(2);
+    expect(parsed.riserNetworks?.[0]?.openEnds).toBeUndefined();
+  });
+
+  it('accepts openEnds 0 and a whole number above 0', () => {
+    const zero = rawWithRiser();
+    zero.riserNetworks = [{ ...entryOf(zero), openEnds: 0 }];
+    expect(parseSheetSummary(zero).riserNetworks?.[0]?.openEnds).toBe(0);
+    const three = rawWithRiser();
+    three.riserNetworks = [{ ...entryOf(three), openEnds: 3 }];
+    expect(parseSheetSummary(three).riserNetworks?.[0]?.openEnds).toBe(3);
+  });
+
+  it('exports the riser warning text', () => {
+    expect(EXPORTED_RISER_WARNING).toBe(RISER_WARNING);
   });
 
   it('needs only the project and the riser ids, and does not throw without a projectUuid', () => {
@@ -511,6 +588,9 @@ describe('riser networks of the sheet summary', () => {
     ['fittingIds has a value that is not a string', (raw) => ({ ...raw, riserNetworks: [{ ...entryOf(raw), fittingIds: [1] }] }), 'riserNetworks[0].fittingIds'],
     ['terminalCapacity is not a number', (raw) => ({ ...raw, riserNetworks: [{ ...entryOf(raw), terminalCapacity: 'x' }] }), 'riserNetworks[0].terminalCapacity'],
     ['hasSource is not a boolean', (raw) => ({ ...raw, riserNetworks: [{ ...entryOf(raw), hasSource: 'yes' }] }), 'riserNetworks[0].hasSource'],
+    ['openEnds is negative', (raw) => ({ ...raw, riserNetworks: [{ ...entryOf(raw), openEnds: -1 }] }), 'riserNetworks[0].openEnds'],
+    ['openEnds is not a whole number', (raw) => ({ ...raw, riserNetworks: [{ ...entryOf(raw), openEnds: 1.5 }] }), 'riserNetworks[0].openEnds'],
+    ['openEnds is not a number', (raw) => ({ ...raw, riserNetworks: [{ ...entryOf(raw), openEnds: '1' }] }), 'riserNetworks[0].openEnds'],
     ['warnings has a value that is not a string', (raw) => ({ ...raw, riserNetworks: [{ ...entryOf(raw), warnings: [1] }] }), 'riserNetworks[0].warnings'],
   ])('refuses a riser network where %s', (_label, change, path) => {
     const raw = change(rawWithRiser());

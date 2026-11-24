@@ -1,4 +1,4 @@
-import { riserFittingFlow, solveFlow, type RiserFittingFlow } from './flow.js';
+import { countOpenEnds, riserFittingFlow, solveFlow, type RiserFittingFlow } from './flow.js';
 import { computeNetworks, type Segment } from './network.js';
 import { buildQuantityTables, type QuantityTable } from './quantities.js';
 import type { ProjectDocument } from './project.js';
@@ -24,6 +24,8 @@ export interface RiserNetworkSummary {
   terminalCapacity: number;
   /** True when the network has an equipment (stamp category 'equipment') whose own capacity is 0 or absent. An equipment with a capacity above 0 is a demand, not a source. */
   hasSource: boolean;
+  /** The number of open ends of the network (bare fittings with one segment), riser fittings excluded. Absent in a summary written before this field existed (no data). */
+  openEnds?: number;
   /** Absent when empty. */
   warnings?: string[];
 }
@@ -94,7 +96,7 @@ function riserFittingFlowOf(project: ProjectDocument, riserIds: ReadonlySet<stri
   return Object.fromEntries([...flow.keys()].sort().map((id) => [id, flow.get(id)!]));
 }
 
-const RISER_WARNING = 'Riser fitting is not an open end. The terminals behind it may not be counted.';
+export const RISER_WARNING = 'Riser fitting is not an open end. The terminals behind it may not be counted.';
 
 /** The networks of the whole project that hold a riser fitting. A network is not limited to one sheet, so the same network can appear in the summary of each sheet that shares the project. The entry is the first sorted riser fitting. Needs no stamp names, so it is light. */
 export function buildRiserNetworks(project: ProjectDocument, riserFittingIds: ReadonlySet<string> | readonly string[]): RiserNetworkSummary[] {
@@ -106,7 +108,7 @@ export function buildRiserNetworks(project: ProjectDocument, riserFittingIds: Re
     const fittingIds = network.fittingIds.filter((id) => riserIds.has(id)).sort();
     if (fittingIds.length === 0) continue;
     const elementCategories = elementCategoriesOf(project, segmentById, network.segmentIds);
-    const result = solveFlow({
+    const flowInput = {
       network,
       segments: project.segments,
       fittings: project.fittings,
@@ -114,8 +116,9 @@ export function buildRiserNetworks(project: ProjectDocument, riserFittingIds: Re
       terminalCapacities: project.terminalCapacities,
       elementCategories,
       riserFittingIds: riserIds,
-      entryFittingId: fittingIds[0],
-    });
+    };
+    const result = solveFlow({ ...flowInput, entryFittingId: fittingIds[0] });
+    const openEnds = countOpenEnds({ ...flowInput, entryFittingId: fittingIds[0] });
     const hasSource = Object.entries(elementCategories).some(
       ([id, category]) => category === 'equipment' && !((project.terminalCapacities[id] ?? 0) > 0),
     );
@@ -132,6 +135,7 @@ export function buildRiserNetworks(project: ProjectDocument, riserFittingIds: Re
       fittingIds,
       terminalCapacity: result.resolved ? (result.totalCapacity ?? 0) : 0,
       hasSource,
+      openEnds,
       ...(midRun ? { warnings: [RISER_WARNING] } : {}),
     });
   }
@@ -311,6 +315,9 @@ const validateRiserNetworks: Validator = (data) => {
     }
     if (!isFiniteNumber(entry.terminalCapacity)) issues.push({ path: `${path}.terminalCapacity`, message: 'terminalCapacity must be a finite number' });
     if (typeof entry.hasSource !== 'boolean') issues.push({ path: `${path}.hasSource`, message: 'hasSource must be a boolean' });
+    if (entry.openEnds !== undefined && !(typeof entry.openEnds === 'number' && Number.isInteger(entry.openEnds) && entry.openEnds >= 0)) {
+      issues.push({ path: `${path}.openEnds`, message: 'openEnds must be a whole number of 0 or more' });
+    }
     if (entry.warnings !== undefined && (!Array.isArray(entry.warnings) || !entry.warnings.every((w) => typeof w === 'string'))) {
       issues.push({ path: `${path}.warnings`, message: 'warnings must be an array of strings' });
     }
