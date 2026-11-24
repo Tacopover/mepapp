@@ -738,6 +738,9 @@
   border-bottom-style: dotted;
   opacity: 0.6;
 }
+.mep-field-row input.mep-field-wide {
+  width: 136px;
+}
 /* A read-only value that is a sentence (B7-T04b): the disabled input is 104 px wide and would cut it. Same look as the disabled input. */
 .mep-field-row--text {
   align-items: baseline;

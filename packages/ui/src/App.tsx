@@ -2047,6 +2047,13 @@ export function MepSketchApp({
     return segmentRiserHint(names);
   }, [buildingHook.building?.file, riserFlow, selectedSegment]);
 
+  const fittingNetworkTypeId = useMemo(() => {
+    const scene = sceneRef.current;
+    if (!scene || !selectedFitting) return null;
+    const { segments, fittings, portGroups } = scene.getConnectivity();
+    return computeNetworks({ segments, fittings, portGroups }).find((item) => item.fittingIds.includes(selectedFitting.id))?.networkTypeId ?? null;
+  }, [selectedFitting]);
+
   const dockTabDefs: DockTabDef[] = [
     { id: 'stamps', label: 'MEP' },
     { id: 'drawings', label: 'Drawings' },
@@ -2142,6 +2149,7 @@ export function MepSketchApp({
         selectedFitting={selectedFitting}
         riserLines={riserLines}
         segmentRiserHint={segmentRiserHintLine}
+        fittingNetworkTypeId={fittingNetworkTypeId}
         networkTypes={networkTypes}
         customPropertyDefs={customPropertyDefs}
         customStampDefinitions={customStampDefinitions}

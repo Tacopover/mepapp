@@ -148,13 +148,13 @@ await selectSegment('s1');
   const o = await overlay();
   check(JSON.stringify(o.texts) === JSON.stringify(['100', '100', '100']), 'ex1: the overlay shows the number 100 on the three segments', JSON.stringify(o));
   check(o.graphics === 0, 'ex1: the overlay has no arrowhead', JSON.stringify(o));
-  check((await solvedField()) === '100', 'ex1: the Properties field of the selected open-end segment shows 100', String(await solvedField()));
+  check((await solvedField()) === 'at most 100', 'ex1: the Properties field of the selected open-end segment shows at most 100', String(await solvedField()));
   const i = await info('s1');
   check(i.seg && i.seg.solvedCapacity === 100 && i.seg.solvedNoSource === 'highest', 'ex1: SegmentInfo has solvedCapacity 100 and solvedNoSource highest', JSON.stringify(i.seg));
   await snap('b7-t09c1-1-example1-no-arrowhead');
 }
 await selectSegment('s2');
-check(JSON.stringify((await overlay()).texts) === JSON.stringify(['100', '100', '100']) && (await solvedField()) === '100', 'ex1: the second open-end segment shows 100 too', String(await solvedField()));
+check(JSON.stringify((await overlay()).texts) === JSON.stringify(['100', '100', '100']) && (await solvedField()) === 'at most 100', 'ex1: the second open-end segment shows at most 100 too', String(await solvedField()));
 
 // --- 2. a fitting reads solvedNoSource too (real click on the T fitting) ---
 {
@@ -165,7 +165,7 @@ check(JSON.stringify((await overlay()).texts) === JSON.stringify(['100', '100', 
   await idle(400);
   const fit = await page.evaluate(() => window.__mepSketchScene.getSelectedFittingInfo());
   check(fit && fit.id === 'T' && fit.solvedCapacity === 100 && fit.solvedNoSource === 'highest', 'fitting: FittingInfo of T has solvedCapacity 100 and solvedNoSource highest', JSON.stringify(fit));
-  check((await solvedField()) === '100', 'fitting: the Properties field of the fitting shows 100', String(await solvedField()));
+  check((await solvedField()) === 'at most 100', 'fitting: the Properties field of the fitting shows at most 100', String(await solvedField()));
 }
 
 // --- 3. riser marks: a marked fitting is never an open end (D-B-102); the keys decide when the solve runs ---

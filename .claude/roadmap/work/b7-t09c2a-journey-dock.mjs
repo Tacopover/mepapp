@@ -1,0 +1,81 @@
+// B7-T09c-2a: the Properties panel at the narrowest dock, with a long number and an 80-character network type name.
+import { open } from '/root/MepApp/.claude/worktrees/buildings-b7/.claude/roadmap/browser/lib.mjs';
+const SHOTS = '/root/MepApp/.claude/worktrees/buildings-b7/.claude/roadmap/work/shots/b7-t09c2a-journey/';
+const LONG80 = 'Supply Air Main Trunk Duct Of The East Wing Of The Building Level Three North 0042';
+const t = await open({ width: 1600, height: 1000 });
+const { page, check, idle } = t;
+await t.start();
+await t.openPdf();
+const screenOf = (p) => page.evaluate((p) => { const s = window.__mepSketchScene; const g = s.world.toGlobal(p); const r = s.app.canvas.getBoundingClientRect(); return { x: r.left + g.x, y: r.top + g.y }; }, p);
+const clickAt = async (p, wait = 300) => { const s = await screenOf(p); await page.mouse.click(s.x, s.y); await idle(wait); };
+await page.evaluate(() => { const s = window.__mepSketchScene; const r = s.app.canvas.getBoundingClientRect(); s.world.scale.set(1); s.world.x = 599 - r.left - 600; s.world.y = 480 - r.top - 670; });
+await idle(300);
+const Tm = { x: 900, y: 400 }, Tj = { x: 650, y: 400 }, O1 = { x: 400, y: 400 }, O2 = { x: 650, y: 600 };
+await page.locator('button.mep-rail-btn[title="Stamp"]').first().click();
+await idle(300);
+await page.locator('.mep-dock input[placeholder^="Search"]').fill('Round Supply');
+await idle(250);
+await page.locator('.mep-stamp-tile').first().click();
+await idle(1000);
+await clickAt(Tm, 800);
+await page.keyboard.press('Escape');
+await page.locator('button.mep-rail-btn[title="Segment"]').first().click();
+await idle(300);
+await page.locator('.mep-dock button', { hasText: /^\s*Network Types\s*$/ }).first().click();
+await idle(300);
+await page.locator('.mep-dock').locator('text=Supply Air').first().click();
+await idle(300);
+await clickAt(Tm); await clickAt(Tj); await clickAt(O1); await page.keyboard.press('Escape'); await idle(200);
+await clickAt(Tj); await clickAt(O2); await page.keyboard.press('Escape'); await idle(300);
+// 80 character type name (setup through the project JSON)
+await page.evaluate(([n]) => { const sc = window.__mepSketchScene; const p = sc.exportProject(); p.networkTypes.find((x) => x.id === 'supply-air').name = n; sc.loadProjectFromJson(p); }, [LONG80]);
+await idle(1000);
+await page.locator('button.mep-rail-btn[title="Select"]').first().click();
+await idle(200);
+await clickAt({ x: Tm.x + 28, y: Tm.y + 24 }, 400);
+const cap = page.locator('.mep-dock .mep-field-row', { has: page.locator('label', { hasText: /^\s*Capacity/i }) }).locator('input').first();
+await cap.click({ clickCount: 3 });
+await page.keyboard.type('12345.67');
+await page.keyboard.press('Enter');
+await idle(500);
+await clickAt({ x: 525, y: 400 }, 400);
+const read = () => page.evaluate(() => {
+  const dock = document.querySelector('.mep-dock');
+  const dr = dock.getBoundingClientRect();
+  const row = [...dock.querySelectorAll('.mep-field-row')].find((r) => /^solved capacity/i.test(r.querySelector('label')?.textContent.trim() ?? ''));
+  const inp = row?.querySelector('input');
+  const sel = [...dock.querySelectorAll('.mep-field-row select')].find((s) => /Supply/.test(s.selectedOptions[0]?.textContent ?? ''));
+  const hint = dock.querySelector('.mep-hint');
+  const rr = row?.getBoundingClientRect();
+  return { dockW: Math.round(dr.width), solved: inp?.value, inputW: inp?.clientWidth, inputScrollW: inp?.scrollWidth, cut: inp ? inp.scrollWidth > inp.clientWidth : null, rowH: rr ? Math.round(rr.height) : null, labelW: Math.round(row?.querySelector('label')?.getBoundingClientRect().width ?? 0), hintH: hint ? Math.round(hint.getBoundingClientRect().height) : null, hintTextOk: hint?.textContent.startsWith('No source yet'), dockHScroll: dock.scrollWidth > dock.clientWidth + 1, selW: sel ? Math.round(sel.getBoundingClientRect().width) : null, selRight: sel ? Math.round(sel.getBoundingClientRect().right) : null, dockRight: Math.round(dr.right), selText: sel?.selectedOptions[0]?.textContent };
+});
+console.log('DOCK 422', JSON.stringify(await read()));
+await page.screenshot({ path: `${SHOTS}dock-1-422-long-number.png` });
+console.log(`SHOT ${SHOTS}dock-1-422-long-number.png`);
+const handles = await page.evaluate(() => [...document.querySelectorAll('[class*=resize], [class*=splitter], [class*=handle], [class*=grip]')].map((e) => `${e.className}|${Math.round(e.getBoundingClientRect().x)},${Math.round(e.getBoundingClientRect().y)},${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`));
+console.log('HANDLES', JSON.stringify(handles));
+const h = await page.evaluate(() => { const e = document.querySelector('[class*=resize], [class*=splitter], [class*=handle], [class*=grip]'); const r = e?.getBoundingClientRect(); return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null; });
+if (h) {
+  await page.mouse.move(h.x, h.y);
+  await page.mouse.down();
+  await page.mouse.move(h.x + 200, h.y, { steps: 10 });
+  await page.mouse.up();
+  await idle(500);
+  const r = await read();
+  console.log('DOCK narrow', JSON.stringify(r));
+  await page.screenshot({ path: `${SHOTS}dock-2-narrow-long-number.png` });
+  console.log(`SHOT ${SHOTS}dock-2-narrow-long-number.png`);
+  check(r.dockW <= 300, 'dock is narrow (<= 300 px) after the drag', String(r.dockW));
+  check(!r.cut, 'at the narrow dock, "at most 12345.67" is not cut in the input', JSON.stringify(r));
+  check(!r.dockHScroll, 'at the narrow dock, the panel has no sideways scroll', JSON.stringify(r));
+  // multi-select at the narrow dock
+  await page.keyboard.down('Shift');
+  await clickAt({ x: 650, y: 500 }, 400);
+  await page.keyboard.up('Shift');
+  console.log('DOCK narrow multi', JSON.stringify(await read()));
+  await page.screenshot({ path: `${SHOTS}dock-3-narrow-multi.png` });
+  console.log(`SHOT ${SHOTS}dock-3-narrow-multi.png`);
+} else {
+  check(false, 'found the dock resize handle');
+}
+await t.finish();

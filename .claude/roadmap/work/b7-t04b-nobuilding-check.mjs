@@ -109,5 +109,62 @@ await load({ ...baseFile, sheets: [sheet('s0', 'l0', 'other-uuid-1'), sheet('s1'
 await probe('riser on other documents, open document not in the building', 250, 300);
 await load({ ...baseFile, sheets: [sheet('s0', 'l0', uuid), sheet('s1', 'l1', 'other-uuid-2')], risers: [] });
 await probe('sheets in the building, no riser at all', 300, 350);
+// B7-T09c-2a: a source-less network with 2 or more open ends shows "at most" and the hint (no building, no riser input is sent).
+// A network with an equipment is unchanged: plain numbers, no hint.
+async function loadTee(withEquipment) {
+  await page.evaluate(
+    ([H, type, withEquipment]) => {
+      const scene = window.__mepSketchScene;
+      const p = scene.exportProject();
+      const base = JSON.parse(JSON.stringify(p.stamps[0]));
+      const sx = base.transform.scale?.x ?? 1;
+      const sy = base.transform.scale?.y ?? 1;
+      const inPort = { id: 'in', name: 'In', fractionX: 0, fractionY: 0.5 };
+      const T = { x: 400, y: H - 400 };
+      const oa = { x: 200, y: H - 400 };
+      const ob = { x: 400, y: H - 200 };
+      const at = { x: 600, y: H - 400 };
+      const mk = (id, category, point) => {
+        const s = JSON.parse(JSON.stringify(base));
+        s.id = id;
+        s.category = category;
+        s.ports = [inPort];
+        s.transform = { ...s.transform, position: { x: point.x - (0 - 0.5) * base.nativeWidth * sx, y: point.y - (0.5 - 0.5) * base.nativeHeight * sy } };
+        return s;
+      };
+      const seg = (id, a, b, from, to) => ({ id, pageIndex: 0, networkTypeId: type.id, shape: 'round', diameter: 200, endpointA: a, endpointB: b, geometry: [from, to] });
+      const fit = (id) => ({ kind: 'fitting', fittingId: id });
+      const port = (id) => ({ kind: 'port', elementId: id, portId: 'in' });
+      p.stamps = [mk('t9', 'terminal', at), ...(withEquipment ? [mk('src9', 'equipment', oa)] : [])];
+      p.fittings = [{ id: 'T9', pageIndex: 0, position: T, kind: 'tee' }, { id: 'ob9', pageIndex: 0, position: ob, kind: 'junction' }, ...(withEquipment ? [] : [{ id: 'oa9', pageIndex: 0, position: oa, kind: 'junction' }])];
+      p.segments = [
+        seg('a9', withEquipment ? port('src9') : fit('oa9'), fit('T9'), oa, T),
+        seg('b9', fit('T9'), fit('ob9'), T, ob),
+        seg('c9', fit('T9'), port('t9'), T, at),
+      ];
+      p.portGroups = [];
+      p.terminalCapacities = { t9: 100 };
+      p.networkTypes = [type];
+      scene.loadProjectFromJson(p);
+    },
+    [H, TYPE, withEquipment],
+  );
+  await idle(1200);
+}
+const atMostHints = () => page.locator('[data-testid="props-at-most-hint"]').count();
+await loadTee(false);
+await clickPoint({ x: 360, y: H - 400 });
+check((await solved()) === 'at most 100', 'no building, no source, two open ends: the segment shows "at most 100"', String(await solved()));
+check((await atMostHints()) === 1, 'no building, no source, two open ends: the hint shows');
+await clickPoint({ x: 400, y: H - 300 });
+check((await solved()) === 'at most 100', 'no building, no source: the second open-end segment shows "at most 100"', String(await solved()));
+await loadTee(true);
+await clickPoint({ x: 360, y: H - 400 });
+check((await solved()) === '100', 'equipment at one open end: the segment of the equipment shows plain 100', String(await solved()));
+check((await atMostHints()) === 0, 'equipment: no hint');
+await clickPoint({ x: 400, y: H - 300 });
+check((await solved()) === '0', 'equipment: the dead open end shows plain 0', String(await solved()));
+check((await atMostHints()) === 0, 'equipment: no hint on the dead open end');
+check((await calls()) === 0, 'setRiserFlowInputs was never called', String(await calls()));
 check(errors.length === 0, 'no page errors', errors.join(' | '));
 await t.finish();

@@ -21,6 +21,7 @@ import {
 import { IconRotate } from '../icons.js';
 import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 import type { FittingRiserLines } from '../riserCapacity.js';
+import { commonNoSourceState, commonSourceWord, noSourceHintOf, sourceWordOf, type NoSourceState } from '../sourceWord.js';
 import { RoomProperties } from './RoomProperties.js';
 import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
 import { capacityLabel } from './capacityLabel.js';
@@ -33,9 +34,17 @@ import type { StampLabelLanguage } from './LanguageToggle.js';
 
 const VARIES = 'Varies';
 
-/** SegmentInfo.solvedCapacity is null both before any solve has run and when a solve left this particular segment unresolved — one label covers both, since the Properties panel has no way to tell them apart without also knowing whether flowResult is null. */
-function formatSolvedCapacity(value: number | null): string {
-  return value === null ? 'Not solved' : String(value);
+/** SegmentInfo.solvedCapacity is null both before any solve has run and when a solve left this particular segment unresolved — one label covers both, since the Properties panel has no way to tell them apart without also knowing whether flowResult is null. With atMost and a number it reads `at most 100`. */
+export function formatSolvedCapacity(value: number | null, atMost = false): string {
+  if (value === null) return 'Not solved';
+  return atMost ? `at most ${value}` : String(value);
+}
+
+/** The hint under the field for one network. A 'loop' always has one. A 'highest' has one only when its value is a number. */
+function noSourceHintFor(state: NoSourceState | undefined, solved: boolean, sourceWord: string): string | null {
+  if (state === 'loop') return noSourceHintOf('loop', sourceWord);
+  if (state === 'highest' && solved) return noSourceHintOf('highest', sourceWord);
+  return null;
 }
 
 const FITTING_KINDS: FittingKind[] = ['junction', 'elbow', 'tee', 'reducer', 'cross'];
@@ -79,6 +88,8 @@ export interface PropertiesPanelProps {
   riserLines?: FittingRiserLines | null;
   /** One hint line for the lone selected segment whose network holds a riser fitting (riserSegmentHint.ts). null or absent: no line. */
   segmentRiserHint?: string | null;
+  /** The network type id of the lone selected fitting's network. Sets the source word of its no-source hint. null or absent: the neutral word. */
+  fittingNetworkTypeId?: string | null;
   /** The active document's adopted network types — the selected segment's "Network Type" dropdown. */
   networkTypes: NetworkType[];
   /** Global Properties definitions (Terminal, Equipment and Circuit) — see GlobalPropertiesDialog. */
@@ -122,6 +133,7 @@ export function PropertiesPanel({
   selectedFitting,
   riserLines = null,
   segmentRiserHint = null,
+  fittingNetworkTypeId = null,
   networkTypes,
   customPropertyDefs,
   customStampDefinitions,
@@ -195,8 +207,13 @@ export function PropertiesPanel({
     ...NETWORK_TYPE_LIBRARY.map((lib) => networkTypes.find((t) => t.id === lib.id) ?? lib),
     ...networkTypes.filter((t) => !NETWORK_TYPE_LIBRARY.some((lib) => lib.id === t.id)),
   ];
+  const typeOf = (id: string | null | undefined) => availableNetworkTypes.find((t) => t.id === id);
 
   if (selection.length === 0 && selectedSegment) {
+    const noSource = selectedSegment.solvedNoSource;
+    const atMost = noSource === 'highest' && selectedSegment.solvedCapacity !== null;
+    const capacityText = formatSolvedCapacity(selectedSegment.solvedCapacity, atMost);
+    const hint = noSourceHintFor(noSource, selectedSegment.solvedCapacity !== null, sourceWordOf(typeOf(selectedSegment.networkTypeId)));
     return (
       <div>
         <div className="mep-elem-row">
@@ -215,8 +232,9 @@ export function PropertiesPanel({
           </div>
           <div className="mep-field-row">
             <label>Solved capacity</label>
-            <input type="text" value={formatSolvedCapacity(selectedSegment.solvedCapacity)} disabled />
+            <input type="text" className={atMost ? 'mep-field-wide' : undefined} title={atMost ? capacityText : undefined} value={capacityText} disabled />
           </div>
+          {hint && <p className="mep-hint" data-testid="props-at-most-hint">{hint}</p>}
           {segmentRiserHint && <p className="mep-hint" data-testid="props-segment-riser-hint">{segmentRiserHint}</p>}
           <div className="mep-field-row">
             <label>Network Type</label>
@@ -295,6 +313,10 @@ export function PropertiesPanel({
     );
   }
   if (selection.length === 0 && selectedFitting) {
+    const noSource = selectedFitting.solvedNoSource;
+    const atMost = noSource === 'highest' && selectedFitting.solvedCapacity !== null;
+    const capacityText = formatSolvedCapacity(selectedFitting.solvedCapacity, atMost);
+    const hint = noSourceHintFor(noSource, selectedFitting.solvedCapacity !== null, sourceWordOf(typeOf(fittingNetworkTypeId)));
     return (
       <div>
         <div className="mep-elem-row">
@@ -326,8 +348,9 @@ export function PropertiesPanel({
           </div>
           <div className="mep-field-row">
             <label>Solved capacity</label>
-            <input type="text" value={formatSolvedCapacity(selectedFitting.solvedCapacity)} disabled />
+            <input type="text" className={atMost ? 'mep-field-wide' : undefined} title={atMost ? capacityText : undefined} value={capacityText} disabled />
           </div>
+          {hint && !riserLines && <p className="mep-hint" data-testid="props-at-most-hint">{hint}</p>}
         </div>
         {riserLines && (
           <div className="mep-section" data-testid="props-riser-section">
@@ -353,6 +376,14 @@ export function PropertiesPanel({
     const height = commonValue(selectedSegments, (s) => s.height);
     const material = commonValue(selectedSegments, (s) => s.material);
     const solvedCapacity = commonValue(selectedSegments, (s) => s.solvedCapacity);
+    const noSourceState = commonNoSourceState(selectedSegments);
+    const atMost = noSourceState === 'highest';
+    const capacityText = solvedCapacity === undefined ? VARIES : formatSolvedCapacity(solvedCapacity, atMost);
+    const hint = noSourceHintFor(
+      noSourceState,
+      selectedSegments.every((s) => s.solvedCapacity !== null),
+      commonSourceWord(selectedSegments.map((s) => typeOf(s.networkTypeId))),
+    );
 
     return (
       <div>
@@ -364,8 +395,15 @@ export function PropertiesPanel({
         <div className="mep-section">
           <div className="mep-field-row">
             <label>Solved capacity{solvedCapacity === undefined ? ` (${VARIES})` : ''}</label>
-            <input type="text" value={solvedCapacity === undefined ? VARIES : formatSolvedCapacity(solvedCapacity)} disabled />
+            <input
+              type="text"
+              className={capacityText.startsWith('at most') ? 'mep-field-wide' : undefined}
+              title={capacityText.startsWith('at most') ? capacityText : undefined}
+              value={capacityText}
+              disabled
+            />
           </div>
+          {hint && <p className="mep-hint" data-testid="props-at-most-hint">{hint}</p>}
           <div className="mep-field-row">
             <label>Network Type{networkTypeId === undefined ? ` (${VARIES})` : ''}</label>
             <select
