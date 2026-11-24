@@ -137,14 +137,14 @@ A "node" of the tree can be an open end, a terminal port, a fitting, or a level.
 
 All of these must hold. Otherwise the old rule runs and nothing changes.
 
-1. The caller asks for it (`highestWhenNoSource: true`, D-B-92). The scene does not ask for a network of a drain type (D-B-100, option A).
+1. The caller asks for it (`highestWhenNoSource: true`, D-B-92). The scene asks for every network type, a drain too (D-B-100, answer of the user: a drain can also go up by a pump).
 2. No explicit root (`rootElementId`) is valid, and no entry fitting (`entryFittingId`) is valid.
 3. The network has no source (no element of category `equipment` with capacity not above 0, in this network only).
 4. K is 1 or more: a local open end, or an open side (3.4).
 5. The graph is a tree (no loop).
 6. Every marked riser fitting is the end of a run (one segment). A mid-run riser fitting keeps the old rule (the T02 warning case).
 
-For the building: the group has no hand-set main level, no node with a source, no missing node, no node with a mid-run riser fitting, no loop, no riser of a drain type (D-B-100), a known number of open ends for each node (D-B-93), and K of 1 or more.
+For the building: the group has no hand-set main level, no node with a source, no missing node, no node with a mid-run riser fitting, no loop, a known number of open ends for each node (D-B-93), and K of 1 or more.
 
 The result says "no source" (3.5) when K is 2 or more (D-B-104, option B). The numbers are the same for K = 1.
 
@@ -247,6 +247,18 @@ When the network has no source, no valid root or entry, and has a loop, the old 
 - **D-B-88 (user): riser spans of a group with no source.** A span shows the highest of its two directions (for example 650 for 100 on one side and 650 on the other). The UI marks it "at most". Words stay neutral: no arrow, no Up, no Down (D-B-74 stays). **Supersedes D-B-76 and D-B-77 item 3 for the case of open ends** (same reason as D-B-86).
 - **D-B-89 (user): what stays level-only.** Sizing, routing and the header total stay level-only (D-B-78). The sheet summary format, the building file and the project file do not change without a question to the user.
 - **D-B-90 (user): the result settles by itself.** After a source or a terminal is placed, the normal rule applies.
+
+### Answered by the user on 2026-11-24 (do not reopen)
+
+- **D-B-93: A (A2).** Add the optional `openEnds` to the stored summary (version stays 2). An absent field means "no data" (the group stays "Not known yet" with a note and the link "Read summaries now").
+- **D-B-97: A.** A hand-set main level with no equipment: its open ends are possible sources.
+- **D-B-100: C.** The rule applies to all types, a drain too. The user wrote: "A drain can also move upwards by ways of a pump, so treat it the same as all the other network types". No drain condition anywhere.
+- **D-B-103: A.** Electrical tag `Connected load, not a design load`, no check of a unit mix.
+- **D-B-104: B.** "at most" and the hint show only when K is 2 or more.
+- **D-B-105: A.** Keep "concurrency factor".
+- **New task B7-T10:** editing the capacity of a terminal marks the document as changed (the user asked for it).
+
+The "Open" text below stays for the record. The answers above win.
 
 ### Open (the user answers before the task named)
 
@@ -530,8 +542,8 @@ sides?: Array<{ demand: number; openEnds: number }>;   // one for each span at t
 // FlowNode gets: openEnds?: number; midRun: boolean   // from RiserNetworkSummary.openEnds and from RISER_WARNING in entry.warnings
 ```
 
-- Behavior (with the recommended answers: A2 for the default, A for the drain, B for K):
-  - In the source step (`building-flow.ts:265-276`), when there are 0 candidates, no hand-set level and no missing node: the group stays `unknown` with the old warning when (1) a node has `midRun` (D-B-106), or (2) a riser of the group has a type id in `ROUTE_GRAVITY_TYPE_IDS` (D-B-100), or (3) a node has `openEnds === undefined` (D-B-93 A2: one note `The summary of Level 1 has no open-end data. Read the summaries.` for each such level), or (4) K = sum of `openEnds` is 0. Else `state = 'ok'`, no `sourceKey`, and `atMost = true` when K is 2 or more.
+- Behavior (with the answers of the user: A2 for the default, C for the drain (no drain condition), B for K):
+  - In the source step (`building-flow.ts:265-276`), when there are 0 candidates, no hand-set level and no missing node: the group stays `unknown` with the old warning when (1) a node has `midRun` (D-B-106), or (2) a node has `openEnds === undefined` (D-B-93 A2: one note `The summary of Level 1 has no open-end data. Read the summaries.` for each such level), or (3) K = sum of `openEnds` is 0. A riser of a drain type uses the rule like any other type (D-B-100 answer C). Else `state = 'ok'`, no `sourceKey`, and `atMost = true` when K is 2 or more.
   - In the solve step (`:279-319`) the group calls `highestFlow` (nodes: `own` = `terminal`, `roots` = `openEnds`; edges: the spans). Each span gets `capacity`, `state: 'ok'`, `complete: true`, and `atMost: true` when the group has it. Each member gets `role: 'open'`, `capacityIn: null`, `demandBeyond` = sum of its sides, and `sides` from `HighestResult.sides` (the side that does not hold the member's node).
   - No other new warning: the state is normal while the user draws.
 - Must not touch: the grouping, the loop rule, the hand-set rule, the missing-level warnings, `deriveRiserFlow`.
@@ -542,7 +554,7 @@ sides?: Array<{ demand: number; openEnds: number }>;   // one for each span at t
   - Two risers in one tree with no source: each span follows the rule.
   - The three rows of the B7 worked example (with equipment) are unchanged. The old tests are green with no edit (D-B-93 A2).
   - A missing level: `unknown`, as today (D-B-94). A loop: as today. Two sources: `unknown`. No open end anywhere: `unknown` with the old warning. A hand-set level with no equipment: `ok`, not `atMost`.
-  - A node with the warning `RISER_WARNING`: `unknown` (D-B-106). A summary with no `openEnds`: `unknown` with the note. A drain riser: `unknown`.
+  - A node with the warning `RISER_WARNING`: `unknown` (D-B-106). A summary with no `openEnds`: `unknown` with the note. A drain riser: the rule runs as for any type (D-B-100 answer C).
   - Placing an equipment on any level turns the mode off (settle test: same input plus `hasSource: true` on Level 0 gives 650 and 150 for the B7 terminals).
 - Size: about 110 lines.
 
@@ -579,11 +591,11 @@ export type RiserFlowInput = {
 
 ### B7-T09c-1: the scene read model, the call and the overlay (render)
 
-- Dependencies: T09a-2. Waits for: D-B-100 (one line).
+- Dependencies: T09a-2. Waits for: nothing (D-B-100 is answered: no drain condition).
 - Files: `packages/render/src/scene.ts` (`SegmentInfo` `:442`, `FittingInfo` `:458`, the lookups `:1470`/`:1479`, `getSelectedFittingInfo` `:1545`, `setRiserMarks` `:3115`, `recomputeFlow` `:3772`, `syncFlowLabels` `:3796-3835`), a new file `packages/render/src/flowArrow.ts` with `flowArrowEnds`, and tests next to them.
 - Exact shapes:
   - `SegmentInfo.solvedNoSource?: 'highest' | 'loop'` and `FittingInfo.solvedNoSource?: 'highest' | 'loop'`. Both come from `FlowResult.noSource` of the network of the item. Absent otherwise.
-  - `recomputeFlow` adds `highestWhenNoSource: !ROUTE_GRAVITY_TYPE_IDS.includes(network.networkTypeId)` (D-B-100 option A) and `notOpenEndIds` (the keys of `this.riserMarks` that are in the network and have no input; D-B-102).
+  - `recomputeFlow` adds `highestWhenNoSource: true` for every network type (D-B-100 answer C) and `notOpenEndIds` (the keys of `this.riserMarks` that are in the network and have no input; D-B-102).
   - `setRiserMarks` also runs `recomputeFlow` when the set of keys changes.
   - `export function flowArrowEnds(direction: 'AtoB' | 'BtoA' | null, a: Vec2, b: Vec2): { from: Vec2; to: Vec2 } | null` returns `null` for a `null` direction, `{ from: a, to: b }` for `AtoB`, and `{ from: b, to: a }` for `BtoA`. `syncFlowLabels` calls it. It skips the arrowhead for `null` and keeps the number label.
 - Must not touch: `computeFlow`, the other read models, the riser-fitting reset of inputs (`:1205`, `:1334`).
@@ -649,9 +661,17 @@ export type RiserFlowInput = {
 - Change:
   - Step 18 (delete the air handling unit) changes. The result depends on open ends. After the unit is deleted, a level may have no open end (not verified: what the segment of the deleted unit becomes). With no open end anywhere the rows stay `not known yet (no source level)`. So the step first says: "Draw a short duct from the riser fitting of each level and leave its end open." Then it expects the numbers of Example 5 for the terminals of that script: Level 0 to Level 1 `at most 650 m³/h`, Level 1 to Level 2 `at most 600 m³/h`. "Main level" reads `not known yet (no source level)`. The hints are the new texts. The implementer checks these numbers in the browser run before writing them.
   - Step 24 (takeoff): the column "Capacity complete" reads `At most` in this case.
-  - New Part J "No source yet": (1) one level in the plain app: draw Example 1, click both open segments, expect `at most` and 100 on both; (2) place an air handling unit at one open end, expect 0 on the dead open end; (3) three levels with a terminal on Level 0 only (Example 2): the open ends of Level 1 and Level 2 show `at most 100`; (4) type a new capacity, expect the numbers to follow with no save; (5) terminals on Level 0 and Level 2, the open end on Level 1 (Example 3): spans `100` and `50`, plain; (6) place the air handling unit: `at most` goes away; (7) a drain network: no "at most", the spans stay "Not known yet", and "Not a design flow" stays; (8) open an old building saved before T09: the note `The summary of Level 1 has no open-end data. Read the summaries.` shows and the link "Read summaries now" shows; click it and the note goes; (9) a ring main with no source: a plain number and the loop hint.
+  - New Part J "No source yet": (1) one level in the plain app: draw Example 1, click both open segments, expect `at most` and 100 on both; (2) place an air handling unit at one open end, expect 0 on the dead open end; (3) three levels with a terminal on Level 0 only (Example 2): the open ends of Level 1 and Level 2 show `at most 100`; (4) type a new capacity, expect the numbers to follow with no save; (5) terminals on Level 0 and Level 2, the open end on Level 1 (Example 3): spans `100` and `50`, plain; (6) place the air handling unit: `at most` goes away; (7) a drain network with no source: it shows "at most" like any other type, and "Not a design flow" stays; (8) open an old building saved before T09: the note `The summary of Level 1 has no open-end data. Read the summaries.` shows and the link "Read summaries now" shows; click it and the note goes; (9) a ring main with no source: a plain number and the loop hint.
   - "What to write down": add the open questions D-B-97, D-B-104 and the word "at most".
 - Verification: each step is possible on one PC (rule 1a). No code change.
+
+### B7-T10: editing a terminal capacity marks the document as changed
+
+- Dependencies: none. Independent of T09 (small, own commit).
+- Goal: after the user edits the Capacity of a terminal (Properties panel, real input), the document is dirty (`isDirty`), as after any other edit. Closing it then asks the unsaved-changes question, and the tab shows the changed mark.
+- The task lead finds the cause first: `PropertiesPanel.tsx:543` and `:681` store `Number(value) || 0`. Find which scene call stores it and why `isDirty` stays false (not a command on the undo stack? a direct write?). The fix follows the way other edits mark dirty. If undo must also work and this is a larger change, the task lead stops and reports before a data-model change.
+- Must not touch: the project file format, the solve.
+- Verification: a core or render test that the edit sets dirty; a browser check with a real input (type 250, press Enter, then read the dirty state from the real UI: the changed mark of the tab or the close question); an edit that sets the same value does not mark dirty (if the other edits do the same); old tests green.
 
 ## 10. Risks
 
@@ -663,7 +683,7 @@ export type RiserFlowInput = {
 - **No-building behavior changes** for networks with no source and K of 2 or more. This is deliberate (Example 1 on one level). Networks with a source are identical. The B7 rule "plain `pnpm dev` must not change" is kept for them and is tested in T09c-2a.
 - **An equipment with two or more connections** next to an open end keeps the old order (the open end wins, `flow.ts:140-143`). This copies the old app (collector heuristic). Not changed here. A note for later.
 - **Old app.** `NetworkFlowProcessor.cs` (FindRoot) picks one root and leaves the others dead. MepApp copied this. T09 is a deliberate change: the old app has no "highest" rule. Where there is a source the two apps agree.
-- **Drain.** With D-B-100 option A a drain with no source keeps an arbitrary root on one level, as today. The tag "Not a design flow" stays. A user-made drain type with another id is not found (the same gap as D-B-82).
+- **Drain.** The user answered C (D-B-100): a drain can go up by a pump, so the rule applies to a drain too. The tag "Not a design flow" stays. The "at most" number of a drain can be higher than the real flow when the outlet is at a known low end. The hint says that a source (outlet) sets the number.
 - **Electrical.** The sum is a plain sum of bare numbers. A mix of units in one network cannot be found (D-B-103).
 - **Stack depth.** The old `demandOf` is recursive. The new helper is not.
 - **Two hand-set levels, two sources, loops** keep "Not known yet". The user may want a later step for the highest value over several sources.
