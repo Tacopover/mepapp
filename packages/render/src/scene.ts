@@ -3606,11 +3606,13 @@ export class SketchScene {
     return true;
   }
 
-  /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). */
+  /** User-entered capacity for a terminal/equipment stamp — the only input solveFlow reads per element (see core/flow.ts). Not an undo step. Marks dirty when the value changes. */
   setTerminalCapacity(elementId: string, capacity: number): void {
+    const changed = (this.doc.terminalCapacities.get(elementId) ?? 0) !== capacity;
     this.doc.terminalCapacities.set(elementId, capacity);
     this.recomputeFlow();
     this.syncLabels();
+    if (changed) this.markDirty();
     // Not part of PlacedStamp, so applyToSelectedStamps' own emit doesn't cover it — without this,
     // the Properties panel's now-directly-bound Capacity field (StampInfo.capacity) would keep
     // showing the value from the last unrelated selection change instead of what was just typed.
@@ -5244,14 +5246,18 @@ export class SketchScene {
     this.applyToSelectedStamps((d) => ({ ...d, properties: { ...d.properties, [name]: value } }), 'Set property');
   }
 
-  /** Same (non-undoable — see setTerminalCapacity) capacity write, generalized across the whole selection. */
+  /** Same (non-undoable — see setTerminalCapacity) capacity write, generalized across the whole selection. Marks dirty when a value changes. */
   setCapacityForSelection(capacity: number): void {
     const state = this.doc.drawingHistory.getState();
+    let changed = false;
     for (const id of this.doc.selectedIds) {
-      if (state.stamps[id]) this.doc.terminalCapacities.set(id, capacity);
+      if (!state.stamps[id]) continue;
+      if ((this.doc.terminalCapacities.get(id) ?? 0) !== capacity) changed = true;
+      this.doc.terminalCapacities.set(id, capacity);
     }
     this.recomputeFlow();
     this.syncLabels();
+    if (changed) this.markDirty();
     this.emitter.emit('selectionChanged', this.getSelection());
   }
 
