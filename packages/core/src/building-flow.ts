@@ -4,7 +4,8 @@
 import type { BuildingFile } from './building.js';
 import { riserSpans, sortedMembers, type RiserSpan } from './riser-quantities.js';
 import type { Riser, RiserMember } from './riser.js';
-import type { RiserNetworkSummary, SheetSummary } from './sheet-summary.js';
+import { highestFlow, type HighestResult } from './flow-highest.js';
+import { RISER_WARNING, type RiserNetworkSummary, type SheetSummary } from './sheet-summary.js';
 
 export interface RiserNetworksLive {
   projectUuid: string;
@@ -22,6 +23,8 @@ export interface BuildingFlowSpan {
   state: 'ok' | 'unknown';
   /** False when a level behind the span has no data: the number reads "at least". */
   complete: boolean;
+  /** Set only when true: the group has no source, so the number is the highest over every open end as a possible source. */
+  atMost?: true;
 }
 
 export interface BuildingFlowMember {
@@ -29,9 +32,11 @@ export interface BuildingFlowMember {
   levelId: string;
   sheetId: string;
   fittingId: string;
-  role: 'source' | 'entry' | 'exit' | 'none';
+  role: 'source' | 'entry' | 'exit' | 'open' | 'none';
   capacityIn: number | null;
   demandBeyond: number | null;
+  /** Only for role 'open': one entry for each span at the member (the span below first). The far side as seen from the member. */
+  sides?: Array<{ demand: number; openEnds: number }>;
 }
 
 export interface BuildingFlowGroup {
@@ -41,6 +46,8 @@ export interface BuildingFlowGroup {
   complete: boolean;
   state: 'ok' | 'unknown';
   sourceLevelId?: string;
+  /** Set only when true: the group has no source and two or more open ends. */
+  atMost?: true;
 }
 
 export interface BuildingFlowResult {
@@ -55,6 +62,10 @@ interface FlowNode {
   terminal: number;
   hasSource: boolean;
   missing: boolean;
+  /** The open ends of the network of this level. Undefined: the summary has no such data. */
+  openEnds?: number;
+  /** The summary warns that a riser fitting is in the middle of a run. */
+  midRun: boolean;
   /** Unique by level id. */
   levels: { id: string; name: string }[];
 }
@@ -79,6 +90,9 @@ interface FlowComponent {
   state: 'ok' | 'unknown';
   sourceKey?: string;
   sourceLevelId?: string;
+  /** Set when the group has no source and the highest rule gives the numbers. The edge ids are the indexes in `edges`. */
+  highest?: HighestResult;
+  atMost?: boolean;
   parentEdgeOf: Map<string, FlowEdge>;
 }
 
@@ -113,7 +127,7 @@ export function solveBuildingFlow(
     const missing = (reason: string): string => {
       const key = `missing|${member.sheetId}`;
       if (!nodeByKey.has(key)) {
-        nodeByKey.set(key, { key, terminal: 0, hasSource: false, missing: true, levels: [{ id: member.levelId, name: level }] });
+        nodeByKey.set(key, { key, terminal: 0, hasSource: false, missing: true, midRun: false, levels: [{ id: member.levelId, name: level }] });
       }
       warn(reason);
       nodeOfMember.set(member, key);
@@ -143,7 +157,15 @@ export function solveBuildingFlow(
     const key = `${uuid}|${entry.fittingIds[0]!}`;
     let node = nodeByKey.get(key);
     if (node === undefined) {
-      node = { key, terminal: entry.terminalCapacity, hasSource: entry.hasSource, missing: false, levels: [] };
+      node = {
+        key,
+        terminal: entry.terminalCapacity,
+        hasSource: entry.hasSource,
+        missing: false,
+        ...(entry.openEnds !== undefined ? { openEnds: entry.openEnds } : {}),
+        midRun: (entry.warnings ?? []).includes(RISER_WARNING),
+        levels: [],
+      };
       nodeByKey.set(key, node);
     }
     if (!node.levels.some((item) => item.id === member.levelId)) node.levels.push({ id: member.levelId, name: level });
@@ -225,6 +247,17 @@ export function solveBuildingFlow(
     });
   }
 
+  /** The highest rule for a group with no source: only when every level has data and the group is a tree with an open end. */
+  const highestSourceOf = (component: FlowComponent): HighestResult | null => {
+    if (!component.complete) return null;
+    if (component.nodes.some((node) => node.midRun || node.openEnds === undefined)) return null;
+    const result = highestFlow(
+      component.nodes.map((node) => ({ id: node.key, own: node.terminal, roots: node.openEnds ?? 0 })),
+      component.edges.map((edge, index) => ({ id: String(index), a: edge.from, b: edge.to })),
+    );
+    return result !== null && result.roots >= 1 ? result : null;
+  };
+
   for (const component of components) {
     const names = component.risers.map((riser) => riser.name);
     if (component.edges.length >= component.nodes.length) {
@@ -269,7 +302,20 @@ export function solveBuildingFlow(
       component.sourceLevelId = source.levels[0]!.id;
       component.state = 'ok';
     } else if (candidates.length === 0) {
-      warn(`${who(names)} ${verb(names, 'has', 'have')} no source level. Set one by hand.`);
+      const highest = highestSourceOf(component);
+      if (highest === null) {
+        warn(`${who(names)} ${verb(names, 'has', 'have')} no source level. Set one by hand.`);
+        if (component.complete) {
+          for (const node of component.nodes) {
+            if (node.openEnds !== undefined) continue;
+            for (const level of node.levels) warn(`The summary of ${level.name} has no open-end data. Read the summaries.`);
+          }
+        }
+      } else {
+        component.highest = highest;
+        component.atMost = highest.roots >= 2;
+        component.state = 'ok';
+      }
     } else {
       const levelList = candidates.flatMap((node) => node.levels.map((level) => level.name)).join(', ');
       warn(`${who(names)} ${verb(names, 'has', 'have')} more than one source level (${levelList}). Set one by hand.`);
@@ -278,6 +324,18 @@ export function solveBuildingFlow(
 
   for (const component of components) {
     const sourceKey = component.sourceKey;
+    const highest = component.highest;
+    if (component.state === 'ok' && highest !== undefined) {
+      component.edges.forEach((edge, index) => {
+        edge.capacity = highest.edge[String(index)] ?? 0;
+        edge.complete = true;
+        edge.out.capacity = edge.capacity;
+        edge.out.state = 'ok';
+        edge.out.complete = true;
+        if (component.atMost) edge.out.atMost = true;
+      });
+      continue;
+    }
     if (component.state !== 'ok' || sourceKey === undefined) {
       for (const edge of component.edges) {
         edge.out.capacity = null;
@@ -333,6 +391,20 @@ export function solveBuildingFlow(
         return { ...base, role: 'none', capacityIn: null, demandBeyond: null };
       }
       const incident = component.edges.filter((edge) => edge.fromMember === member || edge.toMember === member);
+      if (component.highest !== undefined) {
+        const highest = component.highest;
+        const sideOf = (edge: FlowEdge): { demand: number; openEnds: number } => {
+          const sides = highest.sides[String(component.edges.indexOf(edge))]!;
+          const far = edge.toMember === member ? sides.a : sides.b;
+          return { demand: far.demand, openEnds: far.roots };
+        };
+        const sides = [
+          ...incident.filter((edge) => edge.toMember === member),
+          ...incident.filter((edge) => edge.fromMember === member),
+        ].map(sideOf);
+        const beyond = sides.reduce((sum, side) => sum + side.demand, 0);
+        return { ...base, role: 'open', capacityIn: null, demandBeyond: beyond, sides };
+      }
       const parent = component.parentEdgeOf.get(key);
       const demandBeyond = incident.filter((edge) => edge !== parent).reduce((sum, edge) => sum + edge.capacity, 0);
       if (key === component.sourceKey) return { ...base, role: 'source', capacityIn: 0, demandBeyond };
@@ -351,6 +423,7 @@ export function solveBuildingFlow(
       complete: component.complete,
       state: component.state,
       ...(component.sourceLevelId !== undefined ? { sourceLevelId: component.sourceLevelId } : {}),
+      ...(component.atMost ? { atMost: true as const } : {}),
     });
   }
   return result;
@@ -358,12 +431,12 @@ export function solveBuildingFlow(
 
 export type RiserFlowInput = { role: 'entry' | 'exit'; demandBeyond: number };
 
-/** The inputs of the open sheet for the scene, keyed by riser fitting id. A member with role 'none' gives no key. A source member counts as an exit. */
+/** The inputs of the open sheet for the scene, keyed by riser fitting id. A member with role 'none' or 'open' gives no key (the inputs for 'open' come in a later task). A source member counts as an exit. */
 export function riserFlowInputsOf(result: BuildingFlowResult, sheetId: string): Record<string, RiserFlowInput> {
   const inputs: Record<string, RiserFlowInput> = {};
   for (const riser of Object.values(result.risers)) {
     for (const member of riser.members) {
-      if (member.sheetId !== sheetId || member.role === 'none') continue;
+      if (member.sheetId !== sheetId || member.role === 'none' || member.role === 'open') continue;
       const role = member.role === 'entry' ? 'entry' : 'exit';
       const demandBeyond = member.demandBeyond ?? 0;
       const prior = inputs[member.fittingId];

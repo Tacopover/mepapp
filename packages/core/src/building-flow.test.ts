@@ -6,7 +6,7 @@ import type { RiserFittingFlow } from './flow.js';
 import type { NetworkType } from './network.js';
 import type { Riser, RiserMember } from './riser.js';
 import { deriveRiserFlow, type PerSheetRiserFittingFlow } from './riser-flow.js';
-import type { RiserNetworkSummary, SheetSummary } from './sheet-summary.js';
+import { RISER_WARNING, type RiserNetworkSummary, type SheetSummary } from './sheet-summary.js';
 
 const vent: NetworkType = {
   id: 'vent',
@@ -721,5 +721,236 @@ describe('riserFlowInputsOf', () => {
       warnings: [],
     };
     expect(riserFlowInputsOf(twoExits, 's0')).toEqual({ f: { role: 'exit', demandBeyond: 130 } });
+  });
+});
+
+describe('solveBuildingFlow with no source (the highest rule)', () => {
+  function open(terminals: [number, number, number], openEnds: [number | undefined, number | undefined, number | undefined]) {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const entryOf = (index: 0 | 1 | 2) =>
+      entry(['f'], terminals[index], false, openEnds[index] === undefined ? {} : { openEnds: openEnds[index] });
+    const summaries = summariesOf(summary('p0', [entryOf(0)]), summary('p1', [entryOf(1)]), summary('p2', [entryOf(2)]));
+    return { file, summaries };
+  }
+
+  it('Example 2: one terminal on L0, an open end on L1 and L2', () => {
+    const { file, summaries } = open([100, 0, 0], [0, 1, 1]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toEqual([{ riserIds: ['R'], total: 100, complete: true, state: 'ok', atMost: true }]);
+    const spans = result.risers.R!.spans;
+    expect(spans).toHaveLength(2);
+    for (const span of spans) expect(span).toMatchObject({ capacity: 100, state: 'ok', complete: true, atMost: true });
+    const [m0, m1, m2] = result.risers.R!.members;
+    expect(m0).toMatchObject({ levelId: 'l0', role: 'open', capacityIn: null, demandBeyond: 0, sides: [{ demand: 0, openEnds: 2 }] });
+    expect(m1).toMatchObject({
+      levelId: 'l1',
+      role: 'open',
+      capacityIn: null,
+      demandBeyond: 100,
+      sides: [
+        { demand: 100, openEnds: 0 },
+        { demand: 0, openEnds: 1 },
+      ],
+    });
+    expect(m2).toMatchObject({ levelId: 'l2', role: 'open', demandBeyond: 100, sides: [{ demand: 100, openEnds: 1 }] });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('Example 3: one open end on L1 (K = 1) gives plain numbers', () => {
+    const { file, summaries } = open([100, 0, 50], [0, 1, 0]);
+    const result = solveBuildingFlow(file, summaries);
+    const group = result.groups[0]!;
+    expect(group).toMatchObject({ state: 'ok', total: 150, complete: true });
+    expect('atMost' in group).toBe(false);
+    expect(group.sourceLevelId).toBeUndefined();
+    const spans = result.risers.R!.spans;
+    expect(spans.map((span) => span.capacity)).toEqual([100, 50]);
+    for (const span of spans) {
+      expect(span).toMatchObject({ state: 'ok', complete: true });
+      expect('atMost' in span).toBe(false);
+    }
+    expect(result.risers.R!.members[1]).toMatchObject({
+      role: 'open',
+      demandBeyond: 150,
+      sides: [
+        { demand: 100, openEnds: 0 },
+        { demand: 50, openEnds: 0 },
+      ],
+    });
+  });
+
+  it('Example 5: three levels with one open end each give 650 and 600', () => {
+    const { file, summaries } = open([100, 500, 150], [1, 1, 1]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'ok', total: 750, complete: true, atMost: true });
+    expect(result.groups[0]!.sourceLevelId).toBeUndefined();
+    const spans = result.risers.R!.spans;
+    expect(spans.map((span) => span.capacity)).toEqual([650, 600]);
+    for (const span of spans) expect(span).toMatchObject({ state: 'ok', complete: true, atMost: true });
+    expect(result.risers.R!.members[1]).toMatchObject({
+      role: 'open',
+      sides: [
+        { demand: 100, openEnds: 1 },
+        { demand: 150, openEnds: 1 },
+      ],
+    });
+  });
+
+  it('two risers in one tree: each span follows the rule', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(1, 'b'), member(2, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a'], 100, false, { openEnds: 0 })]),
+      summary('p1', [entry(['a', 'b'], 300, false, { openEnds: 1 })]),
+      summary('p2', [entry(['b'], 50, false, { openEnds: 1 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]).toMatchObject({ state: 'ok', total: 450, atMost: true });
+    expect(result.risers.A!.spans[0]).toMatchObject({ capacity: 100, state: 'ok', atMost: true });
+    expect(result.risers.B!.spans[0]).toMatchObject({ capacity: 400, state: 'ok', atMost: true });
+    expect(result.risers.A!.members[1]).toMatchObject({ role: 'open', sides: [{ demand: 100, openEnds: 0 }] });
+    expect(result.risers.B!.members[0]).toMatchObject({ role: 'open', sides: [{ demand: 50, openEnds: 1 }] });
+  });
+
+  it('a missing level keeps the group unknown with the old warning', () => {
+    const { file } = open([100, 500, 150], [1, 1, 1]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, false, { openEnds: 1 })]),
+      summary('p1', [entry(['f'], 500, false, { openEnds: 1 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', complete: false });
+    expect('atMost' in result.groups[0]!).toBe(false);
+    for (const span of result.risers.R!.spans) {
+      expect(span).toMatchObject({ capacity: null, state: 'unknown' });
+      expect('atMost' in span).toBe(false);
+    }
+    for (const item of result.risers.R!.members) expect(item.role).toBe('none');
+    expect(hasWarning(result.warnings, /no source/i)).toBe(true);
+  });
+
+  it('a loop keeps the old result', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(0, 'b'), member(1, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a', 'b'], 100, false, { openEnds: 1 })]),
+      summary('p1', [entry(['a', 'b'], 500, false, { openEnds: 1 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 600 });
+    expect(result.risers.A!.spans[0]).toMatchObject({ capacity: null, state: 'unknown' });
+    expect(hasWarning(result.warnings, /loop/i)).toBe(true);
+  });
+
+  it('two sources keep the group unknown', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true, { openEnds: 1 })]),
+      summary('p1', [entry(['f'], 500, false, { openEnds: 1 })]),
+      summary('p2', [entry(['f'], 150, true, { openEnds: 1 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 750 });
+    for (const span of result.risers.R!.spans) expect(span).toMatchObject({ capacity: null, state: 'unknown' });
+    expect(hasWarning(result.warnings, /more than one source/i)).toBe(true);
+  });
+
+  it('no open end anywhere keeps the group unknown with the old warning', () => {
+    const { file, summaries } = open([100, 500, 150], [0, 0, 0]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 750 });
+    expect('atMost' in result.groups[0]!).toBe(false);
+    for (const span of result.risers.R!.spans) expect(span).toMatchObject({ capacity: null, state: 'unknown' });
+    for (const item of result.risers.R!.members) expect(item.role).toBe('none');
+    expect(hasWarning(result.warnings, /no source/i)).toBe(true);
+    expect(hasWarning(result.warnings, /open-end data/i)).toBe(false);
+  });
+
+  it('a hand-set level with no equipment uses the old rule and is not at most', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)], { sourceLevelId: 'l1' })]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, false, { openEnds: 1 })]),
+      summary('p1', [entry(['f'], 500, false, { openEnds: 1 })]),
+      summary('p2', [entry(['f'], 150, false, { openEnds: 1 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    const group = result.groups[0]!;
+    expect(group).toMatchObject({ state: 'ok', sourceLevelId: 'l1', total: 750 });
+    expect('atMost' in group).toBe(false);
+    const spans = result.risers.R!.spans;
+    expect(spans.map((span) => span.capacity)).toEqual([100, 150]);
+    for (const span of spans) expect('atMost' in span).toBe(false);
+    expect(result.risers.R!.members.map((item) => item.role)).toEqual(['entry', 'source', 'entry']);
+  });
+
+  it('a node with the riser warning turns the mode off', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, false, { openEnds: 1 })]),
+      summary('p1', [entry(['f'], 500, false, { openEnds: 1, warnings: [RISER_WARNING] })]),
+      summary('p2', [entry(['f'], 150, false, { openEnds: 1 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 750 });
+    for (const span of result.risers.R!.spans) expect(span).toMatchObject({ capacity: null, state: 'unknown' });
+    expect(hasWarning(result.warnings, /no source/i)).toBe(true);
+    expect(hasWarning(result.warnings, /not an open end/i, 'L1')).toBe(true);
+  });
+
+  it('a summary with no open-end count keeps the group unknown and adds one note for that level', () => {
+    const { file, summaries } = open([100, 500, 150], [1, undefined, 1]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'unknown', total: 750 });
+    for (const span of result.risers.R!.spans) expect(span).toMatchObject({ capacity: null, state: 'unknown' });
+    expect(hasWarning(result.warnings, /no source/i)).toBe(true);
+    expect(warningsMatching(result.warnings, /open-end data/i)).toEqual([
+      'The summary of L1 has no open-end data. Read the summaries.',
+    ]);
+  });
+
+  it('a drain riser uses the rule like any other type', () => {
+    const drain: NetworkType = { ...vent, id: 'sanitary-waste', name: 'Waste' };
+    const file = fileWith([
+      makeRiser('R', [member(0), member(1), member(2)], { networkTypeId: drain.id, networkType: drain }),
+    ]);
+    const drainEntry = (terminal: number) =>
+      entry(['f'], terminal, false, { openEnds: 1, networkTypeId: drain.id });
+    const summaries = summariesOf(
+      summary('p0', [drainEntry(100)]),
+      summary('p1', [drainEntry(500)]),
+      summary('p2', [drainEntry(150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.groups[0]).toMatchObject({ state: 'ok', atMost: true });
+    expect(result.risers.R!.spans.map((span) => span.capacity)).toEqual([650, 600]);
+  });
+
+  it('settle: an equipment on L0 turns the mode off and gives 650 and 150', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, true, { openEnds: 1 })]),
+      summary('p1', [entry(['f'], 500, false, { openEnds: 1 })]),
+      summary('p2', [entry(['f'], 150, false, { openEnds: 1 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    const group = result.groups[0]!;
+    expect(group).toMatchObject({ state: 'ok', sourceLevelId: 'l0', total: 750 });
+    expect('atMost' in group).toBe(false);
+    const spans = result.risers.R!.spans;
+    expect(spans.map((span) => span.capacity)).toEqual([650, 150]);
+    for (const span of spans) expect('atMost' in span).toBe(false);
+    expect(result.risers.R!.members.map((item) => item.role)).toEqual(['source', 'entry', 'entry']);
+    expect(result.risers.R!.members.some((item) => 'sides' in item)).toBe(false);
+  });
+
+  it('riserFlowInputsOf gives no key for an open member', () => {
+    const { file, summaries } = open([100, 500, 150], [1, 1, 1]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's1')).toEqual({});
   });
 });
