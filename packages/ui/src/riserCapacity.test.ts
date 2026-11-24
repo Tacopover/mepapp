@@ -1,6 +1,6 @@
 import { solveBuildingFlow, type BuildingFile, type BuildingLevel, type BuildingSheet, type NetworkType, type Riser, type RiserMember, type RiserNetworksLive, type RiserNetworkSummary, type SheetSummary } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
-import { capacityNumberText, capacityViewOf, fittingRiserLinesOf, isNotDesignFlow, needsSummaryRead, rebuildNoticeText, riserFlowUnit, unknownReasonOf, type CapacityView } from './riserCapacity.js';
+import { capacityNumberText, capacityViewOf, designFlowTagOf, fittingRiserLinesOf, isNotDesignFlow, needsSummaryRead, rebuildNoticeText, riserFlowUnit, unknownReasonOf, type CapacityView } from './riserCapacity.js';
 import type { RebuildResult } from './rebuildSummaries.js';
 
 const DESIGN_FLOW_TEXT = 'These numbers are a plain sum of connected capacities, with no concurrency factor. They are not a design flow for this network type.';
@@ -806,7 +806,7 @@ describe('riser views with no source level', () => {
     expect(view.designFlowHint).toBe(DESIGN_FLOW_TEXT);
     expect(view.hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, 'Place a panel on a level, or click Set by hand and choose a main level.']);
     const lines = fittingRiserLinesOf(view, 'R1');
-    expect(lines?.tag).toBe('Not a design flow');
+    expect(lines?.tag).toBe('Connected load, not a design load');
     expect(lines?.hints).toEqual([RISER_AT_MOST_TEXT, DESIGN_FLOW_TEXT]);
   });
 
@@ -853,5 +853,83 @@ describe('riser views with no source level', () => {
     const view = capacityViewOf(file, riser, flow);
     expect(view.rows.map((row) => row.valueText)).toEqual(['at most 650 m³/h', 'at most 600 m³/h']);
     expect(view.totalLine).toBe('Connected total: 750 m³/h (no concurrency factor)');
+  });
+});
+
+describe('designFlowTagOf and the design flow tag', () => {
+  it('gives the electrical tag for an electrical type and the other tag for the other types', () => {
+    expect(designFlowTagOf(networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' }))).toBe('Connected load, not a design load');
+    expect(designFlowTagOf(networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' }))).toBe('Not a design flow');
+    expect(designFlowTagOf(networkTypeOf({ id: 'sprinkler', name: 'Sprinkler', discipline: 'fireProtection', flowUnit: 'l/s' }))).toBe('Not a design flow');
+    expect(designFlowTagOf(networkTypeOf({ id: 'vent', name: 'Supply air', discipline: 'ventilation' }))).toBe('Not a design flow');
+  });
+
+  it('gives the electrical tag in the view and keeps the design flow hint for an electrical riser', () => {
+    const power = networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' });
+    const { file, riser, summaries } = worked([true, false, false], [100, 500, 150], power);
+    const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
+    expect(view.designFlowTag).toBe('Connected load, not a design load');
+    expect(view.designFlowHint).toBe(DESIGN_FLOW_TEXT);
+    const single = riserOf('R1', [memberOf(0)], power);
+    const singleFile = fileWith([single]);
+    const singleFlow = solveBuildingFlow(singleFile, summariesOf(summaryOf('p0', [entryOf(['f'], 100, true)])));
+    expect(capacityViewOf(singleFile, single, singleFlow)).toMatchObject({ kind: 'one-member', designFlowTag: 'Connected load, not a design load' });
+  });
+
+  it('gives the other tag in the view for a drain and no tag for air', () => {
+    const drain = networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' });
+    const waste = worked([true, false, false], [100, 500, 150], drain);
+    expect(capacityViewOf(waste.file, waste.riser, solveBuildingFlow(waste.file, waste.summaries)).designFlowTag).toBe('Not a design flow');
+    const air = worked([true, false, false]);
+    expect(capacityViewOf(air.file, air.riser, solveBuildingFlow(air.file, air.summaries)).designFlowTag).toBeUndefined();
+  });
+});
+
+describe('needsSummaryRead for a group with no source level', () => {
+  it('asks for the summary when the stored entries of a group with no source level have no open-end data', () => {
+    const { file, riser, summaries } = worked([false, false, false]);
+    const flow = solveBuildingFlow(file, summaries);
+    expect(unknownReasonOf(file, flow.groups[0]!, flow.warnings)).toBe('no-source');
+    expect(needsSummaryRead(file, riser, flow, summaries)).toBe(true);
+  });
+
+  it('does not ask for the summary when the stored entries have open ends, so the group is at most', () => {
+    const riser = riserOf('R1', [memberOf(0), memberOf(1), memberOf(2)]);
+    const file = fileWith([riser]);
+    const summaries = summariesOf(
+      summaryOf('p0', [{ ...entryOf(['f'], 100), openEnds: 1 }]),
+      summaryOf('p1', [{ ...entryOf(['f'], 500), openEnds: 1 }]),
+      summaryOf('p2', [{ ...entryOf(['f'], 150), openEnds: 1 }]),
+    );
+    const flow = solveBuildingFlow(file, summaries);
+    expect(flow.groups[0]).toMatchObject({ atMost: true });
+    expect(needsSummaryRead(file, riser, flow, summaries)).toBe(false);
+  });
+
+  it('does not ask for the summary of a group with a source level', () => {
+    const { file, riser, summaries } = worked([true, false, false]);
+    const flow = solveBuildingFlow(file, summaries);
+    expect(needsSummaryRead(file, riser, flow, summaries)).toBe(false);
+  });
+
+  it('asks for the summary of a sheet with no open-end data, and not when the live data covers that sheet', () => {
+    const riser = riserOf('R1', [memberOf(0), memberOf(1), memberOf(2)]);
+    const file = fileWith([riser]);
+    const summaries = summariesOf(
+      summaryOf('p0', [{ ...entryOf(['f'], 100), openEnds: 1 }]),
+      summaryOf('p1', [entryOf(['f'], 500)]),
+      summaryOf('p2', [{ ...entryOf(['f'], 150), openEnds: 1 }]),
+    );
+    const live: RiserNetworksLive = { projectUuid: 'p1', riserNetworks: [{ ...entryOf(['f'], 500), openEnds: 1 }] };
+    const flow = solveBuildingFlow(file, summaries, live);
+    expect(needsSummaryRead(file, riser, flow, summaries)).toBe(true);
+    expect(needsSummaryRead(file, riser, flow, summaries, [live])).toBe(false);
+  });
+
+  it('does not ask for a summary when the live data covers every sheet of a group with no source level', () => {
+    const { file, riser, summaries } = worked([false, false, false]);
+    const live: RiserNetworksLive[] = ['p0', 'p1', 'p2'].map((projectUuid) => ({ projectUuid, riserNetworks: [{ ...entryOf(['f'], 100), openEnds: 1 }] }));
+    const flow = solveBuildingFlow(file, summaries, live);
+    expect(needsSummaryRead(file, riser, flow, summaries, live)).toBe(false);
   });
 });

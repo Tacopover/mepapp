@@ -250,6 +250,45 @@ describe('riserTakeoffWarnings', () => {
     ]);
     expect(warnings).not.toContain('Flow is not summed across levels.');
   });
+
+  it('gives one no-source line for each riser of a group with no source level, in file order', () => {
+    const file = fileWith([makeRiser('R2', [member(0), member(2)]), makeRiser('R1', [member(0), member(2)])]);
+    const flow: BuildingFlowResult = {
+      risers: {},
+      groups: [{ riserIds: ['R1', 'R2'], total: 750, complete: true, state: 'ok', atMost: true }],
+      warnings: [],
+    };
+    expect(riserTakeoffWarnings(file, flow).filter((warning) => warning.includes('has no source level yet'))).toEqual([
+      'Riser R2 has no source level yet. Each capacity shows the largest flow for any source position.',
+      'Riser R1 has no source level yet. Each capacity shows the largest flow for any source position.',
+    ]);
+  });
+
+  it('puts the no-source lines before the two closing lines', () => {
+    const file = fileWith([makeRiser('R1', [member(0), member(2)])]);
+    const flow: BuildingFlowResult = {
+      risers: {},
+      groups: [{ riserIds: ['R1'], total: 750, complete: true, state: 'ok', atMost: true }],
+      warnings: [],
+    };
+    expect(riserTakeoffWarnings(file, flow).slice(-3)).toEqual([
+      'Riser R1 has no source level yet. Each capacity shows the largest flow for any source position.',
+      'Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.',
+      'Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.',
+    ]);
+  });
+
+  it('gives no no-source line for a group without atMost or with no flow', () => {
+    const file = fileWith([makeRiser('R1', [member(0), member(2)])]);
+    const single: BuildingFlowResult = {
+      risers: {},
+      groups: [{ riserIds: ['R1'], total: 750, complete: true, state: 'ok' }],
+      warnings: [],
+    };
+    expect(riserTakeoffWarnings(file, single).filter((warning) => warning.includes('has no source level yet'))).toEqual([]);
+    expect(riserTakeoffWarnings(file, { risers: {}, groups: [], warnings: [] }).filter((warning) => warning.includes('has no source level yet'))).toEqual([]);
+    expect(riserTakeoffWarnings(file).filter((warning) => warning.includes('has no source level yet'))).toEqual([]);
+  });
 });
 
 describe('riserTable options', () => {
@@ -410,6 +449,30 @@ describe('riser capacity', () => {
     const noNumberFile = fileWith([makeRiser('R1', [member(0), member(2)])]);
     const noNumber = flowOf({ R1: [flowSpan('R1', 'l0', 'l2', { state: 'unknown', capacity: null, complete: false })] });
     expect(riserTakeoffWarnings(noNumberFile, noNumber).filter((warning) => warning.includes('has no flow unit'))).toEqual([]);
+  });
+
+  it('gives At most for a span of a group with no source level and keeps No for an incomplete span', () => {
+    const riser = makeRiser('R1', [member(0), member(1), member(2)], {}, withUnit);
+    const flow: BuildingFlowResult = {
+      ...flowOf({ R1: [flowSpan('R1', 'l0', 'l1', { atMost: true }), flowSpan('R1', 'l1', 'l2', { complete: false })] }),
+      groups: [{ riserIds: ['R1'], total: 750, complete: true, state: 'ok', atMost: true }],
+    };
+    const table = riserTable(fileWith([riser]), () => null, { flow });
+    expect(cellOf(table, 0, 'Capacity')).toBe(650);
+    expect(cellOf(table, 0, 'Capacity unit')).toBe('m³/h');
+    expect(cellOf(table, 0, 'Capacity complete')).toBe('At most');
+    expect(cellOf(table, 1, 'Capacity complete')).toBe('No');
+  });
+
+  it('keeps the sixteen headers when a group has no source level', () => {
+    const riser = makeRiser('R1', [member(0), member(2)], {}, withUnit);
+    const flow: BuildingFlowResult = {
+      ...flowOf({ R1: [flowSpan('R1', 'l0', 'l2', { atMost: true })] }),
+      groups: [{ riserIds: ['R1'], total: 750, complete: true, state: 'ok', atMost: true }],
+    };
+    const table = riserTable(fileWith([riser]), () => null, { flow });
+    expect(table.headers).toHaveLength(16);
+    expect(table.headers[15]).toBe('Capacity complete');
   });
 });
 

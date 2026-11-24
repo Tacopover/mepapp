@@ -6633,6 +6633,7 @@ button.mep-tree-arrow {
 }
 .mep-rp-capacity-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
 }
@@ -6642,6 +6643,8 @@ button.mep-tree-arrow {
 .mep-rp-tag {
   font-size: 12px;
   color: var(--muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .mep-section > .mep-rp-tag {
   margin-bottom: 6px;

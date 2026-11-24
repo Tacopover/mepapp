@@ -132,7 +132,7 @@ export function riserTable(
       if (span.endLabel !== undefined) return [null, null, null];
       const flowSpan = options.flow?.risers[riser.id]?.spans.find((s) => s.fromLevelId === span.fromLevelId && s.toLevelId === span.toLevelId);
       if (flowSpan === undefined || flowSpan.state !== 'ok' || flowSpan.capacity === null) return [null, null, null];
-      return [Math.round(flowSpan.capacity * 100) / 100, riser.networkType.flowUnit ?? null, flowSpan.complete ? 'Yes' : 'No'];
+      return [Math.round(flowSpan.capacity * 100) / 100, riser.networkType.flowUnit ?? null, flowSpan.atMost === true ? 'At most' : flowSpan.complete ? 'Yes' : 'No'];
     };
     const members = sortedMembers(file, riser);
     if (members.length === 1) {
@@ -191,6 +191,11 @@ export function riserTakeoffWarnings(file: BuildingFile, flow?: BuildingFlowResu
     if (flow?.risers[riser.id]?.spans.some((span) => span.state === 'ok' && span.capacity !== null)) unitless.add(riser.networkType.name);
   }
   for (const name of unitless) warnings.push(`Network type ${name} has no flow unit. Its capacity numbers have no unit.`);
+  for (const riser of file.risers) {
+    if (flow?.groups.some((group) => group.atMost === true && group.riserIds.includes(riser.id))) {
+      warnings.push(`Riser ${riser.name} has no source level yet. Each capacity shows the largest flow for any source position.`);
+    }
+  }
   warnings.push('Capacity is a plain sum of connected capacities, with no concurrency factor. It is not a design flow.');
   warnings.push('Each floor crossing of a duct needs a fire damper or a fire-stopped penetration. Check the local rules.');
   return warnings;

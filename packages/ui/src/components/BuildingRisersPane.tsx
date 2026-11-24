@@ -81,7 +81,7 @@ export function parseMm(text: string): number | undefined | 'invalid' {
   return Number.isFinite(value) && value >= 0 ? value : 'invalid';
 }
 
-type FocusRequest = { kind: 'row'; index: number } | { kind: 'lane'; riserId: string } | { kind: 'checkbox' } | { kind: 'info' };
+type FocusRequest = { kind: 'row'; index: number } | { kind: 'lane'; riserId: string } | { kind: 'checkbox' } | { kind: 'info' } | { kind: 'selects' };
 
 const STATUS_TONE: Record<RowStatus, string> = { ok: 'ok', waiting: 'waiting', off: 'bad', gone: 'muted' };
 
@@ -248,6 +248,8 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
       pane.querySelector<SVGElement>(`[data-riser-id="${focusRequest.riserId}"]`)?.focus();
     } else if (focusRequest.kind === 'info') {
       pane.querySelector<HTMLElement>(`[id="${baseId}-title"]`)?.focus();
+    } else if (focusRequest.kind === 'selects') {
+      pane.querySelector<HTMLSelectElement>('[data-testid="riser-source-select"]')?.focus();
     } else {
       pane.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus();
     }
@@ -270,11 +272,14 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
   const needsAttention = useMemo(() => {
     if (buildingFlow === null || selected === null) return false;
     const view = capacityViewOf(file, selected, buildingFlow);
-    return view.kind === 'solved' && (view.rows.some((row) => !row.known) || needsSummaryRead(file, selected, buildingFlow, summaries, live));
+    return view.kind === 'solved' && (view.atMost || view.rows.some((row) => !row.known) || needsSummaryRead(file, selected, buildingFlow, summaries, live));
   }, [file, selected, buildingFlow, summaries, live]);
 
   useEffect(() => {
-    if (needsAttention) capacityRef.current?.scrollIntoView({ block: 'nearest' });
+    if (needsAttention) {
+      capacityRef.current?.scrollIntoView({ block: 'nearest' });
+      capacityRef.current?.querySelector<HTMLElement>('[data-testid="riser-capacity-actions"]')?.scrollIntoView({ block: 'nearest' });
+    }
   }, [needsAttention, selectedId]);
 
   function idsOf(next: BuildingFile): string[] {
@@ -442,6 +447,8 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
           .sort((a, b) => b.elevationMm - a.elevationMm);
   const rows = riser === null ? [] : riserRows(file, riser, conflictKeys);
   const capacity = riser === null || buildingFlow === null ? null : capacityViewOf(file, riser, buildingFlow, { selectsShown: showSelects });
+  const readLinkShown =
+    riser !== null && buildingFlow !== null && onRebuild !== undefined && needsSummaryRead(file, riser, buildingFlow, summaries, live);
 
   return (
     <div ref={paneRef} className="mep-rp" data-testid="risers-pane">
@@ -522,7 +529,7 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
                     title={capacity.designFlowHint ?? undefined}
                     data-testid="riser-not-design-flow"
                   >
-                    Not a design flow
+                    {capacity.designFlowTag ?? 'Not a design flow'}
                   </span>
                 )}
               </div>
@@ -536,6 +543,35 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
                         <div data-testid="riser-capacity-main">{capacity.mainLine}</div>
                         <div data-testid="riser-capacity-total">{capacity.totalLine}</div>
                       </div>
+                      {(readLinkShown || !showSelects) && (
+                        <div className="mep-rp-links" data-testid="riser-capacity-actions">
+                          {readLinkShown && (
+                            <button
+                              type="button"
+                              className="mep-rp-link"
+                              data-testid="riser-read-summaries"
+                              disabled={busy || reading}
+                              onClick={() => void readSummariesNow()}
+                            >
+                              {reading ? 'Reading…' : 'Read summaries now'}
+                            </button>
+                          )}
+                          {!showSelects && (
+                            <button
+                              type="button"
+                              className="mep-rp-link"
+                              data-testid="riser-set-by-hand"
+                              disabled={busy}
+                              onClick={() => {
+                                setHandOpen(true);
+                                setFocusRequest({ kind: 'selects' });
+                              }}
+                            >
+                              Set by hand
+                            </button>
+                          )}
+                        </div>
+                      )}
                       <div className="mep-rp-cap-list" data-testid="riser-capacity-list" role="list" tabIndex={0} aria-label="Capacity of each span">
                         {capacity.rows.map((row) => (
                           <div
@@ -569,19 +605,6 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
                       {capacity.designFlowHint}
                     </p>
                   )}
-                  {buildingFlow !== null && onRebuild !== undefined && needsSummaryRead(file, riser, buildingFlow, summaries, live) && (
-                    <div className="mep-rp-links">
-                      <button
-                        type="button"
-                        className="mep-rp-link"
-                        data-testid="riser-read-summaries"
-                        disabled={busy || reading}
-                        onClick={() => void readSummariesNow()}
-                      >
-                        {reading ? 'Reading…' : 'Read summaries now'}
-                      </button>
-                    </div>
-                  )}
                 </>
               )}
             </div>
@@ -593,21 +616,6 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
 
             {showSelects && (
               <div className="mep-rp-fields">
-                <div className="mep-rp-field">
-                  <label htmlFor={`${baseId}-flow`}>Direction</label>
-                  <select
-                    id={`${baseId}-flow`}
-                    data-testid="riser-flow-select"
-                    value={flowValue}
-                    disabled={busy}
-                    onChange={(event) => setFlow(riser, event.target.value as RiserFlow)}
-                  >
-                    {flowValue === '' && <option value="">Choose</option>}
-                    <option value="up">Up</option>
-                    <option value="down">Down</option>
-                    <option value="both">Both</option>
-                  </select>
-                </div>
                 <div className="mep-rp-field">
                   <label htmlFor={`${baseId}-source`}>Source level</label>
                   <select
@@ -625,6 +633,21 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
                     ))}
                   </select>
                 </div>
+                <div className="mep-rp-field">
+                  <label htmlFor={`${baseId}-flow`}>Direction</label>
+                  <select
+                    id={`${baseId}-flow`}
+                    data-testid="riser-flow-select"
+                    value={flowValue}
+                    disabled={busy}
+                    onChange={(event) => setFlow(riser, event.target.value as RiserFlow)}
+                  >
+                    {flowValue === '' && <option value="">Choose</option>}
+                    <option value="up">Up</option>
+                    <option value="down">Down</option>
+                    <option value="both">Both</option>
+                  </select>
+                </div>
               </div>
             )}
 
@@ -640,15 +663,20 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
                   Use the flow solve
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className="mep-rp-link"
-                  data-testid="riser-set-by-hand"
-                  disabled={busy}
-                  onClick={() => setHandOpen(true)}
-                >
-                  Set by hand
-                </button>
+                !(capacity !== null && capacity.kind === 'solved') && (
+                  <button
+                    type="button"
+                    className="mep-rp-link"
+                    data-testid="riser-set-by-hand"
+                    disabled={busy}
+                    onClick={() => {
+                      setHandOpen(true);
+                      setFocusRequest({ kind: 'selects' });
+                    }}
+                  >
+                    Set by hand
+                  </button>
+                )
               )}
               <button
                 type="button"
