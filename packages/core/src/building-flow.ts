@@ -429,19 +429,41 @@ export function solveBuildingFlow(
   return result;
 }
 
-export type RiserFlowInput = { role: 'entry' | 'exit'; demandBeyond: number };
+export type RiserFlowInput = {
+  role: 'entry' | 'exit' | 'open';
+  demandBeyond: number;
+  /** Only for role 'open': one entry for each span at the fitting, seen from this level. */
+  sides?: ReadonlyArray<{ demand: number; openEnds: number }>;
+};
 
-/** The inputs of the open sheet for the scene, keyed by riser fitting id. A member with role 'none' or 'open' gives no key (the inputs for 'open' come in a later task). A source member counts as an exit. */
+/** The inputs of the open sheet for the scene, keyed by riser fitting id. A member with role 'none' gives no key. A member with role 'open' gives role 'open', the sum of its sides as `demandBeyond` and its `sides`. A source member counts as an exit. When two members map to one fitting, the demands add and the sides join (two open members) or are dropped (an open member with an entry or an exit). */
 export function riserFlowInputsOf(result: BuildingFlowResult, sheetId: string): Record<string, RiserFlowInput> {
   const inputs: Record<string, RiserFlowInput> = {};
   for (const riser of Object.values(result.risers)) {
     for (const member of riser.members) {
-      if (member.sheetId !== sheetId || member.role === 'none' || member.role === 'open') continue;
-      const role = member.role === 'entry' ? 'entry' : 'exit';
+      if (member.sheetId !== sheetId || member.role === 'none') continue;
       const demandBeyond = member.demandBeyond ?? 0;
       const prior = inputs[member.fittingId];
+      if (member.role === 'open') {
+        const sides = member.sides ?? [];
+        if (prior === undefined) {
+          inputs[member.fittingId] = { role: 'open', demandBeyond, sides: sides.map((side) => ({ ...side })) };
+        } else if (prior.role === 'open') {
+          inputs[member.fittingId] = {
+            role: 'open',
+            demandBeyond: prior.demandBeyond + demandBeyond,
+            sides: [...(prior.sides ?? []), ...sides.map((side) => ({ ...side }))],
+          };
+        } else {
+          inputs[member.fittingId] = { role: prior.role, demandBeyond: prior.demandBeyond + demandBeyond };
+        }
+        continue;
+      }
+      const role = member.role === 'entry' ? 'entry' : 'exit';
       if (prior === undefined) {
         inputs[member.fittingId] = { role, demandBeyond };
+      } else if (prior.role === 'open') {
+        inputs[member.fittingId] = { role, demandBeyond: prior.demandBeyond + demandBeyond };
       } else {
         inputs[member.fittingId] = {
           role: prior.role === 'entry' || role === 'entry' ? 'entry' : 'exit',

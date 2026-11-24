@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeNetworks, solveFlow, type Fitting, type RiserFlowInput, type Segment } from '@mepapp/core';
+import { computeNetworks, riserFlowInputsOf, solveFlow, type BuildingFlowResult, type Fitting, type RiserFlowInput, type Segment } from '@mepapp/core';
 import { riserSolveOptionsFor } from './riserFlowInputs.js';
 
 function segment(id: string, endpointA: Segment['endpointA'], endpointB: Segment['endpointB']): Segment {
@@ -151,5 +151,102 @@ describe('riserSolveOptionsFor', () => {
     });
     expect(withOptions).toEqual(withoutOptions);
     expect('riserCapacity' in withOptions).toBe(false);
+  });
+});
+
+describe('riserSolveOptionsFor with role open and marks', () => {
+  const segments = [segment('a1', { kind: 'fitting', fittingId: 'RF1' }, { kind: 'fitting', fittingId: 'O1' })];
+  const fittings = [fitting('RF1'), fitting('O1')];
+  const [network] = computeNetworks({ segments, fittings, portGroups: [] });
+  const sides = [
+    { demand: 100, openEnds: 0 },
+    { demand: 0, openEnds: 1 },
+  ];
+
+  it('gives riserSides and riserDemand and no entryFittingId for role open', () => {
+    const inputs = new Map<string, RiserFlowInput>([['RF1', { role: 'open', demandBeyond: 100, sides }]]);
+    const result = riserSolveOptionsFor(network, inputs);
+    expect(result?.riserFittingIds).toEqual(new Set(['RF1']));
+    expect(result?.riserSides).toEqual({ RF1: sides });
+    expect(result?.riserDemand).toEqual({ RF1: 100 });
+    expect('entryFittingId' in (result ?? {})).toBe(false);
+    expect('notOpenEndIds' in (result ?? {})).toBe(false);
+  });
+
+  it('gives no riserSides when no input has sides', () => {
+    const inputs = new Map<string, RiserFlowInput>([['RF1', { role: 'exit', demandBeyond: 100 }]]);
+    expect('riserSides' in (riserSolveOptionsFor(network, inputs) ?? {})).toBe(false);
+  });
+
+  it('gives notOpenEndIds for a mark with no input, with no riserDemand', () => {
+    const marks = new Map<string, unknown>([['RF1', {}]]);
+    const result = riserSolveOptionsFor(network, new Map(), marks);
+    expect(result?.notOpenEndIds).toEqual(new Set(['RF1']));
+    expect(result?.riserFittingIds).toEqual(new Set());
+    expect('riserDemand' in (result ?? {})).toBe(false);
+  });
+
+  it('gives no notOpenEndIds for a mark that has an input', () => {
+    const marks = new Map<string, unknown>([['RF1', {}]]);
+    const inputs = new Map<string, RiserFlowInput>([['RF1', { role: 'open', demandBeyond: 100, sides }]]);
+    expect('notOpenEndIds' in (riserSolveOptionsFor(network, inputs, marks) ?? {})).toBe(false);
+  });
+
+  it('gives null with no marks and no inputs, and for a mark of another network', () => {
+    expect(riserSolveOptionsFor(network, new Map(), new Map())).toBeNull();
+    expect(riserSolveOptionsFor(network, new Map(), new Map<string, unknown>([['elsewhere', {}]]))).toBeNull();
+  });
+
+  it('a mark with no input stays out of the open ends: the other open end is the only source', () => {
+    const levelSegments = [
+      segment('s1', { kind: 'fitting', fittingId: 'T' }, { kind: 'fitting', fittingId: 'RF' }),
+      segment('s2', { kind: 'fitting', fittingId: 'T' }, { kind: 'fitting', fittingId: 'O' }),
+      segment('s3', { kind: 'fitting', fittingId: 'T' }, { kind: 'port', elementId: 'term', portId: 'p1' }),
+    ];
+    const levelFittings = [fitting('T'), fitting('RF'), fitting('O')];
+    const [levelNetwork] = computeNetworks({ segments: levelSegments, fittings: levelFittings, portGroups: [] });
+    const options = riserSolveOptionsFor(levelNetwork, new Map(), new Map<string, unknown>([['RF', {}]]));
+    const result = solveFlow({
+      network: levelNetwork,
+      segments: levelSegments,
+      fittings: levelFittings,
+      portGroups: [],
+      terminalCapacities: { term: 100 },
+      elementCategories: { term: 'terminal' },
+      highestWhenNoSource: true,
+      ...options,
+    });
+    expect(result.noSource).toBeUndefined();
+    expect(result.segmentCapacity).toEqual({ s1: 0, s2: 100, s3: 100 });
+  });
+
+  it('Example 2 level 1: options built from riserFlowInputsOf give a1 100, RF1 100, O1 100', () => {
+    const buildingResult: BuildingFlowResult = {
+      risers: {
+        R: {
+          spans: [],
+          members: [{ riserId: 'R', levelId: 'l1', sheetId: 's1', fittingId: 'RF1', role: 'open', capacityIn: null, demandBeyond: 100, sides }],
+        },
+      },
+      groups: [],
+      warnings: [],
+    };
+    const inputs = new Map(Object.entries(riserFlowInputsOf(buildingResult, 's1')));
+    const options = riserSolveOptionsFor(network, inputs, new Map<string, unknown>([['RF1', {}]]));
+    const result = solveFlow({
+      network,
+      segments,
+      fittings,
+      portGroups: [],
+      terminalCapacities: {},
+      highestWhenNoSource: true,
+      ...options,
+    });
+    expect(result.segmentCapacity.a1).toBe(100);
+    expect(result.fittingCapacity).toEqual({ RF1: 100, O1: 100 });
+    expect(result.totalCapacity).toBe(100);
+    expect(result.riserCapacity).toBe(100);
+    expect(result.noSource).toBe('highest');
+    expect(result.segmentDirection).toEqual({ a1: null });
   });
 });

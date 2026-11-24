@@ -163,7 +163,7 @@ import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
 import { riserSolveOptionsFor } from './riserFlowInputs.js';
 import { flowArrowEnds } from './flowArrow.js';
-import { notOpenEndIdsFor, sameKeys, solvedNoSourceOf, type SolvedNoSource } from './flowReadModel.js';
+import { sameKeys, solvedNoSourceOf, type SolvedNoSource } from './flowReadModel.js';
 import { anchorAtPoint, visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
 import { createFittingCommand } from './drawingCommands.js';
 import {
@@ -3806,8 +3806,7 @@ export class SketchScene {
         terminalCapacities: capacities,
         elementCategories,
         highestWhenNoSource: true,
-        notOpenEndIds: notOpenEndIdsFor(network, this.riserMarks, this.riserFlowInputs),
-        ...riserSolveOptionsFor(network, this.riserFlowInputs),
+        ...riserSolveOptionsFor(network, this.riserFlowInputs, this.riserMarks),
       }),
     );
     this.syncFlowLabels();

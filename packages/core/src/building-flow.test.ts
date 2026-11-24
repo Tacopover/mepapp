@@ -948,9 +948,83 @@ describe('solveBuildingFlow with no source (the highest rule)', () => {
     expect(result.risers.R!.members.some((item) => 'sides' in item)).toBe(false);
   });
 
-  it('riserFlowInputsOf gives no key for an open member', () => {
+  it('riserFlowInputsOf gives role open, the sum of the sides and the sides for an open member (Example 5)', () => {
     const { file, summaries } = open([100, 500, 150], [1, 1, 1]);
     const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's1')).toEqual({
+      f: {
+        role: 'open',
+        demandBeyond: 250,
+        sides: [
+          { demand: 100, openEnds: 1 },
+          { demand: 150, openEnds: 1 },
+        ],
+      },
+    });
+  });
+
+  it('riserFlowInputsOf for Example 2 gives exact sides on each level', () => {
+    const { file, summaries } = open([100, 0, 0], [0, 1, 1]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's0')).toEqual({
+      f: { role: 'open', demandBeyond: 0, sides: [{ demand: 0, openEnds: 2 }] },
+    });
+    expect(riserFlowInputsOf(result, 's1')).toEqual({
+      f: {
+        role: 'open',
+        demandBeyond: 100,
+        sides: [
+          { demand: 100, openEnds: 0 },
+          { demand: 0, openEnds: 1 },
+        ],
+      },
+    });
+    expect(riserFlowInputsOf(result, 's2')).toEqual({
+      f: { role: 'open', demandBeyond: 100, sides: [{ demand: 100, openEnds: 1 }] },
+    });
+  });
+
+  it('riserFlowInputsOf for Example 3 gives exact sides on level 1', () => {
+    const { file, summaries } = open([100, 0, 50], [0, 1, 0]);
+    const result = solveBuildingFlow(file, summaries);
+    expect(riserFlowInputsOf(result, 's1')).toEqual({
+      f: {
+        role: 'open',
+        demandBeyond: 150,
+        sides: [
+          { demand: 100, openEnds: 0 },
+          { demand: 50, openEnds: 0 },
+        ],
+      },
+    });
+  });
+
+  it('riserFlowInputsOf gives no key for a member of a group that is not solved', () => {
+    const { file, summaries } = open([100, 500, 150], [0, 0, 0]);
+    const result = solveBuildingFlow(file, summaries);
     expect(riserFlowInputsOf(result, 's1')).toEqual({});
+  });
+
+  it('riserFlowInputsOf joins the sides and adds the demands when two open members share one fitting id', () => {
+    const base = { sheetId: 's1', levelId: 'l1', fittingId: 'f', role: 'open' as const, capacityIn: null };
+    const result = {
+      risers: {
+        A: { spans: [], members: [{ ...base, riserId: 'A', demandBeyond: 100, sides: [{ demand: 100, openEnds: 0 }] }] },
+        B: { spans: [], members: [{ ...base, riserId: 'B', demandBeyond: 30, sides: [{ demand: 20, openEnds: 1 }, { demand: 10, openEnds: 0 }] }] },
+      },
+      groups: [],
+      warnings: [],
+    };
+    expect(riserFlowInputsOf(result, 's1')).toEqual({
+      f: {
+        role: 'open',
+        demandBeyond: 130,
+        sides: [
+          { demand: 100, openEnds: 0 },
+          { demand: 20, openEnds: 1 },
+          { demand: 10, openEnds: 0 },
+        ],
+      },
+    });
   });
 });
