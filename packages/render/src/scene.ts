@@ -162,6 +162,8 @@ import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type Drawin
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
 import { riserSolveOptionsFor } from './riserFlowInputs.js';
+import { flowArrowEnds } from './flowArrow.js';
+import { notOpenEndIdsFor, sameKeys, solvedNoSourceOf, type SolvedNoSource } from './flowReadModel.js';
 import { anchorAtPoint, visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
 import { createFittingCommand } from './drawingCommands.js';
 import {
@@ -452,6 +454,8 @@ export interface SegmentInfo {
   lengthMm: number | null;
   /** This segment's capacity from the last "Solve flow" run (see computeFlow) — null if no solve has run yet, or if this segment was left unresolved (no root found, or it closes a cycle). A read-out, not an input; the editable terminal Capacity field is separate (see StampInfo.capacity). */
   solvedCapacity: number | null;
+  /** The network of this item has no source (from FlowResult.noSource of the last solve). 'highest': the number is the highest over all possible sources. 'loop': a loop kept the old rule. Absent otherwise. */
+  solvedNoSource?: SolvedNoSource;
 }
 
 /** The Properties panel's read model for a single selected fitting — see getSelectedFittingInfo. */
@@ -461,6 +465,8 @@ export interface FittingInfo {
   position: Vec2;
   /** This fitting's subtree capacity from the last flow solve (see core/flow.ts's FlowResult.fittingCapacity) — null if unresolved or nothing has been solved yet. A read-out, same stance as SegmentInfo.solvedCapacity. */
   solvedCapacity: number | null;
+  /** The network of this item has no source (from FlowResult.noSource of the last solve). 'highest': the number is the highest over all possible sources. 'loop': a loop kept the old rule. Absent otherwise. */
+  solvedNoSource?: SolvedNoSource;
 }
 
 /**
@@ -1463,6 +1469,7 @@ export class SketchScene {
       // sum of hypots across the polyline, so dividing the total once is equivalent to summing per-segment conversions.
       lengthMm: calibration ? lengthPt / calibration.pageUnitsPerRealUnit : null,
       solvedCapacity: this.solvedCapacityOf(segment.id),
+      ...this.solvedNoSourceField('segment', segment.id),
     };
   }
 
@@ -1482,6 +1489,11 @@ export class SketchScene {
       if (fittingId in result.fittingCapacity) return result.fittingCapacity[fittingId];
     }
     return null;
+  }
+
+  private solvedNoSourceField(kind: 'segment' | 'fitting', id: string): { solvedNoSource?: SolvedNoSource } {
+    const value = solvedNoSourceOf(this.doc.lastFlowResult, kind, id);
+    return value ? { solvedNoSource: value } : {};
   }
 
   /** The Properties panel's read model for a segment selection — null unless exactly one segment (and nothing else) is selected, mirroring getSelection()'s stamps-only counterpart. */
@@ -1542,7 +1554,13 @@ export class SketchScene {
     const [id] = this.doc.selectedIds;
     const fitting = this.doc.drawingHistory.getState().fittings[id];
     if (!fitting) return null;
-    return { id: fitting.id, kind: fitting.kind, position: fitting.position, solvedCapacity: this.solvedFittingCapacityOf(fitting.id) };
+    return {
+      id: fitting.id,
+      kind: fitting.kind,
+      position: fitting.position,
+      solvedCapacity: this.solvedFittingCapacityOf(fitting.id),
+      ...this.solvedNoSourceField('fitting', fitting.id),
+    };
   }
 
   /** The Properties panel's Kind dropdown for a selected fitting. Fitting markers don't render differently per kind today (see redrawOverlay), so no redraw is needed, just persistence + a refreshed read model. */
@@ -3113,9 +3131,10 @@ export class SketchScene {
 
   /** Replaces the riser marks of the active document. A mark is not an edit, so this never marks the document dirty. */
   setRiserMarks(marks: ReadonlyMap<string, RiserMark>): void {
+    const keysChanged = !sameKeys(this.riserMarks, marks);
     this.riserMarks = new Map(marks);
     this.redrawOverlay();
-    if (this.riserFlowInputs.size > 0) this.recomputeFlow();
+    if (keysChanged || this.riserFlowInputs.size > 0) this.recomputeFlow();
   }
 
   getRiserMarks(): ReadonlyMap<string, RiserMark> {
@@ -3770,7 +3789,7 @@ export class SketchScene {
     return this.recomputeFlow();
   }
 
-  /** The actual solve, run after every mutation that can change flow (see call sites: syncDrawingLayer, setTerminalCapacity, setCapacityForSelection). Always keeps lastFlowResult live; only touches the visible overlay via syncFlowLabels, which no-ops unless flowOverlayActive. */
+  /** The actual solve, run after every mutation that can change flow (see call sites: syncDrawingLayer, setTerminalCapacity, setCapacityForSelection). Always keeps lastFlowResult live; only touches the visible overlay via syncFlowLabels, which no-ops unless flowOverlayActive. Every network type uses the highest rule when it has no source (D-B-100). */
   private recomputeFlow(): FlowResult[] {
     const state = this.doc.drawingHistory.getState();
     const segments = Object.values(state.segments);
@@ -3779,7 +3798,17 @@ export class SketchScene {
     const capacities = Object.fromEntries(this.doc.terminalCapacities);
     const elementCategories = Object.fromEntries(Object.values(state.stamps).map((stamp) => [stamp.id, stamp.category]));
     this.doc.lastFlowResult = networks.map((network: Network) =>
-      solveFlow({ network, segments, fittings, portGroups: this.doc.portGroups, terminalCapacities: capacities, elementCategories, ...riserSolveOptionsFor(network, this.riserFlowInputs) }),
+      solveFlow({
+        network,
+        segments,
+        fittings,
+        portGroups: this.doc.portGroups,
+        terminalCapacities: capacities,
+        elementCategories,
+        highestWhenNoSource: true,
+        notOpenEndIds: notOpenEndIdsFor(network, this.riserMarks, this.riserFlowInputs),
+        ...riserSolveOptionsFor(network, this.riserFlowInputs),
+      }),
     );
     this.syncFlowLabels();
     this.emitter.emit('flowSolved', this.doc.lastFlowResult);
@@ -3805,6 +3834,7 @@ export class SketchScene {
     if (selectedSegmentIds.length === 0) return;
     const relevantResults = results.filter((result) => selectedSegmentIds.some((id) => id in result.segmentCapacity));
     const arrows = new Graphics();
+    let drewArrowhead = false;
 
     for (const result of relevantResults) {
       for (const [segmentId, capacity] of Object.entries(result.segmentCapacity)) {
@@ -3816,13 +3846,16 @@ export class SketchScene {
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         // segmentDirection's 'AtoB' means flow runs endpointA -> endpointB, i.e.
         // geometry[0] -> geometry[last] (see network.ts's Segment doc comment).
-        const [from, to] = result.segmentDirection[segmentId] === 'BtoA' ? [b, a] : [a, b];
-        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        const ends = flowArrowEnds(result.segmentDirection[segmentId] ?? null, a, b);
+        if (ends) {
+          const angle = Math.atan2(ends.to.y - ends.from.y, ends.to.x - ends.from.x);
 
-        for (const sign of [-1, 1]) {
-          const headAngle = angle + sign * ARROWHEAD_ANGLE_RAD;
-          arrows.moveTo(mid.x, mid.y);
-          arrows.lineTo(mid.x - FLOW_ARROWHEAD_LENGTH_PT * Math.cos(headAngle), mid.y - FLOW_ARROWHEAD_LENGTH_PT * Math.sin(headAngle));
+          for (const sign of [-1, 1]) {
+            const headAngle = angle + sign * ARROWHEAD_ANGLE_RAD;
+            arrows.moveTo(mid.x, mid.y);
+            arrows.lineTo(mid.x - FLOW_ARROWHEAD_LENGTH_PT * Math.cos(headAngle), mid.y - FLOW_ARROWHEAD_LENGTH_PT * Math.sin(headAngle));
+          }
+          drewArrowhead = true;
         }
 
         const text = new Text({ text: String(capacity), style: { fontSize: 11, fill: FLOW_LABEL_COLOR } });
@@ -3832,8 +3865,12 @@ export class SketchScene {
       }
     }
 
-    arrows.stroke({ width: 2, color: FLOW_LABEL_COLOR });
-    this.doc.flowLabelLayer.addChild(arrows);
+    if (drewArrowhead) {
+      arrows.stroke({ width: 2, color: FLOW_LABEL_COLOR });
+      this.doc.flowLabelLayer.addChild(arrows);
+    } else {
+      arrows.destroy();
+    }
   }
 
   /** Every room of the active document, all pages. */
