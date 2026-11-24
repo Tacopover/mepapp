@@ -83,15 +83,20 @@ export class LiveRiserOverlay {
   }
 }
 
-/** True when both have the same keys and the same role and demandBeyond for each key (key order does not matter). */
+/** True when both have the same keys and the same role, demandBeyond and sides (length, demand, openEnds, in order) for each key (key order does not matter). */
 export function sameRiserFlowInputs(a: RiserFlowInputs, b: RiserFlowInputs): boolean {
   const keys = Object.keys(a);
   if (keys.length !== Object.keys(b).length) return false;
   return keys.every((key) => {
     const left = a[key];
     const right = b[key];
-    return left !== undefined && right !== undefined && left.role === right.role && left.demandBeyond === right.demandBeyond;
+    return left !== undefined && right !== undefined && left.role === right.role && left.demandBeyond === right.demandBeyond && sameSides(left.sides, right.sides);
   });
+}
+
+function sameSides(a: RiserFlowInput['sides'], b: RiserFlowInput['sides']): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return a.length === b.length && a.every((side, index) => side.demand === b[index]?.demand && side.openEnds === b[index]?.openEnds);
 }
 
 /** Remembers what the scene holds. */

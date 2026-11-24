@@ -229,6 +229,33 @@ describe('sameRiserFlowInputs', () => {
   it('ignores the key order', () => {
     expect(sameRiserFlowInputs(base, { g: { role: 'exit', demandBeyond: 0 }, f: { role: 'entry', demandBeyond: 150 } })).toBe(true);
   });
+
+  describe('sides', () => {
+    const open = (sides?: { demand: number; openEnds: number }[]): RiserFlowInputs => ({
+      f: { role: 'open', demandBeyond: 100, ...(sides === undefined ? {} : { sides }) },
+    });
+    const two = [
+      { demand: 100, openEnds: 0 },
+      { demand: 0, openEnds: 1 },
+    ];
+
+    it('is true for equal sides', () => {
+      expect(sameRiserFlowInputs(open(two), open(two.map((side) => ({ ...side }))))).toBe(true);
+    });
+
+    it('is false when only the sides differ', () => {
+      expect(sameRiserFlowInputs(open(two), open([two[0]!, { demand: 0, openEnds: 2 }]))).toBe(false);
+      expect(sameRiserFlowInputs(open(two), open([two[0]!, { demand: 5, openEnds: 1 }]))).toBe(false);
+      expect(sameRiserFlowInputs(open(two), open([two[1]!, two[0]!]))).toBe(false);
+      expect(sameRiserFlowInputs(open(two), open([two[0]!]))).toBe(false);
+    });
+
+    it('is false when one has sides and the other has none', () => {
+      expect(sameRiserFlowInputs(open(two), open())).toBe(false);
+      expect(sameRiserFlowInputs(open(), open(two))).toBe(false);
+      expect(sameRiserFlowInputs(open(), open())).toBe(true);
+    });
+  });
 });
 
 describe('RiserFlowSender', () => {
@@ -257,5 +284,51 @@ describe('RiserFlowSender', () => {
     expect(sender.next(a)).toEqual(a);
     sender.reset();
     expect(sender.next({})).toBeNull();
+  });
+});
+
+describe('the chain of Example 2 (no source, an open end on Level 1 and Level 2)', () => {
+  const openEnd = (terminal: number, openEnds: number): RiserNetworkSummary => ({ ...entryOf(['f'], terminal), openEnds });
+
+  function level1Inputs(level1OpenEnds: number): RiserFlowInputs | undefined {
+    const file = fileWith([riserOf('R1', [memberOf(0), memberOf(1), memberOf(2)])]);
+    const summaries = summariesOf(summaryOf('p0', [openEnd(100, 0)]), summaryOf('p1', [openEnd(0, 1)]), summaryOf('p2', [openEnd(0, 1)]));
+    return computeRiserFlow({ file, projectUuid: 'p1', pageIndex: 0, summaries, liveNetworksOf: () => [openEnd(0, level1OpenEnds)] })?.inputs;
+  }
+
+  it('gives Level 1 an open input with both sides, and the sender sends it once', () => {
+    const inputs = level1Inputs(1);
+    expect(inputs).toEqual({
+      f: {
+        role: 'open',
+        demandBeyond: 100,
+        sides: [
+          { demand: 100, openEnds: 0 },
+          { demand: 0, openEnds: 1 },
+        ],
+      },
+    });
+    const sender = new RiserFlowSender();
+    expect(sender.next(inputs!)).toEqual(inputs);
+    expect(sender.next(level1Inputs(1)!)).toBeNull();
+  });
+
+  it('sends again when only the open ends on the far side change', () => {
+    const sender = new RiserFlowSender();
+    const first = level1Inputs(1)!;
+    expect(sender.next(first)).toEqual(first);
+    const stored2 = computeRiserFlow({
+      file: fileWith([riserOf('R1', [memberOf(0), memberOf(1), memberOf(2)])]),
+      projectUuid: 'p1',
+      pageIndex: 0,
+      summaries: summariesOf(summaryOf('p0', [openEnd(100, 0)]), summaryOf('p1', [openEnd(0, 1)]), summaryOf('p2', [openEnd(0, 2)])),
+      liveNetworksOf: () => [openEnd(0, 1)],
+    })?.inputs;
+    expect(stored2?.f?.demandBeyond).toBe(100);
+    expect(stored2?.f?.sides).toEqual([
+      { demand: 100, openEnds: 0 },
+      { demand: 0, openEnds: 2 },
+    ]);
+    expect(sender.next(stored2!)).toEqual(stored2);
   });
 });
