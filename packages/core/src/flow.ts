@@ -13,6 +13,13 @@ import { nodeKeyOf } from './network.js';
 import { highestFlow } from './flow-highest.js';
 import type { StampCategory } from './stamp-library.js';
 
+export interface RiserSide {
+  /** Terminal capacity on the far side of one span, seen from this level. */
+  demand: number;
+  /** The number of open ends on the far side. */
+  openEnds: number;
+}
+
 export interface FlowSolveInput {
   network: Network;
   segments: Segment[];
@@ -36,6 +43,8 @@ export interface FlowSolveInput {
   highestWhenNoSource?: boolean;
   /** Fittings that are never a root and never an open end in the highest rule: riser fittings that have no input. Ignored by the old rule. */
   notOpenEndIds?: ReadonlySet<string>;
+  /** For a marked riser fitting with one segment: one entry for each span at the fitting. Used only by the highest rule. A key for an unmarked fitting or a fitting outside the network is ignored. */
+  riserSides?: Record<string, ReadonlyArray<RiserSide>>;
 }
 
 /** `out`: flow arrives at the riser fitting (this level feeds the riser). `in`: flow leaves it (the riser feeds this level). `none`: neither. */
@@ -176,16 +185,34 @@ export function solveFlow(input: FlowSolveInput): FlowResult {
     } else {
       const rootsOf = (k: string): number => (isOpenEndKey(k, degreeOf(k), input) ? 1 : 0);
       const openEnds = nodeKeys.reduce((sum, k) => sum + rootsOf(k), 0);
-      if (openEnds >= 1 && nodeKeys.every((k) => !isMarked(k) || degreeOf(k) === 1)) {
+      const sidesOf = (id: string): ReadonlyArray<RiserSide> => {
+        if (input.riserSides && Object.hasOwn(input.riserSides, id)) return input.riserSides[id];
+        if (riserDemand && Object.hasOwn(riserDemand, id)) return [{ demand: riserDemand[id], openEnds: 0 }];
+        return [];
+      };
+      const sides = nodeKeys.filter(isMarked).flatMap((k) => {
+        const id = k.slice('fitting:'.length);
+        return sidesOf(id).map((side, i) => ({ k, id, i, side }));
+      });
+      const possibleSources = openEnds + sides.reduce((sum, s) => sum + s.side.openEnds, 0);
+      if (possibleSources >= 1 && nodeKeys.every((k) => !isMarked(k) || degreeOf(k) === 1)) {
         const highest = highestFlow(
-          nodeKeys.map((k) => ({ id: k, own: ownCapacityOf(k, input.terminalCapacities), roots: rootsOf(k) })),
-          segments.map((s) => ({ id: s.id, a: nodeKeyOf(s.endpointA, input.portGroups), b: nodeKeyOf(s.endpointB, input.portGroups) })),
+          [
+            ...nodeKeys.map((k) => ({ id: k, own: ownCapacityOf(k, input.terminalCapacities), roots: rootsOf(k) })),
+            ...sides.map(({ id, i, side }) => ({ id: `riser-side:${id}:${i}`, own: side.demand, roots: side.openEnds })),
+          ],
+          [
+            ...segments.map((s) => ({ id: s.id, a: nodeKeyOf(s.endpointA, input.portGroups), b: nodeKeyOf(s.endpointB, input.portGroups) })),
+            ...sides.map(({ k, id, i }) => ({ id: `riser-side-edge:${id}:${i}`, a: k, b: `riser-side:${id}:${i}` })),
+          ],
         );
         if (highest) {
           for (const segment of segments) segmentCapacity[segment.id] = highest.edge[segment.id] ?? null;
           for (const id of input.network.fittingIds) fittingCapacity[id] = highest.node[`fitting:${id}`] ?? null;
           const result: FlowResult = { segmentCapacity, fittingCapacity, resolved: true, totalCapacity: highest.total, segmentDirection };
-          return withRiserCapacity(highest.roots >= 2 ? { ...result, noSource: 'highest' } : result, 0);
+          const withNoSource: FlowResult = highest.roots >= 2 ? { ...result, noSource: 'highest' } : result;
+          const riserCapacity = sides.reduce((sum, s) => sum + s.side.demand, 0);
+          return riserDemand !== undefined || input.riserSides !== undefined ? { ...withNoSource, riserCapacity } : withNoSource;
         }
       }
     }

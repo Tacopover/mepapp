@@ -1219,7 +1219,7 @@ describe('solveFlow — highest rule when no source', () => {
     expect(networkHasSource(input)).toBe(false);
   });
 
-  it('gives riserCapacity 0 for a marked fitting with one segment in a network with no source', () => {
+  it('uses riserDemand of a marked fitting as one side with no open ends in a network with no source', () => {
     const segments = [
       segment('a', { kind: 'port', elementId: 'Tm', portId: 'p1' }, { kind: 'fitting', fittingId: 'T' }),
       segment('b', { kind: 'fitting', fittingId: 'T' }, { kind: 'fitting', fittingId: 'O' }),
@@ -1233,7 +1233,229 @@ describe('solveFlow — highest rule when no source', () => {
     }));
 
     expect(result.resolved).toBe(true);
+    expect(result.totalCapacity).toBe(130);
+    expect(result.riserCapacity).toBe(30);
+  });
+});
+
+describe('solveFlow — sides of riser fittings', () => {
+  it('gives the values of Example 2 at level 1, a riser with one side that has an open end', () => {
+    const segments = [segment('a1', { kind: 'fitting', fittingId: 'RF1' }, { kind: 'fitting', fittingId: 'O1' })];
+    const fittings = [fitting('RF1'), fitting('O1')];
+    const result = solveFlow(inputOf(segments, fittings, {}, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF1']),
+      riserSides: { RF1: [{ demand: 100, openEnds: 0 }, { demand: 0, openEnds: 1 }] },
+    }));
+
+    expect(result.segmentCapacity.a1).toBe(100);
+    expect(result.fittingCapacity).toEqual({ RF1: 100, O1: 100 });
+    expect(result.totalCapacity).toBe(100);
+    expect(result.riserCapacity).toBe(100);
+    expect(result.noSource).toBe('highest');
+    expect(result.segmentDirection).toEqual({ a1: null });
+  });
+
+  it('gives the values of Example 2 at level 0, a riser with two open ends beyond it', () => {
+    const segments = [segment('a0', { kind: 'port', elementId: 'Tm0', portId: 'p1' }, { kind: 'fitting', fittingId: 'RF0' })];
+    const fittings = [fitting('RF0')];
+    const result = solveFlow(inputOf(segments, fittings, { Tm0: 100 }, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF0']),
+      riserSides: { RF0: [{ demand: 0, openEnds: 2 }] },
+    }));
+
+    expect(result.segmentCapacity.a0).toBe(100);
+    expect(result.fittingCapacity.RF0).toBe(100);
     expect(result.totalCapacity).toBe(100);
     expect(result.riserCapacity).toBe(0);
+    expect(result.noSource).toBe('highest');
+  });
+
+  it('gives the values of Example 2 at level 2, a riser with one side that has an open end', () => {
+    const segments = [segment('a2', { kind: 'fitting', fittingId: 'RF2' }, { kind: 'fitting', fittingId: 'O2' })];
+    const fittings = [fitting('RF2'), fitting('O2')];
+    const result = solveFlow(inputOf(segments, fittings, {}, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF2']),
+      riserSides: { RF2: [{ demand: 100, openEnds: 1 }] },
+    }));
+
+    expect(result.segmentCapacity.a2).toBe(100);
+    expect(result.fittingCapacity).toEqual({ RF2: 100, O2: 100 });
+    expect(result.totalCapacity).toBe(100);
+  });
+
+  it('gives the values of Example 3 at level 1, two sides with no open end and no noSource', () => {
+    const segments = [segment('b1', { kind: 'fitting', fittingId: 'RF1' }, { kind: 'fitting', fittingId: 'O1' })];
+    const fittings = [fitting('RF1'), fitting('O1')];
+    const result = solveFlow(inputOf(segments, fittings, {}, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF1']),
+      riserSides: {
+        RF1: [
+          { demand: 100, openEnds: 0 },
+          { demand: 50, openEnds: 0 },
+        ],
+      },
+    }));
+
+    expect(result.segmentCapacity.b1).toBe(150);
+    expect(result.fittingCapacity).toEqual({ RF1: 150, O1: 150 });
+    expect(result.totalCapacity).toBe(150);
+    expect(result.riserCapacity).toBe(150);
+    expect('noSource' in result).toBe(false);
+  });
+
+  it('gives the values of Example 3 at levels 0 and 2, each riser with one side that has an open end', () => {
+    const segments0 = [segment('a0', { kind: 'port', elementId: 'Tm0', portId: 'p1' }, { kind: 'fitting', fittingId: 'RF0' })];
+    const level0 = solveFlow(inputOf(segments0, [fitting('RF0')], { Tm0: 100 }, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF0']),
+      riserSides: { RF0: [{ demand: 50, openEnds: 1 }] },
+    }));
+    expect(level0.segmentCapacity.a0).toBe(100);
+    expect(level0.fittingCapacity.RF0).toBe(100);
+
+    const segments2 = [segment('c2', { kind: 'port', elementId: 'Tm2', portId: 'p1' }, { kind: 'fitting', fittingId: 'RF2' })];
+    const level2 = solveFlow(inputOf(segments2, [fitting('RF2')], { Tm2: 50 }, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF2']),
+      riserSides: { RF2: [{ demand: 100, openEnds: 1 }] },
+    }));
+    expect(level2.segmentCapacity.c2).toBe(50);
+    expect(level2.fittingCapacity.RF2).toBe(50);
+  });
+
+  it('gives the values of Example 5 at level 1, a tee with two terminals, an open end and two riser sides', () => {
+    const segments = [
+      segment('sa', { kind: 'port', elementId: 'Tm300', portId: 'p1' }, { kind: 'fitting', fittingId: 'F' }),
+      segment('sb', { kind: 'port', elementId: 'Tm200', portId: 'p1' }, { kind: 'fitting', fittingId: 'F' }),
+      segment('so', { kind: 'fitting', fittingId: 'F' }, { kind: 'fitting', fittingId: 'O1' }),
+      segment('s1', { kind: 'fitting', fittingId: 'F' }, { kind: 'fitting', fittingId: 'RF1' }),
+    ];
+    const fittings = [fitting('F'), fitting('O1'), fitting('RF1')];
+    const result = solveFlow(inputOf(segments, fittings, { Tm300: 300, Tm200: 200 }, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF1']),
+      riserSides: {
+        RF1: [
+          { demand: 100, openEnds: 1 },
+          { demand: 150, openEnds: 1 },
+        ],
+      },
+    }));
+
+    expect(result.segmentCapacity).toEqual({ sa: 300, sb: 200, so: 750, s1: 500 });
+    expect(result.fittingCapacity).toEqual({ F: 750, O1: 750, RF1: 650 });
+    expect(result.totalCapacity).toBe(750);
+    expect(result.riserCapacity).toBe(250);
+    expect(result.noSource).toBe('highest');
+  });
+
+  it('uses riserDemand of a hand-set main level with no equipment as one side with no open ends', () => {
+    const segments = [
+      segment('m1', { kind: 'port', elementId: 'Tm', portId: 'p1' }, { kind: 'fitting', fittingId: 'T' }),
+      segment('m2', { kind: 'fitting', fittingId: 'T' }, { kind: 'fitting', fittingId: 'O1' }),
+      segment('m3', { kind: 'fitting', fittingId: 'T' }, { kind: 'fitting', fittingId: 'O2' }),
+      segment('m4', { kind: 'fitting', fittingId: 'T' }, { kind: 'fitting', fittingId: 'RF' }),
+    ];
+    const fittings = [fitting('T'), fitting('O1'), fitting('O2'), fitting('RF')];
+    const result = solveFlow(inputOf(segments, fittings, { Tm: 100 }, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF']),
+      riserDemand: { RF: 30 },
+    }));
+
+    expect(result.noSource).toBe('highest');
+    expect(result.totalCapacity).toBe(130);
+    expect(result.riserCapacity).toBe(30);
+    expect(result.segmentCapacity).toEqual({ m1: 100, m2: 130, m3: 130, m4: 30 });
+  });
+
+  it('uses riserSides and not riserDemand when both have a key for the same marked fitting', () => {
+    const segments = [segment('a1', { kind: 'fitting', fittingId: 'RF1' }, { kind: 'fitting', fittingId: 'O1' })];
+    const fittings = [fitting('RF1'), fitting('O1')];
+    const sidesOnly = solveFlow(inputOf(segments, fittings, {}, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF1']),
+      riserSides: { RF1: [{ demand: 100, openEnds: 0 }, { demand: 0, openEnds: 1 }] },
+    }));
+    const both = solveFlow(inputOf(segments, fittings, {}, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF1']),
+      riserSides: { RF1: [{ demand: 100, openEnds: 0 }, { demand: 0, openEnds: 1 }] },
+      riserDemand: { RF1: 999 },
+    }));
+
+    expect(both).toEqual(sidesOnly);
+    expect(both.riserCapacity).toBe(100);
+  });
+
+  it('ignores a riserSides key for an unmarked fitting or a fitting outside the network', () => {
+    const { segments, fittings } = example1Of('O1', 'O2');
+    const base = solveFlow(inputOf(segments, fittings, { Tm: 100 }, { highestWhenNoSource: true }));
+    const withKeys = solveFlow(inputOf(segments, fittings, { Tm: 100 }, {
+      highestWhenNoSource: true,
+      riserSides: {
+        T: [{ demand: 50, openEnds: 0 }],
+        ghost: [{ demand: 10, openEnds: 0 }],
+      },
+    }));
+
+    expect(withKeys).toEqual({ ...base, riserCapacity: 0 });
+  });
+
+  it('ignores riserSides when the mode is off because a marked fitting has two segments', () => {
+    const segments = [
+      segment('a', { kind: 'port', elementId: 'Tm', portId: 'p1' }, { kind: 'fitting', fittingId: 'R' }),
+      segment('b', { kind: 'fitting', fittingId: 'R' }, { kind: 'fitting', fittingId: 'O' }),
+    ];
+    const fittings = [fitting('R'), fitting('O')];
+    const extra = { riserFittingIds: new Set(['R']), riserSides: { R: [{ demand: 50, openEnds: 0 }] } };
+    const withFlag = solveFlow(inputOf(segments, fittings, { Tm: 100 }, { ...extra, highestWhenNoSource: true }));
+    const withoutFlag = solveFlow(inputOf(segments, fittings, { Tm: 100 }, extra));
+
+    expect(withFlag).toEqual(withoutFlag);
+    expect('noSource' in withFlag).toBe(false);
+  });
+
+  it('keeps the old path when the network has equipment, with riserDemand and the flag', () => {
+    const segments = [
+      segment('s1', { kind: 'port', elementId: 'ahu', portId: 'p1' }, { kind: 'fitting', fittingId: 'tee' }),
+      segment('s2', { kind: 'fitting', fittingId: 'tee' }, { kind: 'port', elementId: 'd1', portId: 'p1' }),
+      segment('s3', { kind: 'fitting', fittingId: 'tee' }, { kind: 'fitting', fittingId: 'x' }),
+    ];
+    const fittings = [fitting('tee'), fitting('x')];
+    const extra = {
+      elementCategories: { ahu: 'equipment' as const, d1: 'terminal' as const },
+      riserFittingIds: new Set(['x']),
+      riserDemand: { x: 25 },
+    };
+    const withFlag = solveFlow(inputOf(segments, fittings, { d1: 40 }, { ...extra, highestWhenNoSource: true }));
+    const withoutFlag = solveFlow(inputOf(segments, fittings, { d1: 40 }, extra));
+
+    expect(withFlag).toEqual(withoutFlag);
+    expect('noSource' in withFlag).toBe(false);
+  });
+
+  it('treats a marked fitting with no key in riserSides or riserDemand as a boundary with 0', () => {
+    const segments = [
+      segment('a', { kind: 'port', elementId: 'Tm', portId: 'p1' }, { kind: 'fitting', fittingId: 'T' }),
+      segment('b', { kind: 'fitting', fittingId: 'T' }, { kind: 'fitting', fittingId: 'O' }),
+      segment('c', { kind: 'fitting', fittingId: 'T' }, { kind: 'fitting', fittingId: 'RF' }),
+    ];
+    const fittings = [fitting('T'), fitting('O'), fitting('RF')];
+    const result = solveFlow(inputOf(segments, fittings, { Tm: 100 }, {
+      highestWhenNoSource: true,
+      riserFittingIds: new Set(['RF']),
+    }));
+
+    expect(result.resolved).toBe(true);
+    expect(result.totalCapacity).toBe(100);
+    expect(result.segmentCapacity.b).toBe(100);
+    expect(result.segmentCapacity.c).toBe(0);
+    expect(result.fittingCapacity.RF).toBe(0);
+    expect('riserCapacity' in result).toBe(false);
   });
 });
