@@ -2,6 +2,8 @@
 
 Status: **draft, Phases A–D done, plus a post-D review that fixed 2 real bugs and disclosed 2 previously-unnoticed UI gaps (spare creation, renumbering).** **Phase E (circuit workflow UI: canvas tools, connection lines, tree, terminal side) added 2026-09-23 after Windows testing; E1 and E2 (move command, toasts, Add-to-Circuit tool, terminal Circuit section) done 2026-09-23, E3 (connection lines and Show Circuits toggle) done 2026-09-24, E4 (Circuits mode and floating toolbar) E5 (tree, menus, halos, delete), E6 (spares, renumber, bulk edit) and E7 (circuit type editor) done 2026-09-24; E8 done 2026-09-24 (circuit label moved to the Label feature, PanelAccessory UI and click-to-remove discarded).** Written 2026-09-22. Prerequisite for `.claude/plans/electrical-schematic-templates.md` Phase 1 — see [[electrical-schematic-templates.md#§13 Alignment with the circuit model]] for the two-way cross-check.
 
+B7-T12 (2026-11-25, D-B-114): `diversityPercent` is now `concurrencyPercent` (on `Circuit` and in `Panel.circuitDefaults`), `getEffectiveDiversityPercent` is `getEffectiveConcurrencyPercent`, `setCircuitDiversityCommand` is `setCircuitConcurrencyCommand`, and the template name `circuit.diversifiedCapacity` is `circuit.concurrentCapacity`. Project schema 23 renames the saved fields (step 22 -> 23 in `project.ts`). The text below keeps the old names as written at the time.
+
 ## 1. Goal
 
 MepApp has no concept of an electrical circuit or a distribution panel today. The electrical-schematic-templates plan needs one before its Phase 1 can start. This plan designs that domain model: `Circuit`, `Panel`, `PanelSection`, and `CircuitType`, plus the commands that create and edit them.

@@ -30,6 +30,8 @@ Five choices change stored data ([data model]: Q-R7-01 every option, Q-R7-02 B, 
 
 ### Q-R7-01 [data model]. What are the new fields on `CircuitType` and what do they mean?
 
+B7-T12 (2026-11-25, D-B-114): the circuit field `diversityPercent` that this section names is now `concurrencyPercent` (schema 23). A field of the same kind on `CircuitType` would use the new word. The text below keeps the old names as written at the time.
+
 D-R7-01 A names "`maxTerminals`, `diversity`". It does not say the exact names, the types, or what `diversity` does. `Circuit` already has `diversityPercent` (`circuit.ts:44`), which is a per-circuit value that inherits from the panel.
 
 - **A.** Two optional fields on `CircuitType`: `maxTerminals?: number` (a whole number of 1 or more) and `diversityPercent?: number` (above 0, at most 100). `defaultCapacity` is the load limit in `units`. R7 does not write the `diversityPercent` of the type into the new circuits; a new circuit inherits from its panel. The type value is a planning factor: the limit check uses the load times `diversityPercent` ÷ 100. Schema step 22.

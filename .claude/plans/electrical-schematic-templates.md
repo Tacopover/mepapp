@@ -2,6 +2,8 @@
 
 Status: **draft. Phases 0–4 done (Phases 3 and 4 on 2026-09-24); Phase 5 done 2026-09-24 (block editor) and 2026-09-25 (free-drawn shapes); Phase 5b and the Phase 5c design pass done 2026-09-25 and 2026-09-27; Phase 7 (multi-select and movable generated blocks) done 2026-09-27; Phase 6 not started.** Written 2026-09-21 after a design discussion with the user and a survey of the old app.
 
+B7-T12 (2026-11-25, D-B-114): `diversityPercent` is now `concurrencyPercent` (on `Circuit` and in `Panel.circuitDefaults`), `getEffectiveDiversityPercent` is `getEffectiveConcurrencyPercent`, `setCircuitDiversityCommand` is `setCircuitConcurrencyCommand`, and the template name `circuit.diversifiedCapacity` is `circuit.concurrentCapacity`. Project schema 23 renames the saved fields (step 22 -> 23 in `project.ts`). The text below keeps the old names as written at the time.
+
 ## 1. Goal
 
 The old MEPSketcher app produces one electrical schematic with one fixed layout and one fixed style. An electrical schematic looks different in each country. The user wants a modular replacement.
