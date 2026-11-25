@@ -23,7 +23,7 @@ const expected = [
   'at most 600 m³/h',
   'No source level yet. Each span shows the largest flow for any source position.',
   'Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0.',
-  'Place an air handling unit or a fan on a level, or click Set by hand and choose a main level.',
+  'Place source equipment on a level, or click Set by hand and choose a main level.',
 ];
 
 // step 1 and 2: open Manage Buildings, open tab Risers

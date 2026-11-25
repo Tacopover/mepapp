@@ -8,8 +8,8 @@ import { placeOneStamp } from '/root/MepApp/.claude/worktrees/buildings-b7/.clau
 const SHOTS = '/root/MepApp/.claude/worktrees/buildings-b7/.claude/roadmap/work/shots/b7-t09c2a/';
 const TYPE = { id: 'supply-air', name: 'Supply Air', discipline: 'ventilation', units: 'CFM', defaultCapacity: 400, color: '#2196f3', lineWidthPt: 2, linePattern: 'solid', flowUnit: 'm³/h' };
 const DRAIN = { id: 'sanitary-waste', name: 'Sanitary Waste', discipline: 'plumbing', units: 'GPM', defaultCapacity: 10, color: '#6d4c41', lineWidthPt: 2, linePattern: 'solid' };
-const HINT_A_AIR = 'No source yet. Each number shows the largest flow for any source position. Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0. Place an air handling unit or a fan to set the source.';
-const HINT_L_AIR = 'This network has a loop and no source. The numbers use one start point. Place an air handling unit or a fan to set the source.';
+const HINT_A_AIR = 'No source yet. Each number shows the largest flow for any source position. Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0. Place source equipment to set the source.';
+const HINT_L_AIR = 'This network has a loop and no source. The numbers use one start point. Place source equipment to set the source.';
 const t = await open();
 const { page, check, idle } = t;
 const errors = [];
@@ -161,7 +161,7 @@ await selectSegment(spec, 's1');
 check((await solvedField()) === 'at most 100', 'ex1 s1: the field reads "at most 100"', String(await solvedField()));
 {
   const h = await hintTexts();
-  check(h.length === 1 && h[0] === HINT_A_AIR, 'ex1 s1: Hint A shows once, with the air handling unit or fan', JSON.stringify(h));
+  check(h.length === 1 && h[0] === HINT_A_AIR, 'ex1 s1: Hint A shows once, with source equipment', JSON.stringify(h));
 }
 await snap('b7-t09c2a-ex1-segment');
 await selectSegment(spec, 's2');
@@ -266,7 +266,7 @@ await selectSegment(spec, 'r0', 0.25);
   await snap('b7-t09c2a-loop');
 }
 
-// --- 8. a drain: the rule applies, the source word is the outlet or a pump ---
+// --- 8. a drain: the rule applies, the source word is the same for a drain ---
 spec = example1();
 await load(spec, DRAIN);
 await solveFlowClick();
@@ -274,7 +274,7 @@ await selectSegment(spec, 's1');
 check((await solvedField()) === 'at most 100', 'drain: the field reads "at most 100"', String(await solvedField()));
 {
   const h = await hintTexts();
-  check(h.length === 1 && /Place an outlet or a pump to set the source\.$/.test(h[0]), 'drain: the hint says an outlet or a pump', JSON.stringify(h));
+  check(h.length === 1 && /Place source equipment to set the source\.$/.test(h[0]), 'drain: the hint says source equipment', JSON.stringify(h));
 }
 
 // --- 9. a fan coil unit (equipment with capacity above 0) at the end of a segment ---

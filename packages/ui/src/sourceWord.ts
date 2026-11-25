@@ -1,25 +1,11 @@
-import { ROUTE_GRAVITY_TYPE_IDS, type Discipline } from '@mepapp/core';
+import type { Discipline } from '@mepapp/core';
 
 export type NoSourceState = 'highest' | 'loop';
-export const NEUTRAL_SOURCE_WORD = 'a source equipment';
+export const NEUTRAL_SOURCE_WORD = 'source equipment';
 
-/** The words for a source, by discipline. A drain (id in ROUTE_GRAVITY_TYPE_IDS) is tested first. An unknown type gets the neutral word. */
-export function sourceWordOf(type: { id: string; discipline: Discipline } | undefined): string {
-  if (!type) return NEUTRAL_SOURCE_WORD;
-  if (ROUTE_GRAVITY_TYPE_IDS.includes(type.id)) return 'an outlet or a pump';
-  switch (type.discipline) {
-    case 'ventilation':
-      return 'an air handling unit or a fan';
-    case 'heatingAndCooling':
-    case 'plumbing':
-      return 'a pump or a boiler';
-    case 'electrical':
-      return 'a panel';
-    case 'fireProtection':
-      return 'a pump';
-    default:
-      return NEUTRAL_SOURCE_WORD;
-  }
+/** One word for a source, the same for every network type (D-B-113). This function is the one place to make it type specific later. */
+export function sourceWordOf(_type: { id: string; discipline: Discipline } | undefined): string {
+  return NEUTRAL_SOURCE_WORD;
 }
 
 /** One word for a selection: the word of the types when all agree, else the neutral word. */

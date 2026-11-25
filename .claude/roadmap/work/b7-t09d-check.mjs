@@ -163,7 +163,7 @@ await runCase('Case 3', async () => {
   await showRisers();
   const r = await readRisers();
   console.log(`INFO case 3 main "${r.main}", total "${r.total}", hints ${JSON.stringify(r.hints)}`);
-  const noSourceHint = !r.hints.some((h) => /No source level yet|Place an air handling unit/.test(h));
+  const noSourceHint = !r.hints.some((h) => /No source level yet|Place source equipment/.test(h));
   const ok = JSON.stringify(r.rows) === JSON.stringify(['Level 0 to Level 1: 100 m³/h', 'Level 1 to Level 2: 50 m³/h']) && duct === '150' && noSourceHint;
   check(
     ok,

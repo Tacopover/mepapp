@@ -1,6 +1,8 @@
 # B7-T09: open ends are possible sources (the "highest" rule)
 
 Status: **planned 2026-11-23, revised the same day after the audit (3 high findings) and the domain check. Done 2026-11-24 on the branch, waiting for the Windows test (`buildings-b7-test.md`, Part J) and the merge by the user.** Commits: T10 `47e0ee9`; T09a-1 `d6f0ea8`, T09a-2 `730615f`, T09a-3 `d8559e5`; T09b-1 `44c9837`, T09b-2 `4606f70`, T09b-3a `7179f28`, T09b-3b `e125d72`; T09c-1 `a3b5bb0`, T09c-2a `16c5abf`, T09c-2b `e1d6f00`, T09c-3 `8ac35a5`; T09d is this test script. Stream `buildings`, part `B7`, branch `worktree-buildings-b7`. Parent plan: `buildings-b7-flow-through-risers.md`. T09 starts after B7-T07 is merged on the branch. T07 changes `useRiserFlowInputs.ts`, `riserFlowSync.ts`, `App.tsx`, the Risers pane and `building-flow.ts` (the `live` argument). Each T09 task must re-read these files first. This plan does not depend on their details. Line numbers come from the working copy of 2026-11-23 and can move after T07.
+**T11 (2026-11-25): one wording for all network types, D-B-113.** The user ordered: "Do not make specific changes to any of the network types for now." The source word is now `source equipment` for every type (the hint reads "Place source equipment to set the source."). The tag is "Not a design flow" for every type, electrical too. The texts about the source word and the electrical tag below (D-B-103, D-B-107, "Defaults") are the old wording of T09. `sourceWordOf` and `designFlowTagOf` stay as the one place to make the wording type specific later.
+
 
 Six questions wait for the user (section 6, "Open"). A task that depends on one is marked "waits for D-B-xx". The tasks without such a mark can start at once.
 
@@ -253,7 +255,7 @@ When the network has no source, no valid root or entry, and has a loop, the old 
 - **D-B-93: A (A2).** Add the optional `openEnds` to the stored summary (version stays 2). An absent field means "no data" (the group stays "Not known yet" with a note and the link "Read summaries now").
 - **D-B-97: A.** A hand-set main level with no equipment: its open ends are possible sources.
 - **D-B-100: C.** The rule applies to all types, a drain too. The user wrote: "A drain can also move upwards by ways of a pump, so treat it the same as all the other network types". No drain condition anywhere.
-- **D-B-103: A.** Electrical tag `Connected load, not a design load`, no check of a unit mix.
+- **D-B-103: A (replaced by D-B-113, T11).** Electrical tag `Connected load, not a design load`, no check of a unit mix. Now the tag is `Not a design flow` for every type.
 - **D-B-104: B.** "at most" and the hint show only when K is 2 or more.
 - **D-B-105: A.** Keep "concurrency factor".
 - **New task B7-T10:** editing the capacity of a terminal marks the document as changed (the user asked for it).
@@ -345,13 +347,13 @@ The "Open" text below stays for the record. The answers above win.
 - The unit comes from the riser (`riser.networkType.flowUnit`), never from the open level.
 - No setting, no toggle, no stored state. The mode is a result of the drawing.
 - The new building fields are optional and appear only when true. Old tests that use `toEqual` stay green.
-- The source word comes from the discipline of the network type: ventilation: "an air handling unit or a fan"; heatingAndCooling and plumbing: "a pump or a boiler"; electrical: "a panel"; fireProtection: "a pump"; other: "a source equipment".
+- The source word is the same for every network type (D-B-113, T11): "source equipment". (T09 used a word by discipline: ventilation "an air handling unit or a fan"; heatingAndCooling and plumbing "a pump or a boiler"; electrical "a panel"; fireProtection "a pump"; other "a source equipment"; a drain "an outlet or a pump".)
 - Screenshots are named `b7-t09<task>-<name>` and go to the dashboard after each task.
 - Texts are in English only. People are "they". Texts follow ASD-STE100.
 
 ## 7. The words and where they show
 
-`<source word>` is the word of the discipline (see "Defaults"). "Hint A" below is this text, shown once for each panel:
+`<source word>` is "source equipment" for every network type (D-B-113, T11). "Hint A" below is this text, shown once for each panel:
 
 > No source yet. Each number shows the largest flow for any source position. Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0. Place `<source word>` to set the source.
 

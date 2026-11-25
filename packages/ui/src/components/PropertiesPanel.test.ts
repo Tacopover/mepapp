@@ -75,7 +75,7 @@ describe('PropertiesPanel at most', () => {
     expect(html).toContain('value="at most 100"');
     expect(html).toContain('data-testid="props-at-most-hint"');
     expect(html.indexOf('props-at-most-hint')).toBeLessThan(html.indexOf('props-segment-riser-hint'));
-    expect(hintOf(html, 'props-at-most-hint')).toMatch(/^No source yet\..*Place an air handling unit or a fan to set the source\.$/);
+    expect(hintOf(html, 'props-at-most-hint')).toMatch(/^No source yet\..*Place source equipment to set the source\.$/);
   });
 
   it('shows the plain number and no hint for a segment whose source is set', () => {
@@ -102,10 +102,10 @@ describe('PropertiesPanel at most', () => {
     expect(html).not.toContain('props-at-most-hint');
   });
 
-  it('names the drain source word for a fitting of a drain network', () => {
+  it('gives the same source word for a fitting of a drain network', () => {
     const html = render({ selectedFitting: fitting(), fittingNetworkTypeId: 'sanitary-waste' });
     expect(html).toContain('value="at most 100"');
-    expect(hintOf(html, 'props-at-most-hint')).toMatch(/Place an outlet or a pump to set the source\.$/);
+    expect(hintOf(html, 'props-at-most-hint')).toMatch(/Place source equipment to set the source\.$/);
   });
 
   it('shows no hint on a riser fitting, the riser block has its own hint', () => {
@@ -118,9 +118,9 @@ describe('PropertiesPanel at most', () => {
     expect(html).not.toContain('props-at-most-hint');
   });
 
-  it('names the neutral source word for a fitting with no network type', () => {
+  it('gives the source word for a fitting with no network type', () => {
     const html = render({ selectedFitting: fitting() });
-    expect(hintOf(html, 'props-at-most-hint')).toMatch(/Place a source equipment to set the source\.$/);
+    expect(hintOf(html, 'props-at-most-hint')).toMatch(/Place source equipment to set the source\.$/);
   });
 
   it('shows at most and one hint for several highest segments with one value', () => {
@@ -141,10 +141,10 @@ describe('PropertiesPanel at most', () => {
     expect(countOf(html, 'props-at-most-hint')).toBe(0);
   });
 
-  it('names the neutral source word when the selected segments have two disciplines', () => {
+  it('gives the same source word when the selected segments have two disciplines', () => {
     const html = render({
       selectedSegments: [segment({ id: 's1', networkTypeId: 'supply-air' }), segment({ id: 's2', networkTypeId: 'domestic-cold-water' })],
     });
-    expect(hintOf(html, 'props-at-most-hint')).toMatch(/Place a source equipment to set the source\.$/);
+    expect(hintOf(html, 'props-at-most-hint')).toMatch(/Place source equipment to set the source\.$/);
   });
 });

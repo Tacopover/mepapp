@@ -19,7 +19,7 @@ const snap = async (name) => {
 };
 const q = (id) => page.locator(`[data-testid="${id}"]`);
 const dlg = page.locator('.mep-modal');
-const TAG = 'Connected load, not a design load';
+const TAG = 'Not a design flow';
 
 async function openRisers() {
   await menu('Manage Buildings…');

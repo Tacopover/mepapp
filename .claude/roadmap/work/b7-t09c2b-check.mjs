@@ -57,8 +57,8 @@ async function closeDialog() {
 
 const HINT1 = 'No source level yet. Each span shows the largest flow for any source position.';
 const HINT2 = 'Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0.';
-const HINT3 = 'Place an air handling unit or a fan on a level, or click Set by hand and choose a main level.';
-const HINT3_SELECT = 'Place an air handling unit or a fan on a level, or choose a main level in the list "Source level".';
+const HINT3 = 'Place source equipment on a level, or click Set by hand and choose a main level.';
+const HINT3_SELECT = 'Place source equipment on a level, or choose a main level in the list "Source level".';
 const RISER_HINT = 'No source level yet. Solved capacity shows the largest flow for any source position. Open Manage Buildings, tab Risers, to set the main level.';
 
 // --- 1. the riser block of Properties, level 1 ---
@@ -85,7 +85,7 @@ await showRisers();
   check((await textOf('riser-capacity-main')) === 'Main level: not known yet (no source level)', 'Risers tab: main line', String(await textOf('riser-capacity-main')));
   check((await textOf('riser-capacity-total')) === 'Connected total: 750 m³/h (no concurrency factor)', 'Risers tab: connected total 750', String(await textOf('riser-capacity-total')));
   const hints = await allTexts('riser-capacity-hint');
-  check(JSON.stringify(hints) === JSON.stringify([HINT1, HINT2, HINT3]), 'Risers tab: the three hint paragraphs of section 7 with the source word of ventilation', JSON.stringify(hints));
+  check(JSON.stringify(hints) === JSON.stringify([HINT1, HINT2, HINT3]), 'Risers tab: the three hint paragraphs of section 7 with the one source word', JSON.stringify(hints));
   check(!hints.some((h) => /Click Set by hand and choose a source level/.test(h)), 'Risers tab: the old "Click Set by hand and choose a source level." is gone');
   check((await page.locator('[data-testid="riser-read-summaries"]').count()) === 0, 'Risers tab: no link "Read summaries now" (all summaries have the open-end data)');
   await snap('b7-t09c2b-2-risers-at-most');

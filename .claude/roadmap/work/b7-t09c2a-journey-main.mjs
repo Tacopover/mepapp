@@ -8,8 +8,8 @@ const W = '/root/MepApp/.claude/worktrees/buildings-b7/.claude/roadmap/work/';
 const SHOTS = `${W}shots/b7-t09c2a-journey/`;
 const CFG = JSON.parse(readFileSync(`${W}b7-t09c2a-journey-cfg.json`, 'utf8'));
 const LONG80 = 'Supply Air Main Trunk Duct Of The East Wing Of The Building Level Three North 0042';
-const HINT_A_VENT = 'No source yet. Each number shows the largest flow for any source position. Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0. Place an air handling unit or a fan to set the source.';
-const HINT_L_VENT = 'This network has a loop and no source. The numbers use one start point. Place an air handling unit or a fan to set the source.';
+const HINT_A_VENT = 'No source yet. Each number shows the largest flow for any source position. Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0. Place source equipment to set the source.';
+const HINT_L_VENT = 'This network has a loop and no source. The numbers use one start point. Place source equipment to set the source.';
 let anyFail = false;
 
 async function run({ width, full }) {

@@ -686,8 +686,8 @@ describe('capacityNumberText with atMost', () => {
 describe('riser views with no source level', () => {
   const AT_MOST_HINT_1_TEXT = 'No source level yet. Each span shows the largest flow for any source position.';
   const AT_MOST_HINT_2_TEXT = 'Numbers show different source positions. They do not add up at a fitting. An empty capacity counts as 0.';
-  const AT_MOST_HINT_3_TEXT = 'Place an air handling unit or a fan on a level, or click Set by hand and choose a main level.';
-  const AT_MOST_SELECT_TEXT = 'Place an air handling unit or a fan on a level, or choose a main level in the list "Source level".';
+  const AT_MOST_HINT_3_TEXT = 'Place source equipment on a level, or click Set by hand and choose a main level.';
+  const AT_MOST_SELECT_TEXT = 'Place source equipment on a level, or choose a main level in the list "Source level".';
   const RISER_AT_MOST_TEXT = 'No source level yet. Solved capacity shows the largest flow for any source position. Open Manage Buildings, tab Risers, to set the main level.';
 
   function entryWith(fittingIds: string[], terminalCapacity: number, openEnds: number, hasSource = false): RiserNetworkSummary {
@@ -726,14 +726,14 @@ describe('riser views with no source level', () => {
     expect(capacityViewOf(file, riser, flow, { selectsShown: false }).hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, AT_MOST_HINT_3_TEXT]);
   });
 
-  it('takes the source word of the network type in the third hint', () => {
+  it('gives the same source word in the third hint for every network type', () => {
     const cases: [NetworkType, string][] = [
-      [networkTypeOf({ id: 'water', name: 'Water', discipline: 'heatingAndCooling' }), 'a pump or a boiler'],
-      [networkTypeOf({ id: 'water', name: 'Water', discipline: 'plumbing' }), 'a pump or a boiler'],
-      [networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' }), 'a panel'],
-      [networkTypeOf({ id: 'sprinkler', name: 'Sprinkler', discipline: 'fireProtection', flowUnit: 'l/s' }), 'a pump'],
-      [networkTypeOf({ id: 'other', name: 'Other', discipline: 'other' }), 'a source equipment'],
-      [networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' }), 'an outlet or a pump'],
+      [networkTypeOf({ id: 'water', name: 'Water', discipline: 'heatingAndCooling' }), 'source equipment'],
+      [networkTypeOf({ id: 'water', name: 'Water', discipline: 'plumbing' }), 'source equipment'],
+      [networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' }), 'source equipment'],
+      [networkTypeOf({ id: 'sprinkler', name: 'Sprinkler', discipline: 'fireProtection', flowUnit: 'l/s' }), 'source equipment'],
+      [networkTypeOf({ id: 'other', name: 'Other', discipline: 'other' }), 'source equipment'],
+      [networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' }), 'source equipment'],
     ];
     for (const [type, word] of cases) {
       const { file, riser, flow } = exampleFiveOf(type);
@@ -804,9 +804,9 @@ describe('riser views with no source level', () => {
     const view = capacityViewOf(file, riser, flow);
     expect(view.notDesignFlow).toBe(true);
     expect(view.designFlowHint).toBe(DESIGN_FLOW_TEXT);
-    expect(view.hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, 'Place a panel on a level, or click Set by hand and choose a main level.']);
+    expect(view.hints).toEqual([AT_MOST_HINT_1_TEXT, AT_MOST_HINT_2_TEXT, AT_MOST_HINT_3_TEXT]);
     const lines = fittingRiserLinesOf(view, 'R1');
-    expect(lines?.tag).toBe('Connected load, not a design load');
+    expect(lines?.tag).toBe('Not a design flow');
     expect(lines?.hints).toEqual([RISER_AT_MOST_TEXT, DESIGN_FLOW_TEXT]);
   });
 
@@ -857,26 +857,34 @@ describe('riser views with no source level', () => {
 });
 
 describe('designFlowTagOf and the design flow tag', () => {
-  it('gives the electrical tag for an electrical type and the other tag for the other types', () => {
-    expect(designFlowTagOf(networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' }))).toBe('Connected load, not a design load');
-    expect(designFlowTagOf(networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' }))).toBe('Not a design flow');
-    expect(designFlowTagOf(networkTypeOf({ id: 'sprinkler', name: 'Sprinkler', discipline: 'fireProtection', flowUnit: 'l/s' }))).toBe('Not a design flow');
-    expect(designFlowTagOf(networkTypeOf({ id: 'vent', name: 'Supply air', discipline: 'ventilation' }))).toBe('Not a design flow');
+  it('gives the same tag for every network type', () => {
+    const types = [
+      networkTypeOf({ id: 'vent', name: 'Supply air', discipline: 'ventilation' }),
+      networkTypeOf({ id: 'water', name: 'Water', discipline: 'heatingAndCooling' }),
+      networkTypeOf({ id: 'water', name: 'Water', discipline: 'plumbing' }),
+      networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' }),
+      networkTypeOf({ id: 'sprinkler', name: 'Sprinkler', discipline: 'fireProtection', flowUnit: 'l/s' }),
+      networkTypeOf({ id: 'other', name: 'Other', discipline: 'other' }),
+      networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' }),
+    ];
+    for (const type of types) {
+      expect(designFlowTagOf(type)).toBe('Not a design flow');
+    }
   });
 
-  it('gives the electrical tag in the view and keeps the design flow hint for an electrical riser', () => {
+  it('gives the same tag in the view and keeps the design flow hint for an electrical riser', () => {
     const power = networkTypeOf({ id: 'power', name: 'Power', discipline: 'electrical', flowUnit: 'W' });
     const { file, riser, summaries } = worked([true, false, false], [100, 500, 150], power);
     const view = capacityViewOf(file, riser, solveBuildingFlow(file, summaries));
-    expect(view.designFlowTag).toBe('Connected load, not a design load');
+    expect(view.designFlowTag).toBe('Not a design flow');
     expect(view.designFlowHint).toBe(DESIGN_FLOW_TEXT);
     const single = riserOf('R1', [memberOf(0)], power);
     const singleFile = fileWith([single]);
     const singleFlow = solveBuildingFlow(singleFile, summariesOf(summaryOf('p0', [entryOf(['f'], 100, true)])));
-    expect(capacityViewOf(singleFile, single, singleFlow)).toMatchObject({ kind: 'one-member', designFlowTag: 'Connected load, not a design load' });
+    expect(capacityViewOf(singleFile, single, singleFlow)).toMatchObject({ kind: 'one-member', designFlowTag: 'Not a design flow' });
   });
 
-  it('gives the other tag in the view for a drain and no tag for air', () => {
+  it('gives the same tag for a drain and no tag for air', () => {
     const drain = networkTypeOf({ id: 'sanitary-waste', name: 'Waste', discipline: 'plumbing', flowUnit: 'l/s' });
     const waste = worked([true, false, false], [100, 500, 150], drain);
     expect(capacityViewOf(waste.file, waste.riser, solveBuildingFlow(waste.file, waste.summaries)).designFlowTag).toBe('Not a design flow');

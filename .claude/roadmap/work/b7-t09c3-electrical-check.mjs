@@ -21,7 +21,7 @@ const snap = async (name) => {
 const textOf = async (id) => ((await page.locator(`[data-testid="${id}"]`).count()) > 0 ? (await page.locator(`[data-testid="${id}"]`).first().innerText()).trim() : null);
 const docOf = () => page.evaluate(() => window.__mepSketchScene.getDocuments().find((d) => d.id === window.__mepSketchScene.getActiveDocumentId())?.fileName);
 const dlg = page.locator('.mep-modal');
-const TAG = 'Connected load, not a design load';
+const TAG = 'Not a design flow';
 
 if ((await docOf()) !== 'l1.pdf') {
   if ((await page.locator('.mep-doc-switcher-dropdown').count()) === 0) await page.locator('.mep-doc-switcher-btn').click();
@@ -39,7 +39,7 @@ await idle(100);
   await page.mouse.click(at.x, at.y);
   await idle(600);
   await until(async () => (await textOf('props-riser-tag')) !== null, 'riser block shown', 6000).catch(() => {});
-  check((await textOf('props-riser-tag')) === TAG, 'Properties riser block: the tag reads the electrical text', String(await textOf('props-riser-tag')));
+  check((await textOf('props-riser-tag')) === TAG, 'Properties riser block: the tag reads the same text as for other types', String(await textOf('props-riser-tag')));
   await snap('b7-t09c3-electrical-properties');
 }
 
@@ -54,7 +54,7 @@ await until(async () => (await page.locator('[data-testid="riser-capacity"]').in
 for (const width of [1600, 760]) {
   await page.setViewportSize({ width, height: 900 });
   await idle(500);
-  check((await textOf('riser-not-design-flow')) === TAG, `Risers tab at ${width} px: the tag reads the electrical text`, String(await textOf('riser-not-design-flow')));
+  check((await textOf('riser-not-design-flow')) === TAG, `Risers tab at ${width} px: the tag reads the same text as for other types`, String(await textOf('riser-not-design-flow')));
   const m = await page.evaluate(() => {
     const tag = document.querySelector('[data-testid="riser-not-design-flow"]');
     const head = document.querySelector('.mep-rp-capacity-head');
@@ -70,7 +70,7 @@ for (const width of [1600, 760]) {
   const rows = await page.locator('[data-testid="riser-capacity-row"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
   check(JSON.stringify(rows) === JSON.stringify(['Level 0 to Level 1: at most 650 kW', 'Level 1 to Level 2: at most 600 kW']), 'rows read at most 650 kW and 600 kW', JSON.stringify(rows));
   const hints = await page.locator('[data-testid="riser-capacity-hint"]').evaluateAll((els) => els.map((e) => e.textContent.trim()));
-  check(hints.some((h) => /^Place a panel on a level/.test(h)), 'hint 3 names a panel', JSON.stringify(hints));
+  check(hints.some((h) => /^Place source equipment on a level/.test(h)), 'hint 3 uses the same word as other types', JSON.stringify(hints));
 }
 check(errors.length === 0, 'no page errors', errors.join(' | '));
 await t.finish();

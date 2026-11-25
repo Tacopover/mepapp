@@ -2,6 +2,8 @@
 
 Status: **planned 2026-11-21, revised the same day after the audit and the domain check. T01 to T06 done on the branch (2026-11-21), T07 done (2026-11-23), T08 (the word "concurrency") and T09 with T10 (open ends with no source, "at most"; plan `buildings-b7-t09-open-ends.md`) done (2026-11-24); waiting for the Windows test (`buildings-b7-test.md`) and the merge by the user.** Stream `buildings`, part id `B7`. B5 (shared coordinate system) stays deferred. A later part (B8, riser arrows) needs B7 first. Branch for the work: `worktree-buildings-b7`, made from `origin/worktree-buildings-b4` (master `1b7b4fd` plus this plan).
 
+**T11 (2026-11-25): one wording for all network types, D-B-113.** The user ordered that no network type gets its own words for now. The source word and the tag "Not a design flow" are the same for every type. Details: `buildings-b7-t09-open-ends.md`.
+
 ## 1. Why
 
 The user asked for this on 2026-11-13. A riser is a segment that goes up or down. The flow rules of normal segments should also work for risers. Today they do not:

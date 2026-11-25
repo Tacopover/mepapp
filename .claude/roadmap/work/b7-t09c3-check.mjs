@@ -116,7 +116,7 @@ await showRisers();
   check((await textOf('riser-capacity-main')) === 'Main level: not known yet (no source level)', 'step 1: main line', String(await textOf('riser-capacity-main')));
   check((await textOf('riser-capacity-total')) === 'Connected total: 750 m³/h (no concurrency factor)', 'step 1: connected total 750', String(await textOf('riser-capacity-total')));
   const hints = await allTexts('riser-capacity-hint');
-  check(hints.length === 3 && hints[0].startsWith('No source level yet.') && /Place an air handling unit or a fan on a level/.test(hints[2]), 'step 1: the three hints of section 7', JSON.stringify(hints));
+  check(hints.length === 3 && hints[0].startsWith('No source level yet.') && /Place source equipment on a level/.test(hints[2]), 'step 1: the three hints of section 7', JSON.stringify(hints));
   check((await page.locator('[data-testid="riser-read-summaries"]').count()) === 0, 'step 1: no link "Read summaries now" (all summaries have open-end data)');
   check((await page.locator('[data-testid="riser-not-design-flow"]').count()) === 0, 'step 1: no design-flow tag for an air riser');
   await snap('b7-t09c3-risers-atmost');

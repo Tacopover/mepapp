@@ -58,11 +58,10 @@ const RISER_INCOMPLETE_HINT = 'Some levels have no data, so a number reads "at l
 const RISER_UNKNOWN_HINT = 'Solved capacity counts this level only until the main level is known. Open Manage Buildings, tab Risers, to set it.';
 const RISER_LOOP_HINT = 'Solved capacity counts this level only. The risers make a loop. Open Manage Buildings, tab Risers, for details.';
 const NOT_DESIGN_FLOW_TAG = 'Not a design flow';
-const ELECTRICAL_TAG = 'Connected load, not a design load';
 
-/** The tag next to the heading "Capacity": 'Connected load, not a design load' for an electrical type, else 'Not a design flow'. Use it only when isNotDesignFlow(type) is true. */
-export function designFlowTagOf(type: Pick<NetworkType, 'discipline'>): string {
-  return type.discipline === 'electrical' ? ELECTRICAL_TAG : NOT_DESIGN_FLOW_TAG;
+/** The tag next to the heading "Capacity": 'Not a design flow' for every type. Use it only when isNotDesignFlow(type) is true. */
+export function designFlowTagOf(_type: Pick<NetworkType, 'discipline'>): string {
+  return NOT_DESIGN_FLOW_TAG;
 }
 
 function atMostHint3(word: string, selectsShown: boolean): string {
@@ -137,7 +136,7 @@ export interface CapacityView {
 export interface FittingRiserLines {
   /** `Riser R1` (the name of the riser). */
   heading: string;
-  /** 'Connected load, not a design load' for an electrical type, else 'Not a design flow', when view.notDesignFlow. Else null. */
+  /** 'Not a design flow' when view.notDesignFlow. Else null. */
   tag: string | null;
   /** Always two rows: Main level, Connected total. title = `${label}: ${value}`. */
   rows: { label: string; value: string; title: string }[];

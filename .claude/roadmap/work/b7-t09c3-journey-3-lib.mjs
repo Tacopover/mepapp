@@ -35,7 +35,7 @@ export async function runJ3(tag, type, expectTag) {
     await activate('l1.pdf');
     await clickFittingOnCanvas();
     const info = await page.evaluate(() => {
-      return [...document.querySelectorAll('*')].filter((e) => e.children.length === 0 && /design (flow|load)|Connected load/i.test(e.textContent || '') && !e.closest('.mep-modal')).map((e) => ({ t: e.textContent.trim(), sw: e.scrollWidth, cw: e.clientWidth, h: Math.round(e.getBoundingClientRect().height) }));
+      return [...document.querySelectorAll('*')].filter((e) => e.children.length === 0 && /design (flow|load)/i.test(e.textContent || '') && !e.closest('.mep-modal')).map((e) => ({ t: e.textContent.trim(), sw: e.scrollWidth, cw: e.clientWidth, h: Math.round(e.getBoundingClientRect().height) }));
     });
     console.log('PROPS', tag, w, JSON.stringify(info));
     check(info.some((i) => i.t === expectTag), `${tag} ${w}: Properties tag text is "${expectTag}"`, JSON.stringify(info));
