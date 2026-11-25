@@ -13,7 +13,7 @@ const panel: Panel = {
   feederCable: { type: 'B2CA', crossSectionMm2: 25, lengthM: 23 },
   accessories: [{ id: 'acc-1', kind: 'currentTransformer', label: 'CT-L1' }],
   sectionIds: ['sec-a', 'sec-b'],
-  circuitDefaults: { prefix: 'A', phase: 'L1', diversityPercent: 100, cable: { type: 'B2CA', coreCount: 3, crossSectionMm2: 2.5 } },
+  circuitDefaults: { prefix: 'A', phase: 'L1', concurrencyPercent: 100, cable: { type: 'B2CA', coreCount: 3, crossSectionMm2: 2.5 } },
 };
 
 const sections: PanelSection[] = [
@@ -29,7 +29,7 @@ function circuit(id: string, number: number, overrides: Partial<Circuit> = {}): 
 const circuits: Circuit[] = [
   circuit('c3', 3, { sectionId: 'sec-b', isSpare: true }),
   circuit('c1', 1, { sectionId: 'sec-a', terminalIds: ['t1', 't2'], customName: 'Verlichting', circuitTypeId: 'lighting', device: { kind: 'breaker', curve: 'B', ratingA: 16, rcdMilliamps: 30 }, cable: { lengthM: 33 } }),
-  circuit('c2', 2, { sectionId: 'sec-a', terminalIds: ['t3'], diversityPercent: 50, phase: 'L1L2L3', device: { kind: 'breaker', curve: 'C', ratingA: 20 }, cable: { lengthM: 12 } }),
+  circuit('c2', 2, { sectionId: 'sec-a', terminalIds: ['t3'], concurrencyPercent: 50, phase: 'L1L2L3', device: { kind: 'breaker', curve: 'C', ratingA: 20 }, cable: { lengthM: 12 } }),
   circuit('c4', 4, { terminalIds: ['t4'] }),
   circuit('elsewhere', 1, { panelId: 'panel-2' }),
 ];

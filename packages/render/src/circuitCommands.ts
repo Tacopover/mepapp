@@ -32,7 +32,7 @@ function byId<T extends { id: string }>(items: T[]): Record<string, T> {
   return Object.fromEntries(items.map((item) => [item.id, item]));
 }
 
-/** `prefix` and `diversityPercent` are left unset unless the caller passes an explicit override, so a new circuit inherits its panel's circuitDefaults (templates plan §7 round 4) rather than pinning the old app's `''`/100 literals in. */
+/** `prefix` and `concurrencyPercent` are left unset unless the caller passes an explicit override, so a new circuit inherits its panel's circuitDefaults (templates plan §7 round 4) rather than pinning the old app's `''`/100 literals in. */
 export function createCircuitCommand(
   circuits: Circuit[],
   id: string,
@@ -196,7 +196,7 @@ export function insertSpareCircuitCommand(
 ): Command<DrawingState> {
   const before = byId(circuits);
   const shifted = shiftCircuitNumbersUpFrom(circuits, scope, targetNumber);
-  const spare: Circuit = { id, prefix, number: targetNumber, panelId: scope.panelId, terminalIds: [], isSpare: true, diversityPercent: 100 };
+  const spare: Circuit = { id, prefix, number: targetNumber, panelId: scope.panelId, terminalIds: [], isSpare: true, concurrencyPercent: 100 };
   const after = { ...byId(shifted), [id]: spare };
   return {
     description: `Insert spare circuit at ${targetNumber}`,
@@ -259,9 +259,9 @@ export function setCircuitCableCommand(circuit: Circuit, cable: Circuit['cable']
   return withCircuitField(circuit, 'cable', cable, `Set circuit ${circuit.id} cable`);
 }
 
-/** `diversityPercent: undefined` clears the circuit's own override so it goes back to inheriting its panel's circuitDefaults.diversityPercent (templates plan §7 round 4). */
-export function setCircuitDiversityCommand(circuit: Circuit, diversityPercent: number | undefined): Command<DrawingState> {
-  return withCircuitField(circuit, 'diversityPercent', diversityPercent, `Set circuit ${circuit.id} diversity`);
+/** `concurrencyPercent: undefined` clears the circuit's own override so it goes back to inheriting its panel's circuitDefaults.concurrencyPercent (templates plan §7 round 4). */
+export function setCircuitConcurrencyCommand(circuit: Circuit, concurrencyPercent: number | undefined): Command<DrawingState> {
+  return withCircuitField(circuit, 'concurrencyPercent', concurrencyPercent, `Set circuit ${circuit.id} concurrency`);
 }
 
 export function setCircuitPhaseCommand(circuit: Circuit, phase: Circuit['phase']): Command<DrawingState> {

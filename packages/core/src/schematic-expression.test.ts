@@ -5,7 +5,7 @@ const DOT = { decimalSeparator: '.' } as const;
 const COMMA = { decimalSeparator: ',' } as const;
 
 const context = {
-  circuit: { number: 3, prefix: 'A', diversityPercent: 80, properties: { 'Serial number': 'X-1' } },
+  circuit: { number: 3, prefix: 'A', concurrencyPercent: 80, properties: { 'Serial number': 'X-1' } },
   cable: { type: 'B2CA', crossSectionMm2: 2.5, lengthM: undefined },
   terminals: [{ capacity: 100 }, { capacity: 250 }, { capacity: 50 }],
   terminal: [{ capacity: 100 }, { capacity: 250 }, { capacity: 50 }],
@@ -54,7 +54,7 @@ describe('expressions', () => {
   it('sums and counts lists', () => {
     expect(evaluate('sum(terminal.capacity)')).toBe(400);
     expect(evaluate('count(terminals)')).toBe(3);
-    expect(evaluate('sum(terminal.capacity) * circuit.diversityPercent / 100')).toBe(320);
+    expect(evaluate('sum(terminal.capacity) * circuit.concurrencyPercent / 100')).toBe(320);
   });
 
   it('sums an empty or missing list to 0 and counts it as 0', () => {

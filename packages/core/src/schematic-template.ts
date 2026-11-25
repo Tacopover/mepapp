@@ -72,7 +72,7 @@ export const SCHEMATIC_BLOCK_CATALOGUE: Record<SchematicBlockType, SchematicBloc
   description: { label: 'Description text', scope: 'circuit', width: 40, height: 6, defaultBinding: '{circuit.customName}' },
   customAnnotation: { label: 'Custom annotation', scope: 'circuit', width: 32, height: 5, defaultBinding: '' },
   countCell: { label: 'Table cell: count and VA', scope: 'circuit', width: 22, height: 7, defaultBinding: '{count(terminals)} ({sum(terminal.capacity)}VA)' },
-  derivedCell: { label: 'Table cell: derived value', scope: 'circuit', width: 22, height: 7, defaultBinding: '{circuit.diversifiedCapacity} · {circuit.diversityPercent}%' },
+  derivedCell: { label: 'Table cell: derived value', scope: 'circuit', width: 22, height: 7, defaultBinding: '{circuit.concurrentCapacity} · {circuit.concurrencyPercent}%' },
   aggregateCell: { label: 'Aggregate cell (sum, count)', scope: 'aggregate', width: 24, height: 8, defaultBinding: 'Σ {sum(circuit.capacity)} VA' },
   totalsTable: { label: 'Totals table', scope: 'aggregate', width: 90, height: 30 },
 };

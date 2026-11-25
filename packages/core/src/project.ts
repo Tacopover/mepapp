@@ -7,6 +7,7 @@
 import type { Annotation } from './annotation.js';
 import type { Calibration } from './calibration.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
+import { migrateConcurrencyNames } from './concurrency-rename.js';
 import { isFlowUnitId } from './flow-units.js';
 import { ROUTED_MARK, type Fitting, type NetworkType, type PortGroup, type Segment } from './network.js';
 import type { Room } from './rooms/room.js';
@@ -19,7 +20,7 @@ import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 22;
+export const CURRENT_SCHEMA_VERSION = 23;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -211,7 +212,7 @@ const migrationSteps: MigrationStep[] = [
     toVersion: 10,
     // Version 9 predates Panel.circuitDefaults and the override-or-inherit
     // reading of Circuit.prefix/circuitTypeId/phase/device/cable/
-    // diversityPercent (electrical-schematic-templates.md §7 round 4) — all
+    // diversityPercent (now concurrencyPercent) (electrical-schematic-templates.md §7 round 4) — all
     // of these are optional and every reader already treats "absent" as
     // "no override"/"no default", the same way PlacedStamp.color (v5->v6)
     // never needed a data transform, so this step only advances the version
@@ -350,6 +351,17 @@ const migrationSteps: MigrationStep[] = [
       ...data,
       schemaVersion: 22,
       stamps: Array.isArray(data.stamps) ? data.stamps.map(addPageIndex) : data.stamps,
+    }),
+  },
+  {
+    fromVersion: 22,
+    toVersion: 23,
+    // Version 22 saves the concurrency of a circuit as diversityPercent (on a circuit and in Panel.circuitDefaults) and its
+    // template expressions as circuit.diversityPercent and circuit.diversifiedCapacity (B7-T12, D-B-114). The step renames
+    // them. An older MepApp then refuses the file instead of dropping the new fields when it saves.
+    migrate: (data) => ({
+      ...migrateConcurrencyNames(data),
+      schemaVersion: 23,
     }),
   },
 ];

@@ -16,6 +16,12 @@ function fakeStorage(initial?: string): StorageLike & { value: string | null } {
 
 const template = { ...structuredClone(SCHEMATIC_TEMPLATE_LIBRARY[0]), id: 'custom-1', name: 'Mine' };
 
+function oldForm<T>(t: T): T {
+  return JSON.parse(
+    JSON.stringify(t).replaceAll('concurrencyPercent', 'diversityPercent').replaceAll('concurrentCapacity', 'diversifiedCapacity').replaceAll('Concurrent VA', 'Diversified VA'),
+  ) as T;
+}
+
 describe('custom template storage', () => {
   it('round-trips a template', () => {
     const storage = fakeStorage();
@@ -74,5 +80,33 @@ describe('custom template storage', () => {
     saveCustomTemplates(storage, []);
     expect(SCHEMATIC_TEMPLATES_STORAGE_KEY).toBe('mepapp.schematicTemplates');
     expect(storage.value).toBe('[]');
+  });
+
+  it('loads a template saved with the old names under the new names', () => {
+    const old = oldForm(template);
+    expect(JSON.stringify(old)).toContain('diversifiedCapacity');
+    expect(loadCustomTemplates(fakeStorage(JSON.stringify([old])))).toEqual([template]);
+  });
+
+  it('writes the new names on the next save', () => {
+    const storage = fakeStorage(JSON.stringify([oldForm(template)]));
+    const loaded = loadCustomTemplates(storage);
+    saveCustomTemplates(storage, loaded);
+    expect(storage.value).not.toMatch(/diversity|diversif/i);
+    expect(loadCustomTemplates(storage)).toEqual([template]);
+  });
+
+  it('keeps text that only looks similar', () => {
+    const similar = { ...template, description: 'diversity notes', name: 'Diversified plan' };
+    const storage = fakeStorage(JSON.stringify([oldForm(similar)]));
+    expect(loadCustomTemplates(storage)).toEqual([similar]);
+  });
+
+  it('drops an old-form template that is broken for another reason', () => {
+    const broken = structuredClone(template);
+    broken.id = 'custom-2';
+    broken.layoutBlocks[0].binding = '{oops';
+    const storage = fakeStorage(JSON.stringify([oldForm(template), oldForm(broken)]));
+    expect(loadCustomTemplates(storage).map((t) => t.id)).toEqual(['custom-1']);
   });
 });

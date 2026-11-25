@@ -7,7 +7,7 @@ import {
   getEffectiveCable,
   getEffectiveCircuitTypeId,
   getEffectiveDevice,
-  getEffectiveDiversityPercent,
+  getEffectiveConcurrencyPercent,
   getEffectivePhase,
   getEffectivePrefix,
   type Circuit,
@@ -225,7 +225,7 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
   const facts: CircuitFacts[] = orderPanelCircuits(panel, input.circuits, input.sections).map((circuit) => {
     const terminals = circuit.terminalIds.map((id) => input.terminals[id]).filter((t): t is SchematicTerminalInfo => t !== undefined);
     const capacity = terminals.reduce((sum, t) => sum + t.capacity, 0);
-    const diversity = getEffectiveDiversityPercent(circuit, panel);
+    const concurrency = getEffectiveConcurrencyPercent(circuit, panel);
     const phase = getEffectivePhase(circuit, panel);
     const device = getEffectiveDevice(circuit, panel);
     const circuitTypeId = getEffectiveCircuitTypeId(circuit, panel);
@@ -239,10 +239,10 @@ export function generateSchematic(input: SchematicInput, template: SchematicTemp
           number: circuit.number,
           customName: circuit.customName,
           phase,
-          diversityPercent: diversity,
+          concurrencyPercent: concurrency,
           isSpare: circuit.isSpare,
           capacity,
-          diversifiedCapacity: (capacity * diversity) / 100,
+          concurrentCapacity: (capacity * concurrency) / 100,
           capacityL1: phaseShare(phase, 'L1', capacity),
           capacityL2: phaseShare(phase, 'L2', capacity),
           capacityL3: phaseShare(phase, 'L3', capacity),

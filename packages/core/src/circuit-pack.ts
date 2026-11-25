@@ -12,7 +12,7 @@ export interface PackUnit {
 export interface PackLimits {
   maxTerminals: number | null;
   maxLoad: number | null;
-  diversityPercent: number;
+  concurrencyPercent: number;
 }
 
 export interface PackedCircuit {
@@ -27,7 +27,7 @@ function sumLoads(loads: readonly number[]): number {
 
 function fits(count: number, rawLoad: number, limits: PackLimits): boolean {
   if (limits.maxTerminals !== null && count > limits.maxTerminals) return false;
-  if (limits.maxLoad !== null && (rawLoad * limits.diversityPercent) / 100 > limits.maxLoad) return false;
+  if (limits.maxLoad !== null && (rawLoad * limits.concurrencyPercent) / 100 > limits.maxLoad) return false;
   return true;
 }
 

@@ -1,4 +1,4 @@
-import { validateSchematicTemplate, type SchematicTemplate } from '@mepapp/core';
+import { migrateTemplateConcurrencyNames, validateSchematicTemplate, type SchematicTemplate } from '@mepapp/core';
 
 // Interim per-installation storage of the user's own schematic templates; templates plan Phase 6 replaces it.
 
@@ -27,7 +27,8 @@ export function loadCustomTemplates(storage: StorageLike | undefined): Schematic
     const raw = storage?.getItem(SCHEMATIC_TEMPLATES_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.filter(isUsableTemplate) : [];
+    // The circuit load factor was once named diversityPercent in template expressions; the rename runs on each load.
+    return Array.isArray(parsed) ? parsed.map(migrateTemplateConcurrencyNames).filter(isUsableTemplate) : [];
   } catch {
     return [];
   }

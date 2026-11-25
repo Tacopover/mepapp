@@ -52,6 +52,7 @@ export * from './schematic-drawing.js';
 export * from './schematic-generator.js';
 export * from './schematic-template-edit.js';
 export * from './schematic-symbol.js';
+export { migrateTemplateConcurrencyNames } from './concurrency-rename.js';
 export * from './commands.js';
 export * from './schema.js';
 export * from './segmentTool.js';

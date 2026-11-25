@@ -315,8 +315,8 @@ export const SCHEMATIC_BINDING_FIELDS: SchematicBindingField[] = [
   { expression: 'circuit.customName', description: 'Circuit name', scopes: CIRCUIT },
   { expression: 'circuit.phase', description: 'Phase, for example L1 or L1L2L3', scopes: CIRCUIT },
   { expression: 'circuit.capacity', description: 'Capacity of the circuit (sum of its terminals)', scopes: CIRCUIT },
-  { expression: 'circuit.diversityPercent', description: 'Concurrency in percent', scopes: CIRCUIT },
-  { expression: 'circuit.diversifiedCapacity', description: 'Capacity times concurrency', scopes: CIRCUIT },
+  { expression: 'circuit.concurrencyPercent', description: 'Concurrency in percent', scopes: CIRCUIT },
+  { expression: 'circuit.concurrentCapacity', description: 'Capacity times concurrency', scopes: CIRCUIT },
   { expression: 'circuit.capacityL1', description: 'The capacity on phase L1 (a three-phase circuit splits it equally)', scopes: CIRCUIT },
   { expression: 'circuit.capacityL2', description: 'The capacity on phase L2', scopes: CIRCUIT },
   { expression: 'circuit.capacityL3', description: 'The capacity on phase L3', scopes: CIRCUIT },
@@ -340,7 +340,7 @@ export const SCHEMATIC_BINDING_FIELDS: SchematicBindingField[] = [
   { expression: 'count(circuits)', description: 'Number of circuits, without spares', scopes: ['aggregate'] },
   { expression: 'count(spares)', description: 'Number of spare circuits', scopes: ['aggregate'] },
   { expression: 'sum(circuit.capacity)', description: 'Total capacity of the circuits', scopes: ['aggregate'] },
-  { expression: 'sum(circuit.diversifiedCapacity)', description: 'Total diversified capacity', scopes: ['aggregate'] },
+  { expression: 'sum(circuit.concurrentCapacity)', description: 'Total concurrent capacity', scopes: ['aggregate'] },
   { expression: 'sum(circuit.capacityL1)', description: 'Total capacity on phase L1', scopes: ['aggregate'] },
   { expression: 'sum(circuit.capacityL2)', description: 'Total capacity on phase L2', scopes: ['aggregate'] },
   { expression: 'sum(circuit.capacityL3)', description: 'Total capacity on phase L3', scopes: ['aggregate'] },
@@ -375,7 +375,7 @@ export function buildSampleSchematicInput(template: SchematicTemplate, circuitTy
     feederCable: { type: 'XMvK', crossSectionMm2: 10, lengthM: 12 },
     accessories: [{ id: 'sample-acc', kind: 'meter', label: 'kWh' }],
     sectionIds: ['sample-s1', 'sample-s2'],
-    circuitDefaults: { prefix: 'A', phase: 'L1', device: { kind: 'breaker', curve: 'B', ratingA: 16 }, cable: { type: 'YMvK', coreCount: 3, crossSectionMm2: 2.5 }, diversityPercent: 100 },
+    circuitDefaults: { prefix: 'A', phase: 'L1', device: { kind: 'breaker', curve: 'B', ratingA: 16 }, cable: { type: 'YMvK', coreCount: 3, crossSectionMm2: 2.5 }, concurrencyPercent: 100 },
   };
   const sections: PanelSection[] = [
     { id: 'sample-s1', panelId: panel.id, name: 'Ground floor', order: 0 },
@@ -399,7 +399,7 @@ export function buildSampleSchematicInput(template: SchematicTemplate, circuitTy
     circuit(4, 'sample-s1', { isSpare: true }),
     circuit(5, 'sample-s2', { terminalIds: ['t5'], circuitTypeId: 'hvac', phase: 'L1L2L3', customName: 'Heat pump', device: { kind: 'breaker', curve: 'C', ratingA: 25 }, cable: { coreCount: 5, crossSectionMm2: 4, lengthM: 18 } }),
     circuit(6, 'sample-s2', { terminalIds: ['t6'], circuitTypeId: 'lighting', phase: 'L2', customName: 'Landing lighting', cable: { lengthM: 11 } }),
-    circuit(7, 'sample-s2', { terminalIds: ['t7', 't8'], circuitTypeId: 'sockets', phase: 'L3', customName: 'Bedroom sockets', diversityPercent: 80, cable: { lengthM: 26 } }),
+    circuit(7, 'sample-s2', { terminalIds: ['t7', 't8'], circuitTypeId: 'sockets', phase: 'L3', customName: 'Bedroom sockets', concurrencyPercent: 80, cable: { lengthM: 26 } }),
   ];
   let extraNumber = 8;
   for (const group of template.groups) {

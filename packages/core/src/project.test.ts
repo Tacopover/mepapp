@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_SCHEMA_VERSION, customStampDefinitionsToSave, loadProject, ProjectLoadError, serializeProject } from './project.js';
 import type { Annotation } from './annotation.js';
+import { getEffectiveConcurrencyPercent } from './circuit.js';
 import type { Fitting, NetworkType, Segment } from './network.js';
 import type { PlacedStamp } from './stamp.js';
 import type { StampDefinition } from './stamp-library.js';
-import { SchemaMigrationError } from './schema.js';
+import { migrateToLatest, SchemaMigrationError, type JsonRecord } from './schema.js';
+import { SCHEMATIC_TEMPLATE_LIBRARY } from './schematic-template-library.js';
+import { getSchematicTemplateStatus } from './schematic.js';
 import { SUGGESTED_AIR_SIZING, SUGGESTED_WATER_SIZING } from './sizing-settings.js';
 
 const networkType: NetworkType = { id: 'supply-air', name: 'Supply Air', discipline: 'ventilation', units: 'CFM', defaultCapacity: 0 };
@@ -441,8 +444,8 @@ describe('routing targets in the save format (auto-routing.md §4.5)', () => {
 
   it('loads a version 17 save with the stamps unchanged', () => {
     const loaded = loadProject({ ...v17, stamps: [stamp] });
-    expect(CURRENT_SCHEMA_VERSION).toBe(22);
-    expect(loaded.schemaVersion).toBe(22);
+    expect(CURRENT_SCHEMA_VERSION).toBe(23);
+    expect(loaded.schemaVersion).toBe(23);
     expect(loaded.stamps).toEqual([{ ...stamp, pageIndex: 0 }]);
   });
 
@@ -478,7 +481,7 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
 
   it('loads a version 18 save with two network types as version 19 with the types unchanged', () => {
     const loaded = loadProject({ ...v18, networkTypes: [airType, waterType] });
-    expect(loaded.schemaVersion).toBe(22);
+    expect(loaded.schemaVersion).toBe(23);
     expect(loaded.networkTypes).toEqual([airType, waterType]);
   });
 
@@ -508,8 +511,8 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
   });
 
-  it('refuses a save of a version newer than 22', () => {
-    expect(() => loadProject({ ...v18, schemaVersion: 23 })).toThrow(SchemaMigrationError);
+  it('refuses a save of a version newer than 23', () => {
+    expect(() => loadProject({ ...v18, schemaVersion: 24 })).toThrow(SchemaMigrationError);
   });
 });
 
@@ -527,7 +530,7 @@ describe('network sizing in the save format (auto-routing-r5.md §12.2)', () => 
     const bad = { ...base, id: 'bad', sizing: { method: 'x' } };
     const none = { ...base, id: 'none' };
     const loaded = loadProject({ ...v19, networkTypes: [air, water, bad, none] });
-    expect(loaded.schemaVersion).toBe(22);
+    expect(loaded.schemaVersion).toBe(23);
     expect(loaded.networkSizing).toEqual([]);
     expect(loaded.networkTypes[0]).toEqual({ ...base, id: 'supply-air', flowUnit: 'dm³/s', sizingMethod: 'air' });
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
@@ -567,9 +570,9 @@ describe('routed marks in the save format (auto-routing-r6.md section 4.1)', () 
     networkSizing: [],
   };
 
-  it('loads a version 20 save with an unmarked segment and fitting as version 22 with the items unchanged', () => {
+  it('loads a version 20 save with an unmarked segment and fitting as the current version with the items unchanged', () => {
     const loaded = loadProject({ ...v20, segments: [segment], fittings: [fitting] });
-    expect(loaded.schemaVersion).toBe(22);
+    expect(loaded.schemaVersion).toBe(23);
     expect(loaded.segments).toEqual([segment]);
     expect(loaded.fittings).toEqual([fitting]);
   });
@@ -599,8 +602,8 @@ describe('routed marks in the save format (auto-routing-r6.md section 4.1)', () 
     expect(loaded.fittings[0]).toBe(fitting);
   });
 
-  it('refuses a save of a version newer than 22', () => {
-    expect(() => loadProject({ ...v20, schemaVersion: 23 })).toThrow(SchemaMigrationError);
+  it('refuses a save of a version newer than 23', () => {
+    expect(() => loadProject({ ...v20, schemaVersion: 24 })).toThrow(SchemaMigrationError);
   });
 });
 
@@ -617,7 +620,7 @@ describe('buildings fields in the save format (buildings-b1 B1-T01)', () => {
 
   it('loads a version 21 save with the stamps on page 0 when they have no page index', () => {
     const loaded = loadProject({ ...v21, stamps: [stampOf('a'), stampOf('b', 3)] });
-    expect(loaded.schemaVersion).toBe(22);
+    expect(loaded.schemaVersion).toBe(23);
     expect(loaded.stamps.map((s) => s.pageIndex)).toEqual([0, 3]);
     expect(loaded.projectUuid).toBeUndefined();
   });
@@ -673,5 +676,75 @@ describe('customStampDefinitionsToSave', () => {
     const c = definition('custom-c', 'custom');
     const d = definition('user-d', 'user');
     expect(customStampDefinitionsToSave([a, b, c, d], [stamp('stamp-1', 'user-b')])).toEqual([a, b, c]);
+  });
+});
+
+describe('concurrency names in the save format (B7-T12)', () => {
+  const builtin = SCHEMATIC_TEMPLATE_LIBRARY[0]!;
+  const oldTemplate = JSON.parse(
+    JSON.stringify(builtin).replaceAll('concurrencyPercent', 'diversityPercent').replaceAll('concurrentCapacity', 'diversifiedCapacity').replaceAll('Concurrent VA', 'Diversified VA'),
+  );
+  const v22 = {
+    schemaVersion: 22, networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {},
+    circuits: [
+      { id: 'c1', number: 1, panelId: 'p1', terminalIds: [], isSpare: false, diversityPercent: 80 },
+      { id: 'c2', number: 2, panelId: 'p1', terminalIds: [], isSpare: false },
+      { id: 'c3', number: 3, panelId: 'p1', terminalIds: [], isSpare: true },
+    ],
+    panels: [{ id: 'p1', equipmentStampId: 'db1', name: 'DB 1', sortDirection: 'ascending', circuitDefaults: { prefix: 'A', phase: 'L1', diversityPercent: 90 } }],
+    panelSections: [], circuitTypes: [], stampLabelLayouts: {},
+    schematics: [{ id: 's1', name: 'DB 1', panelId: 'p1', sourceTemplateId: builtin.id, template: oldTemplate, symbols: [], fieldValues: {}, textOverrides: {}, blockOverrides: {}, extras: [] }],
+    schematicProjectFields: {}, rooms: [], calibrations: {}, roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {},
+    networkSizing: [],
+  };
+
+  it('loads a version 22 save as version 23 with the new names', () => {
+    expect(JSON.stringify(oldTemplate)).toContain('diversifiedCapacity');
+    const loaded = loadProject(v22);
+    expect(loaded.schemaVersion).toBe(23);
+    expect(loaded.circuits[0]!.concurrencyPercent).toBe(80);
+    expect('concurrencyPercent' in loaded.circuits[1]!).toBe(false);
+    expect(loaded.panels[0]!.circuitDefaults?.concurrencyPercent).toBe(90);
+    expect(JSON.stringify(loaded)).not.toMatch(/diversity|diversif/i);
+    const schematic = loaded.schematics[0]!;
+    expect(schematic.template).toEqual(builtin);
+    expect(getSchematicTemplateStatus(schematic, builtin, [])).toBe('current');
+  });
+
+  it('gives the same effective concurrency as before the rename', () => {
+    const loaded = loadProject(v22);
+    const panel = loaded.panels[0];
+    expect(getEffectiveConcurrencyPercent(loaded.circuits[0]!, panel)).toBe(80);
+    expect(getEffectiveConcurrencyPercent(loaded.circuits[1]!, panel)).toBe(90);
+    expect(getEffectiveConcurrencyPercent(loaded.circuits[1]!, undefined)).toBe(100);
+  });
+
+  it('keeps the migrated names through a save and a load', () => {
+    const loaded = loadProject(v22);
+    const { schemaVersion: _v, ...doc } = loaded;
+    expect(loadProject(JSON.parse(JSON.stringify(serializeProject(doc))))).toEqual(loaded);
+  });
+
+  it('does not run the step again on a version 23 save', () => {
+    const v23 = { ...v22, schemaVersion: 23, circuits: [{ id: 'c1', number: 1, panelId: 'p1', terminalIds: [], isSpare: false, diversityPercent: 60 }] };
+    const loaded = loadProject(v23);
+    expect(loaded.circuits[0]!.concurrencyPercent).toBeUndefined();
+    expect(loaded.circuits[0]).toMatchObject({ diversityPercent: 60 });
+  });
+
+  it('writes version 23 and no old name', () => {
+    const loaded = loadProject(v22);
+    const { schemaVersion: _v, ...doc } = loaded;
+    const serialized = serializeProject(doc);
+    expect(serialized.schemaVersion).toBe(23);
+    expect(JSON.stringify(serialized)).not.toMatch(/diversity|diversif/i);
+  });
+
+  it('is refused by an older app whose latest version is 22', () => {
+    const loaded = loadProject(v22);
+    const { schemaVersion: _v, ...doc } = loaded;
+    const olderSteps = Array.from({ length: 22 }, (_, i) => ({ fromVersion: i, toVersion: i + 1, migrate: (data: JsonRecord) => ({ ...data, schemaVersion: i + 1 }) }));
+    expect(() => migrateToLatest(serializeProject(doc), { steps: olderSteps, latestVersion: 22 })).toThrow(SchemaMigrationError);
+    expect(() => loadProject({ ...v22, schemaVersion: 24 })).toThrow(SchemaMigrationError);
   });
 });

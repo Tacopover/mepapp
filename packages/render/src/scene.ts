@@ -187,7 +187,7 @@ import {
   setCircuitCableCommand,
   setCircuitCustomNameCommand,
   setCircuitDeviceCommand,
-  setCircuitDiversityCommand,
+  setCircuitConcurrencyCommand,
   setCircuitPhaseCommand,
   setCircuitPrefixBulkCommand,
   setCircuitPrefixCommand,
@@ -2405,9 +2405,9 @@ export class SketchScene {
     this.withCircuit(circuitId, (c) => setCircuitCableCommand(c, cable));
   }
 
-  /** `diversityPercent: undefined` clears the circuit's own override so it inherits its panel's circuitDefaults.diversityPercent. */
-  setCircuitDiversity(circuitId: string, diversityPercent: number | undefined): void {
-    this.withCircuit(circuitId, (c) => setCircuitDiversityCommand(c, diversityPercent));
+  /** `concurrencyPercent: undefined` clears the circuit's own override so it inherits its panel's circuitDefaults.concurrencyPercent. */
+  setCircuitConcurrency(circuitId: string, concurrencyPercent: number | undefined): void {
+    this.withCircuit(circuitId, (c) => setCircuitConcurrencyCommand(c, concurrencyPercent));
   }
 
   setCircuitPhase(circuitId: string, phase: Circuit['phase']): void {

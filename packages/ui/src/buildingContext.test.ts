@@ -36,7 +36,7 @@ const riserOf = (sheetId: string, fittingId: string): Riser => ({
 
 const projectOf = (projectUuid: string | undefined, fittings: unknown[] = []) =>
   ({
-    schemaVersion: 22,
+    schemaVersion: 23,
     projectUuid,
     networkTypes: [],
     segments: [],

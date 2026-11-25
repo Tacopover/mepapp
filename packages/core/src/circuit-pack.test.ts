@@ -5,7 +5,7 @@ function unit(roomId: string, distance: number, terminalIds: string[], loads?: n
   return { roomId, distance, terminalIds, loads: loads ?? terminalIds.map(() => 0) };
 }
 
-const noLoad: PackLimits = { maxTerminals: 4, maxLoad: null, diversityPercent: 100 };
+const noLoad: PackLimits = { maxTerminals: 4, maxLoad: null, concurrencyPercent: 100 };
 
 describe('packRooms', () => {
   it('packs whole rooms next-fit when spanning is allowed', () => {
@@ -45,7 +45,7 @@ describe('packRooms', () => {
 
   it('applies the concurrency factor to the load limit and closes the last piece of a split room', () => {
     const loads = Array.from({ length: 8 }, () => 300);
-    const limits: PackLimits = { maxTerminals: null, maxLoad: 1000, diversityPercent: 50 };
+    const limits: PackLimits = { maxTerminals: null, maxLoad: 1000, concurrencyPercent: 50 };
     const terminalIds = loads.map((_, i) => `t${i + 1}`);
     const result = packRooms([unit('R', 1, terminalIds, loads)], limits, { spanRooms: true });
     expect(result.map((circuit) => circuit.terminalIds.length)).toEqual([6, 2]);
@@ -59,7 +59,7 @@ describe('packRooms', () => {
   });
 
   it('puts a terminal above the load limit alone in its own circuit', () => {
-    const limits: PackLimits = { maxTerminals: null, maxLoad: 100, diversityPercent: 100 };
+    const limits: PackLimits = { maxTerminals: null, maxLoad: 100, concurrencyPercent: 100 };
     const result = packRooms([unit('R', 1, ['x', 'y'], [500, 50])], limits, { spanRooms: true });
     expect(result).toEqual([
       { terminalIds: ['x'], roomIds: ['R'], reason: 'room-split' },
@@ -69,7 +69,7 @@ describe('packRooms', () => {
 
   it('packs everything into one circuit when both limits are null', () => {
     const rooms = [unit('A', 1, ['a1', 'a2']), unit('B', 2, ['b1']), unit('C', 3, ['c1', 'c2', 'c3'])];
-    const limits: PackLimits = { maxTerminals: null, maxLoad: null, diversityPercent: 100 };
+    const limits: PackLimits = { maxTerminals: null, maxLoad: null, concurrencyPercent: 100 };
     expect(packRooms(rooms, limits, { spanRooms: true })).toEqual([
       { terminalIds: ['a1', 'a2', 'b1', 'c1', 'c2', 'c3'], roomIds: ['A', 'B', 'C'], reason: 'pack' },
     ]);
@@ -77,7 +77,7 @@ describe('packRooms', () => {
 
   it('sorts units by distance, breaking ties on roomId', () => {
     const rooms = [unit('C', 12, ['c1']), unit('B', 8, ['b1']), unit('A', 8, ['a1'])];
-    const limits: PackLimits = { maxTerminals: null, maxLoad: null, diversityPercent: 100 };
+    const limits: PackLimits = { maxTerminals: null, maxLoad: null, concurrencyPercent: 100 };
     expect(packRooms(rooms, limits, { spanRooms: true })).toEqual([
       { terminalIds: ['a1', 'b1', 'c1'], roomIds: ['A', 'B', 'C'], reason: 'pack' },
     ]);

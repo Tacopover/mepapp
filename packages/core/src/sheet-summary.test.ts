@@ -32,7 +32,7 @@ const terminal = (id: string, pageIndex: number) =>
 
 const projectOf = (overrides: Partial<Record<string, unknown>> = {}): ProjectDocument =>
   ({
-    schemaVersion: 22,
+    schemaVersion: 23,
     projectUuid: 'proj-1',
     networkTypes: [type],
     segments: [segment('s0', 0, [{ x: 0, y: 0 }, { x: 500, y: 0 }]), segment('s1', 1, [{ x: 0, y: 0 }, { x: 300, y: 0 }])],

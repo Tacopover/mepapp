@@ -10,7 +10,7 @@ import {
   getEffectiveCable,
   getEffectiveCircuitTypeId,
   getEffectiveDevice,
-  getEffectiveDiversityPercent,
+  getEffectiveConcurrencyPercent,
   getEffectivePhase,
   getEffectivePrefix,
   getNextCircuitNumber,
@@ -33,7 +33,7 @@ function circuit(id: string, number: number, overrides: Partial<Circuit> = {}): 
     number,
     terminalIds: [],
     isSpare: false,
-    diversityPercent: 100,
+    concurrencyPercent: 100,
     ...overrides,
   };
 }
@@ -175,17 +175,17 @@ describe('panel-default resolvers (templates plan §7 round 4)', () => {
       phase: 'L1',
       device: { kind: 'breaker', curve: 'B', ratingA: 16 },
       cable: { type: 'B2CA', coreCount: 3, crossSectionMm2: 2.5 },
-      diversityPercent: 80,
+      concurrencyPercent: 80,
     },
   };
 
   it('reads the panel default when the circuit leaves a field unset', () => {
-    const c = circuit('c1', 1, { panelId: 'p1', prefix: undefined, circuitTypeId: undefined, phase: undefined, device: undefined, diversityPercent: undefined });
+    const c = circuit('c1', 1, { panelId: 'p1', prefix: undefined, circuitTypeId: undefined, phase: undefined, device: undefined, concurrencyPercent: undefined });
     expect(getEffectivePrefix(c, panel)).toBe('B');
     expect(getEffectiveCircuitTypeId(c, panel)).toBe('lighting');
     expect(getEffectivePhase(c, panel)).toBe('L1');
     expect(getEffectiveDevice(c, panel)).toEqual({ kind: 'breaker', curve: 'B', ratingA: 16 });
-    expect(getEffectiveDiversityPercent(c, panel)).toBe(80);
+    expect(getEffectiveConcurrencyPercent(c, panel)).toBe(80);
   });
 
   it('prefers the circuit\'s own override over the panel default', () => {
@@ -195,19 +195,19 @@ describe('panel-default resolvers (templates plan §7 round 4)', () => {
       circuitTypeId: 'sockets',
       phase: 'L2',
       device: { kind: 'breaker', curve: 'C', ratingA: 10 },
-      diversityPercent: 100,
+      concurrencyPercent: 100,
     });
     expect(getEffectivePrefix(c, panel)).toBe('A');
     expect(getEffectiveCircuitTypeId(c, panel)).toBe('sockets');
     expect(getEffectivePhase(c, panel)).toBe('L2');
     expect(getEffectiveDevice(c, panel)).toEqual({ kind: 'breaker', curve: 'C', ratingA: 10 });
-    expect(getEffectiveDiversityPercent(c, panel)).toBe(100);
+    expect(getEffectiveConcurrencyPercent(c, panel)).toBe(100);
   });
 
   it('falls back to \'\' and 100 with no panel at all', () => {
-    const c = circuit('c1', 1, { prefix: undefined, diversityPercent: undefined });
+    const c = circuit('c1', 1, { prefix: undefined, concurrencyPercent: undefined });
     expect(getEffectivePrefix(c, undefined)).toBe('');
-    expect(getEffectiveDiversityPercent(c, undefined)).toBe(100);
+    expect(getEffectiveConcurrencyPercent(c, undefined)).toBe(100);
   });
 
   it('resolves cable fields individually, never inheriting lengthM', () => {
@@ -351,8 +351,8 @@ describe('resolveCircuitLineTargets', () => {
 
 describe('resolveCurrentCircuitId', () => {
   const circuits: Circuit[] = [
-    { id: 'c1', number: 1, terminalIds: ['t1', 't2'], diversityPercent: 100 } as Circuit,
-    { id: 'c2', number: 2, terminalIds: ['t3'], diversityPercent: 100 } as Circuit,
+    { id: 'c1', number: 1, terminalIds: ['t1', 't2'], concurrencyPercent: 100 } as Circuit,
+    { id: 'c2', number: 2, terminalIds: ['t3'], concurrencyPercent: 100 } as Circuit,
   ];
 
   it('prefers the tool target, then the tree selection, then the terminals', () => {
@@ -375,10 +375,10 @@ describe('resolveCurrentCircuitId', () => {
 
 describe('getSpareInsertion', () => {
   const circuits: Circuit[] = [
-    { id: 'a', number: 1, panelId: 'p1', terminalIds: [], diversityPercent: 100 } as Circuit,
-    { id: 'b', number: 2, panelId: 'p1', terminalIds: [], diversityPercent: 100 } as Circuit,
-    { id: 'c', number: 4, panelId: 'p1', terminalIds: [], diversityPercent: 100 } as Circuit,
-    { id: 'd', number: 1, terminalIds: [], diversityPercent: 100 } as Circuit,
+    { id: 'a', number: 1, panelId: 'p1', terminalIds: [], concurrencyPercent: 100 } as Circuit,
+    { id: 'b', number: 2, panelId: 'p1', terminalIds: [], concurrencyPercent: 100 } as Circuit,
+    { id: 'c', number: 4, panelId: 'p1', terminalIds: [], concurrencyPercent: 100 } as Circuit,
+    { id: 'd', number: 1, terminalIds: [], concurrencyPercent: 100 } as Circuit,
   ];
 
   it('inserts before a circuit and counts what moves up, only inside that circuit\'s panel', () => {

@@ -40,8 +40,8 @@ export interface Circuit {
     /** Never inherited — always a per-circuit typed measurement (templates plan §1, §7 round 4): two circuits off the same panel practically always run different physical lengths. */
     lengthM?: number;
   };
-  /** undefined = inherits the panel's circuitDefaults.diversityPercent, or 100 if unassigned/no default. Replaces the old app's unpersisted LoadFactor (plan §4). See getEffectiveDiversityPercent. */
-  diversityPercent?: number;
+  /** undefined = inherits the panel's circuitDefaults.concurrencyPercent, or 100 if unassigned/no default. Replaces the old app's unpersisted LoadFactor (plan §4). See getEffectiveConcurrencyPercent. */
+  concurrencyPercent?: number;
   /** Arbitrary user-added annotations (plan §12 open question 7, resolved: reuse custom-properties.ts scoped to circuits rather than a dedicated field set). Definition/reserved-name scoping for circuits is Phase C/D's job — see custom-properties.ts. */
   properties?: CustomPropertyValues;
 }
@@ -59,7 +59,7 @@ export interface PanelCircuitDefaults {
   phase?: Circuit['phase'];
   device?: Circuit['device'];
   cable?: { type?: string; coreCount?: number; crossSectionMm2?: number };
-  diversityPercent?: number;
+  concurrencyPercent?: number;
 }
 
 export interface PanelAccessory {
@@ -367,8 +367,8 @@ export function getEffectiveDevice(circuit: Circuit, panel?: Panel): Circuit['de
   return circuit.device ?? panel?.circuitDefaults?.device;
 }
 
-export function getEffectiveDiversityPercent(circuit: Circuit, panel?: Panel): number {
-  return circuit.diversityPercent ?? panel?.circuitDefaults?.diversityPercent ?? 100;
+export function getEffectiveConcurrencyPercent(circuit: Circuit, panel?: Panel): number {
+  return circuit.concurrencyPercent ?? panel?.circuitDefaults?.concurrencyPercent ?? 100;
 }
 
 /** Unlike getEffectiveDevice, cable fields are resolved individually — `type`/`coreCount`/`crossSectionMm2` each inherit on their own, and `lengthM` never inherits (see Circuit.cable.lengthM's doc comment). */

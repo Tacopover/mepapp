@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { SketchScene, StampInfo } from '@mepapp/render';
-import { coerceDefaultValue, getEffectiveDiversityPercent, getEffectivePrefix, getStampDefinition, type Circuit, type CustomPropertyDefinition, type CircuitType, type Panel, type PanelSection, type StampDefinition } from '@mepapp/core';
+import { coerceDefaultValue, getEffectiveConcurrencyPercent, getEffectivePrefix, getStampDefinition, type Circuit, type CustomPropertyDefinition, type CircuitType, type Panel, type PanelSection, type StampDefinition } from '@mepapp/core';
 import { IconTrash } from '../icons.js';
 
 const PHASES: NonNullable<Circuit['phase']>[] = ['L1', 'L2', 'L3', 'L1L2', 'L2L3', 'L1L3', 'L1L2L3'];
@@ -46,7 +46,7 @@ export interface CircuitPropertiesProps {
  * The Electrical Circuits tree's properties view for one selected circuit
  * (electrical-circuits-model.md §9). `prefix`/`circuitTypeId`/`phase`/
  * `device`/`cable.type`/`cable.coreCount`/`cable.crossSectionMm2`/
- * `diversityPercent` are all defaultable at the panel level (Phase C
+ * `concurrencyPercent` are all defaultable at the panel level (Phase C
  * addendum) — each renders as either inherited (dashed/italic, panel
  * default shown as placeholder) or overridden (solid, with a ↺ reset
  * link), matching the Phase 0 mockup's round-4 decision.
@@ -148,9 +148,9 @@ export function CircuitProperties({ sceneRef, circuit, panel, panels, panelSecti
         />
         <InheritableNumberField
           label="Concurrency %"
-          value={circuit.diversityPercent}
-          defaultValue={getEffectiveDiversityPercent(circuit, panel)}
-          onChange={(v) => sceneRef.current?.setCircuitDiversity(circuit.id, v)}
+          value={circuit.concurrencyPercent}
+          defaultValue={getEffectiveConcurrencyPercent(circuit, panel)}
+          onChange={(v) => sceneRef.current?.setCircuitConcurrency(circuit.id, v)}
         />
       </div>
 
@@ -420,8 +420,8 @@ export function PanelProperties({ sceneRef, panel, circuits, panelSections, circ
           <label>Concurrency %</label>
           <input
             type="number"
-            value={defaults.diversityPercent ?? ''}
-            onChange={(e) => setDefaults({ diversityPercent: Number(e.target.value) || undefined })}
+            value={defaults.concurrencyPercent ?? ''}
+            onChange={(e) => setDefaults({ concurrencyPercent: Number(e.target.value) || undefined })}
           />
         </div>
         <div className="mep-field-row">

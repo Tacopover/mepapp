@@ -15,7 +15,7 @@ function block(id: string, type: SchematicBlockType, x: number, y: number, extra
 const TOTALS_ROWS: TotalsTableRow[] = [
   { label: 'Circuits', formula: 'count(circuit)' },
   { label: 'Total VA', formula: 'sum(circuit.capacity)' },
-  { label: 'Diversified VA', formula: 'sum(circuit.diversifiedCapacity)' },
+  { label: 'Concurrent VA', formula: 'sum(circuit.concurrentCapacity)' },
   { label: 'L1 VA', formula: 'sum(circuit.capacityL1)' },
   { label: 'L2 VA', formula: 'sum(circuit.capacityL2)' },
   { label: 'L3 VA', formula: 'sum(circuit.capacityL3)' },
@@ -84,7 +84,7 @@ const COLUMNS_TEMPLATE: SchematicTemplate = (() => {
     turned('desc', 'description', 1, 66, 40, 8),
     block('num', 'circuitNumber', 1, 108, { width: 12 }),
     block('count', 'countCell', 1, 116, { width: 12, binding: '{count(terminals)}' }),
-    block('derived', 'derivedCell', 1, 124, { width: 12, binding: '{circuit.diversifiedCapacity}' }),
+    block('derived', 'derivedCell', 1, 124, { width: 12, binding: '{circuit.concurrentCapacity}' }),
   ];
   const groups: CircuitGroupDefinition[] = [
     { id: 'spare', name: 'Spare', rule: { kind: 'spare' }, direction: 'row', pitch: 14, blocks: [standardBlocks[0], standardBlocks[4]] },
