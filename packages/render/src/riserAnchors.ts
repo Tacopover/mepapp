@@ -1,7 +1,19 @@
-import type { Segment, Vec2 } from '@mepapp/core';
+import type { LinePattern, RiserArrowPair, Segment, Vec2 } from '@mepapp/core';
 
 /** One free riser anchor on the shown page. The UI builds it. */
-export interface RiserAnchor { riserId: string; label: string; networkTypeId: string; networkTypeName: string; anchorPt: Vec2 }
+export interface RiserAnchor {
+  riserId: string;
+  label: string;
+  networkTypeId: string;
+  networkTypeName: string;
+  anchorPt: Vec2;
+  /** The arrows drawn at the ring. Absent: no arrows (the ring is drawn alone). */
+  arrows?: RiserArrowPair;
+  /** Hex color of the network type of the riser, as NetworkType.color ('#2196f3'). The arrows draw only when this is set. */
+  arrowColor?: string;
+  /** Line pattern of the network type of the riser. Absent: solid. */
+  arrowPattern?: LinePattern;
+}
 
 export type AnchorEndDecision =
   | { kind: 'join'; anchor: RiserAnchor }

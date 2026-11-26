@@ -107,6 +107,7 @@ import {
   type PortSpec,
   type ProjectDocument,
   type ReconciliationReport,
+  type RiserArrowPair,
   type Segment,
   type GlobalPropertyDefs,
   type StampCategory,
@@ -167,6 +168,7 @@ import { applyNetworkTypePatch, type NetworkTypePatch } from './networkTypePatch
 import { flowArrowEnds } from './flowArrow.js';
 import { sameKeys, solvedNoSourceOf, type SolvedNoSource } from './flowReadModel.js';
 import { anchorAtPoint, visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
+import { riserArrowShapes, riserArrowShaftPattern, RISER_ARROW_STYLE } from './riserArrowShapes.js';
 import { createFittingCommand } from './drawingCommands.js';
 import {
   addPanelAccessoryCommand,
@@ -6052,6 +6054,21 @@ export class SketchScene {
     };
   }
 
+  /** Draws the riser arrows of one ring on the overlay: the shaft with the line pattern, then a solid head. The arrows are in world pt, so they scale with the zoom. Nothing is drawn without a pair or without a color, or for the pair (none, none). */
+  private drawRiserArrows(arrows: RiserArrowPair | undefined, colorHex: string | undefined, linePattern: LinePattern | undefined, center: Vec2, ringRadius: number): void {
+    if (!arrows || !colorHex) return;
+    const shapes = riserArrowShapes(arrows, center, ringRadius);
+    if (shapes.length === 0) return;
+    const color = hexColorToPixi(colorHex);
+    const dash = riserArrowShaftPattern(linePattern && linePattern !== 'solid' ? DASH_PATTERN_WORLD[linePattern] : null);
+    for (const shape of shapes) {
+      if (dash) this.strokeDashedPolyline([shape.shaftTail, shape.shaftEnd], RISER_ARROW_STYLE.shaftWidthPt, color, dash, this.overlay);
+      else this.overlay.moveTo(shape.shaftTail.x, shape.shaftTail.y).lineTo(shape.shaftEnd.x, shape.shaftEnd.y).stroke({ width: RISER_ARROW_STYLE.shaftWidthPt, color });
+      const { tip, baseA, baseB } = shape.head;
+      this.overlay.moveTo(tip.x, tip.y).lineTo(baseA.x, baseA.y).lineTo(baseB.x, baseB.y).closePath().fill({ color });
+    }
+  }
+
   /** Draws a dashed/dotted polyline as a series of short stroke() calls (moveTo/lineTo per "on" entry) — see DASH_PATTERN_WORLD's doc comment for why this is manual. `pattern` cycles [dash, gap, dash, gap, ...]; even indices draw, odd indices skip. */
   private strokeDashedPolyline(points: Vec2[], width: number, color: number, pattern: number[], target: Graphics = this.doc.drawingLayer): void {
     for (let i = 0; i < points.length - 1; i++) {
@@ -6272,9 +6289,12 @@ export class SketchScene {
     for (const fittingId of this.riserMarks.keys()) {
       const fitting = state.fittings[fittingId];
       if (!fitting || (fitting.pageIndex ?? 0) !== this.doc.pageIndex) continue;
+      const mark = this.riserMarks.get(fittingId);
+      const ringRadius = FITTING_MARKER_RADIUS_WORLD + 3 / this.world.scale.x;
       this.overlay
-        .circle(fitting.position.x, fitting.position.y, FITTING_MARKER_RADIUS_WORLD + 3 / this.world.scale.x)
-        .stroke({ width: 2.5 / this.world.scale.x, color: this.riserMarks.get(fittingId)?.undecided ? RISER_UNDECIDED_COLOR : RISER_MARK_COLOR });
+        .circle(fitting.position.x, fitting.position.y, ringRadius)
+        .stroke({ width: 2.5 / this.world.scale.x, color: mark?.undecided ? RISER_UNDECIDED_COLOR : RISER_MARK_COLOR });
+      this.drawRiserArrows(mark?.arrows, mark?.arrowColor, mark?.arrowPattern, fitting.position, ringRadius);
     }
     const visibleAnchors = this.getVisibleRiserAnchors();
     for (const anchor of visibleAnchors) {
@@ -6290,6 +6310,7 @@ export class SketchScene {
           .arc(anchor.anchorPt.x, anchor.anchorPt.y, radius, start, end);
       }
       this.overlay.stroke({ width: (selected ? 4.5 : 2.5) / this.world.scale.x, color });
+      this.drawRiserArrows(anchor.arrows, anchor.arrowColor, anchor.arrowPattern, anchor.anchorPt, radius);
     }
     const refusal = this.riserAnchorRefusal;
     const refusedAnchor = refusal ? visibleAnchors.find((anchor) => anchor.riserId === refusal.riserId) : undefined;

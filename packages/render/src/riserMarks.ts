@@ -1,4 +1,4 @@
-import { clearRoutedMarks, recomputeAttachedSegments, segmentIdsOfNetworks, type PortGroup, type Segment, type Vec2 } from '@mepapp/core';
+import { clearRoutedMarks, recomputeAttachedSegments, segmentIdsOfNetworks, type LinePattern, type PortGroup, type RiserArrowPair, type Segment, type Vec2 } from '@mepapp/core';
 import type { DrawingState } from './document.js';
 
 /** One marked fitting. The UI builds it from the building file; anchorPt is the riser anchor in pt on the shown page. */
@@ -9,6 +9,12 @@ export interface RiserMark {
   anchorPt: Vec2;
   /** true: the user chose "Decide later" for a conflict of this fitting. The ring is drawn amber. */
   undecided?: boolean;
+  /** The arrows drawn at the ring. Absent: no arrows (the ring is drawn alone). */
+  arrows?: RiserArrowPair;
+  /** Hex color of the network type of the riser, as NetworkType.color ('#2196f3'). The arrows draw only when this is set. */
+  arrowColor?: string;
+  /** Line pattern of the network type of the riser. Absent: solid. */
+  arrowPattern?: LinePattern;
 }
 
 export interface RiserConflict { fittingId: string; fittingPt: Vec2; anchorPt: Vec2 }
