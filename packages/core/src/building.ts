@@ -390,7 +390,7 @@ export function riserWarnings(file: BuildingFile): string[] {
       const lowerArrows = lower.member.arrows;
       const upperArrows = upper.member.arrows;
       if (lowerArrows && upperArrows && lowerArrows.above !== upperArrows.below) {
-        warnings.push(`Arrows disagree on the span ${lower.level.name} to ${upper.level.name}`);
+        warnings.push(`Arrows of ${riser.name} disagree on the span ${lower.level.name} to ${upper.level.name}. Change the arrows on one of the two levels.`);
       }
     }
     for (const member of riser.members) {

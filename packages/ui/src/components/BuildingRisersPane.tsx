@@ -18,6 +18,7 @@ import {
 import type { FileAccess } from '@mepapp/platform';
 import { readSummaries } from '../quantitiesScope.js';
 import { deleteRiserAction, detachAction, type RiserActionResult } from '../riserActions.js';
+import { ARROWS_TAG } from '../riserArrowPicker.js';
 import { layoutLevels, layoutRisers, typeFilters } from '../riserDiagram.js';
 import {
   derivedFlowOf,
@@ -775,7 +776,10 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
                   className={`mep-rp-row${detailsOpen ? ' mep-rp-row--details' : ''}`}
                   data-testid="riser-row"
                 >
-                  <span className="mep-rp-level">{row.levelName}</span>
+                  <span className="mep-rp-level">
+                    {row.levelName}
+                    {row.arrowsByHand && <span className="mep-rp-tag mep-rp-level-tag" data-testid="riser-row-arrows-tag">{ARROWS_TAG}</span>}
+                  </span>
                   <span className={`mep-rp-status mep-rp-status--${STATUS_TONE[row.status]}`}>{row.statusText}</span>
                   {detailsOpen && (
                     <span className="mep-rp-height">

@@ -1,8 +1,17 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FittingInfo, SegmentInfo } from '@mepapp/render';
+import type { RingArrowsView } from '../riserArrowPicker.js';
 import { formatSolvedCapacity, PropertiesPanel, type PropertiesPanelProps } from './PropertiesPanel.js';
+
+// The geometry itself is tested in packages/render (riserArrowShapes.test.ts); this stub avoids loading PixiJS in node.
+vi.mock('@mepapp/render', () => ({
+  riserArrowShapes: (pair?: { below: string; above: string }, ..._rest: unknown[]) =>
+    (['below', 'above'] as const)
+      .filter((side) => pair !== undefined && pair[side] !== 'none')
+      .map((side) => ({ side, shaftTail: { x: 1, y: 1 }, shaftEnd: { x: 2, y: 2 }, head: { tip: { x: 3, y: 3 }, baseA: { x: 4, y: 4 }, baseB: { x: 5, y: 5 } } })),
+}));
 
 describe('formatSolvedCapacity', () => {
   it('gives the plain number without atMost', () => {
@@ -146,5 +155,50 @@ describe('PropertiesPanel at most', () => {
       selectedSegments: [segment({ id: 's1', networkTypeId: 'supply-air' }), segment({ id: 's2', networkTypeId: 'domestic-cold-water' })],
     });
     expect(hintOf(html, 'props-at-most-hint')).toMatch(/Place source equipment to set the source\.$/);
+  });
+});
+
+function riserArrows(overrides: Partial<RingArrowsView> = {}) {
+  const view: RingArrowsView = {
+    riserId: 'r1',
+    riserName: 'R1',
+    levelId: 'l1',
+    pair: { below: 'none', above: 'up' },
+    pictogram: 2,
+    handSet: false,
+    ...overrides,
+  };
+  return { view, onChoose: () => {}, onUseSolve: () => {} };
+}
+
+describe('PropertiesPanel riser arrows', () => {
+  it('shows the flow solve arrows, the picker and the hint', () => {
+    const html = render({ selectedFitting: fitting(), riserArrows: riserArrows() });
+    expect(hintOf(html, 'props-riser-arrows')).toBe('From the flow solve');
+    expect(html).toContain('data-testid="riser-arrow-picker"');
+    expect(hintOf(html, 'props-riser-arrows-hint')).toBe('Up and down mean higher and lower levels.');
+  });
+
+  it('shows Set by hand when the arrows were set by hand', () => {
+    const html = render({ selectedFitting: fitting(), riserArrows: riserArrows({ handSet: true }) });
+    expect(hintOf(html, 'props-riser-arrows')).toBe('Set by hand');
+  });
+
+  it('shows None yet when there is no pictogram', () => {
+    const html = render({ selectedFitting: fitting(), riserArrows: riserArrows({ pair: { below: 'none', above: 'none' }, pictogram: null }) });
+    expect(hintOf(html, 'props-riser-arrows')).toBe('None yet');
+  });
+
+  it('shows the arrows in a section named for the riser when there is no riser block', () => {
+    const html = render({ selectedFitting: fitting(), riserArrows: riserArrows() });
+    expect(html).toContain('data-testid="props-riser-arrows-section"');
+    expect(html).toContain('<h4>Riser R1</h4>');
+    expect(html).not.toContain('props-riser-section');
+  });
+
+  it('shows no arrows row and no picker without riserArrows', () => {
+    const html = render({ selectedFitting: fitting() });
+    expect(html).not.toContain('<label>Arrows</label>');
+    expect(html).not.toContain('data-testid="riser-arrow-picker"');
   });
 });

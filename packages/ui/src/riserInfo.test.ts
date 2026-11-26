@@ -120,6 +120,22 @@ describe('riserRows', () => {
     expect(row.sheet?.id).toBe('s1');
     expect(row.connectionHeightMm).toBe(900);
   });
+
+  it('marks the row of a member with hand-set arrows as arrowsByHand', () => {
+    const file = fileWith([makeRiser('1', [member(0), member(1, { arrows: { below: 'none', above: 'up' } }), member(2)])]);
+    const rows = riserRows(file, file.risers[0], new Set());
+    expect(rows.map((row) => [row.levelName, row.arrowsByHand])).toEqual([
+      ['Level 2', false],
+      ['Level 1', true],
+      ['Basement', false],
+    ]);
+  });
+
+  it('gives arrowsByHand false for a row of a member on an unknown level', () => {
+    const file = fileWith([makeRiser('1', [member(0), { levelId: 'lX', sheetId: 's9', pageIndex: 0, fittingId: 'g' }])]);
+    const rows = riserRows(file, file.risers[0], new Set());
+    expect(rows.map((row) => row.arrowsByHand)).toEqual([false, false]);
+  });
 });
 
 describe('riserLineText', () => {

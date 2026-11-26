@@ -170,4 +170,49 @@ describe('riser arrow shapes', () => {
     expect(riserArrowShaftPattern([8, 5], 25)).toBeNull();
     expect(riserArrowShaftPattern([8, 5], 26)).toEqual([8, 5]);
   });
+
+  it('uses the default style when no style is given', () => {
+    const pictograms = [1, 2, 3, 4, 5, 6, 7, 8].map((number) => RISER_ARROW_PICTOGRAMS.find((p) => p.number === number));
+    const pairs: (RiserArrowPair | undefined)[] = [...pictograms, { below: 'none', above: 'none' }];
+    for (const pair of pairs) {
+      expect(riserArrowShapes(pair, ORIGIN, 10)).toEqual(riserArrowShapes(pair, ORIGIN, 10, RISER_ARROW_STYLE));
+    }
+  });
+
+  it('takes a smaller picture style with the same angle', () => {
+    const style = { lengthPt: 13, shaftWidthPt: 1.5, headLengthPt: 5, headWidthPt: 4, angleDeg: 60 };
+    const center: Vec2 = { x: 18, y: 18 };
+    const [above] = riserArrowShapes({ below: 'none', above: 'up' }, center, 4.5, style);
+    expect(dist(above.ringPoint, center)).toBeCloseTo(4.5, 9);
+    expect(dist(above.farPoint, center)).toBeCloseTo(17.5, 9);
+    expect(above.headAtRing).toBe(false);
+    expectPoint(above.head.tip, above.farPoint);
+  });
+
+  it('keeps the pictogram 1 arrows inside a 36 px picture with the smaller style', () => {
+    const style = { lengthPt: 13, shaftWidthPt: 1.5, headLengthPt: 5, headWidthPt: 4, angleDeg: 60 };
+    const shapes = riserArrowShapes({ below: 'up', above: 'up' }, { x: 18, y: 18 }, 4.5, style);
+    expect(shapes.length).toBe(2);
+    const below = shapes.find((s) => s.side === 'below');
+    const above = shapes.find((s) => s.side === 'above');
+    expect(below?.headAtRing).toBe(true);
+    expect(above?.headAtRing).toBe(false);
+    for (const shape of shapes) {
+      const points = [shape.ringPoint, shape.farPoint, shape.shaftTail, shape.shaftEnd, shape.head.tip, shape.head.baseA, shape.head.baseB];
+      for (const p of points) {
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThanOrEqual(36);
+        expect(p.y).toBeGreaterThanOrEqual(0);
+        expect(p.y).toBeLessThanOrEqual(36);
+      }
+    }
+  });
+
+  it('turns the above arrow straight up at 90 degrees', () => {
+    const style = { lengthPt: 13, shaftWidthPt: 1.5, headLengthPt: 5, headWidthPt: 4, angleDeg: 90 };
+    const center: Vec2 = { x: 18, y: 18 };
+    const [above] = riserArrowShapes({ below: 'none', above: 'up' }, center, 4.5, style);
+    expect(above.farPoint.x).toBeCloseTo(center.x, 9);
+    expect(above.farPoint.y).toBeLessThan(center.y);
+  });
 });

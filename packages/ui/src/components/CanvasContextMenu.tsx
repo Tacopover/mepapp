@@ -1,13 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { SketchScene } from '@mepapp/render';
 import type { CanvasContextMenuRequest } from '../useSketchScene.js';
+import type { RiserArrowPair } from '@mepapp/core';
 import type { RiserMenuState } from '../useBuildingRisers.js';
+import { RISER_ARROWS_LABEL } from '../riserArrowPicker.js';
+import { RiserArrowPicker } from './RiserArrowPicker.js';
 
 export interface CanvasContextMenuProps {
   request: CanvasContextMenuRequest;
   sceneRef: RefObject<SketchScene | null>;
   onDismiss: () => void;
-  riser?: { state: RiserMenuState; onMake(fittingId: string): void; onDrawFromRing(riserId: string): void; onDetach(riserId: string): void; onDelete(riserId: string): void };
+  riser?: { state: RiserMenuState; onMake(fittingId: string): void; onDrawFromRing(riserId: string): void; onDetach(riserId: string): void; onDelete(riserId: string): void; onArrows(riserId: string, levelId: string, pair: RiserArrowPair | null): void };
 }
 
 /**
@@ -22,6 +25,7 @@ export function CanvasContextMenu({ request, sceneRef, onDismiss, riser }: Canva
   const rootRef = useRef<HTMLDivElement | null>(null);
   const { drawFrom, insertFitting, removeFittingId, riserAnchor } = request.target;
   const riserModel = riser?.state.model ?? null;
+  const arrows = riser?.state.arrows ?? null;
   const hasEntryAbove = Boolean(drawFrom || insertFitting || removeFittingId || riserAnchor);
   const [offset, setOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const { x: posX, y: posY } = request.screenPosition;
@@ -36,12 +40,17 @@ export function CanvasContextMenu({ request, sceneRef, onDismiss, riser }: Canva
     const rect = root.getBoundingClientRect();
     const baseLeft = rect.left - offset.dx;
     const baseTop = rect.top - offset.dy;
-    let dx = Math.min(0, window.innerWidth - 8 - (rect.right - offset.dx));
-    let dy = Math.min(0, window.innerHeight - 8 - (rect.bottom - offset.dy));
-    if (baseLeft + dx < 8) dx = 8 - baseLeft;
-    if (baseTop + dy < 8) dy = 8 - baseTop;
+    const parent = root.offsetParent instanceof HTMLElement ? root.offsetParent.getBoundingClientRect() : null;
+    const limitLeft = Math.max(0, parent?.left ?? 0) + 8;
+    const limitTop = Math.max(0, parent?.top ?? 0) + 8;
+    const limitRight = Math.min(window.innerWidth, parent?.right ?? window.innerWidth) - 8;
+    const limitBottom = Math.min(window.innerHeight, parent?.bottom ?? window.innerHeight) - 8;
+    let dx = Math.min(0, limitRight - (rect.right - offset.dx));
+    let dy = Math.min(0, limitBottom - (rect.bottom - offset.dy));
+    if (baseLeft + dx < limitLeft) dx = limitLeft - baseLeft;
+    if (baseTop + dy < limitTop) dy = limitTop - baseTop;
     setOffset((prev) => (prev.dx === dx && prev.dy === dy ? prev : { dx, dy }));
-  }, [posX, posY, riserModel]);
+  }, [posX, posY, riserModel, riser?.state.arrows ?? null]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
@@ -104,6 +113,25 @@ export function CanvasContextMenu({ request, sceneRef, onDismiss, riser }: Canva
       {riser && riserModel && (riserModel.makeRiser || riserModel.detach || riserModel.deleteRiser) && (
         <>
           {hasEntryAbove && <div className="mep-draw-from-menu-sep" role="separator" />}
+          {arrows !== null && (
+            <>
+              <div className="mep-draw-from-menu-heading">{RISER_ARROWS_LABEL}</div>
+              <RiserArrowPicker
+                variant="menu"
+                pair={arrows.pair}
+                handSet={arrows.handSet}
+                onChoose={(pair) => {
+                  riser.onArrows(arrows.riserId, arrows.levelId, pair);
+                  onDismiss();
+                }}
+                onUseSolve={() => {
+                  riser.onArrows(arrows.riserId, arrows.levelId, null);
+                  onDismiss();
+                }}
+              />
+              <div className="mep-draw-from-menu-sep" role="separator" />
+            </>
+          )}
           {riserModel.makeRiser && riserModel.makeRiser.disabledHint === null && (
             <button
               type="button"

@@ -20,6 +20,7 @@ import {
   type BuildingFile,
   type BuildingSheet,
   type Discipline,
+  type RiserArrowPair,
   type RoomNeed,
   type RoomType,
   type PlacementRule,
@@ -2037,6 +2038,12 @@ export function MepSketchApp({
     return fittingRiserLinesOf(capacityViewOf(file, riser, riserFlow.flow), riser.name);
   }, [buildingHook.building?.file, riserFlow, selectedFitting]);
 
+  const riserArrows = useMemo(() => {
+    const view = selectedFitting ? risers.ringArrowsOf(selectedFitting.id) : null;
+    if (view === null) return null;
+    return { view, onChoose: (pair: RiserArrowPair) => risers.setArrows(view.riserId, view.levelId, pair), onUseSolve: () => risers.setArrows(view.riserId, view.levelId, null) };
+  }, [buildingHook.building?.file, riserFlow, selectedFitting, pageIndex, activeDocumentId]);
+
   const segmentRiserHintLine = useMemo(() => {
     const file = buildingHook.building?.file;
     const scene = sceneRef.current;
@@ -2151,6 +2158,7 @@ export function MepSketchApp({
         selectedSegments={selectedSegments}
         selectedFitting={selectedFitting}
         riserLines={riserLines}
+        riserArrows={riserArrows}
         segmentRiserHint={segmentRiserHintLine}
         fittingNetworkTypeId={fittingNetworkTypeId}
         networkTypes={networkTypes}
@@ -2346,7 +2354,7 @@ export function MepSketchApp({
                   request={canvasContextMenuRequest}
                   sceneRef={sceneRef}
                   onDismiss={() => setCanvasContextMenuRequest(null)}
-                  riser={riserMenuState ? { state: riserMenuState, onMake: risers.makeRiser, onDrawFromRing: risers.drawFromRing, onDetach: risers.detach, onDelete: risers.askDelete } : undefined}
+                  riser={riserMenuState ? { state: riserMenuState, onMake: risers.makeRiser, onDrawFromRing: risers.drawFromRing, onDetach: risers.detach, onDelete: risers.askDelete, onArrows: risers.setArrows } : undefined}
                 />
               )}
             </>

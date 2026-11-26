@@ -14,6 +14,8 @@ export interface RiserLevelRow {
   /** '✓ OK' | '◔ Waiting' | '⚠ Not at position' | 'Level is gone' */
   statusText: string;
   connectionHeightMm: number | undefined;
+  /** true when the member has a hand-set arrows pair (member.arrows !== undefined). */
+  arrowsByHand: boolean;
 }
 
 const STATUS_TEXT: Record<RowStatus, string> = {
@@ -52,6 +54,7 @@ export function riserRows(file: BuildingFile, riser: Riser, conflictKeys: Readon
       status,
       statusText: STATUS_TEXT[status],
       connectionHeightMm: member.connectionHeightMm,
+      arrowsByHand: member.arrows !== undefined,
     };
   });
 }

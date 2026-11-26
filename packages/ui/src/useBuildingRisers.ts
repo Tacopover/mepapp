@@ -12,12 +12,14 @@ import {
   type BuildingSheet,
   type Calibration,
   type NetworkType,
+  type RiserArrowPair,
   type SheetSummary,
   type Vec2,
 } from '@mepapp/core';
 import type { CanvasContextMenuTarget, DocumentSummary, RiserMark, SceneNotice, SketchScene } from '@mepapp/render';
 import type { OpenBuilding } from './buildingController.js';
 import { rememberFlow, withRiserArrows, type RememberedFlow } from './riserArrowMarks.js';
+import { editRingArrows, ringArrowsViewOf, type RingArrowsView } from './riserArrowPicker.js';
 import { readSummaries } from './quantitiesScope.js';
 import {
   dropPendingOps,
@@ -73,6 +75,8 @@ export interface RiserMenuState {
   model: RiserMenuModel;
   fittingId: string | null;
   riserId: string | null;
+  /** The arrows of the marked ring that was clicked. null for a dashed ring, a fitting that is not a ring, or no building. */
+  arrows: RingArrowsView | null;
 }
 
 interface Outcome {
@@ -485,6 +489,19 @@ export function useBuildingRisers(args: {
     enqueuePending(documentId);
   };
 
+  const ringArrowsOf = (fittingId: string): RingArrowsView | null => ringArrowsViewOf(file, sheet?.id ?? null, fittingId, shownFlow);
+
+  /** pair null = "Use the flow solve". Not undoable. A new "Arrows of ... disagree" line shows as a warning toast. */
+  const setArrows = (riserId: string, levelId: string, pair: RiserArrowPair | null): void => {
+    guard(() =>
+      commit((current): Outcome => {
+        const edit = editRingArrows(current, riserId, levelId, pair);
+        if (!edit.ok) return { file: current, notice: { kind: 'warning', message: edit.text } };
+        return { file: edit.file, notice: edit.warning === null ? null : { kind: 'warning', message: edit.warning } };
+      }),
+    );
+  };
+
   const menuStateFor = (target: CanvasContextMenuTarget): RiserMenuState => {
     const scene = sceneRef.current;
     const fittingId = target.drawFrom?.point.kind === 'fitting' ? target.drawFrom.point.fittingId : null;
@@ -497,7 +514,7 @@ export function useBuildingRisers(args: {
         ? makeRiserScaleHint(file, { sheet, thisPageUnitsPerRealUnit: thisScale, networkTypeIds: fittingContext.networkTypeIds, scaleOf: scaleOfWith(file, summariesCache.current) })
         : null;
     const model = riserMenuModel({ file, sheet, hasScale: hasScaleOf(page), fittingContext, markedRiserId: riserId, scaleHint });
-    return { model, fittingId, riserId };
+    return { model, fittingId, riserId, arrows: fittingId !== null && riserId !== null ? ringArrowsOf(fittingId) : null };
   };
 
   const makeRiser = (fittingId: string): void => {
@@ -917,5 +934,7 @@ export function useBuildingRisers(args: {
     setScaleOnAll,
     disconnectForScale,
     syncTypeCopy,
+    ringArrowsOf,
+    setArrows,
   };
 }

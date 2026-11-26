@@ -1,0 +1,31 @@
+// B8-T06 journey tester: G5, how does the user get to the rows of the second riser? Args: <width>.
+import { open } from '/root/MepApp/.claude/worktrees/buildings-b8/.claude/roadmap/browser/lib.mjs';
+import { setup, buildingJson, loadBuilding } from '/root/MepApp/.claude/worktrees/buildings-b8/.claude/roadmap/work/b8-t05-lib.mjs';
+
+const width = Number(process.argv[2] ?? 1100);
+const t = await open({ width, height: width < 900 ? 800 : 900, seed: { 'mepapp.realStore': '1' } });
+const { page, idle, shot, menu } = t;
+await t.start();
+const { uuids, anchors } = await setup(t, { withReturn: true, sources1: [0], sources2: [], extra: [] });
+const file = JSON.parse(buildingJson(uuids, anchors, { withReturn: true }));
+file.risers[0].members[1].arrows = { below: 'up', above: 'up' };
+file.risers[1].members[0].arrows = { below: 'none', above: 'up' };
+await loadBuilding(t, JSON.stringify(file));
+const dlg = page.locator('.mep-modal');
+await menu('Manage Buildings…');
+await dlg.waitFor({ state: 'visible' });
+await idle(600);
+await dlg.getByRole('tab', { name: /^Risers/ }).click();
+await idle(800);
+const tags = async () => dlg.locator('text=Arrows set by hand').count();
+console.log('tags at first sight:', await tags());
+const r1 = dlg.getByText('R1', { exact: true });
+console.log('elements with the text R1:', await r1.count());
+for (let i = 0; i < (await r1.count()); i++) console.log('  R1 candidate', i, await r1.nth(i).evaluate((e) => `${e.tagName} class=${e.getAttribute('class')} role=${e.getAttribute('role')}`));
+await r1.nth(1).click().catch((e) => console.log('click failed', String(e).slice(0, 100)));
+await idle(700);
+console.log('tags after clicking R1 (first candidate):', await tags());
+await shot(`B8-T06-journey-g5-after-R1-${width}`);
+const riserName = await dlg.locator('[data-testid="riser-row"]').first().evaluate((e) => e.closest('section, div')?.parentElement?.innerText?.slice(0, 80)).catch(() => '');
+console.log('detail heading text:', JSON.stringify(riserName));
+await t.finish();

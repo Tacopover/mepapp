@@ -9,6 +9,7 @@ import {
   type CircuitType,
   type Calibration,
   type CustomPropertyDefinition,
+  type RiserArrowPair,
   type Room,
   type RoomType,
   type FittingKind,
@@ -21,12 +22,14 @@ import {
 import { IconRotate } from '../icons.js';
 import { setStampAppearanceDefault } from '../stampAppearanceDefaults.js';
 import type { FittingRiserLines } from '../riserCapacity.js';
+import { ARROWS_HINT, ARROWS_ROW_LABEL, arrowsValueText, type RingArrowsView } from '../riserArrowPicker.js';
 import { commonNoSourceState, commonSourceWord, noSourceHintOf, sourceWordOf, type NoSourceState } from '../sourceWord.js';
 import { RoomProperties } from './RoomProperties.js';
 import { CircuitProperties, PanelProperties } from './CircuitPanelProperties.js';
 import { capacityLabel } from './capacityLabel.js';
 import { ColorPicker } from './ColorPicker.js';
 import { NumberDraftInput } from './NumberDraftInput.js';
+import { RiserArrowPicker } from './RiserArrowPicker.js';
 import { RoutingSection, samePorts } from './RoutingSection.js';
 import { stampLabelFor } from './StampsPanel.js';
 import { TerminalCircuitSection } from './TerminalCircuitSection.js';
@@ -86,6 +89,8 @@ export interface PropertiesPanelProps {
   selectedFitting: FittingInfo | null;
   /** The riser block of the lone selected fitting (riserCapacity.ts fittingRiserLinesOf). null or absent: no block. */
   riserLines?: FittingRiserLines | null;
+  /** The arrows of the ring of the lone selected fitting (riserArrowPicker.ts RingArrowsView, from useBuildingRisers ringArrowsOf). null or absent: no arrows block. */
+  riserArrows?: { view: RingArrowsView; onChoose(pair: RiserArrowPair): void; onUseSolve(): void } | null;
   /** One hint line for the lone selected segment whose network holds a riser fitting (riserSegmentHint.ts). null or absent: no line. */
   segmentRiserHint?: string | null;
   /** The network type id of the lone selected fitting's network. Sets the source word of its no-source hint. null or absent: the neutral word. */
@@ -132,6 +137,7 @@ export function PropertiesPanel({
   selectedSegments,
   selectedFitting,
   riserLines = null,
+  riserArrows = null,
   segmentRiserHint = null,
   fittingNetworkTypeId = null,
   networkTypes,
@@ -312,6 +318,16 @@ export function PropertiesPanel({
       </div>
     );
   }
+  const riserArrowsBlock = riserArrows ? (
+    <>
+      <div className="mep-field-row mep-field-row--text">
+        <label>{ARROWS_ROW_LABEL}</label>
+        <span className="mep-field-text" data-testid="props-riser-arrows">{arrowsValueText(riserArrows.view)}</span>
+      </div>
+      <RiserArrowPicker variant="panel" pair={riserArrows.view.pair} handSet={riserArrows.view.handSet} onChoose={riserArrows.onChoose} onUseSolve={riserArrows.onUseSolve} />
+      <p className="mep-hint" data-testid="props-riser-arrows-hint">{ARROWS_HINT}</p>
+    </>
+  ) : null;
   if (selection.length === 0 && selectedFitting) {
     const noSource = selectedFitting.solvedNoSource;
     const atMost = noSource === 'highest' && selectedFitting.solvedCapacity !== null;
@@ -362,7 +378,14 @@ export function PropertiesPanel({
                 <span className="mep-field-text" title={row.title} data-testid={index === 0 ? 'props-riser-main' : 'props-riser-total'}>{row.value}</span>
               </div>
             ))}
+            {riserArrowsBlock}
             {riserLines.hints.map((hint) => (<p className="mep-hint" data-testid="props-riser-hint" key={hint}>{hint}</p>))}
+          </div>
+        )}
+        {!riserLines && riserArrows && (
+          <div className="mep-section" data-testid="props-riser-arrows-section">
+            <h4>{`Riser ${riserArrows.view.riserName}`}</h4>
+            {riserArrowsBlock}
           </div>
         )}
       </div>

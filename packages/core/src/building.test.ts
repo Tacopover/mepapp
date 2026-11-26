@@ -388,14 +388,27 @@ describe('building file', () => {
     const file = riserFile(
       riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'none' } }] }),
     );
-    expect(riserWarnings(file)).toEqual(['Arrows disagree on the span Basement to Ground']);
+    expect(riserWarnings(file)).toEqual([
+      'Arrows of R1 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
+    ]);
+  });
+
+  it('the warning names the riser', () => {
+    const file = riserFile(
+      riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'none' } }] }),
+    );
+    expect(riserWarnings(file)).toEqual([
+      'Arrows of R1 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
+    ]);
   });
 
   it('warns when a none arrow faces an up arrow', () => {
     const file = riserFile(
       riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'none' } }, { ...member('l1', 's1', 1), arrows: { below: 'up', above: 'none' } }] }),
     );
-    expect(riserWarnings(file)).toEqual(['Arrows disagree on the span Basement to Ground']);
+    expect(riserWarnings(file)).toEqual([
+      'Arrows of R1 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
+    ]);
   });
 
   it('gives no warning when the arrows of a span agree', () => {
@@ -441,8 +454,8 @@ describe('building file', () => {
       }),
     );
     expect(riserWarnings(file)).toEqual([
-      'Arrows disagree on the span Basement to Ground',
-      'Arrows disagree on the span Ground to First',
+      'Arrows of R1 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
+      'Arrows of R1 disagree on the span Ground to First. Change the arrows on one of the two levels.',
     ]);
   });
 
@@ -457,8 +470,8 @@ describe('building file', () => {
       }),
     );
     expect(riserWarnings(file)).toEqual([
-      'Arrows disagree on the span Basement to Ground',
-      'Arrows disagree on the span Ground to First',
+      'Arrows of R1 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
+      'Arrows of R1 disagree on the span Ground to First. Change the arrows on one of the two levels.',
     ]);
   });
 
@@ -472,15 +485,17 @@ describe('building file', () => {
         ],
       }),
     );
-    expect(riserWarnings(file)).toEqual(['Arrows disagree on the span Basement to Ground']);
+    expect(riserWarnings(file)).toEqual([
+      'Arrows of R1 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
+    ]);
   });
 
   it('warns for each riser on its own', () => {
     const disagree = [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'none' } }];
     const file = riserFile(riserRecord({ members: disagree }), riserRecord({ id: 'r2', name: 'R2', anchorMm: { xMm: 1000, yMm: 0 }, members: disagree }));
     expect(riserWarnings(file)).toEqual([
-      'Arrows disagree on the span Basement to Ground',
-      'Arrows disagree on the span Basement to Ground',
+      'Arrows of R1 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
+      'Arrows of R2 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
     ]);
   });
 
@@ -488,7 +503,9 @@ describe('building file', () => {
     const agree = [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'up', above: 'none' } }];
     const disagree = [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'none' } }];
     const file = riserFile(riserRecord({ members: agree }), riserRecord({ id: 'r2', name: 'R2', anchorMm: { xMm: 1000, yMm: 0 }, members: disagree }));
-    expect(riserWarnings(file)).toEqual(['Arrows disagree on the span Basement to Ground']);
+    expect(riserWarnings(file)).toEqual([
+      'Arrows of R2 disagree on the span Basement to Ground. Change the arrows on one of the two levels.',
+    ]);
   });
 });
 
