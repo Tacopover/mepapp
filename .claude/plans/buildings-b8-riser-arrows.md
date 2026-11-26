@@ -128,11 +128,15 @@ Part A (canvas). Part B (Risers tab) starts only when the user has tested part A
 
 ### B8-T05 (ui): the arrows follow the live flow
 
+**DONE 2026-11-26 (763b1d4).** ui 1297 tests, render 98, build 9 of 9, b8-t05-check 40 passed, no-flag check 8 passed, journey tester and UI reviewer ran. Change from the text below (D-B-130 B): the flow sense comes from the riser copy of the type (`riser.networkType`) on every level. The live type of the open drawing gives only the color and the line pattern. A dashed ring shows no arrow (D-B-132 A).
+
 - `useBuildingRisers.ts` computes `riserRingArrows` from the live building flow (the same data as the capacities) and gives the pair to the scene with the marks and anchors. The effect at `useBuildingRisers.ts:691-728` has the dependencies `[ready, sceneRef, file, sheet, calibration, sceneTick, dismissed]`: add the live flow result and the type copies. `setRiserMarks` redraws on every call, so the scene needs no change. A free anchor draws only on a page that has a segment of its network type (`riserAnchors.ts:12`), so "arrows on every ring" holds where the ring shows. Say so in the journeys. The arrows update when the user connects or removes a segment, a terminal or an equipment, and when the user changes the flow direction of a network type, without a save (like the numbers in B7).
 - Screen task: `ux-designer` first. Write the journeys: make a riser (no arrows); add a source on one level (arrows on every ring); add a terminal; remove the source (arrows go); two sources; a level that is not open (the arrows of the open level still show); a supply type and a return type on the same drawing; change the flow direction of a type in the editor. `journey-tester` last.
 - Browser check with real DOM inputs, in the real web store, one Chromium page. Screenshots of the eight pictograms (hand-set, T06), of three network types with three line patterns, and of two zoom levels.
 
 ### B8-T06 (ui): choose a pictogram by hand
+
+**DONE 2026-11-26 (3364b24).** core 2691, ui 1337, render 102, build 9 of 9, b8-t06-check 78 passed, narrow check 14, no-flag check 10. Built as D-B-133 A (picker in the ring menu and in Properties, "No arrows", "Use the flow solve") and D-B-134 A (warning with the riser name). Open for the user: D-B-136 to D-B-139.
 
 - Right-click on a ring: the menu gets "Riser arrows" with the eight pictograms (small pictures with a tooltip text such as "Comes up, goes up") and "Use the flow solve". The Properties panel of a riser fitting shows the same choice. `ux-designer` decides which of the two, or both.
 - Writes `member.arrows` through the edit functions of T03. The action is not undoable, as Direction and Source level in the Risers tab (the building file has no undo stack). "Use the flow solve" reverts it.
