@@ -509,6 +509,7 @@ export function MepSketchApp({
   const [customSchematicSymbols, setCustomSchematicSymbols] = useState<SchematicSymbol[]>(() => loadCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage));
   useEffect(() => saveCustomSymbols(typeof localStorage === 'undefined' ? undefined : localStorage, customSchematicSymbols), [customSchematicSymbols]);
   const buildingHook = useBuilding({ fileAccess, makeStore: makeBuildingStore, buildingStorage });
+  const { flow: riserFlow, live: liveRiserNetworks } = useRiserFlowInputs({ sceneRef, ready, building: buildingHook.building });
   const risers = useBuildingRisers({
     sceneRef,
     ready,
@@ -521,8 +522,8 @@ export function MepSketchApp({
     pushToast,
     pathOfDocument: (documentId) => pathOfTarget(fileTargetsRef.current.get(documentId)),
     isLoading: () => fileTaskRef.current !== null,
+    flow: riserFlow?.flow ?? null,
   });
-  const { flow: riserFlow, live: liveRiserNetworks } = useRiserFlowInputs({ sceneRef, ready, building: buildingHook.building });
   const riserMenuState = canvasContextMenuRequest ? risers.menuStateFor(canvasContextMenuRequest.target) : null;
   const buildingStore = buildingHook.building?.store;
   useEffect(() => {

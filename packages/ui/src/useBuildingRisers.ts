@@ -8,6 +8,7 @@ import {
   scaleDenominatorFromCalibration,
   setPendingScale,
   type BuildingFile,
+  type BuildingFlowResult,
   type BuildingSheet,
   type Calibration,
   type NetworkType,
@@ -16,6 +17,7 @@ import {
 } from '@mepapp/core';
 import type { CanvasContextMenuTarget, DocumentSummary, RiserMark, SceneNotice, SketchScene } from '@mepapp/render';
 import type { OpenBuilding } from './buildingController.js';
+import { rememberFlow, withRiserArrows, type RememberedFlow } from './riserArrowMarks.js';
 import { readSummaries } from './quantitiesScope.js';
 import {
   dropPendingOps,
@@ -156,8 +158,9 @@ export function useBuildingRisers(args: {
   pushToast: (notice: SceneNotice) => void;
   pathOfDocument: (documentId: string) => string | undefined;
   isLoading: () => boolean;
+  flow: BuildingFlowResult | null;
 }) {
-  const { sceneRef, ready, building, update, documents, activeDocumentId, pageIndex, calibration, pushToast, pathOfDocument, isLoading } = args;
+  const { sceneRef, ready, building, update, documents, activeDocumentId, pageIndex, calibration, pushToast, pathOfDocument, isLoading, flow } = args;
   const file = building?.file ?? null;
   const sheet = sheetOnShownPage(file, documents, activeDocumentId, pageIndex);
   const [pendingDelete, setPendingDelete] = useState<{ riserId: string; label: string } | null>(null);
@@ -175,6 +178,11 @@ export function useBuildingRisers(args: {
   const notified = useRef(new Set<string>());
   const live = useRef<LiveValues>({ building, sheet, update, pushToast, pathOfDocument, isLoading });
   live.current = { building, sheet, update, pushToast, pathOfDocument, isLoading };
+  /** The flow result is null for about 60 ms at each page switch. The arrows keep the last flow of the same building (no flash). A hand-set pair shows with no flow. */
+  const remembered = useRef<RememberedFlow | null>(null);
+  remembered.current = rememberFlow(remembered.current, building?.store ?? null, flow);
+  const shownFlow = remembered.current?.flow ?? null;
+  const [typesTick, setTypesTick] = useState(0);
 
   const commit = async (build: (current: BuildingFile) => Outcome): Promise<void> => {
     let outcome = null as Outcome | null;
@@ -688,10 +696,13 @@ export function useBuildingRisers(args: {
     scene.on('documentActivated', bump);
     scene.on('pageChanged', bump);
     scene.on('calibrationSet', bump);
+    const onTypes = () => setTypesTick((tick) => tick + 1);
+    scene.on('networkTypesChanged', onTypes);
     return () => {
       scene.off('documentActivated', bump);
       scene.off('pageChanged', bump);
       scene.off('calibrationSet', bump);
+      scene.off('networkTypesChanged', onTypes);
     };
   }, [ready, sceneRef]);
 
@@ -699,7 +710,7 @@ export function useBuildingRisers(args: {
     const scene = sceneRef.current;
     if (!ready || !scene) return;
     const shown = shownPageOf(scene);
-    const marks = file && sheet ? buildRiserMarks(file, sheet, shown, (fittingId) => scene.getFittingContext(fittingId)?.position ?? null) : new Map<string, RiserMark>();
+    const marks = file && sheet ? withRiserArrows(buildRiserMarks(file, sheet, shown, (fittingId) => scene.getFittingContext(fittingId)?.position ?? null), file, sheet, shownFlow, scene.getNetworkTypes()) : new Map<string, RiserMark>();
     scene.setRiserMarks(marks);
     scene.setRiserAnchors(file && sheet ? buildRiserAnchors(file, sheet, shown) : []);
     if (syncing.current > 0) return;
@@ -732,7 +743,7 @@ export function useBuildingRisers(args: {
     const first = found.find((candidate) => !dismissed.has(candidate.fittingId)) ?? null;
     const next = first === null ? null : riserConflictInfo(file, sheet, first, shown);
     setConflict((previous) => (sameConflict(previous, next) ? previous : next));
-  }, [ready, sceneRef, file, sheet, calibration, sceneTick, dismissed]);
+  }, [ready, sceneRef, file, sheet, calibration, sceneTick, dismissed, shownFlow, typesTick]);
 
   useEffect(() => {
     if (!ready || live.current.isLoading()) return;
