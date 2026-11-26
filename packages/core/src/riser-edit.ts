@@ -110,6 +110,22 @@ export function setRiserProps(
   return { ...file, risers: file.risers.map((candidate) => (candidate.id === riserId ? { ...candidate, ...patch } : candidate)) };
 }
 
+function sameNetworkType(a: NetworkType, b: NetworkType): boolean {
+  const keys = new Set<string>([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    const field = key as keyof NetworkType;
+    if (a[field] !== b[field]) return false;
+  }
+  return true;
+}
+
+/** Writes networkType into the copy `networkType` of every riser whose networkTypeId is networkType.id (the copy is a new object, the argument is not kept). The riser name and the other fields stay. The same file object when no riser has that id or when every such copy already equals networkType or when every such copy already has the same fields and values as networkType (shallow compare over the union of the keys). */
+export function refreshRiserNetworkType(file: BuildingFile, networkType: NetworkType): BuildingFile {
+  const stale = (riser: Riser): boolean => riser.networkTypeId === networkType.id && !sameNetworkType(riser.networkType, networkType);
+  if (!file.risers.some(stale)) return file;
+  return { ...file, risers: file.risers.map((riser) => (stale(riser) ? { ...riser, networkType: { ...networkType } } : riser)) };
+}
+
 /** Removes the member of that sheetId, and the pending ops of that sheet. Unknown riser or sheet: file unchanged. */
 export function detachMember(file: BuildingFile, riserId: string, sheetId: string): BuildingFile {
   const riser = file.risers.find((candidate) => candidate.id === riserId);

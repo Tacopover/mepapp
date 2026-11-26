@@ -21,6 +21,13 @@ export type Discipline =
 
 export type LinePattern = 'solid' | 'dashed' | 'dotted' | 'dashDot' | 'longDash' | 'dashDotDot';
 
+/** Which way the flow of a network type goes in relation to the source equipment (B8, D-B-125). */
+export type FlowSense = 'supply' | 'return';
+
+export function isFlowSense(value: unknown): value is FlowSense {
+  return value === 'supply' || value === 'return';
+}
+
 export interface NetworkType {
   id: string;
   name: string;
@@ -36,6 +43,8 @@ export interface NetworkType {
   flowUnit?: FlowUnitId;
   /** The method to size a network of this type with. Absent = not sized. The limits are in ProjectDocument.networkSizing. */
   sizingMethod?: SizingMethod;
+  /** Which way the flow goes: 'supply' (away from the source equipment) or 'return' (toward it). Absent = the library value of the same id, else 'supply': use flowSenseOf. */
+  flowSense?: FlowSense;
 }
 
 export type SegmentShape = 'round' | 'rectangular';

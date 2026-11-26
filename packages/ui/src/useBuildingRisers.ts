@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   deleteRisers,
   pendingScaleOf,
+  refreshRiserNetworkType,
   rescaleRisers,
   risersOnSheet,
   scaleDenominatorFromCalibration,
@@ -9,6 +10,7 @@ import {
   type BuildingFile,
   type BuildingSheet,
   type Calibration,
+  type NetworkType,
   type SheetSummary,
   type Vec2,
 } from '@mepapp/core';
@@ -194,6 +196,11 @@ export function useBuildingRisers(args: {
 
   const guard = (task: () => Promise<void>): void => {
     task().catch((error: unknown) => live.current.pushToast({ kind: 'warning', message: `Could not update the riser: ${messageOf(error)}` }));
+  };
+
+  /** The editor saved a network type: writes it into the copy of the type in every riser of the open building that has this id (D-B-126). No write when nothing changes or no building is open. */
+  const syncTypeCopy = (networkType: NetworkType): void => {
+    guard(() => commit((current) => ({ file: refreshRiserNetworkType(current, networkType), notice: null })));
   };
 
   const scaleOfWith = (file: BuildingFile, summaries: ReadonlyMap<string, SheetSummary>) => {
@@ -898,5 +905,6 @@ export function useBuildingRisers(args: {
     cancelScaleChange,
     setScaleOnAll,
     disconnectForScale,
+    syncTypeCopy,
   };
 }

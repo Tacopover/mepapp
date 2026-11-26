@@ -13,6 +13,7 @@ import {
   moveRiser,
   nextRiserLabel,
   pendingScaleOf,
+  refreshRiserNetworkType,
   rescaleRisers,
   riserSheetGroup,
   setMemberConnectionHeight,
@@ -618,5 +619,61 @@ describe('rescaleRisers', () => {
     expect(riserOf(next, 'r1').anchorMm).toEqual({ xMm: 2000, yMm: 4000 });
     expect(riserOf(next, 'r2')).toEqual(riserOf(file, 'r2'));
     expect(riserOf(next, 'r2')).toBe(riserOf(file, 'r2'));
+  });
+});
+
+describe('refreshRiserNetworkType', () => {
+  function fileWithTwoVentAndWater(): BuildingFile {
+    const withVent = ok(
+      makeRiser(fileWithRiser(), { id: 'r2', name: 'R2', networkType: vent, sheetId: 's1', fittingId: 'f1', fittingPt: { x: 0, y: 842 }, frame }),
+    );
+    return ok(makeRiser(withVent, { id: 'r3', name: 'R3', networkType: water, sheetId: 's2', fittingId: 'f2', fittingPt: { x: 0, y: 842 }, frame }));
+  }
+
+  it('writes the new copy into every riser of that id and leaves the others', () => {
+    const file = fileWithTwoVentAndWater();
+    const changed: NetworkType = { ...vent, color: '#ff0000', flowSense: 'return' };
+    const next = refreshRiserNetworkType(file, changed);
+    expect(riserOf(next, 'r1').networkType).toEqual(changed);
+    expect(riserOf(next, 'r2').networkType).toEqual(changed);
+    expect(riserOf(next, 'r1').name).toBe('R1');
+    expect(riserOf(next, 'r1').members).toEqual(riserOf(file, 'r1').members);
+    expect(riserOf(next, 'r2').members).toEqual(riserOf(file, 'r2').members);
+    expect(riserOf(next, 'r3')).toBe(riserOf(file, 'r3'));
+  });
+
+  it('returns the same file when no riser has that id', () => {
+    const file = fileWithTwoVentAndWater();
+    expect(refreshRiserNetworkType(file, { ...vent, id: 'gas', color: '#00ff00' })).toBe(file);
+    const empty = baseFile();
+    expect(refreshRiserNetworkType(empty, vent)).toBe(empty);
+  });
+
+  it('returns the same file when every copy already equals the type', () => {
+    const file = fileWithTwoVentAndWater();
+    expect(refreshRiserNetworkType(file, { ...vent })).toBe(file);
+  });
+
+  it('stores a new object, so a later change of the argument does not reach the file', () => {
+    const file = fileWithTwoVentAndWater();
+    const changed: NetworkType = { ...vent, color: '#ff0000' };
+    const next = refreshRiserNetworkType(file, changed);
+    expect(riserOf(next, 'r1').networkType).not.toBe(changed);
+    changed.color = '#000000';
+    expect(riserOf(next, 'r1').networkType.color).toBe('#ff0000');
+  });
+
+  it('adds the flowSense to the copy of an old building', () => {
+    const file = fileWithTwoVentAndWater();
+    expect(riserOf(file, 'r1').networkType).not.toHaveProperty('flowSense');
+    const next = refreshRiserNetworkType(file, { ...vent, flowSense: 'supply' });
+    expect(riserOf(next, 'r1').networkType.flowSense).toBe('supply');
+  });
+
+  it('does not change the input file', () => {
+    const file = fileWithTwoVentAndWater();
+    const snapshot = JSON.stringify(file);
+    refreshRiserNetworkType(file, { ...vent, color: '#ff0000', flowSense: 'return' });
+    expect(JSON.stringify(file)).toBe(snapshot);
   });
 });

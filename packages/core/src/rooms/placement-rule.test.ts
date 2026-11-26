@@ -568,6 +568,23 @@ describe('routing targets of a rule (auto-routing.md §4.2)', () => {
     expect(parsePlacementRules([rule({ id: 'c' })])!.rules[0]).not.toHaveProperty('routingTarget');
   });
 
+  it('the parse keeps a valid flowSense of a network type copy and drops the bad one', () => {
+    const stored = JSON.parse(
+      JSON.stringify([
+        { ...rule({ id: 'a', networkTypeCopies: [{ ...copy, flowSense: 'return' }] }) },
+        { ...rule({ id: 'b', networkTypeCopies: [{ ...copy, flowSense: 'up' }, { ...copy, id: 'nt-other', flowSense: 5 }] }) },
+        { ...rule({ id: 'c', networkTypeCopies: [copy] }) },
+      ]),
+    );
+    const [a, b, c] = parsePlacementRules(stored)!.rules;
+    expect(a!.networkTypeCopies).toEqual([{ ...copy, flowSense: 'return' }]);
+    expect(b!.networkTypeCopies).toEqual([copy, { ...copy, id: 'nt-other' }]);
+    expect(b!.networkTypeCopies![0]).not.toHaveProperty('flowSense');
+    expect(b!.networkTypeCopies![1]).not.toHaveProperty('flowSense');
+    expect(c!.networkTypeCopies).toEqual([copy]);
+    expect(c!.networkTypeCopies![0]).not.toHaveProperty('flowSense');
+  });
+
   it('validatePlacementRule refuses an empty network type id', () => {
     expect(validatePlacementRule(rule({ routingTarget: 'supply-air', portRoutingTargets: { cw: null } }), [])).toBeNull();
     expect(validatePlacementRule(rule({ routingTarget: '' }), [])).toMatch(/routing target/);

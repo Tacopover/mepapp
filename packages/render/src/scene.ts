@@ -141,6 +141,7 @@ import {
   type SizingMethod,
   type SizingSettings,
   findNetworkSizing,
+  flowSenseOf,
   parseSizingSettings,
   withNetworkSizing,
   ensureProjectUuid,
@@ -162,6 +163,7 @@ import { DEFAULT_NETWORK_TYPE, SketchDocument, type DocumentSummary, type Drawin
 import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
 import { riserSolveOptionsFor } from './riserFlowInputs.js';
+import { applyNetworkTypePatch, type NetworkTypePatch } from './networkTypePatch.js';
 import { flowArrowEnds } from './flowArrow.js';
 import { sameKeys, solvedNoSourceOf, type SolvedNoSource } from './flowReadModel.js';
 import { anchorAtPoint, visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
@@ -2751,31 +2753,23 @@ export class SketchScene {
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
-  /** Updates a network type's name and/or visuals (color/thickness/pattern/discipline) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType. If `id` hasn't been picked in this document yet (editing a library type's swatch before ever placing a segment of it), adopts it first — same "adopt on first touch" pattern as setActiveNetworkType — so the edit actually persists instead of being silently dropped. No-op only if `id` isn't a known library type either. Re-syncs the drawing layer so already-drawn segments of this type update immediately. flowUnit and sizingMethod are stored too (undefined removes the field); a patch of only those two does not redraw. */
-  updateNetworkType(id: string, patch: Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline' | 'flowUnit' | 'sizingMethod'>>): void {
+  /** Updates a network type's name and/or visuals (color/thickness/pattern/discipline) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType. If `id` hasn't been picked in this document yet (editing a library type's swatch before ever placing a segment of it), adopts it first — same "adopt on first touch" pattern as setActiveNetworkType — so the edit actually persists instead of being silently dropped. No-op only if `id` isn't a known library type either. Re-syncs the drawing layer so already-drawn segments of this type update immediately. flowUnit, sizingMethod and flowSense are stored too (undefined removes the field); a patch of only those three does not redraw. */
+  updateNetworkType(id: string, patch: NetworkTypePatch): void {
     this.adoptTypes([id], []);
     const target = this.doc.networkTypes.find((t) => t.id === id);
     if (!target) return;
-    const { flowUnit, sizingMethod, ...visual } = patch;
-    Object.assign(target, visual);
-    if ('flowUnit' in patch) {
-      if (flowUnit === undefined) delete target.flowUnit;
-      else target.flowUnit = flowUnit;
-    }
-    if ('sizingMethod' in patch) {
-      if (sizingMethod === undefined) delete target.sizingMethod;
-      else target.sizingMethod = sizingMethod;
-    }
+    const redraw = applyNetworkTypePatch(target, patch);
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
-    if (Object.keys(visual).length > 0) this.syncDrawingLayer();
+    if (redraw) this.syncDrawingLayer();
     this.markDirty();
   }
 
-  /** Clones an adopted network type into a brand-new one named "<name>_copy" — the Network Type Editor dialog's Duplicate action. Existing segments keep referencing the original type; nothing re-tags automatically. Returns the new type, or null if `id` hasn't been adopted yet. */
+  /** Clones a network type into a brand-new one named "<name>_copy" — the Network Type Editor dialog's Duplicate action. Adopts `id` first (like updateNetworkType), so a library type the drawing never used can be duplicated. The copy has the effective flow sense of its source (flowSenseOf), because its new id no longer finds the library value. Existing segments keep referencing the original type; nothing re-tags automatically. Returns the new type, or null if `id` is neither adopted nor a known library type. */
   duplicateNetworkType(id: string): NetworkType | null {
+    this.adoptTypes([id], []);
     const source = this.doc.networkTypes.find((t) => t.id === id);
     if (!source) return null;
-    const copy: NetworkType = { ...source, id: crypto.randomUUID(), name: `${source.name}_copy` };
+    const copy: NetworkType = { ...source, id: crypto.randomUUID(), name: `${source.name}_copy`, flowSense: flowSenseOf(source) };
     this.doc.networkTypes.push(copy);
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
     return copy;

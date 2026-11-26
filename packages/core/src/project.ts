@@ -9,7 +9,7 @@ import type { Calibration } from './calibration.js';
 import type { Circuit, CircuitType, Panel, PanelSection } from './circuit.js';
 import { migrateConcurrencyNames } from './concurrency-rename.js';
 import { isFlowUnitId } from './flow-units.js';
-import { ROUTED_MARK, type Fitting, type NetworkType, type PortGroup, type Segment } from './network.js';
+import { isFlowSense, ROUTED_MARK, type Fitting, type NetworkType, type PortGroup, type Segment } from './network.js';
 import type { Room } from './rooms/room.js';
 import type { RoomNeed } from './rooms/room-need.js';
 import { parseRoomDemands, type RoomType } from './rooms/room-type.js';
@@ -20,7 +20,7 @@ import type { StampLabelLayouts } from './stamp-label.js';
 import { getStampDefinition, type StampDefinition } from './stamp-library.js';
 import { migrateToLatest, validateDocument, type JsonRecord, type MigrationStep, type ValidationIssue } from './schema.js';
 
-export const CURRENT_SCHEMA_VERSION = 23;
+export const CURRENT_SCHEMA_VERSION = 24;
 
 export interface ProjectDocument {
   schemaVersion: number;
@@ -364,12 +364,38 @@ const migrationSteps: MigrationStep[] = [
       schemaVersion: 23,
     }),
   },
+  {
+    fromVersion: 23,
+    toVersion: 24,
+    // Version 23 predates NetworkType.flowSense (B8-T01, D-B-125). The step writes the flow sense on each network type whose id is
+    // a library id and that has none, with a frozen table (not the live library). A type with another id stays without a value:
+    // flowSenseOf then reads the library by id, else supply. An older MepApp then refuses the file instead of dropping the field.
+    migrate: (data) => ({
+      ...data,
+      schemaVersion: 24,
+      networkTypes: Array.isArray(data.networkTypes) ? data.networkTypes.map(addFlowSense) : data.networkTypes,
+    }),
+  },
 ];
 
 function addPageIndex(stamp: unknown): unknown {
   if (!stamp || typeof stamp !== 'object' || Array.isArray(stamp)) return stamp;
   if (typeof (stamp as JsonRecord).pageIndex === 'number') return stamp;
   return { ...(stamp as JsonRecord), pageIndex: 0 };
+}
+
+/** The flow sense of the 14 library network types at version 24. A frozen copy: the step must not follow later changes of the library. */
+const FLOW_SENSE_V24: Readonly<Record<string, 'supply' | 'return'>> = {
+  'supply-air': 'supply', 'return-air': 'return', 'exhaust-air': 'return', 'chilled-water': 'supply', 'heating-water': 'supply',
+  'domestic-cold-water': 'supply', 'domestic-hot-water': 'supply', 'sanitary-waste': 'return', conduit: 'supply', 'cable-tray': 'supply',
+  'branch-circuit': 'supply', feeder: 'supply', 'wet-standpipe': 'supply', 'dry-standpipe': 'supply',
+};
+
+function addFlowSense(type: unknown): unknown {
+  if (!type || typeof type !== 'object' || Array.isArray(type)) return type;
+  const record = type as JsonRecord;
+  if ('flowSense' in record || typeof record.id !== 'string' || !Object.hasOwn(FLOW_SENSE_V24, record.id)) return type;
+  return { ...record, flowSense: FLOW_SENSE_V24[record.id] };
 }
 
 function moveSizingMethod(type: unknown): unknown {
@@ -480,7 +506,7 @@ export function loadProject(raw: JsonRecord): ProjectDocument {
   return {
     ...doc,
     stamps: doc.stamps.map(withCleanRoutingTargets),
-    networkTypes: doc.networkTypes.map(withCleanSizing),
+    networkTypes: doc.networkTypes.map((type) => withCleanFlowSense(withCleanSizing(type))),
     networkSizing: parseNetworkSizing(doc.networkSizing).filter((entry) => stampIds.has(entry.startStampId)),
     segments: doc.segments.map(withCleanRoutedMark),
     fittings: doc.fittings.map(withCleanRoutedMark),
@@ -513,4 +539,11 @@ function withCleanSizing(type: NetworkType): NetworkType {
   const next = { ...rest } as unknown as NetworkType;
   if (isFlowUnitId(flowUnit)) next.flowUnit = flowUnit;
   return next;
+}
+
+/** The network type without a flow sense that is not supply or return (B8-T01). The same object when nothing is wrong. */
+function withCleanFlowSense(type: NetworkType): NetworkType {
+  if (!type || typeof type !== 'object' || !('flowSense' in type) || isFlowSense(type.flowSense)) return type;
+  const { flowSense, ...rest } = type;
+  return rest;
 }

@@ -3,6 +3,7 @@ import { CURRENT_SCHEMA_VERSION, customStampDefinitionsToSave, loadProject, Proj
 import type { Annotation } from './annotation.js';
 import { getEffectiveConcurrencyPercent } from './circuit.js';
 import type { Fitting, NetworkType, Segment } from './network.js';
+import { flowSenseOf } from './network-type-library.js';
 import type { PlacedStamp } from './stamp.js';
 import type { StampDefinition } from './stamp-library.js';
 import { migrateToLatest, SchemaMigrationError, type JsonRecord } from './schema.js';
@@ -444,8 +445,8 @@ describe('routing targets in the save format (auto-routing.md §4.5)', () => {
 
   it('loads a version 17 save with the stamps unchanged', () => {
     const loaded = loadProject({ ...v17, stamps: [stamp] });
-    expect(CURRENT_SCHEMA_VERSION).toBe(23);
-    expect(loaded.schemaVersion).toBe(23);
+    expect(CURRENT_SCHEMA_VERSION).toBe(24);
+    expect(loaded.schemaVersion).toBe(24);
     expect(loaded.stamps).toEqual([{ ...stamp, pageIndex: 0 }]);
   });
 
@@ -481,8 +482,8 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
 
   it('loads a version 18 save with two network types as version 19 with the types unchanged', () => {
     const loaded = loadProject({ ...v18, networkTypes: [airType, waterType] });
-    expect(loaded.schemaVersion).toBe(23);
-    expect(loaded.networkTypes).toEqual([airType, waterType]);
+    expect(loaded.schemaVersion).toBe(24);
+    expect(loaded.networkTypes).toEqual([{ ...airType, flowSense: 'supply' }, { ...waterType, flowSense: 'supply' }]);
   });
 
   it('keeps a valid flow unit and sizing method through a save and a load', () => {
@@ -495,24 +496,24 @@ describe('sizing fields in the save format (auto-routing-r5.md §4.1)', () => {
   it('drops a flow unit that is not a known unit and keeps the other fields', () => {
     const loaded = loadProject({ ...v18, networkTypes: [{ ...waterType, flowUnit: 'kg' }] });
     expect('flowUnit' in loaded.networkTypes[0]!).toBe(false);
-    expect(loaded.networkTypes[0]).toEqual(waterType);
+    expect(loaded.networkTypes[0]).toEqual({ ...waterType, flowSense: 'supply' });
   });
 
   it('drops a stray sizing key of a version 20 save and keeps the flow unit', () => {
     const loaded = loadProject({ ...v18, schemaVersion: 20, networkSizing: [], networkTypes: [{ ...waterType, flowUnit: 'kW', sizing: SUGGESTED_WATER_SIZING }] });
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
-    expect(loaded.networkTypes[0]).toEqual({ ...waterType, flowUnit: 'kW' });
+    expect(loaded.networkTypes[0]).toEqual({ ...waterType, flowUnit: 'kW', flowSense: 'supply' });
   });
 
   it('loads a network type with neither field unchanged', () => {
     const loaded = loadProject({ ...v18, networkTypes: [airType] });
-    expect(loaded.networkTypes[0]).toEqual(airType);
+    expect(loaded.networkTypes[0]).toEqual({ ...airType, flowSense: 'supply' });
     expect('flowUnit' in loaded.networkTypes[0]!).toBe(false);
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
   });
 
-  it('refuses a save of a version newer than 23', () => {
-    expect(() => loadProject({ ...v18, schemaVersion: 24 })).toThrow(SchemaMigrationError);
+  it('refuses a save of a version newer than 24', () => {
+    expect(() => loadProject({ ...v18, schemaVersion: 25 })).toThrow(SchemaMigrationError);
   });
 });
 
@@ -530,9 +531,9 @@ describe('network sizing in the save format (auto-routing-r5.md §12.2)', () => 
     const bad = { ...base, id: 'bad', sizing: { method: 'x' } };
     const none = { ...base, id: 'none' };
     const loaded = loadProject({ ...v19, networkTypes: [air, water, bad, none] });
-    expect(loaded.schemaVersion).toBe(23);
+    expect(loaded.schemaVersion).toBe(24);
     expect(loaded.networkSizing).toEqual([]);
-    expect(loaded.networkTypes[0]).toEqual({ ...base, id: 'supply-air', flowUnit: 'dm³/s', sizingMethod: 'air' });
+    expect(loaded.networkTypes[0]).toEqual({ ...base, id: 'supply-air', flowUnit: 'dm³/s', sizingMethod: 'air', flowSense: 'supply' });
     expect('sizing' in loaded.networkTypes[0]!).toBe(false);
     expect(loaded.networkTypes[1]).toEqual({ ...base, id: 'water', sizingMethod: 'water' });
     expect(loaded.networkTypes[2]).toEqual({ ...base, id: 'bad' });
@@ -572,7 +573,7 @@ describe('routed marks in the save format (auto-routing-r6.md section 4.1)', () 
 
   it('loads a version 20 save with an unmarked segment and fitting as the current version with the items unchanged', () => {
     const loaded = loadProject({ ...v20, segments: [segment], fittings: [fitting] });
-    expect(loaded.schemaVersion).toBe(23);
+    expect(loaded.schemaVersion).toBe(24);
     expect(loaded.segments).toEqual([segment]);
     expect(loaded.fittings).toEqual([fitting]);
   });
@@ -602,8 +603,8 @@ describe('routed marks in the save format (auto-routing-r6.md section 4.1)', () 
     expect(loaded.fittings[0]).toBe(fitting);
   });
 
-  it('refuses a save of a version newer than 23', () => {
-    expect(() => loadProject({ ...v20, schemaVersion: 24 })).toThrow(SchemaMigrationError);
+  it('refuses a save of a version newer than 24', () => {
+    expect(() => loadProject({ ...v20, schemaVersion: 25 })).toThrow(SchemaMigrationError);
   });
 });
 
@@ -620,7 +621,7 @@ describe('buildings fields in the save format (buildings-b1 B1-T01)', () => {
 
   it('loads a version 21 save with the stamps on page 0 when they have no page index', () => {
     const loaded = loadProject({ ...v21, stamps: [stampOf('a'), stampOf('b', 3)] });
-    expect(loaded.schemaVersion).toBe(23);
+    expect(loaded.schemaVersion).toBe(24);
     expect(loaded.stamps.map((s) => s.pageIndex)).toEqual([0, 3]);
     expect(loaded.projectUuid).toBeUndefined();
   });
@@ -698,10 +699,10 @@ describe('concurrency names in the save format (B7-T12)', () => {
     networkSizing: [],
   };
 
-  it('loads a version 22 save as version 23 with the new names', () => {
+  it('loads a version 22 save as version 24 with the new names', () => {
     expect(JSON.stringify(oldTemplate)).toContain('diversifiedCapacity');
     const loaded = loadProject(v22);
-    expect(loaded.schemaVersion).toBe(23);
+    expect(loaded.schemaVersion).toBe(24);
     expect(loaded.circuits[0]!.concurrencyPercent).toBe(80);
     expect('concurrencyPercent' in loaded.circuits[1]!).toBe(false);
     expect(loaded.panels[0]!.circuitDefaults?.concurrencyPercent).toBe(90);
@@ -732,11 +733,11 @@ describe('concurrency names in the save format (B7-T12)', () => {
     expect(loaded.circuits[0]).toMatchObject({ diversityPercent: 60 });
   });
 
-  it('writes version 23 and no old name', () => {
+  it('writes version 24 and no old name', () => {
     const loaded = loadProject(v22);
     const { schemaVersion: _v, ...doc } = loaded;
     const serialized = serializeProject(doc);
-    expect(serialized.schemaVersion).toBe(23);
+    expect(serialized.schemaVersion).toBe(24);
     expect(JSON.stringify(serialized)).not.toMatch(/diversity|diversif/i);
   });
 
@@ -745,6 +746,87 @@ describe('concurrency names in the save format (B7-T12)', () => {
     const { schemaVersion: _v, ...doc } = loaded;
     const olderSteps = Array.from({ length: 22 }, (_, i) => ({ fromVersion: i, toVersion: i + 1, migrate: (data: JsonRecord) => ({ ...data, schemaVersion: i + 1 }) }));
     expect(() => migrateToLatest(serializeProject(doc), { steps: olderSteps, latestVersion: 22 })).toThrow(SchemaMigrationError);
-    expect(() => loadProject({ ...v22, schemaVersion: 24 })).toThrow(SchemaMigrationError);
+    expect(() => loadProject({ ...v22, schemaVersion: 25 })).toThrow(SchemaMigrationError);
+  });
+});
+
+describe('flow sense in the save format (B8-T01, D-B-125)', () => {
+  const libraryTypes: Array<[string, 'supply' | 'return']> = [
+    ['supply-air', 'supply'], ['return-air', 'return'], ['exhaust-air', 'return'], ['chilled-water', 'supply'], ['heating-water', 'supply'],
+    ['domestic-cold-water', 'supply'], ['domestic-hot-water', 'supply'], ['sanitary-waste', 'return'], ['conduit', 'supply'], ['cable-tray', 'supply'],
+    ['branch-circuit', 'supply'], ['feeder', 'supply'], ['wet-standpipe', 'supply'], ['dry-standpipe', 'supply'],
+  ];
+  const plainType = (id: string) => ({ id, name: id, discipline: 'other', units: '', defaultCapacity: 0, color: '#000000', lineWidthPt: 1, linePattern: 'solid' });
+  const v23 = {
+    schemaVersion: 23, networkTypes: [], segments: [], fittings: [], stamps: [], portGroups: [], annotations: [], customStampDefinitions: [], terminalCapacities: {},
+    circuits: [], panels: [], panelSections: [], circuitTypes: [], stampLabelLayouts: {}, schematics: [], schematicProjectFields: {}, rooms: [], calibrations: {}, roomTypes: [], roomNeeds: [], roomTypeCeilingHeightsMm: {},
+    networkSizing: [],
+  };
+
+  it('writes the library flow sense on each library network type of a version 23 save', () => {
+    const loaded = loadProject({ ...v23, networkTypes: libraryTypes.map(([id]) => plainType(id)) });
+    expect(loaded.schemaVersion).toBe(24);
+    expect(loaded.networkTypes.map((t) => [t.id, t.flowSense])).toEqual(libraryTypes);
+  });
+
+  it('leaves a network type with another id without a flow sense', () => {
+    const loaded = loadProject({ ...v23, networkTypes: [plainType('my-type')] });
+    expect('flowSense' in loaded.networkTypes[0]!).toBe(false);
+  });
+
+  it('never overwrites a stored flow sense', () => {
+    const loaded = loadProject({ ...v23, networkTypes: [{ ...plainType('exhaust-air'), flowSense: 'supply' }] });
+    expect(loaded.networkTypes[0]!.flowSense).toBe('supply');
+  });
+
+  it('gives the same result after a save and a load of a version 23 save', () => {
+    const first = loadProject({ ...v23, networkTypes: libraryTypes.map(([id]) => plainType(id)) });
+    const { schemaVersion: _v, ...doc } = first;
+    const second = loadProject(JSON.parse(JSON.stringify(serializeProject(doc))));
+    expect(second).toEqual(first);
+  });
+
+  it('does not add a flow sense to a version 24 save', () => {
+    const loaded = loadProject({ ...v23, schemaVersion: 24, networkTypes: [plainType('exhaust-air')] });
+    expect('flowSense' in loaded.networkTypes[0]!).toBe(false);
+  });
+
+  it('a copy of a migrated library type with a new id keeps its flow sense, an unmigrated copy would not', () => {
+    const exhaust = loadProject({ ...v23, networkTypes: [plainType('exhaust-air')] }).networkTypes[0]!;
+    const copy = { ...exhaust, id: 'copy', name: 'x_copy' };
+    expect(flowSenseOf(copy)).toBe('return');
+    const unmigrated = { ...plainType('exhaust-air'), id: 'copy-2' };
+    expect(flowSenseOf(unmigrated as never)).toBe('supply');
+  });
+
+  it('drops a flow sense that is not supply or return and keeps a good one', () => {
+    const loaded = loadProject({
+      ...v23,
+      schemaVersion: 24,
+      networkTypes: [
+        { ...plainType('my-type'), flowSense: 'sideways' },
+        { ...plainType('return-air'), flowSense: 5 },
+        { ...plainType('conduit'), flowSense: null },
+        { ...plainType('feeder'), flowSense: 'return' },
+      ],
+    });
+    expect(loaded.networkTypes.map((t) => 'flowSense' in t)).toEqual([false, false, false, true]);
+    expect(loaded.networkTypes[3]!.flowSense).toBe('return');
+  });
+
+  it('writes version 24 and keeps a flow sense through a save and a load', () => {
+    const sensed: NetworkType = { ...networkType, flowSense: 'return' };
+    const { schemaVersion: _v, ...doc } = { ...v23, networkTypes: [sensed] };
+    const serialized = serializeProject(doc as never);
+    expect(serialized.schemaVersion).toBe(24);
+    expect(loadProject(JSON.parse(JSON.stringify(serialized))).networkTypes).toEqual([sensed]);
+  });
+
+  it('is refused by an older app whose latest version is 23', () => {
+    const loaded = loadProject(v23);
+    const { schemaVersion: _v, ...doc } = loaded;
+    const olderSteps = Array.from({ length: 23 }, (_, i) => ({ fromVersion: i, toVersion: i + 1, migrate: (data: JsonRecord) => ({ ...data, schemaVersion: i + 1 }) }));
+    expect(() => migrateToLatest(serializeProject(doc), { steps: olderSteps, latestVersion: 23 })).toThrow(SchemaMigrationError);
+    expect(() => loadProject({ ...v23, schemaVersion: 25 })).toThrow(SchemaMigrationError);
   });
 });

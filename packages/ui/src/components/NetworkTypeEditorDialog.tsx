@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import type { Discipline, FlowUnitId, LinePattern, NetworkType } from '@mepapp/core';
-import { FLOW_UNITS } from '@mepapp/core';
+import type { Discipline, FlowSense, FlowUnitId, LinePattern, NetworkType } from '@mepapp/core';
+import { FLOW_UNITS, flowSenseOf } from '@mepapp/core';
 import { Dialog } from './Dialog.js';
 import { ColorPicker } from './ColorPicker.js';
 import { InfoTip } from './InfoTip.js';
-import { coerceMethod, draftFromType, convertPanelOf, draftToPatch, methodsForDiscipline, type SizingMethodChoice } from './sizingDraft.js';
+import { coerceMethod, draftFromType, convertPanelOf, methodsForDiscipline, type SizingMethodChoice } from './sizingDraft.js';
+import { networkTypeEditPatch, type NetworkTypeEditPatch } from './networkTypeEditPatch.js';
 import { sizeText, type SizeTextKey } from './sizePlan.js';
 
-export type NetworkTypeEditPatch = Partial<Pick<NetworkType, 'name' | 'color' | 'lineWidthPt' | 'linePattern' | 'discipline' | 'flowUnit' | 'sizingMethod'>>;
+export type { NetworkTypeEditPatch } from './networkTypeEditPatch.js';
 
 /** All 6 core Discipline values, human-labeled — finer-grained than disciplineGroups.ts's 5-way UI grouping (which this dialog's dropdown drives, via disciplineGroupOf), so it needs its own label map. */
 const DISCIPLINES: Array<{ value: Discipline; label: string }> = [
@@ -48,6 +49,7 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, capa
   const [lineWidthPt, setLineWidthPt] = useState(networkType.lineWidthPt);
   const [linePattern, setLinePattern] = useState<LinePattern>(networkType.linePattern);
   const [discipline, setDiscipline] = useState<Discipline>(networkType.discipline);
+  const [flowSense, setFlowSense] = useState<FlowSense>(() => flowSenseOf(networkType));
   const [sizingDraft, setSizingDraft] = useState(() => coerceMethod(draftFromType(networkType), networkType.discipline));
   const methods = methodsForDiscipline(discipline);
 
@@ -66,7 +68,7 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, capa
   }
 
   function handleSave() {
-    onSave(networkType.id, { name: name.trim() || networkType.name, color, lineWidthPt, linePattern, discipline, ...draftToPatch(sizingDraft) });
+    onSave(networkType.id, networkTypeEditPatch({ oldName: networkType.name, name, color, lineWidthPt, linePattern, discipline, flowSense, sizing: sizingDraft }));
   }
 
   return (
@@ -132,6 +134,16 @@ export function NetworkTypeEditorDialog({ networkType, onSave, onDuplicate, capa
       </div>
       <div className="mep-section">
         <div className="mep-nt-section-title">{sizeText('flowSection')}</div>
+        <div className="mep-field-row mep-nt-flow-sense-row">
+          <label>{sizeText('flowSense')}</label>
+          <select data-testid="nt-flow-sense" value={flowSense} onChange={(e) => setFlowSense(e.target.value as FlowSense)}>
+            <option value="supply">{sizeText('flowSenseSupply')}</option>
+            <option value="return">{sizeText('flowSenseReturn')}</option>
+          </select>
+          <span data-testid="nt-flow-sense-note" className="mep-nt-note-tip">
+            <InfoTip label={sizeText('flowSenseInfoLabel')}>{sizeText('flowSenseNote')}</InfoTip>
+          </span>
+        </div>
         <div className="mep-field-row">
           <label>{sizeText('flowUnit')}</label>
           <select

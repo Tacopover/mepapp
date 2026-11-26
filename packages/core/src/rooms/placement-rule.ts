@@ -6,7 +6,7 @@
 // the numbers. Pure functions, no I/O.
 
 import type { PortSpec } from '../geometry.js';
-import type { Discipline, LinePattern, NetworkType } from '../network.js';
+import { isFlowSense, type Discipline, type LinePattern, type NetworkType } from '../network.js';
 import type { Room } from './room.js';
 import type { RoomValues } from './room-values.js';
 import { demandTotal, matchRoomType, oldDemandFieldTerm, type DemandResult, type DemandTerm, type RoomDemand, type RoomDemands } from './room-type.js';
@@ -702,7 +702,9 @@ function toNetworkTypeCopies(value: unknown): NetworkType[] | undefined {
     const units = typeof t.units === 'string' ? t.units : '';
     if (typeof t.id !== 'string' || !t.id || typeof t.name !== 'string' || typeof t.color !== 'string' || copies.some((c) => c.id === t.id)) continue;
     if (!DISCIPLINES.includes(t.discipline as Discipline) || !LINE_PATTERNS.includes(t.linePattern as LinePattern)) continue;
-    copies.push({ id: t.id, name: t.name, discipline: t.discipline as Discipline, units, defaultCapacity: num(t.defaultCapacity) ?? 0, color: t.color, lineWidthPt: num(t.lineWidthPt) ?? 1, linePattern: t.linePattern as LinePattern });
+    const copy: NetworkType = { id: t.id, name: t.name, discipline: t.discipline as Discipline, units, defaultCapacity: num(t.defaultCapacity) ?? 0, color: t.color, lineWidthPt: num(t.lineWidthPt) ?? 1, linePattern: t.linePattern as LinePattern };
+    if (isFlowSense(t.flowSense)) copy.flowSense = t.flowSense;
+    copies.push(copy);
   }
   return copies.length > 0 ? copies : undefined;
 }

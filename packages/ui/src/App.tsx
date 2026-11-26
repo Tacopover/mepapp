@@ -2005,9 +2005,11 @@ export function MepSketchApp({
   const handleSaveNetworkType = useCallback(
     (id: string, patch: NetworkTypeEditPatch) => {
       sceneRef.current?.updateNetworkType(id, patch);
+      const stored = sceneRef.current?.getNetworkTypes().find((candidate) => candidate.id === id);
+      if (stored) risers.syncTypeCopy(stored);
       setNetworkTypeEditorTarget(null);
     },
-    [sceneRef],
+    [sceneRef, risers.syncTypeCopy],
   );
 
   const handleDuplicateNetworkType = useCallback(
