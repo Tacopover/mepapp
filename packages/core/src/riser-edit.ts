@@ -1,7 +1,8 @@
 import type { NetworkType } from './network.js';
 import type { Vec2 } from './geometry.js';
 import type { BuildingFile } from './building.js';
-import type { Riser, RiserMember, RiserPendingOp } from './riser.js';
+import type { Riser, RiserArrowPair, RiserMember, RiserPendingOp } from './riser.js';
+import { isRiserArrowPair } from './riser.js';
 import { type PageMmFrame, pageSizeMm, ptToMm } from './riser-coords.js';
 
 export type RiserError = 'scale-unknown' | 'level-taken' | 'type-differs' | 'unknown-sheet' | 'unknown-riser' | 'duplicate-id';
@@ -168,6 +169,40 @@ export function setMemberConnectionHeight(file: BuildingFile, riserId: string, s
     const updated: RiserMember = { ...candidate };
     if (mm === undefined) delete updated.connectionHeightMm;
     else updated.connectionHeightMm = mm;
+    return updated;
+  });
+  const next: Riser = { ...riser, members };
+  return { ...file, risers: file.risers.map((candidate) => (candidate.id === riserId ? next : candidate)) };
+}
+
+/** Sets the hand-set arrows of the member of that levelId (the pair is copied: the file does not keep the argument). A pair (none, none) is stored as it is. A pair that `isRiserArrowPair` refuses, an unknown riser or level, or a member that already has an equal pair: file unchanged (same object). */
+export function setMemberArrows(file: BuildingFile, riserId: string, levelId: string, pair: RiserArrowPair): BuildingFile {
+  const riser = file.risers.find((candidate) => candidate.id === riserId);
+  if (riser === undefined) return file;
+  if (!isRiserArrowPair(pair)) return file;
+  const member = riser.members.find((candidate) => candidate.levelId === levelId);
+  if (member === undefined) return file;
+  if (member.arrows !== undefined && member.arrows.below === pair.below && member.arrows.above === pair.above) return file;
+  const members = riser.members.map((candidate) => {
+    if (candidate.levelId !== levelId) return candidate;
+    const updated: RiserMember = { ...candidate };
+    updated.arrows = { below: pair.below, above: pair.above };
+    return updated;
+  });
+  const next: Riser = { ...riser, members };
+  return { ...file, risers: file.risers.map((candidate) => (candidate.id === riserId ? next : candidate)) };
+}
+
+/** Removes the field `arrows` of the member of that levelId (back to "arrows from the flow solve"). Unknown riser or level, or a member with no `arrows`: file unchanged (same object). */
+export function clearMemberArrows(file: BuildingFile, riserId: string, levelId: string): BuildingFile {
+  const riser = file.risers.find((candidate) => candidate.id === riserId);
+  if (riser === undefined) return file;
+  const member = riser.members.find((candidate) => candidate.levelId === levelId);
+  if (member === undefined || member.arrows === undefined) return file;
+  const members = riser.members.map((candidate) => {
+    if (candidate.levelId !== levelId) return candidate;
+    const updated: RiserMember = { ...candidate };
+    delete updated.arrows;
     return updated;
   });
   const next: Riser = { ...riser, members };

@@ -1,6 +1,8 @@
 import { migrateToLatest, SchemaMigrationError, validateDocument } from './schema.js';
 import type { JsonRecord, MigrationStep, ValidationIssue, Validator } from './schema.js';
 import type { Riser } from './riser.js';
+import { isRiserArrowPair } from './riser.js';
+import { sortedMembers } from './riser-quantities.js';
 
 export const BUILDING_SCHEMA_VERSION = 1;
 
@@ -311,6 +313,26 @@ const validateRisers: Validator = (data) => {
 
 const buildingValidators: Validator[] = [validateTopLevel, validateLevels, validateSheets, validateRisers];
 
+/** Removes an `arrows` value that is not a valid pair from each member of each riser. Returns the same object when nothing changes. Never changes its input. */
+function dropBadMemberArrows(migrated: JsonRecord): JsonRecord {
+  if (!Array.isArray(migrated.risers)) return migrated;
+  const originalRisers: unknown[] = migrated.risers;
+  const risers = originalRisers.map((riser: unknown) => {
+    if (!isRecord(riser) || !Array.isArray(riser.members)) return riser;
+    const originalMembers: unknown[] = riser.members;
+    const members = originalMembers.map((member: unknown) => {
+      if (!isRecord(member) || !('arrows' in member) || isRiserArrowPair(member.arrows)) return member;
+      const kept: JsonRecord = { ...member };
+      delete kept.arrows;
+      return kept;
+    });
+    if (members.every((member, index) => member === originalMembers[index])) return riser;
+    return { ...riser, members };
+  });
+  if (risers.every((riser, index) => riser === originalRisers[index])) return migrated;
+  return { ...migrated, risers };
+}
+
 /** Migrates raw JSON (any prior schema version) to the current shape and validates it. Throws BuildingFileError if the file is malformed or newer than this app. Fields that this app does not know stay in the result. */
 export function parseBuildingFile(raw: unknown): BuildingFile {
   if (!isRecord(raw)) throw new BuildingFileError('building file is not an object', [{ path: '', message: 'building file must be a JSON object' }]);
@@ -323,6 +345,7 @@ export function parseBuildingFile(raw: unknown): BuildingFile {
     }
     throw error;
   }
+  migrated = dropBadMemberArrows(migrated);
   const issues = validateDocument(migrated, buildingValidators);
   if (issues.length > 0) throw new BuildingFileError('building file failed validation', issues);
   return migrated as unknown as BuildingFile;
@@ -359,6 +382,16 @@ export function riserWarnings(file: BuildingFile): string[] {
     }
     if (riser.endAllowanceMm > 0 && riser.topEnd === 'member' && riser.bottomEnd === 'member') {
       warnings.push(`${riser.name} has an end allowance but both ends continue on a level.`);
+    }
+    const sorted = sortedMembers(file, riser);
+    for (let i = 0; i + 1 < sorted.length; i++) {
+      const lower = sorted[i]!;
+      const upper = sorted[i + 1]!;
+      const lowerArrows = lower.member.arrows;
+      const upperArrows = upper.member.arrows;
+      if (lowerArrows && upperArrows && lowerArrows.above !== upperArrows.below) {
+        warnings.push(`Arrows disagree on the span ${lower.level.name} to ${upper.level.name}`);
+      }
     }
     for (const member of riser.members) {
       const group = risersByLevel.get(member.levelId);

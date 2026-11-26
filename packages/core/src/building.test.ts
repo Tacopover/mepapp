@@ -325,6 +325,171 @@ describe('building file', () => {
     const members = [member('l0', 's0', 0), member('l0', 's0', 0)];
     expect(riserWarnings(riserFile(riserRecord({ members })))).toEqual([]);
   });
+
+  it('keeps a valid arrow pair on a member', () => {
+    const file = riserFile(riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, member('l1', 's1', 1)] }));
+    expect(parseBuildingFile(file).risers[0]!.members[0]).toEqual({ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } });
+  });
+
+  it('parses a member with no arrows as before', () => {
+    expect(parseBuildingFile(riserFile(riserRecord({ members: [member('l0', 's0', 0)] }))).risers[0]!.members[0]).toEqual(member('l0', 's0', 0));
+  });
+
+  it('round-trips arrow pairs, including (none, none)', () => {
+    const file = riserFile(
+      riserRecord({
+        members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'none' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'up' } }],
+      }),
+    );
+    expect(parseBuildingFile(JSON.parse(serializeBuildingFile(file)))).toEqual(file);
+  });
+
+  it('drops a bad arrow pair from a member and keeps the file', () => {
+    for (const bad of [{ below: 'left', above: 'up' }, { below: 'up' }, 'up', null, 42]) {
+      const parsed = parseBuildingFile(riserFile(riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: bad }, member('l1', 's1', 1)] })));
+      expect(parsed.schemaVersion).toBe(1);
+      expect(parsed.risers[0]!.members[0]).toEqual(member('l0', 's0', 0));
+      expect('arrows' in parsed.risers[0]!.members[0]!).toBe(false);
+    }
+  });
+
+  it('drops a bad arrow pair on one member and keeps a good pair on another', () => {
+    const file = riserFile(
+      riserRecord({
+        members: [{ ...member('l0', 's0', 0), arrows: { below: 'left', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'up' } }],
+      }),
+    );
+    const parsed = parseBuildingFile(file);
+    expect(parsed.risers[0]!.members[0]).toEqual(member('l0', 's0', 0));
+    expect(parsed.risers[0]!.members[1]).toEqual({ ...member('l1', 's1', 1), arrows: { below: 'down', above: 'up' } });
+  });
+
+  it('does not change the raw input when it drops a bad arrow pair', () => {
+    const raw = riserFile(
+      riserRecord({
+        members: [{ ...member('l0', 's0', 0), arrows: { below: 'left', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'none', above: 'up' } }],
+      }),
+    );
+    const before = JSON.parse(JSON.stringify(raw));
+    parseBuildingFile(raw);
+    expect(raw).toEqual(before);
+  });
+
+  it('keeps an unknown field of another kind on a member and on a riser', () => {
+    const raw = riserFile(riserRecord({ members: [{ ...member('l0', 's0', 0), futureThing: { a: 1 } }], futureRiser: { b: 2 } }));
+    expect(parseBuildingFile(raw).risers).toEqual(raw.risers);
+  });
+
+  it('keeps the building schema version at 1', () => {
+    expect(BUILDING_SCHEMA_VERSION).toBe(1);
+  });
+
+  it('warns when the arrows of two rings of a span disagree', () => {
+    const file = riserFile(
+      riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'none' } }] }),
+    );
+    expect(riserWarnings(file)).toEqual(['Arrows disagree on the span Basement to Ground']);
+  });
+
+  it('warns when a none arrow faces an up arrow', () => {
+    const file = riserFile(
+      riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'none' } }, { ...member('l1', 's1', 1), arrows: { below: 'up', above: 'none' } }] }),
+    );
+    expect(riserWarnings(file)).toEqual(['Arrows disagree on the span Basement to Ground']);
+  });
+
+  it('gives no warning when the arrows of a span agree', () => {
+    const file = riserFile(
+      riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'up', above: 'none' } }] }),
+    );
+    expect(riserWarnings(file)).toEqual([]);
+  });
+
+  it('gives no warning when both rings of a span have no arrow', () => {
+    const file = riserFile(
+      riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'none' } }, { ...member('l1', 's1', 1), arrows: { below: 'none', above: 'none' } }] }),
+    );
+    expect(riserWarnings(file)).toEqual([]);
+  });
+
+  it('gives no warning when one ring of a span is not hand-set', () => {
+    const file = riserFile(riserRecord({ members: [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, member('l1', 's1', 1)] }));
+    expect(riserWarnings(file)).toEqual([]);
+  });
+
+  it('gives no warning at the ends of the chain', () => {
+    const file = threeLevelFile(
+      riserRecord({
+        members: [
+          { ...member('l0', 's0', 0), arrows: { below: 'down', above: 'up' } },
+          { ...member('l1', 's1', 1), arrows: { below: 'up', above: 'down' } },
+          { ...member('l2', 's2', 2), arrows: { below: 'down', above: 'up' } },
+        ],
+      }),
+    );
+    expect(riserWarnings(file)).toEqual([]);
+  });
+
+  it('warns for each disagreeing span, lowest span first', () => {
+    const file = threeLevelFile(
+      riserRecord({
+        members: [
+          { ...member('l0', 's0', 0), arrows: { below: 'none', above: 'none' } },
+          { ...member('l1', 's1', 1), arrows: { below: 'up', above: 'down' } },
+          { ...member('l2', 's2', 2), arrows: { below: 'up', above: 'none' } },
+        ],
+      }),
+    );
+    expect(riserWarnings(file)).toEqual([
+      'Arrows disagree on the span Basement to Ground',
+      'Arrows disagree on the span Ground to First',
+    ]);
+  });
+
+  it('pairs the rings by elevation when the members are not in elevation order', () => {
+    const file = threeLevelFile(
+      riserRecord({
+        members: [
+          { ...member('l2', 's2', 2), arrows: { below: 'up', above: 'none' } },
+          { ...member('l0', 's0', 0), arrows: { below: 'none', above: 'none' } },
+          { ...member('l1', 's1', 1), arrows: { below: 'up', above: 'down' } },
+        ],
+      }),
+    );
+    expect(riserWarnings(file)).toEqual([
+      'Arrows disagree on the span Basement to Ground',
+      'Arrows disagree on the span Ground to First',
+    ]);
+  });
+
+  it('skips a member of an unknown level when it pairs the rings', () => {
+    const file = threeLevelFile(
+      riserRecord({
+        members: [
+          { ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } },
+          { ...member('nope', 's9', 0), arrows: { below: 'up', above: 'up' } },
+          { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'none' } },
+        ],
+      }),
+    );
+    expect(riserWarnings(file)).toEqual(['Arrows disagree on the span Basement to Ground']);
+  });
+
+  it('warns for each riser on its own', () => {
+    const disagree = [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'none' } }];
+    const file = riserFile(riserRecord({ members: disagree }), riserRecord({ id: 'r2', name: 'R2', anchorMm: { xMm: 1000, yMm: 0 }, members: disagree }));
+    expect(riserWarnings(file)).toEqual([
+      'Arrows disagree on the span Basement to Ground',
+      'Arrows disagree on the span Basement to Ground',
+    ]);
+  });
+
+  it('warns only for the riser whose arrows disagree', () => {
+    const agree = [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'up', above: 'none' } }];
+    const disagree = [{ ...member('l0', 's0', 0), arrows: { below: 'none', above: 'up' } }, { ...member('l1', 's1', 1), arrows: { below: 'down', above: 'none' } }];
+    const file = riserFile(riserRecord({ members: agree }), riserRecord({ id: 'r2', name: 'R2', anchorMm: { xMm: 1000, yMm: 0 }, members: disagree }));
+    expect(riserWarnings(file)).toEqual(['Arrows disagree on the span Basement to Ground']);
+  });
 });
 
 function riserRecord(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -354,6 +519,17 @@ function riserIssues(overrides: Record<string, unknown>): string[] {
 
 function member(levelId: string, sheetId: string, pageIndex: number): Record<string, unknown> {
   return { levelId, sheetId, pageIndex, fittingId: `f-${sheetId}` };
+}
+
+function threeLevelFile(...risers: Record<string, unknown>[]): BuildingFile {
+  return {
+    ...riserFile(...risers),
+    levels: [
+      { id: 'l0', name: 'Basement', elevationMm: -3000 },
+      { id: 'l1', name: 'Ground', elevationMm: 0 },
+      { id: 'l2', name: 'First', elevationMm: 3000 },
+    ],
+  };
 }
 
 function retag(seq: number, sheetId: string): Record<string, unknown> {

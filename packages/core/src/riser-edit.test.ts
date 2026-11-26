@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { calibrationFromScale } from './calibration.js';
 import type { BuildingFile } from './building.js';
 import type { NetworkType } from './network.js';
-import type { Riser, RiserMember } from './riser.js';
+import type { Riser, RiserArrowPair, RiserMember } from './riser.js';
 import {
   attachMember,
+  clearMemberArrows,
   clearRiserFlowOverride,
   deleteRiser,
   deleteRisers,
@@ -16,6 +17,7 @@ import {
   refreshRiserNetworkType,
   rescaleRisers,
   riserSheetGroup,
+  setMemberArrows,
   setMemberConnectionHeight,
   setPendingScale,
   setRiserProps,
@@ -199,6 +201,14 @@ describe('attachMember', () => {
     const this50: PageFrame = { widthPt: 1190, heightPt: 1684, pageUnitsPerRealUnit: calibrationFromScale(50).pageUnitsPerRealUnit };
     const result = ok(attachMember(fileWithRiser(), 'r1', second, { first, this: this50 }));
     expect(result.warnings).toEqual([]);
+  });
+
+  it('keeps the arrows of a member when another member is attached and detached', () => {
+    const arrows: RiserArrowPair = { below: 'up', above: 'down' };
+    const withArrows = ok(attachMember(fileWithRiser(), 'r1', { ...second, arrows }, sameFrames)).file;
+    const withThird = ok(attachMember(withArrows, 'r1', member(2), sameFrames)).file;
+    const file = detachMember(withThird, 'r1', 's2');
+    expect(riserOf(file, 'r1').members.find((item) => item.sheetId === 's1')?.arrows).toEqual(arrows);
   });
 });
 
@@ -391,6 +401,82 @@ describe('setMemberConnectionHeight', () => {
     const next = setMemberConnectionHeight(file, 'r1', 's1', 250);
     expect(riserOf(next, 'r1').members[0]).toBe(riserOf(file, 'r1').members[0]);
     expect(riserOf(next, 'r1').members[2]).toBe(riserOf(file, 'r1').members[2]);
+  });
+});
+
+describe('setMemberArrows', () => {
+  function withMembers(): BuildingFile {
+    return ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+  }
+
+  function memberOf(file: BuildingFile, levelId: string): RiserMember | undefined {
+    return riserOf(file, 'r1').members.find((item) => item.levelId === levelId);
+  }
+
+  it('writes the pair on the member of that level and leaves the other fields alone', () => {
+    const withHeight = setMemberConnectionHeight(withMembers(), 'r1', 's1', 250);
+    const file = setMemberArrows(withHeight, 'r1', 'l1', { below: 'up', above: 'down' });
+    expect(memberOf(file, 'l1')).toMatchObject({ connectionHeightMm: 250, arrows: { below: 'up', above: 'down' } });
+    expect(riserOf(file, 'r1').members[0]).toBe(riserOf(withHeight, 'r1').members[0]);
+  });
+
+  it('stores (none, none) as a value', () => {
+    const member1 = memberOf(setMemberArrows(withMembers(), 'r1', 'l1', { below: 'none', above: 'none' }), 'l1');
+    expect(member1 !== undefined && 'arrows' in member1).toBe(true);
+    expect(member1?.arrows).toEqual({ below: 'none', above: 'none' });
+  });
+
+  it('stores a copy of the pair and does not change the input file', () => {
+    const input = withMembers();
+    const snapshot = JSON.stringify(input);
+    const pair: RiserArrowPair = { below: 'up', above: 'down' };
+    const file = setMemberArrows(input, 'r1', 'l1', pair);
+    pair.above = 'none';
+    expect(memberOf(file, 'l1')?.arrows).toEqual({ below: 'up', above: 'down' });
+    expect(JSON.stringify(input)).toBe(snapshot);
+  });
+
+  it('replaces a pair', () => {
+    const first = setMemberArrows(withMembers(), 'r1', 'l1', { below: 'up', above: 'down' });
+    const file = setMemberArrows(first, 'r1', 'l1', { below: 'down', above: 'none' });
+    expect(memberOf(file, 'l1')?.arrows).toEqual({ below: 'down', above: 'none' });
+  });
+
+  it('returns the same file for an unknown riser, an unknown level, an invalid pair and an equal pair', () => {
+    const file = setMemberArrows(withMembers(), 'r1', 'l1', { below: 'up', above: 'down' });
+    expect(setMemberArrows(file, 'nope', 'l1', { below: 'up', above: 'down' })).toBe(file);
+    expect(setMemberArrows(file, 'r1', 'l2', { below: 'up', above: 'down' })).toBe(file);
+    expect(setMemberArrows(file, 'r1', 'l1', { below: 'left', above: 'up' } as never)).toBe(file);
+    expect(setMemberArrows(file, 'r1', 'l1', { below: 'up', above: 'down' })).toBe(file);
+  });
+});
+
+describe('clearMemberArrows', () => {
+  function withArrows(): BuildingFile {
+    const attached = ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+    return setMemberArrows(attached, 'r1', 'l1', { below: 'up', above: 'down' });
+  }
+
+  it('removes the field and keeps the other fields', () => {
+    const withHeight = setMemberConnectionHeight(withArrows(), 'r1', 's1', 250);
+    const file = clearMemberArrows(withHeight, 'r1', 'l1');
+    const member1 = riserOf(file, 'r1').members.find((item) => item.levelId === 'l1');
+    expect(member1 !== undefined && 'arrows' in member1).toBe(false);
+    expect(member1?.connectionHeightMm).toBe(250);
+  });
+
+  it('removes a stored (none, none) too', () => {
+    const none = setMemberArrows(withArrows(), 'r1', 'l1', { below: 'none', above: 'none' });
+    const member1 = riserOf(clearMemberArrows(none, 'r1', 'l1'), 'r1').members.find((item) => item.levelId === 'l1');
+    expect(member1 !== undefined && 'arrows' in member1).toBe(false);
+  });
+
+  it('returns the same file for an unknown riser, an unknown level and a member with no field', () => {
+    const file = withArrows();
+    expect(clearMemberArrows(file, 'nope', 'l1')).toBe(file);
+    expect(clearMemberArrows(file, 'r1', 'l2')).toBe(file);
+    const plain = ok(attachMember(fileWithRiser(), 'r1', member(1), { first: frame, this: frame })).file;
+    expect(clearMemberArrows(plain, 'r1', 'l1')).toBe(plain);
   });
 });
 
