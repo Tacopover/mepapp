@@ -4,6 +4,8 @@ Status: **planned 2026-11-21, revised the same day after the audit and the domai
 
 **T11 (2026-11-25): one wording for all network types, D-B-113.** The user ordered that no network type gets its own words for now. The source word and the tag "Not a design flow" are the same for every type. Details: `buildings-b7-t09-open-ends.md`.
 
+**B7-T13 (2026-11-26): wait limit on opening a recent building.** A recent building whose file does not answer froze the Building menu and Manage Buildings (a user report from the Windows test). `openRecent` now gives up after 10 seconds (`OPEN_RECENT_WAIT_MS` in `buildingController.ts`), clears the busy flag and shows a message. The check is `.claude/roadmap/work/b7-t13-check.mjs`. Windows test: Part L of `buildings-b7-test.md`.
+
 ## 1. Why
 
 The user asked for this on 2026-11-13. A riser is a segment that goes up or down. The flow rules of normal segments should also work for risers. Today they do not:

@@ -775,3 +775,221 @@ describe('BuildingController saveCopy', () => {
     expect(fileAccess.saveFileAs).not.toHaveBeenCalled();
   });
 });
+
+describe('BuildingController wait limit for a recent building', () => {
+  const towerJson = serializeBuildingFile(emptyBuilding('a-1', 'Tower'));
+  const entry = { id: 'a-1', name: 'Tower', location: 'Tower.building.json' };
+  const noAnswer = 'The building file "Tower" did not answer. Check that the file exists and that its folder is online. Use Open building… to find it.';
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+  const storeWith = (overrides: Partial<Pick<BuildingStore, 'status' | 'read' | 'requestAccess'>>) =>
+    Object.assign(new MemoryBuildingStore({ json: towerJson }), overrides);
+  const controllerFor = (store: BuildingStore, openWaitMs = 30, storage = fakeStorage()) =>
+    new BuildingController({ fileAccess: {} as FileAccess, makeStore: () => store, openWaitMs, storage, newId: () => 'x-1' });
+  const collectUnhandled = async (body: () => Promise<void>): Promise<unknown[]> => {
+    const runtime = (globalThis as unknown as { process: { on: (event: string, fn: (reason: unknown) => void) => void; off: (event: string, fn: (reason: unknown) => void) => void } }).process;
+    const errors: unknown[] = [];
+    const listener = (reason: unknown) => {
+      errors.push(reason);
+    };
+    runtime.on('unhandledRejection', listener);
+    try {
+      await body();
+      await sleep(20);
+      return errors;
+    } finally {
+      runtime.off('unhandledRejection', listener);
+    }
+  };
+
+  it('gives up when status never settles and clears busy', async () => {
+    const controller = controllerFor(storeWith({ status: () => new Promise<never>(() => {}) }));
+    await controller.openRecent(entry);
+    const state = controller.getState();
+    expect(state.busy).toBe(false);
+    expect(state.message).toBe(noAnswer);
+    expect(state.building).toBeNull();
+    expect(state.needsAccess).toBeNull();
+  });
+
+  it('gives up when read never settles and clears busy', async () => {
+    const controller = controllerFor(storeWith({ status: async () => 'ready', read: () => new Promise<never>(() => {}) }));
+    await controller.openRecent(entry);
+    const state = controller.getState();
+    expect(state.busy).toBe(false);
+    expect(state.message).toBe(noAnswer);
+    expect(state.building).toBeNull();
+    expect(state.needsAccess).toBeNull();
+  });
+
+  it('keeps the state of a status answer that comes after the give-up', async () => {
+    let answer!: (value: 'ready') => void;
+    const controller = controllerFor(storeWith({ status: () => new Promise<'ready'>((resolve) => { answer = resolve; }) }));
+    await controller.openRecent(entry);
+    const before = controller.getState();
+    answer('ready');
+    await sleep(20);
+    expect(controller.getState()).toBe(before);
+    expect(controller.getState().building).toBeNull();
+  });
+
+  it('keeps the state of a read answer that comes after the give-up', async () => {
+    let answer!: (value: { json: string; revision: string }) => void;
+    const controller = controllerFor(
+      storeWith({ status: async () => 'ready', read: () => new Promise<{ json: string; revision: string }>((resolve) => { answer = resolve; }) }),
+    );
+    await controller.openRecent(entry);
+    const before = controller.getState();
+    answer({ json: towerJson, revision: '1' });
+    await sleep(20);
+    expect(controller.getState()).toBe(before);
+    expect(controller.getState().building).toBeNull();
+  });
+
+  it('keeps the state and raises no unhandled rejection when status rejects after the give-up', async () => {
+    let fail!: (error: Error) => void;
+    const controller = controllerFor(storeWith({ status: () => new Promise<'ready'>((_resolve, reject) => { fail = reject; }) }));
+    await controller.openRecent(entry);
+    const before = controller.getState();
+    const errors = await collectUnhandled(async () => {
+      fail(new Error('late'));
+    });
+    expect(errors).toEqual([]);
+    expect(controller.getState()).toBe(before);
+  });
+
+  it('keeps the state and raises no unhandled rejection when read rejects after the give-up', async () => {
+    let fail!: (error: Error) => void;
+    const controller = controllerFor(
+      storeWith({ status: async () => 'ready', read: () => new Promise<{ json: string; revision: string }>((_resolve, reject) => { fail = reject; }) }),
+    );
+    await controller.openRecent(entry);
+    const before = controller.getState();
+    const errors = await collectUnhandled(async () => {
+      fail(new Error('late'));
+    });
+    expect(errors).toEqual([]);
+    expect(controller.getState()).toBe(before);
+    expect(controller.getState().building).toBeNull();
+  });
+
+  it('opens a good building after a stuck one, and a late answer of the stuck one changes nothing', async () => {
+    const annexJson = serializeBuildingFile(emptyBuilding('b-2', 'Annex'));
+    const annex = { id: 'b-2', name: 'Annex', location: 'Annex.building.json' };
+    let answer!: (value: { json: string; revision: string }) => void;
+    const stuck = storeWith({ status: async () => 'ready', read: () => new Promise<{ json: string; revision: string }>((resolve) => { answer = resolve; }) });
+    const good = new MemoryBuildingStore({ json: annexJson });
+    const controller = new BuildingController({
+      fileAccess: {} as FileAccess,
+      makeStore: (ref) => (ref.id === 'a-1' ? stuck : good),
+      openWaitMs: 30,
+      storage: fakeStorage(),
+      newId: () => 'x-1',
+    });
+    await controller.openRecent(entry);
+    expect(controller.getState().message).toBe(noAnswer);
+    await controller.openRecent(annex);
+    expect(controller.getState().building?.file.id).toBe('b-2');
+    expect(controller.getState().message).toBeNull();
+    answer({ json: towerJson, revision: '1' });
+    await sleep(20);
+    expect(controller.getState().building?.file.id).toBe('b-2');
+  });
+
+  it('opens a building that answers inside the limit and clears the timer', async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = controllerFor(storeWith({}));
+      await controller.openRecent(entry);
+      expect(controller.getState().building?.file.name).toBe('Tower');
+      expect(controller.getState().message).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(60);
+      expect(controller.getState().building?.file.name).toBe('Tower');
+      expect(controller.getState().message).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives the no-answer message when the permission is granted and read never settles', async () => {
+    const controller = controllerFor(
+      storeWith({ status: async () => 'needs-permission', requestAccess: async () => 'ready', read: () => new Promise<never>(() => {}) }),
+    );
+    await controller.openRecent(entry);
+    await controller.allowAccess();
+    const state = controller.getState();
+    expect(state.busy).toBe(false);
+    expect(state.message).toBe(noAnswer);
+    expect(state.building).toBeNull();
+  });
+
+  it('keeps the open building when an older stuck openRecent gives up after a newer one', async () => {
+    const annexJson = serializeBuildingFile(emptyBuilding('b-2', 'Annex'));
+    const annex = { id: 'b-2', name: 'Annex', location: 'Annex.building.json' };
+    const stuck = storeWith({ status: () => new Promise<never>(() => {}) });
+    const good = new MemoryBuildingStore({ json: annexJson });
+    const controller = new BuildingController({
+      fileAccess: {} as FileAccess,
+      makeStore: (ref) => (ref.id === 'a-1' ? stuck : good),
+      openWaitMs: 30,
+      storage: fakeStorage(),
+      newId: () => 'x-1',
+    });
+    const pending = controller.openRecent(entry);
+    await controller.openRecent(annex);
+    expect(controller.getState().building?.file.id).toBe('b-2');
+    await pending;
+    expect(controller.getState().message).toBeNull();
+    expect(controller.getState().building?.file.id).toBe('b-2');
+  });
+
+  it('opens a ready building and keeps the old messages for a missing file and for a file that needs permission', async () => {
+    const ready = controllerFor(gatedStore(towerJson, 'ready', 'ready', []));
+    await ready.openRecent(entry);
+    expect(ready.getState().building?.file.name).toBe('Tower');
+    const missing = controllerFor(gatedStore(towerJson, 'unavailable', 'ready', []));
+    await missing.openRecent(entry);
+    expect(missing.getState().message).toBe('The building file "Tower" was not found. Use Open building… to find it.');
+    const gated = controllerFor(gatedStore(towerJson, 'needs-permission', 'ready', []));
+    await gated.openRecent(entry);
+    expect(gated.getState().needsAccess).toEqual({ entry, denied: false });
+    expect(gated.getState().message).toBeNull();
+  });
+
+  it('gives no limit to the permission request in allowAccess', async () => {
+    const store = storeWith({
+      status: async () => 'needs-permission',
+      requestAccess: async () => {
+        await sleep(80);
+        return 'ready';
+      },
+    });
+    const controller = controllerFor(store);
+    await controller.openRecent(entry);
+    await controller.allowAccess();
+    expect(controller.getState().building?.file.name).toBe('Tower');
+    expect(controller.getState().message).toBeNull();
+  });
+
+  it('lets forgetRecent remove a stuck recent entry during the wait', async () => {
+    const storage = fakeStorage();
+    storage.setItem(RECENT_BUILDINGS_KEY, JSON.stringify([entry]));
+    const controller = controllerFor(storeWith({ status: () => new Promise<never>(() => {}) }), 30, storage);
+    const pending = controller.openRecent(entry);
+    controller.forgetRecent('a-1');
+    expect(controller.getState().recent).toEqual([]);
+    await pending;
+    expect(controller.getState().recent).toEqual([]);
+    expect(controller.getState().message).toBe(noAnswer);
+  });
+
+  it('lets forgetRecent remove a recent entry after its wait ended', async () => {
+    const storage = fakeStorage();
+    storage.setItem(RECENT_BUILDINGS_KEY, JSON.stringify([entry]));
+    const controller = controllerFor(storeWith({ status: () => new Promise<never>(() => {}) }), 30, storage);
+    await controller.openRecent(entry);
+    controller.forgetRecent('a-1');
+    expect(controller.getState().recent).toEqual([]);
+    expect(controller.getState().busy).toBe(false);
+  });
+});

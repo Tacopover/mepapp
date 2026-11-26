@@ -73,6 +73,8 @@ export interface BuildingControllerArgs {
   storage?: Pick<Storage, 'getItem' | 'setItem'>;
   /** Defaults to crypto.randomUUID. */
   newId?: () => string;
+  /** How long openRecent waits for the building file before it gives up, in ms. Default OPEN_RECENT_WAIT_MS. */
+  openWaitMs?: number;
 }
 
 export const BUILDING_FILE_TYPES: FileTypeFilter[] = [
@@ -81,10 +83,35 @@ export const BUILDING_FILE_TYPES: FileTypeFilter[] = [
 
 export const BROWSER_LOCATION = 'Kept inside this browser';
 
+export const OPEN_RECENT_WAIT_MS = 10_000;
+
 const CONFLICT_MESSAGE = 'The building file changed on disk. Your last change was not saved.';
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+class NoAnswerError extends Error {}
+
+/** Settles like `promise`, or rejects with NoAnswerError after `ms`. The timer is cleared when `promise` settles. A later result of `promise` is ignored (and a later rejection is handled here, so it is never unhandled). */
+function withinLimit<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new NoAnswerError()), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function noAnswerMessage(name: string): string {
+  return `The building file "${name}" did not answer. Check that the file exists and that its folder is online. Use Open building… to find it.`;
 }
 
 function isStoreConflict(error: unknown): boolean {
@@ -112,6 +139,9 @@ export class BuildingController {
   private readonly makeStore: (ref: BuildingRef, target?: unknown) => BuildingStore;
   private readonly storage: Pick<Storage, 'getItem' | 'setItem'> | undefined;
   private readonly newId: () => string;
+  private readonly openWaitMs: number;
+  /** Counts the openRecent calls. Only the newest call may set the message of a wait limit. */
+  private openToken = 0;
   /** Advances when the open building changes or a conflict drops the queued writes. */
   private generation = 0;
   private pendingWrites = 0;
@@ -126,6 +156,7 @@ export class BuildingController {
     this.makeStore = args.makeStore;
     this.storage = args.storage;
     this.newId = args.newId ?? (() => crypto.randomUUID());
+    this.openWaitMs = args.openWaitMs ?? OPEN_RECENT_WAIT_MS;
     this.state = {
       building: null,
       recent: loadRecentBuildings(args.storage),
@@ -236,10 +267,11 @@ export class BuildingController {
 
   async openRecent(entry: RecentBuilding): Promise<void> {
     this.setState({ needsAccess: null });
+    const token = ++this.openToken;
     try {
       await this.busy(async () => {
         const store = this.makeStore(entry);
-        const status = await store.status();
+        const status = await withinLimit(store.status(), this.openWaitMs);
         if (status === 'unavailable') {
           this.setState({ message: `The building file "${entry.name}" was not found. Use Open building… to find it.` });
           return;
@@ -252,6 +284,10 @@ export class BuildingController {
         await this.openWithStore(store, entry);
       });
     } catch (error) {
+      if (error instanceof NoAnswerError) {
+        if (token === this.openToken) this.setState({ message: noAnswerMessage(entry.name) });
+        return;
+      }
       this.setState({ message: `Could not open the building: ${messageOf(error)}` });
     }
   }
@@ -280,6 +316,10 @@ export class BuildingController {
         await this.openWithStore(store, entry);
       });
     } catch (error) {
+      if (error instanceof NoAnswerError) {
+        this.setState({ message: noAnswerMessage(entry.name) });
+        return;
+      }
       this.setState({ message: `Could not open the building: ${messageOf(error)}` });
     }
   }
@@ -453,7 +493,7 @@ export class BuildingController {
   }
 
   private async openWithStore(store: BuildingStore, entry: RecentBuilding): Promise<void> {
-    const stored = await store.read();
+    const stored = await withinLimit(store.read(), this.openWaitMs);
     if (stored === undefined || (JSON.parse(stored.json) as { id?: unknown }).id !== entry.id) {
       this.setState({ message: `The building file "${entry.name}" was not found. Use Open building… to find it.` });
       return;
