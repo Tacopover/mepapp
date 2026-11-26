@@ -165,7 +165,7 @@ import { clearStampLabels, syncStampLabels } from './stampLabels.js';
 import { fittingContextIn, moveFittingInState, retagRunInState, riserConflictsIn, riserIdsTouchedBySegments, type FittingContext, type RiserConflict, type RiserMark } from './riserMarks.js';
 import { riserSolveOptionsFor } from './riserFlowInputs.js';
 import { applyNetworkTypePatch, type NetworkTypePatch } from './networkTypePatch.js';
-import { flowArrowEnds } from './flowArrow.js';
+import { flowArrowEnds, segmentFlowSense } from './flowArrow.js';
 import { sameKeys, solvedNoSourceOf, type SolvedNoSource } from './flowReadModel.js';
 import { anchorAtPoint, visibleRiserAnchors, type RiserAnchor } from './riserAnchors.js';
 import { riserArrowShapes, riserArrowShaftPattern, RISER_ARROW_STYLE } from './riserArrowShapes.js';
@@ -2755,7 +2755,7 @@ export class SketchScene {
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
   }
 
-  /** Updates a network type's name and/or visuals (color/thickness/pattern/discipline) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType. If `id` hasn't been picked in this document yet (editing a library type's swatch before ever placing a segment of it), adopts it first — same "adopt on first touch" pattern as setActiveNetworkType — so the edit actually persists instead of being silently dropped. No-op only if `id` isn't a known library type either. Re-syncs the drawing layer so already-drawn segments of this type update immediately. flowUnit, sizingMethod and flowSense are stored too (undefined removes the field); a patch of only those three does not redraw. */
+  /** Updates a network type's name and/or visuals (color/thickness/pattern/discipline) — the Network Type Editor dialog's Save action. Same direct-mutation, non-undoable style as renameNetworkType. If `id` hasn't been picked in this document yet (editing a library type's swatch before ever placing a segment of it), adopts it first — same "adopt on first touch" pattern as setActiveNetworkType — so the edit actually persists instead of being silently dropped. No-op only if `id` isn't a known library type either. Re-syncs the drawing layer so already-drawn segments of this type update immediately. flowUnit, sizingMethod and flowSense are stored too (undefined removes the field); a patch of only those three does not redraw. A flowSense change rebuilds the flow arrowheads (they follow the flow sense). */
   updateNetworkType(id: string, patch: NetworkTypePatch): void {
     this.adoptTypes([id], []);
     const target = this.doc.networkTypes.find((t) => t.id === id);
@@ -2763,6 +2763,7 @@ export class SketchScene {
     const redraw = applyNetworkTypePatch(target, patch);
     this.emitter.emit('networkTypesChanged', this.doc.networkTypes);
     if (redraw) this.syncDrawingLayer();
+    else if ('flowSense' in patch) this.syncFlowLabels();
     this.markDirty();
   }
 
@@ -3840,8 +3841,11 @@ export class SketchScene {
         const b = segment.geometry[segment.geometry.length - 1];
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         // segmentDirection's 'AtoB' means flow runs endpointA -> endpointB, i.e.
-        // geometry[0] -> geometry[last] (see network.ts's Segment doc comment).
-        const ends = flowArrowEnds(result.segmentDirection[segmentId] ?? null, a, b);
+        // geometry[0] -> geometry[last] (see network.ts's Segment doc comment). It always
+        // points toward the source; the flow sense of the network type decides what the
+        // arrowhead shows (supply: away from the source, return: toward it).
+        const sense = segmentFlowSense(this.doc.networkTypes, segment.networkTypeId);
+        const ends = flowArrowEnds(result.segmentDirection[segmentId] ?? null, a, b, sense);
         if (ends) {
           const angle = Math.atan2(ends.to.y - ends.from.y, ends.to.x - ends.from.x);
 

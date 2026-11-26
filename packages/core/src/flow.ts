@@ -57,7 +57,7 @@ export interface FlowResult {
   resolved: boolean;
   /** The root's own total subtree demand — the whole network's total capacity. Not the sum of segmentCapacity's values: each of those is already a subtree total on its own, so summing them over-counts everything except the leaf segments. Null when unresolved. */
   totalCapacity: number | null;
-  /** Which physical endpoint is upstream (toward the resolved root): 'AtoB' means flow travels from endpointA to endpointB. A purely structural direction (leaf-to-root), not a supply/return distinction — this layer has no such concept. Null wherever segmentCapacity is null. */
+  /** Which physical endpoint is upstream (toward the resolved root): 'AtoB' means flow travels from endpointA to endpointB. A purely structural direction (leaf-to-root, toward the source) for every network type: this layer has no supply/return concept. The renderer applies the flow sense of the network type to it (render/flowArrow.ts): a supply type draws the arrowhead the other way. Null wherever segmentCapacity is null. */
   segmentDirection: Record<string, 'AtoB' | 'BtoA' | null>;
   /** The sum of the `riserDemand` values this solve used (the exits it reached, plus the entry when it is the root). Set only when `riserDemand` is given. */
   riserCapacity?: number;
