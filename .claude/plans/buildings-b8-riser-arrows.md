@@ -144,6 +144,8 @@ Part A (canvas). Part B (Risers tab) starts only when the user has tested part A
 
 ### B8-T07 (render and ui): the arrowheads on segments follow the flow sense
 
+**DONE 2026-11-26 (4d2be42).** render 114, ui 1337, build 9 of 9, b8-t07-check 34 passed, no-flag check 7. Every existing supply-sense network flips its arrowheads after "Solve flow". A return pipe that uses the supply type shows supply arrowheads (D-B-127 A). Provisional: D-B-140, D-B-141.
+
 - `flowArrowEnds` and `syncFlowLabels` (`scene.ts:3826`, the only reader of `segmentDirection` for drawing, `scene.ts:3848`) get the flow sense of the network type of the segment. `supply`: the arrowhead points away from the source (the flow direction is the reverse of `segmentDirection`). `return`: as today (toward the source). A segment with no direction keeps no arrowhead (D-B-95). The sense comes from the document type, else the library entry of that id, else `supply` (use `flowSenseOf`; the type of a segment may not be adopted, rules.md section 3.4). Keep the flip in render. Do not change `flow.ts`, except the doc comment at `flow.ts:60`.
 - Update `flowArrow.test.ts` (the only test that must change). The Windows script `buildings-b7-test.md` has no step that reads the direction. `b7-t09c1-check.mjs` only counts arrowhead graphics. The numbers do not change.
 - Test: the same network drawn as a supply type and as a return type gives opposite arrowheads. A screenshot of both.
