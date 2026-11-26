@@ -195,10 +195,10 @@ for (const [k, [value, pict]] of flips.entries()) {
   check((await buildingCopy()) === value, `J${k === 0 ? 8 : 9} flip ${k + 1}: the copy of the type in the building file has ${value}`, String(await buildingCopy()));
   if (k === 0) await shot('B8-T05-after-editor-flip');
 }
-// Open point (D-B-130, accepted): the editor changes the type of the OPEN drawing only. Level 2 has its own copy of the type with the old sense.
+// D-B-130 B: the flow sense comes from the riser copy (the editor save updates it in the building file). The editor changed the type of the
+// open drawing (Level 0) only. Level 2 keeps its own old copy of the type, but it must show the same direction for the riser: return, pictogram 6.
 await switchTo(t, 'l2.pdf');
-await page.waitForTimeout(800);
-console.log('INFO after the flips (R1 is return on level 0): level 2 shows', JSON.stringify(Object.fromEntries(Object.entries(await marksOf(page)).map(([k, v]) => [k, v.arrows]))), '(3 = live type of level 2, supply; 6 = riser copy, return)');
-await shot('B8-T05-after-flip-other-level');
+await exp('D-B-130 B level 2', { rf: '6', rf2: '6' }, 'after the flip on Level 0, Level 2 shows return arrows too (6), not the old supply arrows (3)');
+await shot('B8-T05-after-editor-flip-l2');
 check(errors.length === 0, 'no page errors', errors.join(' | '));
 await t.finish();

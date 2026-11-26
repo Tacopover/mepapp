@@ -20,16 +20,16 @@ export function rememberFlow(previous: RememberedFlow | null, building: unknown,
   return null;
 }
 
-/** D-B-130: the live type of the open drawing with the id of `riser.networkTypeId`, else `riser.networkType`. */
+/** The look of a riser (color and line pattern): the live type of the open drawing with the id of riser.networkTypeId, else riser.networkType. It does not decide the flow sense (D-B-130 B). */
 export function riserNetworkTypeLookup(liveTypes: readonly NetworkType[]): (riser: Riser) => NetworkType {
   const byId = new Map(liveTypes.map((type) => [type.id, type] as const));
   return (riser) => byId.get(riser.networkTypeId) ?? riser.networkType;
 }
 
-/** A copy of `marks` where each mark of a ring that has an arrow pair (pictogram not null) gets `arrows` (the pair), `arrowColor` (type.color) and `arrowPattern` (type.linePattern). The member of a mark is found by `riserId`, `fittingId` and the id of `sheet`; its ring by `member.levelId`. A mark with no riser, no member on `sheet`, no ring (level not in file.levels) or the pair (none, none) is copied unchanged (no arrows keys). `flow` null uses EMPTY_FLOW. The input map and the input marks are not changed. */
+/** A copy of `marks` where each mark of a ring that has an arrow pair (pictogram not null) gets `arrows` (the pair), `arrowColor` (type.color) and `arrowPattern` (type.linePattern). The member of a mark is found by `riserId`, `fittingId` and the id of `sheet`; its ring by `member.levelId`. A mark with no riser, no member on `sheet`, no ring (level not in file.levels) or the pair (none, none) is copied unchanged (no arrows keys). `flow` null uses EMPTY_FLOW. The input map and the input marks are not changed. The flow sense is read from riser.networkType only; the live types give color and pattern. */
 export function withRiserArrows(marks: ReadonlyMap<string, RiserMark>, file: BuildingFile, sheet: BuildingSheet, flow: BuildingFlowResult | null, liveTypes: readonly NetworkType[]): Map<string, RiserMark> {
-  const typeOf = riserNetworkTypeLookup(liveTypes);
-  const arrows = riserRingArrows(file, flow ?? EMPTY_FLOW, typeOf);
+  const lookOf = riserNetworkTypeLookup(liveTypes);
+  const arrows = riserRingArrows(file, flow ?? EMPTY_FLOW, (riser) => riser.networkType);
   const risers = new Map(file.risers.map((riser) => [riser.id, riser] as const));
   const result = new Map<string, RiserMark>();
   for (const [fittingId, mark] of marks) {
@@ -40,8 +40,8 @@ export function withRiserArrows(marks: ReadonlyMap<string, RiserMark>, file: Bui
       result.set(fittingId, mark);
       continue;
     }
-    const type = typeOf(riser);
-    result.set(fittingId, { ...mark, arrows: { ...ring.pair }, arrowColor: type.color, arrowPattern: type.linePattern });
+    const look = lookOf(riser);
+    result.set(fittingId, { ...mark, arrows: { ...ring.pair }, arrowColor: look.color, arrowPattern: look.linePattern });
   }
   return result;
 }

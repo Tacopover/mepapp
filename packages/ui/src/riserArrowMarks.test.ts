@@ -169,6 +169,26 @@ describe('withRiserArrows', () => {
     expect(mark?.arrowPattern).toBe('solid');
   });
 
+  it('reads the flow sense from the riser copy, not from the live type: live supply, copy return gives return arrows', () => {
+    const riser = riserOf('R1', threeMembers(), ventReturn);
+    const file = fileWith([riser]);
+    const marks = marksOf(riser);
+    const live: NetworkType = { ...vent, color: '#00ff00' };
+    expect(markAt(0, marks, file, supplyFromL0(), [live])?.arrows).toEqual({ below: 'none', above: 'down' });
+    expect(markAt(1, marks, file, supplyFromL0(), [live])?.arrows).toEqual({ below: 'down', above: 'down' });
+    expect(markAt(2, marks, file, supplyFromL0(), [live])?.arrows).toEqual({ below: 'down', above: 'none' });
+    expect(markAt(0, marks, file, supplyFromL0(), [live])?.arrowColor).toBe('#00ff00');
+  });
+
+  it('reads the flow sense from the riser copy, not from the live type: live return, copy supply gives supply arrows', () => {
+    const riser = riserOf('R1', threeMembers(), vent);
+    const file = fileWith([riser]);
+    const marks = marksOf(riser);
+    expect(markAt(0, marks, file, supplyFromL0(), [ventReturn])?.arrows).toEqual({ below: 'none', above: 'up' });
+    expect(markAt(1, marks, file, supplyFromL0(), [ventReturn])?.arrows).toEqual({ below: 'up', above: 'up' });
+    expect(markAt(2, marks, file, supplyFromL0(), [ventReturn])?.arrows).toEqual({ below: 'up', above: 'none' });
+  });
+
   it('gives no arrows and no arrow keys when the flow is null and no pair is set by hand', () => {
     const riser = riserOf('R1', threeMembers());
     const marks = marksOf(riser);
