@@ -25,6 +25,8 @@ export interface BuildingFlowSpan {
   complete: boolean;
   /** Set only when true: the group has no source, so the number is the highest over every open end as a possible source. */
   atMost?: true;
+  /** Which end of the span is nearer the source of its group: 'from' is `fromLevelId` (the lower member level), 'to' is `toLevelId` (the upper member level). Absent when the group has no source (no source, two sources, a loop, a hand-set conflict, or the highest rule, with or without `atMost`). The direction of the flow is the other end for a supply type and this end for a return type. */
+  towardSource?: 'from' | 'to';
 }
 
 export interface BuildingFlowMember {
@@ -363,6 +365,7 @@ export function solveBuildingFlow(
         edge.capacity = below.demand;
         edge.complete = below.complete;
         component.parentEdgeOf.set(child, edge);
+        edge.out.towardSource = edge.from === key ? 'from' : 'to';
         demand += below.demand;
         complete = complete && below.complete;
       }

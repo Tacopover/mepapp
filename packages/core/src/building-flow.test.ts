@@ -1028,3 +1028,115 @@ describe('solveBuildingFlow with no source (the highest rule)', () => {
     });
   });
 });
+
+describe('solveBuildingFlow towardSource', () => {
+  it('points both spans to the source on level 0', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, false]);
+    const spans = solveBuildingFlow(file, summaries).risers.R!.spans;
+    expect(spans[0]!.towardSource).toBe('from');
+    expect(spans[1]!.towardSource).toBe('from');
+  });
+
+  it('points both spans to the source on level 2', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [false, false, true]);
+    const spans = solveBuildingFlow(file, summaries).risers.R!.spans;
+    expect(spans[0]!.towardSource).toBe('to');
+    expect(spans[1]!.towardSource).toBe('to');
+  });
+
+  it("has towardSource 'to' on the lower span and 'from' on the upper span for the source on level 1", () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [false, true, false]);
+    const spans = solveBuildingFlow(file, summaries).risers.R!.spans;
+    expect(spans[0]!.towardSource).toBe('to');
+    expect(spans[1]!.towardSource).toBe('from');
+  });
+
+  it('matches the source on level 1 for a hand-set source level with no equipment', () => {
+    const { summaries } = threeLevels([100, 500, 150], [false, false, false]);
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)], { sourceLevelId: 'l1' })]);
+    const spans = solveBuildingFlow(file, summaries).risers.R!.spans;
+    expect(spans[0]!.towardSource).toBe('to');
+    expect(spans[1]!.towardSource).toBe('from');
+  });
+
+  it('points to the source of another riser of the group', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(1, 'b'), member(2, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a'], 100, true)]),
+      summary('p1', [entry(['a', 'b'], 500)]),
+      summary('p2', [entry(['b'], 150)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.risers.A!.spans[0]!.towardSource).toBe('from');
+    expect(result.risers.B!.spans[0]!.towardSource).toBe('from');
+  });
+
+  it('points to the source of another riser of the group when the source moves to the other riser', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(1, 'b'), member(2, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a'], 100)]),
+      summary('p1', [entry(['a', 'b'], 500)]),
+      summary('p2', [entry(['b'], 150, true)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.risers.A!.spans[0]!.towardSource).toBe('to');
+    expect(result.risers.B!.spans[0]!.towardSource).toBe('to');
+  });
+
+  it('leaves towardSource undefined when the group has no source', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [false, false, false]);
+    for (const span of solveBuildingFlow(file, summaries).risers.R!.spans) {
+      expect(span.towardSource).toBeUndefined();
+    }
+  });
+
+  it('leaves towardSource undefined when the group has two sources', () => {
+    const { file, summaries } = threeLevels([100, 500, 150], [true, false, true]);
+    for (const span of solveBuildingFlow(file, summaries).risers.R!.spans) {
+      expect(span.towardSource).toBeUndefined();
+    }
+  });
+
+  it('leaves towardSource undefined on the spans of the highest rule', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, false, { openEnds: 0 })]),
+      summary('p1', [entry(['f'], 0, false, { openEnds: 1 })]),
+      summary('p2', [entry(['f'], 0, false, { openEnds: 1 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.risers.R!.spans.map((span) => span.atMost)).toEqual([true, true]);
+    for (const span of result.risers.R!.spans) expect(span.towardSource).toBeUndefined();
+  });
+
+  it('leaves towardSource undefined on the spans of the highest rule with one open end on L1', () => {
+    const file = fileWith([makeRiser('R', [member(0), member(1), member(2)])]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['f'], 100, false, { openEnds: 0 })]),
+      summary('p1', [entry(['f'], 0, false, { openEnds: 1 })]),
+      summary('p2', [entry(['f'], 50, false, { openEnds: 0 })]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    for (const span of result.risers.R!.spans) expect(span.towardSource).toBeUndefined();
+  });
+
+  it('leaves towardSource undefined on the spans of a loop', () => {
+    const file = fileWith([
+      makeRiser('A', [member(0, 'a'), member(1, 'a')]),
+      makeRiser('B', [member(0, 'b'), member(1, 'b')]),
+    ]);
+    const summaries = summariesOf(
+      summary('p0', [entry(['a', 'b'], 100, true)]),
+      summary('p1', [entry(['a', 'b'], 500)]),
+    );
+    const result = solveBuildingFlow(file, summaries);
+    expect(result.risers.A!.spans[0]!.towardSource).toBeUndefined();
+    expect(result.risers.B!.spans[0]!.towardSource).toBeUndefined();
+  });
+});

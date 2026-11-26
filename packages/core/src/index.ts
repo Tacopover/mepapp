@@ -84,3 +84,4 @@ export * from './riser-edit.js';
 export * from './riser-quantities.js';
 export * from './riser-flow.js';
 export * from './building-flow.js';
+export * from './riser-arrows.js';
