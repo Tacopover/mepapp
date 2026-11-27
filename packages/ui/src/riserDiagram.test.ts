@@ -1,6 +1,6 @@
-import { emptyBuilding, type BuildingFile, type LinePattern, type NetworkType, type Riser, type RiserPendingOp } from '@mepapp/core';
+import { emptyBuilding, type BuildingFile, type LinePattern, type NetworkType, type Riser, type RiserPendingOp, type RiserSpanArrow } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
-import { layoutLevels, layoutRisers, memberStatus, riserNumber, typeFilters } from './riserDiagram.js';
+import { layoutLevels, layoutRisers, layoutSpanArrows, memberStatus, riserNumber, typeFilters } from './riserDiagram.js';
 
 function networkType(id: string, name: string, color: string, linePattern: LinePattern): NetworkType {
   return { id, name, discipline: 'ventilation', units: 'CFM', defaultCapacity: 0, color, lineWidthPt: 1, linePattern };
@@ -257,5 +257,94 @@ describe('riserNumber', () => {
     expect(riserNumber('Supply air')).toBeNull();
     expect(riserNumber('riser 3a')).toBeNull();
     expect(riserNumber('')).toBeNull();
+  });
+});
+
+describe('layoutSpanArrows', () => {
+  const span = (fromLevelId: string, toLevelId: string, direction: RiserSpanArrow['direction']): RiserSpanArrow => ({
+    fromLevelId,
+    toLevelId,
+    direction,
+  });
+  const stacked = (riserId: string, name: string, type: NetworkType, levelIds: string[]): Riser =>
+    riser(riserId, name, type, levelIds.map((levelId): [string, string] => [levelId, 's']));
+
+  it('gives one up arrow for each span at the midpoint of its dots', () => {
+    const file = building(THREE_LEVELS, [stacked('r1', 'Supply air riser 1', SUPPLY, ['L0', 'L1', 'L2'])]);
+    const layout = layoutLevels(file.levels);
+    const arrows = layoutSpanArrows(layout, layoutRisers(file, layout, new Set(), new Set()), {
+      r1: [span('L0', 'L1', 'up'), span('L1', 'L2', 'up')],
+    });
+    expect(arrows).toEqual([
+      { riserId: 'r1', key: 'r1|L0|L1', xPx: 44, yPx: 128, direction: 'up', title: 'Flow goes up: Level L0 to Level L1' },
+      { riserId: 'r1', key: 'r1|L1|L2', xPx: 44, yPx: 64, direction: 'up', title: 'Flow goes up: Level L1 to Level L2' },
+    ]);
+  });
+
+  it('gives down then up for a source in the middle, with the titles in flow order', () => {
+    const file = building(THREE_LEVELS, [stacked('r1', 'Supply air riser 1', SUPPLY, ['L0', 'L1', 'L2'])]);
+    const layout = layoutLevels(file.levels);
+    const arrows = layoutSpanArrows(layout, layoutRisers(file, layout, new Set(), new Set()), {
+      r1: [span('L0', 'L1', 'down'), span('L1', 'L2', 'up')],
+    });
+    expect(arrows.map((arrow) => [arrow.direction, arrow.title])).toEqual([
+      ['down', 'Flow goes down: Level L1 to Level L0'],
+      ['up', 'Flow goes up: Level L1 to Level L2'],
+    ]);
+  });
+
+  it('gives no arrow for an unknown span', () => {
+    const file = building(THREE_LEVELS, [stacked('r1', 'Supply air riser 1', SUPPLY, ['L0', 'L1', 'L2'])]);
+    const layout = layoutLevels(file.levels);
+    const arrows = layoutSpanArrows(layout, layoutRisers(file, layout, new Set(), new Set()), {
+      r1: [span('L0', 'L1', 'unknown'), span('L1', 'L2', 'unknown')],
+    });
+    expect(arrows).toEqual([]);
+  });
+
+  it('gives no arrow for a lane with no entry in the directions', () => {
+    const file = building(THREE_LEVELS, [stacked('r1', 'Supply air riser 1', SUPPLY, ['L0', 'L1', 'L2'])]);
+    const layout = layoutLevels(file.levels);
+    expect(layoutSpanArrows(layout, layoutRisers(file, layout, new Set(), new Set()), {})).toEqual([]);
+  });
+
+  it('skips a span whose level is not a dot of the lane', () => {
+    const file = building(THREE_LEVELS, [stacked('r1', 'Supply air riser 1', SUPPLY, ['L0', 'L2'])]);
+    const layout = layoutLevels(file.levels);
+    const arrows = layoutSpanArrows(layout, layoutRisers(file, layout, new Set(), new Set()), {
+      r1: [span('L0', 'L1', 'up'), span('L1', 'L2', 'up')],
+    });
+    expect(arrows).toEqual([]);
+  });
+
+  it('keeps the lane order and the x of each lane', () => {
+    const file = building(THREE_LEVELS, [
+      stacked('r1', 'Supply air riser 1', SUPPLY, ['L0', 'L1']),
+      stacked('r2', 'Chilled water riser 2', CHILLED, ['L0', 'L1']),
+    ]);
+    const layout = layoutLevels(file.levels);
+    const lanes = layoutRisers(file, layout, new Set(), new Set());
+    const arrows = layoutSpanArrows(layout, lanes, {
+      r1: [span('L0', 'L1', 'up')],
+      r2: [span('L0', 'L1', 'down')],
+    });
+    expect(arrows.map((arrow) => [arrow.riserId, arrow.xPx, arrow.direction])).toEqual([
+      ['r2', 44, 'down'],
+      ['r1', 152, 'up'],
+    ]);
+  });
+
+  it('gives no arrow for a lane of a hidden type even when the directions name its riser', () => {
+    const file = building(THREE_LEVELS, [
+      stacked('r1', 'Supply air riser 1', SUPPLY, ['L0', 'L1']),
+      stacked('r2', 'Chilled water riser 2', CHILLED, ['L0', 'L1']),
+    ]);
+    const layout = layoutLevels(file.levels);
+    const lanes = layoutRisers(file, layout, new Set(['cw']), new Set());
+    const arrows = layoutSpanArrows(layout, lanes, {
+      r1: [span('L0', 'L1', 'up')],
+      r2: [span('L0', 'L1', 'down')],
+    });
+    expect(arrows.map((arrow) => arrow.riserId)).toEqual(['r1']);
   });
 });

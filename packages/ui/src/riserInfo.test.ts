@@ -1,6 +1,6 @@
-import type { BuildingFile, BuildingLevel, DerivedRiserFlow, NetworkType, Riser, RiserMember, SheetSummary } from '@mepapp/core';
+import type { BuildingFile, BuildingFlowGroup, BuildingFlowResult, BuildingFlowSpan, BuildingLevel, NetworkType, Riser, RiserMember, RiserSpanArrow, SheetSummary } from '@mepapp/core';
 import { describe, expect, it } from 'vitest';
-import { derivedFlowOf, detachedText, END_OPTIONS, riserFlowText, riserLineText, riserRows } from './riserInfo.js';
+import { derivedFlowOf, detachedText, END_OPTIONS, flowTailOf, riserFlowText, riserLineText, riserRows } from './riserInfo.js';
 
 const vent: NetworkType = {
   id: 'vent',
@@ -72,8 +72,6 @@ function summaryWith(riserFittingFlow: SheetSummary['riserFittingFlow']): SheetS
     riserFittingFlow,
   };
 }
-
-const derivedUp: DerivedRiserFlow = { flow: 'up', sourceLevelId: 'l0', fromSolve: true };
 
 describe('riserRows', () => {
   it('orders the members from the highest level down', () => {
@@ -175,60 +173,154 @@ describe('riserLineText', () => {
   });
 });
 
-describe('riserFlowText', () => {
-  const file = fileWith([]);
+describe('riserFlowText and flowTailOf', () => {
+  const upSpan = (fromLevelId: string, toLevelId: string): RiserSpanArrow => ({ fromLevelId, toLevelId, direction: 'up' });
+  const unknownSpan = (fromLevelId: string, toLevelId: string): RiserSpanArrow => ({ fromLevelId, toLevelId, direction: 'unknown' });
+  const spanOf = (fromLevelId: string, toLevelId: string): BuildingFlowSpan => ({
+    riserId: '1',
+    fromLevelId,
+    toLevelId,
+    fromFittingId: 'f',
+    toFittingId: 'g',
+    capacity: 50,
+    state: 'ok',
+    complete: true,
+    towardSource: 'from',
+  });
+  function flowOf(spans: BuildingFlowSpan[], group: Partial<BuildingFlowGroup> = {}, warnings: string[] = []): BuildingFlowResult {
+    return {
+      risers: { '1': { spans, members: [] } },
+      groups: [{ riserIds: ['1'], total: 100, complete: true, state: 'ok', ...group }],
+      warnings,
+    };
+  }
+  const solved = flowOf([spanOf('l0', 'l1')], { sourceLevelId: 'l0' });
+  const returnType: NetworkType = { ...vent, flowSense: 'return' };
 
-  it('gives the derived direction with the source', () => {
+  it('reads the saved summaries while the flow is not loaded', () => {
     const riser = makeRiser('1', [member(0), member(1)]);
-    expect(riserFlowText(file, riser, derivedUp)).toEqual({
-      text: 'Up · source: Basement · from the flow solve',
+    expect(riserFlowText(fileWith([riser]), riser, null, [])).toEqual({ text: 'Reading the saved summaries…', byHand: false, notes: [] });
+  });
+
+  it('gives the one-level text when the riser has no span', () => {
+    const riser = makeRiser('1', [member(1)]);
+    expect(riserFlowText(fileWith([riser]), riser, flowOf([]), []).text).toBe('No arrows. This riser has one level.');
+  });
+
+  it('gives Away from the source with the flow solve origin for a supply riser', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    expect(riserFlowText(fileWith([riser]), riser, solved, [upSpan('l0', 'l1')])).toEqual({
+      text: 'Away from Basement · from the flow solve',
       byHand: false,
+      notes: [],
     });
   });
 
-  it('gives Not known yet as source when the solve has no source', () => {
+  it('gives Toward the source for a return riser', () => {
+    const riser = makeRiser('1', [member(0), member(1)], { networkType: returnType });
+    expect(riserFlowText(fileWith([riser]), riser, solved, [upSpan('l0', 'l1')]).text).toBe('Toward Basement · from the flow solve');
+  });
+
+  it('gives the Set by hand origin when the riser source is the main level', () => {
+    const riser = makeRiser('1', [member(0), member(1)], { sourceLevelId: 'l0' });
+    expect(riserFlowText(fileWith([riser]), riser, solved, [upSpan('l0', 'l1')])).toEqual({
+      text: 'Away from Basement · Set by hand',
+      byHand: true,
+      notes: [],
+    });
+  });
+
+  it('gives the no-arrow text when every span has the same height', () => {
     const riser = makeRiser('1', [member(0), member(1)]);
-    expect(riserFlowText(file, riser, { flow: 'down', fromSolve: true })).toEqual({
-      text: 'Down · source: Not known yet · from the flow solve',
-      byHand: false,
-    });
+    expect(riserFlowText(fileWith([riser]), riser, solved, [unknownSpan('l0', 'l1')]).text).toBe(
+      'No arrows. The levels of this riser have the same height.',
+    );
   });
 
-  it('gives Not known yet when nothing is solved', () => {
+  it('gives the reason of the unknown group when there is no main level', () => {
     const riser = makeRiser('1', [member(0), member(1)]);
-    expect(riserFlowText(file, riser, undefined)).toEqual({ text: 'Not known yet', byHand: false });
+    const flow = flowOf([spanOf('l0', 'l1')], { state: 'unknown' }, ['Riser Supply air riser 1 is part of a loop.']);
+    expect(riserFlowText(fileWith([riser]), riser, flow, [unknownSpan('l0', 'l1')]).text).toBe('No arrows yet: the risers make a loop.');
   });
 
-  it('gives both direction and source when both are set by hand', () => {
-    const riser = makeRiser('1', [member(0), member(1)], { flow: 'both', sourceLevelId: 'l1' });
-    expect(riserFlowText(file, riser, derivedUp)).toEqual({
-      text: 'Both · source: Level 1 · Set by hand',
-      byHand: true,
-    });
+  it('gives the main level of the group when it is a level of the other riser', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    const other = makeRiser('2', [member(2), member(3)]);
+    const flow: BuildingFlowResult = {
+      risers: { '1': { spans: [spanOf('l0', 'l1')], members: [] } },
+      groups: [{ riserIds: ['1', '2'], total: 100, complete: true, state: 'ok', sourceLevelId: 'l2' }],
+      warnings: [],
+    };
+    expect(riserFlowText(fileWith([riser, other]), riser, flow, [upSpan('l0', 'l1')]).text).toBe('Away from Level 2 · from the flow solve');
   });
 
-  it('gives the derived direction with the hand source when only the source is set', () => {
+  it('gives from the flow solve when the riser source differs from the main level', () => {
     const riser = makeRiser('1', [member(0), member(1)], { sourceLevelId: 'l1' });
-    expect(riserFlowText(file, riser, derivedUp)).toEqual({
-      text: 'Up · source: Level 1 · Set by hand',
+    expect(riserFlowText(fileWith([riser]), riser, solved, [upSpan('l0', 'l1')]).text).toBe('Away from Basement · from the flow solve');
+  });
+
+  it('gives no source level when the main level is not a known level and every span is unknown', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    const flow = flowOf([spanOf('l0', 'l1')], { sourceLevelId: 'lX' });
+    expect(riserFlowText(fileWith([riser]), riser, flow, [unknownSpan('l0', 'l1')]).text).toBe('No arrows yet: no source level.');
+  });
+
+  it('gives no source level for an at-most group even when a warning names another reason', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    const flow = flowOf([spanOf('l0', 'l1')], { state: 'unknown', atMost: true }, ['Riser Supply air riser 1 is part of a loop.']);
+    expect(riserFlowText(fileWith([riser]), riser, flow, [unknownSpan('l0', 'l1')]).text).toBe('No arrows yet: no source level.');
+  });
+
+  it('gives the more-than-one-source reason of the unknown group', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    const flow = flowOf([spanOf('l0', 'l1')], { state: 'unknown' }, ['Riser Supply air riser 1 has more than one source level.']);
+    expect(riserFlowText(fileWith([riser]), riser, flow, [unknownSpan('l0', 'l1')]).text).toBe(
+      'No arrows yet: more than one source level.',
+    );
+  });
+
+  it('gives no source level when the unknown group has no reason text', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    const flow = flowOf([spanOf('l0', 'l1')], { state: 'unknown' });
+    expect(riserFlowText(fileWith([riser]), riser, flow, [unknownSpan('l0', 'l1')]).text).toBe('No arrows yet: no source level.');
+  });
+
+  it('adds the grey line for a direction set by hand', () => {
+    const riser = makeRiser('1', [member(0), member(1)], { flow: 'up' });
+    expect(riserFlowText(fileWith([riser]), riser, solved, [upSpan('l0', 'l1')])).toEqual({
+      text: 'Away from Basement · from the flow solve',
       byHand: true,
+      notes: ['Direction set by hand: Up. The arrows do not use it.'],
     });
   });
 
-  it('gives the hand direction with the flow solve source when only the direction is set', () => {
-    const riser = makeRiser('1', [member(0), member(1)], { flow: 'down' });
-    expect(riserFlowText(file, riser, derivedUp)).toEqual({
-      text: 'Down · source: from the flow solve · Set by hand',
-      byHand: true,
-    });
+  it('adds the grey line for rings with arrows set by hand, after the direction line', () => {
+    const riser = makeRiser('1', [member(0), member(1, { arrows: { below: 'none', above: 'up' } })], { flow: 'down' });
+    expect(riserFlowText(fileWith([riser]), riser, solved, [upSpan('l0', 'l1')]).notes).toEqual([
+      'Direction set by hand: Down. The arrows do not use it.',
+      'Some rings use arrows set by hand. The diagram shows the flow solve.',
+    ]);
   });
 
-  it('gives the source part alone when the direction is not known', () => {
-    const riser = makeRiser('1', [member(0), member(1)], { sourceLevelId: 'l1' });
-    expect(riserFlowText(file, riser, undefined)).toEqual({
-      text: 'source: Level 1 · Set by hand',
-      byHand: true,
-    });
+  it('gives no tail when the group has no source', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    const flow = flowOf([spanOf('l0', 'l1')], { state: 'unknown' });
+    expect(flowTailOf(fileWith([riser]), riser, flow, [upSpan('l0', 'l1')])).toBe('');
+  });
+
+  it('gives no tail with no flow', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    expect(flowTailOf(fileWith([riser]), riser, null, [upSpan('l0', 'l1')])).toBe('');
+  });
+
+  it('gives the away-from tail for a supply riser', () => {
+    const riser = makeRiser('1', [member(0), member(1)]);
+    expect(flowTailOf(fileWith([riser]), riser, solved, [upSpan('l0', 'l1')])).toBe(', flow away from Basement');
+  });
+
+  it('gives the toward tail for a return riser', () => {
+    const riser = makeRiser('1', [member(0), member(1)], { networkType: returnType });
+    expect(flowTailOf(fileWith([riser]), riser, solved, [upSpan('l0', 'l1')])).toBe(', flow toward Basement');
   });
 });
 

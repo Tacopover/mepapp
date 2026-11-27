@@ -1,0 +1,31 @@
+// G1/G2 exploration: dialog closed at start, source on level 0 for supply and return.
+import { open } from '/root/MepApp/.claude/worktrees/buildings-b8/.claude/roadmap/browser/lib.mjs';
+import { setup, buildingJson, loadBuilding, applyLevel } from '/root/MepApp/.claude/worktrees/buildings-b8/.claude/roadmap/work/b8-t05-lib.mjs';
+
+const OUT = '/tmp/claude-0/-root-MepApp/cd485b76-cb23-414a-9318-be68a3af5d12/scratchpad/b8-t09/journey/';
+const t = await open({ seed: { 'mepapp.realStore': '1' } });
+const { page, idle, menu } = t;
+await t.start();
+const cfg = { withReturn: true, sources1: [0], sources2: [0], extra: [] };
+const { uuids, anchors } = await setup(t, cfg);
+await loadBuilding(t, buildingJson(uuids, anchors, { withReturn: true }));
+for (const i of [0, 2, 1]) await applyLevel(t, i, cfg);
+await page.keyboard.press('Escape');
+await idle(500);
+await page.screenshot({ path: OUT + 'e1-closed.png' });
+let clicks = 0;
+await page.locator('button.mep-menu-btn').click(); clicks++;
+await idle(300);
+await page.screenshot({ path: OUT + 'e1-menu.png' });
+console.log('MENU', (await page.locator('button.mep-menu-item').allInnerTexts()).map((s) => s.trim()).join(' | '));
+await page.locator('button.mep-menu-item', { hasText: /Manage Buildings/ }).click(); clicks++;
+await idle(900);
+const dlg = page.locator('.mep-modal');
+await page.screenshot({ path: OUT + 'e1-dialog-open.png' });
+console.log('TABS', (await dlg.getByRole('tab').allInnerTexts()).join(' | '));
+await dlg.getByRole('tab', { name: /^Risers/ }).click(); clicks++;
+await idle(1200);
+await page.screenshot({ path: OUT + 'e1-risers.png' });
+console.log('TEXT', (await dlg.innerText()).replace(/\n+/g, ' / '));
+console.log('CLICKS', clicks);
+await t.finish();

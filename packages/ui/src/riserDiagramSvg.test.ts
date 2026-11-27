@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dashArrayOf, shortLabel } from './components/BuildingRisersDiagram.js';
+import { arrowPoints, dashArrayOf, shortLabel } from './components/BuildingRisersDiagram.js';
 
 describe('dashArrayOf', () => {
   it('maps each line pattern to its SVG dash array', () => {
@@ -9,6 +9,16 @@ describe('dashArrayOf', () => {
     expect(dashArrayOf('longDash')).toBe('24 8');
     expect(dashArrayOf('dashDot')).toBe('14 5 2 5');
     expect(dashArrayOf('dashDotDot')).toBe('14 5 2 5 2 5');
+  });
+});
+
+describe('arrowPoints', () => {
+  it('points the tip up above the base', () => {
+    expect(arrowPoints(100, 50, 'up')).toBe('100,45 94,55 106,55');
+  });
+
+  it('points the tip down below the base', () => {
+    expect(arrowPoints(100, 50, 'down')).toBe('100,55 94,45 106,45');
   });
 });
 

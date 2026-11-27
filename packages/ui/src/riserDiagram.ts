@@ -1,4 +1,4 @@
-import type { BuildingFile, LinePattern, Riser, RiserMember } from '@mepapp/core';
+import type { BuildingFile, LinePattern, Riser, RiserMember, RiserSpanArrow } from '@mepapp/core';
 
 /** Layout numbers of the Risers diagram, in px. */
 export const DIAGRAM_METRICS = {
@@ -220,4 +220,51 @@ export function layoutRisers(
   const lastLane = lanes[lanes.length - 1];
   const widthPx = lastLane ? Math.max(minWidthPx, lastLane.xPx + laneRightPx) : minWidthPx;
   return { lanes, widthPx };
+}
+
+/** Size of a span arrowhead in the diagram, in px. */
+export const SPAN_ARROW_METRICS = { lengthPx: 10, widthPx: 12 } as const;
+
+export interface DiagramSpanArrow {
+  riserId: string;
+  /** `${riserId}|${fromLevelId}|${toLevelId}` */
+  key: string;
+  xPx: number;
+  /** The middle between the two dot centres of the span, rounded to 1 decimal. */
+  yPx: number;
+  direction: 'up' | 'down';
+  /** `Flow goes up: Level 0 to Level 1` (flow order: the level where the flow starts, then the level where it ends). `Flow goes down: Level 2 to Level 1`. */
+  title: string;
+}
+
+/** One entry for each span whose direction is 'up' or 'down', lane by lane (order of lanes.lanes), spans in the order of directions[riserId]. A lane with no entry in `directions` gives none. A span is skipped when one of its two levels is not a dot of the lane (levelId of lane.dots) or not in layout.levels. Never reads span state: 'unknown' gives nothing. */
+export function layoutSpanArrows(
+  layout: DiagramLayout,
+  lanes: RisersLayout,
+  directions: Readonly<Record<string, readonly RiserSpanArrow[]>>,
+): DiagramSpanArrow[] {
+  const levelById = new Map<string, DiagramLevel>(layout.levels.map((level) => [level.id, level]));
+  const arrows: DiagramSpanArrow[] = [];
+  for (const lane of lanes.lanes) {
+    for (const span of directions[lane.riserId] ?? []) {
+      if (span.direction === 'unknown') continue;
+      const lower = levelById.get(span.fromLevelId);
+      const upper = levelById.get(span.toLevelId);
+      const lowerDot = lane.dots.find((dot) => dot.levelId === span.fromLevelId);
+      const upperDot = lane.dots.find((dot) => dot.levelId === span.toLevelId);
+      if (!lower || !upper || !lowerDot || !upperDot) continue;
+      arrows.push({
+        riserId: lane.riserId,
+        key: `${lane.riserId}|${span.fromLevelId}|${span.toLevelId}`,
+        xPx: lane.xPx,
+        yPx: round1((lowerDot.yPx + upperDot.yPx) / 2),
+        direction: span.direction,
+        title:
+          span.direction === 'up'
+            ? `Flow goes up: ${lower.name} to ${upper.name}`
+            : `Flow goes down: ${upper.name} to ${lower.name}`,
+      });
+    }
+  }
+  return arrows;
 }

@@ -1,6 +1,6 @@
 import { useRef, type JSX, type KeyboardEvent } from 'react';
 import type { LinePattern } from '@mepapp/core';
-import type { DiagramLayout, DotStatus, RisersLayout } from '../riserDiagram.js';
+import { SPAN_ARROW_METRICS, type DiagramLayout, type DiagramSpanArrow, type DotStatus, type RisersLayout } from '../riserDiagram.js';
 
 export interface BuildingRisersDiagramProps {
   layout: DiagramLayout;
@@ -11,6 +11,8 @@ export interface BuildingRisersDiagramProps {
   onActivate?: (riserId: string) => void;
   /** Text for aria-label of each lane, by riser id, for example 'Supply air riser 1, Basement to Level 2, 4 levels'. */
   laneAria: ReadonlyMap<string, string>;
+  /** Heads of the spans that have a direction, from layoutSpanArrows. */
+  spanArrows?: readonly DiagramSpanArrow[];
 }
 
 const DASH_ARRAYS: Record<LinePattern, string | undefined> = {
@@ -29,6 +31,15 @@ const LEGEND_ROWS: { status: DotStatus; text: string }[] = [
   { status: 'waiting', text: 'waiting' },
   { status: 'off', text: 'not at position' },
 ];
+
+/** The points of a span head: a triangle with its tip 5 px above (up) or below (down) the point (x, y). */
+export function arrowPoints(x: number, y: number, direction: 'up' | 'down'): string {
+  const half = SPAN_ARROW_METRICS.lengthPx / 2;
+  const base = SPAN_ARROW_METRICS.widthPx / 2;
+  const tip = direction === 'up' ? y - half : y + half;
+  const rear = direction === 'up' ? y + half : y - half;
+  return `${x},${tip} ${x - base},${rear} ${x + base},${rear}`;
+}
 
 /** SVG stroke-dasharray for a pattern: solid -> undefined; dashed '12 6'; dotted '2 6'; longDash '24 8'; dashDot '14 5 2 5'; dashDotDot '14 5 2 5 2 5'. Use strokeLinecap 'butt' (dotted looks as squares of 2 wide; use stroke width 4). */
 export function dashArrayOf(pattern: LinePattern): string | undefined {
@@ -76,7 +87,7 @@ function DotShape({ cx, cy, status, color }: DotShapeProps) {
 
 /** The building diagram of the Risers tab: levels, level lines, one line per riser and a dot per level. */
 export function BuildingRisersDiagram(props: BuildingRisersDiagramProps): JSX.Element {
-  const { layout, lanes, selectedId, onSelect, onActivate, laneAria } = props;
+  const { layout, lanes, selectedId, onSelect, onActivate, laneAria, spanArrows = [] } = props;
   const svgRef = useRef<SVGSVGElement>(null);
   const selectedLane = lanes.lanes.find((lane) => lane.riserId === selectedId);
   const focusId = selectedLane ? selectedLane.riserId : lanes.lanes[0]?.riserId;
@@ -185,6 +196,21 @@ export function BuildingRisersDiagram(props: BuildingRisersDiagramProps): JSX.El
                     strokeLinecap="butt"
                     strokeDasharray={dashArrayOf(lane.linePattern)}
                   />
+                  {spanArrows
+                    .filter((arrow) => arrow.riserId === lane.riserId)
+                    .map((arrow) => (
+                      <polygon
+                        key={arrow.key}
+                        className={isSelected ? 'mep-rd-arrow mep-rd-arrow--selected' : 'mep-rd-arrow'}
+                        data-testid="riser-span-arrow"
+                        data-direction={arrow.direction}
+                        aria-hidden="true"
+                        points={arrowPoints(arrow.xPx, arrow.yPx, arrow.direction)}
+                        style={{ fill: lane.color }}
+                      >
+                        <title>{arrow.title}</title>
+                      </polygon>
+                    ))}
                   <title>{lane.label}</title>
                   <text
                     className="mep-rd-lane-label"
@@ -213,6 +239,12 @@ export function BuildingRisersDiagram(props: BuildingRisersDiagramProps): JSX.El
               <span>{row.text}</span>
             </div>
           ))}
+          <div className="mep-rd-legend-row">
+            <svg className="mep-rd-legend-dot" width={18} height={18} viewBox="0 0 18 18">
+              <polygon className="mep-rd-legend-arrow" points={arrowPoints(9, 9, 'up')} />
+            </svg>
+            <span>flow direction</span>
+          </div>
         </div>
       </div>
     </div>

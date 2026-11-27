@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type JSX } from 'react';
 import {
   clearRiserFlowOverride,
   detachMember,
+  riserSpanDirections,
   riserWarnings,
   setMemberConnectionHeight,
   setRiserProps,
@@ -19,11 +20,12 @@ import type { FileAccess } from '@mepapp/platform';
 import { readSummaries } from '../quantitiesScope.js';
 import { deleteRiserAction, detachAction, type RiserActionResult } from '../riserActions.js';
 import { ARROWS_TAG } from '../riserArrowPicker.js';
-import { layoutLevels, layoutRisers, typeFilters } from '../riserDiagram.js';
+import { layoutLevels, layoutRisers, layoutSpanArrows, typeFilters } from '../riserDiagram.js';
 import {
   derivedFlowOf,
   detachedText,
   END_OPTIONS,
+  flowTailOf,
   riserFlowText,
   riserLineText,
   riserRows,
@@ -261,12 +263,23 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
   const filters = useMemo(() => typeFilters(file.risers, hidden), [file.risers, hidden]);
   const derived = useMemo(() => derivedFlowOf(file, summaries), [file, summaries]);
   const buildingFlow = useMemo(() => (loaded ? solveBuildingFlow(file, summaries, live) : null), [loaded, file, summaries, live]);
+  const spanDirections = useMemo(
+    () => (buildingFlow === null ? {} : riserSpanDirections(file, buildingFlow, (riser) => riser.networkType)),
+    [file, buildingFlow],
+  );
+  const spanArrows = useMemo(() => layoutSpanArrows(levelLayout, lanes, spanDirections), [levelLayout, lanes, spanDirections]);
   const laneAria = useMemo(
     () =>
       new Map(
-        file.risers.map((riser) => [riser.id, `${riser.name}, ${riserLineText(file, riser).replace(/ · /g, ', ')}`] as const),
+        file.risers.map(
+          (riser) =>
+            [
+              riser.id,
+              `${riser.name}, ${riserLineText(file, riser).replace(/ · /g, ', ')}${flowTailOf(file, riser, buildingFlow, spanDirections[riser.id] ?? [])}`,
+            ] as const,
+        ),
       ),
-    [file],
+    [file, buildingFlow, spanDirections],
   );
   const warnings = [...riserWarnings(file), ...(buildingFlow?.warnings ?? [])];
   const selected = file.risers.find((riser) => riser.id === selectedId) ?? null;
@@ -428,7 +441,7 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
   }
 
   const riser = selected;
-  const flow = riser === null ? null : riserFlowText(file, riser, derived[riser.id]);
+  const flow = riser === null ? null : riserFlowText(file, riser, buildingFlow, spanDirections[riser.id] ?? []);
   const solvedFlow = riser === null ? undefined : derived[riser.id]?.flow;
   const flowValue: string =
     riser === null
@@ -490,6 +503,7 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
             setFocusRequest({ kind: 'info' });
           }}
           laneAria={laneAria}
+          spanArrows={spanArrows}
         />
       )}
 
@@ -612,7 +626,10 @@ export function BuildingRisersPane(props: BuildingRisersPaneProps): JSX.Element 
 
             <h5 className="mep-rp-subhead">Flow direction</h5>
             <div className="mep-rp-flowbox" data-testid="riser-flow-box">
-              {flow.text}
+              <div data-testid="riser-flow-text">{flow.text}</div>
+              {flow.notes.map((note) => (
+                <p key={note} className="mep-rp-flownote" data-testid="riser-flow-note">{note}</p>
+              ))}
             </div>
 
             {showSelects && (

@@ -1,4 +1,5 @@
-import { deriveRiserFlow, type BuildingFile, type BuildingSheet, type DerivedRiserFlow, type PerSheetRiserFittingFlow, type Riser, type RiserEndKind, type SheetSummary } from '@mepapp/core';
+import { deriveRiserFlow, flowSenseOf, type BuildingFile, type BuildingFlowResult, type BuildingSheet, type DerivedRiserFlow, type PerSheetRiserFittingFlow, type Riser, type RiserEndKind, type RiserSpanArrow, type SheetSummary } from '@mepapp/core';
+import { capacityViewOf } from './riserCapacity.js';
 import type { DotStatus } from './riserDiagram.js';
 
 export type RowStatus = DotStatus | 'gone';
@@ -75,29 +76,57 @@ export function riserLineText(file: BuildingFile, riser: Riser): string {
 }
 
 export interface RiserFlowText {
-  /** The text of the derived box. */
+  /** Line 1 of the box. */
   text: string;
-  /** True when the file holds a hand-set direction or source level. */
+  /** True when the file holds a hand-set direction or source level (unchanged rule: riser.flow !== 'unknown' || riser.sourceLevelId !== undefined). */
   byHand: boolean;
+  /** Grey lines under the text, in this order, each only when it applies. */
+  notes: string[];
 }
 
-/** derived is the entry of deriveRiserFlow for this riser (undefined = nothing solved). Dir words: 'Up', 'Down', 'Both'. Source word: the name of the level, 'Not known yet' when there is no source.
- * Not by hand and derived.flow is up/down/both: `${Dir} · source: ${source or 'Not known yet'} · from the flow solve`.
- * Not by hand and the direction is unknown: `Not known yet`.
- * By hand: direction = riser.flow when it is not 'unknown', else derived.flow when known (the source set by hand gives the direction), else none. The source part is `source: ${level name}` when riser.sourceLevelId is set and is a known level, else `source: from the flow solve`. Result: `${Dir} · ${sourcePart} · Set by hand`, or `${sourcePart} · Set by hand` when no direction. */
-export function riserFlowText(file: BuildingFile, riser: Riser, derived: DerivedRiserFlow | undefined): RiserFlowText {
-  const byHand = riser.flow !== 'unknown' || riser.sourceLevelId !== undefined;
-  const levelName = (levelId: string | undefined): string | undefined => file.levels.find((level) => level.id === levelId)?.name;
-  if (!byHand) {
-    if (derived === undefined || derived.flow === 'unknown') return { text: 'Not known yet', byHand };
-    const source = levelName(derived.sourceLevelId) ?? 'Not known yet';
-    return { text: `${DIR_WORD[derived.flow]} · source: ${source} · from the flow solve`, byHand };
+function mainLevelOf(file: BuildingFile, riser: Riser, flow: BuildingFlowResult): { id: string; name: string } | undefined {
+  const group = flow.groups.find((item) => item.riserIds.includes(riser.id));
+  const levelId = group?.sourceLevelId;
+  if (levelId === undefined) return undefined;
+  const level = file.levels.find((item) => item.id === levelId);
+  return level === undefined ? undefined : { id: level.id, name: level.name };
+}
+
+function lineOneOf(file: BuildingFile, riser: Riser, flow: BuildingFlowResult | null, directions: readonly RiserSpanArrow[]): string {
+  if (flow === null) return 'Reading the saved summaries…';
+  const view = capacityViewOf(file, riser, flow);
+  if (view.kind === 'one-member') return 'No arrows. This riser has one level.';
+  const main = mainLevelOf(file, riser, flow);
+  if (main !== undefined && directions.some((span) => span.direction !== 'unknown')) {
+    const word = flowSenseOf(riser.networkType) === 'return' ? 'Toward' : 'Away from';
+    const origin = riser.sourceLevelId !== undefined && riser.sourceLevelId === main.id ? 'Set by hand' : 'from the flow solve';
+    return `${word} ${main.name} · ${origin}`;
   }
-  const direction = riser.flow !== 'unknown' ? riser.flow : derived !== undefined && derived.flow !== 'unknown' ? derived.flow : undefined;
-  const handSource = levelName(riser.sourceLevelId);
-  const sourcePart = handSource !== undefined ? `source: ${handSource}` : 'source: from the flow solve';
-  const text = direction !== undefined ? `${DIR_WORD[direction]} · ${sourcePart} · Set by hand` : `${sourcePart} · Set by hand`;
-  return { text, byHand };
+  if (main !== undefined && directions.every((span) => span.direction === 'unknown')) {
+    return 'No arrows. The levels of this riser have the same height.';
+  }
+  const atMost = flow.groups.find((item) => item.riserIds.includes(riser.id))?.atMost === true;
+  return `No arrows yet: ${atMost ? 'no source level' : (view.unknownReasonText ?? 'no source level')}.`;
+}
+
+/** Line 1 and the grey notes of the box "Flow direction". Line 1 is built by lineOneOf. */
+export function riserFlowText(file: BuildingFile, riser: Riser, flow: BuildingFlowResult | null, directions: readonly RiserSpanArrow[]): RiserFlowText {
+  const byHand = riser.flow !== 'unknown' || riser.sourceLevelId !== undefined;
+  const notes: string[] = [];
+  if (riser.flow !== 'unknown') notes.push(`Direction set by hand: ${DIR_WORD[riser.flow]}. The arrows do not use it.`);
+  if (riser.members.some((member) => member.arrows !== undefined)) {
+    notes.push('Some rings use arrows set by hand. The diagram shows the flow solve.');
+  }
+  return { text: lineOneOf(file, riser, flow, directions), byHand, notes };
+}
+
+/** '' or `, flow away from <main level name>` / `, flow toward <main level name>`. Not '' only when the group of the riser has a sourceLevelId that is a known level and at least one entry of `directions` is not 'unknown'. Same sense rule as the text: flowSenseOf(riser.networkType) 'supply' -> away from, 'return' -> toward. flow null -> ''. */
+export function flowTailOf(file: BuildingFile, riser: Riser, flow: BuildingFlowResult | null, directions: readonly RiserSpanArrow[]): string {
+  if (flow === null) return '';
+  const main = mainLevelOf(file, riser, flow);
+  if (main === undefined || !directions.some((span) => span.direction !== 'unknown')) return '';
+  const word = flowSenseOf(riser.networkType) === 'return' ? 'toward' : 'away from';
+  return `, flow ${word} ${main.name}`;
 }
 
 /** Derived flow of every riser. perLevelFlow[sheet.id] = summaries.get(sheet.projectUuid)?.riserFittingFlow ?? {} for each sheet that has a projectUuid (a sheet with projectUuid null gets {}). Then deriveRiserFlow(file, perLevelFlow). */
