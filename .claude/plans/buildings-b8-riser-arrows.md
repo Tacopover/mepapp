@@ -1,6 +1,6 @@
 # B8: riser arrows
 
-Status: **planned 2026-11-26, revised the same day after the answers of the user (section 4) and after the audit and the domain check (section 8). Nothing is built.** Stream `buildings`, part id `B8`, branch `worktree-buildings-b8` (made from `master` 9ad5869). B7 (flow through risers) is on `master`. B5 (shared coordinate system) stays deferred.
+Status: **part A (T01 to T08) built and pushed on 2026-11-26/27, waiting for the Windows test of the user (`.claude/plans/buildings-b8-test.md`). Part B (T09, T10) is not started and waits for the "go" of the user.** Planned 2026-11-26, revised the same day after the answers of the user (section 4) and after the audit and the domain check (section 8). Stream `buildings`, part id `B8`, branch `worktree-buildings-b8` (made from `master` 9ad5869). B7 (flow through risers) is on `master`. B5 (shared coordinate system) stays deferred.
 
 Source of the request: the user, 2026-11-26, after the Windows test of B7 ("I also tested the riser functionality and it works correctly"). The picture of the user is `fixtures/risers.png` (untracked in the main checkout). A copy is committed next to this plan: `.claude/plans/buildings-b8-riser-arrows.png`.
 
