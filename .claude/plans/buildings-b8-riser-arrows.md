@@ -1,6 +1,6 @@
 # B8: riser arrows
 
-Status: **part A (T01 to T08) built and pushed on 2026-11-26/27, waiting for the Windows test of the user (`.claude/plans/buildings-b8-test.md`). Part B (T09, T10) is not started and waits for the "go" of the user.** Planned 2026-11-26, revised the same day after the answers of the user (section 4) and after the audit and the domain check (section 8). Stream `buildings`, part id `B8`, branch `worktree-buildings-b8` (made from `master` 9ad5869). B7 (flow through risers) is on `master`. B5 (shared coordinate system) stays deferred.
+Status: **part A (T01 to T08) built, pushed and tested by the user on Windows (2026-11-27). Part B (T09, T10) built and pushed on 2026-11-27, waiting for the Windows test of part B (steps B0.1 to B5.8 in `.claude/plans/buildings-b8-test.md`).** Planned 2026-11-26, revised the same day after the answers of the user (section 4) and after the audit and the domain check (section 8). Stream `buildings`, part id `B8`, branch `worktree-buildings-b8` (made from `master` 9ad5869). B7 (flow through risers) is on `master`. B5 (shared coordinate system) stays deferred.
 
 Source of the request: the user, 2026-11-26, after the Windows test of B7 ("I also tested the riser functionality and it works correctly"). The picture of the user is `fixtures/risers.png` (untracked in the main checkout). A copy is committed next to this plan: `.claude/plans/buildings-b8-riser-arrows.png`.
 
@@ -157,8 +157,8 @@ Part A (canvas). Part B (Risers tab) starts only when the user has tested part A
 
 ### Part B (after the user says go)
 
-- **B8-T09 (ui): the Risers tab diagram.** `BuildingRisersDiagram.tsx` shows the direction of each span: a small arrowhead on the lane, in the color and pattern of the lane (`dashArrayOf`). The input is `riserSpanDirections`. A span with no direction shows nothing. `ux-designer` first (a wireframe on the dashboard). The old box "Flow direction" text and the words `Up`, `Down`, `Both` (D-B-74) need a decision: keep, or replace by the arrows plus a neutral word. Put the question on the dashboard.
-- **B8-T10:** Windows test steps, records.
+- **B8-T09 (ui): the Risers tab diagram.** **DONE 2026-11-27 (263bce7).** ui 1358 tests, core 2691, render 114, build 9 of 9, b8-t09-check 52 passed, no-flag check 9. Built as D-B-143 A (box reads "Away from" or "Toward" the main level). Provisional: D-B-144 (diagram follows the flow solve, not the hand-set pair), D-B-145 (solid head on every lane), D-B-146 (the Direction select stays, it changes no arrow). `BuildingRisersDiagram.tsx` shows the direction of each span: a small arrowhead on the lane, in the color and pattern of the lane (`dashArrayOf`). The input is `riserSpanDirections`. A span with no direction shows nothing. `ux-designer` first (a wireframe on the dashboard). The old box "Flow direction" text and the words `Up`, `Down`, `Both` (D-B-74) need a decision: keep, or replace by the arrows plus a neutral word. Put the question on the dashboard.
+- **B8-T10:** **DONE 2026-11-27 (3e65972).** Windows test steps, records. Part B of `buildings-b8-test.md` has 38 steps (B0.1 to B5.8); two headless checks passed (65 and 23).
 
 ## 6. Out of scope
 
