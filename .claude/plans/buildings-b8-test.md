@@ -1,8 +1,8 @@
-# Test script B8, part A: riser arrows
+# Test script B8: riser arrows (part A tested, part B new)
 
-Written 2026-11-27 for the branch `worktree-buildings-b8` (tasks T01 to T07). Part B of B8 (the Risers tab, T09 and T10) is not built. It starts only after you test this part and say go.
+Part A (Parts 0 to 7, tasks T01 to T07) was written 2026-11-27 for the branch `worktree-buildings-b8`. You tested part A on 2026-11-27 and said go. Part B (the Risers tab diagram, task T09) is new. It starts at the heading "Part B: the Risers tab diagram" after the end of part A, and its steps have the numbers B0.1 to B5.8. Do part B on the same branch after `git pull`.
 
-For one PC with Windows. Use Chrome or Edge. You can use the desktop app instead: then say so in your notes. The agent ran real browser checks in a headless Chromium (no real window, no real tooltip, no real focus ring). It could not run Windows display scaling, a real browser restart, a read-only file, a touchpad, Tauri or a real mouse. The steps below cover exactly these gaps. The end of the file lists which steps the agent ran headless and how.
+For one PC with Windows. Use Chrome or Edge. You can use the desktop app instead: then say so in your notes. The agent ran real browser checks in a headless Chromium (no real window, no real tooltip, no real focus ring). It could not run Windows display scaling, a real browser restart, a read-only file, a touchpad, Tauri or a real mouse. The steps below cover exactly these gaps. The end of part A and the end of part B list which steps the agent ran headless and how.
 
 Do not merge this branch into `master`. `master` goes live at once. Tell the director when you finish the test.
 
@@ -300,9 +300,9 @@ Also tell me:
 - your answers to the questions of Part 6 (an id and an option, for example "D-B-131 A"),
 - which browser and Windows version you used,
 - if you used the desktop app,
-- when you are done, so that I can tell the director. Part B (the Risers tab, T09 and T10) starts only after you say go.
+- when you are done, so that I can tell the director.
 
-## What the agent ran headless (2026-11-27)
+## What the agent ran headless for part A (2026-11-27)
 
 The agent ran a headless Chromium with real clicks, real typing and real right-clicks. It did NOT draw the levels with a mouse. It made the levels (stamps, segments, fittings, sources) and the building file with the scene API and a dev hook. So every "place a source" and "connect" action of Part 3 was set by the API. The agent read the arrows from the scene (`getRiserMarks`) and from screenshots. The check files are `.claude/roadmap/work/b8-t08-check.mjs` and `b8-t08-check-b.mjs` to `b8-t08-check-e.mjs`. The screenshots are in `.claude/roadmap/work/shots-b8/` (names `B8-T08-*`).
 
@@ -311,3 +311,198 @@ The agent ran a headless Chromium with real clicks, real typing and real right-c
 - Run with another set-up than the script: 3.12 (the building file was changed through the API so that Level 2 had no part of the riser; "Detach" was not clicked; the dashed ring and its menu were read), 3.15 and 3.16 (the editor and the building file were set through the API; no restart, no click in Manage Buildings, no "Solve flow" on Level 2).
 - Reported by the earlier tasks and not run again here: 2.1, 2.2, 3.3, 3.8, 3.10, 3.13, 3.14 (T05 check), 4.3 to 4.8 and 4.13 (T06 check), 4.15 at 760 px (T06 narrow check), 5.2 and 5.4 (T07 check).
 - Not run by the agent, so only you can test them: real tooltips (4.2), the Windows list of the editor (1.10), the narrow editor (1.11), the browser restart (1.8, 3.11, 3.15 and 4.12), the old live site (1.9), a read-only file (4.14), a touchpad right-click and the native menu of the browser (4.16), display scaling and the browser zoom (1.10, 2.9, 4.17, 5.9), a real focus ring (4.8), a real mouse (2.8, 3.13), a closed level with no stored summary (3.11), the real placing of equipment and segments (0.2, 0.4, 3.2 to 3.14), the "Close anyway?" question (3.10), a drain, plumbing or water return pipe (5.3, 5.6), Tauri. The app has no dark theme, so there is no step for it.
+
+## Part B: the Risers tab diagram
+
+Written 2026-11-27 for the branch `worktree-buildings-b8` (task T09, commit 263bce7). It follows part A (Parts 0 to 7 above). The part A steps are unchanged. The step numbers of part B start with the letter B (for example "B2.4"), so they never clash with the part A numbers.
+
+Part B tests one change. The diagram in the Risers tab of Manage Buildings shows the flow direction of each span. The box "Flow direction" has new words. Part B changes no other screen and no file format. The rules of the paragraph "How to use this script" in part A apply: tick one box for each step and write the step number in your feedback (for example "B2.4 fail").
+
+Part A step 3.7 and the row D-B-135 describe the old words of the box ("Up · source: Level 0 · from the flow solve"). Part B replaces them (decision D-B-143, built as option A). Use the new words of part B.
+
+## Part B0: setup
+
+Words in part B (the words of Part 0 stay valid):
+- The **diagram** is the picture at the top of the tab "Risers" in Manage Buildings. The levels are in a column at the left. Level 2 is at the top.
+- A **lane** is the vertical line of one riser. Its name is above it. It has a ring at each level. The lanes have the order of the list "Show" above the diagram: the return lane is at the left of the supply lane (Return Air comes before Supply Air).
+- A **span** is the part of a lane between two levels that are next to each other.
+- A **head** is a small filled triangle in the middle of a span. It shows the flow direction of the span. It points up (the flow goes to the higher level) or down (the flow goes to the lower level). A head is about 12 px wide and 10 px high. It has the color of its lane.
+- The **box "Flow direction"** is the blue-grey box with a dashed edge in the card of the selected riser. It is under the block "Capacity". Its heading is "Flow direction". The text in the box is **line 1**. A grey line under it is a **note**.
+- The **main level** is the level with the source, as in part A.
+- A **block** is a part of the card with a heading, for example "Capacity". A **list** is a drop-down list in the card, for example "Source level".
+- "The supply riser" and "the return riser" are the Supply Air riser and the Return Air riser of part A.
+
+B0.1 Update the branch. In a terminal in the repository run `git fetch origin`, `git checkout worktree-buildings-b8`, `git pull`, `pnpm install` and `pnpm build`. Start the web app again with `pnpm --filter @mepapp/web dev`. Open the address in Chrome or Edge. Check: the app opens. The onboarding overlay does not show again.
+`[ ] pass   [ ] fail   note: `
+
+B0.2 Make the start state. Use the state of part A step 3.5: the building "Tower" with Level 0, Level 1 and Level 2 open, a Supply Air riser and a Return Air riser, and one air handling unit on Level 0 that is connected to each network (two units). Open the editor for Supply Air (dock tab "MEP", sub-tab "Network Types", click the colored dot on the tile). Check: "Flow direction" shows "Supply" and "Pattern" shows "Solid". Click Save. Open the editor for Return Air. Check: "Flow direction" shows "Return" and "Pattern" shows "Dashed". Click Save. (The save writes the type into the risers of the building. Steps 1.4, 2.4, 3.6 and 5.5 of part A changed these values: this step puts them back.) Also remove what part A left. Right-click each ring that you set by hand and click "Use the flow solve". Delete extra units, so that each network has one unit on Level 0. Check: in the Risers tab no grey note shows in the box "Flow direction".
+`[ ] pass   [ ] fail   note: `
+
+B0.3 Open Manage Buildings (Menu, "Manage Buildings…") and click the tab "Risers (2)". Check: the tab shows two lanes. The red dashed lane (Return Air) is at the left. The blue solid lane (Supply Air) is at the right. Each lane has three rings. Close the dialog with Escape. Write down the names of the two risers.
+`[ ] pass   [ ] fail   note: `
+
+## Part B1: the heads in the diagram
+
+Use the start state of B0.2. Part B needs no save of a PDF. The diagram reads the open levels live and the closed levels from their saved summaries. Keep all three levels open.
+
+B1.1 Open Manage Buildings, tab "Risers". Wait one second. Check: at the right of the diagram a legend shows four rows: "at position", "waiting", "not at position" and "flow direction". The row "flow direction" has a small grey triangle that points up. (In a window narrower than 1200 px the legend is under the diagram: see B5.6.)
+`[ ] pass   [ ] fail   note: `
+
+B1.2 Look at the supply lane (blue, solid). Check: two small filled blue triangles. Both point up. One is between Level 0 and Level 1. One is between Level 1 and Level 2. Each head is in the middle of its span. No head touches a ring. A thin white edge cuts the lane around each head.
+`[ ] pass   [ ] fail   note: `
+
+B1.3 Look at the return lane (red, dashed). Check: two small filled red triangles. Both point down. The heads are solid, not dashed. The lane under them stays dashed.
+`[ ] pass   [ ] fail   note: `
+
+B1.4 Compare the diagram with the canvas (the same picture as the ring arrows, span by span). Close the dialog. Go to Level 0, Level 1 and Level 2 one after the other. Write down the pictogram of the supply ring and of the return ring on each level (the numbers of the table in Part 0). Check: the supply rings show 2, 1 and 3. The return rings show 5, 4 and 6. One span is shown twice on the canvas. The span between Level 0 and Level 1 is the upper arrow of the ring on Level 0 and the lower arrow of the ring on Level 1. For the supply riser both arrows mean "up". For the return riser both mean "down". Open the Risers tab again. Check: each head agrees with the two ring arrows of its span.
+`[ ] pass   [ ] fail   note: `
+
+B1.5 Click one head of the return lane with the mouse. Check: the return lane gets the light halo. The card below the diagram shows the name of the return riser. In the box "Flow direction", line 1 reads `Toward Level 0 · from the flow solve`. (A click on a head selects its lane. A head is not a separate control.)
+`[ ] pass   [ ] fail   note: `
+
+B1.6 Click the name of the supply lane. Scroll the card to the box "Flow direction". Check: line 1 reads `Away from Level 0 · from the flow solve`. No grey note shows. The old words "Up" and "source:" do not show in the box.
+`[ ] pass   [ ] fail   note: `
+
+B1.7 Press Tab until a lane has the focus (a frame shows around it). Press the Left arrow and the Right arrow. Check: the selection moves to the next lane. The heads, the legend and the scroll position of the card stay. No dialog closes.
+`[ ] pass   [ ] fail   note: `
+
+## Part B2: where the source is
+
+Part A steps 3.8, 3.9, 3.1 and 3.4 show how to move a source. Do the same here. Each time: close the dialog, change the source on the canvas, wait 3 seconds and open the Risers tab again. Click the lane to read the box.
+
+B2.1 A source in the middle of three levels. Delete the air handling unit of the supply network on Level 0. Place one on Level 1 and connect it to the supply network (part A step 3.8). Keep the return unit on Level 0. Open the Risers tab. Check: the supply lane has one head up (between Level 1 and Level 2) and one head down (between Level 0 and Level 1). Both heads point away from Level 1. The return lane still shows two heads that point down. Click the supply lane: line 1 reads `Away from Level 1 · from the flow solve`. On the canvas the supply rings show 5 (Level 0), 7 (Level 1) and 3 (Level 2).
+`[ ] pass   [ ] fail   note: `
+
+B2.2 A return riser with the source in the middle. Move the return unit from Level 0 to Level 1 in the same way. Check: the return lane has one head down (between Level 1 and Level 2) and one head up (between Level 0 and Level 1). Both heads point toward Level 1. Click the return lane: line 1 reads `Toward Level 1 · from the flow solve`. On the canvas the return rings show 2, 8 and 6.
+`[ ] pass   [ ] fail   note: `
+
+B2.3 A source on the top level. Move the supply unit to Level 2. Check: the supply lane has two heads that point down. Line 1 reads `Away from Level 2 · from the flow solve`. Put the supply unit and the return unit back on Level 0 when you finish. Check: the lanes show the heads of B1.2 and B1.3 again.
+`[ ] pass   [ ] fail   note: `
+
+B2.4 No source. Delete the supply unit. Open the Risers tab. Check: the supply lane has no head. The return lane keeps its two heads. Click the supply lane: line 1 reads `No arrows yet: no source level.` Above the card the box "Warnings" shows `Riser <name> has no source level. Set one by hand.` with the real name of the supply riser. On the canvas the supply rings show no arrow. Put the supply unit back on Level 0.
+`[ ] pass   [ ] fail   note: `
+
+B2.5 Two sources. Place a second supply unit on Level 2 and connect it. Open the Risers tab. Check: the supply lane has no head. Line 1 reads `No arrows yet: more than one source level.` The box "Warnings" shows `Riser <name> has more than one source level (Level 0, Level 2). Set one by hand.` Delete the second unit. Check: the heads come back.
+`[ ] pass   [ ] fail   note: `
+
+B2.6 The same height. Write down the elevation of each level (Manage Buildings, tab "Levels and sheets", click the level, field "Elevation (mm)"). Set the elevation of Level 1 and of Level 2 to the elevation of Level 0 (type the number and press Enter). Open the tab "Risers" and click the supply lane. Check: no lane has a head. Line 1 reads `No arrows. The levels of this riser have the same height.` Set the two elevations back to the numbers that you wrote down. Check: the heads come back.
+`[ ] pass   [ ] fail   note: `
+
+## Part B3: the box "Flow direction", the two lists and the grey notes
+
+Use the start state of B0.2 (the heads of B1.2 and B1.3). All the texts here are in the box "Flow direction" or under it.
+
+The texts of line 1 (the app writes one of them):
+
+| Text | When |
+|---|---|
+| `Away from Level 0 · from the flow solve` | A supply type. The main level comes from the source. |
+| `Toward Level 0 · from the flow solve` | A return type. The main level comes from the source. |
+| `Away from Level 1 · Set by hand` or `Toward Level 1 · Set by hand` | You chose the main level in the list "Source level". |
+| `No arrows yet: no source level.` | No source on any level (B2.4). |
+| `No arrows yet: more than one source level.` | Two sources (B2.5). |
+| `No arrows. The levels of this riser have the same height.` | B2.6. |
+| `No arrows. This riser has one level.` | A riser with one level. No step makes it. |
+| `Reading the saved summaries…` | The app reads the saved summaries. It shows for a short time. |
+
+B3.1 Set the source level by hand. Delete the supply unit (no source). Open the tab "Risers" and click the supply lane. Under the block "Capacity" click "Set by hand". Check: a hint shows `Choose a level in the list "Source level".` The two lists "Source level" and "Direction" show in the card, and a link "Use the flow solve". The list "Source level" has the options "From the flow solve", "Level 2", "Level 1" and "Level 0" (the highest level first). Choose "Level 1". Check: the supply lane gets one head up and one head down at once. Line 1 reads `Away from Level 1 · Set by hand`.
+`[ ] pass   [ ] fail   note: `
+
+B3.2 Close the dialog. Go to the canvas of Level 0, Level 1 and Level 2. Check: the supply rings follow the source level that you chose by hand: 5 on Level 0, 7 on Level 1 and 3 on Level 2. (The source level that you set by hand is the main level for the flow solve, so the rings follow.)
+`[ ] pass   [ ] fail   note: `
+
+B3.3 Two sources and a source level by hand. Put a supply unit on Level 0 and a supply unit on Level 2 (two sources). Open the tab "Risers" and click the supply lane. Check: the lane keeps its heads (one up, one down). Line 1 still reads `Away from Level 1 · Set by hand`. The source level that you chose wins. Choose "From the flow solve" in the list "Source level". Check: the heads go. Line 1 reads `No arrows yet: more than one source level.` The two lists close. Click "Set by hand" again and choose "Level 0". Check: the lane gets two heads that point up. Line 1 reads `Away from Level 0 · Set by hand`.
+`[ ] pass   [ ] fail   note: `
+
+B3.4 The list "Direction". The list has the options "Up", "Down" and "Both". Choose "Up", then "Down", then "Both". After each choice look at the diagram. Check: no head changes. Line 1 does not change. A grey note shows under line 1: `Direction set by hand: Up. The arrows do not use it.` The note names the word that you chose ("Down" and "Both" in the next two notes). The list changes no arrow (decision D-B-146 in the table of Part B6).
+`[ ] pass   [ ] fail   note: `
+
+B3.5 Click "Use the flow solve". Check: the two lists go. Line 1 reads `No arrows yet: more than one source level.` again. The grey note is gone. Delete the second supply unit (on Level 2). Check: the heads come back (up, up). Line 1 reads `Away from Level 0 · from the flow solve`.
+`[ ] pass   [ ] fail   note: `
+
+B3.6 A ring with a pictogram that you set by hand. Close the dialog. Go to Level 1. Pick the Select tool, right-click the supply ring and click the picture "Comes down, goes down" (pictogram 4). Check: the ring shows pictogram 4. Open the tab "Risers". Check: the supply lane still shows two heads that point up. The diagram follows the flow solve and not the ring that you set (decision D-B-144). Click the supply lane. Check: under line 1 a grey note reads `Some rings use arrows set by hand. The diagram shows the flow solve.` In the list of levels at the right of the card, the row "Level 1" has the tag `Arrows set by hand` (it can wrap to a second line).
+`[ ] pass   [ ] fail   note: `
+
+B3.7 Go back. Close the dialog. Right-click the ring on Level 1 and click "Use the flow solve". Check: the ring shows pictogram 1 again. Open the tab "Risers" and click the supply lane. Check: the grey note and the tag "Arrows set by hand" are gone.
+`[ ] pass   [ ] fail   note: `
+
+## Part B4: a flip of the flow direction, patterns, tooltip and lane label
+
+B4.1 A flip on the open level. Go to Level 1. Open the editor for Supply Air. Choose "Return" in "Flow direction" and click Save. Do not save a PDF. Open Manage Buildings, tab "Risers". Check: the supply lane now has two heads that point down (as the return lane). Click the supply lane: line 1 reads `Toward Level 0 · from the flow solve`. Close the dialog. Check: the supply rings show 5, 4 and 6 on Level 0, Level 1 and Level 2.
+`[ ] pass   [ ] fail   note: `
+
+B4.2 The same flip seen on another level. Go to Level 0. Open Manage Buildings, tab "Risers". Check: the supply lane shows the same two heads that point down and the same line 1. The diagram reads the copy of the type in the building (decision D-B-126 of part A). The save of the editor writes that copy for all levels. So the diagram has no gap between levels. Compare with part A step 5.5 (item N1, D-B-142). On Level 0 click "Solve flow" and select a supply segment. Its small arrowhead follows the old type until you open the editor on Level 0 and click Save. Write down if you want the segment arrowheads to follow the building copy too.
+`[ ] pass   [ ] fail   note: `
+
+B4.3 Flip back. Open the editor for Supply Air, choose "Supply" and click Save. Open the tab "Risers". Check: the supply lane shows two heads that point up again.
+`[ ] pass   [ ] fail   note: `
+
+B4.4 A dotted lane next to a solid lane. Open the editor for Supply Air. Set "Pattern" to "Dotted". Click Save. Open the editor for Return Air. Set "Pattern" to "Solid". Click Save. Open the tab "Risers". Check: the supply lane is a thin dotted line. The return lane is a plain line. All four heads are solid filled triangles, also on the dotted lane. You can read the direction of each head. A thin white edge cuts the dotted lane around each head. (Decision D-B-145.) Write down if a head is hard to see. Then set the patterns back: Supply Air "Solid", Return Air "Dashed".
+`[ ] pass   [ ] fail   note: `
+
+B4.5 The legend row. Look at the row "flow direction" of the legend. Check: its triangle is grey. It does not have the color of a lane. The text is in lower case, as in the other rows.
+`[ ] pass   [ ] fail   note: `
+
+B4.6 The tooltip of a head. Put the mouse pointer on a head of the supply lane and keep it still for about one second. Check: a tooltip shows `Flow goes up: Level 0 to Level 1` for the lower head and `Flow goes up: Level 1 to Level 2` for the upper head. For the return lane the tooltip shows `Flow goes down: Level 1 to Level 0` for the lower head and `Flow goes down: Level 2 to Level 1` for the upper head. The tooltip names the two levels in flow order: the level where the flow starts, then the level where it ends. Move the pointer to the lane line away from a head. Check: the tooltip shows only the name of the riser or nothing. (The agent could not see a real tooltip.)
+`[ ] pass   [ ] fail   note: `
+
+B4.7 The lane label. The text above a lane is the name of the riser only. A screen reader reads more. Open the developer tools (F12), tab "Elements", and select a lane with the pointer tool of the developer tools. The lane is an element `g` with `role="radio"`. Open the pane "Accessibility" and read "Name". Check: the supply lane has the name `<riser name>, Level 0 to Level 2, 3 levels, 6.00 m, flow away from Level 0`. The return lane ends with `, flow toward Level 0`. A lane that has no head (delete the supply unit and look again) has no text about flow. If you use Narrator (Windows key, Ctrl and Enter), press Tab until a lane has the focus and write down what Narrator says.
+`[ ] pass   [ ] fail   note: `
+
+## Part B5: Windows screens and the real browser
+
+B5.1 Display scaling. Set the display scaling of Windows to 125 % and then 150 % (Settings, System, Display, Scale). Reload the page. Open the tab "Risers". Check at each scale: the heads are clear. The white edge around a head is not blurred. No head touches a ring. The legend triangle shows. If you do not want to change the display scaling, use the browser zoom and write "browser zoom, not display scaling".
+`[ ] pass   [ ] fail   note: `
+
+B5.2 Zoom 200 %. Set the browser zoom to 200 % (Ctrl and +). Open the tab "Risers". Check: the dialog stays inside the window. The lane names and the heads are whole. You can reach the box "Flow direction" by scrolling the card. Set the zoom back to 100 %.
+`[ ] pass   [ ] fail   note: `
+
+B5.3 A 1366 x 768 screen. Make the browser window 1366 px wide and about 768 px high (a small laptop screen; on a big screen use the window edge or the developer tools). Open the tab "Risers" and click the supply lane. Write down: do you see the box "Flow direction" at once, or must you scroll the card? (The agent saw the box outside the visible area at this size. This is finding J2 in the table of Part B6.) Scroll the card with the mouse wheel or the touchpad and read the box. Check: you can read the whole box after the scroll.
+`[ ] pass   [ ] fail   note: `
+
+B5.4 "Set by hand" and the mouse wheel. At 1366 x 768 click the supply lane. Click "Set by hand" under the block "Capacity". Write down what the dialog shows now. Does the diagram stay in view, or does the card scroll so that the top of the diagram is cut? (The agent saw this. The top of the diagram was about 25 px above the card. The lane names and the top rings were cut. The box and the two lists were in view. This is finding J1.) Scroll up with the mouse wheel or the touchpad, with the pointer on the card. Check: the content moves back and the whole diagram shows again. Choose a "Source level". Turn the wheel as needed to see the heads. Click "Use the flow solve" when you finish.
+`[ ] pass   [ ] fail   note: `
+
+B5.5 A tall window. Make the window 1600 px wide and 900 px high. Do B5.4 again. Check: the whole diagram stays in view after "Set by hand". Write down what you see if it does not.
+`[ ] pass   [ ] fail   note: `
+
+B5.6 A window 760 px wide. Make the browser window 760 px wide. Open the tab "Risers". Check: the legend is under the diagram as a row of four items. The heads are whole. Click a lane: the box and the grey notes wrap to a second line and no text is cut. If you made more than six risers, the diagram scrolls sideways inside its own box and the heads scroll with the lanes.
+`[ ] pass   [ ] fail   note: `
+
+B5.7 A closed level with no stored summary. Save each open level (Menu, Save). Close the browser fully. Open the app again with your normal browser profile (not a private window). Open the building "Tower" (if the card "Allow access" shows, allow it). Open only Level 0. Open Manage Buildings, tab "Risers", and click the supply lane. Write down what you see: heads or no heads, and what line 1 says. If the block "Capacity" shows the link "Read summaries now", click it. Check: after the click the numbers and the heads show, or a notice says that a PDF must be opened first. Open Level 1 and Level 2 again. (The agent did not run this case. If no level lacks a saved summary, write "not testable".)
+`[ ] pass   [ ] fail   note: `
+
+B5.8 The real profile after a restart. Open Level 0, Level 1 and Level 2 again and save each one. Close the browser fully. Open the app, open the building "Tower" and open the tab "Risers". Check: the heads of B1.2 and B1.3 show (the closed levels use their saved summaries). Line 1 of both risers is the same as in B1.5 and B1.6.
+`[ ] pass   [ ] fail   note: `
+
+## Part B6: known limits and open questions
+
+The app does what the second column says. To change one, tell the director the id and your option. The questions and options come from the ledger (`.claude/roadmap/ledger-buildings.jsonl`). J1 and J2 are findings of the journey tester. They are not the journeys J1 to J5 of the UX spec. The findings are open. They are not decisions yet, so each row shows the real behavior and one question.
+
+| Id | What the app does now | Question and options | Where you look |
+|---|---|---|---|
+| D-B-143 (answers D-B-135 for part B; provisional, option A built) | The box "Flow direction" reads `Away from <main level>` (supply) or `Toward <main level>` (return), then `· from the flow solve` or `· Set by hand`. The words "Up", "Down" and "source:" are gone from the box. | The box read "Up · source: Level 0" and Up meant away from the main level. For a Return type the arrows point toward the main level, so the box and the arrows could look opposite. What should the box say now that the diagram shows arrows? A: A neutral phrase that fits the type: "Away from Level 0" (supply) or "Toward Level 0" (return), and the arrows in the diagram. The Direction select stays as it is. B: Keep the box text. Add only the arrows to the diagram. | Steps B1.5, B1.6, B2.1 to B2.6 and B3.1 |
+| D-B-144 (provisional, option A built) | The heads follow the flow solve, not the pictogram that you set by hand on a ring. A grey note in the box says so. | The arrows in the Risers tab diagram follow the flow solve, not the pictogram that you set by hand on a ring. A span has one direction, a ring pair has two ends. A grey note in the box says it when a ring has a hand-set pair. Is this right? A: Yes: the diagram shows the flow solve only. B: The diagram also shows a hand-set pair when one ring of the span has it (more rules, a span can then contradict itself). | Steps B3.6 and B3.7 |
+| D-B-145 (provisional, option A built) | The head is always a solid triangle, also on a dashed or dotted lane. The lane under it keeps its pattern. | The plan said "in the pattern of the lane". Is a solid head right? A: Yes: solid head, as the ring arrowhead on the canvas. B: Head with the pattern of the lane (a dotted triangle is hard to read at 12 px). The contrast of the blue head with its white edge is about 2.5 to 1, the same as the lane: look at it on your screen. | Steps B1.2, B1.3 and B4.4 |
+| D-B-146 (provisional, option A built) | The list "Direction" (Up, Down, Both) changes no head, no number and no text of line 1. A grey note says so. Only the Excel takeoff reads the value. | The list changes nothing on the screen. Keep it? A: Keep it for now. A later task decides (remove it, or let it set the arrows). B: Remove it from the Risers tab now (a change to a field of the building file that old files still hold). | Step B3.4 |
+| J1 (finding of the journey tester, medium, open) | After you click "Set by hand" the card scrolls to the two lists. At 1366 x 768 the top of the diagram moves out of view, so you cannot see all the heads while you pick the "Source level". At 1600 x 900 the diagram stays in view. The old pane did the same. | Accept it, or keep the diagram in view (for example a fixed diagram above a card that scrolls)? Tell the director "J1 accept" or "J1 change". | Steps B5.4 and B5.5 |
+| J2 (finding of the journey tester, medium, open) | On a small screen (1366 x 768) and in a window 760 px wide, the box "Flow direction" is outside the visible area: you scroll the card to read it. The box is under the block "Capacity". | Accept it, or put the box higher in the card? Tell the director "J2 accept" or "J2 change". | Steps B5.3 and B5.6 |
+
+Items with no step: arrows for the open end of a riser, a word for the direction of each span in the list "Capacity", a riser with the source on the level of another riser only, and a dark theme (the app has none). Three texts of line 1 have no step because a short test on one PC cannot make them with the real screens: `No arrows. This riser has one level.`, `No arrows yet: the risers make a loop.` and `No arrows yet: two main levels set by hand.` A unit test of the app checks the first one.
+
+## Part B7: what to tell me
+
+Send what Part 7 asks for, with the step numbers of part B (for example "B2.4 fail"). Also tell me:
+- your answers to the questions of the table in Part B6 (an id and an option, for example "D-B-145 A" or "J2 change"),
+- the display scale or the browser zoom that you used in B5.1,
+- the size of your screen for B5.3,
+- when you are done, so that I can tell the director.
+
+## What the agent ran headless for part B (2026-11-27)
+
+The agent ran a headless Chromium with real clicks, real typing and real right-clicks, as for part A. It made the three levels and the building file with the scene API and a dev hook. So every "place a unit" and "connect" action of Parts B2 and B3 was set by the API. It read the heads, the texts, the tags and the notes from the DOM, and the ring pictograms from the scene (`getRiserMarks`). The check files are `.claude/roadmap/work/b8-t09-check.mjs` (52 passed), `b8-t10-check.mjs` (65 passed) and `b8-t10-check-b.mjs` (23 passed). The screenshots are in `.claude/roadmap/work/shots-b8/` (names `B8-T09-*`).
+
+- Compared by a check (a pass or a fail): B1.1 (the four rows of the legend), B1.2, B1.3, B1.4 (the ring pictograms 2, 1, 3 and 5, 4, 6 next to the heads), B1.5 (a real click on a head), B1.6, B1.7 (the arrow key), B2.1 to B2.6 (with the Elevation field typed in the real Levels tab), B3.1 to B3.5, B3.6 and B3.7 (the real ring menu), B4.1 to B4.3 (the real editor), B4.4 (the real editor; the dash of the lane and of the heads), B4.6 (the text of the tooltip, read from the SVG title), B4.7 (the name of the lane, read from the DOM and found by its role), B5.4 (a mouse wheel event in the headless browser), B5.6 (the legend under the diagram at 760 px).
+- Printed and read by the agent, not compared: B3.1 (the hint under "Set by hand"), B4.5 (the color of the legend triangle, read in a screenshot), B5.3 and B5.4 (the position of the diagram and of the box at 1366 x 768 and at 1600 x 900: the numbers are in the text of J1 and J2), the screenshots.
+- Run with another set-up than the script: B2.1 to B2.5 and B3.1 to B3.5 (units set by the API, not placed with the mouse), B3.6 (the check used pictogram 4 as the script does), B4.1 (the level was changed with the switcher and the editor was real).
+- Not run by the agent, so only you can test them: B0.1, B0.2 (the real placing of units and the editor values), a real tooltip (B4.6), the Accessibility pane of the developer tools and Narrator (B4.7), display scaling (B5.1), the zoom 200 % (B5.2), a real 1366 x 768 screen and a real mouse wheel (B5.3 to B5.5), a closed level with no stored summary (B5.7), a real browser profile and a restart (B5.7 and B5.8), Tauri. The app has no dark theme, so there is no step for it.
